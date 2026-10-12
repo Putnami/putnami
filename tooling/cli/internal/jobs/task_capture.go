@@ -53,15 +53,22 @@
 // must outlive its neighbor's execution has to be ceded by the owner, as the
 // TypeScript build-generate cedes the config-extract schema fallback.
 //
-// Only a required directory output with a literal path is emptied
-// (emptiedOutputDeclarations). An optionalEmpty output is not: a run that
-// writes nothing there is recorded empty, and a restore of that record leaves
-// the path as it stands, so the execution must leave it too. A file is not
-// emptied because the task replaces it whole; an invocation-scoped output
-// because it lives in a private tree created for the run; a pathFrom output
-// because its path is known only after the task ran. A file a generator stops
-// emitting therefore stays in an output of those shapes until the generator
-// removes it.
+// A directory output with a literal path is emptied when it is required or
+// when it lives under the command-output root (emptiedOutputDeclarations,
+// ADR 0065). The engine owns the command-output directory and the plan gives
+// each output one owner, so an optionalEmpty output there holds only what its
+// task wrote. A restore of an entry that records such an output empty empties
+// it the same way (materializeDeclaredOutputs), so an execution and a restore
+// that write nothing leave the same directory.
+//
+// An optionalEmpty output under the project or the workspace root is not
+// emptied: it can hold a committed file no task writes, a run that writes
+// nothing there is recorded empty, and a restore of that record leaves the
+// path as it stands. A file is not emptied because the task replaces it whole;
+// an invocation-scoped output because it lives in a private tree created for
+// the run; a pathFrom output because its path is known only after the task
+// ran. A file a generator stops emitting therefore stays in an output of those
+// shapes until the generator removes it.
 //
 // # Which tasks take this path
 //
@@ -195,15 +202,22 @@ type emptiedOutputDeclaration struct {
 }
 
 // emptiedOutputDeclarations returns, in id order, the declared outputs of job
-// that the scheduler empties before the job executes: every required durable
-// directory output whose path the declaration states.
+// that the scheduler empties before the job executes: every durable directory
+// output whose path the declaration states, when it is required or lives under
+// the command-output root.
 //
-// An optionalEmpty output is left out. A run may write nothing there, and its
-// entry then records the output empty, which a restore leaves as it stands
-// (store.TaskOutputEmpty). Emptying it would make an execution remove what a
-// restore keeps, such as a committed file the task reads when it writes
-// nothing. A required output is recorded present in every entry, so a restore
-// prunes exactly what the emptying removes.
+// A required output is recorded present in every entry, so a restore prunes
+// exactly what the emptying removes. An optionalEmpty output under the
+// command-output root is emptied too. The engine owns that directory, nothing
+// there is committed, and the plan gives each output one owner
+// (validatePlanContract), so the emptying removes only what this task wrote
+// on an earlier run. An entry can record it empty, and a restore of that
+// record empties it the same way (materializeDeclaredOutputs).
+//
+// An optionalEmpty output under the project or the workspace root is left out.
+// It can hold a file no task writes, such as a committed configuration the
+// task reads when it writes nothing there, and a restore of an entry that
+// records it empty leaves it as it stands (store.TaskOutputEmpty).
 //
 // A pathFrom output is left out because its path is known only after the run,
 // and an invocation-scoped one because it lives in a tree created for the run.
@@ -213,8 +227,8 @@ type emptiedOutputDeclaration struct {
 // root, the workspace root and a command-output directory are never emptied.
 //
 // It reads the plan node's declaration alone, because the cache key names the
-// same set (emptiedOutputIDs): what an entry may hold and the address it is
-// stored at are decided by one predicate.
+// same set (emptiedOutputIDs): what an execution empties, what a restore
+// empties, and the address an entry is stored at are decided by one predicate.
 func emptiedOutputDeclarations(job *ScheduledJob) []emptiedOutputDeclaration {
 	declaration := taskDeclarationOf(job)
 	if declaration == nil {
@@ -229,12 +243,15 @@ func emptiedOutputDeclarations(job *ScheduledJob) []emptiedOutputDeclaration {
 	var emptied []emptiedOutputDeclaration
 	for _, id := range ids {
 		output := declaration.Outputs[id]
-		if output.Kind != extension.OutputKindDirectory || output.OptionalEmpty ||
-			output.PathFrom != "" || output.IsInvocationScoped() {
+		if output.Kind != extension.OutputKindDirectory || output.PathFrom != "" || output.IsInvocationScoped() {
 			continue
 		}
 		switch output.EffectiveRoot() {
-		case extension.OutputRootProject, extension.OutputRootWorkspace, extension.OutputRootCommandOutput:
+		case extension.OutputRootCommandOutput:
+		case extension.OutputRootProject, extension.OutputRootWorkspace:
+			if output.OptionalEmpty {
+				continue
+			}
 		default:
 			continue
 		}
@@ -299,33 +316,56 @@ func versionStampWithin(root, rel string) (string, bool) {
 // caller fails the task instead of executing it: a capture of that directory
 // would publish those files under this run's key.
 func (s *Scheduler) emptyOwnedOutputs(job *ScheduledJob) error {
-	emptied := emptiedOutputDeclarations(job)
-	if len(emptied) == 0 {
-		return nil
+	for _, declared := range emptiedOutputDeclarations(job) {
+		if err := s.emptyDeclaredOutput(job, declared); err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+// emptyDeclaredOutput empties what job owns in one output of
+// emptiedOutputDeclarations, and keeps what emptyOwnedOutputs keeps. An
+// execution calls it, and so does a restore that empties an output, so the
+// two remove the same entries. The caller holds the locks and has detached the
+// command-output directory, as emptyOwnedOutputs states.
+func (s *Scheduler) emptyDeclaredOutput(job *ScheduledJob, declared emptiedOutputDeclaration) error {
 	roots := s.outputRoots()
 	if roots.root == "" {
 		// Without a workspace root an output path would resolve against the
 		// working directory, which is nobody's declared output.
 		return fmt.Errorf("no workspace root to resolve declared outputs against")
 	}
-	stagingRoot := store.ResolveScratchRoot(roots.root)
-	for _, declared := range emptied {
-		root := declared.output.EffectiveRoot()
-		base, ok := roots.outputRoot(job, root)
-		if !ok {
-			return fmt.Errorf("declared output %q has unknown root %q", declared.id, root)
-		}
-		keep := outputSkippedSubpaths(declared.rel, declared.output)
-		if stamp, held := versionStampWithin(root, declared.rel); held {
-			keep = append(append([]string(nil), keep...), stamp)
-		}
-		dest := filepath.Join(base, filepath.FromSlash(declared.rel))
-		if err := emptyTaskOutput(dest, stagingRoot, keep...); err != nil {
-			return fmt.Errorf("declared output %q: %w", declared.id, err)
-		}
+	root := declared.output.EffectiveRoot()
+	base, ok := roots.outputRoot(job, root)
+	if !ok {
+		return fmt.Errorf("declared output %q has unknown root %q", declared.id, root)
+	}
+	keep := outputSkippedSubpaths(declared.rel, declared.output)
+	if stamp, held := versionStampWithin(root, declared.rel); held {
+		keep = append(append([]string(nil), keep...), stamp)
+	}
+	dest := filepath.Join(base, filepath.FromSlash(declared.rel))
+	if err := emptyTaskOutput(dest, store.ResolveScratchRoot(roots.root), keep...); err != nil {
+		return fmt.Errorf("declared output %q: %w", declared.id, err)
 	}
 	return nil
+}
+
+// emptiedByRestore returns, by id, the outputs a restore of entry empties:
+// each output of emptiedOutputDeclarations that entry records empty. A
+// required output is never recorded empty, so in practice this is an
+// optionalEmpty output under the command-output root. A restore of such an
+// entry leaves the directory the execution that produced the entry left: the
+// kept subpaths and nothing else.
+func emptiedByRestore(job *ScheduledJob, entry *store.TaskEntry) map[string]emptiedOutputDeclaration {
+	emptied := map[string]emptiedOutputDeclaration{}
+	for _, declared := range emptiedOutputDeclarations(job) {
+		if recorded, ok := entry.Output(declared.id); ok && !recorded.Present() {
+			emptied[declared.id] = declared
+		}
+	}
+	return emptied
 }
 
 // emptyTaskOutput is store.EmptyTaskOutput. It is a variable only so a test can
@@ -683,8 +723,9 @@ func (s *Scheduler) storeDeclaredCapture(job *ScheduledJob, result *JobResult, h
 // `publish` step reading the contract path both run concurrently with a `test`
 // generate served from cache, and the bundle was gone in between — a
 // remote-cache recurrence of the same race. What the owning task's restore then does is
-// unchanged — a PRESENT output swaps the current sources' bytes in, an
-// optionalEmpty absence leaves the path alone.
+// unchanged — a PRESENT output swaps the current sources' bytes in, and an
+// optionalEmpty absence leaves a project or workspace path alone and empties a
+// command-output one (materializeDeclaredOutputs).
 func stageDeclaredOutput(plan declaredOutputPlan, dst string) error {
 	src := plan.src
 	info, err := os.Lstat(src)
@@ -865,6 +906,14 @@ func (s *Scheduler) restoreDeclaredCacheHit(
 // manifest: cache key v5 folds the task-contract digest, so a declaration change
 // moves the key and an entry can only ever be served to the contract it was
 // written for.
+//
+// An output the entry records empty is left as it stands, unless the scheduler
+// empties it before an execution (emptiedByRestore). Such an output is emptied
+// here through emptyDeclaredOutput, with the keep set an execution uses, so
+// the restore leaves the tree the producing execution left. The store never
+// decides that: MaterializeTaskOutput leaves the destination of an empty
+// record untouched, and only the engine knows the declaration. A failure to
+// empty is a restore failure like any other, so the caller executes the task.
 func (s *Scheduler) materializeDeclaredOutputs(job *ScheduledJob, entry *store.TaskEntry) error {
 	roots := s.outputRoots()
 	// A restore stages under the workspace scratch root that declared capture
@@ -874,13 +923,17 @@ func (s *Scheduler) materializeDeclaredOutputs(job *ScheduledJob, entry *store.T
 	if s.ws != nil {
 		stagingRoot = store.ResolveScratchRoot(s.ws.Root)
 	}
+	emptied := emptiedByRestore(job, entry)
 	needsCommandOutput := false
 	for _, output := range entry.Outputs {
-		if output.Root == extension.OutputRootCommandOutput && output.Present() {
+		_, empties := emptied[output.ID]
+		if output.Root == extension.OutputRootCommandOutput && (output.Present() || empties) {
 			needsCommandOutput = true
 			break
 		}
 	}
+	// The detach comes before every write the restore makes, an emptying
+	// included, so no rename reaches through a link into a store blob.
 	if needsCommandOutput {
 		if err := s.ensureCommandOutputWritable(job); err != nil {
 			return err
@@ -888,6 +941,12 @@ func (s *Scheduler) materializeDeclaredOutputs(job *ScheduledJob, entry *store.T
 	}
 
 	for _, output := range entry.Outputs {
+		if declared, empties := emptied[output.ID]; empties {
+			if err := s.emptyDeclaredOutput(job, declared); err != nil {
+				return err
+			}
+			continue
+		}
 		base, ok := roots.outputRoot(job, output.Root)
 		if !ok {
 			return fmt.Errorf("recorded output %q has unknown root %q", output.ID, output.Root)

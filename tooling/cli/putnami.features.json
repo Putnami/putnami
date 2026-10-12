@@ -895,11 +895,14 @@
             "checks": [
               "a-leftover-is-removed-and-never-stored",
               "ceded-and-preserved-paths-and-the-stamp-stay-untouched",
-              "a-hit-and-an-adopted-result-empty-nothing",
+              "a-hit-of-a-present-output-and-an-adopted-result-empty-nothing",
               "a-failure-to-empty-fails-the-task-before-it-runs",
               "a-retry-starts-from-an-empty-directory",
               "a-path-from-output-is-left-as-it-stands",
-              "an-optional-output-is-left-as-it-stands",
+              "an-optional-project-or-workspace-output-is-left-as-it-stands",
+              "an-optional-command-output-directory-is-emptied",
+              "a-restore-of-an-empty-command-output-record-empties-it",
+              "a-failure-to-empty-on-restore-executes-the-task",
               "an-entry-stored-without-emptying-is-never-served"
             ]
           }

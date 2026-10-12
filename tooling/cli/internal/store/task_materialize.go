@@ -86,11 +86,11 @@ var errKeptConflict = errors.New("the restored entry holds bytes at a ceded path
 // reports whether any bytes were written.
 //
 // An output recorded TaskOutputEmpty returns (false, nil) WITHOUT touching dest.
-// That is the binding invariant of the explicit empty state: command-output
-// paths are shared between the steps of one command, so treating "this entry has
-// nothing for this output" as "this path should be empty" would delete a sibling
-// task's artifacts. An empty output is a statement about the task that produced
-// it, not about the destination.
+// That is the binding invariant of the explicit empty state: an empty output is
+// a statement about the task that produced it, not about the destination, and
+// the store cannot tell what else dest holds. The engine reads the declaration
+// and empties dest itself, with EmptyTaskOutput, when an execution of the task
+// would have emptied it.
 //
 // The store's SHARED lock is held for the whole materialize, so a concurrent GC
 // (which needs the exclusive lock) cannot reclaim the blob mid-copy — the same
@@ -472,9 +472,11 @@ var renameStale = os.Rename
 
 // EmptyTaskOutput removes everything a task owns under dest, a declared
 // directory output, so that the execution about to write it starts from an
-// empty directory. It is the pruning half of a restore (mergeIn) with nothing
-// staged to put back: after it, dest holds what a restore of an entry with no
-// file for this output would leave there.
+// empty directory. The engine also calls it to restore an entry that records
+// such an output empty, so the restore leaves what that execution left. It is
+// the pruning half of a restore (mergeIn) with nothing staged to put back:
+// after it, dest holds what a restore of an entry with no file for this output
+// would leave there.
 //
 // keep lists, output-relative and in slash form, the subpaths the task does not
 // own, as MaterializeTaskOutput takes them. Whatever dest holds at each of them

@@ -234,10 +234,13 @@ func (s *Scheduler) snapshotRestoredDrift(job *ScheduledJob, entry *store.TaskEn
 // An output the entry recorded EMPTY is judged too, against an EMPTY tree: the
 // producing run wrote nothing at that path, so committed bytes found there are
 // stale whatever the restore did with them. The restore itself leaves the
-// destination alone (MaterializeTaskOutput's binding invariant for a recorded
-// empty output), so on this path the remedy is to delete, not to commit — and
-// the message says so. Without this arm a warm hit passed a stale committed
-// client that the same generator, executed cold, removes and fails on.
+// destination of a policed output alone (MaterializeTaskOutput's binding
+// invariant for a recorded empty output): it empties a recorded-empty output
+// only under the command-output root (materializeDeclaredOutputs), where
+// validation refuses a drift policy. So on this path the remedy is to delete,
+// not to commit — and the message says so. Without this arm a warm hit passed
+// a stale committed client that the same generator, executed cold, removes and
+// fails on.
 func (s *Scheduler) judgeRestoredDrift(job *ScheduledJob, entry *store.TaskEntry, result *JobResult, reference *driftReference) *JobResult {
 	if reference == nil || result == nil || entry == nil {
 		return result

@@ -82,7 +82,7 @@ v9                          ← format version (for compatibility)
 + runtime identity          ← declared runtime inputs such as hostPlatform or releaseBaseline, absent when none
 + OS class                  ← "windows" on Windows, absent elsewhere
 + source state              ← "unmanaged" where Git does not manage the workspace root, absent inside a repository
-+ emptied outputs           ← ids of the required directory outputs emptied before the task executes, absent when none
++ emptied outputs           ← ids of the directory outputs emptied before the task executes (required, or optional under the command-output directory), absent when none
 + task name                 ← e.g., "build~transpile"
 + task contract digest      ← the task's declaration in the manifest
 + project name              ← e.g., "my-app"
@@ -637,8 +637,9 @@ validated against what was staged. The staging root is the *store's* boundary,
 not the process's: it is what makes an entry independent of sibling steps. It
 does **not** police writes outside the declaration, which would need
 process-level isolation this workspace cannot take yet. What an earlier run left
-inside a required directory output never reaches the entry either, because the
-task starts from an empty owned directory (see below).
+inside a required directory output, or an optional one under the command-output
+directory, never reaches the entry either, because the task starts from an
+empty owned directory (see below).
 
 A directory output may **cede** subpaths (`excludes`): staging skips them, so
 the entry holds no bytes under a path the declaration says belongs to another
@@ -668,9 +669,9 @@ still runs after the ceding one, because its restore or execution is what
 makes the ceded path match the current sources.
 
 **An executing task starts from an empty owned directory.** Before a task
-executes, the scheduler empties each required directory output whose path the
-declaration states. It removes every entry the task owns there and leaves
-three things in place:
+executes, the scheduler empties each directory output whose path the
+declaration states and that is required or under the command-output directory.
+It removes every entry the task owns there and leaves three things in place:
 
 - each subpath the declaration cedes (`excludes`) or preserves (`preserves`),
   exactly as a restore leaves it;
@@ -681,14 +682,25 @@ three things in place:
 
 An execution and a restore therefore leave the same paths untouched, and the
 entry a run stores holds only what that run wrote. A file the generator stops
-emitting, such as the prerendered HTML of a deleted page, is gone after the
-next execution, and no later restore brings it back.
+emitting, such as the prerendered HTML of a deleted page or the binary of a
+dropped target, is gone after the next execution, and no later restore brings
+it back.
+
+A restore of an entry that records such an output empty empties it the same
+way, with the same three things left in place. Of the outputs the scheduler
+empties, only an optional command-output directory can be recorded empty, such
+as the `bin` of a run that builds nothing. The restore then leaves the tree the producing execution left, not a
+binary an earlier run wrote beside a green status. The command-output directory
+is detached from an earlier session's link before the emptying. When the
+restore cannot empty the output, the hit is not served: the run falls back as
+after any failed restore, and the task executes when no restore succeeds.
 
 The emptying runs after the drift reference is taken and before the stamp
 refresh, the `preBuild` hook and the subprocess. Each retry empties again. A
-cache hit, a follower that adopts its leader's result and a coalesced waiter
-(a session that waits on another session's cache lease for the same key, then
-restores its entry) execute nothing, so they empty nothing. Each owned entry
+follower that adopts its leader's result executes nothing and empties nothing.
+A cache hit and a coalesced waiter (a session that waits on another session's
+cache lease for the same key, then restores its entry) execute nothing either,
+and empty only an output their entry records empty. Each owned entry
 leaves the output in one rename into a private directory, so a reader finds an
 entry whole or gone. That directory is under the workspace scratch root, beside
 the output when a rename cannot reach the scratch root, or inside the output
@@ -711,31 +723,38 @@ Four outputs are not emptied:
 
 | Output | Why |
 | --- | --- |
-| An `optionalEmpty` directory | A run that writes nothing there records it empty, and a restore of that record leaves the path as it stands |
+| An `optionalEmpty` project or workspace directory | The path can hold a file no task writes, which a run that writes nothing there reads |
 | A file | The task replaces it whole |
 | An invocation-scoped output | It lives in a private tree created for the run |
 | A `pathFrom` output | Its path is known only after the task ran |
 
-Only a required output is emptied because only a required output is recorded
-present in every entry: ingest rejects a required output that is empty. A
-restore of a present output removes every owned entry the entry does not hold,
-which is what the emptying removes. An optional output can be recorded empty,
-and emptying it would make an execution remove what a restore keeps, such as a
-committed file the task reads when it writes nothing there.
+A required output is recorded present in every entry: ingest rejects a
+required output that is empty. A restore of a present output removes every
+owned entry the entry does not hold, which is what the emptying removes. An
+optional output can be recorded empty. Under the command-output directory, the
+restore of that record empties the output too, so an execution and a restore
+still leave the same tree. The engine creates that directory for the command,
+and each output in it has one owner. Under the project or workspace root, an
+optional output can hold a committed file the task reads when it writes
+nothing there, such as `.gen/clientgen/config.json`, so neither an execution
+nor a restore empties it.
 
-A file that a task stops writing therefore stays in an `optionalEmpty` or
-`pathFrom` directory, and in the entries captured from it, until the task
-removes it.
+A file that a task stops writing therefore stays in an optional project or
+workspace directory, or in a `pathFrom` directory, and in the entries captured
+from it, until the task removes it.
 
 The key of a task with an emptied output carries an `emptiedOutputs` marker
 that names those outputs. An entry stored by a CLI that emptied nothing can hold
 an earlier run's files under the key of the current sources. The marker keeps
 that entry at an address this CLI never asks for, so each such task misses once
 after the upgrade, and so does each task that depends on one. A task with no
-emptied output, including one whose directory outputs are all optional, keeps
-its address. The selection fingerprint carries the marker too, so the next
-publication republishes each release-set member whose key moved. See
-[ADR 0064](adr/0064-an-executing-task-starts-from-an-empty-owned-directory.md).
+emptied output, including one whose directory outputs are all optional project
+or workspace outputs, keeps its address. The selection fingerprint carries the
+marker too, so the next publication republishes each release-set member whose
+key moved. See
+[ADR 0064](adr/0064-an-executing-task-starts-from-an-empty-owned-directory.md)
+and
+[ADR 0065](adr/0065-an-optional-command-output-directory-is-emptied-on-execution-and-on-an-empty-restore.md).
 
 **`--no-cache` never replaces a stored entry.** A bypassed run neither reads
 nor publishes at its key (see
@@ -1994,4 +2013,4 @@ putnami cache clean
 | Version bump | Different effective project version | Expected behavior |
 | Extension changed | Different implementation digest, or a different version for an extension without one | Expected behavior |
 | New task format | Format version changed (now `v9`) | Clean cache after CLI upgrade |
-| Required directory output emptied before execution | The key carries the `emptiedOutputs` marker | Expected once after the CLI upgrade that added it |
+| Directory output emptied before execution | The key carries the `emptiedOutputs` marker, or the marker names one more output | Expected once after each CLI upgrade that adds an output to it |

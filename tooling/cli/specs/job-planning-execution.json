@@ -115,7 +115,7 @@
     },
     {
       "id": "executed-directory-output-starts-empty",
-      "text": "Before a task executes, the engine empties each required directory output declared by a literal path, except ceded and preserved subpaths and the build stamp, so execution and restore leave the same paths. A hit or adopted result empties nothing; a retry empties again; a failure to empty fails the task. OptionalEmpty, file, invocation-scoped and pathFrom outputs are not emptied. A key marker keeps entries stored without emptying from being served."
+      "text": "Before a task executes, the engine empties each literal-path directory output that is required or under the command-output root, keeping ceded and preserved subpaths and the build stamp. A hit whose entry records such an output empty empties it too, or executes the task when it cannot. Other hits and adopted results empty nothing; a retry empties again; a failure to empty fails the task. Other outputs are not emptied. A key marker keeps entries stored without emptying from being served."
     },
     {
       "id": "session-written-input-keys",
@@ -137,6 +137,7 @@
     "tooling/cli/doc/adr/0059-a-cache-key-describes-the-tree-not-the-commit.md",
     "tooling/cli/doc/adr/0061-channel-and-ci-commands-leave-the-core-cli.md",
     "tooling/cli/doc/adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md",
-    "tooling/cli/doc/adr/0064-an-executing-task-starts-from-an-empty-owned-directory.md"
+    "tooling/cli/doc/adr/0064-an-executing-task-starts-from-an-empty-owned-directory.md",
+    "tooling/cli/doc/adr/0065-an-optional-command-output-directory-is-emptied-on-execution-and-on-an-empty-restore.md"
   ]
 }

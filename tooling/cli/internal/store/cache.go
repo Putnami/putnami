@@ -345,13 +345,13 @@ type CacheKey struct {
 	SourceState string
 
 	// EmptiedOutputs lists the ids of the declared directory outputs the engine
-	// empties before the task executes (ADR 0064). An entry captured from an
-	// emptied directory holds only what its own run wrote; one captured from a
-	// directory left as it stood can hold an earlier run's files. The second
-	// kind must never serve a run that expects the first, so a task with such
-	// an output keys apart from an engine that emptied nothing. The hash omits
-	// the field when it is empty, so a task with no such output keeps its
-	// address.
+	// empties before the task executes (ADR 0064, ADR 0065). An entry captured
+	// from an emptied directory holds only what its own run wrote; one
+	// captured from a directory left as it stood can hold an earlier run's
+	// files. The second kind must never serve a run that expects the first, so
+	// a task with such an output keys apart from an engine that emptied
+	// nothing. The hash omits the field when it is empty, so a task with no
+	// such output keeps its address.
 	EmptiedOutputs []string
 
 	// Task is the task name (e.g., "build~transpile").

@@ -25,8 +25,10 @@ import (
 //     lookup time, so it would restore less than the declaration promises for
 //     every future hit, on every machine that pulls it.
 //   - EMPTINESS IS STATED. An optionalEmpty output that produced nothing is
-//     recorded with State TaskOutputEmpty, so restore knows to leave its
-//     destination alone instead of inferring anything from an absent payload.
+//     recorded with State TaskOutputEmpty, so a restore reads that the task
+//     produced nothing instead of inferring it from an absent payload.
+//     MaterializeTaskOutput then leaves the destination alone, and the engine
+//     empties it when its declaration says an execution would.
 //
 // The staging root is laid out by symbolic root, so the ingest finds each
 // declared output at a location derived from the declaration alone and B4b can
