@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"io"
+	"math"
 	"mime"
 	"reflect"
 	"strconv"
@@ -167,8 +168,14 @@ func readDeclaredBinaryBody(ctx *phttp.Context, declared BinaryMeta) ([]byte, *p
 			return nil, phttp.ErrorResponse(perrors.New(perrors.CodePayloadTooLarge, "Request body exceeds the declared bound"))
 		}
 	}
-	limited := io.LimitReader(ctx.Request.Body, declared.MaxBytes+1)
-	data, err := io.ReadAll(limited)
+	// Read one byte past the bound to detect overflow. A bound of math.MaxInt64
+	// has no byte past it: adding one would wrap to a negative limit, which
+	// reads nothing.
+	readLimit := declared.MaxBytes
+	if readLimit < math.MaxInt64 {
+		readLimit++
+	}
+	data, err := io.ReadAll(io.LimitReader(ctx.Request.Body, readLimit))
 	if err != nil {
 		return nil, phttp.ErrorResponse(perrors.BadRequest("Invalid request body"))
 	}
