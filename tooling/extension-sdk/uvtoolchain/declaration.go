@@ -1,6 +1,21 @@
 package uvtoolchain
 
-import "strings"
+import (
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+)
+
+// Pyproject is the workspace root manifest whose [tool.uv] table declares the
+// uv release, as required-version.
+const Pyproject = "pyproject.toml"
+
+// declarationName names the declaration in a message.
+const declarationName = Pyproject + " [tool.uv] required-version"
 
 // Declaration is what a pyproject.toml says about the uv release a workspace
 // runs.
@@ -19,6 +34,43 @@ type Declaration struct {
 	// those forms, and a [tool.uv] header added to such a document defines the
 	// table twice, which TOML forbids.
 	Outside string
+}
+
+// ReadWorkspaceDeclaration reads the declaration of the Pyproject at the root
+// of workspaceRoot. A workspace without one declares nothing.
+func ReadWorkspaceDeclaration(workspaceRoot string) (Declaration, error) {
+	data, err := os.ReadFile(filepath.Join(workspaceRoot, Pyproject))
+	if errors.Is(err, fs.ErrNotExist) {
+		return Declaration{}, nil
+	}
+	if err != nil {
+		return Declaration{}, fmt.Errorf("read %s: %w", Pyproject, err)
+	}
+	return ReadDeclaration(string(data)), nil
+}
+
+// Problem returns why the declaration names no release Putnami can pin and
+// run, and nil when it names one or declares nothing. Its message names the
+// declaration to write; the caller adds the command to run next.
+func (d Declaration) Problem() error {
+	if !d.Present {
+		return nil
+	}
+	if d.Version == "" {
+		written := "empty or not a one-line string"
+		if d.Spec != "" {
+			written = strconv.Quote(d.Spec)
+		}
+		return fmt.Errorf("%s is %s, which names no single uv release: "+
+			"declare one exact release, such as required-version = \"==%s\", so Putnami can pin it",
+			declarationName, written, DefaultVersion)
+	}
+	if err := Supported(d.Version); err != nil {
+		return fmt.Errorf("%s declares a release Putnami cannot run: %w: "+
+			"declare required-version = \"==%s\" or a later release",
+			declarationName, err, MinimumVersion)
+	}
+	return nil
 }
 
 // ReadDeclaration reads the uv release a pyproject.toml declares: the

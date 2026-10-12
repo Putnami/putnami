@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,27 +19,13 @@ const WorkspaceLockFile = "putnami.lock.json"
 
 // RootPyproject is the workspace root manifest whose [tool.uv] table declares
 // the uv release, as required-version.
-const RootPyproject = "pyproject.toml"
+const RootPyproject = uvtoolchain.Pyproject
 
 // DefaultUVVersion is the uv release the extension installs for a workspace
-// that pins and declares none. workspace-install then declares it as the
-// required-version of the root pyproject.toml, and the lock pins it.
-const DefaultUVVersion = "0.11.32"
-
-// defaultUVIntegrities are the SHA-256 digests of the DefaultUVVersion
-// archives, per "<goos>/<goarch>", as the release publishes them in its
-// sha256.sum. They ship in the extension so that installing the default
-// release reads no release metadata from the network. While the repository's
-// own putnami.lock.json pins the same release, it pins the same digests:
-// TestDefaultUVReleaseMatchesTheRepositoryLock compares them.
-var defaultUVIntegrities = map[string]string{
-	"darwin/amd64":  "77f5ca26c0de20e992a3677a174fe1121ee25c36f9b1434a863f75bf077a05eb",
-	"darwin/arm64":  "ed336d0ba49db8ef89b2b41fffa372ce63bd032f22a56f001c265891aec32829",
-	"linux/amd64":   "1fd052f196108d87e61fc3d98fe06b4ec758c9a1eb1466a6fd1a436fe45885f2",
-	"linux/arm64":   "d70cdae687feb6aad9a09fe8d686df8c8efaf69a1007fa581379a2025adc10a5",
-	"windows/amd64": "acfde570451cfdb8689fa159a138ee805ba4e241c466432750302c86254b0984",
-	"windows/arm64": "a7427ea0440bb826b6716d1837ff3d173b8e7d496cb09ee8f456b4e023a2fdcd",
-}
+// that pins and declares none (uvtoolchain.DefaultVersion). workspace-install
+// then declares it as the required-version of the root pyproject.toml, and the
+// lock pins it.
+const DefaultUVVersion = uvtoolchain.DefaultVersion
 
 // UVRelease is one uv release and what verifies its archives.
 type UVRelease struct {
@@ -56,11 +41,12 @@ type UVRelease struct {
 
 // DefaultUVRelease is the release the extension installs when the workspace
 // pins and declares none: DefaultUVVersion, from the uv release downloads,
-// with the digests the extension ships.
+// with the digests it ships (uvtoolchain.DefaultIntegrities), so installing it
+// reads no release metadata from the network.
 func DefaultUVRelease() UVRelease {
 	return UVRelease{
 		Version:     DefaultUVVersion,
-		Integrities: maps.Clone(defaultUVIntegrities),
+		Integrities: uvtoolchain.DefaultIntegrities(),
 		Source:      uvtoolchain.ReleaseURL(DefaultUVVersion),
 	}
 }
@@ -155,18 +141,4 @@ func lockedUVRelease(workspaceRoot string) (UVRelease, bool, error) {
 		return UVRelease{}, false, nil
 	}
 	return release, true, nil
-}
-
-// readUVDeclaration reads what the workspace root pyproject.toml declares
-// about the uv release, with the rule the CLI pins the lock with
-// (uvtoolchain.ReadDeclaration). A missing manifest declares nothing.
-func readUVDeclaration(workspaceRoot string) (uvtoolchain.Declaration, error) {
-	data, err := os.ReadFile(filepath.Join(workspaceRoot, RootPyproject))
-	if errors.Is(err, fs.ErrNotExist) {
-		return uvtoolchain.Declaration{}, nil
-	}
-	if err != nil {
-		return uvtoolchain.Declaration{}, fmt.Errorf("read %s: %w", RootPyproject, err)
-	}
-	return uvtoolchain.ReadDeclaration(string(data)), nil
 }

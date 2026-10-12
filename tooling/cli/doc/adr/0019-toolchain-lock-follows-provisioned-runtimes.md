@@ -18,9 +18,11 @@ Node-compatible output uses Bun's compiler and needs no Node toolchain.
 1. **Only Go, Bun and uv are pinned.** The lock writer derives them from
    `go.work`, `package.json#packageManager` and the exact `required-version`
    of the `[tool.uv]` table in the root `pyproject.toml`; a uv range declares
-   nothing. `package.json#engines.node` is not a Putnami toolchain
-   declaration. The workspace protocol still reads Node entries in v3/v4
-   locks; the next refresh drops them. The TypeScript
+   nothing. A `pyproject.toml` also serves tools other than uv, so it declares
+   uv only while a declared extension's runtime resolves the `uv` lock
+   identity, as `@putnami/python` does. `package.json#engines.node` is not a
+   Putnami toolchain declaration. The workspace protocol still reads Node
+   entries in v3/v4 locks; the next refresh drops them. The TypeScript
    extension's `--target node` stays supported: it is a compilation target, not
    a provisioned runtime.
 2. **A refresh replaces the toolchain map, but keeps the pins declared

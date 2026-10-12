@@ -1554,7 +1554,8 @@
             "kind": "acceptance",
             "checks": [
               "only-go-and-bun-declarations-are-locked",
-              "only-an-exact-tool-uv-required-version-is-locked"
+              "only-an-exact-tool-uv-required-version-is-locked",
+              "a-uv-declaration-pins-nothing-without-an-extension-that-runs-uv"
             ]
           }
         },
@@ -2150,6 +2151,19 @@
             "kind": "acceptance",
             "checks": [
               "a-pinned-release-no-candidate-matches-names-putnami-install-unless-it-does-not-help"
+            ]
+          }
+        },
+        {
+          "id": "missing-uv-pin-names-the-declaration",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-uv-pin-names-the-declaration-to-write"
             ]
           }
         }

@@ -1,7 +1,8 @@
 // Package uvtoolchain holds what the Putnami CLI and the @putnami/python
 // extension both know about uv releases: where a release is published, which
-// archive each platform installs, the oldest release Putnami runs, and the
-// release the root pyproject.toml of a workspace declares.
+// archive each platform installs, the oldest release Putnami runs, the
+// release it installs by default, and the release the root pyproject.toml of
+// a workspace declares.
 //
 // The CLI pins the lock's uv toolchain with it, and the extension installs and
 // selects the uv a task runs with it, so both read the same declaration and
@@ -10,7 +11,9 @@ package uvtoolchain
 
 import (
 	"cmp"
+	"encoding/hex"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 )
@@ -25,6 +28,29 @@ const MinimumVersion = "0.11.8"
 // ChecksumsFile is the file a release publishes beside its archives: one
 // "<sha256> *<archive>" line each.
 const ChecksumsFile = "sha256.sum"
+
+// DefaultVersion is the uv release Putnami installs for a workspace that pins
+// and declares none.
+const DefaultVersion = "0.11.32"
+
+// defaultIntegrities are the SHA-256 digests of the DefaultVersion archives,
+// per "<goos>/<goarch>", as the release lists them in its ChecksumsFile. The
+// test compares them with a copy of that file, committed under testdata.
+var defaultIntegrities = map[string]string{
+	"darwin/amd64":  "77f5ca26c0de20e992a3677a174fe1121ee25c36f9b1434a863f75bf077a05eb",
+	"darwin/arm64":  "ed336d0ba49db8ef89b2b41fffa372ce63bd032f22a56f001c265891aec32829",
+	"linux/amd64":   "1fd052f196108d87e61fc3d98fe06b4ec758c9a1eb1466a6fd1a436fe45885f2",
+	"linux/arm64":   "d70cdae687feb6aad9a09fe8d686df8c8efaf69a1007fa581379a2025adc10a5",
+	"windows/amd64": "acfde570451cfdb8689fa159a138ee805ba4e241c466432750302c86254b0984",
+	"windows/arm64": "a7427ea0440bb826b6716d1837ff3d173b8e7d496cb09ee8f456b4e023a2fdcd",
+}
+
+// DefaultIntegrities returns the SHA-256 of each DefaultVersion archive, per
+// "<goos>/<goarch>". They ship with Putnami, so installing the default release
+// reads no release metadata from the network. The map is a copy.
+func DefaultIntegrities() map[string]string {
+	return maps.Clone(defaultIntegrities)
+}
 
 // releasesURL is where the uv repository publishes its release downloads.
 const releasesURL = "https://github.com/astral-sh/uv/releases/download/"
@@ -77,6 +103,40 @@ func ArchiveFor(goos, goarch string) (Archive, bool) {
 		return Archive{Name: name + ".zip", Zip: true}, true
 	}
 	return Archive{Name: name + ".tar.gz", Dir: name}, true
+}
+
+// PlatformDigests reads the ChecksumsFile of a release and returns the
+// SHA-256 it lists for the archive of each platform ArchiveFor names, keyed by
+// "<goos>/<goarch>", as 64 lower-case hexadecimal characters. A line that is
+// not "<sha256> *<archive>", and an archive no platform installs, are skipped.
+func PlatformDigests(checksums string) map[string]string {
+	platforms := make(map[string]string, len(targets))
+	for platform := range targets {
+		goos, goarch, _ := strings.Cut(platform, "/")
+		if archive, ok := ArchiveFor(goos, goarch); ok {
+			platforms[archive.Name] = platform
+		}
+	}
+	digests := make(map[string]string)
+	for _, line := range strings.Split(checksums, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 {
+			continue
+		}
+		platform, ok := platforms[strings.TrimPrefix(fields[1], "*")]
+		if !ok {
+			continue
+		}
+		if digest := strings.ToLower(fields[0]); len(digest) == 64 && isHex(digest) {
+			digests[platform] = digest
+		}
+	}
+	return digests
+}
+
+func isHex(value string) bool {
+	_, err := hex.DecodeString(value)
+	return err == nil
 }
 
 // Platforms lists, sorted, the "<goos>/<goarch>" platforms ArchiveFor names

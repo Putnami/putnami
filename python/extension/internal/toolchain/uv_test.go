@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -330,7 +329,7 @@ func TestWantedUV_LockThenDeclarationThenDefault(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if want.version != DefaultUVVersion || want.release.Integrities["darwin/arm64"] != defaultUVIntegrities["darwin/arm64"] {
+		if want.version != DefaultUVVersion || want.release.Integrities["darwin/arm64"] != uvtoolchain.DefaultIntegrities()["darwin/arm64"] {
 			t.Fatalf("wantedUV = %+v, want the default release", want)
 		}
 	})
@@ -497,7 +496,8 @@ func TestProvisionUV_InstallsThePinnedArchiveUnderThePutnamiHome(t *testing.T) {
 // that must name an archive and a digest.
 func TestDefaultUVRelease_NamesAnArchiveForEveryPlatform(t *testing.T) {
 	release := DefaultUVRelease()
-	for platform, digest := range defaultUVIntegrities {
+	shipped := uvtoolchain.DefaultIntegrities()
+	for platform, digest := range shipped {
 		goos, goarch, _ := strings.Cut(platform, "/")
 		archive, ok := uvArchiveFor(release, goos, goarch)
 		if !ok {
@@ -510,8 +510,8 @@ func TestDefaultUVRelease_NamesAnArchiveForEveryPlatform(t *testing.T) {
 			t.Fatalf("%s archive = %q, want the uv release downloads", platform, archive.pin.URL)
 		}
 	}
-	if platforms := uvtoolchain.Platforms(); len(defaultUVIntegrities) != len(platforms) {
-		t.Fatalf("the default release has %d digests for the %d platforms %v", len(defaultUVIntegrities), len(platforms), platforms)
+	if platforms := uvtoolchain.Platforms(); len(shipped) != len(platforms) {
+		t.Fatalf("the default release has %d digests for the %d platforms %v", len(shipped), len(platforms), platforms)
 	}
 	if err := uvtoolchain.Supported(DefaultUVVersion); err != nil {
 		t.Fatalf("the default release is not one Putnami runs: %v", err)
@@ -614,30 +614,6 @@ func TestProvisionUV_InstallsNothingItCannotVerifyOrMustNot(t *testing.T) {
 
 	if got := mirror.requests(); len(got) != 0 {
 		t.Fatalf("requests = %v, want none", got)
-	}
-}
-
-// The digests the extension ships for its default release are the ones the
-// repository's own lock pins for that release, which the CLI read from the
-// release's sha256.sum. While the two name different releases there is
-// nothing to compare.
-func TestDefaultUVReleaseMatchesTheRepositoryLock(t *testing.T) {
-	root := filepath.Join("..", "..", "..", "..")
-	locked, pinned, err := lockedUVRelease(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !pinned {
-		t.Fatalf("the repository %s pins no uv", WorkspaceLockFile)
-	}
-	if locked.Version != DefaultUVVersion {
-		t.Skipf("the repository lock pins uv %s and the extension ships uv %s", locked.Version, DefaultUVVersion)
-	}
-	if !maps.Equal(locked.Integrities, defaultUVIntegrities) {
-		t.Fatalf("the repository lock pins %v for uv %s, the extension ships %v", locked.Integrities, DefaultUVVersion, defaultUVIntegrities)
-	}
-	if want := DefaultUVRelease().Source; locked.Source != want {
-		t.Fatalf("the repository lock takes uv %s from %q, the extension from %q", DefaultUVVersion, locked.Source, want)
 	}
 }
 

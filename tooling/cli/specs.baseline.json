@@ -106,6 +106,7 @@
     "cli/runtime-toolchain-pinning#exact-lock-resolution",
     "cli/runtime-toolchain-pinning#identity-keys-results",
     "cli/runtime-toolchain-pinning#minimal-child-environment",
+    "cli/runtime-toolchain-pinning#missing-uv-pin-names-the-declaration",
     "cli/runtime-toolchain-pinning#provisioning-reports-the-installed-toolchain",
     "cli/runtime-toolchain-pinning#provisioning-runs-unpinned",
     "cli/runtime-toolchain-pinning#unplanned-toolchains-do-not-stop-the-run",

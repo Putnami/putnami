@@ -270,8 +270,7 @@ func EnsureUVRequiredVersion(workspaceRoot, version string) (bool, error) {
 	case current.Present && current.Version != "":
 		return false, nil
 	case current.Present:
-		return false, fmt.Errorf("the required-version of its [tool.uv] table names no single uv release: "+
-			"declare one exact release, such as required-version = \"==%s\", so Putnami can pin it", version)
+		return false, current.Problem()
 	case current.Outside != "":
 		return false, fmt.Errorf("it writes uv settings outside a [tool.uv] table header (%s), "+
 			"so a [tool.uv] table added for required-version would define the table twice: "+

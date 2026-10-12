@@ -331,7 +331,7 @@ func TestRefreshToolchainLockReResolvesBunWhenPinDiffers(t *testing.T) {
 func TestReadToolchainDeclarationsRejectsMalformedPackageJSON(t *testing.T) {
 	ws := t.TempDir()
 	mustWriteToolchainTestFile(t, filepath.Join(ws, "package.json"), `{`)
-	_, err := readToolchainDeclarations(ws)
+	_, err := readToolchainDeclarations(ws, func() ([]string, error) { return nil, nil })
 	if err == nil || !strings.Contains(err.Error(), "parse package.json toolchains") {
 		t.Fatalf("error = %v", err)
 	}

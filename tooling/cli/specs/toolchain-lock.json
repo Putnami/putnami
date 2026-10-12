@@ -22,7 +22,7 @@
   "requirements": [
     {
       "id": "supported-runtimes-only",
-      "text": "Toolchain refresh derives entries only from go.work, package.json#packageManager when it names Bun, and an exact required-version in the [tool.uv] table of the root pyproject.toml. It ignores package.json#engines.node, contacts no Node release endpoint, and replaces the toolchain map so a stale Node entry no declared extension resolves cannot survive. Historical v3/v4 Node pins remain readable before that refresh."
+      "text": "Toolchain refresh derives entries only from go.work, package.json#packageManager when it names Bun, and an exact required-version in the [tool.uv] table of the root pyproject.toml when a declared extension's runtime resolves the uv lock identity. It ignores package.json#engines.node, contacts no Node release endpoint, and replaces the toolchain map so a stale Node entry no declared extension resolves cannot survive. Historical v3/v4 Node pins remain readable before that refresh."
     },
     {
       "id": "verified-release-metadata",
