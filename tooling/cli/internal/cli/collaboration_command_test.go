@@ -105,7 +105,7 @@ func collabCommandTool(t *testing.T, contract, operation string) extproto.ToolDe
 		`"annotations":{"readOnlyHint":%t,"destructiveHint":%t,"idempotentHint":%t,"openWorldHint":false},`+
 		`"_meta":{"putnami.dev/contract":{"access":%q,"readOnly":%t,"supportsDryRun":false},"putnami.dev/provider":%s}},`+
 		`"command":%q,"args":["-test.run=^TestCollaborationCommandProviderHelperProcess$"],`+
-		`"env":{%q:"1"},"timeoutMs":20000,"workspaceSelection":%t}`,
+		`"env":{%q:"1"},"workspaceSelection":%t}`,
 		"Fixture "+contract+"."+operation+".", readOnly, op.Destructive, readOnly, op.Access, readOnly, declaration,
 		executable, collabCommandProviderEnv, op.WorkspaceSelection)
 	var def extproto.ToolDefinition

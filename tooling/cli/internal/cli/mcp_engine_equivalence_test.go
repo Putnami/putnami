@@ -408,13 +408,13 @@ exit 0
       "kind": "command",
       "command": "{extensionRoot}/ok.sh",
       "cache": false,
-      "timeoutMs": 30000
+      "timeoutMs": -1
     },
     "lint-task": {
       "kind": "command",
       "command": "{extensionRoot}/lint.sh",
       "cache": false,
-      "timeoutMs": 30000
+      "timeoutMs": -1
     }
   }
 }`, 0o644)

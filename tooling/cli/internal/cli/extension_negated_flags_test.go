@@ -356,7 +356,7 @@ func writeNegationFixture(t *testing.T, wsRoot string) {
       "kind": "command",
       "command": "{extensionRoot}/probe.sh",
       "cache": false,
-      "timeoutMs": 10000
+      "timeoutMs": -1
     }
   }
 }`
