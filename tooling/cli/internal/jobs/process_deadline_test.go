@@ -327,6 +327,12 @@ func TestProcessDeadlineKeepsTheWaitAlreadyRead(t *testing.T) {
 // TestProcessDeadlineBoundsTheTimeNotCounted pins that a process that keeps
 // waiting for a CPU is stopped once its hold and its wait reach the bound,
 // and that the watch says so.
+//
+// The hold lasts until the watch's goroutine takes its first sample, so a host
+// that pauses that goroutine for the whole bound makes the hold reach the
+// bound alone. The deadline then fires before it reads any wait, as it must,
+// so the test expects a measured wait only when the hold stayed under the
+// bound.
 func TestProcessDeadlineBoundsTheTimeNotCounted(t *testing.T) {
 	t.Parallel()
 	const bound = 3 * processDeadlineMinRearm
@@ -338,8 +344,17 @@ func TestProcessDeadlineBoundsTheTimeNotCounted(t *testing.T) {
 	if expirations != 1 {
 		t.Errorf("onExpire ran %d times, want once", expirations)
 	}
-	if !timing.uncountedPastBound || !timing.waitMeasured || timing.held+timing.waitedForCPU < bound {
-		t.Errorf("timing = %+v, want a hold and a wait past the bound %s", timing, bound)
+	if !timing.uncountedPastBound {
+		t.Errorf("timing = %+v, want the bound %s on time not counted", timing, bound)
+	}
+	if timing.held >= bound {
+		if timing.waitMeasured || timing.waitedForCPU != 0 {
+			t.Errorf("timing = %+v, want no wait read after a hold that reached the bound %s", timing, bound)
+		}
+		return
+	}
+	if !timing.waitMeasured || timing.held+timing.waitedForCPU < bound {
+		t.Errorf("timing = %+v, want a hold and a measured wait past the bound %s", timing, bound)
 	}
 }
 
