@@ -1,0 +1,122 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "https://example.test/acme/shop.git",
+      "digest": {
+        "gitCommit": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00",
+        "gitTree": "0123456789abcdef0123456789abcdef01234567"
+      }
+    }
+  ],
+  "predicateType": "https://putnami.dev/verdict/v1",
+  "predicate": {
+    "answer": "passed",
+    "mark": "checked",
+    "change": {
+      "repository": "https://example.test/acme/shop.git",
+      "reference": "refs/pull/42/head",
+      "head": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00",
+      "base": "8f3c2a1b9d4e5f60718293a4b5c6d7e8f9a0b1c2",
+      "tree": "0123456789abcdef0123456789abcdef01234567",
+      "testedCheckout": "fedcba9876543210fedcba9876543210fedcba98"
+    },
+    "run": {
+      "id": "4711",
+      "attempt": 2,
+      "conclusion": "success"
+    },
+    "checks": [
+      {
+        "check": "build",
+        "answer": "passed",
+        "level": "required",
+        "phase": "build"
+      },
+      {
+        "check": "lint",
+        "answer": "passed",
+        "level": "required",
+        "phase": "lint"
+      },
+      {
+        "check": "test",
+        "answer": "passed",
+        "level": "required",
+        "phase": "test"
+      }
+    ],
+    "impact": {
+      "projects": [
+        {
+          "project": "/libs/money",
+          "relation": "touched",
+          "requirements": {
+            "total": 3,
+            "proven": 1,
+            "missing": 2
+          }
+        },
+        {
+          "project": "/services/cart",
+          "relation": "reached",
+          "via": "/libs/money",
+          "requirements": {
+            "total": 0,
+            "proven": 0,
+            "missing": 0
+          }
+        },
+        {
+          "project": "/services/checkout",
+          "relation": "reached",
+          "requirements": {
+            "total": 1,
+            "proven": 1,
+            "missing": 0
+          }
+        }
+      ]
+    },
+    "requirements": {
+      "total": 4,
+      "proven": 2,
+      "missing": 2,
+      "projectsWithout": 1
+    },
+    "declarations": [
+      {
+        "path": "libs/money/specs/money.json",
+        "kind": "spec",
+        "weakening": true
+      },
+      {
+        "path": "putnami.ci.json",
+        "kind": "ci",
+        "weakening": false
+      }
+    ],
+    "gaps": [
+      {
+        "kind": "no-requirement",
+        "project": "/services/cart"
+      },
+      {
+        "kind": "unapproved-declaration",
+        "path": "libs/money/specs/money.json"
+      },
+      {
+        "kind": "unproven-requirement",
+        "project": "/libs/money",
+        "requirement": "money/rounding#half-even"
+      },
+      {
+        "kind": "unproven-requirement",
+        "project": "/libs/money",
+        "requirement": "money/rounding#no-float"
+      }
+    ],
+    "computedAt": "2026-10-13T09:12:30.5Z",
+    "revision": 1
+  }
+}

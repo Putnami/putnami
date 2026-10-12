@@ -146,8 +146,8 @@ discovered graph jobs.
 
 | Role | Who |
 | --- | --- |
-| Producers | a human authoring `putnami.ci.json`, and `putnami cloud ci init` / `putnami cloud ci fmt` writing the canonical form; `putnami impact-plan` emitting an ImpactPlan; an extension projecting an ImpactPlan onto a ChangePlan |
-| Consumers | `putnami cloud ci` (validate, fmt, explain); `putnami publish`; `putnami deploy --env`; the generated agent guidance; a CI plane that reads the document to decide what to run; a CI plane that admits a ChangePlan; an extension that reads an ImpactPlan, or projects it onto a ChangePlan |
+| Producers | a human authoring `putnami.ci.json`, and `putnami cloud ci init` / `putnami cloud ci fmt` writing the canonical form; `putnami impact-plan` emitting an ImpactPlan; an extension projecting an ImpactPlan onto a ChangePlan; a CI plane writing the Verdict of a run |
+| Consumers | `putnami cloud ci` (validate, fmt, explain); `putnami publish`; `putnami deploy --env`; the generated agent guidance; a CI plane that reads the document to decide what to run; a CI plane that admits a ChangePlan; an extension that reads an ImpactPlan, or projects it onto a ChangePlan; a consumer that shows, gates or records a run's Verdict |
 | Owner of this contract | this project. The `putnami cloud ci` commands validate and explain; the execution plane grants trust and resources, and neither may widen the document locally |
 
 The plane split is part of the contract, not an implementation detail. A
@@ -358,6 +358,53 @@ holds both.
 Adding the ImpactPlan changed no ChangePlan byte and no digest. See
 [ADR 0005](doc/adr/0005-a-change-plan-projects-an-impact-plan.md).
 
+## The verdict
+
+A Verdict is the one answer a CI run gives about one change. It is an unsigned
+in-toto Statement v1: `_type` is `https://in-toto.io/Statement/v1`, the one
+subject is the repository URL with the head commit as `gitCommit` and its tree
+as `gitTree`, and `predicateType` is `https://putnami.dev/verdict/v1`. This
+package owns the `Verdict` type, its schema and its validation. It neither
+signs a verdict nor verifies a signature.
+
+| Predicate member | Meaning |
+| --- | --- |
+| `answer` | `passed`, `failed`, `unsupported`, `unanswered`, `canceled` or `infrastructure`: the fold of the required checks |
+| `mark` | `verified` or `checked`, present only when `answer` is `passed` |
+| `change` | `repository`, `reference`, `head`, `base` when the run had one, `tree`, and `testedCheckout` when the run tested another commit, such as a merge |
+| `run` | the run's `id`, its `attempt` from 1, and its own `conclusion` code |
+| `checks` | every check: `check`, `answer`, `level` (`required` or `advisory`), `phase`, and `reason` when it did not pass |
+| `impact` | every impacted `project`, `touched` or `reached` (`via` another impacted project), with its `requirements` counts: `total`, `proven`, `missing` |
+| `requirements` | the sums of the projects' counts, and `projectsWithout`, the projects that state no requirement |
+| `declarations` | every declaration the change modifies: `path`, `kind`, `weakening`, and the `approval` when someone gave one |
+| `gaps` | what keeps a passed verdict from `verified` |
+| `deploy` | the `answer` of the deploys the change triggered and the answer of each of their `channels`, when it triggered any |
+| `computedAt`, `revision` | when the verdict was computed, and its revision from 1 |
+
+- `FoldVerdictAnswers` keeps the most severe answer: `failed`,
+  `infrastructure`, `canceled`, `unanswered`, then `passed`. `unsupported`
+  never blocks: it is the fold of no other answer. `FoldRequiredChecks` folds
+  the required checks only, so an advisory check never changes the answer.
+- `VerdictMarkFor` is `verified` for a passed verdict with no gap, `checked`
+  for a passed verdict with a gap, and no mark otherwise.
+- Only a requirement whose state is `verified` is proven. `missing` counts
+  every other state, so `proven` plus `missing` is `total`.
+- A gap is `no-requirement` for a project that states no requirement,
+  `unproven-requirement` for each missing requirement, as
+  `feature#requirement`, or `unapproved-declaration` for a weakening
+  declaration without an approval. The gaps match the counts and the
+  declarations exactly.
+- Lists are sorted and hold no duplicate: checks by name, projects by ID,
+  channels by name, and gaps by kind, project, requirement, then path.
+  Declarations sort weakening first, then by path.
+- `ParseVerdict` reads one verdict strictly: no duplicate key, no unknown
+  member, no trailing data, and at most `MaxVerdictBytes` (4 MiB).
+  `ValidateVerdict` refuses every defect above and returns the first one.
+
+A run attempt can compute its verdict more than once, for example when a late
+answer arrives. A higher `revision` replaces every lower one. See
+[ADR 0006](doc/adr/0006-a-run-carries-one-verdict.md).
+
 ## Schema and fixtures
 
 - Schema: [`schemas/putnami-ci.json`](schemas/putnami-ci.json)
@@ -403,6 +450,17 @@ Adding the ImpactPlan changed no ChangePlan byte and no digest. See
   holding a comma, an incomplete generator, partial transitive dependents, a
   short SHA, an unknown version, or unsorted tasks. The CLI tests rebuild each
   valid plan from its planner data and must emit the same bytes.
+- Verdict schema: [`schemas/putnami-verdict.json`](schemas/putnami-verdict.json)
+  (`$id` `https://putnami.dev/schemas/putnami-verdict.json`), embedded in the
+  package and returned by `VerdictSchema()`. Every object is closed.
+  `TestVerdictSchemaNamesTheGoMembers` and
+  `TestVerdictSchemaMatchesTheGoVocabulary` pin it to the Go types.
+- Verdict conformance corpus: [`fixtures/verdict`](fixtures/verdict).
+  `expectations.json` maps every `valid/*` verdict to its answer and mark, and
+  every `invalid/*` verdict to the refusal `ParseVerdict` returns. The valid
+  verdicts cover every answer and both marks, and each one is the exact
+  indented encoding of the verdict it holds. Each invalid verdict carries one
+  defect.
 
 ## Versioning and compatibility
 
@@ -429,6 +487,9 @@ must pin a release that includes this member; older closed readers reject it.
 
 Because the root is closed, an unknown member is rejected rather than ignored:
 a typo in a CI document is reported, not silently dropped.
+
+A Verdict has no `version` member: its predicate type carries the version, and
+a later version is a new predicate type.
 
 **Cross-implementation parity is claimed by nothing.** This Go package is the
 only implementation; there is no TypeScript or Python parser of
@@ -484,7 +545,9 @@ replaced `gate` with `commands`, moved deploy off the branch rule, and gave
 `distribution` a home, the lifetime of a published channel in
 [ADR 0003](doc/adr/0003-published-channel-lifetime.md), and the ImpactPlan as
 the document a ChangePlan projects in
-[ADR 0005](doc/adr/0005-a-change-plan-projects-an-impact-plan.md). Anything not settled there is enforced by the schema and
+[ADR 0005](doc/adr/0005-a-change-plan-projects-an-impact-plan.md), and the
+one verdict of a run in
+[ADR 0006](doc/adr/0006-a-run-carries-one-verdict.md). Anything not settled there is enforced by the schema and
 the tests rather than by a separate record. When a further decision becomes
 contested — the first candidate is whether the canonical digest is part of the
 public contract or an implementation detail — it gets a record under

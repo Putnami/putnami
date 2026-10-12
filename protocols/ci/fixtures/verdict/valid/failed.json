@@ -1,0 +1,78 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "http://git.internal.example.test/acme/api",
+      "digest": {
+        "gitCommit": "a1a1a1a1b2b2b2b2c3c3c3c3d4d4d4d4e5e5e5e5",
+        "gitTree": "f6f6f6f607070707181818182929292930303030"
+      }
+    }
+  ],
+  "predicateType": "https://putnami.dev/verdict/v1",
+  "predicate": {
+    "answer": "failed",
+    "change": {
+      "repository": "http://git.internal.example.test/acme/api",
+      "reference": "refs/heads/feature/orders",
+      "head": "a1a1a1a1b2b2b2b2c3c3c3c3d4d4d4d4e5e5e5e5",
+      "tree": "f6f6f6f607070707181818182929292930303030"
+    },
+    "run": {
+      "id": "run-17",
+      "attempt": 1,
+      "conclusion": "failure"
+    },
+    "checks": [
+      {
+        "check": "build",
+        "answer": "infrastructure",
+        "level": "required",
+        "phase": "build",
+        "reason": "runner_lost"
+      },
+      {
+        "check": "lint",
+        "answer": "passed",
+        "level": "required",
+        "phase": "lint"
+      },
+      {
+        "check": "test",
+        "answer": "failed",
+        "level": "required",
+        "phase": "test",
+        "reason": "tests_failed"
+      }
+    ],
+    "impact": {
+      "projects": [
+        {
+          "project": "/api",
+          "relation": "touched",
+          "requirements": {
+            "total": 2,
+            "proven": 1,
+            "missing": 1
+          }
+        }
+      ]
+    },
+    "requirements": {
+      "total": 2,
+      "proven": 1,
+      "missing": 1,
+      "projectsWithout": 0
+    },
+    "declarations": [],
+    "gaps": [
+      {
+        "kind": "unproven-requirement",
+        "project": "/api",
+        "requirement": "api/orders#idempotent-create"
+      }
+    ],
+    "computedAt": "2026-10-13T10:00:00+02:00",
+    "revision": 1
+  }
+}

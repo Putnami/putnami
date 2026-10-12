@@ -1,0 +1,357 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/putnami-verdict.json",
+  "title": "Putnami run verdict",
+  "description": "Version 1: the one answer a CI run gives about one change, as an unsigned in-toto Statement v1. The subject is the repository at the change's head commit and tree. The Go validator also checks what this schema cannot state: the answer is the fold of the required checks, the mark follows the answer and the gaps, the counts add up, the gaps match the impact and the declarations, and every list is sorted without duplicates.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["_type", "subject", "predicateType", "predicate"],
+  "properties": {
+    "_type": {
+      "const": "https://in-toto.io/Statement/v1",
+      "description": "The in-toto Statement v1 type."
+    },
+    "subject": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": { "$ref": "#/$defs/subject" },
+      "description": "Exactly one resource: the repository at the change's head commit and tree."
+    },
+    "predicateType": {
+      "const": "https://putnami.dev/verdict/v1",
+      "description": "The verdict predicate, version 1."
+    },
+    "predicate": { "$ref": "#/$defs/predicate" }
+  },
+  "$defs": {
+    "answer": {
+      "enum": ["passed", "failed", "unsupported", "unanswered", "canceled", "infrastructure"],
+      "description": "Folded most severe first: failed, infrastructure, canceled, unanswered, passed. unsupported never blocks."
+    },
+    "objectID": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "description": "A full Git object ID: 40 or 64 lowercase hexadecimal characters."
+    },
+    "projectID": {
+      "type": "string",
+      "maxLength": 512,
+      "pattern": "^/[A-Za-z0-9][A-Za-z0-9._/-]*$",
+      "description": "A workspace project ID, such as /tooling/cli."
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^[^/\\\\]",
+      "description": "A workspace-relative file path with forward slashes."
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "An RFC 3339 time."
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "digest"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "description": "The repository URL, predicate.change.repository."
+        },
+        "digest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["gitCommit", "gitTree"],
+          "properties": {
+            "gitCommit": { "$ref": "#/$defs/objectID" },
+            "gitTree": { "$ref": "#/$defs/objectID" }
+          }
+        }
+      }
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "answer",
+        "change",
+        "run",
+        "checks",
+        "impact",
+        "requirements",
+        "declarations",
+        "gaps",
+        "computedAt",
+        "revision"
+      ],
+      "properties": {
+        "answer": { "$ref": "#/$defs/answer" },
+        "mark": {
+          "enum": ["verified", "checked"],
+          "description": "Present exactly when the answer is passed: verified with no gap, checked with at least one."
+        },
+        "change": { "$ref": "#/$defs/change" },
+        "run": { "$ref": "#/$defs/run" },
+        "checks": {
+          "type": "array",
+          "maxItems": 512,
+          "items": { "$ref": "#/$defs/check" },
+          "description": "Every check of the run, sorted by name."
+        },
+        "impact": { "$ref": "#/$defs/impact" },
+        "requirements": { "$ref": "#/$defs/requirements" },
+        "declarations": {
+          "type": "array",
+          "maxItems": 1024,
+          "items": { "$ref": "#/$defs/declaration" },
+          "description": "Every declaration the change modifies, the weakening ones first, then by path."
+        },
+        "gaps": {
+          "type": "array",
+          "maxItems": 16384,
+          "items": { "$ref": "#/$defs/gap" },
+          "description": "What keeps a passed verdict from being verified, sorted by kind, project, requirement, then path."
+        },
+        "deploy": { "$ref": "#/$defs/deploy" },
+        "computedAt": { "$ref": "#/$defs/time" },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Counts the computations of this run attempt's verdict from 1. A later revision supersedes every earlier one."
+        }
+      },
+      "if": {
+        "properties": { "answer": { "const": "passed" } }
+      },
+      "then": { "required": ["mark"] },
+      "else": { "not": { "required": ["mark"] } }
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "reference", "head", "tree"],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^(?:https|http|ssh)://[^/@?#\\s\\\\]+/[^@?#\\s\\\\]*[^/@?#\\s\\\\]$",
+          "description": "The credential-free URL of the repository: no user, query, fragment or trailing slash."
+        },
+        "reference": {
+          "type": "string",
+          "maxLength": 1024,
+          "pattern": "^refs/",
+          "description": "The full Git reference the change is on, such as refs/heads/main."
+        },
+        "head": { "$ref": "#/$defs/objectID" },
+        "base": { "$ref": "#/$defs/objectID" },
+        "tree": { "$ref": "#/$defs/objectID" },
+        "testedCheckout": {
+          "$ref": "#/$defs/objectID",
+          "description": "The commit the run checked out and tested, when it is not the head."
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "attempt", "conclusion"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "conclusion": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+          "description": "The run's own conclusion, a machine code the CI plane defines."
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check", "answer", "level"],
+      "properties": {
+        "check": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/~@+-]{0,127}$"
+        },
+        "answer": { "$ref": "#/$defs/answer" },
+        "level": {
+          "enum": ["required", "advisory"],
+          "description": "Only a required check folds into the verdict's answer."
+        },
+        "phase": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+        },
+        "reason": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$",
+          "description": "A machine code that says why the check did not pass."
+        }
+      },
+      "if": {
+        "properties": { "answer": { "const": "passed" } }
+      },
+      "then": { "not": { "required": ["reason"] } }
+    },
+    "impact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projects"],
+      "properties": {
+        "projects": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": { "$ref": "#/$defs/project" },
+          "description": "Every impacted project, sorted by project ID."
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "relation", "requirements"],
+      "properties": {
+        "project": { "$ref": "#/$defs/projectID" },
+        "relation": { "enum": ["touched", "reached"] },
+        "via": {
+          "$ref": "#/$defs/projectID",
+          "description": "Another impacted project the dependency reaches this one through."
+        },
+        "requirements": { "$ref": "#/$defs/requirementCounts" }
+      },
+      "if": {
+        "properties": { "relation": { "const": "touched" } }
+      },
+      "then": { "not": { "required": ["via"] } }
+    },
+    "requirementCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "proven", "missing"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "proven": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Requirements whose state is verified. No other state is proven."
+        },
+        "missing": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "total minus proven."
+        }
+      }
+    },
+    "requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "proven", "missing", "projectsWithout"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "proven": { "type": "integer", "minimum": 0 },
+        "missing": { "type": "integer", "minimum": 0 },
+        "projectsWithout": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Impacted projects that state no requirement."
+        }
+      }
+    },
+    "declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "weakening"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "kind": {
+          "enum": ["spec", "baseline", "binding", "adr", "decisions", "architecture", "ci", "owners"]
+        },
+        "weakening": {
+          "type": "boolean",
+          "description": "Whether the change weakens what the declaration promises."
+        },
+        "approval": { "$ref": "#/$defs/approval" }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by", "via", "at"],
+      "properties": {
+        "by": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "via": { "enum": ["code-host", "console"] },
+        "at": { "$ref": "#/$defs/time" }
+      }
+    },
+    "gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["no-requirement", "unproven-requirement", "unapproved-declaration"] },
+        "project": { "$ref": "#/$defs/projectID" },
+        "requirement": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)+#[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "description": "The unproven requirement, as feature#requirement."
+        },
+        "path": { "$ref": "#/$defs/path" }
+      },
+      "oneOf": [
+        {
+          "properties": { "kind": { "const": "no-requirement" } },
+          "required": ["project"],
+          "not": { "anyOf": [{ "required": ["requirement"] }, { "required": ["path"] }] }
+        },
+        {
+          "properties": { "kind": { "const": "unproven-requirement" } },
+          "required": ["project", "requirement"],
+          "not": { "required": ["path"] }
+        },
+        {
+          "properties": { "kind": { "const": "unapproved-declaration" } },
+          "required": ["path"],
+          "not": { "anyOf": [{ "required": ["project"] }, { "required": ["requirement"] }] }
+        }
+      ]
+    },
+    "deploy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["answer", "channels"],
+      "properties": {
+        "answer": { "$ref": "#/$defs/answer" },
+        "channels": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/channel" },
+          "description": "Every channel the deploys follow, sorted by name."
+        }
+      }
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "answer"],
+      "properties": {
+        "channel": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+        },
+        "answer": { "$ref": "#/$defs/answer" }
+      }
+    }
+  }
+}

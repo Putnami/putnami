@@ -1,0 +1,64 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "https://example.test/acme/shop.git",
+      "digest": {
+        "gitCommit": "d4d4d4d4e5e5e5e5f6f6f6f607070707a1a1a1a1",
+        "gitTree": "1234567812345678123456781234567812345678"
+      }
+    }
+  ],
+  "predicateType": "https://putnami.dev/verdict/v1",
+  "predicate": {
+    "answer": "infrastructure",
+    "change": {
+      "repository": "https://example.test/acme/shop.git",
+      "reference": "refs/heads/main",
+      "head": "d4d4d4d4e5e5e5e5f6f6f6f607070707a1a1a1a1",
+      "base": "8f3c2a1b9d4e5f60718293a4b5c6d7e8f9a0b1c2",
+      "tree": "1234567812345678123456781234567812345678"
+    },
+    "run": {
+      "id": "run-2026-10-13-0002",
+      "attempt": 3,
+      "conclusion": "failure"
+    },
+    "checks": [
+      {
+        "check": "build",
+        "answer": "infrastructure",
+        "level": "required",
+        "phase": "build",
+        "reason": "runner_lost"
+      },
+      {
+        "check": "lint",
+        "answer": "unanswered",
+        "level": "required",
+        "phase": "lint",
+        "reason": "no_report"
+      },
+      {
+        "check": "test",
+        "answer": "canceled",
+        "level": "required",
+        "phase": "test",
+        "reason": "superseded"
+      }
+    ],
+    "impact": {
+      "projects": []
+    },
+    "requirements": {
+      "total": 0,
+      "proven": 0,
+      "missing": 0,
+      "projectsWithout": 0
+    },
+    "declarations": [],
+    "gaps": [],
+    "computedAt": "2026-10-13T11:00:00Z",
+    "revision": 1
+  }
+}

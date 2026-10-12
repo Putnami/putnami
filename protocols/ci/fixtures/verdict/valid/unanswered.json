@@ -1,0 +1,69 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "https://example.test/acme/shop.git",
+      "digest": {
+        "gitCommit": "e5e5e5e5f6f6f6f607070707a1a1a1a1b2b2b2b2",
+        "gitTree": "8765432187654321876543218765432187654321"
+      }
+    }
+  ],
+  "predicateType": "https://putnami.dev/verdict/v1",
+  "predicate": {
+    "answer": "unanswered",
+    "change": {
+      "repository": "https://example.test/acme/shop.git",
+      "reference": "refs/tags/v1.4.0",
+      "head": "e5e5e5e5f6f6f6f607070707a1a1a1a1b2b2b2b2",
+      "tree": "8765432187654321876543218765432187654321"
+    },
+    "run": {
+      "id": "run-2026-10-13-0003",
+      "attempt": 1,
+      "conclusion": "in_progress"
+    },
+    "checks": [
+      {
+        "check": "e2e",
+        "answer": "canceled",
+        "level": "advisory",
+        "reason": "superseded"
+      },
+      {
+        "check": "lint",
+        "answer": "passed",
+        "level": "required",
+        "phase": "lint"
+      },
+      {
+        "check": "test",
+        "answer": "unanswered",
+        "level": "required",
+        "phase": "test"
+      }
+    ],
+    "impact": {
+      "projects": []
+    },
+    "requirements": {
+      "total": 0,
+      "proven": 0,
+      "missing": 0,
+      "projectsWithout": 0
+    },
+    "declarations": [],
+    "gaps": [],
+    "deploy": {
+      "answer": "unanswered",
+      "channels": [
+        {
+          "channel": "stable",
+          "answer": "unanswered"
+        }
+      ]
+    },
+    "computedAt": "2026-10-13T12:00:00Z",
+    "revision": 1
+  }
+}
