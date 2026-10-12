@@ -95,6 +95,21 @@ type SiteContentSection struct {
 	Name    string // bundle manifest name
 	Package string // registry package inside siteContentNamespace, e.g. "doc-contents-platform"
 	Mount   string // site URL prefix, "/docs/<section>"
+	// source is the tree the section's files are read from; nil reads the
+	// tree of the directory above Dir.
+	source *siteContentSource
+}
+
+// walk visits the section's files through its source tree.
+func (sec SiteContentSection) walk(visit func(siteContentFile)) error {
+	source := sec.source
+	if source == nil {
+		var err error
+		if source, err = openSiteContentSource(filepath.Dir(sec.Dir)); err != nil {
+			return err
+		}
+	}
+	return source.walkSection(sec.Dir, sec.Mount, visit)
 }
 
 // SiteContentBundle is a section assembled + contract-validated in memory,
@@ -189,25 +204,23 @@ func PublishSiteContentBundles(params map[string]any, workspaceRoot string, env 
 	return baseURL, results, nil
 }
 
-// DeriveSiteContentSections derives the sections of one site directory: each
-// immediate subdirectory is a section, and files directly under the site
-// directory are meta. When only is non-empty, sections are filtered to that
-// slug. byPackage carries the cross-site duplicate guard: it maps each claimed
-// section slug to its owning "site/section". The result keeps directory
-// order; callers sort.
+// DeriveSiteContentSections derives the sections of one site directory from
+// its source tree (siteContentSource): each section directory is a section,
+// and files directly under the site directory are meta. When only is
+// non-empty, sections are filtered to that slug. byPackage carries the
+// cross-site duplicate guard: it maps each claimed section slug to its owning
+// "site/section". The result is sorted by section.
 func DeriveSiteContentSections(siteDir, site, only string, byPackage map[string]string) ([]SiteContentSection, error) {
-	subEntries, err := os.ReadDir(siteDir)
+	source, err := openSiteContentSource(siteDir)
 	if err != nil {
-		return nil, clicore.NewError("read site directory "+siteDir+": "+err.Error(), clicore.ExitUsage)
+		return nil, err
+	}
+	names, err := source.sectionNames()
+	if err != nil {
+		return nil, err
 	}
 	var sections []SiteContentSection
-	for _, sectionEntry := range subEntries {
-		// A dot-directory is tooling state, never a section: once a site
-		// directory is a project, putnami writes .gen/ into it.
-		if !sectionEntry.IsDir() || strings.HasPrefix(sectionEntry.Name(), ".") {
-			continue
-		}
-		section := sectionEntry.Name()
+	for _, section := range names {
 		if only != "" && section != only {
 			continue
 		}
@@ -228,6 +241,7 @@ func DeriveSiteContentSections(siteDir, site, only string, byPackage map[string]
 			Name:    section,
 			Package: siteContentPackagePrefix + section,
 			Mount:   mount,
+			source:  source,
 		})
 	}
 	return sections, nil
@@ -251,7 +265,7 @@ func siteContentMount(site, section string) (string, error) {
 // validation + every entry) before returning, so a non-conformant bundle
 // never reaches an upload.
 func assembleSection(sec SiteContentSection, commit string) (bundle SiteContentBundle, shipped bool, err error) {
-	files, err := collectSiteContentFiles(sec.Dir, sec.Mount)
+	files, err := collectSiteContentFiles(sec)
 	if err != nil {
 		return SiteContentBundle{}, false, err
 	}
@@ -280,18 +294,19 @@ type siteContentFile struct {
 	absPath     string
 }
 
-// collectSiteContentFiles walks the source tree, collecting regular files only,
-// mapped into the mount's URL space and sorted lexically by payload path (the
-// deterministic entry order of the payload). A payload file at path p is served
-// at "/"+p, so source-relative paths are prefixed with the mount (minus its
-// leading "/") — e.g. index.md under mount /docs/platform → docs/platform/index.md.
-// An absent source dir returns (nil, nil) so the caller can soft-skip under
-// --if-present. Symlinks and other irregular entries are rejected: the contract
-// forbids them in the payload, and following them silently would smuggle
-// content from outside the designated tree.
-func collectSiteContentFiles(sourceDir, mount string) ([]siteContentFile, error) {
+// collectSiteContentFiles reads the section's source tree, collecting regular
+// files only, mapped into the mount's URL space and sorted lexically by
+// payload path (the deterministic entry order of the payload). A payload file
+// at path p is served at "/"+p, so source-relative paths are prefixed with the
+// mount (minus its leading "/") — e.g. index.md under mount /docs/platform →
+// docs/platform/index.md. An absent source dir returns (nil, nil) so the
+// caller can soft-skip under --if-present. Symlinks and other irregular
+// entries are rejected: the contract forbids them in the payload, and
+// following them silently would smuggle content from outside the designated
+// tree.
+func collectSiteContentFiles(sec SiteContentSection) ([]siteContentFile, error) {
 	var files []siteContentFile
-	err := walkSiteContentFiles(sourceDir, mount, func(file siteContentFile) {
+	err := sec.walk(func(file siteContentFile) {
 		files = append(files, file)
 	})
 	if err != nil {

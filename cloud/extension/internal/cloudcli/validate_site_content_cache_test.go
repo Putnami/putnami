@@ -201,6 +201,103 @@ func TestValidateSiteContentVerdictMovesOnlyWithItsKey(t *testing.T) {
 	}
 }
 
+// TestSiteContentPackagingReadsTheTreeValidationChecks changes the project in
+// each way where validation and packaging once read different trees. Inside a
+// Git work tree both read the candidate files: they agree on the verdict, and
+// packaging ships the sections and files validation counted, which the
+// workspace probe declares.
+func TestSiteContentPackagingReadsTheTreeValidationChecks(t *testing.T) {
+	nestedRepository := func(rel string) func(*testing.T, string) {
+		return func(t *testing.T, project string) {
+			writeFixtureFile(t, filepath.Join(project, filepath.FromSlash(rel), "inner.md"), "# Inner\n")
+			gitCommand(t, filepath.Join(project, filepath.FromSlash(rel)), "init", "-q")
+		}
+	}
+	for _, tc := range []struct {
+		name   string
+		change func(*testing.T, string)
+		// refusal is part of both errors, or empty when both accept the
+		// project as the fixture holds it.
+		refusal string
+	}{
+		{name: "a section of ignored files", change: func(t *testing.T, project string) {
+			writeFixtureFile(t, filepath.Join(project, "scratch", "notes.draft"), "notes\n")
+		}},
+		{name: "a section of ignored files that cannot be a mount", change: func(t *testing.T, project string) {
+			writeFixtureFile(t, filepath.Join(project, "Drafts", "notes.draft"), "notes\n")
+		}},
+		{name: "an ignored file in a section", change: func(t *testing.T, project string) {
+			writeFixtureFile(t, filepath.Join(project, "guide", "notes.draft"), "notes\n")
+		}},
+		{name: "an empty directory", change: func(t *testing.T, project string) {
+			if err := os.Mkdir(filepath.Join(project, "empty"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "an ignored symbolic link in a section", change: func(t *testing.T, project string) {
+			if err := os.Symlink("index.md", filepath.Join(project, "guide", "alias.draft")); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "a nested repository in a section", change: nestedRepository("guide/vendor"), refusal: "is not a regular file"},
+		{name: "a nested repository as a section", change: nestedRepository("vendor"), refusal: "is not a regular file"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, project := siteContentKeyFixture(t)
+			tc.change(t, project)
+			params := map[string]any{"app": "docs/example.test", "json": true}
+			var validated, packaged map[string]any
+			t.Chdir(project)
+			validateErr := distributioncli.ValidateSiteContentSources(params, nil, root, IO{JSON: func(data any) { validated = resultMap(t, data) }})
+			packageErr := distributioncli.PackageSiteContent(params, nil, root, IO{JSON: func(data any) { packaged = resultMap(t, data) }})
+			if tc.refusal != "" {
+				for _, err := range []error{validateErr, packageErr} {
+					if err == nil || !strings.Contains(err.Error(), tc.refusal) {
+						t.Fatalf("validate = %v, package = %v, want both to refuse with %q", validateErr, packageErr, tc.refusal)
+					}
+				}
+				return
+			}
+			if validateErr != nil || packageErr != nil {
+				t.Fatalf("validate = %v, package = %v, want both to accept the project", validateErr, packageErr)
+			}
+			if validated["sections"] != float64(2) || validated["files"] != float64(3) {
+				t.Fatalf("validated = %v, want the fixture's 2 sections and 3 files", validated)
+			}
+			var coordinates []string
+			files := 0.0
+			for _, bundle := range packaged["bundles"].([]any) {
+				bundle := bundle.(map[string]any)
+				coordinates = append(coordinates, bundle["coordinate"].(string))
+				files += bundle["files"].(float64)
+			}
+			if want := []string{"cloud/doc-contents-guide", "cloud/doc-contents-reference"}; !reflect.DeepEqual(coordinates, want) || files != 3 {
+				t.Fatalf("packaged %v with %v files, want %v with 3", coordinates, files, want)
+			}
+			sections, err := distributioncli.SiteContentSections(project)
+			if err != nil || !reflect.DeepEqual(sections, []string{"guide", "reference"}) {
+				t.Fatalf("declared sections = (%v, %v), want [guide reference]", sections, err)
+			}
+		})
+	}
+}
+
+// resultMap decodes the data of the JSON result a step prints.
+func resultMap(t *testing.T, data any) map[string]any {
+	t.Helper()
+	encoded, err := json.Marshal(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result struct {
+		Data map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(encoded, &result); err != nil {
+		t.Fatal(err)
+	}
+	return result.Data
+}
+
 // TestValidateSiteContentRefusesAnotherProject covers the parameter that would
 // point the cached check at files its key never hashed. It must fail rather
 // than store a verdict.

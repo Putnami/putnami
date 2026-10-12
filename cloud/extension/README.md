@@ -263,6 +263,9 @@ source predicates used by packaging, without reading or hashing file contents.
 Inside a Git work tree it counts the project's Git candidate files, and a
 section is the first directory of a candidate path. Outside a work tree it
 walks the selected site's section trees on disk and refuses an empty section.
+Packaging, publishing and the workspace probe that declares the sections read
+the same tree, so a project that passes this step packages the sections and
+files the step checked.
 Only a project that declares
 `site-content` launches the site checker. The cached Config step still
 launches for every project with a `putnami.json`, then skips those without a
@@ -291,9 +294,8 @@ files, so the key holds everything the step judges:
   directories.
 - A symbolic link is a candidate, keyed by its target text. Replacing a page
   with a link changes the key, and the step refuses the link.
-
-Packaging and publishing read the disk, so they still check a file Git
-ignores and refuse an empty section directory.
+- A submodule or a nested repository in a section has no key, so the step
+  runs uncached and refuses it, as packaging does.
 
 Outside a Git work tree the CLI computes no key for the step, so the step
 runs every time and reads the disk, where it refuses an empty section

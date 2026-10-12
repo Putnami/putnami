@@ -42,7 +42,7 @@ func writeSiteContentFixture(t *testing.T) string {
 
 func assembleFixtureBundle(t *testing.T, dir string) (*sitecontent.Manifest, []byte, []byte) {
 	t.Helper()
-	files, err := collectSiteContentFiles(dir, "/docs/platform")
+	files, err := collectSiteContentFiles(SiteContentSection{Dir: dir, Mount: "/docs/platform"})
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestSiteContentRejectsSymlinks(t *testing.T) {
 	if err := os.Symlink(filepath.Join(dir, "index.md"), filepath.Join(dir, "link.md")); err != nil {
 		t.Skipf("symlinks unavailable: %v", err)
 	}
-	if _, err := collectSiteContentFiles(dir, "/docs/platform"); err == nil {
+	if _, err := collectSiteContentFiles(SiteContentSection{Dir: dir, Mount: "/docs/platform"}); err == nil {
 		t.Fatal("expected an error collecting a tree containing a symlink")
 	}
 }

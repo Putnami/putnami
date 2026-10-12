@@ -231,6 +231,12 @@ func TestANestedRepositoryIsADirectoryWithoutCandidates(t *testing.T) {
 	if _, kind := tree.Resolve("nested/inner.md"); kind != Missing {
 		t.Errorf("Resolve(nested/inner.md) = %v, want Missing: Git does not list a nested repository's files", kind)
 	}
+	if got := tree.Unkeyable(); !reflect.DeepEqual(got, []string{"nested"}) {
+		t.Errorf("Unkeyable() = %v, want [nested]", got)
+	}
+	if got := tree.Paths(); !reflect.DeepEqual(got, []string{"README.md"}) {
+		t.Errorf("Paths() = %v, want [README.md]: a nested repository is not a candidate file", got)
+	}
 }
 
 func TestOpenAtASubdirectoryListsItsPathsRelativeToIt(t *testing.T) {
