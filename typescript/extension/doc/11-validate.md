@@ -153,10 +153,7 @@ member at the end, and a new overload after the existing ones. These changes
 are not reported either:
 
 - A new optional or rest parameter at the end of a signature.
-- A parameter that becomes optional or gains a default value, in a function
-  or in a class constructor or public method. Importers call those. In an
-  interface, an object type or a call signature it is a warning: importers
-  implement those.
+- A parameter that becomes optional or gains a default value.
 - A renamed parameter or type parameter: signatures are compared by their
   types and by type parameter position, never by name.
 - Another spelling of one type: `Array<T>` and `T[]`, either quote style of a
@@ -168,40 +165,6 @@ are not reported either:
 - An interface rewritten as an alias of an object type with the same members,
   and a function rewritten as a constant that holds an arrow function.
 - A source file that moves, when the entry point still exports the same names.
-
-### A parameter that accepts more
-
-A parameter that accepts every value it accepted before, and more, gives no
-warning. This is the only change of written type the check recognizes as
-compatible.
-
-The rule applies to the parameters of what importers call, when it has one
-signature on both sides:
-
-- an exported function, and a constant that holds an arrow function without a
-  written type;
-- the constructor and the public methods of an exported class, static ones
-  included.
-
-A parameter type widens in four cases, and no other:
-
-| Case | Before | After |
-|---|---|---|
-| A union that keeps every member it had and gains only literal types, `null`, `undefined`, `string`, `number`, `boolean`, `bigint` or `symbol` | `string` | `string \| undefined` |
-| A callback whose return type widens, with the same parameters | `() => string` | `() => string \| undefined` |
-| A built-in generic of the list below whose arguments widen | `Promise<Scope>` | `Promise<Scope \| undefined>` |
-| The cases above combined | `() => Promise<Scope>` | `() => Promise<Scope \| undefined>` |
-
-The generics are `Promise`, `PromiseLike`, `ReadonlyArray`, `readonly T[]`,
-`Readonly`, `Awaited`, `Iterable` and `AsyncIterable`. Each one only gives
-values out, so it accepts more when its argument does. A generic that a
-package declares is never on the list, and neither is `T[]`: the function may
-write to the array.
-
-Every other widening is a warning: a union that gains a function type, an
-object type or a named type; a wider parameter of a function with overloads;
-a wider parameter in an interface, an object type, a type alias or a variable
-typed as a function.
 
 ## The breaking-change marker
 
@@ -310,6 +273,8 @@ changes the answer without changing any file a cache key could name.
     object literal, a constant that holds a class expression;
   - a member that a base class or interface from another package stops
     providing;
+  - a parameter that becomes optional in an interface, an object type or a
+    call signature, which a class outside the package implements;
   - a change inside a namespace's exports, beyond a removed name;
   - decorators, `declare module` and `declare global` augmentations, and a
     `let` that becomes a `const`.
@@ -322,8 +287,6 @@ changes the answer without changing any file a cache key could name.
   `typeof value` type, and a type another package declares.
 - **A member moved to a base the check cannot read** is reported as removed.
   That is an error for a base from another package.
-- **A built-in name the package redeclares.** The widening rule knows
-  `Promise` and the other generics of its list by name.
 - **CommonJS.** A file with no `import` and no `export`, or with `export =`,
   is not compared; the check warns.
 - **Declaration files.** A `.d.ts` module without an export list exports

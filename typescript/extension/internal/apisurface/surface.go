@@ -154,35 +154,6 @@ type Param struct {
 	Type     string `json:"type"`
 	Optional bool   `json:"optional"`
 	Rest     bool   `json:"rest"`
-	// Shape is the structure of Type, for a parameter of a signature whose
-	// type is a union, a function type or a generic; nil for any other type.
-	Shape *TypeShape `json:"shape"`
-}
-
-// TypeShape is the structure of a written type that the widening rule follows
-// (see widens). At most one of Union, Function and Generic is set; a type of
-// any other form is its Text alone.
-type TypeShape struct {
-	// Text is the normalized type, without enclosing parentheses.
-	Text string `json:"text"`
-	// Simple says the type is a literal type, null, undefined or a primitive
-	// keyword: it names no callable and no object.
-	Simple bool `json:"simple"`
-	// Union holds the members of a union type.
-	Union []TypeShape `json:"union"`
-	// Function holds a function type that declares no type parameter.
-	Function *FunctionShape `json:"function"`
-	// Generic names a generic applied to Args, such as Promise; "readonly[]"
-	// stands for a readonly array type.
-	Generic string      `json:"generic"`
-	Args    []TypeShape `json:"args"`
-}
-
-// FunctionShape is a function type: its parameters by their written types,
-// and its return type.
-type FunctionShape struct {
-	Params  []Param   `json:"params"`
-	Returns TypeShape `json:"returns"`
 }
 
 // Member is one member of a class, an interface, an object type or an enum.

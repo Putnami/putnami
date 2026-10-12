@@ -70,15 +70,9 @@ never type-checks, compiles or installs.**
   the types of variables and members, type aliases, type parameters, heritage
   clauses and members added as required are compared and reported. Whether
   one breaks an importer depends on assignability, which the check does not
-  compute. The author decides and adds the marker.
-- One change of written type gives no warning: a parameter that accepts more,
-  in a function or in a class constructor or public method with one signature.
-  The type widens when it is a union that keeps every member and gains only
-  literal types, `null`, `undefined` or primitive keywords; a callback with
-  the same parameters whose return type widens; or one of `Promise`,
-  `PromiseLike`, `ReadonlyArray`, `readonly T[]`, `Readonly`, `Awaited`,
-  `Iterable` and `AsyncIterable` whose arguments widen. The rule only removes
-  noise: it cannot turn a failure into a pass.
+  compute. The author decides and adds the marker. No change of written type
+  is recognized as compatible: a rule that hid a widened parameter only
+  removed warnings, could never turn a failure into a pass, and was deleted.
 - The reader follows a name that the written types of an exported declaration
   use, when the package declares it without exporting it. It stays in the
   files of the package, reads each declaration once, and keeps two
@@ -111,9 +105,6 @@ never type-checks, compiles or installs.**
 - A change of written type never fails the task
   (`TestAChangedSignatureWarnsAndPassesAndARenamedParameterIsSilent`,
   `TestATypeChangeNextToARemovalFailsOnTheRemovalAlone`).
-- A parameter that accepts more gives no warning, and it is the only change
-  of written type that gives none (`TestAParameterThatAcceptsMorePasses`,
-  `TestOnlyACalledParameterMayAcceptMore`).
 - A base is the one its own file names
   (`TestABaseIsResolvedInTheFileThatNamesIt`).
 - The check never says an API it did not compare holds: an entry point it

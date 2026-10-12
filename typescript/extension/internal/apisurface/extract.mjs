@@ -18,16 +18,6 @@ const ts = createRequire(import.meta.url)(input.typescript);
 const SOURCE_EXTENSIONS = [".ts", ".tsx", ".d.ts", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"];
 const JS_TO_TS = { ".js": [".ts", ".tsx"], ".jsx": [".tsx"], ".mjs": [".mts"], ".cjs": [".cts"] };
 
-// SIMPLE_TYPES are the keyword types that name no callable and no object.
-const SIMPLE_TYPES = new Set([
-  ts.SyntaxKind.StringKeyword,
-  ts.SyntaxKind.NumberKeyword,
-  ts.SyntaxKind.BooleanKeyword,
-  ts.SyntaxKind.BigIntKeyword,
-  ts.SyntaxKind.SymbolKeyword,
-  ts.SyntaxKind.UndefinedKeyword,
-]);
-
 function scriptKind(file) {
   if (file.endsWith(".tsx")) return ts.ScriptKind.TSX;
   if (file.endsWith(".jsx")) return ts.ScriptKind.JSX;
@@ -183,53 +173,6 @@ function readSide(side) {
     }
   }
 
-  // shapeOf reads the structure of a normalized type that the widening rule
-  // of the comparison follows: the members of a union, the parameters and the
-  // return type of a function type, and the arguments of a generic. Any other
-  // type is its text alone.
-  function shapeOf(node, sourceFile) {
-    while (ts.isParenthesizedTypeNode(node)) node = node.type;
-    const shape = { text: print(node, sourceFile) };
-    if (SIMPLE_TYPES.has(node.kind) || ts.isLiteralTypeNode(node)) shape.simple = true;
-    if (ts.isUnionTypeNode(node)) {
-      const members = node.types.map((type) => shapeOf(type, sourceFile));
-      shape.union = members.flatMap((member) => member.union ?? [member]);
-    } else if (ts.isFunctionTypeNode(node) && !node.typeParameters?.length) {
-      shape.function = {
-        params: node.parameters.map((parameter) => ({
-          type: parameter.type ? print(parameter.type, sourceFile) : "",
-          optional: Boolean(parameter.questionToken),
-          rest: Boolean(parameter.dotDotDotToken),
-        })),
-        returns: shapeOf(node.type, sourceFile),
-      };
-    } else if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName) && node.typeArguments?.length) {
-      shape.generic = node.typeName.text;
-      shape.args = node.typeArguments.map((argument) => shapeOf(argument, sourceFile));
-    } else if (
-      ts.isTypeOperatorNode(node) &&
-      node.operator === ts.SyntaxKind.ReadonlyKeyword &&
-      ts.isArrayTypeNode(node.type)
-    ) {
-      shape.generic = "readonly[]";
-      shape.args = [shapeOf(node.type.elementType, sourceFile)];
-    }
-    return shape;
-  }
-
-  // renderParameter writes the type of a parameter with its shape. The shape
-  // is left out when it says no more than the text.
-  function renderParameter(node, scope, sourceFile) {
-    const result = ts.transform(node, [(context) => (root) => normalize(root, scope, context, sourceFile)]);
-    try {
-      const type = print(result.transformed[0], sourceFile);
-      const shape = shapeOf(result.transformed[0], sourceFile);
-      return shape.union || shape.function || shape.generic ? { type, shape } : { type };
-    } finally {
-      result.dispose();
-    }
-  }
-
   function typeParametersOf(typeParameters, scope, sourceFile) {
     return (typeParameters ?? []).map((parameter) => ({
       constraint: parameter.constraint ? render(parameter.constraint, scope, sourceFile) : "",
@@ -248,7 +191,7 @@ function readSide(side) {
         continue;
       }
       parameters.push({
-        ...(parameter.type ? renderParameter(parameter.type, scope, sourceFile) : { type: "" }),
+        type: parameter.type ? render(parameter.type, scope, sourceFile) : "",
         optional: Boolean(parameter.questionToken || parameter.initializer),
         rest: Boolean(parameter.dotDotDotToken),
       });

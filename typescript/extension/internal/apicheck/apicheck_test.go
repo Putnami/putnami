@@ -381,26 +381,12 @@ func TestATypeChangeNextToARemovalFailsOnTheRemovalAlone(t *testing.T) {
 	}
 }
 
-func TestAParameterThatAcceptsMorePassesUnderAFeatCommit(t *testing.T) {
-	f := newFixture(t, catalog("package", "stable"))
-	f.write("ts/lib/src/index.ts", strings.Replace(greetSource, "greet(name: string)", "greet(name: string | undefined)", 1))
-	f.commit("feat: greet nobody")
-
-	status, data, events := f.run()
-	if status != "OK" || data["incompatible"] != 0 || data["compared"] != true {
-		t.Fatalf("status = %q, data = %v", status, data)
-	}
-	if found := diagnostics(events, runtime.SeverityError); len(found) != 0 {
-		t.Fatalf("error diagnostics = %+v, want none", found)
-	}
-}
-
 func TestAnUncommittedRemovalIsChecked(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, catalog("package", "stable"))
 	f.write("ts/lib/src/index.ts", waveOnlySource)
 	report := f.check()
-	if len(report.Changes) != 1 || report.Changes[0].Symbol != "function greet" || report.Breaking != nil {
+	if len(report.Changes) != 1 || report.Changes[0].Message != "function greet removed" || report.Breaking != nil {
 		t.Fatalf("report = %+v", report)
 	}
 }
