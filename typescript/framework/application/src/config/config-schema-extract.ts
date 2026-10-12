@@ -271,10 +271,10 @@ function applyDescriptorMeta(field: FieldSchema, descriptor: SchemaDescriptor): 
     field.env = descriptor.env;
   }
   // `default` is a transport string, serialized with omitempty on the Go side,
-  // and only a scalar has one: Go rejects a default tag on a slice, map or
-  // struct. `String([])` would emit `""`, which the config check applies as a
-  // string to an array field, and an empty string would also diverge from the
-  // Go canonical hash.
+  // and only a scalar has one: the Go runtime rejects a default tag on a
+  // slice, map or struct when the config loads. `String([])` would emit `""`,
+  // which the config check applies as a string to an array field, and an empty
+  // string would also diverge from the Go canonical hash.
   if (descriptor.default !== undefined && SCALAR_FIELD_TYPES.has(field.type)) {
     const value = String(descriptor.default);
     if (value !== '') {

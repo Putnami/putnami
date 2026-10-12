@@ -326,7 +326,7 @@ describe('extractConfigSchema end-to-end', () => {
       roles: Default(ArrayOf(String), []),
       hosts: Default(ArrayOf(String), ['a', 'b']),
       labels: Default(MapOf(String, String), {}),
-      tls: Default({ certFile: String }, { certFile: 'cert.pem' }),
+      tls: Default(Desc('TLS settings', { certFile: String }), { certFile: 'cert.pem' }),
       label: Default(String, ''),
       retries: Default(Int, 0),
     });
@@ -339,6 +339,7 @@ describe('extractConfigSchema end-to-end', () => {
     for (const name of ['roles', 'hosts', 'labels', 'tls', 'label']) {
       expect(findField(block.fields, name)).not.toHaveProperty('default');
     }
+    expect(findField(block.fields, 'tls')?.fields?.map((f) => f.name)).toEqual(['certFile']);
     expect(findField(block.fields, 'retries')?.default).toBe('0');
   });
 
