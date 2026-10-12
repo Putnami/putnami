@@ -886,7 +886,7 @@ Related Commands:
 ═══ extensions list ═══
 putnami extensions list
 
-List installed extensions with their versions and source
+List declared and discovered extensions with their versions and source
 
 Usage:
   putnami extensions list [--user] [--output <format>]

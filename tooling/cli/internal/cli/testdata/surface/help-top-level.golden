@@ -30,7 +30,7 @@ Workspace:
 
 Extensions & Templates:
   extensions install           Install extensions from config
-  extensions list              List installed extensions
+  extensions list              List extensions
   extensions update            Update extensions
   extensions remove            Remove an extension
   templates install            Install templates from config

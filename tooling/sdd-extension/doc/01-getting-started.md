@@ -108,8 +108,10 @@ Check what the CLI actually discovered:
 putnami extensions list
 ```
 
-The `INSTALLED` column shows the version the lock records. A `-` there means
-nothing is installed yet, which `putnami extensions install` fixes.
+A `@putnami/sdd` row means the workspace declares it. Its `INSTALLED` column
+shows the version the lock records, not what this machine has;
+`putnami extensions install` installs that version, or the latest when the
+column shows `-`.
 
 ## Where the decisions are recorded
 
