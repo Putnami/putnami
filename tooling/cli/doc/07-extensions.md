@@ -1447,7 +1447,7 @@ An executing task starts from an empty owned directory (see
 [10-caching.md](10-caching.md#task-owned-entries-declared-outputs)). A file the
 hook writes inside a task's required directory output, or inside an
 `optionalEmpty` directory output under the command-output directory, is gone
-once that task executes or restores an entry that records the output empty. An
+once that task executes or is restored from the cache. An
 `optionalEmpty` project or workspace directory output is not emptied. Write
 hook files outside every declared directory output, or under a subpath the
 owning task cedes (`excludes`) or preserves (`preserves`).

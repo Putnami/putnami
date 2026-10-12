@@ -812,6 +812,52 @@ func TestRestoreOfAnEmptyCommandOutputRecordEmptiesIt(t *testing.T) {
 	if got, want := emptyings(), []string{bin, bin}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("emptied %v, want the execution's emptying and the restore's", got)
 	}
+
+	// The shape of the Go package-archives task: the empty directory sits beside
+	// a required file. The entry records the directory empty and the file
+	// present. The restore empties the directory and replaces the file.
+	t.Run("an empty directory beside a required file", func(t *testing.T) {
+		f, archives := newBinFixture(t)
+		f.planned[0].Extension.Tasks[emptyingTask] = extension.TaskDefinition{Declares: &extension.TaskDeclaration{
+			Outputs: map[string]extension.DeclaredOutput{
+				"archives": {
+					Kind: extension.OutputKindDirectory, Root: extension.OutputRootCommandOutput, Path: "bin",
+					OptionalEmpty: true,
+				},
+				"metadata": fileDeclaration(extension.OutputRootCommandOutput, "metadata.json", false),
+			},
+		}}
+		writeExecutable(t, filepath.Join(f.ws.Root, "generate.sh"), "#!/bin/sh\n"+
+			"printf 'run:%s\\n' \"$PUTNAMI_JOB_NAME\" >> "+shellQuote(f.logPath)+"\n"+
+			"mkdir -p \"$PUTNAMI_OUTPUT_PATH/bin\"\n"+
+			"printf '{\"archives\":0}\\n' > \"$PUTNAMI_OUTPUT_PATH/metadata.json\"\n"+
+			"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"OK\"}}'\n")
+		metadata := filepath.Join(filepath.Dir(archives), "metadata.json")
+
+		first := f.executed(t, "nothing archived", f.run(t, SchedulerConfig{}))[0]
+		entry, err := store.NewLocalStore(f.storeRoot).LookupTaskEntry(first.CacheKey)
+		if err != nil || entry == nil {
+			t.Fatalf("no entry under %s (err=%v)", first.CacheKey, err)
+		}
+		if recorded, ok := entry.Output("archives"); !ok || recorded.State != store.TaskOutputEmpty {
+			t.Fatalf("archives recorded as %+v, want the output recorded empty", recorded)
+		}
+		if recorded, ok := entry.Output("metadata"); !ok || recorded.State == store.TaskOutputEmpty {
+			t.Fatalf("metadata recorded as %+v, want the file recorded present", recorded)
+		}
+
+		writeFileAt(t, filepath.Join(archives, "linux-amd64", "app.tar.gz"), "stale\n")
+		writeFileAt(t, metadata, "stale bytes\n")
+
+		f.hit(t, "restore beside a file", f.run(t, SchedulerConfig{}))
+		assertFilesIn(t, "restore beside a file", archives)
+		if got := readFileAt(t, metadata); got != "{\"archives\":0}\n" {
+			t.Fatalf("metadata.json = %q, want the entry's bytes", got)
+		}
+		if got := invocationLog(t, f.logPath); len(got) != 1 {
+			t.Fatalf("invocations = %v, want the one execution", got)
+		}
+	})
 }
 
 // A restore that cannot empty an output it must empty can leave a stale binary

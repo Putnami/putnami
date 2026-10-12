@@ -88,7 +88,13 @@ and a coalesced waiter that restore such a record empty the output.
   earlier layout.
 - A reader in another session sees a command-output directory empty from the
   emptying until the task writes it again, and during a restore of an empty
-  record. ADR 0064 already accepts that window for required outputs.
+  record. A session that runs the same task with other parameters can also
+  replace the directory's contents. The task-output locks cover one task, not
+  the gap between a producer and a reader of the same command, so that reader,
+  such as `package-archives` reading `bin`, can see the other session's set.
+  Before this decision the other session overwrote only the files it wrote. ADR
+  0064 already accepts this risk for required outputs, and this decision
+  extends it to the binary and package directories.
 - No drift verdict changes. `validateOutputDrift` refuses a drift policy on the
   command-output root, so no emptied command-output directory is policed.
 - An optional project or workspace output and every `pathFrom` output keep a
