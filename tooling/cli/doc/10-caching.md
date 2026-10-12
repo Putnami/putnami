@@ -82,6 +82,7 @@ v9                          ← format version (for compatibility)
 + runtime identity          ← declared runtime inputs such as hostPlatform or releaseBaseline, absent when none
 + OS class                  ← "windows" on Windows, absent elsewhere
 + source state              ← "unmanaged" where Git does not manage the workspace root, absent inside a repository
++ emptied outputs           ← ids of the required directory outputs emptied before the task executes, absent when none
 + task name                 ← e.g., "build~transpile"
 + task contract digest      ← the task's declaration in the manifest
 + project name              ← e.g., "my-app"
@@ -598,9 +599,11 @@ Capture reads each output **from its real location** — the task is not run in 
 sandbox — and stages it under a task-owned staging root (hardlinks, or copies
 when a link is impossible) before the entry is ingested and the declaration is
 validated against what was staged. The staging root is the *store's* boundary,
-not the process's: it is what makes an entry independent of sibling steps and of
-directory residue. It does **not** police writes outside the declaration, which
-would need process-level isolation this workspace cannot take yet.
+not the process's: it is what makes an entry independent of sibling steps. It
+does **not** police writes outside the declaration, which would need
+process-level isolation this workspace cannot take yet. What an earlier run left
+inside a required directory output never reaches the entry either, because the
+task starts from an empty owned directory (see below).
 
 A directory output may **cede** subpaths (`excludes`): staging skips them, so
 the entry holds no bytes under a path the declaration says belongs to another
@@ -628,6 +631,85 @@ the ceded subtree stays untouched
 throughout, including its nested readers. The owning task
 still runs after the ceding one, because its restore or execution is what
 makes the ceded path match the current sources.
+
+**An executing task starts from an empty owned directory.** Before a task
+executes, the scheduler empties each required directory output whose path the
+declaration states. It removes every entry the task owns there and leaves
+three things in place:
+
+- each subpath the declaration cedes (`excludes`) or preserves (`preserves`),
+  exactly as a restore leaves it;
+- the build stamp `.gen/version.json`, which belongs to the scheduler, not to
+  the task (see [The stamp is a shared document](#the-stamp-is-a-shared-document));
+- the output directory itself, with its mode. An output that does not exist
+  stays absent.
+
+An execution and a restore therefore leave the same paths untouched, and the
+entry a run stores holds only what that run wrote. A file the generator stops
+emitting, such as the prerendered HTML of a deleted page, is gone after the
+next execution, and no later restore brings it back.
+
+The emptying runs after the drift reference is taken and before the stamp
+refresh, the `preBuild` hook and the subprocess. Each retry empties again. A
+cache hit, a follower that adopts its leader's result and a coalesced waiter
+(a session that waits on another session's cache lease for the same key, then
+restores its entry) execute nothing, so they empty nothing. Each owned entry
+leaves the output in one rename into a private directory, so a reader finds an
+entry whole or gone. That directory is under the workspace scratch root, beside
+the output when a rename cannot reach the scratch root, or inside the output
+when the output is a mount of its own. When the emptying fails, the task fails
+before its subprocess starts, with an error that names the output, and nothing
+is stored.
+
+A file that another task writes inside the owned region is removed with the
+rest, exactly as a restore of the owner's entry removes it. A path that must
+outlive the owner's execution has to be ceded by the owner. The TypeScript
+`build-generate` cedes the config schema fallback `.gen/config-schema.json` and
+its JSON Schema companion, which `config-extract` writes when
+`options.generate.schema=false`, so a build keeps them.
+
+A task of another session in the same worktree that reads an owned directory
+while its owner runs can see it empty. The task-output locks order writers
+across sessions, not readers.
+
+Four outputs are not emptied:
+
+| Output | Why |
+| --- | --- |
+| An `optionalEmpty` directory | A run that writes nothing there records it empty, and a restore of that record leaves the path as it stands |
+| A file | The task replaces it whole |
+| An invocation-scoped output | It lives in a private tree created for the run |
+| A `pathFrom` output | Its path is known only after the task ran |
+
+Only a required output is emptied because only a required output is recorded
+present in every entry: ingest rejects a required output that is empty. A
+restore of a present output removes every owned entry the entry does not hold,
+which is what the emptying removes. An optional output can be recorded empty,
+and emptying it would make an execution remove what a restore keeps, such as a
+committed file the task reads when it writes nothing there.
+
+A file that a task stops writing therefore stays in an `optionalEmpty` or
+`pathFrom` directory, and in the entries captured from it, until the task
+removes it.
+
+The key of a task with an emptied output carries an `emptiedOutputs` marker
+that names those outputs. An entry stored by a CLI that emptied nothing can hold
+an earlier run's files under the key of the current sources. The marker keeps
+that entry at an address this CLI never asks for, so each such task misses once
+after the upgrade, and so does each task that depends on one. A task with no
+emptied output, including one whose directory outputs are all optional, keeps
+its address. The selection fingerprint carries the marker too, so the next
+publication republishes each release-set member whose key moved. See
+[ADR 0064](adr/0064-an-executing-task-starts-from-an-empty-owned-directory.md).
+
+**`--no-cache` never replaces a stored entry.** A bypassed run neither reads
+nor publishes at its key (see
+[Scoping the bypass to some projects](#scoping-the-bypass-to-some-projects)),
+so a successful `--no-cache` run leaves the entry at its key as it was. The
+entry of a task with an emptied output holds what its inputs produce, because
+its producing run started from an empty owned directory, so no bypassed run is
+needed to correct it. To drop entries you do not trust, run
+`putnami cache clean`.
 
 The two models never see each other's payloads, because the entry-format version
 is part of the entry's **address**, not a field inside it:
@@ -1480,6 +1562,14 @@ An identity field the current build leaves empty is *removed* rather than
 inherited, so a `suffix` from the previous commit can never linger and be read as
 this build's identity.
 
+The stamp is also the one file the emptying of an executing task's `.gen`
+leaves in place (see
+[Task-owned entries](#task-owned-entries-declared-outputs)). The scheduler
+writes it once per project and session, before the first task of that project
+executes, so a second task of the session that owns `.gen` still finds it. The
+emptying keeps the whole document, so the fields other writers merged into it
+survive, as they survive a re-stamp.
+
 ### Watch Mode
 
 Watch mode automatically disables the cache (`--no-cache`) to ensure fresh results on every file change.
@@ -1819,3 +1909,4 @@ putnami cache clean
 | Version bump | Different effective project version | Expected behavior |
 | Extension changed | Different implementation digest, or a different version for an extension without one | Expected behavior |
 | New task format | Format version changed (now `v9`) | Clean cache after CLI upgrade |
+| Required directory output emptied before execution | The key carries the `emptiedOutputs` marker | Expected once after the CLI upgrade that added it |

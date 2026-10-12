@@ -1034,7 +1034,7 @@
       }
     },
     "build-generate": {
-      "description": "Generate code into the project's .gen subtree (and, when the project generates one, the configured TypeScript client directory). Ownership decision: build-generate is the SINGLE producer of <project>/.gen, minus the .gen/deployment.json it cedes to package-deployment, the .gen/requirements.json and .gen/infra/runtime.json it cedes to build-infra, which write them after this task's snapshot, and the .gen/layers it cedes to cloud-image-layers of @putnami/cloud, which declares it — every other task that writes inside it (config-extract-exec's .gen/config-schema.json fallback) writes into generate-owned territory rather than claiming a slice of it. This task deletes the .gen/infra fragments at the start of every run, the runtime defaults file with them, which build-infra writes again after this task.",
+      "description": "Generate code into the project's .gen subtree (and, when the project generates one, the configured TypeScript client directory). Ownership decision: build-generate is the SINGLE producer of <project>/.gen, minus the .gen/deployment.json it cedes to package-deployment, the .gen/requirements.json and .gen/infra/runtime.json it cedes to build-infra, which write them after this task's snapshot, the .gen/layers it cedes to cloud-image-layers of @putnami/cloud, which declares it, and the .gen/config-schema.json fallback and its JSON Schema companion that config-extract-exec writes, which it cedes without a declaring owner. This task deletes the .gen/infra fragments at the start of every run, the runtime defaults file with them, which build-infra writes again after this task. Its v3 `declares` block below names these outputs; an executing run starts from a .gen emptied of everything it does not cede, except the scheduler's version stamp.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -1120,12 +1120,14 @@
             "root": "project",
             "path": ".gen",
             "excludes": [
+              ".gen/config-schema.json",
+              ".gen/config-schema.jsonschema.json",
               ".gen/deployment.json",
               ".gen/infra/runtime.json",
               ".gen/layers",
               ".gen/requirements.json"
             ],
-            "description": "Generated sources: the whole project-rooted .gen subtree, owned exclusively by this task (config-extract's schema fallback inside .gen is this task's output, not a second owner), minus .gen/deployment.json, which it cedes to package-deployment, and .gen/requirements.json and .gen/infra/runtime.json, which it cedes to build-infra: those tasks write the files after this task's snapshot and declare them. .gen/layers is ceded to cloud-image-layers of @putnami/cloud, which declares it."
+            "description": "Generated sources: the whole project-rooted .gen subtree, owned exclusively by this task, minus .gen/deployment.json, which it cedes to package-deployment, .gen/requirements.json and .gen/infra/runtime.json, which it cedes to build-infra (those tasks write the files after this task's snapshot and declare them), .gen/layers, which it cedes to cloud-image-layers of @putnami/cloud, which declares it, and .gen/config-schema.json with its .gen/config-schema.jsonschema.json companion, the config-extract fallback that only config-extract-exec writes and nobody claims, so an execution or a restore of this task leaves them in place."
           },
           "client": {
             "kind": "directory",
@@ -2173,7 +2175,7 @@
             "kind": "file",
             "path": "schema/config.json",
             "optionalEmpty": true,
-            "description": "Committed config manifest. Absent when the workload registers no config blocks, or when options.generate.schema=false routes the manifest to the .gen/config-schema.json fallback — that fallback lives inside the .gen subtree build-generate owns, so it is captured there and is deliberately not claimed here."
+            "description": "Committed config manifest. Absent when the workload registers no config blocks, or when options.generate.schema=false routes the manifest to the .gen/config-schema.json fallback — build-generate cedes that path inside its .gen subtree, and it is deliberately not claimed here, so neither task stores it and a build keeps it."
           },
           "jsonSchema": {
             "kind": "file",

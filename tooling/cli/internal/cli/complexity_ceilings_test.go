@@ -574,7 +574,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "cache",
 		prefix: "internal/store/",
 		files:  34,
-		funcs:  289,
+		funcs:  291,
 		why: "internal/store: the content-addressed local cache — entries, task entries, CAS, " +
 			"leases, GC, generations and the remote bridge. Cache-key completeness and atomicity " +
 			"under concurrency are the two invariants this repository has been burned by most " +
@@ -752,7 +752,14 @@ var complexityCeilings = []complexityCeiling{
 			"inputs, and slash-ordered deduplication. They preserve exclusions before " +
 			"source-link validation, raw identity for the lexical link, referent and " +
 			"embedded asset, and Git-candidate precedence. They add no second " +
-			"collector, CAS entry path, write or eviction rule",
+			"collector, CAS entry path, write or eviction rule. " +
+			"RAISED, from 34/289 to 34/291, with no new file (ADR 0064). EmptyTaskOutput " +
+			"empties a declared directory output before its task executes, and emptyInto is its " +
+			"one attempt from a chosen trash directory. They are the pruning half of a restore, " +
+			"over the same pruneAround, keep list, staging-root choice, EXDEV fallback and " +
+			"holderWait budget, so an execution and a restore keep the same paths. Neither is a " +
+			"new way to reach the store: they touch a declared output path, never an entry, and " +
+			"add no entry format, remote path or eviction rule",
 	},
 	{
 		unit:   "output",

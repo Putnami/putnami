@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -29,7 +30,8 @@ var runPreBuildHookFunc = hooks.RunPreBuildHook
 //	openTask     (per task) cache lookup / restore / claim, shared-execution
 //	                        rendezvous
 //	prepareTask  (per task) inside the group's task-output locks: output
-//	                        preparation, version refresh, preBuild hook, JobStart
+//	                        preparation and emptying, version refresh, preBuild
+//	                        hook, JobStart
 //	runWorkItems (1..n)     the runner API: ONE shared subprocess for the whole
 //	                        group, then PER-TASK re-execution of failures
 //	closeTask    (per task) finalizeExecutedJob — run history, source-mutation
@@ -263,10 +265,10 @@ func (s *Scheduler) abandonTask(item taskWork, result *JobResult) jobDone {
 }
 
 // prepareTask is the pre-execution side of ONE task's lifecycle, run while the
-// task holds its task-output locks: drift reference, output preparation,
-// version refresh, preBuild hook, invocation arming and JobStart. It returns
-// the work item to execute, or nil plus the terminal row of a preparation
-// failure.
+// task holds its task-output locks: drift reference, output preparation and
+// emptying, version refresh, preBuild hook, invocation arming and JobStart. It
+// returns the work item to execute, or nil plus the terminal row of a
+// preparation failure.
 func (s *Scheduler) prepareTask(
 	ctx context.Context,
 	item taskWork,
@@ -300,6 +302,20 @@ func (s *Scheduler) prepareTask(
 	if declaresCommandOutput(job) {
 		if err := s.ensureCommandOutputWritable(job); err != nil {
 			return fail(fmt.Errorf("prepare command output: %w", err))
+		}
+	}
+
+	// A task that executes starts from an empty owned directory, so its entry
+	// holds only what this run wrote (ADR 0064). The emptying comes after the
+	// drift reference, which must see what the worktree held before the run,
+	// and after the detach above, so no rename reaches through a link into the
+	// store. It comes before everything that writes for this task: the stamp
+	// refresh, the preBuild hook and the subprocess. A task that adopts a
+	// leader's result executes nothing and captures the tree its leader wrote,
+	// so it empties nothing.
+	if item.sharedResult == nil {
+		if err := s.emptyOwnedOutputs(job); err != nil {
+			return fail(fmt.Errorf("empty declared outputs: %w", err))
 		}
 	}
 
@@ -478,6 +494,16 @@ func (s *Scheduler) runWorkItems(ctx context.Context, work []taskWork) map[strin
 				break
 			}
 			if run.result == nil || run.result.Status != "failed" || ctx.Err() != nil {
+				break
+			}
+			// A retry is another execution, so it starts from an empty owned
+			// directory like the first attempt: what the failed attempt wrote is
+			// not the output of the one that follows. A retry that cannot be
+			// given that directory is not attempted, and the task keeps the
+			// failure it already has.
+			if err := s.emptyOwnedOutputs(work[i].job); err != nil {
+				slog.Warn("retry not attempted: cannot empty declared outputs",
+					"project", work[i].job.Project.Name, "job", work[i].job.JobDef.Name, "error", err)
 				break
 			}
 			run.result = retainFirstEventLatency(run.result, s.runTaskAttempt(ctx, work[i].job))

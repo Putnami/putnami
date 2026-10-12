@@ -980,6 +980,12 @@ func computeJobCacheHashWith(
 		upstreamHashes,
 	)
 	cacheKey.OSClass = hostOSClass(cacheKey.OSClass)
+	// A task whose directory outputs the scheduler empties before it executes
+	// keys apart from an engine that emptied nothing, whose entry for the same
+	// inputs can hold an earlier run's files (ADR 0064). A selection key carries
+	// the marker too: what a publication recorded under the other kind of entry
+	// is not known to be what this engine builds.
+	cacheKey.EmptiedOutputs = emptiedOutputIDs(job)
 	if selection {
 		// The OS class keeps Windows cache entries apart from POSIX ones
 		// (D-W5). A selection key is compared with the one a publication

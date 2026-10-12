@@ -241,7 +241,7 @@ Use `.` when you want current-directory scope instead of the smart default.
 
 | Flag | Purpose |
 |------|---------|
-| `--no-cache` | Force re-execution (skip cache reads, still writes) |
+| `--no-cache` | Force re-execution (skip cache reads and writes; the stored entry stays) |
 | `--watch`, `-w` | Re-run on file changes (150ms debounce) |
 | `--plan` | Show execution plan without running |
 | `--verbose`, `-v` | Show job results and diagnostics |

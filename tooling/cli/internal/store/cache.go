@@ -255,6 +255,16 @@ type CacheKey struct {
 	// repository keeps its address.
 	SourceState string
 
+	// EmptiedOutputs lists the ids of the declared directory outputs the engine
+	// empties before the task executes (ADR 0064). An entry captured from an
+	// emptied directory holds only what its own run wrote; one captured from a
+	// directory left as it stood can hold an earlier run's files. The second
+	// kind must never serve a run that expects the first, so a task with such
+	// an output keys apart from an engine that emptied nothing. The hash omits
+	// the field when it is empty, so a task with no such output keeps its
+	// address.
+	EmptiedOutputs []string
+
 	// Task is the task name (e.g., "build~transpile").
 	Task string
 
@@ -401,6 +411,17 @@ func (k *CacheKey) ComputeHashUsing(cm *CacheManager) (string, error) {
 	if k.SourceState != "" {
 		writeField(h, "sourceState")
 		writeField(h, k.SourceState)
+	}
+	// Same shape: absent for a task that owns no emptied directory, so its key
+	// is unchanged, and present for one that does, so no such key equals a key
+	// computed without the marker.
+	if len(k.EmptiedOutputs) > 0 {
+		writeField(h, "emptiedOutputs")
+		emptied := append([]string(nil), k.EmptiedOutputs...)
+		sort.Strings(emptied)
+		for _, id := range emptied {
+			writeField(h, id)
+		}
 	}
 	writeField(h, k.Task)
 	writeField(h, k.TaskContractDigest)
