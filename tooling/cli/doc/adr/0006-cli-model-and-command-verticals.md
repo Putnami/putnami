@@ -55,8 +55,8 @@ the same answer.
 
 `internal/commands` is a container directory (documented in its `doc.go`)
 with one package per command surface: `agentctx`, `cachecmd`, `ci`,
-`completion`, `composecmd`, `configcmd`, `doctor`, `extensions`, `lifecycle`,
-`migrate`, `qualifycmd`, `sessions`, `treecmd`, `versioncmd`. Only the
+`completion`, `composecmd`, `configcmd`, `contributor`, `doctor`, `extensions`,
+`lifecycle`, `migrate`, `proposals`, `qualifycmd`, `sessions`, `treecmd`, `versioncmd`. Only the
 surface golden (`surface_golden_test.go`, `testdata/surface/`) stays at the
 root.
 
@@ -64,6 +64,14 @@ A helper two or more verticals need moves to `internal/commands/shared` when
 its callers are production code, and to `internal/commands/sharedtest` when
 they are tests. Rationale: a test helper in `shared` makes it import
 `testing`, which links the testing runtime into the shipped binary.
+
+The native `contributor` vertical owns language and machine-load commands;
+`proposals` owns finalization. Their common language evaluator is pure and
+lives in the existing `shared` package. Neither vertical imports the other.
+The restored-report verifier remains a read-only seam in `internal/engine`,
+where the current task cache key, result, output manifest and bounded bytes
+can be checked together. It does not add a command vertical, scheduler or run
+stage; moving that check to `treecmd` would duplicate engine cache ownership.
 
 `lifecycle` is the only vertical that imports siblings (`agentctx`,
 `extensions`, `versioncmd`, `completion`): install, upgrade and

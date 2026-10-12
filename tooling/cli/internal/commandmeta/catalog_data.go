@@ -1216,7 +1216,7 @@ var catalog = []Command{
 			"putnami contributor language commits origin/main..HEAD",
 			"putnami contributor language tasks --limit 100",
 		},
-		Related:   []string{"contributor machine-load", "proposals finalize"},
+		Related:   []string{"contributor machine-load", "tree verify"},
 		Workspace: requiredWorkspace(),
 	},
 	{

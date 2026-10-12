@@ -114,6 +114,7 @@ func (r *verifyRun) workflowReadPath(file, name string) []byte {
 }
 
 func (r *verifyRun) workflowBytes(reference any, name string) ([]byte, string) {
+	require(reference != nil, "missing evidence reference")
 	ref := workflowObject(reference, name, []string{"path", "sha256"}, []string{"path", "sha256"})
 	file := workflowText(ref.get("path"), name+" path")
 	data := r.workflowReadPath(file, name)

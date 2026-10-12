@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,37 +14,18 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 )
 
-func TestLanguageSignalsAndExclusions(t *testing.T) {
-	cases := []struct {
-		text     string
-		offender bool
-	}{
-		{"Nous corrigons le code", true},
-		{"corrige le parseur des tableaux", true},
-		{"école café", true},
-		{"An English naïve example", false},
-		{"Des Moines", false},
-		{"The RGPD and CNIL review `nous avec`\n```\nnous avec\n```", false},
-		{"Use --avec on the command line", false},
-	}
-	for _, tc := range cases {
-		if got := EvaluateLanguage("unit", tc.text) != nil; got != tc.offender {
-			t.Errorf("%q offender=%t, want %t", tc.text, got, tc.offender)
-		}
-	}
-	if hit := EvaluateLanguage("commit", "Explain the reason\nNous corrigeons le code"); hit == nil || len(hit.Lines) == 0 || !strings.HasPrefix(hit.Lines[0], "2:") {
-		t.Fatalf("diagnostic lost actionable line: %+v", hit)
-	}
+func TestLanguageFileExclusions(t *testing.T) {
+	t.Parallel()
 	for _, path := range []string{"src/a_test.go", "src/a.test.ts", "fixtures/sample.md", "testdata/file.md"} {
 		if !ExcludedLanguagePath(path) {
 			t.Errorf("fixture %s was not excluded", path)
 		}
 	}
-	if !ExcludedLanguagePath("tooling/cli/internal/commands/contributor/language.go") ||
-		!ExcludedLanguagePath(`tooling\cli\internal\commands\contributor\language.go`) {
+	if !ExcludedLanguagePath("tooling/cli/internal/commands/shared/language.go") ||
+		!ExcludedLanguagePath(`tooling\cli\internal\commands\shared\language.go`) {
 		t.Fatal("the native detector's signal vocabulary was scanned as public prose")
 	}
-	for _, path := range []string{"tooling/cli/internal/commands/contributor/language_modes.go", "somewhere/else/language.go"} {
+	for _, path := range []string{"tooling/cli/internal/commands/contributor/language.go", "somewhere/else/language.go"} {
 		if ExcludedLanguagePath(path) {
 			t.Errorf("unrelated source %s was excluded", path)
 		}
@@ -100,6 +82,39 @@ func TestLanguageFilesDistinguishesToolFailure(t *testing.T) {
 	}
 }
 
+func TestLanguageRangesRejectGitOptionsBeforeSpawn(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if err := exec.Command("git", "init", "-q", root).Run(); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(root, "injected-output")
+	for _, mode := range []string{"files", "commits"} {
+		var errors bytes.Buffer
+		runner := LanguageRunner{Root: root, Out: &bytes.Buffer{}, Err: &errors}
+		args := []string{"--output=" + output}
+		if mode == "files" {
+			args = append([]string{"--diff"}, args...)
+		}
+		if status := runner.RunLanguage(context.Background(), mode, args); status != 2 || !strings.Contains(errors.String(), "option-like") {
+			t.Fatalf("%s accepted Git option-like range: status=%d diagnostic=%q", mode, status, errors.String())
+		}
+		if _, err := os.Stat(output); !os.IsNotExist(err) {
+			t.Fatalf("%s wrote through a revision range: stat=%v", mode, err)
+		}
+	}
+	for _, mode := range []string{"files", "commits"} {
+		args := []string{" "}
+		if mode == "files" {
+			args = append([]string{"--diff"}, args...)
+		}
+		var errors bytes.Buffer
+		if status := (LanguageRunner{Root: root, Out: &bytes.Buffer{}, Err: &errors}).RunLanguage(context.Background(), mode, args); status != 2 || !strings.Contains(errors.String(), "option-like") {
+			t.Fatalf("%s accepted empty range: status=%d diagnostic=%q", mode, status, errors.String())
+		}
+	}
+}
+
 func TestMachineLoadKnownAndUnknown(t *testing.T) {
 	read := LoadReader{OS: "linux", NumCPU: func() int { return 4 }, ReadFile: func(string) ([]byte, error) { return []byte("2.00 1.00 0.50 1/4 100"), nil }}
 	sample := MachineLoad(read)
@@ -114,5 +129,20 @@ func TestMachineLoadKnownAndUnknown(t *testing.T) {
 	read.ReadFile = func(string) ([]byte, error) { return []byte("invalid"), nil }
 	if MachineLoad(read).Known {
 		t.Fatal("invalid load was reported as known")
+	}
+	read = LoadReader{OS: "darwin", NumCPU: func() int { return 4 }, Command: func(name string, args ...string) ([]byte, error) {
+		if name != "/usr/sbin/sysctl" || len(args) != 2 || args[0] != "-n" || args[1] != "vm.loadavg" {
+			t.Fatalf("load reader used PATH-selected or unexpected command: %q %v", name, args)
+		}
+		return []byte("{ 2.00 1.00 0.50 }"), nil
+	}}
+	if sample := MachineLoad(read); !sample.Known || sample.Ratio != 0.5 {
+		t.Fatalf("absolute Darwin load probe failed: %+v", sample)
+	}
+	for _, platform := range []string{"freebsd", "openbsd", "netbsd"} {
+		read.OS = platform
+		if sample := MachineLoad(read); sample.Known {
+			t.Fatalf("unverified %s path was treated as trustworthy: %+v", platform, sample)
+		}
 	}
 }

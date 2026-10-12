@@ -204,7 +204,7 @@ func TestWorkflowSourcesMustBeTrackedNativeFiles(t *testing.T) {
 		fxObjAt(manifest, "features", 0, "requirements", 0, "verification")["checks"] = fxArr{"first-check"}
 		f.write(".context/putnami.features.json", manifest)
 		fxObjAt(w, "sources", 0)["manifest"] = f.reference(".context/putnami.features.json")
-		f.git("rm", "--cached", "-q", ".context/putnami.features.json")
+		f.git("rm", "--cached", "-f", "-q", ".context/putnami.features.json")
 		f.workflow(w, false, "workflow manifest must be tracked by Git")
 	})
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
 // Git is the narrow repository boundary the finalizer needs. It deliberately
@@ -37,6 +38,33 @@ type CommitMessage struct {
 type NativeGit struct{ Root string }
 
 func (g NativeGit) run(args ...string) ([]byte, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("missing read-only git operation")
+	}
+	switch args[0] {
+	case "branch", "rev-parse", "check-ref-format", "merge-base", "status", "diff", "rev-list", "log", "diff-tree":
+	default:
+		return nil, fmt.Errorf("unsupported read-only git operation %q", args[0])
+	}
+	// Read-only preflight must not start configured fsmonitor code before the
+	// collaboration provider has prepared its credential holder.
+	cmd := exec.Command("git", append([]string{"-C", g.Root, "--no-pager", "-c", "core.fsmonitor=false"}, args...)...)
+	cmd.Env = gitEnvironment(os.Environ())
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	answer, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
+	}
+	return answer, nil
+}
+
+func (g NativeGit) runWrite(args ...string) ([]byte, error) {
+	if len(args) == 0 || args[0] != "commit" && args[0] != "push" {
+		return nil, fmt.Errorf("unsupported repository-writing git operation")
+	}
+	// Commit hooks and push transport helpers may execute repository code.
+	runcredential.MarkRepositoryCodeStarted("git " + args[0])
 	cmd := exec.Command("git", append([]string{"-C", g.Root}, args...)...)
 	cmd.Env = gitEnvironment(os.Environ())
 	var stderr bytes.Buffer
@@ -76,11 +104,11 @@ func (g NativeGit) BaseRef(base string) (string, error) {
 func (g NativeGit) BaseTip(base string) (string, error) { return g.one("rev-parse", "--verify", base) }
 func (g NativeGit) BaseSHA(base string) (string, error) { return g.one("merge-base", base, "HEAD") }
 func (g NativeGit) Clean() (bool, error) {
-	answer, err := g.run("status", "--porcelain", "--untracked-files=all")
+	answer, err := g.run("status", "--porcelain", "--untracked-files=all", "--ignore-submodules=all")
 	return len(answer) == 0, err
 }
 func (g NativeGit) Staged() (bool, error) {
-	answer, err := g.run("diff", "--cached", "--name-only", "-z")
+	answer, err := g.run("diff", "--no-ext-diff", "--cached", "--name-only", "-z")
 	return len(answer) > 0, err
 }
 func (g NativeGit) Ahead(base string) (bool, error) {
@@ -88,7 +116,7 @@ func (g NativeGit) Ahead(base string) (bool, error) {
 	return answer != "0", err
 }
 func (g NativeGit) ChangedPaths(base string) ([]string, error) {
-	answer, err := g.run("diff", "--no-renames", "--name-only", "-z", base+"...HEAD")
+	answer, err := g.run("diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", base+"...HEAD")
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +133,7 @@ func (g NativeGit) CommitMessages(base string) ([]CommitMessage, error) {
 		if err != nil {
 			return nil, err
 		}
-		paths, err := g.run("diff-tree", "--root", "--no-commit-id", "--name-only", "-r", "-z", sha)
+		paths, err := g.run("diff-tree", "--no-ext-diff", "--root", "--no-commit-id", "--name-only", "-r", "-z", sha)
 		if err != nil {
 			return nil, err
 		}
@@ -114,11 +142,11 @@ func (g NativeGit) CommitMessages(base string) ([]CommitMessage, error) {
 	return result, nil
 }
 func (g NativeGit) Seed(title string) error {
-	_, err := g.run("commit", "--allow-empty", "-m", title)
+	_, err := g.runWrite("commit", "--allow-empty", "-m", title)
 	return err
 }
 func (g NativeGit) Push(branch string) error {
-	_, err := g.run("push", "-u", "origin", branch)
+	_, err := g.runWrite("push", "-u", "origin", branch)
 	return err
 }
 func (g NativeGit) Fingerprint() (string, error) {

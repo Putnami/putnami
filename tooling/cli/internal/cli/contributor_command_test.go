@@ -6,6 +6,7 @@ import (
 )
 
 func TestFinalizeOptionsRejectsGateExecutionAndAmbiguousArguments(t *testing.T) {
+	t.Parallel()
 	args := []string{"--base", "main", "--branch", "topic", "--title", "fix: change", "--body-file", "body.md", "--verification-file", "proof.json", "--partial-delivery"}
 	got, err := finalizeOptions(args)
 	if err != nil || !got.PartialDelivery || got.VerificationFile != "proof.json" {

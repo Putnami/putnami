@@ -1246,8 +1246,20 @@ func TestVerifierUsesItsRootDespiteForeignGitEnvironment(t *testing.T) {
 			t.Fatalf("repository selector leaked to verifier Git command: %s", name)
 		}
 	}
-	if top, err := capture("git", command); err != nil || strings.TrimSpace(top) != f.root {
-		t.Fatalf("verifier Git root = %q, error %v, want %q", top, err, f.root)
+	top, err := capture("git", command)
+	if err != nil {
+		t.Fatalf("verifier Git root: %v", err)
+	}
+	resolvedTop, err := filepath.EvalSymlinks(strings.TrimSpace(top))
+	if err != nil {
+		t.Fatalf("resolve verifier Git root: %v", err)
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(f.root)
+	if err != nil {
+		t.Fatalf("resolve fixture Git root: %v", err)
+	}
+	if resolvedTop != resolvedRoot {
+		t.Fatalf("verifier Git root = %q, want %q", resolvedTop, resolvedRoot)
 	}
 	f.verify("")
 }

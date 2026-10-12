@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
-	"go.putnami.dev/tooling/cli/internal/commands/contributor"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 )
 
 type Policy struct {
@@ -196,7 +196,7 @@ func ValidatePublicationText(title, body, proof string, policy Policy) error {
 	if agentMarker.MatchString(combined) {
 		return errors.New("proposal title, body or proof names an agent")
 	}
-	if policy.Verification.Language == "en" && contributor.EvaluateLanguage("proposal title, body and proof", combined) != nil {
+	if policy.Verification.Language == "en" && shared.EvaluateLanguage("proposal title, body and proof", combined) != nil {
 		return errors.New("proposal title, body or proof has non-English signals")
 	}
 	return nil

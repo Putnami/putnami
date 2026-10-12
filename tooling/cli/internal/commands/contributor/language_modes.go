@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -28,7 +29,15 @@ type LanguageRunner struct {
 }
 
 func (r LanguageRunner) git(args ...string) ([]byte, error) {
-	cmd := exec.Command("git", append([]string{"-C", r.Root}, args...)...)
+	if len(args) == 0 {
+		return nil, fmt.Errorf("missing read-only git operation")
+	}
+	switch args[0] {
+	case "diff", "ls-files", "rev-list", "log":
+	default:
+		return nil, fmt.Errorf("unsupported read-only git operation %q", args[0])
+	}
+	cmd := exec.Command("git", append([]string{"-C", r.Root, "--no-pager", "-c", "core.fsmonitor=false"}, args...)...)
 	cmd.Env = git.RepositoryEnvironment(os.Environ())
 	return cmd.Output()
 }
@@ -41,7 +50,7 @@ type languageScan struct {
 
 func (s *languageScan) add(label string, content []byte) {
 	s.units++
-	if hit := EvaluateLanguage(label, string(content)); hit != nil {
+	if hit := shared.EvaluateLanguage(label, string(content)); hit != nil {
 		s.offenders++
 		fmt.Fprintf(s.runner.Out, "%s: non-English signals: %s\n", hit.Label, strings.Join(hit.Signals, ", "))
 		for _, line := range hit.Lines {
@@ -154,7 +163,10 @@ func (s *languageScan) filePaths(args []string) ([]string, error) {
 		if len(args) != 2 {
 			return nil, fmt.Errorf("files --diff needs one revision range")
 		}
-		data, err := s.runner.git("diff", "--no-relative", "--name-only", "--diff-filter=d", "-z", args[1])
+		if invalidRevisionRange(args[1]) {
+			return nil, fmt.Errorf("invalid revision range %q: empty or option-like", args[1])
+		}
+		data, err := s.runner.git("diff", "--no-ext-diff", "--no-relative", "--name-only", "--diff-filter=d", "-z", args[1])
 		if err != nil {
 			return nil, fmt.Errorf("invalid revision range %q: %w", args[1], err)
 		}
@@ -175,6 +187,9 @@ func (s *languageScan) commits(args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("commits needs one revision range")
 	}
+	if invalidRevisionRange(args[0]) {
+		return fmt.Errorf("invalid revision range %q: empty or option-like", args[0])
+	}
 	data, err := s.runner.git("rev-list", args[0])
 	if err != nil {
 		return fmt.Errorf("invalid revision range %q: %w", args[0], err)
@@ -187,6 +202,10 @@ func (s *languageScan) commits(args []string) error {
 		s.add("commit "+sha[:min(7, len(sha))], message)
 	}
 	return nil
+}
+
+func invalidRevisionRange(value string) bool {
+	return strings.TrimSpace(value) == "" || strings.HasPrefix(value, "-")
 }
 
 func (s *languageScan) tasks(ctx context.Context, args []string) error {

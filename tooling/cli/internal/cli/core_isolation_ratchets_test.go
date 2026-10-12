@@ -435,7 +435,14 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // import, nor in internal/cli/clitest, which internal/jobs cannot import without
 // a cycle. It is imported by _test.go files only and never by cmd/putnami's
 // graph. It adds no vertical and no engine stage.
-const internalPackageCountCeiling = 67
+//
+// RAISED 67 → 69 (cli/contributor-workflows): internal/commands/contributor
+// owns native language and machine-load commands, and internal/commands/proposals
+// owns native proposal finalization. These replace shell implementations with
+// two distinct command surfaces under ADR 0006. Their shared pure language
+// evaluator stays in the existing commands/shared package, so this adds exactly
+// two production packages and no execution engine or scheduling stage.
+const internalPackageCountCeiling = 69
 
 func TestInternalPackageCountCeiling(t *testing.T) {
 	t.Parallel()

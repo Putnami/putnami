@@ -9,7 +9,17 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	collab "go.putnami.dev/protocol/collaboration"
 )
+
+type auditNativeWorkspace struct {
+	Name       string   `json:"name"`
+	Extensions []string `json:"extensions"`
+	Options    struct {
+		Collaboration collab.Bindings `json:"collaboration"`
+	} `json:"options"`
+}
 
 // The managed audit's proposal scan must reach the one native language
 // evaluator through the installed check relay, with an ordinary provider
@@ -26,14 +36,12 @@ func TestManagedAuditProposalScanUsesNativeLanguage(t *testing.T) {
 	harness := collaborationHarness(t)
 	root := t.TempDir()
 	providerDir := filepath.ToSlash(filepath.Join(harness, "local-collaboration"))
-	config, err := json.Marshal(map[string]any{
-		"name":       "audit-language-fixture",
-		"extensions": []string{providerDir},
-		"options": map[string]any{"collaboration": map[string]any{
-			"proposals": map[string]any{"provider": "@putnami/local-collaboration", "version": 1,
-				"settings": map[string]any{"repository": "acme/app"}},
-		}},
-	})
+	workspace := auditNativeWorkspace{Name: "audit-language-fixture", Extensions: []string{providerDir}}
+	workspace.Options.Collaboration = collab.Bindings{collab.ContractProposals: {
+		Provider: "@putnami/local-collaboration", Version: 1,
+		Settings: json.RawMessage(`{"repository":"acme/app"}`),
+	}}
+	config, err := json.Marshal(workspace)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,9 +89,9 @@ func TestManagedAuditProposalScanUsesNativeLanguage(t *testing.T) {
 
 	upsert := func(body string) {
 		t.Helper()
-		input, err := json.Marshal(map[string]any{
-			"change": map[string]any{"base": "main", "head": "topic"},
-			"title":  "docs: explain the parser", "body": body,
+		input, err := json.Marshal(collab.ProposalUpsertInput{
+			Change: collab.Change{Base: "main", Head: "topic"},
+			Title:  "docs: explain the parser", Body: body,
 		})
 		if err != nil {
 			t.Fatal(err)

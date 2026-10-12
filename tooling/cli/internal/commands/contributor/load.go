@@ -53,11 +53,11 @@ func MachineLoad(reader LoadReader) LoadSample {
 			return LoadSample{}
 		}
 		raw = string(data)
-	case "darwin", "freebsd", "openbsd", "netbsd":
+	case "darwin":
 		if reader.Command == nil {
 			return LoadSample{}
 		}
-		data, err := reader.Command("sysctl", "-n", "vm.loadavg")
+		data, err := reader.Command("/usr/sbin/sysctl", "-n", "vm.loadavg")
 		if err != nil {
 			return LoadSample{}
 		}

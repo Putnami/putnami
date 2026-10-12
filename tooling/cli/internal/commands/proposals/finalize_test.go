@@ -390,6 +390,7 @@ func TestHostedRequiredCheckNamesFailClosed(t *testing.T) {
 	if got := hostedCheckVerdict(checks, []string{"required"}, head); got != "failing" {
 		t.Fatalf("duplicate mixed check passed: %s", got)
 	}
+	checks.Items = checks.Items[:2]
 	if got := hostedCheckVerdict(checks, []string{"required", "required"}, head); got != "unsupported" {
 		t.Fatalf("duplicate policy check passed: %s", got)
 	}
