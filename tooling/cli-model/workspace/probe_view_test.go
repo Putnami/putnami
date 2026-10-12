@@ -124,6 +124,29 @@ func TestAdoptProbeView_FallsBackToTheScopePatternThenTheBasename(t *testing.T) 
 	}
 }
 
+// Authored and scope tags reach the project in the form the merged view and the
+// job context carry them, so every reader classifies a padded tag as the API
+// check does. An authored list that normalizes to nothing still blocks the
+// scope's tags.
+func TestAdoptProbeView_NormalizesAuthoredAndScopeTags(t *testing.T) {
+	ws := adoptionWorkspace()
+	ws.Projects[0].Scope = ScopeContribution{Tags: []string{" tools ", "", "tools"}}
+	ws.Projects[1].Config.Tags = []string{" protocol", "go", "", "go "}
+	ws.Projects[2].Config.Tags = []string{" "}
+	ws.Projects[2].Scope = ScopeContribution{Tags: []string{"tools"}}
+	ws.AdoptProbeView(nil)
+
+	if got := ws.ProjectByID("/app").Tags; !slices.Equal(got, []string{"tools"}) {
+		t.Errorf("app tags = %q, want the scope's tags trimmed and deduplicated", got)
+	}
+	if got := ws.ProjectByID("/lib").Tags; !slices.Equal(got, []string{"go", "protocol"}) {
+		t.Errorf("lib tags = %q, want the authored tags trimmed, deduplicated and sorted", got)
+	}
+	if got := ws.ProjectByID("/infra").Tags; got == nil || len(got) != 0 {
+		t.Errorf("infra tags = %#v, want an empty authored declaration that blocks the scope's tags", got)
+	}
+}
+
 // Providers report edges as repo-relative PATHS; the dependency graph is keyed on
 // NAMES. Resolution happens after every name is final, so an edge's spelling
 // cannot depend on discovery order.

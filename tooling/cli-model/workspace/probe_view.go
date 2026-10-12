@@ -249,7 +249,7 @@ func ResolveProjectIdentity(p *Project, view *wsproto.MergedProject) {
 	if cfg != nil {
 		p.Name = cfg.Name
 		p.Type = cfg.Type
-		p.Tags = cfg.Tags
+		p.Tags = normalizedTags(cfg.Tags)
 		// Visibility is AUTHORED only. A provider describes what a project
 		// imports; who may import it back is the project owner's statement, and
 		// no scope inherits it — a boundary a project did not write is a
@@ -321,11 +321,31 @@ func ResolveProjectIdentity(p *Project, view *wsproto.MergedProject) {
 	// produces nil or a non-empty list (wsproto normalizes), so a non-nil empty
 	// p.Tags here can only have come from an authored `"tags": []`.
 	if p.Tags == nil {
-		p.Tags = p.Scope.Tags
+		p.Tags = normalizedTags(p.Scope.Tags)
 	}
 	if len(p.Extensions) == 0 {
 		p.Extensions = p.Scope.Extensions
 	}
+}
+
+// normalizedTags is an authored tag list in the form the merged view and the
+// job context carry: trimmed, without empty tags or duplicates, sorted. Every
+// reader of a project's tags (the support subject, the --tag filter, release
+// visibility) then classifies a project as the API check does. An authored list
+// stays non-nil when nothing survives, because it is still the declaration
+// "this project has no tags" that blocks the view's and the scope's tags.
+func normalizedTags(tags []string) []string {
+	if tags == nil {
+		return nil
+	}
+	out := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		if tag = strings.TrimSpace(tag); tag != "" && !slices.Contains(out, tag) {
+			out = append(out, tag)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // artifactBaseProjectDependency extracts the package graph's authored artifact
