@@ -173,14 +173,31 @@ func TestComputeRequiredInputs_ExcludesLocalHitDependencies(t *testing.T) {
 
 	// The consumer executes locally, so its dependency is a required input: a
 	// files-less hit for it must be rebuilt, not silently accepted.
-	if req := r.computeRequiredInputs(planned); !req["dephash"] {
+	if req := r.computeRequiredInputs(planned, r.keys); !req["dephash"] {
 		t.Fatalf("a dependency of a locally-executing job must be a required input, got %v", req)
 	}
 
 	// When the consumer is itself a local hit it never executes, so its inputs are
 	// not consumed and not required.
 	r.localHits["consumerhash"] = true
-	if req := r.computeRequiredInputs(planned); req["dephash"] {
+	if req := r.computeRequiredInputs(planned, r.keys); req["dephash"] {
 		t.Fatalf("a local-hit job's dependency must not be a required input, got %v", req)
+	}
+}
+
+// A job whose key may move has no recorded key, so it counts as one that may
+// execute even when its precomputed key is a local hit, and its dependency stays
+// a required input even when that dependency's key may move too: the guard
+// names dependencies through the whole negotiated key set.
+func TestComputeRequiredInputs_KeepsMovableKeysRequired(t *testing.T) {
+	t.Parallel()
+	dep := cacheableJob("build", "/dep", "dep", "dep")
+	consumer := cacheableJob("test", "/proj", "proj", "proj", dep.Key())
+	planned := []*ScheduledJob{dep, consumer}
+	negotiated := map[string]string{dep.Key(): "dephash", consumer.Key(): "consumerhash"}
+
+	r := &RemoteCache{keys: map[string]string{}, localHits: map[string]bool{"consumerhash": true}}
+	if req := r.computeRequiredInputs(planned, negotiated); !req["dephash"] {
+		t.Fatalf("the dependency of a job whose key may move must stay a required input, got %v", req)
 	}
 }

@@ -19,15 +19,93 @@ import (
 // transparent caching. It handles cache key computation, hit/miss
 // detection, result restoration, and output storage.
 type CacheManager struct {
-	store              *LocalStore
-	fileHashCache      map[string]string // memoizes file hashes: "dir|patterns" → hash
-	fileHashMu         sync.Mutex
-	extraFileHashCache map[string]string // memoizes extra-file hashes: workspace root and sorted paths, NUL-joined → hash
-	extraFileHashMu    sync.Mutex
-	sourceStates       map[string]string // memoizes SourceState: workspace root → state
-	sourceStateMu      sync.Mutex
-	digests            map[string]*memoizedDigest // memoizes Digest: key → one computation
-	digestsMu          sync.Mutex
+	store           *LocalStore
+	fileHashes      inputHashMemo     // memoizes file hashes: "dir|patterns|scope" → hash
+	extraFileHashes inputHashMemo     // memoizes extra-file hashes: workspace root and sorted paths, NUL-joined → hash
+	sourceStates    map[string]string // memoizes SourceState: workspace root → state
+	sourceStateMu   sync.Mutex
+	digests         map[string]*memoizedDigest // memoizes Digest: key → one computation
+	digestsMu       sync.Mutex
+}
+
+// invalidationLogSize is how many invalidations an inputHashMemo remembers
+// the regions of. A digest computed across more of them than that is not
+// memoized, whatever they named.
+const invalidationLogSize = 64
+
+// inputHashMemo memoizes input digests, each with the region every file it
+// read lies in, so an invalidation that names the paths a task wrote drops
+// exactly the digests those writes can move. The zero value is an empty memo.
+type inputHashMemo struct {
+	mu      sync.Mutex
+	entries map[string]memoizedInputHash
+	// generation counts the invalidations, and log holds the regions the last
+	// invalidationLogSize of them named, oldest first.
+	generation uint64
+	log        []invalidatedRegion
+}
+
+// memoizedInputHash is one memoized input digest and the region of its files.
+type memoizedInputHash struct {
+	hash   string
+	region InputRegion
+}
+
+// invalidatedRegion is what one invalidation of an inputHashMemo named.
+type invalidatedRegion struct {
+	generation uint64
+	written    InputRegion
+}
+
+// lookup returns the digest memoized at key, or false with the generation a
+// computation of it starts from (memoize).
+func (m *inputHashMemo) lookup(key string) (string, uint64, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if cached, ok := m.entries[key]; ok {
+		return cached.hash, m.generation, true
+	}
+	return "", m.generation, false
+}
+
+// memoize records hash at key unless an invalidation since generation, the one
+// its computation started from, named a path in region: the digest may then
+// hold the bytes from before that write. An invalidation the log no longer
+// holds counts as one that did.
+func (m *inputHashMemo) memoize(key string, generation uint64, hash string, region InputRegion) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.generation != generation {
+		if len(m.log) == 0 || m.log[0].generation > generation+1 {
+			return
+		}
+		for _, invalidation := range m.log {
+			if invalidation.generation > generation && invalidation.written.Overlaps(region) {
+				return
+			}
+		}
+	}
+	if m.entries == nil {
+		m.entries = make(map[string]memoizedInputHash)
+	}
+	m.entries[key] = memoizedInputHash{hash: hash, region: region}
+}
+
+// invalidate drops every memoized digest whose region overlaps written, and
+// logs written for the digests being computed meanwhile.
+func (m *inputHashMemo) invalidate(written InputRegion) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for key, memo := range m.entries {
+		if memo.region.Overlaps(written) {
+			delete(m.entries, key)
+		}
+	}
+	m.generation++
+	m.log = append(m.log, invalidatedRegion{generation: m.generation, written: written})
+	if len(m.log) > invalidationLogSize {
+		m.log = append([]invalidatedRegion(nil), m.log[len(m.log)-invalidationLogSize:]...)
+	}
 }
 
 // memoizedDigest is one key's computation in CacheManager.Digest.
@@ -39,17 +117,19 @@ type memoizedDigest struct {
 
 // NewCacheManager creates a CacheManager backed by the given store.
 func NewCacheManager(store *LocalStore) *CacheManager {
-	return &CacheManager{
-		store:              store,
-		fileHashCache:      make(map[string]string),
-		extraFileHashCache: make(map[string]string),
-	}
+	return &CacheManager{store: store}
 }
 
 // lookupFileHash computes a combined hash for files matching patterns
 // using file contents, with per-session memoization. Multiple pipeline
 // steps in the same project with identical file patterns reuse the
 // cached result instead of re-reading and re-hashing all source files.
+//
+// An entry lives until an invalidation names a path in its region
+// (FileInputRegion): the scheduler names the outputs every task writes, so a
+// key computed after a task ran reads that task's bytes. A digest computed
+// while an invalidation named a path in its region may hold bytes from before
+// that write, so it is returned but not memoized (inputHashMemo.memoize).
 func (cm *CacheManager) lookupFileHash(dir string, patterns []string, scope ProjectConfigScope) (string, error) {
 	// The scope selects which bytes of a project config the digest reads, so two
 	// scopes are two different values and must never share one memo entry.
@@ -59,24 +139,23 @@ func (cm *CacheManager) lookupFileHash(dir string, patterns []string, scope Proj
 		key += "|verbatim"
 	}
 
-	cm.fileHashMu.Lock()
-	if cached, ok := cm.fileHashCache[key]; ok {
-		cm.fileHashMu.Unlock()
+	cached, generation, ok := cm.fileHashes.lookup(key)
+	if ok {
 		return cached, nil
 	}
-	cm.fileHashMu.Unlock()
 
-	hash, err := hashFiles(dir, patterns, scope)
+	hash, err := memoizedHashFiles(dir, patterns, scope)
 	if err != nil {
 		return "", err
 	}
 
-	cm.fileHashMu.Lock()
-	cm.fileHashCache[key] = hash
-	cm.fileHashMu.Unlock()
-
+	cm.fileHashes.memoize(key, generation, hash, FileInputRegion(dir, patterns))
 	return hash, nil
 }
+
+// memoizedHashFiles is the digest lookupFileHash memoizes (hashFiles). It is a
+// variable only so a test can land an invalidation while a digest is computed.
+var memoizedHashFiles = hashFiles
 
 // HashFiles returns the memoized content digest for files selected under dir,
 // reading a project config through the given task's option scope. A zero scope
@@ -95,18 +174,32 @@ func (cm *CacheManager) HashFiles(dir string, patterns []string, scope ProjectCo
 	return cm.lookupFileHash(dir, patterns, scope)
 }
 
-// InvalidateFileHashes drops the per-session input-hash memo after a task has
-// changed source files. The cache normally assumes file inputs stay stable for
-// a scheduler run; source-writing fix tasks are the deliberate exception.
-// Clearing the small memo ensures both their post-run mutation check and every
-// downstream cache lookup observe the rewritten tree rather than pre-fix bytes.
+// InvalidateFileHashes drops every memoized input digest, project files and
+// extra files alike. A task whose rewrites are not confined to declared
+// outputs — a source rewriter — calls it once it ran, so its post-run mutation
+// check and every later key read the rewritten tree rather than pre-fix bytes.
 func (cm *CacheManager) InvalidateFileHashes() {
 	if cm == nil {
 		return
 	}
-	cm.fileHashMu.Lock()
-	clear(cm.fileHashCache)
-	cm.fileHashMu.Unlock()
+	everything := InputRegion{unbounded: true}
+	cm.fileHashes.invalidate(everything)
+	cm.extraFileHashes.invalidate(everything)
+}
+
+// InvalidateFileHashesUnder drops every memoized input digest whose region
+// reaches a path at, under or above one of paths: the outputs a task just
+// wrote or a restore just materialized. A digest outside them keeps its entry,
+// because nothing it reads changed. The caller names the paths before any task
+// that reads them can start, so no key computed after a write reads a digest
+// of the bytes before it.
+func (cm *CacheManager) InvalidateFileHashesUnder(paths []string) {
+	if cm == nil || len(paths) == 0 {
+		return
+	}
+	written := PathsRegion(paths)
+	cm.fileHashes.invalidate(written)
+	cm.extraFileHashes.invalidate(written)
 }
 
 // lookupExtraFilesHash computes the combined content hash of a set of extra
@@ -115,39 +208,33 @@ func (cm *CacheManager) InvalidateFileHashes() {
 // recursively and reads every byte beneath it, and the same ExtraFiles set is
 // hashed once at key-precompute time and again at execute-time lookup for
 // every cacheable step that declares it — the memo turns those repeated full
-// tree reads into one per CLI invocation. The memo key is the workspace root
-// followed by the sorted path set, joined with NUL (which cannot occur in a
-// path), so distinct sets never collide and one set named against two roots
-// never shares an entry; hashExtraFiles is order-independent, so two orderings
-// of the same set correctly share one entry. The cached value is byte-identical
-// to hashExtraFiles(workspaceRoot, paths).
+// tree reads into one per CLI invocation for a set no task writes. The memo
+// key is the workspace root followed by the sorted path set, joined with NUL
+// (which cannot occur in a path), so distinct sets never collide and one set
+// named against two roots never shares an entry; hashExtraFiles is
+// order-independent, so two orderings of the same set correctly share one
+// entry. The cached value is byte-identical to hashExtraFiles(workspaceRoot,
+// paths).
 //
-// The memo assumes ExtraFiles are stable for the lifetime of a CLI invocation —
-// cross-project *source* assets (committed docs, `build.assets` public trees),
-// not a file another job regenerates mid-run. A file produced during the run
-// and declared as an ExtraFile without a modeled dependency edge would keep its
-// precompute-time hash at execute-time lookup, so its later content is not seen;
-// route such intra-run outputs through the normal dependency graph (which
-// carries the producing job's hash) rather than declaring them as ExtraFiles.
+// An entry lives under the same rule as lookupFileHash's: until an
+// invalidation names a path at, under or above one of its paths. A declared
+// output another task writes during the run is therefore hashed again once that
+// task ran. A file written outside every declaration is not seen, so an
+// intra-run product still belongs in a declared output rather than in an
+// undeclared write.
 func (cm *CacheManager) lookupExtraFilesHash(workspaceRoot string, paths []string) string {
 	sorted := make([]string, len(paths))
 	copy(sorted, paths)
 	sort.Strings(sorted)
 	key := workspaceRoot + "\x00" + strings.Join(sorted, "\x00")
 
-	cm.extraFileHashMu.Lock()
-	if cached, ok := cm.extraFileHashCache[key]; ok {
-		cm.extraFileHashMu.Unlock()
+	cached, generation, ok := cm.extraFileHashes.lookup(key)
+	if ok {
 		return cached
 	}
-	cm.extraFileHashMu.Unlock()
 
 	hash := hashExtraFiles(workspaceRoot, sorted)
-
-	cm.extraFileHashMu.Lock()
-	cm.extraFileHashCache[key] = hash
-	cm.extraFileHashMu.Unlock()
-
+	cm.extraFileHashes.memoize(key, generation, hash, PathsRegion(sorted))
 	return hash
 }
 
@@ -158,7 +245,9 @@ func (cm *CacheManager) lookupExtraFilesHash(workspaceRoot string, paths []strin
 // ways. A nil manager has no answer to share and computes on every call.
 //
 // The memo lives as long as the manager, one per run, so a value derived from
-// files that may change between runs is derived again by the next run.
+// files that may change between runs is derived again by the next run. No
+// invalidation reaches it, so it holds only values derived from what no task
+// of the run writes: repository history and installed extension trees.
 func (cm *CacheManager) Digest(key string, compute func() (string, error)) (string, error) {
 	if cm == nil {
 		return compute()

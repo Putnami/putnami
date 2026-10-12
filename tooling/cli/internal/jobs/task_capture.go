@@ -815,8 +815,13 @@ func (s *Scheduler) restoreDeclaredCacheHit(
 	// committed bytes this checkout holds, which the recorded tree is about to
 	// replace (task_drift.go).
 	drift := s.snapshotRestoredDrift(job, entry)
+	// A restore rewrites every recorded output, so the memoized input digests
+	// those paths can move are dropped once it ended, whether or not it
+	// completed (key_movement.go).
+	restored := restoredOutputPaths(s.outputRoots(), job, entry)
 	if err := s.materializeDeclaredOutputs(job, entry); err != nil {
 		s.invalidateCapabilitySourceBindingsForRestore(job, entry)
+		s.cache.InvalidateFileHashesUnder(restored)
 		slog.Warn("declared restore failed; executing task",
 			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
 		return nil
@@ -827,6 +832,7 @@ func (s *Scheduler) restoreDeclaredCacheHit(
 	// before the hit is published, so no same-run consumer and no later
 	// package/publish/deploy reader can observe the older revision.
 	s.restampRestoredVersionStamp(job, entry)
+	s.cache.InvalidateFileHashesUnder(restored)
 	// A provider may legitimately omit ActionResult.Events when it does not
 	// advertise the optional action-events capability, and entries written before
 	// that capability carry none. Recover the reserved artifacts whose exact

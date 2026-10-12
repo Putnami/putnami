@@ -640,6 +640,247 @@ func HasMatchingFiles(dir string, patterns []string) (bool, error) {
 	return matched, nil
 }
 
+// InputRegion bounds where the files one input digest reads can lie: every
+// file is at or under one of its roots, or the region is unbounded and reaches
+// every path. It is what lets a write drop exactly the memoized digests it can
+// move (CacheManager.InvalidateFileHashesUnder).
+//
+// Regions are compared lexically on absolute, cleaned, slash-separated paths
+// with case folded, the way declared-output ownership is compared: two
+// spellings that alias on a case-insensitive filesystem overlap, and on a
+// case-sensitive one the comparison only reports an overlap too many. A bound
+// that cannot be decided from the patterns alone is unbounded, so between
+// paths as written an overlap can be reported too often but is never missed.
+// Symbolic links are not resolved: a pattern that reaches a directory through
+// a link is bounded by the link's path, so a write declared at the link's
+// target does not overlap it.
+type InputRegion struct {
+	roots     []string
+	unbounded bool
+}
+
+// globMetacharacters make a path segment a glob for path.Match and
+// filepath.Match. A backslash escapes one on a POSIX host, so a segment holding
+// one is not static either.
+const globMetacharacters = `*?[\`
+
+// FileInputRegion is the region of the files collectFiles selects under dir
+// with patterns, decided from the patterns alone, so it also covers a file a
+// write may add there later:
+//   - no pattern selects the whole tree under dir;
+//   - an exclusion only removes files, so it narrows nothing;
+//   - a Go embed selector resolves sources, embedded assets and source-link
+//     referents, none of which may leave dir;
+//   - an ordinary pattern selects under its static prefix, the leading
+//     segments that hold no glob metacharacter, resolved the way the collector
+//     joins it to dir: before its first "**" for a recursive pattern, and as a
+//     whole for any other, ".." segments included;
+//   - a "git:" pattern matches candidate paths relative to dir, where "*" and
+//     "**" also match ".." segments, so it is bounded only when its static
+//     prefix names a segment other than ".." or ".".
+func FileInputRegion(dir string, patterns []string) InputRegion {
+	if len(patterns) == 0 {
+		return InputRegion{roots: []string{regionPath(dir)}}
+	}
+	includes, _ := wsproto.SplitFilePatterns(patterns)
+	region := InputRegion{roots: make([]string, 0, len(includes))}
+	for _, pattern := range includes {
+		root, bounded := patternRoot(dir, pattern)
+		if !bounded {
+			return InputRegion{unbounded: true}
+		}
+		region.roots = append(region.roots, regionPath(root))
+	}
+	return region
+}
+
+// PathsRegion is the region of the named paths and everything beneath them: the
+// files an extra-file declaration hashes, or the outputs a task writes.
+func PathsRegion(paths []string) InputRegion {
+	region := InputRegion{roots: make([]string, 0, len(paths))}
+	for _, p := range paths {
+		region.roots = append(region.roots, regionPath(p))
+	}
+	return region
+}
+
+// Overlaps reports whether a file can lie in both regions: one is unbounded and
+// the other holds a path, or a root of one is at or under a root of the other.
+func (r InputRegion) Overlaps(other InputRegion) bool {
+	if r.unbounded || other.unbounded {
+		return (r.unbounded || len(r.roots) > 0) && (other.unbounded || len(other.roots) > 0)
+	}
+	for _, a := range r.roots {
+		for _, b := range other.roots {
+			if rootsOverlap(a, b) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// RegionIndex names, among many owned regions, the owners whose region
+// overlaps a given one without comparing it against every owner: the ancestors
+// of a root are looked up by name, and its descendants by a range of the sorted
+// roots. The zero value is an empty index. An index sorts itself on its first
+// query, so one index is queried from one goroutine.
+type RegionIndex struct {
+	owners     map[string][]string
+	roots      []string
+	everywhere []string
+	sorted     bool
+}
+
+// Add records that owner's region includes region.
+func (x *RegionIndex) Add(owner string, region InputRegion) {
+	if region.unbounded {
+		x.everywhere = append(x.everywhere, owner)
+		return
+	}
+	if x.owners == nil {
+		x.owners = make(map[string][]string)
+	}
+	for _, root := range region.roots {
+		if _, known := x.owners[root]; !known {
+			x.roots = append(x.roots, root)
+			x.sorted = false
+		}
+		x.owners[root] = append(x.owners[root], owner)
+	}
+}
+
+// Overlapping returns, sorted and once each, every owner whose region overlaps
+// one of regions.
+func (x *RegionIndex) Overlapping(regions ...InputRegion) []string {
+	if !x.sorted {
+		sort.Strings(x.roots)
+		x.sorted = true
+	}
+	found := make(map[string]bool)
+	add := func(owners []string) {
+		for _, owner := range owners {
+			found[owner] = true
+		}
+	}
+	for _, region := range regions {
+		if !region.unbounded && len(region.roots) == 0 {
+			continue
+		}
+		add(x.everywhere)
+		if region.unbounded {
+			for _, owners := range x.owners {
+				add(owners)
+			}
+			continue
+		}
+		for _, root := range region.roots {
+			// The root and every path it lies under. Each separator boundary is
+			// named without and with its separator, so a filesystem or drive root
+			// ("/", "c:/") is named too.
+			add(x.owners[root])
+			for i := len(root) - 1; i >= 0; i-- {
+				if root[i] == '/' {
+					add(x.owners[root[:i]])
+					add(x.owners[root[:i+1]])
+				}
+			}
+			// Every root strictly beneath it.
+			prefix := strings.TrimSuffix(root, "/") + "/"
+			for i := sort.SearchStrings(x.roots, prefix); i < len(x.roots) && strings.HasPrefix(x.roots[i], prefix); i++ {
+				add(x.owners[x.roots[i]])
+			}
+		}
+	}
+	if len(found) == 0 {
+		return nil
+	}
+	owners := make([]string, 0, len(found))
+	for owner := range found {
+		owners = append(owners, owner)
+	}
+	sort.Strings(owners)
+	return owners
+}
+
+// patternRoot returns the directory or file under which every file one include
+// pattern selects lies, and false when no such bound follows from the pattern.
+func patternRoot(dir, pattern string) (string, bool) {
+	if inner, git := wsproto.GitFilePattern(pattern); git {
+		return gitPatternRoot(dir, inner)
+	}
+	if strings.HasPrefix(pattern, "go-embed:") {
+		return dir, true
+	}
+	if before, _, recursive := strings.Cut(filepath.ToSlash(pattern), "**"); recursive {
+		// globDoubleStar walks the directory named before the first "**".
+		prefix := strings.Trim(strings.TrimSuffix(before, "/"), "/")
+		return staticPrefix(filepath.Join(dir, filepath.FromSlash(prefix))), true
+	}
+	// filepath.Glob receives the joined, cleaned pattern.
+	return staticPrefix(filepath.Join(dir, pattern)), true
+}
+
+// gitPatternRoot bounds a Git candidate pattern. A candidate path is relative
+// to dir and clean, so its only ".." segments lead it; a static segment other
+// than ".." anchors every match beneath the static prefix.
+func gitPatternRoot(dir, pattern string) (string, bool) {
+	slashed := strings.TrimPrefix(filepath.ToSlash(pattern), "./")
+	segments := strings.Split(slashed, "/")
+	anchored := false
+	for i, segment := range segments {
+		if strings.ContainsAny(segment, globMetacharacters) {
+			if !anchored {
+				return "", false
+			}
+			return filepath.Join(dir, filepath.FromSlash(strings.Join(segments[:i], "/"))), true
+		}
+		if segment != ".." && segment != "." && segment != "" {
+			anchored = true
+		}
+	}
+	return filepath.Join(dir, filepath.FromSlash(slashed)), true
+}
+
+// staticPrefix returns the leading segments of p that hold no glob
+// metacharacter: the directory every match of the glob p lies under, or p
+// itself when p names one path.
+func staticPrefix(p string) string {
+	segments := strings.Split(filepath.ToSlash(p), "/")
+	for i, segment := range segments {
+		if strings.ContainsAny(segment, globMetacharacters) {
+			prefix := filepath.FromSlash(strings.Join(segments[:i], "/"))
+			if prefix == filepath.VolumeName(prefix) {
+				// Only the filesystem root, or a drive's, is left.
+				prefix += string(filepath.Separator)
+			}
+			return prefix
+		}
+	}
+	return p
+}
+
+// regionPath is the comparison form of a path: absolute, cleaned, in slash
+// form, with case folded.
+func regionPath(p string) string {
+	if absolute, err := filepath.Abs(p); err == nil {
+		p = absolute
+	}
+	return strings.ToLower(filepath.ToSlash(filepath.Clean(p)))
+}
+
+// rootsOverlap reports whether one comparison-form root is at or under the
+// other.
+func rootsOverlap(a, b string) bool {
+	if len(a) > len(b) {
+		a, b = b, a
+	}
+	if !strings.HasPrefix(b, a) {
+		return false
+	}
+	return len(b) == len(a) || strings.HasSuffix(a, "/") || b[len(a)] == '/'
+}
+
 // unreadableSentinel is the byte string a selected-but-unreadable file
 // contributes to a hash in place of its content digest. Both hashing entry
 // points (hashFiles for keyed project inputs, hashFileBytes for extra-file

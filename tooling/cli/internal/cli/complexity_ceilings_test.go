@@ -574,7 +574,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "cache",
 		prefix: "internal/store/",
 		files:  34,
-		funcs:  291,
+		funcs:  305,
 		why: "internal/store: the content-addressed local cache — entries, task entries, CAS, " +
 			"leases, GC, generations and the remote bridge. Cache-key completeness and atomicity " +
 			"under concurrency are the two invariants this repository has been burned by most " +
@@ -759,7 +759,24 @@ var complexityCeilings = []complexityCeiling{
 			"over the same pruneAround, keep list, staging-root choice, EXDEV fallback and " +
 			"holderWait budget, so an execution and a restore keep the same paths. Neither is a " +
 			"new way to reach the store: they touch a declared output path, never an entry, and " +
-			"add no entry format, remote path or eviction rule",
+			"add no entry format, remote path or eviction rule. " +
+			"RAISED, from 34/291 to 34/302, with no new file. FileInputRegion bounds, from the " +
+			"patterns alone and with collectFiles' own join and glob rules (patternRoot, " +
+			"gitPatternRoot, staticPrefix), where the files a memoized digest reads can lie; " +
+			"PathsRegion, Overlaps, regionPath and rootsOverlap compare such a region with the " +
+			"paths a task writes; RegionIndex.Add and Overlapping name, for a whole plan, the " +
+			"planned writers a key's region reaches without comparing every pair; and " +
+			"InvalidateFileHashesUnder drops the memoized digests a write can move. They make " +
+			"keys MORE complete: a key computed after a task wrote a declared output reads that " +
+			"output's bytes, where the memo served the digest of the bytes before. None reads, " +
+			"writes, addresses or evicts an entry. " +
+			"RAISED, from 34/302 to 34/305, with no new file. inputHashMemo.lookup, memoize and " +
+			"invalidate are the file and extra-file memos' one locked read, write and drop, which " +
+			"CacheManager used to repeat by hand for each memo. memoize drops a digest computed " +
+			"across an invalidation only when that invalidation named a path in its region, or " +
+			"when the memo no longer remembers what it named, so a task finishing elsewhere no " +
+			"longer costs the next reader of a large tree a second hash. None reads, writes, " +
+			"addresses or evicts an entry",
 	},
 	{
 		unit:   "output",

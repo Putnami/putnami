@@ -84,6 +84,10 @@ type invocationRelation struct {
 	// pruned records that every consumer was already cached, so neither the
 	// producer nor the finalizer has any work to do.
 	pruned bool
+	// recheck records that pruned rests on a consumer key an earlier task's
+	// writes may move, so the producer confirms it before it is skipped
+	// (isPruned).
+	recheck bool
 	// finalized makes the finalizer's execution exactly-once across the
 	// frontier-completion path and the end-of-run sweep.
 	finalized bool
@@ -378,12 +382,23 @@ func (rt *invocationRuntime) relationFor(job *ScheduledJob) *invocationRelation 
 // relation "skipped" on each warm run: the cached verdict was never served and
 // the declared outputs were never restored, for exactly the runs the pruning
 // exists to make cheap.
-func (rt *invocationRuntime) isPruned(job *ScheduledJob) bool {
+//
+// A producer about to start confirms, once, a pruning decided on a consumer key
+// that may have moved since (prune): present answers for each consumer from the
+// key it computes now, and the first absent entry withdraws the pruning, so the
+// producer runs and its finalizer with it. present runs without the relation's
+// lock: it takes the run's lock, which the coordinator holds while it takes
+// every relation's (pendingFinalizers, settleFinalizers), so a relation's lock
+// is never held while the run's is awaited. Nothing reads pruned meanwhile:
+// only the producer's own start claims the confirmation, and the finalizer
+// waits for the producer to arm it.
+func (rt *invocationRuntime) isPruned(job *ScheduledJob, present func(consumer *ScheduledJob) bool) bool {
 	if rt == nil || job == nil {
 		return false
 	}
 	key := job.Key()
 	rel := rt.byProducer[key]
+	producer := rel != nil
 	if rel == nil {
 		rel = rt.byFinalizer[key]
 	}
@@ -391,7 +406,28 @@ func (rt *invocationRuntime) isPruned(job *ScheduledJob) bool {
 		return false
 	}
 	rel.mu.Lock()
+	confirm := producer && rel.pruned && rel.recheck
+	if confirm {
+		rel.recheck = false
+	}
+	pruned := rel.pruned
+	rel.mu.Unlock()
+	if !confirm {
+		return pruned
+	}
+
+	confirmed := true
+	for _, consumer := range rel.consumers {
+		if !present(consumer) {
+			confirmed = false
+			break
+		}
+	}
+	rel.mu.Lock()
 	defer rel.mu.Unlock()
+	if !confirmed {
+		rel.pruned = false
+	}
 	return rel.pruned
 }
 
@@ -415,6 +451,14 @@ func (rt *invocationRuntime) isPruned(job *ScheduledJob) bool {
 // solely in service of its consumer frontier for a particular request. False
 // and malformed expressions keep the lifecycle: an optimization may waste work
 // when uncertain, but it must never swallow an imperative side effect.
+//
+// A consumer key a planned write may move (planKeyMovement) is only an
+// estimate here: the consumer will look its entry up at the key it computes
+// when it starts. Such a relation is pruned only when every job that can move
+// that key finishes before the producer starts (settlesBefore), and the
+// producer confirms the decision then, from the keys the consumers compute at
+// that moment (isPruned). Otherwise it is not pruned: a consumer that
+// missed its entry would run against a resource nobody provisioned.
 func (rt *invocationRuntime) prune(
 	ws *workspace.Workspace,
 	planned []*ScheduledJob,
@@ -431,6 +475,8 @@ func (rt *invocationRuntime) prune(
 	if err != nil {
 		return
 	}
+	var movement *keyMovement
+	var byKey map[string]*ScheduledJob
 	for _, rel := range rt.relations {
 		allHit := len(rel.consumers) > 0
 		for _, consumer := range rel.consumers {
@@ -450,8 +496,28 @@ func (rt *invocationRuntime) prune(
 				continue
 			}
 		}
+		if movement == nil {
+			decided := planKeyMovement(keyInputs{ws: ws, commandParams: commandParams}, planned)
+			movement = &decided
+			byKey = jobsByKey(planned)
+		}
+		recheck, settled := false, true
+		for _, consumer := range rel.consumers {
+			if !movement.moving[consumer.Key()] {
+				continue
+			}
+			recheck = true
+			if !settlesBefore(rel.producer, consumer, *movement, byKey) {
+				settled = false
+				break
+			}
+		}
+		if !settled {
+			continue
+		}
 		rel.mu.Lock()
 		rel.pruned = true
+		rel.recheck = recheck
 		rel.mu.Unlock()
 	}
 }

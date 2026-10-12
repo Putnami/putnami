@@ -434,6 +434,41 @@ A file wrongly excluded from a key serves a stale result; a file wrongly
 included costs a rebuild. Narrow a declaration only against the action's own
 code, never against an assumption about what it probably reads.
 
+### Outputs written earlier in the session
+
+A run memoizes each file digest, so the steps that share a pattern set read
+their files once. A task's key is computed when the task starts, and that key
+is the one it is looked up, stored and shared under. When a task writes its
+declared outputs — by executing, whatever its verdict, or by restoring its
+entry — every memoized digest whose patterns can select a file at, under or
+above one of those outputs is dropped before any task that reads them can
+start. A task that reads another task's declared output is therefore keyed on
+the bytes it reads, whether or not it depends on that task:
+
+- an ordinary pattern reaches the directory named by its leading segments
+  without a wildcard, so `src/**/*.ts` never reaches `.gen`, while `**/*.go`
+  and an empty pattern list reach the whole project;
+- a Go embed selector reaches its project;
+- a `git:` pattern that reaches a wildcard before any literal segment other
+  than `..` reaches every path, because its wildcards also match `..`;
+- a generate asset reaches the paths it names.
+
+A write outside every declaration is not seen until the next run, so a file a
+task produces for a later task belongs in its declared outputs. Paths are
+compared as written, without resolving symbolic links: an input read through a
+link is reached by the link's path, so an output declared at the link's target
+does not drop its digest. A task that rewrites its sources drops every digest
+(see [Source-writing fix tasks](#source-writing-fix-tasks)).
+
+The remote negotiation and the pruning of an invocation-scoped resource key the
+whole plan before any task runs. When another planned task may write a file a
+task reads — an output whose path a port reports counts as its whole root —
+that precomputed key is only an estimate: the provider may warm it, but the task
+is never looked up or stored under it. A resource pruned on such a consumer key
+is confirmed when its producer starts, from the key the consumer computes then,
+and is provisioned when a task that can move that key may finish after the
+producer starts.
+
 ## Cache Lifecycle
 
 ### Lookup (on cache hit)

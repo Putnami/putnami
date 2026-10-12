@@ -284,7 +284,7 @@ var structuralPins = []structuralPin{
 		token:       "map[string]any",
 		scope:       productionFiles,
 		ceilingOnly: true,
-		want:        255,
+		want:        256,
 		why: "untyped payload plumbing the canonical result model (A2a/A2b) replaces. " +
 			"Counted per line, matching the epic's convention. A0 pinned 208; an earlier change " +
 			"typed the session-event seam — SessionEventHandler now takes a jobs.SessionRecord " +
@@ -409,7 +409,8 @@ var structuralPins = []structuralPin{
 			"runJob itself, and the third is internal/compose's serveParams, the one param a " +
 			"composed serve step receives (port 0) stated in the existing untyped params bag. The " +
 			"environment compose adds is a []string that reaches cmd.Env and never a cache key. A further change adds one: ImpactTraceRecord.EventData, the typed selection trace projected onto the untyped session-event seam (jobs.SessionRecord.Data) at the single point it enters it. " +
-			"The final change raises 254→255 for testCasesOf in cli-model/jobs/result_model.go: a test task hands its per-case results to the CLI in the result's untyped data bag, beside testSummary, and this is the one decode that turns them into typed protocolcli.TestCase values",
+			"The final change raises 254→255 for testCasesOf in cli-model/jobs/result_model.go: a test task hands its per-case results to the CLI in the result's untyped data bag, beside testSummary, and this is the one decode that turns them into typed protocolcli.TestCase values. " +
+			"A later change raises 255→256 for jobs.keyInputs, and the line is the ONE payload this pin already names as untypable on one more hop of the path it already travels: the key-movement analysis hands the command params map to keyFilePatterns, exactly as the cache key, the mutation detector and the portable admission do, so the region it bounds is the region the key hashes. Nothing decodes, stores or forwards a new untyped document",
 	},
 	{
 		name:        "test lines mentioning map[string]any",
@@ -557,7 +558,7 @@ var structuralPins = []structuralPin{
 		token:       "map[string]any",
 		scope:       allFiles,
 		ceilingOnly: true,
-		want:        894,
+		want:        895,
 		why: "the epic body's headline number: production + test lines. A0 pinned 724; " +
 			"an earlier change took it from 720 to 723 for the reasons named on the two scoped pins " +
 			"above, and a later change closed it at 724 = 205 production + 519 test. Another change " +
@@ -613,7 +614,8 @@ var structuralPins = []structuralPin{
 			"A later change raises 885→889 = 253 production + 635 test for the one option-layer constructor itemized on the test pin above; production adds none. " +
 			"A further change raises 889→892 = 253 production + 638 test for the three declared-edges test lines itemized on the test pin above; production adds none. " +
 			"The final change raises 892→893 = 255 production + 638 test for the one test-case decode itemized on the production pin above; tests add none. " +
-			"A later change raises 893→894 = 255 production + 639 test for the one `tree verify` fixture alias itemized on the test pin above; production adds none",
+			"A later change raises 893→894 = 255 production + 639 test for the one `tree verify` fixture alias itemized on the test pin above; production adds none. " +
+			"Another change raises 894→895 = 256 production + 639 test for jobs.keyInputs, itemized on the production pin above; tests add none",
 	},
 	{
 		name:  "lines mentioning map[string]interface{}",
