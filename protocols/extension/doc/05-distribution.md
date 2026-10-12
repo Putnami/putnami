@@ -70,7 +70,7 @@ Extensions are discovered from multiple locations:
 3. **Project config**: Project `putnami.json` → `extensions` array (per-project override)
 4. **Node modules**: `devDependencies` in `package.json` that contain `putnami.extension.json`
 
-Use `putnami extensions list` to see all discovered extensions, their paths, and provided commands.
+Use `putnami extensions list` to see all discovered extensions with their version constraint, installed version and source.
 
 ## Workspace References
 

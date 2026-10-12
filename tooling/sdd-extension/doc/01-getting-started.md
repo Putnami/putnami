@@ -108,8 +108,10 @@ Check what the CLI actually discovered:
 putnami extensions list
 ```
 
-A `Skipped` row names the reason. The most common one is a runtime that has not
-been prepared yet, which `putnami extensions install` fixes.
+A `@putnami/sdd` row means the workspace declares it. Its `INSTALLED` column
+shows the version the lock records, not what this machine has;
+`putnami extensions install` installs that version, or the latest when the
+column shows `-`.
 
 ## Where the decisions are recorded
 

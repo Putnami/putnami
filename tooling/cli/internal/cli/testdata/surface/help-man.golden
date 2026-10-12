@@ -212,7 +212,7 @@ Plan workspace infra (--output=jsonl).
 Install extensions from config.
 .TP
 .B extensions list
-List installed extensions.
+List extensions.
 .TP
 .B extensions update
 Update extensions.
@@ -550,7 +550,7 @@ Materialize artifacts for another platform (skips install hooks and the lock wri
 .B --dest
 Materialize into this artifact-store root instead of the machine-global one.
 .SS extensions list
-List installed extensions with their jobs and activation files.
+List declared and discovered extensions with their versions and source.
 .PP
 .B Usage:
 .br

@@ -578,12 +578,12 @@ Manage workspace extensions.
 
 ```bash
 putnami extensions install          # Install/update all extensions and run install hooks
-putnami extensions list             # List discovered extensions with their jobs
+putnami extensions list             # List extensions with their constraint, installed version and source
 putnami extensions update           # Update extension versions (lock and exact pins)
 putnami extensions remove <name>    # Remove an extension
 ```
 
-`extensions list` shows each extension's name, root path, provided commands, activation files, and priority. Use `--output=jsonl` for machine-readable output.
+`extensions list` shows one row per `extensions` key and one per other loaded extension, with its version constraint, installed version, and source. A `config` row is an entry of `extensions` in `putnami.workspace.json`, named by its key, which can be a path; its installed version is the one the lock records, not what this machine has. A `workspace` row is a loaded extension whose name is not such a key, for example one a workspace project or a `node_modules` package provides; its installed version is its manifest version. A path-declared extension therefore has two rows: a `config` row under its path and a `workspace` row under its name. Use `--output=jsonl` for machine-readable output.
 
 #### The user scope: `--user`
 
@@ -606,6 +606,8 @@ putnami extensions remove --user @acme/audit           # Drop a pin
   install hook and touches nothing in the current directory. A re-run keeps
   the recorded pin; `--latest` moves it to the newest release.
 - A local path, `--platform` and `--dest` are usage errors with `--user`.
+- `list --user` shows each pin's name, installed version, and source `user`;
+  a pin has no version constraint.
 - `install` and `list` accept `--output=json|jsonl`.
 - `update` does not take `--user`: run `install --user --latest`, or install
   an explicit version, to move a pin.

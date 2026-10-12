@@ -127,7 +127,7 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 | Command | Description |
 |---------|-------------|
 | `putnami extensions install` | Install extensions from config |
-| `putnami extensions list` | List installed extensions |
+| `putnami extensions list` | List extensions |
 | `putnami extensions update` | Update extensions |
 | `putnami extensions remove` | Remove an extension |
 | `putnami templates install` | Install templates from config |
@@ -606,7 +606,7 @@ putnami extensions install [name] [--latest] [--user] [--platform <os/arch>] [--
 
 ### `putnami extensions list`
 
-List installed extensions with their jobs and activation files
+List declared and discovered extensions with their versions and source
 
 **Usage**
 
