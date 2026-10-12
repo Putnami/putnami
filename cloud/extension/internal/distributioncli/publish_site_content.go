@@ -105,7 +105,7 @@ func (sec SiteContentSection) walk(visit func(siteContentFile)) error {
 	source := sec.source
 	if source == nil {
 		var err error
-		if source, err = openSiteContentSource(filepath.Dir(sec.Dir)); err != nil {
+		if source, err = openSiteContentSource(filepath.Dir(filepath.Clean(sec.Dir))); err != nil {
 			return err
 		}
 	}

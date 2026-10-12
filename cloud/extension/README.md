@@ -294,8 +294,9 @@ files, so the key holds everything the step judges:
   directories.
 - A symbolic link is a candidate, keyed by its target text. Replacing a page
   with a link changes the key, and the step refuses the link.
-- A submodule or a nested repository in a section has no key, so the step
-  runs uncached and refuses it, as packaging does.
+- A submodule or a nested repository has no key, so the step runs uncached.
+  In a section, or directly under the site directory where it is a section,
+  the step refuses it, as packaging does.
 
 Outside a Git work tree the CLI computes no key for the step, so the step
 runs every time and reads the disk, where it refuses an empty section

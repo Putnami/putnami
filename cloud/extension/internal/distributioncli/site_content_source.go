@@ -1,6 +1,7 @@
 package distributioncli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -74,17 +75,19 @@ func (s *siteContentSource) sectionNames() ([]string, error) {
 // under mount, and applies the regular-file and path policy to each. The
 // visitor gets paths, never content: packaging collects them before reading
 // bytes, and validation only counts them. In the cut, a submodule, a nested
-// repository, a socket, a pipe or a device in the section is refused like a
-// symbolic link, since no `git:` key holds it.
+// repository or any other candidate Git lists that is not a regular file or a
+// symbolic link is refused like a symbolic link, since no `git:` key holds it.
 func (s *siteContentSource) walkSection(sourceDir, mount string, visit func(siteContentFile)) error {
 	if s.tree == nil {
 		return walkSiteContentFiles(sourceDir, mount, visit)
 	}
-	rel, err := filepath.Rel(s.dir, sourceDir)
+	section, err := filepath.Rel(s.dir, sourceDir)
+	if err == nil && (section == "." || filepath.Dir(section) != ".") {
+		err = fmt.Errorf("%s is not a section directory of %s", sourceDir, s.dir)
+	}
 	if err != nil {
 		return clicore.NewError("read site content source: "+err.Error(), clicore.ExitUsage)
 	}
-	section := filepath.ToSlash(rel)
 	for _, candidate := range s.candidates {
 		if candidate != section && !strings.HasPrefix(candidate, section+"/") {
 			continue

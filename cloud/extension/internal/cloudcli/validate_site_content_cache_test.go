@@ -202,10 +202,10 @@ func TestValidateSiteContentVerdictMovesOnlyWithItsKey(t *testing.T) {
 }
 
 // TestSiteContentPackagingReadsTheTreeValidationChecks changes the project in
-// each way where validation and packaging once read different trees. Inside a
-// Git work tree both read the candidate files: they agree on the verdict, and
-// packaging ships the sections and files validation counted, which the
-// workspace probe declares.
+// each way where the candidate files and the disk differ. Inside a Git work
+// tree validation and packaging both read the candidate files: they agree on
+// the verdict, and packaging ships the sections and files validation counted,
+// which the workspace probe declares.
 func TestSiteContentPackagingReadsTheTreeValidationChecks(t *testing.T) {
 	nestedRepository := func(rel string) func(*testing.T, string) {
 		return func(t *testing.T, project string) {
