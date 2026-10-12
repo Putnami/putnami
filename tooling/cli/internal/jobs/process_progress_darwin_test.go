@@ -56,32 +56,28 @@ func TestHostProcessProgressSeesARealProcessRun(t *testing.T) {
 	}
 }
 
-// TestHostProcessProgressSeesAStoppedProcessStill pins that the counters of a
-// process that runs no code do not move: a process the host holds before its
-// first instruction reads the same way. The test stops the process and waits
-// until the kernel reports it stopped, so no timing decides the outcome.
-func TestHostProcessProgressSeesAStoppedProcessStill(t *testing.T) {
+// TestHostProcessProgressSeesAProcessStoppedBeforeItsFirstInstructionHeld
+// pins that a process that runs no code reads held, as a process the host
+// holds before its first instruction does. The test starts the process traced,
+// so the kernel stops it at exec, before its first instruction, and waits
+// until the kernel reports it stopped: no timing decides the outcome.
+func TestHostProcessProgressSeesAProcessStoppedBeforeItsFirstInstructionHeld(t *testing.T) {
 	t.Parallel()
 	cmd := exec.Command("/bin/sleep", "3600")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Ptrace: true}
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
+	// A kill sent to a stopped traced process stays pending until its tracer
+	// lets it go, so the test detaches after the kill.
 	defer func() {
 		_ = cmd.Process.Kill()
+		_ = syscall.PtraceDetach(cmd.Process.Pid)
 		_ = cmd.Wait()
 	}()
-	if err := cmd.Process.Signal(syscall.SIGSTOP); err != nil {
-		t.Fatal(err)
-	}
-	var status syscall.WaitStatus
-	if _, err := syscall.Wait4(cmd.Process.Pid, &status, syscall.WUNTRACED, nil); err != nil {
-		t.Fatal(err)
-	}
-	// syscall's BSD WaitStatus reads a stop by SIGSTOP as Continued, not
-	// Stopped, so the test reads the bits <sys/wait.h> defines: 0177 in the
-	// low byte for a stopped process, the stop signal in the next one.
-	if status&0xff != 0o177 || syscall.Signal(status>>8) != syscall.SIGSTOP {
-		t.Fatalf("wait status %#x, want stopped by SIGSTOP", uint32(status))
+	waitStopped(t, cmd.Process.Pid, syscall.SIGTRAP)
+	if hasRunItsOwnCode(cmd.Process.Pid) {
+		t.Error("a process stopped before its first instruction reads as having run its own code")
 	}
 	sample := hostProcessProgress(cmd.Process)
 	if sample == nil {
@@ -90,8 +86,70 @@ func TestHostProcessProgressSeesAStoppedProcessStill(t *testing.T) {
 	for range 5 {
 		time.Sleep(10 * time.Millisecond)
 		if !sample().held {
-			t.Fatal("the counters of a stopped process moved")
+			t.Fatal("the counters of a process stopped before its first instruction moved")
 		}
+	}
+}
+
+// TestHostProcessProgressSeesAProcessThatRanBeforeItsBaselineRunning pins
+// that a process that ran its own code and then blocked before the baseline
+// reads running at its first sample, so its deadline counts from there instead
+// of waiting for the bound on time not counted. Its counters stay still, as
+// those of a held process do. The test waits until the program recorded its
+// run, then stops it, which stands for a block without a system call.
+func TestHostProcessProgressSeesAProcessThatRanBeforeItsBaselineRunning(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	record := filepath.Join(dir, "record")
+	release := filepath.Join(dir, "release")
+	path := fixtureproc.Write(t, filepath.Join(dir, "program"),
+		fixtureproc.Program{Record: record, WaitFor: []string{release}})
+	cmd := exec.Command(path)
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = cmd.Process.Signal(syscall.SIGCONT)
+		if err := os.WriteFile(release, nil, 0o644); err != nil {
+			t.Error(err)
+		}
+		if err := cmd.Wait(); err != nil {
+			t.Errorf("program: %v", err)
+		}
+	}()
+	for bound := time.Now().Add(progressHangBound); len(fixtureproc.Runs(t, record)) == 0; {
+		if time.Now().After(bound) {
+			t.Fatalf("the program did not record its run in %s", progressHangBound)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if err := cmd.Process.Signal(syscall.SIGSTOP); err != nil {
+		t.Fatal(err)
+	}
+	waitStopped(t, cmd.Process.Pid, syscall.SIGSTOP)
+	sample := hostProcessProgress(cmd.Process)
+	if sample == nil {
+		t.Fatal("the counters of a live child could not be read")
+	}
+	if first := sample(); first.held {
+		t.Error("a process that ran before its baseline reads held at its first sample")
+	} else if !first.measured {
+		t.Error("the wait for a CPU of a live child could not be read")
+	}
+}
+
+// waitStopped waits until the kernel reports the child pid stopped by signal.
+func waitStopped(t *testing.T, pid int, signal syscall.Signal) {
+	t.Helper()
+	var status syscall.WaitStatus
+	if _, err := syscall.Wait4(pid, &status, syscall.WUNTRACED, nil); err != nil {
+		t.Fatal(err)
+	}
+	// syscall's BSD WaitStatus reads a stop by SIGSTOP as Continued, not
+	// Stopped, so the test reads the bits <sys/wait.h> defines: 0177 in the
+	// low byte for a stopped process, the stop signal in the next one.
+	if status&0xff != 0o177 || syscall.Signal(status>>8) != signal {
+		t.Fatalf("wait status %#x, want stopped by %s", uint32(status), signal)
 	}
 }
 
@@ -131,12 +189,18 @@ func TestHostProcessProgressCountsAnUnreadableProcessAsRunning(t *testing.T) {
 	if watchTaskProgress(100000) != nil {
 		t.Error("the baseline of a process ID no process can have reads as held")
 	}
+	if hasRunItsOwnCode(100000) {
+		t.Error("a process ID no process can have reads as having run its own code")
+	}
 	if _, err := readCPUWait(100000); err == nil {
 		t.Error("the wait for a CPU of a process ID no process can have was read")
 	}
 	for _, size := range []int{0, procTaskInfoSize - 1, procTaskInfoSize + 1} {
 		if _, err := decodeTaskProgress(make([]byte, size)); err == nil {
 			t.Errorf("a %d-byte proc_taskinfo decoded", size)
+		}
+		if _, _, err := decodeRegion(make([]byte, size)); err == nil {
+			t.Errorf("a %d-byte proc_regioninfo decoded", size)
 		}
 	}
 }
@@ -208,5 +272,36 @@ func TestMachTimebaseFrequencyIsRead(t *testing.T) {
 	}
 	if frequency, err := machTimebaseFrequency(); err != nil || frequency == 0 {
 		t.Errorf("machTimebaseFrequency = %d, %v; want a frequency", frequency, err)
+	}
+}
+
+// TestDecodeRegionReadsTheTagAndTheEnd pins how a struct proc_regioninfo
+// becomes a user tag and an end address, and which tags prove the process ran
+// its own code.
+func TestDecodeRegionReadsTheTagAndTheEnd(t *testing.T) {
+	t.Parallel()
+	info := func(tag uint32, address, size uint64) []byte {
+		buf := make([]byte, procRegionInfoSize)
+		binary.NativeEndian.PutUint32(buf[procRegionInfoUserTag:], tag)
+		binary.NativeEndian.PutUint64(buf[procRegionInfoAddress:], address)
+		binary.NativeEndian.PutUint64(buf[procRegionInfoRegionSize:], size)
+		return buf
+	}
+	if tag, end, err := decodeRegion(info(73, 0x1000, 0x4000)); err != nil || tag != 73 || end != 0x5000 {
+		t.Errorf("decodeRegion = %d, %#x, %v; want 73, 0x5000", tag, end, err)
+	}
+	if _, end, err := decodeRegion(info(0, math.MaxUint64-1, 2)); err != nil || end != 0 {
+		t.Errorf("a region past the address space ends at %#x, %v; want 0", end, err)
+	}
+	for _, tag := range []uint32{1, 2, 7, 11, 13, 60, 61, 73} {
+		if !allocatedByOwnCode(tag) {
+			t.Errorf("tag %d does not prove the process ran", tag)
+		}
+	}
+	// No tag, the stack, the shared region and a tag Rosetta gives.
+	for _, tag := range []uint32{0, 14, 30, 32, 35, 230} {
+		if allocatedByOwnCode(tag) {
+			t.Errorf("tag %d proves the process ran", tag)
+		}
 	}
 }

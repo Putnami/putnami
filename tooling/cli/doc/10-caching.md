@@ -1903,8 +1903,11 @@ that time from the kernel on macOS (`proc_pid_rusage`) and on Linux (the
 after a read that fails it counts every moment since the last read that
 succeeded. It reads the runtime only, not the processes the runtime
 starts. A separate two-minute bound caps the check and the wait together. A
-runtime that blocks before the CLI first reads its counters looks held, so it
-stops at that bound rather than at the deadline. A runtime still running at the
+runtime that blocks before the CLI first reads its counters keeps them still,
+so on macOS the CLI also reads its memory: memory that malloc or dyld
+allocated proves it ran, and its deadline counts from that first reading. Only
+a runtime that blocks inside its loader before that reads as held, and stops
+at the bound rather than at the deadline. A runtime still running at the
 deadline, or at the bound, fails with `runtime.handshake_timeout`. Its message
 states how long the host held the runtime and how long the runtime waited for a
 CPU; at the deadline, it also states how long the runtime ran. It names machine
