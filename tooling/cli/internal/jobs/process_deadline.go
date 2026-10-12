@@ -17,10 +17,12 @@ import (
 // apart. It stops a process the host never lets run, and one that keeps
 // running on a machine too loaded to give it its deadline's worth of CPU.
 //
-// It also applies, in place of the deadline, to a process that blocked in its
-// own code before its progress was first sampled: the baseline sample follows
-// exec.Cmd.Start, and on a loaded machine a fast program can run and block in
-// between. Such a process is stopped at this bound instead of at its deadline.
+// It also applies, in place of the deadline, to a process that blocked before
+// its progress was first sampled and that the baseline cannot prove ran: the
+// baseline sample follows exec.Cmd.Start, and on a loaded machine a program
+// can start and block in between. On macOS that is a process blocked inside
+// dyld before it allocated any memory. Such a process is stopped at this bound
+// instead of at its deadline.
 //
 // Only the watched process is read, never its children. A process that waits
 // on a child is blocked in its own work, so that time counts against its

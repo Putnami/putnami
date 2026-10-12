@@ -31,6 +31,19 @@ const (
 	procTaskInfoSyscallsUnix = 76
 )
 
+// proc_info with PROC_INFO_CALL_PIDINFO and the PROC_PIDREGIONINFO flavor
+// fills a struct proc_regioninfo (<sys/proc_info.h>) for the first memory
+// region of one process at or past an address.
+const (
+	procPIDRegionInfo = 7
+	// procRegionInfoSize is sizeof(struct proc_regioninfo).
+	procRegionInfoSize = 96
+	// Offsets of pri_user_tag (uint32), pri_address and pri_size (uint64).
+	procRegionInfoUserTag    = 32
+	procRegionInfoAddress    = 80
+	procRegionInfoRegionSize = 88
+)
+
 // proc_info with PROC_INFO_CALL_PIDRUSAGE and the RUSAGE_INFO_V4 flavor fills
 // a struct rusage_info_v4 (<sys/resource.h>) for one process: what
 // proc_pid_rusage(3) returns. The host keeps it for a process that exited
@@ -62,10 +75,11 @@ type taskProgress struct {
 
 // hostProcessProgress reads the task counters of process as the baseline
 // that tells a held process. The returned function reads the process held
-// while they have not moved since. Once they have, it reads how long the
-// process has waited for a CPU. A process whose counters cannot be read
-// counts as running, at the baseline or at any later sample, and a wait that
-// cannot be read is not measured.
+// while they have not moved since, unless the baseline found the process
+// already ran its own code. Once they have, it reads how long the process has
+// waited for a CPU. A process whose counters cannot be read counts as
+// running, at the baseline or at any later sample, and a wait that cannot be
+// read is not measured.
 func hostProcessProgress(process *os.Process) func() processSample {
 	if process == nil {
 		return nil
@@ -78,9 +92,14 @@ func watchTaskProgress(pid int) func() processSample {
 	if err != nil {
 		return nil
 	}
+	// A process that ran and then blocked before the baseline keeps still
+	// counters too: only its memory tells it from a held one.
+	ran := hasRunItsOwnCode(pid)
 	return func() processSample {
-		if current, err := readTaskProgress(pid); err == nil && current == baseline {
-			return processSample{held: true}
+		if !ran {
+			if current, err := readTaskProgress(pid); err == nil && current == baseline {
+				return processSample{held: true}
+			}
 		}
 		waited, err := readCPUWait(pid)
 		return processSample{waitedForCPU: waited, measured: err == nil}
@@ -111,6 +130,65 @@ func decodeTaskProgress(info []byte) (taskProgress, error) {
 		machSyscalls: int32(binary.NativeEndian.Uint32(info[procTaskInfoSyscallsMach:])),
 		unixSyscalls: int32(binary.NativeEndian.Uint32(info[procTaskInfoSyscallsUnix:])),
 	}, nil
+}
+
+// hasRunItsOwnCode reports that the process pid holds memory that only code
+// running in it allocates: a region tagged by malloc, by dyld or by the
+// once-only allocator of libSystem. exec gives the new process a fresh address
+// space whose only tagged region is its stack, so a process the host holds
+// before its first instruction has none. dyld and the libSystem initializer
+// create them before main, whatever the parent and the arguments. A process
+// whose regions cannot be read, or that blocked inside dyld before any of
+// them, is not proven to have run.
+func hasRunItsOwnCode(pid int) bool {
+	var address uint64
+	for {
+		tag, next, err := readRegion(pid, address)
+		if err != nil || next <= address {
+			return false
+		}
+		if allocatedByOwnCode(tag) {
+			return true
+		}
+		address = next
+	}
+}
+
+// allocatedByOwnCode reports that tag, a region's user tag
+// (<mach/vm_statistics.h>), names an allocator that runs in the process:
+// VM_MEMORY_MALLOC to VM_MEMORY_MALLOC_PROB_GUARD, VM_MEMORY_DYLD,
+// VM_MEMORY_DYLD_MALLOC and VM_MEMORY_OS_ALLOC_ONCE.
+func allocatedByOwnCode(tag uint32) bool {
+	return tag >= 1 && tag <= 13 || tag == 60 || tag == 61 || tag == 73
+}
+
+// readRegion reads the user tag of the first memory region of the process pid
+// at or past address, and the address that region ends at.
+func readRegion(pid int, address uint64) (tag uint32, end uint64, err error) {
+	var info [procRegionInfoSize]byte
+	n, _, errno := syscall.Syscall6(syscall.SYS_PROC_INFO, procInfoCallPIDInfo, uintptr(pid), procPIDRegionInfo,
+		uintptr(address), uintptr(unsafe.Pointer(&info[0])), uintptr(len(info)))
+	if errno != 0 {
+		return 0, 0, errno
+	}
+	if n > uintptr(len(info)) {
+		return 0, 0, fmt.Errorf("proc_info reports %d bytes in a %d-byte buffer", n, len(info))
+	}
+	return decodeRegion(info[:n])
+}
+
+// decodeRegion reads the user tag and the end address out of a struct
+// proc_regioninfo. An end past the address space reads as 0.
+func decodeRegion(info []byte) (tag uint32, end uint64, err error) {
+	if len(info) != procRegionInfoSize {
+		return 0, 0, fmt.Errorf("proc_regioninfo is %d bytes, want %d", len(info), procRegionInfoSize)
+	}
+	end, carry := bits.Add64(binary.NativeEndian.Uint64(info[procRegionInfoAddress:]),
+		binary.NativeEndian.Uint64(info[procRegionInfoRegionSize:]), 0)
+	if carry != 0 {
+		end = 0
+	}
+	return binary.NativeEndian.Uint32(info[procRegionInfoUserTag:]), end, nil
 }
 
 // machTimebaseFrequency is how many mach time units the host counts per
