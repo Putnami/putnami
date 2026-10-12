@@ -318,7 +318,8 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// registry token recipes) is restored. Lazily run `putnami install` when the
 	// recorded install state is missing or stale. Built-in structured commands
 	// (install, deps, ...) are excluded — they restore workspace state on their
-	// own — and the guard is inert under --plan/--dry-run and best-effort.
+	// own — and the guard is inert under --plan/--dry-run. It is best-effort on
+	// a local run; a hosted run stops here when the install fails.
 	bootstrapGlobal := parsed.Global
 	engine.ApplyEnvOverrides(&bootstrapGlobal, cfg)
 	// A hosted job command reads the remote cache through one provider, and
@@ -327,7 +328,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	hostedCache, hostedReporters := &engine.HostedRemoteCache{}, &engine.HostedReporters{}
 	defer closeHostedHolders(hostedCache, hostedReporters)
 	if !providerMode && wsRoot != "" && !isStructuredCommand(parsed.Commands[0]) {
-		lifecycle.EnsureWorkspaceBootstrap(ctx, wsRoot, cfg, lifecycle.BootstrapOptions{
+		if err := lifecycle.EnsureWorkspaceBootstrap(ctx, wsRoot, cfg, lifecycle.BootstrapOptions{
 			Command:    parsed.Commands[0],
 			Subcommand: parsed.Subcommand,
 			Output:     bootstrapGlobal.Output,
@@ -340,7 +341,9 @@ func (a *App) Run(ctx context.Context, args []string) int {
 			Plan:                 bootstrapGlobal.Plan,
 			DryRun:               bootstrapGlobal.DryRun,
 			BeforeRepositoryCode: startHostedHoldersOfJobCommand(hostedCache, hostedReporters, parsed, extensionGroups, wsRoot, cfg),
-		})
+		}); err != nil {
+			return bootstrapFailureExit(ctx)
+		}
 	}
 
 	// Extension-owned structured commands (e.g. "cloud login") are routed
@@ -364,6 +367,16 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	}
 
 	return a.runTerminalSession(ctx, cfg, parsed, wsRoot, hostedCache, hostedReporters)
+}
+
+// bootstrapFailureExit is the exit code of a hosted run that its first-use
+// install stopped: the interrupt code when a signal canceled the install, a
+// failure otherwise.
+func bootstrapFailureExit(ctx context.Context) int {
+	if ctx.Err() != nil {
+		return ExitSignalReceived
+	}
+	return ExitError
 }
 
 // ErrHostedExtensionCommand refuses an extension command group on a hosted

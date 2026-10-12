@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
 // spyInstall replaces installRunner with a spy that records calls and returns
@@ -308,17 +309,54 @@ func TestEnsureWorkspaceBootstrap_SkipsWhenParentBootstrapped(t *testing.T) {
 	}
 }
 
+// A local run keeps going after a failed install: the command surfaces its
+// own error if it needs installed state.
 func TestEnsureWorkspaceBootstrap_BestEffortOnInstallFailure(t *testing.T) {
 	resetBootstrapEnv(t)
+	t.Cleanup(runcredential.SetForTest(""))
 	calls := spyInstall(t, errors.New("network down"))
 	ws := t.TempDir()
 	writeLock(t, ws, "putnami.lock.json", `{}`) // stale
 
-	// Must not panic or otherwise abort; the command is expected to proceed.
-	EnsureWorkspaceBootstrap(context.Background(), ws, &wsproto.Config{}, BootstrapOptions{Command: "build"})
+	var err error
+	_, stderr := captureProcessOutput(t, func() {
+		err = EnsureWorkspaceBootstrap(context.Background(), ws, &wsproto.Config{}, BootstrapOptions{Command: "build"})
+	})
 
+	if err != nil {
+		t.Errorf("a local run must continue after a failed install; got %v", err)
+	}
 	if *calls != 1 {
 		t.Errorf("install should be attempted once; got %d calls", *calls)
+	}
+	if !strings.Contains(stderr, "  Workspace install did not complete: network down\n  Continuing;") {
+		t.Errorf("stderr = %q, want the failure line and the continue hint", stderr)
+	}
+}
+
+// A hosted run stops on a failed install: its gate would otherwise run every
+// task on a workspace without dependencies.
+func TestEnsureWorkspaceBootstrap_HostedRunReturnsTheInstallError(t *testing.T) {
+	resetBootstrapEnv(t)
+	t.Cleanup(runcredential.SetForTest("hosted-run-credential"))
+	installErr := errors.New("network down")
+	calls := spyInstall(t, installErr)
+	ws := t.TempDir()
+	writeLock(t, ws, "putnami.lock.json", `{}`) // stale
+
+	var err error
+	_, stderr := captureProcessOutput(t, func() {
+		err = EnsureWorkspaceBootstrap(context.Background(), ws, &wsproto.Config{}, BootstrapOptions{Command: "build"})
+	})
+
+	if !errors.Is(err, installErr) {
+		t.Errorf("a hosted run must return the install error; got %v", err)
+	}
+	if *calls != 1 {
+		t.Errorf("install should be attempted once; got %d calls", *calls)
+	}
+	if stderr != "  Workspace install did not complete: network down\n" {
+		t.Errorf("stderr = %q, want the failure line alone", stderr)
 	}
 }
 
