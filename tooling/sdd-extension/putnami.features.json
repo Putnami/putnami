@@ -195,6 +195,28 @@
           }
         },
         {
+          "id": "squash-keeps-the-breaking-marker",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dropped-marker-fails-naming-the-commit",
+              "a-title-with-the-marker-passes",
+              "no-breaking-commit-passes-any-title",
+              "a-footer-counts-only-in-a-body",
+              "a-non-conventional-title-declares-nothing",
+              "base-commits-merged-in-do-not-count",
+              "an-unset-message-passes-with-a-note",
+              "a-missing-baseline-fails",
+              "a-shallow-clone-fails",
+              "the-step-is-never-served-from-cache"
+            ]
+          }
+        },
+        {
           "id": "authoring-never-grants-a-permission",
           "stage": "coded",
           "evidenceKinds": [

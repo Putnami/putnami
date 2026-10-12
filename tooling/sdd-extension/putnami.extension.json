@@ -275,7 +275,7 @@
       ]
     },
     "validate-workspace": {
-      "description": "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, and check the links of every README.md file and doc/ tree of the workspace.",
+      "description": "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, and check that the proposed squash commit keeps the breaking marker the commits of the change declare.",
       "activation": "workspace-once",
       "run": [
         {
@@ -301,6 +301,10 @@
         {
           "id": "docs-links",
           "task": "docs-links-validate"
+        },
+        {
+          "id": "breaking-marker",
+          "task": "breaking-marker-validate"
         }
       ]
     }
@@ -785,6 +789,30 @@
       "cache": {
         "enabled": true,
         "noOutput": true
+      },
+      "declares": {}
+    },
+    "breaking-marker-validate": {
+      "description": "Compare the proposed squash commit message in PUTNAMI_PROPOSAL_MESSAGE with the commits the change adds since the run's impacted baseline, and fail naming each commit that declares a breaking change the message does not. Every message is read as a conventional commit with the parser the version bump uses: a \"!\" before the subject colon, or a BREAKING CHANGE: footer in the body. An unset message passes with a note; a set message without an impacted baseline, or in a shallow clone, fails. Uncached on purpose: the verdict reads an environment variable and Git history, and the candidate cut holds neither, so a restored answer could approve a message or a range it never read.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "breaking-marker-validate"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000,
+      "inputs": {
+        "PUTNAMI_PROPOSAL_MESSAGE": {
+          "from": "env"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Breaking-marker report: the squash subject, whether it declares a break, the baseline, the number of commits read, and the commits that declare a break."
+        }
+      },
+      "cache": {
+        "enabled": false
       },
       "declares": {}
     },

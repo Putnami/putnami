@@ -8,7 +8,7 @@ contract.
 | Command | Activation | Steps | Cached |
 |---|---|---|---|
 | `validate` | project-scoped, on `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
-| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS and docs links on the Git candidate cut |
+| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS and docs links on the Git candidate cut. The breaking marker is never cached |
 
 Two commands rather than one, because one command carries one activation and
 these two have different subjects. A project's features and specs are a
@@ -24,7 +24,7 @@ when no project's features or specs are touched (a change to only
 explicitly stays one plan of each, and `validate-workspace` remains directly
 requestable.
 
-One word therefore covers all five steps in the canonical gate:
+One word therefore covers every step of both commands in the canonical gate:
 
 ```bash
 putnami lint,test,build,validate --impacted --enforce-coverage
@@ -157,6 +157,51 @@ its existing admission gate; the shared absent-policy default remains `report`.
   name any file of the workspace, so it reads the Git candidate cut and is
   cached on the input `git:**`: a link to a file Git ignores is broken, as it
   is in a clone.
+- **`breaking-marker-validate`** — the breaking-marker step. A pull request
+  merges by squash: the commits of its branch are dropped, and only the squash
+  commit reaches the base branch. `putnami version` reads the breaking marker
+  from that commit, so a `!` or a `BREAKING CHANGE:` footer that only a branch
+  commit carries is lost. The step reads the proposed squash message from the
+  `PUTNAMI_PROPOSAL_MESSAGE` environment variable, which the runner sets on a
+  pull request: the title, a blank line, and the body when the repository
+  squashes with it. It splits the message as Git splits a commit message,
+  reads the commits from the run's impacted baseline to `HEAD`, and reads every
+  message with the
+  [conventional-commit reader](../../../protocols/cli/doc/07-conventional-commit.md)
+  the version bump uses.
+
+  | Situation | Result |
+  |---|---|
+  | `PUTNAMI_PROPOSAL_MESSAGE` unset or blank | Passes, with the note "no proposal message to compare" |
+  | Message set, the run resolved no impacted baseline | Fails: without a baseline there is no range to compare. This covers a run without `--impacted` and an `--impacted` run that found no base and fell back to every project |
+  | Message set, the repository is a shallow clone | Fails, naming the shallow clone: the range could stop at the clone depth |
+  | Message set, the baseline names no commit, or Git fails | Fails with exit `1`, an error rather than a finding |
+  | No commit of the range declares a break | Passes, whatever the title says |
+  | A commit declares a break, and the title carries `!` or the body a `BREAKING CHANGE:` footer | Passes |
+  | A commit declares a break, and the message declares none | Fails with one `sdd.breaking_marker_dropped` diagnostic per such commit |
+  | A commit declares a break, and the title is not a conventional commit | Fails: such a title declares nothing, whatever its body says |
+
+  A failure names each commit that declares a break, by its 12-character ID
+  and its subject:
+
+  ```text
+  breaking marker: the squash commit "feat(cli): rework the selection" drops the breaking change that 1 commit declares since origin/main:
+    3f2a9c1d0b7e feat(cli)!: drop the --all flag
+  Add "!" before the colon of the title, or a "BREAKING CHANGE:" footer to the body when the squash commit keeps the body. If the change breaks nothing, reword the commit.
+  ```
+
+  A footer in the body counts only because the runner writes the body into
+  the variable when the repository squashes with it: the step cannot read that
+  setting. A footer with no blank line above it is part of the subject and
+  declares nothing. A merge of the base into the branch brings no commit of
+  the base into the range. The step reads every commit of the range, so two
+  cases fail although the squash commit breaks nothing: a branch stacked on a
+  parent that has since been squash-merged still holds the parent's commits,
+  and a breaking commit reverted later on the branch still declares its break.
+  Rebase the branch onto the base and drop those commits. The step does not
+  run when `--impacted` selects no project, because the run then plans no job. It is never cached (see
+  [below](#breaking-marker-validate--never-cached)). The decision is
+  [ADR 0001](adr/0001-the-squash-commit-keeps-the-breaking-marker.md).
 
 Selection narrows what a run **owns**, never what it **reads**: durable
 manifests and canonical spec documents are read at every root under any
@@ -452,6 +497,22 @@ paths in sorted order, never inside `node_modules`, `vendor`, or any dot
 directory (`.git`, `.gen`, `.putnami`), and never through a symlink — a
 generated or linked copy of a matched file would make the same registry answer
 differently before and after a build.
+
+### `breaking-marker-validate` — never cached
+
+```json
+"inputs": {
+  "PUTNAMI_PROPOSAL_MESSAGE": { "from": "env" }
+},
+"cache": { "enabled": false }
+```
+
+The verdict reads an environment variable and the commits of the range, and
+the candidate cut holds neither. A key would need those commits, and a key
+describes the tree, never the commit
+([ADR 0059 of the CLI](../../cli/doc/adr/0059-a-cache-key-describes-the-tree-not-the-commit.md)).
+So the task runs every time, and costs one `git log` of the range. The `env`
+port names the variable the step reads, and keys nothing.
 
 ## Exit codes
 

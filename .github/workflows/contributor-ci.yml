@@ -1,4 +1,4 @@
-# Contributor CI — the credential-free gate.
+# Contributor CI (without credentials) — the credential-free gate.
 #
 # This does NOT replace Putnami CI, the authoritative gate Putnami Cloud's
 # native runner executes. It runs beside it and proves the one thing that gate
@@ -15,7 +15,11 @@
 # the public npm registry for TypeScript dependencies, and npm.putnami.dev for
 # the @putnami/cloud version that sites/putnami.dev pins, which it serves
 # without an account.
-name: Contributor CI
+#
+# On a pull request the gate also checks that the squash commit keeps the
+# breaking marker the commits of the change declare. See the "Run the gate"
+# step.
+name: Contributor CI (without credentials)
 
 # A draft pull request runs nothing: every proposal opens as a draft when work
 # starts, and its checkpoints need no gate. Marking it ready runs the job.
@@ -241,9 +245,26 @@ jobs:
       # is what keeps that safe: an unset GATE_ARGS aborts here instead of
       # quietly falling through to the CLI's own default project selection,
       # which would gate a different set than the one just reported above.
+      #
+      # On a pull request, PUTNAMI_PROPOSAL_MESSAGE carries the squash commit
+      # message: the breaking-marker step of `validate-workspace` fails when a
+      # commit of the change declares a breaking change that the message drops.
+      # This repository squashes with the pull request title and body, so the
+      # message is the title, a blank line and the body. Title and body are
+      # untrusted text, so they reach the script through env and never through
+      # an expression inside it. The job does not run when only the title or
+      # the body is edited, so such an edit is checked at the next push.
       - name: Run the gate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PROPOSAL_TITLE: ${{ github.event.pull_request.title }}
+          PROPOSAL_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -euo pipefail
+          if [ "$EVENT_NAME" = pull_request ]; then
+            PUTNAMI_PROPOSAL_MESSAGE=$(printf '%s\n\n%s' "$PROPOSAL_TITLE" "$PROPOSAL_BODY")
+            export PUTNAMI_PROPOSAL_MESSAGE
+          fi
           ./putnamiw lint,test,build,validate $GATE_ARGS --enforce-coverage
 
       # A gate that changed or created a file ran over bytes nobody committed:

@@ -121,6 +121,16 @@ Examples:
 - `docs(react): update SSR guide`
 
 The PR title becomes the squash merge commit message, so keep it accurate as the PR evolves.
+The PR description becomes the body of that commit.
+
+The squash merge drops the commits of your branch, and `putnami version` reads
+the breaking marker only from the squash commit. When a commit of your branch
+declares a breaking change, with `!` before the colon or a `BREAKING CHANGE:`
+footer, the squash commit must declare it too: add `!` to the PR title, or a
+`BREAKING CHANGE:` footer to the PR description. Otherwise `validate` fails on
+the pull request and names the commit. If the change breaks nothing, reword the
+commit instead. Contributor CI (without credentials) runs this check at each
+push, so a title you edit after your last push is checked at the next one.
 
 ## Contributor CI Without Putnami Cloud Credentials
 
@@ -197,8 +207,8 @@ Beside it, [`.github/workflows/contributor-ci.yml`](.github/workflows/contributo
 runs the documented contributor path on every pull request, on a GitHub-hosted
 runner that reads no secret and empties every Putnami credential variable before
 starting. It complements Putnami CI — the merge decision rests on Putnami CI;
-a red Contributor CI means the credential-free path broke and is worth fixing on
-its own. It is scoped by `--impacted`, so a documentation-only pull request
+a red Contributor CI (without credentials) check means the credential-free path
+broke and is worth fixing on its own. It is scoped by `--impacted`, so a documentation-only pull request
 selects zero projects and passes having run nothing; the job summary prints the
 selected project and job counts so that case is visible.
 

@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -110,8 +111,9 @@ func serveProvider(record string, hosts []string) int {
 	defer func() { _ = file.Close() }()
 	note := func(line string) { _, _ = file.WriteString(line + "\n") }
 	note("start")
+	// Quoted, so a value that holds a newline stays on its line of the record.
 	for _, entry := range os.Environ() {
-		note("env " + entry)
+		note("env " + strconv.Quote(entry))
 	}
 	write := func(response registry.CredentialResponse) {
 		line, _ := json.Marshal(response)

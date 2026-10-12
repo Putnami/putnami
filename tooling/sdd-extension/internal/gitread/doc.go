@@ -15,6 +15,8 @@
 //	ReadTreeBlob          <- internal/git/tree.go
 //	CommitSourceBinding   <- internal/git/tree.go
 //	ProjectSourceBinding  <- internal/git/source_binding.go, ProjectSourceBindingMeasured
+//	IsShallow             <- internal/git/tags.go
+//	CommitsSince          <- internal/git/tags.go, without the pathspecs
 //
 // This package is the only implementation left for most of that list. Core's
 // `internal/git/tree.go` was the SDD vertical's file and nothing else called
@@ -38,7 +40,9 @@
 //
 // What was deliberately NOT copied: the version, diff, and merge-base helpers,
 // and the subprocess count `ProjectSourceBindingMeasured` reports. No SDD
-// engine calls them. ResolveBaseline dropped core's epic-branch tier and its
+// engine calls them. Of core's version helpers only IsShallow and CommitsSince
+// came over, for the breaking-marker step, which reads commit messages and
+// never a tag. ResolveBaseline dropped core's epic-branch tier and its
 // ResolvedBaseline tier label with the same reasoning — the architecture engine
 // passes no epic branches and discards the label.
 //

@@ -331,6 +331,35 @@ func runDocsLinksValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (s
 	return finish(report, verdict)
 }
 
+// runBreakingMarkerValidate is the seventh step of the workspace-scoped
+// `validate-workspace` command. It compares the proposed squash message the
+// runner sets in PUTNAMI_PROPOSAL_MESSAGE with the commits the change adds since
+// the run's impacted baseline, and fails when a commit declares a breaking
+// change the message drops.
+//
+// The baseline is the one the run's `--impacted` selection resolved, and only
+// that one: a run that selected its projects another way names no range, and
+// the engine refuses to compare a message against nothing. The step reads the
+// repository at the workspace root, needs no membership, and is never served
+// from cache: the variable and the history it reads are outside the candidate
+// cut.
+func runBreakingMarkerValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
+	baseline := ""
+	if ctx.Selection != nil && ctx.Selection.Mode == pctx.SelectionModeImpacted {
+		baseline = ctx.Selection.Baseline
+	}
+	report, verdict := sdd.BuildBreakingMarkerResult(ctx.WorkspaceRoot, os.Getenv(sdd.ProposalMessageEnv), baseline)
+	publishDiagnostics(emit, report.Diagnostics)
+	switch {
+	case !report.Proposal:
+		emit.Summary("breaking marker: " + report.Note)
+	case verdict == nil:
+		emit.Summary(fmt.Sprintf("breaking marker: %d commit(s) since %s, %d breaking, squash commit declares a break: %t",
+			report.Commits, report.Baseline, len(report.Breaking), report.Declares))
+	}
+	return finish(report, verdict)
+}
+
 // projectValidationView builds the membership and the projection a PROJECT-
 // SCOPED validation task runs over.
 //

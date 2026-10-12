@@ -47,7 +47,7 @@ planner special case — and its semantics stay where they belong, in
 | `manifest_contract_test.go` | The manifest's conformance harness: the protocol's own validation, plus the one-author rule. |
 | `internal/sdd/` | The four SDD engines: what a features, specs, architecture or contracts run DECIDES. Copied from `tooling/cli/internal/commands/sdd`, minus its command and rendering layer. |
 | `internal/features/` | The feature and spec engine: discovery, aggregation, evidence freshness, snapshot deltas. Copied from `tooling/cli/internal/features`; only its imports differ. |
-| `internal/gitread/` | Immutable Git history reads over the `git` binary, for the revision reader and for source bindings. Copied from `tooling/cli/internal/git`, narrowed to what the engine calls. |
+| `internal/gitread/` | Immutable Git history reads over the `git` binary, for the revision reader, for source bindings, and for the commit messages the breaking-marker step reads. Copied from `tooling/cli/internal/git`, narrowed to what the engine calls. |
 | `internal/wsview/` | The extension's read-only view of workspace membership, and the adapter that builds it from the job context. |
 | `cmd/putnami-sdd/validate.go` | The job bodies `validate` and `validate-workspace` run. Each builds the view its wire context entitles it to, calls ONE engine builder, and publishes the diagnostics. |
 | `cmd/putnami-sdd/interactive.go` | The sixteen interactive subcommands: argument arity, selection refusals, output-mode resolution, and the result envelope. |
@@ -307,7 +307,7 @@ activation:
 | Command | Scope | Steps | Cached? |
 |---|---|---|---|
 | `validate` | one project, activated by `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
-| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS and docs links on the Git candidate cut |
+| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS and docs links on the Git candidate cut. The breaking marker is never cached |
 
 Both are in the canonical gate:
 
@@ -370,6 +370,11 @@ A task may be cacheable only when its declared inputs COVER what it reads.
   the commit, the ref or the checkout. The cut is a workspace port, so one
   digest serves every project's key; a project port naming
   `putnami.features.json` keeps the project side off ignored build output.
+- `breaking-marker-validate` is never cached. It compares the proposed squash
+  message in `PUTNAMI_PROPOSAL_MESSAGE` with the commits since the run's
+  impacted baseline, and the candidate cut holds neither the variable nor the
+  commits. Its `env` input names the variable and keys nothing. See
+  [the validation jobs](doc/02-validation-jobs.md#breaking-marker-validate--never-cached).
 
 ### The decision gate
 
