@@ -234,6 +234,20 @@ describe('Client Form Handlers', () => {
       expect(result.headers.get('Location')).toBe('https://idp.example.com/authorize');
     });
 
+    it('redirects to the page fetch already followed when a redirect came before the action route', async () => {
+      fetchMock.mockImplementationOnce(async () => {
+        const followed = new Response('<!doctype html>', { status: 200, headers: { 'Content-Type': 'text/html' } });
+        Object.defineProperty(followed, 'redirected', { value: true });
+        Object.defineProperty(followed, 'url', { value: 'http://localhost/login' });
+        return followed;
+      });
+
+      const result = (await submit()) as Response;
+
+      expect(result.status).toBe(302);
+      expect(result.headers.get('Location')).toBe('http://localhost/login');
+    });
+
     it('falls back to 302 for a status React Router does not follow', async () => {
       fetchMock.mockImplementationOnce(
         async () =>

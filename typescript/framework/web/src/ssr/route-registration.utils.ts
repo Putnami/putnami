@@ -338,8 +338,8 @@ function publishing(handler: RouteHandler): RouteHandler {
  * session cookie, stay. A plain HTML form POST does not send
  * {@link ACTION_REQUEST_HEADER} and receives the redirect unchanged.
  *
- * It wraps the route middleware too, so a redirect a middleware answers, such
- * as a login redirect from `.secure()`, reaches the client the same way.
+ * It wraps the route middleware too, so a redirect a route middleware answers
+ * reaches the client the same way.
  *
  * @param handler - The action route handler, middleware included.
  * @returns The same handler, with redirects made followable by the client.
@@ -370,27 +370,15 @@ function followableRedirects(handler: RouteHandler): RouteHandler {
  * @returns The followable response, or `undefined` when `value` is no redirect.
  */
 function toFollowable(value: unknown): HttpResponse | undefined {
-  let status: number;
-  let headers: [string, string][];
-  if (value instanceof HttpResponse) {
-    if (!value.redirected) return undefined;
-    status = value.status ?? 302;
-    headers = value.getHeaderEntries();
-  } else if (value instanceof Response) {
-    if (value.status < 300 || value.status >= 400 || !value.headers.has('Location')) return undefined;
-    status = value.status;
-    headers = [...value.headers.entries()].filter(([name]) => name !== 'set-cookie');
-    for (const cookie of value.headers.getSetCookie()) headers.push(['set-cookie', cookie]);
-  } else {
+  if (!(value instanceof HttpResponse) || !value.redirected) {
     return undefined;
   }
-  const location = headers.find(([name]) => name.toLowerCase() === 'location')?.[1] ?? '';
   return new HttpResponse(undefined, {
     status: 204,
     headers: [
-      ...headers.filter(([name]) => name.toLowerCase() !== 'location'),
-      [ACTION_REDIRECT_HEADER, location],
-      [ACTION_REDIRECT_STATUS_HEADER, String(status)],
+      ...value.getHeaderEntries().filter(([name]) => name !== 'Location'),
+      [ACTION_REDIRECT_HEADER, value.getHeader('Location') as string],
+      [ACTION_REDIRECT_STATUS_HEADER, String(value.status)],
     ],
   });
 }

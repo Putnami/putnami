@@ -27,22 +27,27 @@ const createContext = (enhanced: boolean) =>
   }) as unknown as HttpRequestContext;
 
 /** Registers one eager action and returns the handler its HTTP route got. */
-function registerAction(handler: (ctx: HttpRequestContext) => unknown, middleware?: HttpMiddleware[]): RouteHandler {
+function registerAction(
+  handler: (ctx: HttpRequestContext) => unknown,
+  middleware?: HttpMiddleware[],
+  isLazy = false,
+): RouteHandler {
   let registered: RouteHandler | undefined;
   const httpPlugin = {
     post: (_route: string, routeHandler: RouteHandler) => {
       registered = routeHandler;
     },
   } as unknown as HttpPlugin;
+  const actionModule = { default: { handler } };
 
   registerRouteAction({
     httpPlugin,
-    cache: {} as never,
+    cache: { loadModule: async () => actionModule } as never,
     route: '/tasks/[id]',
     httpRoute: '/tasks/:id',
     node: {} as RouteObject,
-    action: { default: { handler } } as never,
-    isLazy: false,
+    action: (isLazy ? async () => actionModule : actionModule) as never,
+    isLazy,
     middleware,
   });
 
@@ -83,14 +88,13 @@ describe('action route — redirects for the client action', () => {
     expect(result.getHeader('Set-Cookie')).toBe('session=abc');
   });
 
-  it('answers a native redirect Response the same way', async () => {
-    const route = registerAction(() => Response.redirect('http://localhost/tasks', 307));
+  it('answers a redirect from a lazy action the same way', async () => {
+    const route = registerAction(() => redirect('/tasks'), undefined, true);
 
     const result = (await route(createContext(true))) as HttpResponse;
 
     expect(result.status).toBe(204);
-    expect(result.getHeader(ACTION_REDIRECT_HEADER)).toBe('http://localhost/tasks');
-    expect(result.getHeader(ACTION_REDIRECT_STATUS_HEADER)).toBe('307');
+    expect(result.getHeader(ACTION_REDIRECT_HEADER)).toBe('/tasks');
   });
 
   it('answers a redirect from the route middleware the same way', async () => {
