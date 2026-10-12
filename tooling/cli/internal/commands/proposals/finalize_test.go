@@ -80,7 +80,7 @@ func (p *finalizerProvider) call(_ context.Context, contract, operation string, 
 		if contract == collab.ContractProposals {
 			repository := p.proposalRepository
 			if repository == "" {
-				repository = "Putnami/putnami"
+				repository = "acme/app"
 			}
 			settings, _ := json.Marshal(map[string]string{"repository": repository})
 			capabilities.Provider = &collab.ProviderIdentity{Name: "@putnami/github-collaboration"}
@@ -299,7 +299,7 @@ func TestPostPushHeadChangeWithoutNewRevisionStopsBeforeUpsert(t *testing.T) {
 func finalizerFixture(t *testing.T) (Finalizer, *finalizerGit, *finalizerProvider, Options) {
 	t.Helper()
 	root := t.TempDir()
-	policy := `{"options":{"@putnami/contributor":{"version":1,"proposals":{"source":"github:putnami/putnami"},"states":{"delivered":"blocked"},"verification":{"language":"en","ciGate":{"checks":["Putnami CI"]}},"publication":{"taskReference":"Closes #{id}","bodyMaxBytes":1500}}}}`
+	policy := `{"options":{"@putnami/contributor":{"version":1,"proposals":{"source":"github:acme/app"},"states":{"delivered":"blocked"},"verification":{"language":"en","ciGate":{"checks":["Putnami CI"]}},"publication":{"taskReference":"Closes #{id}","bodyMaxBytes":1500}}}}`
 	if err := os.WriteFile(filepath.Join(root, "putnami.workspace.json"), []byte(policy), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -308,7 +308,7 @@ func finalizerFixture(t *testing.T) (Finalizer, *finalizerGit, *finalizerProvide
 		t.Fatal(err)
 	}
 	git := &finalizerGit{branch: "topic", head: "0123456789012345678901234567890123456789", fingerprint: "tree-fingerprint", baseTip: "base-tip", baseSHA: "base-sha", clean: true, ahead: true, paths: []string{"source.go"}}
-	provider := &finalizerProvider{task: collab.Task{Ref: collab.Ref{Source: "github:putnami/putnami", ID: "42"}, Revision: "task-revision", URL: "https://github.com/putnami/putnami/issues/42", State: collab.TaskStateInProgress}}
+	provider := &finalizerProvider{task: collab.Task{Ref: collab.Ref{Source: "github:acme/app", ID: "42"}, Revision: "task-revision", URL: "https://github.com/acme/app/issues/42", State: collab.TaskStateInProgress}}
 	verifications := 0
 	f := Finalizer{Root: root, Git: git, Call: provider.call, Verify: func(context.Context, string, string) (Verified, error) {
 		verifications++
@@ -333,10 +333,10 @@ func TestFinalizerPartialNeverClosesOrTransitions(t *testing.T) {
 	if provider.transitions != 0 || git.pushes != 1 {
 		t.Fatalf("pushes=%d transitions=%d", git.pushes, provider.transitions)
 	}
-	if result.State != collab.ProposalStateOpen || !strings.Contains(provider.proposal.Body, "Refs https://github.com/putnami/putnami/issues/42") {
+	if result.State != collab.ProposalStateOpen || !strings.Contains(provider.proposal.Body, "Refs https://github.com/acme/app/issues/42") {
 		t.Fatalf("unexpected partial proposal: %+v", provider.proposal)
 	}
-	for _, body := range []string{"Closes #42", "Closes\n #42", "Fixes https://github.com/putnami/putnami/issues/42"} {
+	for _, body := range []string{"Closes #42", "Closes\n #42", "Fixes https://github.com/acme/app/issues/42"} {
 		git.pushes = 0
 		_ = os.WriteFile(opts.BodyFile, []byte(body), 0600)
 		if _, err := f.Run(context.Background(), opts); err == nil || git.pushes != 0 {
@@ -649,7 +649,7 @@ func TestPolicyAndTaskReferenceAuthority(t *testing.T) {
 		t.Fatal("agent attribution passed")
 	}
 	policy := Policy{}
-	policy.Proposals.Source = "github:putnami/putnami"
+	policy.Proposals.Source = "github:acme/app"
 	policy.Publication.TaskReference = "Closes #{id}"
 	foreign := collab.Task{Ref: collab.Ref{Source: "github:elsewhere/repo", ID: "42"}, URL: "https://github.com/elsewhere/repo/issues/42"}
 	if _, err := TaskReference(policy, foreign, false); err == nil {

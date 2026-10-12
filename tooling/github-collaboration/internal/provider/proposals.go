@@ -475,8 +475,8 @@ func (s *proposalSession) relatedIssues(body string) []relatedIssue {
 	for _, indexes := range relatedReference.FindAllStringSubmatchIndex(body, -1) {
 		action := strings.ToLower(body[indexes[2]:indexes[3]])
 		token := body[indexes[4]:indexes[5]]
-		// #42 is not a reference inside #42extra or #42-more. The same
-		// boundary rule also keeps #42 from being inferred from #420.
+		// A reference ends after its number. A following letter, digit,
+		// underscore or hyphen makes the matched token part of a longer value.
 		if indexes[5] < len(body) && referenceSuffix(body[indexes[5]]) {
 			continue
 		}

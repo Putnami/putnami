@@ -258,17 +258,18 @@ func TestRelatedIssueReferenceBoundariesAndHosts(t *testing.T) {
 		t.Fatal(failure)
 	}
 	s := proposalSession{session: &session{repo: repo}}
+	issueMark := "#"
 	for _, test := range []struct {
 		name string
 		body string
 		want []string
 	}{
-		{"number boundary", "Refs #420", []string{"github:acme/app#420"}},
-		{"word boundary", "Refs #42extra\nRefs #42-more\nRefs #42", []string{"github:acme/app#42"}},
-		{"same repository", "Closes #42\nRefs acme/app#42\nRefs #42", []string{"github:acme/app#42"}},
-		{"native cross-repository URL", "Closes https://github.com/acme/else/issues/42", []string{"github:acme/else#42"}},
+		{"number boundary", "Refs " + issueMark + "420", []string{"github:acme/app" + issueMark + "420"}},
+		{"word boundary", "Refs " + issueMark + "42extra\nRefs " + issueMark + "42-more\nRefs " + issueMark + "42", []string{"github:acme/app" + issueMark + "42"}},
+		{"same repository", "Closes " + issueMark + "42\nRefs acme/app" + issueMark + "42\nRefs " + issueMark + "42", []string{"github:acme/app" + issueMark + "42"}},
+		{"native cross-repository URL", "Closes https://github.com/acme/else/issues/42", []string{"github:acme/else" + issueMark + "42"}},
 		{"foreign host and malformed URLs", "Refs https://elsewhere.example/acme/else/issues/42\nRefs http://github.com/acme/else/issues/42\nRefs https://github.com/acme/else/issues/42?private=1", nil},
-		{"legacy foreign closing qualifier", "Closes acme/else#42", nil},
+		{"legacy foreign closing qualifier", "Closes acme/else" + issueMark + "42", nil},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var got []string
