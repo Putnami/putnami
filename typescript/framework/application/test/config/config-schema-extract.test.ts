@@ -23,6 +23,7 @@ import {
   renderJSONSchema,
 } from '../../src/config/config-schema-extract';
 import { FIELD_TYPE_VALUES, type JsonSchemaManifest, MAP_KEY_TYPE_VALUES } from '../../src/config/config-schema.types';
+import { OAuthConfig } from '../../src/oauth/oauth.config';
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Resolve the shared cross-language fixtures from the monorepo's protocol package.
@@ -315,6 +316,47 @@ describe('extractConfigSchema end-to-end', () => {
 
     expect(findField(block.fields, 'driver')?.productionUnsafeDefault).toBe(true);
     expect(findField(block.fields, 'url')?.productionUnsafeDefault).toBeUndefined();
+  });
+
+  it('writes no default for array, map and object fields, nor an empty one', () => {
+    // Go rejects a default tag on a slice, map or struct and drops an empty
+    // default. `String([])` used to write `""`, which the config check applied
+    // as a string to the array field.
+    const def = Config('defaults', {
+      roles: Default(ArrayOf(String), []),
+      hosts: Default(ArrayOf(String), ['a', 'b']),
+      labels: Default(MapOf(String, String), {}),
+      tls: Default({ certFile: String }, { certFile: 'cert.pem' }),
+      label: Default(String, ''),
+      retries: Default(Int, 0),
+    });
+
+    const manifest = extractConfigSchema({ appName: 'e2e-app', version: '0.0.0', output: false, definitions: [def] });
+    if (!manifest) throw new Error('expected manifest from extractConfigSchema');
+    const block = manifest.configs.find((c) => c.path === 'defaults');
+    if (!block) throw new Error('expected block at path "defaults"');
+
+    for (const name of ['roles', 'hosts', 'labels', 'tls', 'label']) {
+      expect(findField(block.fields, name)).not.toHaveProperty('default');
+    }
+    expect(findField(block.fields, 'retries')?.default).toBe('0');
+  });
+
+  it('writes no default for the unset OAuth roles and scopes arrays', () => {
+    const manifest = extractConfigSchema({
+      appName: 'e2e-app',
+      version: '0.0.0',
+      output: false,
+      definitions: [OAuthConfig],
+    });
+    const block = manifest?.configs.find((c) => c.path === 'oauth');
+    if (!block) throw new Error('expected block at path "oauth"');
+
+    for (const name of ['roles', 'scopes']) {
+      const field = findField(block.fields, name);
+      expect(field?.type).toBe('array');
+      expect(field).not.toHaveProperty('default');
+    }
   });
 
   it('rejects non-primitive map keys with a build-time error', () => {
