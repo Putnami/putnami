@@ -58,10 +58,14 @@
 // missing field decodes to the zero value, and "empty" must never be the
 // consequence of something being absent. It is what makes the binding invariant
 // checkable — MATERIALIZING AN EMPTY OUTPUT MUST NOT TOUCH ITS DESTINATION.
-// Command-output paths are shared between the steps of one command, so deleting
-// a destination "because this entry has nothing for it" would delete a sibling
-// task's artifacts. An empty output is a statement about THIS task, not a
-// statement about the path.
+// An empty output is a statement about THIS task, not a statement about the
+// path: the store cannot tell what else the destination holds, such as a
+// committed file no task writes inside an optional project output. Whether a
+// restore empties the destination is the engine's decision, because the engine
+// reads the declaration. It empties an optionalEmpty directory under the
+// command-output root, where the plan gives each output one owner, with the
+// same EmptyTaskOutput an execution uses, and leaves every other empty output
+// as it stands (jobs.materializeDeclaredOutputs, CLI ADR 0065).
 //
 // # Merge points: the model deliberately cannot express them (finding from B3c)
 //
@@ -175,7 +179,8 @@ const (
 	TaskOutputPresent = "present"
 
 	// TaskOutputEmpty means the task produced nothing for an optionalEmpty
-	// output. Restoring it is a no-op; it must never remove the destination.
+	// output. Materializing it is a no-op that never removes the destination;
+	// the engine decides whether a restore empties it.
 	TaskOutputEmpty = "empty"
 )
 

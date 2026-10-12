@@ -210,11 +210,18 @@ func (f *emptyingFixture) rows(t *testing.T, leg string, result *SchedulerResult
 // output: the files a later hit restores.
 func (f *emptyingFixture) storedFiles(t *testing.T, key string) []string {
 	t.Helper()
+	return f.storedOutput(t, key, "gen")
+}
+
+// storedOutput lists what the entry published under key holds for the output
+// id.
+func (f *emptyingFixture) storedOutput(t *testing.T, key, id string) []string {
+	t.Helper()
 	entry, err := store.NewLocalStore(f.storeRoot).LookupTaskEntry(key)
 	if err != nil || entry == nil {
 		t.Fatalf("no task-owned entry under %s: entry=%v err=%v", key, entry, err)
 	}
-	return filesIn(t, filepath.Join(entry.FilesDir, "gen"))
+	return filesIn(t, filepath.Join(entry.FilesDir, id))
 }
 
 // filesIn lists the files under root, slash-form and sorted. An absent root
@@ -303,7 +310,7 @@ func engineWithoutEmptying(t *testing.T) (restore func()) {
 func TestExecutingTaskStartsFromAnEmptyOwnedDirectory(t *testing.T) {
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-leftover-is-removed-and-never-stored")
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "ceded-and-preserved-paths-and-the-stamp-stay-untouched")
-	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-hit-and-an-adopted-result-empty-nothing")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-hit-of-a-present-output-and-an-adopted-result-empty-nothing")
 	f := newEmptyingFixture(t, false)
 	emptyings := recordEmptyings(t)
 
@@ -403,7 +410,7 @@ func TestSecondOwnerOfTheStampDirectoryStillFindsTheStamp(t *testing.T) {
 // the leader wrote. It must empty nothing: emptying would delete that tree
 // before the capture reads it.
 func TestAdoptedResultEmptiesNothing(t *testing.T) {
-	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-hit-and-an-adopted-result-empty-nothing")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-hit-of-a-present-output-and-an-adopted-result-empty-nothing")
 	requireShell(t)
 	logPath := filepath.Join(t.TempDir(), "invocations")
 	ws, planned := sharedRuntimeFixture(t, logPath, "0")
@@ -601,13 +608,14 @@ func TestEntryStoredWithoutEmptyingIsNeverServed(t *testing.T) {
 	assertFilesIn(t, "this engine, restore", f.gen, "public/static/index.html", "version.json")
 }
 
-// An optionalEmpty directory can hold a file no task wrote, such as a
-// committed configuration the task reads when it writes nothing there. A run
-// that writes nothing is recorded empty, and a restore of that record leaves
-// the path as it stands. An execution that writes nothing must leave it too,
-// so the scheduler never empties an optional output.
+// An optionalEmpty directory under the project root can hold a file no task
+// wrote, such as a committed configuration the task reads when it writes
+// nothing there. A run that writes nothing is recorded empty, and a restore of
+// that record leaves the path as it stands. An execution that writes nothing
+// must leave it too, so the scheduler never empties an optional project or
+// workspace output.
 func TestOptionalOutputKeepsAFileThroughAnExecutionThatWritesNothing(t *testing.T) {
-	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-output-is-left-as-it-stands")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-project-or-workspace-output-is-left-as-it-stands")
 	f := newEmptyingFixture(t, false)
 	f.planned[0].Extension.Tasks[emptyingTask] = extension.TaskDefinition{Declares: &extension.TaskDeclaration{
 		Outputs: map[string]extension.DeclaredOutput{
@@ -653,7 +661,310 @@ func TestOptionalOutputKeepsAFileThroughAnExecutionThatWritesNothing(t *testing.
 	assertKept("execution that writes nothing")
 
 	if got := emptyings(); len(got) != 0 {
-		t.Fatalf("emptied %v, want nothing: the task owns no required directory", got)
+		t.Fatalf("emptied %v, want nothing: the task owns no emptied directory", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// an optional command-output directory, through the real scheduler
+// ---------------------------------------------------------------------------
+
+// newBinFixture gives the fixture project the shape of the Go cross-compile:
+// its task owns the optionalEmpty command-output directory bin, cedes
+// bin/ceded to another task and preserves bin/kept for the workspace. Its tool
+// writes one binary per line of pages.txt, as bin/<line>, and never removes
+// one. It returns the fixture and the absolute path of bin.
+func newBinFixture(t *testing.T) (*emptyingFixture, string) {
+	t.Helper()
+	f := newEmptyingFixture(t, false)
+	f.planned[0].Extension.Tasks[emptyingTask] = extension.TaskDefinition{Declares: &extension.TaskDeclaration{
+		Outputs: map[string]extension.DeclaredOutput{
+			"bin": {
+				Kind: extension.OutputKindDirectory, Root: extension.OutputRootCommandOutput, Path: "bin",
+				OptionalEmpty: true, Excludes: []string{"bin/ceded"}, Preserves: []string{"kept"},
+			},
+		},
+	}}
+	writeExecutable(t, filepath.Join(f.ws.Root, "generate.sh"), "#!/bin/sh\n"+
+		"printf 'run:%s\\n' \"$PUTNAMI_JOB_NAME\" >> "+shellQuote(f.logPath)+"\n"+
+		"mkdir -p \"$PUTNAMI_OUTPUT_PATH/bin\"\n"+
+		"while IFS= read -r name; do\n"+
+		"  if [ -n \"$name\" ]; then printf 'binary %s\\n' \"$name\" > \"$PUTNAMI_OUTPUT_PATH/bin/$name\"; fi\n"+
+		"done < pages.txt\n"+
+		"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"OK\"}}'\n")
+	return f, filepath.Join(f.ws.Root, ".putnami", "out", emptyingProject, "build", "bin")
+}
+
+// writeUnowned writes a file at the ceded and at the preserved subpath of bin
+// and returns the identity of each path the emptying must leave in place:
+// both files, the directories that hold them, and bin itself.
+func writeUnowned(t *testing.T, bin string) map[string]os.FileInfo {
+	t.Helper()
+	ceded := filepath.Join(bin, "ceded", "other")
+	preserved := filepath.Join(bin, "kept", "note.txt")
+	writeFileAt(t, ceded, "ceded to another task\n")
+	writeFileAt(t, preserved, "kept for the workspace\n")
+	unowned := map[string]os.FileInfo{}
+	for _, path := range []string{ceded, preserved, filepath.Dir(ceded), filepath.Dir(preserved), bin} {
+		info, err := os.Lstat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		unowned[path] = info
+	}
+	return unowned
+}
+
+func assertUnmoved(t *testing.T, leg string, unowned map[string]os.FileInfo) {
+	t.Helper()
+	for path, info := range unowned {
+		now, err := os.Lstat(path)
+		if err != nil || !os.SameFile(info, now) {
+			t.Errorf("%s: %s was moved or replaced (err=%v)", leg, path, err)
+		}
+	}
+}
+
+// The defect, end to end, on the shape of the Go cross-compile: a project
+// drops a platform, and the binary built for it stays in bin. The execution
+// that follows must find no such binary, the entry it stores must not hold it,
+// and a later build from a deleted directory must not bring it back. The ceded
+// and preserved subpaths stay, under the same inode. A hit that restores a
+// present output replaces the directory through the restore alone.
+func TestDroppedPlatformLeavesNoBinaryBehind(t *testing.T) {
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-command-output-directory-is-emptied")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-leftover-is-removed-and-never-stored")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-hit-of-a-present-output-and-an-adopted-result-empty-nothing")
+	f, bin := newBinFixture(t)
+	emptyings := recordEmptyings(t)
+
+	f.setPages(t, "a", "b")
+	first := f.executed(t, "two platforms", f.run(t, SchedulerConfig{}))[0]
+	assertFilesIn(t, "two platforms", bin, "a", "b")
+	if got, want := f.storedOutput(t, first.CacheKey, "bin"), []string{"a", "b"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("the first entry holds %v, want %v", got, want)
+	}
+	unowned := writeUnowned(t, bin)
+
+	// The project drops platform b: the tool writes a alone and removes nothing.
+	f.setPages(t, "a")
+	second := f.executed(t, "one platform", f.run(t, SchedulerConfig{}))[0]
+	if second.CacheKey == "" || second.CacheKey == first.CacheKey {
+		t.Fatalf("keys = %q then %q, want two distinct keys for two platform sets", first.CacheKey, second.CacheKey)
+	}
+	assertFilesIn(t, "one platform", bin, "a", "ceded/other", "kept/note.txt")
+	assertUnmoved(t, "one platform", unowned)
+	if got, want := f.storedOutput(t, second.CacheKey, "bin"), []string{"a"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("the stored entry holds %v, want %v: the dropped platform's binary entered the cache", got, want)
+	}
+
+	// A hit over a stale binary restores the present output and prunes it.
+	writeFileAt(t, filepath.Join(bin, "b"), "stale\n")
+	f.hit(t, "restore over a stale binary", f.run(t, SchedulerConfig{}))
+	assertFilesIn(t, "restore over a stale binary", bin, "a", "ceded/other", "kept/note.txt")
+
+	// A build from a deleted directory restores the one binary.
+	if err := os.RemoveAll(bin); err != nil {
+		t.Fatal(err)
+	}
+	f.hit(t, "restore", f.run(t, SchedulerConfig{}))
+	assertFilesIn(t, "restore", bin, "a")
+
+	if got := invocationLog(t, f.logPath); len(got) != 2 {
+		t.Fatalf("invocations = %v, want the two executions and no third", got)
+	}
+	if got, want := emptyings(), []string{bin, bin}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("emptied %v, want one emptying per execution and none for a hit of a present output", got)
+	}
+}
+
+// A run that builds nothing records bin empty. A hit on that entry must leave
+// bin as that run left it: it empties what the task owns there, keeps the
+// ceded and preserved subpaths under the same inode, and runs no tool.
+// Leaving the destination of the empty record as it stood would serve a stale
+// binary beside a green status.
+func TestRestoreOfAnEmptyCommandOutputRecordEmptiesIt(t *testing.T) {
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-restore-of-an-empty-command-output-record-empties-it")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "ceded-and-preserved-paths-and-the-stamp-stay-untouched")
+	f, bin := newBinFixture(t)
+	emptyings := recordEmptyings(t)
+
+	first := f.executed(t, "nothing built", f.run(t, SchedulerConfig{}))[0]
+	entry, err := store.NewLocalStore(f.storeRoot).LookupTaskEntry(first.CacheKey)
+	if err != nil || entry == nil {
+		t.Fatalf("no entry under %s (err=%v)", first.CacheKey, err)
+	}
+	if recorded, ok := entry.Output("bin"); !ok || recorded.State != store.TaskOutputEmpty {
+		t.Fatalf("bin recorded as %+v, want the output recorded empty", recorded)
+	}
+
+	unowned := writeUnowned(t, bin)
+	writeFileAt(t, filepath.Join(bin, "a"), "stale\n")
+	writeFileAt(t, filepath.Join(bin, "linux-amd64", "a"), "stale\n")
+
+	f.hit(t, "restore of the empty record", f.run(t, SchedulerConfig{}))
+	assertFilesIn(t, "restore of the empty record", bin, "ceded/other", "kept/note.txt")
+	assertUnmoved(t, "restore of the empty record", unowned)
+
+	if got := invocationLog(t, f.logPath); len(got) != 1 {
+		t.Fatalf("invocations = %v, want the one execution", got)
+	}
+	if got, want := emptyings(), []string{bin, bin}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("emptied %v, want the execution's emptying and the restore's", got)
+	}
+
+	// The shape of the Go package-archives task: the empty directory sits beside
+	// a required file. The entry records the directory empty and the file
+	// present. The restore empties the directory and replaces the file.
+	t.Run("an empty directory beside a required file", func(t *testing.T) {
+		f, archives := newBinFixture(t)
+		f.planned[0].Extension.Tasks[emptyingTask] = extension.TaskDefinition{Declares: &extension.TaskDeclaration{
+			Outputs: map[string]extension.DeclaredOutput{
+				"archives": {
+					Kind: extension.OutputKindDirectory, Root: extension.OutputRootCommandOutput, Path: "bin",
+					OptionalEmpty: true,
+				},
+				"metadata": fileDeclaration(extension.OutputRootCommandOutput, "metadata.json", false),
+			},
+		}}
+		writeExecutable(t, filepath.Join(f.ws.Root, "generate.sh"), "#!/bin/sh\n"+
+			"printf 'run:%s\\n' \"$PUTNAMI_JOB_NAME\" >> "+shellQuote(f.logPath)+"\n"+
+			"mkdir -p \"$PUTNAMI_OUTPUT_PATH/bin\"\n"+
+			"printf '{\"archives\":0}\\n' > \"$PUTNAMI_OUTPUT_PATH/metadata.json\"\n"+
+			"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"OK\"}}'\n")
+		metadata := filepath.Join(filepath.Dir(archives), "metadata.json")
+
+		first := f.executed(t, "nothing archived", f.run(t, SchedulerConfig{}))[0]
+		entry, err := store.NewLocalStore(f.storeRoot).LookupTaskEntry(first.CacheKey)
+		if err != nil || entry == nil {
+			t.Fatalf("no entry under %s (err=%v)", first.CacheKey, err)
+		}
+		if recorded, ok := entry.Output("archives"); !ok || recorded.State != store.TaskOutputEmpty {
+			t.Fatalf("archives recorded as %+v, want the output recorded empty", recorded)
+		}
+		if recorded, ok := entry.Output("metadata"); !ok || recorded.State == store.TaskOutputEmpty {
+			t.Fatalf("metadata recorded as %+v, want the file recorded present", recorded)
+		}
+
+		writeFileAt(t, filepath.Join(archives, "linux-amd64", "app.tar.gz"), "stale\n")
+		writeFileAt(t, metadata, "stale bytes\n")
+
+		f.hit(t, "restore beside a file", f.run(t, SchedulerConfig{}))
+		assertFilesIn(t, "restore beside a file", archives)
+		if got := readFileAt(t, metadata); got != "{\"archives\":0}\n" {
+			t.Fatalf("metadata.json = %q, want the entry's bytes", got)
+		}
+		if got := invocationLog(t, f.logPath); len(got) != 1 {
+			t.Fatalf("invocations = %v, want the one execution", got)
+		}
+	})
+}
+
+// A restore that cannot empty an output it must empty can leave a stale binary
+// beside a green status. That is a restore failure like any other, so the hit
+// is not served. What follows is what follows any failed restore. A key of
+// unknown cost is worth coalescing: it finds its entry published and restores
+// it once more, then executes when that restore fails too. Either way the run
+// ends with bin emptied, or with the task failed before its tool runs when
+// bin cannot be emptied at all.
+func TestFailureToEmptyOnRestoreExecutesTheTask(t *testing.T) {
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-failure-to-empty-on-restore-executes-the-task")
+
+	// prepare stores an entry that records bin empty, leaves a stale binary in
+	// bin, and makes the emptying fail on each call fails names. It drops the
+	// run history so the next run sees the key's cost as unknown.
+	prepare := func(t *testing.T, fails func(call int) bool) (*emptyingFixture, string, *int) {
+		t.Helper()
+		f, bin := newBinFixture(t)
+		f.executed(t, "nothing built", f.run(t, SchedulerConfig{}))
+		writeFileAt(t, filepath.Join(bin, "a"), "stale\n")
+		if err := os.Remove(taskStatsPath(f.ws.Root)); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+		saved := emptyTaskOutput
+		calls := 0
+		emptyTaskOutput = func(dest, stagingRoot string, keep ...string) error {
+			calls++
+			if fails(calls) {
+				return errors.New("device busy")
+			}
+			return saved(dest, stagingRoot, keep...)
+		}
+		t.Cleanup(func() { emptyTaskOutput = saved })
+		return f, bin, &calls
+	}
+
+	t.Run("a second restore serves the entry", func(t *testing.T) {
+		f, bin, calls := prepare(t, func(call int) bool { return call == 1 })
+		row := f.executed(t, "first restore cannot empty", f.run(t, SchedulerConfig{}))[0]
+		if row.ReuseKind() != ReuseCoalesced {
+			t.Fatalf("reuse = %q, want the published entry restored by the claim-or-wait path", row.ReuseKind())
+		}
+		if *calls != 2 {
+			t.Fatalf("emptyings asked = %d, want the failed restore's and the second restore's", *calls)
+		}
+		if got := invocationLog(t, f.logPath); len(got) != 1 {
+			t.Fatalf("invocations = %v, want the first execution alone", got)
+		}
+		assertFilesIn(t, "first restore cannot empty", bin)
+	})
+
+	t.Run("a restore that keeps failing executes the task", func(t *testing.T) {
+		f, bin, calls := prepare(t, func(call int) bool { return call <= 2 })
+		row := f.executed(t, "no restore can empty", f.run(t, SchedulerConfig{}))[0]
+		if row.ReuseKind() != ReuseNone {
+			t.Fatalf("reuse = %q, want an execution", row.ReuseKind())
+		}
+		if *calls != 3 {
+			t.Fatalf("emptyings asked = %d, want two failed restores and the execution's", *calls)
+		}
+		if got := invocationLog(t, f.logPath); len(got) != 2 {
+			t.Fatalf("invocations = %v, want the first execution and the one that replaced the hit", got)
+		}
+		assertFilesIn(t, "no restore can empty", bin)
+	})
+
+	t.Run("an output that cannot be emptied fails the task", func(t *testing.T) {
+		f, bin, _ := prepare(t, func(int) bool { return true })
+		result := f.run(t, SchedulerConfig{})
+		row := f.rows(t, "cannot empty", result)[0]
+		if result.Success || row.Status != "failed" || row.CacheHit || row.Error == nil ||
+			!strings.Contains(row.Error.Message, "empty declared outputs") {
+			t.Fatalf("row = %+v (success=%v), want the task failed before it runs", row, result.Success)
+		}
+		if got := invocationLog(t, f.logPath); len(got) != 1 {
+			t.Fatalf("invocations = %v, want the first execution alone", got)
+		}
+		assertFilesIn(t, "cannot empty", bin, "a")
+	})
+}
+
+// An entry an engine that emptied nothing stored for an optional
+// command-output directory can hold the binary of a platform the project
+// dropped. This engine computes another key for the same sources, so it never
+// serves that entry.
+func TestBinaryEntryStoredWithoutEmptyingIsNeverServed(t *testing.T) {
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-entry-stored-without-emptying-is-never-served")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-command-output-directory-is-emptied")
+	f, bin := newBinFixture(t)
+
+	restore := engineWithoutEmptying(t)
+	f.setPages(t, "a", "b")
+	f.executed(t, "old engine, two platforms", f.run(t, SchedulerConfig{}))
+	f.setPages(t, "a")
+	poisoned := f.executed(t, "old engine, one platform", f.run(t, SchedulerConfig{}))[0]
+	if got, want := f.storedOutput(t, poisoned.CacheKey, "bin"), []string{"a", "b"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("the old engine stored %v, want the leftover in the entry (%v): the fixture no longer reproduces the defect", got, want)
+	}
+	restore()
+
+	clean := f.executed(t, "this engine", f.run(t, SchedulerConfig{}))[0]
+	if clean.CacheKey == poisoned.CacheKey {
+		t.Fatalf("this engine computed the old engine's key %s for a task it empties", clean.CacheKey)
+	}
+	assertFilesIn(t, "this engine", bin, "a")
+	if got, want := f.storedOutput(t, clean.CacheKey, "bin"), []string{"a"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("stored %v, want %v", got, want)
 	}
 }
 
@@ -662,8 +973,9 @@ func TestOptionalOutputKeepsAFileThroughAnExecutionThatWritesNothing(t *testing.
 // ---------------------------------------------------------------------------
 
 // emptyingShapesJob declares one output of every shape: a required directory
-// at each of the three durable roots and at the default root, which are
-// emptied, and the shapes that are not.
+// at each of the three durable roots and at the default root, and an optional
+// directory under the command-output root, which are emptied, and the shapes
+// that are not.
 func emptyingShapesJob() *ScheduledJob {
 	return declaredJob("build~emit", "emit", &extension.TaskDeclaration{
 		Outputs: map[string]extension.DeclaredOutput{
@@ -672,31 +984,38 @@ func emptyingShapesJob() *ScheduledJob {
 				Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: ".gen",
 				Excludes: []string{".gen/migration-bundle"}, Preserves: []string{"handwritten"},
 			},
-			"shared":   dirDeclaration(extension.OutputRootWorkspace, "dist/shared", false),
-			"default":  {Kind: extension.OutputKindDirectory, Path: "generated"},
-			"optional": dirDeclaration(extension.OutputRootProject, "described", true),
-			"tool":     fileDeclaration(extension.OutputRootCommandOutput, "bin/tool", true),
-			"client":   {Kind: extension.OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true},
-			"scratch":  {Kind: extension.OutputKindDirectory, Scope: extensionproto.OutputScopeInvocation, Path: "scratch", OptionalEmpty: true},
-			"socket":   {Kind: extensionproto.OutputKindRuntimeFile, Scope: extensionproto.OutputScopeInvocation, Path: "socket", OptionalEmpty: true},
-			"escape":   {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: "../outside", OptionalEmpty: true},
-			"root":     {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: ".", OptionalEmpty: true},
-			"unknown":  {Kind: extension.OutputKindDirectory, Root: "elsewhere", Path: "out", OptionalEmpty: true},
+			"shared":  dirDeclaration(extension.OutputRootWorkspace, "dist/shared", false),
+			"default": {Kind: extension.OutputKindDirectory, Path: "generated"},
+			"archives": {
+				Kind: extension.OutputKindDirectory, Root: extension.OutputRootCommandOutput, Path: "archives",
+				OptionalEmpty: true, Excludes: []string{"archives/ceded"}, Preserves: []string{"kept"},
+			},
+			"optional":       dirDeclaration(extension.OutputRootProject, "described", true),
+			"optionalShared": dirDeclaration(extension.OutputRootWorkspace, "dist/optional", true),
+			"tool":           fileDeclaration(extension.OutputRootCommandOutput, "bin/tool", true),
+			"client":         {Kind: extension.OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true},
+			"scratch":        {Kind: extension.OutputKindDirectory, Scope: extensionproto.OutputScopeInvocation, Path: "scratch", OptionalEmpty: true},
+			"socket":         {Kind: extensionproto.OutputKindRuntimeFile, Scope: extensionproto.OutputScopeInvocation, Path: "socket", OptionalEmpty: true},
+			"escape":         {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: "../outside", OptionalEmpty: true},
+			"root":           {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: ".", OptionalEmpty: true},
+			"unknown":        {Kind: extension.OutputKindDirectory, Root: "elsewhere", Path: "out", OptionalEmpty: true},
 		},
 	})
 }
 
-// The emptied set is every required durable directory output whose path the
-// declaration states, in id order. An optionalEmpty directory, a file, a
-// pathFrom output, an invocation-scoped output, a path that escapes or names
-// its root, and an unknown root are left out. The key carries the ids of
-// exactly that set.
-func TestEmptiedOutputsAreRequiredDirectoriesWithAStatedPath(t *testing.T) {
+// The emptied set is every durable directory output whose path the
+// declaration states and that is required or lives under the command-output
+// root, in id order. An optionalEmpty directory under the project or the
+// workspace root, a file, a pathFrom output, an invocation-scoped output, a
+// path that escapes or names its root, and an unknown root are left out. The
+// key carries the ids of exactly that set.
+func TestEmptiedOutputsAreRequiredOrCommandOutputDirectoriesWithAStatedPath(t *testing.T) {
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-path-from-output-is-left-as-it-stands")
-	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-output-is-left-as-it-stands")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-project-or-workspace-output-is-left-as-it-stands")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-command-output-directory-is-emptied")
 	job := emptyingShapesJob()
 
-	want := []string{"default", "gen", "lib", "shared"}
+	want := []string{"archives", "default", "gen", "lib", "shared"}
 	if got := emptiedOutputIDs(job); !reflect.DeepEqual(got, want) {
 		t.Fatalf("emptiedOutputIDs = %v, want %v", got, want)
 	}
@@ -704,7 +1023,9 @@ func TestEmptiedOutputsAreRequiredDirectoriesWithAStatedPath(t *testing.T) {
 	for _, declared := range emptiedOutputDeclarations(job) {
 		rels[declared.id] = declared.rel
 	}
-	if want := map[string]string{"default": "generated", "gen": ".gen", "lib": "lib", "shared": "dist/shared"}; !reflect.DeepEqual(rels, want) {
+	if want := map[string]string{
+		"archives": "archives", "default": "generated", "gen": ".gen", "lib": "lib", "shared": "dist/shared",
+	}; !reflect.DeepEqual(rels, want) {
 		t.Fatalf("emptied paths = %v, want %v", rels, want)
 	}
 
@@ -747,11 +1068,12 @@ func TestVersionStampWithin(t *testing.T) {
 // the three roots. Nothing beside an output is touched: the project root, the
 // workspace root and the command-output directory are never emptied. The
 // outputs that are not emptied keep what they hold: a committed file in an
-// optionalEmpty directory, and an earlier run's files in the other shapes,
-// which for a pathFrom output is the documented limit.
+// optionalEmpty project or workspace directory, and an earlier run's files in
+// the other shapes, which for a pathFrom output is the documented limit.
 func TestEmptyOwnedOutputsPerRoot(t *testing.T) {
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-path-from-output-is-left-as-it-stands")
-	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-output-is-left-as-it-stands")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-project-or-workspace-output-is-left-as-it-stands")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-command-output-directory-is-emptied")
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "ceded-and-preserved-paths-and-the-stamp-stay-untouched")
 	job := emptyingShapesJob()
 	f := newCaptureFixture(t, job)
@@ -761,6 +1083,8 @@ func TestEmptyOwnedOutputsPerRoot(t *testing.T) {
 	owned := []string{
 		filepath.Join(command, "lib", "stale.js"),
 		filepath.Join(command, "lib", "nested", "stale.js"),
+		filepath.Join(command, "archives", "linux-amd64", "app.tar.gz"),
+		filepath.Join(command, "archives", "channel.json"),
 		filepath.Join(project, ".gen", "public", "static", "deleted.html"),
 		filepath.Join(project, ".gen", "config-schema.json"),
 		filepath.Join(project, "generated", "stale.ts"),
@@ -771,16 +1095,20 @@ func TestEmptyOwnedOutputsPerRoot(t *testing.T) {
 		filepath.Join(project, ".gen", "migration-bundle", "0001.sql"),
 		filepath.Join(project, ".gen", "handwritten", "note.txt"),
 		filepath.Join(project, ".gen", "version.json"),
+		filepath.Join(command, "archives", "ceded", "other.tar.gz"),
+		filepath.Join(command, "archives", "kept", "note.txt"),
 		// Beside the outputs, under each root.
 		filepath.Join(command, "other", "sibling.js"),
 		filepath.Join(project, "src", "main.ts"),
 		filepath.Join(project, "putnami.json"),
 		filepath.Join(f.ws.Root, "dist", "other", "sibling.txt"),
 		filepath.Join(f.ws.Root, "README.md"),
-		// Outputs that are not emptied: an optionalEmpty directory, a file, a
-		// pathFrom directory, and the paths the invocation-scoped, escaping
-		// and unknown-root declarations would name under the project.
+		// Outputs that are not emptied: an optionalEmpty project or workspace
+		// directory, a file, a pathFrom directory, and the paths the
+		// invocation-scoped, escaping and unknown-root declarations would name
+		// under the project.
 		filepath.Join(project, "described", "config.json"),
+		filepath.Join(f.ws.Root, "dist", "optional", "config.json"),
 		filepath.Join(command, "bin", "tool"),
 		filepath.Join(project, "src", "clients", "removed-endpoint.ts"),
 		filepath.Join(project, "scratch", "kept.txt"),
@@ -844,15 +1172,17 @@ func TestEmptyOwnedOutputsRefusesWithoutAWorkspaceRoot(t *testing.T) {
 }
 
 // The marker moves the key of a task that owns an emptied directory, and of no
-// other task: a task with no declared output, an optionalEmpty directory, a
-// file output or a pathFrom output keeps the address an engine that emptied
-// nothing computed for it. The selection key, which a release-set member
-// records, moves exactly when the execution key does. A member republishes
-// when its own task owns a required directory or when one of its upstream
-// keys moved.
+// other task: a task with no declared output, an optionalEmpty project or
+// workspace directory, a file output or a pathFrom output keeps the address an
+// engine that emptied nothing computed for it. An optionalEmpty command-output
+// directory is emptied, so its task moves. The selection key, which a
+// release-set member records, moves exactly when the execution key does. A
+// member republishes when its own task owns an emptied directory or when one
+// of its upstream keys moved.
 func TestEmptiedOutputsMoveOnlyTheKeysOfTasksThatOwnOne(t *testing.T) {
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-entry-stored-without-emptying-is-never-served")
-	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-output-is-left-as-it-stands")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-project-or-workspace-output-is-left-as-it-stands")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-command-output-directory-is-emptied")
 	for name, tc := range map[string]struct {
 		outputs map[string]extension.DeclaredOutput
 		moves   bool
@@ -870,6 +1200,13 @@ func TestEmptiedOutputsMoveOnlyTheKeysOfTasksThatOwnOne(t *testing.T) {
 		},
 		"optional directory": {
 			outputs: map[string]extension.DeclaredOutput{"clientgen": dirDeclaration(extension.OutputRootProject, ".gen/clientgen", true)},
+		},
+		"optional workspace directory": {
+			outputs: map[string]extension.DeclaredOutput{"shared": dirDeclaration(extension.OutputRootWorkspace, "dist/shared", true)},
+		},
+		"optional command-output directory": {
+			outputs: map[string]extension.DeclaredOutput{"bin": dirDeclaration(extension.OutputRootCommandOutput, "bin", true)},
+			moves:   true,
 		},
 		"no output": {outputs: nil},
 		"file": {

@@ -623,15 +623,69 @@ func TestDeclaredRestoreDetachesPriorSessionCommandOutputLink(t *testing.T) {
 	}
 }
 
+// A restore that empties an optional command-output directory writes to the
+// command directory too, so it detaches a surviving prior-session link first.
+// The emptying then removes the copy and never reaches the link target.
+func TestDeclaredEmptyRestoreDetachesPriorSessionCommandOutputLink(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "executed-directory-output-starts-empty", "a-restore-of-an-empty-command-output-record-empties-it")
+	job := declaredJob("build~transpile", "transpile", &extension.TaskDeclaration{
+		Outputs: map[string]extension.DeclaredOutput{
+			"lib": dirDeclaration(extension.OutputRootCommandOutput, "lib", true),
+		},
+	})
+	f := newCaptureFixture(t, job)
+	commandDir := f.commandDir("build")
+	if !f.sched.storeDeclaredCapture(job, capturedResult(nil), captureHashA) {
+		t.Fatal("store declared entry")
+	}
+	if entry, err := f.cache.LookupTaskEntry(captureHashA); err != nil || entry == nil {
+		t.Fatalf("lookup task entry: %v %v", entry, err)
+	} else if recorded, ok := entry.Output("lib"); !ok || recorded.Present() {
+		t.Fatalf("lib recorded as %+v, want an explicit empty state", recorded)
+	}
+
+	prior := t.TempDir()
+	priorLib := filepath.Join(prior, "lib", "index.js")
+	priorTool := filepath.Join(prior, "bin", "tool")
+	writeFileAt(t, priorLib, "prior\n")
+	writeFileAt(t, priorTool, "prior\n")
+	if err := os.MkdirAll(filepath.Dir(commandDir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(commandDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(prior, commandDir); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	f.hitOrFail(t, job, captureHashA)
+	info, err := os.Lstat(commandDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("the empty restore left command output as a symlink")
+	}
+	if got := readFileAt(t, priorLib); got != "prior\n" {
+		t.Fatalf("the emptying reached the prior-session source: %q", got)
+	}
+	if got := readFileAt(t, filepath.Join(commandDir, "bin", "tool")); got != "prior\n" {
+		t.Errorf("prior sibling output was not preserved: %q", got)
+	}
+	if got := filesIn(t, filepath.Join(commandDir, "lib")); len(got) != 0 {
+		t.Errorf("the empty restore left %v in lib, want it empty", got)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // optional-empty, end to end
 // ---------------------------------------------------------------------------
 
-// An optionalEmpty output the task did not produce is RECORDED empty, and
-// restoring it must not touch its destination. Command-output paths are shared
-// between the steps of one command, so "this entry has nothing for it" must
-// never be read as "this path should be empty" — that would delete a sibling
-// task's artifacts.
+// An optionalEmpty file output the task did not produce is RECORDED empty, and
+// restoring it must not touch its destination. The engine empties directories
+// only, so "this entry has nothing for it" must never be read as "this file
+// should be gone": that would delete what something else wrote there.
 func TestDeclaredCaptureOptionalEmptyLeavesSiblingsAlone(t *testing.T) {
 	job := declaredJob("test~run", "run", &extension.TaskDeclaration{
 		Outputs: map[string]extension.DeclaredOutput{
@@ -683,7 +737,7 @@ func TestDeclaredCaptureOptionalEmptyLeavesSiblingsAlone(t *testing.T) {
 // file, both under the project root. An entry stored while the workload
 // authored its runtime records the defaults file as empty. A hit on that entry
 // restores the manifest and leaves the defaults file an earlier run wrote in
-// place, because restoring an empty output never touches its destination. The
+// place, because restoring an empty file output never touches its destination. The
 // Go and TypeScript build-infra descriptions say so instead of promising that
 // the file is gone.
 func TestDeclaredCaptureEmptyProjectFileLeavesAnEarlierFileInPlace(t *testing.T) {
@@ -839,14 +893,17 @@ func TestDeclaredCaptureOfASkipNeverAdoptsAnEarlierRunsBytes(t *testing.T) {
 	if !ok || recorded.Present() {
 		t.Fatalf("a skip captured %+v, want an explicit empty state", recorded)
 	}
-	// And restoring that entry leaves the tree exactly as it is.
+	// Restoring that entry leaves lib as an execution leaves it: an optional
+	// command-output directory is emptied (ADR 0065), so the earlier run's
+	// bytes do not survive beside the skip's status.
 	f.hitOrFail(t, job, captureHashA)
-	if got := readFileAt(t, filepath.Join(lib, "index.js")); got != "from an earlier run\n" {
-		t.Errorf("restoring a skip disturbed the tree: %q", got)
+	if got := filesIn(t, lib); len(got) != 0 {
+		t.Errorf("restoring a skip left %v in lib, want it empty", got)
 	}
 
-	// Positive control: the SAME job and the same on-disk tree DO get captured
-	// when the execution succeeded, so the emptiness comes from the skip.
+	// Positive control: the SAME job over the same tree DOES get captured when
+	// the execution succeeded, so the emptiness comes from the skip.
+	writeFileAt(t, filepath.Join(lib, "index.js"), "from an earlier run\n")
 	if !f.sched.storeDeclaredCapture(job, capturedResult(nil), captureHashB) {
 		t.Fatal("successful capture failed")
 	}

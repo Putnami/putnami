@@ -383,6 +383,13 @@ captured — so it leaves `root` unset. See
 fine" (coverage off, no client generated) and "the task and its declaration
 disagree". Without the flag, a missing declared output is a defect.
 
+Before a task executes, the engine empties each directory output with a
+literal `path` that the task owns, except an `optionalEmpty` one under the
+`project` or `workspace` root. A restore of an entry that recorded an
+`optionalEmpty` `command-output` directory empty also empties it. A task keeps
+no state there that must outlive a run. See
+[task-owned entries](../../../tooling/cli/doc/10-caching.md#task-owned-entries-declared-outputs).
+
 #### Ceding a Subpath (`excludes`)
 
 A task that declares a subtree **whole** and runs **first** makes everything a

@@ -1,6 +1,7 @@
 # ADR 0064 — An executing task starts from an empty owned directory
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0065](0065-an-optional-command-output-directory-is-emptied-on-execution-and-on-an-empty-restore.md)
 - **Scope**: `@putnami/cli` (`internal/jobs`, `internal/store`)
 
 ## Context
