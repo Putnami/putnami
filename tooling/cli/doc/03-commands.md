@@ -932,7 +932,15 @@ the opaque source/ID pair, never a concatenated display string. A task receipt
 or local task record for the handoff unit must also appear in its exact
 `handoff.inputs`.
 `--record` can establish `ready` for a current unit at `candidate` without a
-digest cycle. A `merged` claim needs a matching native `proposals status`
+digest cycle. To resume a unit already at `ready`, its `receipt: ref` must
+point to the unchanged JSON output of a prior successful `tree verify
+--record` call. The verifier requires that output's native ready verdict,
+assurance, exact current tree fingerprint and full HEAD, and the same dossier
+base when verifying a new dossier. A standalone `--workflow` call checks the
+receipt but still only projects progress; it cannot issue a ready verdict.
+Current native requirements, stages, decisions, and dependencies are checked
+again, so an earlier generic ready receipt cannot cover missing unit proof.
+A `merged` claim needs a matching native `proposals status`
 receipt for the unit's `proposal: {source,id}`, with state `merged` and the
 exact current HEAD. Other external receipt kinds remain visible but cannot
 establish `outcomeComplete` until a native adapter validates them.

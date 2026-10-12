@@ -386,6 +386,46 @@ func (r *verifyRun) workflowMergedReceipt(unit *jsObject) bool {
 	return true
 }
 
+// A ready receipt is the unchanged output of an earlier native dossier
+// verification. It may be used to resume a unit after that dossier has been
+// verified, without treating the unit's authored stage as proof of readiness.
+func (r *verifyRun) workflowReadyReceipt(unit *jsObject, expectedBaseSHA string) bool {
+	data, _ := r.workflowBytes(unit.get("receipt"), "workflow ready receipt")
+	parsed, err := parseJSON(data)
+	if err != nil {
+		failErr(err)
+	}
+	receipt := workflowObject(parsed, "workflow ready receipt",
+		[]string{"verdict", "stage", "assurance", "binding", "gateSession", "review", "limits"},
+		[]string{"verdict", "stage", "assurance", "binding", "gateSession", "review", "limits", "workflow"})
+	require(strictEqual(receipt.get("verdict"), "Putnami verified") && strictEqual(receipt.get("stage"), "ready") &&
+		strictEqual(receipt.get("assurance"), "local-declared-scope") && strictEqual(receipt.get("limits"), verifiedLimits),
+		"workflow ready receipt is not a native ready verdict")
+	workflowText(receipt.get("gateSession"), "workflow ready gate session")
+	r.checkRef(receipt.get("review"))
+	binding := workflowObject(receipt.get("binding"), "workflow ready binding",
+		[]string{"fingerprint", "headSHA", "baseSHA"}, []string{"fingerprint", "headSHA", "baseSHA"})
+	require(strictEqual(binding.get("fingerprint"), r.fingerprint()) &&
+		strictEqual(binding.get("headSHA"), r.git("rev-parse", "HEAD")), "stale workflow ready receipt tree")
+	base := workflowText(binding.get("baseSHA"), "workflow ready base")
+	require(baseSHAPattern.MatchString(base), "workflow ready receipt has invalid base")
+	resolved, resolveErr := capture("git", gitCommand(r.root, "rev-parse", "--verify", base+"^{commit}"))
+	require(resolveErr == nil && jsTrim(resolved) == base, "workflow ready receipt has invalid base")
+	ancestor, ancestorErr := capture("git", gitCommand(r.root, "merge-base", base, "HEAD"))
+	require(ancestorErr == nil && jsTrim(ancestor) == base, "workflow ready receipt has invalid base")
+	if expectedBaseSHA != "" {
+		require(base == expectedBaseSHA, "workflow ready receipt names another dossier base")
+	}
+	if receipt.has("workflow") {
+		projection := workflowObject(receipt.get("workflow"), "workflow ready projection",
+			[]string{"verdict", "stage", "outcome", "currentRequirements", "verifiedRequirements", "laterRequirements", "outcomeComplete", "units", "nativeDiagnostics", "nextAction"},
+			[]string{"verdict", "stage", "outcome", "currentRequirements", "verifiedRequirements", "laterRequirements", "outcomeComplete", "units", "nativeDiagnostics", "nextAction"})
+		require(strictEqual(projection.get("verdict"), "workflow valid") && strictEqual(projection.get("stage"), "progress"),
+			"workflow ready receipt has invalid workflow projection")
+	}
+	return true
+}
+
 func (r *verifyRun) workflowProjectTargets(value any) map[string]bool {
 	items := workflowList(value, "workflow unit projects")
 	require(len(items) > 0, "workflow unit has no project scope")
@@ -411,7 +451,7 @@ func (r *verifyRun) workflowProjectTargets(value any) map[string]bool {
 	return projects
 }
 
-func (r *verifyRun) workflowDeliveryReceipt(unit *jsObject, final bool) (string, string, bool) {
+func (r *verifyRun) workflowDeliveryReceipt(unit *jsObject, final bool, expectedBaseSHA string) (string, string, bool) {
 	requiredStage := workflowText(unit.get("requiredStage"), "workflow unit required stage")
 	stage := workflowText(unit.get("stage"), "workflow unit stage")
 	require(oneOf(requiredStage, "candidate", "ready", "merged", "published", "deployed", "adopted") &&
@@ -425,8 +465,13 @@ func (r *verifyRun) workflowDeliveryReceipt(unit *jsObject, final bool) (string,
 	if requiredStage == "ready" && stage == "candidate" && final {
 		reached = true // The enclosing verified dossier supplies this transition.
 	}
-	if requiredStage == "merged" && stage == "merged" {
-		reached = r.workflowMergedReceipt(unit)
+	if stage == "ready" {
+		ready := r.workflowReadyReceipt(unit, expectedBaseSHA)
+		reached = requiredStage == "ready" && ready
+	}
+	if stage == "merged" {
+		merged := r.workflowMergedReceipt(unit)
+		reached = requiredStage == "merged" && merged
 	}
 	return requiredStage, stage, reached
 }
@@ -533,7 +578,7 @@ func workflowUnitRequirementStatuses(id string, members []string, requirements m
 	return statuses, current, verified, complete, unitCurrent
 }
 
-func (r *verifyRun) workflowUnits(value any, requirements map[string]workflowRequirement, verdicts map[string]features.SpecRequirementVerdict, reports map[string][]any, warnings map[string][]diag.Diagnostic, sources map[string]workflowSource, stageBlockers map[string][]any, final bool) (int, int, map[string]bool, map[string]bool, bool, []any) {
+func (r *verifyRun) workflowUnits(value any, requirements map[string]workflowRequirement, verdicts map[string]features.SpecRequirementVerdict, reports map[string][]any, warnings map[string][]diag.Diagnostic, sources map[string]workflowSource, stageBlockers map[string][]any, final bool, expectedBaseSHA string) (int, int, map[string]bool, map[string]bool, bool, []any) {
 	items := workflowList(value, "workflow.units")
 	require(len(items) > 0, "workflow needs a delivery unit")
 	ids := map[string]bool{}
@@ -571,7 +616,7 @@ func (r *verifyRun) workflowUnits(value any, requirements map[string]workflowReq
 		stages, hasStages := stageBlockers[id]
 		require(hasStages, "workflow stage inventory missing unit "+id)
 		nextResult := workflowText(unit.get("nextResult"), "workflow unit next result")
-		requiredStage, stage, reached := r.workflowDeliveryReceipt(unit, final)
+		requiredStage, stage, reached := r.workflowDeliveryReceipt(unit, final, expectedBaseSHA)
 		requirementStatuses, unitRequirements, unitVerified, unitComplete, unitCurrent :=
 			workflowUnitRequirementStatuses(id, members, requirements, verdicts, reports, sources, projects, assigned)
 		current += unitRequirements
@@ -857,7 +902,7 @@ func (r *verifyRun) workflowStages(value any) map[string][]any {
 	return blockers
 }
 
-func (r *verifyRun) verifyWorkflow(value any, final bool) *jsObject {
+func (r *verifyRun) verifyWorkflow(value any, final bool, expectedBaseSHA string) *jsObject {
 	w := workflowObject(value, "workflow", []string{"version", "outcome", "mandate", "sources", "requirements", "units", "artifacts", "experiments", "stages", "handoff"},
 		[]string{"version", "outcome", "mandate", "sources", "requirements", "units", "artifacts", "experiments", "stages", "handoff", "proof"})
 	require(strictEqual(w.get("version"), 1.0), "unsupported local workflow version; expected v1")
@@ -893,7 +938,7 @@ func (r *verifyRun) verifyWorkflow(value any, final bool) *jsObject {
 		}
 	}
 	stageBlockers := r.workflowStages(w.get("stages"))
-	current, complete, units, projects, reached, statuses := r.workflowUnits(w.get("units"), rows, verdicts, reports, warnings, sources, stageBlockers, final)
+	current, complete, units, projects, reached, statuses := r.workflowUnits(w.get("units"), rows, verdicts, reports, warnings, sources, stageBlockers, final, expectedBaseSHA)
 	r.workflowArtifacts(w.get("artifacts"), units, projects, final)
 	r.workflowExperiments(w.get("experiments"))
 	handoff := workflowObject(w.get("handoff"), "workflow handoff", []string{"mandate", "unit", "scopes", "receiver", "responsibility", "inputs", "expectedOutput", "acceptance", "nextAction", "unresolvedFindings"},

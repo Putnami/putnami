@@ -57,7 +57,7 @@ func (r *verifyRun) verify(record any, expectedBase *string) *jsObject {
 		if err != nil {
 			failErr(err)
 		}
-		workflow = r.verifyWorkflow(workflowRecord, true)
+		workflow = r.verifyWorkflow(workflowRecord, true, jsToString(baseSHA))
 	}
 	require(r.fingerprint() == current, "tree changed during verification")
 	r.checkEvidenceStable()

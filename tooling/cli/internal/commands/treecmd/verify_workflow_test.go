@@ -137,6 +137,19 @@ func (f *verifyFixture) workflow(w fxObj, final bool, reason string) verifyResul
 	return result
 }
 
+func (f *verifyFixture) issuedReadyReceipt() fxObj {
+	f.t.Helper()
+	f.write(".context/dossier.json", f.record)
+	f.resetFingerprint(fxFingerprint{})
+	issued := f.invoke("--record", ".context/dossier.json")
+	f.expect(issued, "", "Putnami verified")
+	if issued.value["stage"] != "ready" {
+		f.t.Fatalf("native dossier issued no ready verdict: %s", issued.out)
+	}
+	f.write(".context/ready-verdict.json", issued.out)
+	return f.reference(".context/ready-verdict.json")
+}
+
 func TestWorkflowNativeChecksAndDossier(t *testing.T) {
 	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "workflow-versions-and-references")
 	t.Parallel()
@@ -437,6 +450,72 @@ func TestWorkflowDeliveryRequiresExactNativeReceipt(t *testing.T) {
 	unitStatus := workflowProjectedUnits(t, result)[0]
 	if !strings.Contains(unitStatus.Blockers[0], "adapter unavailable") {
 		t.Fatalf("missing unsupported receipt diagnostic: %s", result.out)
+	}
+}
+
+func TestWorkflowReadyReceiptResumesNativeDossier(t *testing.T) {
+	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "delivery-receipts-and-parent-completeness")
+	t.Parallel()
+	f, w := newWorkflowFixture(t)
+	unit := fxObjAt(w, "units", 0)
+	unit["stage"] = "ready"
+	f.workflow(w, false, "missing evidence reference") // A declared stage cannot issue its own receipt.
+	unit["receipt"] = f.issuedReadyReceipt()
+	result := f.workflow(w, false, "")
+	if result.value["stage"] != "progress" || result.value["outcomeComplete"] != true {
+		t.Fatalf("native ready receipt did not resume progress: %s", result.out)
+	}
+	f.workflow(w, true, "")
+
+	delete(w, "proof")
+	f.workflow(w, true, "workflow current unit lacks passing native checks")
+	w["proof"] = fxObj{"session": f.reference(".context/sessions/synthetic-gate/session.json"),
+		"specVerification": f.reference(".context/sessions/synthetic-gate/spec-verification.json")}
+	f.write(".context/blocked-ready.md", "A current decision remains open.")
+	unit["decisions"] = fxArr{f.reference(".context/blocked-ready.md")}
+	f.workflow(w, true, "workflow current unit has unresolved decisions")
+}
+
+func TestWorkflowReadyReceiptRejectsBareAndStaleClaims(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, reason string
+		change       func(*verifyFixture, fxObj)
+	}{
+		{"bare verdict", "workflow ready receipt missing assurance", func(f *verifyFixture, _ fxObj) {
+			f.write(".context/ready-verdict.json", fxObj{"verdict": "Putnami verified", "stage": "ready"})
+		}},
+		{"wrong verdict", "workflow ready receipt is not a native ready verdict", func(f *verifyFixture, receipt fxObj) {
+			receipt["verdict"] = "claimed ready"
+			f.write(".context/ready-verdict.json", receipt)
+		}},
+		{"stale tree", "stale workflow ready receipt tree", func(f *verifyFixture, receipt fxObj) {
+			fxObjAt(receipt, "binding")["fingerprint"] = fxOtherTree
+			f.write(".context/ready-verdict.json", receipt)
+		}},
+		{"another head", "stale workflow ready receipt tree", func(f *verifyFixture, receipt fxObj) {
+			fxObjAt(receipt, "binding")["headSHA"] = strings.Repeat("a", 40)
+			f.write(".context/ready-verdict.json", receipt)
+		}},
+		{"invalid base", "workflow ready receipt has invalid base", func(f *verifyFixture, receipt fxObj) {
+			fxObjAt(receipt, "binding")["baseSHA"] = strings.Repeat("a", 40)
+			f.write(".context/ready-verdict.json", receipt)
+		}},
+		{"malformed document", "JSON Parse error", func(f *verifyFixture, _ fxObj) {
+			f.write(".context/ready-verdict.json", "{invalid")
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f, w := newWorkflowFixture(t)
+			unit := fxObjAt(w, "units", 0)
+			unit["stage"] = "ready"
+			unit["receipt"] = f.issuedReadyReceipt()
+			receipt := f.readJSON(".context/ready-verdict.json")
+			tc.change(f, receipt)
+			unit["receipt"] = f.reference(".context/ready-verdict.json")
+			f.workflow(w, false, tc.reason)
+		})
 	}
 }
 

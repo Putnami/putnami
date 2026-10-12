@@ -151,7 +151,7 @@ func (v Verifier) verdict(args []string) (value any, err error) {
 		return r.reusableGate(parsed.input, *parsed.report, parsed.baseOr("origin/main")), nil
 	case "--workflow":
 		before := r.digest(parsed.input)
-		result := r.verifyWorkflow(r.readJSON(parsed.input), false)
+		result := r.verifyWorkflow(r.readJSON(parsed.input), false, "")
 		require(r.digest(parsed.input) == before, "workflow changed during verification")
 		r.checkEvidenceStable()
 		return result, nil
