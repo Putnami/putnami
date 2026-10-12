@@ -149,6 +149,10 @@ type providerSession struct {
 	// negotiated in minimal mode and carries no download (see runPrefetch).
 	negotiateIdx map[string]providerCacheResult
 	prefetchDone chan struct{}
+	// inline records the download-batch requests the prefetch sends for the
+	// small files of its hits (see cacheinline.go). Every request is recorded
+	// before prefetchDone is closed.
+	inline inlinePrefetch
 
 	// runCredentialCaller is set when initialize echoed
 	// cache.CapabilityRunCredential: core then sends the hosted run's
@@ -1027,14 +1031,16 @@ func (s *providerSession) transfersStale(r providerCacheResult) bool {
 	return false
 }
 
-// prefetch negotiates a set of keys ahead of their restores and downloads
-// nothing: a restore fetches a key's files, and only when core asks for them.
-// It returns promptly with the count it accepted; the work is drained at
-// summary. The outcome is kept as the session's negotiate index. The first
-// prefetch installs prefetchDone synchronously here, before the response, so a
-// restore dispatched right after this op always finds the in-flight batch to
-// wait on. Core sends exactly one prefetch; a hypothetical second one adds its
-// keys to the index and leaves the already-released waiters untouched.
+// prefetch negotiates a set of keys ahead of their restores. Then it fetches
+// the small files of the hits in a few download-batch requests (see
+// cacheinline.go). A restore downloads the other files of its key, and only
+// when core asks for them. It returns promptly with the count it accepted; the
+// work is drained at summary. The outcome is kept as the session's negotiate
+// index. The first prefetch installs prefetchDone synchronously here, before
+// the response, so a restore dispatched right after this op always finds the
+// in-flight batch to wait on. Core sends exactly one prefetch; a hypothetical
+// second one adds its keys to the index and leaves the already-released
+// waiters untouched.
 func (s *providerSession) prefetch(req *cache.ProviderRequest, p *cache.PrefetchParams) *cache.ProviderResponse {
 	if !s.serving() || len(p.Keys) == 0 {
 		return providerOK(req, &cache.PrefetchResult{Started: 0})
@@ -1102,8 +1108,13 @@ func prefetchBatches(keys, resultOnly []string, mode cache.Mode) []prefetchBatch
 // negotiates its own key. done is nil when a prior prefetch already owns the
 // waiters; the outcomes then join the index without replacing an earlier one.
 //
+// Before it publishes the outcomes it records the download-batch requests for
+// the hits' small files, so a restore that reads the index always finds the
+// request that carries its files and waits for it. It sends them after it
+// releases the waiters.
+//
 // PrefetchedCount counts the prefetched keys the server holds an entry for. It
-// no longer counts warmed blobs: prefetch downloads none.
+// does not count the files the prefetch fetched.
 func (s *providerSession) runPrefetch(batches []prefetchBatch, done chan struct{}) {
 	var wg sync.WaitGroup
 	for i := range batches {
@@ -1114,6 +1125,8 @@ func (s *providerSession) runPrefetch(batches []prefetchBatch, done chan struct{
 		}(&batches[i])
 	}
 	wg.Wait()
+
+	inline := s.planInlinePrefetch(batches)
 
 	found := 0
 	s.mu.Lock()
@@ -1148,6 +1161,7 @@ func (s *providerSession) runPrefetch(batches []prefetchBatch, done chan struct{
 		}
 	}
 	s.addStats(func(st *cache.SummaryResult) { st.PrefetchedCount += found })
+	s.fetchInlinePrefetch(inline)
 }
 
 // negotiatedResult returns the batched negotiate outcome for key, waiting for
@@ -1325,17 +1339,20 @@ func (s *providerSession) reportAuthRefusals(stats cache.SummaryResult, refusals
 }
 
 // materializeHit downloads every blob of a negotiate hit into the blob-exchange
-// directory, skipping digests already present (placed by an earlier
-// restore), and returns the bytes downloaded. Each blob is content-verified by
-// the fetcher and written atomically (temp + rename) so core never ingests a
-// half-written file.
+// directory, skipping digests already present (placed by an earlier restore or
+// by the prefetch), and returns the bytes it placed for this restore. Each blob
+// is content-verified by the fetcher and written atomically (temp + rename) so
+// core never ingests a half-written file.
+//
+// A blob a prefetch download-batch asks for is not fetched here until that
+// request ends (see cacheinline.go): the restore downloads its other blobs
+// first, then waits, then fetches what the request did not place.
 //
 // It materializes the blobs the server returned for the negotiated mode; the
 // guarantee that every Manifest digest is present (full vs minimal/toplevel
 // materialization) is refined with the mode ownership decision.
 func (s *providerSession) materializeHit(ctx context.Context, result cache.KeyResult) (int64, error) {
-	fetch := s.client.BatchHitFetcher(ctx, result)
-	var total int64
+	var own, carried []cache.BlobTransfer
 	seen := make(map[string]bool, len(result.Downloads))
 	for _, t := range result.Downloads {
 		if seen[t.Digest] {
@@ -1345,13 +1362,52 @@ func (s *providerSession) materializeHit(ctx context.Context, result cache.KeyRe
 		if s.known[t.Digest] {
 			continue // core already has this blob in its CAS; it ingests from there, not the exchange dir
 		}
-		path, ok := cache.BlobExchangePath(s.exchangeDir, t.Digest)
-		if !ok {
-			return total, fmt.Errorf("invalid digest %s", t.Digest)
+		if _, ok := cache.BlobExchangePath(s.exchangeDir, t.Digest); !ok {
+			return 0, fmt.Errorf("invalid digest %s", t.Digest)
 		}
-		if blobPresent(path, t.SizeBytes) {
-			continue
+		if s.inline.batch(t.Digest) != nil {
+			carried = append(carried, t)
+		} else {
+			own = append(own, t)
 		}
+	}
+	total, err := s.placeBlobs(ctx, own, s.client.BatchHitFetcher)
+	if err != nil || len(carried) == 0 {
+		return total, err
+	}
+	retry, direct, counted, err := s.awaitInline(ctx, carried)
+	total += counted
+	if err != nil {
+		return total, err
+	}
+	n, err := s.placeBlobs(ctx, retry, s.client.BatchHitFetcher)
+	total += n
+	if err != nil {
+		return total, err
+	}
+	n, err = s.placeBlobs(ctx, direct, s.client.HitFetcher)
+	return total + n, err
+}
+
+// placeBlobs downloads the blobs the exchange directory does not hold yet,
+// through one opener newFetcher builds for them, and returns the bytes it
+// wrote. Building the opener for those blobs alone keeps a download-batch from
+// asking for a blob already placed.
+func (s *providerSession) placeBlobs(ctx context.Context, blobs []cache.BlobTransfer, newFetcher func(context.Context, cache.KeyResult) func(string) (io.ReadCloser, error)) (int64, error) {
+	var need []cache.BlobTransfer
+	for _, t := range blobs {
+		path, _ := cache.BlobExchangePath(s.exchangeDir, t.Digest) // materializeHit checked the digest
+		if !blobPresent(path, t.SizeBytes) {
+			need = append(need, t)
+		}
+	}
+	if len(need) == 0 {
+		return 0, nil
+	}
+	fetch := newFetcher(ctx, cache.KeyResult{Downloads: need})
+	var total int64
+	for _, t := range need {
+		path, _ := cache.BlobExchangePath(s.exchangeDir, t.Digest)
 		n, err := writeExchangeBlob(fetch, t.Digest, path)
 		if err != nil {
 			return total, err
