@@ -893,6 +893,8 @@ const parityCommitDate = "2026-01-01T00:00:00+00:00"
 
 // commitParityWorkspace makes the fixture a git repository with one commit, so
 // `features diff` and `contracts check`'s prior-IR loader have history to read.
+// Automatic maintenance is off: `git commit` otherwise starts it in the
+// background, and its lock file can vanish while a test copies the template.
 func commitParityWorkspace(t *testing.T, root string) {
 	t.Helper()
 	for _, args := range [][]string{
@@ -900,6 +902,8 @@ func commitParityWorkspace(t *testing.T, root string) {
 		{"config", "user.email", "parity@example.test"},
 		{"config", "user.name", "Parity Fixture"},
 		{"config", "commit.gpgsign", "false"},
+		{"config", "maintenance.auto", "false"},
+		{"config", "gc.auto", "0"},
 		{"add", "-A"},
 		{"commit", "-m", "sdd parity fixture"},
 	} {

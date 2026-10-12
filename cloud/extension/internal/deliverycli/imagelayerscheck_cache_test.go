@@ -1,17 +1,13 @@
 package deliverycli
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime/debug"
 	"slices"
 	"strings"
 	"testing"
-
-	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 )
 
 // The cloud-image-layers-check task is cached, and a cache hit replays the
@@ -98,28 +94,42 @@ func imageLayersCheckKeyFixture(t *testing.T) (workspaceRoot, project string) {
 	}
 	writeImageLayersFixtureFile(t, filepath.Join(project, imageLayersManifestName), manifest)
 
-	writeImageLayersFixtureFile(t, filepath.Join(workspaceRoot, ".putnami/out/cloud/extension/build/bin/linux-x64/putnami-cloud"), "workspace CLI prerequisite bytes")
-	info := &debug.BuildInfo{
-		GoVersion: "go1.26.1", Path: imageLayersCloudCLIModule + "/cmd/putnami-cloud",
-		Main:     debug.Module{Path: imageLayersCloudCLIModule, Version: "(devel)"},
-		Settings: []debug.BuildSetting{{Key: "GOOS", Value: "linux"}, {Key: "GOARCH", Value: "amd64"}, {Key: "CGO_ENABLED", Value: "0"}, {Key: "-trimpath", Value: "true"}},
-	}
-	previous := imageLayersReadBuildInfo
-	t.Cleanup(func() { imageLayersReadBuildInfo = previous })
-	// The build info is read from the binary, so a missing binary has none.
-	imageLayersReadBuildInfo = func(path string) (*debug.BuildInfo, error) {
-		if _, err := os.Stat(path); err != nil {
-			return nil, err
-		}
-		return info, nil
-	}
+	// The layer's identity is the lock's @putnami/cloud pin, which also joins
+	// the warm layer's set.
+	cloudSHA := strings.Repeat("d", 64)
+	writeImageLayersFixtureFile(t, filepath.Join(workspaceRoot, "putnami.lock.json"),
+		`{"cli":{"version":"0.1.0-dedb6e331","integrities":{"linux/amd64":"`+strings.Repeat("a", 64)+`"}},`+
+			`"extensions":{`+
+			`"@putnami/cloud":{"version":"0.1.0-cloudext","integrities":{"linux/amd64":"`+cloudSHA+`"}},`+
+			`"@putnami/go":{"version":"0.1.0-goext","integrities":{"linux/amd64":"`+imageLayersCheckGoExtensionSHA+`"}},`+
+			`"@putnami/typescript":{"version":"0.1.0-tsext","integrities":{"linux/amd64":"`+strings.Repeat("c", 64)+`"}}}}`)
 	outDir := imageLayersOutputDir(project)
-	record, err := imageLayersProduceCloudCLI(context.Background(), spec, workspaceRoot, outDir, nil, clicore.IO{})
-	if err != nil {
-		t.Fatalf("produce the %s layer: %v", spec.Name, err)
-	}
-	if err := imageLayersWriteRecord(outDir, record); err != nil {
-		t.Fatal(err)
+	for _, layer := range []struct {
+		spec          imageLayerSpec
+		file, version string
+	}{
+		{spec, "bin/" + spec.Name, "@putnami/cloud 0.1.0-cloudext " + cloudSHA},
+		{imageLayerSpec{Name: "putnami-warm", Producer: "putnami-warm", Path: "/root/.putnami/artifacts"}, "putnami-warm.tar",
+			"@putnami/cloud 0.1.0-cloudext " + cloudSHA + ", @putnami/go 0.1.0-goext " + imageLayersCheckGoExtensionSHA +
+				", @putnami/typescript 0.1.0-tsext " + strings.Repeat("c", 64)},
+	} {
+		path := filepath.Join(outDir, filepath.FromSlash(layer.file))
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			writeImageLayersFixtureFile(t, path, layer.spec.Name+"-bytes\n")
+		}
+		sum, size, err := imageLayersHashFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		record := imageLayerRecord{Name: layer.spec.Name, Producer: layer.spec.Producer, Path: layer.spec.Path, SHA256: sum, Size: size, Version: layer.version}
+		if strings.HasSuffix(layer.file, ".tar") {
+			record.Tar = filepath.Base(layer.file)
+		} else {
+			record.File = layer.file
+		}
+		if err := imageLayersWriteRecord(outDir, record); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Files the ports leave out. Each holds other bytes for a declared layer.
@@ -181,10 +191,9 @@ func TestImageLayersCheckReadsOnlyKeyedFiles(t *testing.T) {
 			keyed = append(keyed, keyedFile{dir: source.to, rel: rel})
 		}
 	}
-	// One manifest, eight records and eight produced files, four pin files and
-	// the Cloud CLI binary.
-	if len(keyed) != 22 {
-		t.Fatalf("the ports select %d files, want 22: %v", len(keyed), keyed)
+	// One manifest, eight records, eight produced files and four pin files.
+	if len(keyed) != 21 {
+		t.Fatalf("the ports select %d files, want 21: %v", len(keyed), keyed)
 	}
 	if got := imageLayersCheckOutcomeOf(t, prunedWorkspace, prunedProject); got != baseline {
 		t.Fatalf("the check reads a file its ports do not select (keyed: %v)\nfull tree:\n%s\nkeyed files only:\n%s", keyed, baseline, got)
