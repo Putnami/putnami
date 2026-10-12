@@ -57,6 +57,10 @@ type finalizerProvider struct {
 	checks                                     collab.Checks
 	proposalRepository                         string
 	upserts, transitions, reviews, statusReads int
+	findReads                                  int
+	findExisting                               bool
+	rejectRevision                             bool
+	upsertRevision                             string
 	unresolved                                 bool
 	dropLabels                                 bool
 	statusHook                                 func(*collab.Proposal)
@@ -98,14 +102,22 @@ func (p *finalizerProvider) call(_ context.Context, contract, operation string, 
 		p.task.Revision = "next"
 		return answer(collab.TaskResult{Task: p.task})
 	case "proposals.find":
-		return answer(collab.ProposalListResult{Items: nil})
+		p.findReads++
+		if !p.findExisting {
+			return answer(collab.ProposalListResult{Items: nil})
+		}
+		return answer(collab.ProposalListResult{Items: []collab.Proposal{p.proposal}})
 	case "proposals.upsert":
 		p.upserts++
+		var request collab.ProposalUpsertInput
+		_ = json.Unmarshal(input, &request)
+		p.upsertRevision = request.ExpectedRevision
+		if p.rejectRevision || p.findExisting && request.ExpectedRevision != p.proposal.Revision {
+			return collab.Envelope{Outcome: collab.OutcomeConflict, Error: &collab.Error{Reason: collab.ReasonRevisionConflict, Message: "revision changed before the single upsert"}}
+		}
 		if p.unresolved {
 			return collab.Envelope{Outcome: collab.OutcomeUnresolved, Error: &collab.Error{Message: "unknown effect", Reconcile: "proposals.status"}}
 		}
-		var request collab.ProposalUpsertInput
-		_ = json.Unmarshal(input, &request)
 		p.proposal = collab.Proposal{Ref: collab.Ref{Source: "local:proposal", ID: "pr"}, Revision: "pr-revision", Change: request.Change,
 			Title: request.Title, Body: request.Body, Labels: []string{"parent"}}
 		p.proposal.Change.Repository = "repository"
@@ -130,6 +142,124 @@ func (p *finalizerProvider) call(_ context.Context, contract, operation string, 
 		return answer(collab.ProposalReviewResult{})
 	default:
 		return collab.Envelope{Outcome: collab.OutcomeUnsupported, Error: &collab.Error{Message: "unexpected call"}}
+	}
+}
+
+func existingDraftProposal(p *finalizerProvider, head string) {
+	p.findExisting = true
+	p.proposal = collab.Proposal{
+		Ref: collab.Ref{Source: "local:proposal", ID: "pr"}, Revision: "before-push",
+		Change: collab.Change{Repository: "repository", Base: "main", Head: "topic", HeadCommit: head},
+		Title:  "fix: earlier proposal", Body: "Earlier body.", State: collab.ProposalStateDraft,
+		ProviderState: "draft", Labels: []string{"parent"}, Assignees: []string{}, UpdatedAt: "2026-10-12T00:00:00Z",
+	}
+}
+
+func TestOwnPushRefreshesExistingProposalRevisionBeforeSingleUpsert(t *testing.T) {
+	t.Parallel()
+	f, git, provider, opts := finalizerFixture(t)
+	opts.Draft, opts.VerificationFile = true, ""
+	existingDraftProposal(provider, "prior-head")
+	git.pushHook = func() {
+		provider.proposal.Change.HeadCommit = git.head
+		provider.proposal.Revision = "after-own-push"
+		provider.proposal.UpdatedAt = "2026-10-13T00:00:00Z"
+	}
+	result, err := f.Run(context.Background(), opts)
+	if err != nil || result.State != collab.ProposalStateDraft || provider.findReads != 2 ||
+		provider.upserts != 1 || provider.upsertRevision != "after-own-push" || git.pushes != 1 {
+		t.Fatalf("own push was not reconciled before one upsert: result=%+v err=%v finds=%d upserts=%d expected=%q pushes=%d",
+			result, err, provider.findReads, provider.upserts, provider.upsertRevision, git.pushes)
+	}
+}
+
+func TestPostPushProposalDriftStopsBeforeUpsert(t *testing.T) {
+	cases := []struct {
+		name   string
+		change func(*collab.Proposal)
+	}{
+		{name: "title", change: func(p *collab.Proposal) { p.Title = "fix: concurrent title" }},
+		{name: "body", change: func(p *collab.Proposal) { p.Body = "Concurrent body." }},
+		{name: "state", change: func(p *collab.Proposal) { p.State, p.ProviderState = collab.ProposalStateOpen, "open" }},
+		{name: "labels", change: func(p *collab.Proposal) { p.Labels = []string{"parent", "new"} }},
+		{name: "assignees", change: func(p *collab.Proposal) { p.Assignees = []string{"another"} }},
+		{name: "identity", change: func(p *collab.Proposal) { p.Ref.ID = "other" }},
+		{name: "repository", change: func(p *collab.Proposal) { p.Change.Repository = "other/repo" }},
+		{name: "base", change: func(p *collab.Proposal) { p.Change.Base = "other" }},
+		{name: "head", change: func(p *collab.Proposal) { p.Change.Head = "other" }},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			f, git, provider, opts := finalizerFixture(t)
+			opts.Draft, opts.VerificationFile = true, ""
+			existingDraftProposal(provider, "prior-head")
+			git.pushHook = func() {
+				provider.proposal.Change.HeadCommit = git.head
+				provider.proposal.Revision = "after-concurrent-edit"
+				test.change(&provider.proposal)
+			}
+			if _, err := f.Run(context.Background(), opts); err == nil || provider.upserts != 0 || provider.findReads != 2 {
+				t.Fatalf("%s drift reached proposal write: err=%v upserts=%d finds=%d", test.name, err, provider.upserts, provider.findReads)
+			}
+		})
+	}
+}
+
+func TestPostPushRevisionWithoutHeadChangeOrNewProposalStopsBeforeUpsert(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		appearing bool
+	}{{name: "revision-only"}, {name: "concurrent creation", appearing: true}} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			f, git, provider, opts := finalizerFixture(t)
+			opts.Draft, opts.VerificationFile = true, ""
+			if !test.appearing {
+				existingDraftProposal(provider, git.head)
+			}
+			git.pushHook = func() {
+				if test.appearing {
+					existingDraftProposal(provider, git.head)
+				} else {
+					provider.proposal.Revision = "concurrent-revision"
+					provider.proposal.UpdatedAt = "2026-10-13T00:00:00Z"
+				}
+			}
+			if _, err := f.Run(context.Background(), opts); err == nil || provider.upserts != 0 || provider.findReads != 2 {
+				t.Fatalf("%s reached proposal write: err=%v upserts=%d finds=%d", test.name, err, provider.upserts, provider.findReads)
+			}
+		})
+	}
+}
+
+func TestPostPushHeadLagOrLateRevisionConflictNeverRetriesWrite(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		lateConflict bool
+	}{{name: "head lag"}, {name: "late revision conflict", lateConflict: true}} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			f, git, provider, opts := finalizerFixture(t)
+			opts.Draft, opts.VerificationFile = true, ""
+			existingDraftProposal(provider, "prior-head")
+			if test.lateConflict {
+				git.pushHook = func() {
+					provider.proposal.Change.HeadCommit = git.head
+					provider.proposal.Revision = "after-own-push"
+				}
+				provider.rejectRevision = true
+			}
+			_, err := f.Run(context.Background(), opts)
+			wantUpserts := 0
+			if test.lateConflict {
+				wantUpserts = 1
+			}
+			if err == nil || provider.upserts != wantUpserts || provider.findReads != 2 || provider.transitions != 0 {
+				t.Fatalf("head lag or late conflict retried publication: err=%v upserts=%d finds=%d transitions=%d",
+					err, provider.upserts, provider.findReads, provider.transitions)
+			}
+		})
 	}
 }
 

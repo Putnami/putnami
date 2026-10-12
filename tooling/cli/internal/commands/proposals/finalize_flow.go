@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
+	"sort"
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
@@ -23,6 +25,7 @@ type publicationCandidate struct {
 	proposalCaps, taskCaps  collab.Capabilities
 	task                    collab.Task
 	change                  collab.Change
+	existingProposal        *collab.Proposal
 	expectedRevision        string
 	workflowSHA             string
 	readyUnits              []string
@@ -307,27 +310,89 @@ func (f Finalizer) seedAndFind(ctx context.Context, c *publicationCandidate) err
 		return errors.New("branch has no commit ahead of base")
 	}
 	c.change = collab.Change{Base: c.opts.Base, Head: c.opts.Branch, HeadCommit: c.head}
-	var existing collab.ProposalListResult
-	if err := f.call(ctx, collab.ContractProposals, collab.OperationFind, collab.ProposalFindInput{Change: c.change, States: []collab.ProposalState{collab.ProposalStateDraft, collab.ProposalStateOpen}}, &existing); err != nil {
+	existing, err := f.findProposal(ctx, c)
+	if err != nil {
 		return err
 	}
-	if existing.Page.Next != "" {
-		return errors.New("proposals.find returned another page; exact proposal identity is ambiguous")
-	}
-	if len(existing.Items) > 1 {
-		return errors.New("multiple open proposals for the same base/head")
-	}
-	if len(existing.Items) == 0 {
+	c.existingProposal = existing
+	if existing == nil || !precondition(c.proposalCaps, collab.OperationUpsert) {
 		return nil
 	}
-	if existing.Items[0].Change.Base != c.opts.Base || existing.Items[0].Change.Head != c.opts.Branch {
-		return errors.New("proposals.find returned another base/head")
+	c.expectedRevision = existing.Revision
+	if c.expectedRevision == "" {
+		return errors.New("existing proposal lacks revision for upsert precondition")
+	}
+	return nil
+}
+
+func (f Finalizer) findProposal(ctx context.Context, c *publicationCandidate) (*collab.Proposal, error) {
+	var existing collab.ProposalListResult
+	if err := f.call(ctx, collab.ContractProposals, collab.OperationFind, collab.ProposalFindInput{Change: c.change, States: []collab.ProposalState{collab.ProposalStateDraft, collab.ProposalStateOpen}}, &existing); err != nil {
+		return nil, err
+	}
+	if existing.Page.Next != "" {
+		return nil, errors.New("proposals.find returned another page; exact proposal identity is ambiguous")
+	}
+	if len(existing.Items) > 1 {
+		return nil, errors.New("multiple open proposals for the same base/head")
+	}
+	if len(existing.Items) == 0 {
+		return nil, nil
+	}
+	proposal := existing.Items[0]
+	if proposal.Ref.Source == "" || proposal.Ref.ID == "" || proposal.Change.Repository == "" ||
+		proposal.Change.Base != c.opts.Base || proposal.Change.Head != c.opts.Branch {
+		return nil, errors.New("proposals.find returned an incomplete or different proposal identity/base/head")
+	}
+	return &proposal, nil
+}
+
+func sameMembers(a, b []string) bool {
+	if (a == nil) != (b == nil) || len(a) != len(b) {
+		return false
+	}
+	left, right := slices.Clone(a), slices.Clone(b)
+	sort.Strings(left)
+	sort.Strings(right)
+	return slices.Equal(left, right)
+}
+
+func sameProposalExceptHead(before, after collab.Proposal) bool {
+	// UpdatedAt is provider-maintained display metadata. The proposed content
+	// and identity must remain unchanged across the publisher's own push.
+	return before.Ref == after.Ref && before.Change.Repository == after.Change.Repository &&
+		before.Change.Base == after.Change.Base && before.Change.Head == after.Change.Head &&
+		before.Title == after.Title && before.Body == after.Body && before.State == after.State &&
+		before.ProviderState == after.ProviderState && sameMembers(before.Labels, after.Labels) &&
+		sameMembers(before.Assignees, after.Assignees)
+}
+
+func (f Finalizer) refreshAfterPush(ctx context.Context, c *publicationCandidate) error {
+	current, err := f.findProposal(ctx, c)
+	if err != nil {
+		return err
+	}
+	if c.existingProposal == nil {
+		if current != nil {
+			return errors.New("proposal appeared after push; no proposal write was attempted")
+		}
+		return nil
+	}
+	if current == nil || !sameProposalExceptHead(*c.existingProposal, *current) {
+		return errors.New("proposal identity or content changed after push; no proposal write was attempted")
+	}
+	if current.Change.HeadCommit != c.head {
+		return errors.New("proposal head has not reached the pushed full HEAD; resume after the provider catches up")
+	}
+	if current.Revision != c.existingProposal.Revision &&
+		(c.existingProposal.Change.HeadCommit == "" || c.existingProposal.Change.HeadCommit == c.head) {
+		return errors.New("proposal revision changed without a head change; no proposal write was attempted")
 	}
 	if precondition(c.proposalCaps, collab.OperationUpsert) {
-		c.expectedRevision = existing.Items[0].Revision
-		if c.expectedRevision == "" {
-			return errors.New("existing proposal lacks revision for upsert precondition")
+		if current.Revision == "" {
+			return errors.New("post-push proposal lacks revision for upsert precondition")
 		}
+		c.expectedRevision = current.Revision
 	}
 	return nil
 }
@@ -338,6 +403,12 @@ func (f Finalizer) publish(ctx context.Context, c *publicationCandidate) (Result
 	}
 	if err := f.Git.Push(c.opts.Branch); err != nil {
 		return Result{}, fmt.Errorf("push may have happened; inspect origin before resuming: %w", err)
+	}
+	if _, err := c.recheck(ctx, f); err != nil {
+		return Result{}, err
+	}
+	if err := f.refreshAfterPush(ctx, c); err != nil {
+		return Result{}, err
 	}
 	if _, err := c.recheck(ctx, f); err != nil {
 		return Result{}, err

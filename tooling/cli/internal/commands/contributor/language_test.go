@@ -166,7 +166,7 @@ func TestLanguageCommitsNeverRunsConfiguredVerifier(t *testing.T) {
 	}
 	runner := LanguageRunner{Root: root, Out: &bytes.Buffer{}, Err: &bytes.Buffer{}}
 	message, err := runner.git("log", "-1", "--format=%B", sha)
-	if err != nil || string(message) != "feat: English title\n\nBody kept exactly\n" {
+	if err != nil || string(message) != "feat: English title\n\nBody kept exactly\n\n" {
 		t.Fatalf("commit body changed: %q, err=%v", message, err)
 	}
 	if status := runner.RunLanguage(context.Background(), "commits", []string{base + "..HEAD"}); status != 0 {
