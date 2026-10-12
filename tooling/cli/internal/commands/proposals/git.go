@@ -48,7 +48,9 @@ func (g NativeGit) run(args ...string) ([]byte, error) {
 	}
 	// Read-only preflight must not start configured fsmonitor code before the
 	// collaboration provider has prepared its credential holder.
-	cmd := exec.Command("git", append([]string{"-C", g.Root, "--no-pager", "-c", "core.fsmonitor=false"}, args...)...)
+	// Repository log.showSignature must not start a configured verifier during
+	// this pre-provider read. The override applies only to this invocation.
+	cmd := exec.Command("git", append([]string{"-C", g.Root, "--no-pager", "-c", "core.fsmonitor=false", "-c", "log.showSignature=false"}, args...)...)
 	cmd.Env = gitEnvironment(os.Environ())
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -59,9 +61,9 @@ func (g NativeGit) run(args ...string) ([]byte, error) {
 	return answer, nil
 }
 
-func (g NativeGit) runWrite(args ...string) ([]byte, error) {
+func (g NativeGit) runWrite(args ...string) error {
 	if len(args) == 0 || args[0] != "commit" && args[0] != "push" {
-		return nil, fmt.Errorf("unsupported repository-writing git operation")
+		return fmt.Errorf("unsupported repository-writing git operation")
 	}
 	// Commit hooks and push transport helpers may execute repository code.
 	runcredential.MarkRepositoryCodeStarted("git " + args[0])
@@ -69,11 +71,11 @@ func (g NativeGit) runWrite(args ...string) ([]byte, error) {
 	cmd.Env = gitEnvironment(os.Environ())
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	answer, err := cmd.Output()
+	err := cmd.Run()
 	if err != nil {
-		return nil, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
+		return fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
 	}
-	return answer, nil
+	return nil
 }
 
 func gitEnvironment(input []string) []string {
@@ -142,12 +144,10 @@ func (g NativeGit) CommitMessages(base string) ([]CommitMessage, error) {
 	return result, nil
 }
 func (g NativeGit) Seed(title string) error {
-	_, err := g.runWrite("commit", "--allow-empty", "-m", title)
-	return err
+	return g.runWrite("commit", "--allow-empty", "-m", title)
 }
 func (g NativeGit) Push(branch string) error {
-	_, err := g.runWrite("push", "-u", "origin", branch)
-	return err
+	return g.runWrite("push", "-u", "origin", branch)
 }
 func (g NativeGit) Fingerprint() (string, error) {
 	result, err := git.FingerprintTree(g.Root)

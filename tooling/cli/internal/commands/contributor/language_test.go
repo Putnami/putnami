@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -112,6 +113,67 @@ func TestLanguageRangesRejectGitOptionsBeforeSpawn(t *testing.T) {
 		if status := (LanguageRunner{Root: root, Out: &bytes.Buffer{}, Err: &errors}).RunLanguage(context.Background(), mode, args); status != 2 || !strings.Contains(errors.String(), "option-like") {
 			t.Fatalf("%s accepted empty range: status=%d diagnostic=%q", mode, status, errors.String())
 		}
+	}
+}
+
+func TestLanguageCommitsNeverRunsConfiguredVerifier(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the verifier sentinel is a POSIX executable")
+	}
+	t.Parallel()
+	root := t.TempDir()
+	command := func(input []byte, args ...string) []byte {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		cmd.Stdin = bytes.NewReader(input)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, output)
+		}
+		return output
+	}
+	command(nil, "init", "-q")
+	command(nil, "config", "user.name", "Test")
+	command(nil, "config", "user.email", "test@example.invalid")
+	command(nil, "config", "commit.gpgsign", "false")
+	command(nil, "commit", "-q", "--allow-empty", "-m", "base")
+	base := strings.TrimSpace(string(command(nil, "rev-parse", "HEAD")))
+	command(nil, "commit", "-q", "--allow-empty", "-m", "feat: English title", "-m", "Body kept exactly")
+	raw := command(nil, "cat-file", "commit", "HEAD")
+	parts := bytes.SplitN(raw, []byte("\n\n"), 2)
+	if len(parts) != 2 {
+		t.Fatal("commit object has no body boundary")
+	}
+	signed := append(bytes.Clone(parts[0]), []byte("\ngpgsig -----BEGIN PGP SIGNATURE-----\n fake-signature\n -----END PGP SIGNATURE-----\n\n")...)
+	signed = append(signed, parts[1]...)
+	sha := strings.TrimSpace(string(command(signed, "hash-object", "-t", "commit", "-w", "--stdin")))
+	command(nil, "update-ref", "HEAD", sha)
+	verifier := filepath.Join(root, "signature-verifier")
+	marker := verifier + ".invoked"
+	if err := os.WriteFile(verifier, []byte("#!/bin/sh\nprintf invoked > \"$0.invoked\"\nexit 23\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	command(nil, "config", "log.showSignature", "true")
+	command(nil, "config", "gpg.format", "openpgp")
+	command(nil, "config", "gpg.program", verifier)
+	probe := exec.Command("git", "-C", root, "log", "-1", "--format=%B", sha)
+	_, _ = probe.CombinedOutput()
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("fixture did not invoke configured verifier: %v", err)
+	}
+	if err := os.Remove(marker); err != nil {
+		t.Fatal(err)
+	}
+	runner := LanguageRunner{Root: root, Out: &bytes.Buffer{}, Err: &bytes.Buffer{}}
+	message, err := runner.git("log", "-1", "--format=%B", sha)
+	if err != nil || string(message) != "feat: English title\n\nBody kept exactly\n" {
+		t.Fatalf("commit body changed: %q, err=%v", message, err)
+	}
+	if status := runner.RunLanguage(context.Background(), "commits", []string{base + "..HEAD"}); status != 0 {
+		t.Fatalf("language scan status=%d", status)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("read invoked the configured verifier: %v", err)
 	}
 }
 

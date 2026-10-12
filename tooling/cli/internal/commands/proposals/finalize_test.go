@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
@@ -265,6 +266,30 @@ func TestExplicitHostedChecksUseNoLocalVerifierAndReturnFailedProposalToDraft(t 
 		Items: []collab.Check{{Name: "Putnami CI", State: collab.CheckStateFailing}}}
 	if _, err := f.Run(context.Background(), opts); err == nil || provider.proposal.State != collab.ProposalStateDraft {
 		t.Fatalf("failing hosted checks did not restore draft: state=%s err=%v", provider.proposal.State, err)
+	}
+}
+
+func TestUnsupportedHostedChecksReturnProposalToDraftWithoutPolling(t *testing.T) {
+	f, _, provider, opts := finalizerFixture(t)
+	opts.Gate, opts.VerificationFile, opts.WorkflowFile = "ci", "", ".context/workflow.json"
+	opts.TaskSource, opts.TaskID = provider.task.Ref.Source, provider.task.Ref.ID
+	provider.checks = collab.Checks{State: collab.ChecksStateUnsupported, Detail: "the provider has no hosted checks"}
+	f.Workflow = func(_ context.Context, request HostedWorkflowRequest) (HostedWorkflowResult, error) {
+		if request.Status != nil {
+			t.Fatal("unsupported hosted checks reached native status-backed promotion")
+		}
+		return HostedWorkflowResult{WorkflowSHA256: "workflow-sha", WouldCompleteAfterReady: true, ReadyUnits: []string{"current"}}, nil
+	}
+	waits := 0
+	f.Wait = func(context.Context, time.Duration) error {
+		waits++
+		return nil
+	}
+	_, err := f.Run(context.Background(), opts)
+	if err == nil || !strings.Contains(err.Error(), "hosted checks unsupported; proposal returned to draft") ||
+		waits != 0 || provider.upserts != 2 || provider.transitions != 0 || provider.proposal.State != collab.ProposalStateDraft {
+		t.Fatalf("unsupported checks did not fail closed: err=%v waits=%d upserts=%d transitions=%d state=%s",
+			err, waits, provider.upserts, provider.transitions, provider.proposal.State)
 	}
 }
 

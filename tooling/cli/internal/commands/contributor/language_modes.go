@@ -37,7 +37,9 @@ func (r LanguageRunner) git(args ...string) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unsupported read-only git operation %q", args[0])
 	}
-	cmd := exec.Command("git", append([]string{"-C", r.Root, "--no-pager", "-c", "core.fsmonitor=false"}, args...)...)
+	// Reading commits must not invoke a repository-configured signature
+	// verifier before provider credential custody is established.
+	cmd := exec.Command("git", append([]string{"-C", r.Root, "--no-pager", "-c", "core.fsmonitor=false", "-c", "log.showSignature=false"}, args...)...)
 	cmd.Env = git.RepositoryEnvironment(os.Environ())
 	return cmd.Output()
 }

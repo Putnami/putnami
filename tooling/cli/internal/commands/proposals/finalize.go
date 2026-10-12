@@ -370,6 +370,9 @@ func (f Finalizer) waitHosted(ctx context.Context, c *publicationCandidate, requ
 }
 
 func hostedCheckVerdict(checks collab.Checks, names []string, head string) string {
+	if checks.State == collab.ChecksStateUnsupported {
+		return "unsupported"
+	}
 	if len(names) == 0 {
 		return "unsupported"
 	}
