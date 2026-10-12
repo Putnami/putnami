@@ -49,7 +49,7 @@ func TestFixtureTasksCarryNoIncidentalWallClockBudget(t *testing.T) {
 				}
 				for _, match := range fixtureTaskBudget.FindAllStringSubmatch(text, -1) {
 					if budget, err := strconv.ParseInt(match[1], 10, 64); err == nil && budget > 0 {
-						t.Errorf("%s: a fixture task declares \"timeoutMs\": %d; declare -1", fset.Position(node.Pos()), budget)
+						t.Errorf("%s: a fixture declares \"timeoutMs\": %d; declare -1 on a task, omit it on a tool", fset.Position(node.Pos()), budget)
 					}
 				}
 			case *ast.KeyValueExpr:
@@ -62,7 +62,7 @@ func TestFixtureTasksCarryNoIncidentalWallClockBudget(t *testing.T) {
 					return true // an identifier, a call, or a negative literal: no budget
 				}
 				if budget, err := strconv.ParseInt(lit.Value, 0, 64); err == nil && budget > 0 {
-					t.Errorf("%s: a fixture task declares TimeoutMs: %d; declare -1", fset.Position(node.Pos()), budget)
+					t.Errorf("%s: a fixture declares TimeoutMs: %d; declare -1 on a task, omit it on a tool", fset.Position(node.Pos()), budget)
 				}
 			}
 			return true
