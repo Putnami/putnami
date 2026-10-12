@@ -10,11 +10,13 @@
 # store and a reachable private cache, so "it passes there" says nothing about a
 # fresh clone on a stranger's machine.
 #
-# Everything below is anonymous. The job reads no secret and reaches only public
-# endpoints: go.dev for the Go toolchain, putnami.dev for the CLI's extensions,
-# the public npm registry for TypeScript dependencies, and npm.putnami.dev for
-# the @putnami/cloud version that sites/putnami.dev pins, which it serves
-# without an account.
+# The job reads no secret. It reaches public endpoints anonymously: go.dev for
+# the Go toolchain, putnami.dev for the CLI's extensions, the public npm
+# registry for TypeScript dependencies, and npm.putnami.dev for the
+# @putnami/cloud version that sites/putnami.dev pins, which it serves without
+# an account. The one exception is this repository's GitHub Container Registry
+# (GHCR), which it reads with the run's own GITHUB_TOKEN: GitHub mints that
+# token for each run, and it is not a repository secret.
 #
 # On a pull request the gate also checks that the squash commit keeps the
 # breaking marker the commits of the change declare. See the "Run the gate"
@@ -38,6 +40,8 @@ on:
 
 permissions:
   contents: read
+  # Pull the Postgres service image from this repository's GHCR mirror.
+  packages: read
 
 concurrency:
   group: contributor-ci-${{ github.ref }}
@@ -70,16 +74,20 @@ jobs:
       # A service container removes the race instead of widening the timeout:
       # GitHub starts Postgres and waits for the health check below to pass
       # BEFORE the first step runs, so the helper's liveness probe succeeds on
-      # its first try and it never shells out to Docker at all. The image is a
-      # public one and the credentials are the fixture's own, so the job still
-      # reads no secret.
+      # its first try and it never shells out to Docker at all. The credentials
+      # are the fixture's own, so the job still reads no secret.
       #
-      # The image is Docker Hub's official `postgres:17-alpine`, served by its
-      # Amazon ECR Public mirror. Both registries cap anonymous pulls per IP
-      # address, and GitHub-hosted runners share addresses. ECR Public's caps,
-      # 1 pull per second and 500 GB per month, are far above Docker Hub's.
+      # The image is Docker Hub's official `postgres:17-alpine`, copied into
+      # this repository's GHCR by mirror-ci-images.yml. Public registries cap
+      # anonymous pulls per IP address, and GitHub-hosted runners share
+      # addresses, so another tenant could spend the quota and fail this job
+      # before its first step. Pulling with the run's GITHUB_TOKEN spends a
+      # quota this repository owns.
       postgres:
-        image: public.ecr.aws/docker/library/postgres:17-alpine
+        image: ghcr.io/putnami/putnami/postgres:17-alpine
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
