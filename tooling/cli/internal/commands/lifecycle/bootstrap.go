@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/output"
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
 const (
@@ -77,9 +78,12 @@ type BootstrapOptions struct {
 //   - Marker-gated on a content hash of the workspace lock files (see
 //     install_state.go): the warm path is a handful of stats (~0.015ms), and it
 //     never re-installs when only mtimes moved.
-//   - Best-effort: a failed install is logged and the command still runs (it
-//     surfaces its own clear error if it truly needs installed state), so a
-//     flaky network or missing token can't wedge an offline `putnami build`.
+//   - Best-effort on a local run: a failed install is logged and the command
+//     still runs (it surfaces its own clear error if it truly needs installed
+//     state), so a flaky network or missing token can't wedge an offline
+//     `putnami build`. A hosted run (runcredential.Hosted) returns the install
+//     error instead: its gate would otherwise run every task on a workspace
+//     without dependencies, and their failures would hide the install's.
 //   - Idempotent and re-entrancy safe: once per workspace per process, and
 //     skipped when a parent putnami already bootstrapped this workspace.
 //   - Inert under --plan/--dry-run (read-only) and when PUTNAMI_NO_AUTO_INSTALL
@@ -90,21 +94,21 @@ type BootstrapOptions struct {
 // build/test that needs the full install anyway, and reusing install means an
 // extension's existing workspace-install provider (e.g. Cloud's) restores its
 // own state with no new protocol.
-func EnsureWorkspaceBootstrap(ctx context.Context, wsRoot string, cfg *wsproto.Config, opts BootstrapOptions) {
+func EnsureWorkspaceBootstrap(ctx context.Context, wsRoot string, cfg *wsproto.Config, opts BootstrapOptions) error {
 	if cfg == nil || wsRoot == "" {
-		return
+		return nil
 	}
 	if os.Getenv(noAutoInstallEnv) != "" {
-		return
+		return nil
 	}
 	if isInstallCommand(opts.Command) {
-		return // install/deps/upgrade restore workspace state themselves
+		return nil // install/deps/upgrade restore workspace state themselves
 	}
 	if isCredentialSeam(opts.Command, opts.Subcommand) {
-		return // stdout is the bearer; the parent command owns workspace state
+		return nil // stdout is the bearer; the parent command owns workspace state
 	}
 	if os.Getenv(workspaceBootstrappedEnv) == wsRoot {
-		return // a parent putnami already bootstrapped this workspace
+		return nil // a parent putnami already bootstrapped this workspace
 	}
 
 	if opts.Plan || opts.DryRun {
@@ -112,11 +116,11 @@ func EnsureWorkspaceBootstrap(ctx context.Context, wsRoot string, cfg *wsproto.C
 		if stale, _ := evalInstall(wsRoot); stale {
 			iox.Fprintln(os.Stderr, "  Note: workspace install is out of date; run `putnami install` (skipped under --plan/--dry-run).")
 		}
-		return
+		return nil
 	}
 
 	if _, loaded := bootstrappedWorkspaces.LoadOrStore(wsRoot, struct{}{}); loaded {
-		return
+		return nil
 	}
 
 	stale, repair := evalInstall(wsRoot)
@@ -128,7 +132,7 @@ func EnsureWorkspaceBootstrap(ctx context.Context, wsRoot string, cfg *wsproto.C
 				slog.Debug("refresh install state", "error", err)
 			}
 		}
-		return
+		return nil
 	}
 
 	// Mark before installing so install jobs that re-invoke putnami skip this pass.
@@ -138,13 +142,19 @@ func EnsureWorkspaceBootstrap(ctx context.Context, wsRoot string, cfg *wsproto.C
 		iox.Fprintln(os.Stderr, "  Workspace is out of date — running `putnami install` (set PUTNAMI_NO_AUTO_INSTALL=1 to skip)...")
 	}
 	if err := runBootstrapInstall(ctx, wsRoot, cfg, opts); err != nil {
-		// Best-effort: surface the failure but let the original command proceed.
-		// It fails with its own clear error if it genuinely needs installed state.
 		slog.Debug("workspace bootstrap install failed", "error", err)
-		iox.Fprintf(os.Stderr, "  Workspace install did not complete: %v\n  Continuing; run `putnami install` manually if the command fails.\n", err)
-		return
+		// Runners match on this line: keep its wording.
+		iox.Fprintf(os.Stderr, "  Workspace install did not complete: %v\n", err)
+		if runcredential.Hosted() {
+			return err
+		}
+		// Best-effort: let the original command proceed. It fails with its own
+		// clear error if it genuinely needs installed state.
+		iox.Fprintln(os.Stderr, "  Continuing; run `putnami install` manually if the command fails.")
+		return nil
 	}
 	// A successful Install wrote the marker (see Install in install.go).
+	return nil
 }
 
 // runBootstrapInstall runs the implicit install with its human output routed to
@@ -190,4 +200,13 @@ func isInstallCommand(cmd string) bool {
 		return true
 	}
 	return false
+}
+
+// SetInstallRunnerForTest makes the first-use bootstrap run install instead
+// of Install until restore runs. A test that calls it changes the whole
+// process, so it must not run in parallel.
+func SetInstallRunnerForTest(install func(context.Context, string, *wsproto.Config, []string, LifecycleEnv) error) (restore func()) {
+	previous := installRunner
+	installRunner = install
+	return func() { installRunner = previous }
 }

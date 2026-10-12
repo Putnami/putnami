@@ -87,7 +87,8 @@ func (a *App) runBoundRequest(ctx context.Context, wsRoot string, cfg *wsproto.C
 	// The same first-use bootstrap the terminal path runs: the snapshot or the
 	// checkout carries no installed workspace state, so dependencies and
 	// lock-pinned extensions are restored through the ordinary lifecycle before
-	// the engine plans.
+	// the engine plans. On a hosted run, a failed install stops the request
+	// before the engine plans.
 	bootstrapGlobal := global
 	engine.ApplyEnvOverrides(&bootstrapGlobal, cfg)
 	boot.ensureArtifactsAndClose(ctx, wsRoot, cfg, true)
@@ -112,7 +113,7 @@ func (a *App) runBoundRequest(ctx context.Context, wsRoot string, cfg *wsproto.C
 	defer hostedCache.Close()
 	hostedReporters := &engine.HostedReporters{}
 	defer hostedReporters.Close()
-	lifecycle.EnsureWorkspaceBootstrap(ctx, wsRoot, cfg, lifecycle.BootstrapOptions{
+	if err := lifecycle.EnsureWorkspaceBootstrap(ctx, wsRoot, cfg, lifecycle.BootstrapOptions{
 		Command: invocation.Commands[0], Output: bootstrapGlobal.Output,
 		Display: bootstrapLifecycleDisplay(bootstrapGlobal), RunJob: RunWorkspaceJob,
 		BeforeRepositoryCode: func(ctx context.Context) error {
@@ -123,7 +124,9 @@ func (a *App) runBoundRequest(ctx context.Context, wsRoot string, cfg *wsproto.C
 			hostedReporters.Start(ctx, req)
 			return nil
 		},
-	})
+	}); err != nil {
+		return ExitError
+	}
 	result, _ := engine.New().Run(ctx, engine.Request{
 		WorkspaceRoot:     wsRoot,
 		Config:            cfg,
