@@ -47,7 +47,7 @@ declaration, so it can give every task the same starting point.
 4. **Only an execution empties.** A cache hit, a follower of a plan-level shared
    node (`sharedResult`) and a coalesced waiter (a session that waits on
    another session's cache lease for the same key, then restores its entry)
-   execute nothing, so they empty nothing. A follower captures the tree its leader wrote. Each member of a
+   execute nothing, so they empty nothing. A follower captures the tree its leader wrote, so a task that declares a `command-output` output, which resolves per command, never joins a shared node. Each member of a
    batch is emptied in its own preparation, before the one subprocess starts.
 5. **The emptying is the pruning half of a restore** (`store.EmptyTaskOutput`
    over `pruneAround`). Each owned entry leaves the output in one rename into a

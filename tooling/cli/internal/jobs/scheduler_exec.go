@@ -317,7 +317,8 @@ func (s *Scheduler) prepareTask(
 	// store. It comes before everything that writes for this task: the stamp
 	// refresh, the preBuild hook and the subprocess. A task that adopts a
 	// leader's result executes nothing and captures the tree its leader wrote,
-	// so it empties nothing.
+	// so it empties nothing; the planner never shares a task that declares a
+	// command-output output, which its leader would not write.
 	if item.sharedResult == nil {
 		if err := s.emptyOwnedOutputs(job); err != nil {
 			return fail(fmt.Errorf("empty declared outputs: %w", err))

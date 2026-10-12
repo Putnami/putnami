@@ -299,12 +299,15 @@ func TestSharedExecutions_RequireDeclaredWritesAndDeterminism(t *testing.T) {
 		{"no declared writes", func(task *extension.TaskDefinition) { task.Writes = nil }},
 		{"no declared inputs", func(task *extension.TaskDefinition) { task.Inputs = nil }},
 		{"a declared command-output directory", func(task *extension.TaskDefinition) {
-			task.Declares = &extension.TaskDeclaration{
-				Outputs: map[string]extension.DeclaredOutput{
-					"client": task.Declares.Outputs["client"],
-					"report": {Kind: extension.OutputKindDirectory, Root: extension.OutputRootCommandOutput, Path: "report"},
-				},
-			}
+			addDeclaredOutput(task, extension.DeclaredOutput{
+				Kind: extension.OutputKindDirectory, Root: extension.OutputRootCommandOutput, Path: "report",
+			})
+		}},
+		{"an optional command-output file", func(task *extension.TaskDefinition) {
+			addDeclaredOutput(task, extension.DeclaredOutput{
+				Kind: extension.OutputKindFile, Root: extension.OutputRootCommandOutput, Path: "report.json",
+				OptionalEmpty: true,
+			})
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -325,6 +328,16 @@ func TestSharedExecutions_RequireDeclaredWritesAndDeterminism(t *testing.T) {
 			}
 		})
 	}
+}
+
+// addDeclaredOutput declares one more output, "report", without mutating the
+// fixture's shared declaration.
+func addDeclaredOutput(task *extension.TaskDefinition, report extension.DeclaredOutput) {
+	outputs := map[string]extension.DeclaredOutput{"report": report}
+	for id, output := range task.Declares.Outputs {
+		outputs[id] = output
+	}
+	task.Declares = &extension.TaskDeclaration{Outputs: outputs}
 }
 
 // TestSharedExecutions_SeparateDifferentProjects keeps the grouping keyed on the
