@@ -83,6 +83,10 @@ func TaskStart(job *jobs.ScheduledJob, at time.Time) protocolcli.SessionStreamRe
 // event's, so the stream keeps the producer's clock rather than restamping it
 // with the moment the CLI happened to forward it.
 //
+// The record's event names its type, level and message even when the CLI built
+// the event itself (jobs.RawJobEvent.RecordPayload): a cache hit's replayed
+// result and an upload node's published-member artifact are read by type.
+//
 // A result event's payload loses its data.testCases: every case travels once,
 // in its own test:case record (TaskEndRecords).
 func TaskEvent(job *jobs.ScheduledJob, event jobs.RawJobEvent, at time.Time) protocolcli.SessionStreamRecord {
@@ -190,7 +194,7 @@ func taskEvent(identity protocolcli.TaskIdentity, event jobs.RawJobEvent, at tim
 		Record:          protocolcli.RecordTaskEvent,
 		Time:            event.Time,
 		Identity:        &identity,
-		Event:           event.Data,
+		Event:           event.RecordPayload(),
 	}
 	if record.Time == "" {
 		record.Time = stamp(at)

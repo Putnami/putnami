@@ -316,7 +316,8 @@ func TestMachineV2Renderer_ProjectsDockerPublicationFactsOnBothMachineSurfaces(t
 			t.Fatalf("decode machine record: %v", err)
 		}
 		if record.Record == protocolcli.RecordTaskEvent && record.Event["kind"] == "published" {
-			sawTypedArtifact = record.Event["imageDigest"] == digestA || record.Event["imageDigest"] == digestB
+			sawTypedArtifact = record.Event["type"] == jobs.EventTypeArtifact &&
+				(record.Event["imageDigest"] == digestA || record.Event["imageDigest"] == digestB)
 		}
 		if record.Record == protocolcli.RecordSessionEnd {
 			terminal = record
