@@ -178,12 +178,16 @@ func TestRuntimeToolchainProbeTimeoutIsFiveSecondsUnlessTheCallerSetsOne(t *test
 
 // A required toolchain whose probe timed out fails with the text of any other
 // mismatch, and unwraps to ErrToolchainProbeTimeout: a caller tells a slow
-// toolchain from an absent one by the error, never by its text.
+// toolchain from an absent one by the error, never by its text. The program
+// that times out polls for a file that never appears, so its counters move
+// after the first sample whenever that sample was taken, and its deadline
+// counts from then.
 func TestRuntimeToolchainMismatchUnwrapsToAProbeThatTimedOut(t *testing.T) {
-	path := fixtureproc.Write(t, filepath.Join(t.TempDir(), "compiler"), fixtureproc.Program{Sleep: 5 * time.Second})
+	dir := t.TempDir()
+	path := fixtureproc.Write(t, filepath.Join(dir, "compiler"), fixtureproc.Program{WaitFor: []string{filepath.Join(dir, "never")}})
 	_, probeErr := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, hostProcessDeadline(100*time.Millisecond))
 	if want := "probe timed out after 100ms: "; probeErr == nil || !strings.HasPrefix(probeErr.Error(), want) {
-		t.Fatalf("probe of a program that sleeps 5s = %v, want an error starting with %q", probeErr, want)
+		t.Fatalf("probe of a program that waits for a file that never appears = %v, want an error starting with %q", probeErr, want)
 	}
 	absent := runtimeToolchainRejection{candidate: `candidate 1 (path "compiler")`, reason: "path missing"}
 	timedOut := runtimeToolchainRejection{candidate: `candidate 2 (path "compiler") at ` + path, reason: probeErr.Error(), err: probeErr}
@@ -235,8 +239,9 @@ func TestRuntimeToolchainMismatchNamesInstallUnlessItDoesNotHelp(t *testing.T) {
 
 // TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion pins each probe
 // rejection reason, including the timeout a slow machine can trip. The program
-// that times out polls for a file that never appears, so it keeps running its
-// own code and its deadline arms whenever its progress is first sampled.
+// that times out polls for a file that never appears, so its counters move
+// after the first sample whenever that sample was taken, and its deadline
+// counts from then.
 func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 	cases := []struct {
 		name    string
