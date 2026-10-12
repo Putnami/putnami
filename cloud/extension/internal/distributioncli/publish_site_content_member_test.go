@@ -21,7 +21,6 @@ const (
 	siteContentTestRevision = "0123456789abcdef0123456789abcdef01234567"
 	siteContentTestVersion  = "0.0.0-20260911000000-0123456"
 	siteContentTestProject  = "/docs/example.dev"
-	siteContentTestCapToken = "local_broker_capability_0123456789abcdef"
 )
 
 // writeSiteContentProject lays down docs/example.dev as a site project with
@@ -74,9 +73,8 @@ func siteContentPlan(coordinate string, channels ...string) *releaseset.Plan {
 	}
 }
 
-// fakePutBroker stands in for the runner's loopback broker in front of
-// put-server. It records every request and serves blobs, publish, and the
-// manifest readback.
+// fakePutBroker stands in for put-server. It records every request and serves
+// blobs, publish, and the manifest readback.
 type fakePutBroker struct {
 	mu             sync.Mutex
 	requests       []string
@@ -128,13 +126,13 @@ func (b *fakePutBroker) handler(t *testing.T) http.Handler {
 	})
 }
 
-func siteContentBrokerEnv(t *testing.T, url string) map[string]string {
+// siteContentPutEnv points the Put endpoint at url and stores a Put lease for
+// it, the credential a signed-in machine holds.
+func siteContentPutEnv(t *testing.T, url string) map[string]string {
 	t.Helper()
-	return map[string]string{
-		"PUTNAMI_HOME":             t.TempDir(),
-		"PUTNAMI_REGISTRY_PUT_URL": url + "/put",
-		"PUTNAMI_CLOUD_TOKEN":      siteContentTestCapToken,
-	}
+	env := nativePutCredentialEnv(t, url+"/put")
+	env["PUTNAMI_REGISTRY_PUT_URL"] = url + "/put"
+	return env
 }
 
 func quietIO(client *http.Client) clicore.IO {
@@ -151,7 +149,7 @@ func TestPublishSiteContentMembersPublishesThePlannedVersionOnThePlanChannel(t *
 		releaseset.ContextParamName: siteContentPlan("cloud/doc-contents-platform", "canary"),
 	}
 
-	results, err := PublishSiteContentMembers(params, nil, ws, siteContentBrokerEnv(t, srv.URL), quietIO(srv.Client()))
+	results, err := PublishSiteContentMembers(params, nil, ws, siteContentPutEnv(t, srv.URL), quietIO(srv.Client()))
 	if err != nil {
 		t.Fatalf("publish planned members: %v", err)
 	}
@@ -164,8 +162,8 @@ func TestPublishSiteContentMembersPublishesThePlannedVersionOnThePlanChannel(t *
 		t.Fatalf("broker requests = %q, want %q", broker.requests, wantRequests)
 	}
 	for i, auth := range broker.auths {
-		if auth != "Bearer "+siteContentTestCapToken {
-			t.Fatalf("request %d authorization = %q, want the local capability", i, auth)
+		if auth != "Bearer "+nativePutBearer() {
+			t.Fatalf("request %d authorization = %q, want the stored Put lease", i, auth)
 		}
 	}
 	if string(broker.publishBody["version"]) != `"`+siteContentTestVersion+`"` {
@@ -206,7 +204,7 @@ func TestPublishSiteContentMembersConfirmsARetriedVersionWithoutMovingAChannel(t
 	ws := writeSiteContentProject(t, `"site-content"`)
 	params := map[string]any{"app": "docs/example.dev", "json": true, releaseset.ContextParamName: siteContentPlan("cloud/doc-contents-platform", "canary")}
 
-	results, err := PublishSiteContentMembers(params, nil, ws, siteContentBrokerEnv(t, srv.URL), quietIO(srv.Client()))
+	results, err := PublishSiteContentMembers(params, nil, ws, siteContentPutEnv(t, srv.URL), quietIO(srv.Client()))
 	if err != nil {
 		t.Fatalf("retried publish: %v", err)
 	}
@@ -244,7 +242,7 @@ func TestPublishSiteContentMembersRefusesBeforeAnyRequest(t *testing.T) {
 			srv := newPutTestServer(broker.handler(t))
 			defer srv.Close()
 			ws := writeSiteContentProject(t, `"site-content"`)
-			_, err := PublishSiteContentMembers(test.params, nil, ws, siteContentBrokerEnv(t, srv.URL), quietIO(srv.Client()))
+			_, err := PublishSiteContentMembers(test.params, nil, ws, siteContentPutEnv(t, srv.URL), quietIO(srv.Client()))
 			if err == nil || !strings.Contains(err.Error(), test.wantErr) {
 				t.Fatalf("error = %v, want %q", err, test.wantErr)
 			}
@@ -281,7 +279,7 @@ func TestPublishSiteContentMembersPublishesNothingWithoutAPlanOrADeclaration(t *
 			srv := newPutTestServer(broker.handler(t))
 			defer srv.Close()
 			ws := writeSiteContentProject(t, test.publish)
-			results, err := PublishSiteContentMembers(test.params, nil, ws, siteContentBrokerEnv(t, srv.URL), quietIO(srv.Client()))
+			results, err := PublishSiteContentMembers(test.params, nil, ws, siteContentPutEnv(t, srv.URL), quietIO(srv.Client()))
 			if err != nil || results != nil {
 				t.Fatalf("PublishSiteContentMembers = (%+v, %v), want a skip", results, err)
 			}

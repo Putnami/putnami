@@ -163,9 +163,10 @@ func PackageSiteContent(params map[string]any, args []string, workspaceRoot stri
 // for this project, at the planned version, with the planned source revision
 // in each bundle.json, and moves the plan's first channel in the same atomic
 // Put publish. Without a plan it publishes nothing: `putnami cloud
-// publish-doc` remains the direct operator path. Under native CI the Put
-// requests go to the runner's loopback broker, which admits only these
-// planned members.
+// publish-doc` remains the direct operator path. Under the engine's
+// publication-v1 capability, which every hosted CI run has, it packs the one
+// planned member into the publication outbox and sends no Put request: the
+// engine uploads the member.
 func PublishSiteContentMembers(params map[string]any, args []string, workspaceRoot string, env map[string]string, ioctx clicore.IO) ([]SiteContentMemberResult, error) {
 	project, found, err := resolveSiteContentProject(params, args, workspaceRoot)
 	if err != nil {

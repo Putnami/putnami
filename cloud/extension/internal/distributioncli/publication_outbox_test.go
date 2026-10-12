@@ -376,7 +376,7 @@ func TestPublishSiteContentMembersPacksTheBytesTheDirectPathPublishes(t *testing
 	plan := siteContentPlan("cloud/doc-contents-platform", "canary")
 	direct, srv := newRecordingPutServer(t)
 	params := map[string]any{"app": "docs/example.dev", "json": true, "channel": "canary", releaseset.ContextParamName: plan}
-	published, err := PublishSiteContentMembers(params, nil, ws, siteContentBrokerEnv(t, srv.URL), quietIO(srv.Client()))
+	published, err := PublishSiteContentMembers(params, nil, ws, siteContentPutEnv(t, srv.URL), quietIO(srv.Client()))
 	if err != nil || len(published) != 1 {
 		t.Fatalf("direct publish = (%+v, %v)", published, err)
 	}

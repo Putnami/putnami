@@ -167,7 +167,9 @@ func machineTokensCreate(params map[string]any, workspaceRoot string, env map[st
 
 // machineTokenCreateLines renders the one-time human reveal: the raw token, the
 // store-it-now warning, and paste-ready hints for the common consumers. This is
-// the ONLY command that ever prints the secret.
+// the ONLY command that ever prints the secret. A session with no signed-in
+// user needs one variable: the build cache reads PUTNAMI_CLOUD_TOKEN too, so
+// no hint names PUTNAMI_CACHE_TOKEN.
 func machineTokenCreateLines(name, workspaceID, rawToken string) []string {
 	return []string{
 		fmt.Sprintf("Created workspace machine token %q for workspace %s.", name, workspaceID),
@@ -179,8 +181,8 @@ func machineTokenCreateLines(name, workspaceID, rawToken string) []string {
 		"Paste-ready:",
 		"  # GitHub Actions repo/environment secret",
 		fmt.Sprintf("  gh secret set PUTNAMI_CLOUD_TOKEN --body %q", rawToken),
-		"  # Build cache token source",
-		fmt.Sprintf("  export PUTNAMI_CACHE_TOKEN=%q", rawToken),
+		"  # Agent session or CI job with no signed-in user; with the cache.read scope it also reads the build cache",
+		fmt.Sprintf("  export PUTNAMI_CLOUD_TOKEN=%q", rawToken),
 		"  # E2E / agent runner",
 		fmt.Sprintf("  export PUTNAMI_E2E_TOKEN=%q", rawToken),
 	}

@@ -515,6 +515,11 @@ func archiveCommandFixture(t *testing.T) string {
 	return ws
 }
 
+// nativePutBearer is the Put lease bearer nativePutCredentialEnv stores.
+func nativePutBearer() string {
+	return workflowJWT(map[string]any{"aud": "distribution", "scope": "put"})
+}
+
 func nativePutCredentialEnv(t *testing.T, baseURL string) map[string]string {
 	t.Helper()
 	env := map[string]string{"PUTNAMI_HOME": t.TempDir()}
@@ -523,8 +528,7 @@ func nativePutCredentialEnv(t *testing.T, baseURL string) map[string]string {
 	if err := WriteRegistriesState(env, &RegistriesState{Version: 1, Keys: []KeyRef{{Registry: RegistryPut, Host: host, URL: baseURL}}}); err != nil {
 		t.Fatal(err)
 	}
-	bearer := workflowJWT(map[string]any{"aud": "distribution", "scope": "put"})
-	if err := materializeRegistryLease(env, endpoint, bearer); err != nil {
+	if err := materializeRegistryLease(env, endpoint, nativePutBearer()); err != nil {
 		t.Fatal(err)
 	}
 	return env

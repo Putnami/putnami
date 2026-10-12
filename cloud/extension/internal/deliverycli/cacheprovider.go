@@ -908,7 +908,7 @@ func (s *providerSession) serving() bool {
 // restore materializes one key's blobs into the blob-exchange directory and
 // returns the cached result on a hit. A miss or an error both tell core to build
 // locally; the error status is the restore-failure signal (logged, not a cold
-// miss). Eligibility/break-even filtering is core's call at this point — the
+// miss). Eligibility filtering is core's call at this point — the
 // provider restores exactly the key core asked for, so it builds the negotiate
 // request directly rather than through the eligibility-filtering BuildRequest.
 //
