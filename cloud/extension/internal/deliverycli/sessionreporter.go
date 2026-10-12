@@ -56,6 +56,12 @@ const (
 	sessionReporterPlanRetryableNacks = 3
 )
 
+// specVerificationArtifact is the spec gate's record, which the engine's
+// session reporter sends last, once the events final marker is acknowledged.
+// The engine omits it on any refusal, so a fault on it needs no answer of its
+// own: it never costs the rest of the session.
+const specVerificationArtifact = "spec-verification.json"
+
 // Delivery's run-session ingest headers, mirrored from the delivery API
 // (delivery-api) records contract (the extension does not import server packages).
 const (
@@ -357,11 +363,13 @@ func platformShedRequest(status int) bool {
 	return status == http.StatusTooManyRequests || status == http.StatusRequestTimeout
 }
 
-// sessionPartFor maps the wire's canonical artifact name onto Delivery's closed
-// part vocabulary. Both sides already agree on the three documents; only the
-// spelling differs. A Delivery that predates the `plan` part answers 400, which
-// post answers as a terminal invalid_chunk: the engine omits the plan and
-// delivers the rest, so this receiver and delivery-api deploy in either order.
+// sessionPartFor maps the wire's canonical artifact name onto the receiver's
+// closed part vocabulary. Both sides agree on the four documents; only the
+// spelling differs. A receiver that predates the `plan` or the
+// `spec-verification` part answers 400, which post answers as a terminal
+// invalid_chunk: the engine omits that document and the rest of the session's
+// delivery is unchanged, so this reporter and the receiver deploy in either
+// order.
 func sessionPartFor(artifact string) (string, bool) {
 	switch artifact {
 	case "session.json":
@@ -370,6 +378,8 @@ func sessionPartFor(artifact string) (string, bool) {
 		return "events", true
 	case planArtifact:
 		return "plan", true
+	case specVerificationArtifact:
+		return "spec-verification", true
 	}
 	return "", false
 }

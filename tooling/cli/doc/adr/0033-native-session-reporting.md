@@ -11,9 +11,9 @@ Only the native engine observes the whole graph lifecycle and owns the
 persisted session. An after-build uploader cannot stream live work and cannot
 describe a failed or canceled graph; a report task with successful
 prerequisites has the same defect. Extensions need two kinds of delivery: the
-full session (the recorded plan, events, then the terminal `session.json`) and
-the live event stream alone, such as a log view. Neither may slow a task or
-change a verdict.
+full session (the recorded plan, events, the terminal `session.json`, then the
+spec gate's record) and the live event stream alone, such as a log view.
+Neither may slow a task or change a verdict.
 
 ## Decision
 
@@ -55,7 +55,7 @@ A reporting capability is one row of `Capabilities()` in
 
 | Capability | Command | Selector | Token | Artifacts | Live chunk leaves at | Checkpoint, lock |
 | --- | --- | --- | --- | --- | --- | --- |
-| Session reporter | `session-reporter` | `PUTNAMI_SESSION_REPORTER` | `PUTNAMI_SESSION_REPORTER_TOKEN` | `plan.json` first, then `session.json` closes before `events.jsonl` | 64 KiB or 10 s | `reporting.json`, `reporting.lock` |
+| Session reporter | `session-reporter` | `PUTNAMI_SESSION_REPORTER` | `PUTNAMI_SESSION_REPORTER_TOKEN` | `plan.json` first, then `session.json` closes before `events.jsonl`, then `spec-verification.json` | 64 KiB or 10 s | `reporting.json`, `reporting.lock` |
 | Log reporter | `log-reporter` | `PUTNAMI_LOG_REPORTER` | `PUTNAMI_LOG_REPORTER_TOKEN` | `events.jsonl` | 64 KiB or 2 s | `log-reporting.json`, `log-reporting.lock` |
 
 - Command, environment and artifact names belong to the protocol
@@ -81,6 +81,15 @@ A reporting capability is one row of `Capabilities()` in
   refusal with retry on the last attempt fails delivery instead, so replay sends
   the plan. A checkpoint written before `plan.json` existed, whose other
   artifacts progressed, omits it as late.
+- The session reporter sends `spec-verification.json`, the spec gate's record,
+  last. The engine writes it before reporting ends, and its first frame leaves
+  once the events final marker is acknowledged. It is best-effort and bounded
+  to 8 MiB (`SessionReportingSpecVerificationBytes`). An absent, oversized,
+  unreadable or refused record, a reporter that quit, or a finalization limit
+  omits it, with its reason in the checkpoint. The delivery stays complete,
+  with no diagnostic: its evidence already reads `delivered`, so no replay
+  would send the record. A checkpoint completed before the record existed
+  omits it as late.
 - A failing capability (unavailable extension, refused chunk, crash, exhausted
   budget) produces at most one diagnostic of its own. It never changes the
   other capability, the graph verdict or the exit code.
@@ -92,7 +101,8 @@ A reporting capability is one row of `Capabilities()` in
 ### Durable delivery
 
 - One atomic checkpoint per capability beside the retained session holds the
-  ACK cursors, the exact pending frame and why `plan.json` was omitted.
+  ACK cursors, the exact pending frame and why `plan.json` or
+  `spec-verification.json` was omitted.
   Provider identity, sequence, byte offset, SHA-256 and final identity survive
   retry and replay.
 - ACK means durable acceptance. An identical duplicate succeeds; conflicting
@@ -154,6 +164,9 @@ service or dependency. Unset selectors leave behavior unchanged.
   deliveries.
 - **A `plan.json` every receiver must accept.** A receiver that predates it
   would fail every session's delivery, not only the plan's.
+- **Restarting a reporter for `spec-verification.json`.** A reporter that
+  predates the record may quit after the events final marker, and on a hosted
+  run custody refuses a reporter restarted after repository code.
 - **A polling reporter.** Subscribers wait on the wake signal and batch by
   frame or interval, so the chunk count follows run duration, not ACK round
   trips.

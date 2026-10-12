@@ -6,8 +6,9 @@ The package also exports `SessionReportingChunk`, `SessionReportingAck`,
 [native session reporter protocol](../../../protocols/cli/doc/04-session-reporting.md).
 Go and TypeScript execute one shared conformance corpus. The reporter names
 (`SESSION_REPORTER_*`, `LOG_REPORTER_*`) and `sessionReportingArtifacts`
-state which artifacts the session reporter and the log reporter receive, and
-`SESSION_REPORTING_PLAN_BYTES` bounds the session reporter's `plan.json`.
+state which artifacts the session reporter and the log reporter receive.
+`SESSION_REPORTING_PLAN_BYTES` bounds the session reporter's `plan.json`, and
+`SESSION_REPORTING_SPEC_VERIFICATION_BYTES` its `spec-verification.json`.
 `parseSessionReportingHandshake`, `parseSessionReportingHandshakeResult` and
 `sessionReportingHandshakeResultAnswers` decode the v2 handshake that hands a
 reporter the run credential of a hosted run.

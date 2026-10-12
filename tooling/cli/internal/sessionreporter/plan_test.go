@@ -31,14 +31,7 @@ func acknowledgeEveryChunk(chunk protocolcli.SessionReportingChunk) *protocolcli
 // refusePlan answers every plan.json chunk ok:false, with retry or without,
 // and acknowledges every other chunk.
 func refusePlan(retryable bool) planAnswer {
-	code := map[bool]string{true: "receiver_unavailable", false: "invalid_chunk"}[retryable]
-	return func(chunk protocolcli.SessionReportingChunk) *protocolcli.SessionReportingAck {
-		ack := chunk.Ack()
-		if chunk.Artifact == planFile {
-			ack.OK, ack.Retryable, ack.Code = false, retryable, code
-		}
-		return &ack
-	}
+	return refuse(planFile, retryable)
 }
 
 // planHarness runs the session reporter's delivery worker over a session whose
@@ -251,9 +244,17 @@ func TestPlanPrecedesEveryOtherFrame(t *testing.T) {
 // removed or truncated after it, or not a regular file, is unreadable.
 func TestPlanIsReadUpToItsBound(t *testing.T) {
 	spectest.Proves(t, "cli/native-session-reporting", "bounded-transport", "plan-is-bounded-and-omitted-past-its-bound")
+	assertReadUpToItsBound(t, planFile, protocolcli.SessionReportingPlanBytes)
+}
+
+// assertReadUpToItsBound frames a whole document of exactly bound bytes to its
+// end, and refuses one byte more before its first chunk. Only a document
+// missing before its first chunk is absent; one removed or truncated after it,
+// or not a regular file, is unreadable.
+func assertReadUpToItsBound(t *testing.T, artifact string, bound int64) {
+	t.Helper()
 	dir := t.TempDir()
-	path := filepath.Join(dir, planFile)
-	bound := int64(protocolcli.SessionReportingPlanBytes)
+	path := filepath.Join(dir, artifact)
 	resize := func(size int64) {
 		t.Helper()
 		if err := os.WriteFile(path, nil, 0o644); err != nil {
@@ -265,31 +266,31 @@ func TestPlanIsReadUpToItsBound(t *testing.T) {
 	}
 	resize(bound)
 	for _, c := range []cursor{{}, {Offset: bound - 5, Sequence: 1}, {Offset: bound, Sequence: 2}} {
-		data, err := readPlan(dir, c)
+		data, err := readDocument(dir, artifact, c)
 		if want := min(bound-c.Offset, protocolcli.SessionReportingChunkBytes); err != nil || int64(len(data)) != want {
-			t.Fatalf("plan.json at its bound, cursor %+v: %d bytes, %v; want %d bytes", c, len(data), err, want)
+			t.Fatalf("%s at its bound, cursor %+v: %d bytes, %v; want %d bytes", artifact, c, len(data), err, want)
 		}
 	}
 	resize(bound + 1)
 	for _, c := range []cursor{{}, {Offset: bound - 5, Sequence: 1}} {
-		if _, err := readPlan(dir, c); !errors.Is(err, errPlanTooLarge) {
-			t.Fatalf("plan.json past its bound, cursor %+v: %v, want errPlanTooLarge", c, err)
+		if _, err := readDocument(dir, artifact, c); !errors.Is(err, errDocumentTooLarge) {
+			t.Fatalf("%s past its bound, cursor %+v: %v, want errDocumentTooLarge", artifact, c, err)
 		}
 	}
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := readPlan(dir, cursor{}); !errors.Is(err, errPlanAbsent) {
-		t.Fatalf("missing plan.json: %v, want errPlanAbsent", err)
+	if _, err := readDocument(dir, artifact, cursor{}); !errors.Is(err, errDocumentAbsent) {
+		t.Fatalf("missing %s: %v, want errDocumentAbsent", artifact, err)
 	}
-	if _, err := readPlan(dir, cursor{Offset: 5, Sequence: 1}); !errors.Is(err, errPlanUnreadable) {
-		t.Fatalf("plan.json removed after its first chunk: %v, want errPlanUnreadable", err)
+	if _, err := readDocument(dir, artifact, cursor{Offset: 5, Sequence: 1}); !errors.Is(err, errDocumentUnreadable) {
+		t.Fatalf("%s removed after its first chunk: %v, want errDocumentUnreadable", artifact, err)
 	}
 	if err := os.WriteFile(path, []byte("abc"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := readPlan(dir, cursor{Offset: 5, Sequence: 1}); !errors.Is(err, errPlanUnreadable) {
-		t.Fatalf("plan.json truncated below its cursor: %v, want errPlanUnreadable", err)
+	if _, err := readDocument(dir, artifact, cursor{Offset: 5, Sequence: 1}); !errors.Is(err, errDocumentUnreadable) {
+		t.Fatalf("%s truncated below its cursor: %v, want errDocumentUnreadable", artifact, err)
 	}
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
@@ -297,8 +298,8 @@ func TestPlanIsReadUpToItsBound(t *testing.T) {
 	if err := os.Mkdir(path, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := readPlan(dir, cursor{}); !errors.Is(err, errPlanUnreadable) {
-		t.Fatalf("plan.json as a directory: %v, want errPlanUnreadable", err)
+	if _, err := readDocument(dir, artifact, cursor{}); !errors.Is(err, errDocumentUnreadable) {
+		t.Fatalf("%s as a directory: %v, want errDocumentUnreadable", artifact, err)
 	}
 }
 
@@ -811,14 +812,16 @@ func TestReportingCursorRejectsInconsistentPlanState(t *testing.T) {
 		t.Fatalf("a fresh session reporter state was refused: %v", err)
 	}
 	for name, mutate := range map[string]func(*state){
-		"negative plan offset":            func(s *state) { s.Plan.Offset = -1 },
-		"negative plan sequence":          func(s *state) { s.Plan.Sequence = -1 },
-		"unknown omission":                func(s *state) { s.PlanOmitted = "forgotten" },
-		"omitted after its final marker":  func(s *state) { s.Plan.Final, s.PlanOmitted = true, planRefused },
-		"events past an open plan":        func(s *state) { s.Events = cursor{Offset: 3, Sequence: 1} },
-		"session past an open plan":       func(s *state) { s.Session = cursor{Offset: 2, Sequence: 1} },
-		"complete with an open plan":      func(s *state) { s.Events, s.Session, s.Complete = cursor{3, 2, true}, cursor{2, 2, true}, true },
-		"incomplete with a closed plan":   func(s *state) { s.Events, s.Session, s.PlanOmitted = cursor{3, 2, true}, cursor{2, 2, true}, planLate },
+		"negative plan offset":           func(s *state) { s.Plan.Offset = -1 },
+		"negative plan sequence":         func(s *state) { s.Plan.Sequence = -1 },
+		"unknown omission":               func(s *state) { s.PlanOmitted = "forgotten" },
+		"omitted after its final marker": func(s *state) { s.Plan.Final, s.PlanOmitted = true, planRefused },
+		"events past an open plan":       func(s *state) { s.Events = cursor{Offset: 3, Sequence: 1} },
+		"session past an open plan":      func(s *state) { s.Session = cursor{Offset: 2, Sequence: 1} },
+		"complete with an open plan":     func(s *state) { s.Events, s.Session, s.Complete = cursor{3, 2, true}, cursor{2, 2, true}, true },
+		"incomplete with a closed plan": func(s *state) {
+			s.Events, s.Session, s.PlanOmitted, s.SpecVerificationOmitted = cursor{3, 2, true}, cursor{2, 2, true}, planLate, specVerificationAbsent
+		},
 		"pending plan frame once omitted": func(s *state) { s.PlanOmitted, s.Pending = planRefused, &planPending },
 		"pending plan frame once closed":  func(s *state) { s.Plan, s.Pending = cursor{2, 1, true}, &planPending },
 		"pending plan frame off cursor":   func(s *state) { s.Pending = &shiftedPlan },
@@ -844,13 +847,14 @@ func TestReportingCursorRejectsInconsistentPlanState(t *testing.T) {
 	}
 }
 
-// TestTheLogReporterNeverSendsPlan drains the log reporter beside a plan.json:
-// it never frames it.
+// TestTheLogReporterNeverSendsPlan drains the log reporter beside a plan.json
+// and a spec-verification.json: it frames neither.
 func TestTheLogReporterNeverSendsPlan(t *testing.T) {
 	h := newCapabilityHarness(t, LogReporter)
 	if err := os.WriteFile(filepath.Join(h.run.dir, planFile), planOf(10), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	writeSpecVerification(t, h.run.dir, specVerificationOf(10))
 	h.append(`{"record":"task:end"}`)
 	h.settle()
 	if err := h.log.Close(); err != nil {
@@ -864,7 +868,7 @@ func TestTheLogReporterNeverSendsPlan(t *testing.T) {
 	if got := frameOrder(h.sent()); got != "events.jsonl,events.jsonl:final" {
 		t.Fatalf("the log reporter sent %s", got)
 	}
-	if h.run.state.Plan != (cursor{}) || h.run.state.PlanOmitted != "" {
-		t.Fatalf("the log reporter recorded plan.json state: %+v", h.run.state)
+	if h.run.state.Plan != (cursor{}) || h.run.state.PlanOmitted != "" || h.run.state.SpecVerification != (cursor{}) || h.run.state.SpecVerificationOmitted != "" {
+		t.Fatalf("the log reporter recorded plan.json or spec-verification.json state: %+v", h.run.state)
 	}
 }

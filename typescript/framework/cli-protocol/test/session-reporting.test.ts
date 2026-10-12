@@ -21,6 +21,7 @@ import {
   SESSION_REPORTING_OP_INITIALIZE,
   SESSION_REPORTING_PLAN_BYTES,
   SESSION_REPORTING_SCHEMA_ID,
+  SESSION_REPORTING_SPEC_VERIFICATION_BYTES,
   type SessionReportingAck,
   type SessionReportingChunk,
   type SessionReportingHandshakeResult,
@@ -86,7 +87,12 @@ test('reporter capability names and artifacts match the Go constants', () => {
     'PUTNAMI_LOG_REPORTER',
     'PUTNAMI_LOG_REPORTER_TOKEN',
   ]);
-  expect(sessionReportingArtifacts(SESSION_REPORTER_COMMAND)).toEqual(['plan.json', 'session.json', 'events.jsonl']);
+  expect(sessionReportingArtifacts(SESSION_REPORTER_COMMAND)).toEqual([
+    'plan.json',
+    'session.json',
+    'events.jsonl',
+    'spec-verification.json',
+  ]);
   expect(sessionReportingArtifacts(LOG_REPORTER_COMMAND)).toEqual(['events.jsonl']);
   expect(sessionReportingArtifacts('cache-provider')).toEqual([]);
   sessionReportingArtifacts(LOG_REPORTER_COMMAND).push('session.json');
@@ -138,8 +144,13 @@ async function sha256(bytes: Uint8Array): Promise<string> {
   return Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-test('plan.json chunks end at or before the plan bound, as in Go', async () => {
+test('plan.json and spec-verification.json chunks end at or before their bound, as in Go', async () => {
   expect(SESSION_REPORTING_PLAN_BYTES).toBe(16 * 1024 * 1024);
+  expect(SESSION_REPORTING_SPEC_VERIFICATION_BYTES).toBe(8 * 1024 * 1024);
+  const bounds: Record<string, number> = {
+    'plan.json': SESSION_REPORTING_PLAN_BYTES,
+    'spec-verification.json': SESSION_REPORTING_SPEC_VERIFICATION_BYTES,
+  };
   const frame = async (artifact: string, offset: number, size: number) => {
     const bytes = new Uint8Array(size).fill(120);
     return JSON.stringify({
@@ -153,56 +164,68 @@ test('plan.json chunks end at or before the plan bound, as in Go', async () => {
       final: size === 0,
     });
   };
-  for (const [name, artifact, offset, size, valid] of [
-    ['plan chunk ending at the bound', 'plan.json', SESSION_REPORTING_PLAN_BYTES - 3, 3, true],
-    ['plan chunk ending past the bound', 'plan.json', SESSION_REPORTING_PLAN_BYTES - 2, 3, false],
-    [
-      'full plan chunk ending at the bound',
-      'plan.json',
-      SESSION_REPORTING_PLAN_BYTES - SESSION_REPORTING_CHUNK_BYTES,
-      SESSION_REPORTING_CHUNK_BYTES,
-      true,
-    ],
-    ['plan final marker at the bound', 'plan.json', SESSION_REPORTING_PLAN_BYTES, 0, true],
-    ['plan final marker past the bound', 'plan.json', SESSION_REPORTING_PLAN_BYTES + 1, 0, false],
-    ['events chunk past the plan bound', 'events.jsonl', SESSION_REPORTING_PLAN_BYTES, 3, true],
-    ['session chunk past the plan bound', 'session.json', SESSION_REPORTING_PLAN_BYTES, 3, true],
-  ] as const) {
-    const line = await frame(artifact, offset, size);
-    let accepted = true;
-    try {
-      expect((await parseSessionReportingChunk(line)).artifact).toBe(artifact);
-    } catch {
-      accepted = false;
+  for (const [bounded, bound] of Object.entries(bounds)) {
+    for (const [name, artifact, offset, size, valid] of [
+      ['chunk ending at the bound', bounded, bound - 3, 3, true],
+      ['chunk ending past the bound', bounded, bound - 2, 3, false],
+      [
+        'full chunk ending at the bound',
+        bounded,
+        bound - SESSION_REPORTING_CHUNK_BYTES,
+        SESSION_REPORTING_CHUNK_BYTES,
+        true,
+      ],
+      ['final marker at the bound', bounded, bound, 0, true],
+      ['final marker past the bound', bounded, bound + 1, 0, false],
+      ['events chunk past the bound', 'events.jsonl', bound, 3, true],
+      ['session chunk past the bound', 'session.json', bound, 3, true],
+    ] as const) {
+      const line = await frame(artifact, offset, size);
+      let accepted = true;
+      try {
+        expect((await parseSessionReportingChunk(line)).artifact).toBe(artifact);
+      } catch {
+        accepted = false;
+      }
+      expect({ bounded, name, accepted }).toEqual({ bounded, name, accepted: valid });
     }
-    expect({ name, accepted }).toEqual({ name, accepted: valid });
-  }
-  for (const [offset, valid] of [
-    [SESSION_REPORTING_PLAN_BYTES, true],
-    [SESSION_REPORTING_PLAN_BYTES + 1, false],
-  ] as const) {
-    const ack = JSON.stringify({
-      protocolVersion: 1,
-      sessionId: 'session',
-      artifact: 'plan.json',
-      offset,
-      sequence: 1,
-      sha256: await sha256(new Uint8Array()),
-      final: true,
-      ok: true,
-    });
-    if (valid) expect(parseSessionReportingAck(ack).offset).toBe(offset);
-    else expect(() => parseSessionReportingAck(ack)).toThrow();
+    for (const [offset, valid] of [
+      [bound, true],
+      [bound + 1, false],
+    ] as const) {
+      const ack = JSON.stringify({
+        protocolVersion: 1,
+        sessionId: 'session',
+        artifact: bounded,
+        offset,
+        sequence: 1,
+        sha256: await sha256(new Uint8Array()),
+        final: true,
+        ok: true,
+      });
+      if (valid) expect(parseSessionReportingAck(ack).offset).toBe(offset);
+      else expect(() => parseSessionReportingAck(ack)).toThrow();
+    }
   }
   const schema = JSON.parse(readFileSync(join(root, 'schemas/session-reporting.json'), 'utf8'));
   for (const name of ['chunk', 'ack']) {
     const def = schema.$defs[name];
-    expect(def.properties.artifact.enum).toEqual(['events.jsonl', 'session.json', 'plan.json']);
-    const bound = def.allOf.find(
-      (rule: { if?: { properties?: { artifact?: { const?: string } } } }) =>
-        rule.if?.properties?.artifact?.const === 'plan.json',
-    );
-    expect(bound?.then?.properties?.offset?.maximum).toBe(SESSION_REPORTING_PLAN_BYTES);
+    expect(def.properties.artifact.enum).toEqual([
+      'events.jsonl',
+      'session.json',
+      'plan.json',
+      'spec-verification.json',
+    ]);
+    const maxima: Record<string, number> = {};
+    for (const rule of def.allOf as {
+      if?: { properties?: { artifact?: { const?: string } } };
+      then?: { properties?: { offset?: { maximum?: number } } };
+    }[]) {
+      const artifact = rule.if?.properties?.artifact?.const;
+      const maximum = rule.then?.properties?.offset?.maximum;
+      if (artifact !== undefined && maximum !== undefined) maxima[artifact] = maximum;
+    }
+    expect(maxima).toEqual(bounds);
   }
 });
 

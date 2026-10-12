@@ -29,6 +29,10 @@ const (
 	// sits at or before it too. events.jsonl and session.json have no
 	// artifact bound beyond the chunk and line bounds.
 	SessionReportingPlanBytes = 16 << 20
+	// SessionReportingSpecVerificationBytes bounds spec-verification.json on
+	// the wire as SessionReportingPlanBytes bounds plan.json: every
+	// spec-verification.json chunk ends at or before this decoded byte offset.
+	SessionReportingSpecVerificationBytes = 8 << 20
 )
 
 // Session reporting v2 is v1 opened by a handshake that hands the reporter the
@@ -62,13 +66,13 @@ const (
 
 // SessionReportingArtifacts returns the artifacts the reporter capability named
 // by its reserved command receives, in the order they close: plan.json, then
-// session.json, then events.jsonl for the session reporter, events.jsonl alone
-// for the log reporter. Any other command receives nothing. The result is a
-// fresh slice.
+// session.json, then events.jsonl, then spec-verification.json for the session
+// reporter, events.jsonl alone for the log reporter. Any other command
+// receives nothing. The result is a fresh slice.
 func SessionReportingArtifacts(command string) []string {
 	switch command {
 	case SessionReporterCommand:
-		return []string{"plan.json", "session.json", "events.jsonl"}
+		return []string{"plan.json", "session.json", "events.jsonl", "spec-verification.json"}
 	case LogReporterCommand:
 		return []string{"events.jsonl"}
 	}
@@ -84,8 +88,8 @@ type SessionReportingChunk struct {
 	ProtocolVersion int `json:"protocolVersion"`
 	// SessionID is the stable identity of the original retained execution.
 	SessionID string `json:"sessionId"`
-	// Artifact names the canonical events.jsonl, session.json or plan.json
-	// document.
+	// Artifact names the canonical events.jsonl, session.json, plan.json or
+	// spec-verification.json document.
 	Artifact string `json:"artifact"`
 	// Offset is the zero-based position in decoded artifact bytes.
 	Offset int64 `json:"offset"`
@@ -144,7 +148,9 @@ func NewSessionReportingChunk(sessionID, artifact string, offset, sequence int64
 }
 
 // Validate checks the identity, byte bounds, final marker and content digest.
-// A plan.json chunk that ends past SessionReportingPlanBytes is invalid.
+// A plan.json chunk that ends past SessionReportingPlanBytes, or a
+// spec-verification.json chunk that ends past
+// SessionReportingSpecVerificationBytes, is invalid.
 func (c SessionReportingChunk) Validate() error {
 	if err := validateReportingIdentity(c.ProtocolVersion, c.SessionID, c.Artifact, c.Offset, c.SHA256); err != nil {
 		return err
@@ -155,8 +161,8 @@ func (c SessionReportingChunk) Validate() error {
 	if len(c.Data) > SessionReportingChunkBytes || c.Final != (len(c.Data) == 0) {
 		return fmt.Errorf("invalid reporting chunk size or final marker")
 	}
-	if c.Artifact == "plan.json" && c.Offset+int64(len(c.Data)) > SessionReportingPlanBytes {
-		return fmt.Errorf("reporting chunk exceeds the plan.json bound")
+	if bound, _ := reportingArtifactBound(c.Artifact); bound > 0 && c.Offset+int64(len(c.Data)) > bound {
+		return fmt.Errorf("reporting chunk exceeds the %s bound", c.Artifact)
 	}
 	if c.SHA256 != SessionReportingDigest(c.Data) {
 		return fmt.Errorf("reporting chunk digest mismatch")
@@ -175,15 +181,32 @@ func (a SessionReportingAck) Matches(c SessionReportingChunk) bool {
 }
 
 // validateReportingIdentity checks the members a chunk and its acknowledgement
-// share. A plan.json offset past SessionReportingPlanBytes is invalid.
+// share. An offset past the artifact's bound (reportingArtifactBound) is
+// invalid.
 func validateReportingIdentity(version int, sessionID, artifact string, offset int64, digest string) error {
-	if version != SessionReportingVersion || !reportingSessionID.MatchString(sessionID) || (artifact != "events.jsonl" && artifact != "session.json" && artifact != "plan.json") || offset < 0 || offset > 9007199254740991 || !reportingDigest.MatchString(digest) {
+	bound, known := reportingArtifactBound(artifact)
+	if version != SessionReportingVersion || !reportingSessionID.MatchString(sessionID) || !known || offset < 0 || offset > 9007199254740991 || !reportingDigest.MatchString(digest) {
 		return fmt.Errorf("invalid reporting identity")
 	}
-	if artifact == "plan.json" && offset > SessionReportingPlanBytes {
+	if bound > 0 && offset > bound {
 		return fmt.Errorf("invalid reporting identity")
 	}
 	return nil
+}
+
+// reportingArtifactBound reports whether artifact is a session reporting
+// artifact, and the decoded byte offset its chunks end at or before: 0 for
+// events.jsonl and session.json, which only the chunk and line bounds limit.
+func reportingArtifactBound(artifact string) (bound int64, known bool) {
+	switch artifact {
+	case "events.jsonl", "session.json":
+		return 0, true
+	case "plan.json":
+		return SessionReportingPlanBytes, true
+	case "spec-verification.json":
+		return SessionReportingSpecVerificationBytes, true
+	}
+	return 0, false
 }
 
 // ParseSessionReportingChunk strictly decodes one bounded frame and verifies bytes.

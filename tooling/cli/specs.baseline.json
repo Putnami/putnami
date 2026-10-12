@@ -99,6 +99,7 @@
     "cli/native-session-reporting#credential-boundary",
     "cli/native-session-reporting#durable-replay",
     "cli/native-session-reporting#engine-lifecycle",
+    "cli/native-session-reporting#spec-verification-record",
     "cli/portable-runner#immutable-source",
     "cli/portable-runner#optional-placement",
     "cli/publish-dry-run-probe#one-pass-verdict",

@@ -91,12 +91,13 @@ func TestNativeSessionReporterProvider(t *testing.T) {
 		// offline refuses every chunk without retry, unavailable with retry.
 		// offline-after-live acknowledges the chunk that carries task:start,
 		// then refuses every later chunk. refuse-plan refuses every plan.json
-		// chunk without retry and acknowledges the other artifacts.
+		// chunk without retry and acknowledges the other artifacts;
+		// refuse-spec-verification does the same for spec-verification.json.
 		goOffline := false
 		if unavailable := exists("unavailable"); unavailable || exists("offline") {
 			ack.OK, ack.Retryable, ack.Code = false, unavailable, "unavailable"
 			fmt.Fprintln(os.Stderr, "provider diagnostic "+token)
-		} else if chunk.Artifact == "plan.json" && exists("refuse-plan") {
+		} else if chunk.Artifact == "plan.json" && exists("refuse-plan") || chunk.Artifact == "spec-verification.json" && exists("refuse-spec-verification") {
 			ack.OK, ack.Code = false, "unsupported_artifact"
 		} else {
 			path := file("received-" + chunk.Artifact)
@@ -121,7 +122,10 @@ func TestNativeSessionReporterProvider(t *testing.T) {
 		if goOffline {
 			_ = os.WriteFile(file("offline"), nil, 0o600)
 		}
-		if ack.OK && chunk.Artifact == "events.jsonl" && chunk.Final {
+		// The provider exits once it acknowledged the events final marker, as
+		// one that does not receive spec-verification.json may. keep-open
+		// makes it read on until its input closes.
+		if ack.OK && chunk.Artifact == "events.jsonl" && chunk.Final && !exists("keep-open") {
 			os.Exit(0)
 		}
 	}
@@ -552,6 +556,103 @@ func TestNativeSessionReportingReplaySendsThePlanFirst(t *testing.T) {
 	verifyReporterArtifacts(t, root, sessionID)
 	if runs := fixtureproc.Runs(t, filepath.Join(root, "executions")); len(runs) != 1 {
 		t.Fatalf("replay ran the workload: %d executions, want 1", len(runs))
+	}
+}
+
+// specCriteriaEvent is the task output that announces a spec criteria
+// projection. The projection itself is missing, which the spec gate records
+// as a finding: the session then carries a spec-verification record.
+const specCriteriaEvent = `{"v":2,"type":"artifact","id":"putnami-spec-criteria","name":"putnami-spec-criteria","kind":"report","path":"spec-criteria.json"}` + "\n"
+
+// TestNativeSessionReportingSendsTheSpecVerificationRecordLast runs a session
+// that carries a spec-verification record. The engine writes the record
+// before reporting ends: a receiver that reads on after the events final
+// marker receives it whole, after every other frame. A receiver that refuses
+// it, or quits after the events final marker, leaves it omitted, the exit code
+// and the delivery evidence unchanged, and no diagnostic printed.
+func TestNativeSessionReportingSendsTheSpecVerificationRecordLast(t *testing.T) {
+	spectest.Proves(t, "cli/native-session-reporting", "spec-verification-record", "the-engine-writes-spec-verification-before-reporting-ends")
+	for _, tc := range []struct {
+		name    string
+		markers []string
+		exit    int
+		omitted string
+		// frames is how many spec-verification.json frames reach the receiver.
+		frames int
+	}{
+		{"delivered", []string{"keep-open"}, 0, "", 2},
+		{"refused", []string{"keep-open", "refuse-spec-verification"}, 1, "refused", 1},
+		{"quit", nil, 0, "quit", 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, req := reporterFixture(t, fixtureproc.Program{Record: "executions", Stdout: specCriteriaEvent, Exit: tc.exit})
+			for _, marker := range tc.markers {
+				if err := os.WriteFile(filepath.Join(root, marker), nil, 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var result SessionResult
+			var err error
+			stderr := captureStderr(t, func() { result, err = New().Run(context.Background(), req, discardEvents{}) })
+			if err != nil || result.ExitCode != tc.exit || strings.Contains(stderr, "incomplete") {
+				t.Fatalf("the spec-verification record changed the run: exit=%d err=%v diagnostics=%s", result.ExitCode, err, stderr)
+			}
+			sessionID := workspace_state.NewSessionStore(root).LatestID()
+			verifyReporterArtifacts(t, root, sessionID)
+			dir := sessionDir(root, sessionID)
+			record, err := os.ReadFile(filepath.Join(dir, "spec-verification.json"))
+			if err != nil {
+				t.Fatalf("the session carries no spec-verification record: %v", err)
+			}
+			data, err := os.ReadFile(filepath.Join(dir, sessionreporter.StateFile))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var checkpoint struct {
+				SpecVerification struct {
+					Offset int64 `json:"offset"`
+					Final  bool  `json:"final"`
+				} `json:"specVerification"`
+				SpecVerificationOmitted string `json:"specVerificationOmitted"`
+			}
+			if err := json.Unmarshal(data, &checkpoint); err != nil {
+				t.Fatal(err)
+			}
+			if checkpoint.SpecVerificationOmitted != tc.omitted || checkpoint.SpecVerification.Final != (tc.omitted == "") {
+				t.Fatalf("checkpoint = %s, want spec-verification.json omitted as %q", data, tc.omitted)
+			}
+			received, err := os.ReadFile(filepath.Join(root, "received-spec-verification.json"))
+			_, finalErr := os.Stat(filepath.Join(root, "received-spec-verification.json.final"))
+			if tc.omitted == "" && (err != nil || !bytes.Equal(received, record) || finalErr != nil || checkpoint.SpecVerification.Offset != int64(len(record))) {
+				t.Fatalf("the receiver holds %d bytes of the %d-byte record (final: %v)", len(received), len(record), finalErr)
+			}
+			if tc.omitted != "" && finalErr == nil {
+				t.Fatal("the receiver closed an omitted spec-verification.json")
+			}
+			frames, eventsFinal := 0, false
+			for _, line := range traceLines(t, filepath.Join(root, "trace.jsonl")) {
+				chunk, err := protocolcli.ParseSessionReportingChunk(line)
+				if err != nil {
+					t.Fatal(err)
+				}
+				switch {
+				case chunk.Artifact == "spec-verification.json" && !eventsFinal:
+					t.Fatal("a spec-verification.json frame preceded the events final marker")
+				case chunk.Artifact == "spec-verification.json":
+					frames++
+				case frames > 0:
+					t.Fatalf("a %s frame followed spec-verification.json", chunk.Artifact)
+				case chunk.Artifact == "events.jsonl" && chunk.Final:
+					eventsFinal = true
+				}
+			}
+			if frames != tc.frames {
+				t.Fatalf("spec-verification.json frames = %d, want %d", frames, tc.frames)
+			}
+			if got := subscriberEvidence(t, root, sessionID)[protocolcli.SessionReporterCommand].Evidence; got != protocolcli.SubscriberEvidenceDelivered {
+				t.Fatalf("session reporter evidence %q", got)
+			}
+		})
 	}
 }
 

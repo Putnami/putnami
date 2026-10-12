@@ -43,13 +43,14 @@ const maxAttempts = 3
 // the limit that canceled it.
 var errBudgetExhausted = errors.New("reporting budget exhausted")
 
-// errPlanAbsent, errPlanTooLarge and errPlanUnreadable are why plan.json
-// cannot be framed: no plan.json exists before its first chunk, it exceeds
-// protocolcli.SessionReportingPlanBytes, or it cannot be read at its cursor.
+// errDocumentAbsent, errDocumentTooLarge and errDocumentUnreadable are why a
+// whole document, plan.json or spec-verification.json, cannot be framed: it
+// does not exist before its first chunk, it exceeds its bound, or it cannot be
+// read at its cursor.
 var (
-	errPlanAbsent     = errors.New("plan.json absent")
-	errPlanTooLarge   = errors.New("plan.json exceeds its bound")
-	errPlanUnreadable = errors.New("plan.json unreadable")
+	errDocumentAbsent     = errors.New("document absent")
+	errDocumentTooLarge   = errors.New("document exceeds its bound")
+	errDocumentUnreadable = errors.New("document unreadable")
 )
 
 // The reasons a checkpoint records in planOmitted. plan.json is best-effort:
@@ -77,6 +78,34 @@ const (
 )
 
 var planOmissions = map[string]bool{planAbsent: true, planTooLarge: true, planUnreadable: true, planRefused: true, planUndeliverable: true, planLate: true}
+
+// The reasons a checkpoint records in specVerificationOmitted.
+// spec-verification.json is best-effort and leaves last: every failure to
+// deliver it closes it without its final marker, records why, and leaves the
+// delivery complete. The worker never restarts a reporter for it.
+const (
+	// specVerificationAbsent: no spec-verification.json existed before its
+	// first chunk.
+	specVerificationAbsent = "absent"
+	// specVerificationTooLarge: spec-verification.json exceeds
+	// protocolcli.SessionReportingSpecVerificationBytes.
+	specVerificationTooLarge = "too_large"
+	// specVerificationUnreadable: spec-verification.json cannot be read at its
+	// cursor, as for planUnreadable.
+	specVerificationUnreadable = "unreadable"
+	// specVerificationRefused: the reporter answered a chunk ok:false, with
+	// or without retry, or acknowledged another chunk.
+	specVerificationRefused = "refused"
+	// specVerificationQuit: the reporter exited, closed its pipe, stopped
+	// answering, or could not start before it acknowledged a chunk.
+	specVerificationQuit = "quit"
+	// specVerificationLate: the finalization limits ended before it was
+	// delivered, or the checkpoint completed without it, as one that a CLI
+	// that does not send it wrote.
+	specVerificationLate = "late"
+)
+
+var specVerificationOmissions = map[string]bool{specVerificationAbsent: true, specVerificationTooLarge: true, specVerificationUnreadable: true, specVerificationRefused: true, specVerificationQuit: true, specVerificationLate: true}
 
 // EventsBatchInterval is the longest a live session reporter events.jsonl chunk
 // shorter than one frame waits before it leaves: the chunk count, and the
@@ -122,18 +151,21 @@ type cursor struct {
 // the process. A crash after remote acceptance but before the local checkpoint
 // therefore replays the exact same identity, including a short live chunk.
 // plan.json is closed once its final marker is acknowledged or PlanOmitted
-// records why it is not sent (planAbsent and the other reasons).
+// records why it is not sent (planAbsent and the other reasons), and
+// spec-verification.json likewise with SpecVerificationOmitted.
 type state struct {
-	Version     int                                `json:"version"`
-	Provider    string                             `json:"provider"`
-	SessionID   string                             `json:"sessionId"`
-	Events      cursor                             `json:"events"`
-	Session     cursor                             `json:"session"`
-	Plan        cursor                             `json:"plan"`
-	PlanOmitted string                             `json:"planOmitted,omitempty"`
-	Pending     *protocolcli.SessionReportingChunk `json:"pending,omitempty"`
-	Complete    bool                               `json:"complete"`
-	Error       string                             `json:"error,omitempty"`
+	Version                 int                                `json:"version"`
+	Provider                string                             `json:"provider"`
+	SessionID               string                             `json:"sessionId"`
+	Events                  cursor                             `json:"events"`
+	Session                 cursor                             `json:"session"`
+	Plan                    cursor                             `json:"plan"`
+	PlanOmitted             string                             `json:"planOmitted,omitempty"`
+	SpecVerification        cursor                             `json:"specVerification"`
+	SpecVerificationOmitted string                             `json:"specVerificationOmitted,omitempty"`
+	Pending                 *protocolcli.SessionReportingChunk `json:"pending,omitempty"`
+	Complete                bool                               `json:"complete"`
+	Error                   string                             `json:"error,omitempty"`
 }
 
 type LaunchSpec struct {
@@ -242,6 +274,7 @@ func openRun(ctx context.Context, capability Capability, dir, sessionID, provide
 			return nil, fmt.Errorf("reporting checkpoint is invalid or belongs to a different provider/session")
 		}
 		r.omitLatePlan()
+		r.omitLateSpecVerification()
 		if err := r.validate(); err != nil {
 			r.release()
 			return nil, err
@@ -286,7 +319,7 @@ func (r *Run) omitLatePlan() {
 // framed a chunk.
 func (r *Run) otherArtifactProgressed() bool {
 	s := r.state
-	return s.Events.Sequence > 0 || s.Session.Sequence > 0 || s.Pending != nil && s.Pending.Artifact != planFile
+	return s.Events.Sequence > 0 || s.Session.Sequence > 0 || s.SpecVerification.Sequence > 0 || s.Pending != nil && s.Pending.Artifact != planFile
 }
 
 // planClosed reports whether plan.json acknowledged its final marker or was
@@ -295,8 +328,32 @@ func (r *Run) planClosed() bool {
 	return r.state.Plan.Final || r.state.PlanOmitted != ""
 }
 
+// omitLateSpecVerification closes an open spec-verification.json as late in a
+// checkpoint that completed without it: a CLI that does not send the record
+// wrote it, and the evidence of its delivery already reads delivered, so no
+// replay would send the record.
+func (r *Run) omitLateSpecVerification() {
+	if r.state.Complete && r.specVerificationOpen() {
+		r.state.SpecVerificationOmitted = specVerificationLate
+	}
+}
+
+// specVerificationOpen reports whether the capability sends
+// spec-verification.json and has neither acknowledged its final marker nor
+// omitted it.
+func (r *Run) specVerificationOpen() bool {
+	return r.capability.sends(specVerificationFile) && !r.state.SpecVerification.Final && r.state.SpecVerificationOmitted == ""
+}
+
+// specVerificationStarted reports whether spec-verification.json framed a
+// chunk, has one pending, or was omitted.
+func (r *Run) specVerificationStarted() bool {
+	s := r.state
+	return s.SpecVerification != (cursor{}) || s.SpecVerificationOmitted != "" || s.Pending != nil && s.Pending.Artifact == specVerificationFile
+}
+
 func (r *Run) validate() error {
-	for _, c := range []cursor{r.state.Events, r.state.Session, r.state.Plan} {
+	for _, c := range []cursor{r.state.Events, r.state.Session, r.state.Plan, r.state.SpecVerification} {
 		if c.Offset < 0 || c.Sequence < 0 {
 			return fmt.Errorf("invalid reporting cursor")
 		}
@@ -313,6 +370,14 @@ func (r *Run) validate() error {
 	if r.capability.sends(planFile) && !r.planClosed() && r.otherArtifactProgressed() {
 		return fmt.Errorf("invalid reporting cursor")
 	}
+	// spec-verification.json frames only once the events final marker is
+	// acknowledged.
+	if r.specVerificationStarted() && (!r.capability.sends(specVerificationFile) || !r.state.Events.Final) {
+		return fmt.Errorf("invalid reporting cursor")
+	}
+	if r.state.SpecVerificationOmitted != "" && (r.state.SpecVerification.Final || !specVerificationOmissions[r.state.SpecVerificationOmitted]) {
+		return fmt.Errorf("invalid reporting cursor")
+	}
 	if r.capability.sends(sessionFile) && r.state.Events.Final && !r.state.Session.Final || r.state.Complete != r.complete() {
 		return fmt.Errorf("invalid reporting completion")
 	}
@@ -321,7 +386,7 @@ func (r *Run) validate() error {
 			return fmt.Errorf("invalid pending reporting frame")
 		}
 		c := r.cursor(p.Artifact)
-		if c.Final || p.Offset != c.Offset || p.Sequence != c.Sequence || p.Artifact == planFile && r.state.PlanOmitted != "" {
+		if c.Final || p.Offset != c.Offset || p.Sequence != c.Sequence || p.Artifact == planFile && r.state.PlanOmitted != "" || p.Artifact == specVerificationFile && r.state.SpecVerificationOmitted != "" {
 			return fmt.Errorf("pending reporting frame disagrees with cursor")
 		}
 	}
@@ -334,14 +399,17 @@ func (r *Run) cursor(artifact string) *cursor {
 		return &r.state.Session
 	case planFile:
 		return &r.state.Plan
+	case specVerificationFile:
+		return &r.state.SpecVerification
 	}
 	return &r.state.Events
 }
 
 // complete reports whether the capability closed every artifact it transmits:
-// it acknowledged each final marker, or omitted plan.json.
+// it acknowledged each final marker, or omitted plan.json or
+// spec-verification.json.
 func (r *Run) complete() bool {
-	return r.state.Events.Final && (r.state.Session.Final || !r.capability.sends(sessionFile)) && (r.planClosed() || !r.capability.sends(planFile))
+	return r.state.Events.Final && (r.state.Session.Final || !r.capability.sends(sessionFile)) && (r.planClosed() || !r.capability.sends(planFile)) && !r.specVerificationOpen()
 }
 
 // save publishes the checkpoint through a staged file and a rename. The rename
@@ -406,6 +474,11 @@ func (r *Run) deliver() error {
 	lastEventsSend := r.clock.Now()
 	for !r.state.Complete {
 		if r.ctx.Err() != nil {
+			// A spec-verification.json that alone remains when the limits end
+			// is omitted, and the delivery it would have ended is complete.
+			if r.state.Events.Final && r.specVerificationOpen() {
+				return r.omit(specVerificationFile, specVerificationLate)
+			}
 			return errBudgetExhausted
 		}
 		select {
@@ -424,8 +497,9 @@ func (r *Run) deliver() error {
 			}
 		}
 		if err := r.send(*r.state.Pending); err != nil {
-			if reason := planOmission(r.state.Pending.Artifact, err); reason != "" {
-				if err := r.omitPlan(reason); err != nil {
+			artifact := r.state.Pending.Artifact
+			if reason := omission(artifact, err); reason != "" {
+				if err := r.omit(artifact, reason); err != nil {
 					return err
 				}
 				continue
@@ -454,19 +528,22 @@ func (r *Run) deliver() error {
 
 // frame saves the next frame as pending and reports whether it did. When it
 // did not, it waited, under the live batching rule or for a stream with
-// nothing new, or it omitted plan.json, and the worker loops; finished reports
-// that Finish was called while it waited. lastEventsSend is the time of the
-// latest events frame, which frame updates.
+// nothing new, or it omitted plan.json or spec-verification.json, and the
+// worker loops; finished reports that Finish was called while it waited.
+// lastEventsSend is the time of the latest events frame, which frame updates.
 func (r *Run) frame(terminal bool, lastEventsSend *time.Time) (pending, finished bool, err error) {
 	// Preserve the consumer ordering: plan.json, when the capability transmits
-	// it, closes before any other frame leaves, and session.json closes before
-	// events.
+	// it, closes before any other frame leaves, session.json closes before
+	// events, and spec-verification.json leaves once the events final marker
+	// is acknowledged.
 	artifact := sessionstream.EventsFile
 	switch {
 	case r.capability.sends(planFile) && !r.planClosed():
 		artifact = planFile
 	case terminal && r.capability.sends(sessionFile) && !r.state.Session.Final:
 		artifact = sessionFile
+	case r.state.Events.Final && r.specVerificationOpen():
+		artifact = specVerificationFile
 	}
 	if artifact == sessionstream.EventsFile && !terminal {
 		if wait := r.eventsBatchWait(*lastEventsSend); wait > 0 {
@@ -475,8 +552,8 @@ func (r *Run) frame(terminal bool, lastEventsSend *time.Time) (pending, finished
 		}
 	}
 	chunk, err := r.next(artifact, terminal)
-	if reason := planOmission(artifact, err); reason != "" {
-		return false, false, r.omitPlan(reason)
+	if reason := omission(artifact, err); reason != "" {
+		return false, false, r.omit(artifact, reason)
 	}
 	if err != nil {
 		return false, false, err
@@ -504,22 +581,33 @@ func (r *Run) frame(terminal bool, lastEventsSend *time.Time) (pending, finished
 	return true, false, r.save()
 }
 
-// planOmission is the reason to omit plan.json after err framed or sent one of
-// its chunks, or "" when err is nil, concerns another artifact, or stops the
-// delivery: a budget, a reporter that cannot start, an acknowledgement of
+// omission is the reason to omit artifact after err framed or sent one of its
+// chunks, or "" when err is nil or stops the delivery. Only plan.json and
+// spec-verification.json are ever omitted.
+func omission(artifact string, err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case artifact == planFile:
+		return planOmission(err)
+	case artifact == specVerificationFile:
+		return specVerificationOmission(err)
+	}
+	return ""
+}
+
+// planOmission is the reason to omit plan.json after err, or "" when err stops
+// the delivery: a budget, a reporter that cannot start, an acknowledgement of
 // another identity, a refusal with retry on the last attempt (errRetryBudget),
 // whose frame stays pending for replay.
-func planOmission(artifact string, err error) string {
-	if artifact != planFile || err == nil {
-		return ""
-	}
+func planOmission(err error) string {
 	var failure *chunkFailure
 	switch {
-	case errors.Is(err, errPlanAbsent):
+	case errors.Is(err, errDocumentAbsent):
 		return planAbsent
-	case errors.Is(err, errPlanTooLarge):
+	case errors.Is(err, errDocumentTooLarge):
 		return planTooLarge
-	case errors.Is(err, errPlanUnreadable):
+	case errors.Is(err, errDocumentUnreadable):
 		return planUnreadable
 	case errors.As(err, &failure) && failure.refused:
 		return planRefused
@@ -529,10 +617,37 @@ func planOmission(artifact string, err error) string {
 	return ""
 }
 
-// omitPlan closes plan.json without its final marker, records reason, and
-// drops its pending frame, durably, before another artifact is framed.
-func (r *Run) omitPlan(reason string) error {
-	r.state.PlanOmitted = reason
+// specVerificationOmission is the reason to omit spec-verification.json after
+// err. Every error omits it: it leaves after the events final marker, whose
+// acknowledgement already makes the evidence read delivered, so no replay
+// would retry it.
+func specVerificationOmission(err error) string {
+	var failure *chunkFailure
+	switch {
+	case errors.Is(err, errDocumentAbsent):
+		return specVerificationAbsent
+	case errors.Is(err, errDocumentTooLarge):
+		return specVerificationTooLarge
+	case errors.Is(err, errDocumentUnreadable):
+		return specVerificationUnreadable
+	case errors.Is(err, errBudgetExhausted):
+		return specVerificationLate
+	case errors.As(err, &failure) && failure.refused, errors.Is(err, errRetryBudget), errors.Is(err, errAckMismatch):
+		return specVerificationRefused
+	}
+	// A failure in transport, or a reporter that could not start.
+	return specVerificationQuit
+}
+
+// omit closes artifact, plan.json or spec-verification.json, without its
+// final marker, records reason, and drops its pending frame, durably, before
+// another frame is framed.
+func (r *Run) omit(artifact, reason string) error {
+	if artifact == planFile {
+		r.state.PlanOmitted = reason
+	} else {
+		r.state.SpecVerificationOmitted = reason
+	}
 	r.state.Pending = nil
 	r.state.Complete = r.complete()
 	return r.save()
@@ -594,7 +709,8 @@ func (r *Run) awaitEvents(wait time.Duration) (bool, error) {
 // the stream subscription, which never reads past what the producer committed;
 // its final marker additionally waits for the stream's own final marker.
 // session.json is not a stream: it is read once it exists. plan.json is whole
-// before the worker starts, so its final marker never waits for the graph.
+// before the worker starts, and spec-verification.json before Finish, so
+// neither final marker waits for the graph.
 func (r *Run) next(artifact string, terminal bool) (*protocolcli.SessionReportingChunk, error) {
 	c := r.cursor(artifact)
 	var data []byte
@@ -606,8 +722,8 @@ func (r *Run) next(artifact string, terminal bool) (*protocolcli.SessionReportin
 		}
 		_, final := r.events.Extent()
 		data, terminal = read, terminal && final
-	case planFile:
-		read, err := readPlan(r.dir, *c)
+	case planFile, specVerificationFile:
+		read, err := readDocument(r.dir, artifact, *c)
 		if err != nil {
 			return nil, err
 		}
@@ -626,26 +742,34 @@ func (r *Run) next(artifact string, terminal bool) (*protocolcli.SessionReportin
 	return &chunk, nil
 }
 
-// readPlan reads the plan.json bytes after c. Every failure omits plan.json:
-// errPlanAbsent when no plan.json exists before its first chunk,
-// errPlanTooLarge when plan.json exceeds
-// protocolcli.SessionReportingPlanBytes, and errPlanUnreadable otherwise, for
-// a plan.json that is not a regular file, fails to read, or was removed or
-// truncated after its first chunk.
-func readPlan(dir string, c cursor) ([]byte, error) {
-	info, err := os.Stat(filepath.Join(dir, planFile))
+// documentBounds are the whole documents a capability may transmit, each with
+// the protocol bound on its bytes.
+var documentBounds = map[string]int64{
+	planFile:             protocolcli.SessionReportingPlanBytes,
+	specVerificationFile: protocolcli.SessionReportingSpecVerificationBytes,
+}
+
+// readDocument reads the bytes after c of artifact, a whole document of
+// documentBounds. Every failure omits the document: errDocumentAbsent when it
+// does not exist before its first chunk, errDocumentTooLarge when it exceeds
+// its bound, and errDocumentUnreadable otherwise, for a document that is not a
+// regular file, fails to read, or was removed or truncated after its first
+// chunk.
+func readDocument(dir, artifact string, c cursor) ([]byte, error) {
+	bound := documentBounds[artifact]
+	info, err := os.Stat(filepath.Join(dir, artifact))
 	if errors.Is(err, fs.ErrNotExist) && c == (cursor{}) {
-		return nil, errPlanAbsent
+		return nil, errDocumentAbsent
 	}
-	if err == nil && info.Size() > protocolcli.SessionReportingPlanBytes {
-		return nil, errPlanTooLarge
+	if err == nil && info.Size() > bound {
+		return nil, errDocumentTooLarge
 	}
-	data, err := readArtifact(dir, planFile, c.Offset)
+	data, err := readArtifact(dir, artifact, c.Offset)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errPlanUnreadable, err)
+		return nil, fmt.Errorf("%w: %w", errDocumentUnreadable, err)
 	}
-	if c.Offset+int64(len(data)) > protocolcli.SessionReportingPlanBytes {
-		return nil, errPlanTooLarge
+	if c.Offset+int64(len(data)) > bound {
+		return nil, errDocumentTooLarge
 	}
 	return data, nil
 }
@@ -674,7 +798,7 @@ func readArtifact(dir, artifact string, offset int64) ([]byte, error) {
 // transport (an exit, a closed pipe, a timeout, an unreadable
 // acknowledgement). A chunk the reporter answered ok:false with retry on its
 // last attempt is not a chunkFailure: its frame stays pending for replay, as
-// for any artifact.
+// for any artifact but spec-verification.json.
 type chunkFailure struct {
 	refused bool
 	reason  string
@@ -686,6 +810,12 @@ func (f *chunkFailure) Error() string { return f.reason }
 // last attempt.
 var errRetryBudget = errors.New("reporter retry budget exhausted")
 
+// errAckMismatch is an acknowledgement of another chunk than the one sent.
+var errAckMismatch = errors.New("reporter acknowledgement identity mismatch")
+
+// send delivers chunk in at most maxAttempts attempts, starting the reporter
+// when no process serves the capability. A spec-verification.json chunk never
+// restarts it: its first failure in transport ends the attempts.
 func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 	retryable := false
 	for attempt := 0; attempt < maxAttempts; attempt++ {
@@ -704,7 +834,7 @@ func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 		cancel()
 		if err == nil {
 			if !ack.Matches(chunk) {
-				return fmt.Errorf("reporter acknowledgement identity mismatch")
+				return errAckMismatch
 			}
 			if ack.OK {
 				return nil
@@ -717,6 +847,14 @@ func (r *Run) send(chunk protocolcli.SessionReportingChunk) error {
 			r.process.close()
 			r.process = nil
 			retryable = false
+			if chunk.Artifact == specVerificationFile {
+				if r.ctx.Err() != nil {
+					return errBudgetExhausted
+				}
+				// A reporter may quit after the events final marker, as one
+				// that does not receive the record does.
+				return &chunkFailure{reason: "reporter quit"}
+			}
 		}
 		if attempt+1 < maxAttempts {
 			select {

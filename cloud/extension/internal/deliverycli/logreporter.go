@@ -87,9 +87,9 @@ func (s *logReporterSender) deliver(ctx context.Context, chunk *protocolcli.Sess
 	if s.cfg.ingestURL == "" || s.cfg.token == "" {
 		return nack(chunk, ackCodeNotConfigured, false)
 	}
-	// The log is the event stream alone. session.json and plan.json belong to
-	// the session reporter; appending one here would put a second document in
-	// the run's log.
+	// The log is the event stream alone. session.json, plan.json and
+	// spec-verification.json belong to the session reporter; appending one
+	// here would put a second document in the run's log.
 	if !slices.Contains(protocolcli.SessionReportingArtifacts(protocolcli.LogReporterCommand), chunk.Artifact) {
 		return nack(chunk, ackCodeInvalidChunk, false)
 	}

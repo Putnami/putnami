@@ -18,7 +18,7 @@ func TestCapabilitiesAreIndependentProtocolSubscribers(t *testing.T) {
 		state, lock                            string
 	}
 	want := []row{
-		{"session-reporter", "session reporter", "session reporting", "PUTNAMI_SESSION_REPORTER", "PUTNAMI_SESSION_REPORTER_TOKEN", []string{"plan.json", "session.json", "events.jsonl"}, 10 * time.Second, "reporting.json", "reporting.lock"},
+		{"session-reporter", "session reporter", "session reporting", "PUTNAMI_SESSION_REPORTER", "PUTNAMI_SESSION_REPORTER_TOKEN", []string{"plan.json", "session.json", "events.jsonl", "spec-verification.json"}, 10 * time.Second, "reporting.json", "reporting.lock"},
 		{"log-reporter", "log reporter", "log reporting", "PUTNAMI_LOG_REPORTER", "PUTNAMI_LOG_REPORTER_TOKEN", []string{"events.jsonl"}, 2 * time.Second, "log-reporting.json", "log-reporting.lock"},
 	}
 	var got []row
@@ -33,5 +33,9 @@ func TestCapabilitiesAreIndependentProtocolSubscribers(t *testing.T) {
 	}
 	if !SessionReporter.sends(planFile) || LogReporter.sends(planFile) {
 		t.Fatal("only the session reporter transmits plan.json")
+	}
+	// The record the engine writes is the one the session reporter transmits.
+	if !SessionReporter.sends(specVerificationFile) || LogReporter.sends(specVerificationFile) {
+		t.Fatal("only the session reporter transmits spec-verification.json")
 	}
 }

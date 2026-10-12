@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"reflect"
 	"slices"
@@ -80,7 +81,7 @@ func TestReporterCapabilityNames(t *testing.T) {
 		}
 	}
 	for command, want := range map[string][]string{
-		SessionReporterCommand: {"plan.json", "session.json", "events.jsonl"},
+		SessionReporterCommand: {"plan.json", "session.json", "events.jsonl", "spec-verification.json"},
 		LogReporterCommand:     {"events.jsonl"},
 		"cache-provider":       nil,
 		"":                     nil,
@@ -133,49 +134,55 @@ func TestSessionReportingSchemaAndBounds(t *testing.T) {
 	}
 }
 
-// TestSessionReportingPlanBound pins the plan.json bound at its edge: a chunk
-// may end exactly at SessionReportingPlanBytes and its final marker may sit
-// there, one byte more is invalid, and an acknowledgement obeys the same
-// offset bound. The other artifacts have no such bound. The schema states the
-// same number.
-func TestSessionReportingPlanBound(t *testing.T) {
+// TestSessionReportingArtifactBounds pins the plan.json and
+// spec-verification.json bounds at their edge: a chunk may end exactly at the
+// bound and its final marker may sit there, one byte more is invalid, and an
+// acknowledgement obeys the same offset bound. events.jsonl and session.json
+// have no such bound. The schema states the same numbers.
+func TestSessionReportingArtifactBounds(t *testing.T) {
 	if SessionReportingPlanBytes != 16<<20 {
 		t.Fatalf("SessionReportingPlanBytes = %d, want 16 MiB", SessionReportingPlanBytes)
 	}
-	data := []byte("abc")
-	for _, tc := range []struct {
-		name     string
-		artifact string
-		offset   int64
-		data     []byte
-		valid    bool
-	}{
-		{"plan chunk ending at the bound", "plan.json", SessionReportingPlanBytes - 3, data, true},
-		{"plan chunk ending past the bound", "plan.json", SessionReportingPlanBytes - 2, data, false},
-		{"full plan chunk ending at the bound", "plan.json", SessionReportingPlanBytes - SessionReportingChunkBytes, bytes.Repeat([]byte("x"), SessionReportingChunkBytes), true},
-		{"plan final marker at the bound", "plan.json", SessionReportingPlanBytes, nil, true},
-		{"plan final marker past the bound", "plan.json", SessionReportingPlanBytes + 1, nil, false},
-		{"events chunk past the plan bound", "events.jsonl", SessionReportingPlanBytes, data, true},
-		{"session chunk past the plan bound", "session.json", SessionReportingPlanBytes, data, true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			chunk := NewSessionReportingChunk("session", tc.artifact, tc.offset, 7, tc.data, len(tc.data) == 0)
-			if err := chunk.Validate(); (err == nil) != tc.valid {
-				t.Fatalf("Validate = %v, want valid=%v", err, tc.valid)
-			}
-			parsed, err := ParseSessionReportingChunk(mustJSON(t, chunk))
-			if (err == nil) != tc.valid {
-				t.Fatalf("ParseSessionReportingChunk = %v, want valid=%v", err, tc.valid)
-			}
-			if tc.valid && parsed.Artifact != tc.artifact {
-				t.Fatalf("parsed artifact %q", parsed.Artifact)
-			}
-		})
+	if SessionReportingSpecVerificationBytes != 8<<20 {
+		t.Fatalf("SessionReportingSpecVerificationBytes = %d, want 8 MiB", SessionReportingSpecVerificationBytes)
 	}
-	for offset, valid := range map[int64]bool{SessionReportingPlanBytes: true, SessionReportingPlanBytes + 1: false} {
-		ack := NewSessionReportingChunk("session", "plan.json", offset, 1, nil, true).Ack()
-		if _, err := ParseSessionReportingAck(mustJSON(t, ack)); (err == nil) != valid {
-			t.Errorf("plan acknowledgement at offset %d: %v, want valid=%v", offset, err, valid)
+	bounds := map[string]int64{"plan.json": SessionReportingPlanBytes, "spec-verification.json": SessionReportingSpecVerificationBytes}
+	data := []byte("abc")
+	for artifact, bound := range bounds {
+		for _, tc := range []struct {
+			name     string
+			artifact string
+			offset   int64
+			data     []byte
+			valid    bool
+		}{
+			{"chunk ending at the bound", artifact, bound - 3, data, true},
+			{"chunk ending past the bound", artifact, bound - 2, data, false},
+			{"full chunk ending at the bound", artifact, bound - SessionReportingChunkBytes, bytes.Repeat([]byte("x"), SessionReportingChunkBytes), true},
+			{"final marker at the bound", artifact, bound, nil, true},
+			{"final marker past the bound", artifact, bound + 1, nil, false},
+			{"events chunk past the bound", "events.jsonl", bound, data, true},
+			{"session chunk past the bound", "session.json", bound, data, true},
+		} {
+			t.Run(artifact+" "+tc.name, func(t *testing.T) {
+				chunk := NewSessionReportingChunk("session", tc.artifact, tc.offset, 7, tc.data, len(tc.data) == 0)
+				if err := chunk.Validate(); (err == nil) != tc.valid {
+					t.Fatalf("Validate = %v, want valid=%v", err, tc.valid)
+				}
+				parsed, err := ParseSessionReportingChunk(mustJSON(t, chunk))
+				if (err == nil) != tc.valid {
+					t.Fatalf("ParseSessionReportingChunk = %v, want valid=%v", err, tc.valid)
+				}
+				if tc.valid && parsed.Artifact != tc.artifact {
+					t.Fatalf("parsed artifact %q", parsed.Artifact)
+				}
+			})
+		}
+		for offset, valid := range map[int64]bool{bound: true, bound + 1: false} {
+			ack := NewSessionReportingChunk("session", artifact, offset, 1, nil, true).Ack()
+			if _, err := ParseSessionReportingAck(mustJSON(t, ack)); (err == nil) != valid {
+				t.Errorf("%s acknowledgement at offset %d: %v, want valid=%v", artifact, offset, err, valid)
+			}
 		}
 	}
 	schema, err := os.ReadFile("schemas/session-reporting.json")
@@ -212,17 +219,17 @@ func TestSessionReportingPlanBound(t *testing.T) {
 	}
 	for _, name := range []string{"chunk", "ack"} {
 		def := document.Defs[name]
-		if want := []string{"events.jsonl", "session.json", "plan.json"}; !slices.Equal(def.Properties.Artifact.Enum, want) {
+		if want := []string{"events.jsonl", "session.json", "plan.json", "spec-verification.json"}; !slices.Equal(def.Properties.Artifact.Enum, want) {
 			t.Errorf("schema %s artifacts = %v, want %v", name, def.Properties.Artifact.Enum, want)
 		}
-		bound := false
+		maxima := map[string]int64{}
 		for _, rule := range def.AllOf {
-			if rule.If.Properties.Artifact.Const == "plan.json" && rule.Then.Properties.Offset.Maximum != nil {
-				bound = *rule.Then.Properties.Offset.Maximum == SessionReportingPlanBytes
+			if artifact := rule.If.Properties.Artifact.Const; artifact != "" && rule.Then.Properties.Offset.Maximum != nil {
+				maxima[artifact] = *rule.Then.Properties.Offset.Maximum
 			}
 		}
-		if !bound {
-			t.Errorf("schema %s does not bound the plan.json offset to %d", name, SessionReportingPlanBytes)
+		if !maps.Equal(maxima, bounds) {
+			t.Errorf("schema %s bounds the offsets as %v, want %v", name, maxima, bounds)
 		}
 	}
 }

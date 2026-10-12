@@ -28,6 +28,23 @@ type fakeIngest struct {
 	// acceptPlan makes it a Delivery that knows the plan part; without
 	// it, it answers that part 400, as a Delivery that predates it does.
 	acceptPlan bool
+	// acceptSpecVerification makes it a receiver that knows the
+	// spec-verification part; without it, it answers that part 400, as a
+	// receiver that predates it does.
+	acceptSpecVerification bool
+}
+
+// serves reports whether the receiver knows part.
+func (f *fakeIngest) serves(part string) bool {
+	switch part {
+	case "session", "events":
+		return true
+	case "plan":
+		return f.acceptPlan
+	case "spec-verification":
+		return f.acceptSpecVerification
+	}
+	return false
 }
 
 type storedChunk struct {
@@ -53,7 +70,7 @@ func (f *fakeIngest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	part := r.Header.Get(sessionPartHeader)
 	seq, err := strconv.Atoi(r.Header.Get(sessionSeqHeader))
-	if err != nil || (part != "session" && part != "events" && (part != "plan" || !f.acceptPlan)) {
+	if err != nil || !f.serves(part) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
