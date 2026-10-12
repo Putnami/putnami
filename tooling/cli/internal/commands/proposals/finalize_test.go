@@ -373,6 +373,7 @@ func TestDraftSeedAndLegacyEmptyCommitAllowLaterPartial(t *testing.T) {
 
 func TestCurrentProofAndReadbackGuardWrites(t *testing.T) {
 	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "the-read-back-carries-what-the-upsert-answered")
+	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "an-unresolved-write-stops-without-a-retry")
 	f, git, provider, opts := finalizerFixture(t)
 	opts.TaskSource, opts.TaskID = provider.task.Ref.Source, provider.task.Ref.ID
 	provider.dropLabels = true
@@ -413,7 +414,7 @@ func TestDossierUsesResolvedRemoteBase(t *testing.T) {
 }
 
 func TestExplicitHostedChecksUseNoLocalVerifierAndReturnFailedProposalToDraft(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "an-explicit-hosted-gate-waits-without-local-execution")
+	spectest.Proves(t, "cli/contributor-workflows", "squash-ready-publication", "an-explicit-hosted-gate-waits-without-local-execution")
 	f, git, provider, opts := finalizerFixture(t)
 	opts.Gate, opts.VerificationFile = "ci", ""
 	f.Verify = func(context.Context, string, string) (Verified, error) {
