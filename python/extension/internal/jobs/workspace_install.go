@@ -93,7 +93,7 @@ func WorkspaceInstall(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (st
 	if !hosted {
 		declared, err := workspace.EnsureUVRequiredVersion(wsRoot, uv.Version)
 		if err != nil {
-			emit.Diagnostic("error", fmt.Sprintf("Declaring uv %s in pyproject.toml failed: %v", uv.Version, err), "", 0)
+			emit.Diagnostic("error", fmt.Sprintf("Cannot declare uv %s in pyproject.toml: %v", uv.Version, err), "", 0)
 			return "FAILED", nil, nil
 		}
 		if declared {

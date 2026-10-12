@@ -16,6 +16,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/uvtoolchain"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs"
@@ -44,12 +45,8 @@ var (
 	}
 	// uvChecksumsURL is the checksum file a uv release publishes beside its
 	// archives: one "<sha256> *<archive>" line each.
-	uvChecksumsURL = func(version string) string {
-		return "https://github.com/astral-sh/uv/releases/download/" + version + "/sha256.sum"
-	}
-	uvReleaseURL = func(version string) string {
-		return "https://github.com/astral-sh/uv/releases/download/" + version + "/"
-	}
+	uvChecksumsURL = uvtoolchain.ChecksumsURL
+	uvReleaseURL   = uvtoolchain.ReleaseURL
 )
 
 // SetGoReleaseEndpoints points the Go release index the lock step reads at
@@ -345,8 +342,11 @@ func readToolchainDeclarations(wsRoot string) (map[string]string, error) {
 }
 
 // readUvDeclaration returns the uv release the workspace root pyproject.toml
-// declares, or "" when it declares none (see uvRequiredVersion). A missing
-// pyproject.toml declares none.
+// declares, or "" when it declares none: the exact required-version of its
+// [tool.uv] table, read by uvtoolchain.ReadDeclaration, which the
+// @putnami/python extension reads it with too. A range, a wildcard or another
+// form pins nothing here; the extension's workspace-install reports it. A
+// missing pyproject.toml declares none.
 func readUvDeclaration(wsRoot string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(wsRoot, "pyproject.toml"))
 	if os.IsNotExist(err) {
@@ -355,81 +355,7 @@ func readUvDeclaration(wsRoot string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read pyproject.toml: %w", err)
 	}
-	return uvRequiredVersion(string(data)), nil
-}
-
-// uvRequiredVersion returns the exact uv release a pyproject.toml declares as
-// required-version in its [tool.uv] table: "==X.Y.Z", or a bare "X.Y.Z", which
-// uv reads the same way. A MAJOR.MINOR release gets a ".0" patch. Any other
-// specifier, such as a range or a wildcard, names no single release and
-// declares nothing, and so does a key in any other table or form.
-//
-// The @putnami/python extension reads the declaration with the same rule
-// (python/extension/internal/toolchain UVRequiredVersion), and both tests run
-// the same cases, so the release the lock pins is the one its install selects.
-func uvRequiredVersion(pyproject string) string {
-	table := ""
-	for _, raw := range strings.Split(pyproject, "\n") {
-		line := strings.TrimSpace(strings.TrimSuffix(raw, "\r"))
-		if strings.HasPrefix(line, "[") {
-			header, _, _ := strings.Cut(line, "#")
-			header = strings.TrimSpace(header)
-			table = ""
-			if !strings.HasPrefix(header, "[[") && strings.HasSuffix(header, "]") {
-				table = strings.Join(strings.Fields(strings.Trim(header, "[]")), "")
-			}
-			continue
-		}
-		if table != "tool.uv" {
-			continue
-		}
-		key, value, ok := strings.Cut(line, "=")
-		if !ok || strings.Trim(strings.TrimSpace(key), `"'`) != "required-version" {
-			continue
-		}
-		return exactUvRelease(tomlStringValue(value))
-	}
-	return ""
-}
-
-// tomlStringValue returns the content of the single-line TOML string that
-// value starts with, or "" when it starts with none.
-func tomlStringValue(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" || (value[0] != '"' && value[0] != '\'') {
-		return ""
-	}
-	content, _, closed := strings.Cut(value[1:], value[:1])
-	if !closed {
-		return ""
-	}
-	return content
-}
-
-// exactUvRelease returns the release spec names when it names exactly one:
-// "==X.Y.Z" or "X.Y.Z", with a leading "v" dropped and a ".0" patch added to a
-// MAJOR.MINOR version. It returns "" for any other specifier and for a version
-// that is not MAJOR.MINOR.PATCH in decimal digits, the only form a published
-// uv release has.
-func exactUvRelease(spec string) string {
-	spec = strings.TrimSpace(spec)
-	if rest, ok := strings.CutPrefix(spec, "=="); ok && !strings.HasPrefix(rest, "=") {
-		spec = strings.TrimSpace(rest)
-	}
-	version := strings.TrimPrefix(spec, "v")
-	if strings.Count(version, ".") == 1 {
-		version += ".0"
-	}
-	parts := strings.Split(version, ".")
-	if len(parts) != 3 {
-		return ""
-	}
-	for _, part := range parts {
-		if part == "" || strings.Trim(part, "0123456789") != "" {
-			return ""
-		}
-	}
-	return version
+	return uvtoolchain.ReadDeclaration(string(data)).Version, nil
 }
 
 func higherExactVersion(a, b string) string {
@@ -660,26 +586,23 @@ func resolveBunToolchain(ctx context.Context, version string, current lockfile.L
 	return lockfile.LockEntry{Version: version, Integrities: integrities, Source: bunReleaseURL(version)}, nil
 }
 
-// uvArchivePlatforms maps the archive names a uv release publishes to the
-// platform each one installs on. Linux takes the statically linked musl
-// archives, which run on glibc and musl hosts alike.
-var uvArchivePlatforms = map[string]string{
-	"uv-x86_64-apple-darwin.tar.gz":        "darwin/amd64",
-	"uv-aarch64-apple-darwin.tar.gz":       "darwin/arm64",
-	"uv-x86_64-unknown-linux-musl.tar.gz":  "linux/amd64",
-	"uv-aarch64-unknown-linux-musl.tar.gz": "linux/arm64",
-	"uv-x86_64-pc-windows-msvc.zip":        "windows/amd64",
-	"uv-aarch64-pc-windows-msvc.zip":       "windows/arm64",
-}
-
 // resolveUvToolchain returns the lock entry of one exact uv release: its
 // version, the release download source, and the SHA-256 of the archive of each
-// supported platform, read from the checksum file the release publishes.
+// platform uvtoolchain.ArchiveFor names, read from the checksum file the
+// release publishes.
+//
+// A release older than uvtoolchain.MinimumVersion is refused before any
+// request: Putnami cannot tell such a uv by its version probe, and its
+// checksum file lists no archive.
 //
 // A current entry that already pins version with digests and a source is
 // returned as is, without a request, as resolveBunToolchain does: published
 // release archives do not change.
 func resolveUvToolchain(ctx context.Context, version string, current lockfile.LockEntry) (lockfile.LockEntry, error) {
+	if err := uvtoolchain.Supported(version); err != nil {
+		return lockfile.LockEntry{}, fmt.Errorf("%w: declare required-version = \"==%s\" or a later release in the [tool.uv] table of pyproject.toml",
+			err, uvtoolchain.MinimumVersion)
+	}
 	if current.Version == version && len(current.Integrities) > 0 && current.Source != "" {
 		return current, nil
 	}
@@ -688,13 +611,20 @@ func resolveUvToolchain(ctx context.Context, version string, current lockfile.Lo
 	if err != nil {
 		return lockfile.LockEntry{}, err
 	}
+	platforms := make(map[string]string)
+	for _, platform := range uvtoolchain.Platforms() {
+		goos, goarch, _ := lockfile.SplitPlatformKey(platform)
+		if archive, ok := uvtoolchain.ArchiveFor(goos, goarch); ok {
+			platforms[archive.Name] = platform
+		}
+	}
 	integrities := make(map[string]string)
 	for _, line := range strings.Split(string(body), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) != 2 {
 			continue
 		}
-		platform, ok := uvArchivePlatforms[strings.TrimPrefix(fields[1], "*")]
+		platform, ok := platforms[strings.TrimPrefix(fields[1], "*")]
 		if !ok {
 			continue
 		}

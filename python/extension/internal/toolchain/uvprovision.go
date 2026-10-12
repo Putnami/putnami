@@ -46,7 +46,9 @@ var uvArchiveLimits = pinnedarchive.Limits{ArchiveBytes: 256 << 20, ExtractedByt
 //
 // The release is the one the workspace lock pins, else the one the root
 // pyproject.toml declares as [tool.uv] required-version, else
-// DefaultUVVersion. The candidates are those of ResolveUV: uv on PATH, then
+// DefaultUVVersion. A required-version that names no single release, and a
+// release older than uvtoolchain.MinimumVersion, fail before anything is
+// installed. The candidates are those of ResolveUV: uv on PATH, then
 // toolchains/uv/uv-<version>/uv under the Putnami home. Nothing is downloaded
 // when one of them reports the release.
 //
@@ -93,7 +95,7 @@ func provisionUV(ctx context.Context, req UVRequest, host uvHost) (UV, error) {
 	if got != want.version {
 		return UV{}, fmt.Errorf("%s holds uv %s, not uv %s: remove it, then run `putnami install`", search.dir, got, want.version)
 	}
-	return UV{Path: program, Version: got, Managed: true}, nil
+	return UV{Path: program, Version: got}, nil
 }
 
 // install makes the search's directory hold the wanted uv release, with its
@@ -128,7 +130,7 @@ func (s *uvSearch) install(ctx context.Context, req UVRequest) error {
 
 	programs := uvPrograms(s.host.goos)
 	s.log(req, "info", "Installing uv "+version+" from "+pin.URL+" under "+s.dir+"...")
-	_, err = pinnedarchive.Install(ctx, pin, s.dir, pinnedarchive.Options{
+	installed, err := pinnedarchive.Install(ctx, pin, s.dir, pinnedarchive.Options{
 		Client:    client,
 		UserAgent: req.UserAgent,
 		Limits:    uvArchiveLimits,
@@ -136,8 +138,13 @@ func (s *uvSearch) install(ctx context.Context, req UVRequest) error {
 		Prepare:   func(stage string) error { return shapeUVInstall(stage, archive.dir, programs) },
 	})
 	switch {
-	case err == nil:
+	case err == nil && installed:
 		s.log(req, "info", "uv "+version+" installed")
+		return nil
+	case err == nil:
+		// The directory was complete already, or another process published
+		// the release first. The caller checks the release it reports.
+		s.log(req, "info", "Kept the existing uv install under "+s.dir)
 		return nil
 	case errors.Is(err, pinnedarchive.ErrNoDigest):
 		return fmt.Errorf("refusing to download uv %s from %s: the %s SHA-256 that %s records is not valid (%w): %s",

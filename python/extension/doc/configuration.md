@@ -165,11 +165,30 @@ The release comes from the root `pyproject.toml`:
 required-version = "==0.11.32"
 ```
 
-Only an exact release counts; a range such as `">=0.11"` pins nothing. When
-the file declares no `required-version`, `putnami workspace-install` declares
-the release it installs, 0.11.32 by default. To move to another release, change
-`required-version` and run `putnami install`: it pins the new release and
-installs it.
+When the file declares no `required-version`, `putnami workspace-install`
+declares the release it installs, 0.11.32 by default. To move to another
+release, change `required-version` and run `putnami install`: it pins the new
+release and installs it.
+
+The declaration must name one exact release, `"==X.Y.Z"`. Putnami refuses
+these, and `putnami install` and every task that runs uv fail with a message
+that names the declaration to write:
+
+| Declaration | Why it is refused |
+|-------------|-------------------|
+| A range or a wildcard, such as `">=0.11"` or `"==0.11.*"` | It names no single release to pin |
+| A value that is not a one-line string | It names no release |
+| A release older than 0.11.8 | An older uv prints more than its release with `uv self version --short`, so Putnami cannot tell which release it runs |
+
+`putnami workspace-install` also refuses a root `pyproject.toml` that writes uv
+settings outside a `[tool.uv]` table header, as dotted keys (`uv.managed = true`
+under `[tool]`) or as an inline table (`uv = { managed = true }`). A
+`[tool.uv]` table added for `required-version` would define the table twice.
+Move those settings into a `[tool.uv]` table.
+
+A workspace that a CLI older than the uv pin installed has no `toolchains.uv`
+in its lock. See
+[Upgrading an existing workspace](./workspace-install.md#upgrading-an-existing-workspace).
 
 ## uv Directories
 

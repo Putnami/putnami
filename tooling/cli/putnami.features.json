@@ -1568,7 +1568,8 @@
             "kind": "acceptance",
             "checks": [
               "go-and-bun-pins-carry-version-source-and-digests",
-              "uv-pins-carry-version-source-and-digests"
+              "uv-pins-carry-version-source-and-digests",
+              "a-uv-release-older-than-the-minimum-is-refused"
             ]
           }
         },

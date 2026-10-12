@@ -13,6 +13,7 @@ import (
 	"go.putnami.dev/python/extension/internal/toolchain"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/putnamihome"
 )
 
 // stubUV is the uv program the job tests resolve: the install `putnami install`
@@ -54,7 +55,7 @@ func stubUVProvisioning(t *testing.T, provisionErr error) *uvStub {
 		if provisionErr != nil {
 			return toolchain.UV{}, provisionErr
 		}
-		return toolchain.UV{Path: stubUV, Version: "0.11.32", Managed: true}, nil
+		return toolchain.UV{Path: stubUV, Version: "0.11.32"}, nil
 	}
 	uvCommandRun = func(uv string, args []string, dir string, _ []string) ([]byte, error) {
 		stub.calls = append(stub.calls, uvCall{uv: uv, args: append([]string(nil), args...), dir: dir})
@@ -302,6 +303,74 @@ func TestWorkspaceInstall_HostedRunFindsUVAndDeclaresNothing(t *testing.T) {
 	}
 	if string(data) != manifest {
 		t.Fatalf("a hosted run rewrote pyproject.toml:\n%s", data)
+	}
+}
+
+// A required-version that names no single release, such as a range, pins
+// nothing in the CLI. workspace-install then fails with a diagnostic that says
+// what to declare, instead of installing a release nobody declared and
+// passing, and a task that runs uv fails with the same diagnostic: no install
+// could ever give it a pin. Nothing is downloaded, nothing is written, and no
+// uv runs.
+func TestARangeDeclarationFailsInstallAndTasksWithOneDiagnostic(t *testing.T) {
+	spectest.Proves(t, "python/experimental-workspace-integration", "exact-uv-declaration", "a-required-version-that-names-no-release-fails-install-and-tasks")
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
+	t.Setenv(putnamihome.Env, t.TempDir())
+	ran := 0
+	origRun := uvCommandRun
+	t.Cleanup(func() { uvCommandRun = origRun })
+	uvCommandRun = func(string, []string, string, []string) ([]byte, error) {
+		ran++
+		return nil, nil
+	}
+	manifest := "[project]\nname = \"ws\"\n\n[tool.uv.workspace]\nmembers = [\"pkg\"]\n\n" +
+		"[tool.uv]\nrequired-version = \">=0.5\"\n\n[tool.uv.sources]\npkg = { workspace = true }\n"
+	tmp := pythonWorkspace(t, manifest)
+	if err := os.WriteFile(filepath.Join(tmp, toolchain.WorkspaceLockFile), []byte(`{"version":4,"extensions":{},"templates":{}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	const diagnostic = `pyproject.toml [tool.uv] required-version is ">=0.5", which names no single uv release: ` +
+		`declare one exact release, such as required-version = "==` + toolchain.DefaultUVVersion + `", so Putnami can pin it`
+	carries := func(events []map[string]any) bool {
+		for _, event := range events {
+			if message, _ := event["message"].(string); strings.Contains(message, diagnostic) {
+				return true
+			}
+		}
+		return false
+	}
+
+	installEvents := captureEvents(t, func(emit *jsonl.Emitter) {
+		status, _, err := WorkspaceInstall(&pctx.Context{WorkspaceRoot: tmp}, emit, []string{"--force"})
+		if err != nil || status != "FAILED" {
+			t.Fatalf("WorkspaceInstall = %s, %v; want FAILED", status, err)
+		}
+	})
+	if !carries(installEvents) {
+		t.Fatalf("workspace-install does not report %q: %v", diagnostic, installEvents)
+	}
+
+	taskEvents := captureEvents(t, func(emit *jsonl.Emitter) {
+		status, _, err := Test(&pctx.Context{
+			WorkspaceRoot: tmp,
+			Project:       pctx.Project{Name: "pkg", Path: "pkg", FullPath: filepath.Join(tmp, "pkg")},
+		}, emit, nil)
+		if err != nil || status != "FAILED" {
+			t.Fatalf("Test = %s, %v; want FAILED", status, err)
+		}
+	})
+	if !carries(taskEvents) {
+		t.Fatalf("the test task does not report %q: %v", diagnostic, taskEvents)
+	}
+
+	if ran != 0 {
+		t.Fatalf("uv ran %d times", ran)
+	}
+	if data, err := os.ReadFile(filepath.Join(tmp, "pyproject.toml")); err != nil || string(data) != manifest {
+		t.Fatalf("pyproject.toml = %q, %v; want it unchanged", data, err)
+	}
+	if entries, err := os.ReadDir(os.Getenv(putnamihome.Env)); err != nil || len(entries) != 0 {
+		t.Fatalf("the Putnami home holds %v, %v; want nothing installed", entries, err)
 	}
 }
 

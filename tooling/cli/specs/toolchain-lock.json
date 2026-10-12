@@ -26,7 +26,7 @@
     },
     {
       "id": "verified-release-metadata",
-      "text": "Every generated Go, Bun or uv toolchain entry carries an exact version, its vendor release source, and at least one vendor-published SHA-256 digest keyed by os/arch."
+      "text": "Every generated Go, Bun or uv toolchain entry carries an exact version, its vendor release source, and at least one vendor-published SHA-256 digest keyed by os/arch. A uv release older than 0.11.8, the oldest one Putnami runs, is refused with that minimum before any release metadata is read."
     },
     {
       "id": "extension-resolved-pins-survive",

@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/uvtoolchain"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
 
@@ -196,38 +197,62 @@ func TestResolveUvToolchainFailsWithoutASupportedDigest(t *testing.T) {
 	}
 }
 
-// Only an exact required-version in the [tool.uv] table declares a uv release.
-// A range, a wildcard, a key of another table and a malformed value declare
-// none, so they pin nothing and make no request.
-func TestUvRequiredVersionReadsOnlyAnExactToolUvDeclaration(t *testing.T) {
-	cases := []struct {
-		name      string
-		pyproject string
-		want      string
-	}{
-		{"exact", "[tool.uv]\nrequired-version = \"==0.11.32\"\n", "0.11.32"},
-		{"bare release", "[tool.uv]\nrequired-version = '0.11.32'\n", "0.11.32"},
-		{"spaces and comment", "[ tool.uv ]  # uv settings\r\n  required-version   =   \"== 0.11.32\"   # pinned\r\n", "0.11.32"},
-		{"major minor", "[tool.uv]\nrequired-version = \"==0.12\"\n", "0.12.0"},
-		{"after other keys", "[tool.uv]\nmanaged = true\nrequired-version = \"==0.11.32\"\n[tool.uv.sources]\n", "0.11.32"},
-		{"range", "[tool.uv]\nrequired-version = \">=0.11.0\"\n", ""},
-		{"wildcard", "[tool.uv]\nrequired-version = \"==0.11.*\"\n", ""},
-		{"arbitrary equality", "[tool.uv]\nrequired-version = \"===0.11.32\"\n", ""},
-		{"compound", "[tool.uv]\nrequired-version = \"==0.11.32,<1\"\n", ""},
-		{"prerelease", "[tool.uv]\nrequired-version = \"==0.11.32rc1\"\n", ""},
-		{"another table", "[tool.uv.workspace]\nrequired-version = \"==0.11.32\"\n", ""},
-		{"top level", "required-version = \"==0.11.32\"\n[tool.uv]\n", ""},
-		{"array of tables", "[[tool.uv]]\nrequired-version = \"==0.11.32\"\n", ""},
-		{"not a string", "[tool.uv]\nrequired-version = 0.11\n", ""},
-		{"unterminated", "[tool.uv]\nrequired-version = \"==0.11.32\n", ""},
-		{"no declaration", "[project]\nname = \"x\"\n", ""},
+// A declared release older than the oldest one Putnami runs is refused before
+// any request, with the minimum, even when the lock already pins it: its
+// sha256.sum lists no archive (or does not exist before 0.5.0), and its
+// version probe could not identify it anyway.
+func TestResolveUvToolchainRefusesAReleaseOlderThanTheMinimum(t *testing.T) {
+	withToolchainTestClient(t, &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("an unsupported uv release must not read release metadata")
+	})})
+	pinned := lockfile.LockEntry{
+		Version:     "0.4.30",
+		Integrities: map[string]string{"linux/amd64": strings.Repeat("a", 64)},
+		Source:      "https://github.com/astral-sh/uv/releases/download/0.4.30/",
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := uvRequiredVersion(tc.pyproject); got != tc.want {
-				t.Errorf("uvRequiredVersion(%q) = %q, want %q", tc.pyproject, got, tc.want)
+	for _, current := range []lockfile.LockEntry{{}, pinned} {
+		_, err := resolveUvToolchain(context.Background(), "0.4.30", current)
+		if err == nil {
+			t.Fatal("uv 0.4.30 was pinned")
+		}
+		for _, want := range []string{"uv 0.4.30 is older than uv " + uvtoolchain.MinimumVersion, `required-version = "==` + uvtoolchain.MinimumVersion + `"`} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("the error does not name %q: %v", want, err)
 			}
-		})
+		}
+	}
+
+	ws := t.TempDir()
+	mustWriteToolchainTestFile(t, filepath.Join(ws, "pyproject.toml"), "[tool.uv]\nrequired-version = \"==0.10.0\"\n")
+	if err := lockfile.WriteLockFile(ws, lockfile.NewLockFile()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := PinDeclaredToolchains(context.Background(), ws); err == nil || !strings.Contains(err.Error(), "resolve uv toolchain: uv 0.10.0 is older") {
+		t.Fatalf("PinDeclaredToolchains error = %v, want the refusal of uv 0.10.0", err)
+	}
+	spectest.Proves(t, "cli/toolchain-lock", "verified-release-metadata", "a-uv-release-older-than-the-minimum-is-refused")
+}
+
+// Only an exact required-version in the [tool.uv] table declares a uv release,
+// read by uvtoolchain.ReadDeclaration, whose test holds the cases. A range
+// pins nothing and makes no request, and an unreadable pyproject.toml is
+// reported.
+func TestUvDeclarationPinsOnlyAnExactToolUvRequiredVersion(t *testing.T) {
+	for pyproject, want := range map[string]string{
+		uvTestPyproject: "0.11.32",
+		"[tool.uv]\nrequired-version = \">=0.11\"\n":            "",
+		"[tool]\nuv.required-version = \"==0.11.32\"\n":         "",
+		"[tool.uv.workspace]\nrequired-version = \"0.11.32\"\n": "",
+	} {
+		ws := t.TempDir()
+		mustWriteToolchainTestFile(t, filepath.Join(ws, "pyproject.toml"), pyproject)
+		declared, err := readToolchainDeclarations(ws)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := declared["uv"]; got != want {
+			t.Errorf("declared uv = %q for %q, want %q", got, pyproject, want)
+		}
 	}
 
 	withToolchainTestClient(t, &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {

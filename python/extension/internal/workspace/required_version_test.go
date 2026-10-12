@@ -3,6 +3,8 @@ package workspace
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -12,6 +14,7 @@ func TestEnsureUVRequiredVersion(t *testing.T) {
 		content string
 		want    string
 		changed bool
+		wantErr string
 	}{
 		{
 			name:    "declares the release on the line after the [tool.uv] header",
@@ -49,9 +52,40 @@ func TestEnsureUVRequiredVersion(t *testing.T) {
 			want:    "[tool.uv]\nrequired-version = \"==0.5.18\"\n",
 		},
 		{
-			name:    "never changes a range declaration",
+			name:    "declares the release beside the word in a comment or another table",
+			content: "# required-version is set by Putnami\n[tool.ruff]\nrequired-version = \">=0.5\"\n[tool.uv]\n",
+			want:    "# required-version is set by Putnami\n[tool.ruff]\nrequired-version = \">=0.5\"\n[tool.uv]\nrequired-version = \"==0.11.32\"\n",
+			changed: true,
+		},
+		{
+			name:    "appends a [tool.uv] table after an index entry and other tools' dotted keys",
+			content: "[tool]\nruff.line-length = 100\n\n[[tool.uv.index]]\nurl = \"https://example.test/simple\"\n",
+			want:    "[tool]\nruff.line-length = 100\n\n[[tool.uv.index]]\nurl = \"https://example.test/simple\"\n\n[tool.uv]\nrequired-version = \"==0.11.32\"\n",
+			changed: true,
+		},
+		{
+			name:    "refuses a range declaration",
 			content: "[tool.uv]\nrequired-version = \">=0.5\"\n",
 			want:    "[tool.uv]\nrequired-version = \">=0.5\"\n",
+			wantErr: "names no single uv release",
+		},
+		{
+			name:    "refuses uv settings as dotted keys of the [tool] table",
+			content: "[tool]\nuv.managed = true\n\n[tool.uv.sources]\na = { workspace = true }\n",
+			want:    "[tool]\nuv.managed = true\n\n[tool.uv.sources]\na = { workspace = true }\n",
+			wantErr: "(uv.managed)",
+		},
+		{
+			name:    "refuses uv settings as an inline table",
+			content: "[tool]\nuv = { managed = true }\n",
+			want:    "[tool]\nuv = { managed = true }\n",
+			wantErr: "outside a [tool.uv] table header (uv)",
+		},
+		{
+			name:    "refuses uv settings as dotted keys at the top level",
+			content: "tool.uv.managed = true\n[project]\nname = \"ws\"\n",
+			want:    "tool.uv.managed = true\n[project]\nname = \"ws\"\n",
+			wantErr: "(tool.uv.managed)",
 		},
 	}
 	for _, tc := range cases {
@@ -62,8 +96,11 @@ func TestEnsureUVRequiredVersion(t *testing.T) {
 				t.Fatal(err)
 			}
 			changed, err := EnsureUVRequiredVersion(root, "0.11.32")
-			if err != nil {
+			switch {
+			case tc.wantErr == "" && err != nil:
 				t.Fatalf("EnsureUVRequiredVersion: %v", err)
+			case tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)):
+				t.Fatalf("EnsureUVRequiredVersion error = %v, want one that names %q", err, tc.wantErr)
 			}
 			if changed != tc.changed {
 				t.Fatalf("changed = %v, want %v", changed, tc.changed)
@@ -82,8 +119,37 @@ func TestEnsureUVRequiredVersion(t *testing.T) {
 			if info.Mode().Perm() != 0o600 {
 				t.Fatalf("mode = %v, want the file's own 0600", info.Mode().Perm())
 			}
+			entries, err := os.ReadDir(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(entries) != 1 {
+				t.Fatalf("the workspace root holds %v, want only pyproject.toml: no temporary file is left", entries)
+			}
 		})
 	}
+
+	t.Run("a write that fails leaves the file as it was", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("a read-only directory refuses new files only to a user other than root on Unix")
+		}
+		root := t.TempDir()
+		path := filepath.Join(root, "pyproject.toml")
+		content := "[tool.uv]\n"
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(root, 0o555); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(root, 0o755) })
+		if changed, err := EnsureUVRequiredVersion(root, "0.11.32"); err == nil || changed {
+			t.Fatalf("EnsureUVRequiredVersion = %v, %v; want an error in a read-only directory", changed, err)
+		}
+		if data, _ := os.ReadFile(path); string(data) != content {
+			t.Fatalf("pyproject.toml = %q, want %q", data, content)
+		}
+	})
 
 	t.Run("writes nothing when the workspace has no root pyproject.toml", func(t *testing.T) {
 		root := t.TempDir()

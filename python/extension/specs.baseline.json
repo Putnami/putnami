@@ -8,6 +8,7 @@
     "python/experimental-server-template#experimental-disclosure",
     "python/experimental-server-template#explicit-template",
     "python/experimental-server-template#minimal-server-shape",
+    "python/experimental-workspace-integration#exact-uv-declaration",
     "python/experimental-workspace-integration#experimental-boundary",
     "python/experimental-workspace-integration#explicit-opt-in",
     "python/experimental-workspace-integration#native-tools",

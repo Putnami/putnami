@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/sdk/extension/pinnedarchive"
+	"go.putnami.dev/sdk/extension/uvtoolchain"
 )
 
 // WorkspaceLockFile is the workspace lock that pins the uv release the tasks
@@ -29,7 +30,9 @@ const DefaultUVVersion = "0.11.32"
 // defaultUVIntegrities are the SHA-256 digests of the DefaultUVVersion
 // archives, per "<goos>/<goarch>", as the release publishes them in its
 // sha256.sum. They ship in the extension so that installing the default
-// release reads no release metadata from the network.
+// release reads no release metadata from the network. While the repository's
+// own putnami.lock.json pins the same release, it pins the same digests:
+// TestDefaultUVReleaseMatchesTheRepositoryLock compares them.
 var defaultUVIntegrities = map[string]string{
 	"darwin/amd64":  "77f5ca26c0de20e992a3677a174fe1121ee25c36f9b1434a863f75bf077a05eb",
 	"darwin/arm64":  "ed336d0ba49db8ef89b2b41fffa372ce63bd032f22a56f001c265891aec32829",
@@ -37,19 +40,6 @@ var defaultUVIntegrities = map[string]string{
 	"linux/arm64":   "d70cdae687feb6aad9a09fe8d686df8c8efaf69a1007fa581379a2025adc10a5",
 	"windows/amd64": "acfde570451cfdb8689fa159a138ee805ba4e241c466432750302c86254b0984",
 	"windows/arm64": "a7427ea0440bb826b6716d1837ff3d173b8e7d496cb09ee8f456b4e023a2fdcd",
-}
-
-// uvTargets maps "<goos>/<goarch>" to the target a uv release names its
-// archive after. Linux takes the statically linked musl build, which runs on
-// glibc and musl hosts alike. The CLI pins the same archives
-// (tooling/cli versioncmd uvArchivePlatforms).
-var uvTargets = map[string]string{
-	"darwin/amd64":  "x86_64-apple-darwin",
-	"darwin/arm64":  "aarch64-apple-darwin",
-	"linux/amd64":   "x86_64-unknown-linux-musl",
-	"linux/arm64":   "aarch64-unknown-linux-musl",
-	"windows/amd64": "x86_64-pc-windows-msvc",
-	"windows/arm64": "aarch64-pc-windows-msvc",
 }
 
 // UVRelease is one uv release and what verifies its archives.
@@ -71,13 +61,8 @@ func DefaultUVRelease() UVRelease {
 	return UVRelease{
 		Version:     DefaultUVVersion,
 		Integrities: maps.Clone(defaultUVIntegrities),
-		Source:      uvReleaseSource(DefaultUVVersion),
+		Source:      uvtoolchain.ReleaseURL(DefaultUVVersion),
 	}
-}
-
-// uvReleaseSource is where the archives of version are published.
-func uvReleaseSource(version string) string {
-	return "https://github.com/astral-sh/uv/releases/download/" + version + "/"
 }
 
 // uvArchive names the archive of a release for one platform.
@@ -90,37 +75,32 @@ type uvArchive struct {
 	dir string
 }
 
-// uvArchiveFor returns the archive of release for goos/goarch, and false when
-// uv publishes none for that platform: uv-<target>.zip on Windows, and
-// uv-<target>.tar.gz, which holds the directory uv-<target>, elsewhere.
+// uvArchiveFor returns the archive of release for goos/goarch, as
+// uvtoolchain.ArchiveFor names it, and false when uv publishes none for that
+// platform.
 func uvArchiveFor(release UVRelease, goos, goarch string) (uvArchive, bool) {
-	platform := goos + "/" + goarch
-	target, ok := uvTargets[platform]
+	archive, ok := uvtoolchain.ArchiveFor(goos, goarch)
 	if !ok {
 		return uvArchive{}, false
 	}
 	source := strings.TrimSpace(release.Source)
 	if source == "" {
-		source = uvReleaseSource(release.Version)
+		source = uvtoolchain.ReleaseURL(release.Version)
 	}
 	if !strings.HasSuffix(source, "/") {
 		source += "/"
 	}
-	name := "uv-" + target
-	if goos == "windows" {
-		return uvArchive{pin: pinnedarchive.Pin{
-			URL:    source + name + ".zip",
-			SHA256: release.Integrities[platform],
-			Format: pinnedarchive.Zip,
-		}}, true
+	format := pinnedarchive.TarGz
+	if archive.Zip {
+		format = pinnedarchive.Zip
 	}
 	return uvArchive{
 		pin: pinnedarchive.Pin{
-			URL:    source + name + ".tar.gz",
-			SHA256: release.Integrities[platform],
-			Format: pinnedarchive.TarGz,
+			URL:    source + archive.Name,
+			SHA256: release.Integrities[goos+"/"+goarch],
+			Format: format,
 		},
-		dir: name,
+		dir: archive.Dir,
 	}, true
 }
 
@@ -177,103 +157,16 @@ func lockedUVRelease(workspaceRoot string) (UVRelease, bool, error) {
 	return release, true, nil
 }
 
-// declaredUVVersion returns the uv release the workspace root pyproject.toml
-// declares, or "" when the manifest is missing, unreadable, or declares none.
-// See UVRequiredVersion for what counts as a declaration.
-func declaredUVVersion(workspaceRoot string) string {
+// readUVDeclaration reads what the workspace root pyproject.toml declares
+// about the uv release, with the rule the CLI pins the lock with
+// (uvtoolchain.ReadDeclaration). A missing manifest declares nothing.
+func readUVDeclaration(workspaceRoot string) (uvtoolchain.Declaration, error) {
 	data, err := os.ReadFile(filepath.Join(workspaceRoot, RootPyproject))
+	if errors.Is(err, fs.ErrNotExist) {
+		return uvtoolchain.Declaration{}, nil
+	}
 	if err != nil {
-		return ""
+		return uvtoolchain.Declaration{}, fmt.Errorf("read %s: %w", RootPyproject, err)
 	}
-	return UVRequiredVersion(string(data))
-}
-
-// UVRequiredVersion returns the exact uv release a pyproject.toml declares as
-// required-version in its [tool.uv] table: "==X.Y.Z", or a bare "X.Y.Z",
-// which uv reads the same way. A MAJOR.MINOR release gets a ".0" patch. Any
-// other specifier, such as a range or a wildcard, names no single release and
-// declares nothing, and so does the key in any other table or form.
-//
-// The CLI reads the declaration with the same rule when it pins the lock
-// (tooling/cli versioncmd uvRequiredVersion), so the release it pins is the
-// one this extension selects.
-func UVRequiredVersion(pyproject string) string {
-	table := ""
-	for _, raw := range strings.Split(pyproject, "\n") {
-		line := strings.TrimSpace(strings.TrimSuffix(raw, "\r"))
-		if strings.HasPrefix(line, "[") {
-			table = tomlTableName(line)
-			continue
-		}
-		if table != "tool.uv" {
-			continue
-		}
-		key, value, ok := strings.Cut(line, "=")
-		if !ok || strings.Trim(strings.TrimSpace(key), `"'`) != "required-version" {
-			continue
-		}
-		return exactUVRelease(tomlStringValue(value))
-	}
-	return ""
-}
-
-// tomlTableName returns the name of the table a header line opens, with the
-// white space around its parts removed, or "" for an array-of-tables header
-// or a line that is not a header.
-func tomlTableName(line string) string {
-	header, _, _ := strings.Cut(line, "#")
-	header = strings.TrimSpace(header)
-	if strings.HasPrefix(header, "[[") || !strings.HasPrefix(header, "[") || !strings.HasSuffix(header, "]") {
-		return ""
-	}
-	return strings.Join(strings.Fields(strings.Trim(header, "[]")), "")
-}
-
-// tomlStringValue returns the content of the single-line TOML string that
-// value starts with, or "" when it starts with none.
-func tomlStringValue(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" || (value[0] != '"' && value[0] != '\'') {
-		return ""
-	}
-	content, _, closed := strings.Cut(value[1:], value[:1])
-	if !closed {
-		return ""
-	}
-	return content
-}
-
-// exactUVRelease returns the release spec names when it names exactly one:
-// "==X.Y.Z" or "X.Y.Z", with a leading "v" dropped and a ".0" patch added to a
-// MAJOR.MINOR version. It returns "" for any other specifier.
-func exactUVRelease(spec string) string {
-	spec = strings.TrimSpace(spec)
-	if rest, ok := strings.CutPrefix(spec, "=="); ok && !strings.HasPrefix(rest, "=") {
-		spec = strings.TrimSpace(rest)
-	}
-	version := strings.TrimPrefix(spec, "v")
-	if strings.Count(version, ".") == 1 {
-		version += ".0"
-	}
-	if !IsPlainUVRelease(version) {
-		return ""
-	}
-	return version
-}
-
-// IsPlainUVRelease reports whether version is MAJOR.MINOR.PATCH with decimal
-// parts and no prerelease or build suffix. Only such a version names a
-// published release, and only such a version is safe as a directory name and
-// in a URL.
-func IsPlainUVRelease(version string) bool {
-	parts := strings.Split(version, ".")
-	if len(parts) != 3 {
-		return false
-	}
-	for _, part := range parts {
-		if part == "" || strings.Trim(part, "0123456789") != "" {
-			return false
-		}
-	}
-	return true
+	return uvtoolchain.ReadDeclaration(string(data)), nil
 }

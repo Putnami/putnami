@@ -8,10 +8,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	"go.putnami.dev/sdk/extension/putnamihome"
+	"go.putnami.dev/sdk/extension/uvtoolchain"
 )
 
 // uvToolchainName names uv in the toolchains subtree of a Putnami home.
@@ -116,22 +118,49 @@ const uvDeclarationOrigin = RootPyproject + " [tool.uv] required-version"
 
 // wantedUV reads the release workspaceRoot asks for: the one its lock pins,
 // else the one its root pyproject.toml declares, else DefaultUVVersion.
+//
+// A required-version that names no single release, such as a range, fails
+// whether or not the lock pins a release: the CLI pins nothing from it, so
+// the workspace would otherwise run a release it never declared, and a task
+// that finds no pin would send the user to an install that changes nothing.
+// A declared or pinned release older than uvtoolchain.MinimumVersion fails
+// too: no probe can tell such a uv.
 func wantedUV(workspaceRoot string) (uvWant, error) {
+	declaration, err := readUVDeclaration(workspaceRoot)
+	if err != nil {
+		return uvWant{}, err
+	}
+	if declaration.Present && declaration.Version == "" {
+		written := "empty or not a one-line string"
+		if declaration.Spec != "" {
+			written = strconv.Quote(declaration.Spec)
+		}
+		return uvWant{}, fmt.Errorf("%s is %s, which names no single uv release: "+
+			"declare one exact release, such as required-version = \"==%s\", so Putnami can pin it, then run `putnami install`",
+			uvDeclarationOrigin, written, DefaultUVVersion)
+	}
+	if declaration.Version != "" {
+		if err := uvtoolchain.Supported(declaration.Version); err != nil {
+			return uvWant{}, fmt.Errorf("%s declares a release Putnami cannot run: %w: "+
+				"declare required-version = \"==%s\" or a later release, then run `putnami install`",
+				uvDeclarationOrigin, err, uvtoolchain.MinimumVersion)
+		}
+	}
 	locked, pinned, err := lockedUVRelease(workspaceRoot)
 	if err != nil {
 		return uvWant{}, err
 	}
 	if pinned {
-		if !IsPlainUVRelease(locked.Version) {
-			return uvWant{}, fmt.Errorf("toolchains.uv in %s pins %q, which names no uv release: "+
-				"declare one as required-version = \"==MAJOR.MINOR.PATCH\" in the [tool.uv] table of %s, then run `putnami install`",
-				WorkspaceLockFile, locked.Version, RootPyproject)
+		if err := uvtoolchain.Supported(locked.Version); err != nil {
+			return uvWant{}, fmt.Errorf("toolchains.uv in %s pins a release Putnami cannot run: %w: "+
+				"declare required-version = \"==%s\" or a later release in the [tool.uv] table of %s, then run `putnami install`",
+				WorkspaceLockFile, err, uvtoolchain.MinimumVersion, RootPyproject)
 		}
 		return uvWant{version: locked.Version, origin: WorkspaceLockFile, release: locked}, nil
 	}
-	if declared := declaredUVVersion(workspaceRoot); declared != "" {
-		want := uvWant{version: declared, origin: uvDeclarationOrigin}
-		if declared == DefaultUVVersion {
+	if declaration.Version != "" {
+		want := uvWant{version: declaration.Version, origin: uvDeclarationOrigin}
+		if declaration.Version == DefaultUVVersion {
 			want.release = DefaultUVRelease()
 		}
 		return want, nil
@@ -145,8 +174,6 @@ type UV struct {
 	Path string
 	// Version is the release it reports.
 	Version string
-	// Managed reports whether it is the install under the Putnami home.
-	Managed bool
 }
 
 // uvSearch is one selection of a uv, with what it saw on the way.
@@ -199,7 +226,7 @@ func (s *uvSearch) find() (UV, bool) {
 		case got != s.want.version:
 			s.other = append(s.other, candidate+" (uv "+got+")")
 		default:
-			return UV{Path: candidate, Version: got, Managed: candidate == s.program()}, true
+			return UV{Path: candidate, Version: got}, true
 		}
 	}
 	return UV{}, false

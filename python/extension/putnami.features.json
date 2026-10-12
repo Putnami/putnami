@@ -75,6 +75,19 @@
           }
         },
         {
+          "id": "exact-uv-declaration",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-required-version-that-names-no-release-fails-install-and-tasks"
+            ]
+          }
+        },
+        {
           "id": "experimental-boundary",
           "stage": "coded",
           "evidenceKinds": [

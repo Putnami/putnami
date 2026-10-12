@@ -15,6 +15,7 @@
       "coverage-threshold": 50,
       "filePatterns": [
         "../../putnami.support.json",
+        "../../putnami.lock.json",
         "../templates/python-server/**",
         "../templates/python-library/**",
         "putnami.extension.json"
