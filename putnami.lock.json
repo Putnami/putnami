@@ -31,13 +31,13 @@
   },
   "extensions": {
     "@putnami/cloud": {
-      "version": "0.0.0-20261011205957-5ad6a786e",
+      "version": "0.0.0-20261012111654-02ea82670",
       "integrities": {
-        "darwin/arm64": "5c55ea20392337c08ee1d333eb8e33153cc88be50e5d45909642b9a3111d4e51",
-        "linux/amd64": "f2c947b6e74217345b1e07425463f8c5ec424c3f6e50f6ff523fcfcee3d14036"
+        "darwin/arm64": "21b1b6e469e8e9cbefb06bfe4862d4dffcdd50202ffc32f9a7c8d4c73ac446c5",
+        "linux/amd64": "9e3ddd452e13f63caaff721a7755097edd6957ffc8c82c132e506e7a736a3bea"
       },
-      "manifestHash": "d14d2a397be6d11172d212dba1a42b88cd7de341c382e266fdb527ce8c520dce",
-      "source": "https://put.putnami.dev/putnami/cloud/download?channel=0.0.0-20261011205957-5ad6a786e"
+      "manifestHash": "35396fea73ca0fdac352d552602440a437fa7c29eca49144b81380e814c11b2b",
+      "source": "https://put.putnami.dev/putnami/cloud/download?channel=0.0.0-20261012111654-02ea82670"
     },
     "@putnami/intelligence": {
       "version": "0.0.0-20261002155126-05f5df1b2",
