@@ -60,7 +60,7 @@ fi
 				runner.ProviderCommandName: {Description: "Local isolated conformance provider", Run: []extensionproto.PipelineStep{{ID: "provider", Task: "provider"}}},
 			},
 			Tasks: map[string]extensionproto.TaskDefinition{"provider": {
-				Kind: "command", Command: executable, Cache: &extensionproto.TaskCachePolicy{Enabled: &disabled}, TimeoutMs: 60000,
+				Kind: "command", Command: executable, Cache: &extensionproto.TaskCachePolicy{Enabled: &disabled}, TimeoutMs: -1,
 				Env: map[string]string{RunnerFixtureRoleEnv: "provider", RunnerFixtureRootEnv: providerRoot},
 			}},
 		}
@@ -145,7 +145,7 @@ func BoundFixtureRequest(t *testing.T, root string, keys ...string) []byte {
 				Project:  protocolcli.ProjectIdentity{ID: "/app", Name: "app"},
 				Task:     protocolcli.TaskRef{Name: name, Command: "build", Step: "check", Kind: "check"},
 				Provider: protocolcli.ProviderIdentity{Extension: "@fixture/gate", Version: "1.0.0"}},
-			DependsOn: []string{}, SerializeAfter: []string{}, DeadlineMs: 60000,
+			DependsOn: []string{}, SerializeAfter: []string{}, DeadlineMs: PortableTaskDeadlineMs,
 			Resources: runner.TaskResources{CPUWeight: 1, Reads: []runner.TaskResource{}, Writes: []runner.TaskResource{}},
 		})
 	}

@@ -67,10 +67,10 @@ func writeFetchingLifecycleFixture(t *testing.T, wsRoot string, fetchExit int, s
 	// The runtime is warmed for the handshake's deadline (fixtureproc.Script).
 	fixtureproc.Script(t, filepath.Join(extRoot, "bin", "runtime"), runtimeScript, "__putnami", "runtime-info")
 	writeFixtureFile(t, filepath.Join(extRoot, "install.sh"), task("install", 0), 0o755)
-	fetchTask := `{ "kind": "command", "command": "{extensionRuntime}", "args": ["fetch"], "cache": false, "timeoutMs": 10000 }`
+	fetchTask := `{ "kind": "command", "command": "{extensionRuntime}", "args": ["fetch"], "cache": false, "timeoutMs": -1 }`
 	if scriptFetch {
 		writeFixtureFile(t, filepath.Join(extRoot, "fetch.sh"), task("fetch", fetchExit), 0o755)
-		fetchTask = `{ "kind": "command", "command": "{extensionRoot}/fetch.sh", "cache": false, "timeoutMs": 10000 }`
+		fetchTask = `{ "kind": "command", "command": "{extensionRoot}/fetch.sh", "cache": false, "timeoutMs": -1 }`
 	}
 	if err := os.Symlink(extRoot, link); err != nil {
 		t.Fatal(err)
@@ -94,7 +94,7 @@ func writeFetchingLifecycleFixture(t *testing.T, wsRoot string, fetchExit int, s
   },
   "tasks": {
     "fetch-task": `+fetchTask+`,
-    "install-task": { "kind": "command", "command": "{extensionRoot}/install.sh", "cache": false, "timeoutMs": 10000 }
+    "install-task": { "kind": "command", "command": "{extensionRoot}/install.sh", "cache": false, "timeoutMs": -1 }
   }
 }`)
 	workspace.InvalidateLoadCache(wsRoot)

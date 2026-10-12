@@ -689,7 +689,7 @@ func extensionArchive(t *testing.T, records, name, version string) []byte {
       "args": ["workspace-install"],
       "cwd": "{workspaceRoot}",
       "cache": false,
-      "timeoutMs": 60000
+      "timeoutMs": -1
     }
   }
 }`

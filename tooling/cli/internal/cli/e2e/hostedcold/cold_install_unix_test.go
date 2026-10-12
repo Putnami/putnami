@@ -252,8 +252,8 @@ func newPrivateExtension(t *testing.T, log string) privateExtension {
     }
   },
   "tasks": {
-    "fetch-task": { "kind": "command", "command": "{extensionRuntime}", "args": ["fetch"], "cache": false, "timeoutMs": 30000 },
-    "install-task": { "kind": "command", "command": "/bin/sh", "args": ["{extensionRoot}/install.sh"], "cache": false, "timeoutMs": 30000 }
+    "fetch-task": { "kind": "command", "command": "{extensionRuntime}", "args": ["fetch"], "cache": false, "timeoutMs": -1 },
+    "install-task": { "kind": "command", "command": "/bin/sh", "args": ["{extensionRoot}/install.sh"], "cache": false, "timeoutMs": -1 }
   }
 }
 `, extensionName, extensionVersion, protocolcli.CurrentContract)

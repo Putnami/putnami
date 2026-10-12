@@ -10,9 +10,12 @@ import (
 	"testing"
 )
 
-// A fixture task in this package that declares a budget declares
-// "timeoutMs": -1, the manifest's unbounded sentinel, the rule internal/jobs
-// pins with TestFixtureJobsCarryNoIncidentalWallClockBudget.
+// A fixture task that declares a budget, in this package, in the e2e packages
+// or in their clitest helpers, declares "timeoutMs": -1, the manifest's
+// unbounded sentinel, the rule internal/jobs pins with
+// TestFixtureJobsCarryNoIncidentalWallClockBudget. A task that portable
+// execution or `ci change-plan` plans needs a hard deadline and declares
+// clitest.PortableTaskDeadlineMs.
 //
 // A task budget is wall clock from the moment the job is prepared. On a loaded
 // host a /bin/sh that exits at once can spend 10 s waiting for a CPU, and the
@@ -21,15 +24,20 @@ import (
 // the verdict flips. The Go test binary's -timeout stays the backstop.
 var fixtureTaskBudget = regexp.MustCompile(`"timeoutMs"\s*:\s*(\d+)`)
 
-// TestFixtureTasksCarryNoIncidentalWallClockBudget reads this package's test
-// sources, because a budget comes back one manifest literal or one TimeoutMs
-// field at a time and nothing else notices until a loaded gate fails.
+// TestFixtureTasksCarryNoIncidentalWallClockBudget reads the test sources of
+// this package and of the e2e packages, and the clitest helpers they share,
+// because a budget comes back one manifest literal or one TimeoutMs field at a
+// time and nothing else notices until a loaded gate fails.
 func TestFixtureTasksCarryNoIncidentalWallClockBudget(t *testing.T) {
 	t.Parallel()
 
-	files, err := filepath.Glob("*_test.go")
-	if err != nil || len(files) == 0 {
-		t.Fatalf("glob package test files: %v (%d files)", err, len(files))
+	var files []string
+	for _, pattern := range []string{"*_test.go", "e2e/*/*_test.go", "clitest/*.go"} {
+		matches, err := filepath.Glob(pattern)
+		if err != nil || len(matches) == 0 {
+			t.Fatalf("glob %s: %v (%d files)", pattern, err, len(matches))
+		}
+		files = append(files, matches...)
 	}
 	fset := token.NewFileSet()
 	for _, file := range files {

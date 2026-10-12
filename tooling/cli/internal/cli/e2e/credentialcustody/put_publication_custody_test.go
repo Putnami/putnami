@@ -188,7 +188,7 @@ func writePutPublicationFixture(t *testing.T, self, endpoint string) putPublicat
 		task := "publication-" + string(member.kind)
 		steps = append(steps, fmt.Sprintf(`{ "id": %s, "task": %s, "activation": { "files": [%s] } }`,
 			jsonString(member.step), jsonString(task), jsonString(marker)))
-		tasks = append(tasks, fmt.Sprintf(`%s: { "kind": "command", "command": %s, "cache": false, "timeoutMs": 60000, "env": { %s: "put-publication", %s: %s } }`,
+		tasks = append(tasks, fmt.Sprintf(`%s: { "kind": "command", "command": %s, "cache": false, "timeoutMs": -1, "env": { %s: "put-publication", %s: %s } }`,
 			jsonString(task), jsonString(self), jsonString(custodyRoleEnv), jsonString(custodyReportEnv), jsonString(fx.jobReports[member.project])))
 		probeProjects = append(probeProjects, fmt.Sprintf(
 			`{"path":%q,"metadata":{"releaseSet":{"ecosystems":[{"ecosystem":%q,"coordinate":%q,"packageStep":"artifact","publishStep":%q}]}}}`,

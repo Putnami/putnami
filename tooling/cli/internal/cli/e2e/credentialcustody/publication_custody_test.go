@@ -359,7 +359,7 @@ func writePublicationFixture(t *testing.T, self, endpoint, gate string) publicat
       "kind": "command",
       "command": %s,
       "cache": false,
-      "timeoutMs": 60000,
+      "timeoutMs": -1,
       "env": { %s: "publication", %s: %s }
     },
     "credential-provider": {

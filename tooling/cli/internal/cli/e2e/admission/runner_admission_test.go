@@ -43,13 +43,13 @@ func portableInputFixture(t *testing.T, provider bool) (root, providerRoot strin
 	disabled := false
 	check := manifest.Tasks["check"]
 	manifest.Tasks["readconf"] = extensionproto.TaskDefinition{
-		Kind: "command", Command: "/bin/sh", Args: []string{"{extensionRoot}/readconf.sh"}, TimeoutMs: 60000,
+		Kind: "command", Command: "/bin/sh", Args: []string{"{extensionRoot}/readconf.sh"}, TimeoutMs: clitest.PortableTaskDeadlineMs,
 		Cache:  &extensionproto.TaskCachePolicy{Enabled: &disabled},
 		Inputs: map[string]extensionproto.TaskInputPort{"conf": {From: extensionproto.TaskInputFromProject, Files: []string{"conf/*.txt", ".gen/*.txt"}}},
 		Reads:  check.Reads, Writes: check.Writes,
 	}
 	manifest.Tasks["envcheck"] = extensionproto.TaskDefinition{
-		Kind: "command", Command: "/bin/sh", Args: []string{"{extensionRoot}/gate.sh"}, TimeoutMs: 60000,
+		Kind: "command", Command: "/bin/sh", Args: []string{"{extensionRoot}/gate.sh"}, TimeoutMs: clitest.PortableTaskDeadlineMs,
 		Inputs:   map[string]extensionproto.TaskInputPort{"PUTNAMI_FIXTURE_TARGET": {From: extensionproto.TaskInputFromEnv}},
 		Declares: &extensionproto.TaskDeclaration{},
 		Reads:    check.Reads, Writes: check.Writes,
@@ -57,7 +57,7 @@ func portableInputFixture(t *testing.T, provider bool) (root, providerRoot strin
 	// A CACHEABLE task with no declared file input at all: its key falls back
 	// to the whole non-hidden project tree, which is what must not be bound.
 	manifest.Tasks["nodecl"] = extensionproto.TaskDefinition{
-		Kind: "command", Command: "/bin/sh", Args: []string{"{extensionRoot}/gate.sh"}, TimeoutMs: 60000,
+		Kind: "command", Command: "/bin/sh", Args: []string{"{extensionRoot}/gate.sh"}, TimeoutMs: clitest.PortableTaskDeadlineMs,
 		Declares: &extensionproto.TaskDeclaration{},
 		Reads:    check.Reads, Writes: check.Writes,
 	}

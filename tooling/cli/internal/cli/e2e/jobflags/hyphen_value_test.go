@@ -55,7 +55,7 @@ done
 		}},
 		Tasks: map[string]extensionproto.TaskDefinition{"run-app": {
 			Kind: "command", Command: "/bin/sh", Args: []string{"{extensionRoot}/run.sh"},
-			Cache: &extensionproto.TaskCachePolicy{Enabled: &disabled}, TimeoutMs: 60000,
+			Cache: &extensionproto.TaskCachePolicy{Enabled: &disabled}, TimeoutMs: -1,
 		}},
 	}
 	data, err := json.Marshal(manifest)
