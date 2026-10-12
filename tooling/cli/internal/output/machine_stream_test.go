@@ -272,6 +272,129 @@ func TestMachineStreamReservesNormalizedFailedResultAfterOrdinaryExhaustion(t *t
 	}
 }
 
+// TestMachineStreamReservesABuiltFailedResultAfterOrdinaryExhaustion is the
+// same guarantee for a failed result the CLI builds itself, which names its
+// type on the event only: a batched member's projected result
+// (jobs.canonicalTaskEvents). The live stream classifies a record by its event's
+// type, so a record written without it was elided like ordinary detail.
+func TestMachineStreamReservesABuiltFailedResultAfterOrdinaryExhaustion(t *testing.T) {
+	spectest.Proves(t, "cli/diagnostics-results", "bounded-machine-detail", "failure-capacity-is-reserved-after-exhaustion")
+	var live bytes.Buffer
+	session, err := workspace_state.NewSession(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	renderer := WithSessionRecording(newMachineV2Renderer(&live, "test", true), session, false)
+	job := makeRendererTestJob()
+	failed := &jobs.JobResult{Status: string(jobs.TaskStatusFailed), Error: &jobs.JobError{Message: "tests failed"}}
+
+	renderer.Start([]*jobs.ScheduledJob{job})
+	for i := 0; i < 800; i++ {
+		renderer.JobEvent(job, jobs.RawJobEvent{Data: map[string]any{
+			"type": "log", "level": "info", "message": "ordinary",
+		}})
+	}
+	renderer.JobEvent(job, jobs.RawJobEvent{
+		Version: runtimeproto.MaxKnownProtocolVersion,
+		Type:    jobs.EventTypeResult,
+		Level:   "info",
+		Message: "Job FAILED",
+		Data: map[string]any{
+			"status": "FAILED",
+			"data":   map[string]any{"testSummary": map[string]any{"total": float64(1), "failed": float64(1)}},
+		},
+	})
+	renderer.JobComplete(job, failed)
+	renderer.Finish(map[string]*jobs.JobResult{job.Key(): failed}, jobs.SessionOutcome{})
+	session.Close()
+
+	artifact, err := os.ReadFile(filepath.Join(session.Dir(), protocolcli.MachineOutputArtifactPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(live.Bytes(), []byte(`"message":"Job FAILED","status":"FAILED","type":"result"`)) {
+		t.Fatalf("the built failed result did not consume the failure reserve:\n%s", lastLines(live.Bytes(), 3))
+	}
+	if violations := protocolcli.ValidateSessionStream(live.Bytes(), artifact); len(violations) != 0 {
+		t.Fatalf("built failed result stream violations: %+v", violations)
+	}
+}
+
+// TestMachineStreamNamesTheTypeOfEventsTheCLIBuilds pins the records of two
+// events the CLI builds itself, whose type lives on the event only: a cache
+// hit's synthesized result and an upload node's published-member artifact. The
+// live stream and the recorded events.jsonl both name that type, so a reader
+// that switches on event.type finds the replayed coverage and the publication.
+func TestMachineStreamNamesTheTypeOfEventsTheCLIBuilds(t *testing.T) {
+	var live bytes.Buffer
+	session, err := workspace_state.NewSession(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	renderer := WithSessionRecording(newMachineV2Renderer(&live, "test,publish", true), session, false)
+	test := testCaseJob("app")
+	upload := dockerPublicationTestJob("/app", "app", "publish~docker~upload", "publish")
+	cached := &jobs.JobResult{Status: string(jobs.TaskStatusSuccess), CacheHit: true, Data: map[string]any{
+		"coverageSummary": map[string]any{"percentage": 78.57, "granularity": "statements", "threshold": float64(70)},
+	}}
+	replayed := jobs.RawJobEvent{
+		Version: runtimeproto.MaxKnownProtocolVersion,
+		Type:    jobs.EventTypeResult,
+		Data:    map[string]any{"status": cached.Status, "data": cached.Data},
+	}
+	published := jobs.RawJobEvent{
+		Version: runtimeproto.MaxKnownProtocolVersion,
+		Type:    jobs.EventTypeArtifact,
+		Data: map[string]any{
+			"id": "oci", "name": "acme/app", "kind": "published-member", "ecosystem": "oci",
+			"coordinate": "acme/app", "version": "1.0.0", "artifactDigest": "sha256:" + strings.Repeat("a", 64),
+		},
+	}
+	uploaded := &jobs.JobResult{Status: string(jobs.TaskStatusSuccess), Events: []jobs.RawJobEvent{published}}
+
+	stream := recordTestCaseStream(t, renderer, session, &live, func(renderer jobs.Renderer) {
+		renderer.Start([]*jobs.ScheduledJob{test, upload})
+		renderer.JobStart(test)
+		renderer.JobEvent(test, replayed)
+		renderer.JobComplete(test, cached)
+		renderer.JobStart(upload)
+		renderer.JobEvent(upload, published)
+		renderer.JobComplete(upload, uploaded)
+		renderer.Finish(map[string]*jobs.JobResult{test.Key(): cached, upload.Key(): uploaded}, jobs.SessionOutcome{})
+	})
+
+	for name, output := range map[string][]byte{"live": stream.live, "events.jsonl": stream.artifact} {
+		records, _ := parseOuterV2Records(t, output)
+		events := map[string]map[string]any{}
+		for _, record := range records {
+			if record.Record == protocolcli.RecordTaskEvent && record.Identity != nil {
+				events[record.Identity.Key] = record.Event
+			}
+		}
+		result := events[test.Key()]
+		data, _ := result["data"].(map[string]any)
+		if result["type"] != jobs.EventTypeResult || data["coverageSummary"] == nil {
+			t.Errorf("%s: the cache hit's result event = %v, want type result with its coverageSummary", name, result)
+		}
+		artifact := events[upload.Key()]
+		if artifact["type"] != jobs.EventTypeArtifact || artifact["kind"] != "published-member" || artifact["coordinate"] != "acme/app" {
+			t.Errorf("%s: the upload's event = %v, want a published-member artifact", name, artifact)
+		}
+	}
+	if _, typed := replayed.Data["type"]; typed {
+		t.Fatal("rendering wrote the type into the replayed event's payload")
+	}
+}
+
+// lastLines is the tail of a stream, for a failure message.
+func lastLines(stream []byte, n int) []byte {
+	lines := bytes.Split(bytes.TrimSpace(stream), []byte{'\n'})
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return bytes.Join(lines, []byte{'\n'})
+}
+
 func TestMachineStreamEmitsOneCanonicalReleaseSetResultBeforeSyntheticTerminal(t *testing.T) {
 	const resultKey = "putnami:publish~release-set"
 	outcome := releaseSetRendererTestOutcome("a")

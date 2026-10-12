@@ -76,20 +76,7 @@ func (r *retainedJobEvents) add(event RawJobEvent) {
 		return
 	}
 	size := int64(len(encoded) + 1)
-	payload := maps.Clone(event.Data)
-	if payload == nil {
-		payload = make(map[string]any)
-	}
-	if _, exists := payload["type"]; !exists {
-		payload["type"] = event.Type
-	}
-	if _, exists := payload["level"]; !exists && event.Level != "" {
-		payload["level"] = event.Level
-	}
-	if _, exists := payload["message"]; !exists && event.Message != "" {
-		payload["message"] = event.Message
-	}
-	record := protocolcli.SessionStreamRecord{Record: protocolcli.RecordTaskEvent, Event: payload}
+	record := protocolcli.SessionStreamRecord{Record: protocolcli.RecordTaskEvent, Event: event.RecordPayload()}
 	if event.Type == EventTypeArtifact {
 		// An artifact record names a file the task produced. Consumers read it
 		// as a task output — the spec gate joins verification reports, publish
@@ -346,6 +333,43 @@ func ParseRawEvent(line string) (RawJobEvent, bool) {
 	}
 
 	return event, true
+}
+
+// RecordPayload is the event as a task:event record carries it: Data, with the
+// event's type, level and message folded in the way ParseRawEvent folds a
+// subprocess line.
+//
+// A parsed line already holds those members in Data. An event the CLI builds
+// itself holds them on the struct only: a cache hit's replayed or synthesized
+// result, a batch member's projection, an upload node's published-member
+// artifact, a restored report artifact. Written from Data alone, such a record
+// reached its readers with no type, and none of them could tell a result or an
+// artifact from any other event.
+//
+// A member Data already names wins. Data is copied only when a member is added,
+// and is never written to.
+func (e RawJobEvent) RecordPayload() map[string]any {
+	folded := [...]struct{ key, value string }{
+		{"type", e.Type},
+		{"level", e.Level},
+		{"message", e.Message},
+	}
+	payload, copied := e.Data, false
+	for _, member := range folded {
+		if member.value == "" {
+			continue
+		}
+		if _, present := payload[member.key]; present {
+			continue
+		}
+		if !copied {
+			payload = make(map[string]any, len(e.Data)+len(folded))
+			maps.Copy(payload, e.Data)
+			copied = true
+		}
+		payload[member.key] = member.value
+	}
+	return payload
 }
 
 // ExtractResult builds a JobResult from the data payload of a "result" event.

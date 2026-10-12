@@ -896,6 +896,12 @@ contract 3 accepts exactly one runtime-event version, so a per-line restatement
 would only create a second place for the two to disagree. A consumer that needs
 the inner version reads it from the CLI's contract, not from the event.
 
+An event the CLI builds itself has the same normalized shape, and names its
+`type`, `level` and `message` the same way: a cache hit's replayed or
+synthesized `result`, a batched task's projected events, an upload node's
+`published-member` artifact. A consumer can therefore switch on `event.type`
+for every `task:event` record, whether a subprocess or the CLI produced it.
+
 The version-1 column is documentation, not code: `protocols/runtime/stream.go`
 and `schemas/stream.json` declared those envelopes until they were deleted. The
 v2 cutover had already removed their last producer, leaving a protocol with no

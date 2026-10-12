@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -187,5 +189,85 @@ func TestReadEventLineKeepsALineAtTheLimit(t *testing.T) {
 	}
 	if _, _, err := readEventLine(reader); !errors.Is(err, io.EOF) {
 		t.Fatalf("err = %v, want io.EOF after the last line", err)
+	}
+}
+
+// TestRecordPayloadOfABuiltEventIsTheParsedLines pins the task:event payload of
+// an event the CLI builds itself, which holds its type, level and message on the
+// struct only: a cache hit's synthesized result, a batch member's projected
+// result, an upload node's published-member artifact. Its payload is the one
+// the same runtime line gets when ParseRawEvent reads it from a subprocess, so
+// a reader that switches on the event's type finds it.
+func TestRecordPayloadOfABuiltEventIsTheParsedLines(t *testing.T) {
+	for name, tc := range map[string]struct {
+		line  string
+		built RawJobEvent
+	}{
+		"synthesized result": {
+			line: `{"v":2,"type":"result","data":{"status":"success","data":{"coverageSummary":{"percentage":78.57,"threshold":70}}}}`,
+			built: RawJobEvent{Version: 2, Type: EventTypeResult, Data: map[string]any{
+				"status": "success",
+				"data":   map[string]any{"coverageSummary": map[string]any{"percentage": 78.57, "threshold": float64(70)}},
+			}},
+		},
+		"projected result": {
+			line: `{"v":2,"type":"result","level":"info","message":"Job OK","data":{"status":"OK","data":{"lintSummary":{"errors":0}}}}`,
+			built: RawJobEvent{Version: 2, Type: EventTypeResult, Level: "info", Message: "Job OK", Data: map[string]any{
+				"status": "OK",
+				"data":   map[string]any{"lintSummary": map[string]any{"errors": float64(0)}},
+			}},
+		},
+		"published member": {
+			line: `{"v":2,"type":"artifact","data":{"id":"oci","name":"acme/api","kind":"published-member",` +
+				`"ecosystem":"oci","coordinate":"acme/api","version":"1.0.0","artifactDigest":"sha256:abc"}}`,
+			built: RawJobEvent{Version: 2, Type: EventTypeArtifact, Data: map[string]any{
+				"id": "oci", "name": "acme/api", "kind": "published-member",
+				"ecosystem": "oci", "coordinate": "acme/api", "version": "1.0.0", "artifactDigest": "sha256:abc",
+			}},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			parsed, ok := ParseRawEvent(tc.line)
+			if !ok {
+				t.Fatalf("fixture did not parse: %s", tc.line)
+			}
+			given := maps.Clone(tc.built.Data)
+
+			got := tc.built.RecordPayload()
+			if want := parsed.RecordPayload(); !reflect.DeepEqual(got, want) {
+				t.Fatalf("payload of the built event = %v\nwant the parsed line's %v", got, want)
+			}
+			if got["type"] != tc.built.Type {
+				t.Fatalf("payload type = %v, want %q", got["type"], tc.built.Type)
+			}
+			if !reflect.DeepEqual(tc.built.Data, given) {
+				t.Fatalf("RecordPayload wrote to the event's Data: %v", tc.built.Data)
+			}
+		})
+	}
+}
+
+// TestRecordPayloadKeepsWhatDataNames pins the two limits of the fold: a member
+// Data already names wins over the struct's, and a payload with nothing to add
+// is returned as it is, not copied.
+func TestRecordPayloadKeepsWhatDataNames(t *testing.T) {
+	parsed, ok := ParseRawEvent(`{"v":2,"type":"log","level":"warn","message":"from the line"}`)
+	if !ok {
+		t.Fatal("fixture did not parse")
+	}
+	if got := parsed.RecordPayload(); reflect.ValueOf(got).Pointer() != reflect.ValueOf(parsed.Data).Pointer() {
+		t.Fatal("a payload that names every member was copied")
+	}
+
+	built := RawJobEvent{Type: EventTypeLog, Level: "info", Message: "from the struct", Data: map[string]any{"message": "from the data"}}
+	if got := built.RecordPayload(); got["message"] != "from the data" || got["type"] != EventTypeLog || got["level"] != "info" {
+		t.Fatalf("payload = %v, want Data's message beside the struct's type and level", got)
+	}
+
+	if got := (RawJobEvent{Type: EventTypeMeta}).RecordPayload(); !reflect.DeepEqual(got, map[string]any{"type": EventTypeMeta}) {
+		t.Fatalf("payload of an event without Data = %v, want its type alone", got)
+	}
+	if got := (RawJobEvent{}).RecordPayload(); got != nil {
+		t.Fatalf("payload of an empty event = %v, want none", got)
 	}
 }
