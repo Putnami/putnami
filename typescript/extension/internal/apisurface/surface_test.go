@@ -108,7 +108,7 @@ func TestIncompatibleChangesAreAClosedList(t *testing.T) {
 		},
 		{
 			name: "a changed kind", old: "export function make(): void {}", current: "export class make {}",
-			want: []string{"function make is now a class"},
+			want: []string{"warning: function make is now a class"},
 		},
 		{
 			name: "a type that becomes a value", old: "export interface Shape { side: number }", current: "export const Shape = 1;",
@@ -164,7 +164,7 @@ func TestIncompatibleChangesAreAClosedList(t *testing.T) {
 		},
 		{
 			name: "a re-export from another package", old: "export * from 'dep'; export { z } from 'zod';", current: "export const other = 1;",
-			want: []string{`export * from "dep" removed`, "re-export z removed"},
+			want: []string{`warning: export * from "dep" is not compared: the check cannot read the module it names`, "re-export z removed"},
 		},
 		{
 			name:    "an overload added before the others",
@@ -256,7 +256,8 @@ func TestIncompatibleChangesAreAClosedList(t *testing.T) {
 			name:    "a method removed from a base class that is not exported",
 			old:     "class Base { run(): void {}\nstop(): void {} }\nexport class C extends Base {}",
 			current: "class Base { stop(): void {} }\nexport class C extends Base {}",
-			want:    []string{"warning: method Base.run removed"},
+			// Importers of C call the method it inherited.
+			want: []string{"method C.run removed", "warning: method Base.run removed"},
 		},
 		{
 			name:    "a member removed two references away, through a cycle",
@@ -432,8 +433,10 @@ func TestAnExportAssignmentIsNotCompared(t *testing.T) {
 		map[string]string{"src/index.ts": "import fs = require('fs');\nclass C { run(): void {} }\nexport = C;"},
 		map[string]string{"src/index.ts": "import fs = require('fs');\nclass C {}\nexport = C;"},
 	)
-	if !surfaces[0].Entries[0].Script || Compared(surfaces[0].Entries[0], surfaces[1].Entries[0]) {
-		t.Fatal("an entry point that assigns its exports with `export =` is compared")
+	comparison := Compare("@example/lib", surfaces[0], surfaces[1])
+	want := []Skipped{{Subpath: ".", Target: "src/index.ts", Reason: Script}}
+	if !surfaces[0].Entries[0].Script || comparison.Compared != 0 || !slices.Equal(comparison.Skipped, want) {
+		t.Fatalf("comparison = %+v, want an entry point that assigns its exports with `export =` not compared", comparison)
 	}
 }
 
@@ -479,7 +482,7 @@ func TestAFileWithoutImportOrExportIsAScript(t *testing.T) {
 		t.Fatalf("script = %v, %v, %v, want true, false, false",
 			surfaces[0].Entries[0].Script, surfaces[1].Entries[0].Script, surfaces[2].Entries[0].Script)
 	}
-	if Compared(surfaces[0].Entries[0], surfaces[1].Entries[0]) || !Compared(surfaces[1].Entries[0], surfaces[2].Entries[0]) {
+	if Compare("@example/lib", surfaces[0], surfaces[1]).Compared != 0 || Compare("@example/lib", surfaces[1], surfaces[2]).Compared != 1 {
 		t.Fatal("a released script is not compared, and a released module is")
 	}
 	if found := Incompatible("@example/lib", surfaces[0], surfaces[0]); len(found) != 0 {

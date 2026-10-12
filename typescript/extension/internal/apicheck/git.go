@@ -261,7 +261,6 @@ func readBlobs(dir string, objects []string) ([][]byte, error) {
 
 // commit is one commit of the range the check reads.
 type commit struct {
-	sha     string
 	subject string
 	body    string
 }
@@ -270,21 +269,20 @@ type commit struct {
 // read literally and relative to dir, newest first.
 func commitsSince(dir, tag, pathspec string) ([]commit, error) {
 	output, stderr, err := gitCapture(dir, append(os.Environ(), "GIT_LITERAL_PATHSPECS=1"), nil,
-		"log", "--format="+commitRecordSeparator+"%H%x00%s%x00%b",
+		"log", "--format="+commitRecordSeparator+"%s%x00%b",
 		"--no-show-signature", "refs/tags/"+tag+"..HEAD", "--", pathspec)
 	if err != nil {
 		return nil, fmt.Errorf("git log (in %s): %w: %s", dir, err, strings.TrimSpace(stderr))
 	}
 	var commits []commit
 	for record := range strings.SplitSeq(output, commitRecordSeparator) {
-		fields := strings.SplitN(record, "\x00", 3)
-		if len(fields) != 3 {
+		fields := strings.SplitN(record, "\x00", 2)
+		if len(fields) != 2 {
 			continue
 		}
 		commits = append(commits, commit{
-			sha:     strings.TrimSpace(fields[0]),
-			subject: strings.TrimSpace(fields[1]),
-			body:    strings.TrimRight(fields[2], "\n"),
+			subject: strings.TrimSpace(fields[0]),
+			body:    strings.TrimRight(fields[1], "\n"),
 		})
 	}
 	return commits, nil

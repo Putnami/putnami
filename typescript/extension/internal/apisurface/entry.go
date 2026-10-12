@@ -32,11 +32,15 @@ const (
 	TargetMissing
 )
 
-// EntryPoint is one entry point a package.json declares.
+// EntryPoint is one entry point a package.json declares: one target of a
+// subpath, under the conditions that select it.
 type EntryPoint struct {
 	// Key names the entry point: its subpath, then its conditions in
 	// parentheses when they are not the default one, such as ". (browser)".
 	Key string
+	// Subpath is what an importer writes after the package name, such as "."
+	// or "./hooks". The entry points of one subpath are its conditions.
+	Subpath string
 	// Target is the slash path, relative to the project, the entry point names.
 	Target string
 	// State says whether Target is a source file among the side's files.
@@ -58,7 +62,9 @@ func IsSource(name string) bool {
 //
 // "exports" is the authority when the package declares it. Each target of a
 // subpath is one entry point, named by the conditions that select it; the
-// "default" condition adds nothing to the name. A package without "exports"
+// "default" condition adds nothing to the name. A subpath pattern gives the
+// subpaths its target matches, except those a more specific key maps, to
+// another target or to null, as Node resolves them. A package without "exports"
 // declares "." with "main", ". (module)" with "module", and ". (types)" with
 // "types" or "typings".
 func EntryPoints(manifest []byte, sources []string) ([]EntryPoint, error) {
@@ -111,6 +117,8 @@ type entryCollector struct {
 	sources []string
 	seen    map[string]bool
 	entries []EntryPoint
+	// keys are the subpath keys of "exports".
+	keys []string
 }
 
 // exports reads the "exports" member: one target, a list of fallbacks, a map
@@ -130,7 +138,8 @@ func (c *entryCollector) exports(raw json.RawMessage) error {
 	if !subpaths {
 		return c.target(".", nil, raw)
 	}
-	for _, subpath := range sortedKeys(members) {
+	c.keys = sortedKeys(members)
+	for _, subpath := range c.keys {
 		if !strings.HasPrefix(subpath, ".") {
 			return fmt.Errorf(`mixes the subpath and condition keys of "exports" (%q)`, subpath)
 		}
@@ -187,12 +196,39 @@ func (c *entryCollector) add(subpath string, conditions []string, target string)
 		for _, source := range c.sources {
 			if len(source) > len(prefix)+len(suffix) && strings.HasPrefix(source, prefix) && strings.HasSuffix(source, suffix) {
 				matched := source[len(prefix) : len(source)-len(suffix)]
-				c.record(strings.Replace(subpath, "*", matched, 1), conditions, source)
+				if resolved := strings.Replace(subpath, "*", matched, 1); !c.shadowed(subpath, resolved) {
+					c.record(resolved, conditions, source)
+				}
 			}
 		}
 		return
 	}
 	c.record(subpath, conditions, target)
+}
+
+// shadowed reports whether a key of "exports" other than pattern maps subpath,
+// so pattern does not: the subpath itself, or a pattern with a longer part
+// before its "*", or of the same part and longer, that matches it. Node
+// resolves a subpath with that key, whatever it maps to, null included.
+func (c *entryCollector) shadowed(pattern, subpath string) bool {
+	prefix, _, _ := strings.Cut(pattern, "*")
+	for _, key := range c.keys {
+		if key == pattern {
+			continue
+		}
+		if key == subpath {
+			return true
+		}
+		keyPrefix, keySuffix, isPattern := strings.Cut(key, "*")
+		if !isPattern || strings.Contains(keySuffix, "*") || len(subpath) < len(keyPrefix)+len(keySuffix) ||
+			!strings.HasPrefix(subpath, keyPrefix) || !strings.HasSuffix(subpath, keySuffix) {
+			continue
+		}
+		if len(keyPrefix) > len(prefix) || (len(keyPrefix) == len(prefix) && len(key) > len(pattern)) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *entryCollector) record(subpath string, conditions []string, target string) {
@@ -218,7 +254,7 @@ func (c *entryCollector) record(subpath string, conditions []string, target stri
 			target, state = resolved, TargetRead
 		}
 	}
-	c.entries = append(c.entries, EntryPoint{Key: key, Target: target, State: state})
+	c.entries = append(c.entries, EntryPoint{Key: key, Subpath: subpath, Target: target, State: state})
 }
 
 // resolve returns the source file a path without an extension names, the way
@@ -235,6 +271,57 @@ func (c *entryCollector) resolve(target string) (string, bool) {
 	return "", false
 }
 
+// ImportAliases returns the aliases the "imports" member of a package.json
+// declares, such as "#src/*", each with the slash paths, relative to the
+// project, that its conditions and fallbacks name. A manifest the check cannot
+// read, or an alias that names another package, gives nothing: the reader then
+// cannot follow the alias.
+func ImportAliases(manifest []byte) map[string][]string {
+	var document struct {
+		Imports map[string]json.RawMessage `json:"imports"`
+	}
+	if json.Unmarshal(manifest, &document) != nil || len(document.Imports) == 0 {
+		return nil
+	}
+	aliases := map[string][]string{}
+	for _, alias := range sortedKeys(document.Imports) {
+		if !strings.HasPrefix(alias, "#") {
+			continue
+		}
+		var targets []string
+		collectTargets(document.Imports[alias], &targets)
+		if len(targets) > 0 {
+			aliases[alias] = targets
+		}
+	}
+	return aliases
+}
+
+// collectTargets appends the relative paths a target, a list of fallbacks or a
+// map of conditions names, in order.
+func collectTargets(raw json.RawMessage, into *[]string) {
+	var value string
+	if json.Unmarshal(raw, &value) == nil {
+		if strings.HasPrefix(value, "./") {
+			*into = append(*into, path.Clean(strings.TrimPrefix(value, "./")))
+		}
+		return
+	}
+	var fallbacks []json.RawMessage
+	if json.Unmarshal(raw, &fallbacks) == nil {
+		for _, fallback := range fallbacks {
+			collectTargets(fallback, into)
+		}
+		return
+	}
+	var nested map[string]json.RawMessage
+	if json.Unmarshal(raw, &nested) == nil {
+		for _, condition := range sortedKeys(nested) {
+			collectTargets(nested[condition], into)
+		}
+	}
+}
+
 func sortedKeys(members map[string]json.RawMessage) []string {
 	keys := make([]string, 0, len(members))
 	for key := range members {
@@ -245,8 +332,8 @@ func sortedKeys(members map[string]json.RawMessage) []string {
 }
 
 // PackageName returns the name an entry point has for an importer: the package
-// name, then the subpath, then the conditions, such as "@scope/lib/hooks" or
-// "@scope/lib (browser)".
+// name, then the subpath, then the conditions when key carries them, such as
+// "@scope/lib/hooks" or "@scope/lib (browser)".
 func PackageName(name, key string) string {
 	subpath, conditions, _ := strings.Cut(key, " ")
 	display := name + strings.TrimPrefix(subpath, ".")

@@ -50,6 +50,9 @@ type File struct {
 type Side struct {
 	Files   []File
 	Entries []EntryPoint
+	// Imports are the aliases the package.json "imports" declares, such as
+	// "#src/*", each with the slash paths it may name (see ImportAliases).
+	Imports map[string][]string
 }
 
 // Surface is the public API of a package in one state.
@@ -72,6 +75,8 @@ type Entry struct {
 	// Key names the entry point: its subpath, and its conditions when they are
 	// not the default one.
 	Key string `json:"key"`
+	// Subpath is the subpath of the entry point, such as "." or "./hooks".
+	Subpath string `json:"-"`
 	// Exports are the exported declarations, in name order. A name that
 	// declares both a value and a type has one of each.
 	Exports []Declaration `json:"exports"`
@@ -83,7 +88,8 @@ type Entry struct {
 	// CommonJS module, and the reader knows none of its exports.
 	Script bool `json:"script"`
 	// Stars are the specifiers of the `export *` the reader cannot follow:
-	// another package, or a file the package does not hold.
+	// another package, an alias that resolves to no file, or a file the
+	// package does not hold.
 	Stars []string `json:"stars"`
 	// Target is the slash path, relative to the project, that the entry point
 	// names.
@@ -128,8 +134,12 @@ type Declaration struct {
 	// no value.
 	TypeOnly bool `json:"typeOnly"`
 	// Namespace lists the names a namespace of this name exports, whether the
-	// declaration is the namespace or merges with it.
+	// declaration is the namespace or merges with it, or the names of the
+	// module an `export * as` names.
 	Namespace []string `json:"namespace"`
+	// Unread says the namespace is a module an `export * as` names that the
+	// reader cannot read whole, so Namespace is not all it exports.
+	Unread bool `json:"unread"`
 }
 
 // TypeParam is one type parameter. Its name is not kept: type parameters are
@@ -185,8 +195,9 @@ type request struct {
 }
 
 type requestSide struct {
-	Files   map[string]string `json:"files"`
-	Entries []requestEntry    `json:"entries"`
+	Files   map[string]string   `json:"files"`
+	Entries []requestEntry      `json:"entries"`
+	Imports map[string][]string `json:"imports"`
 }
 
 type requestEntry struct {
@@ -220,7 +231,7 @@ func Read(bun, projectDir string, sides ...Side) ([]*Surface, error) {
 				entries = append(entries, requestEntry{Key: entry.Key, File: entry.Target})
 			}
 		}
-		input.Sides[i] = requestSide{Files: files, Entries: entries}
+		input.Sides[i] = requestSide{Files: files, Entries: entries, Imports: side.Imports}
 	}
 	payload, err := json.Marshal(input)
 	if err != nil {
@@ -275,7 +286,7 @@ func mergeEntries(declared []EntryPoint, read []Entry) []Entry {
 	entries := make([]Entry, 0, len(declared))
 	for _, point := range declared {
 		entry := byKey[point.Key]
-		entry.Key, entry.Target, entry.State = point.Key, point.Target, point.State
+		entry.Key, entry.Subpath, entry.Target, entry.State = point.Key, point.Subpath, point.Target, point.State
 		entries = append(entries, entry)
 	}
 	return entries

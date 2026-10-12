@@ -279,12 +279,15 @@ func TestABreakingMarkerAllowsTheChange(t *testing.T) {
 		t.Fatalf("error diagnostics = %+v, want none", found)
 	}
 	infos := diagnostics(events, runtime.SeverityInfo)
-	if len(infos) != 1 || !strings.Contains(infos[0].Message, "function greet removed since ts/v0.4.0, declared breaking by") ||
-		!strings.Contains(infos[0].Message, `"feat!: drop the greeting"`) {
-		t.Fatalf("info diagnostics = %+v", infos)
+	want := "@example/lib: function greet removed since ts/v0.4.0; a commit since ts/v0.4.0 declares the breaking change"
+	if len(infos) != 1 || infos[0].Message != want {
+		t.Fatalf("info diagnostics = %+v\nwant one: %q", infos, want)
 	}
-	if data["breakingCommit"] == "" || data["breakingCommit"] == nil {
-		t.Fatalf("data = %v, want the breaking commit", data)
+	if data["breakingDeclared"] != true {
+		t.Fatalf("data = %v, want breakingDeclared", data)
+	}
+	if _, named := data["breakingCommit"]; named {
+		t.Fatalf("data = %v, want no commit named", data)
 	}
 }
 
@@ -294,7 +297,7 @@ func TestABreakingChangeFooterAllowsTheChange(t *testing.T) {
 	f.write("ts/lib/src/index.ts", waveOnlySource)
 	f.commit("refactor: drop the greeting\n\nBREAKING CHANGE: greet is gone")
 	report := f.check()
-	if len(report.Changes) != 1 || report.Breaking == nil || report.Breaking.Subject != "refactor: drop the greeting" {
+	if len(report.Changes) != 1 || !report.Breaking {
 		t.Fatalf("report = %+v", report)
 	}
 }
@@ -307,7 +310,7 @@ func TestAMarkerOnACommitOutsideTheProjectDoesNotCount(t *testing.T) {
 	f.write("ts/lib/src/index.ts", waveOnlySource)
 	f.commit("feat: drop the greeting")
 	report := f.check()
-	if len(report.Changes) != 1 || report.Breaking != nil {
+	if len(report.Changes) != 1 || report.Breaking {
 		t.Fatalf("report = %+v, want one change and no marker", report)
 	}
 }
@@ -361,7 +364,7 @@ func TestAChangedSignatureWarnsAndPassesAndARenamedParameterIsSilent(t *testing.
 	f.write("ts/lib/src/hooks.ts", hooksSource+"\n")
 	f.commit("feat!: greet loudly")
 	_, data, events = f.run()
-	if found := diagnostics(events, runtime.SeverityWarning); len(found) != 0 || data["breakingCommit"] == nil {
+	if found := diagnostics(events, runtime.SeverityWarning); len(found) != 0 || data["breakingDeclared"] != true {
 		t.Fatalf("warnings = %+v, data = %v, want none under a breaking marker", found, data)
 	}
 }
@@ -386,7 +389,7 @@ func TestAnUncommittedRemovalIsChecked(t *testing.T) {
 	f := newFixture(t, catalog("package", "stable"))
 	f.write("ts/lib/src/index.ts", waveOnlySource)
 	report := f.check()
-	if len(report.Changes) != 1 || report.Changes[0].Message != "function greet removed" || report.Breaking != nil {
+	if len(report.Changes) != 1 || report.Changes[0].Message != "function greet removed" || report.Breaking {
 		t.Fatalf("report = %+v", report)
 	}
 }
@@ -754,16 +757,19 @@ func TestAPackageWhoseDirectoryMovedIsComparedWithItsOldDirectory(t *testing.T) 
 	}
 
 	// A breaking marker on a commit that touched only the old directory counts.
-	if report := f.check(); report.Breaking != nil {
-		t.Fatalf("breaking = %+v, want no marker yet", report.Breaking)
+	f.commit("feat: drop the greeting")
+	if report := f.check(); report.Breaking {
+		t.Fatal("breaking = true, want no marker yet")
 	}
-	f.git("mv", "ts/moved", "ts/lib")
+	f.write("ts/lib/NOTES.md", "the package moved to ts/moved\n")
 	f.commit("feat!: declared in the old directory")
-	f.git("mv", "ts/lib", "ts/moved")
-	f.commit("refactor: move the package again")
-	if report := f.check(); report.Breaking == nil || report.Breaking.Subject != "feat!: declared in the old directory" {
-		t.Fatalf("breaking = %+v, want the marker of the commit in the old directory", report.Breaking)
+	if changed, err := gitOutput(f.root, "show", "--name-only", "--format=", "HEAD"); err != nil || strings.TrimSpace(changed) != "ts/lib/NOTES.md" {
+		t.Fatalf("the marker commit touches %q (%v), want only the old directory", changed, err)
 	}
+	if report := f.check(); !report.Breaking {
+		t.Fatal("breaking = false, want the marker of the commit in the old directory")
+	}
+	f.remove("ts/lib/NOTES.md")
 
 	// Two directories of the tag that declare the name give no baseline.
 	f.write("ts/lib/package.json", manifest)
@@ -776,7 +782,8 @@ func TestAPackageWhoseDirectoryMovedIsComparedWithItsOldDirectory(t *testing.T) 
 	f.remove("ts/moved/package.json")
 	f.write("ts/again/package.json", manifest)
 	f.project = filepath.Join(f.root, "ts", "again")
-	if report := f.check(); !strings.Contains(report.Warning, "holds no package.json that declares it") {
+	if report := f.check(); !strings.Contains(report.Warning,
+		"the tag ts/v0.5.0 holds 3 package.json files that declare @example/lib (ts/copy, ts/lib, ts/moved), so the check cannot tell which one released") {
 		t.Fatalf("report = %+v, want a warning for an ambiguous baseline", report)
 	}
 }
@@ -847,8 +854,9 @@ func TestAnEntryPointWithoutAnExtensionIsResolvedAndCompared(t *testing.T) {
 	f.write("ts/lib/src/index.ts", waveOnlySource)
 
 	report := f.check()
-	want := []string{"@example/lib: function greet removed", "@example/lib (types): function greet removed"}
-	if got := messages(report); len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
+	// Both conditions name one subpath: its removal is reported once.
+	want := []string{"@example/lib: function greet removed"}
+	if got := messages(report); !slices.Equal(got, want) {
 		t.Fatalf("changes = %q, want %q", got, want)
 	}
 

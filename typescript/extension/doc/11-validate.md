@@ -73,21 +73,29 @@ the last release and the marker by the same rules.
    directory holds no `package.json` at the tag, the check looks for the one
    `package.json` of the tag that declares the same `name`, and compares with
    its directory: a package that moved keeps its baseline. When no directory of
-   the tag declares the name, or more than one does, nothing is compared. That
-   is a warning for a package the catalog lists as stable, and an information
-   line in a workspace without a catalog.
-3. The public API is what the package's entry points export. The entry points
-   are the targets of `exports` in `package.json`, one per subpath and
-   condition. A package without `exports` declares `.` with `main`,
-   `. (module)` with `module` and `. (types)` with `types`. A subpath pattern
-   such as `"./plugins/*": "./src/plugins/*.ts"` gives one entry point per
-   matching file. A target without an extension is resolved the way Node and
-   TypeScript resolve it: `./src/index` names `src/index.ts`, and `./src`
-   names `src/index.ts`.
+   the tag declares the name, nothing is compared. That is a warning for a
+   package the catalog lists as stable, and an information line in a workspace
+   without a catalog. When more than one directory declares it, the check
+   cannot tell which one released: it warns and names the directories.
+3. The public API is what the package's entry points export. An entry point
+   is a subpath of `exports` in `package.json`, such as `.` or `./hooks`. Its
+   conditions, such as `import`, `types` or `browser`, each name a file, and
+   the subpath exports what any of them exports. A name is gone only when no
+   condition of the subpath exports it now, so moving a subpath from one
+   target to conditions, or back, changes nothing. A package without `exports`
+   declares `.` with `main`, `module` and `types`. A subpath pattern such as
+   `"./plugins/*": "./src/plugins/*.ts"` gives one entry point per matching
+   file, except a subpath that a more specific key maps, `null` included:
+   `"./internal/*": null` keeps `./internal/helper` out. A target without an
+   extension is resolved the way Node and TypeScript resolve it:
+   `./src/index` names `src/index.ts`, and `./src` names `src/index.ts`.
 4. Each entry point is read from source, at the tag and in the working tree,
-   uncommitted edits included. The check follows `export * from` and
-   `export { name } from` into the other files of the package. It parses with
-   the TypeScript parser the workspace installs. Nothing is compiled or
+   uncommitted edits included. The check follows `export * from`,
+   `export type * from`, `export * as name from` and `export { name } from`
+   into the other files of the package. A specifier that ends in `.js` names
+   the `.ts` file of the same name, and an alias that starts with `#` is
+   resolved through the `imports` of `package.json`. It parses with the
+   TypeScript parser the workspace installs. Nothing is compiled or
    type-checked, and no dependency is read.
 5. A declaration the package does not export is compared too, when the
    written types of an exported one name it: the interface a function returns,
@@ -102,11 +110,13 @@ the last release and the marker by the same rules.
 | Change | Example message |
 |---|---|
 | An entry point removed, or pointed at a file that is not source | `@example/lib/hooks: entry point removed` |
+| A file the tag held and the working tree does not, while `package.json` still names it | `@example/lib/legacy: entry point names src/legacy.ts, which the release held and the working tree does not` |
 | An exported function, class, interface, type, enum, variable or namespace removed or renamed | `function greet removed` |
-| A re-export of another package removed | `export * from "dep" removed` |
-| A member removed from an exported class, interface, object type or enum | `method Client.send removed` |
-| A name removed from a namespace, also when the namespace merges with a class, a function or an enum | `namespace member Client.defaults removed` |
-| A declaration that changes kind | `function make is now a class` |
+| A name re-exported from another package removed | `re-export z removed` |
+| A member removed from an exported class, interface, object type or enum, or a member it inherited from a base the check reads | `method Client.send removed` |
+| A name removed from a namespace, also when the namespace merges with a class, a function or an enum, or is the module of `export * as` | `namespace member Client.defaults removed` |
+| A value that becomes a type only, or a type that becomes a value only | `interface Shape is now a variable` |
+| A class or an enum that becomes another kind of declaration | `class make is now a function` |
 | A class that becomes abstract | `class Client is now abstract` |
 | An enum that becomes a `const enum` | `enum Level is now a const enum` |
 | A class, an enum, a function or a variable now exported with `export type` | `class Client is now exported as a type only` |
@@ -115,8 +125,16 @@ the last release and the marker by the same rules.
 | A constructor that took parameters removed | `constructor of Client removed` |
 
 A member that moves to a base class or a base interface is not removed, when
-the check reads that base. The base is resolved in the file that names it, so
-another declaration of the same name elsewhere is never taken for it.
+the check reads that base. A class also has the members of an interface of
+the same name that merges with it, and the constructor of its nearest base
+class when it declares none: a constructor that moves to a base is kept when
+the base declares it with the same visibility. The base is resolved in the
+file that names it, so another declaration of the same name elsewhere is
+never taken for it.
+
+The members a class or an interface inherited at the tag count as its own. A
+class that drops `extends Base` removes the members of `Base` that it does
+not declare now.
 
 ## Warnings: changes of written type
 
@@ -136,7 +154,11 @@ never fails the task.
 | A member that becomes required, optional or abstract; an abstract member added | `property Config.host is now required` |
 | A constructor with required parameters added to a class that had none and extends nothing | `constructor of Box added with required parameters` |
 | A method that becomes a property, or the reverse | `method Client.send is now a property` |
+| A function that becomes a variable, or the reverse; an interface that becomes a type alias, or the reverse | `function handler is now a variable` |
 | The value of an enum member | `enum member Level.Info changed value from 1 to 0` |
+| A member removed from a class or an interface whose base the check cannot read: a base of another package, a base named through a namespace import, a mixin call | `method Client.close removed, unless a base the check cannot read declares it` |
+| An `export *` the check cannot follow, at the tag or now; an export removed while the working tree has one | `export * from "dep" is not compared: the check cannot read the module it names` |
+| The members of `export * as name` whose module the check cannot read whole | `the members of namespace Util are not compared: the check cannot read the whole module it names` |
 | Any change, a removed member included, in a declaration the package does not export and that an exported one names | `property Inner.port removed` |
 
 The last row is a warning on purpose. Importers have no name for a type the
@@ -207,16 +229,18 @@ package and the symbol:
 ```
 
 The package is named as an importer writes it: `@example/lib` for the root
-entry point, `@example/lib/hooks` for a subpath, and `@example/lib (browser)`
-for a condition other than `default`. A changed declaration also carries its
-file and line. Fix the code, or keep the change and commit it with the marker.
+entry point and `@example/lib/hooks` for a subpath. A changed declaration also
+carries its file and line. Fix the code, or keep the change and commit it with
+the marker. Under a marker, each error is information that ends with "a commit
+since ts/v0.4.0 declares the breaking change". The report names no commit: a
+branch and its squash merge that declare the same break give the same verdict.
 
-The task's data holds `compared`, `tag`, `entryPoints` (the number of entry
-points at the tag), `comparedEntryPoints` (the number whose exports were
-compared), `incompatible` (the number of errors), `typeChanges` (the number of
-warnings for a change of written type), `notCompared` (the number of entry
-points the check could not read) and, when a commit declares a breaking
-change, `breakingCommit`. A failure reports the `api-incompatible` metric.
+The task's data holds `compared`, `tag`, `entryPoints` (the number of subpaths
+at the tag), `comparedEntryPoints` (the number whose exports were compared),
+`incompatible` (the number of errors), `typeChanges` (the number of warnings),
+`notCompared` (the number of subpaths the check could not read) and, when a
+commit declares a breaking change, `breakingDeclared`. A failure reports the
+`api-incompatible` metric.
 
 A passing check says how much it compared: "5 entry points keep every export
 and member of ts/v0.4.0; 1 other is still declared and has no exports the
@@ -236,10 +260,18 @@ The task passes without comparing, with a warning diagnostic coded
 | No release tag of the line is reachable while the repository has other tags | a warning: fetch the line's tags |
 | The project's `package.json` at the tag does not parse, is not a regular file or is over 1 MiB | a warning |
 | A source file at the tag does not parse with the installed TypeScript | a warning: update the `typescript` package |
-| An entry point names a source file git does not hold, at the tag or now, such as build output, or a path without an extension that resolves to no source file | a warning for that entry point; the others are compared |
-| An entry point's file at the tag has no `import` and no `export`, or assigns its exports with `export =`: a script or a CommonJS module | a warning for that entry point; the others are compared |
+| A condition of an entry point names a source file git does not hold now, such as build output, or a path without an extension that resolves to no source file | a warning for that entry point; the others are compared |
+| No condition of an entry point names, at the tag, a file the tag holds and the check reads as a module: build output, a script or a CommonJS module, with no `import` and no `export` or with `export =` | a warning for that entry point; the others are compared |
 | The `package.json` at the tag declares no entry point | a warning |
-| The catalog lists the package as stable and no `package.json` of the tag declares its name, or more than one does | a warning |
+| The catalog lists the package as stable and no `package.json` of the tag declares its name | a warning |
+| More than one `package.json` of the tag declares the package's name | a warning that names their directories |
+
+A source file at the tag that does not parse is a warning on purpose, where
+the [Go extension's check](../../../go/extension/doc/validate.md) fails. Go
+source that built at a release parses with every later `go/parser`. A
+TypeScript release may use syntax the installed parser does not read, older
+or newer, and no change to the working tree makes a released file parse:
+failing would block every run until the next release.
 
 These cases fail the task, because the fix is in the working tree:
 
@@ -281,19 +313,21 @@ changes the answer without changing any file a cache key could name.
 - **Declarations held by their existence only.** The check fails on their
   removal and reports nothing else: a name re-exported from another package; a
   name whose declaration is in a file the package does not hold, such as
-  generated code git ignores; the names of `export * as name`, of
-  `export import name = …` and of a destructured export.
+  generated code git ignores; the names of `export import name = …` and of a
+  destructured export.
 - **Names the check does not follow.** A qualified name such as `ns.Type`, a
   `typeof value` type, and a type another package declares.
-- **A member moved to a base the check cannot read** is reported as removed.
-  That is an error for a base from another package.
+- **A member moved to a base the check cannot read** is a warning, not an
+  error: the check cannot tell whether the base declares it.
 - **CommonJS.** A file with no `import` and no `export`, or with `export =`,
   is not compared; the check warns.
 - **Declaration files.** A `.d.ts` module without an export list exports
   every top-level declaration, and the check reads it that way. A `.d.ts`
   script, with no `import` and no `export`, is not compared.
-- **Conditions are separate entry points.** A change to a file that two
-  conditions share is reported once per condition.
+- **Conditions are one entry point.** The exports of a subpath are what any
+  of its conditions exports. A name that one condition drops while another
+  still exports it passes, though an importer that resolves the first
+  condition loses it.
 - **A moved package** is found by its `name`. A package that moved and was
   renamed in one release has no baseline; the check warns.
 - **Commands.** The `bin` entries of a package are not part of the check.

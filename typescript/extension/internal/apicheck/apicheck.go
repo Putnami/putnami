@@ -79,16 +79,14 @@ type Report struct {
 	Warning string
 	// Tag is the line tag the API was compared with.
 	Tag string
-	// EntryPoints is the number of entry points the package declared at Tag.
+	// EntryPoints is the number of subpaths the package declared at Tag.
 	EntryPoints int
-	// Compared is the number of those entry points whose exports were
-	// compared.
+	// Compared is the number of those subpaths whose exports were compared.
 	Compared int
 	// MovedFrom is the directory, relative to the repository root, that held
 	// the package at Tag, when it is not the project's.
 	MovedFrom string
-	// NotCompared says, for each entry point whose exports were not compared
-	// while the others were, why.
+	// NotCompared says, for each subpath whose exports were not compared, why.
 	NotCompared []string
 	// Changes are the changes since Tag that break an importer whatever the
 	// types are: they fail the check without a breaking marker.
@@ -96,15 +94,11 @@ type Report struct {
 	// TypeChanges are the changes of written type since Tag: they are
 	// reported and never fail the check.
 	TypeChanges []apisurface.Change
-	// Breaking is a commit since Tag that declares a breaking change; nil when
-	// none does.
-	Breaking *Commit
-}
-
-// Commit identifies the commit that declares a breaking change.
-type Commit struct {
-	SHA     string
-	Subject string
+	// Breaking reports whether a commit since Tag that touches the package
+	// declares a breaking change. The report names no commit: a branch and its
+	// squash merge that declare the same break with different commits give
+	// the same verdict.
+	Breaking bool
 }
 
 // Run is the task body: it checks the project and reports each incompatible
@@ -206,15 +200,16 @@ func Check(workspaceRoot, projectDir, name string, tags []string) (*Report, erro
 			"so the API is not compared; update the typescript package to read it", first.File, tag, first.Line, first.Message)}, nil
 	}
 
-	report = &Report{Tag: tag, EntryPoints: len(old.Entries), MovedFrom: moved.dir}
-	for _, change := range apisurface.Incompatible(name, old, now) {
+	comparison := apisurface.Compare(name, old, now)
+	report = &Report{Tag: tag, EntryPoints: comparison.Subpaths, Compared: comparison.Compared, MovedFrom: moved.dir,
+		NotCompared: notCompared(name, tag, comparison.Skipped)}
+	for _, change := range comparison.Changes {
 		if change.Warning {
 			report.TypeChanges = append(report.TypeChanges, change)
 		} else {
 			report.Changes = append(report.Changes, change)
 		}
 	}
-	report.NotCompared, report.Compared = notCompared(name, tag, old, now)
 	if len(report.Changes) == 0 && len(report.TypeChanges) == 0 {
 		return report, nil
 	}
@@ -231,12 +226,10 @@ func Check(workspaceRoot, projectDir, name string, tags []string) (*Report, erro
 		}
 		commits = append(commits, before...)
 	}
-	for _, commit := range commits {
-		if parsed, ok := protocolcli.ParseConventionalCommit(commit.subject, commit.body); ok && parsed.Breaking {
-			report.Breaking = &Commit{SHA: commit.sha, Subject: commit.subject}
-			break
-		}
-	}
+	report.Breaking = slices.ContainsFunc(commits, func(c commit) bool {
+		parsed, ok := protocolcli.ParseConventionalCommit(c.subject, c.body)
+		return ok && parsed.Breaking
+	})
 	return report, nil
 }
 
@@ -267,11 +260,17 @@ func releasedSide(projectDir, tag, name string, listed bool) (*apisurface.Side, 
 	}
 	manifest := findManifest(entries)
 	if manifest == nil {
-		top, dir, found, err := packageAtTag(projectDir, tag, name)
+		top, dirs, err := packageAtTag(projectDir, tag, name)
 		if err != nil {
 			return nil, movedPackage{}, nil, err
 		}
-		if !found {
+		if len(dirs) > 1 {
+			// The check does not guess which one released.
+			return nil, movedPackage{}, &Report{Warning: fmt.Sprintf("the tag %s holds %d %s files that declare %s (%s), "+
+				"so the check cannot tell which one released and nothing is compared",
+				tag, len(dirs), apisurface.ManifestFilename, name, strings.Join(dirs, ", "))}, nil
+		}
+		if len(dirs) == 0 {
 			if listed {
 				return nil, movedPackage{}, &Report{Warning: fmt.Sprintf("%s is stable and the tag %s holds no %s that declares it, in this directory or another, "+
 					"so it has no released API to compare with and nothing is compared", name, tag, apisurface.ManifestFilename)}, nil
@@ -279,6 +278,7 @@ func releasedSide(projectDir, tag, name string, listed bool) (*apisurface.Side, 
 			return nil, movedPackage{}, &Report{Note: fmt.Sprintf("the project has no %s at %s: there is no released API to compare with",
 				apisurface.ManifestFilename, tag)}, nil
 		}
+		dir := dirs[0]
 		root, moved = top, movedPackage{top: top, dir: dir}
 		if dir != "." {
 			prefix = dir + "/"
@@ -317,7 +317,7 @@ func releasedSide(projectDir, tag, name string, listed bool) (*apisurface.Side, 
 	if err != nil {
 		return unreadable(err.Error())
 	}
-	return &apisurface.Side{Files: files, Entries: points}, moved, nil, nil
+	return &apisurface.Side{Files: files, Entries: points, Imports: apisurface.ImportAliases(contents[0])}, moved, nil, nil
 }
 
 // findManifest returns the package.json at the top of a listing.
@@ -330,20 +330,19 @@ func findManifest(entries []treeEntry) *treeEntry {
 	return nil
 }
 
-// packageAtTag finds the directory of tag's tree whose package.json declares
-// the package name, for a package whose directory moved since the tag. It
-// returns the repository root and the directory's slash path under it. found
-// is false when no package.json of the tag declares the name, or when more
-// than one does: the check does not guess which one released.
-func packageAtTag(projectDir, tag, name string) (top, dir string, found bool, err error) {
+// packageAtTag finds the directories of tag's tree whose package.json
+// declares the package name, for a package whose directory moved since the
+// tag. It returns the repository root and the slash paths of the directories
+// under it, in tree order.
+func packageAtTag(projectDir, tag, name string) (top string, found []string, err error) {
 	output, err := gitOutput(projectDir, "rev-parse", "--show-toplevel")
 	if err != nil {
-		return "", "", false, err
+		return "", nil, err
 	}
 	top = strings.TrimSpace(output)
 	entries, err := treeAtTag(top, tag, ".", treeListing{recursive: true})
 	if err != nil {
-		return "", "", false, err
+		return "", nil, err
 	}
 	var dirs, objects []string
 	for _, entry := range entries {
@@ -355,25 +354,21 @@ func packageAtTag(projectDir, tag, name string) (top, dir string, found bool, er
 		objects = append(objects, entry.object)
 	}
 	if len(objects) == 0 {
-		return top, "", false, nil
+		return top, nil, nil
 	}
 	contents, err := readBlobs(top, objects)
 	if err != nil {
-		return "", "", false, err
+		return "", nil, err
 	}
 	for i, content := range contents {
 		var document struct {
 			Name string `json:"name"`
 		}
-		if json.Unmarshal(content, &document) != nil || document.Name != name {
-			continue
+		if json.Unmarshal(content, &document) == nil && document.Name == name {
+			found = append(found, dirs[i])
 		}
-		if found {
-			return top, "", false, nil
-		}
-		dir, found = dirs[i], true
 	}
-	return top, dir, found, nil
+	return top, found, nil
 }
 
 // currentSide reads the package in the working tree. A package.json that is
@@ -395,6 +390,7 @@ func currentSide(projectDir string) (apisurface.Side, error) {
 	if side.Entries, err = apisurface.EntryPoints(manifest, paths(files)); err != nil {
 		return apisurface.Side{}, protocolcli.Classify(fmt.Errorf("%s %w", apisurface.ManifestFilename, err), protocolcli.ErrInvalidConfig)
 	}
+	side.Imports = apisurface.ImportAliases(manifest)
 	return side, nil
 }
 
@@ -406,34 +402,27 @@ func paths(files []apisurface.File) []string {
 	return names
 }
 
-// notCompared says, for each entry point both sides declare, why its exports
-// were not compared, and counts the entry points whose exports were. An entry
-// point is not compared when one side names a source file it does not hold,
-// such as build output that is not committed, or when the released target is
-// not an ES module.
-func notCompared(name, tag string, old, current *apisurface.Surface) (reasons []string, compared int) {
-	for _, entry := range old.Entries {
-		for _, now := range current.Entries {
-			if now.Key != entry.Key {
-				continue
-			}
-			pkg := apisurface.PackageName(name, entry.Key)
-			switch {
-			case apisurface.Compared(entry, now):
-				compared++
-			case now.State == apisurface.TargetMissing:
-				reasons = append(reasons, fmt.Sprintf("%s: the entry point names %s, which the project does not hold, "+
-					"so its exports are not compared; name a source file git tracks", pkg, now.Target))
-			case entry.State == apisurface.TargetMissing:
-				reasons = append(reasons, fmt.Sprintf("%s: the entry point named %s at %s, which the tag does not hold, "+
-					"so its exports are not compared", pkg, entry.Target, tag))
-			case entry.State == apisurface.TargetRead && now.State == apisurface.TargetRead:
-				reasons = append(reasons, fmt.Sprintf("%s: %s at %s has no import and no export, or assigns its exports with `export =`, "+
-					"so it is a script or a CommonJS module and its exports are not compared; the check reads ES modules", pkg, entry.Target, tag))
-			}
+// notCompared says why the exports of each skipped subpath were not compared:
+// a condition names a source file the project does not hold, such as build
+// output that is not committed; the release did not hold its target; or the
+// released target is not an ES module.
+func notCompared(name, tag string, skipped []apisurface.Skipped) []string {
+	reasons := make([]string, 0, len(skipped))
+	for _, skip := range skipped {
+		pkg := apisurface.PackageName(name, skip.Subpath)
+		switch skip.Reason {
+		case apisurface.MissingNow:
+			reasons = append(reasons, fmt.Sprintf("%s: the entry point names %s, which the project does not hold, "+
+				"so its exports are not compared; name a source file git tracks", pkg, skip.Target))
+		case apisurface.MissingThen:
+			reasons = append(reasons, fmt.Sprintf("%s: the entry point named %s at %s, which the tag does not hold, "+
+				"so its exports are not compared", pkg, skip.Target, tag))
+		case apisurface.Script:
+			reasons = append(reasons, fmt.Sprintf("%s: %s at %s has no import and no export, or assigns its exports with `export =`, "+
+				"so it is a script or a CommonJS module and its exports are not compared; the check reads ES modules", pkg, skip.Target, tag))
 		}
 	}
-	return reasons, compared
+	return reasons
 }
 
 // render reports a check on the event stream and returns the task's status
@@ -470,17 +459,16 @@ func render(emit *jsonl.Emitter, workspaceRoot, projectDir string, report *Repor
 		emit.Info(fmt.Sprintf("the package was in %s at %s: the API is compared with that directory", report.MovedFrom, report.Tag))
 	}
 	data["typeChanges"] = len(report.TypeChanges)
-	declared := ""
-	if report.Breaking != nil {
-		data["breakingCommit"] = report.Breaking.SHA
-		declared = fmt.Sprintf("declared breaking by %s %q", shortSHA(report.Breaking.SHA), report.Breaking.Subject)
+	declared := fmt.Sprintf("a commit since %s declares the breaking change", report.Tag)
+	if report.Breaking {
+		data["breakingDeclared"] = true
 	}
 	// A change of written type never fails: a warning, or information once a
 	// commit declares the release breaking.
 	for _, change := range report.TypeChanges {
 		file, line := location(workspaceRoot, projectDir, change.File, change.Line)
-		if report.Breaking != nil {
-			emit.DiagnosticWithCode("info", fmt.Sprintf("%s: %s since %s, %s",
+		if report.Breaking {
+			emit.DiagnosticWithCode("info", fmt.Sprintf("%s: %s since %s; %s",
 				change.Package, change.Message, report.Tag, declared), file, line, 0, TypeChangeCode)
 			continue
 		}
@@ -512,13 +500,13 @@ func render(emit *jsonl.Emitter, workspaceRoot, projectDir string, report *Repor
 		return "OK", data, nil
 	}
 
-	if report.Breaking != nil {
+	if report.Breaking {
 		for _, change := range report.Changes {
 			file, line := location(workspaceRoot, projectDir, change.File, change.Line)
-			emit.DiagnosticWithCode("info", fmt.Sprintf("%s: %s since %s, %s",
+			emit.DiagnosticWithCode("info", fmt.Sprintf("%s: %s since %s; %s",
 				change.Package, change.Message, report.Tag, declared), file, line, 0, Code)
 		}
-		emit.Info(fmt.Sprintf("%s since %s, %s", changeCount(report), report.Tag, declared))
+		emit.Info(fmt.Sprintf("%s since %s; %s", changeCount(report), report.Tag, declared))
 		emit.PhaseEnd(phase, "success")
 		return "OK", data, nil
 	}
@@ -564,13 +552,6 @@ func location(workspaceRoot, projectDir, file string, line int) (string, int) {
 		full = rel
 	}
 	return filepath.ToSlash(full), line
-}
-
-func shortSHA(sha string) string {
-	if len(sha) > 12 {
-		return sha[:12]
-	}
-	return sha
 }
 
 func isOrAre(n int) string {

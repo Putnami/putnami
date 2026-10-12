@@ -1,7 +1,7 @@
 // Reads the exported declarations of TypeScript packages for the API check.
 //
 // Input, one JSON document on stdin:
-//   { typescript, sides: [{ files: { "<path>": "<text>" }, entries: [{ key, file }] }] }
+//   { typescript, sides: [{ files: { "<path>": "<text>" }, entries: [{ key, file }], imports: { "<alias>": ["<path>"] } }] }
 // Output, one JSON document on stdout:
 //   { sides: [{ entries: [{ key, exports, referenced, stars, script }], errors }] }
 //
@@ -27,6 +27,7 @@ function scriptKind(file) {
 
 function readSide(side) {
   const files = new Map(Object.entries(side.files));
+  const imports = side.imports ?? {};
   const modules = new Map();
   const errors = [];
   const printer = ts.createPrinter({ removeComments: true, omitTrailingSemicolon: true });
@@ -615,8 +616,11 @@ function readSide(side) {
         explicit = true;
         const from = statement.moduleSpecifier?.text;
         const clause = statement.exportClause;
-        if (!clause) module.stars.push(from);
-        else if (ts.isNamespaceExport(clause)) module.exports.set(clause.name.text, { from, name: "*" });
+        // `export type *` carries the names of the module as types only.
+        if (!clause) module.stars.push({ from, typeOnly: Boolean(statement.isTypeOnly) });
+        else if (ts.isNamespaceExport(clause)) {
+          module.exports.set(clause.name.text, { from, name: "*", typeOnly: Boolean(statement.isTypeOnly) });
+        }
         else {
           for (const element of clause.elements) {
             const source = (element.propertyName ?? element.name).text;
@@ -679,17 +683,47 @@ function readSide(side) {
     return module;
   }
 
-  // resolveModule returns the file a relative specifier names, or undefined
-  // for another package or a file the side does not hold.
+  // resolveModule returns the file a specifier names: a relative path, or an
+  // alias of the package.json "imports"; undefined for another package, an
+  // alias the package does not declare, or a file the side does not hold.
   function resolveModule(fromFile, specifier) {
+    if (specifier?.startsWith("#")) {
+      return aliasTargets(specifier).map(resolvePath).find(Boolean);
+    }
     if (!specifier?.startsWith(".")) return undefined;
-    const base = path.posix.normalize(path.posix.join(path.posix.dirname(fromFile), specifier));
+    return resolvePath(path.posix.normalize(path.posix.join(path.posix.dirname(fromFile), specifier)));
+  }
+
+  // resolvePath returns the source file a project path names, the way
+  // TypeScript resolves an import: the path, the TypeScript file a .js path
+  // stands for, the path plus a source extension, or a directory index.
+  function resolvePath(base) {
     const candidates = [base];
     const extension = path.posix.extname(base);
     for (const replacement of JS_TO_TS[extension] ?? []) candidates.push(base.slice(0, -extension.length) + replacement);
     for (const suffix of SOURCE_EXTENSIONS) candidates.push(base + suffix);
     for (const suffix of SOURCE_EXTENSIONS) candidates.push(`${base}/index${suffix}`);
     return candidates.find((candidate) => files.has(candidate));
+  }
+
+  // aliasTargets returns the project paths an "imports" alias names: the
+  // targets of its exact key, else of the pattern key with the longest part
+  // before its "*" that matches it.
+  function aliasTargets(specifier) {
+    if (imports[specifier]) return imports[specifier];
+    let best;
+    for (const key of Object.keys(imports)) {
+      const star = key.indexOf("*");
+      if (star < 0 || key.indexOf("*", star + 1) >= 0) continue;
+      const prefix = key.slice(0, star);
+      const suffix = key.slice(star + 1);
+      if (specifier.length < prefix.length + suffix.length) continue;
+      if (!specifier.startsWith(prefix) || !specifier.endsWith(suffix)) continue;
+      if (best && best.prefix.length >= prefix.length) continue;
+      best = { key, prefix, matched: specifier.slice(prefix.length, specifier.length - suffix.length) };
+    }
+    if (!best) return [];
+    return imports[best.key].map((target) => target.replace("*", best.matched));
   }
 
   function outside(name, from, importedName) {
@@ -705,19 +739,32 @@ function readSide(side) {
     const entry = module.exports.get(name);
     if (entry) return resolveReference(module, entry, exportedAs, seen);
     if (name === "default") return [];
-    for (const from of module.stars) {
-      const target = resolveModule(module.file, from);
+    for (const star of module.stars) {
+      const target = resolveModule(module.file, star.from);
       if (!target) continue;
       const found = resolveExport(loadModule(target), name, exportedAs, seen);
-      if (found.length) return found;
+      if (found.length) return typeOnly(found, star.typeOnly);
     }
     return [];
   }
 
   function resolveImport(module, from, importedName, exportedAs, seen) {
     const target = resolveModule(module.file, from);
+    if (importedName === "*" && (target || from.startsWith(".") || from.startsWith("#"))) {
+      // A namespace object: its members are the names the module exports. A
+      // module the side does not hold, or one with an `export *` the reader
+      // cannot follow, has names the reader does not know.
+      const declaration = { name: exportedAs, kind: "namespace", file: target ?? "", line: 1, unread: !target };
+      if (target) {
+        const names = new Set();
+        const stars = new Set();
+        exportedNames(loadModule(target), names, stars, new Set());
+        declaration.namespace = [...names].sort();
+        declaration.unread = stars.size > 0;
+      }
+      return [declaration];
+    }
     if (!target) return outside(exportedAs, from, importedName);
-    if (importedName === "*") return [{ name: exportedAs, kind: "namespace", file: target, line: 1 }];
     const found = resolveExport(loadModule(target), importedName, exportedAs, seen);
     return found.length ? found : [{ name: exportedAs, kind: "unknown" }];
   }
@@ -783,7 +830,7 @@ function readSide(side) {
     if (seen.has(module.file)) return;
     seen.add(module.file);
     for (const name of module.exports.keys()) names.add(name);
-    for (const from of module.stars) {
+    for (const { from } of module.stars) {
       const target = resolveModule(module.file, from);
       if (!target) {
         stars.add(from.startsWith(".") ? path.posix.normalize(path.posix.join(path.posix.dirname(module.file), from)) : from);

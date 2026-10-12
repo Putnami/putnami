@@ -62,10 +62,11 @@ never type-checks, compiles or installs.**
   object type.
 - **The check fails only on a change that breaks an importer whatever the
   types are.** That is a closed list: an entry point, an export or a member
-  removed; a declaration that changes kind, becomes abstract, becomes a
-  `const enum` or is exported as a type only; a member or a constructor with
-  less visibility; a property that can no longer be written; a constructor
-  that took parameters removed.
+  removed; a value that becomes a type only or the reverse; a class or an enum
+  that becomes another kind of declaration; a class that becomes abstract; an
+  enum that becomes a `const enum`; a member or a constructor with less
+  visibility; a property that can no longer be written; a constructor that
+  took parameters removed.
 - **Every change of written type is a warning and never fails.** Signatures,
   the types of variables and members, type aliases, type parameters, heritage
   clauses and members added as required are compared and reported. Whether
@@ -73,19 +74,29 @@ never type-checks, compiles or installs.**
   compute. The author decides and adds the marker. No change of written type
   is recognized as compatible: a rule that hid a widened parameter only
   removed warnings, could never turn a failure into a pass, and was deleted.
+- **A removal the check cannot confirm is a warning.** A member that a base
+  the check cannot read may declare, and an export that an `export *` the
+  check cannot follow may still export, are reported without failing. So is
+  another kind of declaration that keeps its uses: an interface written as a
+  type alias, a function written as a variable.
+- **An entry point is a subpath.** It exports what any of its conditions
+  exports, so restructuring the conditions of a subpath changes nothing.
 - The reader follows a name that the written types of an exported declaration
   use, when the package declares it without exporting it. It stays in the
   files of the package, reads each declaration once, and keeps two
   declarations of one name in two files apart. Every change in such a
   declaration is a warning, a removed member included: importers have no name
   for the type.
-- A heritage clause is resolved in the file that writes it. A member that
-  moves to a base the check reads is not a removal, and a base of the same
-  name in another file is never taken for it.
+- A heritage clause is resolved in the file that writes it, on both sides. A
+  member that moves to a base the check reads is not a removal, and a base of
+  the same name in another file is never taken for it. A member inherited at
+  the tag counts as declared: dropping a base removes its members.
 - `internal/apisurface/diff.go` holds the rules, in Go, where they are tested
   without bun.
-- The catalog and the tag are read by the Go check's own code, copied into
-  `internal/apicheck` (`support.go`, `git.go`). The marker is read by
+- The catalog is read by the Go check's own code, copied into
+  `internal/apicheck/support.go`. The last release is read by
+  `linetag.LastRelease`, the function the version bump and the Go check call.
+  The marker is read by
   `ParseConventionalCommit` of `protocols/cli`, the function the version bump
   and the Go check call.
 
@@ -105,6 +116,9 @@ never type-checks, compiles or installs.**
 - A change of written type never fails the task
   (`TestAChangedSignatureWarnsAndPassesAndARenamedParameterIsSilent`,
   `TestATypeChangeNextToARemovalFailsOnTheRemovalAlone`).
+- A removal that a base or an `export *` the check cannot read may cover is a
+  warning, and so is a declaration of another kind that keeps its uses
+  (`TestComparisons`).
 - A base is the one its own file names
   (`TestABaseIsResolvedInTheFileThatNamesIt`).
 - The check never says an API it did not compare holds: an entry point it
@@ -125,8 +139,8 @@ never type-checks, compiles or installs.**
 - What the check does not see is listed in
   [doc/11-validate.md](../11-validate.md#limits). The main one: a type the
   source does not write is not compared.
-- The extension holds a copy of the Go check's reading of the catalog and the
-  tag. The two copies must stay equal.
+- The extension holds a copy of the Go check's reading of the catalog. The two
+  copies must stay equal.
 
 ## When to revisit
 
@@ -137,8 +151,8 @@ never type-checks, compiles or installs.**
   type is written in source. Then `ts.transpileDeclaration` gives the
   declaration of each file without a type-check, and the unwritten-type limit
   goes away.
-- When the catalog and tag readers move to a package both extensions can
-  import, delete the copy.
+- When the catalog reader moves to a package both extensions can import,
+  delete the copy.
 
 ## Rejected alternatives
 
