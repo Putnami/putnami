@@ -68,8 +68,11 @@ func TestHostProcessProgressSeesAProcessStoppedBeforeItsFirstInstructionHeld(t *
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
+	// A kill sent to a stopped traced process stays pending until its tracer
+	// lets it go, so the test detaches after the kill.
 	defer func() {
 		_ = cmd.Process.Kill()
+		_ = syscall.PtraceDetach(cmd.Process.Pid)
 		_ = cmd.Wait()
 	}()
 	waitStopped(t, cmd.Process.Pid, syscall.SIGTRAP)

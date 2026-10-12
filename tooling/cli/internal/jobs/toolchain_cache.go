@@ -19,10 +19,10 @@ import (
 // The time the host holds a new process before that, such as darwin's check of
 // a freshly written executable, is not charged to it, and neither is the time
 // the probe then waits for a CPU: uncountedTimeBound bounds both together. A
-// tool that blocks before its first sample, such as a wrapper waiting on a
-// hung child, reads as held and stalls up to that bound. The CPU wait of the
-// probe's children is not read: a wrapper waiting on a child that waits for a
-// CPU is charged for that time.
+// tool that blocks before its first sample reads as running once it got past
+// its loader, so a wrapper waiting on a hung child stops at this deadline. The
+// CPU wait of the probe's children is not read: a wrapper waiting on a child
+// that waits for a CPU is charged for that time.
 const toolVersionProbeTimeout = 5 * time.Second
 
 // toolVersionProbeWaitDelay bounds the drain AFTER the deadline kills the child.

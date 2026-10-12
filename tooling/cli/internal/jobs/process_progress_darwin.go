@@ -133,8 +133,8 @@ func decodeTaskProgress(info []byte) (taskProgress, error) {
 }
 
 // hasRunItsOwnCode reports that the process pid holds memory that only code
-// running in it allocates: a region tagged by malloc, by dyld or by the
-// once-only allocator of libSystem. exec gives the new process a fresh address
+// running in it allocates: a region tagged by malloc and the other user-space
+// allocators, by dyld or by the once-only allocator of libSystem. exec gives the new process a fresh address
 // space whose only tagged region is its stack, so a process the host holds
 // before its first instruction has none. dyld and the libSystem initializer
 // create them before main, whatever the parent and the arguments. A process
@@ -155,8 +155,9 @@ func hasRunItsOwnCode(pid int) bool {
 }
 
 // allocatedByOwnCode reports that tag, a region's user tag
-// (<mach/vm_statistics.h>), names an allocator that runs in the process:
-// VM_MEMORY_MALLOC to VM_MEMORY_MALLOC_PROB_GUARD, VM_MEMORY_DYLD,
+// (<mach/vm_statistics.h>), names an allocator that runs in the process: the
+// tags from VM_MEMORY_MALLOC to VM_MEMORY_MALLOC_PROB_GUARD, which also
+// include VM_MEMORY_SBRK and VM_MEMORY_ANALYSIS_TOOL, VM_MEMORY_DYLD,
 // VM_MEMORY_DYLD_MALLOC and VM_MEMORY_OS_ALLOC_ONCE.
 func allocatedByOwnCode(tag uint32) bool {
 	return tag >= 1 && tag <= 13 || tag == 60 || tag == 61 || tag == 73
