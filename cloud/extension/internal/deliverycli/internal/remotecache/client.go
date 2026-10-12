@@ -276,9 +276,8 @@ type KeyInput struct {
 }
 
 // BuildRequest constructs a negotiate request from inputs, keeping only keys
-// eligible for remote caching (not side-effecting and past the break-even
-// guard) and applying canonical ordering. The number of remote-eligible keys is
-// typically far smaller than the full plan.
+// eligible for remote caching (every key whose task is not side-effecting)
+// and applying canonical ordering.
 func (c *Client) BuildRequest(inputs []KeyInput) *cache.NegotiateRequest {
 	req := &cache.NegotiateRequest{
 		ProtocolVersion: cache.ProtocolVersion,

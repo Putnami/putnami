@@ -291,19 +291,18 @@ func releaseSetContractError(subject string, diagnostics []diag.Diagnostic, exit
 }
 
 // resolveReleaseSetProviderCredential selects the native Put credential for
-// the configured Put host. A sealed managed-publish broker advertises its
-// exclusive credential by storing PutAuth for that exact host; once present,
-// any exchange failure is terminal and can never fall through to a human
-// session. A normal user path mints the same aud=distribution token used by
-// `cloud token --for put`, whose bare marker delegates namespace authority to
-// the registry's IAM projection.
+// the configured Put host. A machine credential stored in PutAuth for that
+// exact host is exclusive: once present, any exchange failure is terminal and
+// can never fall through to a human session. A normal user path mints the
+// same aud=distribution token used by `cloud token --for put`, whose bare
+// marker delegates namespace authority to the registry's IAM projection.
 //
-// The one stored credential that does not take the broker path is a lease
+// The one stored credential that does not take the stored path is a lease
 // bearer that is no longer fresh (stalePutLease): `cloud token --for put
 // --materialize` leaves such a lease behind after its one invocation, and
 // put-server can only answer it with 401. That entry is skipped, not deleted,
 // and the user path mints a fresh token. A fresh stored lease, a lease
-// without an exp claim and an opaque key keep the broker path.
+// without an exp claim and an opaque key keep the stored path.
 func resolveReleaseSetProviderCredential(
 	params map[string]any,
 	workspaceRoot string,
@@ -479,10 +478,9 @@ type verbatimReleaseSetBodyKey struct{}
 
 // verbatimReleaseSetClient sends the validated protocol bytes in place of the
 // generated client's re-encoding. The generated body orders its keys
-// alphabetically, the protocol does not, and the CI publication broker
-// compares each inherited member byte for byte with the one put-server
-// resolved. A re-encoded member never matched, so the broker refused every
-// release that inherited one.
+// alphabetically and the protocol does not, so a receiver that compares an
+// inherited member byte for byte with the one put-server resolved never
+// matches a re-encoded member, so the wire carries the protocol encoding.
 func verbatimReleaseSetClient(base *http.Client) *http.Client {
 	if base == nil {
 		base = http.DefaultClient

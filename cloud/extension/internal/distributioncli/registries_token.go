@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -160,15 +158,6 @@ func mintUserRegistryToken(
 	ioctx clicore.IO,
 	endpoint RegistryEndpoint,
 ) (string, error) {
-	// A private runner broker substitutes its upstream bearer. The local
-	// capability already held by this gated process must never be exchanged
-	// through human OAuth or cached as a registry credential.
-	if token := clicore.EnvGet(env, "PUTNAMI_CLOUD_TOKEN"); token != "" && privateRegistryBroker(endpoint.URL) {
-		if !regproto.ValidBearer(token) {
-			return "", clicore.NewError("private registry capability is invalid", clicore.ExitAuth)
-		}
-		return token, nil
-	}
 	clientID := registryTokenClientID(params, env)
 	requestedScope := RegistryMarkerScope(endpoint.Registry)
 	if requestedScope == "" {
@@ -590,13 +579,4 @@ func readDockerToken(env map[string]string, host string) (string, error) {
 		return token, nil
 	}
 	return "", nil
-}
-
-func privateRegistryBroker(raw string) bool {
-	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Scheme != "http" || parsed.Port() == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return false
-	}
-	address := net.ParseIP(parsed.Hostname())
-	return address != nil && address.IsLoopback()
 }

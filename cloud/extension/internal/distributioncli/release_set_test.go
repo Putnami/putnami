@@ -234,9 +234,9 @@ func TestReleaseSetOperationsPostOneStrictV2Exchange(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				// The publication broker compares inherited members byte for
-				// byte, so the wire carries the protocol encoding, not the
-				// generated client's alphabetical one.
+				// A receiver may compare inherited members byte for byte, so
+				// the wire carries the protocol encoding, not the generated
+				// client's alphabetical one.
 				if !bytes.Equal(raw, prepared.body) {
 					t.Fatalf("posted body = %s, want the validated protocol bytes %s", raw, prepared.body)
 				}

@@ -39,12 +39,11 @@ type uploadWindowLimit struct {
 	// blobs than that still stores: it goes alone, and its blobs are asked
 	// about in several find-missing requests.
 	blobs int
-	// bytes caps the encoded entries at half the 1 MiB the cache server reads
-	// of a commit-batch body, so that body always fits with room for its
-	// envelope. The 1 MiB is the route's own bound: every cache-server route
-	// but upload-batch reads at most that, whatever the server's body limit
-	// (16 MiB) allows. The window's small blobs do not count here: they travel
-	// in upload-batch requests, bounded on their own
+	// bytes caps the encoded entries at 512 KiB, which keeps one commit-batch
+	// body small. An entry over the cap goes alone: cache-server reads the
+	// body of a write route up to 16 MiB, so one entry of a few MiB still
+	// commits. The window's small blobs do not count here: they travel in
+	// upload-batch requests, bounded on their own
 	// (remotecache.maxInlineBatchBytes).
 	bytes int
 	// blobBytes caps the size of the distinct blobs, as the manifests declare

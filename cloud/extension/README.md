@@ -755,8 +755,8 @@ surfaces the server's 403 cleanly.
   `12h`, `2w`) or an explicit RFC 3339 timestamp. The raw `pkt_*` is printed
   **exactly once** with a "store it now, it won't be shown again" warning and
   paste-ready hints (a GitHub Actions `gh secret set PUTNAMI_CLOUD_TOKEN` line,
-  plus `PUTNAMI_CACHE_TOKEN` and `PUTNAMI_E2E_TOKEN` exports). The CLI never
-  persists the secret. Use resource-owned machine scopes such as `cache.read`,
+  plus `export PUTNAMI_CLOUD_TOKEN` and `export PUTNAMI_E2E_TOKEN` lines). The
+  CLI never persists the secret. Use resource-owned machine scopes such as `cache.read`,
   `deploy.read`, `deploy.write`, and `delivery.ingest`. `cache.write` gives a
   workspace machine token nothing: only a hosted CI run writes to the build
   cache. Human management scopes like `apikeys:write` belong to the signed-in

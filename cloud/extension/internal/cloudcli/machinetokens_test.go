@@ -86,7 +86,11 @@ func TestMachineTokensCreateShapesWorkspaceOwnedRequest(t *testing.T) {
 	}
 	assertContains(t, joined, "shown only once")
 	assertContains(t, joined, "gh secret set PUTNAMI_CLOUD_TOKEN")
-	assertContains(t, joined, "PUTNAMI_CACHE_TOKEN")
+	// One variable serves a session with no signed-in user, the build cache
+	// included: the reveal does not ask for a second one.
+	assertContains(t, joined, `export PUTNAMI_CLOUD_TOKEN="pkt_01_secret_ci-deploy"`)
+	assertContains(t, joined, "with the cache.read scope it also reads the build cache")
+	assertNotContains(t, joined, "PUTNAMI_CACHE_TOKEN")
 	assertContains(t, joined, "PUTNAMI_E2E_TOKEN")
 }
 

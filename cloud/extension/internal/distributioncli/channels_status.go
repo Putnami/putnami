@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	ciproto "go.putnami.dev/protocol/ci"
@@ -56,7 +55,7 @@ func ChannelsStatus(params map[string]any, args []string, workspaceRoot string, 
 		return clicore.WriteStatus(params, ioctx, clicore.UnknownStatus("channels."+channel, channel, err, ""))
 	}
 	provider := &channelProvider{params: params, workspaceRoot: workspaceRoot, env: env, ioctx: ioctx}
-	deadline := time.Now().Add(wait.duration)
+	deadline := channelNow().Add(wait.duration)
 	for {
 		response, err := provider.channelStatus(namespace, channel)
 		var node clicore.StatusNode
@@ -72,7 +71,7 @@ func ChannelsStatus(params map[string]any, args []string, workspaceRoot string, 
 				clicore.CountMetric("registries_behind", "registries behind", channelRegistriesBehind(node), clicore.MetricHealth),
 			}
 		}
-		if node.State == clicore.StatusOK || !time.Now().Before(deadline) {
+		if node.State == clicore.StatusOK || !channelNow().Before(deadline) {
 			if node.State != clicore.StatusOK && wait.duration > 0 {
 				// --wait gates a script: a channel not served when the wait
 				// ends fails, whether a registry is behind or the provider

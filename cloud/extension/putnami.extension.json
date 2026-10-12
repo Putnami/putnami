@@ -2916,12 +2916,15 @@
       ],
       "cwd": "{projectRoot}",
       "cache": false,
+      "inputs": {
+        "harness": {"from": "project", "files": ["*.sh", "*.json", "tests/**", "samples/**"]}
+      },
       "declares": {
         "effects": [
           "process"
         ]
       },
-      "description": "Execute the project's committed shell test harness at tests/run.sh; its exit status is the verdict. Uncached on purpose: the harness drives real git and process fixtures, so its inputs are wider than any declarable file set and a stale hit would report a green gate for an unexercised entrypoint. The limit is 900 s because the harness runs a cold `putnami test` of the libs it covers.",
+      "description": "Execute the project's committed shell test harness at tests/run.sh; its exit status is the verdict. Uncached on purpose: the harness drives real git and process fixtures, so its inputs are wider than any declarable file set and a stale hit would report a green gate for an unexercised entrypoint. The declared inputs do not key a cache; they make a change to the project's scripts, contracts or tests select this task under --impacted, which selects nothing for a file no task reads. The limit is 900 s because the harness runs a cold `putnami test` of the libs it covers.",
       "timeoutMs": 900000
     },
     "cloud-cache-provider": {
