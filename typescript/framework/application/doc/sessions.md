@@ -38,7 +38,7 @@ session:
   ttl: 604800                # 1 week in seconds
 ```
 
-`cookieSecret` is sensitive: `infra/requirements.json` lists it as the secret `session.cookie_secret`, and Cloud publish skips its value in config files, so set it where secrets belong. The app starts without it; the first cookie access fails.
+`cookieSecret` is sensitive: `infra/requirements.json` lists it as `session.cookie_secret`, and Cloud publish skips its value in every `conf/env*.yaml` file. Store it as a Cloud secret under its config key with `putnami cloud secrets set <app> session.cookieSecret --env <env> --from-stdin`. The app starts without it; the first cookie access fails.
 
 The `oAuth2()` plugin declares the `session` block in `schema/config.json`. An app that uses sessions without that plugin declares the block itself, for example with `configToken(SessionConfig)` at module level.
 
