@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import type { HttpPlugin, RouteHandler } from '@putnami/application';
-import { type HttpRequestContext, HttpResponse } from '@putnami/application';
+import { type HttpRequestContext, HttpResponse, redirect } from '@putnami/application';
 import { HttpException } from '@putnami/runtime';
 import type { RouteObject } from 'react-router';
 import { runInContext } from '../../runtime/src/context/context.utils';
@@ -69,6 +69,14 @@ describe('action outcome slot', () => {
 
     expect(response.status).toBe(404);
     expect(outcomeOf(ctx)).toEqual({ route: '/tasks/[id]', outcome: 'error' });
+  });
+
+  it('records ok for a thrown redirect and rethrows it', async () => {
+    const ctx = createContext(ROUTE);
+    const wrapped = actionHandler(() => redirect('/tasks'));
+
+    await expect(runInContext(ctx as never, async () => await wrapped())).rejects.toBeInstanceOf(HttpResponse);
+    expect(outcomeOf(ctx)?.outcome).toBe('ok');
   });
 
   it('records error and rethrows an unknown failure', async () => {
@@ -186,6 +194,14 @@ describe('action outcome slot — the HTTP form route', () => {
     await route(ctx);
 
     expect(outcomeOf(ctx)?.outcome).toBe('validation_error');
+  });
+
+  it('publishes ok for a thrown redirect, which is how redirect() ends an action', async () => {
+    const ctx = createContext(ROUTE);
+    const route = registerAction(() => redirect('/tasks'));
+
+    await expect(route(ctx)).rejects.toBeInstanceOf(HttpResponse);
+    expect(outcomeOf(ctx)?.outcome).toBe('ok');
   });
 
   it('publishes error and rethrows when the action throws', async () => {

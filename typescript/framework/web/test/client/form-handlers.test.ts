@@ -164,7 +164,7 @@ describe('Client Form Handlers', () => {
       });
       fetchMock.mockImplementationOnce(async (_input, init) => {
         expect(init?.method).toBe('POST');
-        expect(init?.headers).toEqual({ 'X-CSRF-Token': 'token-123' });
+        expect(init?.headers).toEqual({ 'X-Putnami-Action': '1', 'X-CSRF-Token': 'token-123' });
         expect(init?.body).toBeInstanceOf(FormData);
         return new Response(JSON.stringify({ saved: true }), { status: 201 });
       });
@@ -196,6 +196,57 @@ describe('Client Form Handlers', () => {
       } as never);
 
       expect(result).toEqual({ status: 422, ok: false, message: 'invalid' });
+    });
+
+    const submit = () =>
+      clientActionHandler({
+        request: new Request('http://localhost/app/tasks/7', { method: 'POST', body: new FormData() }),
+      } as never);
+
+    it('returns a router redirect, resolved against the action URL, when the action redirects', async () => {
+      fetchMock.mockImplementationOnce(
+        async () =>
+          new Response(null, {
+            status: 204,
+            headers: { 'X-Putnami-Redirect': '../done?from=7', 'X-Putnami-Redirect-Status': '303' },
+          }),
+      );
+
+      const result = (await submit()) as Response;
+
+      expect(result).toBeInstanceOf(Response);
+      expect(result.status).toBe(303);
+      expect(result.headers.get('Location')).toBe('http://localhost/app/done?from=7');
+    });
+
+    it('keeps a redirect to another origin absolute', async () => {
+      fetchMock.mockImplementationOnce(
+        async () =>
+          new Response(null, {
+            status: 204,
+            headers: { 'X-Putnami-Redirect': 'https://idp.example.com/authorize' },
+          }),
+      );
+
+      const result = (await submit()) as Response;
+
+      expect(result.status).toBe(302);
+      expect(result.headers.get('Location')).toBe('https://idp.example.com/authorize');
+    });
+
+    it('falls back to 302 for a status React Router does not follow', async () => {
+      fetchMock.mockImplementationOnce(
+        async () =>
+          new Response(null, {
+            status: 204,
+            headers: { 'X-Putnami-Redirect': '/tasks', 'X-Putnami-Redirect-Status': '300' },
+          }),
+      );
+
+      const result = (await submit()) as Response;
+
+      expect(result.status).toBe(302);
+      expect(result.headers.get('Location')).toBe('http://localhost/tasks');
     });
   });
 });

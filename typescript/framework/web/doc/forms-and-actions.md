@@ -439,6 +439,12 @@ export default action(async (ctx) => {
 });
 ```
 
+A `<Form>` follows the redirect in the app: the router renders the target page,
+or loads it as a new document when it is on another origin. A plain HTML form
+POST, without JavaScript, receives the redirect itself. The redirect also
+applies when a route middleware answers it, such as a login redirect from
+`.secure()`.
+
 ### Delete with Confirmation
 
 ```tsx
