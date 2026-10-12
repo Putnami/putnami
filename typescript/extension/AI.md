@@ -65,6 +65,20 @@ files and `doc/` trees that does not resolve, including a path whose case
 differs from the file on disk. Fix the link; do not turn the check off. See
 [doc/04-lint.md](doc/04-lint.md#documentation-links).
 
+## API compatibility
+
+`validate` compares what the entry points of a package's `package.json` export
+with the last release of its version line. It runs for a project that
+`putnami.support.json` lists as stable, or for every project when the workspace
+has no catalog. A removed entry point, export or member, a changed kind or a
+reduced visibility fails unless a commit since that release that touches the project
+declares a breaking change (`feat!:` or a `BREAKING CHANGE:` footer). A change
+of written type, such as a signature, is a warning: the check cannot tell
+whether it breaks importers, so you decide and add the marker when it does.
+Commit a deliberate break with the marker, and put the marker in the pull
+request title too when the branch is squash-merged. Do not work around the
+check. See [doc/11-validate.md](doc/11-validate.md).
+
 ## Serve and run
 
 Serve resolves its entrypoint from the project's `"./serve"` export unless one

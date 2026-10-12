@@ -513,6 +513,11 @@
         }
       ]
     },
+    "validate": {
+      "description": "Hold the breaking-change marker: for a TypeScript package the root putnami.support.json lists as stable, or every TypeScript package when the workspace has no catalog, compare what the entry points of its package.json export with the last release of the project's version line. An incompatible change fails unless a commit since that release declares a breaking change with \"!\" or a BREAKING CHANGE: footer.",
+      "activationFiles": ["package.json"],
+      "run": [{ "id": "api", "task": "validate-api" }]
+    },
     "lint": {
       "description": "Lint and format project code.",
       "activationFiles": [
@@ -1705,6 +1710,22 @@
       "cache": {
         "noOutput": true,
         "enabled": true
+      },
+      "declares": {}
+    },
+    "validate-api": {
+      "description": "API compatibility check of one TypeScript package against its version line's last release, the line's highest MAJOR.MINOR.PATCH tag that HEAD reaches: the exported functions, classes, interfaces, types, enums and variables of every entry point its package.json declares, with their members, read from source with the TypeScript parser and no type-checking. When the workspace has a support catalog, only a project it lists as stable is checked; a preview, experimental or unlisted project is skipped. The project's tags select the catalog entry, protocol or package: the check reads the resolved tags the job context carries (project.tags) and reads no tag from a putnami.json. A tag that holds no package.json for the project gives a note; a package.json or a source file the tag holds and the check cannot read gives a not-compared warning, as does an entry point that names a file git does not hold. UNCACHEABLE on purpose: the verdict reads the line's git tags, the files at its last release, and the messages of the commits since, and no file-pattern key covers git history, so a key would serve a stale verdict after a new release or a new commit. The check starts git, and one bun process that parses both sides with the typescript package the workspace installs.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["validate-api"],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "outputs": {
+        "data": { "description": "API check result: whether a tag was compared, the tag, the number of entry points at that tag, the number of incompatible changes, the number of entry points whose exports were not compared, and the commit that declares the changes breaking" }
+      },
+      "reads": ["sources"],
+      "cache": {
+        "enabled": false
       },
       "declares": {}
     },

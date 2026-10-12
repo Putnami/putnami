@@ -323,8 +323,10 @@ CLI refuses this extension. See CLI
   `protocol` and a `package` subject.
 - **Platform files.** Files for every platform are read together. When two
   files declare the same name, the first in path order is compared.
-- **Go only.** TypeScript projects are not checked yet, and the command
-  surface is compared only for a Go project.
+- **Go only.** This check reads Go projects. The TypeScript extension holds
+  TypeScript packages to the same marker with
+  [its own check](../../../typescript/extension/doc/11-validate.md). The
+  command surface is compared only for a Go project.
 - **What the command surface holds.** The check holds what the document lists,
   and Putnami's own CLI lists its core command catalog only:
   - commands and flags an extension manifest declares, such as the
