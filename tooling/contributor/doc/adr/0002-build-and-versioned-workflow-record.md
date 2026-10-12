@@ -14,14 +14,24 @@ Original material objections must survive revision and host replacement.
 
 ## Decision
 
-`build` is the canonical outcome owner. It reuses the single physical
-`execute/references/loop.md` and its records, policy and collaboration paths
-for compatibility. `spec`, `design`, `prototype`, `review`, `adr` and `check`
-are focused interventions. `plan`, `execute`, `fix`, `epic`, `code-review`
-and four `putnami-*` aliases remain compatible entries with their former
-arguments and authority. `fix-loop` and `content-bump` remain explicit-only.
-Alias removal is outside this pre-1.0 line and requires a separately
-announced breaking change. Existing helper paths remain stable.
+`build` is the canonical outcome owner. The single physical loop and its
+records, policy and collaboration references live under `build/references/`.
+`spec`, `design`, `prototype`, `review`, `adr` and `check` are focused
+interventions. The former `plan`, `execute`, `fix`, `epic`, `code-review`,
+`putnami-plan`, `putnami-change`, `putnami-check`, `putnami-review` and
+`fix-loop` entries are removed by the explicit owner-authorized breaking
+change in this pull request. `content-bump` remains an active explicit-only
+repository integration. Build neither selects backlog work nor inherits
+external action authority from a removed entry. A named task claim requires
+explicit authorization.
+Publication and language/load helpers move to native CLI commands:
+`proposals finalize`, `contributor language` and `contributor machine-load`.
+The direct `tree fingerprint` command remains the tree producer. Native
+finalization consumes an exact current dossier or explicit hosted check mode;
+it never runs or retries a local gate. The finalization, load and fingerprint
+shell helpers and optional session-cap hook no longer install. The active
+audit integration keeps only a thin `check/scripts/english-only.sh` relay to
+the native language command.
 
 An independently versioned v1 local workflow JSON references native
 feature/spec sources, partitions their full requirement inventory and maps
@@ -36,7 +46,8 @@ and acceptance checks. A caller first confirms `--workflow` is supported,
 since an older dossier reader can ignore an unknown member.
 
 Units describe delivered behavior and required receipts; milestones and tasks
-track work. Stage entries are linked to a unit, and each unit has the full
+track work. Stage entries require a nonempty `entryCondition` and are linked
+to a unit; each unit has the full
 canonical stage inventory. A current unit cannot be ready with blocked stages
 or unresolved decisions; later units keep their pending stages visible. Native
 next-cycle task refs retain opaque provider `{source,id}` identity, with a
@@ -50,7 +61,7 @@ for same-path changes. Changing an index digest does not renew them. The
 whole-tree candidate binding remains stricter. Handoffs name available
 versioned inputs and explicitly identify local assets that cannot travel.
 
-The existing finalizer accepts `--partial-delivery` for an intermediate unit.
+Native `putnami proposals finalize` accepts `--partial-delivery` for an intermediate unit.
 It keeps a non-closing parent reference, rejects caller closing directives in
 title, the fully normalized proposal body and branch commits before a write,
 and skips the parent task transition. When a

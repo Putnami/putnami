@@ -51,10 +51,11 @@ func init() {
 	registerCommand("infra", cmdInfra)
 	registerCommand("config", cmdConfig)
 	registerCommand("context", cmdContext)
+	registerCommand("contributor", cmdContributor)
 	registerCommand("migrate", cmdMigrate)
 	registerCommand("sessions", cmdSessions)
 	registerCommand("tree", cmdTree)
-	// Raw: the execute skill and finalize-pr.sh parse the verdict document.
+	// Raw: workflow consumers parse the native verdict document.
 	registerRawSubcommand("tree", "verify")
 	// Raw: a composition streams its start document before it runs and its exit
 	// document when it stops, so its stdout cannot be captured until exit.
@@ -804,7 +805,7 @@ func cmdTreeVerify(env *CommandEnv) error {
 	if err != nil {
 		return fmt.Errorf("resolve the working directory: %w", err)
 	}
-	err = treecmd.Verifier{Dir: workingDirectory, Stdout: iox.Stdout()}.Run(env.Args)
+	err = treecmd.Verifier{Dir: workingDirectory, Stdout: iox.Stdout(), RecoverReport: engine.VerifyCachedVerificationReport}.Run(env.Args)
 	if errors.Is(err, treecmd.ErrNotVerified) {
 		return reportedFailure{err: err}
 	}

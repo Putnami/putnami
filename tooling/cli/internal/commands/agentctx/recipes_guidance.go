@@ -24,9 +24,9 @@ import (
 //
 // Consumer workspaces do not contain the samples, so the index cannot be read
 // where it is used. It travels the way every other workflow file does: `putnami
-// context generate` renders it into the in-tree `build` and compatible `plan` skills as a reference
+// context generate` renders it into the in-tree `build` skill as a reference
 // asset, the agent content that carries the skill packages that asset, and
-// every consumer's planning entry receives it.
+// every consumer's build entry receives it.
 // The rendering is a pure function of the committed indexes, so the same
 // indexes always write the same bytes.
 
@@ -44,8 +44,6 @@ const (
 	recipeReferenceSkill = "build"
 	recipeReferenceAsset = "references/recipes.md"
 )
-
-var recipeReferenceSkills = []string{recipeReferenceSkill, "plan"}
 
 type recipeIndex struct {
 	ProtocolVersion int      `json:"protocolVersion"`
@@ -119,7 +117,7 @@ func renderRecipe(entry recipe) string {
 }
 
 // writeRecipeReferences writes the rendered index into every in-tree source of
-// agent content that carries the planning skill: the authored agent content of
+// agent content that carries the build skill: the authored agent content of
 // an opted-in extension declared by path. It runs before that content is
 // materialized, so one `putnami context generate` carries an index edit all
 // the way to the host copies. A workspace that commits no index is left
@@ -142,20 +140,18 @@ func writeRecipeReferences(wsRoot string, cfg *wsproto.Config) (bool, error) {
 		if sourceDir == "" {
 			continue
 		}
-		for _, skill := range recipeReferenceSkills {
-			skillDir := filepath.Join(sourceDir, "skills", skill)
-			if _, err := os.Stat(filepath.Join(skillDir, "SKILL.md")); err != nil {
-				continue
-			}
-			target := filepath.Join(skillDir, filepath.FromSlash(recipeReferenceAsset))
-			if current, err := os.ReadFile(target); err == nil && string(current) == rendered {
-				continue
-			}
-			if err := shared.AtomicWriteFile(target, []byte(rendered)); err != nil {
-				return changed, err
-			}
-			changed = true
+		skillDir := filepath.Join(sourceDir, "skills", recipeReferenceSkill)
+		if _, err := os.Stat(filepath.Join(skillDir, "SKILL.md")); err != nil {
+			continue
 		}
+		target := filepath.Join(skillDir, filepath.FromSlash(recipeReferenceAsset))
+		if current, err := os.ReadFile(target); err == nil && string(current) == rendered {
+			continue
+		}
+		if err := shared.AtomicWriteFile(target, []byte(rendered)); err != nil {
+			return changed, err
+		}
+		changed = true
 	}
 	return changed, nil
 }

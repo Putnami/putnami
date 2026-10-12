@@ -24,8 +24,8 @@ type ProposalSettings struct {
 	// upsert writes.
 	AssignAuthor bool `json:"assignAuthor,omitempty"`
 	// InheritLabelPrefixes copies, onto every proposal an upsert writes, the
-	// labels with one of these prefixes that the issues its body closes carry
-	// ("Closes #12").
+	// labels with one of these prefixes that related issues carry ("Closes #12"
+	// or "Refs #12"). URLs are accepted only on the configured GitHub host.
 	InheritLabelPrefixes []string `json:"inheritLabelPrefixes,omitempty"`
 }
 
@@ -458,20 +458,82 @@ func (s *proposalSession) edit(pull *ghPull, in *collab.ProposalUpsertInput) (*g
 	return pull, nil
 }
 
-var closingReference = regexp.MustCompile(`(?i)\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+(?:([A-Za-z0-9-]+/[A-Za-z0-9._-]+))?#([0-9]+)\b`)
+// A qualified foreign closing reference historically adds no labels. Refs is
+// an explicit non-closing relation; a full issue URL is explicit about its
+// repository as well. Both may read another repository on the configured
+// GitHub host. The parser never fetches a URL as an HTTP destination.
+var relatedReference = regexp.MustCompile(`(?i)\b(refs|close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+((?:https?://[^\s<>)]+)|(?:(?:[A-Za-z0-9-]+/[A-Za-z0-9._-]+))?#[0-9]+)`)
 
-// closedIssues lists the issue numbers of this repository a body closes.
-func (s *proposalSession) closedIssues(body string) []int {
-	var numbers []int
-	for _, match := range closingReference.FindAllStringSubmatch(body, -1) {
-		if match[1] != "" && !strings.EqualFold(match[1], s.repo.owner+"/"+s.repo.name) {
+type relatedIssue struct {
+	repo   repository
+	number int
+}
+
+func (s *proposalSession) relatedIssues(body string) []relatedIssue {
+	var issues []relatedIssue
+	seen := map[string]bool{}
+	for _, indexes := range relatedReference.FindAllStringSubmatchIndex(body, -1) {
+		action := strings.ToLower(body[indexes[2]:indexes[3]])
+		token := body[indexes[4]:indexes[5]]
+		// #42 is not a reference inside #42extra or #42-more. The same
+		// boundary rule also keeps #42 from being inferred from #420.
+		if indexes[5] < len(body) && referenceSuffix(body[indexes[5]]) {
 			continue
 		}
-		if number, err := strconv.Atoi(match[2]); err == nil && number > 0 && !slices.Contains(numbers, number) {
-			numbers = append(numbers, number)
+		repo := s.repo
+		numberText := ""
+		if strings.HasPrefix(strings.ToLower(token), "https://") {
+			parsed, err := url.Parse(strings.TrimRight(token, ".,;"))
+			if err != nil || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" ||
+				!strings.EqualFold(parsed.Host, s.repo.host) {
+				continue
+			}
+			parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+			if len(parts) != 4 || parts[2] != "issues" {
+				continue
+			}
+			qualified := parts[0] + "/" + parts[1]
+			validated, failure := parseRepository(qualified, s.repo.host)
+			if failure != nil {
+				continue
+			}
+			repo, numberText = validated, parts[3]
+		} else if strings.HasPrefix(strings.ToLower(token), "http://") {
+			continue
+		} else {
+			before, number, found := strings.Cut(token, "#")
+			if !found {
+				continue
+			}
+			numberText = number
+			if before != "" {
+				validated, failure := parseRepository(before, s.repo.host)
+				if failure != nil {
+					continue
+				}
+				// Keep the preexisting behavior of qualified closing refs.
+				if action != "refs" && !strings.EqualFold(validated.source, s.repo.source) {
+					continue
+				}
+				repo = validated
+			}
 		}
+		number, err := strconv.Atoi(numberText)
+		if err != nil || number <= 0 || strconv.Itoa(number) != numberText {
+			continue
+		}
+		key := strings.ToLower(repo.source) + "#" + numberText
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		issues = append(issues, relatedIssue{repo: repo, number: number})
 	}
-	return numbers
+	return issues
+}
+
+func referenceSuffix(b byte) bool {
+	return b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || b >= '0' && b <= '9' || b == '_' || b == '-'
 }
 
 // complete applies what the settings add to every written pull request: the
@@ -514,15 +576,15 @@ func (s *proposalSession) complete(pull *ghPull) (*ghPull, *collab.Failure) {
 		return pull, nil
 	}
 	var wanted []string
-	for _, number := range s.closedIssues(deref(pull.Body)) {
+	for _, related := range s.relatedIssues(deref(pull.Body)) {
 		var issue ghIssue
-		if _, err := s.client.Get(s.ctx, s.repo.path("issues", strconv.Itoa(number)), nil, &issue); err != nil {
-			return nil, partial("reading the labels of #"+strconv.Itoa(number), "inheritLabelPrefixes", fail(err, "read #%d", number))
+		if _, err := s.client.Get(s.ctx, related.repo.path("issues", strconv.Itoa(related.number)), nil, &issue); err != nil {
+			return nil, partial("reading the labels of "+related.repo.display+"#"+strconv.Itoa(related.number), "inheritLabelPrefixes", fail(err, "read %s#%d", related.repo.display, related.number))
 		}
 		for _, label := range issue.labelNames() {
 			inherited := slices.ContainsFunc(s.settings.InheritLabelPrefixes, func(prefix string) bool { return strings.HasPrefix(label, prefix) })
 			present := slices.ContainsFunc(pull.Labels, func(have ghLabel) bool { return strings.EqualFold(have.Name, label) })
-			if inherited && !present && !slices.Contains(wanted, label) {
+			if inherited && !present && !slices.ContainsFunc(wanted, func(have string) bool { return strings.EqualFold(have, label) }) {
 				wanted = append(wanted, label)
 			}
 		}

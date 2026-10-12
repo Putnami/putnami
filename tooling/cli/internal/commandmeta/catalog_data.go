@@ -1184,6 +1184,57 @@ var catalog = []Command{
 
 	// ── Agents ───────────────────────────────────────────────────────────
 	{
+		Path:        "contributor",
+		Kind:        KindStructured,
+		Category:    "Agents",
+		Summary:     "Run native contributor checks and inspect machine load",
+		Description: "Run the local contributor helpers used by the build workflow. Language checks read text, tracked files, commit messages, or tasks through the configured collaboration provider; machine-load reads local resource capacity. Neither command runs the project gate",
+		Usage:       "putnami contributor <language|machine-load> [arguments]",
+		Examples: []string{
+			"putnami contributor language files --diff origin/main..HEAD",
+			"putnami contributor machine-load --output=json",
+		},
+		Related:   []string{"contributor language", "contributor machine-load", "tree verify"},
+		Workspace: requiredWorkspace(),
+	},
+	{
+		Path:        "contributor language",
+		Kind:        KindStructured,
+		Category:    "Agents",
+		Summary:     "Check English-language signals in contributor material",
+		Description: "Inspect text or stdin, tracked workspace files, commit messages, or task titles and bodies using the repository's bounded English-language rule. The tasks mode reads the configured tasks provider. Findings exit 1; invalid input or an unavailable provider exits 2",
+		Usage:       "putnami contributor language <text|files|commits|tasks> [--label <name> | --diff <range> | --limit <n>] [arguments]",
+		Flags: []Flag{
+			{Long: "--label", Type: FlagValue, ValueName: "<name>", Description: "With text: label the input in findings"},
+			{Long: "--diff", Type: FlagValue, ValueName: "<range>", Description: "With files: inspect tracked files changed in a Git revision range"},
+			{Long: "--limit", Type: FlagValue, ValueName: "<n>", Description: "With tasks: maximum number of task records to inspect"},
+		},
+		Positionals: []Positional{{Name: "text|files|commits|tasks", Required: true}},
+		Examples: []string{
+			"putnami contributor language text --label proposal - < body.md",
+			"putnami contributor language files --diff origin/main..HEAD",
+			"putnami contributor language commits origin/main..HEAD",
+			"putnami contributor language tasks --limit 100",
+		},
+		Related:   []string{"contributor machine-load", "proposals finalize"},
+		Workspace: requiredWorkspace(),
+	},
+	{
+		Path:        "contributor machine-load",
+		Kind:        KindStructured,
+		Category:    "Agents",
+		Summary:     "Report available local CPU and memory for check admission",
+		Description: "Read local machine load and capacity to guide when to start a costly check. This is advisory and does not execute or schedule a gate",
+		Usage:       "putnami contributor machine-load [--output <format>]",
+		Examples: []string{
+			"putnami contributor machine-load",
+			"putnami contributor machine-load --output=json",
+		},
+		Related:          []string{"contributor language", "tree verify"},
+		StructuredOutput: true,
+		Workspace:        requiredWorkspace(),
+	},
+	{
 		Path:        "mcp",
 		Kind:        KindStructured,
 		Category:    "Agents",

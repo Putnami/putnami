@@ -41,32 +41,29 @@ state the repository's conventions in its [policy](doc/02-repository-policy.md).
 | `review` | Independently challenge a material artifact or frozen candidate | implicit |
 | `adr` | Record a durable choice in its owning project | implicit |
 | `check` | Run the gate, applicable local proof, the documentation audit and the language rule | implicit |
-| `plan`, `execute`, `fix`, `epic`, `code-review` | Compatible planning, execution, task selection, epic and code-review entries into the canonical interventions | same as before; `epic` explicit only |
-| `fix-loop` | Repeat `fix` over the backlog | explicit only |
 | `content-bump` | Refresh a pinned-content lock the policy declares | explicit only |
-| `putnami-plan`, `putnami-change`, `putnami-check`, `putnami-review` | Deprecated aliases of `plan`, `execute`, `check`, `code-review` | as their canonical skill |
+
+The former `plan`, `execute`, `fix`, `epic`, `code-review`, four `putnami-*`
+aliases and `fix-loop` entries are removed. This intentional breaking change
+is documented in the [migration guide](doc/03-entry-point-migration.md).
+`build` handles named tasks and coordinated units only within its mandate;
+it does not select backlog work or inherit external publication authority.
 
 Worker profiles: `fix-light`, `fix-standard`, `fix-heavy` and `epic-analyst`,
 each one body for both hosts with host metadata beside it.
 
-Helpers, with the shell suites the `@putnami/cli` tests run against the
-materialized copies:
-
-- `fix/scripts/finalize-pr.sh` commits and pushes with Git, publishes the
-  proposal through `putnami proposals upsert`, reads it back, and moves the
-  task through `putnami tasks transition`. `--draft` opens the draft proposal
-  when work starts; without it, the helper gates, posts the verification record
-  as a proposal comment, and marks the proposal ready. On a loaded machine it
-  leaves the gate to the hosted checks the policy names. `--partial-delivery`
-  keeps a non-closing parent link and skips its delivered transition.
-- `fix/scripts/tree-fingerprint.sh` forwards to `putnami tree fingerprint`.
-- `fix/scripts/machine-load.sh` prints the one-minute load average divided by
-  the CPU count.
-- `fix/scripts/session-cap.sh` is an optional Claude Code `PreToolUse` hook that
-  warns once at 250 of the orchestrator's own tool calls (subagent calls are
-  not counted) and never blocks; wiring it is the workspace's choice.
-- `check/scripts/english-only.sh` detects non-English text in a text, tracked
-  files, commit messages, or the open tasks of the tasks provider.
+The portable helpers are native CLI commands, validated with the CLI's Go
+suite: `putnami proposals finalize` publishes an authorized draft or a
+verified ready proposal, reads it back, and applies an authorized task
+transition. A partial delivery uses `--partial-delivery` to keep a non-closing
+parent reference and skip that transition. It consumes current producer proof
+and never runs or retries a local gate; `--gate ci` explicitly selects hosted
+checks. `putnami contributor language text|files|commits|tasks` enforces the
+configured language rule, `putnami contributor machine-load` reports load for
+hosted-gate admission, and `putnami tree fingerprint` supplies tree identity.
+Host session limits remain the host runtime's responsibility.
+The active audit integration retains `check/scripts/english-only.sh` as a
+thin relay to the native language command; it carries no separate evaluator.
 
 The build skill's dossier and workflow checker is the CLI command
 `putnami tree verify`. Its standalone `--workflow` validates a local progress

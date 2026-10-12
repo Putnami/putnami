@@ -2492,7 +2492,7 @@
       "id": "cli/contributor-workflows",
       "type": "feature",
       "name": "Contributor workflows",
-      "outcome": "A workspace uses build to carry its requested outcome, issue or epic through delivery planning, bounded experiments, independent artifact challenge and verified delivery on both supported hosts, with native requirement coverage, portable records and compatible entry points under its existing mandate and provider policy",
+      "outcome": "A workspace uses build to carry its requested outcome, issue or epic through delivery planning, bounded experiments, independent artifact challenge and verified delivery on both supported hosts, with native requirement coverage, portable records, canonical entry points and proof-consuming Go publication under its existing mandate and provider policy",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -2518,12 +2518,12 @@
           }
         },
         {
-          "id": "entry-point-aliases",
+          "id": "canonical-entry-points",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": ["each-alias-names-an-existing-canonical-skill"]
+            "checks": ["only-canonical-entry-points-and-active-utilities"]
           }
         },
         {
@@ -2575,7 +2575,7 @@
               "a-draft-opens-before-the-first-edit",
               "the-body-is-the-squash-message",
               "no-publication-names-an-agent",
-              "a-loaded-machine-gates-on-hosted-checks"
+              "an-explicit-hosted-gate-waits-without-local-execution"
             ]
           }
         },
@@ -2601,8 +2601,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "packaged-canonical-and-compatible-consumer-content",
-              "canonical-and-compatible-recipe-materialization"
+              "packaged-canonical-consumer-content",
+              "canonical-recipe-materialization"
             ]
           }
         }

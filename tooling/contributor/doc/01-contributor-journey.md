@@ -1,10 +1,11 @@
 # Contributor journey
 
 `build <intention|task|proposal>` owns an authorized outcome through one
-implementation, challenge, review, repair and evidence loop. `fix` selects and
-claims a task before entering build; `epic` supplies coordinated dependencies.
-Neither build nor `execute` selects backlog work implicitly. The invocation's
-mandate controls task, Git, proposal, merge and deployment actions throughout.
+implementation, challenge, review, repair and evidence loop, including
+coordinated multi-unit work. It does not select backlog work. A named task may
+be claimed only when that action is explicitly authorized. The invocation's
+mandate controls task, Git, proposal, merge and deployment actions throughout;
+a natural-language request alone grants none of those external actions.
 
 1. **Understand the outcome.** Read repository instructions, the accepted
    mandate, current task/proposal and existing plan. Start discovery with
@@ -28,7 +29,7 @@ mandate controls task, Git, proposal, merge and deployment actions throughout.
    tier. Preserve scope positions, original findings and refs. Integrate
    serially and freeze the candidate before independent code review or gate
    evidence. A multi-project unit need not become several proposals.
-5. **Review and repair.** An independent `review`/`code-review` context covers
+5. **Review and repair.** An independent `review` context covers
    the frozen candidate. Fix findings in the same change; preserve original
    reports and append resolutions. A changed candidate gets a new snapshot.
    Material artifact repairs preserve original examined bytes and findings,
@@ -45,11 +46,11 @@ mandate controls task, Git, proposal, merge and deployment actions throughout.
    unknown member. The dossier's `--record` ready verdict still requires its
    own candidate review, gate, qualification and acceptance, and the optional
    workflow adds complete current native requirements.
-8. **Deliver within authority.** The existing finalizer publishes the
+8. **Deliver within authority.** `putnami proposals finalize` publishes the
    verified proposal and reads it back. For a partial unit, pass
    `--partial-delivery` on draft and final calls: the parent stays linked and
    its task state stays unchanged. Normal close/transition is
-   for the complete mandated outcome; the helper checks the final normalized
+   for the complete mandated outcome; the command checks the final normalized
    proposal body for closing directives before any write. Record ready, merged, published,
    deployed and adopted from their separate actual receipts.
 9. **Handoff or resume.** Save the mandate, unit, scopes, receiver,
@@ -68,7 +69,7 @@ authenticate its writer or grant an external action.
 
 | Step | Contract | Without a binding |
 |---|---|---|
-| Select, claim, deliver a task | tasks | `fix` needs a task; use `build` with an intention or bind tasks |
+| Read or explicitly claim a named task, then deliver it when authorized | tasks | Build can start from an intention; task operations require a binding and mandate |
 | Publish and read back a proposal | proposals | Finalization stops before writes and names the binding |
 | Mission context and checkpoints | memory | Keep a local checkpoint and disclose that it does not survive workspace deletion |
 

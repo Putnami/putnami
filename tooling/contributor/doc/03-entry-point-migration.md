@@ -2,51 +2,52 @@
 
 ## Entry points
 
-Every current entry point remains available. The new canonical interventions
-are `build`, `spec`, `design`, `prototype`, `review`, `adr` and `check`. Build
-owns the one reused execute loop. The next table distinguishes those entries
-from compatibility names and records older migration history.
+The extension now installs `build`, `spec`, `design`, `prototype`, `review`,
+`adr` and `check`. `build` owns the single shared implementation and evidence
+loop. `content-bump` remains a separately configured explicit-only utility.
+This is an owner-authorized breaking change in the current pre-1.0 line.
 
 | Before | Now | Status |
 |---|---|---|
-| `build`, `spec`, `design`, `prototype`, `review`, `adr`, `check` | Same names, from `@putnami/contributor` | Canonical |
-| `plan`, `execute`, `fix`, `epic`, `code-review` | Same arguments and authority, entering the canonical interventions | Compatible |
-| `fix-loop`, `content-bump` | Same names and explicit-only invocation | Compatible |
-| `putnami-plan` (public artifact) | Alias of `plan`, local plan only | Deprecated |
-| `putnami-change` (public artifact) | Alias of `execute`, local mandate only | Deprecated |
-| `putnami-check` (public artifact) | Alias of `check`, local evidence only | Deprecated |
-| `putnami-review` (public artifact) | Alias of `code-review`, local findings only | Deprecated |
+| `build`, `spec`, `design`, `prototype`, `review`, `adr`, `check` | Same names, from `@putnami/contributor` | Installed |
+| `execute` | `build` for the one implementation, review and evidence loop | Removed; no inherited external authority |
+| `plan` | `build` for outcome mapping and a precise next cycle | Removed; no implicit task creation |
+| `fix` | `build <named-task>` under an explicit task mandate | Removed; no implicit backlog selection or claim |
+| `epic` | `build` with coordinated delivery units and milestones | Removed; no separate epic controller |
+| `code-review` | `review` for an independent candidate review | Removed; publication requires separate explicit authority |
+| `putnami-plan`, `putnami-change`, `putnami-check`, `putnami-review` | Canonical intervention named above | Removed; no alias invocation |
+| `fix-loop` | No automatic batch successor | Removed |
+| `content-bump` | Same configured utility | Retained, explicit-only |
 
-An alias names its compatible target and keeps the restriction its entry
-point always had. These aliases remain through the current pre-1.0 line;
-removal requires a separately announced breaking change. No new build entry
-silently inherits backlog selection or external publication from `fix`.
+`build` accepts a named task as an input when one is supplied. Claiming it
+requires explicit authorization; choosing a backlog task, creating a task,
+publishing, merging or deploying are never implied by a planning request.
 
 ## Arguments and helper interfaces
 
-| Before | Now |
-|---|---|
-| `fix <issue-number>`, `epic <issue-number>` | `fix <task>`: an id resolved with the policy's `tasks.source`, or a whole `{source, id}` reference |
-| `fix --group <g>`, `--domain <d>` | Filters the policy's `tasks.filters` defines (this repository keeps `--group` and `--domain`), or `--label <label>` |
-| `plan --issue` | `plan --task` (`--issue` is its deprecated spelling) |
-| `plan --domain <audit-group>` | Removed: scopes come from native project selection, labels from `--label` |
-| `epic --no-fable` | `epic --no-analyst` |
-| `code-review <pr-number>` | `code-review <proposal id or reference or branch>` |
-| `finalize-pr.sh --issue <n>` | `--task-source <source> --task-id <id>`, optional; `--issue` fails with a message naming the replacement |
-| `finalize-pr.sh` prints `PR_URL=` | Prints `PROPOSAL_REF=`, and `PROPOSAL_URL=` when the provider supplies one |
-| Proof recorded as an issue comment | Proof recorded as a proposal comment through `proposals review` when supported; otherwise reported locally |
-| `english-only.sh github` | `english-only.sh tasks`; `github` is a deprecated alias that no longer scans proposals |
-| `session-cap.sh` names a mission file, blocks at 300 tool calls, counts subagent calls | It names the memory checkpoint, warns once at 250 of the orchestrator's own calls, never blocks; the harness's auto-compaction bounds the context |
+Removed skill-specific flags have no direct replacement. `build` takes an
+intention, named task or proposal reference, `--resume <record>`,
+`--tier light|standard|heavy`, `--base <ref>` and `--dry-run` under its own
+mandate. `review` accepts an exact proposal reference, branch or current
+candidate. Re-express a former `plan --scope` or label filter as explicit
+native project scope and acceptance, rather than relying on a removed skill
+to select work. A former `fix --group` or backlog loop has no automatic
+successor; select and authorize each task through the provider before asking
+build to deliver it. Native `proposals finalize` and `contributor language`
+interfaces are documented in the [CLI commands](../../cli/doc/03-commands.md).
+The former `fix/scripts/finalize-pr.sh`, `machine-load.sh`,
+`tree-fingerprint.sh` and `session-cap.sh` are removed from installed content.
+Use `proposals finalize`, `contributor machine-load` and `tree fingerprint`;
+the host runtime handles session limits. The active audit integration still
+calls `check/scripts/english-only.sh`: that path remains as a thin relay to
+`contributor language`, with no separate language heuristic.
 
 ## Workspace declarations
 
-Current `plan --scope`, `--label`, `--task` and deprecated `--issue`; current
-`epic --resume`, `--refine-only`, `--skip-refine`, `--sub-prs`, `--max`,
-`--tier`, `--no-analyst` and `--dry-run`; and current `fix` task/backlog
-selection remain compatible. The removed historical `plan --domain` and
-`epic --no-fable` in the table above are not reintroduced. The four
-`putnami-*` aliases remain local-only. `fix-loop` and `content-bump` remain
-explicit-only.
+Stored task backlog filters, ranks and plan labels from the removed workflows
+do not make build select tasks or create them. Repository owners may remove
+those unused policy values during migration. `content-bump` still reads its
+configured `integrations.contentBump` block and remains explicit-only.
 
 A workspace that still declares `@putnami/agent-workflows` or
 `@putnami/maintainer-workflows` is refused by every agent-content command, with
@@ -118,19 +119,19 @@ published extension; this repository's self-consumption does not prove it.
   producer records, review coverage and scope notes. It does not authenticate
   authors, prove scope completeness, or replace a producer's full schema
   validator. Agents sharing write access can alter notes and policy.
-- The finalizer records the caller's proof; it cannot establish that the proof
+- Native finalization records the caller's proof; it cannot establish that the proof
   is truthful, current or complete. Only a dossier the verifier accepts
   supports `Putnami verified`, and only for the local, declared scope.
-- The finalizer's "verified proposal" covers what the proposals contract
+- Native finalization's "verified proposal" covers what the proposals contract
   returns: base, head, head commit and state; the assignees and labels the
   upsert answered with, which the proposal read back must still carry; and
   the task's state. The upsert answer already includes what the provider
   applies from its own settings (`assignAuthor` and `inheritLabelPrefixes` on
   the GitHub provider, which refuses an upsert whose addition GitHub dropped).
-  The finalizer does not read provider settings, so it cannot see a provider
+  The command does not read provider settings, so it cannot see a provider
   that silently ignores its own setting; that is the provider's suite to
   prove. A provider that does not report assignees or labels is not verified
-  on them, and the finalizer prints that it did not verify them. The
+  on them, and the command reports that it did not verify them. The
   superseded helper called GitHub directly and compared both with this
   repository's own label prefixes.
 - A provider answer is as strong as the provider: `checked` preconditions do
@@ -139,6 +140,5 @@ published extension; this repository's self-consumption does not prove it.
   unsupported.
 - Memory is context, never evidence: a checkpoint references gate, review and
   qualification records and proves nothing they do not.
-- The helper suites run against a CLI built from the tree and the local
-  provider. They do not exercise a hosted provider; that proof belongs to each
-  provider's own suite.
+- The native command suites run against the local provider. They do not
+  exercise a hosted provider; that proof belongs to each provider's own suite.

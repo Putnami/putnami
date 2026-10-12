@@ -50,18 +50,8 @@
         "prototype",
         "review",
         "adr",
-        "plan",
-        "execute",
-        "fix",
-        "epic",
         "check",
-        "code-review",
-        "fix-loop",
-        "content-bump",
-        "putnami-plan",
-        "putnami-change",
-        "putnami-check",
-        "putnami-review"
+        "content-bump"
       ]
     }
   },

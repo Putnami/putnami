@@ -7,7 +7,7 @@
 
 ## Context
 
-The contributor workflows (plan, execute, check, review, fix, epic) serve this
+The contributor workflows (build, spec, design, prototype, review, adr, check) serve this
 repository and every other workspace. A public copy and a maintainer copy would
 duplicate them and make "public" mean "less capable" instead of "configured
 differently". Extensions can ship agent content
@@ -24,11 +24,12 @@ provider-neutral call
 its manifest declares only `agentContent` in the authored form (`source: src`,
 `path: content`, `supersedes` naming `@putnami/agent-workflows` and
 `@putnami/maintainer-workflows`) and `cliContract: 5`. It carries the skills,
-the worker profiles, the execute references and the helper scripts with their
-test suites; `options.agent-artifact.requiredSkills` lists the skills. The
-helpers are Bash scripts only: the execute verifier is the CLI command
-`putnami tree verify`, so the extension needs no JavaScript runtime on the
-contributor's machine. Its
+the worker profiles and the build references; `options.agent-artifact.requiredSkills`
+lists the skills. `putnami tree verify`, `putnami proposals finalize` and
+`putnami contributor` provide the native verifier, publication and policy
+helpers. An active audit integration retains only a thin shell relay at
+`check/scripts/english-only.sh` to the native language command; no separate
+language evaluator remains. Its
 content policy forbids credentials, backend client invocations, tracker labels,
 hosted repository addresses, private memory identities and this repository's
 paths in every emitted file.
@@ -37,14 +38,12 @@ This repository declares the extension by path and opts in with
 `agentArtifacts: ["extension:@putnami/contributor"]`, so it runs exactly the
 content it distributes.
 
-### 2. `putnami-*` skills are deprecated aliases
+### 2. Former aliases (superseded by ADR 0002)
 
-`putnami-plan`, `putnami-change`, `putnami-check` and `putnami-review` are
-aliases of `plan`, `execute`, `check` and `code-review`. Each names its
-canonical skill and keeps its local restriction (a local plan, a local change,
-local evidence, a local review). Aliases remain through the current pre-1.0
-line; removal needs a separately announced breaking change. No alias carries
-an asset.
+The initial extension carried `putnami-plan`, `putnami-change`,
+`putnami-check` and `putnami-review` aliases. ADR 0002 records their
+owner-authorized breaking removal with the other legacy entries. No
+alias invocation remains available in the current package.
 
 ### 3. Repository conventions are policy
 
@@ -57,6 +56,8 @@ language rule, extra documentation roots, publication defaults and the optional
 credentials and no provider settings: a state-to-label mapping or a repository
 name belongs to the provider's binding. Putnami's own values are documented as a
 reference, not a default.
+ADR 0002 removes the entries that consumed backlog states, filters, ranking
+and plan labels; retaining those stored values does not activate task selection.
 
 ### 4. Instructions name worker profiles; profiles carry the model
 
@@ -70,15 +71,18 @@ the ownership rules.
 
 ### 5. Publication goes through the contracts
 
-`finalize-pr.sh` owns Git, the gate, trailers and the dossier, and calls no
-backend directly:
+`putnami proposals finalize` owns the authorized proposal lifecycle through
+the collaboration contracts. Build produces the local gate and dossier before
+calling it; native finalization never runs or retries a local gate:
 
 - A task is named by `--task-source <source> --task-id <id>` (optional).
-  `--issue` fails with a message naming the replacement.
+  The request also gives `--base`, `--branch`, `--title` and `--body-file`.
+  A draft call uses `--draft`; a ready call uses current
+  `--verification-file` or explicit hosted `--gate ci`.
 - A read before any write checks that the proposals contract is bound and that
   a named task exists.
 - `proposals upsert` finds or creates the proposal for the exact base and head,
-  with the pushed head commit. An `unresolved` answer stops the helper with the
+  with the pushed head commit. An `unresolved` answer stops the command with the
   reconciling read and no retry; a resumed run repeats the identity-keyed
   upsert, which never creates a second proposal.
 - `proposals status` reads back head, base, head commit, state, assignees and
@@ -86,27 +90,26 @@ backend directly:
 - The verification record (gate and local proof) is a proposal comment through
   `proposals review` when the provider offers it, with the comment verdict;
   the proposal body remains the squash commit message. If review is
-  unsupported, the helper reports the record locally.
+  unsupported, the command reports the record locally.
 - `tasks transition` moves the task to `states.delivered`, with
   `expectedRevision` when the provider enforces it, even when the task already
   reads as that state: the provider decides whether its representation changes.
 - `publication.taskReference`, rendered with the task id, goes in the commit
   and the body for a complete mandated outcome. An intermediate unit uses
   `--partial-delivery`, keeping a non-closing parent reference and skipping
-  its delivered transition. The finalizer also refuses a caller closing
+  its delivered transition. The command also refuses a caller closing
   directive and, for a referenced workflow dossier, refuses normal parent
   close when `outcomeComplete` is false.
-- The helper prints `PROPOSAL_REF=` and, when the provider has one,
-  `PROPOSAL_URL=`.
+- The command returns the exact proposal reference and any provider URL.
 
-The finalizer requires the `proposals status` read-back to carry every
+Native finalization requires the `proposals status` read-back to carry every
 assignee and label the upsert answer carried
 ([collaboration ADR 0001](../../../../protocols/collaboration/doc/adr/0001-collaboration-provider-contracts.md)),
 and prints both lists (`none` when empty). A member the read-back omits is not
-reported by the provider: the finalizer says it did not verify it and
+reported by the provider: the command says it did not verify it and
 continues. A member only the upsert answer carries stops it.
 
-The finalizer never reads provider settings. Label copying and author
+Native finalization never reads provider settings. Label copying and author
 assignment are provider settings, and the provider checks they took effect
 before it answers (the GitHub provider answers `unresolved`,
 `github.incomplete`, when GitHub dropped one). A provider that silently ignores
@@ -114,9 +117,9 @@ its own setting must be caught by its own suite.
 
 ### 6. The language rule is policy
 
-The English-only detector runs in `check` and in the finalizer only when
-`verification.language` is `en`. Its `tasks` mode pages through `tasks find`;
-`github` is a deprecated alias that says what it no longer covers. The
+`putnami contributor language` runs in `check` and native finalization only
+when `verification.language` is `en`. Its `tasks` mode pages through `tasks find`.
+The
 proposals contract finds proposals by base and head only, so no mode lists
 every open proposal.
 
@@ -124,12 +127,12 @@ every open proposal.
 
 - One source feeds every entry point on both hosts; the drift gate builds it
   from the extension declaration.
-- A workspace that binds no proposals provider cannot use the finalizer; it
+- A workspace that binds no proposals provider cannot finalize a proposal; it
   fails before any write and names the binding to add.
 - A clone holding ownership records of the superseded artifacts migrates them
   with `putnami migrate agent-content @putnami/contributor --apply`.
-- Backlog selection reads semantic states: on GitHub, an open issue without a
-  state label is `open`.
+- Build does not select from a backlog. A named task operation uses the
+  provider's semantic state and requires its own authority.
 
 ## Rejected alternatives
 
@@ -139,7 +142,7 @@ every open proposal.
   second resolution beside the digest-bound pin.
 - **Keep `gh` in the helpers behind a flag.** Neutral content would still carry
   a backend, and a second backend would need a second flag.
-- **Read `options.collaboration.proposals.settings` in the finalizer.** Puts
+- **Read `options.collaboration.proposals.settings` in finalization.** Puts
   provider vocabulary in neutral content; each provider would need a reader.
 - **Declare expected labels in the repository policy.** A second copy of the
   provider's prefixes, which drifts.

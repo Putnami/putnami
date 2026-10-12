@@ -68,7 +68,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-proposal-answer-reports-its-assignees-and-labels"
+              "a-proposal-answer-reports-its-assignees-and-labels",
+              "partial-related-task-label-inheritance"
             ]
           }
         },

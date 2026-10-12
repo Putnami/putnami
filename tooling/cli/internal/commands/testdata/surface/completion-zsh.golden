@@ -37,6 +37,12 @@ _putnami_subcommands_for() {
                 'map'
             )
             ;;
+        'contributor')
+            reply=(
+                'language'
+                'machine-load'
+            )
+            ;;
         'deps')
             reply=(
                 'add'
@@ -153,6 +159,9 @@ _putnami_path_known() {
         'context') return 0 ;;
         'context generate') return 0 ;;
         'context map') return 0 ;;
+        'contributor') return 0 ;;
+        'contributor language') return 0 ;;
+        'contributor machine-load') return 0 ;;
         'deps') return 0 ;;
         'deps add') return 0 ;;
         'deps install') return 0 ;;
@@ -238,6 +247,13 @@ _putnami_flags_for() {
         'context map')
             reply=(
                 '--print[Render the map to stdout (md by default, or json) and write nothing]'
+            )
+            ;;
+        'contributor language')
+            reply=(
+                '--diff[With files: inspect tracked files changed in a Git revision range]:range:'
+                '--label[With text: label the input in findings]:name:'
+                '--limit[With tasks: maximum number of task records to inspect]:n:'
             )
             ;;
         'dev template')
@@ -475,6 +491,7 @@ _putnami() {
         'compose:Serve a workload with the workloads it runs with'
         'config:Manage configuration'
         'context:Manage AI context'
+        'contributor:Run native contributor checks and inspect machine load'
         'deps:Manage dependencies'
         'dev:Author extensions and templates'
         'doctor:Preflight production readiness under a deployment profile'

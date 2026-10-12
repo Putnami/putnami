@@ -60,7 +60,7 @@ compiles the runtime from this directory (`bin/prepare`).
 | tasks | `keyScanPages` | `3` | How many pages of 100 of the account's most recent issues a create reads for its idempotency key before it asks the search index (1 to 10). |
 | proposals | `allowMerge` | `false` | Lets `proposals merge` merge. Without it, merge is refused before anything is sent. |
 | proposals | `assignAuthor` | `false` | Assigns the credential's account to every proposal an upsert writes. |
-| proposals | `inheritLabelPrefixes` | none | Copies onto every proposal an upsert writes the labels with these prefixes that the issues its body closes carry (`Closes #12`). |
+| proposals | `inheritLabelPrefixes` | none | Copies onto every proposal an upsert writes matching labels from related issues in its body. `Closes #12` and `Refs #12` name this repository; `Refs owner/repo#12` and full `https://<configured-host>/owner/repo/issues/12` URLs may name another repository on the configured GitHub host. Qualified foreign closing references retain their previous behavior and add no labels. |
 
 An unknown setting is refused. Settings never carry a credential.
 

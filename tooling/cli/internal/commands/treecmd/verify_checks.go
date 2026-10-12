@@ -1,6 +1,8 @@
 package treecmd
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"regexp"
 	"slices"
@@ -72,6 +74,19 @@ func (r *verifyRun) verify(record any, expectedBase *string) *jsObject {
 
 func (r *verifyRun) checkEvidenceStable() {
 	for _, checked := range r.checked {
+		if checked.restored != nil {
+			data, err := r.v.RecoverReport(r.root, *checked.restored)
+			require(err == nil && len(data) > 0, "workflow restored report changed during verification: "+checked.restored.Task)
+			sum := sha256.Sum256(data)
+			require(hex.EncodeToString(sum[:]) == checked.digest, "workflow restored report changed during verification: "+checked.restored.Task)
+			continue
+		}
+		if checked.workflow {
+			data := r.workflowReadPath(checked.path, "workflow evidence")
+			sum := sha256.Sum256(data)
+			require(hex.EncodeToString(sum[:]) == checked.digest, "evidence changed during verification")
+			continue
+		}
 		require(r.digest(checked.path) == checked.digest, "evidence changed during verification")
 	}
 }

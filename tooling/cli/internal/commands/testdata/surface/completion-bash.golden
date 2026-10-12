@@ -8,6 +8,7 @@ _putnami_subcommands_for() {
         'completion') printf '%s\n' 'bash fish zsh' ;;
         'config') printf '%s\n' 'set show' ;;
         'context') printf '%s\n' 'generate map' ;;
+        'contributor') printf '%s\n' 'language machine-load' ;;
         'deps') printf '%s\n' 'add install remove' ;;
         'dev') printf '%s\n' 'extension template' ;;
         'extensions') printf '%s\n' 'install list remove update' ;;
@@ -42,6 +43,9 @@ _putnami_path_known() {
         'context') return 0 ;;
         'context generate') return 0 ;;
         'context map') return 0 ;;
+        'contributor') return 0 ;;
+        'contributor language') return 0 ;;
+        'contributor machine-load') return 0 ;;
         'deps') return 0 ;;
         'deps add') return 0 ;;
         'deps install') return 0 ;;
@@ -114,6 +118,7 @@ _putnami_flags_for() {
         'compose') printf '%s\n' '--no-watch --port --ready-timeout' ;;
         'context generate') printf '%s\n' '--force' ;;
         'context map') printf '%s\n' '--print' ;;
+        'contributor language') printf '%s\n' '--diff --label --limit' ;;
         'dev template') printf '%s\n' '--keep --skip-build --stable --version' ;;
         'doctor') printf '%s\n' '--profile --project' ;;
         'extensions install') printf '%s\n' '--dest --latest --platform --user' ;;
@@ -151,8 +156,8 @@ _putnami_completions() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="D P b build cache completion compose config context d deploy deps dev doctor extensions f format generate help impact-plan infra init install l lint mcp migrate p package pin projects publish qualify report run s scopes serve sessions t telemetry templates test tree upgrade version workspace"
-    local structured="cache completion compose config context deps dev doctor extensions help impact-plan infra init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade version workspace"
+    local commands="D P b build cache completion compose config context contributor d deploy deps dev doctor extensions f format generate help impact-plan infra init install l lint mcp migrate p package pin projects publish qualify report run s scopes serve sessions t telemetry templates test tree upgrade version workspace"
+    local structured="cache completion compose config context contributor deps dev doctor extensions help impact-plan infra init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade version workspace"
     local global_flags="--verbose --debug --watch --plan --help --all --impacted --projects --tag --exclude-tag --exclude --baseline --impacted-strict --where --providers --credential-fd --no-cache --no-cache-projects --cache-trust --continue-on-error --max-parallel --resource --cpu-policy --retry --retry-failed --profile --dry-run --output --json --quiet --color --no-color --trace-profile --version"
     local projects=""
     local project_ids=""

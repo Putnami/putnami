@@ -18,6 +18,7 @@ import (
 	"strings"
 	"syscall"
 
+	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
@@ -42,6 +43,9 @@ type Verifier struct {
 	// Windows) with `<commands joined by ,> --impacted --baseline <baseSHA>
 	// <flags> --plan --output=json`.
 	Plan func(root string, commands, flags []string, baseSHA string) ([]string, error)
+	// RecoverReport verifies a restored native report against the current
+	// task-owned cache key and returns its validated bytes. Nil fails closed.
+	RecoverReport func(root string, report features.VerificationReportRef) ([]byte, error)
 	// Stdout receives exactly one JSON document, or the usage line for --help.
 	Stdout io.Writer
 }
@@ -119,7 +123,11 @@ type verifyRun struct {
 	checked []checkedRef
 }
 
-type checkedRef struct{ path, digest string }
+type checkedRef struct {
+	path, digest string
+	workflow     bool
+	restored     *features.VerificationReportRef
+}
 
 // verifyArgs is the parsed command line. base and report are nil when absent.
 type verifyArgs struct {
@@ -150,9 +158,13 @@ func (v Verifier) verdict(args []string) (value any, err error) {
 	case "--gate":
 		return r.reusableGate(parsed.input, *parsed.report, parsed.baseOr("origin/main")), nil
 	case "--workflow":
-		before := r.digest(parsed.input)
-		result := r.verifyWorkflow(r.readJSON(parsed.input), false, "")
-		require(r.digest(parsed.input) == before, "workflow changed during verification")
+		before := r.workflowReadPath(parsed.input, "workflow record")
+		workflow, parseErr := parseJSON(before)
+		if parseErr != nil {
+			failErr(parseErr)
+		}
+		result := r.verifyWorkflow(workflow, false, "")
+		require(bytes.Equal(r.workflowReadPath(parsed.input, "workflow record"), before), "workflow changed during verification")
 		r.checkEvidenceStable()
 		return result, nil
 	}
@@ -382,6 +394,7 @@ func (r *verifyRun) fileList(args ...string) []string {
 func gitCommand(dir string, args ...string) *exec.Cmd {
 	command := exec.Command("git", args...)
 	command.Dir = dir
+	command.Env = git.RepositoryEnvironment(os.Environ())
 	return command
 }
 

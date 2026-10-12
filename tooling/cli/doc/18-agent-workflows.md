@@ -55,8 +55,7 @@ is skills, worker profiles, references and helpers, written for every supported
 host: `.agents/skills/**`, `.claude/skills/**`, `.claude/agents/**` and
 `.codex/agents/**`. `@putnami/contributor` ships the daily `build` entry,
 focused `spec`, `design`, `prototype`, `review`, `adr` and `check` interventions,
-compatible `plan`, `execute`, `fix`, `epic` and `code-review` entries,
-and explicit-only `fix-loop` and `content-bump` operations with their workers;
+and the explicit-only `content-bump` utility with its workers;
 see its [contributor journey](../../contributor/doc/01-contributor-journey.md).
 
 `build` coordinates only the requested outcome, including its issue or epic.
@@ -69,11 +68,13 @@ without changing old dossiers or closed hosted review reports. The
 [workflow record contract](../../contributor/doc/04-workflow-contract.md) describes
 stages, materialization and review responsibilities.
 
-Framework recipes reach both `build/references/recipes.md` and the compatible
-`plan/references/recipes.md` from the same committed sample indexes. Legacy
-arguments and local-only aliases remain supported through the current pre-1.0
-line; removal requires an announced breaking change. Helper paths under `fix`
-and `check` remain stable. Publication, merge and deployment still follow the
+Framework recipes reach `build/references/recipes.md` from the committed sample
+indexes. The native `putnami contributor language` and
+`putnami contributor machine-load` helpers replace workflow-owned shell
+implementations; `putnami tree fingerprint` supplies the native tree binding.
+`putnami proposals finalize` is a local publication command when a proposals
+provider is configured, not an operation added to the provider contract. It
+does not run a local gate. Publication, merge and deployment still follow the
 existing mandate and repository controls.
 
 Excluded, permanently:
@@ -491,10 +492,10 @@ and no duration, so two runs over the same inputs produce byte-identical bytes:
   "archiveDigest": "…",
   "manifestHash": "…",
   "applied": true,
-  "created": [".agents/skills/plan/SKILL.md"],
-  "updated": [".agents/skills/execute/SKILL.md"],
-  "removed": [".claude/skills/check/SKILL.md"],
-  "unchanged": [".claude/skills/code-review/SKILL.md"],
+  "created": [".agents/skills/build/SKILL.md"],
+  "updated": [".agents/skills/review/SKILL.md"],
+  "removed": [".claude/skills/plan/SKILL.md"],
+  "unchanged": [".claude/skills/spec/SKILL.md"],
   "collided": []
 }
 ```

@@ -2,10 +2,13 @@ package treecmd
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
 )
 
@@ -65,6 +68,12 @@ func newWorkflowFixture(t *testing.T) (*verifyFixture, fxObj) {
 		"requirements": fxArr{fxObj{"id": "acceptance", "text": "Both checks pass."}}}
 	f.write(".context/putnami.features.json", manifest)
 	f.write(".context/specs/workflow.json", spec)
+	f.git("add", "-f", ".context/putnami.features.json", ".context/specs/workflow.json")
+	f.record["changedFiles"] = fxArr{".context/putnami.features.json", ".context/specs/workflow.json", "app.txt"}
+	fxAppend(fxObjAt(f.record, "review"), "coverage",
+		fxObj{"path": ".context/putnami.features.json", "status": "reviewed", "reason": "Native feature source."})
+	fxAppend(fxObjAt(f.record, "review"), "coverage",
+		fxObj{"path": ".context/specs/workflow.json", "status": "reviewed", "reason": "Native spec source."})
 	f.write(".context/putnami.json", fxObj{"name": "fixture"})
 	f.write(".context/companion/putnami.json", fxObj{"name": "companion"})
 	f.write(".context/verification-report.json", fxObj{"protocolVersion": 1, "observations": fxArr{
@@ -91,7 +100,7 @@ func newWorkflowFixture(t *testing.T) (*verifyFixture, fxObj) {
 	stageReason := f.note("stage-nonapplicable", "This settled correction reuses earlier material.")
 	stages := fxArr{}
 	for _, name := range []string{"intent", "spec", "design", "prototype", "review", "adr", "candidate", "handoff"} {
-		stage := fxObj{"unit": "first", "name": name, "state": "not-applicable", "inputs": fxArr{mandate},
+		stage := fxObj{"unit": "first", "name": name, "state": "not-applicable", "entryCondition": "The bounded unit has an owner and exact inputs.", "inputs": fxArr{mandate},
 			"expectedOutput": name + " decision", "exitCriteria": "The bounded unit is inspectable", "reason": stageReason}
 		if name == "candidate" {
 			stage["state"] = "passed"
@@ -170,6 +179,82 @@ func TestWorkflowNativeChecksAndDossier(t *testing.T) {
 	f.workflow(w, true, "")
 	delete(f.record, "workflow")
 	f.verify("") // Existing v2 dossiers still work with no workflow member.
+}
+
+func TestWorkflowSourcesMustBeTrackedNativeFiles(t *testing.T) {
+	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "workflow-versions-and-references")
+	t.Parallel()
+	for _, tc := range []struct {
+		name, file, reason string
+	}{
+		{"manifest", ".context/putnami.features.json", "workflow manifest must be tracked by Git"},
+		{"spec", ".context/specs/workflow.json", "workflow spec must be tracked by Git"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f, w := newWorkflowFixture(t)
+			f.git("rm", "--cached", "-q", tc.file)
+			f.workflow(w, false, tc.reason)
+		})
+	}
+	t.Run("untracked one-check replacement", func(t *testing.T) {
+		t.Parallel()
+		f, w := newWorkflowFixture(t)
+		manifest := f.readJSON(".context/putnami.features.json")
+		fxObjAt(manifest, "features", 0, "requirements", 0, "verification")["checks"] = fxArr{"first-check"}
+		f.write(".context/putnami.features.json", manifest)
+		fxObjAt(w, "sources", 0)["manifest"] = f.reference(".context/putnami.features.json")
+		f.git("rm", "--cached", "-q", ".context/putnami.features.json")
+		f.workflow(w, false, "workflow manifest must be tracked by Git")
+	})
+}
+
+func TestWorkflowRejectsUnsafeEvidenceBeforeReading(t *testing.T) {
+	t.Parallel()
+	f, w := newWorkflowFixture(t)
+	source := fxObjAt(w, "sources", 0)
+	original := source["manifest"]
+	source["manifest"] = fxObj{"path": "../outside/putnami.features.json", "sha256": strings.Repeat("0", 64)}
+	f.workflow(w, false, "unsafe workflow evidence path")
+	source["manifest"] = original
+
+	target := filepath.Join(f.root, ".context", "workflow-mandate.md")
+	link := filepath.Join(f.root, ".context", "mandate-link.md")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	w["mandate"] = f.reference(".context/mandate-link.md")
+	f.workflow(w, false, "workflow evidence path contains symlink")
+}
+
+func TestWorkflowRestoredReportRequiresNativeCacheCorroboration(t *testing.T) {
+	t.Parallel()
+	f, w := newWorkflowFixture(t)
+	proof := f.readJSON(".context/sessions/synthetic-gate/spec-verification.json")
+	fxObjAt(proof, "groups", 0, "reports", 0)["restored"] = true
+	f.write(".context/sessions/synthetic-gate/spec-verification.json", proof)
+	fxObjAt(w, "proof")["specVerification"] = f.reference(".context/sessions/synthetic-gate/spec-verification.json")
+	f.workflow(w, false, "restored report has no native cache verifier")
+	f.recoverReport = func(_ string, _ features.VerificationReportRef) ([]byte, error) {
+		return []byte("forged restored bytes"), nil
+	}
+	f.workflow(w, false, "restored report digest changed")
+	f.recoverReport = func(_ string, report features.VerificationReportRef) ([]byte, error) {
+		if report.Task != "/application:test" || !report.Restored {
+			t.Fatalf("native callback received wrong report: %+v", report)
+		}
+		return os.ReadFile(filepath.Join(f.root, ".context/verification-report.json"))
+	}
+	f.workflow(w, false, "") // The native cache bridge owns producer corroboration.
+	first := true
+	f.recoverReport = func(_ string, _ features.VerificationReportRef) ([]byte, error) {
+		if first {
+			first = false
+			return os.ReadFile(filepath.Join(f.root, ".context/verification-report.json"))
+		}
+		return []byte("cache content changed after admission"), nil
+	}
+	f.workflow(w, false, "workflow restored report changed during verification")
 }
 
 func TestWorkflowRejectsNativeInventoryAndProofFailures(t *testing.T) {
@@ -336,7 +421,21 @@ func TestWorkflowLaterScopeAndUnitReceipts(t *testing.T) {
 		!strings.Contains(strings.Join(laterStatus.Blockers, " "), "features.unobserved_requirement") {
 		t.Fatalf("native warning was lost from later unit: %s", result.out)
 	}
+	w["artifacts"] = fxArr{
+		fxObj{"id": "later-design", "kind": "design", "contractVersion": "1", "lifecycle": "proposed", "units": fxArr{"later"},
+			"scopes": fxArr{"/.context"}, "source": f.note("later-design", "Later design is not yet reviewed."),
+			"context": fxArr{}, "author": "later-author", "material": true},
+		fxObj{"id": "replaced-design", "kind": "design", "contractVersion": "1", "lifecycle": "superseded", "units": fxArr{"first"},
+			"scopes": fxArr{"/.context"}, "source": f.note("replaced-design", "The current unit replaced this design."),
+			"context": fxArr{}, "author": "first-author", "material": true},
+	}
 	f.workflow(w, true, "") // Ready is for the current unit, not the parent outcome.
+	w["artifacts"] = append(fxArrAt(w, "artifacts"), fxObj{"id": "current-design", "kind": "design", "contractVersion": "1",
+		"lifecycle": "accepted", "units": fxArr{"first"}, "scopes": fxArr{"/.context"},
+		"source": f.note("current-design", "Material design needs independent review."), "context": fxArr{},
+		"author": "first-author", "material": true})
+	f.workflow(w, true, "material workflow artifact lacks independent challenge")
+	w["artifacts"] = fxArrAt(w, "artifacts")[:2]
 	fxObjAt(w, "units", 1)["dependsOn"] = fxArr{}
 	fxObjAt(w, "units", 0)["dependsOn"] = fxArr{"later"}
 	f.workflow(w, true, "workflow current unit has incomplete dependency")
@@ -453,6 +552,38 @@ func TestWorkflowDeliveryRequiresExactNativeReceipt(t *testing.T) {
 	}
 }
 
+func TestWorkflowDeliveryAcceptsProvenLaterStage(t *testing.T) {
+	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "delivery-receipts-and-parent-completeness")
+	t.Parallel()
+	f, w := newWorkflowFixture(t)
+	unit := fxObjAt(w, "units", 0)
+	unit["requiredStage"], unit["stage"] = "candidate", "ready"
+	unit["receipt"] = f.issuedReadyReceipt()
+	result := f.workflow(w, false, "")
+	if result.value["outcomeComplete"] != true {
+		t.Fatalf("native ready receipt failed to cover candidate: %s", result.out)
+	}
+	f.workflow(w, true, "")
+
+	unit["requiredStage"], unit["stage"] = "ready", "merged"
+	unit["proposal"] = fxObj{"source": "github:fixture/repo", "id": "7"}
+	f.write(".context/merged-beyond-ready.json", fxObj{"contract": "proposals", "version": 1, "operation": "status", "outcome": "ok", "result": fxObj{"proposal": fxObj{
+		"ref": fxObj{"source": "github:fixture/repo", "id": "7"}, "revision": "r2",
+		"change": fxObj{"repository": "fixture/repo", "base": "main", "head": "feature", "headCommit": f.head},
+		"title":  "feat: workflow", "state": "merged"}, "checks": fxObj{"state": "passing"}}})
+	unit["receipt"] = f.reference(".context/merged-beyond-ready.json")
+	result = f.workflow(w, false, "")
+	if result.value["outcomeComplete"] != true {
+		t.Fatalf("native merged receipt failed to cover ready: %s", result.out)
+	}
+	f.workflow(w, true, "")
+	status := f.readJSON(".context/merged-beyond-ready.json")
+	fxObjAt(status, "result", "proposal")["state"] = "open"
+	f.write(".context/merged-beyond-ready.json", status)
+	unit["receipt"] = f.reference(".context/merged-beyond-ready.json")
+	f.workflow(w, false, "does not show merged state")
+}
+
 func TestWorkflowReadyReceiptResumesNativeDossier(t *testing.T) {
 	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "delivery-receipts-and-parent-completeness")
 	t.Parallel()
@@ -542,6 +673,42 @@ func TestWorkflowCandidateStageCannotBeSkipped(t *testing.T) {
 	delete(candidate, "receipt")
 	candidate["reason"] = f.note("candidate-waiver", "No actual candidate proof.")
 	f.workflow(w, true, "workflow candidate stage incomplete")
+}
+
+func TestWorkflowStageEntryConditionIsRequired(t *testing.T) {
+	t.Parallel()
+	f, w := newWorkflowFixture(t)
+	stage := fxObjAt(w, "stages", 0)
+	delete(stage, "entryCondition")
+	f.workflow(w, false, "workflow stage missing entryCondition")
+	stage["entryCondition"] = ""
+	f.workflow(w, false, "workflow stage entry condition must be nonempty text")
+}
+
+func TestWorkflowUnknownStageDiagnosticIsDeterministic(t *testing.T) {
+	t.Parallel()
+	f, w := newWorkflowFixture(t)
+	original := fxArrAt(w, "stages")
+	for _, unit := range []string{"zzz", "aaa"} {
+		for _, item := range original {
+			stage, ok := item.(fxObj)
+			if !ok {
+				t.Fatal("stage fixture is not an object")
+			}
+			copy := fxObj{}
+			for key, value := range stage {
+				copy[key] = value
+			}
+			copy["unit"] = unit
+			w["stages"] = append(fxArrAt(w, "stages"), copy)
+		}
+	}
+	for range 20 {
+		result := f.workflow(w, false, "workflow stage names unknown unit aaa")
+		if got := result.value["reason"]; got != "workflow stage names unknown unit aaa" {
+			t.Fatalf("nondeterministic unknown-stage diagnostic: %v", got)
+		}
+	}
 }
 
 func TestWorkflowReadyRejectsBlockedStagesAndDecisions(t *testing.T) {

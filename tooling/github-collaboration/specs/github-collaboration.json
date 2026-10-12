@@ -30,7 +30,7 @@
     },
     {
       "id": "reported-publication",
-      "text": "Every proposal answer lists the pull request's labels and assignees, [] when it has none. An upsert answers after assignAuthor and inheritLabelPrefixes applied their additions, and is unresolved when GitHub dropped one; the proposal's revision covers its labels and assignees, so a change to either by anyone moves it."
+      "text": "Every proposal answer lists its labels and assignees, [] when absent, with revision covering both. Upsert applies assignAuthor and inheritLabelPrefixes and reports unresolved dropped additions. Label inheritance uses deduplicated exact issue references: Closes and non-closing Refs, including configured-host issue URLs for same or cross-repository tasks; foreign-host URLs never trigger reads. Partial delivery preserves related-task labels without closing the parent."
     },
     {
       "id": "reconciled-writes",

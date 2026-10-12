@@ -49,6 +49,28 @@ func TestSurface_ListsEveryCommandUsersType(t *testing.T) {
 	}
 }
 
+func TestSurface_ContributorHelpersAreNativeAndProviderFinalizerIsLocal(t *testing.T) {
+	t.Parallel()
+	surface, err := Surface()
+	if err != nil {
+		t.Fatalf("Surface: %v", err)
+	}
+	for _, path := range []string{"contributor", "contributor language", "contributor machine-load"} {
+		surfaceEntry(t, surface, path)
+	}
+	language := surfaceEntry(t, surface, "contributor language")
+	for _, want := range []string{"--label", "--diff", "--limit"} {
+		if !slices.ContainsFunc(language.Flags, func(flag protocolcli.CommandSurfaceFlag) bool { return flag.Long == want }) {
+			t.Errorf("contributor language is missing %s", want)
+		}
+	}
+	for _, command := range surface.Commands {
+		if command.Path == "proposals finalize" {
+			t.Fatal("local proposals finalize was exposed as a provider wire operation")
+		}
+	}
+}
+
 // An alternate spelling accepts what its canonical path accepts, and an alias
 // runs its command.
 func TestSurface_AnAlternateSpellingSharesItsCommandsSurface(t *testing.T) {

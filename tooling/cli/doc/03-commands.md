@@ -905,7 +905,9 @@ reference, `sources`, `requirements`, `units`, `artifacts`, `experiments`,
 sha256}` from `tree verify --ref`; paths resolve from the consumer's Git root.
 Each source is `{feature, manifest: ref, spec: ref}`. The manifest must be a
 native `putnami.features.json`, and the spec a direct child of `specs/` for
-that feature. Every requirement in those specs appears exactly once as
+that feature; both paths must be tracked by Git. Workflow evidence refs are
+bounded workspace-relative files and refuse symlink components before reading.
+Every requirement in those specs appears exactly once as
 `{feature, id, disposition, unit}` with `disposition` `current` or `later`,
 or as `{feature, id, disposition: "excluded", reason: ref, authority: ref}`.
 `later` retains requested outcome scope and keeps `outcomeComplete` false;
@@ -923,7 +925,11 @@ the mandate's delivery target, among `candidate`, `ready`, `merged`,
 `published`, `deployed`, and `adopted`. `stage` also allows `planned` and
 `building`. A unit with `later` or unverified requirements cannot claim
 `candidate`. Unit dependencies express delivery ordering, not a scheduler; a
-current unit cannot become ready while a dependency remains incomplete. Each
+current unit cannot become ready while a dependency remains incomplete. A
+verified achieved stage at or beyond `requiredStage` satisfies the delivery
+target: native `ready` covers `candidate`, and native `merged` covers `ready`.
+The achieved stage needs its own valid receipt. `published`, `deployed`, and
+`adopted` stay incomplete until native receipt adapters exist. Each
 next-cycle provider task is `{kind:"provider",ref:{source,id}}`; an exact task
 handoff pairs `revision` with a `receipt: ref` to the native `tasks get`
 envelope. A local task is `{kind:"local",record:ref}` to a strict v1 local
@@ -966,8 +972,10 @@ experiment records `question`, `effortCeiling`, exact `inputs`, inspectable
 `asset`, `instructions`, `observed` refs, explicit `simulated` behavior,
 `assumptions`, `conclusion`, and `uncertainty`. Stage entries cover exactly
 `intent`, `spec`, `design`, `prototype`, `review`, `adr`, `candidate`, and
-`handoff` for each unit. Each records `unit`, `state`, `inputs`, `expectedOutput`, `exitCriteria`,
-and a receipt or reason for passed or nonapplicable results. `handoff` binds
+`handoff` for each unit. Each records `unit`, `state`, `entryCondition`, `inputs`,
+`expectedOutput`, `exitCriteria`, and a receipt or reason for passed, blocked,
+or nonapplicable results. `entryCondition` states what must be true before the
+stage can start; `inputs` binds the concrete material. `handoff` binds
 the same `mandate`, one declared `unit`, native project `scopes`, `receiver`,
 `responsibility`, `inputs`, `expectedOutput`, `acceptance`, `nextAction`,
 and `unresolvedFindings`.
@@ -983,9 +991,18 @@ warnings remain visible with the affected incomplete unit, so a later
 unobserved requirement cannot silently disappear or block an otherwise ready
 independent current unit. A standalone `--workflow` call can report pending
 progress without proof; it never prints `Putnami verified` or `ready`.
+An unplanned report marked `restored` needs the current native test-plan cache
+key, successful task-owned entry, exact declared output manifest, and matching
+report bytes. A handwritten `restored` flag alone supplies no proof. A cache
+entry keyed by run parameters absent from the session cannot be corroborated
+and leaves the workflow incomplete without rerunning a gate.
 Its `units` projection shows each unit's outcome, requirement/check verdicts
 and native producer report references, next inspectable result, pending tasks,
-decision references, and blockers. Unsupported external receipt kinds have an
+decision references, and blockers. `requiredStageReached` means the verified
+achieved stage covers the required stage and native unit requirements pass;
+`deliveryReady` additionally requires completed stage exits, no unresolved
+unit decisions, and ready dependencies. A blocked stage needs a reason ref and
+appears in that unit's blockers. Unsupported external receipt kinds have an
 explicit blocker.
 `--record` with a workflow reference requires proof, passing current units,
 passed or reasoned nonapplicable current-unit stages, and no unresolved current
@@ -1019,6 +1036,31 @@ JSON fail the check. A failure prints
 nothing to stderr, and `--output` does not change the document. The verifier
 writes no file and needs no workspace. It is a consistency check, not a signed
 review or an access boundary.
+
+### `contributor`
+
+Run the native local helpers that contributor workflows use:
+
+```bash
+putnami contributor language text --label proposal - < body.md
+putnami contributor language files --diff origin/main..HEAD
+putnami contributor language commits origin/main..HEAD
+putnami contributor language tasks --limit 100
+putnami contributor machine-load --output=json
+```
+
+`language` inspects English-language signals in text, tracked files, commit
+messages, or task titles and bodies. The tasks mode reads the configured tasks
+provider; findings exit 1 and invalid input or an unavailable provider exits 2.
+`machine-load` reports local CPU and memory capacity for check admission. These
+commands do not run or schedule a gate. `--output=json` on `machine-load`
+returns the shared CLI result envelope with the capacity sample in `data`.
+
+When a proposals provider is configured, `putnami proposals finalize --help`
+shows the local publication command's flags. `--verification-file` reads the
+current dossier, `--gate ci` waits for policy-named hosted checks, and
+`--partial-delivery` preserves an incomplete parent task. The command does not
+add a provider operation or run another local gate.
 
 ### `compose`
 

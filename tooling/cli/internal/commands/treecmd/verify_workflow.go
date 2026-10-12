@@ -1,8 +1,11 @@
 package treecmd
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -67,22 +70,63 @@ func workflowStrings(value any, name string) []string {
 	return result
 }
 
-func (r *verifyRun) workflowBytes(reference any, name string) ([]byte, string) {
+func workflowRefPath(reference any, name string) string {
 	ref := workflowObject(reference, name, []string{"path", "sha256"}, []string{"path", "sha256"})
-	file := r.checkRef(ref)
-	info, err := os.Stat(r.path(file))
-	require(err == nil && info.Size() <= maxEvidenceBytes, name+" exceeds 32 MiB")
-	f, err := os.Open(r.path(file))
+	return workflowText(ref.get("path"), name+" path")
+}
+
+func workflowEvidencePath(file string) {
+	require(file != "" && !filepath.IsAbs(file) && !strings.ContainsAny(file, "\\\x00\r\n") &&
+		path.Clean(file) == file && file != "." && file != ".." && !strings.HasPrefix(file, "../") &&
+		file != ".git" && !strings.HasPrefix(file, ".git/"), "unsafe workflow evidence path: "+file)
+}
+
+// workflowReadPath bounds every local evidence read to the Git root and
+// refuses symlinks in every component before opening a file. os.Root also
+// contains a concurrently changed path inside the root.
+func (r *verifyRun) workflowReadPath(file, name string) []byte {
+	workflowEvidencePath(file)
+	root, err := os.OpenRoot(r.root)
 	if err != nil {
-		failErr(fileError(err, file))
+		failErr(err)
 	}
+	defer func() { _ = root.Close() }()
+	component := ""
+	for _, part := range strings.Split(file, "/") {
+		component = path.Join(component, part)
+		info, statErr := root.Lstat(component)
+		require(statErr == nil, "missing or empty evidence file: "+file)
+		require(info.Mode()&os.ModeSymlink == 0, "workflow evidence path contains symlink: "+file)
+	}
+	f, err := root.Open(file)
+	require(err == nil, "missing or empty evidence file: "+file)
 	defer f.Close()
+	info, err := f.Stat()
+	require(err == nil && info.Mode().IsRegular() && info.Size() > 0, "missing or empty evidence file: "+file)
+	require(info.Size() <= maxEvidenceBytes, name+" exceeds 32 MiB")
 	data, err := io.ReadAll(io.LimitReader(f, maxEvidenceBytes+1))
 	if err != nil {
 		failErr(fileError(err, file))
 	}
+	require(len(data) > 0, "missing or empty evidence file: "+file)
 	require(len(data) <= maxEvidenceBytes, name+" exceeds 32 MiB")
+	return data
+}
+
+func (r *verifyRun) workflowBytes(reference any, name string) ([]byte, string) {
+	ref := workflowObject(reference, name, []string{"path", "sha256"}, []string{"path", "sha256"})
+	file := workflowText(ref.get("path"), name+" path")
+	data := r.workflowReadPath(file, name)
+	sum := sha256.Sum256(data)
+	digest := hex.EncodeToString(sum[:])
+	require(strictEqual(digest, ref.get("sha256")), "evidence digest changed: "+file)
+	r.checked = append(r.checked, checkedRef{path: file, digest: digest, workflow: true})
 	return data, file
+}
+
+func (r *verifyRun) workflowCheckRef(reference any) string {
+	_, file := r.workflowBytes(reference, "workflow evidence")
+	return file
 }
 
 func workflowNativePath(file, kind string) {
@@ -98,6 +142,11 @@ func workflowNativePath(file, kind string) {
 	}
 }
 
+func (r *verifyRun) workflowTrackedSource(file, kind string) {
+	tracked := r.fileList("--literal-pathspecs", "ls-files", "-z", "--", file)
+	require(len(tracked) == 1 && tracked[0] == file, "workflow "+kind+" must be tracked by Git: "+file)
+}
+
 func workflowNativeError(kind string, diagnostics any) {
 	fail(fmt.Sprintf("invalid native %s: %v", kind, diagnostics))
 }
@@ -111,10 +160,16 @@ func (r *verifyRun) workflowSources(value any) map[string]workflowSource {
 		featureID := workflowText(source.get("feature"), "workflow source feature")
 		_, exists := result[featureID]
 		require(!exists, "duplicate workflow feature "+featureID)
-		manifestBytes, manifestPath := r.workflowBytes(source.get("manifest"), "workflow manifest")
-		specBytes, specPath := r.workflowBytes(source.get("spec"), "workflow spec")
+		manifestPath := workflowRefPath(source.get("manifest"), "workflow manifest")
+		specPath := workflowRefPath(source.get("spec"), "workflow spec")
+		workflowEvidencePath(manifestPath)
+		workflowEvidencePath(specPath)
 		workflowNativePath(manifestPath, "manifest")
 		workflowNativePath(specPath, "spec")
+		r.workflowTrackedSource(manifestPath, "manifest")
+		r.workflowTrackedSource(specPath, "spec")
+		manifestBytes, _ := r.workflowBytes(source.get("manifest"), "workflow manifest")
+		specBytes, _ := r.workflowBytes(source.get("spec"), "workflow spec")
 		projectDir := path.Dir(manifestPath)
 		require(path.Dir(specPath) == path.Join(projectDir, features.SpecDirectory),
 			"workflow spec and feature manifest have different native owners")
@@ -155,11 +210,14 @@ func (r *verifyRun) workflowSources(value any) map[string]workflowSource {
 
 func (r *verifyRun) workflowProof(value any, current string) (*features.SpecVerificationRecord, any) {
 	proof := workflowObject(value, "workflow proof", []string{"session", "specVerification"}, []string{"session", "specVerification"})
-	sessionPath := r.checkRef(proof.get("session"))
+	sessionBytes, sessionPath := r.workflowBytes(proof.get("session"), "workflow proof session")
 	verificationBytes, verificationPath := r.workflowBytes(proof.get("specVerification"), "workflow spec verification")
 	require(filepath.Clean(r.path(verificationPath)) == filepath.Join(filepath.Dir(r.path(sessionPath)), features.SpecVerificationRecordFilename),
 		"workflow spec verification is not the session sibling artifact")
-	session := r.readJSON(sessionPath)
+	session, err := parseJSON(sessionBytes)
+	if err != nil {
+		failErr(err)
+	}
 	require(strictEqual(at(session, "protocolVersion"), 2.0), "workflow proof needs a v2 session")
 	require(!truthy(at(session, "parentSessionId")) && text(at(session, "endTime")), "workflow proof session is nested or unfinished")
 	require(strictEqual(at(at(session, "tree"), "fingerprint"), current), "stale workflow proof tree")
@@ -192,7 +250,8 @@ func (r *verifyRun) workflowVerdicts(record *features.SpecVerificationRecord, se
 			}
 		}
 	}
-	for featureID, native := range source {
+	for _, featureID := range slices.Sorted(maps.Keys(source)) {
+		native := source[featureID]
 		requirements := native.checks
 		var group *features.SpecVerificationGroup
 		for i := range record.Groups {
@@ -208,10 +267,22 @@ func (r *verifyRun) workflowVerdicts(record *features.SpecVerificationRecord, se
 			"workflow proof has inconsistent native group decision for "+featureID)
 		var observations []features.VerificationObservation
 		for _, report := range group.Reports {
-			require(produced[report.Task] || report.Restored, "workflow proof report has no successful producer task: "+report.Task)
 			require(strings.HasPrefix(report.Digest, "sha256:") && contractDigestPattern.MatchString(report.Digest),
 				"workflow proof report has invalid digest")
-			data, _ := r.workflowBytes(obj([]string{"path", "sha256"}, report.Path, strings.TrimPrefix(report.Digest, "sha256:")), "workflow producer report")
+			var data []byte
+			if report.Restored {
+				require(r.v.RecoverReport != nil, "workflow proof restored report has no native cache verifier: "+report.Task)
+				var err error
+				data, err = r.v.RecoverReport(r.root, report)
+				require(err == nil && len(data) > 0, "workflow proof restored report has no matching native cache producer: "+report.Task)
+				sum := sha256.Sum256(data)
+				require(report.Digest == "sha256:"+hex.EncodeToString(sum[:]), "workflow proof restored report digest changed: "+report.Task)
+				recorded := report
+				r.checked = append(r.checked, checkedRef{restored: &recorded, digest: hex.EncodeToString(sum[:])})
+			} else {
+				require(produced[report.Task], "workflow proof report has no successful producer task: "+report.Task)
+				data, _ = r.workflowBytes(obj([]string{"path", "sha256"}, report.Path, strings.TrimPrefix(report.Digest, "sha256:")), "workflow producer report")
+			}
 			parsed, diagnostics := features.ParseAndValidateVerificationReport(data)
 			if len(diagnostics) > 0 {
 				workflowNativeError("producer report", diagnostics)
@@ -285,8 +356,8 @@ func (r *verifyRun) workflowRequirements(value any, source map[string]workflowSo
 		unit := ""
 		if disposition == "excluded" {
 			require(!row.has("unit"), "excluded workflow requirement cannot name a unit")
-			r.checkRef(row.get("reason"))
-			r.checkRef(row.get("authority"))
+			r.workflowCheckRef(row.get("reason"))
+			r.workflowCheckRef(row.get("authority"))
 		} else {
 			unit = workflowText(row.get("unit"), "workflow requirement unit")
 			require(!row.has("reason") && !row.has("authority"), "non-excluded workflow requirement has exclusion fields")
@@ -363,7 +434,7 @@ func (r *verifyRun) workflowNextCycleTasks(value any) []any {
 			workflowText(local.get("id"), "local workflow task ID")
 			workflowText(local.get("nextResult"), "local workflow task next result")
 			for _, input := range workflowList(local.get("inputs"), "local workflow task inputs") {
-				r.checkRef(input)
+				r.workflowCheckRef(input)
 			}
 		default:
 			fail("unknown workflow task kind")
@@ -402,7 +473,7 @@ func (r *verifyRun) workflowReadyReceipt(unit *jsObject, expectedBaseSHA string)
 		strictEqual(receipt.get("assurance"), "local-declared-scope") && strictEqual(receipt.get("limits"), verifiedLimits),
 		"workflow ready receipt is not a native ready verdict")
 	workflowText(receipt.get("gateSession"), "workflow ready gate session")
-	r.checkRef(receipt.get("review"))
+	r.workflowCheckRef(receipt.get("review"))
 	binding := workflowObject(receipt.get("binding"), "workflow ready binding",
 		[]string{"fingerprint", "headSHA", "baseSHA"}, []string{"fingerprint", "headSHA", "baseSHA"})
 	require(strictEqual(binding.get("fingerprint"), r.fingerprint()) &&
@@ -433,8 +504,10 @@ func (r *verifyRun) workflowProjectTargets(value any) map[string]bool {
 	for _, item := range items {
 		project := workflowObject(item, "workflow project target", []string{"id", "manifest"}, []string{"id", "manifest"})
 		id := workflowText(project.get("id"), "workflow project ID")
-		data, file := r.workflowBytes(project.get("manifest"), "workflow project manifest")
+		file := workflowRefPath(project.get("manifest"), "workflow project manifest")
+		workflowEvidencePath(file)
 		workflowNativePath(file, "project")
+		data, _ := r.workflowBytes(project.get("manifest"), "workflow project manifest")
 		require(path.Base(file) == "putnami.json", "workflow project manifest must name putnami.json")
 		derived := "/"
 		if dir := path.Dir(file); dir != "." {
@@ -451,33 +524,55 @@ func (r *verifyRun) workflowProjectTargets(value any) map[string]bool {
 	return projects
 }
 
+func workflowDeliveryRank(stage string) int {
+	switch stage {
+	case "candidate":
+		return 1
+	case "ready":
+		return 2
+	case "merged":
+		return 3
+	case "published":
+		return 4
+	case "deployed":
+		return 5
+	case "adopted":
+		return 6
+	default:
+		return 0
+	}
+}
+
 func (r *verifyRun) workflowDeliveryReceipt(unit *jsObject, final bool, expectedBaseSHA string) (string, string, bool) {
 	requiredStage := workflowText(unit.get("requiredStage"), "workflow unit required stage")
 	stage := workflowText(unit.get("stage"), "workflow unit stage")
 	require(oneOf(requiredStage, "candidate", "ready", "merged", "published", "deployed", "adopted") &&
 		oneOf(stage, "planned", "building", "candidate", "ready", "merged", "published", "deployed", "adopted"), "unknown workflow delivery stage")
 	if oneOf(stage, "ready", "merged", "published", "deployed", "adopted") {
-		r.checkRef(unit.get("receipt"))
+		r.workflowCheckRef(unit.get("receipt"))
 	} else {
 		require(!unit.has("receipt"), "workflow unit has receipt before delivery")
 	}
-	reached := stage == requiredStage && requiredStage == "candidate"
-	if requiredStage == "ready" && stage == "candidate" && final {
-		reached = true // The enclosing verified dossier supplies this transition.
+	achieved := workflowDeliveryRank(stage)
+	if stage == "candidate" && final {
+		achieved = workflowDeliveryRank("ready") // The enclosing verified dossier supplies this transition.
 	}
 	if stage == "ready" {
-		ready := r.workflowReadyReceipt(unit, expectedBaseSHA)
-		reached = requiredStage == "ready" && ready
+		r.workflowReadyReceipt(unit, expectedBaseSHA)
 	}
 	if stage == "merged" {
-		merged := r.workflowMergedReceipt(unit)
-		reached = requiredStage == "merged" && merged
+		r.workflowMergedReceipt(unit)
 	}
+	if oneOf(stage, "published", "deployed", "adopted") {
+		achieved = 0 // No native receipt adapter verifies these external stages yet.
+	}
+	reached := achieved >= workflowDeliveryRank(requiredStage)
 	return requiredStage, stage, reached
 }
 
 func workflowDependencyReadiness(ids, localReady, currentUnits map[string]bool, dependencies map[string][]string, unitStatus map[string]*jsObject, final bool) bool {
-	for id, deps := range dependencies {
+	for _, id := range slices.Sorted(maps.Keys(dependencies)) {
+		deps := dependencies[id]
 		for _, dependency := range deps {
 			require(ids[dependency] && dependency != id, "workflow unit dependency is unknown or self-referential: "+id)
 		}
@@ -507,7 +602,7 @@ func workflowDependencyReadiness(ids, localReady, currentUnits map[string]bool, 
 		return ready
 	}
 	allReached := true
-	for id := range ids {
+	for _, id := range slices.Sorted(maps.Keys(ids)) {
 		if !visit(id) {
 			allReached = false
 			if final && currentUnits[id] && localReady[id] {
@@ -578,7 +673,7 @@ func workflowUnitRequirementStatuses(id string, members []string, requirements m
 	return statuses, current, verified, complete, unitCurrent
 }
 
-func (r *verifyRun) workflowUnits(value any, requirements map[string]workflowRequirement, verdicts map[string]features.SpecRequirementVerdict, reports map[string][]any, warnings map[string][]diag.Diagnostic, sources map[string]workflowSource, stageBlockers map[string][]any, final bool, expectedBaseSHA string) (int, int, map[string]bool, map[string]bool, bool, []any) {
+func (r *verifyRun) workflowUnits(value any, requirements map[string]workflowRequirement, verdicts map[string]features.SpecRequirementVerdict, reports map[string][]any, warnings map[string][]diag.Diagnostic, sources map[string]workflowSource, stageBlockers map[string][]any, final bool, expectedBaseSHA string) (int, int, map[string]bool, map[string]bool, map[string]bool, bool, []any) {
 	items := workflowList(value, "workflow.units")
 	require(len(items) > 0, "workflow needs a delivery unit")
 	ids := map[string]bool{}
@@ -597,9 +692,9 @@ func (r *verifyRun) workflowUnits(value any, requirements map[string]workflowReq
 		require(!ids[id], "duplicate workflow unit "+id)
 		ids[id] = true
 		outcome := workflowText(unit.get("outcome"), "workflow unit outcome")
-		r.checkRef(unit.get("boundary"))
+		r.workflowCheckRef(unit.get("boundary"))
 		for _, exclusion := range workflowList(unit.get("exclusions"), "workflow unit exclusions") {
-			r.checkRef(exclusion)
+			r.workflowCheckRef(exclusion)
 		}
 		projects := r.workflowProjectTargets(unit.get("projects"))
 		for project := range projects {
@@ -611,7 +706,7 @@ func (r *verifyRun) workflowUnits(value any, requirements map[string]workflowReq
 		nextCycleTasks := r.workflowNextCycleTasks(unit.get("nextCycleTasks"))
 		decisions := workflowList(unit.get("decisions"), "workflow unit decisions")
 		for _, decision := range decisions {
-			r.checkRef(decision)
+			r.workflowCheckRef(decision)
 		}
 		stages, hasStages := stageBlockers[id]
 		require(hasStages, "workflow stage inventory missing unit "+id)
@@ -660,15 +755,16 @@ func (r *verifyRun) workflowUnits(value any, requirements map[string]workflowReq
 		statuses = append(statuses, status)
 	}
 	allReached := workflowDependencyReadiness(ids, localReady, currentUnits, dependencies, unitStatus, final)
-	for stageUnit := range stageBlockers {
+	for _, stageUnit := range slices.Sorted(maps.Keys(stageBlockers)) {
 		require(ids[stageUnit], "workflow stage names unknown unit "+stageUnit)
 	}
-	for key, row := range requirements {
+	for _, key := range slices.Sorted(maps.Keys(requirements)) {
+		row := requirements[key]
 		if row.disposition != "excluded" {
 			require(assigned[key], "workflow requirement has no unit "+key)
 		}
 	}
-	return current, complete, ids, projectIDs, allReached, statuses
+	return current, complete, ids, projectIDs, currentUnits, allReached, statuses
 }
 
 func workflowRefKey(value any, name string) string {
@@ -679,11 +775,11 @@ func workflowRefKey(value any, name string) string {
 func (r *verifyRun) workflowHistoricalRef(value any, snapshots map[string]*jsObject, used map[string]bool) {
 	key := workflowRefKey(value, "historical workflow reference")
 	if copy, archived := snapshots[key]; archived {
-		r.checkRef(copy)
+		r.workflowCheckRef(copy)
 		used[key] = true
 		return
 	}
-	r.checkRef(value)
+	r.workflowCheckRef(value)
 }
 
 type workflowChallengeOpinion struct {
@@ -703,18 +799,18 @@ func (r *verifyRun) workflowChallengeReport(reference any, author string, snapsh
 	require(strictEqual(opinion.get("version"), 1.0), "unsupported original workflow challenge version")
 	reviewer := workflowText(opinion.get("reviewer"), "workflow challenge reviewer")
 	require(reviewer != author && strictEqual(opinion.get("author"), author), "workflow artifact challenge is not independent")
-	r.checkRef(opinion.get("report"))
+	r.workflowCheckRef(opinion.get("report"))
 	if historical {
 		r.workflowHistoricalRef(opinion.get("artifact"), snapshots, used)
 	} else {
-		r.checkRef(opinion.get("artifact"))
+		r.workflowCheckRef(opinion.get("artifact"))
 	}
 	result := workflowChallengeOpinion{artifact: workflowRefKey(opinion.get("artifact"), "workflow challenge artifact")}
 	for _, context := range workflowList(opinion.get("context"), "workflow challenge context") {
 		if historical {
 			r.workflowHistoricalRef(context, snapshots, used)
 		} else {
-			r.checkRef(context)
+			r.workflowCheckRef(context)
 		}
 		result.context = append(result.context, workflowRefKey(context, "workflow challenge context ref"))
 	}
@@ -730,7 +826,7 @@ func (r *verifyRun) workflowChallengeReport(reference any, author string, snapsh
 	return result
 }
 
-func (r *verifyRun) workflowArtifacts(value any, units, projects map[string]bool, final bool) {
+func (r *verifyRun) workflowArtifacts(value any, units, projects, currentUnits map[string]bool, final bool) {
 	items := workflowList(value, "workflow.artifacts")
 	ids := map[string]bool{}
 	for _, item := range items {
@@ -743,21 +839,26 @@ func (r *verifyRun) workflowArtifacts(value any, units, projects map[string]bool
 		workflowText(a.get("contractVersion"), "workflow artifact contract version")
 		lifecycle := workflowText(a.get("lifecycle"), "workflow artifact lifecycle")
 		require(oneOf(lifecycle, "proposed", "challenged", "accepted", "superseded"), "unknown workflow artifact lifecycle")
+		currentArtifact := false
 		for _, unit := range workflowStrings(a.get("units"), "workflow artifact units") {
 			require(units[unit], "workflow artifact names unknown unit "+unit)
+			currentArtifact = currentArtifact || currentUnits[unit]
 		}
 		scopes := workflowStrings(a.get("scopes"), "workflow artifact scopes")
 		require(len(scopes) > 0, "workflow artifact has no scope")
 		for _, scope := range scopes {
 			require(projects[scope], "workflow artifact names unknown project scope "+scope)
 		}
-		r.checkRef(a.get("source"))
+		r.workflowCheckRef(a.get("source"))
 		for _, context := range workflowList(a.get("context"), "workflow artifact context") {
-			r.checkRef(context)
+			r.workflowCheckRef(context)
 		}
 		author := workflowText(a.get("author"), "workflow artifact author")
 		material, ok := a.get("material").(bool)
 		require(ok, "workflow artifact material must be boolean")
+		if !currentArtifact || lifecycle == "superseded" {
+			continue // This artifact cannot gate a current unit's readiness.
+		}
 		if !a.has("challenge") {
 			require((!final && lifecycle != "accepted") || !material, "material workflow artifact lacks independent challenge: "+id)
 			continue
@@ -775,7 +876,7 @@ func (r *verifyRun) workflowArtifacts(value any, units, projects map[string]bool
 				copyKey := workflowRefKey(copy, "workflow snapshot copy")
 				require(copyKey != key && strictEqual(at(copy, "sha256"), at(snapshot.get("original"), "sha256")),
 					"workflow snapshot does not preserve original bytes at a distinct path")
-				r.checkRef(copy)
+				r.workflowCheckRef(copy)
 				snapshots[key] = copy
 			}
 		}
@@ -798,7 +899,7 @@ func (r *verifyRun) workflowArtifacts(value any, units, projects map[string]bool
 			}
 			opinions = append(opinions, opinion)
 		}
-		for key := range snapshots {
+		for _, key := range slices.Sorted(maps.Keys(snapshots)) {
 			require(usedSnapshots[key], "workflow challenge snapshot has no examined original ref")
 		}
 		latest := opinions[len(opinions)-1]
@@ -818,16 +919,16 @@ func (r *verifyRun) workflowArtifacts(value any, units, projects map[string]bool
 			resolved[fid] = true
 			state := workflowText(resolution.get("state"), "workflow finding resolution state")
 			require(oneOf(state, "fixed", "refuted", "deferred"), "unknown workflow finding resolution state")
-			r.checkRef(resolution.get("note"))
+			r.workflowCheckRef(resolution.get("note"))
 			if state == "deferred" {
-				r.checkRef(resolution.get("authority"))
+				r.workflowCheckRef(resolution.get("authority"))
 			} else if state == "fixed" {
 				require(findingIndex[fid] < len(reviews) && opinions[findingIndex[fid]-1].artifact != latest.artifact,
 					"fixed workflow finding lacks later review of corrected artifact: "+fid)
 			}
 		}
 		if final || lifecycle == "accepted" {
-			for fid := range findingIndex {
+			for _, fid := range slices.Sorted(maps.Keys(findingIndex)) {
 				require(resolved[fid], "unresolved material workflow finding: "+fid)
 			}
 		}
@@ -847,10 +948,10 @@ func (r *verifyRun) workflowExperiments(value any) {
 			workflowText(e.get(field), "workflow experiment "+field)
 		}
 		for _, input := range workflowList(e.get("inputs"), "workflow experiment inputs") {
-			r.checkRef(input)
+			r.workflowCheckRef(input)
 		}
 		for _, field := range []string{"asset", "instructions", "observed"} {
-			r.checkRef(e.get(field))
+			r.workflowCheckRef(e.get(field))
 		}
 		workflowStrings(e.get("simulated"), "workflow experiment simulated behavior")
 		workflowStrings(e.get("assumptions"), "workflow experiment assumptions")
@@ -863,8 +964,8 @@ func (r *verifyRun) workflowStages(value any) map[string][]any {
 	names := map[string]map[string]bool{}
 	blockers := map[string][]any{}
 	for _, item := range items {
-		s := workflowObject(item, "workflow stage", []string{"unit", "name", "state", "inputs", "expectedOutput", "exitCriteria"},
-			[]string{"unit", "name", "state", "inputs", "expectedOutput", "exitCriteria", "receipt", "reason"})
+		s := workflowObject(item, "workflow stage", []string{"unit", "name", "state", "entryCondition", "inputs", "expectedOutput", "exitCriteria"},
+			[]string{"unit", "name", "state", "entryCondition", "inputs", "expectedOutput", "exitCriteria", "receipt", "reason"})
 		unit := workflowText(s.get("unit"), "workflow stage unit")
 		if names[unit] == nil {
 			names[unit] = map[string]bool{}
@@ -876,15 +977,16 @@ func (r *verifyRun) workflowStages(value any) map[string][]any {
 		names[unit][name] = true
 		state := workflowText(s.get("state"), "workflow stage state")
 		require(oneOf(state, "pending", "blocked", "passed", "not-applicable"), "unknown workflow stage state")
+		workflowText(s.get("entryCondition"), "workflow stage entry condition")
 		for _, input := range workflowList(s.get("inputs"), "workflow stage inputs") {
-			r.checkRef(input)
+			r.workflowCheckRef(input)
 		}
 		workflowText(s.get("expectedOutput"), "workflow stage expected output")
 		workflowText(s.get("exitCriteria"), "workflow stage exit criteria")
 		if state == "passed" {
-			r.checkRef(s.get("receipt"))
+			r.workflowCheckRef(s.get("receipt"))
 		} else if state == "not-applicable" || state == "blocked" {
-			r.checkRef(s.get("reason"))
+			r.workflowCheckRef(s.get("reason"))
 		} else {
 			require(!s.has("receipt"), "pending workflow stage has a receipt")
 		}
@@ -896,7 +998,8 @@ func (r *verifyRun) workflowStages(value any) map[string][]any {
 			blockers[unit] = append(blockers[unit], message)
 		}
 	}
-	for unit, stages := range names {
+	for _, unit := range slices.Sorted(maps.Keys(names)) {
+		stages := names[unit]
 		require(len(stages) == len(canonical), "workflow stage inventory is incomplete for "+unit)
 	}
 	return blockers
@@ -907,7 +1010,7 @@ func (r *verifyRun) verifyWorkflow(value any, final bool, expectedBaseSHA string
 		[]string{"version", "outcome", "mandate", "sources", "requirements", "units", "artifacts", "experiments", "stages", "handoff", "proof"})
 	require(strictEqual(w.get("version"), 1.0), "unsupported local workflow version; expected v1")
 	workflowText(w.get("outcome"), "workflow outcome")
-	r.checkRef(w.get("mandate"))
+	r.workflowCheckRef(w.get("mandate"))
 	sources := r.workflowSources(w.get("sources"))
 	rows, later := r.workflowRequirements(w.get("requirements"), sources)
 	var proof *features.SpecVerificationRecord
@@ -938,12 +1041,12 @@ func (r *verifyRun) verifyWorkflow(value any, final bool, expectedBaseSHA string
 		}
 	}
 	stageBlockers := r.workflowStages(w.get("stages"))
-	current, complete, units, projects, reached, statuses := r.workflowUnits(w.get("units"), rows, verdicts, reports, warnings, sources, stageBlockers, final, expectedBaseSHA)
-	r.workflowArtifacts(w.get("artifacts"), units, projects, final)
+	current, complete, units, projects, currentUnits, reached, statuses := r.workflowUnits(w.get("units"), rows, verdicts, reports, warnings, sources, stageBlockers, final, expectedBaseSHA)
+	r.workflowArtifacts(w.get("artifacts"), units, projects, currentUnits, final)
 	r.workflowExperiments(w.get("experiments"))
 	handoff := workflowObject(w.get("handoff"), "workflow handoff", []string{"mandate", "unit", "scopes", "receiver", "responsibility", "inputs", "expectedOutput", "acceptance", "nextAction", "unresolvedFindings"},
 		[]string{"mandate", "unit", "scopes", "receiver", "responsibility", "inputs", "expectedOutput", "acceptance", "nextAction", "unresolvedFindings"})
-	r.checkRef(handoff.get("mandate"))
+	r.workflowCheckRef(handoff.get("mandate"))
 	require(strictEqual(at(handoff.get("mandate"), "path"), at(w.get("mandate"), "path")) &&
 		strictEqual(at(handoff.get("mandate"), "sha256"), at(w.get("mandate"), "sha256")), "workflow handoff changes mandate")
 	require(units[workflowText(handoff.get("unit"), "workflow handoff unit")], "workflow handoff names unknown unit")
@@ -956,7 +1059,7 @@ func (r *verifyRun) verifyWorkflow(value any, final bool, expectedBaseSHA string
 		workflowText(handoff.get(field), "workflow handoff "+field)
 	}
 	for _, input := range workflowList(handoff.get("inputs"), "workflow handoff inputs") {
-		r.checkRef(input)
+		r.workflowCheckRef(input)
 	}
 	available := map[string]bool{}
 	for _, input := range workflowList(handoff.get("inputs"), "workflow handoff inputs") {

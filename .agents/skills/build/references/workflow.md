@@ -16,8 +16,12 @@ The v1 record has `version: 1`, a stable `outcome`, an exact `mandate` reference
 and `sources: [{feature, manifest: ref, spec: ref}]`. `sources` points to
 native feature declarations and specs by exact bytes. Load their entire
 requirement inventory; identifiers are qualified as `feature#requirement`
-because requirement IDs are local to a spec. The record's `requirements`
-partitions every selected native requirement into `current`, `later` or
+because requirement IDs are local to a spec. The manifest and spec paths
+must be Git-tracked in the consumer workspace;
+an ignored local spec cannot redefine the authoritative inventory.
+Workflow references refuse symlinks and bind the exact regular-file bytes.
+The record's `requirements` partitions every selected native requirement
+into `current`, `later` or
 `excluded`. Current and later rows name a `unit`; an exclusion instead names
 `reason` and actual `authority` references. Do not drop a requested large
 outcome when a first unit has a smaller limit. An unsupported exclusion blocks
@@ -82,10 +86,11 @@ ordinary build review and proof.
 `stages` contains exactly the canonical `intent`, `spec`, `design`,
 `prototype`, `review`, `adr`, `candidate` and `handoff` entries **for each
 unit**. Each has a `unit` ID, `name`, `state` (`pending`, `blocked`, `passed`,
-`not-applicable`), exact
-`inputs`, `expectedOutput`, `exitCriteria`, and a real `receipt` for passed
-or a `reason` ref for non-applicable. State the entry condition and supported
-result in the surrounding stage note. A settled change may mark a new
+`not-applicable`), nonempty `entryCondition` describing the observable
+prerequisite for starting that stage, exact `inputs`, `expectedOutput`,
+`exitCriteria`, and a real `receipt` for passed or a `reason` ref for
+non-applicable. The entry condition is separate from the referenced inputs
+and the supported result. A settled change may mark a new
 prototype or ADR not applicable with a reason; it does not omit the stage.
 Every current unit's stages must have passed or be not applicable, and its
 candidate stage must be passed, for that unit to reach ready. Pending or
@@ -105,7 +110,9 @@ Optional `proof: {session: ref, specVerification: ref}` points to the native
 producer session and its sibling `spec-verification.json` on the same current
 tree. Never write these receipts by hand. The verifier joins native expected
 checks to producer observations: missing, duplicate, unknown, skipped, failed
-or stale results cannot be counted as passed. A well-formed planning record
+or stale results cannot be counted as passed. A restored producer result needs
+its native cache and session corroboration; a handwritten restored flag is
+not proof. A well-formed planning record
 can have no proof and still report progress. A v2 ready dossier that references
 the workflow requires all current included native requirements proven from
 the actual producer, in addition to its existing review/gate/qualification and

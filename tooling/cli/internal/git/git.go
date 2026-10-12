@@ -869,7 +869,10 @@ func runCaptureEnv(repoRoot string, env []string, args ...string) (string, strin
 
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = repoRoot
-	cmd.Env = env
+	if env == nil {
+		env = os.Environ()
+	}
+	cmd.Env = RepositoryEnvironment(env)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -880,6 +883,27 @@ func runCaptureEnv(repoRoot string, env []string, args ...string) (string, strin
 		return "", stderr.String(), err
 	}
 	return stdout.String(), stderr.String(), nil
+}
+
+// RepositoryEnvironment removes selectors that could redirect a Git command
+// away from its explicit working directory. Transport credentials and tracing
+// (including GIT_SSH_COMMAND and GIT_ASKPASS) pass through unchanged.
+func RepositoryEnvironment(environ []string) []string {
+	cleaned := make([]string, 0, len(environ))
+	for _, entry := range environ {
+		name, _, _ := strings.Cut(entry, "=")
+		if strings.HasPrefix(name, "GIT_CONFIG") {
+			continue
+		}
+		switch name {
+		case "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
+			"GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_PREFIX", "GIT_CEILING_DIRECTORIES",
+			"GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_NAMESPACE":
+			continue
+		}
+		cleaned = append(cleaned, entry)
+	}
+	return cleaned
 }
 
 func splitLines(s string) []string {

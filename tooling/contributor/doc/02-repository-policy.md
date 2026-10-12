@@ -3,7 +3,7 @@
 A repository states its contributor conventions once, in the
 `options["@putnami/contributor"]` block of `putnami.workspace.json`. Skills and
 helpers read it from there; the shipped reference
-(`.agents/skills/execute/references/policy.md`) lists every member, its
+(`.agents/skills/build/references/policy.md`) lists every member, its
 default and which workflow reads it.
 
 The block holds conventions only:
@@ -15,8 +15,8 @@ The block holds conventions only:
 - **Not host policy.** Permissions, hooks and model access stay in the host's
   configuration (`.claude/settings.json`, `.codex/config.toml`).
 
-A workspace without the block gets the defaults: backlog `open`, claimed and
-delivered state `in_progress`, the shipped worker profiles, no language rule,
+A workspace without the block gets the defaults: claimed and delivered state
+`in_progress`, the shipped worker profiles, no language rule,
 no hosted gate, proposals ready at finalization, no body limit beyond the
 contract's, no task reference line, no integration.
 
@@ -58,14 +58,7 @@ repositories.
       "version": 1,
       "tasks": {
         "source": "github:putnami/putnami",
-        "backlog": { "states": ["open"] },
-        "filters": { "group": "group/{value}", "scope": "scope/{value}" },
-        "rank": [
-          "severity/critical", "severity/high", "severity/medium", "severity/low",
-          "priority/p0", "priority/p1", "priority/p2", "priority/p3"
-        ],
         "tiers": { "light": "tier/light", "standard": "tier/standard", "heavy": "tier/heavy" },
-        "planLabels": ["enhancement", "source/plan"],
         "claimAssignees": ["@me"]
       },
       "proposals": { "source": "github:putnami/putnami" },
@@ -101,34 +94,37 @@ How the pieces combine for one delivery:
   review, as the label workflow expects. The tasks contract has no "awaiting
   review" state of its own, so `status/needs-design` reads as `blocked` too.
   An issue that is already blocked through `status/needs-design` (a reviewer
-  added it after the claim, or `execute` ran without a claim) still moves to
-  `status/needs-review`: the finalizer always sends the transition, and the
+  added it after the claim, or build ran without a claim) still moves to
+  `status/needs-review`: native finalization sends the transition when authorized, and the
   provider applies a state's first label whenever another label decided it.
   No mapping alone avoids that collision: the contract has three open states,
   and this repository gives four meanings to its status labels.
 - `publication.taskReference` puts `Closes #<id>` in the commit and the
   proposal body; the provider reads it to copy the issue's classification
   labels (`inheritLabelPrefixes`) and GitHub closes the issue on merge when
-  the mandated outcome is complete. For an intermediate unit, the finalizer's
+  the mandated outcome is complete. For an intermediate unit, native finalize's
   `--partial-delivery` uses a non-closing parent reference, rejects a caller
   closing directive and skips the task's delivered transition. If a versioned
   workflow dossier reports `outcomeComplete: false`, normal parent-task
   finalization is refused. This protection also applies if the policy maps
-  delivered to `done`.
+  delivered to `done`. A partial proposal's non-closing reference may not
+  trigger the provider's closing-reference label inheritance; report the
+  actual labels from proposal read-back.
 - `claimAssignees: ["@me"]` is the GitHub provider's notation for the
   credential's account; another provider documents its own.
-- `verification.language: "en"` makes `check` and the finalizer run the
+- `verification.language: "en"` makes `check` and native finalization run the
   English-only detector on everything a change publishes.
 - The repository squash-merges with the proposal title and body as the commit
   title and message, the merge button included. `bodyMaxBytes: 1500` keeps
-  that body a commit message; the finalizer posts the verification record as
+  that body a commit message; native finalization posts the verification record as
   a proposal comment instead of appending it.
-- Every proposal opens as a draft when work starts (`finalize-pr.sh --draft`).
+- Every authorized proposal opens as a draft when work starts (`putnami proposals finalize --draft`).
   Putnami CI holds runs on a draft, so checkpoint pushes cost no runner time.
 - `verification.ciGate` names `Putnami CI` as the hosted check that stands for
-  the gate. When the machine's load ratio exceeds `0.7`, the finalizer runs no
-  local impacted gate: it marks the proposal ready, which starts Putnami CI,
-  and waits for that check on the pushed commit.
+  the gate. When the machine's load ratio exceeds `0.7`, build selects
+  `proposals finalize --gate ci` instead of running a local impacted gate;
+  native finalization waits for that check on the pushed commit. It never
+  runs a local gate itself.
 
 ## A minimal repository
 

@@ -20,29 +20,22 @@ import (
 
 const contributorExtension = "@putnami/contributor"
 
-// contributorSkills are the entry points the extension must ship. The last
-// four are deprecated aliases (contributorAliases).
+// contributorSkills are the complete active entry-point inventory.
 var contributorSkills = []string{
-	"build", "spec", "design", "prototype", "review", "adr",
-	"plan", "execute", "fix", "epic", "check", "code-review", "fix-loop", "content-bump",
+	"build", "spec", "design", "prototype", "review", "adr", "check", "content-bump",
+}
+
+var contributorRemovedSkills = []string{
+	"plan", "execute", "fix", "epic", "code-review", "fix-loop",
 	"putnami-plan", "putnami-change", "putnami-check", "putnami-review",
 }
 
 // contributorWorkers are the worker profiles the extension ships.
 var contributorWorkers = []string{"fix-light", "fix-standard", "fix-heavy", "epic-analyst"}
 
-// contributorAliases maps each deprecated entry point to the canonical skill
-// that replaces it.
-var contributorAliases = map[string]string{
-	"putnami-plan":   "plan",
-	"putnami-change": "execute",
-	"putnami-check":  "check",
-	"putnami-review": "code-review",
-}
-
 // contributorExplicitOnly are the skills that never run on implicit selection:
 // they mutate shared state in bulk or only apply to a configured integration.
-var contributorExplicitOnly = []string{"content-bump", "epic", "fix-loop"}
+var contributorExplicitOnly = []string{"content-bump"}
 
 func contributorRoot(t *testing.T) string {
 	t.Helper()
@@ -77,8 +70,8 @@ func TestContributorContentRendersEveryEntryPointOnBothHosts(t *testing.T) {
 			}
 		}
 	}
-	// Every shipped skill and worker is one this test names, so a new entry
-	// point is added here, with its aliases and invocation policy, on purpose.
+	// Every shipped skill and worker is named here, so an added entry point
+	// changes the explicit inventory and its invocation policy on purpose.
 	var extra []string
 	for path := range result.Files {
 		parts := strings.Split(path, "/")
@@ -96,7 +89,7 @@ func TestContributorContentRendersEveryEntryPointOnBothHosts(t *testing.T) {
 }
 
 func TestContributorPackagedAndSourceConsumerMigration(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "canonical-consumer-migration", "packaged-canonical-and-compatible-consumer-content")
+	spectest.Proves(t, "cli/contributor-workflows", "canonical-consumer-migration", "packaged-canonical-consumer-content")
 	pkg, err := sdkagentartifact.PackageExtension(contributorRoot(t), "0.1.0")
 	if err != nil {
 		t.Fatal(err)
@@ -148,6 +141,57 @@ func TestContributorPackagedAndSourceConsumerMigration(t *testing.T) {
 	}
 }
 
+func TestManagedUpgradeRemovesUnchangedLegacySkillAndProtectsEditedCopy(t *testing.T) {
+	for _, edited := range []bool{false, true} {
+		name := "unchanged"
+		if edited {
+			name = "edited"
+		}
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			dir := writeLocalContentExtension(t, root, "/tools/workflows", "@local/workflows", "build", "Canonical build.\n")
+			writePathFile(t, dir, "src/skills/plan/SKILL.md", "---\nname: plan\ndescription: Legacy plan\n---\n\nLegacy plan.\n")
+			cfg := localContentConfig("/tools/workflows", "@local/workflows")
+			if changed, err := MaterializeLocalAgentContent(root, cfg, nil); err != nil || !changed {
+				t.Fatalf("install legacy fixture changed=%v, err=%v", changed, err)
+			}
+			for _, host := range []string{".agents", ".claude"} {
+				if _, statErr := os.Stat(filepath.Join(root, host, "skills", "plan", "SKILL.md")); statErr != nil {
+					t.Fatalf("legacy fixture was not installed on %s: %v", host, statErr)
+				}
+			}
+			if edited {
+				writePathFile(t, root, ".agents/skills/plan/SKILL.md", "Local protected plan edit.\n")
+			}
+			if err := os.RemoveAll(filepath.Join(dir, "src", "skills", "plan")); err != nil {
+				t.Fatal(err)
+			}
+			changed, err := MaterializeLocalAgentContent(root, cfg, nil)
+			if edited {
+				if err == nil {
+					t.Fatal("edited managed legacy skill was removed without a conflict")
+				}
+				got, readErr := os.ReadFile(filepath.Join(root, ".agents", "skills", "plan", "SKILL.md"))
+				if readErr != nil || string(got) != "Local protected plan edit.\n" {
+					t.Fatalf("edited managed legacy skill was not protected: %q, %v", got, readErr)
+				}
+				if _, statErr := os.Stat(filepath.Join(root, ".claude", "skills", "plan", "SKILL.md")); statErr != nil {
+					t.Fatalf("collision removed the other host's managed copy: %v", statErr)
+				}
+				return
+			}
+			if err != nil || !changed {
+				t.Fatalf("remove unchanged legacy skill changed=%v, err=%v", changed, err)
+			}
+			for _, host := range []string{".agents", ".claude"} {
+				if _, statErr := os.Stat(filepath.Join(root, host, "skills", "plan", "SKILL.md")); !os.IsNotExist(statErr) {
+					t.Errorf("unchanged legacy skill survived on %s: %v", host, statErr)
+				}
+			}
+		})
+	}
+}
+
 func TestContributorExplicitOnlySkillsDeclareItOnBothHosts(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "explicit-only-invocation", "explicit-only-skills-declare-it-on-both-hosts")
@@ -185,7 +229,7 @@ func TestContributorReviewMetadataKeepsTheReviewQualityFloor(t *testing.T) {
 		t.Fatal("the analysis profile declares no model")
 	}
 	result := buildContributorContent(t)
-	for _, skill := range []string{"review", "code-review"} {
+	for _, skill := range []string{"review"} {
 		metadata, err := os.ReadFile(filepath.Join(contributorRoot(t), "src", "skills", skill, "agents", "claude.yaml"))
 		if err != nil {
 			t.Fatal(err)
@@ -199,23 +243,18 @@ func TestContributorReviewMetadataKeepsTheReviewQualityFloor(t *testing.T) {
 	}
 }
 
-func TestContributorAliasesNameAnExistingCanonicalSkill(t *testing.T) {
+func TestContributorShipsOnlyCanonicalEntriesAndActiveUtilities(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/contributor-workflows", "entry-point-aliases", "each-alias-names-an-existing-canonical-skill")
+	spectest.Proves(t, "cli/contributor-workflows", "canonical-entry-points", "only-canonical-entry-points-and-active-utilities")
 	result := buildContributorContent(t)
-	for alias, canonical := range contributorAliases {
-		body := string(result.Files[".agents/skills/"+alias+"/SKILL.md"])
-		if !strings.Contains(body, "deprecated alias of `"+canonical+"`") {
-			t.Errorf("%s does not declare itself a deprecated alias of %s", alias, canonical)
+	for _, removed := range contributorRemovedSkills {
+		if _, err := os.Stat(filepath.Join(contributorRoot(t), "src", "skills", removed)); !os.IsNotExist(err) {
+			t.Errorf("removed contributor source %s remains: %v", removed, err)
 		}
-		if !strings.Contains(body, "`.agents/skills/"+canonical+"/SKILL.md`") {
-			t.Errorf("%s does not name the canonical workflow file of %s", alias, canonical)
-		}
-		if _, ok := result.Files[".agents/skills/"+canonical+"/SKILL.md"]; !ok {
-			t.Errorf("%s names %s, which the contributor content does not ship", alias, canonical)
-		}
-		if contains(contributorExplicitOnly, alias) != contains(contributorExplicitOnly, canonical) {
-			t.Errorf("%s and %s disagree on explicit-only invocation", alias, canonical)
+		for _, host := range []string{".agents", ".claude"} {
+			if _, present := result.Files[host+"/skills/"+removed+"/SKILL.md"]; present {
+				t.Errorf("removed skill %s still renders on %s", removed, host)
+			}
 		}
 	}
 }
@@ -251,14 +290,6 @@ func TestContributorContentIsProviderNeutral(t *testing.T) {
 			}
 		}
 	}
-	// The rules above only mean something while the helpers actually publish:
-	// the finalizer must reach proposals and tasks through the contracts.
-	finalizer := string(result.Files[".agents/skills/fix/scripts/finalize-pr.sh"])
-	for _, call := range []string{`collab proposals upsert`, `collab proposals status`, `collab tasks transition`} {
-		if !strings.Contains(finalizer, call) {
-			t.Errorf("the finalizer no longer calls %q", call)
-		}
-	}
 }
 
 // modelIdentity matches a host model name or identifier.
@@ -280,9 +311,6 @@ func TestContributorInstructionsNameProfilesNotModels(t *testing.T) {
 		t.Fatalf("found %d instruction bodies, fewer than the entry points; the walk is broken", len(bodies))
 	}
 	for _, path := range bodies {
-		if strings.HasSuffix(path, filepath.Join("plan", "references", "recipes.md")) {
-			continue // generated from the recipe indexes; it names no model
-		}
 		content, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
@@ -290,77 +318,6 @@ func TestContributorInstructionsNameProfilesNotModels(t *testing.T) {
 		if match := modelIdentity.FindString(string(content)); match != "" {
 			rel, _ := filepath.Rel(root, path)
 			t.Errorf("%s names the model %q: instructions select a worker profile, whose host metadata carries the model", rel, match)
-		}
-	}
-}
-
-// fix-loop reconciles and deduplicates a task, then hands exactly that task to
-// fix. A backlog-selection flag beside the reference would let fix pick
-// another task than the one the loop reconciled.
-func TestContributorLoopHandsFixTheTaskItReconciled(t *testing.T) {
-	t.Parallel()
-	content, err := os.ReadFile(filepath.Join(contributorRoot(t), "src", "skills", "fix-loop", "SKILL.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	loop := string(content)
-	if !strings.Contains(loop, "invoke `/fix <reference>`") {
-		t.Error("fix-loop no longer hands fix the task reference it selected")
-	}
-	if strings.Contains(loop, "--from-audit") {
-		t.Error("fix-loop passes --from-audit, a backlog selection, beside the reference it selected")
-	}
-}
-
-// directScriptRun matches a script run as a command of its own: a path ending
-// in .sh that opens a line (after an optional "$ " prompt), a code span, a
-// usage string, a command after &&, || or ;, or a $(...) substitution, and is
-// followed by an argument, the end of the line or the closing parenthesis.
-// "bash <path>.sh" does not match, because bash opens that command.
-var directScriptRun = regexp.MustCompile("(?m)(?:^[ \\t]*(?:\\$[ \\t]+)?|`|usage: |(?:&&|\\|\\||;|\\$\\()[ \\t]*)[^\\s`|\"'()]*\\.sh(?:[ \\t]+[^\\s|]|[ \\t]*$|\\))")
-
-func TestDirectScriptRunPattern(t *testing.T) {
-	t.Parallel()
-	for _, line := range []string{
-		"`scripts/finalize-pr.sh --base <branch>`",
-		"  finalize-pr.sh --base <branch>",
-		"usage: english-only.sh (files | tasks)",
-		"  tree-fingerprint.sh",
-		"$ .agents/skills/fix/scripts/finalize-pr.sh --base main",
-		`cd "$root" && .agents/skills/fix/scripts/finalize-pr.sh --base main`,
-		"fp=$(.agents/skills/fix/scripts/tree-fingerprint.sh)",
-	} {
-		if !directScriptRun.MatchString(line) {
-			t.Errorf("a direct run is not detected: %q", line)
-		}
-	}
-	for _, line := range []string{
-		"`bash .agents/skills/fix/scripts/finalize-pr.sh --base <branch>`",
-		"$ bash .agents/skills/fix/scripts/finalize-pr.sh --help",
-		"fp=$(bash .agents/skills/fix/scripts/tree-fingerprint.sh)",
-		"- `tree-fingerprint.sh` forwards to the canonical tree producer.",
-		"    english-only.sh | */english-only.sh) return 0 ;;",
-		`ENGLISH_ONLY="$(cd "$dir" && pwd || true)/english-only.sh"`,
-	} {
-		if directScriptRun.MatchString(line) {
-			t.Errorf("a run through bash or a script name is reported as a direct run: %q", line)
-		}
-	}
-}
-
-// The agent artifact carries no file mode, so an installed script is never
-// executable: every instruction and help text runs it through bash.
-func TestContributorContentRunsScriptsThroughBash(t *testing.T) {
-	t.Parallel()
-	result := buildContributorContent(t)
-	names := make([]string, 0, len(result.Files))
-	for name := range result.Files {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		for _, match := range directScriptRun.FindAllString(string(result.Files[name]), -1) {
-			t.Errorf("%s runs a script without bash: %q", name, strings.TrimSpace(match))
 		}
 	}
 }
@@ -393,7 +350,7 @@ func TestContributorContentPolicyRefusesProviderSpecificContent(t *testing.T) {
 	} {
 		root := t.TempDir()
 		copyTree(t, source, root, "putnami.json", "putnami.extension.json", "src")
-		skill := filepath.Join(root, "src", "skills", "fix", "SKILL.md")
+		skill := filepath.Join(root, "src", "skills", "build", "SKILL.md")
 		body, err := os.ReadFile(skill)
 		if err != nil {
 			t.Fatal(err)

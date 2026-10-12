@@ -9,9 +9,10 @@ argument-hint: [<intention|task|proposal>] [--resume <record>] [--tier <light|st
 
 Own the requested outcome, whether it arrives as an intention, a specified
 task, an existing proposal, or a coordinated epic. This is the one
-implementation, review, repair and evidence loop. `fix` may select a backlog
-task before entering it; invoking `build` alone never selects backlog work.
-`execute` and `epic` remain compatible entries into this loop.
+implementation, review, repair and evidence loop. A natural-language request
+authorizes local work toward its stated outcome; it does not authorize choosing
+backlog work, changing a task, publishing, merging or deploying. A named task
+may be claimed only when the mandate explicitly authorizes the claim.
 
 Resolve the CLI from the consumer workspace root in every shell and worker:
 
@@ -23,11 +24,11 @@ fi
 ```
 
 Read repository instructions, accepted mandate, current task and proposal,
-existing studies and [the execution loop](../../../.agents/skills/execute/references/loop.md).
-Use [records](../../../.agents/skills/execute/references/records.md),
-[scope contributions](../../../.agents/skills/execute/references/scopes.md),
-[collaboration contracts](../../../.agents/skills/execute/references/collaboration.md)
-and [repository policy](../../../.agents/skills/execute/references/policy.md).
+existing studies and [the execution loop](../../../.agents/skills/build/references/loop.md).
+Use [records](../../../.agents/skills/build/references/records.md),
+[scope contributions](../../../.agents/skills/build/references/scopes.md),
+[collaboration contracts](../../../.agents/skills/build/references/collaboration.md)
+and [repository policy](../../../.agents/skills/build/references/policy.md).
 The [workflow contract](../../../.agents/skills/build/references/workflow.md)
 describes the separate versioned local progress record and native artifacts.
 Before relying on it, confirm `"$PUTNAMI_CLI" tree verify --help` advertises
@@ -45,6 +46,17 @@ an existing run with a recorded objective was explicitly resumed. Preserve the
 invocation's local-only or ready-only limit in the mandate reference. A task,
 review, ADR or verified record grants no additional publication, backlog,
 merge or deployment authority.
+
+For a specified task, resolve an ID with policy `tasks.source` or use its
+whole `{source,id}` reference, and read it through `tasks get`. Reconcile a
+done or canceled task and any active proposal before work. When the mandate
+explicitly authorizes a claim, the coordinator transitions the exact task to
+policy `states.claimed` with its observed revision as `expectedRevision` where
+supported, then assigns `tasks.claimAssignees` only if the provider offers
+`assign`. Read the task back and report the actual state and assignees. A
+conflict requires a fresh read and decision; an unresolved write requires
+reconciliation before retry. Assignment is not an exclusive lease. This
+specified-task path does not search, rank or claim backlog items.
 
 ## Shape the next result
 
@@ -77,8 +89,9 @@ distinct `review` challenge before adoption. No document count is required.
 
 Record the run as a projection of authoritative native sources, attributed
 artifact opinions, original findings, producer records and provider receipts.
-Each stage names its entry condition, exact inputs, expected output and exit
-evidence, including pending or non-applicable stages. `"$PUTNAMI_CLI" tree
+Each unit's eight canonical stages name their nonempty `entryCondition`, exact
+inputs, expected output and exit evidence, including pending or
+non-applicable stages. `"$PUTNAMI_CLI" tree
 verify --workflow <record>` validates and projects local progress; it does
 not emit the candidate-ready stamp. Missing or unavailable local inputs block
 their dependent stage and remain explicit in a handoff. Use repository or
@@ -86,7 +99,7 @@ provider references that another supported host can read when available.
 
 ## Implement and verify
 
-Follow the single [loop](../../../.agents/skills/execute/references/loop.md)
+Follow the single [loop](../../../.agents/skills/build/references/loop.md)
 for ownership, tier, freeze, independent candidate review, repair, one
 `--projects` iteration gate and final impacted gate, qualification, the v2
 dossier and finalization. The workflow record is an optional exact reference
@@ -96,13 +109,16 @@ Missing, duplicate, unknown, skipped, failed or stale expected checks cannot
 be described as passed. Keep ordinary functional acceptance distinct from
 smoke and native check reports.
 
-On a partial unit proposal, pass `--partial-delivery` to the existing
-`fix/scripts/finalize-pr.sh` helper, including its draft checkpoint. That
+On a partial unit proposal, pass `--partial-delivery` to
+`"$PUTNAMI_CLI" proposals finalize`, including its draft checkpoint. That
 retains a non-closing parent reference and leaves the parent task's delivered
 transition untouched. Use normal finalization only when the mandated outcome
 is complete and the required stage is supported by current evidence. Ready,
 merged, published, deployed and adopted are separate receipts. Stop at the
 mandate's authority boundary with the next exact action visible.
+Continue until the mandated outcome reaches its required stage, or preserve a
+precise checkpoint at a demonstrated blocker, reserved decision, authority
+boundary or exhausted host budget; a passing unit alone does not end the run.
 
 Return demonstrated behavior, actual stage, exact records and candidate
 binding, original unresolved findings and resolutions, scope reservations,

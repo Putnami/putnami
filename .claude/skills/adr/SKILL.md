@@ -9,8 +9,10 @@ argument-hint: <decision|feature|task> [--dry-run]
 
 Record a durable choice only when the change rests on one. First read the
 owning project's existing decisions; a settled value stays settled unless
-the same authorized change updates its decision source. A routine correction
-needs no new ADR.
+the same authorized change updates its decision source. An ADR cannot settle
+a choice outside the accepted mandate or a decision reserved to another owner;
+record that choice as pending with the responsible authority. A routine
+correction needs no new ADR.
 
 Resolve the consumer CLI anew from the workspace root:
 

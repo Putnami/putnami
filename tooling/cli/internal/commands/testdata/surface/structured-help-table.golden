@@ -49,6 +49,26 @@ example: putnami context map
 example: putnami context map --print
 example: putnami context map --print=json
 example: putnami context map --impacted
+═══ contributor ═══
+description: Run the local contributor helpers used by the build workflow. Language checks read text, tracked files, commit messages, or tasks through the configured collaboration provider; machine-load reads local resource capacity. Neither command runs the project gate
+usage: putnami contributor <language|machine-load> [arguments]
+example: putnami contributor language files --diff origin/main..HEAD
+example: putnami contributor machine-load --output=json
+═══ contributor language ═══
+description: Inspect text or stdin, tracked workspace files, commit messages, or task titles and bodies using the repository's bounded English-language rule. The tasks mode reads the configured tasks provider. Findings exit 1; invalid input or an unavailable provider exits 2
+usage: putnami contributor language <text|files|commits|tasks> [--label <name> | --diff <range> | --limit <n>] [arguments]
+flag: --label | <name> | With text: label the input in findings
+flag: --diff | <range> | With files: inspect tracked files changed in a Git revision range
+flag: --limit | <n> | With tasks: maximum number of task records to inspect
+example: putnami contributor language text --label proposal - < body.md
+example: putnami contributor language files --diff origin/main..HEAD
+example: putnami contributor language commits origin/main..HEAD
+example: putnami contributor language tasks --limit 100
+═══ contributor machine-load ═══
+description: Read local machine load and capacity to guide when to start a costly check. This is advisory and does not execute or schedule a gate
+usage: putnami contributor machine-load [--output <format>]
+example: putnami contributor machine-load
+example: putnami contributor machine-load --output=json
 ═══ deps install ═══
 description: Install project dependencies by delegating to extension-provided installers
 usage: putnami deps install [--tag <tags>] [--exclude-tag <tags>]

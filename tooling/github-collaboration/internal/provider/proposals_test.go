@@ -184,7 +184,7 @@ func TestUpsertEditsAndTogglesDraft(t *testing.T) {
 	}
 }
 
-func TestUpsertAssignsAndInheritsLabelsFromClosedIssues(t *testing.T) {
+func TestUpsertAssignsAndInheritsLabelsFromRelatedIssues(t *testing.T) {
 	h := newHarness(t)
 	h.proposals = `{"repository":"acme/app","assignAuthor":true,"inheritLabelPrefixes":["group/","scope/"]}`
 	issue := h.seedIssue("Bug", "", "group/tooling", "scope/cli", "bug", "status/confirmed")
@@ -193,7 +193,7 @@ func TestUpsertAssignsAndInheritsLabelsFromClosedIssues(t *testing.T) {
 	var created collab.ProposalUpsertResult
 	h.ok("proposals", "upsert", `{"change":{"base":"main","head":"topic-a"},"title":"Fix","body":`+quoteJSON(body)+`}`, &created)
 	pull := h.issue(number(t, created.Proposal.Ref))
-	if !slices.Equal(pull.labels, []string{"group/tooling", "scope/cli"}) || !slices.Equal(pull.assignees, []string{"putnami-bot"}) {
+	if !slices.Equal(pull.labels, []string{"group/tooling", "scope/cli", "group/other"}) || !slices.Equal(pull.assignees, []string{"putnami-bot"}) {
 		t.Fatalf("the pull request carries labels %v and assignees %v", pull.labels, pull.assignees)
 	}
 	labelPosts := h.fake.count("POST", `/labels$`)
@@ -205,7 +205,7 @@ func TestUpsertAssignsAndInheritsLabelsFromClosedIssues(t *testing.T) {
 
 	h.proposals = `{"repository":"acme/app","inheritLabelPrefixes":["group/"]}`
 	h.fake.mu.Lock()
-	h.fake.issues[issue.number].labels = append(h.fake.issues[issue.number].labels, "group/second")
+	h.fake.issues[other.number].labels = append(h.fake.issues[other.number].labels, "group/second")
 	h.fake.mu.Unlock()
 	h.fake.fail("POST", `/labels$`, statusFault(403, "Resource not accessible by integration", true))
 	failure := h.fails("proposals", "upsert", `{"change":{"base":"main","head":"topic-a"},"title":"Fix","body":`+quoteJSON(body)+`}`, collab.OutcomeUnresolved)
@@ -215,6 +215,70 @@ func TestUpsertAssignsAndInheritsLabelsFromClosedIssues(t *testing.T) {
 	h.ok("proposals", "upsert", `{"change":{"base":"main","head":"topic-a"},"title":"Fix","body":`+quoteJSON(body)+`}`, &repeated)
 	if got := h.issue(number(t, created.Proposal.Ref)).labels; !slices.Contains(got, "group/second") {
 		t.Fatalf("the repeat did not finish the labels: %v", got)
+	}
+}
+
+func TestPartialRelatedTaskLabelInheritance(t *testing.T) {
+	spectest.Proves(t, feature, "reported-publication", "partial-related-task-label-inheritance")
+	h := newHarness(t)
+	h.proposals = `{"repository":"acme/app","inheritLabelPrefixes":["group/"]}`
+	local := h.seedIssue("Local", "", "group/local", "bug")
+	foreign := h.seedIssue("Foreign", "", "group/foreign")
+	ignored := h.seedIssue("Closing in another repository", "", "group/ignored")
+	h.fake.mu.Lock()
+	h.fake.issues[foreign.number].movedTo = "acme/else"
+	h.fake.issues[ignored.number].movedTo = "acme/else"
+	h.fake.mu.Unlock()
+	body := "A partial contribution.\n\nRefs #" + strconv.Itoa(local.number) +
+		"\nRefs acme/else#" + strconv.Itoa(foreign.number) +
+		"\nRefs https://github.com/acme/else/issues/" + strconv.Itoa(foreign.number) +
+		"\nRefs https://elsewhere.example/acme/else/issues/" + strconv.Itoa(ignored.number) +
+		"\nCloses acme/else#" + strconv.Itoa(ignored.number)
+	var created collab.ProposalUpsertResult
+	h.ok("proposals", "upsert", `{"change":{"base":"main","head":"topic-a"},"title":"Partial","body":`+quoteJSON(body)+`}`, &created)
+	if !slices.Equal(created.Proposal.Labels, []string{"group/local", "group/foreign"}) {
+		t.Fatalf("related labels: %v", created.Proposal.Labels)
+	}
+	if h.fake.count("GET", `/repos/acme/app/issues/`+strconv.Itoa(local.number)+`$`) != 1 ||
+		h.fake.count("GET", `/repos/acme/else/issues/`+strconv.Itoa(foreign.number)+`$`) != 1 ||
+		h.fake.count("GET", `/repos/acme/else/issues/`+strconv.Itoa(ignored.number)+`$`) != 0 ||
+		h.fake.count("POST", `/labels$`) != 1 {
+		t.Fatal("related issues were read more than once, an unrelated URL was fetched, or labels were written more than once")
+	}
+	var repeated collab.ProposalUpsertResult
+	h.ok("proposals", "upsert", `{"change":{"base":"main","head":"topic-a"},"title":"Partial","body":`+quoteJSON(body)+`}`, &repeated)
+	if h.fake.count("POST", `/labels$`) != 1 || !slices.Equal(repeated.Proposal.Labels, created.Proposal.Labels) {
+		t.Fatalf("repeating related references wrote labels again: %v", repeated.Proposal.Labels)
+	}
+}
+
+func TestRelatedIssueReferenceBoundariesAndHosts(t *testing.T) {
+	repo, failure := parseRepository("acme/app", "github.com")
+	if failure != nil {
+		t.Fatal(failure)
+	}
+	s := proposalSession{session: &session{repo: repo}}
+	for _, test := range []struct {
+		name string
+		body string
+		want []string
+	}{
+		{"number boundary", "Refs #420", []string{"github:acme/app#420"}},
+		{"word boundary", "Refs #42extra\nRefs #42-more\nRefs #42", []string{"github:acme/app#42"}},
+		{"same repository", "Closes #42\nRefs acme/app#42\nRefs #42", []string{"github:acme/app#42"}},
+		{"native cross-repository URL", "Closes https://github.com/acme/else/issues/42", []string{"github:acme/else#42"}},
+		{"foreign host and malformed URLs", "Refs https://elsewhere.example/acme/else/issues/42\nRefs http://github.com/acme/else/issues/42\nRefs https://github.com/acme/else/issues/42?private=1", nil},
+		{"legacy foreign closing qualifier", "Closes acme/else#42", nil},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var got []string
+			for _, issue := range s.relatedIssues(test.body) {
+				got = append(got, issue.repo.source+"#"+strconv.Itoa(issue.number))
+			}
+			if !slices.Equal(got, test.want) {
+				t.Fatalf("related issues for %q: %v, want %v", test.body, got, test.want)
+			}
+		})
 	}
 }
 

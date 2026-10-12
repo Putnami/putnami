@@ -61,8 +61,7 @@ a material uncertainty when useful, obtains independent artifact challenge,
 implements, reviews, repairs and checks through one loop. A small settled
 correction reuses existing intent and design. Focused `spec`, `design`,
 `prototype`, `review`, `adr` and `check` entries remain available for direct
-interventions; compatible `plan`, `execute`, `fix`, `epic` and `code-review`
-entries preserve their arguments and authority.
+interventions. `content-bump` remains an explicit-only utility.
 
 The default progress view shows the promised outcome, demonstrated results,
 each unit's required delivery stage, blockers, unresolved decisions and next
@@ -79,9 +78,13 @@ published, deployed and adopted each need their actual evidence.
 
 New workflows require a CLI that supports `tree verify --workflow`; an older
 v2 dossier reader can ignore the added reference, so the workflow checks this
-capability explicitly. Legacy entries remain through the current pre-1.0 line,
-and helpers under `fix` and `check` keep their paths. Bulk backlog processing
-and configured content updates remain explicit-only. A natural-language build
+capability explicitly. Framework recipes are generated in the `build` skill's
+reference. `putnami contributor language` checks English-language signals in
+text, tracked files, commits and task records; `putnami contributor machine-load`
+reports local check capacity. `putnami tree fingerprint` supplies the native
+tree binding, and `putnami proposals finalize` publishes through the configured
+proposals provider without running another local gate. Configured content
+updates remain explicit-only. A natural-language build
 request authorizes its objective; task publication, merge and deployment still
 follow the existing mandate. Workspace-local checkpoints and experiments need
 their referenced assets transferred before another workspace can resume them.

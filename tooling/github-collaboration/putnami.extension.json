@@ -318,7 +318,7 @@
       "timeoutMs": 120000
     },
     "github-collaboration.proposals.upsert": {
-      "description": "Update the open pull request of an exact base and head, or open it. GitHub keeps one open pull request per base and head, so a repeated or concurrent upsert never opens a second. A requested headCommit must be the commit the head points at. expectedRevision is compared with the pull request read just before the write. settings.assignAuthor and settings.inheritLabelPrefixes add the account's assignment and the closed issues' labels, and the answer lists the pull request's assignees and labels.",
+      "description": "Update the open pull request of an exact base and head, or open it. GitHub keeps one open pull request per base and head, so a repeated or concurrent upsert never opens a second. A requested headCommit must be the commit the head points at. expectedRevision is compared with the pull request read just before the write. settings.assignAuthor adds the account's assignment. settings.inheritLabelPrefixes copies matching labels from related issues named by Closes or Refs in the body; Refs may name another repository on the configured GitHub host. The answer lists the pull request's assignees and labels.",
       "inputSchema": {
         "type": "object",
         "description": "The proposals.upsert request document of go.putnami.dev/protocol/collaboration version 1."
