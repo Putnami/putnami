@@ -104,10 +104,10 @@ func writePathExtensionFixture(t *testing.T, home string) (wsRoot, log string) {
       "command": "{extensionRuntime}",
       "args": ["fetch"],
       "cache": false,
-      "timeoutMs": 30000,
+      "timeoutMs": -1,
       "env": { %s: "path-fetch", %s: %s }
     },
-    "build-task": { "kind": "command", "command": "/bin/sh", "args": ["-c", %s], "cache": false, "timeoutMs": 30000 }
+    "build-task": { "kind": "command", "command": "/bin/sh", "args": ["-c", %s], "cache": false, "timeoutMs": -1 }
   }
 }`,
 		protocolcli.CurrentContract, logStep(pathHookRan), logStep(pathProviderStarted),

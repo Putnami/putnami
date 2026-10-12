@@ -46,7 +46,7 @@ func writeCloudPathFixture(t *testing.T) (wsRoot, marker string) {
     }
   },
   "tasks": {
-    "token-task": { "kind": "command", "command": "/bin/sh", "args": ["-c", %s], "cache": false, "timeoutMs": 30000 }
+    "token-task": { "kind": "command", "command": "/bin/sh", "args": ["-c", %s], "cache": false, "timeoutMs": -1 }
   }
 }`, protocolcli.CurrentContract, jsonString("printf ran > "+shellQuote(marker))))
 	return wsRoot, marker

@@ -103,11 +103,11 @@ func writeBootstrapFixture(t *testing.T, home string) (wsRoot, log string) {
       "command": "{extensionRuntime}",
       "args": ["fetch"],
       "cache": false,
-      "timeoutMs": 30000,
+      "timeoutMs": -1,
       "env": { %[4]s: "fetch", %[5]s: %[6]s }
     },
-    "install-task": { "kind": "command", "command": "/bin/sh", "args": ["-c", %s], "cache": false, "timeoutMs": 30000 },
-    "build-task": { "kind": "command", "command": "/bin/sh", "args": ["-c", %s], "cache": false, "timeoutMs": 30000 }
+    "install-task": { "kind": "command", "command": "/bin/sh", "args": ["-c", %s], "cache": false, "timeoutMs": -1 },
+    "build-task": { "kind": "command", "command": "/bin/sh", "args": ["-c", %s], "cache": false, "timeoutMs": -1 }
   }
 }`,
 		protocolcli.CurrentContract, logStep(installHookRan), jsonString(cache.ProviderCommandName),

@@ -388,14 +388,14 @@ func goExtensionArchive(t *testing.T, records string) []byte {
       "args": ["workspace-install"],
       "cwd": "{workspaceRoot}",
       "cache": false,
-      "timeoutMs": 60000
+      "timeoutMs": -1
     },
     "build-task": {
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["build"],
       "cache": false,
-      "timeoutMs": 60000
+      "timeoutMs": -1
     }
   }
 }`

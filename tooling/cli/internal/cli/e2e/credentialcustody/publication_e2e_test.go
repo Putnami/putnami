@@ -585,7 +585,7 @@ type manifestTaskInput struct {
 // binary.
 func stageTask(job string, env map[string]string) manifestTask {
 	return manifestTask{
-		Kind: "command", Args: []string{job}, Cwd: "{projectRoot}", TimeoutMs: 60000, Env: env,
+		Kind: "command", Args: []string{job}, Cwd: "{projectRoot}", TimeoutMs: -1, Env: env,
 		Inputs: map[string]manifestTaskInput{"releaseSetPlan": {From: "params"}},
 	}
 }

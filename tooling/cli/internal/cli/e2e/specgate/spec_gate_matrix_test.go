@@ -87,7 +87,7 @@ exit 0
       "command": "{extensionRoot}/emit.sh",
       "args": ["spec-criteria.json", "putnami-spec-criteria"],
       "cwd": "{projectRoot}",
-      "timeoutMs": 60000,
+      "timeoutMs": -1,
       "inputs": {"sources": {"from": "project", "files": ["*.json", "*.txt", "*.marker", "gate.project"]}},
       "cache": {"enabled": true},
       "declares": {"outputs": {"criteria": {"kind": "file", "root": "command-output", "path": "spec-criteria.json", "optionalEmpty": true}}}
@@ -98,7 +98,7 @@ exit 0
       "command": "{extensionRoot}/emit.sh",
       "args": ["putnami-feature-verification.json", "putnami-feature-verification"],
       "cwd": "{projectRoot}",
-      "timeoutMs": 60000,
+      "timeoutMs": -1,
       "inputs": {"sources": {"from": "project", "files": ["*.json", "*.txt", "*.marker", "gate.project"]}},
       "cache": {"enabled": true},
       "declares": {"outputs": {"report": {"kind": "file", "root": "command-output", "path": "putnami-feature-verification.json", "optionalEmpty": true}}}
@@ -648,7 +648,7 @@ func withGeneratePrerequisite(t *testing.T, wsRoot string) {
       "command": "{extensionRoot}/emit.sh",
       "args": ["generated", "generated"],
       "cwd": "{projectRoot}",
-      "timeoutMs": 60000
+      "timeoutMs": -1
     },`},
 	} {
 		if strings.Count(manifest, edit[0]) != 1 {

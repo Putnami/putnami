@@ -206,7 +206,7 @@ func writeProviderFixture(t *testing.T, self, home string, start int) providerFi
       "command": "/bin/sh",
       "args": ["-c", %s],
       "cache": false,
-      "timeoutMs": 30000
+      "timeoutMs": -1
     }
   }
 }`,

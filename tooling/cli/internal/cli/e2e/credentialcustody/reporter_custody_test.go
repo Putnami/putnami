@@ -147,8 +147,8 @@ func writeReporterFixture(t *testing.T, home, role string) (wsRoot, log string) 
       "args": [%[3]s],
       "env": { %s: %s, %s: %s }
     },
-    "install-task": { "kind": "command", "command": "/bin/sh", "args": ["-c", %s], "cache": false, "timeoutMs": 30000 },
-    "build-task": { "kind": "command", "command": "/bin/sh", "args": ["-c", %s], "cache": false, "timeoutMs": 30000 }
+    "install-task": { "kind": "command", "command": "/bin/sh", "args": ["-c", %s], "cache": false, "timeoutMs": -1 },
+    "build-task": { "kind": "command", "command": "/bin/sh", "args": ["-c", %s], "cache": false, "timeoutMs": -1 }
   }
 }`,
 		protocolcli.CurrentContract, logStep(installHookRan), jsonString(protocolcli.SessionReporterCommand),

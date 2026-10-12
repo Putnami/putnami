@@ -337,14 +337,14 @@ func writeRunToolchainExtensionFixture(t *testing.T, wsRoot string) runToolchain
       "command": "{extensionRuntime}",
       "args": ["install"],
       "cache": false,
-      "timeoutMs": 10000
+      "timeoutMs": -1
     },
     "build-task": {
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["build"],
       "cache": false,
-      "timeoutMs": 10000
+      "timeoutMs": -1
     }
   }
 }`, 0o644)

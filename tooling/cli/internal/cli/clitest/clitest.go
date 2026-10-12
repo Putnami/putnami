@@ -32,7 +32,17 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs"
 )
+
+// PortableTaskDeadlineMs is the budget of a fixture task that portable
+// execution or `ci change-plan` plans. Every other fixture task declares
+// "timeoutMs": -1, the manifest's unbounded sentinel, because a wall-clock
+// budget fires on a loaded host and reads as the regression a test guards.
+// The ChangePlan projection refuses a task with no hard deadline, so these
+// tasks take the engine's default instead: five minutes, far above any host
+// load, for a shell that exits at once.
+const PortableTaskDeadlineMs = jobs.DefaultTimeoutMs
 
 // Main is the TestMain body of an e2e package. It drops a hosted run's
 // invocation broker before any test runs: the broker wins over every
@@ -218,7 +228,7 @@ fi
 		// The task declares resources so a portable request carries reads and
 		// writes and a submit envelope reaches its deepest admitted level.
 		Tasks: map[string]extensionproto.TaskDefinition{"check": {
-			Kind: "command", Command: "/bin/sh", Args: []string{"{extensionRoot}/gate.sh"}, Cache: &extensionproto.TaskCachePolicy{Enabled: &disabled}, TimeoutMs: 60000,
+			Kind: "command", Command: "/bin/sh", Args: []string{"{extensionRoot}/gate.sh"}, Cache: &extensionproto.TaskCachePolicy{Enabled: &disabled}, TimeoutMs: PortableTaskDeadlineMs,
 			Reads:  []extensionproto.ResourceRef{{ID: extensionproto.ResourceIDSources}},
 			Writes: []extensionproto.ResourceRef{{ID: "calls", Scope: extensionproto.ResourceScopeWorkspace}},
 		}},

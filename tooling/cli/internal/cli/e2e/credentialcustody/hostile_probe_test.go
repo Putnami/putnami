@@ -298,7 +298,7 @@ func writeHostileFixture(t *testing.T, self, reportsDir, home string) hostileFix
       "kind": "command",
       "command": %s,
       "cache": false,
-      "timeoutMs": 30000,
+      "timeoutMs": -1,
       "env": { %s: "task", %s: %s }
     }
   }
