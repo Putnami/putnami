@@ -915,14 +915,22 @@ author a smaller expected-check list.
 
 A unit records `id`, `outcome`, `boundary: ref`, `exclusions: [ref]`, qualified
 `requirements` (`feature#requirement`), `dependsOn` unit IDs,
-`nextCycleTasks` opaque provider IDs, `decisions: [ref]`, `nextResult`,
+`nextCycleTasks` native task references, unresolved `decisions: [ref]`, `nextResult`,
 `requiredStage`, and `stage`. Each `projects` entry is `{id, manifest: ref}`;
 its canonical ID is derived from the referenced native `putnami.json` path.
 The feature/spec source's project must belong to the unit. `requiredStage` is
 the mandate's delivery target, among `candidate`, `ready`, `merged`,
 `published`, `deployed`, and `adopted`. `stage` also allows `planned` and
 `building`. A unit with `later` or unverified requirements cannot claim
-`candidate`. Unit dependencies express delivery ordering, not a scheduler.
+`candidate`. Unit dependencies express delivery ordering, not a scheduler; a
+current unit cannot become ready while a dependency remains incomplete. Each
+next-cycle provider task is `{kind:"provider",ref:{source,id}}`; an exact task
+handoff pairs `revision` with a `receipt: ref` to the native `tasks get`
+envelope. A local task is `{kind:"local",record:ref}` to a strict v1 local
+task JSON with `id`, `inputs:[ref]`, and `nextResult`. Provider identity is
+the opaque source/ID pair, never a concatenated display string. A task receipt
+or local task record for the handoff unit must also appear in its exact
+`handoff.inputs`.
 `--record` can establish `ready` for a current unit at `candidate` without a
 digest cycle. A `merged` claim needs a matching native `proposals status`
 receipt for the unit's `proposal: {source,id}`, with state `merged` and the
@@ -932,20 +940,25 @@ establish `outcomeComplete` until a native adapter validates them.
 Material artifacts carry `id`, `kind`, `contractVersion`, `lifecycle`,
 `units`, native project `scopes`, `source: ref`, `context: [ref]`, `author`,
 and `material: true`. Their `challenge` has `original: ref` and
-`resolutions`. The original reviewer-authored JSON v1 record contains
+`resolutions`, with optional `revisions:[ref]` for later independent v1
+reviews and `snapshots:[{original:ref,copy:ref}]` for historical bytes when a
+source or context path is repaired in place. Each copy has a distinct path
+and the original digest. The original reviewer-authored JSON v1 record contains
 `reviewer`, `author`, `artifact: ref`, `context: [ref]`, `report: ref`, and
 `findings` with stable `id`, `scenario`, `consequence`, and `correction`.
 An appended resolution names the finding `id`, `state` (`fixed`, `refuted`,
 or `deferred`), and `note: ref`; a deferral also needs `authority: ref`.
-Replacing relevant artifact or context bytes invalidates the original
-challenge, even if the workflow index is rehashed. An unrelated tree edit
+Replacing relevant artifact or context bytes requires a later independent
+review of the corrected version. Earlier findings remain in the chain and a
+`fixed` resolution needs that later review; rehashing the index cannot renew
+an old opinion. An unrelated tree edit
 leaves that challenge intact, while it still invalidates a whole-tree
 candidate dossier. An
 experiment records `question`, `effortCeiling`, exact `inputs`, inspectable
 `asset`, `instructions`, `observed` refs, explicit `simulated` behavior,
 `assumptions`, `conclusion`, and `uncertainty`. Stage entries cover exactly
 `intent`, `spec`, `design`, `prototype`, `review`, `adr`, `candidate`, and
-`handoff`. Each records `state`, `inputs`, `expectedOutput`, `exitCriteria`,
+`handoff` for each unit. Each records `unit`, `state`, `inputs`, `expectedOutput`, `exitCriteria`,
 and a receipt or reason for passed or nonapplicable results. `handoff` binds
 the same `mandate`, one declared `unit`, native project `scopes`, `receiver`,
 `responsibility`, `inputs`, `expectedOutput`, `acceptance`, `nextAction`,
@@ -957,14 +970,20 @@ session ID and current tree fingerprint. Its native per-requirement and
 per-check verdicts must match the complete authored spec and manifest
 inventories. Missing, duplicate, failed, skipped, stale, or unknown checks
 cannot pass a current unit. Unmapped and unexecutable requirements remain
-visible as incomplete. A standalone `--workflow` call can report pending
+visible as incomplete. Native collection errors block proof; advisory native
+warnings remain visible with the affected incomplete unit, so a later
+unobserved requirement cannot silently disappear or block an otherwise ready
+independent current unit. A standalone `--workflow` call can report pending
 progress without proof; it never prints `Putnami verified` or `ready`.
 Its `units` projection shows each unit's outcome, requirement/check verdicts
 and native producer report references, next inspectable result, pending tasks,
 decision references, and blockers. Unsupported external receipt kinds have an
 explicit blocker.
-`--record` with a workflow reference requires proof and passing current units,
-then prints its ordinary candidate-ready verdict with a workflow progress
+`--record` with a workflow reference requires proof, passing current units,
+passed or reasoned nonapplicable current-unit stages, and no unresolved current
+unit decisions. A later independent unit may stay pending or blocked; its
+required outcome stage remains incomplete. The verifier then prints its
+ordinary candidate-ready verdict with a workflow progress
 member. That candidate stamp never claims an incomplete parent outcome,
 merge, publication, deployment, or adoption.
 `--gate` checks that a recorded gate session and its report can replace the

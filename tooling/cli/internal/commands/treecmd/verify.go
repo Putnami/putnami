@@ -345,7 +345,7 @@ func (r *verifyRun) checkRef(value any) string {
 	require(isObject && text(reference.get("path")), "missing evidence reference")
 	name, _ := reference.get("path").(string)
 	info, err := os.Stat(r.path(name))
-	require(err == nil && info.Mode().IsRegular() && info.Size() > 0, "missing or empty evidence file")
+	require(err == nil && info.Mode().IsRegular() && info.Size() > 0, "missing or empty evidence file: "+name)
 	digest := r.digest(name)
 	require(strictEqual(digest, reference.get("sha256")), "evidence digest changed: "+name)
 	r.checked = append(r.checked, checkedRef{path: name, digest: digest})

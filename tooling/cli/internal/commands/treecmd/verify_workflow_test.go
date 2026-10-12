@@ -12,9 +12,20 @@ import (
 const workflowFeature = "fixture/workflow"
 
 type workflowUnitProjection struct {
-	Outcome      string   `json:"outcome"`
-	NextResult   string   `json:"nextResult"`
-	Blockers     []string `json:"blockers"`
+	Outcome           string   `json:"outcome"`
+	NextResult        string   `json:"nextResult"`
+	Blockers          []string `json:"blockers"`
+	NativeDiagnostics []struct {
+		Code string `json:"code"`
+	} `json:"nativeDiagnostics"`
+	NextCycleTasks []struct {
+		Kind string `json:"kind"`
+		Ref  struct {
+			Source string `json:"source"`
+			ID     string `json:"id"`
+		} `json:"ref"`
+		Revision string `json:"revision"`
+	} `json:"nextCycleTasks"`
 	Requirements []struct {
 		State           string `json:"state"`
 		ProducerReports []struct {
@@ -80,7 +91,7 @@ func newWorkflowFixture(t *testing.T) (*verifyFixture, fxObj) {
 	stageReason := f.note("stage-nonapplicable", "This settled correction reuses earlier material.")
 	stages := fxArr{}
 	for _, name := range []string{"intent", "spec", "design", "prototype", "review", "adr", "candidate", "handoff"} {
-		stage := fxObj{"name": name, "state": "not-applicable", "inputs": fxArr{mandate},
+		stage := fxObj{"unit": "first", "name": name, "state": "not-applicable", "inputs": fxArr{mandate},
 			"expectedOutput": name + " decision", "exitCriteria": "The bounded unit is inspectable", "reason": stageReason}
 		if name == "candidate" {
 			stage["state"] = "passed"
@@ -237,6 +248,13 @@ func TestWorkflowRejectsNativeInventoryAndProofFailures(t *testing.T) {
 			f.write(".context/unrelated.json", f.readJSON(".context/sessions/synthetic-gate/spec-verification.json"))
 			fxObjAt(w, "proof")["specVerification"] = f.reference(".context/unrelated.json")
 		}},
+		{"native collection error", "unresolved native collection errors", func(f *verifyFixture, w fxObj) {
+			record := f.readJSON(".context/sessions/synthetic-gate/spec-verification.json")
+			record["diagnostics"] = fxArr{fxObj{"severity": "error", "code": "features.report_unreadable",
+				"message": "The producer report could not be read.", "field": ".context/verification-report.json"}}
+			f.write(".context/sessions/synthetic-gate/spec-verification.json", record)
+			fxObjAt(w, "proof")["specVerification"] = f.reference(".context/sessions/synthetic-gate/spec-verification.json")
+		}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -269,21 +287,48 @@ func TestWorkflowLaterScopeAndUnitReceipts(t *testing.T) {
 		"exclusions": fxArr{}, "projects": fxArr{fxObj{"id": "/.context", "manifest": f.reference(".context/putnami.json")}},
 		"requirements": fxArr{workflowFeature + "#large-data"}, "dependsOn": fxArr{"first"},
 		"requiredStage": "ready", "stage": "planned", "nextResult": "Bounded large-data prototype",
-		"nextCycleTasks": fxArr{"github:fixture#2"}, "decisions": fxArr{}})
+		"nextCycleTasks": fxArr{fxObj{"kind": "provider", "ref": fxObj{"source": "github:fixture", "id": "2"}}}, "decisions": fxArr{}})
+	for _, item := range fxArrAt(w, "stages") {
+		original, ok := item.(fxObj)
+		if !ok {
+			t.Fatal("fixture stage is not an object")
+		}
+		stage := fxObj{}
+		for key, value := range original {
+			stage[key] = value
+		}
+		stage["unit"], stage["state"] = "later", "pending"
+		delete(stage, "receipt")
+		delete(stage, "reason")
+		w["stages"] = append(fxArrAt(w, "stages"), stage)
+	}
 	record := f.readJSON(".context/sessions/synthetic-gate/spec-verification.json")
 	group := fxObjAt(record, "groups", 0)
 	group["requirements"] = append(fxArrAt(group, "requirements"), fxObj{"requirement": "large-data", "state": "missing",
 		"checks": fxArr{fxObj{"check": "large-data-export", "state": "missing"}}})
 	group["counts"] = fxObj{"specRequirements": 2, "executable": 2, "verified": 1,
 		"unmapped": 0, "unexecutable": 0, "missing": 1, "stale": 0, "contradicted": 0}
-	group["blocked"] = true
+	group["mode"] = "report"
+	group["blocked"] = false
+	group["diagnostics"] = fxArr{fxObj{"severity": "warning", "code": "features.unobserved_requirement",
+		"message": "The large-export check was not observed.", "field": ".context/specs/workflow.json"}}
 	f.write(".context/sessions/synthetic-gate/spec-verification.json", record)
 	fxObjAt(w, "proof")["specVerification"] = f.reference(".context/sessions/synthetic-gate/spec-verification.json")
 	result := f.workflow(w, false, "")
 	if result.value["outcomeComplete"] != false || result.value["laterRequirements"] != float64(1) {
 		t.Fatalf("later unit was lost: %s", result.out)
 	}
+	laterStatus := workflowProjectedUnits(t, result)[1]
+	if len(laterStatus.NativeDiagnostics) != 1 || laterStatus.NativeDiagnostics[0].Code != "features.unobserved_requirement" ||
+		!strings.Contains(strings.Join(laterStatus.Blockers, " "), "features.unobserved_requirement") {
+		t.Fatalf("native warning was lost from later unit: %s", result.out)
+	}
 	f.workflow(w, true, "") // Ready is for the current unit, not the parent outcome.
+	fxObjAt(w, "units", 1)["dependsOn"] = fxArr{}
+	fxObjAt(w, "units", 0)["dependsOn"] = fxArr{"later"}
+	f.workflow(w, true, "workflow current unit has incomplete dependency")
+	fxObjAt(w, "units", 0)["dependsOn"] = fxArr{}
+	fxObjAt(w, "units", 1)["dependsOn"] = fxArr{"first"}
 	fxObjAt(w, "requirements", 1)["disposition"] = "excluded"
 	delete(fxObjAt(w, "requirements", 1), "unit")
 	f.workflow(w, false, "missing evidence reference")
@@ -309,8 +354,8 @@ func TestWorkflowArtifactAndHandoffBindings(t *testing.T) {
 		"units": fxArr{"first"}, "scopes": fxArr{"/.context"}, "source": source, "context": fxArr{context},
 		"author": "author-session", "material": true,
 		"challenge": fxObj{"original": f.reference(".context/original-design-challenge.json"),
-			"resolutions": fxArr{fxObj{"id": "F1", "state": "fixed",
-				"note": f.note("finding-resolution", "Reviewer accepted repaired handoff.")}}}}}
+			"resolutions": fxArr{fxObj{"id": "F1", "state": "refuted",
+				"note": f.note("finding-resolution", "Counterevidence for the original concern.")}}}}}
 	w["experiments"] = fxArr{fxObj{"id": "prototype", "question": "Does the interaction clarify a choice?",
 		"effortCeiling": "One day", "inputs": fxArr{context}, "asset": f.note("prototype-asset", "Inspectable mockup"),
 		"instructions": f.note("prototype-instructions", "Open asset and inspect"), "observed": f.note("prototype-result", "The flow is understandable"),
@@ -353,20 +398,36 @@ func TestWorkflowDeliveryRequiresExactNativeReceipt(t *testing.T) {
 	unit := fxObjAt(w, "units", 0)
 	unit["requiredStage"], unit["stage"] = "merged", "merged"
 	unit["proposal"] = fxObj{"source": "github:fixture/repo", "id": "7"}
-	f.write(".context/merged-status.json", fxObj{"proposal": fxObj{
+	f.write(".context/merged-status.json", fxObj{"contract": "proposals", "version": 1, "operation": "status", "outcome": "ok", "result": fxObj{"proposal": fxObj{
 		"ref":      fxObj{"source": "github:fixture/repo", "id": "7"},
 		"revision": "r2", "change": fxObj{"repository": "fixture/repo", "base": "main", "head": "feature", "headCommit": f.head},
-		"title": "feat: workflow", "state": "merged"}, "checks": fxObj{"state": "passing"}})
+		"title": "feat: workflow", "state": "merged"}, "checks": fxObj{"state": "passing"}}})
 	unit["receipt"] = f.reference(".context/merged-status.json")
 	result := f.workflow(w, false, "")
 	if result.value["outcomeComplete"] != true {
 		t.Fatalf("merged native receipt was not recognized: %s", result.out)
 	}
 	status := f.readJSON(".context/merged-status.json")
-	fxObjAt(status, "proposal")["state"] = "open"
+	fxObjAt(status, "result", "proposal", "change")["headCommit"] = strings.Repeat("b", 40)
+	f.write(".context/merged-status.json", status)
+	unit["receipt"] = f.reference(".context/merged-status.json")
+	f.workflow(w, false, "workflow merged receipt names another head")
+	fxObjAt(status, "result", "proposal", "change")["headCommit"] = f.head
+	fxObjAt(status, "result", "proposal")["state"] = "open"
 	f.write(".context/merged-status.json", status)
 	unit["receipt"] = f.reference(".context/merged-status.json")
 	f.workflow(w, false, "does not show merged state")
+	status["operation"] = "get"
+	f.write(".context/merged-status.json", status)
+	unit["receipt"] = f.reference(".context/merged-status.json")
+	f.workflow(w, false, "invalid native collaboration envelope")
+	status["operation"] = "status"
+	status["outcome"] = "not_found"
+	delete(status, "result")
+	status["error"] = fxObj{"message": "missing proposal", "retryable": false}
+	f.write(".context/merged-status.json", status)
+	unit["receipt"] = f.reference(".context/merged-status.json")
+	f.workflow(w, false, "not a successful native proposals.status result")
 	unit["requiredStage"], unit["stage"] = "adopted", "adopted"
 	unit["receipt"] = f.note("opaque-adoption", "An unsupported claim")
 	result = f.workflow(w, false, "")
@@ -387,7 +448,11 @@ func TestWorkflowRejectsUnknownNativeProjectAndMissingHandoff(t *testing.T) {
 	f.workflow(w, false, "unknown or duplicate workflow project target")
 	fxObjAt(w, "units", 0, "projects", 0)["id"] = "/.context"
 	fxObjAt(w, "handoff")["inputs"] = fxArr{fxObj{"path": ".context/absent.md", "sha256": strings.Repeat("0", 64)}}
-	f.workflow(w, false, "missing or empty evidence file")
+	result := f.workflow(w, false, "missing or empty evidence file")
+	reason, ok := result.value["reason"].(string)
+	if !ok || !strings.Contains(reason, ".context/absent.md") {
+		t.Fatalf("missing handoff input did not name its path: %s", result.out)
+	}
 }
 
 func TestWorkflowCandidateStageCannotBeSkipped(t *testing.T) {
@@ -398,4 +463,95 @@ func TestWorkflowCandidateStageCannotBeSkipped(t *testing.T) {
 	delete(candidate, "receipt")
 	candidate["reason"] = f.note("candidate-waiver", "No actual candidate proof.")
 	f.workflow(w, true, "workflow candidate stage incomplete")
+}
+
+func TestWorkflowReadyRejectsBlockedStagesAndDecisions(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, reason string
+		change       func(*verifyFixture, fxObj)
+	}{
+		{"blocked design", "workflow design stage incomplete", func(f *verifyFixture, w fxObj) {
+			stage := fxObjAt(w, "stages", 2)
+			stage["state"] = "blocked"
+			stage["reason"] = f.note("blocked-design", "A design decision is reserved.")
+		}},
+		{"pending review", "workflow review stage incomplete", func(_ *verifyFixture, w fxObj) {
+			stage := fxObjAt(w, "stages", 4)
+			stage["state"] = "pending"
+			delete(stage, "reason")
+		}},
+		{"unresolved decision", "workflow current unit has unresolved decisions", func(f *verifyFixture, w fxObj) {
+			fxObjAt(w, "units", 0)["decisions"] = fxArr{f.note("reserved-decision", "Still awaiting an owner decision.")}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f, w := newWorkflowFixture(t)
+			tc.change(f, w)
+			f.workflow(w, true, tc.reason)
+		})
+	}
+}
+
+func TestWorkflowRetainsOriginalChallengeAcrossSamePathRepair(t *testing.T) {
+	t.Parallel()
+	f, w := newWorkflowFixture(t)
+	originalSource := f.note("repaired-design", "The first design loses handoff state.")
+	context := f.note("repair-context", "A durable handoff is required.")
+	f.write(".context/repair-original-review.json", fxObj{"version": 1, "reviewer": "first-reviewer", "author": "author",
+		"artifact": originalSource, "context": fxArr{context}, "report": f.note("repair-first-report", "F1: handoff state can be lost."),
+		"findings": fxArr{fxObj{"id": "F1", "scenario": "Host resumes after transfer",
+			"consequence": "The state is lost", "correction": "Carry the exact input snapshot"}}})
+	artifact := fxObj{"id": "design", "kind": "design", "contractVersion": "1", "lifecycle": "accepted",
+		"units": fxArr{"first"}, "scopes": fxArr{"/.context"}, "source": originalSource, "context": fxArr{context},
+		"author": "author", "material": true,
+		"challenge": fxObj{"original": f.reference(".context/repair-original-review.json"),
+			"resolutions": fxArr{fxObj{"id": "F1", "state": "refuted", "note": f.note("repair-initial-refutation", "Initial counterevidence.")}}}}
+	w["artifacts"] = fxArr{artifact}
+	f.workflow(w, true, "")
+	f.write(".context/repaired-design-original-snapshot.md", "The first design loses handoff state.")
+	snapshot := f.reference(".context/repaired-design-original-snapshot.md")
+	f.write(".context/repaired-design.md", "The repaired design carries the exact handoff input.")
+	currentSource := f.reference(".context/repaired-design.md")
+	artifact["source"] = currentSource
+	f.workflow(w, false, "evidence digest changed") // No index edit can renew the original review.
+	f.write(".context/repair-current-review.json", fxObj{"version": 1, "reviewer": "replacement-reviewer", "author": "author",
+		"artifact": currentSource, "context": fxArr{context}, "report": f.note("repair-current-report", "The corrected handoff retains its state."),
+		"findings": fxArr{}})
+	challenge, ok := artifact["challenge"].(fxObj)
+	if !ok {
+		t.Fatal("fixture challenge is not an object")
+	}
+	challenge["snapshots"] = fxArr{fxObj{"original": originalSource, "copy": snapshot}}
+	challenge["revisions"] = fxArr{f.reference(".context/repair-current-review.json")}
+	challenge["resolutions"] = fxArr{fxObj{"id": "F1", "state": "fixed", "note": f.note("repair-resolution", "Replacement reviewer inspected the correction.")}}
+	f.workflow(w, true, "")
+	delete(challenge, "revisions")
+	f.workflow(w, true, "evidence digest changed")
+}
+
+func TestWorkflowNativeTaskRefsRoundTrip(t *testing.T) {
+	t.Parallel()
+	f, w := newWorkflowFixture(t)
+	input := f.note("task-input", "An exact handoff input.")
+	f.write(".context/local-task.json", fxObj{"version": 1, "id": "local:follow-up", "inputs": fxArr{input}, "nextResult": "Inspect the repaired handoff"})
+	providerRef := fxObj{"source": "github:one/repo", "id": "issue#2/with:punctuation"}
+	f.write(".context/task-get.json", fxObj{"contract": "tasks", "version": 1, "operation": "get", "outcome": "ok",
+		"result": fxObj{"task": fxObj{"ref": providerRef, "revision": "v3", "title": "Review next unit", "state": "open"}}})
+	fxObjAt(w, "units", 0)["nextCycleTasks"] = fxArr{
+		fxObj{"kind": "provider", "ref": fxObj{"source": "github:one/repo", "id": "same-id"}},
+		fxObj{"kind": "provider", "ref": fxObj{"source": "github:two/repo", "id": "same-id"}},
+		fxObj{"kind": "provider", "ref": providerRef, "revision": "v3", "receipt": f.reference(".context/task-get.json")},
+		fxObj{"kind": "local", "record": f.reference(".context/local-task.json")},
+	}
+	fxObjAt(w, "handoff")["inputs"] = fxArr{input, f.reference(".context/task-get.json"), f.reference(".context/local-task.json")}
+	result := f.workflow(w, false, "")
+	tasks := workflowProjectedUnits(t, result)[0].NextCycleTasks
+	if len(tasks) != 4 || tasks[0].Ref.Source == tasks[1].Ref.Source || tasks[2].Ref.ID != "issue#2/with:punctuation" || tasks[2].Revision != "v3" {
+		t.Fatalf("native task identity lost in projection: %s", result.out)
+	}
+	f.workflow(w, true, "")
+	fxObjAt(w, "units", 0, "nextCycleTasks", 2)["revision"] = "v4"
+	f.workflow(w, false, "workflow task receipt does not match native ref and revision")
 }

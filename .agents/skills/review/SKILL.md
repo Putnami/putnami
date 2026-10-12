@@ -29,8 +29,11 @@ location, scenario, consequence and concrete correction. Write an original,
 attributed report with exact artifact and relevant context references as
 specified by the [workflow contract](../../../.agents/skills/build/references/workflow.md).
 The author may append a correction and re-review, counterevidence or an
-actual mandate-authorized deferral; preserve the original report. Changed
-examined bytes reopen the opinion. Unrelated tree edits do not invalidate a
+actual mandate-authorized deferral; preserve the original report and the exact
+examined bytes at a versioned path or digest-matched snapshot. A corrected
+artifact needs a later independent review that binds the current source and
+context and retains earlier findings. Changed examined bytes reopen the
+opinion. Unrelated tree edits do not invalidate a
 design opinion, while any covered edit invalidates whole-tree candidate proof.
 
 Review is read-only on product and collaboration state. It never creates a

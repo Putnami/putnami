@@ -27,7 +27,7 @@ verification check IDs.
 `units` contain a stable `id`, observable `outcome`, native `projects` as
 `[{id, manifest: ref}]` for each exact project `putnami.json`, exact
 `requirements`, `dependsOn` unit IDs, a `boundary` ref, `exclusions` refs,
-opaque `nextCycleTasks` provider IDs, unresolved `decisions` refs,
+native `nextCycleTasks` references, unresolved `decisions` refs,
 `requiredStage`, current `stage`, `nextResult`, and a `receipt` when the stage
 has one. A merged claim also names the unit's opaque `proposal` reference,
 which the CLI checks against a native proposal-status receipt. Required stage is one of
@@ -35,7 +35,13 @@ which the CLI checks against a native proposal-status receipt. Required stage is
 also be `planned` or `building`. A unit's requirement list must equal its
 assigned requirement rows. Dependencies explain delivery order, while native
 project dependencies control builds. A milestone or task count is not a
-receipt. Ready source, merge, package publication, deployment and consumer
+receipt. Unresolved `decisions` block that unit's ready claim. Each next-cycle
+task is either `{kind: "provider", ref: {source, id}, revision?, receipt?}`
+with the provider identity kept opaque, or `{kind: "local", record: ref}`.
+`revision` and a native `tasks get` envelope `receipt` travel together when
+exact provider input is needed; never reconstruct a task reference by parsing
+a display string. The local task record is strict JSON
+`{version: 1, id, inputs: [ref], nextResult}`. Ready source, merge, package publication, deployment and consumer
 adoption use distinct actual producer or provider references. Never infer one
 from another or store a manually synchronized completion percentage.
 
@@ -45,14 +51,24 @@ review or other source. Each carries `id`, `kind`, `contractVersion`, exact
 `lifecycle` (`proposed`, `challenged`, `accepted`, `superseded`) and `material`.
 Artifact and handoff scope IDs must match declared unit projects.
 A material artifact also carries a distinct
-`challenge: {original: ref, resolutions: [...]}`. The original immutable
+`challenge: {original: ref, revisions?: [ref], snapshots?: [{original: ref,
+copy: ref}], resolutions: [...]}`. The original immutable
 reviewer-authored JSON v1 has `version`, `reviewer`, `author`, exact `artifact`
 and `context` refs, a report ref and stable findings, each with `id`,
 `scenario`, `consequence` and `correction`. The challenge resolution list
 names the finding `id`, `state` (`fixed`, `refuted`, `deferred`), `note` ref
-and actual `authority` ref for deferral. Keep the original report and append
-correction/re-review, counterevidence or authorized deferral. A new source or
-relevant context digest reopens its opinion; an unrelated edit does not. A
+and actual `authority` ref for deferral. Preserve the original report and
+examined artifact and context bytes at immutable versioned paths. If a
+historical examined artifact or context path changes in place and its original
+digest is no longer there, a snapshot pairs its old exact ref with a copy at
+a distinct path whose digest matches those historical bytes. Each revision is
+a later independent reviewer-authored v1 challenge, with finding IDs unique
+across the chain. The final review must bind the current source and context;
+a fixed finding needs a later independent review whose artifact digest differs
+from the version it corrects. Preserve every
+original finding and append correction/re-review, counterevidence or authorized
+deferral. A new source or relevant context digest reopens its opinion; an
+unrelated edit does not. A
 whole-tree candidate review and gate remain bound to their exact tree even
 when an artifact opinion can be reused.
 
@@ -64,20 +80,26 @@ establish production acceptance. A reused prototype implementation enters
 ordinary build review and proof.
 
 `stages` contains exactly the canonical `intent`, `spec`, `design`,
-`prototype`, `review`, `adr`, `candidate` and `handoff` entries. Each has a
-`name`, `state` (`pending`, `blocked`, `passed`, `not-applicable`), exact
+`prototype`, `review`, `adr`, `candidate` and `handoff` entries **for each
+unit**. Each has a `unit` ID, `name`, `state` (`pending`, `blocked`, `passed`,
+`not-applicable`), exact
 `inputs`, `expectedOutput`, `exitCriteria`, and a real `receipt` for passed
 or a `reason` ref for non-applicable. State the entry condition and supported
 result in the surrounding stage note. A settled change may mark a new
 prototype or ADR not applicable with a reason; it does not omit the stage.
-Candidate must be passed for a ready dossier. A pending or blocked stage is
-legitimate progress, not ready. `handoff` names the same `mandate` ref as the
+Every current unit's stages must have passed or be not applicable, and its
+candidate stage must be passed, for that unit to reach ready. Pending or
+blocked stages of later units remain visible without falsely failing a
+current ready unit. `handoff` names the same `mandate` ref as the
 top level, a `unit`, native `scopes`, the receiving `responsibility` and
 `receiver`, exact `inputs`, `expectedOutput`, `acceptance`, `nextAction` and
 `unresolvedFindings`. Use repository or provider
 versioned paths for portable inputs; an ignored local asset that was not
 transferred must be named as unavailable and blocks only the stage consuming
-it. Reconcile provider revisions, open findings and current tree on resume.
+it. For the handoff unit, include every next-cycle provider `receipt` ref and
+local task `record` ref in `handoff.inputs`; a provider entry without a receipt
+is a planning identity, not an exact task-body handoff. Reconcile provider
+revisions, open findings and current tree on resume.
 
 Optional `proof: {session: ref, specVerification: ref}` points to the native
 producer session and its sibling `spec-verification.json` on the same current

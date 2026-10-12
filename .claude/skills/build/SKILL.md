@@ -56,6 +56,14 @@ list or a manual passing verdict. Partition the inventory into current, later
 and excluded work, with authority for an outcome-changing exclusion. A smaller
 unit or a finished task cannot silently replace the original outcome.
 
+Before choosing implementation primitives or a nearby example, read the
+[canonical recipe index](../../../.agents/skills/build/references/recipes.md)
+when present. If an intention matches, cite its intention, sample and
+primitives in the plan and avoid its named anti-patterns. State "no recipe
+matches" when none does. Reuse a still-valid existing plan on resume after
+checking the current recipe and native contracts; do not create a new plan
+merely because this entry was invoked.
+
 Name useful delivery units by their demonstrated behavior and boundary. A
 unit may span projects; a milestone groups progress and is not a delivery
 receipt. Give the next cycle precise tasks, inputs, local environment, proof

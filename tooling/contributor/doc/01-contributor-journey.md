@@ -10,9 +10,13 @@ mandate controls task, Git, proposal, merge and deployment actions throughout.
    mandate, current task/proposal and existing plan. Start discovery with
    Putnami, then native project dependencies and scope contracts. Load the
    selected feature/spec requirements and acceptance, including later work.
+   Read the canonical build recipe index when present before choosing
+   primitives; cite a matching recipe or state that none matches. Reuse a
+   still-valid plan on resume.
 2. **Map delivery.** Define useful units by observable behavior, their limits
    and required receipts. Keep milestones as coordination markers. Give the
-   next cycle precise tasks, inputs, environment, proof entrypoint and expected
+   next cycle native provider task refs or exact local records, inputs,
+   environment, proof entrypoint and expected
    inspectable result; keep later cycles proportional. A settled small change
    reuses existing spec and design.
 3. **Resolve uncertainty.** Use `spec` for the native acceptance contract,
@@ -27,6 +31,8 @@ mandate controls task, Git, proposal, merge and deployment actions throughout.
 5. **Review and repair.** An independent `review`/`code-review` context covers
    the frozen candidate. Fix findings in the same change; preserve original
    reports and append resolutions. A changed candidate gets a new snapshot.
+   Material artifact repairs preserve original examined bytes and findings,
+   then receive a distinct revision review of the corrected source.
 6. **Verify.** Run the canonical `--projects` iteration gate and one final
    impacted gate in the loop's order, reusing applicable records. Qualify
    reachable workloads. Native feature checks come from actual producer
@@ -43,7 +49,8 @@ mandate controls task, Git, proposal, merge and deployment actions throughout.
    verified proposal and reads it back. For a partial unit, pass
    `--partial-delivery` on draft and final calls: the parent stays linked and
    its task state stays unchanged. Normal close/transition is
-   for the complete mandated outcome. Record ready, merged, published,
+   for the complete mandated outcome; the helper checks the final normalized
+   proposal body for closing directives before any write. Record ready, merged, published,
    deployed and adopted from their separate actual receipts.
 9. **Handoff or resume.** Save the mandate, unit, scopes, receiver,
    responsibility, exact inputs, expected output/acceptance, original

@@ -301,15 +301,51 @@ if [ "$PARTIAL_DELIVERY" = true ]; then
   else
     TASK_REFERENCE_LINE="Task: $TASK_SOURCE/$TASK_ID (partial delivery)"
   fi
+fi
+
+# The host wraps the squash commit message at its own width. Normalize the
+# caller's body before any write, then validate and publish these same bytes.
+# Blank lines, list markers, fenced blocks and indented code keep their breaks.
+unwrap_paragraphs() {
+  awk '
+    function flush() { if (held != "") print held; held = "" }
+    /^[[:space:]]*(```|~~~)/ { flush(); print; fence = !fence; next }
+    fence { print; next }
+    /^[[:space:]]*$/ { flush(); print; next }
+    /^[[:space:]]*([-*+]|[0-9]+[.)])[[:space:]]/ { flush(); held = $0; sub(/[[:space:]]+$/, "", held); next }
+    held == "" && /^(    |\t)/ { print; next }
+    {
+      line = $0
+      sub(/^[[:space:]]+/, "", line)
+      sub(/[[:space:]]+$/, "", line)
+      held = (held == "") ? line : held " " line
+    }
+    END { flush() }
+  '
+}
+
+BODY="$(unwrap_paragraphs <"$BODY_FILE")"
+if [ -n "$TASK_REFERENCE_LINE" ] && ! grep -Fxq -- "$TASK_REFERENCE_LINE" "$BODY_FILE"; then
+  BODY="${BODY}
+
+${TASK_REFERENCE_LINE}"
+fi
+BODY_BYTES="$(printf '%s' "$BODY" | wc -c | tr -d '[:space:]')"
+if [ "$BODY_BYTES" -gt 65536 ]; then
+  echo "finalize-pr: the proposal body is $BODY_BYTES bytes, and the proposals contract carries at most 65536; shorten --body-file, then finalize again. Nothing was pushed." >&2
+  exit 1
+fi
+
+if [ "$PARTIAL_DELIVERY" = true ]; then
   # A partial unit must not close any task through a hand-written squash body
-  # or a commit already on the branch. Reject common provider closing forms
-  # before the first Git or provider write, including when resuming a draft.
+  # or a commit already on the branch. Inspect the exact normalized body that
+  # will be published, including line-wrapped directives, before any write.
   CLOSING_DIRECTIVE='(^|[[:space:]])(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)[:,]?[[:space:]]+(([^[:space:]#]+/)?[^[:space:]#]+#|#|https?://[^[:space:]]+/issues/)[[:alnum:]_-]+'
   if ! BRANCH_COMMIT_MESSAGES="$(git log --format=%B "$REVISION_BASE..HEAD")"; then
     echo "finalize-pr: cannot inspect branch commits for closing directives" >&2
     exit 1
   fi
-  CLOSING_INPUT="$(printf '%s\n' "$TITLE"; cat "$BODY_FILE"; printf '%s\n' "$BRANCH_COMMIT_MESSAGES")"
+  CLOSING_INPUT="$(printf '%s\n%s\n%s\n' "$TITLE" "$BODY" "$BRANCH_COMMIT_MESSAGES")"
   if grep -Eiq "$CLOSING_DIRECTIVE" <<<"$CLOSING_INPUT" ||
     { [ -n "$POLICY_TASK_REFERENCE_LINE" ] && grep -Fqi "$POLICY_TASK_REFERENCE_LINE" <<<"$CLOSING_INPUT"; }; then
     echo "finalize-pr: --partial-delivery refuses a closing directive in the title, body or branch commits; keep the parent task open" >&2
@@ -738,44 +774,6 @@ while IFS= read -r sha; do
     exit 1
   fi
 done < <(git rev-list --no-merges "$REVISION_BASE..HEAD")
-
-# The host wraps the squash commit message at its own width, so a body wrapped
-# by its author reaches the base with broken lines. Join the lines of each
-# paragraph and list item; blank lines, list markers, fenced blocks and
-# indented code keep their breaks.
-unwrap_paragraphs() {
-  awk '
-    function flush() { if (held != "") print held; held = "" }
-    /^[[:space:]]*(```|~~~)/ { flush(); print; fence = !fence; next }
-    fence { print; next }
-    /^[[:space:]]*$/ { flush(); print; next }
-    /^[[:space:]]*([-*+]|[0-9]+[.)])[[:space:]]/ { flush(); held = $0; sub(/[[:space:]]+$/, "", held); next }
-    held == "" && /^(    |\t)/ { print; next }
-    {
-      line = $0
-      sub(/^[[:space:]]+/, "", line)
-      sub(/[[:space:]]+$/, "", line)
-      held = (held == "") ? line : held " " line
-    }
-    END { flush() }
-  '
-}
-
-# The proposal body is the squash commit message: the caller's body and the
-# task reference line when the policy defines one and the body lacks it.
-BODY="$(unwrap_paragraphs <"$BODY_FILE")"
-if [ -n "$TASK_REFERENCE_LINE" ] && ! grep -Fxq -- "$TASK_REFERENCE_LINE" "$BODY_FILE"; then
-  BODY="${BODY}
-
-${TASK_REFERENCE_LINE}"
-fi
-# The proposals contract carries at most 65536 bytes of body. A longer one is
-# refused here, before the push, not by the provider after it.
-BODY_BYTES="$(printf '%s' "$BODY" | wc -c | tr -d '[:space:]')"
-if [ "$BODY_BYTES" -gt 65536 ]; then
-  echo "finalize-pr: the proposal body is $BODY_BYTES bytes, and the proposals contract carries at most 65536; shorten --body-file, then finalize again. Nothing was pushed." >&2
-  exit 1
-fi
 
 # The verification record is a comment on the proposal, never part of the
 # commit message. It names the gate and the proof, not the files: the proposal

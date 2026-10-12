@@ -175,6 +175,30 @@ func TestContributorExplicitOnlySkillsDeclareItOnBothHosts(t *testing.T) {
 	}
 }
 
+func TestContributorReviewMetadataKeepsTheReviewQualityFloor(t *testing.T) {
+	profile, err := os.ReadFile(filepath.Join(contributorRoot(t), "src", "agents", "epic-analyst", "claude.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	modelLine := regexp.MustCompile(`(?m)^model: .+$`).FindString(string(profile))
+	if modelLine == "" {
+		t.Fatal("the analysis profile declares no model")
+	}
+	result := buildContributorContent(t)
+	for _, skill := range []string{"review", "code-review"} {
+		metadata, err := os.ReadFile(filepath.Join(contributorRoot(t), "src", "skills", skill, "agents", "claude.yaml"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := regexp.MustCompile(`(?m)^model: .+$`).FindString(string(metadata)); got != modelLine {
+			t.Errorf("%s model=%s, review floor=%s", skill, got, modelLine)
+		}
+		if !strings.Contains(string(result.Files[".claude/skills/"+skill+"/SKILL.md"]), modelLine) {
+			t.Errorf("%s does not render the declared review floor", skill)
+		}
+	}
+}
+
 func TestContributorAliasesNameAnExistingCanonicalSkill(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/contributor-workflows", "entry-point-aliases", "each-alias-names-an-existing-canonical-skill")

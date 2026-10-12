@@ -36,16 +36,24 @@ and acceptance checks. A caller first confirms `--workflow` is supported,
 since an older dossier reader can ignore an unknown member.
 
 Units describe delivered behavior and required receipts; milestones and tasks
-track work. A bounded first unit retains later requirements and any
+track work. Stage entries are linked to a unit, and each unit has the full
+canonical stage inventory. A current unit cannot be ready with blocked stages
+or unresolved decisions; later units keep their pending stages visible. Native
+next-cycle task refs retain opaque provider `{source,id}` identity, with a
+revision and actual `tasks get` receipt together when exact inputs matter, or
+an exact local task record. A bounded first unit retains later requirements and any
 outcome-changing exclusion needs actual mandate authority. Material artifact
 opinions bind to the exact source and relevant context bytes in an original
-reviewer-authored report; changing an index digest does not renew them. The
+reviewer-authored report; immutable examined bytes and later independent
+`challenge.revisions` retain the chain after correction, with exact snapshots
+for same-path changes. Changing an index digest does not renew them. The
 whole-tree candidate binding remains stricter. Handoffs name available
 versioned inputs and explicitly identify local assets that cannot travel.
 
 The existing finalizer accepts `--partial-delivery` for an intermediate unit.
 It keeps a non-closing parent reference, rejects caller closing directives in
-title/body/branch commits, and skips the parent task transition. When a
+title, the fully normalized proposal body and branch commits before a write,
+and skips the parent task transition. When a
 workflow dossier reports `outcomeComplete: false`, normal parent-task
 finalization is refused. Normal policy close and delivered transition remain
 for a complete mandated outcome. All existing gate, proof, English, provider

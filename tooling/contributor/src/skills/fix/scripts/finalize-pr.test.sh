@@ -1493,6 +1493,37 @@ grep -Fq -- "--partial-delivery refuses a closing directive" "$TEST_DIR/partial-
 [ ! -s "$TEST_DIR/state/git-mutations" ]
 [ ! -s "$TEST_DIR/state/collab-invocations" ]
 [ ! -s "$TEST_DIR/state/gate-invocations" ]
+# The exact body published by the finalizer joins paragraph and list lines.
+# Refuse directives that appear only after that normalization, before a gate,
+# commit, push or provider write.
+cat >"$TEST_DIR/partial-wrapped.md" <<BODY
+First unit. Closes
+#$TASK_ID
+
+Deletes: nothing.
+BODY
+if partial --body-file "$TEST_DIR/partial-wrapped.md" --file example.txt >"$TEST_DIR/partial-wrapped.out" 2>"$TEST_DIR/partial-wrapped.err"; then
+  echo "finalize-pr test: partial delivery accepted a wrapped closing directive" >&2
+  exit 1
+fi
+grep -Fq -- "--partial-delivery refuses a closing directive" "$TEST_DIR/partial-wrapped.err"
+[ ! -s "$TEST_DIR/state/git-mutations" ]
+[ ! -s "$TEST_DIR/state/collab-invocations" ]
+[ ! -s "$TEST_DIR/state/gate-invocations" ]
+cat >"$TEST_DIR/partial-list-wrapped.md" <<BODY
+- Closes
+  #$TASK_ID
+
+Deletes: nothing.
+BODY
+if partial --body-file "$TEST_DIR/partial-list-wrapped.md" --file example.txt >"$TEST_DIR/partial-list-wrapped.out" 2>"$TEST_DIR/partial-list-wrapped.err"; then
+  echo "finalize-pr test: partial delivery accepted a list-wrapped closing directive" >&2
+  exit 1
+fi
+grep -Fq -- "--partial-delivery refuses a closing directive" "$TEST_DIR/partial-list-wrapped.err"
+[ ! -s "$TEST_DIR/state/git-mutations" ]
+[ ! -s "$TEST_DIR/state/collab-invocations" ]
+[ ! -s "$TEST_DIR/state/gate-invocations" ]
 if partial --title "Closes #$TASK_ID" --file example.txt >"$TEST_DIR/partial-title.out" 2>"$TEST_DIR/partial-title.err"; then
   echo "finalize-pr test: partial delivery accepted a closing title" >&2
   exit 1
