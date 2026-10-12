@@ -60,15 +60,23 @@ provider applies.
 ### Uploads
 
 `upload` queues an entry and answers at once. One uploader stores the queue a
-window at a time.
+window at a time. A window costs one `commit-batch`, one `upload-batch` per
+4 MiB of small blobs, and a `find-missing` when it has blobs to PUT, so a
+window is as large as one `commit-batch` takes. It is stored as soon as it
+reaches one of these bounds:
 
 | Bound | Value |
 | --- | --- |
-| Entries in a window | 64 |
+| Entries in a window | 5,000 |
 | Distinct blobs in a window | 5,000 |
 | Encoded entries in a window | 512 KiB |
+| Size of the distinct blobs in a window | 256 MiB |
 | Blobs or entries named in one request | 5,000 |
 | Blob PUTs at once | 16 |
+
+A window that reaches no bound is stored once no entry has arrived for 30 s,
+and at the end of the run: the summary stores every queued entry. A CI run
+that builds a few hundred entries stores them in one or two windows.
 
 An entry with more than 5,000 distinct blobs goes alone. Its blobs are asked
 about in several `find-missing` requests of at most 5,000 each. `commit-batch`
@@ -124,6 +132,23 @@ fetches the small files of every hit, the files of at most 256 KiB, through
 - When that request fails, each restore asks for its own small files in one
   `download-batch`, as before. A file the server left out of its answer comes
   through its own download.
+
+Core computes the key of a task only once the tasks it depends on have
+finished, so it also restores keys the prefetch did not cover. Those restores
+share their negotiate:
+
+- A restore that needs a negotiate joins the open group of its mode: minimal
+  for a restore of the result only, the session's mode otherwise.
+- The group is sent once no restore has joined it for 20 ms, at the latest
+  50 ms after its first restore, and at once when it holds 5,000 keys. A
+  finished task releases the tasks that depend on it together, so their
+  restores share one negotiate. A restore that arrives alone waits 20 ms
+  more, less than one request to the cache server.
+- The small files of the group's hits come in one `download-batch`, the way
+  the prefetch fetches them.
+- When the group's negotiate fails, each restore negotiates its own key. A
+  group of one key, or a credential the server refused, gets no second
+  negotiate: the restore is an `error`.
 
 A restore uses the downloads of the negotiate answer. They do not last: the
 cache server signs a URL for 15 minutes, or hands out a storage token that

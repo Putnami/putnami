@@ -20,22 +20,6 @@ import (
 // directory core exported them to, and are read from there when the server asks
 // for them.
 const (
-	// uploadWindowEntries caps the entries of one window: a CI run builds a few
-	// hundred entries, so 64 keeps its writes to a handful of exchanges.
-	uploadWindowEntries = 64
-	// uploadWindowBlobs caps the distinct blobs of one window at the protocol's
-	// per-request limit, so a window asks about its blobs in one find-missing.
-	// One entry with more blobs than that still stores: it goes alone, and its
-	// blobs are asked about in several find-missing requests.
-	uploadWindowBlobs = cache.MaxKeysPerRequest
-	// uploadWindowBytes caps the encoded entries of one window at half the
-	// 1 MiB the cache server reads of a commit-batch body, so that body always
-	// fits with room for its envelope. The 1 MiB is the route's own bound: every
-	// cache-server route but upload-batch reads at most that, whatever the
-	// server's body limit (16 MiB) allows. The window's small blobs do not count
-	// here: they travel in upload-batch requests, bounded on their own
-	// (remotecache.maxInlineBatchBytes).
-	uploadWindowBytes = 512 << 10
 	// uploadWindowBlobConcurrency bounds the blobs of one window uploading at
 	// once: before windows each entry uploaded on its own goroutine, so one
 	// uploader needs the bound the restore path has, or it trails the build.
@@ -45,12 +29,53 @@ const (
 	uploadFallbackConcurrency = 8
 )
 
+// uploadWindowLimit bounds one window. A window stops at the entry that would
+// take it past a bound. An entry that alone exceeds a bound goes alone.
+type uploadWindowLimit struct {
+	// entries caps the entries, at the most one commit-batch takes.
+	entries int
+	// blobs caps the distinct blobs at the protocol's per-request limit, so a
+	// window asks about its blobs in one find-missing. One entry with more
+	// blobs than that still stores: it goes alone, and its blobs are asked
+	// about in several find-missing requests.
+	blobs int
+	// bytes caps the encoded entries at half the 1 MiB the cache server reads
+	// of a commit-batch body, so that body always fits with room for its
+	// envelope. The 1 MiB is the route's own bound: every cache-server route
+	// but upload-batch reads at most that, whatever the server's body limit
+	// (16 MiB) allows. The window's small blobs do not count here: they travel
+	// in upload-batch requests, bounded on their own
+	// (remotecache.maxInlineBatchBytes).
+	bytes int
+	// blobBytes caps the size of the distinct blobs, as the manifests declare
+	// it. A window sends its blobs when it is stored, so the bound keeps them
+	// moving while the build runs, and leaves the run-end drain at most this
+	// much to send: 256 MiB take about 5 s at 50 MB/s, a tenth of
+	// uploadDrainBudget.
+	blobBytes int64
+}
+
+// uploadWindowLimits are the bounds of a window. Each window costs a
+// commit-batch, an upload-batch for its small blobs, and a find-missing when
+// it has blobs to PUT, so the windows are as large as one commit-batch takes.
+// A CI run builds a few hundred entries: they fit in one or two windows. It is
+// a variable so a test can lower it; a session reads it once, when it is
+// created.
+var uploadWindowLimits = uploadWindowLimit{
+	entries:   cache.MaxKeysPerRequest,
+	blobs:     cache.MaxKeysPerRequest,
+	bytes:     512 << 10,
+	blobBytes: 256 << 20,
+}
+
 // uploadWindowIdle flushes a partial window once no entry has arrived for this
-// long: a build finishing tasks every second keeps filling one window, and a
-// pause makes its entries durable well before the summary. It is a variable so
-// a test can change it; production never does. A session reads it once, when it
-// is created.
-var uploadWindowIdle = 2 * time.Second
+// long. While a CI build runs, it finishes a task every few seconds, and those
+// entries fill one window. A pause this long means the build waits on long
+// tasks: the window is then stored well before the summary. A shorter delay
+// stored a window at every short pause, so a CI run of a few hundred entries
+// took several windows. It is a variable so a test can change it; production
+// never does. A session reads it once, when it is created.
+var uploadWindowIdle = 30 * time.Second
 
 // uploadRetry is how a window meets a failure. A find-missing, upload-batch or
 // commit-batch that fails for a reason that can pass (a 5xx, a 429, a network
@@ -81,8 +106,14 @@ type uploadWindow struct {
 	// wake is a one-slot signal that makes the uploader look at the queue
 	// before its idle delay elapses: a full window or a drain.
 	wake chan struct{}
-	// idle is uploadWindowIdle as the session read it at creation.
-	idle time.Duration
+	// idle is uploadWindowIdle, and limit uploadWindowLimits, as the session
+	// read them at creation.
+	idle  time.Duration
+	limit uploadWindowLimit
+	// load adds up the queued entries. It counts a blob once per entry that
+	// names it, so it is never below what a window of the queue holds: a
+	// queue that fills a window always wakes the uploader.
+	load uploadLoad
 	// retry is uploadRetry as the session read it at creation.
 	retry remotecache.WriteRetry
 	// inflight counts the entries of the window being stored, so a drain that
@@ -99,10 +130,29 @@ type uploadWindow struct {
 	probeLog sync.Once
 }
 
-// pendingUpload is one queued entry and the encoded size of its commit entry.
+// pendingUpload is one queued entry, the encoded size of its commit entry, and
+// the size its manifest declares for its files.
 type pendingUpload struct {
-	in    remotecache.StoreInput
-	bytes int
+	in        remotecache.StoreInput
+	bytes     int
+	blobBytes int64
+}
+
+// uploadLoad adds up queued entries: their files, the encoded size of their
+// commit entries, and the size of their files.
+type uploadLoad struct {
+	blobs     int
+	bytes     int
+	blobBytes int64
+}
+
+// add adds p to the load when sign is 1, and takes it out when sign is -1.
+func (l *uploadLoad) add(p pendingUpload, sign int) {
+	if p.in.Manifest != nil {
+		l.blobs += sign * len(p.in.Manifest.Files)
+	}
+	l.bytes += sign * p.bytes
+	l.blobBytes += int64(sign) * p.blobBytes
 }
 
 // init prepares the queue of a new session. It sets the fields in place: an
@@ -110,7 +160,17 @@ type pendingUpload struct {
 func (w *uploadWindow) init() {
 	w.wake = make(chan struct{}, 1)
 	w.idle = uploadWindowIdle
+	w.limit = uploadWindowLimits
 	w.retry = uploadRetry
+}
+
+// mayBeFull reports whether the queue may fill a window: it reaches the entry
+// bound, or its load passes another bound. The caller holds w.mu.
+func (w *uploadWindow) mayBeFull() bool {
+	return len(w.queue) >= w.limit.entries ||
+		w.load.blobs > w.limit.blobs ||
+		w.load.bytes > w.limit.bytes ||
+		w.load.blobBytes > w.limit.blobBytes
 }
 
 // touch records that an upload moved forward.
@@ -138,13 +198,19 @@ func (w *uploadWindow) signal() {
 // enqueueUpload queues an entry for the uploader, starting the uploader when
 // none runs. It runs on the read loop, as summary and shutdown do.
 func (s *providerSession) enqueueUpload(in remotecache.StoreInput) {
-	size := 0
+	p := pendingUpload{in: in}
 	if encoded, err := json.Marshal(cache.CommitEntry{Key: in.Key, Result: in.Result, Manifest: in.Manifest}); err == nil {
-		size = len(encoded)
+		p.bytes = len(encoded)
+	}
+	if in.Manifest != nil {
+		for _, f := range in.Manifest.Files {
+			p.blobBytes += f.Size
+		}
 	}
 	w := &s.uploads
 	w.mu.Lock()
-	w.queue = append(w.queue, pendingUpload{in: in, bytes: size})
+	w.queue = append(w.queue, p)
+	w.load.add(p, 1)
 	w.last = time.Now()
 	start := !w.running
 	if start {
@@ -152,7 +218,7 @@ func (s *providerSession) enqueueUpload(in remotecache.StoreInput) {
 		w.stopped = make(chan struct{})
 		s.bg.Add(1)
 	}
-	full := len(w.queue) >= uploadWindowEntries
+	full := w.mayBeFull()
 	w.mu.Unlock()
 	if start {
 		go s.runUploader()
@@ -208,17 +274,19 @@ func (s *providerSession) nextUploadWindow() ([]remotecache.StoreInput, bool) {
 		w.mu.Lock()
 		if len(w.queue) == 0 || s.ctx.Err() != nil {
 			w.queue = nil
+			w.load = uploadLoad{}
 			w.running = false
 			close(w.stopped)
 			w.mu.Unlock()
 			return nil, false
 		}
-		n, full := uploadWindowSize(w.queue)
+		n, full := uploadWindowSize(w.queue, w.limit)
 		wait := w.idle - time.Since(w.last)
 		if full || w.drain || wait <= 0 {
 			window := make([]remotecache.StoreInput, n)
 			for i := range window {
 				window[i] = w.queue[i].in
+				w.load.add(w.queue[i], -1)
 			}
 			w.queue = w.queue[n:]
 			w.inflight = n
@@ -237,30 +305,35 @@ func (s *providerSession) nextUploadWindow() ([]remotecache.StoreInput, bool) {
 }
 
 // uploadWindowSize returns how many queued entries the next window carries,
-// and whether that is a full window. A window stops at uploadWindowEntries, at
-// the entry whose blobs would take it past one find-missing request, or at the
-// entry whose commit entry would take it past one commit-batch body. It is
-// never zero for a non-empty queue: an entry too large for any window goes
-// alone. The client then asks about its blobs in find-missing requests of at
-// most cache.MaxKeysPerRequest blobs each.
-func uploadWindowSize(queue []pendingUpload) (int, bool) {
+// and whether that is a full window. A window stops at limit.entries, at the
+// entry whose blobs would take it past one find-missing request, at the entry
+// whose commit entry would take it past one commit-batch body, or at the entry
+// whose blobs would take it past limit.blobBytes. It is never zero for a
+// non-empty queue: an entry too large for any window goes alone. The client
+// then asks about its blobs in find-missing requests of at most
+// cache.MaxKeysPerRequest blobs each.
+func uploadWindowSize(queue []pendingUpload, limit uploadWindowLimit) (int, bool) {
 	blobs := make(map[string]bool)
 	bytes := 0
+	var blobBytes int64
 	for i, p := range queue {
-		if i == uploadWindowEntries {
+		if i == limit.entries {
 			return i, true
 		}
 		if p.in.Manifest != nil {
 			for _, f := range p.in.Manifest.Files {
-				blobs[f.Digest] = true
+				if !blobs[f.Digest] {
+					blobs[f.Digest] = true
+					blobBytes += f.Size
+				}
 			}
 		}
-		if i > 0 && (len(blobs) > uploadWindowBlobs || bytes+p.bytes > uploadWindowBytes) {
+		if i > 0 && (len(blobs) > limit.blobs || bytes+p.bytes > limit.bytes || blobBytes > limit.blobBytes) {
 			return i, true
 		}
 		bytes += p.bytes
 	}
-	return len(queue), len(queue) == uploadWindowEntries
+	return len(queue), len(queue) == limit.entries
 }
 
 // flushUploadWindow stores one window. A window the latch closed is dropped

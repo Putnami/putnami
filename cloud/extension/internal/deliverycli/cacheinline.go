@@ -18,7 +18,8 @@ import (
 // a run that restored N entries sent N requests, most of them for one file of
 // a few hundred bytes. The prefetch now asks for the small files of every hit
 // it negotiated in a few requests, and a restore finds them in the exchange
-// directory.
+// directory. A late negotiate, which several restores share, does the same for
+// the hits it negotiated (see cachenegotiate.go).
 //
 // A restore that needs one of those files waits for the request that carries
 // it, never for the others, and then reads the exchange directory. When that
@@ -26,13 +27,14 @@ import (
 // download-batch, as before. A file the server left out of its answer is not
 // inline, so the restore downloads it on its own.
 
-// inlinePrefetchConcurrency bounds the download-batch requests the prefetch
-// has in flight. A run's small files usually fit in a few requests; the bound
-// keeps a large run from asking cache-server to hold more than about 4 answers
-// of at most maxDownloadBatchBytes each at once.
-const inlinePrefetchConcurrency = 4
+// inlineFetchConcurrency bounds the download-batch requests the prefetch, or
+// one late negotiate, has in flight. A run's small files usually fit in a few
+// requests; the bound keeps a large run from asking cache-server to hold more
+// than about 4 answers of at most maxDownloadBatchBytes each at once.
+const inlineFetchConcurrency = 4
 
-// inlineBatch is one download-batch request of the prefetch.
+// inlineBatch is one download-batch request of the prefetch or of a late
+// negotiate.
 type inlineBatch struct {
 	blobs []cache.BlobTransfer
 	// done is closed when the request has ended and the blobs it returned are
@@ -43,9 +45,9 @@ type inlineBatch struct {
 	answered bool
 }
 
-// inlinePrefetch records the prefetch's download-batch requests for the
-// restores.
-type inlinePrefetch struct {
+// inlineRequests records the download-batch requests of the prefetch and of
+// the late negotiates for the restores.
+type inlineRequests struct {
 	mu sync.Mutex
 	// batchOf maps a digest to the request that asks for it.
 	batchOf map[string]*inlineBatch
@@ -55,7 +57,7 @@ type inlinePrefetch struct {
 }
 
 // batch returns the request that asks for digest, or nil.
-func (p *inlinePrefetch) batch(digest string) *inlineBatch {
+func (p *inlineRequests) batch(digest string) *inlineBatch {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.batchOf[digest]
@@ -63,7 +65,7 @@ func (p *inlinePrefetch) batch(digest string) *inlineBatch {
 
 // record registers blobs as requests and returns them. A blob an earlier
 // request asks for is left out.
-func (p *inlinePrefetch) record(blobs []cache.BlobTransfer) []*inlineBatch {
+func (p *inlineRequests) record(blobs []cache.BlobTransfer) []*inlineBatch {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	blobs = slices.DeleteFunc(blobs, func(t cache.BlobTransfer) bool { return p.batchOf[t.Digest] != nil })
@@ -86,7 +88,7 @@ func (p *inlinePrefetch) record(blobs []cache.BlobTransfer) []*inlineBatch {
 }
 
 // place records that a request wrote n bytes for digest.
-func (p *inlinePrefetch) place(digest string, n int64) {
+func (p *inlineRequests) place(digest string, n int64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.placed[digest] = n
@@ -94,7 +96,7 @@ func (p *inlinePrefetch) place(digest string, n int64) {
 
 // claim returns the size of a blob a request placed, once: the first restore
 // that uses the blob counts it, as when that restore downloaded it itself.
-func (p *inlinePrefetch) claim(digest string) int64 {
+func (p *inlineRequests) claim(digest string) int64 {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	n := p.placed[digest]
@@ -103,10 +105,9 @@ func (p *inlinePrefetch) claim(digest string) int64 {
 }
 
 // planInlinePrefetch registers the download-batch requests for the small files
-// of the hits in batches, and returns them. It leaves out a file core already
-// has, one the exchange directory holds, and one an earlier request asks for.
-// runPrefetch calls it before it releases the restores waiting on the index,
-// so a restore of a hit always finds the request that carries its files.
+// of the hits in batches, and returns them. runPrefetch calls it before it
+// releases the restores waiting on the index, so a restore of a hit always
+// finds the request that carries its files.
 //
 // A hit negotiated in minimal mode names no download, so the result-only keys
 // add no file: the prefetch fetches only files core said it will read.
@@ -117,31 +118,51 @@ func (s *providerSession) planInlinePrefetch(batches []prefetchBatch) []*inlineB
 		if b.err != nil {
 			continue
 		}
-		for _, k := range b.keys {
-			r := b.results[k]
-			if !r.result.Hit {
-				continue
-			}
-			for _, t := range r.result.Downloads {
-				if !remotecache.InlineDownload(t) || seen[t.Digest] || s.known[t.Digest] {
-					continue
-				}
-				seen[t.Digest] = true
-				path, ok := cache.BlobExchangePath(s.exchangeDir, t.Digest)
-				if !ok || blobPresent(path, t.SizeBytes) {
-					continue
-				}
-				blobs = append(blobs, t)
-			}
-		}
+		blobs = s.appendInlineBlobs(blobs, seen, b.keys, b.results)
 	}
 	return s.inline.record(blobs)
 }
 
-// fetchInlinePrefetch sends the planned requests, inlinePrefetchConcurrency at
-// a time, and closes the done channel of every one of them, whatever happens.
-func (s *providerSession) fetchInlinePrefetch(batches []*inlineBatch) {
-	sem := make(chan struct{}, inlinePrefetchConcurrency)
+// planInlineLate registers the download-batch requests for the small files of
+// the hits of one late negotiate, and returns them. sendLateNegotiate calls it
+// before it answers the restores of the group, as runPrefetch does. Every key
+// of the group is a restore core sent, so the request fetches only files core
+// will read: a result-only restore negotiates in minimal mode, which names no
+// download.
+func (s *providerSession) planInlineLate(keys []string, results map[string]providerCacheResult) []*inlineBatch {
+	return s.inline.record(s.appendInlineBlobs(nil, make(map[string]bool), keys, results))
+}
+
+// appendInlineBlobs appends to blobs the small files of the hits among keys
+// that a download-batch should fetch, in the order of keys. It leaves out a
+// file core already has, one the exchange directory holds, and one seen
+// records. record then leaves out one an earlier request asks for.
+func (s *providerSession) appendInlineBlobs(blobs []cache.BlobTransfer, seen map[string]bool, keys []string, results map[string]providerCacheResult) []cache.BlobTransfer {
+	for _, k := range keys {
+		r := results[k]
+		if !r.result.Hit {
+			continue
+		}
+		for _, t := range r.result.Downloads {
+			if !remotecache.InlineDownload(t) || seen[t.Digest] || s.known[t.Digest] {
+				continue
+			}
+			seen[t.Digest] = true
+			path, ok := cache.BlobExchangePath(s.exchangeDir, t.Digest)
+			if !ok || blobPresent(path, t.SizeBytes) {
+				continue
+			}
+			blobs = append(blobs, t)
+		}
+	}
+	return blobs
+}
+
+// fetchInline sends the planned requests, inlineFetchConcurrency at a time,
+// and closes the done channel of every one of them, whatever happens. scope
+// names the sender in the log: the prefetch or the late restores.
+func (s *providerSession) fetchInline(scope string, batches []*inlineBatch) {
+	sem := make(chan struct{}, inlineFetchConcurrency)
 	var wg sync.WaitGroup
 	for _, b := range batches {
 		wg.Add(1)
@@ -154,7 +175,7 @@ func (s *providerSession) fetchInlinePrefetch(batches []*inlineBatch) {
 				return
 			}
 			defer func() { <-sem }()
-			s.fetchInlineBatch(b)
+			s.fetchInlineBatch(scope, b)
 		}()
 	}
 	wg.Wait()
@@ -163,10 +184,10 @@ func (s *providerSession) fetchInlinePrefetch(batches []*inlineBatch) {
 // fetchInlineBatch sends one request and writes each blob of the answer to the
 // exchange directory, atomically. A request that fails places nothing: the
 // restores of its files ask for them again.
-func (s *providerSession) fetchInlineBatch(b *inlineBatch) {
+func (s *providerSession) fetchInlineBatch(scope string, b *inlineBatch) {
 	data, err := s.client.DownloadInline(s.ctx, b.blobs)
 	if err != nil {
-		s.logCacheError(fmt.Sprintf("prefetch download-batch of %d files", len(b.blobs)), err)
+		s.logCacheError(fmt.Sprintf("%s download-batch of %d files", scope, len(b.blobs)), err)
 		return
 	}
 	b.answered = true
@@ -177,7 +198,7 @@ func (s *providerSession) fetchInlineBatch(b *inlineBatch) {
 		if !ok {
 			continue
 		}
-		path, _ := cache.BlobExchangePath(s.exchangeDir, t.Digest) // planInlinePrefetch kept only valid digests
+		path, _ := cache.BlobExchangePath(s.exchangeDir, t.Digest) // appendInlineBlobs kept only valid digests
 		open := func(string) (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(blob)), nil }
 		n, err := writeExchangeBlob(open, t.Digest, path)
 		if err != nil {
@@ -190,7 +211,7 @@ func (s *providerSession) fetchInlineBatch(b *inlineBatch) {
 		s.inline.place(t.Digest, n)
 	}
 	if failed > 0 {
-		s.log(fmt.Sprintf("prefetch download-batch: %d files not placed; their restores download them: %v", failed, first))
+		s.log(fmt.Sprintf("%s download-batch: %d files not placed; their restores download them: %v", scope, failed, first))
 	}
 }
 
