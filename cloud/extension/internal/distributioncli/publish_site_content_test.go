@@ -521,13 +521,9 @@ func TestDeriveSiteContentSections(t *testing.T) {
 	}
 }
 
-// Under native CI, PUTNAMI_REGISTRY_PUT_URL names the runner's loopback
-// publication broker and PUTNAMI_CLOUD_TOKEN is the job's local capability.
-// PublishSiteContentBundles must send every Put request to that broker with
-// the capability, with no stored credential and no human session (a lookup
-// of one fails with "no Put registry credential for 127.0.0.1:<port>").
-func TestPublishSiteContentBundlesUsesNativePublicationBroker(t *testing.T) {
-	const capability = "local_broker_capability_0123456789abcdef"
+// PublishSiteContentBundles sends every Put request to the configured Put
+// endpoint with the stored Put credential for its host.
+func TestPublishSiteContentBundlesUsesTheStoredPutCredential(t *testing.T) {
 	var (
 		paths []string
 		auths []string
@@ -554,15 +550,11 @@ func TestPublishSiteContentBundlesUsesNativePublicationBroker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	env := map[string]string{
-		"PUTNAMI_HOME":             t.TempDir(), // no registries.json: no stored credential
-		"PUTNAMI_REGISTRY_PUT_URL": srv.URL + "/put",
-		"PUTNAMI_CLOUD_TOKEN":      capability,
-	}
+	env := siteContentPutEnv(t, srv.URL)
 	ioctx := clicore.IO{Stdout: func(string) {}, Stderr: func(string) {}, JSON: func(any) {}, Client: srv.Client()}
 	baseURL, results, err := PublishSiteContentBundles(map[string]any{}, ws, env, ioctx, []SiteContentBundle{bundle}, "stable")
 	if err != nil {
-		t.Fatalf("publish through the native broker: %v", err)
+		t.Fatalf("publish with the stored Put credential: %v", err)
 	}
 	if baseURL != srv.URL+"/put" || len(results) != 1 || results[0].Package != "cloud/doc-contents-platform" ||
 		results[0].Version != bundle.Version() || results[0].Channel != "stable" {
@@ -574,18 +566,19 @@ func TestPublishSiteContentBundlesUsesNativePublicationBroker(t *testing.T) {
 		"POST /put/put/cloud/doc-contents-platform/publish",
 	}
 	if strings.Join(paths, "\n") != strings.Join(want, "\n") {
-		t.Fatalf("broker requests = %q, want %q", paths, want)
+		t.Fatalf("Put requests = %q, want %q", paths, want)
 	}
 	for i, auth := range auths {
-		if auth != "Bearer "+capability {
-			t.Fatalf("request %d authorization = %q, want the local capability", i, auth)
+		if auth != "Bearer "+nativePutBearer() {
+			t.Fatalf("request %d authorization = %q, want the stored Put lease", i, auth)
 		}
 	}
 }
 
-// A malformed local capability is configuration, not a reason to fall back:
-// PublishSiteContentBundles must fail before any request leaves the process.
-// A refused upload fails the publish.
+// PUTNAMI_CLOUD_TOKEN is no Put credential, even for a loopback Put endpoint:
+// with no stored credential, no linked workspace and no session,
+// PublishSiteContentBundles fails before any request leaves the process. A
+// refused upload fails the publish.
 func TestPublishSiteContentBundlesRefusals(t *testing.T) {
 	requests := 0
 	srv := newPutTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -603,21 +596,20 @@ func TestPublishSiteContentBundlesRefusals(t *testing.T) {
 	env := map[string]string{
 		"PUTNAMI_HOME":             t.TempDir(),
 		"PUTNAMI_REGISTRY_PUT_URL": srv.URL + "/put",
-		"PUTNAMI_CLOUD_TOKEN":      "bad token",
+		"PUTNAMI_CLOUD_TOKEN":      "local_broker_capability_0123456789abcdef",
 	}
 	if _, _, err := PublishSiteContentBundles(map[string]any{}, ws, env, ioctx, []SiteContentBundle{bundle}, "stable"); err == nil {
-		t.Fatal("a malformed local capability must fail the publish")
+		t.Fatal("PUTNAMI_CLOUD_TOKEN alone must not publish to a loopback Put endpoint")
 	}
 	if requests != 0 {
-		t.Fatalf("broker received %d requests, want 0", requests)
+		t.Fatalf("Put endpoint received %d requests, want 0", requests)
 	}
 
-	env["PUTNAMI_CLOUD_TOKEN"] = "local_broker_capability_0123456789abcdef"
-	if _, _, err := PublishSiteContentBundles(map[string]any{}, ws, env, ioctx, []SiteContentBundle{bundle}, "stable"); err == nil {
+	if _, _, err := PublishSiteContentBundles(map[string]any{}, ws, siteContentPutEnv(t, srv.URL), ioctx, []SiteContentBundle{bundle}, "stable"); err == nil {
 		t.Fatal("a refused upload must fail the publish")
 	}
 	if requests == 0 {
-		t.Fatal("the upload never reached the broker")
+		t.Fatal("the upload never reached the Put endpoint")
 	}
 }
 

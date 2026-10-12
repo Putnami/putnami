@@ -307,7 +307,7 @@ activation:
 | Command | Scope | Steps | Cached? |
 |---|---|---|---|
 | `validate` | one project, activated by `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
-| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS and docs links on the Git candidate cut. The breaking marker is never cached |
+| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS and docs links on the Git candidate cut. The breaking marker and the agent attribution are never cached |
 
 Both are in the canonical gate:
 
@@ -375,6 +375,10 @@ A task may be cacheable only when its declared inputs COVER what it reads.
   impacted baseline, and the candidate cut holds neither the variable nor the
   commits. Its `env` input names the variable and keys nothing. See
   [the validation jobs](doc/02-validation-jobs.md#breaking-marker-validate--never-cached).
+- `agent-attribution-validate` is never cached. It reads the proposed squash
+  message in `PUTNAMI_PROPOSAL_MESSAGE` when `options.sdd.agentAttribution` is
+  `"forbid"`, and the candidate cut does not hold the variable. See
+  [the validation jobs](doc/02-validation-jobs.md#agent-attribution-validate--never-cached).
 
 ### The decision gate
 

@@ -40,6 +40,7 @@
       "owners": [
         "@fdumay"
       ],
+      "agentAttribution": "forbid",
       "verification": {
         "architecture": "enforce"
       }

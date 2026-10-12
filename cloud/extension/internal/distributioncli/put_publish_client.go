@@ -25,7 +25,7 @@ type putPublisher struct {
 // newPutPublisher binds put-server's generated client to the Put endpoint
 // baseURL as given. The generated routes carry the `/put` mount, so each
 // request URL is the one the hand-written publishers built from the same
-// endpoint, the CI publication broker's `<broker>/put` included.
+// endpoint.
 func newPutPublisher(base *http.Client, baseURL, token string) (*putPublisher, error) {
 	put, err := clicore.NewServiceClient[putserverclient.PutClient](putserverclient.RegisterPutClient,
 		clicore.ForwardedServiceBinding(baseURL, putLegHTTPClient(base), putServerReaderProfile))

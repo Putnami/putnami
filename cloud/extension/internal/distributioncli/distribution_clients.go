@@ -26,9 +26,9 @@ func putOwnerClient(ioctx clicore.IO, registryURL string) (*putserverclient.PutC
 
 // putMountBase drops a trailing `/put` from a Put endpoint. put-server's
 // generated routes already carry the `/put` mount, and an endpoint can name
-// that mount itself: the CI publication broker hands the CLI `<broker>/put`.
-// Joining both sent `/put/put/_/release-sets/resolve`, which the broker
-// refused, and every publishing run failed at release-set resolve.
+// that mount itself, as a PUTNAMI_REGISTRY_PUT_URL that ends in `/put` does.
+// Joining both sent `/put/put/_/release-sets/resolve`, and every publishing
+// run failed at release-set resolve.
 func putMountBase(registryURL string) string {
 	base := strings.TrimRight(strings.TrimSpace(registryURL), "/")
 	return strings.TrimSuffix(base, "/put")

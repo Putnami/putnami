@@ -4,6 +4,25 @@
   "runtime": {
     "executable": "compiled/putnami-python",
     "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          { "from": "environment", "environment": "GOROOT", "path": "bin/go" },
+          { "from": "path", "path": "go" },
+          { "from": "putnami-home", "path": "toolchains/go/go-{version}/go/bin/go" }
+        ],
+        "probe": {
+          "args": ["env", "GOVERSION"],
+          "expect": "go{version}",
+          "unset": ["GOROOT"],
+          "environment": { "GOTOOLCHAIN": "local" }
+        },
+        "environment": {
+          "GOROOT": { "from": "ancestor", "levels": 2 },
+          "GOTOOLCHAIN": { "from": "literal", "value": "local" }
+        },
+        "prependPath": true
+      },
       "uv": {
         "lock": "uv",
         "candidates": [
@@ -20,7 +39,8 @@
     "prepare": {
       "command": "{extensionRoot}/bin/prepare",
       "args": ["--output", "{runtimeOutput}"],
-      "inputs": ["bin/prepare", "cmd/**", "go.mod", "go.sum", "internal/**"]
+      "inputs": ["bin/prepare", "cmd/**", "go.mod", "go.sum", "internal/**"],
+      "toolchains": ["runtimeCompiler"]
     }
   },
   "workspace": {

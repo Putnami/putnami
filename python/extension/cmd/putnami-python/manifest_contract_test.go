@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -72,6 +73,42 @@ func TestManifestExercisesTheV3TaskContract(t *testing.T) {
 	m := loadExtensionManifest(t)
 	if got := proto.ManifestProtocolVersion(m); got != proto.ProtocolVersionV3 {
 		t.Fatalf("manifest protocol version = %d, want %d (v3 task declarations)", got, proto.ProtocolVersionV3)
+	}
+}
+
+// bin/prepare compiles the runtime with Go. Without a prepare toolchain bound
+// to the `go` lock entry, the CLI passes no GOROOT and the script takes the
+// first `go` on PATH: a host with no Go, or an older one, fails the install.
+// The Go that Putnami installs is found only through the putnami-home
+// candidate, and reaches the script only through GOROOT.
+func TestPrepareBuildsWithTheLockedGo(t *testing.T) {
+	m := loadExtensionManifest(t)
+	if m.Runtime == nil || !m.Runtime.RequiresPreparation() {
+		t.Fatal("the manifest declares no runtime prepare step")
+	}
+	if got, want := m.Runtime.Prepare.Toolchains, []string{"runtimeCompiler"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("prepare toolchains = %v, want %v", got, want)
+	}
+	compiler, ok := m.Runtime.Toolchains["runtimeCompiler"]
+	if !ok {
+		t.Fatal("runtimeCompiler is not declared; prepare cannot resolve the locked Go compiler")
+	}
+	if compiler.Lock != "go" {
+		t.Errorf("runtimeCompiler lock = %q, want go", compiler.Lock)
+	}
+	if !compiler.PrependPath {
+		t.Error("runtimeCompiler does not prepend its resolved executable to PATH")
+	}
+	home := proto.RuntimeToolchainCandidate{From: proto.RuntimeToolchainCandidatePutnamiHome, Path: "toolchains/go/go-{version}/go/bin/go"}
+	if !slices.Contains(compiler.Candidates, home) {
+		t.Errorf("runtimeCompiler candidates = %+v, want the Go Putnami installs: %+v", compiler.Candidates, home)
+	}
+	wantEnv := map[string]proto.RuntimeToolchainEnvironment{
+		"GOROOT":      {From: proto.RuntimeToolchainEnvironmentAncestor, Levels: 2},
+		"GOTOOLCHAIN": {From: proto.RuntimeToolchainEnvironmentLiteral, Value: "local"},
+	}
+	if !reflect.DeepEqual(compiler.Environment, wantEnv) {
+		t.Errorf("runtimeCompiler environment = %+v, want %+v", compiler.Environment, wantEnv)
 	}
 }
 

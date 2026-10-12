@@ -262,12 +262,19 @@ func TestChannelsStatusWaitFailsWhenTheProviderNeverAnswers(t *testing.T) {
 		t.Fatalf("an unreadable channel without --wait = %v, want unknown and exit 0", err)
 	}
 	polls = 0
-	err := ChannelsStatus(map[string]any{}, []string{"canary", "--wait", "500ms"}, root, env, ioctx)
-	if clicore.ExitCode(err) != clicore.ExitFailure || !strings.Contains(err.Error(), "still unreadable after 500ms") {
+	// The wait's clock moves 10ms per read, so the 20ms wait ends at the second
+	// read however long a read takes on a loaded machine. The provider answers
+	// on this goroutine, so polls needs no lock.
+	start := time.Now()
+	previousNow := channelNow
+	channelNow = func() time.Time { return start.Add(time.Duration(polls) * 10 * time.Millisecond) }
+	t.Cleanup(func() { channelNow = previousNow })
+	err := ChannelsStatus(map[string]any{}, []string{"canary", "--wait", "20ms"}, root, env, ioctx)
+	if clicore.ExitCode(err) != clicore.ExitFailure || !strings.Contains(err.Error(), "still unreadable after 20ms") {
 		t.Fatalf("error = %v, want failing once the wait ends", err)
 	}
-	if polls < 2 {
-		t.Fatalf("polls = %d, want the provider read again until the deadline", polls)
+	if polls != 2 {
+		t.Fatalf("polls = %d, want the provider read again until the deadline and not after", polls)
 	}
 }
 

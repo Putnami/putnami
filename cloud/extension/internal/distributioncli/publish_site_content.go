@@ -167,10 +167,9 @@ func AssembleSiteContentSection(sec SiteContentSection, commit string) (bundle S
 // moves the channel instead (the idempotent same-content republish).
 //
 // It uses the same credential seam as archive publication: a stored machine
-// credential for the Put host, else the native runner's loopback publication
-// broker (PUTNAMI_REGISTRY_PUT_URL + the run's local capability), else a
-// minted user registry token. Under native CI the broker holds the upstream
-// bearer and admits only planned members.
+// credential for the Put host, else a minted user registry token. A hosted CI
+// run packs its members into the publication outbox and does not come through
+// here.
 func PublishSiteContentBundles(params map[string]any, workspaceRoot string, env map[string]string, ioctx clicore.IO, bundles []SiteContentBundle, channel string) (string, []SiteContentPublishResult, error) {
 	credential, err := resolveReleaseSetProviderCredential(params, workspaceRoot, env, ioctx)
 	if err != nil {

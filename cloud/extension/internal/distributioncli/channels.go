@@ -28,6 +28,11 @@ import (
 // is a poll. Tests shorten it.
 var channelPollInterval = 2 * time.Second
 
+// channelNow is the clock that `channels status --wait` measures its deadline
+// on. A test replaces it to end the wait after a set number of reads, however
+// long each read takes on a loaded machine.
+var channelNow = time.Now
+
 // channelProvider is one resolved provider session: the Put endpoint and the
 // bearer, resolved once per command and reused by every call it makes.
 type channelProvider struct {
@@ -293,7 +298,7 @@ func channelWait(params map[string]any, args []string) (waitOption, error) {
 // sleepUntilNextPoll waits one poll interval, or until the deadline or the
 // command's context ends.
 func sleepUntilNextPoll(ioctx clicore.IO, deadline time.Time) error {
-	delay := min(channelPollInterval, time.Until(deadline))
+	delay := min(channelPollInterval, deadline.Sub(channelNow()))
 	if delay <= 0 {
 		return nil
 	}

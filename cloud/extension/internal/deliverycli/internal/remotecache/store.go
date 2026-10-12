@@ -45,7 +45,7 @@ type BlobSource interface {
 }
 
 // BuildStoreRequest assembles the step-1 store request from a freshly built
-// manifest. Remote eligibility (side-effecting, break-even) is already decided
+// manifest. Remote eligibility (side-effecting or not) is already decided
 // at negotiate time, so this only constructs and normalizes the wire request.
 func (c *Client) BuildStoreRequest(in StoreInput) *cache.StoreRequest {
 	req := &cache.StoreRequest{
