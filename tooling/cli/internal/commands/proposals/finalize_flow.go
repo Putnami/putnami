@@ -24,10 +24,67 @@ type publicationCandidate struct {
 	task                    collab.Task
 	change                  collab.Change
 	expectedRevision        string
+	workflowSHA             string
+	readyUnits              []string
 }
 
 func (c *publicationCandidate) recheck(ctx context.Context, f Finalizer) (Verified, error) {
-	return f.frozen(ctx, c.opts, c.originalBody, c.head, c.fingerprint, c.base, c.baseTip, c.baseSHA)
+	verified, err := f.frozen(ctx, c.opts, c.originalBody, c.head, c.fingerprint, c.base, c.baseTip, c.baseSHA)
+	if err != nil {
+		return verified, err
+	}
+	if c.opts.Gate != "ci" || c.opts.TaskID == "" {
+		return verified, nil
+	}
+	if f.Workflow == nil {
+		return verified, errors.New("native hosted workflow verifier unavailable")
+	}
+	projection, err := f.Workflow(ctx, c.workflowRequest(nil))
+	if err != nil {
+		return verified, err
+	}
+	if projection.WorkflowSHA256 == "" || c.workflowSHA != "" && projection.WorkflowSHA256 != c.workflowSHA {
+		return verified, errors.New("hosted workflow changed during finalization")
+	}
+	if !c.opts.PartialDelivery && !projection.WouldCompleteAfterReady {
+		return verified, errors.New("hosted workflow is not eligible to complete the parent; use --partial-delivery")
+	}
+	if c.opts.PartialDelivery && len(projection.ReadyUnits) == 0 {
+		return verified, errors.New("hosted workflow has no eligible current unit for partial delivery")
+	}
+	c.workflowSHA = projection.WorkflowSHA256
+	return verified, nil
+}
+
+func (c *publicationCandidate) workflowRequest(status *collab.ProposalStatusResult) HostedWorkflowRequest {
+	return HostedWorkflowRequest{File: c.opts.WorkflowFile, SHA256: c.workflowSHA, BaseSHA: c.baseSHA,
+		HeadSHA: c.head, Fingerprint: c.fingerprint, RequiredChecks: c.policy.Verification.CIGate.Checks, Status: status}
+}
+
+func (c *publicationCandidate) promoteHosted(ctx context.Context, f Finalizer, status *collab.ProposalStatusResult) error {
+	if c.opts.TaskID == "" {
+		return nil
+	}
+	if _, err := c.recheck(ctx, f); err != nil {
+		return err
+	}
+	request := c.workflowRequest(status)
+	request.ProposalRef = status.Proposal.Ref
+	projection, err := f.Workflow(ctx, request)
+	if err != nil {
+		return err
+	}
+	if projection.WorkflowSHA256 != c.workflowSHA {
+		return errors.New("hosted workflow changed before ready promotion")
+	}
+	if !c.opts.PartialDelivery && !projection.OutcomeComplete {
+		return errors.New("hosted workflow remains incomplete; parent task was not transitioned")
+	}
+	if c.opts.PartialDelivery && len(projection.ReadyUnits) == 0 {
+		return errors.New("hosted workflow has no eligible current unit for partial delivery")
+	}
+	c.readyUnits = projection.ReadyUnits
+	return nil
 }
 
 func (f Finalizer) prepare(ctx context.Context, opts Options) (publicationCandidate, error) {
@@ -67,6 +124,12 @@ func (f Finalizer) optionsPolicy(opts Options) (Policy, error) {
 	if opts.Draft && (opts.VerificationFile != "" || opts.Gate != "" || opts.Proof != "") {
 		return Policy{}, errors.New("draft accepts no verification, gate or proof")
 	}
+	if opts.WorkflowFile != "" && opts.Gate != "ci" {
+		return Policy{}, errors.New("--workflow-file requires --gate ci")
+	}
+	if opts.Gate == "ci" && opts.TaskID != "" && opts.WorkflowFile == "" {
+		return Policy{}, errors.New("--gate ci with a parent task requires --workflow-file")
+	}
 	if !opts.Draft && (opts.VerificationFile == "") == (opts.Gate != "ci") {
 		return Policy{}, errors.New("ready publication needs exactly one of --verification-file or --gate ci")
 	}
@@ -74,8 +137,17 @@ func (f Finalizer) optionsPolicy(opts Options) (Policy, error) {
 	if err != nil {
 		return policy, err
 	}
-	if opts.Gate == "ci" && (len(policy.Verification.CIGate.Checks) == 0 || policy.Publication.Draft) {
-		return policy, errors.New("--gate ci requires named hosted checks and a ready publication policy")
+	if opts.Gate == "ci" {
+		if len(policy.Verification.CIGate.Checks) == 0 || policy.Publication.Draft {
+			return policy, errors.New("--gate ci requires named hosted checks and a ready publication policy")
+		}
+		seen := make(map[string]bool, len(policy.Verification.CIGate.Checks))
+		for _, name := range policy.Verification.CIGate.Checks {
+			if name == "" || seen[name] {
+				return policy, errors.New("--gate ci requires distinct nonempty hosted check names")
+			}
+			seen[name] = true
+		}
 	}
 	return policy, nil
 }
@@ -304,6 +376,9 @@ func (f Finalizer) upsertAndReadback(ctx context.Context, c *publicationCandidat
 	if err := validateProposal(upsert.Proposal, c.change, draft, c.opts.Title, c.body); err != nil {
 		return Result{}, err
 	}
+	if _, err := c.recheck(ctx, f); err != nil {
+		return Result{}, err
+	}
 	var status collab.ProposalStatusResult
 	if err := f.call(ctx, collab.ContractProposals, collab.OperationStatus, collab.ProposalRefInput{Ref: upsert.Proposal.Ref}, &status); err != nil {
 		return Result{}, err
@@ -324,10 +399,27 @@ func (f Finalizer) upsertAndReadback(ctx context.Context, c *publicationCandidat
 
 func (f Finalizer) publicationEvidence(ctx context.Context, c *publicationCandidate, request collab.ProposalUpsertInput, result *Result) error {
 	if c.opts.Gate == "ci" {
-		if err := f.waitHosted(ctx, c.opts, c.policy, request, result.ProposalRef, c.head, c.originalBody, c.fingerprint, c.base, c.baseTip, c.baseSHA); err != nil {
+		status, err := f.waitHosted(ctx, c, request, result.ProposalRef)
+		if err != nil {
+			return err
+		}
+		if err := c.promoteHosted(ctx, f, &status); err != nil {
 			return err
 		}
 		result.Gate = "hosted checks passed on " + c.head
+		result.WorkflowSHA256 = c.workflowSHA
+		result.ReadyUnits = c.readyUnits
+		if c.opts.TaskID != "" && len(c.readyUnits) > 0 {
+			receipt := &HostedWorkflowReceipt{
+				BaseSHA: c.baseSHA, HeadSHA: c.head, Fingerprint: c.fingerprint,
+				ProposalRef:    result.ProposalRef,
+				RequiredChecks: append([]string(nil), c.policy.Verification.CIGate.Checks...),
+				Status:         status,
+			}
+			receipt.Workflow.Path = c.opts.WorkflowFile
+			receipt.Workflow.SHA256 = c.workflowSHA
+			result.HostedWorkflowReceipt = receipt
+		}
 	} else if !c.opts.Draft {
 		proof, err := c.recheck(ctx, f)
 		if err != nil {
@@ -341,6 +433,9 @@ func (f Finalizer) publicationEvidence(ctx context.Context, c *publicationCandid
 func (f Finalizer) reviewProof(ctx context.Context, c *publicationCandidate, result Result) error {
 	if !operationSupported(c.proposalCaps, collab.OperationReview) {
 		return nil
+	}
+	if err := f.confirmHostedReady(ctx, c, result.ProposalRef); err != nil {
+		return err
 	}
 	if _, err := c.recheck(ctx, f); err != nil {
 		return err
@@ -377,6 +472,9 @@ func (f Finalizer) transitionTask(ctx context.Context, c *publicationCandidate, 
 			return errors.New("task lacks revision for transition precondition")
 		}
 	}
+	if err := f.confirmHostedReady(ctx, c, result.ProposalRef); err != nil {
+		return err
+	}
 	if _, err := c.recheck(ctx, f); err != nil {
 		return err
 	}
@@ -391,4 +489,25 @@ func (f Finalizer) transitionTask(ctx context.Context, c *publicationCandidate, 
 		return errors.New("task state readback failed")
 	}
 	return nil
+}
+
+func (f Finalizer) confirmHostedReady(ctx context.Context, c *publicationCandidate, ref collab.Ref) error {
+	if c.opts.Gate != "ci" {
+		return nil
+	}
+	if _, err := c.recheck(ctx, f); err != nil {
+		return err
+	}
+	var status collab.ProposalStatusResult
+	if err := f.call(ctx, collab.ContractProposals, collab.OperationStatus, collab.ProposalRefInput{Ref: ref}, &status); err != nil {
+		return err
+	}
+	if status.Proposal.Ref != ref || status.Proposal.Change.HeadCommit != c.head || status.Proposal.State != collab.ProposalStateOpen ||
+		hostedCheckVerdict(status.Checks, c.policy.Verification.CIGate.Checks, c.head) != "passing" {
+		return errors.New("hosted proposal or required checks changed before dependent publication")
+	}
+	if c.opts.TaskID == "" {
+		return nil
+	}
+	return c.promoteHosted(ctx, f, &status)
 }

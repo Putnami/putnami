@@ -466,6 +466,9 @@ func (r *verifyRun) workflowReadyReceipt(unit *jsObject, expectedBaseSHA string)
 	if err != nil {
 		failErr(err)
 	}
+	if hosted, ok := parsed.(*jsObject); ok && hosted.has("hostedWorkflowReceipt") {
+		return r.hostedWorkflowReadyReceipt(unit, hosted, expectedBaseSHA)
+	}
 	receipt := workflowObject(parsed, "workflow ready receipt",
 		[]string{"verdict", "stage", "assurance", "binding", "gateSession", "review", "limits"},
 		[]string{"verdict", "stage", "assurance", "binding", "gateSession", "review", "limits", "workflow"})

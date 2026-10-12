@@ -139,8 +139,12 @@ proposal ready, which starts the hosted checks, waits for every named check on
 the pushed commit, and returns the proposal to draft when one fails. It can
 wait up to `verification.ciGate.timeoutMinutes`, so run it in the background
 where the host bounds a command's duration; invoking it again keeps waiting.
-`--gate ci` is explicit and exclusive with `--verification-file`; the command
-has no automatic local gate mode.
+`--gate ci` is explicit and exclusive with `--verification-file`. When naming
+a parent task, pass `--workflow-file <immutable-workflow.json>`. Native
+preflight rejects an incomplete parent before publication unless partial delivery
+is explicit. Only exact required hosted checks on the current full HEAD can
+advance eligible current units to ready; later obligations remain incomplete.
+The command has no automatic local gate mode.
 Otherwise run the final gate with
 `--impacted --baseline <baseSHA> --enforce-coverage`, plus `--fix=false` when
 the policy's `flags` list it, or the broader all-project selection with the

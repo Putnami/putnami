@@ -123,6 +123,7 @@ How the pieces combine for one delivery:
 - `verification.ciGate` names `Putnami CI` as the hosted check that stands for
   the gate. When the machine's load ratio exceeds `0.7`, build selects
   `proposals finalize --gate ci` instead of running a local impacted gate;
+  a parent task requires `--workflow-file` and native completion eligibility before publication;
   native finalization waits for that check on the pushed commit. It never
   runs a local gate itself.
 

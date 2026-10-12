@@ -23,4 +23,8 @@ func TestFinalizeOptionsRejectsGateExecutionAndAmbiguousArguments(t *testing.T) 
 	if _, err := finalizeOptions([]string{"--body-file", "--draft"}); err == nil || !strings.Contains(err.Error(), "value") {
 		t.Fatalf("missing body value: %v", err)
 	}
+	hosted, err := finalizeOptions([]string{"--gate", "ci", "--workflow-file", ".context/workflow.json"})
+	if err != nil || hosted.Gate != "ci" || hosted.WorkflowFile != ".context/workflow.json" {
+		t.Fatalf("hosted workflow options=%+v err=%v", hosted, err)
+	}
 }

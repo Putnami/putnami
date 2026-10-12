@@ -21,6 +21,7 @@ type Options struct {
 	PartialDelivery  bool
 	Draft            bool
 	VerificationFile string
+	WorkflowFile     string
 	Gate             string
 	Proof            string
 }
@@ -37,23 +38,59 @@ type Verified struct {
 type Verify func(ctx context.Context, file, base string) (Verified, error)
 type Provider func(ctx context.Context, contract, operation string, input json.RawMessage) collab.Envelope
 
+// HostedWorkflow validates a native workflow projection for the current
+// candidate. Status is nil during read-only preflight, and is a provider
+// status read after hosted checks pass when establishing current ready units.
+type HostedWorkflowRequest struct {
+	File, SHA256, BaseSHA, HeadSHA, Fingerprint string
+	RequiredChecks                              []string
+	ProposalRef                                 collab.Ref
+	Status                                      *collab.ProposalStatusResult
+}
+type HostedWorkflowResult struct {
+	WorkflowSHA256                           string
+	WouldCompleteAfterReady, OutcomeComplete bool
+	ReadyUnits                               []string
+}
+type HostedWorkflow func(context.Context, HostedWorkflowRequest) (HostedWorkflowResult, error)
+
+// HostedWorkflowReceipt records the native provider status and local inputs
+// that can be checked again against the unchanged workflow file. It does not
+// claim readiness without a fresh native verification of those inputs.
+type HostedWorkflowReceipt struct {
+	Workflow struct {
+		Path   string `json:"path"`
+		SHA256 string `json:"sha256"`
+	} `json:"workflow"`
+	BaseSHA        string                      `json:"baseSHA"`
+	HeadSHA        string                      `json:"headSHA"`
+	Fingerprint    string                      `json:"fingerprint"`
+	ProposalRef    collab.Ref                  `json:"proposalRef"`
+	RequiredChecks []string                    `json:"requiredChecks"`
+	Status         collab.ProposalStatusResult `json:"status"`
+}
+
 type Finalizer struct {
-	Root   string
-	Git    Git
-	Verify Verify
-	Call   Provider
-	Wait   func(context.Context, time.Duration) error
-	Now    func() time.Time
+	Root     string
+	Git      Git
+	Verify   Verify
+	Workflow HostedWorkflow
+	Call     Provider
+	Wait     func(context.Context, time.Duration) error
+	Now      func() time.Time
 }
 
 type Result struct {
-	ProposalRef       collab.Ref           `json:"proposalRef"`
-	ProposalURL       string               `json:"proposalUrl,omitempty"`
-	HeadSHA           string               `json:"headSHA"`
-	State             collab.ProposalState `json:"state"`
-	Gate              string               `json:"gate,omitempty"`
-	LabelsVerified    bool                 `json:"labelsVerified"`
-	AssigneesVerified bool                 `json:"assigneesVerified"`
+	ProposalRef           collab.Ref             `json:"proposalRef"`
+	ProposalURL           string                 `json:"proposalUrl,omitempty"`
+	HeadSHA               string                 `json:"headSHA"`
+	State                 collab.ProposalState   `json:"state"`
+	Gate                  string                 `json:"gate,omitempty"`
+	WorkflowSHA256        string                 `json:"workflowSHA256,omitempty"`
+	ReadyUnits            []string               `json:"readyUnits,omitempty"`
+	HostedWorkflowReceipt *HostedWorkflowReceipt `json:"hostedWorkflowReceipt,omitempty"`
+	LabelsVerified        bool                   `json:"labelsVerified"`
+	AssigneesVerified     bool                   `json:"assigneesVerified"`
 }
 
 func (f Finalizer) call(ctx context.Context, contract, operation string, input any, output any) error {
@@ -115,14 +152,14 @@ func precondition(c collab.Capabilities, operation string) bool {
 	return false
 }
 
-func (f Finalizer) verify(ctx context.Context, opts Options, fingerprint, head, baseSHA string) (Verified, error) {
+func (f Finalizer) verify(ctx context.Context, opts Options, fingerprint, head, baseSHA, baseRef string) (Verified, error) {
 	if opts.Draft || opts.Gate == "ci" {
 		return Verified{}, nil
 	}
 	if f.Verify == nil {
 		return Verified{}, errors.New("native dossier verifier unavailable")
 	}
-	result, err := f.Verify(ctx, opts.VerificationFile, opts.Base)
+	result, err := f.Verify(ctx, opts.VerificationFile, baseRef)
 	if err != nil {
 		return result, err
 	}
@@ -187,7 +224,7 @@ func (f Finalizer) frozen(ctx context.Context, opts Options, originalBody []byte
 	if string(currentBody) != string(originalBody) {
 		return Verified{}, errors.New("body file changed during finalization")
 	}
-	return f.verify(ctx, opts, fingerprint, head, baseSHA)
+	return f.verify(ctx, opts, fingerprint, head, baseSHA, baseRef)
 }
 
 func (f Finalizer) Run(ctx context.Context, opts Options) (Result, error) {
@@ -277,83 +314,95 @@ func waitContext(ctx context.Context, interval time.Duration) error {
 	}
 }
 
-func (f Finalizer) waitHosted(ctx context.Context, opts Options, policy Policy, request collab.ProposalUpsertInput, ref collab.Ref, head string, originalBody []byte, fingerprint, baseRef, baseTip, baseSHA string) error {
-	deadline := f.Now().Add(time.Duration(policy.Verification.CIGate.TimeoutMinutes) * time.Minute)
+func (f Finalizer) waitHosted(ctx context.Context, c *publicationCandidate, request collab.ProposalUpsertInput, ref collab.Ref) (collab.ProposalStatusResult, error) {
+	deadline := f.Now().Add(time.Duration(c.policy.Verification.CIGate.TimeoutMinutes) * time.Minute)
 	for {
+		if _, err := c.recheck(ctx, f); err != nil {
+			return collab.ProposalStatusResult{}, err
+		}
 		var status collab.ProposalStatusResult
 		if err := f.call(ctx, collab.ContractProposals, collab.OperationStatus, collab.ProposalRefInput{Ref: ref}, &status); err != nil {
-			return err
+			return status, err
 		}
-		if status.Proposal.Ref != ref || status.Proposal.Change.HeadCommit != head {
-			return errors.New("hosted check proposal head changed")
+		if status.Proposal.Ref != ref || status.Proposal.Change.HeadCommit != c.head || status.Proposal.State != collab.ProposalStateOpen {
+			return status, errors.New("hosted check proposal identity, head or open state changed")
 		}
-		verdict := hostedCheckVerdict(status.Checks, policy.Verification.CIGate.Checks, head)
+		verdict := hostedCheckVerdict(status.Checks, c.policy.Verification.CIGate.Checks, c.head)
 		switch verdict {
 		case "passing":
-			return nil
+			if _, err := c.recheck(ctx, f); err != nil {
+				return status, err
+			}
+			return status, nil
 		case "failing", "unsupported":
-			if _, err := f.frozen(ctx, opts, originalBody, head, fingerprint, baseRef, baseTip, baseSHA); err != nil {
-				return err
+			if _, err := c.recheck(ctx, f); err != nil {
+				return status, err
 			}
 			request.Draft = new(bool)
 			*request.Draft = true
 			request.ExpectedRevision = status.Proposal.Revision
 			if request.ExpectedRevision == "" {
-				return errors.New("proposal lacks revision for return-to-draft precondition")
+				return status, errors.New("proposal lacks revision for return-to-draft precondition")
 			}
 			var returned collab.ProposalUpsertResult
 			if err := f.call(ctx, collab.ContractProposals, collab.OperationUpsert, request, &returned); err != nil {
-				return fmt.Errorf("hosted checks %s; return to draft: %w", verdict, err)
+				return status, fmt.Errorf("hosted checks %s; return to draft: %w", verdict, err)
 			}
 			if err := validateProposal(returned.Proposal, request.Change, true, request.Title, request.Body); err != nil {
-				return err
+				return status, err
 			}
 			var readback collab.ProposalStatusResult
 			if err := f.call(ctx, collab.ContractProposals, collab.OperationStatus, collab.ProposalRefInput{Ref: ref}, &readback); err != nil {
-				return err
+				return status, err
 			}
 			if err := validateProposal(readback.Proposal, request.Change, true, request.Title, request.Body); err != nil {
-				return err
+				return status, err
 			}
-			return fmt.Errorf("hosted checks %s; proposal returned to draft", verdict)
+			return status, fmt.Errorf("hosted checks %s; proposal returned to draft", verdict)
 		}
 		if !f.Now().Before(deadline) {
-			return errors.New("hosted checks pending at timeout; resume finalization to continue waiting")
+			return status, errors.New("hosted checks pending at timeout; resume finalization to continue waiting")
 		}
-		if err := f.Wait(ctx, time.Duration(policy.Verification.CIGate.PollSeconds)*time.Second); err != nil {
-			return err
+		if err := f.Wait(ctx, time.Duration(c.policy.Verification.CIGate.PollSeconds)*time.Second); err != nil {
+			return status, err
 		}
 	}
 }
 
 func hostedCheckVerdict(checks collab.Checks, names []string, head string) string {
-	if checks.State == collab.ChecksStateUnsupported {
+	if len(names) == 0 {
 		return "unsupported"
 	}
 	if checks.Commit != head {
 		return "pending"
 	}
 	allPassing := true
+	seen := map[string]bool{}
 	for _, name := range names {
-		passing, pending, failing := false, false, false
+		if name == "" || seen[name] {
+			return "unsupported"
+		}
+		seen[name] = true
+		count := 0
+		var state collab.CheckState
 		for _, check := range checks.Items {
 			if check.Name == name {
-				switch check.State {
-				case collab.CheckStatePassing:
-					passing = true
-				case collab.CheckStatePending:
-					pending = true
-				case collab.CheckStateFailing:
-					failing = true
-				}
+				count++
+				state = check.State
 			}
 		}
-		if passing {
+		if count > 1 {
+			return "failing"
+		}
+		if count == 0 {
+			allPassing = false
 			continue
 		}
-		allPassing = false
-		if !pending && failing {
+		if state == collab.CheckStateFailing {
 			return "failing"
+		}
+		if state != collab.CheckStatePassing {
+			allPassing = false
 		}
 	}
 	if allPassing {

@@ -938,12 +938,19 @@ the opaque source/ID pair, never a concatenated display string. A task receipt
 or local task record for the handoff unit must also appear in its exact
 `handoff.inputs`.
 `--record` can establish `ready` for a current unit at `candidate` without a
-digest cycle. To resume a unit already at `ready`, its `receipt: ref` must
-point to the unchanged JSON output of a prior successful `tree verify
---record` call. The verifier requires that output's native ready verdict,
+digest cycle. Hosted `proposals finalize --gate ci --workflow-file` can also
+establish it after the policy-named checks pass on the exact full HEAD. To
+resume a unit already at `ready`, its `receipt: ref` points to the unchanged
+JSON output of either a prior successful `tree verify --record` call or that
+hosted finalizer. The local receipt requires the native ready verdict,
 assurance, exact current tree fingerprint and full HEAD, and the same dossier
-base when verifying a new dossier. A standalone `--workflow` call checks the
-receipt but still only projects progress; it cannot issue a ready verdict.
+base when verifying a new dossier. The hosted receipt carries the original
+workflow path and digest, base, HEAD, fingerprint, proposal reference, named
+checks, and native proposal status. The verifier replays the hosted check
+against the unchanged original workflow; write a later workflow revision to a
+different path to preserve that original. Overwriting it invalidates the
+receipt. A standalone `--workflow` call checks either receipt but still only
+projects progress; it cannot issue a ready verdict.
 Current native requirements, stages, decisions, and dependencies are checked
 again, so an earlier generic ready receipt cannot cover missing unit proof.
 A `merged` claim needs a matching native `proposals status`
@@ -1059,6 +1066,9 @@ returns the shared CLI result envelope with the capacity sample in `data`.
 When a proposals provider is configured, `putnami proposals finalize --help`
 shows the local publication command's flags. `--verification-file` reads the
 current dossier, `--gate ci` waits for policy-named hosted checks, and
+`--workflow-file` supplies an immutable native workflow and is required for
+hosted publication naming a parent task. Native eligibility is checked before
+publication, and exact required checks can advance eligible current units.
 `--partial-delivery` preserves an incomplete parent task. The command does not
 add a provider operation or run another local gate.
 

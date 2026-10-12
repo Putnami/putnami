@@ -51,13 +51,14 @@ func (g *finalizerGit) Push(string) error {
 func (g *finalizerGit) Fingerprint() (string, error) { return g.fingerprint, nil }
 
 type finalizerProvider struct {
-	proposal                      collab.Proposal
-	task                          collab.Task
-	checks                        collab.Checks
-	proposalRepository            string
-	upserts, transitions, reviews int
-	unresolved                    bool
-	dropLabels                    bool
+	proposal                                   collab.Proposal
+	task                                       collab.Task
+	checks                                     collab.Checks
+	proposalRepository                         string
+	upserts, transitions, reviews, statusReads int
+	unresolved                                 bool
+	dropLabels                                 bool
+	statusHook                                 func(*collab.Proposal)
 }
 
 func (p *finalizerProvider) call(_ context.Context, contract, operation string, input json.RawMessage) collab.Envelope {
@@ -114,7 +115,11 @@ func (p *finalizerProvider) call(_ context.Context, contract, operation string, 
 		}
 		return answer(collab.ProposalUpsertResult{Proposal: p.proposal})
 	case "proposals.status":
+		p.statusReads++
 		read := p.proposal
+		if p.statusHook != nil {
+			p.statusHook(&read)
+		}
 		if p.dropLabels {
 			read.Labels = nil
 		}
@@ -228,6 +233,21 @@ func TestCurrentProofAndReadbackGuardWrites(t *testing.T) {
 	}
 }
 
+func TestDossierUsesResolvedRemoteBase(t *testing.T) {
+	f, git, _, opts := finalizerFixture(t)
+	var verifiedBase string
+	f.Verify = func(_ context.Context, _ string, base string) (Verified, error) {
+		verifiedBase = base
+		return Verified{Fingerprint: git.fingerprint, HeadSHA: git.head, BaseSHA: git.baseSHA, GateSession: "session-id"}, nil
+	}
+	if _, err := f.Run(context.Background(), opts); err != nil {
+		t.Fatal(err)
+	}
+	if verifiedBase != "origin/main" {
+		t.Fatalf("dossier saw %q, expected the resolved remote base origin/main", verifiedBase)
+	}
+}
+
 func TestExplicitHostedChecksUseNoLocalVerifierAndReturnFailedProposalToDraft(t *testing.T) {
 	spectest.Proves(t, "cli/contributor-workflows", "provider-neutral-publication", "an-explicit-hosted-gate-waits-without-local-execution")
 	f, git, provider, opts := finalizerFixture(t)
@@ -245,6 +265,149 @@ func TestExplicitHostedChecksUseNoLocalVerifierAndReturnFailedProposalToDraft(t 
 		Items: []collab.Check{{Name: "Putnami CI", State: collab.CheckStateFailing}}}
 	if _, err := f.Run(context.Background(), opts); err == nil || provider.proposal.State != collab.ProposalStateDraft {
 		t.Fatalf("failing hosted checks did not restore draft: state=%s err=%v", provider.proposal.State, err)
+	}
+}
+
+func TestHostedParentRequiresNativeWorkflowEligibilityAndStatus(t *testing.T) {
+	spectest.Proves(t, "cli/contributor-workflows", "squash-ready-publication", "hosted-parent-workflow-completeness")
+	f, git, provider, opts := finalizerFixture(t)
+	opts.Gate, opts.VerificationFile, opts.WorkflowFile = "ci", "", ".context/workflow.json"
+	opts.TaskSource, opts.TaskID = provider.task.Ref.Source, provider.task.Ref.ID
+	provider.checks = collab.Checks{State: collab.ChecksStatePassing, Commit: git.head,
+		Items: []collab.Check{{Name: "Putnami CI", State: collab.CheckStatePassing}}}
+	opts.WorkflowFile = ""
+	if _, err := f.Run(context.Background(), opts); err == nil || git.pushes != 0 {
+		t.Fatalf("hosted parent without workflow reached a write: %v", err)
+	}
+	opts.WorkflowFile = ".context/workflow.json"
+	if _, err := f.Run(context.Background(), opts); err == nil || git.pushes != 0 {
+		t.Fatalf("missing native workflow verifier reached a write: %v", err)
+	}
+	before, after := 0, 0
+	eligible := false
+	readyUnits := []string{"current"}
+	f.Workflow = func(_ context.Context, request HostedWorkflowRequest) (HostedWorkflowResult, error) {
+		if request.File != opts.WorkflowFile || request.HeadSHA != git.head || request.BaseSHA != git.baseSHA || request.Fingerprint != git.fingerprint {
+			t.Fatalf("workflow binding %+v", request)
+		}
+		if request.Status == nil {
+			before++
+		} else {
+			after++
+			if request.ProposalRef != provider.proposal.Ref || request.Status.Proposal.Ref != provider.proposal.Ref {
+				t.Fatalf("provider status was not bound to the proposal: %+v", request)
+			}
+		}
+		return HostedWorkflowResult{WorkflowSHA256: "workflow-sha", WouldCompleteAfterReady: eligible,
+			OutcomeComplete: eligible && request.Status != nil, ReadyUnits: readyUnits}, nil
+	}
+	if _, err := f.Run(context.Background(), opts); err == nil || git.pushes != 0 || provider.upserts != 0 {
+		t.Fatalf("incomplete parent reached publication: %v", err)
+	}
+	opts.PartialDelivery = true
+	readyUnits = nil
+	if _, err := f.Run(context.Background(), opts); err == nil || git.pushes != 0 || provider.upserts != 0 {
+		t.Fatalf("partial hosted workflow without an eligible unit reached publication: %v", err)
+	}
+	opts.PartialDelivery = false
+	readyUnits = []string{"current"}
+	eligible = true
+	result, err := f.Run(context.Background(), opts)
+	if err != nil || provider.transitions != 1 || before < 2 || after != 2 || result.WorkflowSHA256 != "workflow-sha" || len(result.ReadyUnits) != 1 || result.HostedWorkflowReceipt == nil {
+		t.Fatalf("hosted parent status was not promoted: result=%+v err=%v before=%d after=%d", result, err, before, after)
+	}
+	receipt := result.HostedWorkflowReceipt
+	if receipt.Workflow.Path != opts.WorkflowFile || receipt.Workflow.SHA256 != "workflow-sha" ||
+		receipt.BaseSHA != git.baseSHA || receipt.HeadSHA != git.head || receipt.Fingerprint != git.fingerprint ||
+		receipt.ProposalRef != provider.proposal.Ref || receipt.Status.Proposal.Ref != provider.proposal.Ref ||
+		len(receipt.RequiredChecks) != 1 || receipt.RequiredChecks[0] != "Putnami CI" {
+		t.Fatalf("hosted receipt lost native binding or provider status: %+v", receipt)
+	}
+	git.pushes = 0
+	provider.upserts = 0
+	provider.transitions = 0
+	before, after = 0, 0
+	changing := false
+	git.pushHook = func() { changing = true }
+	f.Workflow = func(_ context.Context, request HostedWorkflowRequest) (HostedWorkflowResult, error) {
+		sha := "first"
+		if changing {
+			sha = "changed"
+		}
+		return HostedWorkflowResult{WorkflowSHA256: sha, WouldCompleteAfterReady: true}, nil
+	}
+	if _, err := f.Run(context.Background(), opts); err == nil || git.pushes != 1 || provider.upserts != 0 || provider.transitions != 0 {
+		t.Fatalf("changed workflow reached provider write: %v", err)
+	}
+}
+
+func TestHostedPolicyRejectsDuplicateChecksBeforeWrite(t *testing.T) {
+	f, git, provider, opts := finalizerFixture(t)
+	opts.Gate, opts.VerificationFile = "ci", ""
+	path := filepath.Join(f.Root, "putnami.workspace.json")
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, names := range []string{`["Putnami CI","Putnami CI"]`, `["Putnami CI",""]`} {
+		bad := strings.Replace(string(contents), `["Putnami CI"]`, names, 1)
+		if err := os.WriteFile(path, []byte(bad), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.Run(context.Background(), opts); err == nil || git.pushes != 0 || provider.upserts != 0 {
+			t.Fatalf("invalid hosted check policy reached write: names=%s err=%v", names, err)
+		}
+	}
+}
+
+func TestHostedPartialPromotesOnlyCurrentUnitsAndKeepsParentOpen(t *testing.T) {
+	f, git, provider, opts := finalizerFixture(t)
+	opts.Gate, opts.VerificationFile, opts.WorkflowFile = "ci", "", ".context/workflow.json"
+	opts.TaskSource, opts.TaskID, opts.PartialDelivery = provider.task.Ref.Source, provider.task.Ref.ID, true
+	provider.checks = collab.Checks{Commit: git.head,
+		Items: []collab.Check{{Name: "Putnami CI", State: collab.CheckStatePassing}}}
+	f.Workflow = func(_ context.Context, request HostedWorkflowRequest) (HostedWorkflowResult, error) {
+		return HostedWorkflowResult{WorkflowSHA256: "frozen-workflow", ReadyUnits: []string{"current"}}, nil
+	}
+	result, err := f.Run(context.Background(), opts)
+	if err != nil || provider.transitions != 0 || result.State != collab.ProposalStateOpen ||
+		len(result.ReadyUnits) != 1 || result.ReadyUnits[0] != "current" || result.HostedWorkflowReceipt == nil {
+		t.Fatalf("partial hosted publication changed parent or lost current unit: result=%+v task=%s err=%v", result, provider.task.State, err)
+	}
+	if strings.Contains(provider.proposal.Body, "Closes ") {
+		t.Fatalf("partial publication has closing directive: %s", provider.proposal.Body)
+	}
+}
+
+func TestHostedRequiredCheckNamesFailClosed(t *testing.T) {
+	head := strings.Repeat("a", 40)
+	checks := collab.Checks{Commit: head, State: collab.ChecksStateFailing,
+		Items: []collab.Check{{Name: "required", State: collab.CheckStatePassing}, {Name: "unrelated", State: collab.CheckStateFailing}}}
+	if got := hostedCheckVerdict(checks, []string{"required"}, head); got != "passing" {
+		t.Fatalf("unrelated failure masked required check: %s", got)
+	}
+	checks.Items = append(checks.Items, collab.Check{Name: "required", State: collab.CheckStateFailing})
+	if got := hostedCheckVerdict(checks, []string{"required"}, head); got != "failing" {
+		t.Fatalf("duplicate mixed check passed: %s", got)
+	}
+	if got := hostedCheckVerdict(checks, []string{"required", "required"}, head); got != "unsupported" {
+		t.Fatalf("duplicate policy check passed: %s", got)
+	}
+}
+
+func TestHostedChecksRejectProposalThatReturnsToDraft(t *testing.T) {
+	f, git, provider, opts := finalizerFixture(t)
+	opts.Gate, opts.VerificationFile = "ci", ""
+	provider.checks = collab.Checks{Commit: git.head,
+		Items: []collab.Check{{Name: "Putnami CI", State: collab.CheckStatePassing}}}
+	provider.statusHook = func(proposal *collab.Proposal) {
+		if provider.statusReads > 1 {
+			proposal.State = collab.ProposalStateDraft
+		}
+	}
+	if _, err := f.Run(context.Background(), opts); err == nil || provider.upserts != 1 || provider.transitions != 0 || provider.reviews != 0 {
+		t.Fatalf("draft proposal accepted hosted proof: upserts=%d transitions=%d reviews=%d err=%v",
+			provider.upserts, provider.transitions, provider.reviews, err)
 	}
 }
 

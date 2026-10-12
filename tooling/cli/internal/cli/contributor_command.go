@@ -87,7 +87,7 @@ func finalizeOptions(args []string) (proposals.Options, error) {
 				options.PartialDelivery = true
 			}
 			continue
-		case "--base", "--branch", "--title", "--body-file", "--task-source", "--task-id", "--verification-file", "--gate", "--proof":
+		case "--base", "--branch", "--title", "--body-file", "--task-source", "--task-id", "--verification-file", "--workflow-file", "--gate", "--proof":
 		default:
 			return options, fmt.Errorf("unexpected finalize argument %q", raw)
 		}
@@ -123,6 +123,8 @@ func finalizeOptions(args []string) (proposals.Options, error) {
 			options.TaskID = value
 		case "--verification-file":
 			options.VerificationFile = value
+		case "--workflow-file":
+			options.WorkflowFile = value
 		case "--gate":
 			options.Gate = value
 		case "--proof":
@@ -133,7 +135,7 @@ func finalizeOptions(args []string) (proposals.Options, error) {
 }
 
 func printFinalizeHelp(w io.Writer) {
-	iox.Fprintln(w, "  finalize --base BRANCH --branch BRANCH --title TITLE --body-file FILE [--task-source SOURCE --task-id ID] [--partial-delivery] [--draft | --verification-file DOSSIER | --gate ci] [--proof TEXT]")
+	iox.Fprintln(w, "  finalize --base BRANCH --branch BRANCH --title TITLE --body-file FILE [--task-source SOURCE --task-id ID] [--partial-delivery] [--draft | --verification-file DOSSIER | --gate ci --workflow-file WORKFLOW] [--proof TEXT]")
 	iox.Fprintln(w, "    Publish a draft or a clean committed proposal with current native proof; --gate ci waits for policy-named hosted checks. The command runs no local gate.")
 }
 
@@ -171,6 +173,23 @@ func nativeDossierVerify(root string) proposals.Verify {
 	}
 }
 
+func nativeHostedWorkflowVerify(root string) proposals.HostedWorkflow {
+	return func(ctx context.Context, request proposals.HostedWorkflowRequest) (proposals.HostedWorkflowResult, error) {
+		verifier := treecmd.Verifier{Dir: root, RecoverReport: engine.VerifyCachedVerificationReport}
+		projection, err := verifier.CheckHostedWorkflow(ctx, treecmd.HostedWorkflowRequest{
+			File: request.File, SHA256: request.SHA256, BaseSHA: request.BaseSHA,
+			HeadSHA: request.HeadSHA, Fingerprint: request.Fingerprint, ProposalRef: request.ProposalRef,
+			RequiredChecks: request.RequiredChecks, Status: request.Status,
+		})
+		if err != nil {
+			return proposals.HostedWorkflowResult{}, err
+		}
+		return proposals.HostedWorkflowResult{WorkflowSHA256: projection.WorkflowSHA256,
+			WouldCompleteAfterReady: projection.WouldCompleteAfterReady, OutcomeComplete: projection.OutcomeComplete,
+			ReadyUnits: projection.ReadyUnits}, nil
+	}
+}
+
 func (a *App) runFinalizeCommand(ctx context.Context, parsed *ParsedArgs, cfg *wsproto.Config,
 	root string, discovered []*extension.ExtensionDescription, stdout, stderr io.Writer) int {
 	if selection := collaborationSelectionFlags(parsed.Global); selection != "" {
@@ -183,7 +202,7 @@ func (a *App) runFinalizeCommand(ctx context.Context, parsed *ParsedArgs, cfg *w
 		return ExitUsage
 	}
 	providers, unavailable := collaborationProviders(ctx, root, cfg, discovered)
-	f := proposals.Finalizer{Root: root, Verify: nativeDossierVerify(root), Call: func(ctx context.Context, contract, operation string, input json.RawMessage) collab.Envelope {
+	f := proposals.Finalizer{Root: root, Verify: nativeDossierVerify(root), Workflow: nativeHostedWorkflowVerify(root), Call: func(ctx context.Context, contract, operation string, input json.RawMessage) collab.Envelope {
 		return mcp.CallProviderOperation(ctx, mcp.ProviderEnvironment{WorkspaceRoot: root,
 			Extensions: providers, Unavailable: unavailable, AttachView: cliWorkspaceView(root)}, contract, operation, input)
 	}}

@@ -96,3 +96,11 @@ These records provide traceable local coordination, not a trusted authorship
 service. The CLI checks structure and bindings; independent reviewers judge
 semantic scope coverage and material decisions. A local checkpoint that was
 not transferred cannot promise another workspace a working asset.
+
+Hosted publication with a parent task requires its exact `--workflow-file`.
+Native preflight checks whether the outcome can complete after eligible current
+units reach ready; partial delivery preserves pending later obligations. Exact
+policy-named checks on the same full HEAD produce a `hostedWorkflowReceipt`.
+Keep its original workflow file immutable and append a new stage-ready revision
+using the native publisher result as the receipt. Native replay checks the
+original inputs and provider status; a rewritten original or stale tree fails.

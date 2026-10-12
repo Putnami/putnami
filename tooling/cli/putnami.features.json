@@ -2575,8 +2575,9 @@
               "a-draft-opens-before-the-first-edit",
               "the-body-is-the-squash-message",
               "no-publication-names-an-agent",
-              "an-explicit-hosted-gate-waits-without-local-execution"
-            ]
+              "an-explicit-hosted-gate-waits-without-local-execution",
+              "hosted-parent-workflow-completeness"
+]
           }
         },
         {
@@ -2590,8 +2591,9 @@
               "native-requirement-check-coverage",
               "relevant-artifact-invalidation",
               "delivery-receipts-and-parent-completeness",
-              "experiment-and-handoff-inputs"
-            ]
+              "experiment-and-handoff-inputs",
+              "hosted-workflow-readiness-bound-to-required-checks"
+]
           }
         },
         {

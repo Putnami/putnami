@@ -45,11 +45,11 @@
     },
     {
       "id": "squash-ready-publication",
-      "text": "A proposal opens as a draft before edits without a gate; an empty seed contains the title only. Its title/body form the squash message. Native finalization checks paragraph/body limits, English and attribution, posting proof as a comment. Build selects one final local or hosted gate from policy/load. The finalizer reuses the supplied native proof or waits for explicit named hosted checks on the pushed HEAD, returning to draft on failure."
+      "text": "Build selects one final local or hosted gate after independent review. Native publication consumes a current dossier or explicitly waits for named hosted checks, never executes local gates and reuses current proof at each boundary. Hosted parent publication requires an immutable workflow and native completion eligibility; incomplete parents need partial delivery. Exact hosted proof can advance eligible current units, preserves later obligations and yields a replayable native receipt."
     },
     {
       "id": "native-workflow-validation",
-      "text": "The local workflow binds Git-tracked native manifests/specs and safe exact refs. Real native checks and corroborated cache provenance establish acceptance. Attained stages satisfy earlier required stages only with valid receipts. Current nonsuperseded material artifacts need challenge; later artifacts do not block current readiness. Original findings, entry conditions, experiment limits, decisions and handoffs remain visible. Progress grants no authority."
+      "text": "The native verifier checks tracked, safe feature/spec sources, complete requirement/check coverage, units, stage entry/exit contracts, preserved challenges and native producer provenance. Reached stages are monotonic; current-unit readiness ignores superseded or later artifacts. Hosted ready needs exact policy-named provider checks on the same head and tree; native replay preserves the original workflow. Pending, blocked, stale, missing and unsupported states remain visible."
     },
     {
       "id": "canonical-consumer-migration",

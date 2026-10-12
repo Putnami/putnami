@@ -20,7 +20,8 @@ func TestLanguageSignalsAndExclusions(t *testing.T) {
 	}{
 		{"Nous corrigons le code", true},
 		{"corrige le parseur des tableaux", true},
-		{"école naïve", true},
+		{"école café", true},
+		{"An English naïve example", false},
 		{"Des Moines", false},
 		{"The RGPD and CNIL review `nous avec`\n```\nnous avec\n```", false},
 		{"Use --avec on the command line", false},

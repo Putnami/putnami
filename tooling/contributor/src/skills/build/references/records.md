@@ -124,6 +124,24 @@ requires an explicit `authority` and an approval reference in `resolution`.
 Missing required gate, qualification or acceptance cannot be waived this way.
 Original reports remain intact when the projection shows a later resolution.
 
+## Hosted ready receipts
+
+Hosted finalization naming a parent requires `--workflow-file` with the exact
+current workflow. Native preflight validates completion eligibility before
+publication. After every policy-named check succeeds on the same full HEAD, the
+native publisher emits `hostedWorkflowReceipt`: original workflow ref, binding,
+proposal ref, required checks and raw provider status. It can advance eligible
+current units; pending later requirements and decisions still prevent full
+completion. A generic passing check never supplies that authority.
+
+Keep the original workflow file immutable and create a new revision when
+recording `stage: "ready"` with the publisher result as the unit receipt. The
+reader replays native validation against the preserved original record and exact
+provider checks. Overwriting the original file or changing its inputs makes the
+receipt stale. This local receipt is not authenticated author identity or
+deployment proof. Standalone `--workflow` without a supported receipt remains
+progress-only.
+
 ## What is computed, and what is declared
 
 The checker compares current tree and policy hashes, exact file coverage,
