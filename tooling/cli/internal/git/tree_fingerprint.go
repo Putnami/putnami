@@ -30,10 +30,9 @@ import (
 // set of changes.
 //
 // This is the ONE implementation. `putnami tree fingerprint` prints it and
-// recorded sessions carry it (protocol cli.SessionTree); the fix skill's
-// tree-fingerprint.sh is a thin caller of that command rather than a second copy
-// of the calculation, because two agents comparing fingerprints computed by two
-// implementations compare nothing.
+// recorded sessions carry it (protocol cli.SessionTree); skills call that
+// command rather than keep a second copy of the calculation, because two agents
+// comparing fingerprints computed by two implementations compare nothing.
 type TreeFingerprint struct {
 	// Fingerprint is the lowercase hex sha256 of the canonical stream below.
 	Fingerprint string

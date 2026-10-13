@@ -27,7 +27,7 @@ jq '.options["@putnami/contributor"] // {}' putnami.workspace.json
 | `verification.language` | none | check, proposals finalize | `en` runs the English-only detector on everything a change publishes; absent, no language rule is enforced. |
 | `verification.documentation` | `[]` | check | Documentation roots a user-facing change must update, besides each project's `doc/`. |
 | `verification.ciGate.checks` | `[]` | build, proposals finalize | Names of the hosted checks that stand for the gate. Empty, build runs the gate locally before finalization. |
-| `verification.ciGate.load` | `0.7` | build, proposals finalize | Load ratio (one-minute load average divided by CPUs) above which build selects the hosted gate. |
+| `verification.ciGate.load` | `0.7` | build | Load ratio (one-minute load average divided by CPUs) above which build selects the hosted gate. |
 | `verification.ciGate.timeoutMinutes` | `60` | proposals finalize | How long the command waits for the hosted checks before it stops; invoking it again keeps waiting. |
 | `verification.ciGate.pollSeconds` | `30` | proposals finalize | Interval between two reads of the hosted checks. |
 | `publication.draft` | `false` | proposals finalize | Keep proposals as drafts at finalization. Every proposal opens as a draft (`--draft`) whatever this says. |

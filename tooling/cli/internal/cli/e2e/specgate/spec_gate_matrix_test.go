@@ -1,6 +1,8 @@
 package specgate
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
@@ -704,6 +707,23 @@ func TestSpecGateEvidenceScope_EndToEnd(t *testing.T) {
 		if len(group.Reports) != 1 || !group.Reports[0].Restored ||
 			group.Reports[0].Project != "/library" {
 			t.Fatalf("report refs = %+v, want one restored reference to /library", group.Reports)
+		}
+		// `tree verify --workflow` corroborates this restored reference through
+		// the same native cache bridge: the real store must answer its bytes,
+		// and a reference whose digest the store does not hold must fail.
+		restored := group.Reports[0]
+		data, err := engine.VerifyCachedVerificationReport(wsRoot, restored)
+		if err != nil {
+			t.Fatalf("the native cache bridge rejected a restored report: %v", err)
+		}
+		sum := sha256.Sum256(data)
+		if digest := "sha256:" + hex.EncodeToString(sum[:]); digest != restored.Digest {
+			t.Fatalf("the native cache bridge answered digest %s, want %s", digest, restored.Digest)
+		}
+		forged := restored
+		forged.Digest = "sha256:" + strings.Repeat("0", 64)
+		if _, err := engine.VerifyCachedVerificationReport(wsRoot, forged); err == nil {
+			t.Fatal("the native cache bridge accepted a restored report whose digest the store does not hold")
 		}
 	})
 

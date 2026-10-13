@@ -10,6 +10,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	collab "go.putnami.dev/protocol/collaboration"
 )
@@ -539,9 +540,7 @@ func (f Finalizer) transitionTask(ctx context.Context, c *publicationCandidate, 
 	if result.ProposalURL == "" {
 		reason = "Proposal " + result.ProposalRef.Source + "/" + result.ProposalRef.ID + " published for review"
 	}
-	if len(reason) > 256 {
-		reason = reason[:256]
-	}
+	reason = truncateUTF8(reason, 256)
 	transition := collab.TaskTransitionInput{Ref: c.task.Ref, State: c.policy.States.Delivered, Reason: reason}
 	if precondition(c.taskCaps, collab.OperationTransition) {
 		transition.ExpectedRevision = current.Task.Revision
@@ -587,4 +586,15 @@ func (f Finalizer) confirmHostedReady(ctx context.Context, c *publicationCandida
 		return nil
 	}
 	return c.promoteHosted(ctx, f, &status)
+}
+
+// truncateUTF8 cuts text to at most limit bytes without splitting a character.
+func truncateUTF8(text string, limit int) string {
+	if len(text) <= limit {
+		return text
+	}
+	for limit > 0 && !utf8.RuneStart(text[limit]) {
+		limit--
+	}
+	return text[:limit]
 }

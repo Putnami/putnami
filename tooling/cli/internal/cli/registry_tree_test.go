@@ -65,8 +65,8 @@ func runTree(t *testing.T, env *CommandEnv) (string, error) {
 	return captured, err
 }
 
-// TestCmdTreeFingerprintNeedsNoWorkspace is the property the fix skill's script
-// depends on: the digest is a pure git operation, and the script fingerprints
+// TestCmdTreeFingerprintNeedsNoWorkspace is the property the build skill
+// depends on: the digest is a pure git operation, and the skill fingerprints
 // throwaway repositories that carry no putnami.json. WsRoot is deliberately
 // empty here — a handler that required a workspace would fail this outright.
 func TestCmdTreeFingerprintNeedsNoWorkspace(t *testing.T) {

@@ -386,25 +386,23 @@ func hostedCheckVerdict(checks collab.Checks, names []string, head string) strin
 			return "unsupported"
 		}
 		seen[name] = true
+		// A provider can report one name more than once, for example a check
+		// run and a commit status. The name passes only when every result
+		// passes, and fails as soon as one result fails.
 		count := 0
-		var state collab.CheckState
 		for _, check := range checks.Items {
-			if check.Name == name {
-				count++
-				state = check.State
+			if check.Name != name {
+				continue
+			}
+			count++
+			if check.State == collab.CheckStateFailing {
+				return "failing"
+			}
+			if check.State != collab.CheckStatePassing {
+				allPassing = false
 			}
 		}
-		if count > 1 {
-			return "failing"
-		}
 		if count == 0 {
-			allPassing = false
-			continue
-		}
-		if state == collab.CheckStateFailing {
-			return "failing"
-		}
-		if state != collab.CheckStatePassing {
 			allPassing = false
 		}
 	}

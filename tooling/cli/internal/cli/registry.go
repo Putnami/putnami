@@ -132,7 +132,7 @@ func registerRawCommand(name string, run CommandFunc) {
 // registerRawSubcommand marks one subcommand of a registered command as raw,
 // the way registerRawCommand marks a whole command: its stdout is a document a
 // consumer binds to directly, forwarded untouched in every output mode.
-// `tree verify` qualifies: finalize-pr.sh and the execute skill parse its
+// `tree verify` qualifies: `proposals finalize` and the build skill parse its
 // verdict document, and a bare call that prints no such document tells them the
 // CLI lacks the verifier. Marking a subcommand of an unregistered command, or a
 // path the catalog does not declare, panics like registerCommand does.

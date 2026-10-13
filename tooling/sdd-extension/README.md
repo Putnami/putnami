@@ -419,7 +419,7 @@ fails with `sdd.invalid_recipe_index`. An absent index is adoption. A sample
 directory exists when it holds a tracked or unignored file, and the task is
 cached on the input `git:**`, so emptying, renaming or deleting a sample
 directory moves the key. `putnami context generate` renders the indexes
-into the `putnami-plan` skill's `references/recipes.md`.
+into the `build` skill's `references/recipes.md`.
 
 ### CODEOWNERS
 

@@ -83,7 +83,7 @@ func (v Verifier) Run(args []string) error {
 }
 
 // The checks run in a fixed order, and each failure names a fixed reason:
-// finalize-pr.sh and the execute skill read those reasons. The evidence is read
+// `proposals finalize` and the build skill read those reasons. The evidence is read
 // with JavaScript semantics (see verify_json.go), the semantics its producers
 // and the skill's earlier JavaScript verifier share. A failed check, and a read
 // that JavaScript answers with a TypeError, unwinds with a verifyFailure panic;

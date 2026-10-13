@@ -1,6 +1,6 @@
 // Package treeverify drives `putnami tree verify` through the real CLI: the
 // global flag parser, the catalog and the dispatcher, with both process
-// streams captured apart. finalize-pr.sh and the execute skill parse the
+// streams captured apart. `proposals finalize` and the build skill parse the
 // verdict document on stdout, so these tests pin that nothing else reaches
 // either stream. They swap the process streams, change the working directory
 // and set the environment, so they run one after another in their own test
@@ -40,7 +40,7 @@ func runTreeVerify(t *testing.T, dir string, args ...string) (code int, stdout, 
 	return code, stdout, stderr
 }
 
-// TestTreeVerifyBareCallIsAVerdictOnStdoutAlone pins how finalize-pr.sh tells
+// TestTreeVerifyBareCallIsAVerdictOnStdoutAlone pins how the build skill tells
 // whether the CLI has the verifier: a bare `putnami tree verify` prints one
 // not-verified verdict on stdout, exits 1 and writes nothing on stderr, in
 // every output mode. No parser, catalog or dispatcher step answers first.

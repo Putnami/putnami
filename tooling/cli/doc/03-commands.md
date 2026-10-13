@@ -1059,7 +1059,8 @@ putnami contributor machine-load --output=json
 `language` inspects English-language signals in text, tracked files, commit
 messages, or task titles and bodies. The tasks mode reads the configured tasks
 provider; findings exit 1 and invalid input or an unavailable provider exits 2.
-`machine-load` reports local CPU and memory capacity for check admission. These
+`machine-load` reports the one-minute load average, the logical CPU count and
+their ratio for check admission; it does not read memory. These
 commands do not run or schedule a gate. `--output=json` on `machine-load`
 returns the shared CLI result envelope with the capacity sample in `data`.
 
@@ -1070,7 +1071,9 @@ current dossier, `--gate ci` waits for policy-named hosted checks, and
 hosted publication naming a parent task. Native eligibility is checked before
 publication, and exact required checks can advance eligible current units.
 `--partial-delivery` preserves an incomplete parent task. The command does not
-add a provider operation or run another local gate.
+add a provider operation or run another local gate. It pushes the branch to the
+`origin` remote and resolves the base from `origin/<base>`, so `origin` must be
+the repository the proposals provider manages.
 
 ### `compose`
 

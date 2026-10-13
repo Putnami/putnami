@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
@@ -575,7 +576,15 @@ func TestHostedRequiredCheckNamesFailClosed(t *testing.T) {
 	if got := hostedCheckVerdict(checks, []string{"required"}, head); got != "passing" {
 		t.Fatalf("unrelated failure masked required check: %s", got)
 	}
-	checks.Items = append(checks.Items, collab.Check{Name: "required", State: collab.CheckStateFailing})
+	checks.Items = append(checks.Items, collab.Check{Name: "required", State: collab.CheckStatePassing})
+	if got := hostedCheckVerdict(checks, []string{"required"}, head); got != "passing" {
+		t.Fatalf("duplicate passing check did not pass: %s", got)
+	}
+	checks.Items[2].State = collab.CheckStatePending
+	if got := hostedCheckVerdict(checks, []string{"required"}, head); got != "pending" {
+		t.Fatalf("duplicate pending check did not wait: %s", got)
+	}
+	checks.Items[2].State = collab.CheckStateFailing
 	if got := hostedCheckVerdict(checks, []string{"required"}, head); got != "failing" {
 		t.Fatalf("duplicate mixed check passed: %s", got)
 	}
@@ -725,5 +734,16 @@ func TestNativeGitIgnoresForeignGitDirectoryAndDraftSeed(t *testing.T) {
 	commits, err := git.CommitMessages("HEAD~1")
 	if err != nil || len(commits) != 1 || !commits[0].Empty || commits[0].Text != "fix: seed title only" {
 		t.Fatalf("seed: %+v %v", commits, err)
+	}
+}
+
+func TestTransitionReasonKeepsWholeCharacters(t *testing.T) {
+	reason := strings.Repeat("a", 255) + "é"
+	got := truncateUTF8(reason, 256)
+	if got != strings.Repeat("a", 255) || !utf8.ValidString(got) {
+		t.Fatalf("truncated reason split a character: %q", got)
+	}
+	if got := truncateUTF8("short", 256); got != "short" {
+		t.Fatalf("short reason changed: %q", got)
 	}
 }
