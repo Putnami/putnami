@@ -669,9 +669,9 @@ describe('ReactApplication', () => {
       expect(after).toBe('fresh');
     });
 
-    // `redirect()` throws its response; the action still succeeded.
+    // `redirect()` throws its response and the action still succeeded; a 4xx or 5xx response failed.
     for (const mode of ['eager', 'lazy'] as const) {
-      const registerSave = (handle: () => never) => {
+      const registerSave = (handle: () => unknown) => {
         const httpPluginMock = { get: mock(), post: mock() };
         const appWithMock = new ReactApplication(
           undefined,
@@ -724,6 +724,17 @@ describe('ReactApplication', () => {
         const thrown = await submit().catch((error: unknown) => error);
 
         expect((thrown as HttpResponse).status).toBe(422);
+        expect(await cachedUsers('fresh')).toBe('stale');
+      });
+
+      it(`keeps cache patterns when a ${mode} action returns a failing response`, async () => {
+        await clearCache();
+        await cachedUsers('stale');
+        const submit = registerSave(() => HttpResponse.json({ errors: ['name'] }, { status: 422 }));
+
+        const result = await submit();
+
+        expect((result as HttpResponse).status).toBe(422);
         expect(await cachedUsers('fresh')).toBe('stale');
       });
     }

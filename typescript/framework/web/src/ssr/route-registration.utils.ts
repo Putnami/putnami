@@ -4,7 +4,7 @@ import type { LoaderFunction, RouteObject } from 'react-router';
 import { generatePageId, type RouteTreeHelper } from '../shared/route-tree.utils';
 import type { ActionDefinition } from './action';
 import RootHtml from './default.html';
-import { actionHandler, loaderHandler, recordActionFailure, recordActionOutcome, settlesActionOk } from './handlers';
+import { actionHandler, loaderHandler, recordActionFailure, recordActionOutcome } from './handlers';
 import type { LoaderDefinition } from './loader';
 import type {
   ActionModule,
@@ -20,7 +20,7 @@ import type { LazyPageData, MiddlewareResolver, ReactModuleCache } from './react
 import type { ReactPluginConfig } from './react-plugin';
 import type { PutnamiReactConfigExtras } from './react-ssr.config';
 import { inModuleOrDefault } from './react-ssr.utils';
-import { evictPatterns, wrapPageWithCache } from './route-cache.utils';
+import { runAndEvict, wrapPageWithCache } from './route-cache.utils';
 import { registerJsonEndpoint, registerLazyJsonEndpoint } from './route-endpoint.utils';
 import { applyMiddlewareSource, type MiddlewareSource, wrapWithMiddleware } from './route-middleware.utils';
 import type { StaticRouteMeta } from './static';
@@ -256,7 +256,7 @@ export function registerRouteAction(reg: RouteActionRegistration): void {
       const actionModule = await cache.loadModule(`action:${route}`, lazyAction);
       const actionDef = inModuleOrDefault<ActionDefinition, ActionModule>(actionModule, 'action');
       if (actionDef) {
-        return runAndEvict(actionDef, ctx);
+        return runAndEvict(() => actionDef.handler(ctx), actionDef.evict);
       }
       return undefined;
     };
@@ -267,38 +267,10 @@ export function registerRouteAction(reg: RouteActionRegistration): void {
 
   const actionDef = inModuleOrDefault<ActionDefinition, ActionModule>(action as ActionModule, 'action');
   if (actionDef) {
-    const actionFn: RouteHandler = (ctx) => runAndEvict(actionDef, ctx);
+    const actionFn: RouteHandler = (ctx) => runAndEvict(() => actionDef.handler(ctx), actionDef.evict);
     node.action = actionHandler(actionFn);
     httpPlugin.post(httpRoute, applyMiddlewareSource(publishing(actionFn), middleware), postOptions);
   }
-}
-
-/**
- * Runs an action, then evicts the cache patterns it declares.
- *
- * `redirect()` throws its response, so the eviction also runs when the handler
- * throws a response that settles the action successfully, before that response
- * leaves. Any other throw evicts nothing.
- *
- * @param actionDef - The action to run.
- * @param ctx - The request context.
- * @returns What the action handler returned.
- */
-async function runAndEvict(
-  actionDef: ActionDefinition,
-  ctx: Parameters<ActionDefinition['handler']>[0],
-): Promise<Awaited<ReturnType<ActionDefinition['handler']>>> {
-  let result: Awaited<ReturnType<ActionDefinition['handler']>>;
-  try {
-    result = await actionDef.handler(ctx);
-  } catch (thrown) {
-    if (settlesActionOk(thrown)) {
-      await evictPatterns(actionDef.evict);
-    }
-    throw thrown;
-  }
-  await evictPatterns(actionDef.evict);
-  return result;
 }
 
 /**

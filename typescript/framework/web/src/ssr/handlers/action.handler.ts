@@ -24,22 +24,6 @@ const outcomeOf = (status: number): ActionOutcome => {
 };
 
 /**
- * Tells whether a value an action threw settles it successfully.
- *
- * `redirect()` throws its response, so a throw is not always a failure: a
- * thrown response below 400 is how a form normally ends.
- *
- * @param thrown - The thrown value.
- * @returns `true` when `thrown` is a response whose outcome is `ok`.
- */
-export function settlesActionOk(thrown: unknown): boolean {
-  if (thrown instanceof HttpResponse) {
-    return outcomeOf(thrown.status ?? 200) === 'ok';
-  }
-  return thrown instanceof Response && outcomeOf(thrown.status) === 'ok';
-}
-
-/**
  * Publishes the outcome of an action that returned.
  *
  * Exported because the seam has two call sites: {@link actionHandler} wraps the
