@@ -227,6 +227,22 @@ func TestVerdictMarkFollowsTheAnswerAndTheGaps(t *testing.T) {
 	}
 }
 
+// A declaration change needs its approval whether it weakens the declaration
+// or not: without one, the verdict records a gap and stays checked.
+func TestEveryUnapprovedDeclarationIsAGap(t *testing.T) {
+	verdict := readVerdictFixture(t, "passed-verified.json")
+	declaration := &verdict.Predicate.Declarations[1]
+	if declaration.Weakening {
+		t.Fatal("the fixture's second declaration must not weaken")
+	}
+	declaration.Approval = nil
+	verdict.Predicate.Gaps = []VerdictGap{{Kind: GapUnapprovedDeclaration, Path: declaration.Path}}
+	verdict.Predicate.Mark = MarkChecked
+	if err := ValidateVerdict(verdict); err != nil {
+		t.Fatalf("ValidateVerdict: %v", err)
+	}
+}
+
 // verdictCase is one change to a valid verdict and the refusal it causes.
 type verdictCase struct {
 	name    string
@@ -410,6 +426,9 @@ func TestValidateVerdictRefusals(t *testing.T) {
 		{"gap for an approved declaration", checked, func(v *Verdict) {
 			v.Predicate.Declarations[0].Approval = &VerdictApproval{By: "octo-reviewer", Via: ApprovalViaConsole,
 				At: "2026-10-13T09:10:00Z"}
+		}, gapMatch},
+		{"no gap for an unapproved declaration that does not weaken", verified, func(v *Verdict) {
+			v.Predicate.Declarations[1].Approval = nil
 		}, gapMatch},
 		{"no gap for a project without requirements", checked, func(v *Verdict) {
 			v.Predicate.Gaps = v.Predicate.Gaps[1:]

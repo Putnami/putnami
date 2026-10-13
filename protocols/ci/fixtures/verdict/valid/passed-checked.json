@@ -93,7 +93,12 @@
       {
         "path": "putnami.ci.json",
         "kind": "ci",
-        "weakening": false
+        "weakening": false,
+        "approval": {
+          "by": "octo-reviewer",
+          "via": "console",
+          "at": "2026-10-13T08:55:00Z"
+        }
       }
     ],
     "gaps": [

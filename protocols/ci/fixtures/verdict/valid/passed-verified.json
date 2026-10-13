@@ -102,7 +102,12 @@
       {
         "path": "services/cart/specs/cart.json",
         "kind": "spec",
-        "weakening": false
+        "weakening": false,
+        "approval": {
+          "by": "octo-reviewer",
+          "via": "code-host",
+          "at": "2026-10-13T08:55:00Z"
+        }
       }
     ],
     "gaps": [],

@@ -278,7 +278,7 @@
         },
         "weakening": {
           "type": "boolean",
-          "description": "Whether the change weakens what the declaration promises."
+          "description": "Whether the change weakens what the declaration promises. It orders the declarations; a declaration without an approval is a gap either way."
         },
         "approval": { "$ref": "#/$defs/approval" }
       }

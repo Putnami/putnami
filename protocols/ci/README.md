@@ -391,9 +391,9 @@ signs a verdict nor verifies a signature.
   every other state, so `proven` plus `missing` is `total`.
 - A gap is `no-requirement` for a project that states no requirement,
   `unproven-requirement` for each missing requirement, as
-  `feature#requirement`, or `unapproved-declaration` for a weakening
-  declaration without an approval. The gaps match the counts and the
-  declarations exactly.
+  `feature#requirement`, or `unapproved-declaration` for a declaration
+  without an approval, whether the change weakens it or not. The gaps match
+  the counts and the declarations exactly.
 - Lists are sorted and hold no duplicate: checks by name, projects by ID,
   channels by name, and gaps by kind, project, requirement, then path.
   Declarations sort weakening first, then by path.

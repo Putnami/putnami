@@ -44,7 +44,7 @@
       {
         "path": "specs/shop.json",
         "kind": "spec",
-        "weakening": true
+        "weakening": false
       }
     ],
     "gaps": [],

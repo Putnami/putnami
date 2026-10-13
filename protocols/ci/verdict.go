@@ -112,7 +112,7 @@ var verdictDeclarationKinds = []string{
 	DeclarationDecisions, DeclarationArchitecture, DeclarationCI, DeclarationOwners,
 }
 
-// The places an approval of a weakening declaration is given.
+// The places an approval of a declaration change is given.
 const (
 	// ApprovalViaCodeHost: a review on the code host that holds the change.
 	ApprovalViaCodeHost = "code-host"
@@ -127,7 +127,8 @@ const (
 	// GapUnprovenRequirement: an impacted project's requirement is not
 	// verified.
 	GapUnprovenRequirement = "unproven-requirement"
-	// GapUnapprovedDeclaration: a weakening declaration has no approval.
+	// GapUnapprovedDeclaration: a declaration the change modifies has no
+	// approval, whether the change weakens it or not.
 	GapUnapprovedDeclaration = "unapproved-declaration"
 )
 
@@ -312,10 +313,11 @@ type VerdictDeclaration struct {
 	// Kind is the declaration's kind, such as spec.
 	Kind string `json:"kind"`
 	// Weakening reports whether the change weakens what the declaration
-	// promises, such as a removed requirement or a lowered floor.
+	// promises, such as a removed requirement or a lowered floor. It orders
+	// the declarations; it does not decide whether an approval is needed.
 	Weakening bool `json:"weakening"`
 	// Approval records who approved the change to the declaration, when
-	// someone did. A weakening declaration without one is a gap.
+	// someone did. A declaration without one is a gap.
 	Approval *VerdictApproval `json:"approval,omitempty"`
 }
 
@@ -340,7 +342,7 @@ type VerdictGap struct {
 	Project string `json:"project,omitempty"`
 	// Requirement is the unproven requirement, as feature#requirement.
 	Requirement string `json:"requirement,omitempty"`
-	// Path is the weakening declaration without an approval.
+	// Path is the declaration without an approval.
 	Path string `json:"path,omitempty"`
 }
 
@@ -611,7 +613,7 @@ func declarationSortsBefore(left, right VerdictDeclaration) bool {
 // the members of another kind, or that do not match the predicate: one
 // no-requirement gap per impacted project that states no requirement, as many
 // unproven-requirement gaps for a project as its missing count, and one
-// unapproved-declaration gap per weakening declaration without an approval.
+// unapproved-declaration gap per declaration without an approval.
 func validateVerdictGaps(p VerdictPredicate) error {
 	gaps := p.Gaps
 	if len(gaps) > MaxVerdictGaps {
@@ -644,7 +646,7 @@ func validateVerdictGaps(p VerdictPredicate) error {
 		}
 	}
 	for _, declaration := range p.Declarations {
-		if declaration.Weakening && declaration.Approval == nil {
+		if declaration.Approval == nil {
 			want[VerdictGap{Kind: GapUnapprovedDeclaration, Path: declaration.Path}] = 1
 		}
 	}

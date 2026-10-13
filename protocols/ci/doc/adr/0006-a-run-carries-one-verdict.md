@@ -34,9 +34,10 @@ answer about another commit.
 5. **Only a verified requirement is proven.** Each impacted project counts its
    requirements, and `missing` counts every state other than `verified`. The
    verdict sums the counts. It lists one gap per missing requirement, one per
-   project that states no requirement, and one per weakening declaration
-   without an approval. The validator checks that the gaps match the counts
-   and the declarations.
+   project that states no requirement, and one per declaration without an
+   approval. A declaration change needs its approval whether it weakens the
+   declaration or not: `weakening` only puts it first. The validator checks
+   that the gaps match the counts and the declarations.
 6. **Every list is canonical.** Checks sort by name, projects by ID, deploy
    channels by name, and gaps by kind, project, requirement, then path.
    Declarations sort weakening first, then by path. No list is absent or null.
