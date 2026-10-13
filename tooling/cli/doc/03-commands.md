@@ -1042,7 +1042,9 @@ JSON fail the check. A failure prints
 `{"verdict":"not-verified","reason":"..."}` on one line, exits 1 and writes
 nothing to stderr, and `--output` does not change the document. The verifier
 writes no file and needs no workspace. It is a consistency check, not a signed
-review or an access boundary.
+review or an access boundary. An unknown flag or a `--` is a usage error
+instead: the parser rejects it before the verifier runs, and the command exits
+2.
 
 ### `contributor`
 

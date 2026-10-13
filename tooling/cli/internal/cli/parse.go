@@ -269,7 +269,7 @@ func firstPositionalArg(args []string) string {
 func validateStructuredFlags(root, sub string, rawArgs []string) error {
 	path := commandmeta.CanonicalPath(root, sub)
 	if passthroughCut(rawArgs) < len(rawArgs) && !commandmeta.TakesPassthrough(path) {
-		return usageErrorf("`putnami %s` takes no arguments after --", path)
+		return usageErrorf("`putnami %s` takes no arguments after --", strings.TrimSpace(root+" "+sub))
 	}
 	declared, known := commandmeta.ResolveFlags(path)
 	if !known {
