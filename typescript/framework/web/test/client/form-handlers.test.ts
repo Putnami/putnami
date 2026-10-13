@@ -45,6 +45,20 @@ describe('Client Form Handlers', () => {
       expect(response).toBeInstanceOf(Response);
     });
 
+    it('keeps the query string after the JSON suffix', async () => {
+      await pageLoaderHandler()({
+        request: new Request('http://localhost/tasks?page=2&sort=name'),
+        params: {},
+        unstable_pattern: '/tasks',
+        context: undefined,
+      });
+
+      expect(fetchMock).toHaveBeenCalledWith('http://localhost/tasks.json?page=2&sort=name', {
+        headers: { Accept: 'application/json', 'X-Putnami-Loader': '1' },
+        signal: expect.any(AbortSignal),
+      });
+    });
+
     describe('redirects', () => {
       const navigate = () =>
         pageLoaderHandler()({

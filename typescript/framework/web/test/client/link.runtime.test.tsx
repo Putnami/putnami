@@ -43,7 +43,9 @@ mock.module('react-router', () => ({
   useResolvedPath: (to: string | { pathname?: string }) => ({
     pathname: typeof to === 'string' ? to : (to.pathname ?? currentPathname),
   }),
+  useHref: (to: string) => to,
   matchRoutes: realReactRouter.matchRoutes,
+  parsePath: realReactRouter.parsePath,
   UNSAFE_DataRouterContext: DataRouterContext,
 }));
 

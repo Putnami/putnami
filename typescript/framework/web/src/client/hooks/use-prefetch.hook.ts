@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useRef } from 'react';
-import { matchRoutes, type To, UNSAFE_DataRouterContext } from 'react-router';
+import { matchRoutes, parsePath, type To, UNSAFE_DataRouterContext, useHref } from 'react-router';
 import { escapeCssAttrValue } from '../document/tag.utils';
 import { useFetcher } from './use-fetcher.hook';
 import { useResolvedPath } from './use-resolved-path.hook';
@@ -10,9 +10,9 @@ export type PrefetchBehavior = 'intent' | 'render' | 'none';
  * Prefetches a route's code and data when triggered.
  *
  * It loads the route modules and warms the JSON loader endpoint
- * (`{path}.json`) so that client-side navigation has both ready. It does not
- * run the route's loader: a loader that redirects would make React Router
- * navigate on a hover.
+ * (`{basename}{path}.json{query}`) so that client-side navigation has both
+ * ready. It does not run the route's loader: a loader that redirects would make
+ * React Router navigate on a hover.
  */
 export function usePrefetch(
   to: To,
@@ -24,6 +24,7 @@ export function usePrefetch(
 } {
   const fetcher = useFetcher();
   const path = useResolvedPath(to);
+  const href = useHref(to);
   const router = useContext(UNSAFE_DataRouterContext)?.router;
   const jsonPrefetched = useRef(false);
 
@@ -40,7 +41,10 @@ export function usePrefetch(
     // Also prefetch the JSON loader endpoint so data is cached
     if (!jsonPrefetched.current) {
       jsonPrefetched.current = true;
-      const jsonUrl = `${path.pathname}.json`;
+      // The URL the client loader fetches on navigation: the mounted basename,
+      // the path with its `.json` suffix, then the query string.
+      const target = parsePath(href);
+      const jsonUrl = `${target.pathname ?? ''}.json${target.search ?? ''}`;
       const link = document.querySelector(`link[href="${escapeCssAttrValue(jsonUrl)}"]`);
       if (!link) {
         const prefetchLink = document.createElement('link');
@@ -51,7 +55,7 @@ export function usePrefetch(
         document.head.appendChild(prefetchLink);
       }
     }
-  }, [router, path]);
+  }, [router, path, href]);
 
   useEffect(() => {
     if (prefetch === 'render') {

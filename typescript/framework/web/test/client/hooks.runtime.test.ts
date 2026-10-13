@@ -67,6 +67,9 @@ const dataRouterValue = { router: { routes: [{ path: '/docs', lazy: lazyDocsMock
 const useResolvedPathMock = mock((to: string | { pathname?: string }) => ({
   pathname: typeof to === 'string' ? to : (to.pathname ?? '/resolved'),
 }));
+// The basename the mocked router is mounted under, applied by `useHref`.
+let routerBasename = '';
+const useHrefMock = mock((to: string) => `${routerBasename}${to}`);
 
 mock.module('react', () => ({
   useState<T>(initial: T | (() => T)) {
@@ -116,7 +119,9 @@ mock.module('react-router', () => ({
   useFormAction: (action?: string) => useFormActionMock(action),
   useFetcher: () => useFetcherMock(),
   useResolvedPath: (to: string | { pathname?: string }) => useResolvedPathMock(to),
+  useHref: (to: string) => useHrefMock(to),
   matchRoutes: realReactRouter.matchRoutes,
+  parsePath: realReactRouter.parsePath,
   UNSAFE_DataRouterContext: dataRouterContext,
 }));
 
@@ -159,6 +164,8 @@ describe('hook runtime behavior', () => {
     useFormActionMock.mockClear();
     useFetcherMock.mockClear();
     useResolvedPathMock.mockClear();
+    useHrefMock.mockClear();
+    routerBasename = '';
     fetcherLoadMock.mockClear();
     (globalThis as typeof globalThis & { document?: FakeDocument; fetch?: typeof fetch }).document = new FakeDocument();
   });
@@ -339,5 +346,20 @@ describe('hook runtime behavior', () => {
     expect(fetcherLoadMock).not.toHaveBeenCalled();
     expect(appendedLinks).toHaveLength(1);
     expect(appendedLinks[0]?.href).toBe('/docs.json');
+  });
+
+  it('prefetches the loader endpoint the navigation fetches: basename, path, then query', () => {
+    routerBasename = '/app';
+    const fakeDocument = (globalThis as typeof globalThis & { document?: FakeDocument }).document!;
+    const appendedLinks: Record<string, string>[] = [];
+    fakeDocument.head.appendChild = mock((element: Record<string, string>) => {
+      appendedLinks.push(element);
+      return element;
+    });
+
+    usePrefetch('/tasks?page=2#top', 'render');
+
+    expect(appendedLinks).toHaveLength(1);
+    expect(appendedLinks[0]?.href).toBe('/app/tasks.json?page=2');
   });
 });
