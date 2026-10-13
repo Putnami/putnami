@@ -10,7 +10,7 @@
           "path": "typescript/framework/web/src/client/form/action.handler.ts",
           "transport": "http",
           "symbol": "fetch",
-          "fingerprint": "79c622bf465329cef3ecc2096ecc79a8911365aa01432263844fbe8735e0a3cd"
+          "fingerprint": "5ff561bbff1257d7d31f748d2fdb6da489437c653687aa7c938043ed6ee589f9"
         }
       ],
       "owner": "@putnami/web",

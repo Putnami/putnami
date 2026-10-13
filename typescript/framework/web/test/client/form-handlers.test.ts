@@ -164,7 +164,7 @@ describe('Client Form Handlers', () => {
       });
       fetchMock.mockImplementationOnce(async (_input, init) => {
         expect(init?.method).toBe('POST');
-        expect(init?.headers).toEqual({ 'X-CSRF-Token': 'token-123' });
+        expect(init?.headers).toEqual({ 'X-Putnami-Action': '1', 'X-CSRF-Token': 'token-123' });
         expect(init?.body).toBeInstanceOf(FormData);
         return new Response(JSON.stringify({ saved: true }), { status: 201 });
       });
@@ -196,6 +196,85 @@ describe('Client Form Handlers', () => {
       } as never);
 
       expect(result).toEqual({ status: 422, ok: false, message: 'invalid' });
+    });
+
+    const submit = () =>
+      clientActionHandler({
+        request: new Request('http://localhost/app/tasks/7', { method: 'POST', body: new FormData() }),
+      } as never);
+
+    it('returns a router redirect, resolved against the action URL, when the action redirects', async () => {
+      fetchMock.mockImplementationOnce(
+        async () =>
+          new Response(null, {
+            status: 204,
+            headers: { 'X-Putnami-Redirect': '../done?from=7', 'X-Putnami-Redirect-Status': '303' },
+          }),
+      );
+
+      const result = (await submit()) as Response;
+
+      expect(result).toBeInstanceOf(Response);
+      expect(result.status).toBe(303);
+      expect(result.headers.get('Location')).toBe('http://localhost/app/done?from=7');
+    });
+
+    it('keeps a redirect to another origin absolute', async () => {
+      fetchMock.mockImplementationOnce(
+        async () =>
+          new Response(null, {
+            status: 204,
+            headers: { 'X-Putnami-Redirect': 'https://idp.example.com/authorize' },
+          }),
+      );
+
+      const result = (await submit()) as Response;
+
+      expect(result.status).toBe(302);
+      expect(result.headers.get('Location')).toBe('https://idp.example.com/authorize');
+    });
+
+    it('redirects to the page fetch already followed when a redirect came before the action route', async () => {
+      fetchMock.mockImplementationOnce(async () => {
+        const followed = new Response('<!doctype html>', { status: 200, headers: { 'Content-Type': 'text/html' } });
+        Object.defineProperty(followed, 'redirected', { value: true });
+        Object.defineProperty(followed, 'url', { value: 'http://localhost/login' });
+        return followed;
+      });
+
+      const result = (await submit()) as Response;
+
+      expect(result.status).toBe(302);
+      expect(result.headers.get('Location')).toBe('http://localhost/login');
+    });
+
+    it('keeps the data of an action that a followed 307 re-sent the POST to', async () => {
+      fetchMock.mockImplementationOnce(async () => {
+        const followed = new Response(JSON.stringify({ saved: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+        Object.defineProperty(followed, 'redirected', { value: true });
+        Object.defineProperty(followed, 'url', { value: 'http://localhost/app/tasks/7/' });
+        return followed;
+      });
+
+      expect(await submit()).toEqual({ status: 200, ok: true, saved: true });
+    });
+
+    it('falls back to 302 for a status React Router does not follow', async () => {
+      fetchMock.mockImplementationOnce(
+        async () =>
+          new Response(null, {
+            status: 204,
+            headers: { 'X-Putnami-Redirect': '/tasks', 'X-Putnami-Redirect-Status': '300' },
+          }),
+      );
+
+      const result = (await submit()) as Response;
+
+      expect(result.status).toBe(302);
+      expect(result.headers.get('Location')).toBe('http://localhost/tasks');
     });
   });
 });

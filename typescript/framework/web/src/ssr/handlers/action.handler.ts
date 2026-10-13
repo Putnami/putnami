@@ -60,6 +60,11 @@ export function recordActionOutcome(ctx: HttpRequestContext, result: unknown): v
  * @param error - The thrown value.
  */
 export function recordActionFailure(ctx: HttpRequestContext, error: unknown): void {
+  // `redirect()` throws its response: a thrown response settles like a returned one.
+  if (error instanceof HttpResponse || error instanceof Response) {
+    recordActionOutcome(ctx, error);
+    return;
+  }
   // 400/422 is the caller's input being wrong, not the action failing.
   record(ctx, outcomeOf(error instanceof HttpException ? error.getStatus() : 500));
 }

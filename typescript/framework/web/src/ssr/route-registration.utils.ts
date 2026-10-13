@@ -1,6 +1,18 @@
-import type { HttpMiddleware, HttpPlugin, RouteHandler, RouteOptions } from '@putnami/application';
+import {
+  type HttpMiddleware,
+  type HttpPlugin,
+  HttpResponse,
+  type RouteHandler,
+  type RouteHandlerResult,
+  type RouteOptions,
+} from '@putnami/application';
 import type { ReactNode } from 'react';
 import type { LoaderFunction, RouteObject } from 'react-router';
+import {
+  ACTION_REDIRECT_HEADER,
+  ACTION_REDIRECT_STATUS_HEADER,
+  ACTION_REQUEST_HEADER,
+} from '../shared/action-redirect';
 import { generatePageId, type RouteTreeHelper } from '../shared/route-tree.utils';
 import type { ActionDefinition } from './action';
 import RootHtml from './default.html';
@@ -264,7 +276,11 @@ export function registerRouteAction(reg: RouteActionRegistration): void {
       return undefined;
     };
     node.action = actionHandler(lazyActionHandler);
-    httpPlugin.post(httpRoute, applyMiddlewareSource(publishing(lazyActionHandler), middleware), postOptions);
+    httpPlugin.post(
+      httpRoute,
+      followableRedirects(applyMiddlewareSource(publishing(lazyActionHandler), middleware)),
+      postOptions,
+    );
     return;
   }
 
@@ -277,7 +293,11 @@ export function registerRouteAction(reg: RouteActionRegistration): void {
       return result;
     };
     node.action = actionHandler(actionFn);
-    httpPlugin.post(httpRoute, applyMiddlewareSource(publishing(actionFn), middleware), postOptions);
+    httpPlugin.post(
+      httpRoute,
+      followableRedirects(applyMiddlewareSource(publishing(actionFn), middleware)),
+      postOptions,
+    );
   }
 }
 
@@ -305,4 +325,60 @@ function publishing(handler: RouteHandler): RouteHandler {
       throw error;
     }
   };
+}
+
+/**
+ * Answers a redirect with a response the client action can follow, when the
+ * request comes from the client action.
+ *
+ * The client posts an enhanced `<Form>` with `fetch`, which follows a redirect
+ * itself and receives the target page's HTML instead of the action's data. For
+ * that request, a returned or thrown redirect becomes a 204 that carries the
+ * location in {@link ACTION_REDIRECT_HEADER}; its other headers, such as a
+ * session cookie, stay. A plain HTML form POST does not send
+ * {@link ACTION_REQUEST_HEADER} and receives the redirect unchanged.
+ *
+ * It wraps the route middleware too, so a redirect a route middleware answers
+ * reaches the client the same way.
+ *
+ * @param handler - The action route handler, middleware included.
+ * @returns The same handler, with redirects made followable by the client.
+ */
+function followableRedirects(handler: RouteHandler): RouteHandler {
+  return async (ctx) => {
+    if (!ctx.headers.get(ACTION_REQUEST_HEADER)) {
+      return handler(ctx);
+    }
+    let result: RouteHandlerResult;
+    try {
+      result = await handler(ctx);
+    } catch (error) {
+      const followable = toFollowable(error);
+      if (followable) {
+        return followable;
+      }
+      throw error;
+    }
+    return toFollowable(result) ?? result;
+  };
+}
+
+/**
+ * Turns a redirect into a 204 that carries its location and status in headers.
+ *
+ * @param value - What the handler returned or threw.
+ * @returns The followable response, or `undefined` when `value` is no redirect.
+ */
+function toFollowable(value: unknown): HttpResponse | undefined {
+  if (!(value instanceof HttpResponse) || !value.redirected) {
+    return undefined;
+  }
+  return new HttpResponse(undefined, {
+    status: 204,
+    headers: [
+      ...value.getHeaderEntries().filter(([name]) => name !== 'Location'),
+      [ACTION_REDIRECT_HEADER, value.getHeader('Location') as string],
+      [ACTION_REDIRECT_STATUS_HEADER, String(value.status)],
+    ],
+  });
 }
