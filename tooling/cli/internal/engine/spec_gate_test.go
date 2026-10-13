@@ -8,6 +8,7 @@ import (
 
 	"go.putnami.dev/cli/model/extension"
 	features "go.putnami.dev/protocol/features"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/specgate"
@@ -138,6 +139,7 @@ func TestSpecGateFinalizer_AttachmentConditions(t *testing.T) {
 // spec-owning project, keyed so the reduction attributes it there, and only
 // for an unresolved requirement.
 func TestSpecGateFinalizer_EnforceSanctionsThroughTheReducer(t *testing.T) {
+	spectest.Proves(t, "cli/diagnostics-results", "recorded-run-context", "declared-check-failures-carry-a-code")
 	t.Parallel()
 	for name, tc := range map[string]struct {
 		status  string
@@ -165,6 +167,11 @@ func TestSpecGateFinalizer_EnforceSanctionsThroughTheReducer(t *testing.T) {
 				if synthetic.Status != "failed" || synthetic.Error == nil ||
 					!strings.Contains(synthetic.Error.Message, "putnami specs verify") {
 					t.Errorf("synthetic result = %+v; it must fail and point at the audit surface", synthetic)
+				}
+				if synthetic.Canonical == nil || len(synthetic.Canonical.Diagnostics) != 1 ||
+					synthetic.Canonical.Diagnostics[0].Code != features.ErrorCodeUnresolvedRequirement {
+					t.Errorf("synthetic result carries no %s diagnostic: %+v",
+						features.ErrorCodeUnresolvedRequirement, synthetic.Canonical)
 				}
 			}
 			if outcome.record == nil || len(outcome.record.Groups) != 1 {

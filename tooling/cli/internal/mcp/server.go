@@ -26,8 +26,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	proto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/engine"
@@ -42,7 +44,45 @@ const (
 	// AgentModelEnv lets a harness explicitly name the active model because MCP
 	// initialize has no standard model identifier.
 	AgentModelEnv = proto.AgentModelEnv
+	// AgentSessionEnv lets a harness explicitly name its own session, which
+	// MCP initialize does not carry. A recorded run_jobs session states it.
+	AgentSessionEnv = "PUTNAMI_AGENT_SESSION_ID"
 )
+
+// harnessSessionEnvs are the variables in which a harness itself exports its
+// session id to the processes it spawns, the MCP server included. They are
+// read only when AgentSessionEnv is unset.
+var harnessSessionEnvs = []string{"CLAUDE_CODE_SESSION_ID"}
+
+// AgentSessionID returns the agent session id the MCP server environment
+// states: AgentSessionEnv, else the first harness-exported variable set. A
+// value that is not printable ASCII within protocolcli.SessionAgentValueMaxBytes
+// states nothing.
+func AgentSessionID(getenv func(string) string) string {
+	for _, name := range append([]string{AgentSessionEnv}, harnessSessionEnvs...) {
+		value := strings.TrimSpace(getenv(name))
+		if value == "" {
+			continue
+		}
+		if !printableASCII(value, protocolcli.SessionAgentValueMaxBytes) {
+			return ""
+		}
+		return value
+	}
+	return ""
+}
+
+func printableASCII(value string, maximum int) bool {
+	if value == "" || len(value) > maximum {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		if value[i] < 0x20 || value[i] > 0x7e {
+			return false
+		}
+	}
+	return true
+}
 
 // maxFrameBytes bounds one inbound JSON-RPC frame, terminating newline
 // included. The stdio framing carries no length prefix, so without a cap a
@@ -124,6 +164,9 @@ type Options struct {
 	// AgentModel is an explicit harness-provided model identifier. MCP itself
 	// has no standard model field, so this value must never be inferred.
 	AgentModel string
+	// AgentSessionID is the agent's own session id (AgentSessionID). A run_jobs
+	// session records it beside the client name; empty records no id.
+	AgentSessionID string
 	// AgentContext returns one project's freshly aggregated agent-context result
 	// (a commands.AgentContextResult, typed as any so this package needs no
 	// dependency on internal/commands). It is dependency-injected by the CLI

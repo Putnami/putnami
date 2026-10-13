@@ -89,7 +89,7 @@ func TestRunBatchUsesOneGoInvocationAndSplitsFailure(t *testing.T) {
 		t.Fatalf("project b data = %#v, want singleton %#v", results[1].Data, wantBData)
 	}
 	wantBDiagnostics := []parse.ToolDiagnostic{
-		{Severity: "error", Description: "boom", File: "b/b_test.go", Line: 9},
+		{Category: parse.TestAssertionCode, Severity: "error", Description: "boom", File: "b/b_test.go", Line: 9},
 	}
 	if !reflect.DeepEqual(results[1].Diagnostics, wantBDiagnostics) {
 		t.Fatalf(

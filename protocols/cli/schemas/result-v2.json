@@ -910,7 +910,9 @@
           }
         },
         "tree": { "$ref": "#/$defs/sessionTree" },
+        "declarations": { "$ref": "#/$defs/sessionDeclarations" },
         "placement": { "$ref": "#/$defs/sessionPlacement" },
+        "agent": { "$ref": "#/$defs/sessionAgent" },
         "run": { "$ref": "#/$defs/runSummary" },
         "tasks": { "type": "array", "items": { "$ref": "#/$defs/taskRecord" } },
         "executions": {
@@ -1118,6 +1120,46 @@
           "type": "string",
           "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
           "description": "The FULL object id of the commit the worktree sat on — 40 hex for a sha1 repository, 64 for a sha256 one. It is folded into fingerprint as well, so a moved HEAD reads as a different tree instead of canceling out against a coincidentally identical diff."
+        }
+      }
+    },
+    "sessionDeclarations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest", "files"],
+      "description": "The declaration files a session's declared checks read (feature manifests, specs, decisions, architecture manifests and their baselines), identified by content and separately from the tree, so two runs of one branch tell a code change from a declaration change. Captured before the first task runs. Absent when the producer could not read them.",
+      "properties": {
+        "digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Lowercase hex sha256 of the canonical declaration byte stream defined in doc/02-result-v2.md (Declaration digest)."
+        },
+        "files": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many declaration files the digest covers. Zero is a measurement: the workspace declares nothing."
+        }
+      }
+    },
+    "sessionAgent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "description": "The agent session that launched the run through the MCP server. Absent for any other run, including a terminal run. No member is inferred.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[\\x20-\\x7e]+$",
+          "description": "The agent harness, as the MCP client named itself during initialize. Printable ASCII."
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[\\x20-\\x7e]+$",
+          "description": "The agent's own session id, as the MCP server environment stated it (PUTNAMI_AGENT_SESSION_ID, or the harness's exported variable). Absent when none was stated. Printable ASCII."
         }
       }
     },

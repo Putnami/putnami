@@ -10,7 +10,8 @@
     "A reader of a recorded session can tell which worktree it ran against by comparing one digest, instead of recomputing it against a tree that may have moved",
     "A ledger or benchmark reads what each recorded run cost, over which selection, without writing its own reduction and without counting a nested run as a gate",
     "A reader of a recorded session can tell why a task executed or reused a result from the input digest it was keyed on, without re-running the engine",
-    "A runner can identify the actual invocation's recorded plan before its tasks start, without repeating preparation in a separate planning invocation"
+    "A runner can identify the actual invocation's recorded plan before its tasks start, without repeating preparation in a separate planning invocation",
+    "A reader comparing two recorded sessions of one branch can tell which declared check failed, whether the declarations changed between them, and which agent session ran each"
   ],
   "nonGoals": [
     "Treating advisory repository hygiene findings as production blockers",
@@ -66,6 +67,10 @@
     {
       "id": "gated-tree-identity",
       "text": "`putnami tree fingerprint` prints one digest covering HEAD, the bytes at every tracked path that differs from it (recursing through submodules), and the content of every untracked non-ignored file, from anywhere inside the worktree and without a workspace. A recorded session carries that same digest, captured before its first task ran, together with the dirty verdict and the head it was taken against. A producer that cannot determine the tree records no tree block rather than claiming a clean one."
+    },
+    {
+      "id": "recorded-run-context",
+      "text": "A failed declared check in a recorded session carries a stable diagnostic code; a spec-verification sanction uses features.unresolved_requirement or features.verification_unreadable. The session carries a digest of the declaration files its declared checks read, taken before its first task and separate from the tree fingerprint: a declaration edit moves it, a code edit does not. An MCP run records the agent kind its client named and the session id its environment stated; a terminal run records no agent."
     },
     {
       "id": "local-evidence-verification",

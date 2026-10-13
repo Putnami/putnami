@@ -293,11 +293,7 @@ func loadUncached(root string) (*Workspace, error) {
 	}
 
 	// Build scope index (aggregated aliases and groups from all scopes).
-	projectPaths := make([]string, len(ws.Projects))
-	for i, p := range ws.Projects {
-		projectPaths[i] = p.Path
-	}
-	scopeIndex, err := wsproto.ScanAllScopes(root, projectPaths)
+	scopeIndex, err := wsproto.ScanAllScopes(root, ws.ProjectPaths())
 	if err != nil {
 		return nil, fmt.Errorf("scan scopes: %w", err)
 	}

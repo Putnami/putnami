@@ -96,6 +96,7 @@ func recordedSessionDocument(
 	document := run.SessionFile(req.Commands, scheduler, cache)
 	document.ParentSessionID = protocolcli.ParentSessionFromEnv(sessionID)
 	document.Selection = machine.SessionSelection(req.selection)
+	document.Agent = req.Agent
 	requested := req.Global.Where
 	if requested == "" {
 		requested = "local"
@@ -284,6 +285,10 @@ func (e *Engine) executeSession(
 	}
 
 	if session != nil {
+		// Captured before the first task, like the tree above; it covers every
+		// project, not the selection (workspace_state.DeclarationDigest).
+		session.CaptureDeclarations(wsRoot, ws.ProjectPaths())
+
 		// Every task subprocess of this run learns which session spawned it, so a
 		// CLI a task invokes records itself as nested instead of looking like a
 		// second gate. The scheduler delivers it on the execution-only channel

@@ -217,6 +217,16 @@ var (
 		req("headSHA", gitObjectID),
 	}
 
+	sessionDeclarationsFields = []field{
+		req("digest", sha256Digest),
+		req("files", intAtLeast(0)),
+	}
+
+	sessionAgentFields = []field{
+		req("kind", printableASCIIBytesAtMost(SessionAgentValueMaxBytes)),
+		opt("sessionId", printableASCIIBytesAtMost(SessionAgentValueMaxBytes)),
+	}
+
 	sessionPlacementFields = []field{
 		req("requested", enumOf("local", "remote")),
 		req("actual", enumOf("local", "remote")),
@@ -426,7 +436,9 @@ var (
 		opt("selection", sessionSelection),
 		opt("git", sessionGit),
 		opt("tree", sessionTree),
+		opt("declarations", sessionDeclarations),
 		opt("placement", sessionPlacement),
+		opt("agent", sessionAgent),
 		req("run", runSummary),
 		opt("tasks", arrayOf(taskRecord)),
 		opt("executions", arrayOf(executionRecord)),
@@ -573,6 +585,8 @@ var v2FieldSets = map[string][]field{
 	"cgroupMemory":             cgroupMemoryFields,
 	"memoryPressure":           memoryPressureFields,
 	"sessionTree":              sessionTreeFields,
+	"sessionDeclarations":      sessionDeclarationsFields,
+	"sessionAgent":             sessionAgentFields,
 	"sessionPlacement":         sessionPlacementFields,
 	"sessionProvenance":        sessionProvenanceFields,
 	"sessionEnvironment":       sessionEnvironmentFields,
@@ -951,6 +965,14 @@ func sessionGit(v *validator, path string, value any) {
 
 func sessionTree(v *validator, path string, value any) {
 	object(v, path, value, sessionTreeFields)
+}
+
+func sessionDeclarations(v *validator, path string, value any) {
+	object(v, path, value, sessionDeclarationsFields)
+}
+
+func sessionAgent(v *validator, path string, value any) {
+	object(v, path, value, sessionAgentFields)
 }
 
 // sessionPlacement applies the one semantic rule beside the member set:

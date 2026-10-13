@@ -919,6 +919,39 @@ type SessionTree struct {
 	HeadSHA string `json:"headSHA"`
 }
 
+// SessionDeclarations identifies, by content, the declaration files a session's
+// declared checks read: feature declarations, specs, decisions and
+// architecture rules. Two sessions with an equal Tree ran the same code and the
+// same declarations; two sessions with a different Tree and an equal Digest ran
+// different code against the same declarations.
+//
+// The digest is defined in doc/02-result-v2.md § Declaration digest. Like
+// SessionTree, the object is captured before the first task runs and is absent
+// when the producer could not read the files, never written as an empty digest.
+type SessionDeclarations struct {
+	// Digest is the lowercase hex sha256 of the canonical declaration byte
+	// stream.
+	Digest string `json:"digest"`
+	// Files is the number of declaration files the digest covers. Zero is a
+	// measurement: the workspace declares nothing.
+	Files int `json:"files"`
+}
+
+// SessionAgentValueMaxBytes bounds each member of SessionAgent.
+const SessionAgentValueMaxBytes = 128
+
+// SessionAgent names the agent session that launched a run. It is present only
+// when an agent launched the run through the MCP server, and each member only
+// when the agent stated it; a terminal run records none. No member is inferred.
+type SessionAgent struct {
+	// Kind is the agent harness, as the MCP client named itself during
+	// initialize (for example "claude-code"). Printable ASCII.
+	Kind string `json:"kind"`
+	// SessionID is the agent's own session identifier, absent when the agent
+	// stated none. Printable ASCII.
+	SessionID string `json:"sessionId,omitempty"`
+}
+
 // SessionPlacement records requested and actual execution locations. It is
 // observational metadata, not part of task identity or cache keys. Omit the
 // whole object when placement is unknown, including records from older CLIs.
@@ -1367,9 +1400,16 @@ type SessionFile struct {
 	// failed — because a session that cannot say which tree it measured says
 	// nothing rather than claiming a clean one.
 	Tree *SessionTree `json:"tree,omitempty"`
+	// Declarations identifies the declaration files the run's declared checks
+	// read, by content, separately from Tree. Absent when the producer could not
+	// read them.
+	Declarations *SessionDeclarations `json:"declarations,omitempty"`
 	// Placement distinguishes the requested location from actual execution.
 	// Absent when the producer did not record placement.
 	Placement *SessionPlacement `json:"placement,omitempty"`
+	// Agent names the agent session that launched the run through the MCP
+	// server. Absent for any other run.
+	Agent *SessionAgent `json:"agent,omitempty"`
 	// Run is the session's verdict, identical to the one the other surfaces
 	// reported for the same run.
 	Run RunSummary `json:"run"`

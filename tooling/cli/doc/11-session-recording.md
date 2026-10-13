@@ -358,6 +358,72 @@ rather than a clean-looking one. Sessions recorded before the block existed keep
 opening unchanged. The exact byte stream the digest covers is specified once, in
 [the result contract](../../../protocols/cli/doc/02-result-v2.md).
 
+### The declarations
+
+`declarations` names **which declarations the run's declared checks read**, by
+content, separately from `tree`:
+
+```json
+{
+  "declarations": {
+    "digest": "9a1c0e7b5d3f2a4c6e8b0d1f3a5c7e9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c",
+    "files": 14
+  }
+}
+```
+
+The digest covers `putnami.features.json`, `decisions.json`,
+`specs.baseline.json`, `putnami.architecture.json`,
+`architecture.baseline.json` and every `specs/*.json`, in the workspace root,
+every project directory, and every directory between the two. Editing only one
+of those files changes it; editing only code does not, even when the edit widens
+an `--impacted` selection. Compare two sessions of one branch:
+
+| `tree.fingerprint` | `declarations.digest` | Reading |
+|---|---|---|
+| equal | equal | the same tree |
+| different | equal | code changed, declarations did not |
+| different | different | declarations changed, and possibly code |
+
+The digest is captured with `tree`, before the first task runs, and the block is
+absent when a declaration file could not be read. The byte stream is specified in
+[the result contract](../../../protocols/cli/doc/02-result-v2.md#declaration-digest).
+
+### The launching agent
+
+`agent` names **the agent session that launched the run** through the MCP
+server's `run_jobs` tool:
+
+```json
+{
+  "agent": { "kind": "claude-code", "sessionId": "0f3c2a1e-5b7d-4e8a-9c6f-2d1b0a9e8f7c" }
+}
+```
+
+`kind` is the name the MCP client sent in `initialize`. `sessionId` is
+`PUTNAMI_AGENT_SESSION_ID` from the MCP server environment, else
+`CLAUDE_CODE_SESSION_ID`, which Claude Code exports to the servers it starts.
+Each member is absent when nobody stated it, and a terminal run records no
+`agent` block at all. The block is recorded locally; it leaves the machine only
+through a session reporter the workspace turned on.
+
+### Declared-check failure codes
+
+Each failure in `run.failures[]` carries its diagnostics, and a declared-check
+failure carries a stable `code` in `run.failures[].diagnostics[]`. Two sessions
+that fail on the same code failed the same check.
+
+| Declared check | Task | Codes |
+|---|---|---|
+| Specs and their bound tests | `<project>:specs~verify` (runs when `test` is selected) | `features.unresolved_requirement` (enforced requirements not verified), `features.verification_unreadable` (criteria or observations unreadable) |
+| Specs ratchet | `validate-workspace` (`specs-ratchet-validate`) | `features.ratchet_regression`, plus the `features.*` read errors of the floor |
+| Feature decisions | `decisions-validate` | `features.decision_violated`, `features.invalid_decision_registry`, `features.decisions_unreadable` |
+| Architecture rules | `architecture-validate` | the `architecture.*` codes of the rule that failed |
+| Protocol fixtures | the protocol's `test` (Go conformance tests) | `GO_TEST_ASSERTION` per failed assertion line, `GO_TEST_FAILURE` when no assertion explains the failure |
+
+The SDD extension's codes are documented with its jobs in
+[Validation jobs](../../sdd-extension/doc/02-validation-jobs.md).
+
 ### The runner environment
 
 `environment` records the **machine** the session ran on, so a duration can be

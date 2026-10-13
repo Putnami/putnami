@@ -37,6 +37,9 @@ type Session struct {
 	// finalize runs after every task: the tree the session GATED is the tree it
 	// opened on, not whatever `lint --fix` left behind.
 	tree *cli.SessionTree
+	// declarations is the declaration digest captured by CaptureDeclarations,
+	// a START-of-run measurement for the same reason as tree.
+	declarations *cli.SessionDeclarations
 }
 
 // SessionMetadata is the READER's view of a recorded session.json.
@@ -299,6 +302,9 @@ func (s *Session) FinalizeV2(meta *cli.SessionFile, wsRoot string, baseline stri
 	s.mu.Lock()
 	if meta.Tree == nil && s.tree != nil {
 		meta.Tree = s.tree
+	}
+	if meta.Declarations == nil && s.declarations != nil {
+		meta.Declarations = s.declarations
 	}
 	s.mu.Unlock()
 

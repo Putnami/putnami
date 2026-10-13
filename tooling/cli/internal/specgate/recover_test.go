@@ -407,8 +407,8 @@ func TestUnresolvableEvidenceWarnsAndDoesNotBlock(t *testing.T) {
 	if messages := WarningMessages(record); len(messages["/billing"]) != 1 {
 		t.Errorf("WarningMessages = %+v, want one line for /billing", messages)
 	}
-	// SanctionMessages must not exist for a project nothing blocked.
-	if _, sanctioned := SanctionMessages(record)["/billing"]; sanctioned {
+	// Sanctions must not exist for a project nothing blocked.
+	if _, sanctioned := Sanctions(record)["/billing"]; sanctioned {
 		t.Error("an unobserved-only project produced a sanction message")
 	}
 }

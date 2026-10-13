@@ -39,12 +39,23 @@ func GateActive(ws *workspace.Workspace) bool {
 	return false
 }
 
-// SanctionMessages returns, per spec-owning project with at least one blocked
-// group, the one synthetic-failure message the engine reports it under, in
-// deterministic project order. Counts are summed across the project's blocked
-// groups so a project with two specs fails once with one legible message —
-// decision 9's "one failed synthetic result per spec-owning project".
-func SanctionMessages(record *features.SpecVerificationRecord) map[string]string {
+// Sanction is the one synthetic failure the engine reports a spec-owning
+// project under: a stable diagnostic code and its message.
+type Sanction struct {
+	// Code is features.ErrorCodeUnresolvedRequirement when enforce-mode
+	// requirements did not resolve verified, and
+	// features.ErrorCodeVerificationUnreadable when the criteria projection or
+	// its observations could not be read.
+	Code    string
+	Message string
+}
+
+// Sanctions returns, per spec-owning project with at least one blocked group,
+// the one synthetic failure the engine reports it under. Counts are summed
+// across the project's blocked groups so a project with two specs fails once
+// with one legible message — decision 9's "one failed synthetic result per
+// spec-owning project".
+func Sanctions(record *features.SpecVerificationRecord) map[string]Sanction {
 	if record == nil {
 		return nil
 	}
@@ -70,13 +81,16 @@ func SanctionMessages(record *features.SpecVerificationRecord) map[string]string
 		projects = append(projects, project)
 	}
 	sort.Strings(projects)
-	messages := make(map[string]string, len(totals))
+	sanctions := make(map[string]Sanction, len(totals))
 	for _, project := range projects {
 		counts := totals[project]
 		if counts.SpecRequirements == 0 {
 			// A blocked group with no requirement rows means the inputs
 			// themselves were unreadable; the group diagnostics carry the detail.
-			messages[project] = "spec verification: the criteria projection or its observations could not be read; run `putnami specs verify` for the audit report (docs: https://putnami.dev/docs/spec-driven-development/validation-jobs)"
+			sanctions[project] = Sanction{
+				Code:    features.ErrorCodeVerificationUnreadable,
+				Message: "spec verification: the criteria projection or its observations could not be read; run `putnami specs verify` for the audit report (docs: https://putnami.dev/docs/spec-driven-development/validation-jobs)",
+			}
 			continue
 		}
 		// Unobserved requirements are subtracted from the sanctioned count, not
@@ -85,12 +99,12 @@ func SanctionMessages(record *features.SpecVerificationRecord) map[string]string
 		// for a regression that is not there. They are still stated, because the
 		// project is failing anyway and the reader needs the whole picture.
 		unresolved := counts.SpecRequirements - counts.Verified - counts.Unobserved
-		messages[project] = fmt.Sprintf(
+		sanctions[project] = Sanction{Code: features.ErrorCodeUnresolvedRequirement, Message: fmt.Sprintf(
 			"spec verification: %d of %d textual requirement(s) unresolved under enforce (unmapped %d, unexecutable %d, missing %d, stale %d, contradicted %d)%s; run `putnami specs verify` for the audit report (docs: https://putnami.dev/docs/spec-driven-development/validation-jobs)",
 			unresolved, counts.SpecRequirements, counts.Unmapped, counts.Unexecutable,
-			counts.Missing, counts.Stale, counts.Contradicted, unobservedClause(counts.Unobserved))
+			counts.Missing, counts.Stale, counts.Contradicted, unobservedClause(counts.Unobserved))}
 	}
-	return messages
+	return sanctions
 }
 
 func unobservedClause(unobserved int) string {

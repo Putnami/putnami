@@ -732,6 +732,64 @@ written only when the fingerprint was computed — and computing it IS the
 measurement that decides dirtiness. A present block always knows all three
 facts.
 
+### Declaration digest
+
+`sessionFile.declarations` is an additive optional object: **which declarations
+the session's declared checks read**, identified by content and separately from
+`tree`. Two runs of one branch with different `tree` fingerprints and the same
+`declarations.digest` ran different code against the same declarations; a
+different digest means a declaration changed between them.
+
+| Member | Meaning |
+|--------|---------|
+| `digest` | lowercase hex sha256 of the canonical byte stream below, always 64 characters |
+| `files` | how many declaration files the digest covers; `0` is a measurement, not an unknown |
+
+**The declaration files.** In the workspace root, in every project directory,
+and in every directory between the root and a project: `putnami.features.json`,
+`decisions.json`, `specs.baseline.json`, `putnami.architecture.json`,
+`architecture.baseline.json`, and every regular `specs/*.json`. The set covers
+every project, not the run's selection, so a code change that widens an
+`--impacted` selection leaves the digest unchanged. Files are read from disk,
+so an uncommitted edit counts, and no git call is involved.
+
+**The canonical byte stream.** The digest is `sha256` of:
+
+```
+putnami-declarations/1\n
+files <count>\n
+<entry>   (× count, ordered by path)
+```
+
+where each `<entry>` is:
+
+```
+<sha256 of the file's content> <byte length of path>\n<path>\n
+```
+
+and `<path>` is slash-separated and relative to the workspace root.
+
+Like `tree`, the digest is captured when the session OPENS, before its first
+task runs. A producer that cannot read a declaration file (other than a missing
+one) records no `declarations` block rather than a digest over a partial set.
+
+### Recorded agent
+
+`sessionFile.agent` is an additive optional object: **the agent session that
+launched the run through the MCP server**. A run launched any other way, a
+terminal run included, records no block.
+
+| Member | Meaning |
+|--------|---------|
+| `kind` | the harness, as the MCP client named itself in `initialize` (`clientInfo.name`) |
+| `sessionId` | the agent's own session id, absent when the server environment stated none |
+
+`sessionId` comes from `PUTNAMI_AGENT_SESSION_ID` in the MCP server
+environment, else from the variable a harness exports to the processes it
+spawns (`CLAUDE_CODE_SESSION_ID`). Both members are printable ASCII of at most
+128 bytes. Nothing is inferred: a client that sends no name records no block,
+even when a session id is set, and a value outside the bound is dropped.
+
 ### Task input digest
 
 `taskRecord.inputDigest` is an additive optional member: the cache key the

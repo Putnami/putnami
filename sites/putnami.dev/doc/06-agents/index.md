@@ -186,6 +186,11 @@ Off by default. Set `PUTNAMI_AGENT_IDENTITY=1` and explicitly set
 harness and model headers — so what an agent did is attributable after the fact,
 by the same principle that makes every other action in Putnami reviewable.
 
+A `run_jobs` session also records which agent session ran it: the client name
+from `initialize`, and the session id from `PUTNAMI_AGENT_SESSION_ID` or the
+`CLAUDE_CODE_SESSION_ID` that Claude Code exports. This record stays in the
+local `session.json`. A terminal run records no agent.
+
 ---
 
 ## Blast radius before action

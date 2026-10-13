@@ -719,3 +719,105 @@ func TestRunJobs_DoesNotRotateTheLatestSessionPointer(t *testing.T) {
 			"the session every --session latest reader opens.", got, seeded.ID)
 	}
 }
+
+// recordedRunJobsSession runs run_jobs in one MCP session, preceded by the
+// given requests, and returns the session.json the run recorded.
+func recordedRunJobsSession(t *testing.T, srv *Server, dir string, before ...any) protocolcli.SessionFile {
+	t.Helper()
+	sessions := filepath.Join(dir, ".putnami", "sessions")
+	existing := map[string]bool{}
+	if entries, err := os.ReadDir(sessions); err == nil {
+		for _, entry := range entries {
+			existing[entry.Name()] = true
+		}
+	}
+	requests := append(append([]any{}, before...), req(len(before)+1, "tools/call",
+		toolCall{Name: "run_jobs", Arguments: json.RawMessage(`{"commands":["build"]}`)}))
+	runSession(t, srv, requests...)
+
+	entries, err := os.ReadDir(sessions)
+	if err != nil {
+		t.Fatalf("read sessions dir: %v", err)
+	}
+	for _, entry := range entries {
+		if existing[entry.Name()] || !entry.IsDir() {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(sessions, entry.Name(), "session.json"))
+		if err != nil {
+			t.Fatalf("read session.json: %v", err)
+		}
+		if violations := protocolcli.ValidateDocument(protocolcli.DocumentSessionFile, data); len(violations) != 0 {
+			t.Fatalf("recorded session violates the contract: %v\n%s", violations, data)
+		}
+		var document protocolcli.SessionFile
+		if err := json.Unmarshal(data, &document); err != nil {
+			t.Fatalf("decode session.json: %v", err)
+		}
+		return document
+	}
+	t.Fatal("run_jobs recorded no session")
+	return protocolcli.SessionFile{}
+}
+
+func TestRunJobs_RecordsTheAgentThatLaunchedIt(t *testing.T) {
+	spectest.Proves(t, "cli/diagnostics-results", "recorded-run-context",
+		"an-mcp-run-names-its-agent-and-a-terminal-run-names-none")
+	t.Parallel()
+	dir := jobFixture(t)
+	srv := NewServer(Options{
+		WorkspaceRoot: dir, Config: wsproto.Load(dir), ServerVersion: "test",
+		AgentSessionID: "0f3c2a1e-5b7d-4e8a-9c6f-2d1b0a9e8f7c",
+	})
+
+	document := recordedRunJobsSession(t, srv, dir, req(1, "initialize", initializeParams{
+		ProtocolVersion: "2025-03-26",
+		ClientInfo:      clientInfo{Name: "claude-code", Version: "2.1.0"},
+	}))
+	want := protocolcli.SessionAgent{Kind: "claude-code", SessionID: "0f3c2a1e-5b7d-4e8a-9c6f-2d1b0a9e8f7c"}
+	if document.Agent == nil || *document.Agent != want {
+		t.Errorf("recorded agent = %+v, want %+v", document.Agent, want)
+	}
+	if document.Declarations == nil {
+		t.Error("the recorded session carries no declaration digest")
+	}
+}
+
+func TestRunJobs_RecordsNoAgentAClientDidNotName(t *testing.T) {
+	spectest.Proves(t, "cli/diagnostics-results", "recorded-run-context",
+		"an-mcp-run-names-its-agent-and-a-terminal-run-names-none")
+	t.Parallel()
+	dir := jobFixture(t)
+	srv := NewServer(Options{
+		WorkspaceRoot: dir, Config: wsproto.Load(dir), ServerVersion: "test",
+		AgentSessionID: "orphan-session",
+	})
+
+	// A session id with no client name is never recorded on its own.
+	document := recordedRunJobsSession(t, srv, dir, req(1, "initialize", struct{}{}))
+	if document.Agent != nil {
+		t.Errorf("recorded agent = %+v, want none", document.Agent)
+	}
+}
+
+func TestAgentSessionID_ReadsTheStatedSessionOnly(t *testing.T) {
+	env := func(values map[string]string) func(string) string {
+		return func(name string) string { return values[name] }
+	}
+	for name, tc := range map[string]struct {
+		values map[string]string
+		want   string
+	}{
+		"nothing stated":          {values: nil, want: ""},
+		"explicit":                {values: map[string]string{AgentSessionEnv: "abc"}, want: "abc"},
+		"harness exported":        {values: map[string]string{"CLAUDE_CODE_SESSION_ID": "def"}, want: "def"},
+		"explicit wins":           {values: map[string]string{AgentSessionEnv: "abc", "CLAUDE_CODE_SESSION_ID": "def"}, want: "abc"},
+		"control character":       {values: map[string]string{AgentSessionEnv: "a\x1bb"}, want: ""},
+		"over the member bound":   {values: map[string]string{AgentSessionEnv: strings.Repeat("a", protocolcli.SessionAgentValueMaxBytes+1)}, want: ""},
+		"blank explicit is unset": {values: map[string]string{AgentSessionEnv: "  ", "CLAUDE_CODE_SESSION_ID": "def"}, want: "def"},
+	} {
+		if got := AgentSessionID(env(tc.values)); got != tc.want {
+			t.Errorf("%s: AgentSessionID = %q, want %q", name, got, tc.want)
+		}
+	}
+}

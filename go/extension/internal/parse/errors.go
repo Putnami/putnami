@@ -206,6 +206,17 @@ func TestJSON(output string) TestCounts {
 	return counts
 }
 
+// Stable codes of the diagnostics a failed `go test` run emits.
+const (
+	// TestAssertionCode marks an assertion line of a failed test (t.Error,
+	// t.Fatal and their formatted forms).
+	TestAssertionCode = "GO_TEST_ASSERTION"
+	// TestFailureCode marks a failure no assertion line explains: the failed
+	// test count, or the raw output of a panic, a race, a TestMain exit or a
+	// build error.
+	TestFailureCode = "GO_TEST_FAILURE"
+)
+
 // TestFailureDiagnostics emits the diagnostics for a failed `go test` run. It
 // always emits at least one diagnostic, so a failing step can never render as
 // "(no details emitted)". Call it only for runs that actually failed.
@@ -290,7 +301,7 @@ func TestDiagnosticList(output string, locate TestFileLocator) []ToolDiagnostic 
 			continue
 		}
 		if m := testDiagRe.FindStringSubmatch(evt.Output); m != nil {
-			diagnostic := ToolDiagnostic{Severity: "error", Description: m[3]}
+			diagnostic := ToolDiagnostic{Category: TestAssertionCode, Severity: "error", Description: m[3]}
 			if locate != nil {
 				if file := locate(evt.Package, m[1]); file != "" {
 					diagnostic.File = file
@@ -303,6 +314,7 @@ func TestDiagnosticList(output string, locate TestFileLocator) []ToolDiagnostic 
 
 	if len(diagnostics) == 0 && failCount > 0 {
 		diagnostics = append(diagnostics, ToolDiagnostic{
+			Category:    TestFailureCode,
 			Severity:    "error",
 			Description: fmt.Sprintf("%d test(s) failed", failCount),
 		})
@@ -369,7 +381,7 @@ func TestFailureDiagnosticList(output string, locate TestFileLocator) []ToolDiag
 		}
 	}
 	return append(diagnostics, ToolDiagnostic{
-		Category:    "GO_TEST_FAILURE",
+		Category:    TestFailureCode,
 		Severity:    "error",
 		Description: TestFailureText(output),
 	})

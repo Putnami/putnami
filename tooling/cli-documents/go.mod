@@ -26,6 +26,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	go.putnami.dev/cli/model v0.0.0 // indirect
 	go.putnami.dev/protocol/agentcontext v0.0.0 // indirect
+	go.putnami.dev/protocol/architecture v0.0.0 // indirect
 	go.putnami.dev/protocol/cache v0.0.0 // indirect
 	go.putnami.dev/protocol/capabilities v0.0.0 // indirect
 	go.putnami.dev/protocol/clientcontract v0.0.0 // indirect
