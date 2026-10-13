@@ -223,6 +223,10 @@ type Request struct {
 	// otherwise become the session those readers open, and session metadata has
 	// no origin field, so nobody could tell afterwards.
 	EphemeralSession bool
+	// Agent names the agent session that launched this run, recorded as
+	// session.json's agent block. The MCP adapter is the only caller that sets
+	// it; nil records no block.
+	Agent *protocolcli.SessionAgent
 	// ExecutesUnderDryRun keeps --dry-run from short-circuiting into the engine's
 	// plan-only preview, so the jobs actually run.
 	//

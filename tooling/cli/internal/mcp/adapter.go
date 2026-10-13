@@ -732,12 +732,26 @@ func (s *Server) runThroughEngine(ctx context.Context, a runJobsArgs, planOnly b
 		// become `latest`, the session every `--session latest` reader opens.
 		// The session is still written and still listed by `putnami sessions`.
 		EphemeralSession: true,
+		Agent:            s.sessionAgent(),
 		// An agent's run executes real jobs, so it meets the same production
 		// doctor bar a human's does; nil fails a production run closed.
 		Preflight: s.opts.Preflight,
 		Stdout:    &s.notices,
 	}, discardSink{})
 	return result, runErr
+}
+
+// sessionAgent is the agent block a run_jobs session records: the client name
+// MCP initialize carried, and the session id the server environment stated. A
+// client that named itself nothing records no block.
+func (s *Server) sessionAgent() *protocolcli.SessionAgent {
+	s.identityMu.RLock()
+	kind := s.identity.ClientName
+	s.identityMu.RUnlock()
+	if !printableASCII(kind, protocolcli.SessionAgentValueMaxBytes) {
+		return nil
+	}
+	return &protocolcli.SessionAgent{Kind: kind, SessionID: s.opts.AgentSessionID}
 }
 
 // selectionFlags maps the tool's three selection shapes onto the engine's

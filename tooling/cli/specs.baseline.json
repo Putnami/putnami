@@ -69,6 +69,7 @@
     "cli/diagnostics-results#gated-tree-identity",
     "cli/diagnostics-results#located-diagnostics",
     "cli/diagnostics-results#opening-session-identity",
+    "cli/diagnostics-results#recorded-run-context",
     "cli/diagnostics-results#redaction",
     "cli/diagnostics-results#session-record-durability",
     "cli/diagnostics-results#session-summary-view",

@@ -148,6 +148,8 @@ var v2StructDefs = map[string]any{
 	"cgroupMemory":             CgroupMemory{},
 	"memoryPressure":           MemoryPressure{},
 	"sessionTree":              SessionTree{},
+	"sessionDeclarations":      SessionDeclarations{},
+	"sessionAgent":             SessionAgent{},
 	"sessionPlacement":         SessionPlacement{},
 	"sessionProvenance":        SessionProvenance{},
 	"sessionEnvironment":       SessionEnvironment{},
@@ -259,14 +261,15 @@ func TestSessionSelectionMatchesSchema(t *testing.T) {
 	}
 }
 
-// TestSessionFileCarriesTheNestingAndSelectionMembers states, as a contract
+// TestSessionFileCarriesTheOptionalRunContextMembers states, as a contract
 // fact rather than an implementation detail, that a recorded session can name
-// the run that spawned it and how that run selected. Both members are optional,
-// so a record written before they existed keeps validating.
-func TestSessionFileCarriesTheNestingAndSelectionMembers(t *testing.T) {
+// the run that spawned it, how that run selected, which declarations it read,
+// and which agent session launched it. Every member is optional, so a record
+// written before they existed keeps validating.
+func TestSessionFileCarriesTheOptionalRunContextMembers(t *testing.T) {
 	names := fieldNames(sessionFileFields)
 	required := requiredFieldNames(sessionFileFields)
-	for _, member := range []string{"parentSessionId", "selection"} {
+	for _, member := range []string{"parentSessionId", "selection", "declarations", "agent"} {
 		if !slices.Contains(names, member) {
 			t.Errorf("sessionFile declares no %q member", member)
 		}

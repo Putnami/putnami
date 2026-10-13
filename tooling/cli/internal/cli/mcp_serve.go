@@ -127,6 +127,7 @@ func newMCPServerWithContext(ctx context.Context, wsRoot string, cfg *wsproto.Co
 		},
 		PropagateAgentIdentity: mcpAgentIdentityEnabled(os.Getenv(mcp.AgentIdentityEnabledEnv)),
 		AgentModel:             os.Getenv(mcp.AgentModelEnv),
+		AgentSessionID:         mcp.AgentSessionID(os.Getenv),
 		// Dependency injection avoids an internal/mcp → internal/commands import
 		// cycle (commands already imports the agent-context builder). version is
 		// threaded through so the in-memory build stamps the same provenance

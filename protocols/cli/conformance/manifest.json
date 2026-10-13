@@ -805,6 +805,115 @@
       "violations": [{ "code": "cli.result.missing_field", "path": "tree.dirty" }]
     },
     {
+      "id": "session.file.declarations-and-agent",
+      "document": "sessionFile",
+      "expect": "accept",
+      "summary": "A session states the declarations its declared checks read apart from the tree, so two runs of one branch tell a code change from a declaration change, and names the agent session that launched it through the MCP server. files is a measurement: zero means the workspace declares nothing.",
+      "value": {
+        "protocolVersion": 2,
+        "sessionId": "20261013-101500-a1b2c3",
+        "startTime": "2026-10-13T10:15:00.000Z",
+        "commands": ["lint", "test", "build", "validate"],
+        "tree": {
+          "fingerprint": "4f3d0d6f0c1ba6c8c4b9a2e7d6c5b4a39281706f5e4d3c2b1a0f9e8d7c6b5a49",
+          "dirty": true,
+          "headSHA": "ad048a6b3c0d1e2f30415263748596a7b8c9d0e1"
+        },
+        "declarations": { "digest": "9a1c0e7b5d3f2a4c6e8b0d1f3a5c7e9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c", "files": 14 },
+        "agent": { "kind": "claude-code", "sessionId": "0f3c2a1e-5b7d-4e8a-9c6f-2d1b0a9e8f7c" },
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": { "total": 1, "succeeded": 1, "failed": 0, "canceled": 0, "skipped": 0 },
+          "reuse": { "localCache": 0, "remoteCache": 0, "coalesced": 0 },
+          "durationMs": 3500
+        }
+      }
+    },
+    {
+      "id": "session.file.agent-without-session-id",
+      "document": "sessionFile",
+      "expect": "accept",
+      "summary": "An agent that named itself but stated no session id records its kind alone. The id is never inferred.",
+      "value": {
+        "protocolVersion": 2,
+        "sessionId": "20261013-101500-a1b2c3",
+        "startTime": "2026-10-13T10:15:00.000Z",
+        "commands": ["lint", "test", "build", "validate"],
+        "agent": { "kind": "codex" },
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": { "total": 1, "succeeded": 1, "failed": 0, "canceled": 0, "skipped": 0 },
+          "reuse": { "localCache": 0, "remoteCache": 0, "coalesced": 0 },
+          "durationMs": 3500
+        }
+      }
+    },
+    {
+      "id": "invalid.session-file.abbreviated-declaration-digest",
+      "document": "sessionFile",
+      "expect": "reject",
+      "summary": "The declaration digest is a join key compared as a string, so it is the full lowercase hex sha256, exactly like the tree fingerprint.",
+      "value": {
+        "protocolVersion": 2,
+        "sessionId": "20261013-101500-a1b2c3",
+        "startTime": "2026-10-13T10:15:00.000Z",
+        "commands": ["lint", "test", "build", "validate"],
+        "declarations": { "digest": "9a1c0e7b5d3f2a4c", "files": 14 },
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": { "total": 1, "succeeded": 1, "failed": 0, "canceled": 0, "skipped": 0 },
+          "reuse": { "localCache": 0, "remoteCache": 0, "coalesced": 0 },
+          "durationMs": 3500
+        }
+      },
+      "violations": [{ "code": "cli.result.invalid_value", "path": "declarations.digest" }]
+    },
+    {
+      "id": "invalid.session-file.agent-without-kind",
+      "document": "sessionFile",
+      "expect": "reject",
+      "summary": "A present agent block names the harness. A producer that cannot name it records no block rather than an anonymous session id.",
+      "value": {
+        "protocolVersion": 2,
+        "sessionId": "20261013-101500-a1b2c3",
+        "startTime": "2026-10-13T10:15:00.000Z",
+        "commands": ["lint", "test", "build", "validate"],
+        "agent": { "sessionId": "0f3c2a1e-5b7d-4e8a-9c6f-2d1b0a9e8f7c" },
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": { "total": 1, "succeeded": 1, "failed": 0, "canceled": 0, "skipped": 0 },
+          "reuse": { "localCache": 0, "remoteCache": 0, "coalesced": 0 },
+          "durationMs": 3500
+        }
+      },
+      "violations": [{ "code": "cli.result.missing_field", "path": "agent.kind" }]
+    },
+    {
+      "id": "invalid.session-file.agent-control-character",
+      "document": "sessionFile",
+      "expect": "reject",
+      "summary": "Agent members are client-supplied, so they are bounded printable ASCII: a control character never reaches a ledger or a terminal.",
+      "value": {
+        "protocolVersion": 2,
+        "sessionId": "20261013-101500-a1b2c3",
+        "startTime": "2026-10-13T10:15:00.000Z",
+        "commands": ["lint", "test", "build", "validate"],
+        "agent": { "kind": "claude-code\u001b[31m" },
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": { "total": 1, "succeeded": 1, "failed": 0, "canceled": 0, "skipped": 0 },
+          "reuse": { "localCache": 0, "remoteCache": 0, "coalesced": 0 },
+          "durationMs": 3500
+        }
+      },
+      "violations": [{ "code": "cli.result.invalid_value", "path": "agent.kind" }]
+    },
+    {
       "id": "session.plan-file",
       "document": "sessionPlanFile",
       "expect": "accept",

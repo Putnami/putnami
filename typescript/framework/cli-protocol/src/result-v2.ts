@@ -681,6 +681,27 @@ export interface SessionGit {
  * parties comparing fingerprints produced by two implementations compare
  * nothing.
  */
+export interface SessionDeclarations {
+  /** Lowercase hex sha256 of the canonical declaration byte stream (§ Declaration digest). */
+  digest: string;
+  /** How many declaration files the digest covers. Zero means the workspace declares nothing. */
+  files: number;
+}
+
+/** Bound on each {@link SessionAgent} member, in bytes. */
+export const SESSION_AGENT_VALUE_MAX_BYTES = 128;
+
+/**
+ * The agent session that launched a run through the MCP server. Each member is
+ * present only when the agent stated it, and is never inferred.
+ */
+export interface SessionAgent {
+  /** The harness, as the MCP client named itself during initialize. Printable ASCII. */
+  kind: string;
+  /** The agent's own session identifier, absent when the agent stated none. Printable ASCII. */
+  sessionId?: string;
+}
+
 export interface SessionTree {
   /**
    * Lowercase hex sha256 of the canonical tree byte stream — always 64
@@ -1008,8 +1029,15 @@ export interface SessionFile {
    * one.
    */
   tree?: SessionTree;
+  /**
+   * The declaration files the run's declared checks read, by content and
+   * separately from `tree`. Absent when the producer could not read them.
+   */
+  declarations?: SessionDeclarations;
   /** Absent when the producer did not record placement, including older sessions. */
   placement?: SessionPlacement;
+  /** The agent session that launched the run through the MCP server; absent for any other run. */
+  agent?: SessionAgent;
   run: RunSummary;
   tasks?: TaskRecord[];
   /**
@@ -1318,6 +1346,19 @@ function nonEmptyStringBytesAtMost(maximum: number): Check {
       return;
     }
     if (value === '' || UTF8.encode(value).length > maximum) {
+      v.add(VIOLATION_CODE.invalidValue, path);
+    }
+  };
+}
+
+// Each byte is printable ASCII (0x20 to 0x7e).
+function printableAsciiBytesAtMost(maximum: number): Check {
+  return (v, path, value) => {
+    if (typeof value !== 'string') {
+      v.add(VIOLATION_CODE.invalidType, path);
+      return;
+    }
+    if (value === '' || value.length > maximum || !/^[\x20-\x7e]+$/.test(value)) {
       v.add(VIOLATION_CODE.invalidValue, path);
     }
   };
@@ -1939,6 +1980,15 @@ const sessionTreeFields: Field[] = [
 ];
 const sessionTree: Check = (v, path, value) => object(v, path, value, sessionTreeFields);
 
+const sessionDeclarationsFields: Field[] = [req('digest', sha256Digest), req('files', intAtLeast(0))];
+const sessionDeclarations: Check = (v, path, value) => object(v, path, value, sessionDeclarationsFields);
+
+const sessionAgentFields: Field[] = [
+  req('kind', printableAsciiBytesAtMost(SESSION_AGENT_VALUE_MAX_BYTES)),
+  opt('sessionId', printableAsciiBytesAtMost(SESSION_AGENT_VALUE_MAX_BYTES)),
+];
+const sessionAgent: Check = (v, path, value) => object(v, path, value, sessionAgentFields);
+
 // Every member is required: the executing engine states all three from the
 // one bound request it was handed, so a partial block would be a claim nobody
 // executed.
@@ -2346,7 +2396,9 @@ const sessionFileFields: Field[] = [
   opt('selection', sessionSelection),
   opt('git', sessionGit),
   opt('tree', sessionTree),
+  opt('declarations', sessionDeclarations),
   opt('placement', sessionPlacement),
+  opt('agent', sessionAgent),
   req('run', runSummary),
   opt('tasks', arrayOf(taskRecord)),
   opt('executions', arrayOf(executionRecord)),
@@ -2833,6 +2885,8 @@ export const V2_FIELD_NAMES: Record<string, { members: string[]; required: strin
       ['cgroupMemory', cgroupMemoryFields],
       ['memoryPressure', memoryPressureFields],
       ['sessionTree', sessionTreeFields],
+      ['sessionDeclarations', sessionDeclarationsFields],
+      ['sessionAgent', sessionAgentFields],
       ['sessionPlacement', sessionPlacementFields],
       ['sessionProvenance', sessionProvenanceFields],
       ['sessionEnvironment', sessionEnvironmentFields],

@@ -49,6 +49,8 @@ const (
 	ErrorCodeInvalidDecisionRegistry      = "features.invalid_decision_registry"
 	ErrorCodeDecisionViolated             = "features.decision_violated"
 	ErrorCodeDecisionsUnreadable          = "features.decisions_unreadable"
+	ErrorCodeUnresolvedRequirement        = "features.unresolved_requirement"
+	ErrorCodeVerificationUnreadable       = "features.verification_unreadable"
 	WarningCodeRatchetGrowth              = "features.ratchet_growth"
 	WarningCodeMisplacedBaseline          = "features.misplaced_baseline"
 	WarningCodeMissingEvidence            = "features.missing_evidence"
@@ -75,8 +77,9 @@ var ValidDiagnosticCodes = map[string]bool{
 	ErrorCodeSymlinkEscape: true, ErrorCodeOutsideDiscoveryRoot: true, ErrorCodeSensitiveContent: true,
 	ErrorCodeRatchetRegression: true, WarningCodeRatchetGrowth: true,
 	ErrorCodeInvalidDecisionRegistry: true, ErrorCodeDecisionViolated: true,
-	ErrorCodeDecisionsUnreadable: true,
-	WarningCodeMissingEvidence:   true, WarningCodeStaleEvidence: true,
+	ErrorCodeDecisionsUnreadable: true, ErrorCodeUnresolvedRequirement: true,
+	ErrorCodeVerificationUnreadable: true,
+	WarningCodeMissingEvidence:      true, WarningCodeStaleEvidence: true,
 	WarningCodeContradictedEvidence: true, WarningCodeMissingHumanAuthority: true,
 	WarningCodeUnclassifiedContribution: true, WarningCodeUnresolvedFeatureAuthority: true,
 	WarningCodeUnobservedRequirement: true,

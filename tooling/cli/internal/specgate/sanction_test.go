@@ -25,7 +25,7 @@ func TestGateActiveFollowsTheCommittedPolicy(t *testing.T) {
 	}
 }
 
-func TestSanctionMessagesAggregatePerProject(t *testing.T) {
+func TestSanctionsAggregatePerProject(t *testing.T) {
 	record := &features.SpecVerificationRecord{
 		ProtocolVersion: features.SpecVerificationRecordProtocolVersion,
 		GeneratedAt:     "2026-08-23T12:00:00Z",
@@ -38,23 +38,30 @@ func TestSanctionMessagesAggregatePerProject(t *testing.T) {
 				Counts: features.SpecVerificationCounts{SpecRequirements: 3, Missing: 3, Executable: 3}},
 		},
 	}
-	messages := SanctionMessages(record)
-	if len(messages) != 1 {
-		t.Fatalf("messages = %v, want exactly the enforce project", messages)
+	sanctions := Sanctions(record)
+	if len(sanctions) != 1 {
+		t.Fatalf("sanctions = %v, want exactly the enforce project", sanctions)
 	}
-	message := messages["/a"]
+	if code := sanctions["/a"].Code; code != features.ErrorCodeUnresolvedRequirement {
+		t.Errorf("sanction code = %q, want %q", code, features.ErrorCodeUnresolvedRequirement)
+	}
+	message := sanctions["/a"].Message
 	for _, want := range []string{"2 of 3", "missing 1", "contradicted 1", "putnami specs verify"} {
 		if !strings.Contains(message, want) {
 			t.Errorf("message %q does not carry %q", message, want)
 		}
 	}
-	if SanctionMessages(nil) != nil {
+	if Sanctions(nil) != nil {
 		t.Error("a nil record produced sanctions")
 	}
 	broken := &features.SpecVerificationRecord{Groups: []features.SpecVerificationGroup{
 		{Project: "/c", Mode: features.VerificationModeEnforce, Blocked: true},
 	}}
-	if message := SanctionMessages(broken)["/c"]; !strings.Contains(message, "could not be read") {
-		t.Errorf("an input-failure sanction reads %q", message)
+	unreadable := Sanctions(broken)["/c"]
+	if !strings.Contains(unreadable.Message, "could not be read") {
+		t.Errorf("an input-failure sanction reads %q", unreadable.Message)
+	}
+	if unreadable.Code != features.ErrorCodeVerificationUnreadable {
+		t.Errorf("input-failure sanction code = %q, want %q", unreadable.Code, features.ErrorCodeVerificationUnreadable)
 	}
 }

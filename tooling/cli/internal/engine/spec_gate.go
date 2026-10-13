@@ -91,10 +91,16 @@ func specGateFinalizer(req *Request, ws *workspace.Workspace, planned []*jobs.Sc
 			return
 		}
 		reportSpecGateWarnings(record)
-		for projectID, message := range specgate.SanctionMessages(record) {
+		for projectID, sanction := range specgate.Sanctions(record) {
+			// The coded diagnostic reaches the machine records (session.json
+			// run.failures, report.json); the terminal keeps printing the
+			// error message alone.
 			results[projectID+":"+specGateResultTask] = &jobs.JobResult{
 				Status: "failed",
-				Error:  &jobs.JobError{Message: message},
+				Error:  &jobs.JobError{Message: sanction.Message},
+				Canonical: &jobs.TaskResult{Diagnostics: []jobs.TaskDiagnostic{{
+					Severity: "error", Code: sanction.Code, Message: sanction.Message,
+				}}},
 			}
 		}
 	}

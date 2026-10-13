@@ -61,6 +61,19 @@ type Workspace struct {
 	probe probeView
 }
 
+// ProjectPaths returns every project's path, relative to the workspace root, in
+// project order. A nil workspace has none.
+func (ws *Workspace) ProjectPaths() []string {
+	if ws == nil {
+		return nil
+	}
+	paths := make([]string, len(ws.Projects))
+	for i, project := range ws.Projects {
+		paths[i] = project.Path
+	}
+	return paths
+}
+
 // AddWarning appends human prose and, when provided, its stable machine code.
 func (ws *Workspace) AddWarning(code WarningCode, message string) {
 	if ws == nil {

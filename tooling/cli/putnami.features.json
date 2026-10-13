@@ -1105,6 +1105,21 @@
           }
         },
         {
+          "id": "recorded-run-context",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "declared-check-failures-carry-a-code",
+              "the-declaration-digest-moves-with-declarations-only",
+              "an-mcp-run-names-its-agent-and-a-terminal-run-names-none"
+            ]
+          }
+        },
+        {
           "id": "local-evidence-verification",
           "stage": "coded",
           "evidenceKinds": [

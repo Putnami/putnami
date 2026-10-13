@@ -274,6 +274,28 @@ func nonEmptyStringBytesAtMost(maximum int) check {
 	}
 }
 
+// printableASCIIBytesAtMost requires a nonempty string of at most maximum bytes,
+// each a printable ASCII character (0x20 to 0x7e).
+func printableASCIIBytesAtMost(maximum int) check {
+	return func(v *validator, path string, value any) {
+		text, ok := value.(string)
+		if !ok {
+			v.add(ViolationInvalidType, path)
+			return
+		}
+		if text == "" || len(text) > maximum {
+			v.add(ViolationInvalidValue, path)
+			return
+		}
+		for i := 0; i < len(text); i++ {
+			if text[i] < 0x20 || text[i] > 0x7e {
+				v.add(ViolationInvalidValue, path)
+				return
+			}
+		}
+	}
+}
+
 // enumOf requires a string drawn from a closed vocabulary.
 func enumOf(allowed ...string) check {
 	return func(v *validator, path string, value any) {

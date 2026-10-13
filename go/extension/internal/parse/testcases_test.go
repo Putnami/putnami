@@ -274,9 +274,9 @@ func TestTestDiagnosticListResolvesTheFailingPackagesTestFile(t *testing.T) {
 	got := TestDiagnosticList(output, ModuleTestFileLocator(workspace, moduleRoot, "example.com/mod"))
 	want := []ToolDiagnostic{
 		// The sub-package file lives in the package directory, not the module root.
-		{Severity: "error", Description: "got 1, want 2", File: "mod/pkg/fail_test.go", Line: 12},
+		{Category: TestAssertionCode, Severity: "error", Description: "got 1, want 2", File: "mod/pkg/fail_test.go", Line: 12},
 		// A root-package file keeps the path it always had.
-		{Severity: "error", Description: "boom", File: DiagPath(workspace, moduleRoot, "root_test.go"), Line: 3},
+		{Category: TestAssertionCode, Severity: "error", Description: "boom", File: DiagPath(workspace, moduleRoot, "root_test.go"), Line: 3},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("TestDiagnosticList =\n  %+v\nwant\n  %+v", got, want)
@@ -295,7 +295,7 @@ func TestTestDiagnosticListOmitsALocationItCannotResolve(t *testing.T) {
 	locate := ModuleTestFileLocator(workspace, moduleRoot, "example.com/mod")
 
 	got := TestDiagnosticList(output, locate)
-	want := []ToolDiagnostic{{Severity: "error", Description: "boom"}}
+	want := []ToolDiagnostic{{Category: TestAssertionCode, Severity: "error", Description: "boom"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("TestDiagnosticList = %+v, want the message without a location", got)
 	}
