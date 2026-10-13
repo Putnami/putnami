@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 	"regexp"
 	"slices"
@@ -89,9 +90,11 @@ const (
 
 // The relations of an impacted project to the change.
 const (
-	// RelationTouched: the project owns at least one changed path.
+	// RelationTouched: a changed path claims the project itself. The project
+	// owns the path, or reads it as a declared input.
 	RelationTouched = "touched"
-	// RelationReached: the project depends on a touched project.
+	// RelationReached: no changed path claims the project. The change reaches
+	// it from another impacted project, touched or reached.
 	RelationReached = "reached"
 )
 
@@ -170,6 +173,9 @@ func VerdictSchema() []byte { return append([]byte(nil), verdictSchemaBytes...) 
 // change passed, how well its requirements are proven, which declarations it
 // modifies, and what is missing or unknown. A producer may sign it; this
 // package neither signs nor verifies a signature.
+//
+// A verdict is an answer about a tested tree. A run that tested no tree, such
+// as one canceled before its checkout, has no verdict.
 type Verdict struct {
 	// Type is always VerdictStatementType.
 	Type string `json:"_type"`
@@ -217,7 +223,8 @@ type VerdictPredicate struct {
 	// Requirements sums the requirement counts of Impact.
 	Requirements VerdictRequirements `json:"requirements"`
 	// Declarations is every declaration the change modifies, the weakening
-	// ones first, then by path.
+	// ones first, then by path. It is empty when the verdict carries a
+	// GapUnknownDeclarations.
 	Declarations []VerdictDeclaration `json:"declarations"`
 	// Gaps is everything that keeps a passed verdict from being verified,
 	// sorted by kind, project, requirement, then path.
@@ -281,7 +288,8 @@ type VerdictCheck struct {
 
 // VerdictImpact is the project closure the change reaches.
 type VerdictImpact struct {
-	// Projects is every impacted project, sorted by project ID.
+	// Projects is every impacted project, sorted by project ID. It is empty
+	// when the verdict carries a GapUnknownImpact.
 	Projects []VerdictProject `json:"projects"`
 }
 
@@ -291,8 +299,8 @@ type VerdictProject struct {
 	Project string `json:"project"`
 	// Relation is RelationTouched or RelationReached.
 	Relation string `json:"relation"`
-	// Via names another impacted project the dependency reaches this one
-	// through. Only a reached project names one.
+	// Via names the impacted project the change reaches this one from. Only a
+	// reached project names one, and it may name none.
 	Via string `json:"via,omitempty"`
 	// Requirements counts the project's requirements. It is absent when the
 	// producer does not know how they stand, and the verdict then records a
@@ -458,16 +466,33 @@ func ParseVerdict(data []byte) (Verdict, error) {
 }
 
 // ValidateVerdict is the check a consumer runs before it trusts a verdict. It
-// refuses another statement or predicate type, a subject that is not the
-// change's repository at its head commit, a list that is absent or null,
-// malformed identities, an unknown vocabulary value, a merge without a base,
-// a list that is unsorted or holds a duplicate, an answer that is not the
-// fold of the required checks, requirement counts that do not add up, a list
-// that holds entries beside the gap that says it is unknown, gaps that do not
-// match the impact and the declarations, a mark that does not follow the
-// answer and the gaps, a deploy answer that is not the fold of its channels,
-// a computedAt that is not RFC 3339, and a revision below 1. It returns the
-// first refusal, in that order.
+// returns the first refusal, in this order:
+//
+//  1. another statement or predicate type;
+//  2. a list that is absent or null;
+//  3. the change: a malformed repository, reference or object ID, an unknown
+//     tested checkout, a merge without a base;
+//  4. a subject that is not the change's repository at its head commit;
+//  5. a malformed run identity;
+//  6. checks with an unknown answer or level, unsorted, duplicated or
+//     malformed;
+//  7. an answer that is not the fold of the required checks;
+//  8. impacted projects with an unknown relation, unsorted, duplicated or
+//     malformed, counts that do not add up, and sums that are not the sums of
+//     the counts;
+//  9. declarations with an unknown kind or an incomplete approval, unsorted,
+//     duplicated or malformed;
+//  10. gaps with an unknown kind or the members of another kind, unsorted or
+//     duplicated, then a list that holds entries beside the gap that says it
+//     is unknown, then gaps that do not match the impact and the declarations;
+//  11. a mark that does not follow the answer and the gaps;
+//  12. deploy channels that are malformed, unsorted or duplicated, and a
+//     deploy answer that is not their fold;
+//  13. a computedAt that is not RFC 3339;
+//  14. a revision below 1.
+//
+// A list over its bound is refused where the list is checked, before its
+// entries.
 func ValidateVerdict(verdict Verdict) error {
 	if verdict.Type != VerdictStatementType {
 		return errors.New("verdict is not an in-toto Statement v1")
@@ -571,9 +596,11 @@ func validateVerdictChecks(checks []VerdictCheck) error {
 
 // validateVerdictImpact refuses projects that are not sorted by a
 // well-formed unique ID, an unknown relation, a via on a touched project or
-// one that names no other impacted project, a project whose counts do not add
-// up, and totals that are not the sums of the projects' counts. A project
-// without counts adds to ProjectsUnknown only.
+// one that names no other impacted project, a project whose counts are
+// negative or do not add up, and totals that are not the sums of the
+// projects' counts. A project without counts adds to ProjectsUnknown only.
+// Counts whose sum passes the largest integer are refused like counts that do
+// not add up: no sum wraps.
 func validateVerdictImpact(impact VerdictImpact, totals VerdictRequirements) error {
 	projects := impact.Projects
 	if len(projects) > MaxVerdictProjects {
@@ -597,7 +624,8 @@ func validateVerdictImpact(impact VerdictImpact, totals VerdictRequirements) err
 			sum.ProjectsUnknown++
 			continue
 		}
-		if counts.Proven < 0 || counts.Missing < 0 || counts.Proven+counts.Missing != counts.Total {
+		if counts.Total < 0 || counts.Proven < 0 || counts.Missing < 0 || counts.Total-counts.Proven != counts.Missing ||
+			counts.Total > math.MaxInt-sum.Total {
 			return errors.New("verdict project requirement counts do not add up")
 		}
 		sum.Total += counts.Total

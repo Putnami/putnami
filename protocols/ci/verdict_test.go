@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -435,10 +437,20 @@ func TestValidateVerdictRefusals(t *testing.T) {
 		{"missing is not total minus proven", verified, func(v *Verdict) {
 			v.Predicate.Impact.Projects[0].Requirements.Missing = 1
 		}, counts},
+		{"negative total that wraps into counts that add up", verified, func(v *Verdict) {
+			v.Predicate.Impact.Projects[0].Requirements = &VerdictRequirementCounts{
+				Total: math.MinInt, Proven: math.MaxInt, Missing: 1}
+		}, counts},
+		{"sums past the largest integer", verified, func(v *Verdict) {
+			v.Predicate.Impact.Projects[0].Requirements = &VerdictRequirementCounts{Total: math.MaxInt, Proven: math.MaxInt}
+			v.Predicate.Impact.Projects[1].Requirements = &VerdictRequirementCounts{Total: 1, Proven: 1}
+			v.Predicate.Requirements = VerdictRequirements{Total: math.MinInt, Proven: math.MinInt}
+		}, counts},
 		{"projectsWithout is not the count", verified, func(v *Verdict) { v.Predicate.Requirements.ProjectsWithout = 1 }, sums},
 		{"projectsUnknown is not the count", verified, func(v *Verdict) { v.Predicate.Requirements.ProjectsUnknown = 1 }, sums},
 		{"a project without counts is not counted", verified, func(v *Verdict) {
 			v.Predicate.Impact.Projects[1].Requirements = nil
+			v.Predicate.Requirements = VerdictRequirements{Total: 4, Proven: 4}
 		}, sums},
 		{"a project without counts adds to the sums", checked, func(v *Verdict) {
 			v.Predicate.Impact.Projects[0].Requirements = nil
@@ -495,17 +507,17 @@ func TestValidateVerdictRefusals(t *testing.T) {
 			v.Predicate.Gaps[2].Requirement = "half-even"
 		}, gaps},
 		{"unproven-requirement gap with a long requirement", checked, func(v *Verdict) {
-			v.Predicate.Gaps[3].Requirement = "money/rounding#" + strings.Repeat("a", 512)
+			v.Predicate.Gaps[3].Requirement = "money/rounding#" + strings.Repeat("z", 498)
 		}, gaps},
 		{"unproven-requirement gap names a path", checked, func(v *Verdict) {
 			v.Predicate.Gaps[2].Path = "libs/money/specs/money.json"
 		}, gaps},
 		{"unknown-requirements gap names a requirement", checked, func(v *Verdict) {
-			v.Predicate.Gaps[0] = VerdictGap{Kind: GapUnknownRequirements, Project: "/services/cart",
-				Requirement: "cart/totals#sum"}
+			v.Predicate.Gaps = slices.Insert(v.Predicate.Gaps, 2, VerdictGap{Kind: GapUnknownRequirements,
+				Project: "/services/checkout", Requirement: "checkout/pay#card"})
 		}, gaps},
 		{"unknown-requirements gap without a project", checked, func(v *Verdict) {
-			v.Predicate.Gaps[0] = VerdictGap{Kind: GapUnknownRequirements}
+			v.Predicate.Gaps = slices.Insert(v.Predicate.Gaps, 2, VerdictGap{Kind: GapUnknownRequirements})
 		}, gaps},
 		{"unknown-impact gap names a project", checked, func(v *Verdict) {
 			v.Predicate.Gaps = []VerdictGap{{Kind: GapUnknownImpact, Project: "/libs/money"}}
@@ -625,6 +637,22 @@ func TestValidateVerdictAcceptsItsBounds(t *testing.T) {
 	verdict.Predicate.Run = VerdictRun{ID: strings.Repeat("r", 128), Attempt: 3, Conclusion: strings.Repeat("c", 64)}
 	if err := ValidateVerdict(verdict); err != nil {
 		t.Fatalf("ValidateVerdict at its bounds: %v", err)
+	}
+
+	// The longest requirement a gap names: 512 bytes, at its sorted place.
+	checked := readVerdictFixture(t, "passed-checked.json")
+	checked.Predicate.Gaps[3].Requirement = "money/rounding#" + strings.Repeat("z", 497)
+	if err := ValidateVerdict(checked); err != nil {
+		t.Fatalf("ValidateVerdict with a 512-byte requirement: %v", err)
+	}
+
+	// The largest counts: the sums reach the largest integer and do not pass it.
+	verdict = readVerdictFixture(t, "passed-verified.json")
+	verdict.Predicate.Impact.Projects[0].Requirements = &VerdictRequirementCounts{
+		Total: math.MaxInt - 2, Proven: math.MaxInt - 2}
+	verdict.Predicate.Requirements = VerdictRequirements{Total: math.MaxInt, Proven: math.MaxInt}
+	if err := ValidateVerdict(verdict); err != nil {
+		t.Fatalf("ValidateVerdict with sums at the largest integer: %v", err)
 	}
 }
 
@@ -822,6 +850,12 @@ func TestVerdictSchemaMatchesTheGoVocabulary(t *testing.T) {
 		"$defs/check/properties/reason/pattern":            verdictReasonPattern.String(),
 		"$defs/gap/properties/requirement/pattern":         verdictRequirementPattern.String(),
 		"$defs/channel/properties/channel/pattern":         channelPattern.String(),
+		// The rules the schema states with a condition name the same words.
+		"$defs/predicate/allOf/0/if/properties/mark/const":                          MarkVerified,
+		"$defs/predicate/allOf/1/if/properties/mark/const":                          MarkChecked,
+		"$defs/predicate/allOf/2/if/properties/gaps/contains/properties/kind/const": GapUnknownImpact,
+		"$defs/predicate/allOf/3/if/properties/gaps/contains/properties/kind/const": GapUnknownDeclarations,
+		"$defs/change/if/properties/testedCheckout/const":                           TestedCheckoutMerge,
 	} {
 		if got := schemaValue(t, schema, path); got != want {
 			t.Errorf("%s = %v, want %v", path, got, want)
@@ -859,16 +893,26 @@ func verdictSchema(t *testing.T) map[string]any {
 	return schema
 }
 
-// schemaValue returns the value at a slash-separated path under schema.
+// schemaValue returns the value at a slash-separated path under schema. A
+// segment names a member of an object, or the index of an array element.
 func schemaValue(t *testing.T, schema map[string]any, path string) any {
 	t.Helper()
 	var node any = schema
 	for _, key := range strings.Split(path, "/") {
-		object, ok := node.(map[string]any)
-		if !ok {
-			t.Fatalf("schema has no %s", path)
-		}
-		if node, ok = object[key]; !ok {
+		switch value := node.(type) {
+		case map[string]any:
+			child, ok := value[key]
+			if !ok {
+				t.Fatalf("schema has no %s", path)
+			}
+			node = child
+		case []any:
+			index, err := strconv.Atoi(key)
+			if err != nil || index < 0 || index >= len(value) {
+				t.Fatalf("schema has no %s", path)
+			}
+			node = value[index]
+		default:
 			t.Fatalf("schema has no %s", path)
 		}
 	}

@@ -9,10 +9,10 @@
 ADR 0006 defined the verdict before any producer wrote one. Writing the first
 producer showed two things a producer could not say truthfully.
 
-**The tree.** ADR 0006 put the head commit and its tree in the subject, and
-recorded the tested commit only when it was not the head. A CI plane that
-tests a pull request merged into its base tests a tree that is not the head's
-tree. That tree is what the answer is about: every cache key and every
+**The tree.** ADR 0006 put the head commit and its tree in the subject. The
+first shape of version 1 also recorded the tested commit, only when it was not
+the head. A CI plane that tests a pull request merged into its base tests a
+tree that is not the head's tree. That tree is what the answer is about: every cache key and every
 artifact digest of the run is a hash of it. The commit that carries it is
 often one the runner builds. It is on no branch, and nobody can fetch it. So
 the verdict held a tree the run did not test and a commit ID nobody can
@@ -56,6 +56,15 @@ No consumer reads a verdict yet, so version 1 changes in place.
 6. **`weakening` is what the producer found.** It is true when the producer
    found that the change weakens the declaration. A producer that does not
    compare the declaration's content writes false.
+7. **No tree, no verdict.** A verdict is an answer about a tested tree, so
+   `change.tree` and `change.testedCheckout` stay required. A run that tested
+   no tree has no verdict: a run canceled or failed before its checkout, and
+   a run that lost the base of the merge it tested.
+8. **`touched` and `reached` say how the change got to a project.** A project
+   is `touched` when a changed path claims it: the project owns the path, or
+   reads it as a declared input. It is `reached` when the change reaches it
+   from another impacted project, touched or reached. `via` names that
+   project when the producer knows it.
 
 ## Rejected alternatives
 
@@ -68,8 +77,12 @@ No consumer reads a verdict yet, so version 1 changes in place.
   `change.tree`.
 - **The ID of the tested commit.** A commit the runner builds is on no branch.
   Its ID resolves to nothing outside the run.
-- **No verdict when evidence is missing.** A run that failed would then have
-  no answer document, and a consumer would need a second path to show it.
+- **No verdict when the impact, the requirement states or the declarations
+  are missing.** A run that failed would then have no answer document, and a
+  consumer would need a second path to show it.
+- **A verdict without a tree,** for a run that tested none. The verdict would
+  then answer for nothing a consumer can name. Such a run answered no check,
+  and its own record says how it ended.
 - **Zero counts, or a flag that says a list is unknown.** A reader that skips
   the flag reads zero as "none". An absent member cannot be read as a count.
 - **A new predicate version.** No consumer reads version 1, so a second
@@ -88,3 +101,11 @@ No consumer reads a verdict yet, so version 1 changes in place.
   these two, as it does for every answer.
 - A producer that knows the impact but no requirement state writes one gap per
   impacted project: at most 4,096 gaps, inside the bound of 16,384.
+- A consumer finds no verdict for a run that tested no tree. It reads how that
+  run ended from the CI plane's own record of the run.
+- `ParseVerdict` reads an optional member written as `null` or as an empty
+  string like an absent one, like every Go reader in this package. The schema
+  refuses both.
+- The schema states the mark of a passed verdict and the empty list beside an
+  `unknown-impact` or an `unknown-declarations` gap. It does not state the
+  folds, the sums, the match between gaps and lists, or the order of a list.

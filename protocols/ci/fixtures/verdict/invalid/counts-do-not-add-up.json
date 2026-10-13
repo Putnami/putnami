@@ -38,16 +38,16 @@
           "relation": "touched",
           "requirements": {
             "total": 2,
-            "proven": 2,
-            "missing": 1
+            "proven": 1,
+            "missing": 0
           }
         }
       ]
     },
     "requirements": {
       "total": 2,
-      "proven": 2,
-      "missing": 1,
+      "proven": 1,
+      "missing": 0,
       "projectsWithout": 0,
       "projectsUnknown": 0
     },

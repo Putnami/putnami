@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://putnami.dev/schemas/putnami-verdict.json",
   "title": "Putnami run verdict",
-  "description": "Version 1: the one answer a CI run gives about one change, as an unsigned in-toto Statement v1. The subject is the repository at the change's head commit. The Go validator also checks what this schema cannot state: the answer is the fold of the required checks, the mark follows the answer and the gaps, the counts add up, the gaps match the impact and the declarations, a list is empty beside the gap that says it is unknown, and every list is sorted without duplicates.",
+  "description": "Version 1: the one answer a CI run gives about one change, as an unsigned in-toto Statement v1. The subject is the repository at the change's head commit. A run that tested no tree has no verdict. The Go validator also checks what this schema does not state: the subject is the change's repository at its head commit, the answer is the fold of the required checks, the deploy answer is the fold of its channels, the counts add up and the totals are their sums, the gaps match the impact and the declarations, and every list is sorted without duplicates.",
   "type": "object",
   "additionalProperties": false,
   "required": ["_type", "subject", "predicateType", "predicate"],
@@ -111,7 +111,7 @@
           "type": "array",
           "maxItems": 1024,
           "items": { "$ref": "#/$defs/declaration" },
-          "description": "Every declaration the change modifies, the weakening ones first, then by path."
+          "description": "Every declaration the change modifies, the weakening ones first, then by path. Empty beside an unknown-declarations gap."
         },
         "gaps": {
           "type": "array",
@@ -131,7 +131,35 @@
         "properties": { "answer": { "const": "passed" } }
       },
       "then": { "required": ["mark"] },
-      "else": { "not": { "required": ["mark"] } }
+      "else": { "not": { "required": ["mark"] } },
+      "allOf": [
+        {
+          "if": { "properties": { "mark": { "const": "verified" } }, "required": ["mark"] },
+          "then": { "properties": { "gaps": { "maxItems": 0 } } }
+        },
+        {
+          "if": { "properties": { "mark": { "const": "checked" } }, "required": ["mark"] },
+          "then": { "properties": { "gaps": { "minItems": 1 } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "gaps": { "contains": { "properties": { "kind": { "const": "unknown-impact" } }, "required": ["kind"] } }
+            },
+            "required": ["gaps"]
+          },
+          "then": { "properties": { "impact": { "properties": { "projects": { "maxItems": 0 } } } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "gaps": { "contains": { "properties": { "kind": { "const": "unknown-declarations" } }, "required": ["kind"] } }
+            },
+            "required": ["gaps"]
+          },
+          "then": { "properties": { "declarations": { "maxItems": 0 } } }
+        }
+      ]
     },
     "change": {
       "type": "object",
@@ -221,7 +249,7 @@
           "type": "array",
           "maxItems": 4096,
           "items": { "$ref": "#/$defs/project" },
-          "description": "Every impacted project, sorted by project ID."
+          "description": "Every impacted project, sorted by project ID. Empty beside an unknown-impact gap."
         }
       }
     },
@@ -231,10 +259,13 @@
       "required": ["project", "relation"],
       "properties": {
         "project": { "$ref": "#/$defs/projectID" },
-        "relation": { "enum": ["touched", "reached"] },
+        "relation": {
+          "enum": ["touched", "reached"],
+          "description": "touched when a changed path claims the project itself, reached when the change reaches it from another impacted project."
+        },
         "via": {
           "$ref": "#/$defs/projectID",
-          "description": "Another impacted project the dependency reaches this one through."
+          "description": "The impacted project the change reaches this one from."
         },
         "requirements": {
           "$ref": "#/$defs/requirementCounts",

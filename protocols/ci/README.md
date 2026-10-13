@@ -369,6 +369,9 @@ verifies a signature.
 
 The Verdict is *defined, not yet adopted*: no consumer reads it yet.
 
+A verdict is an answer about a tested tree. A run that tested no tree, such as
+one canceled before its checkout, has no verdict.
+
 | Predicate member | Meaning |
 | --- | --- |
 | `answer` | `passed`, `failed`, `unsupported`, `unanswered`, `canceled` or `infrastructure`: the fold of the required checks |
@@ -376,9 +379,9 @@ The Verdict is *defined, not yet adopted*: no consumer reads it yet.
 | `change` | `repository`, `reference`, `head`, `base` when the run had one, `tree`, the tree the run tested, and `testedCheckout`: `head` when that is the head's own tree, `merge` when it is the tree of the head merged into the base |
 | `run` | the run's `id`, its `attempt` from 1, and its own `conclusion` code |
 | `checks` | every check: `check`, `answer`, `level` (`required` or `advisory`), `phase`, and `reason` when it did not pass |
-| `impact` | every impacted `project`, `touched` or `reached` (`via` another impacted project), with its `requirements` counts: `total`, `proven`, `missing`. A project carries no counts when the producer does not know them |
+| `impact` | every impacted `project` with its `relation` and its `requirements` counts: `total`, `proven`, `missing`. A project is `touched` when a changed path claims it: the project owns the path, or reads it as a declared input. It is `reached` when the change reaches it from another impacted project, which `via` names. A project carries no counts when the producer does not know them |
 | `requirements` | the sums of the projects' counts, `projectsWithout`, the projects that state no requirement, and `projectsUnknown`, the projects without counts |
-| `declarations` | every declaration the change modifies: `path`, `kind`, `weakening` when the producer found that the change weakens it, and the `approval` when someone gave one |
+| `declarations` | every declaration the change modifies: `path`, `kind`, `weakening`, true when the producer found that the change weakens it, and the `approval` when someone gave one |
 | `gaps` | what keeps a passed verdict from `verified`: something missing, or something the producer does not know |
 | `deploy` | the `answer` of the deploys the change triggered and the answer of each of their `channels`, when it triggered any |
 | `computedAt`, `revision` | when the verdict was computed, and its revision from 1 |
@@ -408,8 +411,11 @@ The Verdict is *defined, not yet adopted*: no consumer reads it yet.
   channels by name, and gaps by kind, project, requirement, then path.
   Declarations sort weakening first, then by path.
 - `ParseVerdict` reads one verdict strictly: no duplicate key, no unknown
-  member, no trailing data, and at most `MaxVerdictBytes` (4 MiB).
-  `ValidateVerdict` refuses every defect above and returns the first one.
+  member, no trailing data, and at most `MaxVerdictBytes` (4 MiB). It reads
+  an optional member written as `null` or as an empty string like an absent
+  one; the schema refuses both.
+  `ValidateVerdict` refuses every defect above and returns the first one, in
+  the order its documentation lists.
 
 A run attempt can compute its verdict more than once, for example when a late
 answer arrives. A higher `revision` replaces every lower one. See
@@ -463,7 +469,11 @@ answer arrives. A higher `revision` replaces every lower one. See
   valid plan from its planner data and must emit the same bytes.
 - Verdict schema: [`schemas/putnami-verdict.json`](schemas/putnami-verdict.json)
   (`$id` `https://putnami.dev/schemas/putnami-verdict.json`), embedded in the
-  package and returned by `VerdictSchema()`. Every object is closed.
+  package and returned by `VerdictSchema()`. Every object is closed. It
+  states the shape, the vocabularies, the mark of a passed verdict, and the
+  empty list beside an `unknown-impact` or an `unknown-declarations` gap. It
+  does not state the folds, the sums, the match between gaps and lists, or
+  the order of a list: `ValidateVerdict` checks those.
   `TestVerdictSchemaNamesTheGoMembers` and
   `TestVerdictSchemaMatchesTheGoVocabulary` pin it to the Go types.
 - Verdict conformance corpus: [`fixtures/verdict`](fixtures/verdict).
