@@ -254,7 +254,9 @@ not change:
   requirement's state with per-check detail, the observation reports read with
   their SHA-256 digests, and the group's one `Blocked` decision. It is derived
   history — the audit surface `putnami specs verify --session` replays — never
-  an input to current maturity.
+  an input to current maturity. A record with no group and no diagnostic
+  means the gate ran and no selected project states a requirement; a session
+  with no record evaluated nothing.
 
 The committed policy is one domain-keyed object under the open command-options
 surface, resolved by this package. Project-scoped subjects use

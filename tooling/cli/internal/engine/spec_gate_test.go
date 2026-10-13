@@ -98,37 +98,37 @@ func TestSpecGateFinalizer_AttachmentConditions(t *testing.T) {
 	t.Parallel()
 	fixture := newSpecGateFixture(t, "passed")
 
-	if specGateFinalizer(&Request{Commands: []string{"build", "lint"}}, fixture.ws, fixture.planned, nil, &specGateOutcome{}) != nil {
+	if specGateFinalizer(&Request{Commands: []string{"build", "lint"}}, fixture.ws, fixture.planned, nil, nil, &specGateOutcome{}) != nil {
 		t.Error("a session without test carried the spec gate")
 	}
-	if specGateFinalizer(&Request{Commands: []string{"test"}}, nil, nil, nil, &specGateOutcome{}) != nil {
+	if specGateFinalizer(&Request{Commands: []string{"test"}}, nil, nil, nil, nil, &specGateOutcome{}) != nil {
 		t.Error("a run with no loaded workspace carried the spec gate")
 	}
-	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, &specGateOutcome{}) == nil {
+	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, nil, &specGateOutcome{}) == nil {
 		t.Error("a test session under the default report mode carried no spec gate")
 	}
 	// One project going off does NOT disarm the workspace: the built-in default
 	// stays report for everyone else, so the collector still attaches.
 	fixture.setProjectMode("off")
-	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, &specGateOutcome{}) == nil {
+	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, nil, &specGateOutcome{}) == nil {
 		t.Error("a single project's off disarmed the whole workspace's gate")
 	}
 	// Off EVERYWHERE — the committed workspace policy plus no overriding
 	// project — attaches no collector at all.
 	fixture.ws.Config.Options = map[string]map[string]any{"sdd": {"verification": map[string]any{"specs": "off"}}}
-	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, &specGateOutcome{}) != nil {
+	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, nil, &specGateOutcome{}) != nil {
 		t.Error("off everywhere still attached the collector")
 	}
 	// A project override back on re-attaches even under a workspace off.
 	fixture.setProjectMode("enforce")
-	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, &specGateOutcome{}) == nil {
+	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, nil, &specGateOutcome{}) == nil {
 		t.Error("a committed enforce override under a workspace off attached nothing")
 	}
 	// A watch iteration replans through Engine.Run and rebuilds the finalizer
 	// list, so an iteration request attaches the gate exactly as a terminal
 	// run does — watch parity costs no special case.
 	iteration := &Request{Commands: []string{"test"}, watchIteration: true}
-	if specGateFinalizer(iteration, fixture.ws, fixture.planned, nil, &specGateOutcome{}) == nil {
+	if specGateFinalizer(iteration, fixture.ws, fixture.planned, nil, nil, &specGateOutcome{}) == nil {
 		t.Error("a watch iteration carried no spec gate")
 	}
 }
@@ -151,7 +151,7 @@ func TestSpecGateFinalizer_EnforceSanctionsThroughTheReducer(t *testing.T) {
 			fixture := newSpecGateFixture(t, tc.status)
 			fixture.setProjectMode("enforce")
 			outcome := &specGateOutcome{}
-			finalize := specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, outcome)
+			finalize := specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, nil, outcome)
 			if finalize == nil {
 				t.Fatal("enforce session carried no finalizer")
 			}
@@ -181,7 +181,7 @@ func TestSpecGateFinalizer_ReportNeverChangesACleanExit(t *testing.T) {
 	t.Parallel()
 	fixture := newSpecGateFixture(t, "failed")
 	outcome := &specGateOutcome{}
-	finalize := specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, outcome)
+	finalize := specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, nil, outcome)
 	if finalize == nil {
 		t.Fatal("default report session carried no finalizer")
 	}
@@ -207,7 +207,7 @@ func TestSpecGateFinalizer_IncompleteSessionsGainNoSecondaryFailures(t *testing.
 			fixture.setProjectMode("enforce")
 			fixture.results[fixture.planned[1].Key()].Status = status
 			outcome := &specGateOutcome{}
-			finalize := specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, outcome)
+			finalize := specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, nil, outcome)
 			finalize(fixture.results)
 
 			if _, sanctioned := fixture.results["/billing:specs~verify"]; sanctioned {
@@ -249,7 +249,7 @@ func TestSpecGateFinalizer_TruncatedSessionsWarnAboutNothing(t *testing.T) {
 		t.Helper()
 		return captureStderr(t, func() {
 			finalize := specGateFinalizer(&Request{Commands: []string{"test"}},
-				fixture.ws, fixture.planned, exhaustedRecovery{}, &specGateOutcome{})
+				fixture.ws, fixture.planned, exhaustedRecovery{}, nil, &specGateOutcome{})
 			finalize(fixture.results)
 		})
 	}
@@ -292,4 +292,88 @@ func keysOf(results map[string]*jobs.JobResult) []string {
 		keys = append(keys, key)
 	}
 	return keys
+}
+
+// projectionProducerExtension is an SDD-shaped extension: a `validate`
+// pipeline step whose task declares the reserved criteria projection, active
+// in a project that holds specs/*.json.
+func projectionProducerExtension() *extension.ExtensionDescription {
+	enabled := true
+	return &extension.ExtensionDescription{
+		Name:    "@acme/sdd",
+		Version: "1.0.0",
+		Jobs: map[string]*extension.JobDefinition{
+			"validate": {
+				ExtensionName:   "@acme/sdd",
+				Name:            "validate",
+				Kind:            "command",
+				Command:         "sdd",
+				ActivationFiles: []string{"specs/*.json"},
+				PipelineSteps:   []extension.PipelineStep{{ID: "specs", Task: "specs-validate"}},
+			},
+		},
+		Tasks: map[string]extension.TaskDefinition{
+			"specs-validate": {
+				Kind: "command", Command: "sdd",
+				Cache: &extension.TaskCachePolicy{Enabled: &enabled},
+				Declares: &extension.TaskDeclaration{Outputs: map[string]extension.DeclaredOutput{
+					"criteria": {Kind: extension.OutputKindFile, Root: extension.OutputRootCommandOutput,
+						Path: features.SpecCriteriaProjectionFilename, OptionalEmpty: true},
+				}},
+			},
+		},
+	}
+}
+
+// TestValidateProducerPlanAnswersFromTheWholeExtensionSet pins the engine half
+// of the empty-evaluation rule: a producer applies by the planner's activation
+// rule alone, the session's disable lists never hide one, and a project that
+// disables validate itself leaves the answer unknown.
+func TestValidateProducerPlanAnswersFromTheWholeExtensionSet(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeSpecGateFile(t, filepath.Join(root, "billing", "specs", "invoicing.json"), "{}")
+	writeSpecGateFile(t, filepath.Join(root, "ledger", "ledger.go"), "package ledger\n")
+	writeSpecGateFile(t, filepath.Join(root, "audit", "specs", "audit.json"), "{}")
+	billing := &workspace.Project{ID: "/billing", Name: "billing", Path: "billing",
+		Extensions: []string{"@acme/sdd"}, Config: &wsproto.ProjectConfig{}}
+	ledger := &workspace.Project{ID: "/ledger", Name: "ledger", Path: "ledger",
+		Extensions: []string{"@acme/sdd"}, Config: &wsproto.ProjectConfig{}}
+	audit := &workspace.Project{ID: "/audit", Name: "audit", Path: "audit",
+		Extensions: []string{"@acme/sdd"}, Config: &wsproto.ProjectConfig{}}
+	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "gate"}, []*workspace.Project{billing, ledger, audit})
+	req := &Request{Commands: []string{"test"}, Config: &wsproto.Config{Disable: &wsproto.DisableConfig{
+		Jobs: []string{"validate"}, Extensions: []string{"@acme/sdd"},
+	}}}
+	plan := &validateProducerPlan{req: req, ws: ws, projects: []*workspace.Project{billing, ledger},
+		extensions: []*extension.ExtensionDescription{projectionProducerExtension()}}
+
+	applicable, err := plan.ApplicableProjects()
+	if err != nil {
+		t.Fatalf("ApplicableProjects: %v", err)
+	}
+	if !applicable["/billing"] || applicable["/ledger"] || applicable["/audit"] || len(applicable) != 1 {
+		t.Fatalf("applicable = %v, want only the selected project that holds a spec", applicable)
+	}
+
+	plan.skipped = []extension.SkippedExtension{{Ref: "@acme/other", Name: "@acme/other"}}
+	if _, err := plan.ApplicableProjects(); err == nil {
+		t.Fatal("a discovery that skipped an extension answered applicability")
+	}
+	plan.skipped = nil
+
+	req.Config.Extensions.List = map[string]string{"@acme/sdd": "", "@acme/other": ""}
+	req.Config.Disable.Extensions = []string{"@acme/sdd", "@acme/other"}
+	if _, err := plan.ApplicableProjects(); err == nil {
+		t.Fatal("a configured registry extension that is not loaded answered applicability")
+	}
+	req.Config.Extensions.List = map[string]string{"@acme/sdd": ""}
+	if _, err := plan.ApplicableProjects(); err != nil {
+		t.Fatalf("ApplicableProjects with every configured extension loaded: %v", err)
+	}
+
+	billing.Config.Disable = &wsproto.ProjectDisableConfig{Jobs: []string{"@acme/sdd:validate"}}
+	if _, err := plan.ApplicableProjects(); err == nil {
+		t.Fatal("a selected project that disables validate answered applicability")
+	}
 }

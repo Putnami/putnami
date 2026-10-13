@@ -127,7 +127,7 @@ func (f *attestedFixture) rebuildGraph() {
 func (f *attestedFixture) collect(t *testing.T, recovery ObservationRecovery) *features.SpecVerificationRecord {
 	t.Helper()
 	record, err := Collect(f.ws, f.planned, f.results,
-		time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC), recovery)
+		time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC), recovery, nil)
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}

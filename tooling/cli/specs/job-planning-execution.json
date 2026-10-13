@@ -70,6 +70,10 @@
       "text": "A declared output with a drift policy is compared with the bytes at its path immediately before the task wrote it: before the subprocess when executed, before the recorded tree is swapped in on a hit. A difference is the diagnostic generated-output-drift naming added, removed and changed paths; fail fails the task with its outputs still written, warn keeps its status. A pathFrom output is judged inside a digest of its project root. Neither reference nor verdict reaches a key, an entry or the failure cache."
     },
     {
+      "id": "spec-gate-records-an-empty-evaluation",
+      "text": "A session whose spec gate ran records a verdict with no group and no diagnostic when no selected project states a requirement: every selected project a criteria-projection producer applies to ran one that succeeded and none emitted a projection; a project no producer applies to states none. When a producer applies but did not run, as in test without validate, or it failed, was canceled or was skipped, the session writes no record or one that carries only its collection findings."
+    },
+    {
       "id": "spec-gate-evidence-scope",
       "text": "A selected project's requirements resolve from observations its transitive dependencies and its DIRECT dependents already published: an attester the run did not plan is answered from that project's own test cache entry, provenance still contained in the reporting project. Transitive dependents stay out of scope. A consulted source that did not support a check still blocks under enforce, as does an exhausted scope; a check no reachable source could report is recorded unobserved and warned, never blocked."
     },

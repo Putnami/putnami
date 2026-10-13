@@ -293,8 +293,17 @@ digests, and the recorded blocking decision — reproduced, never recomputed.
 `--session <id>` names an exact recorded session; the default follows the
 latest one, and a spec no session covered is evaluated against zero
 observations through the same shared rule, so nothing unproven reads as
-green. Under an effective `off` policy the group reports
-`automaticEvaluation: false` and succeeds; structural spec errors keep
+green. A session whose gate ran over projects that state no requirement
+records a verdict with no group and no diagnostic, and `specs verify` reads it
+as "this session selected no project that states a requirement". The gate
+records that verdict when every selected project that `specs-validate` applies
+to ran it successfully. The gate reads a project that `specs-validate` does
+not apply to, because it holds no `putnami.features.json` or `specs/*.json` or
+does not attach this extension, as stating no requirement. A session without
+a record evaluated nothing: it ran no `test`, its policy is `off` everywhere,
+or a selected project's `specs-validate` did not run or did not succeed, as in
+a `test` run without `validate`. Under an effective `off` policy the group
+reports `automaticEvaluation: false` and succeeds; structural spec errors keep
 failing exactly as `specs validate` fails. The committed policy lives in
 `options.sdd.verification` (workspace or spec-hosting project), and an
 unknown domain or value there fails every run before jobs execute.

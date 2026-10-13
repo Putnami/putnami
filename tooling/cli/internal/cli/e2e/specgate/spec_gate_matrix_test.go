@@ -35,7 +35,9 @@ import (
 // gateMatrixFixture writes the synthetic workspace: two spec-owning projects
 // (alpha, beta) whose validate command emits a criteria projection with one
 // executable requirement each, and whose test command emits the observation
-// report stated in the project's report.src.json.
+// report stated in the project's report.src.json. The validate command
+// activates on gate.specs and the test command on gate.project, so removing
+// gate.specs leaves a tested project no projection producer applies to.
 func gateMatrixFixture(t *testing.T, wsRoot string) {
 	t.Helper()
 	clitest.WriteFile(t, filepath.Join(wsRoot, "putnami.workspace.json"), `{
@@ -74,7 +76,7 @@ exit 0
   "commands": {
     "validate": {
       "description": "Emit the criteria projection",
-      "activationFiles": ["gate.project"],
+      "activationFiles": ["gate.specs"],
       "run": [{"id": "specs", "task": "criteria-exec"}]
     },
     "test": {
@@ -91,7 +93,7 @@ exit 0
       "args": ["spec-criteria.json", "putnami-spec-criteria"],
       "cwd": "{projectRoot}",
       "timeoutMs": -1,
-      "inputs": {"sources": {"from": "project", "files": ["*.json", "*.txt", "*.marker", "gate.project"]}},
+      "inputs": {"sources": {"from": "project", "files": ["*.json", "*.txt", "*.marker", "gate.specs"]}},
       "cache": {"enabled": true},
       "declares": {"outputs": {"criteria": {"kind": "file", "root": "command-output", "path": "spec-criteria.json", "optionalEmpty": true}}}
     },
@@ -114,6 +116,7 @@ exit 0
 		clitest.WriteFile(t, filepath.Join(dir, "putnami.json"),
 			`{"name":"`+project+`","extensions":["@putnami/gate-fixture"]}`)
 		clitest.WriteFile(t, filepath.Join(dir, "gate.project"), "")
+		clitest.WriteFile(t, filepath.Join(dir, "gate.specs"), "")
 		clitest.WriteFile(t, filepath.Join(dir, project+"_check.txt"), "fixture declaration\n")
 		clitest.WriteFile(t, filepath.Join(dir, "spec-criteria.json.src.json"), `{
   "protocolVersion": 1,
@@ -317,6 +320,58 @@ func TestSpecGateMatrix_EndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("a selection that states no requirement records an empty evaluation", func(t *testing.T) {
+		spectest.Proves(t, "cli/job-planning-execution", "spec-gate-records-an-empty-evaluation",
+			"every-answered-selected-project-records-no-group")
+		wsRoot := newWorkspace(t)
+		setGatePolicy(t, wsRoot, "alpha", "enforce")
+		for _, project := range []string{"alpha", "beta"} {
+			if err := os.Remove(filepath.Join(wsRoot, project, "spec-criteria.json.src.json")); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		// A producer applies to both projects, and `test` alone runs none:
+		// the gate evaluated nothing, and the session keeps no record.
+		code, output := clitest.RunGateArgs(t, wsRoot, "test", "--all")
+		if code != cli.ExitSuccess {
+			t.Fatalf("exit = %d for a test-only session\n%s", code, output)
+		}
+		if record, found := optionalLatestGateRecord(t, wsRoot); found {
+			t.Fatalf("a session that ran no applicable producer recorded %+v", record)
+		}
+
+		// With validate, every producer succeeds and projects nothing, on the
+		// cold run and on the warm run its cache serves.
+		for _, run := range []string{"cold", "warm"} {
+			code, output = runGateSession(t, wsRoot)
+			if code != cli.ExitSuccess {
+				t.Fatalf("%s: exit = %d for projects without a requirement\n%s", run, code, output)
+			}
+			record, _ := latestGateRecord(t, wsRoot)
+			if len(record.Groups) != 0 || len(record.Diagnostics) != 0 {
+				t.Fatalf("%s: an empty evaluation recorded %+v, want no group and no diagnostic", run, record)
+			}
+		}
+
+		// Once no producer applies to either project, a test-only session
+		// answers for the whole selection and records the empty evaluation.
+		for _, project := range []string{"alpha", "beta"} {
+			if err := os.Remove(filepath.Join(wsRoot, project, "gate.specs")); err != nil {
+				t.Fatal(err)
+			}
+		}
+		workspace.InvalidateLoadCache(wsRoot)
+		code, output = clitest.RunGateArgs(t, wsRoot, "test", "--all")
+		if code != cli.ExitSuccess {
+			t.Fatalf("exit = %d for a test-only session no producer applies to\n%s", code, output)
+		}
+		record, _ := latestGateRecord(t, wsRoot)
+		if len(record.Groups) != 0 || len(record.Diagnostics) != 0 {
+			t.Fatalf("a selection no producer applies to recorded %+v, want no group and no diagnostic", record)
+		}
+	})
+
 	t.Run("failed tests gain no secondary sanction", func(t *testing.T) {
 		wsRoot := newWorkspace(t)
 		setGatePolicy(t, wsRoot, "alpha", "enforce")
@@ -337,8 +392,8 @@ func TestSpecGateMatrix_EndToEnd(t *testing.T) {
 		// in which case the record persists and carries their groups — or
 		// projected none, in which case there is no record at all. The one
 		// state ruled out is the third: a persisted record with zero groups,
-		// which `specs verify` replays as "every enforced feature was
-		// evaluated and observed nothing" and blocks the whole workspace on.
+		// which states that no selected project carries a requirement while
+		// alpha's spec does.
 		record, found := optionalLatestGateRecord(t, wsRoot)
 		if found && len(record.Groups) == 0 {
 			t.Fatal("a session that evaluated nothing persisted a record claiming an empty evaluation")

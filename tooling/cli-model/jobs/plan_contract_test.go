@@ -76,3 +76,51 @@ func TestProducesVerificationReportFollowsTheDeclaration(t *testing.T) {
 		})
 	}
 }
+
+// TestProducesSpecCriteriaProjectionFollowsTheDeclaration pins how the spec
+// gate tells a projection producer from every other validate task: only a
+// declared command-output FILE at the reserved filename, on the validate
+// command, counts. A job without a declaration never does.
+func TestProducesSpecCriteriaProjectionFollowsTheDeclaration(t *testing.T) {
+	t.Parallel()
+	projectionFile := extension.DeclaredOutput{Kind: extension.OutputKindFile,
+		Root: extension.OutputRootCommandOutput, Path: features.SpecCriteriaProjectionFilename, OptionalEmpty: true}
+	near := func(edit func(*extension.DeclaredOutput)) map[string]extension.DeclaredOutput {
+		output := projectionFile
+		edit(&output)
+		return map[string]extension.DeclaredOutput{"criteria": output}
+	}
+	declared := map[string]extension.DeclaredOutput{"criteria": projectionFile}
+
+	cases := map[string]struct {
+		job  *ScheduledJob
+		want bool
+	}{
+		"the declared projection file": {
+			job: declaredCaptureJob("validate", "specs-validate", declared), want: true},
+		"the reserved name under the default project root": {
+			job: declaredCaptureJob("validate", "specs-validate", near(func(o *extension.DeclaredOutput) { o.Root = "" }))},
+		"a directory at the reserved name": {
+			job: declaredCaptureJob("validate", "specs-validate",
+				near(func(o *extension.DeclaredOutput) { o.Kind = extension.OutputKindDirectory }))},
+		"another command-output file": {
+			job: declaredCaptureJob("validate", "specs-validate", near(func(o *extension.DeclaredOutput) { o.Path = "report.json" }))},
+		"the projection file declared outside the validate command": {
+			job: declaredCaptureJob("test", "specs-validate", declared)},
+		"a declaration without outputs": {
+			job: declaredCaptureJob("validate", "lint-specs", nil)},
+		"a validate command job with no pipeline step": {
+			job: &ScheduledJob{JobDef: &extension.JobDefinition{Name: "validate", CommandName: "validate"}}},
+		"a job without a definition": {
+			job: &ScheduledJob{}},
+		"no job": {},
+	}
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := ProducesSpecCriteriaProjection(testCase.job); got != testCase.want {
+				t.Errorf("ProducesSpecCriteriaProjection = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}

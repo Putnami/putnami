@@ -34,19 +34,24 @@ const maxArtifactBytes = 16 << 20
 // becomes an error finding that fails closed under enforce; it is never
 // skipped into a silently green gate.
 //
-// A session in which NO job declared a criteria projection returns (nil, nil):
-// the gate had nothing to evaluate, which is not the same fact as evaluating
-// and finding nothing. The distinction is load-bearing downstream — the
-// persisted record is what `specs verify` replays, and a record claiming an
-// empty evaluation makes every enforced feature read as unevaluated. A
-// projection that was declared but could not be read is the opposite case and
-// still produces a record, because that is a finding that must fail closed.
+// A session in which NO job declared a criteria projection returns a record
+// with no group when every selected project a projection producer applies to
+// ran one that succeeded: the gate ran, and no selected project states a
+// requirement. It returns (nil, nil) when a producer applies to a selected
+// project the session did not run it for, as in a `test` run without
+// `validate`, or when a producer failed or never finished: the gate had
+// nothing to evaluate, which is not the same fact as evaluating and finding
+// nothing. A projection that was declared but could not be read still
+// produces a record, because that is a finding that must fail closed.
 //
 // recovery is the unplanned-attester seam (recover.go). It is consulted
 // LAZILY — only for a group the in-session join left unresolved — so a green
 // run pays nothing for it, and it may be nil, which disables recovery.
+//
+// producers is consulted only when nothing was projected. It may be nil, and
+// then such a session records nothing.
 func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[string]*jobs.JobResult,
-	at time.Time, recovery ObservationRecovery) (*features.SpecVerificationRecord, error) {
+	at time.Time, recovery ObservationRecovery, producers ProjectionProducers) (*features.SpecVerificationRecord, error) {
 	if ws == nil {
 		return nil, fmt.Errorf("spec gate collection requires a loaded workspace")
 	}
@@ -105,10 +110,12 @@ func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[
 				observations, reportsByFeature, at, evidence))
 		}
 	}
-	// Nothing was projected and nothing was diagnosed: the session ran no spec
-	// evaluation. Say so by returning no record rather than an empty one — the
-	// persistence seam already contracts absence as "the gate did not run".
-	if !projected && len(record.Diagnostics) == 0 {
+	// Nothing was projected and nothing was diagnosed. The record is empty when
+	// every selected project a producer applies to ran one that succeeded,
+	// because each of them then answered that its project states no
+	// requirement. Otherwise there is no record, which the persistence seam
+	// contracts as "the gate did not run".
+	if !projected && len(record.Diagnostics) == 0 && !producersAnswered(planned, results, producers) {
 		return nil, nil
 	}
 	sortRecord(record)
@@ -404,6 +411,49 @@ func artifactField(wsRoot, path string) string {
 		return filepath.ToSlash(path)
 	}
 	return filepath.ToSlash(relative)
+}
+
+// ProjectionProducers is the engine-owned seam that names the selected
+// projects a criteria-projection producer applies to. The planner decides it,
+// and this package does not import the planner.
+type ProjectionProducers interface {
+	// ApplicableProjects returns the IDs of the session's selected projects
+	// for which a `validate` plan holds a criteria-projection producer,
+	// whether or not the session planned that command.
+	ApplicableProjects() (map[string]bool, error)
+}
+
+// producersAnswered reports whether every planned criteria-projection producer
+// succeeded and every selected project a producer applies to ran one. A
+// producer that succeeded without emitting a projection states that its
+// project has no requirement; a failed, canceled, skipped or missing result
+// states nothing, and neither does a producer the session did not plan.
+func producersAnswered(planned []*jobs.ScheduledJob, results map[string]*jobs.JobResult,
+	producers ProjectionProducers) bool {
+	if producers == nil {
+		return false
+	}
+	answered := make(map[string]bool)
+	for _, job := range planned {
+		if job == nil || job.Project == nil || !jobs.ProducesSpecCriteriaProjection(job) {
+			continue
+		}
+		result := results[job.Key()]
+		if result == nil || result.Status != string(jobs.TaskStatusSuccess) {
+			return false
+		}
+		answered[job.Project.ID] = true
+	}
+	applicable, err := producers.ApplicableProjects()
+	if err != nil {
+		return false
+	}
+	for projectID := range applicable {
+		if !answered[projectID] {
+			return false
+		}
+	}
+	return true
 }
 
 // orderedJobs returns the session's jobs with results, sorted by key, so two

@@ -61,9 +61,9 @@ func TestSessionStreamSubscribersKeepRecordedBytesIdenticalToBase(t *testing.T) 
 		if got := normalizeRecordedSession(t, session, events); got != sessionStreamBaseGolden {
 			t.Fatalf("subscribed=%v: recorded session differs from the base CLI\n--- got\n%s\n--- base\n%s", subscribed, got, sessionStreamBaseGolden)
 		}
-		want := []string{"events.jsonl", "plan.json", "session.json"}
+		want := []string{"events.jsonl", "plan.json", "session.json", "spec-verification.json"}
 		if subscribed {
-			want = []string{"events.jsonl", "plan.json", "reporting.json", "reporting.lock", "session.json", protocolcli.SessionSubscribersFileName, "subscribers.lock"}
+			want = []string{"events.jsonl", "plan.json", "reporting.json", "reporting.lock", "session.json", "spec-verification.json", protocolcli.SessionSubscribersFileName, "subscribers.lock"}
 			verifyReporterArtifacts(t, root, id)
 			readLedger(t, dir, id, events)
 			evidence, err := sessionstream.ReadEvidence(dir)

@@ -84,8 +84,12 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  25,
-		funcs:  177,
-		why: "RAISED 24/174→25/177 (cli/contributor-workflows): spec_gate_cache_verify.go adds a read-only " +
+		funcs:  178,
+		why: "RAISED 177→178 (cli/job-planning-execution, spec-gate-records-an-empty-evaluation): " +
+			"spec_gate.go adds validateProducerPlan.ApplicableProjects, the one seam that answers which " +
+			"selected projects a criteria-projection producer applies to. It plans through the existing " +
+			"planner and adds no run stage, scheduler or store. " +
+			"RAISED 24/174→25/177 (cli/contributor-workflows): spec_gate_cache_verify.go adds a read-only " +
 			"verification seam for restored native producer reports. VerifyCachedVerificationReport, " +
 			"cachedObservationRecovery.verifyCachedReport, and readCachedVerificationReport reuse the " +
 			"engine's existing cache key, result, manifest, and bounded-byte checks; they add no run stage, " +

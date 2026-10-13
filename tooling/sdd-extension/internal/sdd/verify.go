@@ -113,12 +113,21 @@ func BuildSpecVerifyResult(ws *workspace.Workspace, selection Selection, session
 				// ever evaluated it" — so each says which one it is, and the
 				// second names the command that produces the evidence. Without
 				// that second message a workspace whose latest session carried
-				// no spec gate blocks with no stated cause at all.
-				if record != nil {
+				// no spec gate blocks with no stated cause at all. A record with
+				// no group and no diagnostic is a session whose gate ran over
+				// projects that state no requirement, so it names that fact and
+				// the same command.
+				switch {
+				case record != nil && len(record.Groups) == 0 && len(record.Diagnostics) == 0:
+					report.Diagnostics = append(report.Diagnostics, diag.Warningf(featureproto.WarningCodeMissingEvidence,
+						expected.Spec, "session %s selected no project that states a requirement, so feature %q was not "+
+							"evaluated; run `putnami test,validate` over its project to produce an evaluation",
+						sessionID, expected.Feature))
+				case record != nil:
 					report.Diagnostics = append(report.Diagnostics, diag.Warningf(featureproto.WarningCodeMissingEvidence,
 						expected.Spec, "feature %q was not evaluated by session %s; states assume no observations",
 						expected.Feature, sessionID))
-				} else {
+				default:
 					report.Diagnostics = append(report.Diagnostics, diag.Warningf(featureproto.WarningCodeMissingEvidence,
 						expected.Spec, "feature %q has no recorded evaluation to replay; run `putnami test,validate` "+
 							"over its project to produce one", expected.Feature))
