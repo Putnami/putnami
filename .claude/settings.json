@@ -11,5 +11,8 @@
     "commit": "",
     "pr": "",
     "sessionUrl": false
+  },
+  "env": {
+    "PUTNAMI_SESSION_REPORTER": "@putnami/cloud"
   }
 }
