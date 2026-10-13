@@ -360,6 +360,12 @@ export default loader(async (ctx) => {
 });
 ```
 
+The redirect works on a full page load and during client navigation. On a full
+page load, the server answers the redirect. During client navigation, the router
+follows it in the app: it renders the target page, or loads it as a new document
+when it is on another origin or outside the app's basename. A redirect that a
+route middleware answers is followed the same way.
+
 ### Data Revalidation
 
 Use `useRevalidator` to manually revalidate data:

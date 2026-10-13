@@ -39,10 +39,93 @@ describe('Client Form Handlers', () => {
       });
 
       expect(fetchMock).toHaveBeenCalledWith('http://localhost/tasks.json', {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'X-Putnami-Loader': '1' },
         signal: expect.any(AbortSignal),
       });
       expect(response).toBeInstanceOf(Response);
+    });
+
+    describe('redirects', () => {
+      const navigate = () =>
+        pageLoaderHandler()({
+          request: new Request('http://localhost/app/tasks/7'),
+          params: {},
+          context: undefined,
+        }) as Promise<Response>;
+
+      it('returns a router redirect, resolved against the page URL, when the loader redirects', async () => {
+        fetchMock.mockImplementationOnce(
+          async () =>
+            new Response(null, {
+              status: 204,
+              headers: { 'X-Putnami-Redirect': '../login?from=7', 'X-Putnami-Redirect-Status': '307' },
+            }),
+        );
+
+        const result = await navigate();
+
+        expect(result.status).toBe(307);
+        expect(result.headers.get('Location')).toBe('http://localhost/app/login?from=7');
+      });
+
+      it('keeps a redirect to another origin absolute', async () => {
+        fetchMock.mockImplementationOnce(
+          async () =>
+            new Response(null, {
+              status: 204,
+              headers: { 'X-Putnami-Redirect': 'https://idp.example.com/authorize' },
+            }),
+        );
+
+        const result = await navigate();
+
+        expect(result.status).toBe(302);
+        expect(result.headers.get('Location')).toBe('https://idp.example.com/authorize');
+      });
+
+      it('redirects to the page fetch already followed when a redirect came before the loader route', async () => {
+        fetchMock.mockImplementationOnce(async () => {
+          // fetch keeps `Accept: application/json` when it follows, so the page answers a JSON error.
+          const followed = new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
+            status: 405,
+            headers: { 'Content-Type': 'application/json' },
+          });
+          Object.defineProperty(followed, 'redirected', { value: true });
+          Object.defineProperty(followed, 'url', { value: 'http://localhost/login' });
+          return followed;
+        });
+
+        const result = await navigate();
+
+        expect(result.status).toBe(302);
+        expect(result.headers.get('Location')).toBe('http://localhost/login');
+      });
+
+      it('keeps the data of a JSON endpoint that fetch reached through a redirect', async () => {
+        const followed = new Response(JSON.stringify({ id: 7 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+        Object.defineProperty(followed, 'redirected', { value: true });
+        Object.defineProperty(followed, 'url', { value: 'http://localhost/app/tasks/7/.json' });
+        fetchMock.mockImplementationOnce(async () => followed);
+
+        expect(await navigate()).toBe(followed);
+      });
+
+      it('resolves a layout loader redirect against the page URL, not the layout endpoint', async () => {
+        fetchMock.mockImplementationOnce(
+          async () => new Response(null, { status: 204, headers: { 'X-Putnami-Redirect': 'login' } }),
+        );
+
+        const result = (await layoutLoaderHandler('/docs')({
+          request: new Request('http://localhost/docs/guides/start'),
+          params: {},
+          context: undefined,
+        })) as Response;
+
+        expect(result.headers.get('Location')).toBe('http://localhost/docs/guides/login');
+      });
     });
   });
 
@@ -67,7 +150,7 @@ describe('Client Form Handlers', () => {
       });
 
       expect(fetchMock).toHaveBeenCalledWith('http://localhost/docs-layout.json', {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'X-Putnami-Loader': '1' },
         signal: expect.any(AbortSignal),
       });
     });
@@ -87,7 +170,7 @@ describe('Client Form Handlers', () => {
       });
 
       expect(fetchMock).toHaveBeenCalledWith('http://localhost/docs-layout.json', {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'X-Putnami-Loader': '1' },
         signal: expect.any(AbortSignal),
       });
     });
@@ -104,7 +187,7 @@ describe('Client Form Handlers', () => {
       });
 
       expect(fetchMock).toHaveBeenCalledWith('http://localhost/docs-layout.json', {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'X-Putnami-Loader': '1' },
         signal: expect.any(AbortSignal),
       });
     });
@@ -123,7 +206,7 @@ describe('Client Form Handlers', () => {
       });
 
       expect(fetchMock).toHaveBeenCalledWith('http://localhost/app/docs-layout.json', {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'X-Putnami-Loader': '1' },
         signal: expect.any(AbortSignal),
       });
     });
@@ -141,7 +224,7 @@ describe('Client Form Handlers', () => {
       });
 
       expect(fetchMock).toHaveBeenCalledWith('http://localhost/docs-layout.json', {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'X-Putnami-Loader': '1' },
         signal: expect.any(AbortSignal),
       });
     });

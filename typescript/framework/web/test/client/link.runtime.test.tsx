@@ -9,6 +9,11 @@ let fetcherData: unknown;
 let lastRouterLinkProps: Record<string, unknown> | undefined;
 
 const fetcherLoadMock = mock(() => undefined);
+const lazyGuidesMock = mock(async () => ({}));
+// The router the Link reads its routes from, without a RouterProvider.
+const DataRouterContext = React.createContext<unknown>({
+  router: { routes: [{ path: '/guides', lazy: lazyGuidesMock }] },
+});
 
 function getLinkHandler<Event>(name: string): (event: Event) => void {
   const handler = lastRouterLinkProps?.[name];
@@ -38,6 +43,8 @@ mock.module('react-router', () => ({
   useResolvedPath: (to: string | { pathname?: string }) => ({
     pathname: typeof to === 'string' ? to : (to.pathname ?? currentPathname),
   }),
+  matchRoutes: realReactRouter.matchRoutes,
+  UNSAFE_DataRouterContext: DataRouterContext,
 }));
 
 const { Link } = await import('../../src/client/components');
@@ -53,6 +60,7 @@ describe('Link runtime behavior', () => {
     fetcherData = undefined;
     lastRouterLinkProps = undefined;
     fetcherLoadMock.mockClear();
+    lazyGuidesMock.mockClear();
     const globals = globalThis as typeof globalThis & { document?: FakeDocument; window?: Record<string, unknown> };
     globals.document = new FakeDocument();
     globals.window = {};
@@ -84,7 +92,7 @@ describe('Link runtime behavior', () => {
     expect(preventDefault).toHaveBeenCalledTimes(1);
   });
 
-  it('prefetches route data on user intent for internal links and forwards handlers', () => {
+  it('prefetches the route module and data on user intent for internal links and forwards handlers', () => {
     renderToStaticMarkup(
       React.createElement(Link, {
         to: '/guides',
@@ -102,8 +110,9 @@ describe('Link runtime behavior', () => {
     getLinkHandler('onFocus')(focusEvent);
     getLinkHandler('onTouchStart')(touchEvent);
 
-    expect(fetcherLoadMock).toHaveBeenCalledWith('/guides');
-    expect(fetcherLoadMock).toHaveBeenCalledTimes(3);
+    expect(lazyGuidesMock).toHaveBeenCalledTimes(3);
+    // The loader does not run: a loader that redirects would navigate on a hover.
+    expect(fetcherLoadMock).not.toHaveBeenCalled();
     expect((globalThis as typeof globalThis & { document?: FakeDocument }).document?.head.children).toHaveLength(1);
     expect(
       ((globalThis as typeof globalThis & { document?: FakeDocument }).document?.head.children[0] as { href?: string })
@@ -116,7 +125,7 @@ describe('Link runtime behavior', () => {
 
     getLinkHandler('onMouseEnter')({});
 
-    expect(fetcherLoadMock).not.toHaveBeenCalled();
+    expect(lazyGuidesMock).not.toHaveBeenCalled();
     expect((globalThis as typeof globalThis & { document?: FakeDocument }).document?.head.children).toHaveLength(0);
   });
 });

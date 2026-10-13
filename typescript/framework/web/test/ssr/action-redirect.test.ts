@@ -9,10 +9,10 @@ import {
 } from '@putnami/application';
 import type { RouteObject } from 'react-router';
 import {
-  ACTION_REDIRECT_HEADER,
-  ACTION_REDIRECT_STATUS_HEADER,
+  CLIENT_REDIRECT_HEADER,
+  CLIENT_REDIRECT_STATUS_HEADER,
   ACTION_REQUEST_HEADER,
-} from '../../src/shared/action-redirect';
+} from '../../src/shared/client-redirect';
 import { registerRouteAction } from '../../src/ssr/route-registration.utils';
 
 const createContext = (enhanced: boolean) =>
@@ -63,8 +63,8 @@ describe('action route — redirects for the client action', () => {
 
     expect(result).toBeInstanceOf(HttpResponse);
     expect(result.status).toBe(204);
-    expect(result.getHeader(ACTION_REDIRECT_HEADER)).toBe('/tasks');
-    expect(result.getHeader(ACTION_REDIRECT_STATUS_HEADER)).toBe('303');
+    expect(result.getHeader(CLIENT_REDIRECT_HEADER)).toBe('/tasks');
+    expect(result.getHeader(CLIENT_REDIRECT_STATUS_HEADER)).toBe('303');
     expect(result.getHeader('Location')).toBeUndefined();
   });
 
@@ -83,8 +83,8 @@ describe('action route — redirects for the client action', () => {
     const result = (await route(createContext(true))) as HttpResponse;
 
     expect(result.status).toBe(204);
-    expect(result.getHeader(ACTION_REDIRECT_HEADER)).toBe('/tasks');
-    expect(result.getHeader(ACTION_REDIRECT_STATUS_HEADER)).toBe('302');
+    expect(result.getHeader(CLIENT_REDIRECT_HEADER)).toBe('/tasks');
+    expect(result.getHeader(CLIENT_REDIRECT_STATUS_HEADER)).toBe('302');
     expect(result.getHeader('Set-Cookie')).toBe('session=abc');
   });
 
@@ -94,7 +94,7 @@ describe('action route — redirects for the client action', () => {
     const result = (await route(createContext(true))) as HttpResponse;
 
     expect(result.status).toBe(204);
-    expect(result.getHeader(ACTION_REDIRECT_HEADER)).toBe('/tasks');
+    expect(result.getHeader(CLIENT_REDIRECT_HEADER)).toBe('/tasks');
   });
 
   it('answers a redirect from the route middleware the same way', async () => {
@@ -104,7 +104,7 @@ describe('action route — redirects for the client action', () => {
     const result = (await route(createContext(true))) as HttpResponse;
 
     expect(result.status).toBe(204);
-    expect(result.getHeader(ACTION_REDIRECT_HEADER)).toBe('/login');
+    expect(result.getHeader(CLIENT_REDIRECT_HEADER)).toBe('/login');
   });
 
   it('leaves a response that is no redirect unchanged', async () => {

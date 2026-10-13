@@ -26,7 +26,7 @@
           "path": "typescript/framework/web/src/client/form/loader.handler.ts",
           "transport": "http",
           "symbol": "fetch",
-          "fingerprint": "81c2fa1e840f0bc589edf81977ef91e6b12af33e586438cd6881b228c9859b71"
+          "fingerprint": "e472cddf5eb647f5c4542bd8727b9f6390cf61656652d9d4cd9d0e2b5268fd9e"
         }
       ],
       "owner": "@putnami/web",

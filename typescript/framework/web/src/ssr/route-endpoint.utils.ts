@@ -7,12 +7,22 @@ import {
   type RouteHandler,
 } from '@putnami/application';
 import { joinPath } from '@putnami/utils';
+import { LOADER_REQUEST_HEADER } from '../shared/client-redirect';
+import { followableRedirects } from './followable-redirect';
 import type { LoaderCacheOptions, LoaderDefinition } from './loader';
 import type { LazyLoaderModule, LoaderModule } from './module.types';
 import type { ReactModuleCache } from './react-module-cache';
 import { buildJsonResponseWithCache, executeLoaderWithCache } from './route-cache.utils';
 import { applyMiddlewareSource, type MiddlewareSource } from './route-middleware.utils';
 import { inModuleOrDefault } from './react-ssr.utils';
+
+/**
+ * Wraps a loader JSON handler with its route middleware, and answers a redirect
+ * to the client loader in the form it can follow (see {@link followableRedirects}).
+ */
+function loaderRoute(handler: RouteHandler, middleware: MiddlewareSource): RouteHandler {
+  return followableRedirects(applyMiddlewareSource(handler, middleware), LOADER_REQUEST_HEADER);
+}
 
 export function registerJsonEndpoint(
   httpPlugin: HttpPlugin,
@@ -28,7 +38,7 @@ export function registerJsonEndpoint(
     return buildJsonResponseWithCache(data, ctx, cacheOpts);
   };
 
-  httpPlugin.get(`${route}${suffix}`, applyMiddlewareSource(handler, middleware), {
+  httpPlugin.get(`${route}${suffix}`, loaderRoute(handler, middleware), {
     ...routeOptions,
     accept: ['application/json', '*/*'],
   });
@@ -55,7 +65,7 @@ export function registerLazyJsonEndpoint(
     return buildJsonResponseWithCache(data, ctx, cacheOpts);
   };
 
-  httpPlugin.get(`${route}${suffix}`, applyMiddlewareSource(handler, middleware), {
+  httpPlugin.get(`${route}${suffix}`, loaderRoute(handler, middleware), {
     ...routeOptions,
     accept: ['application/json', '*/*'],
   });
