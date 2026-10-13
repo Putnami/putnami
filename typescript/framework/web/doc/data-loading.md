@@ -567,6 +567,8 @@ export default action()
   });
 ```
 
+An action that ends with `redirect()` is successful, so its patterns are evicted before the redirect leaves. A failed action evicts nothing: it throws an error, or it returns or throws a response with a 4xx or 5xx status.
+
 Eviction patterns support globs and can be dynamic:
 
 ```typescript

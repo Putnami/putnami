@@ -32,7 +32,7 @@ import type { LazyPageData, MiddlewareResolver, ReactModuleCache } from './react
 import type { ReactPluginConfig } from './react-plugin';
 import type { PutnamiReactConfigExtras } from './react-ssr.config';
 import { inModuleOrDefault } from './react-ssr.utils';
-import { evictPatterns, wrapPageWithCache } from './route-cache.utils';
+import { runAndEvict, wrapPageWithCache } from './route-cache.utils';
 import { registerJsonEndpoint, registerLazyJsonEndpoint } from './route-endpoint.utils';
 import { applyMiddlewareSource, type MiddlewareSource, wrapWithMiddleware } from './route-middleware.utils';
 import type { StaticRouteMeta } from './static';
@@ -256,7 +256,7 @@ interface RouteActionRegistration {
 /**
  * Register the POST action endpoint for a page (lazy or eager) and attach the
  * React-Router action to its route node. Evicts the action's cache patterns
- * after a successful run.
+ * after a successful run (see {@link runAndEvict}).
  */
 export function registerRouteAction(reg: RouteActionRegistration): void {
   const { httpPlugin, cache, route, httpRoute, node, action, isLazy, middleware, routeOptions } = reg;
@@ -268,10 +268,7 @@ export function registerRouteAction(reg: RouteActionRegistration): void {
       const actionModule = await cache.loadModule(`action:${route}`, lazyAction);
       const actionDef = inModuleOrDefault<ActionDefinition, ActionModule>(actionModule, 'action');
       if (actionDef) {
-        const result = await actionDef.handler(ctx);
-        // Evict cache patterns after successful action
-        await evictPatterns(actionDef.evict);
-        return result;
+        return runAndEvict(() => actionDef.handler(ctx), actionDef.evict);
       }
       return undefined;
     };
@@ -286,12 +283,7 @@ export function registerRouteAction(reg: RouteActionRegistration): void {
 
   const actionDef = inModuleOrDefault<ActionDefinition, ActionModule>(action as ActionModule, 'action');
   if (actionDef) {
-    const actionFn: RouteHandler = async (ctx) => {
-      const result = await actionDef.handler(ctx);
-      // Evict cache patterns after successful action
-      await evictPatterns(actionDef.evict);
-      return result;
-    };
+    const actionFn: RouteHandler = (ctx) => runAndEvict(() => actionDef.handler(ctx), actionDef.evict);
     node.action = actionHandler(actionFn);
     httpPlugin.post(
       httpRoute,

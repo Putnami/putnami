@@ -92,6 +92,50 @@ export async function evictPatterns(patterns: readonly EvictPattern[] | undefine
 }
 
 /**
+ * Tells whether a value an action returned or threw is a failing response.
+ *
+ * Same rule as the action outcome: a status of 400 or above failed, and a
+ * redirect is a success.
+ */
+function isFailingResponse(value: unknown): boolean {
+  if (value instanceof HttpResponse) {
+    return (value.status ?? 200) >= 400;
+  }
+  return value instanceof Response && value.status >= 400;
+}
+
+/**
+ * Runs an action, then evicts its cache patterns when the action succeeded.
+ *
+ * `redirect()` throws its response, so a throw is not always a failure: the
+ * eviction also runs when the action throws a response below 400, before that
+ * response leaves. An action that throws anything else, or that returns or
+ * throws a response of 400 or above, evicts nothing.
+ *
+ * @param run - Runs the action handler.
+ * @param patterns - The cache patterns the action declares.
+ * @returns What the action handler returned.
+ */
+export async function runAndEvict<T>(
+  run: () => T | Promise<T>,
+  patterns: readonly EvictPattern[] | undefined,
+): Promise<T> {
+  let result: T;
+  try {
+    result = await run();
+  } catch (thrown) {
+    if ((thrown instanceof HttpResponse || thrown instanceof Response) && !isFailingResponse(thrown)) {
+      await evictPatterns(patterns);
+    }
+    throw thrown;
+  }
+  if (!isFailingResponse(result)) {
+    await evictPatterns(patterns);
+  }
+  return result;
+}
+
+/**
  * Cached page data structure for SSR caching.
  */
 interface CachedPageData {
