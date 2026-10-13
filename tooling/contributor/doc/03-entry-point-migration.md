@@ -21,7 +21,9 @@ This is an owner-authorized breaking change in the current pre-1.0 line.
 
 `build` accepts a named task as an input when one is supplied. Claiming it
 requires explicit authorization; choosing a backlog task, creating a task,
-publishing, merging or deploying are never implied by a planning request.
+merging or deploying are never implied by a request. Publishing the run's own
+proposal is the default, as with the former `fix`; pass `--local` to stay
+local.
 
 ## Arguments and helper interfaces
 

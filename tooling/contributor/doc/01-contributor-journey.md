@@ -3,9 +3,11 @@
 `build <intention|task|proposal>` owns an authorized outcome through one
 implementation, challenge, review, repair and evidence loop, including
 coordinated multi-unit work. It does not select backlog work. A named task may
-be claimed only when that action is explicitly authorized. The invocation's
-mandate controls task, Git, proposal, merge and deployment actions throughout;
-a natural-language request alone grants none of those external actions.
+be claimed only when that action is explicitly authorized. By default, build
+publishes its own proposal: a draft once the plan is settled, a pushed
+checkpoint at each milestone, and ready for review once the final local gate
+passes. `--local` or a mandate that says to stay local keeps the run local. A
+request alone grants no task claim, merge or deployment.
 
 1. **Understand the outcome.** Read repository instructions, the accepted
    mandate, current task/proposal and existing plan. Start discovery with
@@ -46,8 +48,9 @@ a natural-language request alone grants none of those external actions.
    unknown member. The dossier's `--record` ready verdict still requires its
    own candidate review, gate, qualification and acceptance, and the optional
    workflow adds complete current native requirements.
-8. **Deliver within authority.** `putnami proposals finalize` publishes the
-   verified proposal and reads it back. For a partial unit, pass
+8. **Deliver within authority.** `putnami proposals finalize` marks the
+   verified draft ready for review and reads it back, in the same run as the
+   final gate. For a partial unit, pass
    `--partial-delivery` on draft and final calls: the parent stays linked and
    its task state stays unchanged. Normal close/transition is
    for the complete mandated outcome; the command checks the final normalized

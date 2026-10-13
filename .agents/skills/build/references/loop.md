@@ -29,14 +29,21 @@ uncertainty and independent challenge for material proposed artifacts. Separate
 design agreement from realization review. Do not build a parallel architecture
 inventory or impose a document count.
 
-When publication is authorized, open the proposal as a draft once the plan is
-settled, before the first edit: run
+Publication is the default. Unless the run is local (`--local`, a mandate
+that says to stay local, `--dry-run`, or no bound proposals provider), open the
+proposal as a draft once the plan is settled, before the first edit: run
 `"$PUTNAMI_CLI" proposals finalize --draft` with the planned
 title, a body that states the intended change, and the task reference. The
 command adds an empty commit carrying the title when the branch has none; the
-squash removes it. Push later checkpoints with `--draft` too, so the title and
-body follow the branch. Readers see the work from its start, and a draft
-starts no hosted run.
+squash removes it. Readers see the work from its start, and a draft starts no
+hosted run.
+
+Push a checkpoint at each milestone: a delivery unit, a phase, or a repair
+round whose `--projects` gate passes. Commit the finished edits, then run
+`proposals finalize --draft` again; it pushes the committed HEAD and refreshes
+the title and body, so rewrite the body when the net change moved. Do not push
+a failing or half-edited tree as a milestone. The draft stays a draft until
+the ready finalization below.
 
 ## One intent, gated phases
 
@@ -49,7 +56,7 @@ it, and no threshold exists to add.
 Deliver work that spans several projects, or an epic, in phases:
 
 1. Work on an integration branch that matches the workspace `epicBranches`.
-2. Make one commit per phase.
+2. Make one commit per phase, and push it as a milestone checkpoint.
 3. Pass the gate on each phase before the next one starts.
 4. Merge the branch as one unit that one revert undoes.
 
@@ -84,7 +91,7 @@ verified.
 ## Freeze, review and repair
 
 Iterate with focused checks using Putnami `--projects`. Format and finish edits
-before final proof. If publishing is authorized, make a meaningful checkpoint
+before final proof. Unless the run is local, make a meaningful checkpoint
 commit before final review/proof: HEAD participates in the canonical fingerprint.
 A subsequent commit, rebase or edit invalidates that binding, even if the working
 file contents appear unchanged. Local-only work may be verified as a dirty tree;
@@ -176,7 +183,7 @@ provider-to-generated-client-to-real-consumer journey. HTTP smoke, ordinary
 gate and functional acceptance are separate; a response below 500 is not proof
 of authorization or business behavior.
 
-## Ready and authorized delivery
+## Ready and delivery
 
 Run `"$PUTNAMI_CLI" tree verify --record <dossier.json>` on
 the final tree. Only exit 0 produces
@@ -238,12 +245,15 @@ and `chore`. `fix` is a user-visible defect corrected; `feat` is new
 behavior. The command refuses `fix` and `feat` on a branch whose every
 changed path is a test.
 
-The proposal stays a draft until native finalization marks it ready for review; keep
-it a draft at finalization when requested (`publication.draft` or the
-mandate). Draft backup with missing proof is never marked verified. A failed or `unresolved`
-external operation leaves a resumable state, not permission to bypass checks or
-to repeat the write blindly. Publishing is not required for a mandate that
-explicitly stays local.
+The proposal stays a draft until native finalization marks it ready for review.
+Once the outcome is complete, the final local gate passes and `tree verify
+--record` returns `Putnami verified`, run the ready finalization without
+`--draft` in the same run; do not stop at a local ready verdict and wait to be
+asked. Keep it a draft at finalization when requested (`publication.draft` or
+the mandate). Draft backup with missing proof is never marked verified. A
+failed or `unresolved` external operation leaves a resumable state, not
+permission to bypass checks or to repeat the write blindly. A local run ends
+with local evidence and names the finalization command it did not run.
 
 If merge/deployment is already authorized, continue through the normal required
 checks and provider operations; re-evaluate after head/base changes. A provider

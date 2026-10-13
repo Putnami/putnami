@@ -86,8 +86,9 @@ title, the fully normalized proposal body and branch commits before a write,
 and skips the parent task's delivered transition.
 The normal closing template and transition are for the complete mandated
 outcome only. Native finalization still enforces proof, gate, English,
-proposal read-back and comment controls in both modes. Publication, merge,
-release and deployment remain bounded by the invocation's authority.
+proposal read-back and comment controls in both modes. Build publishes its
+own proposal unless the run is local; merge, release and deployment remain
+bounded by the invocation's authority.
 Provider label inheritance that relies on a closing task reference may not
 run for a partial proposal; read back the actual proposal labels and report
 their state rather than claiming the parent's labels transferred.
