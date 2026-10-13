@@ -226,7 +226,7 @@ var reporterDenyInspection = procguard.DenyInspection
 // the run's verdict does not change.
 func newReporterConfig(env map[string]string, command, tokenEnv string, logw io.Writer) sessionReporterConfig {
 	if err := reporterDenyInspection(); err != nil {
-		fmt.Fprintf(logw, "putnami-cloud %s: cannot deny process inspection (%v); not using the run credential\n", command, err)
+		fmt.Fprintf(logw, "%s %s: cannot deny process inspection (%v); not using the run credential\n", reporterBinary, command, err)
 		return sessionReporterConfig{inspectionGuardFailed: true}
 	}
 	return sessionReporterConfig{
@@ -271,7 +271,7 @@ func serveReportingFrames(ctx context.Context, in io.Reader, out, logw io.Writer
 				if !result.OK {
 					// The code only: the line may hold the run credential. op and
 					// the code are protocol constants (handshakeOp, answer).
-					fmt.Fprintf(logw, "putnami-cloud %s: refused %s: %s\n", command, op, result.Code) //nolint:gosec // G705: logw is the reporter's stderr, never an HTTP response, and every value is a constant
+					fmt.Fprintf(logw, "%s %s: refused %s: %s\n", reporterBinary, command, op, result.Code) //nolint:gosec // G705: logw is the reporter's stderr, never an HTTP response, and every value is a constant
 				}
 				if err := writeReportingLine(w, result); err != nil {
 					return err
@@ -281,7 +281,7 @@ func serveReportingFrames(ctx context.Context, in io.Reader, out, logw io.Writer
 		}
 		chunk, err := protocolcli.ParseSessionReportingChunk(line)
 		if err != nil {
-			fmt.Fprintf(logw, "putnami-cloud %s: malformed frame: %v\n", command, err)
+			fmt.Fprintf(logw, "%s %s: malformed frame: %v\n", reporterBinary, command, err)
 			return fmt.Errorf("malformed session reporting frame")
 		}
 		streaming = true
@@ -376,13 +376,22 @@ func (s *sessionReporterSender) localSession() *clicore.WorkspaceContext {
 	session, err := s.cfg.local()
 	switch {
 	case err != nil:
-		fmt.Fprintf(s.logw, "putnami-cloud %s: local mode not configured: %v\n", protocolcli.SessionReporterCommand, err)
+		s.localUnavailable(err.Error())
 	case session == nil || session.WorkspaceID == "" || session.ControlPlane == "" || session.AuthToken.Empty():
-		fmt.Fprintf(s.logw, "putnami-cloud %s: local mode not configured: no linked workspace or login\n", protocolcli.SessionReporterCommand)
+		s.localUnavailable("no linked workspace or login")
 	default:
 		s.local = session
 	}
 	return s.local
+}
+
+// reporterBinary is the extension binary's name, the encoded extension name;
+// every reporter diagnostic starts with it.
+const reporterBinary = "putnami-cloud"
+
+// localUnavailable reports on stderr why the local mode is off.
+func (s *sessionReporterSender) localUnavailable(reason string) {
+	fmt.Fprintf(s.logw, "%s %s: local mode not configured: %s\n", reporterBinary, protocolcli.SessionReporterCommand, reason)
 }
 
 // remint re-mints the local session's bearer once after a 401, as
@@ -392,7 +401,7 @@ func (s *sessionReporterSender) remint(session *clicore.WorkspaceContext) (clico
 	fresh, err := session.RefreshAuth()
 	if err != nil || fresh.Empty() {
 		if err != nil {
-			fmt.Fprintf(s.logw, "putnami-cloud %s: local mode not configured: %v\n", protocolcli.SessionReporterCommand, err)
+			s.localUnavailable(err.Error())
 		}
 		s.local = nil
 		return clicore.Bearer{}, false
