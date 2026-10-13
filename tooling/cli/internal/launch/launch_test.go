@@ -168,6 +168,8 @@ func TestIsExemptInvocation(t *testing.T) {
 		{"extensions", "list"},
 		{"extensions", "install", "--", "--user"},
 		{"upgrade", "--", "--from-source"},
+		{"version", "--", "list"},
+		{"migrate", "--", "vnext"},
 	}
 	for _, args := range notExempt {
 		if IsExemptInvocation(args) {

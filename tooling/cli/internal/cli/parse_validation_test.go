@@ -111,8 +111,35 @@ func TestValidateStructuredFlags_LeavesUnknownPathsAlone(t *testing.T) {
 // holds on every surface: after a bare "--" the tokens belong to the user.
 func TestValidateStructuredFlags_PassthroughIsNeverValidated(t *testing.T) {
 	t.Parallel()
-	if err := validateStructuredFlags("projects", "list", []string{"--", "--not-a-flag", "-x"}); err != nil {
+	if err := validateStructuredFlags("contributor", "language", []string{"files", "--", "--not-a-flag", "-x"}); err != nil {
 		t.Errorf("passthrough must never be validated: %v", err)
+	}
+}
+
+// TestParseArgs_BuiltInRejectsUnreadPassthrough pins #246: a built-in command
+// that reads no passthrough rejects a "--", so no payload token reaches a
+// handler that would read it as one of its own flags (`version tag -- --push`
+// pushed the tag, `tree verify -- --help` printed the usage).
+func TestParseArgs_BuiltInRejectsUnreadPassthrough(t *testing.T) {
+	t.Parallel()
+	for _, args := range [][]string{
+		{"version", "tag", "--", "--push"},
+		{"version", "--", "tag"},
+		{"tree", "verify", "--", "--help"},
+		{"dev", "template", "package", "--", "--stable"},
+		{"upgrade", "--", "--from-source"},
+		{"upgrade", "1.2.3", "--", "--from-source"},
+		{"init", "--", "--force"},
+		{"projects", "sync", "--", "--prune"},
+		{"help", "--", "--man"},
+	} {
+		parsed := ParseArgs(args, nil, nil)
+		if !errors.Is(parsed.Err, cmderr.ErrUsage) || !strings.Contains(parsed.Err.Error(), "takes no arguments after --") {
+			t.Errorf("ParseArgs(%q).Err = %v, want the passthrough usage error", args, parsed.Err)
+		}
+	}
+	if parsed := ParseArgs([]string{"contributor", "language", "files", "--", "a.go"}, nil, nil); parsed.Err != nil {
+		t.Errorf("contributor language reads its passthrough paths: %v", parsed.Err)
 	}
 }
 

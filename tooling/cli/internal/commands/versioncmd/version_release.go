@@ -387,8 +387,6 @@ func parseVersionFlags(args []string) (versionFlags, []string, error) {
 			flags.DryRun = true
 		case "--yes":
 			flags.Yes = true
-		case "--":
-			return flags, nil, cmderr.Usagef("putnami version takes no arguments after --")
 		default:
 			rest = append(rest, arg)
 		}

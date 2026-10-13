@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -479,14 +478,6 @@ func TestParseUpgradeFlags_RejectsMissingValue(t *testing.T) {
 	t.Parallel()
 	if _, err := parseUpgradeFlags([]string{"--channel"}); err == nil {
 		t.Fatal("--channel with no value should be rejected")
-	}
-}
-
-func TestParseUpgradeFlags_RejectsTokensAfterSeparator(t *testing.T) {
-	t.Parallel()
-	_, err := parseUpgradeFlags([]string{"--", "--from-source"})
-	if !errors.Is(err, protocolcli.ErrUsage) {
-		t.Fatalf("parseUpgradeFlags(-- --from-source) = %v, want a usage error", err)
 	}
 }
 

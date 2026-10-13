@@ -266,6 +266,11 @@ type Command struct {
 	// separate list would be a second description of the same commands, which
 	// internal/cli/structural_baseline_test.go exists to prevent.
 	Recovery bool
+	// Passthrough marks a command that reads the arguments after a bare `--`
+	// (`contributor language files -- <paths>`). Every other built-in takes
+	// none, so the parser rejects a `--` instead of letting a handler read a
+	// payload token as one of its own flags.
+	Passthrough bool
 }
 
 // DisplayName returns the spelling used in the categorized listing.
@@ -500,6 +505,13 @@ func GlobalFlagValues(long string) []string {
 		}
 	}
 	return nil
+}
+
+// TakesPassthrough reports whether an invocation path reads the arguments
+// after a bare `--`. An unknown path takes none.
+func TakesPassthrough(path string) bool {
+	command, ok := Lookup(path)
+	return ok && command.Passthrough
 }
 
 // ResolveFlags returns the flag surface an invocation path accepts, following

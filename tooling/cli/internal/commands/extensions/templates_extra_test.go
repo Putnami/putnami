@@ -3,14 +3,12 @@ package extensions
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -578,17 +576,4 @@ func withWorkingDir(t *testing.T, dir string) {
 		t.Fatalf("chdir: %v", err)
 	}
 	t.Cleanup(func() { _ = os.Chdir(orig) })
-}
-
-// Neither `dev template package` nor `dev template test` takes a passthrough
-// payload: a token after `--` is a usage error, never one of their flags.
-func TestTemplatesRejectTokensAfterSeparator(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	if err := TemplatesPackage(context.Background(), []string{dir, "--", "--stable"}); !errors.Is(err, cmderr.ErrUsage) {
-		t.Fatalf("TemplatesPackage(-- --stable) = %v, want a usage error", err)
-	}
-	if err := TemplatesTest(context.Background(), []string{dir, "--", "--keep"}); !errors.Is(err, cmderr.ErrUsage) {
-		t.Fatalf("TemplatesTest(-- --keep) = %v, want a usage error", err)
-	}
 }

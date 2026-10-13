@@ -202,8 +202,6 @@ func TestVerifierArgumentErrors(t *testing.T) {
 		{[]string{"--report"}, "missing --report value"},
 		{[]string{"--base", "--x"}, "missing --base value"},
 		{[]string{"--snapshot", "extra"}, "unknown argument: extra"},
-		{[]string{"--snapshot", "--", "--help"}, "tree verify takes no arguments after --"},
-		{[]string{"--", "-h"}, "tree verify takes no arguments after --"},
 		{[]string{"--snapshot"}, "git rev-parse --show-toplevel failed (128)"},
 	}
 	for _, tc := range cases {
