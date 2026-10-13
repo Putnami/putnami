@@ -415,6 +415,10 @@ import { Link } from '@putnami/web';
 </Link>
 ```
 
+A prefetch downloads the route's code and its loader data. It does not run the
+loader in the router, so a loader that redirects takes effect on the click, not
+on the hover.
+
 ### Programmatic Navigation
 
 ```tsx

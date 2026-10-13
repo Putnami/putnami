@@ -18,7 +18,11 @@ export const actionHandler: ActionFunction = async ({ request }) => {
     signal: AbortSignal.timeout(clientFetchTimeoutMs()),
   });
 
-  const redirected = routerRedirect(res, request.url);
+  // A followed redirect that ends on JSON, such as a 307/308 that re-sent the
+  // POST to an action, stays data; anything else is the target page.
+  const redirected = routerRedirect(res, request.url, (followed) =>
+    Boolean(followed.headers.get('Content-Type')?.includes('application/json')),
+  );
   if (redirected) {
     return redirected;
   }

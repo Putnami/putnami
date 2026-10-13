@@ -61,6 +61,9 @@ const useFetcherMock = mock(() => ({
   data: undefined,
   load: fetcherLoadMock,
 }));
+const dataRouterContext = { name: 'DataRouterContext' };
+const lazyDocsMock = mock(async () => ({}));
+const dataRouterValue = { router: { routes: [{ path: '/docs', lazy: lazyDocsMock }] } };
 const useResolvedPathMock = mock((to: string | { pathname?: string }) => ({
   pathname: typeof to === 'string' ? to : (to.pathname ?? '/resolved'),
 }));
@@ -98,6 +101,7 @@ mock.module('react', () => ({
   useCallback<T extends (...args: never[]) => unknown>(callback: T) {
     return callback;
   },
+  useContext: (context: unknown) => (context === dataRouterContext ? dataRouterValue : undefined),
   useRef<T>(initialValue: T) {
     const index = refCursor++;
     refStore[index] ||= { current: initialValue };
@@ -112,6 +116,8 @@ mock.module('react-router', () => ({
   useFormAction: (action?: string) => useFormActionMock(action),
   useFetcher: () => useFetcherMock(),
   useResolvedPath: (to: string | { pathname?: string }) => useResolvedPathMock(to),
+  matchRoutes: realReactRouter.matchRoutes,
+  UNSAFE_DataRouterContext: dataRouterContext,
 }));
 
 const hooks = await import('../../src/client/hooks');
@@ -328,7 +334,9 @@ describe('hook runtime behavior', () => {
     const prefetch = usePrefetch('/docs', 'render');
     prefetch.load();
 
-    expect(fetcherLoadMock).toHaveBeenCalledWith('/docs');
+    // The route module loads, the loader does not run: a redirecting loader would navigate.
+    expect(lazyDocsMock).toHaveBeenCalled();
+    expect(fetcherLoadMock).not.toHaveBeenCalled();
     expect(appendedLinks).toHaveLength(1);
     expect(appendedLinks[0]?.href).toBe('/docs.json');
   });

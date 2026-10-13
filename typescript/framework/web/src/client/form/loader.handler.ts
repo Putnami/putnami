@@ -82,5 +82,12 @@ async function loaderHandler(opt: {
 
   // A loader that redirects: resolved against the page the router navigates
   // to, not the JSON endpoint, as the server render does on a full page load.
-  return routerRedirect(res, args.request.url) ?? res;
+  // A followed redirect is data only when it ends on a loader endpoint: a page
+  // answers the JSON request with an error, never with loader data.
+  return routerRedirect(res, args.request.url, isLoaderEndpoint) ?? res;
+}
+
+/** Whether a followed loader fetch ended on a loader JSON endpoint. */
+function isLoaderEndpoint(followed: Response): boolean {
+  return new URL(followed.url).pathname.endsWith('.json');
 }

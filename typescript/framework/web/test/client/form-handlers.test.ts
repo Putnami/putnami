@@ -85,7 +85,11 @@ describe('Client Form Handlers', () => {
 
       it('redirects to the page fetch already followed when a redirect came before the loader route', async () => {
         fetchMock.mockImplementationOnce(async () => {
-          const followed = new Response('<!doctype html>', { status: 200, headers: { 'Content-Type': 'text/html' } });
+          // fetch keeps `Accept: application/json` when it follows, so the page answers a JSON error.
+          const followed = new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
+            status: 405,
+            headers: { 'Content-Type': 'application/json' },
+          });
           Object.defineProperty(followed, 'redirected', { value: true });
           Object.defineProperty(followed, 'url', { value: 'http://localhost/login' });
           return followed;
@@ -103,6 +107,7 @@ describe('Client Form Handlers', () => {
           headers: { 'Content-Type': 'application/json' },
         });
         Object.defineProperty(followed, 'redirected', { value: true });
+        Object.defineProperty(followed, 'url', { value: 'http://localhost/app/tasks/7/.json' });
         fetchMock.mockImplementationOnce(async () => followed);
 
         expect(await navigate()).toBe(followed);
