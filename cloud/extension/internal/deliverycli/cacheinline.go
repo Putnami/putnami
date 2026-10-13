@@ -183,14 +183,18 @@ func (s *providerSession) fetchInline(scope string, batches []*inlineBatch) {
 
 // fetchInlineBatch sends one request and writes each blob of the answer to the
 // exchange directory, atomically. A request that fails places nothing: the
-// restores of its files ask for them again.
+// restores of its files ask for them again. A blob of the answer that does not
+// verify is not placed, and the restore of its file downloads it.
 func (s *providerSession) fetchInlineBatch(scope string, b *inlineBatch) {
-	data, err := s.client.DownloadInline(s.ctx, b.blobs)
+	data, unverified, err := s.client.DownloadInline(s.ctx, b.blobs)
 	if err != nil {
 		s.logCacheError(fmt.Sprintf("%s download-batch of %d files", scope, len(b.blobs)), err)
 		return
 	}
 	b.answered = true
+	if len(unverified) > 0 {
+		s.log(fmt.Sprintf("%s download-batch: %d of %d files do not verify; their restores download them: %v", scope, len(unverified), len(b.blobs), unverified[0]))
+	}
 	var failed int
 	var first error
 	for _, t := range b.blobs {
