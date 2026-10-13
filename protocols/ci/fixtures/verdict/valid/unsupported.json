@@ -1,0 +1,48 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "ssh://git.example.test/acme/legacy.git",
+      "digest": {
+        "gitCommit": "0f1e2d3c4b5a69780f1e2d3c4b5a69780f1e2d3c4b5a69780f1e2d3c4b5a6978",
+        "gitTree": "a0b1c2d3e4f5a6b7a0b1c2d3e4f5a6b7a0b1c2d3e4f5a6b7a0b1c2d3e4f5a6b7"
+      }
+    }
+  ],
+  "predicateType": "https://putnami.dev/verdict/v1",
+  "predicate": {
+    "answer": "unsupported",
+    "change": {
+      "repository": "ssh://git.example.test/acme/legacy.git",
+      "reference": "refs/heads/main",
+      "head": "0f1e2d3c4b5a69780f1e2d3c4b5a69780f1e2d3c4b5a69780f1e2d3c4b5a6978",
+      "tree": "a0b1c2d3e4f5a6b7a0b1c2d3e4f5a6b7a0b1c2d3e4f5a6b7a0b1c2d3e4f5a6b7"
+    },
+    "run": {
+      "id": "run-2026-10-13-0004",
+      "attempt": 1,
+      "conclusion": "success"
+    },
+    "checks": [
+      {
+        "check": "putnami",
+        "answer": "unsupported",
+        "level": "required",
+        "reason": "no_workspace"
+      }
+    ],
+    "impact": {
+      "projects": []
+    },
+    "requirements": {
+      "total": 0,
+      "proven": 0,
+      "missing": 0,
+      "projectsWithout": 0
+    },
+    "declarations": [],
+    "gaps": [],
+    "computedAt": "2026-10-13T13:00:00Z",
+    "revision": 1
+  }
+}

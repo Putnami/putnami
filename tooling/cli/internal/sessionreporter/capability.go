@@ -5,6 +5,7 @@ import (
 	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	features "go.putnami.dev/protocol/features"
 )
 
 // sessionFile is the finalized session document a capability may transmit
@@ -14,6 +15,10 @@ const sessionFile = "session.json"
 // planFile is the recorded plan a capability may transmit before the event
 // stream. The engine writes it whole before the capability starts.
 const planFile = "plan.json"
+
+// specVerificationFile is the spec gate's record a capability may transmit
+// after the event stream. The engine writes it whole before Finish.
+const specVerificationFile = features.SpecVerificationRecordFilename
 
 // LogStateFile is the log reporter's checkpoint beside the session. StateFile
 // is the session reporter's.
@@ -48,8 +53,8 @@ type Capability struct {
 	StateFile, LockFile string
 }
 
-// SessionReporter delivers the recorded plan, the event stream and the
-// finalized session.
+// SessionReporter delivers the recorded plan, the event stream, the finalized
+// session and the spec gate's record.
 var SessionReporter = Capability{
 	Name: protocolcli.SessionReporterCommand, Label: "session reporter", Activity: "session reporting",
 	SelectorEnv: protocolcli.SessionReporterEnv, TokenEnv: protocolcli.SessionReporterTokenEnv,
@@ -74,7 +79,8 @@ func Capabilities() []Capability {
 
 // sends reports whether the capability transmits artifact. A capability that
 // sends plan.json closes it before any other frame leaves; one that sends
-// session.json closes it before the events final marker.
+// session.json closes it before the events final marker; one that sends
+// spec-verification.json frames it once that marker is acknowledged.
 func (c Capability) sends(artifact string) bool {
 	return slices.Contains(c.Artifacts, artifact)
 }

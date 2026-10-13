@@ -7,7 +7,8 @@ PUTNAMI_SESSION_REPORTER=@example/reporter putnami lint,test,build
 ```
 
 The engine reports the recorded plan and persisted events while the graph
-runs, then the terminal session, including failed and canceled work. Local and
+runs, then the terminal session, including failed and canceled work, and last
+the spec gate's record. Local and
 hosted execution use the same capability. A trusted launcher may supply
 `PUTNAMI_SESSION_REPORTER_TOKEN`; the authoritative CLI captures it before
 workspace setup/hooks/tasks and passes it only to the selected provider
@@ -67,6 +68,34 @@ gets no credential, and the session's delivery fails (see
 [Hosted runs](#hosted-runs)): upgrade a hosted receiver to accept or refuse
 `plan.json` before you upgrade the CLI.
 
+## Spec gate record
+
+Once the receiver acknowledges the events final marker, the session reporter
+sends the spec gate's record, `.putnami/sessions/<id>/spec-verification.json`:
+what each requirement of each judged spec resolved to. The engine writes it
+before reporting ends, so it is the last artifact the receiver gets. The CLI
+sends the persisted bytes unchanged. A record above 8 MiB is not sent.
+
+The record is best-effort. The reporter skips it, records why in
+`reporting.json` (`specVerificationOmitted`), and the delivery stays complete:
+
+| `specVerificationOmitted` | Why |
+| --- | --- |
+| `absent` | The session has no `spec-verification.json`. |
+| `too_large` | `spec-verification.json` is above 8 MiB. |
+| `unreadable` | `spec-verification.json` cannot be read: it is not a regular file, a read fails, or it was removed or truncated after its first chunk. |
+| `refused` | The receiver refused a `spec-verification.json` chunk, with or without retry, or acknowledged another chunk. |
+| `quit` | The reporter exited, closed its pipe or stopped answering at a `spec-verification.json` chunk, or could not start. |
+| `late` | The finalization limits ended before the record was delivered, or a checkpoint written by an earlier CLI completed without it. |
+
+An omitted record prints no diagnostic and changes neither the exit code nor
+`subscribers.json`: the events final marker is acknowledged, so the evidence
+already reads `delivered`, and no replay sends the record again. The CLI
+never restarts a reporter for the record, on a hosted run or not. A receiver that
+predates the record can refuse it or exit: the run omits it, and the rest of
+the session's delivery is unchanged. The log reporter never receives
+`spec-verification.json`.
+
 ## Log reporter
 
 Select an installed extension implementing `log-reporter` to receive only the
@@ -77,7 +106,7 @@ PUTNAMI_LOG_REPORTER=@example/logs putnami lint,test,build
 ```
 
 The log reporter receives `events.jsonl` through the same wire and never
-receives `session.json` or `plan.json`. A live chunk leaves once a full 64 KiB frame is
+receives `plan.json`, `session.json` or `spec-verification.json`. A live chunk leaves once a full 64 KiB frame is
 committed, or 2 seconds after the previous events chunk. When the graph ends, it
 sends the rest at once and closes the stream. `PUTNAMI_LOG_REPORTER_TOKEN` is
 its optional credential. The CLI captures it like the session reporter's token

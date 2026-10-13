@@ -37,7 +37,8 @@ asynchronous because it verifies SHA-256 with Web Crypto. Both execute the
 [shared conformance corpus](../conformance/session-reporting.json).
 
 A data frame contains `protocolVersion: 1`, `sessionId`, `artifact`
-(`events.jsonl`, `session.json` or `plan.json`), `offset` in decoded bytes,
+(`events.jsonl`, `session.json`, `plan.json` or `spec-verification.json`),
+`offset` in decoded bytes,
 `sequence` (zero based per artifact), canonical base64 `data`, lowercase hex
 `sha256` of decoded bytes, and `final: false`. Chunks carry at most 65536
 bytes; JSONL lines contain at most 98304 bytes excluding LF. Integers are
@@ -49,8 +50,10 @@ bytes, EOF offset, and the next sequence ordinal. During execution only
 `plan.json` frames, which come first, and non-final events chunks flow. After
 graph termination, all session bytes and the session final marker precede the
 events final marker. An already pending events chunk may precede the session,
-but events final always follows session final. Chunks may split a JSON line or
-UTF-8 character: reassemble bytes before parsing the canonical documents.
+but events final always follows session final. `spec-verification.json` frames
+come last, once the events final marker is acknowledged. Chunks may split a
+JSON line or UTF-8 character: reassemble bytes before parsing the canonical
+documents.
 
 ACKs echo `protocolVersion`, `sessionId`, `artifact`, `offset`, `sequence`,
 `sha256`, and `final`, plus `ok`. `ok: true` means durable acceptance, including
@@ -73,8 +76,9 @@ seconds. The diagnostic names the limit that stopped delivery (`no chunk
 acknowledged for 30s` or `finalization reached its 5m0s cap`). Errors preserve
 the graph verdict and leave retained state for
 `putnami sessions replay --session <id>`. Checkpoint reads are bounded to 192 KiB;
-replay validates finalized session documents up to 16 MiB, and `plan.json`
-frames end at or before 16 MiB. Retention follows
+replay validates finalized session documents up to 16 MiB, `plan.json`
+frames end at or before 16 MiB, and `spec-verification.json` frames at or
+before 8 MiB. Retention follows
 [`sessions.keep`](../../../tooling/cli/doc/16-session-reporting.md).
 
 `PUTNAMI_SESSION_REPORTER_TOKEN` is an optional explicit provider credential.
@@ -113,6 +117,32 @@ receiver that exits at the frame costs three process starts before core
 starts it again for the other artifacts; on a hosted run, a reporter started
 again after repository code ran gets no credential (see
 [Run credential](#run-credential)), so that receiver's delivery fails.
+
+### The spec-verification record
+
+The session reporter sends `spec-verification.json` last: the session's
+spec-verification record, the bytes the CLI persisted in the session
+directory, then its final marker. The CLI writes the record before reporting
+ends, and core frames it only once the receiver acknowledged the events final
+marker, so a receiver holds the whole event stream and the terminal session
+before it reads the record. Core adds no redaction. Every
+`spec-verification.json` frame ends at or before 8388608 decoded bytes
+(`SessionReportingSpecVerificationBytes`), so its final marker's offset is at
+most that bound; both parsers refuse a frame or ACK past it, and the schema
+bounds its `offset`.
+
+`spec-verification.json` is best-effort, and its omission never fails
+delivery. Core omits it, records why in its checkpoint, and completes delivery
+when the file is absent (a run without the spec gate writes none), past its
+bound or unreadable at its cursor, when the receiver answers a frame
+`ok: false`, with or without `retryable`, when the reporter quit or a frame
+fails in transport, or when the finalization limit ends first. Core never
+starts a reporter again for this artifact, so a receiver that exits after the
+events final marker costs nothing, on a hosted run too. Once omitted, no
+further `spec-verification.json` frame is sent, its final marker included. An
+omission changes neither the graph verdict, the other artifacts' delivery, nor
+`subscribers.json`, and prints no diagnostic. A receiver that does not keep
+the record answers its frames `ok: false`.
 
 ## Run credential
 
@@ -190,14 +220,14 @@ TypeScript exports `parseSessionReportingHandshake`,
 `log-reporter` is a second reporting capability for an extension that needs
 only the live event stream. It uses this wire unchanged, restricted to
 `events.jsonl`: every frame and ACK names `events.jsonl`, and the provider never
-receives `session.json` or `plan.json`. Its events final marker follows graph
-termination.
+receives `session.json`, `plan.json` or `spec-verification.json`. Its events
+final marker follows graph termination.
 
 | | `session-reporter` | `log-reporter` |
 | --- | --- | --- |
 | Selector | `PUTNAMI_SESSION_REPORTER` | `PUTNAMI_LOG_REPORTER` |
 | Optional token | `PUTNAMI_SESSION_REPORTER_TOKEN` | `PUTNAMI_LOG_REPORTER_TOKEN` |
-| Artifacts | `plan.json` first, then `session.json` closes before `events.jsonl` | `events.jsonl` |
+| Artifacts | `plan.json` first, then `session.json` closes before `events.jsonl`, then `spec-verification.json` | `events.jsonl` |
 | Live chunk leaves at | a full frame or 10 s | a full frame or 2 s |
 
 Each selected capability is a separate subscriber of the session event stream,
@@ -210,9 +240,10 @@ handshake instead. One capability's outage, refusal or crash changes neither the
 capability's delivery nor the graph verdict.
 
 Go publishes `LogReporterCommand`, `LogReporterEnv`, `LogReporterTokenEnv`,
-`SessionReportingArtifacts(command)` and `SessionReportingPlanBytes`;
-TypeScript exports `LOG_REPORTER_COMMAND`, `LOG_REPORTER_ENV`,
-`LOG_REPORTER_TOKEN_ENV`, `sessionReportingArtifacts` and
-`SESSION_REPORTING_PLAN_BYTES`.
+`SessionReportingArtifacts(command)`, `SessionReportingPlanBytes` and
+`SessionReportingSpecVerificationBytes`; TypeScript exports
+`LOG_REPORTER_COMMAND`, `LOG_REPORTER_ENV`, `LOG_REPORTER_TOKEN_ENV`,
+`sessionReportingArtifacts`, `SESSION_REPORTING_PLAN_BYTES` and
+`SESSION_REPORTING_SPEC_VERIFICATION_BYTES`.
 A corpus case may name its `reporter`; both runtimes reject a case whose
 artifact that reporter never transmits.

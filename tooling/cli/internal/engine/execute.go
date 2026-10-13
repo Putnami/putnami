@@ -453,6 +453,15 @@ func (e *Engine) executeSession(
 			recordedSessionDocument(run, req, session.ID, result.Tuning, cacheSummary(result.Cache)),
 			wsRoot, req.Global.Baseline, req.CommandParams,
 			planned, result.Results, result.Session, versionInfo.Primary())
+		// The spec gate's decided record, persisted beside the session
+		// documents so `specs verify --session` replays what the finalizer
+		// decided. It is written before reporting ends, so the session
+		// reporter sends it after the event stream. Best-effort like
+		// everything here: the sanction already happened inside the
+		// reduction, so losing the audit file never changes the verdict.
+		if req.specGate != nil {
+			_ = session.WriteSpecVerification(req.specGate.record)
+		}
 		finishSessionReporting(reporter, session.ID, finalizeErr)
 		// `latest` names the user's last build, and every `--session latest`
 		// reader resolves it. An adapter whose runs are not the user's build must
@@ -470,14 +479,6 @@ func (e *Engine) executeSession(
 		// and is best-effort like FinalizeV2 above: the report is a projection,
 		// never an input, so a missing one is a missing file and never a failed run.
 		_ = writeRunReport(wsRoot, session, run, req, result.Tuning, result.Cache)
-		// The spec gate's decided record, persisted beside the session
-		// documents so `specs verify --session` replays what the finalizer
-		// decided. Best-effort like everything here: the sanction already
-		// happened inside the reduction, so losing the audit file never changes
-		// the verdict.
-		if req.specGate != nil {
-			_ = session.WriteSpecVerification(req.specGate.record)
-		}
 	}
 
 	boundMachineCachesAfterRun(req, ws, extensions, cache != nil)

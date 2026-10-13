@@ -1,0 +1,130 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "https://example.test/acme/shop.git",
+      "digest": {
+        "gitCommit": "8f3c2a1b9d4e5f60718293a4b5c6d7e8f9a0b1c2",
+        "gitTree": "9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d"
+      }
+    }
+  ],
+  "predicateType": "https://putnami.dev/verdict/v1",
+  "predicate": {
+    "answer": "passed",
+    "mark": "verified",
+    "change": {
+      "repository": "https://example.test/acme/shop.git",
+      "reference": "refs/heads/main",
+      "head": "8f3c2a1b9d4e5f60718293a4b5c6d7e8f9a0b1c2",
+      "base": "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d",
+      "tree": "9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d"
+    },
+    "run": {
+      "id": "run-2026-10-13-0001",
+      "attempt": 1,
+      "conclusion": "success"
+    },
+    "checks": [
+      {
+        "check": "build",
+        "answer": "passed",
+        "level": "required",
+        "phase": "build"
+      },
+      {
+        "check": "coverage",
+        "answer": "failed",
+        "level": "advisory",
+        "phase": "test",
+        "reason": "below_floor"
+      },
+      {
+        "check": "lint",
+        "answer": "passed",
+        "level": "required",
+        "phase": "lint"
+      },
+      {
+        "check": "qualify",
+        "answer": "unsupported",
+        "level": "required",
+        "phase": "validate",
+        "reason": "no_request"
+      },
+      {
+        "check": "test",
+        "answer": "passed",
+        "level": "required",
+        "phase": "test"
+      }
+    ],
+    "impact": {
+      "projects": [
+        {
+          "project": "/services/cart",
+          "relation": "touched",
+          "requirements": {
+            "total": 4,
+            "proven": 4,
+            "missing": 0
+          }
+        },
+        {
+          "project": "/services/checkout",
+          "relation": "reached",
+          "via": "/services/cart",
+          "requirements": {
+            "total": 2,
+            "proven": 2,
+            "missing": 0
+          }
+        }
+      ]
+    },
+    "requirements": {
+      "total": 6,
+      "proven": 6,
+      "missing": 0,
+      "projectsWithout": 0
+    },
+    "declarations": [
+      {
+        "path": "services/cart/specs.baseline.json",
+        "kind": "baseline",
+        "weakening": true,
+        "approval": {
+          "by": "octo-reviewer",
+          "via": "code-host",
+          "at": "2026-10-13T08:55:00Z"
+        }
+      },
+      {
+        "path": "services/cart/specs/cart.json",
+        "kind": "spec",
+        "weakening": false,
+        "approval": {
+          "by": "octo-reviewer",
+          "via": "code-host",
+          "at": "2026-10-13T08:55:00Z"
+        }
+      }
+    ],
+    "gaps": [],
+    "deploy": {
+      "answer": "passed",
+      "channels": [
+        {
+          "channel": "canary",
+          "answer": "passed"
+        },
+        {
+          "channel": "preview",
+          "answer": "unsupported"
+        }
+      ]
+    },
+    "computedAt": "2026-10-13T09:00:00Z",
+    "revision": 2
+  }
+}

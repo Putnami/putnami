@@ -21,8 +21,10 @@ The aggregator in [`internal/cloudcli`](../cloudcli) imports it.
 - The `session-reporter` (`sessionreporter.go`) and `log-reporter`
   (`logreporter.go`) processes the engine starts. They post each
   session-reporting chunk to the Delivery ingest under the run credential.
-  The session reporter also posts `plan.json` as the `plan` part; the log
-  reporter refuses it.
+  The session reporter also posts `plan.json` as the `plan` part and the spec
+  gate's record, `spec-verification.json`, as the `spec-verification` part;
+  the log reporter refuses both. A receiver that predates a part answers 400,
+  and the engine omits that document.
 - `status_node.go` builds the status node of `putnami cloud ci status` and
   `putnami cloud cache status`. `CIStatusNode` and `CacheStatusNode` are the
   same nodes for the `ci` and `cache` lines of `putnami cloud status`.

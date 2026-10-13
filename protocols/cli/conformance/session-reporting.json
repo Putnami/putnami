@@ -687,6 +687,162 @@
     }
   },
   {
+    "name": "session-reporter-spec-verification-chunk",
+    "kind": "chunk",
+    "valid": true,
+    "reporter": "session-reporter",
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "spec-verification.json",
+      "offset": 0,
+      "sequence": 0,
+      "data": "YWJj",
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "final": false
+    }
+  },
+  {
+    "name": "session-reporter-spec-verification-final",
+    "kind": "chunk",
+    "valid": true,
+    "reporter": "session-reporter",
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "spec-verification.json",
+      "offset": 3,
+      "sequence": 1,
+      "data": "",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "final": true
+    }
+  },
+  {
+    "name": "session-reporter-spec-verification-ack",
+    "kind": "ack",
+    "valid": true,
+    "reporter": "session-reporter",
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "spec-verification.json",
+      "offset": 0,
+      "sequence": 0,
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "final": false,
+      "ok": true
+    }
+  },
+  {
+    "name": "session-reporter-spec-verification-refused",
+    "kind": "ack",
+    "valid": true,
+    "reporter": "session-reporter",
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "spec-verification.json",
+      "offset": 0,
+      "sequence": 0,
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "final": false,
+      "ok": false,
+      "code": "invalid_chunk"
+    }
+  },
+  {
+    "name": "spec-verification-chunk-ending-at-bound",
+    "kind": "chunk",
+    "valid": true,
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "spec-verification.json",
+      "offset": 8388605,
+      "sequence": 128,
+      "data": "YWJj",
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "final": false
+    }
+  },
+  {
+    "name": "spec-verification-chunk-ending-past-bound",
+    "kind": "chunk",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "spec-verification.json",
+      "offset": 8388606,
+      "sequence": 128,
+      "data": "YWJj",
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "final": false
+    }
+  },
+  {
+    "name": "spec-verification-final-at-bound",
+    "kind": "chunk",
+    "valid": true,
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "spec-verification.json",
+      "offset": 8388608,
+      "sequence": 129,
+      "data": "",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "final": true
+    }
+  },
+  {
+    "name": "spec-verification-final-past-bound",
+    "kind": "chunk",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "spec-verification.json",
+      "offset": 8388609,
+      "sequence": 129,
+      "data": "",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "final": true
+    }
+  },
+  {
+    "name": "spec-verification-ack-past-bound",
+    "kind": "ack",
+    "valid": false,
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "spec-verification.json",
+      "offset": 8388609,
+      "sequence": 129,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "final": true,
+      "ok": true
+    }
+  },
+  {
+    "name": "log-reporter-spec-verification-chunk",
+    "kind": "chunk",
+    "valid": false,
+    "reporter": "log-reporter",
+    "wire": {
+      "protocolVersion": 1,
+      "sessionId": "20260914-120000-abc123",
+      "artifact": "spec-verification.json",
+      "offset": 0,
+      "sequence": 0,
+      "data": "YWJj",
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "final": false
+    }
+  },
+  {
     "name": "unknown-reporter-events-chunk",
     "kind": "chunk",
     "valid": false,

@@ -13,6 +13,12 @@ export const SESSION_REPORTING_SCHEMA_ID = 'https://putnami.dev/schemas/putnami-
  * line bounds. Twin of SessionReportingPlanBytes.
  */
 export const SESSION_REPORTING_PLAN_BYTES = 16_777_216;
+/**
+ * Bounds spec-verification.json on the wire as SESSION_REPORTING_PLAN_BYTES
+ * bounds plan.json: every spec-verification.json chunk ends at or before this
+ * decoded byte offset. Twin of SessionReportingSpecVerificationBytes.
+ */
+export const SESSION_REPORTING_SPEC_VERIFICATION_BYTES = 8_388_608;
 
 /**
  * Log reporter discovery names. The log reporter speaks the same v1 wire as the
@@ -23,19 +29,35 @@ export const LOG_REPORTER_COMMAND = 'log-reporter';
 export const LOG_REPORTER_ENV = 'PUTNAMI_LOG_REPORTER';
 export const LOG_REPORTER_TOKEN_ENV = 'PUTNAMI_LOG_REPORTER_TOKEN';
 
-export type SessionReportingArtifact = 'events.jsonl' | 'session.json' | 'plan.json';
+export type SessionReportingArtifact = 'events.jsonl' | 'session.json' | 'plan.json' | 'spec-verification.json';
 
-const artifacts: string[] = ['events.jsonl', 'session.json', 'plan.json'];
+/**
+ * Every artifact and the decoded byte offset its chunks end at or before: 0
+ * for events.jsonl and session.json, which only the chunk and line bounds
+ * limit.
+ */
+const artifactBounds = new Map<string, number>([
+  ['events.jsonl', 0],
+  ['session.json', 0],
+  ['plan.json', SESSION_REPORTING_PLAN_BYTES],
+  ['spec-verification.json', SESSION_REPORTING_SPEC_VERIFICATION_BYTES],
+]);
+
+/** The bound of artifact in artifactBounds, or 0 when it has none. */
+function artifactBound(artifact: unknown): number {
+  return (typeof artifact === 'string' && artifactBounds.get(artifact)) || 0;
+}
 
 /**
  * The artifacts the reporter capability named by its reserved command receives,
- * in the order they close: plan.json, then session.json, then events.jsonl for
- * the session reporter, events.jsonl alone for the log reporter. Any other
- * command receives nothing. Twin of SessionReportingArtifacts; the result is a
- * fresh array.
+ * in the order they close: plan.json, then session.json, then events.jsonl,
+ * then spec-verification.json for the session reporter, events.jsonl alone for
+ * the log reporter. Any other command receives nothing. Twin of
+ * SessionReportingArtifacts; the result is a fresh array.
  */
 export function sessionReportingArtifacts(command: string): SessionReportingArtifact[] {
-  if (command === SESSION_REPORTER_COMMAND) return ['plan.json', 'session.json', 'events.jsonl'];
+  if (command === SESSION_REPORTER_COMMAND)
+    return ['plan.json', 'session.json', 'events.jsonl', 'spec-verification.json'];
   if (command === LOG_REPORTER_COMMAND) return ['events.jsonl'];
   return [];
 }
@@ -83,10 +105,10 @@ function parse(line: string, required: string[], optional: string[] = []): Recor
     typeof v['sessionId'] !== 'string' ||
     !whole(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}/, v['sessionId']) ||
     typeof v['artifact'] !== 'string' ||
-    !artifacts.includes(v['artifact']) ||
+    !artifactBounds.has(v['artifact']) ||
     !Number.isSafeInteger(v['offset']) ||
     Number(v['offset']) < 0 ||
-    (v['artifact'] === 'plan.json' && Number(v['offset']) > SESSION_REPORTING_PLAN_BYTES) ||
+    (artifactBound(v['artifact']) > 0 && Number(v['offset']) > artifactBound(v['artifact'])) ||
     !Number.isSafeInteger(v['sequence']) ||
     Number(v['sequence']) < 0 ||
     typeof v['sha256'] !== 'string' ||
@@ -99,7 +121,9 @@ function parse(line: string, required: string[], optional: string[] = []): Recor
 
 /**
  * Validates bytes and digest using Web Crypto, usable in providers and browsers.
- * A plan.json chunk that ends past SESSION_REPORTING_PLAN_BYTES is invalid.
+ * A plan.json chunk that ends past SESSION_REPORTING_PLAN_BYTES, or a
+ * spec-verification.json chunk that ends past
+ * SESSION_REPORTING_SPEC_VERIFICATION_BYTES, is invalid.
  */
 export async function parseSessionReportingChunk(line: string): Promise<SessionReportingChunk> {
   const v = parse(line, [...identityKeys, 'data']);
@@ -116,8 +140,9 @@ export async function parseSessionReportingChunk(line: string): Promise<SessionR
     v['final'] !== (binary.length === 0)
   )
     throw new Error('invalid reporting chunk size or final marker');
-  if (v['artifact'] === 'plan.json' && Number(v['offset']) + binary.length > SESSION_REPORTING_PLAN_BYTES)
-    throw new Error('reporting chunk exceeds the plan.json bound');
+  const bound = artifactBound(v['artifact']);
+  if (bound > 0 && Number(v['offset']) + binary.length > bound)
+    throw new Error(`reporting chunk exceeds the ${String(v['artifact'])} bound`);
   const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   const hex = Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');

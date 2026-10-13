@@ -18,7 +18,7 @@
   ],
   "$defs": {
     "chunk": {
-      "description": "One frame of a persisted session artifact. A plan.json frame starts at or before 16777216 decoded bytes; the Go and TypeScript parsers also refuse one whose offset plus decoded data length exceeds it.",
+      "description": "One frame of a persisted session artifact. A plan.json frame starts at or before 16777216 decoded bytes, and a spec-verification.json frame at or before 8388608; the Go and TypeScript parsers also refuse one whose offset plus decoded data length exceeds its bound.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -43,7 +43,8 @@
           "enum": [
             "events.jsonl",
             "session.json",
-            "plan.json"
+            "plan.json",
+            "spec-verification.json"
           ]
         },
         "offset": {
@@ -108,6 +109,22 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "artifact": {
+                "const": "spec-verification.json"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "offset": {
+                "maximum": 8388608
+              }
+            }
+          }
         }
       ]
     },
@@ -136,7 +153,8 @@
           "enum": [
             "events.jsonl",
             "session.json",
-            "plan.json"
+            "plan.json",
+            "spec-verification.json"
           ]
         },
         "offset": {
@@ -206,6 +224,22 @@
             "properties": {
               "offset": {
                 "maximum": 16777216
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "artifact": {
+                "const": "spec-verification.json"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "offset": {
+                "maximum": 8388608
               }
             }
           }
