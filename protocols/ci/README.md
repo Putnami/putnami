@@ -407,6 +407,10 @@ one canceled before its checkout, has no verdict.
   the gap. A passed verdict with any of them is `checked`.
 - The tree is the tree the run tested, so the subject holds the head commit
   and no tree. A run that tested a `merge` names its `base`.
+- A project ID is `/` for the project at the workspace root, else a slash and
+  the project's path, such as `/tooling/cli`. The path follows the rules of a
+  declaration path: forward slashes, no empty segment, no `.` or `..`
+  segment. A directory may be named `@scope`, `c++` or `.github`.
 - Lists are sorted and hold no duplicate: checks by name, projects by ID,
   channels by name, and gaps by kind, project, requirement, then path.
   Declarations sort weakening first, then by path.
@@ -479,9 +483,9 @@ answer arrives. A higher `revision` replaces every lower one. See
 - Verdict conformance corpus: [`fixtures/verdict`](fixtures/verdict).
   `expectations.json` maps every `valid/*` verdict to its answer and mark, and
   every `invalid/*` verdict to the refusal `ParseVerdict` returns. The valid
-  verdicts cover every answer, both marks, every gap kind and both tested
-  checkouts, and each one is the exact indented encoding of the verdict it
-  holds. Each invalid verdict carries one
+  verdicts cover every answer, both marks, every gap kind, both tested
+  checkouts and a project at the workspace root, and each one is the exact
+  indented encoding of the verdict it holds. Each invalid verdict carries one
   defect.
 
 ## Versioning and compatibility

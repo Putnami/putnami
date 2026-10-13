@@ -623,7 +623,9 @@ func TestCredentialProviderSharesOneDeliveryCallPerPurpose(t *testing.T) {
 	h.send(credentialLine(2, registry.PurposeRead))
 	<-arrived
 	h.send(credentialLine(3, registry.PurposeRead))
-	// The second request joins the first exchange instead of starting one.
+	// The second request joins the first exchange instead of starting one. It
+	// joins when the provider reads it, before it answers the next line: the
+	// exchange is still in progress then, whenever its goroutine runs.
 	h.send(credentialLine(4, registry.PurposePublish))
 	if response := h.next(registry.CredentialOpCredential); response.ID != 4 {
 		t.Fatalf("first answer id = %d, want the publish absence (4) while read waits", response.ID)

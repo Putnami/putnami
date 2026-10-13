@@ -159,6 +159,9 @@ var (
 	verdictReasonPattern      = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,63}$`)
 	verdictCheckPattern       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/~@+-]{0,127}$`)
 	verdictRequirementPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)+#[a-z0-9]+(?:-[a-z0-9]+)*$`)
+	// verdictProjectIDPattern is the part of a project ID's form the schema
+	// states too: a slash, then nothing or the start of a path.
+	verdictProjectIDPattern = regexp.MustCompile(`^/(?:[^/\\]|$)`)
 )
 
 //go:embed schemas/putnami-verdict.json
@@ -295,7 +298,8 @@ type VerdictImpact struct {
 
 // VerdictProject is one impacted project and how its requirements stand.
 type VerdictProject struct {
-	// Project is the workspace project ID, such as /tooling/cli.
+	// Project is the workspace project ID: / for the project at the workspace
+	// root, else a slash and the project's path, such as /tooling/cli.
 	Project string `json:"project"`
 	// Relation is RelationTouched or RelationReached.
 	Relation string `json:"relation"`
@@ -839,10 +843,17 @@ func fullGitReference(value string) bool {
 	return true
 }
 
-// verdictProjectID reports whether value is a workspace project ID, rooted at
-// the workspace: a slash, then a project path without dot segments.
+// verdictProjectID reports whether value is a workspace project ID: `/` for
+// the project at the workspace root, else a slash and the project's path.
+//
+// The path follows the rules of a workspace path and no narrower one. A
+// project is named after its directories, and a directory may be named
+// `@scope`, `c++` or `.github`.
 func verdictProjectID(value string) bool {
-	return len(value) <= 512 && strings.HasPrefix(value, "/") && projectIDPattern.MatchString(value) && !containsDotSegment(value)
+	if !verdictProjectIDPattern.MatchString(value) || len(value) > 512 {
+		return false
+	}
+	return value == "/" || workspacePath(value[1:])
 }
 
 // workspacePath reports whether value is a workspace-relative file path with
