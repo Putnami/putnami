@@ -1,6 +1,6 @@
 # ADR 0002 — One build loop with a versioned local workflow record
 
-- **Status**: accepted for implementation
+- **Status**: accepted for implementation, superseded in part by [ADR 0003](0003-build-publishes-its-proposal-by-default.md)
 - **Scope**: `@putnami/contributor` content and its consumer CLI validator
 
 ## Context
@@ -79,7 +79,8 @@ capability, proposal read-back and comment controls continue in either mode.
 - Local workflow validation supports progress and resume, but local writer
   identity and semantic scope completeness still require independent review.
 - Ready, merged, published, deployed and adopted remain distinct actual
-  receipts. The mandate still controls every external action.
+  receipts. The mandate still controls every external action except the
+  run's own proposal, which ADR 0003 publishes by default.
 
 ## Alternatives rejected
 

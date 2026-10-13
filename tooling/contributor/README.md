@@ -47,15 +47,16 @@ The former `plan`, `execute`, `fix`, `epic`, `code-review`, four `putnami-*`
 aliases and `fix-loop` entries are removed. This intentional breaking change
 is documented in the [migration guide](doc/03-entry-point-migration.md).
 `build` handles named tasks and coordinated units only within its mandate;
-it does not select backlog work or inherit external publication authority.
+it does not select backlog work. It publishes its own proposal by default
+([ADR 0003](doc/adr/0003-build-publishes-its-proposal-by-default.md)), and
+`--local` keeps a run local.
 
 Worker profiles: `fix-light`, `fix-standard`, `fix-heavy` and `epic-analyst`,
 each one body for both hosts with host metadata beside it.
 
 The portable helpers are native CLI commands, validated with the CLI's Go
-suite: `putnami proposals finalize` publishes an authorized draft or a
-verified ready proposal, reads it back, and applies an authorized task
-transition. A partial delivery uses `--partial-delivery` to keep a non-closing
+suite: `putnami proposals finalize` publishes a draft or a verified ready
+proposal, reads it back, and applies the named task's delivered transition. A partial delivery uses `--partial-delivery` to keep a non-closing
 parent reference and skip that transition. It consumes current producer proof
 and never runs or retries a local gate; `--gate ci` explicitly selects hosted
 checks. `putnami contributor language text|files|commits|tasks` enforces the

@@ -2,17 +2,19 @@
 name: build
 description: Deliver an authorized outcome through one implementation, review and evidence loop
 allowed-tools: Bash, Read, Grep, Glob, TodoWrite, Edit, Write, Agent, ToolSearch, mcp__putnami__putnami_search, mcp__putnami__putnami_symbol, mcp__putnami__putnami_context, mcp__putnami__putnami_impact, mcp__putnami__putnami_related, mcp__putnami__putnami_summary, mcp__putnami__list_projects, mcp__putnami__describe_project, mcp__putnami__deps, mcp__putnami__find_owner, mcp__putnami__why_impacted, mcp__putnami__topo_sort, mcp__putnami__impacted, mcp__putnami__get_diagnostics
-argument-hint: [<intention|task|proposal>] [--resume <record>] [--tier <light|standard|heavy>] [--base <ref>] [--dry-run]
+argument-hint: [<intention|task|proposal>] [--resume <record>] [--tier <light|standard|heavy>] [--base <ref>] [--local] [--dry-run]
 ---
 
 # Build
 
 Own the requested outcome, whether it arrives as an intention, a specified
 task, an existing proposal, or a coordinated epic. This is the one
-implementation, review, repair and evidence loop. A natural-language request
-authorizes local work toward its stated outcome; it does not authorize choosing
-backlog work, changing a task, publishing, merging or deploying. A named task
-may be claimed only when the mandate explicitly authorizes the claim.
+implementation, review, repair and evidence loop. A request to build an
+outcome authorizes the work toward it and the publication of its own proposal:
+a draft once the plan is settled, a pushed checkpoint at each milestone, and
+ready for review once the final local gate and dossier pass. It does not
+authorize choosing backlog work, claiming a task, merging or deploying. A named
+task may be claimed only when the mandate explicitly authorizes the claim.
 
 Resolve the CLI from the consumer workspace root in every shell and worker:
 
@@ -40,12 +42,14 @@ command exits zero. Report the missing capability and required CLI upgrade.
 
 `<intention|task|proposal>` names the objective. `--resume <record>` continues
 an existing run; `--tier light|standard|heavy` selects its worker tier;
-`--base <ref>` selects an existing integration base; `--dry-run` projects the
-work without edits or external writes. No objective means ask for one, unless
-an existing run with a recorded objective was explicitly resumed. Preserve the
-invocation's local-only or ready-only limit in the mandate reference. A task,
-review, ADR or verified record grants no additional publication, backlog,
-merge or deployment authority.
+`--base <ref>` selects an existing integration base; `--local` keeps the run
+local, with no push and no proposal; `--dry-run` projects the work without
+edits or external writes. A mandate that says to stay local has the effect of
+`--local`. No objective means ask for one, unless an existing run with a
+recorded objective was explicitly resumed. Preserve the invocation's local-only
+or draft-only limit in the mandate reference. A workspace that binds no
+proposals provider runs local and reports the missing binding. A task, review,
+ADR or verified record grants no backlog, merge or deployment authority.
 
 For a specified task, resolve an ID with policy `tasks.source` or use its
 whole `{source,id}` reference, and read it through `tasks get`. Reconcile a
@@ -115,7 +119,8 @@ retains a non-closing parent reference and leaves the parent task's delivered
 transition untouched. Use normal finalization only when the mandated outcome
 is complete and the required stage is supported by current evidence. Ready,
 merged, published, deployed and adopted are separate receipts. Stop at the
-mandate's authority boundary with the next exact action visible.
+mandate's authority boundary with the next exact action visible; by default
+that boundary is the proposal ready for review.
 Continue until the mandated outcome reaches its required stage, or preserve a
 precise checkpoint at a demonstrated blocker, reserved decision, authority
 boundary or exhausted host budget; a passing unit alone does not end the run.
