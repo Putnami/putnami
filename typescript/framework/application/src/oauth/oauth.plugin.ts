@@ -1,7 +1,8 @@
-import { type InferConfig, useConfig } from '@putnami/runtime';
+import { type ConfigContributor, type ConfigDefinition, type InferConfig, useConfig } from '@putnami/runtime';
 import type { Module, Plugin } from '../application';
 import { HttpPlugin } from '../http/http.plugin';
 import { IdentityResolverMiddleware } from '../security/identity-resolver.middleware';
+import { SessionConfig } from '../session/session.config';
 import { CallbackHandler } from './handlers/callback.get';
 import { LoginHandler } from './handlers/login.get';
 import { LogoutHandler } from './handlers/logout.get';
@@ -14,6 +15,10 @@ import { OAuthService, setActiveOAuthService } from './oauth.service';
  * Registers `loginRoute`, `callbackRoute` (when distinct from `loginRoute`),
  * and `logoutRoute` against `HttpPlugin`. Owns a process-wide `OAuthService`
  * accessible via `useOAuthService()`.
+ *
+ * Contributes the `oauth` and `session` config blocks (the flow keeps its
+ * tokens in the session), so a workload that composes the plugin publishes
+ * both blocks and their secrets without a module-level `configToken()` call.
  *
  * @example Putnami Auth (OIDC discovery)
  * ```ts
@@ -38,10 +43,14 @@ import { OAuthService, setActiveOAuthService } from './oauth.service';
  *   }));
  * ```
  */
-export class OAuthPlugin implements Plugin {
+export class OAuthPlugin implements Plugin, ConfigContributor {
   readonly service = new OAuthService();
 
   constructor(private providedConfig?: Partial<InferConfig<typeof OAuthConfig>>) {}
+
+  configDefinitions(): ConfigDefinition[] {
+    return [OAuthConfig, SessionConfig];
+  }
 
   async warmup(app: Module): Promise<void> {
     this.service.confInit = this.providedConfig;

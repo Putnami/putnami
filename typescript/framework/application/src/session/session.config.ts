@@ -1,4 +1,4 @@
-import { Config, Default, Int, OneOf } from '@putnami/runtime';
+import { Config, Default, Int, OneOf, Optional, Sensitive } from '@putnami/runtime';
 
 /**
  * Session store type options.
@@ -26,7 +26,12 @@ export const SessionConfig = Config('session', {
   sameSite: Default(OneOf('lax', 'strict', 'none'), 'lax'),
   secure: Default(Boolean, true),
   algorithm: Default(String, 'aes-256-gcm'),
-  cookieSecret: String,
+  /**
+   * Hex key that encrypts the session cookies. Optional in the schema so an app
+   * that never touches a session starts without it; the first cookie access
+   * fails when it is missing.
+   */
+  cookieSecret: Optional(Sensitive(String)),
   ttl: Default(Int, 60 * 60 * 24 * 7),
   /** Maximum number of in-memory sessions before oldest are evicted. Only applies to memory store. */
   maxSessions: Default(Int, 10_000),

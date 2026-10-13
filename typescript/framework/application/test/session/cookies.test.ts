@@ -152,6 +152,13 @@ describe('SessionConfig', () => {
     expect(config.algorithm).toBe('aes-256-gcm');
     expect(config.ttl).toBe(60 * 60 * 24 * 7);
   });
+
+  it('accepts a config without cookieSecret, so an app that uses no session still starts', () => {
+    process.env.CONFIG_DATA = JSON.stringify({});
+    resetConfigLoader();
+
+    expect(useConfig(SessionConfig).cookieSecret).toBeUndefined();
+  });
 });
 
 describe('cookies()', () => {
@@ -236,6 +243,14 @@ describe('cookies()', () => {
       const response = applyCallbacks(context);
       expect(response.getHeaders('Set-Cookie')).toEqual([]);
     });
+  });
+
+  it('refuses to read cookies when cookieSecret is not set', () => {
+    process.env.CONFIG_DATA = JSON.stringify({});
+    resetConfigLoader();
+    const context = createContext();
+
+    expect(() => runInContext(context, () => cookies())).toThrow(/session\.cookieSecret is not set/);
   });
 
   it('rejects a wrong-length cookieSecret with an actionable error instead of an opaque crypto failure', () => {
