@@ -45,6 +45,20 @@ describe('Client Form Handlers', () => {
       expect(response).toBeInstanceOf(Response);
     });
 
+    it('keeps the query string after the JSON suffix', async () => {
+      await pageLoaderHandler()({
+        request: new Request('http://localhost/tasks?page=2&sort=name'),
+        params: {},
+        unstable_pattern: '/tasks',
+        context: undefined,
+      });
+
+      expect(fetchMock).toHaveBeenCalledWith('http://localhost/tasks.json?page=2&sort=name', {
+        headers: { Accept: 'application/json', 'X-Putnami-Loader': '1' },
+        signal: expect.any(AbortSignal),
+      });
+    });
+
     describe('redirects', () => {
       const navigate = () =>
         pageLoaderHandler()({
@@ -206,6 +220,20 @@ describe('Client Form Handlers', () => {
       });
 
       expect(fetchMock).toHaveBeenCalledWith('http://localhost/app/docs-layout.json', {
+        headers: { Accept: 'application/json', 'X-Putnami-Loader': '1' },
+        signal: expect.any(AbortSignal),
+      });
+    });
+
+    it('keeps the query string after the layout JSON suffix', async () => {
+      await layoutLoaderHandler('/docs')({
+        request: new Request('http://localhost/docs/guide?lang=fr'),
+        params: {},
+        unstable_pattern: '/docs/*',
+        context: undefined,
+      });
+
+      expect(fetchMock).toHaveBeenCalledWith('http://localhost/docs-layout.json?lang=fr', {
         headers: { Accept: 'application/json', 'X-Putnami-Loader': '1' },
         signal: expect.any(AbortSignal),
       });

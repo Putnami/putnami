@@ -28,7 +28,7 @@ export default loader()
   });
 ```
 
-Cache keys are auto-generated from the route and parameters. For custom keys:
+Cache keys are auto-generated from the route, its parameters and its query string. For custom keys:
 
 ```ts
 export default loader()

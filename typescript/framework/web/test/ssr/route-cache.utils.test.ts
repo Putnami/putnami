@@ -132,6 +132,27 @@ describe('route-cache.utils', () => {
       expect(second).toEqual(first);
     });
 
+    specTest(
+      'caches each query string of a route apart',
+      {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'cache-isolation',
+        check: 'the-default-loader-cache-key-includes-the-query-string',
+      },
+      async () => {
+        const loader = mock((ctx: { queryParams: () => Record<string, string> }) => ({
+          page: ctx.queryParams().page,
+        }));
+        const page2 = createMockContext({ queryParams: () => ({ page: '2' }) });
+        const page3 = createMockContext({ queryParams: () => ({ page: '3' }) });
+
+        expect(await executeLoaderWithCache(loader, page2, '/tasks', { ttl: 60_000 })).toEqual({ page: '2' });
+        expect(await executeLoaderWithCache(loader, page3, '/tasks', { ttl: 60_000 })).toEqual({ page: '3' });
+        expect(await executeLoaderWithCache(loader, page2, '/tasks', { ttl: 60_000 })).toEqual({ page: '2' });
+        expect(loader).toHaveBeenCalledTimes(2);
+      },
+    );
+
     it('uses a custom cache key when provided', async () => {
       const loader = mock(() => ({ cached: true }));
       const ctx = createMockContext({ params: { id: 'abc' } });
