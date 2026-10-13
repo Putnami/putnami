@@ -1403,6 +1403,10 @@ feature branch runs `--impacted` against the trunk, while `main`/`master` uses a
 local same-command/same-params run marker first, then an active remote-cache run
 marker, and falls back to every project.
 
+Global flags end at the first `--`. Every argument after it reaches the job as
+written and sets no global flag, so `putnami run my-job -- --verbose` passes
+`--verbose` to the job and leaves the CLI's own output unchanged.
+
 ### Credential provider: `--providers`
 
 `--providers <list>` lets this process ask the workspace's credential provider

@@ -192,9 +192,11 @@ func startPreviousTelemetryDrain(ctx context.Context, allowed bool) {
 	}()
 }
 
+// telemetryFlagPresence reports the allowlisted flags the user gave the CLI.
+// Tokens past the passthrough separator are the job's, so they count for none.
 func telemetryFlagPresence(args []string) telemetry.FlagPresence {
 	var presence telemetry.FlagPresence
-	for _, arg := range args {
+	for _, arg := range args[:passthroughCut(args)] {
 		flag := strings.SplitN(arg, "=", 2)[0]
 		switch flag {
 		case "--impacted":

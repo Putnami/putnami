@@ -105,7 +105,6 @@ func TestParseArgs_PassthroughTokensReachTheJob(t *testing.T) {
 		{[]string{"run", "app", "--", "--watch=no"}, []string{"--", "--watch=no"}},
 		{[]string{"run", "app", "--", "--help", "-v"}, []string{"--", "--help", "-v"}},
 		{[]string{"run", "app", "--", "--projects", "x", "--output=json"}, []string{"--", "--projects", "x", "--output=json"}},
-		{[]string{"run", "app", "--verbose", "--", "--quiet"}, []string{"--", "--quiet"}},
 		{[]string{"run", "app", "--", "--", "--verbose"}, []string{"--", "--", "--verbose"}},
 	}
 	for _, tc := range cases {
@@ -117,15 +116,13 @@ func TestParseArgs_PassthroughTokensReachTheJob(t *testing.T) {
 			t.Errorf("ParseArgs(%q).RawJobArgs = %q, want %q", tc.args, parsed.RawJobArgs, tc.want)
 		}
 		g := parsed.Global
-		if g.Watch || g.Help || g.Quiet || g.Output != "" || g.Projects != "app" {
+		if g.Verbose || g.Watch || g.Help || g.Quiet || g.Output != "" || g.Projects != "app" {
 			t.Errorf("ParseArgs(%q) bound a payload token: %+v", tc.args, g)
 		}
 	}
-	if parsed := ParseArgs([]string{"run", "app", "--", "--verbose"}, nil, nil); parsed.Global.Verbose {
-		t.Error("--verbose past the separator turned verbose on")
-	}
-	if parsed := ParseArgs([]string{"run", "app", "--verbose", "--", "x"}, nil, nil); !parsed.Global.Verbose {
-		t.Error("--verbose before the separator left verbose off")
+	parsed := ParseArgs([]string{"run", "app", "--verbose", "--", "--quiet"}, nil, nil)
+	if !parsed.Global.Verbose || parsed.Global.Quiet || !reflect.DeepEqual(parsed.RawJobArgs, []string{"--", "--quiet"}) {
+		t.Errorf("a flag before the separator: %+v %q", parsed.Global, parsed.RawJobArgs)
 	}
 }
 

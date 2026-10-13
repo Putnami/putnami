@@ -88,8 +88,9 @@ func ContextMapCommand(wsRoot string, opts ContextMapOptions) error {
 // this flag is not spelled `--output`).
 //
 // The format is accepted ATTACHED or as the next token, because the CLI's global
-// parser normalizes every unknown `--flag=value` into two tokens before the
-// remainder reaches a command (internal/cli/flags.go, splitInlineValues). What a
+// parser normalizes every unknown `--flag=value` before the passthrough
+// separator into two tokens before the remainder reaches a command
+// (internal/cli/flags.go, splitInlineValues). What a
 // user typed as `--print=json` therefore arrives here as `--print` `json`, and a
 // caller that builds Args itself must not have to know that.
 func parsePrintFlag(args []string) (string, error) {

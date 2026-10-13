@@ -36,7 +36,9 @@ import (
 // rubber-stamps its own drift. A row that moves is a repo-wide cold-cache event
 // plus run-marker mismatches, with no error anywhere.
 //
-// wantParams and wantMarker pin the parser seam, and nothing moves them.
+// wantParams and wantMarker pin the parser seam, and nothing moves them, except
+// a fix that changes which tokens the parser hands the job: its pull request
+// names the invocations whose keys move.
 // wantCacheKey pins the current cache-key format against accidental movement,
 // and it is the only column a format change may touch: a format change is an
 // intentional repo-wide cold-cache event, and it remaps that column to values

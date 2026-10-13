@@ -362,9 +362,9 @@ func TestIsFlagValue(t *testing.T) {
 }
 
 // TestSplitInlineValues_KeepsAJobTokenWholeOnlyWhereTheSplitMisreadsIt pins
-// which "--name=value" tokens a job command keeps whole, and that a global flag,
-// a token past the separator, and every token of a built-in or command-group
-// invocation are split.
+// which "--name=value" tokens a job command keeps whole, and that a global flag
+// and every token of a built-in or command-group invocation are split. Tokens
+// past the separator never reach splitInlineValues (parseGlobalFlags).
 func TestSplitInlineValues_KeepsAJobTokenWholeOnlyWhereTheSplitMisreadsIt(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
