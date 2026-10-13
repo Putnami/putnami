@@ -117,7 +117,7 @@ func TestWatcher_DetectChanges(t *testing.T) {
 	}
 }
 
-// TestWatcher_DropsGitIgnoredChanges is issue #233: a log a serve run writes
+// TestWatcher_DropsGitIgnoredChanges: a log a serve run writes
 // into an ignored directory restarted the server on every line. A change Git
 // ignores is dropped, including a `log/*` rule that ignores the files but not
 // the directory. A dotenv file still counts, such as conf/.env.local.yaml that

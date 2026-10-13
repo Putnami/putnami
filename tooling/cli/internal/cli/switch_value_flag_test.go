@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Issue #233: `serve --watch=false` turned watch ON and left a stray "false"
+// `serve --watch=false` turned watch ON and left a stray "false"
 // token. It now turns serve's own watch flag off, as --no-watch does.
 func TestParseArgs_WatchFalseIsNoWatch(t *testing.T) {
 	t.Parallel()

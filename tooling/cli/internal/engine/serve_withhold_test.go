@@ -86,7 +86,7 @@ func TestWithholdServeSteps_NonServeCommandsAreNeverWithheld(t *testing.T) {
 	}
 }
 
-// Issue #233: serve watches by default, and --no-watch, which reaches the run
+// Serve watches by default, and --no-watch, which reaches the run
 // as the serve flag `watch: false`, keeps it out of the restart loop.
 func TestForcesServeWatch_NoWatchKeepsServeOutOfTheLoop(t *testing.T) {
 	for _, tc := range []struct {

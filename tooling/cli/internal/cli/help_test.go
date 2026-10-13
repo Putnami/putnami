@@ -260,7 +260,7 @@ func TestPrintHelpMan_IncludesStructuredCommandDetails(t *testing.T) {
 	}
 }
 
-// Issue #233: serve's help offered `-w, --watch (default: true)` and no
+// Serve's help offered `-w, --watch (default: true)` and no
 // spelling that turns the flag off.
 func TestExtensionFlagHelpLine_ListsTheNegationOfAFlagOnByDefault(t *testing.T) {
 	t.Parallel()
