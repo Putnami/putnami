@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://putnami.dev/schemas/putnami-verdict.json",
   "title": "Putnami run verdict",
-  "description": "Version 1: the one answer a CI run gives about one change, as an unsigned in-toto Statement v1. The subject is the repository at the change's head commit and tree. The Go validator also checks what this schema cannot state: the answer is the fold of the required checks, the mark follows the answer and the gaps, the counts add up, the gaps match the impact and the declarations, and every list is sorted without duplicates.",
+  "description": "Version 1: the one answer a CI run gives about one change, as an unsigned in-toto Statement v1. The subject is the repository at the change's head commit. The Go validator also checks what this schema cannot state: the answer is the fold of the required checks, the mark follows the answer and the gaps, the counts add up, the gaps match the impact and the declarations, a list is empty beside the gap that says it is unknown, and every list is sorted without duplicates.",
   "type": "object",
   "additionalProperties": false,
   "required": ["_type", "subject", "predicateType", "predicate"],
@@ -16,7 +16,7 @@
       "minItems": 1,
       "maxItems": 1,
       "items": { "$ref": "#/$defs/subject" },
-      "description": "Exactly one resource: the repository at the change's head commit and tree."
+      "description": "Exactly one resource: the repository at the change's head commit."
     },
     "predicateType": {
       "const": "https://putnami.dev/verdict/v1",
@@ -66,10 +66,12 @@
         "digest": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["gitCommit", "gitTree"],
+          "required": ["gitCommit"],
           "properties": {
-            "gitCommit": { "$ref": "#/$defs/objectID" },
-            "gitTree": { "$ref": "#/$defs/objectID" }
+            "gitCommit": {
+              "$ref": "#/$defs/objectID",
+              "description": "The head commit, predicate.change.head."
+            }
           }
         }
       }
@@ -134,7 +136,7 @@
     "change": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["repository", "reference", "head", "tree"],
+      "required": ["repository", "reference", "head", "tree", "testedCheckout"],
       "properties": {
         "repository": {
           "type": "string",
@@ -150,12 +152,19 @@
         },
         "head": { "$ref": "#/$defs/objectID" },
         "base": { "$ref": "#/$defs/objectID" },
-        "tree": { "$ref": "#/$defs/objectID" },
-        "testedCheckout": {
+        "tree": {
           "$ref": "#/$defs/objectID",
-          "description": "The commit the run checked out and tested, when it is not the head."
+          "description": "The tree the run tested."
+        },
+        "testedCheckout": {
+          "enum": ["head", "merge"],
+          "description": "What tree is the tree of: head when the run tested the head as it is, merge when it tested the head merged into the base."
         }
-      }
+      },
+      "if": {
+        "properties": { "testedCheckout": { "const": "merge" } }
+      },
+      "then": { "required": ["base"] }
     },
     "run": {
       "type": "object",
@@ -219,7 +228,7 @@
     "project": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["project", "relation", "requirements"],
+      "required": ["project", "relation"],
       "properties": {
         "project": { "$ref": "#/$defs/projectID" },
         "relation": { "enum": ["touched", "reached"] },
@@ -227,7 +236,10 @@
           "$ref": "#/$defs/projectID",
           "description": "Another impacted project the dependency reaches this one through."
         },
-        "requirements": { "$ref": "#/$defs/requirementCounts" }
+        "requirements": {
+          "$ref": "#/$defs/requirementCounts",
+          "description": "Absent when the producer does not know how the project's requirements stand."
+        }
       },
       "if": {
         "properties": { "relation": { "const": "touched" } }
@@ -255,7 +267,7 @@
     "requirements": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["total", "proven", "missing", "projectsWithout"],
+      "required": ["total", "proven", "missing", "projectsWithout", "projectsUnknown"],
       "properties": {
         "total": { "type": "integer", "minimum": 0 },
         "proven": { "type": "integer", "minimum": 0 },
@@ -264,6 +276,11 @@
           "type": "integer",
           "minimum": 0,
           "description": "Impacted projects that state no requirement."
+        },
+        "projectsUnknown": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Impacted projects that carry no requirement counts."
         }
       }
     },
@@ -278,7 +295,7 @@
         },
         "weakening": {
           "type": "boolean",
-          "description": "Whether the change weakens what the declaration promises. It orders the declarations; a declaration without an approval is a gap either way."
+          "description": "True when the producer found that the change weakens what the declaration promises. It orders the declarations; a declaration without an approval is a gap either way."
         },
         "approval": { "$ref": "#/$defs/approval" }
       }
@@ -298,7 +315,16 @@
       "additionalProperties": false,
       "required": ["kind"],
       "properties": {
-        "kind": { "enum": ["no-requirement", "unproven-requirement", "unapproved-declaration"] },
+        "kind": {
+          "enum": [
+            "no-requirement",
+            "unproven-requirement",
+            "unapproved-declaration",
+            "unknown-impact",
+            "unknown-requirements",
+            "unknown-declarations"
+          ]
+        },
         "project": { "$ref": "#/$defs/projectID" },
         "requirement": {
           "type": "string",
@@ -310,7 +336,7 @@
       },
       "oneOf": [
         {
-          "properties": { "kind": { "const": "no-requirement" } },
+          "properties": { "kind": { "enum": ["no-requirement", "unknown-requirements"] } },
           "required": ["project"],
           "not": { "anyOf": [{ "required": ["requirement"] }, { "required": ["path"] }] }
         },
@@ -323,6 +349,12 @@
           "properties": { "kind": { "const": "unapproved-declaration" } },
           "required": ["path"],
           "not": { "anyOf": [{ "required": ["project"] }, { "required": ["requirement"] }] }
+        },
+        {
+          "properties": { "kind": { "enum": ["unknown-impact", "unknown-declarations"] } },
+          "not": {
+            "anyOf": [{ "required": ["project"] }, { "required": ["requirement"] }, { "required": ["path"] }]
+          }
         }
       ]
     },

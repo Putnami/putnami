@@ -1,6 +1,7 @@
 # ADR 0006 — a run carries one verdict
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0007](0007-a-verdict-names-the-tested-tree-and-what-it-does-not-know.md)
 - **Scope**: `go.putnami.dev/protocol/ci` (`protocols/ci`)
 
 ## Context

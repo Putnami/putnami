@@ -4,8 +4,7 @@
     {
       "name": "https://example.test/acme/web.git",
       "digest": {
-        "gitCommit": "b2b2b2b2c3c3c3c3d4d4d4d4e5e5e5e5f6f6f6f6",
-        "gitTree": "5a5a5a5a6b6b6b6b7c7c7c7c8d8d8d8d9e9e9e9e"
+        "gitCommit": "b2b2b2b2c3c3c3c3d4d4d4d4e5e5e5e5f6f6f6f6"
       }
     }
   ],
@@ -18,7 +17,7 @@
       "head": "b2b2b2b2c3c3c3c3d4d4d4d4e5e5e5e5f6f6f6f6",
       "base": "a1a1a1a1b2b2b2b2c3c3c3c3d4d4d4d4e5e5e5e5",
       "tree": "5a5a5a5a6b6b6b6b7c7c7c7c8d8d8d8d9e9e9e9e",
-      "testedCheckout": "0c0c0c0c1d1d1d1d2e2e2e2e3f3f3f3f40404040"
+      "testedCheckout": "merge"
     },
     "run": {
       "id": "run-2026-10-13-0005",
@@ -64,7 +63,8 @@
       "total": 1,
       "proven": 1,
       "missing": 0,
-      "projectsWithout": 0
+      "projectsWithout": 0,
+      "projectsUnknown": 0
     },
     "declarations": [],
     "gaps": [],

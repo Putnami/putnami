@@ -109,6 +109,29 @@ func TestVerdictValidCorpusCoversEveryAnswerAndMark(t *testing.T) {
 	}
 }
 
+func TestVerdictValidCorpusCoversEveryGapKindAndTestedCheckout(t *testing.T) {
+	kinds := map[string]bool{}
+	checkouts := map[string]bool{}
+	for name := range readVerdictExpectations(t).Valid {
+		verdict := readVerdictFixture(t, name)
+		checkouts[verdict.Predicate.Change.TestedCheckout] = true
+		for _, gap := range verdict.Predicate.Gaps {
+			kinds[gap.Kind] = true
+		}
+	}
+	for _, kind := range []string{GapNoRequirement, GapUnprovenRequirement, GapUnapprovedDeclaration,
+		GapUnknownImpact, GapUnknownRequirements, GapUnknownDeclarations} {
+		if !kinds[kind] {
+			t.Errorf("no valid fixture records a %q gap", kind)
+		}
+	}
+	for _, checkout := range []string{TestedCheckoutHead, TestedCheckoutMerge} {
+		if !checkouts[checkout] {
+			t.Errorf("no valid fixture tested a %q checkout", checkout)
+		}
+	}
+}
+
 func TestVerdictValidCorpus(t *testing.T) {
 	for name, want := range readVerdictExpectations(t).Valid {
 		t.Run(name, func(t *testing.T) {
@@ -243,6 +266,56 @@ func TestEveryUnapprovedDeclarationIsAGap(t *testing.T) {
 	}
 }
 
+// A producer that does not know the impact or the declarations says so with a
+// gap, so a passed verdict cannot read verified on evidence nobody recorded.
+func TestUnknownEvidenceKeepsAPassedVerdictChecked(t *testing.T) {
+	verdict := readVerdictFixture(t, "passed-verified.json")
+	p := &verdict.Predicate
+	p.Impact.Projects = []VerdictProject{}
+	p.Requirements = VerdictRequirements{}
+	p.Declarations = []VerdictDeclaration{}
+	if err := ValidateVerdict(verdict); err != nil {
+		t.Fatalf("a verdict that knows the change reaches nothing: %v", err)
+	}
+	for _, gaps := range [][]VerdictGap{
+		{{Kind: GapUnknownImpact}},
+		{{Kind: GapUnknownDeclarations}},
+		{{Kind: GapUnknownDeclarations}, {Kind: GapUnknownImpact}},
+	} {
+		p.Gaps, p.Mark = gaps, MarkVerified
+		if err := ValidateVerdict(verdict); err == nil || err.Error() != "verdict mark does not follow its answer and gaps" {
+			t.Errorf("verified with %+v: ValidateVerdict = %v", gaps, err)
+		}
+		p.Mark = MarkChecked
+		if err := ValidateVerdict(verdict); err != nil {
+			t.Errorf("checked with %+v: %v", gaps, err)
+		}
+	}
+}
+
+// A project without counts is a project whose requirements the producer does
+// not know: it adds nothing to the sums but ProjectsUnknown, and it carries
+// exactly one gap, which is not the gap of a project that states no
+// requirement.
+func TestAProjectWithoutCountsIsUnknownNotEmpty(t *testing.T) {
+	verdict := readVerdictFixture(t, "passed-checked.json")
+	p := &verdict.Predicate
+	p.Impact.Projects[1].Requirements = nil
+	p.Requirements = VerdictRequirements{Total: 4, Proven: 2, Missing: 2, ProjectsUnknown: 1}
+	if err := ValidateVerdict(verdict); err == nil || err.Error() != "verdict gaps do not match its impact and declarations" {
+		t.Fatalf("a no-requirement gap for a project without counts: ValidateVerdict = %v", err)
+	}
+	p.Gaps = []VerdictGap{
+		{Kind: GapUnapprovedDeclaration, Path: "libs/money/specs/money.json"},
+		{Kind: GapUnknownRequirements, Project: "/services/cart"},
+		{Kind: GapUnprovenRequirement, Project: "/libs/money", Requirement: "money/rounding#half-even"},
+		{Kind: GapUnprovenRequirement, Project: "/libs/money", Requirement: "money/rounding#no-float"},
+	}
+	if err := ValidateVerdict(verdict); err != nil {
+		t.Fatalf("ValidateVerdict: %v", err)
+	}
+}
+
 // verdictCase is one change to a valid verdict and the refusal it causes.
 type verdictCase struct {
 	name    string
@@ -254,7 +327,7 @@ type verdictCase struct {
 func TestValidateVerdictRefusals(t *testing.T) {
 	const (
 		lists        = "verdict omits a list or writes it as null"
-		subject      = "verdict subject is not the change's repository at its head commit and tree"
+		subject      = "verdict subject is not the change's repository at its head commit"
 		revisions    = "verdict revisions must be full lowercase object IDs"
 		run          = "verdict run identity is malformed"
 		checks       = "verdict checks are not canonical"
@@ -264,6 +337,7 @@ func TestValidateVerdictRefusals(t *testing.T) {
 		declarations = "verdict declarations are not canonical"
 		gaps         = "verdict gaps are not canonical"
 		gapMatch     = "verdict gaps do not match its impact and declarations"
+		sums         = "verdict requirements are not the sums of its impacted projects"
 		mark         = "verdict mark does not follow its answer and gaps"
 		channels     = "verdict deploy channels are not canonical"
 		deployCount  = "verdict deploy names no channel or more than 64"
@@ -287,17 +361,26 @@ func TestValidateVerdictRefusals(t *testing.T) {
 		{"subject names another repository", verified, func(v *Verdict) {
 			v.Subject[0].Name = "https://example.test/acme/other.git"
 		}, subject},
-		{"subject tree is not the change's", verified, func(v *Verdict) {
-			v.Subject[0].Digest.GitTree = v.Predicate.Change.Base
+		{"subject commit is not the change's head", verified, func(v *Verdict) {
+			v.Subject[0].Digest.GitCommit = v.Predicate.Change.Base
+		}, subject},
+		{"subject commit is the tested tree", verified, func(v *Verdict) {
+			v.Subject[0].Digest.GitCommit = v.Predicate.Change.Tree
 		}, subject},
 		{"uppercase head", verified, func(v *Verdict) { v.Predicate.Change.Head = strings.ToUpper(v.Predicate.Change.Head) },
 			revisions},
 		{"long head", verified, func(v *Verdict) { v.Predicate.Change.Head += "0" }, revisions},
 		{"short tree", verified, func(v *Verdict) { v.Predicate.Change.Tree = v.Predicate.Change.Tree[:39] }, revisions},
 		{"short base", verified, func(v *Verdict) { v.Predicate.Change.Base = "1a2b3c4" }, revisions},
-		{"tested checkout is not hexadecimal", checked, func(v *Verdict) {
-			v.Predicate.Change.TestedCheckout = strings.Repeat("g", 40)
-		}, revisions},
+		{"no tested checkout", verified, func(v *Verdict) { v.Predicate.Change.TestedCheckout = "" },
+			`unknown verdict tested checkout ""`},
+		{"unknown tested checkout", checked, func(v *Verdict) { v.Predicate.Change.TestedCheckout = "rebase" },
+			`unknown verdict tested checkout "rebase"`},
+		{"tested checkout is a commit", checked, func(v *Verdict) {
+			v.Predicate.Change.TestedCheckout = v.Predicate.Change.Head
+		}, `unknown verdict tested checkout "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00"`},
+		{"merge without a base", checked, func(v *Verdict) { v.Predicate.Change.Base = "" },
+			"verdict tested a merge without a base"},
 		{"empty run ID", verified, func(v *Verdict) { v.Predicate.Run.ID = "" }, run},
 		{"run ID with a space", verified, func(v *Verdict) { v.Predicate.Run.ID = "run 1" }, run},
 		{"long run ID", verified, func(v *Verdict) { v.Predicate.Run.ID = strings.Repeat("r", 129) }, run},
@@ -347,13 +430,20 @@ func TestValidateVerdictRefusals(t *testing.T) {
 			v.Predicate.Impact.Projects[1].Via = "/services/payments"
 		}, projects},
 		{"negative proven count", verified, func(v *Verdict) {
-			v.Predicate.Impact.Projects[0].Requirements = VerdictRequirementCounts{Total: 4, Proven: -1, Missing: 5}
+			v.Predicate.Impact.Projects[0].Requirements = &VerdictRequirementCounts{Total: 4, Proven: -1, Missing: 5}
 		}, counts},
 		{"missing is not total minus proven", verified, func(v *Verdict) {
 			v.Predicate.Impact.Projects[0].Requirements.Missing = 1
 		}, counts},
-		{"projectsWithout is not the count", verified, func(v *Verdict) { v.Predicate.Requirements.ProjectsWithout = 1 },
-			"verdict requirements are not the sums of its impacted projects"},
+		{"projectsWithout is not the count", verified, func(v *Verdict) { v.Predicate.Requirements.ProjectsWithout = 1 }, sums},
+		{"projectsUnknown is not the count", verified, func(v *Verdict) { v.Predicate.Requirements.ProjectsUnknown = 1 }, sums},
+		{"a project without counts is not counted", verified, func(v *Verdict) {
+			v.Predicate.Impact.Projects[1].Requirements = nil
+		}, sums},
+		{"a project without counts adds to the sums", checked, func(v *Verdict) {
+			v.Predicate.Impact.Projects[0].Requirements = nil
+			v.Predicate.Requirements.ProjectsUnknown = 1
+		}, sums},
 		{"too many declarations", verified, func(v *Verdict) {
 			v.Predicate.Declarations = make([]VerdictDeclaration, MaxVerdictDeclarations+1)
 		}, "verdict has more than 1024 declarations"},
@@ -410,6 +500,22 @@ func TestValidateVerdictRefusals(t *testing.T) {
 		{"unproven-requirement gap names a path", checked, func(v *Verdict) {
 			v.Predicate.Gaps[2].Path = "libs/money/specs/money.json"
 		}, gaps},
+		{"unknown-requirements gap names a requirement", checked, func(v *Verdict) {
+			v.Predicate.Gaps[0] = VerdictGap{Kind: GapUnknownRequirements, Project: "/services/cart",
+				Requirement: "cart/totals#sum"}
+		}, gaps},
+		{"unknown-requirements gap without a project", checked, func(v *Verdict) {
+			v.Predicate.Gaps[0] = VerdictGap{Kind: GapUnknownRequirements}
+		}, gaps},
+		{"unknown-impact gap names a project", checked, func(v *Verdict) {
+			v.Predicate.Gaps = []VerdictGap{{Kind: GapUnknownImpact, Project: "/libs/money"}}
+		}, gaps},
+		{"unknown-declarations gap names a path", checked, func(v *Verdict) {
+			v.Predicate.Gaps = []VerdictGap{{Kind: GapUnknownDeclarations, Path: "putnami.ci.json"}}
+		}, gaps},
+		{"duplicate unknown-impact gap", checked, func(v *Verdict) {
+			v.Predicate.Gaps = []VerdictGap{{Kind: GapUnknownImpact}, {Kind: GapUnknownImpact}}
+		}, gaps},
 		{"unsorted gaps", checked, func(v *Verdict) {
 			list := v.Predicate.Gaps
 			list[2], list[3] = list[3], list[2]
@@ -433,6 +539,25 @@ func TestValidateVerdictRefusals(t *testing.T) {
 		{"no gap for a project without requirements", checked, func(v *Verdict) {
 			v.Predicate.Gaps = v.Predicate.Gaps[1:]
 		}, gapMatch},
+		{"no gap for a project without counts", checked, func(v *Verdict) {
+			v.Predicate.Impact.Projects[2].Requirements = nil
+			v.Predicate.Requirements = VerdictRequirements{Total: 3, Proven: 1, Missing: 2, ProjectsWithout: 1,
+				ProjectsUnknown: 1}
+		}, gapMatch},
+		{"unknown-requirements gap for a project with counts", checked, func(v *Verdict) {
+			v.Predicate.Gaps = slices.Insert(v.Predicate.Gaps, 2,
+				VerdictGap{Kind: GapUnknownRequirements, Project: "/services/checkout"})
+		}, gapMatch},
+		{"unknown-requirements gap for an unlisted project", checked, func(v *Verdict) {
+			v.Predicate.Gaps = slices.Insert(v.Predicate.Gaps, 2,
+				VerdictGap{Kind: GapUnknownRequirements, Project: "/services/payments"})
+		}, gapMatch},
+		{"impacted projects beside an unknown impact", checked, func(v *Verdict) {
+			v.Predicate.Gaps = slices.Insert(v.Predicate.Gaps, 2, VerdictGap{Kind: GapUnknownImpact})
+		}, "verdict lists impacted projects beside an unknown impact"},
+		{"declarations beside unknown declarations", checked, func(v *Verdict) {
+			v.Predicate.Gaps = slices.Insert(v.Predicate.Gaps, 2, VerdictGap{Kind: GapUnknownDeclarations})
+		}, "verdict lists declarations beside unknown declarations"},
 		{"verified with gaps", checked, func(v *Verdict) { v.Predicate.Mark = MarkVerified }, mark},
 		{"passed without a mark", verified, func(v *Verdict) { v.Predicate.Mark = "" }, mark},
 		{"checked without gaps", verified, func(v *Verdict) { v.Predicate.Mark = MarkChecked }, mark},
@@ -703,13 +828,15 @@ func TestVerdictSchemaMatchesTheGoVocabulary(t *testing.T) {
 		}
 	}
 	for path, want := range map[string][]string{
-		"$defs/answer/enum":                      append([]string{AnswerUnsupported}, verdictAnswerSeverity...),
-		"$defs/predicate/properties/mark/enum":   {MarkVerified, MarkChecked},
-		"$defs/check/properties/level/enum":      {LevelRequired, LevelAdvisory},
-		"$defs/project/properties/relation/enum": {RelationTouched, RelationReached},
-		"$defs/declaration/properties/kind/enum": verdictDeclarationKinds,
-		"$defs/approval/properties/via/enum":     {ApprovalViaCodeHost, ApprovalViaConsole},
-		"$defs/gap/properties/kind/enum":         {GapNoRequirement, GapUnprovenRequirement, GapUnapprovedDeclaration},
+		"$defs/answer/enum":                           append([]string{AnswerUnsupported}, verdictAnswerSeverity...),
+		"$defs/predicate/properties/mark/enum":        {MarkVerified, MarkChecked},
+		"$defs/check/properties/level/enum":           {LevelRequired, LevelAdvisory},
+		"$defs/project/properties/relation/enum":      {RelationTouched, RelationReached},
+		"$defs/declaration/properties/kind/enum":      verdictDeclarationKinds,
+		"$defs/approval/properties/via/enum":          {ApprovalViaCodeHost, ApprovalViaConsole},
+		"$defs/change/properties/testedCheckout/enum": {TestedCheckoutHead, TestedCheckoutMerge},
+		"$defs/gap/properties/kind/enum": {GapNoRequirement, GapUnprovenRequirement, GapUnapprovedDeclaration,
+			GapUnknownImpact, GapUnknownRequirements, GapUnknownDeclarations},
 	} {
 		var got []string
 		for _, value := range schemaValue(t, schema, path).([]any) {

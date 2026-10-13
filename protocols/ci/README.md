@@ -362,22 +362,24 @@ Adding the ImpactPlan changed no ChangePlan byte and no digest. See
 
 A Verdict is the one answer a CI run gives about one change. It is an unsigned
 in-toto Statement v1: `_type` is `https://in-toto.io/Statement/v1`, the one
-subject is the repository URL with the head commit as `gitCommit` and its tree
-as `gitTree`, and `predicateType` is `https://putnami.dev/verdict/v1`. This
-package owns the `Verdict` type, its schema and its validation. It neither
-signs a verdict nor verifies a signature.
+subject is the repository URL with the head commit as `gitCommit`, and
+`predicateType` is `https://putnami.dev/verdict/v1`. This package owns the
+`Verdict` type, its schema and its validation. It neither signs a verdict nor
+verifies a signature.
+
+The Verdict is *defined, not yet adopted*: no consumer reads it yet.
 
 | Predicate member | Meaning |
 | --- | --- |
 | `answer` | `passed`, `failed`, `unsupported`, `unanswered`, `canceled` or `infrastructure`: the fold of the required checks |
 | `mark` | `verified` or `checked`, present only when `answer` is `passed` |
-| `change` | `repository`, `reference`, `head`, `base` when the run had one, `tree`, and `testedCheckout` when the run tested another commit, such as a merge |
+| `change` | `repository`, `reference`, `head`, `base` when the run had one, `tree`, the tree the run tested, and `testedCheckout`: `head` when that is the head's own tree, `merge` when it is the tree of the head merged into the base |
 | `run` | the run's `id`, its `attempt` from 1, and its own `conclusion` code |
 | `checks` | every check: `check`, `answer`, `level` (`required` or `advisory`), `phase`, and `reason` when it did not pass |
-| `impact` | every impacted `project`, `touched` or `reached` (`via` another impacted project), with its `requirements` counts: `total`, `proven`, `missing` |
-| `requirements` | the sums of the projects' counts, and `projectsWithout`, the projects that state no requirement |
-| `declarations` | every declaration the change modifies: `path`, `kind`, `weakening`, and the `approval` when someone gave one |
-| `gaps` | what keeps a passed verdict from `verified` |
+| `impact` | every impacted `project`, `touched` or `reached` (`via` another impacted project), with its `requirements` counts: `total`, `proven`, `missing`. A project carries no counts when the producer does not know them |
+| `requirements` | the sums of the projects' counts, `projectsWithout`, the projects that state no requirement, and `projectsUnknown`, the projects without counts |
+| `declarations` | every declaration the change modifies: `path`, `kind`, `weakening` when the producer found that the change weakens it, and the `approval` when someone gave one |
+| `gaps` | what keeps a passed verdict from `verified`: something missing, or something the producer does not know |
 | `deploy` | the `answer` of the deploys the change triggered and the answer of each of their `channels`, when it triggered any |
 | `computedAt`, `revision` | when the verdict was computed, and its revision from 1 |
 
@@ -394,6 +396,14 @@ signs a verdict nor verifies a signature.
   `feature#requirement`, or `unapproved-declaration` for a declaration
   without an approval, whether the change weakens it or not. The gaps match
   the counts and the declarations exactly.
+- A producer says what it does not know with a gap, never with an empty list.
+  `unknown-requirements` names a project without counts. `unknown-impact`
+  means the producer does not know which projects the change reaches, and
+  `unknown-declarations` that it does not know which declarations the change
+  modifies: the list is then empty, and the validator refuses an entry beside
+  the gap. A passed verdict with any of them is `checked`.
+- The tree is the tree the run tested, so the subject holds the head commit
+  and no tree. A run that tested a `merge` names its `base`.
 - Lists are sorted and hold no duplicate: checks by name, projects by ID,
   channels by name, and gaps by kind, project, requirement, then path.
   Declarations sort weakening first, then by path.
@@ -403,7 +413,8 @@ signs a verdict nor verifies a signature.
 
 A run attempt can compute its verdict more than once, for example when a late
 answer arrives. A higher `revision` replaces every lower one. See
-[ADR 0006](doc/adr/0006-a-run-carries-one-verdict.md).
+[ADR 0006](doc/adr/0006-a-run-carries-one-verdict.md) and
+[ADR 0007](doc/adr/0007-a-verdict-names-the-tested-tree-and-what-it-does-not-know.md).
 
 ## Schema and fixtures
 
@@ -458,8 +469,9 @@ answer arrives. A higher `revision` replaces every lower one. See
 - Verdict conformance corpus: [`fixtures/verdict`](fixtures/verdict).
   `expectations.json` maps every `valid/*` verdict to its answer and mark, and
   every `invalid/*` verdict to the refusal `ParseVerdict` returns. The valid
-  verdicts cover every answer and both marks, and each one is the exact
-  indented encoding of the verdict it holds. Each invalid verdict carries one
+  verdicts cover every answer, both marks, every gap kind and both tested
+  checkouts, and each one is the exact indented encoding of the verdict it
+  holds. Each invalid verdict carries one
   defect.
 
 ## Versioning and compatibility
@@ -547,7 +559,9 @@ replaced `gate` with `commands`, moved deploy off the branch rule, and gave
 the document a ChangePlan projects in
 [ADR 0005](doc/adr/0005-a-change-plan-projects-an-impact-plan.md), and the
 one verdict of a run in
-[ADR 0006](doc/adr/0006-a-run-carries-one-verdict.md). Anything not settled there is enforced by the schema and
+[ADR 0006](doc/adr/0006-a-run-carries-one-verdict.md), amended by
+[ADR 0007](doc/adr/0007-a-verdict-names-the-tested-tree-and-what-it-does-not-know.md).
+Anything not settled there is enforced by the schema and
 the tests rather than by a separate record. When a further decision becomes
 contested — the first candidate is whether the canonical digest is part of the
 public contract or an implementation detail — it gets a record under
