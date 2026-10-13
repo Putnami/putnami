@@ -489,7 +489,7 @@ func RunJob(
 }
 
 // RunJobWithProcessEnv is RunJob plus process-spawn facts the caller owns
-// (compose: PORT, NODE_ENV, CONFIG_DATA). It is not a cache input: serve jobs
+// (compose: PORT, NODE_ENV, APP_ENV, CONFIG_DATA). It is not a cache input: serve jobs
 // are cache:false.
 //
 // The entries reach the subprocess environment and nothing else — not the job

@@ -118,6 +118,18 @@
           }
         },
         {
+          "id": "config-environment",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "app-env-names-the-config-environment-of-a-production-build",
+              "node-env-test-keeps-the-test-environment"
+            ]
+          }
+        },
+        {
           "id": "env-fills-gaps",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

@@ -2364,6 +2364,15 @@
           }
         },
         {
+          "id": "local-target-reads-the-local-config",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-local-target-reads-the-local-config-of-its-production-build"]
+          }
+        },
+        {
           "id": "local-readiness-is-completed-startup",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

@@ -209,8 +209,8 @@ The `pg_cron` migration fails when the extension is not admin-installed, on
 purpose.
 
 `conf/.env.yaml` carries `analytics.secret` for every environment: the visitor
-hash needs a server-side key and the plugin fails closed without one — under
-`putnami qualify --target local` too, which runs the sample production-mode.
+hash needs a server-side key and the plugin fails closed without one, in every
+environment, tests included.
 The value is a sample-only placeholder; a real workload keeps its key out of
 the tree.
 

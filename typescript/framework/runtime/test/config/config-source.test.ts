@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { getEnv } from '../../src/config/config';
 import type { ConfigSource } from '../../src/config/config-source';
 import { getDefaultSources, loadGlobalConfig } from '../../src/config/config-source';
 import { specTest } from '../../src/spectest';
@@ -28,6 +29,58 @@ describe('ConfigSource', () => {
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
     }
+  });
+
+  describe('getEnv', () => {
+    let nodeEnv: string | undefined;
+
+    beforeEach(() => {
+      nodeEnv = process.env.NODE_ENV;
+      delete process.env.NODE_ENV;
+    });
+
+    afterEach(() => {
+      if (nodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = nodeEnv;
+    });
+
+    specTest(
+      'APP_ENV names the config environment of a production build',
+      {
+        feature: 'typescript/typed-configuration',
+        requirement: 'config-environment',
+        check: 'app-env-names-the-config-environment-of-a-production-build',
+      },
+      () => {
+        process.env.NODE_ENV = 'production';
+        expect(getEnv()).toBe('production');
+        process.env.APP_ENV = 'local';
+        expect(getEnv()).toBe('local');
+        process.env.K_SERVICE = 'service';
+        expect(getEnv()).toBe('local');
+        // A deployment that names its environment prod keeps the production files.
+        process.env.APP_ENV = 'prod';
+        expect(getEnv()).toBe('production');
+      },
+    );
+
+    specTest(
+      'NODE_ENV=test keeps the test environment',
+      {
+        feature: 'typescript/typed-configuration',
+        requirement: 'config-environment',
+        check: 'node-env-test-keeps-the-test-environment',
+      },
+      () => {
+        process.env.NODE_ENV = 'test';
+        process.env.APP_ENV = 'local';
+        expect(getEnv()).toBe('test');
+      },
+    );
+
+    it('falls back to local without NODE_ENV, APP_ENV or K_SERVICE', () => {
+      expect(getEnv()).toBe('local');
+    });
   });
 
   describe('getDefaultSources', () => {

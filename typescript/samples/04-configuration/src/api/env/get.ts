@@ -10,11 +10,13 @@ export const GET = endpoint().handle(() => {
     configFile: `.env.${env}.yaml`,
     detectionLogic: {
       test: "NODE_ENV === 'test' → 'test'",
-      production: "NODE_ENV === 'production' → 'production'",
+      appEnv: "APP_ENV is set → its value ('prod' → 'production')",
+      production: "NODE_ENV === 'production' or K_SERVICE is set → 'production'",
       local: "Otherwise → 'local'",
     },
     environmentVariables: {
       NODE_ENV: process.env.NODE_ENV || '(not set)',
+      APP_ENV: process.env.APP_ENV || '(not set)',
     },
   };
 });
