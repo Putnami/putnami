@@ -171,6 +171,33 @@ func TestPublishMigrationSkipsAMissingBundleNoPlanSelects(t *testing.T) {
 	}
 }
 
+// TestPublishMigrationProjectReadsTheGenResource pins the one declaration that
+// orders the publication against the generates of its session. The bundle lives
+// in the project's .gen, and every generate of the project writes .gen: the
+// test command's generate can start while this task reads, and an executing
+// generate starts from a .gen emptied of the bundle. Reading the gen resource
+// makes the planner order this task against every .gen writer of the session,
+// so it reads the bundle its build produced.
+func TestPublishMigrationProjectReadsTheGenResource(t *testing.T) {
+	raw, ok := readCloudManifestTasks(t)["cloud-publish-migration-project"]
+	if !ok {
+		t.Fatal("manifest has no cloud-publish-migration-project task")
+	}
+	var task struct {
+		CWD   string   `json:"cwd"`
+		Reads []string `json:"reads"`
+	}
+	if err := json.Unmarshal(raw, &task); err != nil {
+		t.Fatal(err)
+	}
+	if task.CWD != "{projectRoot}" {
+		t.Fatalf("cwd = %q, want {projectRoot}: the gen resource is the working project's", task.CWD)
+	}
+	if len(task.Reads) != 1 || task.Reads[0] != "gen" {
+		t.Fatalf("reads = %v, want [gen]", task.Reads)
+	}
+}
+
 func TestMigrationSelectionFailsClosedOnMissingOrMismatchedPlan(t *testing.T) {
 	prepared := &datacli.PreparedMigration{ProjectPath: "/app", ExpectedCoordinate: "owner/app", Version: "1"}
 	if _, err := migrationSelection(map[string]any{}, prepared); err == nil {

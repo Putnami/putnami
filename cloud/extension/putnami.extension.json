@@ -3191,7 +3191,10 @@
           "registry"
         ]
       },
-      "description": "Send the selected project's migration bundle to Data when one was built; an existing bundle requires an explicit project namespace.",
+      "reads": [
+        "gen"
+      ],
+      "description": "Send the selected project's migration bundle to Data when one was built; an existing bundle requires an explicit project namespace. It reads the bundle from the project's .gen, so it declares the gen resource: no other generate of the session rewrites .gen while it reads.",
       "timeoutMs": 120000
     },
     "cloud-publish-archives": {
