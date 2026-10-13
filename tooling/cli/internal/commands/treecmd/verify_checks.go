@@ -1,6 +1,8 @@
 package treecmd
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"regexp"
 	"slices"
@@ -50,13 +52,43 @@ func (r *verifyRun) verify(record any, expectedBase *string) *jsObject {
 	r.checkGate(session, report, current, baseSHA, true, nil)
 	r.checkQualification(at(record, "qualification"), current)
 	r.checkAcceptance(at(record, "acceptance"))
-	require(r.fingerprint() == current, "tree changed during verification")
-	for _, checked := range r.checked {
-		require(r.digest(checked.path) == checked.digest, "evidence changed during verification")
+	var workflow any
+	if hasOwnMember(record, "workflow") {
+		workflowBytes, _ := r.workflowBytes(at(record, "workflow"), "dossier workflow")
+		workflowRecord, err := parseJSON(workflowBytes)
+		if err != nil {
+			failErr(err)
+		}
+		workflow = r.verifyWorkflow(workflowRecord, true, jsToString(baseSHA))
 	}
-	return obj([]string{"verdict", "stage", "assurance", "binding", "gateSession", "review", "limits"},
+	require(r.fingerprint() == current, "tree changed during verification")
+	r.checkEvidenceStable()
+	result := obj([]string{"verdict", "stage", "assurance", "binding", "gateSession", "review", "limits"},
 		"Putnami verified", "ready", "local-declared-scope", binding,
 		at(session, "sessionId"), at(review, "report"), verifiedLimits)
+	if workflow != nil {
+		result.set("workflow", workflow)
+	}
+	return result
+}
+
+func (r *verifyRun) checkEvidenceStable() {
+	for _, checked := range r.checked {
+		if checked.restored != nil {
+			data, err := r.v.RecoverReport(r.root, *checked.restored)
+			require(err == nil && len(data) > 0, "workflow restored report changed during verification: "+checked.restored.Task)
+			sum := sha256.Sum256(data)
+			require(hex.EncodeToString(sum[:]) == checked.digest, "workflow restored report changed during verification: "+checked.restored.Task)
+			continue
+		}
+		if checked.workflow {
+			data := r.workflowReadPath(checked.path, "workflow evidence")
+			sum := sha256.Sum256(data)
+			require(hex.EncodeToString(sum[:]) == checked.digest, "evidence changed during verification")
+			continue
+		}
+		require(r.digest(checked.path) == checked.digest, "evidence changed during verification")
+	}
 }
 
 // checkPolicies checks that the dossier references exactly the policy files

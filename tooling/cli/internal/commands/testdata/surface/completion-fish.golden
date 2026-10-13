@@ -67,6 +67,7 @@ complete -c putnami -n '__fish_use_subcommand' -a 'completion' -d 'Generate shel
 complete -c putnami -n '__fish_use_subcommand' -a 'compose' -d 'Serve a workload with the workloads it runs with'
 complete -c putnami -n '__fish_use_subcommand' -a 'config' -d 'Manage configuration'
 complete -c putnami -n '__fish_use_subcommand' -a 'context' -d 'Manage AI context'
+complete -c putnami -n '__fish_use_subcommand' -a 'contributor' -d 'Run native contributor checks and inspect machine load'
 complete -c putnami -n '__fish_use_subcommand' -a 'deps' -d 'Manage dependencies'
 complete -c putnami -n '__fish_use_subcommand' -a 'dev' -d 'Author extensions and templates'
 complete -c putnami -n '__fish_use_subcommand' -a 'doctor' -d 'Preflight production readiness under a deployment profile'
@@ -102,6 +103,8 @@ complete -c putnami -n '__putnami_complete_children config' -a 'set'
 complete -c putnami -n '__putnami_complete_children config' -a 'show'
 complete -c putnami -n '__putnami_complete_children context' -a 'generate'
 complete -c putnami -n '__putnami_complete_children context' -a 'map'
+complete -c putnami -n '__putnami_complete_children contributor' -a 'language'
+complete -c putnami -n '__putnami_complete_children contributor' -a 'machine-load'
 complete -c putnami -n '__putnami_complete_children deps' -a 'add'
 complete -c putnami -n '__putnami_complete_children deps' -a 'install'
 complete -c putnami -n '__putnami_complete_children deps' -a 'remove'
@@ -185,6 +188,9 @@ complete -c putnami -n '__putnami_seen_path compose' -l 'port' -d 'Proxy port of
 complete -c putnami -n '__putnami_seen_path compose' -l 'ready-timeout' -d 'Deadline for each member\'s typed ready event; default 60s' -r
 complete -c putnami -n '__putnami_seen_path context generate' -l 'force' -d 'Rewrite a guidance block that was edited or written by an older release'
 complete -c putnami -n '__putnami_seen_path context map' -l 'print' -d 'Render the map to stdout (md by default, or json) and write nothing'
+complete -c putnami -n '__putnami_seen_path contributor language' -l 'diff' -d 'With files: inspect tracked files changed in a Git revision range' -r
+complete -c putnami -n '__putnami_seen_path contributor language' -l 'label' -d 'With text: label the input in findings' -r
+complete -c putnami -n '__putnami_seen_path contributor language' -l 'limit' -d 'With tasks: maximum number of task records to inspect' -r
 complete -c putnami -n '__putnami_seen_path dev template' -l 'keep' -d 'With test: keep the rendered temporary workspace for inspection'
 complete -c putnami -n '__putnami_seen_path dev template' -l 'skip-build' -d 'With test: render the template without running build and test on it'
 complete -c putnami -n '__putnami_seen_path dev template' -l 'stable' -d 'With package: publish under a stable version instead of a prerelease'
@@ -242,6 +248,7 @@ complete -c putnami -n '__putnami_seen_path tree verify' -l 'record' -d 'Verify 
 complete -c putnami -n '__putnami_seen_path tree verify' -l 'ref' -d 'Print the reference to this file: its path as given and its SHA-256' -r
 complete -c putnami -n '__putnami_seen_path tree verify' -l 'report' -d 'Session report of the --gate session' -r
 complete -c putnami -n '__putnami_seen_path tree verify' -l 'snapshot' -d 'Print the dossier skeleton for the current tree'
+complete -c putnami -n '__putnami_seen_path tree verify' -l 'workflow' -d 'Validate a v1 local workflow and report progress without a ready verdict' -r
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'channel' -d 'Resolve a release channel (stable by default; canary for latest prerelease)' -r
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'cli' -d 'Only upgrade the CLI binary'
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'deps' -d 'Only upgrade framework dependencies'

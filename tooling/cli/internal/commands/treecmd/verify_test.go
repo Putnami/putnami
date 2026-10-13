@@ -24,6 +24,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	features "go.putnami.dev/protocol/features"
 )
 
 var (
@@ -83,7 +85,8 @@ type verifyFixture struct {
 	planFlags    []string
 	planBaseline string
 	// cliPlan leaves Verifier.Plan nil, so the fake ./putnamiw answers.
-	cliPlan bool
+	cliPlan       bool
+	recoverReport func(root string, report features.VerificationReportRef) ([]byte, error)
 
 	mu          sync.Mutex
 	calls       int
@@ -461,7 +464,8 @@ func (f *verifyFixture) checkCLIPlanRequest() {
 func (f *verifyFixture) invoke(args ...string) verifyResult {
 	f.t.Helper()
 	var stdout bytes.Buffer
-	verifier := Verifier{Dir: f.root, Fingerprint: f.fakeFingerprint, Plan: f.fakePlan, Stdout: &stdout}
+	verifier := Verifier{Dir: f.root, Fingerprint: f.fakeFingerprint, Plan: f.fakePlan,
+		RecoverReport: f.recoverReport, Stdout: &stdout}
 	if f.cliPlan {
 		verifier.Plan = nil
 	}
@@ -1206,4 +1210,56 @@ func TestWorkspaceCLI(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestVerifierUsesItsRootDespiteForeignGitEnvironment(t *testing.T) {
+	f := newVerifyFixture(t)
+	foreign := t.TempDir()
+	init := exec.Command("git", "init", "-q", "-b", "main")
+	init.Dir = foreign
+	if output, err := init.CombinedOutput(); err != nil {
+		t.Fatalf("init foreign repository: %v: %s", err, output)
+	}
+	gitDir := filepath.Join(foreign, ".git")
+	for name, value := range map[string]string{
+		"GIT_DIR":              gitDir,
+		"GIT_WORK_TREE":        foreign,
+		"GIT_COMMON_DIR":       gitDir,
+		"GIT_INDEX_FILE":       filepath.Join(gitDir, "index"),
+		"GIT_OBJECT_DIRECTORY": filepath.Join(gitDir, "objects"),
+		"GIT_CONFIG_COUNT":     "1",
+		"GIT_CONFIG_KEY_0":     "core.bare",
+		"GIT_CONFIG_VALUE_0":   "true",
+	} {
+		t.Setenv(name, value)
+	}
+	t.Setenv("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
+
+	command := gitCommand(f.root, "rev-parse", "--show-toplevel")
+	if !slices.Contains(command.Env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes") {
+		t.Fatal("repository isolation removed a transport setting")
+	}
+	for _, entry := range command.Env {
+		name, _, _ := strings.Cut(entry, "=")
+		if name == "GIT_DIR" || name == "GIT_WORK_TREE" || name == "GIT_COMMON_DIR" ||
+			name == "GIT_INDEX_FILE" || name == "GIT_OBJECT_DIRECTORY" || strings.HasPrefix(name, "GIT_CONFIG") {
+			t.Fatalf("repository selector leaked to verifier Git command: %s", name)
+		}
+	}
+	top, err := capture("git", command)
+	if err != nil {
+		t.Fatalf("verifier Git root: %v", err)
+	}
+	resolvedTop, err := filepath.EvalSymlinks(strings.TrimSpace(top))
+	if err != nil {
+		t.Fatalf("resolve verifier Git root: %v", err)
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(f.root)
+	if err != nil {
+		t.Fatalf("resolve fixture Git root: %v", err)
+	}
+	if resolvedTop != resolvedRoot {
+		t.Fatalf("verifier Git root = %q, want %q", resolvedTop, resolvedRoot)
+	}
+	f.verify("")
 }

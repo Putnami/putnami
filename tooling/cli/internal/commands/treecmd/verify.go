@@ -18,12 +18,13 @@ import (
 	"strings"
 	"syscall"
 
+	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
 // VerifyUsage is the one-line usage `putnami tree verify --help` prints.
-const VerifyUsage = "usage: putnami tree verify (--record FILE | --snapshot | --ref FILE | --gate SESSION --report REPORT) [--base REV]\n"
+const VerifyUsage = "usage: putnami tree verify (--record FILE | --workflow FILE | --snapshot | --ref FILE | --gate SESSION --report REPORT) [--base REV]\n"
 
 // Verifier checks local workflow evidence against the worktree it runs in. It
 // is a consistency check, not a signed review or an access boundary, and it
@@ -42,6 +43,9 @@ type Verifier struct {
 	// Windows) with `<commands joined by ,> --impacted --baseline <baseSHA>
 	// <flags> --plan --output=json`.
 	Plan func(root string, commands, flags []string, baseSHA string) ([]string, error)
+	// RecoverReport verifies a restored native report against the current
+	// task-owned cache key and returns its validated bytes. Nil fails closed.
+	RecoverReport func(root string, report features.VerificationReportRef) ([]byte, error)
 	// Stdout receives exactly one JSON document, or the usage line for --help.
 	Stdout io.Writer
 }
@@ -79,7 +83,7 @@ func (v Verifier) Run(args []string) error {
 }
 
 // The checks run in a fixed order, and each failure names a fixed reason:
-// finalize-pr.sh and the execute skill read those reasons. The evidence is read
+// `proposals finalize` and the build skill read those reasons. The evidence is read
 // with JavaScript semantics (see verify_json.go), the semantics its producers
 // and the skill's earlier JavaScript verifier share. A failed check, and a read
 // that JavaScript answers with a TypeError, unwinds with a verifyFailure panic;
@@ -119,7 +123,11 @@ type verifyRun struct {
 	checked []checkedRef
 }
 
-type checkedRef struct{ path, digest string }
+type checkedRef struct {
+	path, digest string
+	workflow     bool
+	restored     *features.VerificationReportRef
+}
 
 // verifyArgs is the parsed command line. base and report are nil when absent.
 type verifyArgs struct {
@@ -149,6 +157,16 @@ func (v Verifier) verdict(args []string) (value any, err error) {
 		return r.ref(parsed.input), nil
 	case "--gate":
 		return r.reusableGate(parsed.input, *parsed.report, parsed.baseOr("origin/main")), nil
+	case "--workflow":
+		before := r.workflowReadPath(parsed.input, "workflow record")
+		workflow, parseErr := parseJSON(before)
+		if parseErr != nil {
+			failErr(parseErr)
+		}
+		result := r.verifyWorkflow(workflow, false, "")
+		require(bytes.Equal(r.workflowReadPath(parsed.input, "workflow record"), before), "workflow changed during verification")
+		r.checkEvidenceStable()
+		return result, nil
 	}
 	before := r.digest(parsed.input)
 	result := r.verify(r.readJSON(parsed.input), parsed.base)
@@ -156,7 +174,7 @@ func (v Verifier) verdict(args []string) (value any, err error) {
 	return result, nil
 }
 
-const chooseOneMode = "choose exactly one of --record, --snapshot, --ref and --gate"
+const chooseOneMode = "choose exactly one of --record, --workflow, --snapshot, --ref and --gate"
 
 func parseVerifyArgs(args []string) verifyArgs {
 	var parsed verifyArgs
@@ -170,7 +188,7 @@ func parseVerifyArgs(args []string) verifyArgs {
 	}
 	for index := 0; index < len(args); index++ {
 		switch arg := args[index]; arg {
-		case "--record", "--snapshot", "--ref", "--gate":
+		case "--record", "--workflow", "--snapshot", "--ref", "--gate":
 			require(parsed.mode == "", chooseOneMode)
 			parsed.mode = arg
 			if arg != "--snapshot" {
@@ -339,7 +357,7 @@ func (r *verifyRun) checkRef(value any) string {
 	require(isObject && text(reference.get("path")), "missing evidence reference")
 	name, _ := reference.get("path").(string)
 	info, err := os.Stat(r.path(name))
-	require(err == nil && info.Mode().IsRegular() && info.Size() > 0, "missing or empty evidence file")
+	require(err == nil && info.Mode().IsRegular() && info.Size() > 0, "missing or empty evidence file: "+name)
 	digest := r.digest(name)
 	require(strictEqual(digest, reference.get("sha256")), "evidence digest changed: "+name)
 	r.checked = append(r.checked, checkedRef{path: name, digest: digest})
@@ -376,6 +394,7 @@ func (r *verifyRun) fileList(args ...string) []string {
 func gitCommand(dir string, args ...string) *exec.Cmd {
 	command := exec.Command("git", args...)
 	command.Dir = dir
+	command.Env = git.RepositoryEnvironment(os.Environ())
 	return command
 }
 

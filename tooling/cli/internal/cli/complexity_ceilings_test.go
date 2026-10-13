@@ -83,9 +83,14 @@ var complexityCeilings = []complexityCeiling{
 	{
 		unit:   "engine",
 		prefix: "internal/engine/",
-		files:  24,
-		funcs:  174,
-		why: "RAISED 173→174 (cli/report-fix): the run report states the run's explicit --fix value, " +
+		files:  25,
+		funcs:  177,
+		why: "RAISED 24/174→25/177 (cli/contributor-workflows): spec_gate_cache_verify.go adds a read-only " +
+			"verification seam for restored native producer reports. VerifyCachedVerificationReport, " +
+			"cachedObservationRecovery.verifyCachedReport, and readCachedVerificationReport reuse the " +
+			"engine's existing cache key, result, manifest, and bounded-byte checks; they add no run stage, " +
+			"scheduler, or cache store. " +
+			"RAISED 173→174 (cli/report-fix): the run report states the run's explicit --fix value, " +
 			"which `tree verify` requires as fix: false for a CI policy that lists --fix=false. " +
 			"report.go holds reportFix, which reads the `fix` command param as only a bool or the " +
 			"strings \"true\" and \"false\"; reportEnforceCoverage also reads \"1\", so the two stay " +

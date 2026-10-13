@@ -21,7 +21,7 @@ was published, validates the projects that read it, and publishes one
 proposal. When nothing moved it stops cleanly — no branch, no proposal.
 
 It is an optional integration. The repository declares it in its
-[policy](../../../.agents/skills/execute/references/policy.md) under
+[policy](../../../.agents/skills/build/references/policy.md) under
 `integrations.contentBump`:
 
 | Member | Meaning |

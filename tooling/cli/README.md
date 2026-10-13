@@ -79,6 +79,15 @@ putnami serve my-app
 putnami build --impacted --plan
 ```
 
+The `@putnami/contributor` extension supplies the `build`, `spec`, `design`,
+`prototype`, `review`, `adr`, and `check` workflows, plus the explicit
+`content-bump` utility. Native `putnami contributor language` checks repository
+prose and task records; `putnami contributor machine-load` reports local check
+capacity. `putnami tree verify --workflow FILE` checks a separately versioned
+local workflow record. A configured proposals provider also enables the local
+`putnami proposals finalize` command, which consumes current verification and
+does not rerun the gate.
+
 ## Documentation
 
 - **[Overview](doc/01-overview.md)** — Architecture, boot sequence, exit codes

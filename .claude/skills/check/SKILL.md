@@ -10,7 +10,10 @@ argument-hint: [<project-path-or-name> | --all] [--skip-docs]
 Run the full pre-commit validation suite, qualify applicable runtime behavior
 from the current worktree, and audit documentation coverage for impacted
 changes. Read the repository's conventions from
-[its policy](../../../.agents/skills/execute/references/policy.md).
+[its policy](../../../.agents/skills/build/references/policy.md).
+This remains directly callable. [Build](../build/SKILL.md) automatically
+performs the applicable checks within its single evidence cycle, reusing
+current producer proof rather than starting a new gate for a stage change.
 
 ## Portable host contract
 
@@ -66,13 +69,13 @@ Run `"$PUTNAMI_CLI" build <selection> --plan` to understand which projects will 
 
 ### 2. Run or reuse the applicable gate
 
-When execute calls this step, first inspect the exact referenced producer session
+When build calls this step, first inspect the exact referenced producer session
 and report under its records contract. Reuse a current applicable result; do not
 start another gate merely because a review completed. Derive blocking roots and
 flags from the workspace CI policy. `validate` already includes the SDD
 `validate-workspace` companion. The command below is the ordinary default, not
 an override of additional repository checks. During final evidence collection,
-use execute's immutable base SHA and freeze the tree. This check verdict alone
+use build's immutable base SHA and freeze the tree. This check verdict alone
 is not the computed Putnami verified stamp.
 
 
@@ -161,8 +164,8 @@ no language rule, report it as not configured. The detector checks everything
 this change publishes:
 
 ```bash
-bash .agents/skills/check/scripts/english-only.sh commits origin/<base>..HEAD
-bash .agents/skills/check/scripts/english-only.sh files --diff origin/<base>...HEAD
+"$PUTNAMI_CLI" contributor language commits origin/<base>..HEAD
+"$PUTNAMI_CLI" contributor language files --diff origin/<base>...HEAD
 ```
 
 The proposal text is checked only when the proposals contract answers `ok`
@@ -177,7 +180,7 @@ outcome="$(jq -j '.outcome // "no envelope"' <<<"$envelope" 2>/dev/null || echo 
 found="$(jq -j '.result.items // [] | length' <<<"$envelope" 2>/dev/null || echo 0)"
 if [ "$outcome" = ok ] && [ "$found" -gt 0 ]; then
   jq -r '.result.items[0] | .title + "\n\n" + (.body // "")' <<<"$envelope" |
-    bash .agents/skills/check/scripts/english-only.sh text --label "proposal title and body"
+    "$PUTNAMI_CLI" contributor language text --label "proposal title and body"
 else
   echo "proposal title and body: NOT CHECKED (outcome $outcome, $found proposal(s))"
 fi

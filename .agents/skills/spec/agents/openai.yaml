@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spec"
+  short_description: "Define a verifiable outcome"
+  default_prompt: "Use $spec to clarify this outcome and its native acceptance contract."

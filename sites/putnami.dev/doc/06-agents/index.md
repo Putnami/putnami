@@ -230,8 +230,11 @@ What keeps a large change safe is how it lands:
 When the authored code of a change spans projects that no dependency relates,
 and the branch is not on an epic branch, the run prints a mixed-intent warning.
 The warning never changes the exit code. Both are also recorded as a
-`selection:change-shape` session event. The managed `plan`, `fix`, `execute`
-and `epic` skills follow the same rule.
+`selection:change-shape` session event. The managed `build` workflow follows
+the same rule and preserves an allocated workspace branch. Delivery units follow observable
+value, compatibility, release and rollback boundaries. A project, worker or
+task count does not establish a separate unit or proposal. Intermediate units
+retain their parent's pending requirements and use non-closing references.
 
 ---
 

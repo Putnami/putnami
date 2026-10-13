@@ -53,9 +53,29 @@ An extension's agent content (`agentContent` in its manifest; see the
 [extension manifest](../../../protocols/extension/doc/01-manifest.md#agent-content))
 is skills, worker profiles, references and helpers, written for every supported
 host: `.agents/skills/**`, `.claude/skills/**`, `.claude/agents/**` and
-`.codex/agents/**`. `@putnami/contributor` ships `plan`, `execute`, `fix`,
-`epic`, `check`, `code-review`, `fix-loop`, `content-bump` and their workers;
+`.codex/agents/**`. `@putnami/contributor` ships the daily `build` entry,
+focused `spec`, `design`, `prototype`, `review`, `adr` and `check` interventions,
+and the explicit-only `content-bump` utility with its workers;
 see its [contributor journey](../../contributor/doc/01-contributor-journey.md).
+
+`build` coordinates only the requested outcome, including its issue or epic.
+It plans observable delivery units, challenges material proposals independently,
+implements and repairs through one loop, and derives progress from exact artifact
+references and actual evidence. The CLI checks its separately versioned local
+record with `tree verify --workflow`; a planning verdict cannot establish
+readiness. An optional `workflow` reference extends a v2 execution dossier
+without changing old dossiers or closed hosted review reports. The
+[workflow record contract](../../contributor/doc/04-workflow-contract.md) describes
+stages, materialization and review responsibilities.
+
+Framework recipes reach `build/references/recipes.md` from the committed sample
+indexes. The native `putnami contributor language` and
+`putnami contributor machine-load` helpers replace workflow-owned shell
+implementations; `putnami tree fingerprint` supplies the native tree binding.
+`putnami proposals finalize` is a local publication command when a proposals
+provider is configured, not an operation added to the provider contract. It
+does not run a local gate. Publication, merge and deployment still follow the
+existing mandate and repository controls.
 
 Excluded, permanently:
 
@@ -472,10 +492,10 @@ and no duration, so two runs over the same inputs produce byte-identical bytes:
   "archiveDigest": "…",
   "manifestHash": "…",
   "applied": true,
-  "created": [".agents/skills/plan/SKILL.md"],
-  "updated": [".agents/skills/execute/SKILL.md"],
-  "removed": [".claude/skills/check/SKILL.md"],
-  "unchanged": [".claude/skills/code-review/SKILL.md"],
+  "created": [".agents/skills/build/SKILL.md"],
+  "updated": [".agents/skills/review/SKILL.md"],
+  "removed": [".claude/skills/plan/SKILL.md"],
+  "unchanged": [".claude/skills/spec/SKILL.md"],
   "collided": []
 }
 ```

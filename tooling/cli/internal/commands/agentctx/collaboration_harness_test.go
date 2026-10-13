@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"go.putnami.dev/sdk/extension/scratch"
-	"go.putnami.dev/tooling/cli/internal/mcp"
 )
 
 // The contributor helpers reach tasks and proposals only through `putnami
@@ -176,22 +175,6 @@ func programName(name string) string {
 // shellQuote quotes a path for a POSIX shell.
 func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
-}
-
-// collaborationScriptEnv is the environment a helper suite runs with: the
-// caller's, plus the harness CLI launcher, the resolved local provider, and
-// the reconcile hint the CLI writes on an unresolved proposals.upsert, which a
-// suite that stands in for that answer relays. The paths are in slash form:
-// the suites write them into JSON documents, where a Windows path's
-// backslashes are escapes, and bash and the CLI read C:/… as the same path.
-func collaborationScriptEnv(t *testing.T) []string {
-	t.Helper()
-	dir := collaborationHarness(t)
-	return append(os.Environ(),
-		"PUTNAMI_TEST_CLI="+filepath.ToSlash(filepath.Join(dir, "putnami")),
-		"PUTNAMI_TEST_LOCAL_PROVIDER="+filepath.ToSlash(filepath.Join(dir, "local-collaboration")),
-		"PUTNAMI_TEST_UPSERT_RECONCILE="+mcp.ReconcileHint("proposals", "upsert"),
-	)
 }
 
 // A Windows runtime path reaches the harness manifest as escaped JSON: spliced

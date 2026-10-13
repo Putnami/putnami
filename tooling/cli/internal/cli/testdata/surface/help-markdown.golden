@@ -192,6 +192,9 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 
 | Command | Description |
 |---------|-------------|
+| `putnami contributor` | Run native contributor checks and inspect machine load |
+| `putnami contributor language` | Check English-language signals in contributor material |
+| `putnami contributor machine-load` | Report available local CPU and memory for check admission |
 | `putnami mcp` | Run the MCP server over stdio for AI agent harnesses |
 | `putnami mcp install` | Register the MCP server in .mcp.json for agent IDEs |
 
@@ -901,12 +904,12 @@ putnami tree fingerprint [--output <format>]
 
 ### `putnami tree verify`
 
-Check the local evidence of an execute run against the worktree it runs in, and print one JSON verdict. --record verifies a dossier: its tree binding, changed files, policy files, consulted scopes, independent review, gate, qualification verdicts and acceptance evidence. --snapshot prints the dossier skeleton for the current tree, --ref prints a file reference with its SHA-256, and --gate checks that a recorded gate session and report can replace the gate the PR finalizer would run. A gate must cover the native impacted plan, which the workspace CLI of the checked repository answers as a dry run. Paths resolve against the Git top level. A failure prints {"verdict":"not-verified","reason":...} on one line and exits 1 with nothing on stderr; --output does not change the document. It is a consistency check, not a signed review or an access boundary, and it writes nothing
+Check the local evidence of an execute run against the worktree it runs in, and print one JSON verdict. --record verifies a dossier: its tree binding, changed files, policy files, consulted scopes, independent review, gate, qualification verdicts, acceptance evidence and an optional v1 workflow record. --workflow validates a separately versioned local workflow and reports progress without minting readiness. --snapshot prints the dossier skeleton for the current tree, --ref prints a file reference with its SHA-256, and --gate checks that a recorded gate session and report can replace the gate the PR finalizer would run. A gate must cover the native impacted plan, which the workspace CLI of the checked repository answers as a dry run. Paths resolve against the Git top level. A failure prints {"verdict":"not-verified","reason":...} on one line and exits 1 with nothing on stderr; --output does not change the document. It is a consistency check, not a signed review or an access boundary, and it writes nothing
 
 **Usage**
 
 ```
-putnami tree verify (--record <file> | --snapshot | --ref <file> | --gate <session> --report <report>) [--base <rev>]
+putnami tree verify (--record <file> | --workflow <file> | --snapshot | --ref <file> | --gate <session> --report <report>) [--base <rev>]
 ```
 
 **Flags**
@@ -914,6 +917,7 @@ putnami tree verify (--record <file> | --snapshot | --ref <file> | --gate <sessi
 | Flag | Description |
 |------|-------------|
 | `--record` <file> | Verify the dossier this file holds and print the verified verdict |
+| `--workflow` <file> | Validate a v1 local workflow and report progress without a ready verdict |
 | `--snapshot` | Print the dossier skeleton for the current tree |
 | `--ref` <file> | Print the reference to this file: its path as given and its SHA-256 |
 | `--gate` <session> | Check that the recorded gate session can replace the finalizer's gate |
@@ -923,6 +927,7 @@ putnami tree verify (--record <file> | --snapshot | --ref <file> | --gate <sessi
 **Examples**
 
 - `putnami tree verify --snapshot --base origin/main`
+- `putnami tree verify --workflow .context/workflow.json`
 - `putnami tree verify --record .context/dossier.json`
 - `putnami tree verify --gate .putnami/sessions/<id>/session.json --report .putnami/reports/<id>.json`
 
@@ -1196,6 +1201,61 @@ putnami dev template <validate|test|package> [path] [--skip-build] [--keep] [--v
 - `putnami dev template validate ./my-template/`
 - `putnami dev template test`
 - `putnami dev template package`
+
+### `putnami contributor`
+
+Run the local contributor helpers used by the build workflow. Language checks read text, tracked files, commit messages, or tasks through the configured collaboration provider; machine-load reads local resource capacity. Neither command runs the project gate
+
+**Usage**
+
+```
+putnami contributor <language|machine-load> [arguments]
+```
+
+**Examples**
+
+- `putnami contributor language files --diff origin/main..HEAD`
+- `putnami contributor machine-load --output=json`
+
+### `putnami contributor language`
+
+Inspect text or stdin, tracked workspace files, commit messages, or task titles and bodies using the repository's bounded English-language rule. The tasks mode reads the configured tasks provider. Findings exit 1; invalid input or an unavailable provider exits 2
+
+**Usage**
+
+```
+putnami contributor language <text|files|commits|tasks> [--label <name> | --diff <range> | --limit <n>] [arguments]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--label` <name> | With text: label the input in findings |
+| `--diff` <range> | With files: inspect tracked files changed in a Git revision range |
+| `--limit` <n> | With tasks: maximum number of task records to inspect |
+
+**Examples**
+
+- `putnami contributor language text --label proposal - < body.md`
+- `putnami contributor language files --diff origin/main..HEAD`
+- `putnami contributor language commits origin/main..HEAD`
+- `putnami contributor language tasks --limit 100`
+
+### `putnami contributor machine-load`
+
+Read local machine load and capacity to guide when to start a costly check. This is advisory and does not execute or schedule a gate
+
+**Usage**
+
+```
+putnami contributor machine-load [--output <format>]
+```
+
+**Examples**
+
+- `putnami contributor machine-load`
+- `putnami contributor machine-load --output=json`
 
 ### `putnami mcp`
 

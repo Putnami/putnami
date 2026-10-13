@@ -44,18 +44,14 @@
         "sites/putnami.dev"
       ],
       "requiredSkills": [
-        "plan",
-        "execute",
-        "fix",
-        "epic",
+        "build",
+        "spec",
+        "design",
+        "prototype",
+        "review",
+        "adr",
         "check",
-        "code-review",
-        "fix-loop",
-        "content-bump",
-        "putnami-plan",
-        "putnami-change",
-        "putnami-check",
-        "putnami-review"
+        "content-bump"
       ]
     }
   },

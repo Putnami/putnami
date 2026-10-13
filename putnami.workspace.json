@@ -93,34 +93,11 @@
       "version": 1,
       "tasks": {
         "source": "github:putnami/putnami",
-        "backlog": {
-          "states": [
-            "open"
-          ]
-        },
-        "filters": {
-          "group": "group/{value}",
-          "scope": "scope/{value}"
-        },
-        "rank": [
-          "severity/critical",
-          "severity/high",
-          "severity/medium",
-          "severity/low",
-          "priority/p0",
-          "priority/p1",
-          "priority/p2",
-          "priority/p3"
-        ],
         "tiers": {
           "light": "tier/light",
           "standard": "tier/standard",
           "heavy": "tier/heavy"
         },
-        "planLabels": [
-          "enhancement",
-          "source/plan"
-        ],
         "claimAssignees": [
           "@me"
         ]

@@ -3,30 +3,33 @@
   "protocolVersion": 1,
   "feature": "cli/contributor-workflows",
   "outcomes": [
-    "A workspace installs one contributor offering and receives every contributor workflow, worker profile and helper at the version of that one extension",
+    "One contributor offering distributes canonical skills and worker profiles; publication, language evaluation, load sampling and tree verification use native Go CLI commands",
     "Contributor workflows reach tasks, proposals and memory through the providers the workspace binds, so a backend changes without a skill edit",
     "A repository states its labels, states, worker profiles, language rule and publication defaults once, in its own configuration",
-    "Existing entry points keep working through named, deprecated aliases until their announced removal"
+    "Only build, spec, design, prototype, review, adr and check remain as workflow entries, alongside the configured explicit-only content-bump utility; legacy aliases and duplicated orchestration are removed",
+    "Build coordinates a requested intention, multi-task issue or epic from observable delivery units through its mandated stage, making demonstrated results, blockers and next actions visible",
+    "Material specs, designs, prototypes, ADRs and delivery boundaries receive independent challenge before adoption, with original findings and supported resolutions preserved",
+    "Versioned local records carry exact native artifact, handoff and producer references across sessions without creating another requirement registry or controller"
   ],
   "nonGoals": [
     "Choosing a tasks, proposals or memory provider for the workspace, or falling back to another one",
     "Authorizing publication, merge or deployment: the mandate and the repository's controls still decide",
     "Changing host permissions, credentials or model access, which stay with the workspace and the host",
-    "Moving the audit workflow and its workers, which stay hand-authored until their owner ships them as a contribution",
+    "Changing the separately owned audit workflow; its active language relay delegates to the shared native evaluator",
     "Migrating other workspaces' separate agentArtifacts declarations and pins"
   ],
   "requirements": [
     {
       "id": "one-contributor-extension",
-      "text": "One content-only extension, @putnami/contributor, ships the plan, execute, fix, epic, check, code-review, fix-loop and content-bump workflows, the four worker profiles, their references and helpers, rendered for Claude Code and Codex from one source. A workspace opts in with the agentArtifacts entry extension:@putnami/contributor; this repository declares nothing else, so its committed host trees are exactly what that extension builds."
+      "text": "One content-only @putnami/contributor extension ships build, spec, design, prototype, review, adr and check, the explicit content-bump utility, four worker profiles and shared references for both hosts. Build owns one planning/implementation/review/repair/check loop and continues until the requested outcome, concrete blocker or mandate boundary. A workspace opts in with extension:@putnami/contributor."
     },
     {
       "id": "explicit-only-invocation",
-      "text": "epic, fix-loop and content-bump never run on implicit selection: each declares it on both hosts, disable-model-invocation on Claude Code and allow_implicit_invocation false on Codex. Every other entry point stays implicitly available."
+      "text": "The configured content-bump utility is explicit-only on both hosts. Canonical workflows remain implicitly available for the requested objective. Implicit selection grants no backlog processing, task mutation, Git publication, merge or deployment authority; local implementation checkpoints remain within the authorized work."
     },
     {
-      "id": "entry-point-aliases",
-      "text": "putnami-plan, putnami-change, putnami-check and putnami-review remain as deprecated aliases of plan, execute, check and code-review. Each names its canonical skill, keeps the local-only restriction of the entry point it replaces, and shares its canonical skill's invocation policy until the documented migration window ends."
+      "id": "canonical-entry-points",
+      "text": "Only canonical workflow entries and active configured utilities are materialized. Removed plan, execute, fix, epic, code-review, fix-loop and putnami-* entries have no metadata, resource directories or duplicate implementations. Unchanged owned legacy files are removed during upgrade; edited files remain protected and their collision is explicit."
     },
     {
       "id": "provider-neutral-content",
@@ -34,18 +37,27 @@
     },
     {
       "id": "provider-neutral-publication",
-      "text": "The finalizer commits and pushes with Git, publishes with proposals upsert for the exact base and head, reads the proposal back with proposals status, which must carry every assignee and label the upsert answered with, and moves a named task with tasks transition. An unresolved write stops it without a retry and names the reconciling read; an unbound contract or an unknown task stops it before any write. The language rule reads open tasks through tasks find."
+      "text": "Native proposals finalize consumes a current native dossier or explicitly waits for named hosted checks; it executes no local gate. It pushes and publishes through bound contracts with exact readback and checked preconditions. Partial delivery preserves the opaque parent identity without closing or delivered transition. Draft seeds carry no closing directive. Unresolved writes stop without retry. Native language task scanning uses the tasks contract."
     },
     {
       "id": "repository-policy",
-      "text": "Conventions live in options[\"@putnami/contributor\"] of putnami.workspace.json: backlog states, filters and ranking labels, claimed and delivered task states, worker profiles per tier, the language rule, publication defaults and optional integrations. Instructions name worker profiles, never models; the shipped profiles' host metadata carries the reference model mapping."
+      "text": "options[\"@putnami/contributor\"] holds task sources, claimed/delivered states, tier labels and worker profiles, language/publication controls and active integrations. Removed backlog/filter/rank/plan-label settings have no canonical consumer. Instructions name profiles; host metadata supplies the model mapping."
     },
     {
       "id": "squash-ready-publication",
-      "text": "A proposal opens as a draft when work starts, carries no gate, and keeps one empty checkpoint the squash drops. Its title and body are the squash commit: the finalizer refuses a heading, a body over publication.bodyMaxBytes, and any title, body or commit that names an agent, and posts the verification record as a comment. On a machine loaded above verification.ciGate.load, the named hosted checks gate the change; a failing check returns the proposal to draft."
+      "text": "Build selects one final local or hosted gate after independent review. Native publication consumes a current dossier or explicitly waits for named hosted checks, never executes local gates and reuses current proof at each boundary. Hosted parent publication requires an immutable workflow and native completion eligibility; incomplete parents need partial delivery. Exact hosted proof can advance eligible current units, preserves later obligations and yields a replayable native receipt."
+    },
+    {
+      "id": "native-workflow-validation",
+      "text": "The native verifier checks tracked, safe feature/spec sources, complete requirement/check coverage, units, stage entry/exit contracts, preserved challenges and native producer provenance. Reached stages are monotonic; current-unit readiness ignores superseded or later artifacts. Hosted ready needs exact policy-named provider checks on the same head and tree; native replay preserves the original workflow. Pending, blocked, stale, missing and unsupported states remain visible."
+    },
+    {
+      "id": "canonical-consumer-migration",
+      "text": "Both hosts install canonical source/package content with exact resource links, one build recipe index, repeat-install idempotence and edited-file protection. Legacy workflows and shell implementations are deleted; the active audit language relay only calls the native evaluator. Workflow records require advertised native support. Stage changes, reviews, adapters and publication rechecks never execute another gate; actual released adoption is distinct."
     }
   ],
   "decisions": [
-    "tooling/contributor/doc/adr/0001-one-contributor-extension.md"
+    "tooling/contributor/doc/adr/0001-one-contributor-extension.md",
+    "tooling/contributor/doc/adr/0002-build-and-versioned-workflow-record.md"
   ]
 }

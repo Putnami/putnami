@@ -47,8 +47,10 @@ type cachedObservationRecovery struct {
 	// generic "no cache entry".
 	disabled string
 
-	once     sync.Once
-	versions jobs.RunVersions
+	once      sync.Once
+	versions  jobs.RunVersions
+	entriesMu sync.Mutex
+	entries   map[string]*store.TaskEntry
 }
 
 // newCachedObservationRecovery builds the recovery source for one run, or nil
@@ -143,6 +145,12 @@ func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.
 		outcome.entries++
 		if report := reportInEntry(source.ws.Root, job, entry); report != nil && outcome.report == nil {
 			outcome.report = report
+			source.entriesMu.Lock()
+			if source.entries == nil {
+				source.entries = make(map[string]*store.TaskEntry)
+			}
+			source.entries[report.Path] = entry
+			source.entriesMu.Unlock()
 		}
 	}
 	for _, candidate := range candidates {

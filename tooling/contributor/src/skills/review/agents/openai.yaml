@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review"
+  short_description: "Challenge an artifact or candidate"
+  default_prompt: "Use $review to independently challenge this exact artifact or candidate."

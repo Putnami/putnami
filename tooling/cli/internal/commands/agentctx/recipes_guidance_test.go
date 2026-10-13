@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
+
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
@@ -22,11 +24,11 @@ const seededGoRecipes = `{
   ]
 }`
 
-// writePlanExtension creates a local extension whose agent content carries
-// the planning skill, and returns the config that opts into it.
-func writePlanExtension(t *testing.T, root string) *wsproto.Config {
+// writeBuildExtension creates a local extension whose agent content carries
+// the build skill, and returns the config that opts into it.
+func writeBuildExtension(t *testing.T, root string) *wsproto.Config {
 	t.Helper()
-	writeLocalContentExtension(t, root, "/tools/workflows", "@local/workflows", "plan", "Read the recipes.\n")
+	writeLocalContentExtension(t, root, "/tools/workflows", "@local/workflows", "build", "Read the recipes.\n")
 	return localContentConfig("/tools/workflows", "@local/workflows")
 }
 
@@ -78,7 +80,7 @@ func TestRenderRecipeReferenceRendersNothingWithoutAUsableIndex(t *testing.T) {
 			if rendered := renderRecipeReference(root); rendered != "" {
 				t.Fatalf("rendered %q, want nothing", rendered)
 			}
-			changed, err := writeRecipeReferences(root, writePlanExtension(t, root))
+			changed, err := writeRecipeReferences(root, writeBuildExtension(t, root))
 			if err != nil || changed {
 				t.Fatalf("changed = %v, err = %v; want no write", changed, err)
 			}
@@ -86,14 +88,30 @@ func TestRenderRecipeReferenceRendersNothingWithoutAUsableIndex(t *testing.T) {
 	}
 }
 
+func TestRecipeReferenceWritesOnlyBuild(t *testing.T) {
+	root := t.TempDir()
+	writePathFile(t, root, "go/samples/recipes.json", seededGoRecipes)
+	cfg := writeBuildExtension(t, root)
+	writePathFile(t, root, "tools/workflows/src/skills/plan/SKILL.md", "Legacy planning entry.\n")
+	writePathFile(t, root, "tools/workflows/src/skills/plan/references/recipes.md", "Keep this legacy file untouched.\n")
+	changed, err := writeRecipeReferences(root, cfg)
+	if err != nil || !changed {
+		t.Fatalf("write build recipes changed=%v, err=%v", changed, err)
+	}
+	if got, err := os.ReadFile(filepath.Join(root, "tools/workflows/src/skills/plan/references/recipes.md")); err != nil || string(got) != "Keep this legacy file untouched.\n" {
+		t.Fatalf("legacy plan reference was rewritten: %q, %v", got, err)
+	}
+}
+
 // TestContextGenerateCarriesTheRecipeIndexToTheHostCopy proves the whole path:
-// a committed index reaches the planning skill's reference asset in
+// a committed index reaches the build skill's reference asset in
 // the in-tree source and the materialized `.agents` copy in one run, and a
 // second run changes nothing.
 func TestContextGenerateCarriesTheRecipeIndexToTheHostCopy(t *testing.T) {
+	spectest.Proves(t, "cli/contributor-workflows", "canonical-consumer-migration", "canonical-recipe-materialization")
 	root := t.TempDir()
 	writePathFile(t, root, "go/samples/recipes.json", seededGoRecipes)
-	cfg := writePlanExtension(t, root)
+	cfg := writeBuildExtension(t, root)
 
 	first, err := ContextGenerateWithResult(root, cfg, nil)
 	if err != nil {
@@ -104,8 +122,8 @@ func TestContextGenerateCarriesTheRecipeIndexToTheHostCopy(t *testing.T) {
 	}
 	want := renderRecipeReference(root)
 	for _, rel := range []string{
-		"tools/workflows/src/skills/plan/references/recipes.md",
-		".agents/skills/plan/references/recipes.md",
+		"tools/workflows/src/skills/build/references/recipes.md",
+		".agents/skills/build/references/recipes.md",
 	} {
 		got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
 		if err != nil {
@@ -126,7 +144,7 @@ func TestContextGenerateCarriesTheRecipeIndexToTheHostCopy(t *testing.T) {
 }
 
 // TestCommittedRecipeReferenceMatchesTheSampleIndexes is the drift gate for
-// this repository: the planning skill's committed reference is exactly what
+// this repository: the build skill's committed reference is exactly what
 // `putnami context generate` renders from the committed indexes.
 func TestCommittedRecipeReferenceMatchesTheSampleIndexes(t *testing.T) {
 	root := driftRepositoryRoot(t)
