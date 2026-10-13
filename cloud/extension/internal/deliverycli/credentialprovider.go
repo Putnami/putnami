@@ -136,7 +136,7 @@ type credentialServer struct {
 
 // credentialFlight is the one exchange in progress for a purpose. A request
 // for a purpose that already has one waits for its answer instead of starting
-// another.
+// another. The request loop decides which, when it reads the request (join).
 type credentialFlight struct {
 	done   chan struct{}
 	answer credentialAnswer
@@ -402,10 +402,11 @@ func (s *credentialServer) credential(request *registry.CredentialRequest) {
 		return
 	}
 	id := request.ID
+	flight, leads := s.join(registry.PurposeRead)
 	s.work.Add(1)
 	go func() {
 		defer s.work.Done()
-		answer, ok := s.shared(registry.PurposeRead, s.resolveRead)
+		answer, ok := s.shared(registry.PurposeRead, flight, leads, s.resolveRead)
 		if !ok {
 			return // the session ended first; nobody reads this answer
 		}
@@ -463,23 +464,34 @@ func (s *credentialServer) publicationOp(request *registry.CredentialRequest) {
 	}()
 }
 
-// shared runs resolve for purpose unless an exchange for it is already in
-// progress, in which case it waits for that exchange's answer. ok is false
-// when the session ended first.
-func (s *credentialServer) shared(purpose string, resolve func(context.Context) credentialAnswer) (credentialAnswer, bool) {
+// join returns the exchange in progress for purpose, or opens one the caller
+// leads. The request loop calls it as it reads the request, so a request read
+// while an exchange is in progress joins that exchange. Joined from the
+// request's own goroutine, it could start after the exchange ended, and start
+// a second one.
+func (s *credentialServer) join(purpose string) (*credentialFlight, bool) {
 	s.flightMu.Lock()
-	flight := s.flights[purpose]
-	if flight == nil {
-		flight = &credentialFlight{done: make(chan struct{})}
-		s.flights[purpose] = flight
-		s.flightMu.Unlock()
+	defer s.flightMu.Unlock()
+	if flight := s.flights[purpose]; flight != nil {
+		return flight, false
+	}
+	flight := &credentialFlight{done: make(chan struct{})}
+	s.flights[purpose] = flight
+	return flight, true
+}
+
+// shared answers the exchange a request joined: the request that leads it
+// runs resolve and closes it, every other one waits for that answer. ok is
+// false when the session ended first.
+func (s *credentialServer) shared(purpose string, flight *credentialFlight, leads bool,
+	resolve func(context.Context) credentialAnswer) (credentialAnswer, bool) {
+	if leads {
 		flight.answer = resolve(s.ctx)
 		s.flightMu.Lock()
 		delete(s.flights, purpose)
 		s.flightMu.Unlock()
 		close(flight.done)
 	} else {
-		s.flightMu.Unlock()
 		select {
 		case <-flight.done:
 		case <-s.ctx.Done():
