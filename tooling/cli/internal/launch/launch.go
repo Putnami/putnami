@@ -187,6 +187,9 @@ func IsExemptInvocation(args []string) bool {
 		}
 	case "upgrade":
 		for _, a := range args[1:] {
+			if a == "--" {
+				break
+			}
 			if a == "--from-source" {
 				return true
 			}
@@ -212,9 +215,13 @@ func IsExemptInvocation(args []string) bool {
 const UserScopeFlag = "--user"
 
 // firstNonFlag returns the first argument that does not start with "-", or ""
-// when there is none — used to read a subcommand past any leading flags.
+// when there is none before a bare "--" — used to read a subcommand past any
+// leading flags. A token after "--" is a payload, never a subcommand.
 func firstNonFlag(args []string) string {
 	for _, a := range args {
+		if a == "--" {
+			return ""
+		}
 		if a == "" || a[0] != '-' {
 			return a
 		}

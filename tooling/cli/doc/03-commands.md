@@ -1042,7 +1042,9 @@ JSON fail the check. A failure prints
 `{"verdict":"not-verified","reason":"..."}` on one line, exits 1 and writes
 nothing to stderr, and `--output` does not change the document. The verifier
 writes no file and needs no workspace. It is a consistency check, not a signed
-review or an access boundary.
+review or an access boundary. An unknown flag or a `--` is a usage error
+instead: the parser rejects it before the verifier runs, and the command exits
+2.
 
 ### `contributor`
 
@@ -1406,6 +1408,11 @@ marker, and falls back to every project.
 Global flags end at the first `--`. Every argument after it reaches the job as
 written and sets no global flag, so `putnami run my-job -- --verbose` passes
 `--verbose` to the job and leaves the CLI's own output unchanged.
+
+A built-in command that runs no job reads no arguments after `--`, so it
+rejects a `--` with a usage error: `putnami version tag -- --push` stops
+before it tags anything. `contributor language` is the exception: it reads the
+paths after `--`.
 
 ### Credential provider: `--providers`
 

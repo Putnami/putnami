@@ -37,7 +37,8 @@ import (
 //     whose manifest under-declares — a known failure mode. Those get a deprecation
 //     warning on stderr for one minor version instead.
 //   - Everything after a bare "--" is passthrough and is never validated on any
-//     surface.
+//     surface. A built-in structured command takes a passthrough only when its
+//     catalog entry declares Passthrough; any other one rejects the "--".
 //
 // What this file must never do is CHANGE which tokens survive into
 // ParsedArgs.RawJobArgs for an invocation that still succeeds: that slice is
@@ -262,9 +263,14 @@ func firstPositionalArg(args []string) string {
 // validateStructuredFlags is the hard-rejection half of the strictness policy:
 // a built-in structured command whose exact catalog path is known accepts only
 // its declared flags plus the CLI-wide globals. An unknown path stays lenient —
-// see commandmeta.ResolveFlags for why.
+// see commandmeta.ResolveFlags for why. Any built-in path, known or not, rejects
+// a bare "--" unless its catalog entry declares Passthrough: a payload it does
+// not read must not reach a handler that would take a token for its own flag.
 func validateStructuredFlags(root, sub string, rawArgs []string) error {
 	path := commandmeta.CanonicalPath(root, sub)
+	if passthroughCut(rawArgs) < len(rawArgs) && !commandmeta.TakesPassthrough(path) {
+		return usageErrorf("`putnami %s` takes no arguments after --", strings.TrimSpace(root+" "+sub))
+	}
 	declared, known := commandmeta.ResolveFlags(path)
 	if !known {
 		return nil
