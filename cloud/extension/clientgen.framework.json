@@ -112,15 +112,17 @@
           "path": "cloud/extension/internal/deliverycli/sessionreporter.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "0b3577a19d3c41b154b73e39b343b25d6cc2e7a909d0203ee7fcd5ed866c2506"
+          "fingerprint": "9e7d927f8b3a7dddcad04fe3070f1ecf4068757c3cd042ba1bd3a8915037dcbf"
         }
       ],
       "owner": "@putnami/cloud-extension",
       "tests": [
+        "cloud/extension/internal/deliverycli/sessionreporter_local_test.go",
         "cloud/extension/internal/deliverycli/sessionreporter_test.go"
       ],
-      "reason": "Session reporter chunk ingest to delivery-api. The octet body is expressible in the strict contract; the frame's identity is not. Each POST carries X-Putnami-Session-Part, X-Putnami-Session-Seq and X-Putnami-Session-Final, and a Go provider cannot declare header parameters yet (the OpenAPI generator emits path and query parameters only), so the strict contract cannot state this operation's inputs and a generated client has no typed place to carry them. Moving the three facts into the path or the query would change the wire the deployed CI runners already speak, which needs a skew plan rather than a client swap.",
+      "reason": "Session reporter chunk ingest to delivery-api. The octet body is expressible in the strict contract; the frame's identity is not. Each POST carries X-Putnami-Session-Part, X-Putnami-Session-Seq and X-Putnami-Session-Final, and a Go provider cannot declare header parameters yet (the OpenAPI generator emits path and query parameters only), so the strict contract cannot state this operation's inputs and a generated client has no typed place to carry them. Moving the three facts into the path or the query would change the wire the deployed CI runners already speak, which needs a skew plan rather than a client swap. The same request carries the local mode's frames to the linked workspace's local-sessions route under the stored login, with the same three headers, so that operation has the same gap.",
       "operations": [
+        "delivery-api.local-sessions.chunks.ingest",
         "delivery-api.run-sessions.chunks.ingest"
       ],
       "pendingWork": "Provider-side contract declarations in delivery-api and oci-server"

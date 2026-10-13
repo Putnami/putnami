@@ -25,6 +25,56 @@
           }
         }
       ]
+    },
+    {
+      "id": "cloud/local-session-reporting",
+      "type": "feature",
+      "name": "Gate sessions reported from a developer machine",
+      "outcome": "A gate session run on a developer machine or in a local agent session reaches Delivery under the developer's stored login, and a hosted run keeps reporting under its run credential",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "local-session-under-developer-login",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "local-session-route-and-bearer"
+            ]
+          }
+        },
+        {
+          "id": "hosted-credential-wins",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "hosted-credential-precedence"
+            ]
+          }
+        },
+        {
+          "id": "local-session-fails-closed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "local-session-not-configured",
+              "local-session-token-never-printed"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

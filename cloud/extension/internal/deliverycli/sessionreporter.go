@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -24,7 +25,8 @@ import (
 // token in the environment. Otherwise the engine places the token in this
 // process's environment only (protocolcli.SessionReporterTokenEnv, captured
 // before any repository hook runs). The ingest URL is a non-secret destination
-// the trusted launcher exports beside the reporter selector.
+// the trusted launcher exports beside the reporter selector. With none of the
+// three, the session reporter runs in local mode (storedLoginSession).
 const (
 	// SessionReporterIngestURLEnv names the Delivery ingest base the reporter
 	// POSTs to. The chunk route is RecordsRunSessionChunkIngestPath's `/sessions`
@@ -32,6 +34,9 @@ const (
 	SessionReporterIngestURLEnv = "PUTNAMI_CLOUD_INGEST_URL"
 
 	sessionReporterChunkPath = "/sessions"
+	// localSessionsRoute is the local mode's route under the linked workspace:
+	// one session per path, the escaped session id after it.
+	localSessionsRoute = "/ci/local-sessions/"
 	// sessionReporterRequestTimeout stays under the engine's five-second RPC
 	// deadline so a slow receiver produces a retryable NACK instead of a
 	// silent frame the engine has to time out on.
@@ -99,6 +104,11 @@ const (
 // handshake that hands this process the run credential (reportingHandshake);
 // elsewhere the credential is the token in its environment.
 //
+// A process with no run credential and no ingest base runs in local mode: each
+// frame goes to the linked workspace's local-sessions route under the stored
+// login of `putnami cloud login` (storedLoginSession), with the same body and
+// headers, and the same status-to-ACK mapping.
+//
 // The reporter is stateless on purpose. The run credential binds the
 // destination: Delivery derives the workspace/run from the bearer and keeps a
 // dense per-part sequence, so a replay under a credential for another run
@@ -107,14 +117,20 @@ const (
 //
 // Because the protocol owns stdout, diagnostics go to stderr; core discards
 // them, which is exactly why no ACK ever carries receiver text or the URL.
-func SessionReporter(_ map[string]any, _ []string, _ string, env map[string]string, _ clicore.IO) error {
-	return serveSessionReporter(env, os.Stdin, os.Stdout, os.Stderr)
+func SessionReporter(params map[string]any, _ []string, workspaceRoot string, env map[string]string, ioctx clicore.IO) error {
+	local := storedLoginSession(params, workspaceRoot, env, ioctx, os.Stderr)
+	return serveSessionReporter(env, local, os.Stdin, os.Stdout, os.Stderr)
 }
 
 // serveSessionReporter denies inspection, reads the reporter's configuration
-// from env, then serves frames until in closes.
-func serveSessionReporter(env map[string]string, in io.Reader, out, logw io.Writer) error {
+// from env, then serves frames until in closes. local resolves the local
+// mode's session; nil leaves the local mode off. A process that could not deny
+// inspection never gets it, so it never reads the stored login.
+func serveSessionReporter(env map[string]string, local localSessionResolver, in io.Reader, out, logw io.Writer) error {
 	cfg := newReporterConfig(env, protocolcli.SessionReporterCommand, protocolcli.SessionReporterTokenEnv, logw)
+	if !cfg.inspectionGuardFailed {
+		cfg.local = local
+	}
 	return runSessionReporter(context.Background(), in, out, logw, cfg, &http.Client{Timeout: sessionReporterRequestTimeout})
 }
 
@@ -127,6 +143,60 @@ type sessionReporterConfig struct {
 	// inspection, so it holds no token, refuses initialize and answers every
 	// frame with ackCodeInspectionGuard.
 	inspectionGuardFailed bool
+	// initialized records an accepted initialize: the engine opened the
+	// handshake it sends only on a hosted run.
+	initialized bool
+	// local resolves the local mode's session. Nil leaves the local mode off,
+	// as for the log reporter.
+	local localSessionResolver
+}
+
+// hosted reports whether the engine runs this reporter for a hosted run: it
+// holds a run credential, the launcher exported an ingest base, or the engine
+// opened the handshake. A hosted reporter never falls back to a stored login,
+// so a missing credential or ingest base stays reporter_not_configured.
+func (c *sessionReporterConfig) hosted() bool {
+	return c.token != "" || c.ingestURL != "" || c.initialized
+}
+
+// localSessionResolver resolves the local mode's session: the workspace the
+// frames go to, the control-plane base, a bearer, and its one-shot re-mint.
+type localSessionResolver func() (*clicore.WorkspaceContext, error)
+
+// storedLoginSession is the local mode's resolver. It resolves the session the
+// way every workspace command does (clicore.ResolveWorkspaceContext): the
+// workspace linked to workspaceRoot, the control-plane base, and a
+// workspace-scoped bearer from the stored login, refreshed when it expired.
+// It withholds the machine token (cloudTokenEnv): the local mode reports under
+// the developer's login only. Its IO writes to logw, never to stdout, which
+// the protocol owns. It reads nothing until a frame needs it.
+func storedLoginSession(params map[string]any, workspaceRoot string, env map[string]string, ioctx clicore.IO, logw io.Writer) localSessionResolver {
+	return func() (*clicore.WorkspaceContext, error) {
+		loginEnv := make(map[string]string, len(env))
+		for key, value := range env {
+			if key != cloudTokenEnv {
+				loginEnv[key] = value
+			}
+		}
+		now := ioctx.Now
+		if now == nil {
+			now = time.Now
+		}
+		line := func(text string) { fmt.Fprintln(logw, text) }
+		return clicore.ResolveWorkspaceContext(params, workspaceRoot, loginEnv, clicore.IO{
+			Env:    loginEnv,
+			Stdout: line,
+			Stderr: line,
+			Client: clicore.WithUserAgent(ioctx.Client),
+			Now:    now,
+		})
+	}
+}
+
+// localSessionURL is the local-sessions route of sessionID under the linked
+// workspace.
+func localSessionURL(session *clicore.WorkspaceContext, sessionID string) string {
+	return session.WorkspaceURL(localSessionsRoute + url.PathEscape(sessionID))
 }
 
 // Format renders the configuration for every verb without its bearer, so no
@@ -156,7 +226,7 @@ var reporterDenyInspection = procguard.DenyInspection
 // the run's verdict does not change.
 func newReporterConfig(env map[string]string, command, tokenEnv string, logw io.Writer) sessionReporterConfig {
 	if err := reporterDenyInspection(); err != nil {
-		fmt.Fprintf(logw, "putnami-cloud %s: cannot deny process inspection (%v); not using the run credential\n", command, err)
+		fmt.Fprintf(logw, "%s %s: cannot deny process inspection (%v); not using the run credential\n", reporterBinary, command, err)
 		return sessionReporterConfig{inspectionGuardFailed: true}
 	}
 	return sessionReporterConfig{
@@ -169,7 +239,7 @@ func newReporterConfig(env map[string]string, command, tokenEnv string, logw io.
 // for a frame it cannot answer at all (a malformed line has no identity to
 // echo); every receiver outcome is an ACK.
 func runSessionReporter(ctx context.Context, in io.Reader, out, logw io.Writer, cfg sessionReporterConfig, client *http.Client) error {
-	sender := &sessionReporterSender{cfg: &cfg, client: client}
+	sender := &sessionReporterSender{cfg: &cfg, client: client, logw: logw}
 	return serveReportingFrames(ctx, in, out, logw, protocolcli.SessionReporterCommand, &cfg, sender.deliver)
 }
 
@@ -201,7 +271,7 @@ func serveReportingFrames(ctx context.Context, in io.Reader, out, logw io.Writer
 				if !result.OK {
 					// The code only: the line may hold the run credential. op and
 					// the code are protocol constants (handshakeOp, answer).
-					fmt.Fprintf(logw, "putnami-cloud %s: refused %s: %s\n", command, op, result.Code) //nolint:gosec // G705: logw is the reporter's stderr, never an HTTP response, and every value is a constant
+					fmt.Fprintf(logw, "%s %s: refused %s: %s\n", reporterBinary, command, op, result.Code) //nolint:gosec // G705: logw is the reporter's stderr, never an HTTP response, and every value is a constant
 				}
 				if err := writeReportingLine(w, result); err != nil {
 					return err
@@ -211,7 +281,7 @@ func serveReportingFrames(ctx context.Context, in io.Reader, out, logw io.Writer
 		}
 		chunk, err := protocolcli.ParseSessionReportingChunk(line)
 		if err != nil {
-			fmt.Fprintf(logw, "putnami-cloud %s: malformed frame: %v\n", command, err)
+			fmt.Fprintf(logw, "%s %s: malformed frame: %v\n", reporterBinary, command, err)
 			return fmt.Errorf("malformed session reporting frame")
 		}
 		streaming = true
@@ -252,6 +322,92 @@ type sessionReporterSender struct {
 	// planRetryableNacks counts the retryable NACKs this process answered
 	// plan.json frames (sessionReporterPlanRetryableNacks).
 	planRetryableNacks int
+	logw               io.Writer
+	// localResolved records that the first local-mode frame resolved the
+	// session, once per process. local is that session, or nil when it could
+	// not be resolved or its re-mint failed: every later frame then gets
+	// reporter_not_configured without another read of the stored login.
+	localResolved bool
+	local         *clicore.WorkspaceContext
+}
+
+// sessionDestination is where one frame goes and the bearer it carries. local
+// is the stored-login session that re-mints its bearer on a 401; it is nil for
+// a hosted destination.
+type sessionDestination struct {
+	url    string
+	bearer clicore.Bearer
+	local  *clicore.WorkspaceContext
+}
+
+// destination returns where chunk goes, or false when the reporter has none.
+// A hosted reporter (sessionReporterConfig.hosted) posts to the ingest base
+// under its run credential and needs both. Otherwise the local mode posts to
+// the local-sessions route under the stored login.
+func (s *sessionReporterSender) destination(chunk *protocolcli.SessionReportingChunk) (sessionDestination, bool) {
+	if s.cfg.hosted() {
+		if s.cfg.ingestURL == "" || s.cfg.token == "" {
+			return sessionDestination{}, false
+		}
+		return sessionDestination{
+			url:    strings.TrimRight(s.cfg.ingestURL, "/") + sessionReporterChunkPath,
+			bearer: clicore.NewBearer(s.cfg.token),
+		}, true
+	}
+	session := s.localSession()
+	if session == nil {
+		return sessionDestination{}, false
+	}
+	return sessionDestination{url: localSessionURL(session, chunk.SessionID), bearer: session.AuthToken, local: session}, true
+}
+
+// localSession resolves the local mode's session on the first frame that needs
+// it and keeps it for the process. A resolver error (no stored login, no
+// linked workspace, a failed refresh) leaves it nil. The diagnostic carries
+// the resolver's message, which names the fix and never a credential.
+func (s *sessionReporterSender) localSession() *clicore.WorkspaceContext {
+	if s.localResolved {
+		return s.local
+	}
+	s.localResolved = true
+	if s.cfg.local == nil {
+		return nil
+	}
+	session, err := s.cfg.local()
+	switch {
+	case err != nil:
+		s.localUnavailable(err.Error())
+	case session == nil || session.WorkspaceID == "" || session.ControlPlane == "" || session.AuthToken.Empty():
+		s.localUnavailable("no linked workspace or login")
+	default:
+		s.local = session
+	}
+	return s.local
+}
+
+// reporterBinary is the extension binary's name, the encoded extension name;
+// every reporter diagnostic starts with it.
+const reporterBinary = "putnami-cloud"
+
+// localUnavailable reports on stderr why the local mode is off.
+func (s *sessionReporterSender) localUnavailable(reason string) {
+	fmt.Fprintf(s.logw, "%s %s: local mode not configured: %s\n", reporterBinary, protocolcli.SessionReporterCommand, reason)
+}
+
+// remint re-mints the local session's bearer once after a 401, as
+// clicore.CallWithSession does for every workspace command. A failed re-mint
+// ends the local mode for the process.
+func (s *sessionReporterSender) remint(session *clicore.WorkspaceContext) (clicore.Bearer, bool) {
+	fresh, err := session.RefreshAuth()
+	if err != nil || fresh.Empty() {
+		if err != nil {
+			s.localUnavailable(err.Error())
+		}
+		s.local = nil
+		return clicore.Bearer{}, false
+	}
+	session.AuthToken = fresh
+	return fresh, true
 }
 
 func nack(chunk *protocolcli.SessionReportingChunk, code string, retryable bool) protocolcli.SessionReportingAck {
@@ -285,7 +441,8 @@ func (s *sessionReporterSender) post(ctx context.Context, chunk *protocolcli.Ses
 	if s.cfg.inspectionGuardFailed {
 		return nack(chunk, ackCodeInspectionGuard, false)
 	}
-	if s.cfg.ingestURL == "" || s.cfg.token == "" {
+	dest, ok := s.destination(chunk)
+	if !ok {
 		return nack(chunk, ackCodeNotConfigured, false)
 	}
 	part, ok := sessionPartFor(chunk.Artifact)
@@ -293,28 +450,23 @@ func (s *sessionReporterSender) post(ctx context.Context, chunk *protocolcli.Ses
 		return nack(chunk, ackCodeInvalidChunk, false)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(s.cfg.ingestURL, "/")+sessionReporterChunkPath, bytes.NewReader(chunk.Data))
-	if err != nil {
-		return nack(chunk, ackCodeNotConfigured, false)
+	status, body, failure := s.send(ctx, dest, part, chunk)
+	if failure == "" && status == http.StatusUnauthorized && dest.local != nil && dest.local.RefreshAuth != nil {
+		// The ingest is idempotent per part and sequence, and a 401 stored
+		// nothing, so the frame is sent again under the re-minted bearer.
+		fresh, reminted := s.remint(dest.local)
+		if !reminted {
+			return nack(chunk, ackCodeNotConfigured, false)
+		}
+		dest.bearer = fresh
+		status, body, failure = s.send(ctx, dest, part, chunk)
 	}
-	req.Header.Set("Authorization", "Bearer "+s.cfg.token)
-	req.Header.Set("Content-Type", "application/octet-stream")
-	req.Header.Set(sessionPartHeader, part)
-	req.Header.Set(sessionSeqHeader, strconv.FormatInt(chunk.Sequence, 10))
-	req.Header.Set(sessionFinalHeader, strconv.FormatBool(chunk.Final))
-	req.ContentLength = int64(len(chunk.Data))
-
-	resp, err := s.client.Do(req) //nolint:gosec // G704: the destination is the launcher-exported ingest base, never frame content
-	if err != nil {
-		// Transport failures (dial, reset, deadline) are the class worth another
-		// bounded attempt; the receiver may never have seen the bytes.
-		return nack(chunk, ackCodeReceiverUnavailable, true)
+	if failure != "" {
+		return nack(chunk, failure, failure == ackCodeReceiverUnavailable)
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 
 	switch {
-	case resp.StatusCode == http.StatusOK:
+	case status == http.StatusOK:
 		var accepted struct {
 			Part string `json:"part"`
 			Seq  int64  `json:"seq"`
@@ -325,7 +477,7 @@ func (s *sessionReporterSender) post(ctx context.Context, chunk *protocolcli.Ses
 			return nack(chunk, ackCodeReceiverMismatch, false)
 		}
 		return chunk.Ack()
-	case resp.StatusCode == http.StatusConflict:
+	case status == http.StatusConflict:
 		var conflict struct {
 			ExpectedSeq *int64 `json:"expectedSeq"`
 		}
@@ -335,21 +487,48 @@ func (s *sessionReporterSender) post(ctx context.Context, chunk *protocolcli.Ses
 			return nack(chunk, ackCodeSequenceGap, false)
 		}
 		return nack(chunk, ackCodeReplayConflict, false)
-	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
+	case status == http.StatusUnauthorized || status == http.StatusForbidden:
 		return nack(chunk, ackCodeUnauthorized, false)
-	case resp.StatusCode == http.StatusRequestEntityTooLarge:
+	case status == http.StatusRequestEntityTooLarge:
 		return nack(chunk, ackCodeChunkTooLarge, false)
-	case resp.StatusCode == http.StatusNotFound:
+	case status == http.StatusNotFound:
 		// A dormant ingest: the route does not exist on this host. Terminal, like
 		// the shell shipper's dormantIngestRefusal — a retry cannot grow a route.
 		return nack(chunk, ackCodeIngestUnavailable, false)
-	case platformShedRequest(resp.StatusCode):
+	case platformShedRequest(status):
 		return nack(chunk, ackCodeReceiverUnavailable, true)
-	case resp.StatusCode >= 400 && resp.StatusCode < 500:
+	case status >= 400 && status < 500:
 		return nack(chunk, ackCodeInvalidChunk, false)
 	default:
 		return nack(chunk, ackCodeReceiverUnavailable, true)
 	}
+}
+
+// send makes one POST of chunk's original bytes to dest under dest's bearer,
+// with the receiver's session headers. It returns the receiver's status and
+// at most 64 KiB of its body, or the NACK code of a request that got no
+// answer.
+func (s *sessionReporterSender) send(ctx context.Context, dest sessionDestination, part string, chunk *protocolcli.SessionReportingChunk) (int, []byte, string) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, dest.url, bytes.NewReader(chunk.Data))
+	if err != nil {
+		return 0, nil, ackCodeNotConfigured
+	}
+	req.Header.Set("Authorization", dest.bearer.Authorization())
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set(sessionPartHeader, part)
+	req.Header.Set(sessionSeqHeader, strconv.FormatInt(chunk.Sequence, 10))
+	req.Header.Set(sessionFinalHeader, strconv.FormatBool(chunk.Final))
+	req.ContentLength = int64(len(chunk.Data))
+
+	resp, err := s.client.Do(req) //nolint:gosec // G704: the destination is the launcher-exported ingest base or the linked workspace's control plane, never frame content
+	if err != nil {
+		// Transport failures (dial, reset, deadline) are the class worth another
+		// bounded attempt; the receiver may never have seen the bytes.
+		return 0, nil, ackCodeReceiverUnavailable
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	return resp.StatusCode, body, ""
 }
 
 // platformShedRequest reports whether the platform refused the request before

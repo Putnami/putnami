@@ -1,0 +1,27 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/local-session-reporting",
+  "outcomes": [
+    "A gate session run on a developer machine or in a local agent session reaches Delivery under the developer's stored login, and a hosted run keeps reporting under its run credential"
+  ],
+  "nonGoals": [
+    "Turning reporting on by default. A developer selects the reporter with PUTNAMI_SESSION_REPORTER=@putnami/cloud",
+    "Reporting under the workspace machine token. The local mode withholds PUTNAMI_CLOUD_TOKEN and uses the stored login only",
+    "Changing the session's own verdict. A refused frame is recorded by the engine and changes nothing else"
+  ],
+  "requirements": [
+    {
+      "id": "local-session-under-developer-login",
+      "text": "With no run credential from the handshake or the environment and no ingest base, the session reporter posts each frame to /v1/workspaces/{workspace}/ci/local-sessions/{sessionId} on the control plane of the linked workspace, with the run-session body and its three session headers, under the workspace token of the stored login of putnami cloud login. It refreshes that login the way workspace commands do, and re-mints it once on a 401."
+    },
+    {
+      "id": "hosted-credential-wins",
+      "text": "A run credential from the handshake or the environment, an ingest base, or an opened handshake makes the reporter hosted. A hosted reporter posts to the ingest base under its run credential, or answers reporter_not_configured when one of the two is missing, and never reads the stored login."
+    },
+    {
+      "id": "local-session-fails-closed",
+      "text": "Without a stored login, without a linked workspace, or when a refresh or a re-mint fails, every frame gets a terminal reporter_not_configured NACK and nothing is posted. The reporter reads the stored login only after it denied process inspection, and no answer or diagnostic carries a credential."
+    }
+  ]
+}

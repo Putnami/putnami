@@ -173,6 +173,22 @@ edit. Delivery resolves producer ownership and the current Distribution read
 grant; subscription enablement does not grant arbitrary registry access. The
 CLI needs an existing subscription before setting a track.
 
+## Report local gate sessions
+
+A gate session run on your machine, or by an agent on it, can report to
+Delivery under your own login. It is off by default. After
+`putnami cloud login` and `putnami cloud setup`, select the session reporter
+for the runs you want reported:
+
+```sh
+PUTNAMI_SESSION_REPORTER=@putnami/cloud putnami lint,test,build --impacted
+```
+
+Each session goes to the linked workspace. Without a login or a linked
+workspace, nothing is sent and the run's result does not change.
+[Local mode](internal/deliverycli/README.md#local-mode) describes the route,
+the credential rules and the refusals.
+
 ## Commands
 
 Validate a project's authored production Config inputs before starting the full
