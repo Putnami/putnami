@@ -32,6 +32,8 @@ The watcher polls the workspace for file system changes using a configurable int
 - `__pycache__/`
 - `.venv/`
 
+A change to a path Git ignores (through `.gitignore`, `.git/info/exclude` or the global excludes file) is dropped as well, so a log or a browser snapshot written into `.context/`, `log/` or `.playwright-mcp/` re-runs nothing. A dotenv file, any file whose name starts with `.env`, still counts wherever it is: `.env` and `conf/.env.local.yaml` are ignored because they hold local values, and a runtime or a config task reads them. A tracked file always counts, and outside a Git repository every change counts.
+
 ### Change Classification
 
 When changes are detected, the classifier:
@@ -48,6 +50,13 @@ When changes are detected, the classifier:
 - **Session recording**: each iteration creates a child session for the audit trail.
 
 ## Serve Mode
+
+`serve` watches without `--watch`. To run the server once, with no restarts, turn serve's own `watch` flag off:
+
+```bash
+putnami serve my-app --no-watch
+putnami serve my-app --watch=false   # the same
+```
 
 When watching with the `serve` command, the behavior is specialized:
 

@@ -307,8 +307,8 @@ func withTaskRan(log, want []string) bool {
 // A hosted run that watches is refused before anything starts: each watch
 // iteration starts after repository code ran, when its reporters could no
 // longer receive the run credential, and a hosted runner runs one finite
-// invocation per fresh sandbox. `build --watch` and `serve`, which always
-// watches, exit 2 with the named usage error, and no reporter, install, hook
+// invocation per fresh sandbox. `build --watch` and `serve`, which watches
+// by default, exit 2 with the named usage error, and no reporter, install, hook
 // or task starts.
 func TestAHostedRunThatWatchesIsRefusedBeforeAnythingStarts(t *testing.T) {
 	t.Parallel()

@@ -50,6 +50,10 @@ type WatcherConfig struct {
 	Roots []string
 	// IgnorePatterns are directory names to skip.
 	IgnorePatterns []string
+	// Ignored reports which of the changed paths, relative to their root, to
+	// drop: a log or a browser snapshot Git ignores is not a source edit
+	// (NewSession binds it to gitIgnored). Nil drops nothing.
+	Ignored func(paths []string) map[string]bool
 	// Debounce is the window to coalesce changes.
 	Debounce time.Duration
 	// PollInterval is how often to check for changes.
@@ -121,7 +125,7 @@ func (w *Watcher) Watch(done <-chan struct{}) <-chan []string {
 				return
 
 			case <-ticker.C:
-				changed := w.detectChanges()
+				changed := w.dropIgnored(w.detectChanges())
 				if len(changed) > 0 {
 					pending = mergeChanges(pending, changed)
 
@@ -201,6 +205,24 @@ func (w *Watcher) detectChanges() []string {
 	w.snapshot = current
 
 	return changed
+}
+
+// dropIgnored removes the paths cfg.Ignored reports from changed.
+func (w *Watcher) dropIgnored(changed []string) []string {
+	if len(changed) == 0 || w.cfg.Ignored == nil {
+		return changed
+	}
+	ignored := w.cfg.Ignored(changed)
+	if len(ignored) == 0 {
+		return changed
+	}
+	kept := changed[:0]
+	for _, path := range changed {
+		if !ignored[path] {
+			kept = append(kept, path)
+		}
+	}
+	return kept
 }
 
 // walkRoot populates the snapshot with files under the given root.

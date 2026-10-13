@@ -2,7 +2,9 @@ package watch
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 )
@@ -112,6 +114,75 @@ func TestWatcher_DetectChanges(t *testing.T) {
 	changed = w.detectChanges()
 	if len(changed) != 1 {
 		t.Errorf("expected 1 deletion, got %d: %v", len(changed), changed)
+	}
+}
+
+// TestWatcher_DropsGitIgnoredChanges: a log a serve run writes
+// into an ignored directory restarted the server on every line. A change Git
+// ignores is dropped, including a `log/*` rule that ignores the files but not
+// the directory. A dotenv file still counts, such as conf/.env.local.yaml that
+// config-merge reads, and so does a tracked file that matches an ignore rule.
+func TestWatcher_DropsGitIgnoredChanges(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	dir := t.TempDir()
+	runGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	write := func(rel, content string) {
+		t.Helper()
+		path := filepath.Join(dir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runGit("init", "-q")
+	write(".gitignore", ".context/\n.playwright-mcp/\nlog/*\n!log/.keep\n*.log\n.env\n.env.local.yaml\n")
+	write("app/main.go", "package main")
+	write("log/.keep", "")
+	write("kept.log", "tracked despite the rule")
+	runGit("add", ".gitignore", "app/main.go", "log/.keep")
+	runGit("add", "-f", "kept.log")
+
+	w := NewWatcher(WatcherConfig{Roots: []string{dir}, Ignored: gitIgnored(dir)})
+	if err := w.TakeSnapshot(); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(10 * time.Millisecond)
+	write(".context/serve.log", "listening")
+	write(".playwright-mcp/page.yml", "snapshot")
+	write("log/development.log", "line")
+	write("app/server.log", "line")
+	write("app/.env", "PORT=3001")
+	write("app/conf/.env.local.yaml", "port: 3001")
+	write("app/main.go", "package main\n// edited")
+	write("kept.log", "edited")
+
+	changed := w.dropIgnored(w.detectChanges())
+	for i := range changed {
+		changed[i] = filepath.ToSlash(changed[i])
+	}
+	slices.Sort(changed)
+	want := []string{"app/.env", "app/conf/.env.local.yaml", "app/main.go", "kept.log"}
+	if !slices.Equal(changed, want) {
+		t.Errorf("changes = %v, want %v", changed, want)
+	}
+}
+
+// TestGitIgnored_OutsideARepositoryIgnoresNothing keeps the watcher working
+// where Git cannot answer: every change counts, as before.
+func TestGitIgnored_OutsideARepositoryIgnoresNothing(t *testing.T) {
+	if ignored := gitIgnored(t.TempDir())([]string{"serve.log"}); len(ignored) != 0 {
+		t.Errorf("ignored = %v, want none", ignored)
 	}
 }
 

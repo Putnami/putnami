@@ -259,3 +259,24 @@ func TestPrintHelpMan_IncludesStructuredCommandDetails(t *testing.T) {
 		t.Error("expected projects create man section")
 	}
 }
+
+// Serve's help offered `-w, --watch (default: true)` and no
+// spelling that turns the flag off.
+func TestExtensionFlagHelpLine_ListsTheNegationOfAFlagOnByDefault(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		flag extension.FlagDefinition
+		want string
+	}{
+		{"watch", extension.FlagDefinition{Type: "boolean", Short: "-w", Default: true, Description: "Restart on changes"},
+			"  -w, --watch, --no-watch  Restart on changes (default: true)"},
+		{"race", extension.FlagDefinition{Type: "boolean", Default: false, Description: "Race detector"},
+			"  --race  Race detector (default: false)"},
+		{"port", extension.FlagDefinition{Type: "number", Default: 3000}, "  --port  port (default: 3000)"},
+	} {
+		if got := extensionFlagHelpLine(tc.name, tc.flag); got != tc.want {
+			t.Errorf("extensionFlagHelpLine(%s) = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}

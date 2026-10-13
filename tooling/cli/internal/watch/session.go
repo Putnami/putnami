@@ -4,11 +4,13 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/runnersource"
 )
 
 // IterationResult is the verdict of ONE replanned run.
@@ -91,6 +93,7 @@ func NewSession(cfg SessionConfig) *Session {
 	watcher := NewWatcher(WatcherConfig{
 		Roots:    watchRoots,
 		Debounce: DefaultDebounce,
+		Ignored:  gitIgnored(ws.Root),
 	})
 
 	watchRend := NewWatchRenderer(cfg.Renderer, os.Stderr, cfg.ServeMode)
@@ -99,6 +102,35 @@ func NewSession(cfg SessionConfig) *Session {
 		cfg:       cfg,
 		watcher:   watcher,
 		watchRend: watchRend,
+	}
+}
+
+// gitIgnored answers the watcher's Ignored question with `git check-ignore`
+// run in root: a log in `.context/` or `log/`, a browser snapshot in
+// `.playwright-mcp/`. A dotenv file still counts though Git ignores it: `.env`
+// and `conf/.env.local.yaml` are ignored because they hold local values, and a
+// runtime or a config-merge task reads them. A tracked path is never reported.
+// When Git cannot answer (no repository, no git binary), nothing is ignored and
+// every change counts, as it did before.
+func gitIgnored(root string) func(paths []string) map[string]bool {
+	return func(paths []string) map[string]bool {
+		queries := make([]string, 0, len(paths))
+		for _, path := range paths {
+			if !strings.HasPrefix(filepath.Base(path), ".env") {
+				queries = append(queries, filepath.ToSlash(path))
+			}
+		}
+		answer, err := runnersource.IgnoredPaths(context.Background(), root, queries)
+		if err != nil || len(answer) == 0 {
+			return nil
+		}
+		ignored := make(map[string]bool, len(answer))
+		for _, path := range paths {
+			if answer[filepath.ToSlash(path)] {
+				ignored[path] = true
+			}
+		}
+		return ignored
 	}
 }
 

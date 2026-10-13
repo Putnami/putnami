@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -33,21 +34,31 @@ func parseFlags(args []string) (GlobalFlags, []string, error) {
 // parseCommandFlags is parseFlags after a command has been selected, where
 // --version belongs to the command (`putnami upgrade --version 1.2.3`) rather
 // than to the CLI.
-func parseCommandFlags(args []string) (GlobalFlags, []string, error) {
-	return parseGlobalFlags(args, flagParseOptions{consumeVersion: false})
+func parseCommandFlags(args, commands []string) (GlobalFlags, []string, error) {
+	return parseGlobalFlags(args, flagParseOptions{consumeVersion: false, ownWatch: ownsWatchFlag(commands)})
+}
+
+// ownsWatchFlag reports whether a command watches by default and reads
+// --no-watch to stop it: serve through its `watch` flag, and compose for its
+// target.
+func ownsWatchFlag(commands []string) bool {
+	return slices.Contains(commands, "serve") || slices.Contains(commands, "compose")
 }
 
 // parseJobFlags is parseCommandFlags for a job command, whose leftover tokens
 // become job params (buildCommandParams) and nothing else; see
 // splitInlineValues for what that changes.
-func parseJobFlags(args []string) (GlobalFlags, []string, error) {
-	return parseGlobalFlags(args, flagParseOptions{consumeVersion: false, jobArgs: true})
+func parseJobFlags(args, commands []string) (GlobalFlags, []string, error) {
+	return parseGlobalFlags(args, flagParseOptions{consumeVersion: false, jobArgs: true, ownWatch: ownsWatchFlag(commands)})
 }
 
 type flagParseOptions struct {
 	consumeVersion bool
 	// jobArgs marks a job command's arguments (parseJobFlags).
 	jobArgs bool
+	// ownWatch marks a run whose command has its own `watch` flag
+	// (ownsWatchFlag, switchOpposite).
+	ownWatch bool
 }
 
 // reservedGlobalFlags are consumed alongside any command but deliberately kept
@@ -134,14 +145,69 @@ func keepsInlineToken(spelling, value string) bool {
 	return strings.HasPrefix(value, "-") && !strings.ContainsFunc(value, unicode.IsSpace)
 }
 
+// resolveSwitchValues rewrites a global switch spelled with an inline boolean,
+// before splitInlineValues would part the value from it: `--verbose=true` is
+// `--verbose`, and `--verbose=false` leaves the switch off. Split, the value
+// stayed behind as a stray token while the switch turned ON, whatever it said.
+// Any other inline value on a switch is a usage error. Tokens past the
+// passthrough separator are the user's payload and stay untouched.
+func resolveSwitchValues(args []string, opts flagParseOptions) ([]string, error) {
+	cut := passthroughCut(args)
+	resolved := make([]string, 0, len(args))
+	for i, arg := range args {
+		spelling, value, inline := strings.Cut(arg, "=")
+		spec, known := globalFlagSpec(spelling)
+		if i >= cut || !inline || !strings.HasPrefix(arg, "--") || !known || spec.Type == commandmeta.FlagValue ||
+			(spec.Long == "--version" && !opts.consumeVersion) {
+			resolved = append(resolved, arg)
+			continue
+		}
+		switch value {
+		case "true":
+			resolved = append(resolved, spec.Long)
+		case "false":
+			if opposite, ok := switchOpposite(spec.Long, opts); ok {
+				resolved = append(resolved, opposite)
+			}
+		default:
+			return nil, usageErrorf("flag %s is a switch: write %s, or %s=true or %s=false, not %s", spelling, spelling, spelling, spelling, arg)
+		}
+	}
+	return resolved, nil
+}
+
+// switchOpposite is the spelling `<switch>=false` stands for when leaving the
+// switch off is not enough. A global pair such as --color and --no-color gives
+// the other half. `--watch=false` on serve or compose is `--no-watch`: both
+// watch without --watch, and only --no-watch turns that off, through serve's
+// `watch` flag (engine.forcesServeWatch) or compose's own; the Go serve docs
+// spell it `--watch=false`.
+func switchOpposite(long string, opts flagParseOptions) (string, bool) {
+	if long == "--watch" {
+		return "--no-watch", opts.ownWatch
+	}
+	opposite := "--no-" + strings.TrimPrefix(long, "--")
+	if name, negated := strings.CutPrefix(long, "--no-"); negated {
+		opposite = "--" + name
+	}
+	spec, known := globalFlagSpec(opposite)
+	return opposite, known && spec.Type != commandmeta.FlagValue
+}
+
 // parseGlobalFlags is phase 2 of the parse: syntax-normalized tokens in, bound
 // GlobalFlags plus the untouched remainder out. A value-taking flag with no
-// value, an unparseable --retry, and an unrecognized --max-parallel mode are
+// value, an unparseable --retry and an unrecognized --max-parallel mode are
 // hard usage errors here; before this change all three were silently dropped.
+// So is a switch with an inline value other than true or false
+// (resolveSwitchValues).
 // Unknown flags are NOT rejected here — only the command-scoped pass in
 // parse.go knows whether an extension could own them.
 func parseGlobalFlags(args []string, opts flagParseOptions) (GlobalFlags, []string, error) {
 	g := GlobalFlags{}
+	args, err := resolveSwitchValues(args, opts)
+	if err != nil {
+		return g, nil, err
+	}
 	normalized := splitInlineValues(args, opts.jobArgs)
 	remaining := make([]string, 0, len(normalized))
 

@@ -387,7 +387,7 @@ var ErrHostedExtensionCommand = fmt.Errorf("an extension command group does not 
 	"run a job command, such as build, or a built-in command, such as install", runcredential.Flag)
 
 // ErrHostedWatch refuses a hosted run (runcredential.Flag) that watches:
-// --watch, or serve, which always watches. Every watch iteration starts after
+// --watch, or serve, which watches by default. Every watch iteration starts after
 // repository code ran, when custody hands the run credential to no new
 // process, so its reporters could never hold it; and a hosted runner runs one
 // finite invocation per fresh sandbox.
@@ -396,7 +396,7 @@ var ErrHostedWatch = fmt.Errorf("--watch and serve do not accept %s: "+
 	"when no process may receive the run credential; run a finite command, such as build, without --watch", runcredential.Flag)
 
 // refuseHostedWatch refuses, as a usage error, a hosted run whose commands
-// watch: global.Watch, or serve, which the engine always runs in watch mode
+// watch: global.Watch, or serve, which the engine runs in watch mode by default
 // (ErrHostedWatch).
 func refuseHostedWatch(hosted bool, global *GlobalFlags, commands []string) error {
 	if !hosted || !global.Watch && !slices.Contains(commands, "serve") {

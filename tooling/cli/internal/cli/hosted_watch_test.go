@@ -6,7 +6,7 @@ import (
 )
 
 // A hosted run that watches is refused as a usage error: --watch, and serve,
-// which always watches. Every watch iteration starts after repository code
+// which watches by default. Every watch iteration starts after repository code
 // ran, when no process may receive the run credential. A finite hosted run,
 // and any run without the credential, is not refused.
 func TestAHostedRunRefusesToWatch(t *testing.T) {

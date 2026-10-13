@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"maps"
 	"os"
@@ -592,20 +591,7 @@ func printExtensionSubcommandHelp(extensions []*extension.ExtensionDescription, 
 	if len(flags) > 0 {
 		iox.Fprintln(os.Stdout, "Flags:")
 		for _, name := range SortedExtensionFlags(flags) {
-			flag := flags[name]
-			short := ""
-			if flag.Short != "" {
-				short = flag.Short + ", "
-			}
-			def := ""
-			if flag.Default != nil {
-				def = fmt.Sprintf(" (default: %v)", flag.Default)
-			}
-			desc := flag.Description
-			if desc == "" {
-				desc = name
-			}
-			iox.Fprintf(os.Stdout, "  %s--%s  %s%s\n", short, name, desc, def)
+			iox.Fprintln(os.Stdout, extensionFlagHelpLine(name, flags[name]))
 		}
 		iox.Fprintln(os.Stdout)
 	}
