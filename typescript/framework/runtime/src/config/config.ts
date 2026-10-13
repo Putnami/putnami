@@ -80,13 +80,28 @@ export function resetConfigLoader() {
  *
  * Detection priority:
  * 1. `NODE_ENV === 'test'` → `'test'`
- * 2. `NODE_ENV === 'production'` or `NODE_ENV === 'prod'` → `'production'`
- * 3. `K_SERVICE` is set (GCP Cloud Run) → `'production'`
- * 4. Otherwise → `'local'`
+ * 2. `APP_ENV === 'production'` or `APP_ENV === 'prod'` → `'production'`
+ * 3. `APP_ENV` is set → its value, as the Go config reads it (the Go config
+ *    has no `prod` alias)
+ * 4. `NODE_ENV === 'production'` or `NODE_ENV === 'prod'` → `'production'`
+ * 5. `K_SERVICE` is set (GCP Cloud Run) → `'production'`
+ * 6. Otherwise → `'local'`
+ *
+ * `APP_ENV` separates the config environment from the build mode: a local
+ * composition runs `NODE_ENV=production` with `APP_ENV=local`, so the workload
+ * reads `conf/.env.local.yaml` and `conf/.secrets.local.yaml`. A deployment
+ * that names its environment `prod` keeps reading the `production` files.
  */
 export function getEnv(): string {
   if (process.env.NODE_ENV === 'test') {
     return 'test';
+  }
+  const appEnv = process.env.APP_ENV;
+  if (appEnv === 'production' || appEnv === 'prod') {
+    return 'production';
+  }
+  if (appEnv) {
+    return appEnv;
   }
   if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'prod') {
     return 'production';

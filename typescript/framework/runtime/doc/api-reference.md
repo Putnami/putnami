@@ -70,7 +70,7 @@ Determines the current environment name.
 function getEnv(): string
 ```
 
-**Returns:** `'local'`, `'test'`, or `'production'`
+**Returns:** `'test'` under `NODE_ENV=test`, otherwise `APP_ENV` when set (`prod` reads as `'production'`), otherwise `'production'` under `NODE_ENV=production` or on Cloud Run, otherwise `'local'`
 
 ### `resetConfigLoader()`
 

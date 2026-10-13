@@ -154,9 +154,18 @@ The environment is automatically detected:
 | Condition | Environment |
 |-----------|-------------|
 | `NODE_ENV === 'test'` | `'test'` |
+| `APP_ENV === 'production'` or `'prod'` | `'production'` |
+| `APP_ENV` is set | its value |
 | `NODE_ENV === 'production'` or `'prod'` | `'production'` |
 | `K_SERVICE` is set (GCP Cloud Run) | `'production'` |
 | Otherwise | `'local'` |
+
+The first matching row wins. `APP_ENV` names the config environment apart from
+the build mode, as in the Go config, and outranks `NODE_ENV=production` and
+`K_SERVICE` on a deployed service too. The `prod` alias is TypeScript-only: the
+Go config reads `APP_ENV=prod` as `prod`. `putnami qualify --target local` runs
+the workload with `NODE_ENV=production` and `APP_ENV=local`, so it reads
+`conf/.env.local.yaml` and `conf/.secrets.local.yaml`, like `putnami serve`.
 
 You can also check the current environment:
 

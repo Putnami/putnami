@@ -56,6 +56,10 @@
       "text": "--target local composes the workload with the workloads it runs with, production-mode without watch, and binds the verdict to the worktree fingerprint read before anything is prepared. Version-binding passes only when the worktree still has that fingerprint once every member is ready; otherwise digest_mismatch and no request is sent. --expect-sha with local exits 2. A composition failure is composition_failed naming the member and phase; teardown always runs and cleanup.state is recorded."
     },
     {
+      "id": "local-target-reads-the-local-config",
+      "text": "A production compose member, which is every member under --target local, runs the production build with the local config: it receives APP_ENV=local unless the caller exported APP_ENV, so it reads conf/.env.local.yaml and conf/.secrets.local.yaml as under serve, and a workload that needs a local secret to start qualifies."
+    },
+    {
       "id": "local-readiness-is-completed-startup",
       "text": "Go and TypeScript applications report completed startup, once every plugin starter and module start hook returned, two ways: a typed v2 ready event with target workload, which compose records per member, and a platform /readyz that answers 200 only from then on. --target local polls GET <prefix>/readyz when the inventory declares it or --platform-prefix is set, else waits for the claim; a server claim never counts. No claim in time is timed_out with no request sent; an early exit is composition_failed."
     },

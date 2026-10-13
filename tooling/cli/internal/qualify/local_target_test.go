@@ -53,6 +53,9 @@ const (
 	// completed startup once the test creates its release marker, as an
 	// application whose start hook fails after its HTTP server bound does.
 	fixtureFailAfterListen = "fail-after-listen"
+	// fixtureNeedsLocalSecret refuses to start without conf/.secrets.<env>.yaml,
+	// as an application whose startup requires a secret does.
+	fixtureNeedsLocalSecret = "needs-local-secret"
 )
 
 func TestMain(m *testing.M) {
@@ -82,6 +85,22 @@ type localFixtureRecord struct {
 	PID     int    `json:"pid"`
 	Port    string `json:"port"`
 	NodeEnv string `json:"nodeEnv"`
+	AppEnv  string `json:"appEnv"`
+}
+
+// fixtureConfigEnv is the config environment a TypeScript workload reads its
+// conf/ files for: getEnv() of @putnami/runtime, whose own tests prove it.
+func fixtureConfigEnv() string {
+	nodeEnv := os.Getenv("NODE_ENV")
+	switch {
+	case nodeEnv == "test":
+		return "test"
+	case os.Getenv("APP_ENV") != "":
+		return os.Getenv("APP_ENV")
+	case nodeEnv == "production" || nodeEnv == "prod" || os.Getenv("K_SERVICE") != "":
+		return "production"
+	}
+	return "local"
 }
 
 // localFixtureEvent is one runtime protocol v2 line a member prints.
@@ -118,9 +137,18 @@ func runLocalFixtureWorkload() int {
 		return 2
 	}
 	marker := func(suffix string) string { return filepath.Join(config.Markers, name+suffix) }
-	record, _ := json.Marshal(localFixtureRecord{PID: os.Getpid(), Port: os.Getenv("PORT"), NodeEnv: os.Getenv("NODE_ENV")})
+	record, _ := json.Marshal(localFixtureRecord{
+		PID: os.Getpid(), Port: os.Getenv("PORT"), NodeEnv: os.Getenv("NODE_ENV"), AppEnv: os.Getenv("APP_ENV"),
+	})
 	_ = os.WriteFile(marker(".json"), record, 0o600)
 	emitFixtureLog("info", "fixture "+name+" starting in "+config.Mode)
+	if config.Mode == fixtureNeedsLocalSecret {
+		secrets := filepath.Join("conf", ".secrets."+fixtureConfigEnv()+".yaml")
+		if _, err := os.Stat(secrets); err != nil {
+			emitFixtureLog("error", "startup failed: "+name+" needs its secret in "+secrets)
+			return 1
+		}
+	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
@@ -232,6 +260,9 @@ type localMember struct {
 	runsWith []string
 	// routes, when set, are committed as the member's route inventory.
 	routes []httproutes.Route
+	// localSecret, when set, is written to the member's Git-ignored
+	// conf/.secrets.local.yaml.
+	localSecret string
 }
 
 // localFixture is a committed git repository holding a composable workspace.
@@ -277,7 +308,9 @@ func newLocalFixture(t *testing.T, members ...localMember) *localFixture {
 	write("putnami.workspace.json", workspaceManifest)
 	// The engine records sessions and compose records leases under .putnami:
 	// runtime state, never sources, so the worktree fingerprint must not see it.
-	write(".gitignore", []byte(".putnami/\n.gen/\n"))
+	// conf/.secrets.*.yaml holds local values, ignored as a project template
+	// ignores them.
+	write(".gitignore", []byte(".putnami/\n.gen/\nconf/.secrets.*.yaml\n"))
 	write("fixture-extension/putnami.json", []byte(`{"name":"@putnami/qualify-fixture"}`))
 	command, _ := json.Marshal(executable)
 	write("fixture-extension/putnami.extension.json", []byte(fmt.Sprintf(`{
@@ -311,6 +344,9 @@ func newLocalFixture(t *testing.T, members ...localMember) *localFixture {
 		write(member.name+"/putnami.json", projectManifest)
 		config, _ := json.Marshal(localFixtureConfig{Mode: member.mode, Markers: fixture.markers})
 		write(member.name+"/fixture.json", config)
+		if member.localSecret != "" {
+			write(member.name+"/conf/.secrets.local.yaml", []byte("secret: "+member.localSecret+"\n"))
+		}
 		if member.routes != nil {
 			inventory, diags := httproutes.Canonicalize(member.routes)
 			if diag.HasErrors(diags) {
@@ -446,6 +482,7 @@ var compositionIDPattern = regexp.MustCompile(`^[0-9a-f]{16}$`)
 func TestLocalTarget_BindsToTreeFingerprintAndComposes(t *testing.T) {
 	spectest.Proves(t, "cli/workload-qualification", "local-verdict-binds-to-the-exact-worktree",
 		"a-local-verdict-names-the-worktree-it-composed-and-a-clean-teardown")
+	t.Setenv("APP_ENV", "")
 	fixture := newLocalFixture(t,
 		localMember{name: "provider", mode: fixtureServe},
 		localMember{name: "app", mode: fixtureServe, runsWith: []string{"provider"}},
@@ -475,12 +512,36 @@ func TestLocalTarget_BindsToTreeFingerprintAndComposes(t *testing.T) {
 	}
 	// The target is qualified the way it ships: production mode, no watch, an
 	// ephemeral port behind the proxy — exactly like the member it runs with.
+	// Its configuration stays local: production selects the build, not the
+	// config files.
 	for _, name := range []string{"provider", "app"} {
-		if record, _ := fixture.record(t, name); record.NodeEnv != "production" || record.Port != "0" {
-			t.Errorf("member %s ran with NODE_ENV=%q PORT=%q, want production and 0", name, record.NodeEnv, record.Port)
+		if record, _ := fixture.record(t, name); record.NodeEnv != "production" || record.AppEnv != "local" || record.Port != "0" {
+			t.Errorf("member %s ran with NODE_ENV=%q APP_ENV=%q PORT=%q, want production, local and 0",
+				name, record.NodeEnv, record.AppEnv, record.Port)
 		}
 	}
 	fixture.assertStopped(t, "provider", "app")
+}
+
+func TestLocalTarget_ReadsTheLocalConfigOfAProductionBuild(t *testing.T) {
+	spectest.Proves(t, "cli/workload-qualification", "local-target-reads-the-local-config",
+		"a-local-target-reads-the-local-config-of-its-production-build")
+	t.Setenv("APP_ENV", "")
+	fixture := newLocalFixture(t, localMember{name: "app", mode: fixtureNeedsLocalSecret, localSecret: "local-only-secret"})
+
+	verdict := execute(t, context.Background(), contractFor(t, "/app", "GET /items"), fixture.target(t, "app", hangDetector), fastOptions())
+
+	if verdict.State != qualifyproto.StatePassed {
+		t.Fatalf("state = %s (%s)\n%+v", verdict.State, phaseStates(verdict), verdict.Phases)
+	}
+	// The secret file is Git-ignored, so the verdict still binds a clean tree.
+	if verdict.Binding.Dirty {
+		t.Errorf("binding = %+v, want a clean tree: the local secret is ignored", verdict.Binding)
+	}
+	if got := fixture.requests("app"); got != "GET /items" {
+		t.Errorf("requests reaching the target = %q", got)
+	}
+	fixture.assertStopped(t, "app")
 }
 
 func TestLocalTarget_TreeThatChangesBeforeReadinessIsDigestMismatch(t *testing.T) {

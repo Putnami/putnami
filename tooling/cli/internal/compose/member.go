@@ -3,6 +3,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,6 +22,8 @@ import (
 const (
 	envPort              = "PORT=0"
 	envProductionNodeEnv = "NODE_ENV=production"
+	envAppEnv            = "APP_ENV"
+	envLocalAppEnv       = envAppEnv + "=local"
 	serveParamPort       = "port"
 	serveParamEphemeral  = 0
 )
@@ -347,10 +350,19 @@ func (rt *memberRuntime) waitStartup(ctx context.Context) error {
 // memberEnv is the process environment of a member's serve step: an
 // ephemeral port, production mode for a dependency and for an unwatched
 // target, and the CONFIG_DATA document when there is one.
+//
+// Production mode selects the build, not the configuration: a composition runs
+// on this machine, so a production member still reads its local config files
+// (conf/.env.local.yaml, conf/.secrets.local.yaml), as a watched one does.
+// APP_ENV names that config environment; a TypeScript runtime would otherwise
+// derive it from NODE_ENV. An APP_ENV the caller exported is kept.
 func memberEnv(production bool, document []byte) []string {
 	env := []string{envPort}
 	if production {
 		env = append(env, envProductionNodeEnv)
+		if os.Getenv(envAppEnv) == "" {
+			env = append(env, envLocalAppEnv)
+		}
 	}
 	if len(document) > 0 {
 		env = append(env, ConfigDataEnv+"="+string(document))

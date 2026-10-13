@@ -10,6 +10,7 @@
     "typescript/dependency-injection#scope-isolation",
     "typescript/dependency-injection#singleton-identity",
     "typescript/typed-configuration#browser-surface",
+    "typescript/typed-configuration#config-environment",
     "typescript/typed-configuration#contributed-paths",
     "typescript/typed-configuration#env-fills-gaps",
     "typescript/typed-configuration#fail-loud",

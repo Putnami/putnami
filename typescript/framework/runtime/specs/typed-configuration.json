@@ -19,6 +19,10 @@
       "text": "Configuration sources merge from lowest to highest as base file, environment file, build-merged file, local secrets file, registered extension sources, then CONFIG_DATA."
     },
     {
+      "id": "config-environment",
+      "text": "The config environment that names the conf/ files read is test under NODE_ENV=test, else APP_ENV when set (prod reads as production), else production under NODE_ENV=production or on Cloud Run, else local, so a production build run with APP_ENV=local reads conf/.env.local.yaml and conf/.secrets.local.yaml."
+    },
+    {
       "id": "env-fills-gaps",
       "text": "A field-level Env() descriptor supplies a value only when no merged source provided that key, so any file or CONFIG_DATA value overrides the environment variable."
     },

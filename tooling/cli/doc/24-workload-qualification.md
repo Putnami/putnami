@@ -62,6 +62,11 @@ Dependencies run production-mode (`NODE_ENV=production`) without watch. The
 target watches by default: a change restarts it behind the same proxy URL;
 `--no-watch` runs it like its dependencies.
 
+Production mode selects the build, not the configuration. A production member
+also receives `APP_ENV=local`, unless you exported `APP_ENV` yourself, so it
+reads `conf/.env.local.yaml` and `conf/.secrets.local.yaml` as it does under
+`putnami serve`.
+
 ### Proxies
 
 Every member binds port `0` (`PORT=0` and the serve step's `port` param) and is
@@ -232,9 +237,10 @@ putnami qualify @example/go-items-consumer --target local --output=json
    starts: there is no tree to bind a verdict to.
 2. It composes the workload exactly as `compose --no-watch --port 0` does. The
    target and every member run production-mode (`NODE_ENV=production`) without
-   watch, each on port `0` behind its own proxy, with dependency URLs and
-   per-composition databases injected. A watched target could rebuild itself
-   during the smoke, and the verdict would no longer name one tree.
+   watch, with the local config (`APP_ENV=local`), each on port `0` behind its
+   own proxy, with dependency URLs and per-composition databases injected. A
+   watched target could rebuild itself during the smoke, and the verdict would
+   no longer name one tree.
 3. It runs the contract against the target's proxy URL.
 4. It tears the composition down, whatever happened before.
 

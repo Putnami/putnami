@@ -107,7 +107,7 @@ export const GET = endpoint()
 ### Environment Detection
 
 ```typescript
-const env = getEnv(); // 'local' | 'test' | 'production'
+const env = getEnv(); // 'test', then APP_ENV, then 'production' or 'local'
 ```
 
 ### Secrets

@@ -149,7 +149,7 @@ Configuration is loaded from multiple sources in priority order (highest wins):
 5. `confInit` programmatic defaults
 6. `Default()` schema values
 
-The environment is automatically detected based on `NODE_ENV` and other indicators.
+The environment is detected from `NODE_ENV`, `APP_ENV` and `K_SERVICE`; see [Environment Detection](./configuration.md#environment-detection).
 
 ### Context Propagation
 
