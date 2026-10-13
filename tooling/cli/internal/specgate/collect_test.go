@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/cli/model/workspace"
 	diag "go.putnami.dev/protocol/diagnostic"
 	features "go.putnami.dev/protocol/features"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
@@ -55,9 +56,10 @@ func fixtureReport(status string) string {
 }
 
 type gateFixture struct {
-	ws      *workspace.Workspace
-	planned []*jobs.ScheduledJob
-	results map[string]*jobs.JobResult
+	ws        *workspace.Workspace
+	planned   []*jobs.ScheduledJob
+	results   map[string]*jobs.JobResult
+	producers ProjectionProducers
 }
 
 // newGateFixture lays the session output tree out on disk exactly as the
@@ -75,7 +77,7 @@ func newGateFixture(t *testing.T, projection, report string) *gateFixture {
 	fixture := &gateFixture{ws: ws, results: map[string]*jobs.JobResult{}}
 	if projection != "" {
 		writeFile(t, filepath.Join(root, ".putnami", "out", "billing", "validate", "spec-criteria.json"), projection)
-		job := fixtureJob(project, "validate~specs", "validate")
+		job := producerJob(project)
 		fixture.planned = append(fixture.planned, job)
 		fixture.results[job.Key()] = resultWithArtifact("success",
 			features.SpecCriteriaProjectionArtifactID, "spec-criteria.json")
@@ -109,6 +111,22 @@ func fixtureJob(project *workspace.Project, name, command string) *jobs.Schedule
 	}
 }
 
+// producerJob is a project's criteria-projection producer, declared the way the
+// SDD extension declares its specs-validate task.
+func producerJob(project *workspace.Project) *jobs.ScheduledJob {
+	return &jobs.ScheduledJob{
+		Project: project,
+		Extension: &extension.ExtensionDescription{Name: "@putnami/test-fixture", Tasks: map[string]extension.TaskDefinition{
+			"specs-validate": {Declares: &extension.TaskDeclaration{Outputs: map[string]extension.DeclaredOutput{
+				"criteria": {Kind: extension.OutputKindFile, Root: extension.OutputRootCommandOutput,
+					Path: features.SpecCriteriaProjectionFilename, OptionalEmpty: true},
+			}}},
+		}},
+		JobDef: &extension.JobDefinition{Name: "validate~specs", CommandName: "validate"},
+		Step:   &extension.PipelineStep{Task: "specs-validate"},
+	}
+}
+
 func resultWithArtifact(status, id, path string) *jobs.JobResult {
 	return &jobs.JobResult{Status: status, Events: []jobs.RawJobEvent{{
 		Type: jobs.EventTypeArtifact,
@@ -129,11 +147,25 @@ func writeFile(t *testing.T, path, content string) {
 func collect(t *testing.T, fixture *gateFixture) *features.SpecVerificationRecord {
 	t.Helper()
 	record, err := Collect(fixture.ws, fixture.planned, fixture.results,
-		time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC), nil)
+		time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC), nil, fixture.producers)
 	if err != nil {
 		t.Fatalf("collect: %v", err)
 	}
 	return record
+}
+
+// applicableProjects answers ProjectionProducers with a fixed project set.
+type applicableProjects map[string]bool
+
+func (projects applicableProjects) ApplicableProjects() (map[string]bool, error) {
+	return projects, nil
+}
+
+// unplannableProducers answers ProjectionProducers with an error.
+type unplannableProducers struct{}
+
+func (unplannableProducers) ApplicableProjects() (map[string]bool, error) {
+	return nil, os.ErrInvalid
 }
 
 func soleGroup(t *testing.T, record *features.SpecVerificationRecord) features.SpecVerificationGroup {
@@ -369,22 +401,98 @@ func hasDiagnostic(diagnostics []diag.Diagnostic, code string) bool {
 
 // TestCollectSeparatesNotAskedFromFoundNothing pins the one distinction the
 // persisted record cannot blur. A session that ran `test` but no `validate`
-// carries no criteria projection, so the gate evaluated nothing; a record
-// stating that as an empty evaluation is what `specs verify` later replays,
-// and it makes every enforced feature in the workspace read as unevaluated.
-// Absence has to stay absence all the way to the persistence seam, whose own
-// contract is "a nil record means the gate did not run".
+// over a project a producer applies to carries no criteria projection, so the
+// gate evaluated nothing; a record stating that as an empty evaluation would
+// tell `specs verify` and the session reader that no selected project states
+// a requirement. Absence has to stay absence all the way to the persistence
+// seam, whose own contract is "a nil record means the gate did not run". A
+// session in which every selected project was answered, by a producer that
+// succeeded or because no producer applies to it, is the opposite fact, and
+// records it.
 func TestCollectSeparatesNotAskedFromFoundNothing(t *testing.T) {
-	t.Run("no projection at all records nothing", func(t *testing.T) {
+	t.Run("an unplanned producer records nothing", func(t *testing.T) {
 		fixture := newGateFixture(t, "", fixtureReport("passed"))
 		fixture.setPolicy("project", "enforce")
-		record, err := Collect(fixture.ws, fixture.planned, fixture.results,
-			time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC), nil)
-		if err != nil {
-			t.Fatalf("collect: %v", err)
-		}
-		if record != nil {
+		fixture.producers = applicableProjects{"/billing": true}
+		if record := collect(t, fixture); record != nil {
 			t.Fatalf("a session that projected no criteria recorded an evaluation: %+v", record)
+		}
+	})
+
+	t.Run("an answered selection records an empty evaluation", func(t *testing.T) {
+		cases := map[string]func(*gateFixture){
+			"no producer applies": func(fixture *gateFixture) {
+				fixture.producers = applicableProjects{}
+			},
+			"the applicable producer succeeded": func(fixture *gateFixture) {
+				producer := producerJob(fixture.project())
+				fixture.planned = append(fixture.planned, producer)
+				fixture.results[producer.Key()] = &jobs.JobResult{Status: "success"}
+				fixture.producers = applicableProjects{"/billing": true}
+			},
+		}
+		for name, arrange := range cases {
+			t.Run(name, func(t *testing.T) {
+				fixture := newGateFixture(t, "", fixtureReport("passed"))
+				fixture.setPolicy("project", "enforce")
+				arrange(fixture)
+				record := collect(t, fixture)
+				if record == nil {
+					t.Fatal("a session whose selection was answered recorded nothing")
+				}
+				if record.Groups == nil || len(record.Groups) != 0 || len(record.Diagnostics) != 0 {
+					t.Fatalf("an empty evaluation recorded %+v, want an empty group list and no diagnostic", record)
+				}
+			})
+		}
+	})
+
+	// A producer that did not succeed, or did not run, answered nothing about
+	// its project, so the session cannot claim that no selected project states
+	// a requirement.
+	t.Run("an unanswered selected project records nothing", func(t *testing.T) {
+		spectest.Proves(t, "cli/job-planning-execution", "spec-gate-records-an-empty-evaluation",
+			"an-unanswered-selected-project-records-nothing")
+		cases := map[string]*jobs.JobResult{
+			"failed":   {Status: "failed"},
+			"canceled": {Status: "canceled"},
+			"skipped":  {Status: "skipped"},
+			"missing":  nil,
+		}
+		for name, result := range cases {
+			t.Run("a "+name+" producer", func(t *testing.T) {
+				fixture := newGateFixture(t, "", fixtureReport("passed"))
+				fixture.setPolicy("project", "enforce")
+				fixture.producers = applicableProjects{"/billing": true, "/ledger": true}
+				succeeded := producerJob(fixture.project())
+				fixture.planned = append(fixture.planned, succeeded)
+				fixture.results[succeeded.Key()] = &jobs.JobResult{Status: "success"}
+				other := producerJob(&workspace.Project{ID: "/ledger", Name: "@acme/ledger", Path: "ledger"})
+				fixture.planned = append(fixture.planned, other)
+				if result != nil {
+					fixture.results[other.Key()] = result
+				}
+				if record := collect(t, fixture); record != nil {
+					t.Fatalf("a session with a %s producer recorded %+v", name, record)
+				}
+			})
+		}
+		for name, producers := range map[string]ProjectionProducers{
+			"no applicability answer":     nil,
+			"an applicability error":      unplannableProducers{},
+			"a second applicable project": applicableProjects{"/billing": true, "/ledger": true},
+		} {
+			t.Run(name, func(t *testing.T) {
+				fixture := newGateFixture(t, "", fixtureReport("passed"))
+				fixture.setPolicy("project", "enforce")
+				producer := producerJob(fixture.project())
+				fixture.planned = append(fixture.planned, producer)
+				fixture.results[producer.Key()] = &jobs.JobResult{Status: "success"}
+				fixture.producers = producers
+				if record := collect(t, fixture); record != nil {
+					t.Fatalf("a session with %s recorded %+v", name, record)
+				}
+			})
 		}
 	})
 

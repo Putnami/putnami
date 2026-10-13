@@ -8,6 +8,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	featureproto "go.putnami.dev/protocol/features"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
@@ -165,6 +166,67 @@ func TestBuildSpecVerifyResultReplaysTheRecordedVerdict(t *testing.T) {
 	if !strings.Contains(verdict.Error(), "/app") {
 		t.Errorf("verdict %q does not name the blocked project", verdict)
 	}
+}
+
+// TestBuildSpecVerifyResultReadsAnEmptyRecordAsNoRequirement pins the replay
+// of a session whose gate ran over projects that state no requirement: the
+// session is recorded, the selected spec is still evaluated against zero
+// observations, and the warning names that the session selected no project
+// that states a requirement instead of claiming the session evaluated it. A
+// record that carries a diagnostic keeps the session message.
+func TestBuildSpecVerifyResultReadsAnEmptyRecordAsNoRequirement(t *testing.T) {
+	const sessionID = "20260823-140000-abcdef"
+	emptyRecord := func(diagnostics string) string {
+		return `{
+  "protocolVersion": 1,
+  "sessionId": "` + sessionID + `",
+  "generatedAt": "2026-08-23T14:00:00Z",
+  "groups": []` + diagnostics + `
+}`
+	}
+	replay := func(t *testing.T, record string) string {
+		t.Helper()
+		ws := verifyWorkspace(t, enforceOptions())
+		writeVerifySession(t, ws.Root, sessionID, record)
+		report, verdict := BuildSpecVerifyResult(ws, Selection{}, sessionID)
+		if verdict == nil || len(report.Blocked) != 1 {
+			t.Fatalf("an unevaluated enforce spec did not block: %v / %+v", verdict, report.Blocked)
+		}
+		if !report.Recorded || report.Session != sessionID {
+			t.Fatalf("report did not replay the record: %+v", report)
+		}
+		messages := make([]string, 0, len(report.Diagnostics))
+		for _, diagnostic := range report.Diagnostics {
+			messages = append(messages, diagnostic.Message)
+		}
+		return strings.Join(messages, "\n")
+	}
+
+	t.Run("an empty record", func(t *testing.T) {
+		spectest.Proves(t, "tooling/specification-driven-development", "verify-names-an-empty-evaluation",
+			"an-empty-record-names-no-requirement")
+		messages := replay(t, emptyRecord(""))
+		if !strings.Contains(messages, "session "+sessionID+" selected no project that states a requirement") ||
+			!strings.Contains(messages, "putnami test,validate") {
+			t.Errorf("diagnostics do not name the empty evaluation and its command: %s", messages)
+		}
+		if strings.Contains(messages, "was not evaluated by session") {
+			t.Errorf("diagnostics claim the session evaluated the spec: %s", messages)
+		}
+	})
+
+	t.Run("a record with a diagnostic", func(t *testing.T) {
+		spectest.Proves(t, "tooling/specification-driven-development", "verify-names-an-empty-evaluation",
+			"a-record-with-a-diagnostic-keeps-the-session-message")
+		messages := replay(t, emptyRecord(`,
+  "diagnostics": [{"severity": "error", "code": "features.invalid_path", "field": "/app:test", "message": "declared artifact \"report.json\" was not found under the session output tree"}]`))
+		if strings.Contains(messages, "selected no project that states a requirement") {
+			t.Errorf("a record with a diagnostic read as an empty evaluation: %s", messages)
+		}
+		if !strings.Contains(messages, "was not evaluated by session "+sessionID) {
+			t.Errorf("diagnostics lost the session message: %s", messages)
+		}
+	})
 }
 
 func TestBuildSpecVerifyResultRefusesABrokenOrForeignRecord(t *testing.T) {

@@ -133,7 +133,7 @@ bounds its `offset`.
 
 `spec-verification.json` is best-effort, and its omission never fails
 delivery. Core omits it, records why in its checkpoint, and completes delivery
-when the file is absent (a run without the spec gate writes none), past its
+when the file is absent (a session whose spec gate evaluated nothing writes none), past its
 bound or unreadable at its cursor, when the receiver answers a frame
 `ok: false`, with or without `retryable`, when the reporter quit or a frame
 fails in transport, or when the finalization limit ends first. Core never

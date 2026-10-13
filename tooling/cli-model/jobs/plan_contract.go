@@ -40,10 +40,32 @@ func ProducesVerificationReport(job *ScheduledJob) bool {
 	if declaration == nil {
 		return job.Step == nil
 	}
+	return declaresCommandOutputFile(declaration, features.VerificationReportFilename)
+}
+
+// ProducesSpecCriteriaProjection reports whether a planned job is a project's
+// criteria-projection producer: a `validate` task whose v3 declaration names a
+// command-output FILE at the reserved projection filename. The declaration
+// marks that output optional and empty when the project's specs state no
+// requirement, so a producer that succeeded without emitting it answers "this
+// project states no requirement". A job without a declaration is never a
+// producer.
+func ProducesSpecCriteriaProjection(job *ScheduledJob) bool {
+	if job == nil || job.JobDef == nil || job.CommandName() != "validate" {
+		return false
+	}
+	declaration := TaskDeclarationOf(job)
+	return declaration != nil && declaresCommandOutputFile(declaration, features.SpecCriteriaProjectionFilename)
+}
+
+// declaresCommandOutputFile reports whether declaration names a command-output
+// file at path, the shape a task-owned cache entry records and a warm hit
+// restores.
+func declaresCommandOutputFile(declaration *extension.TaskDeclaration, path string) bool {
 	for _, output := range declaration.Outputs {
 		if output.Kind == extension.OutputKindFile &&
 			output.EffectiveRoot() == extension.OutputRootCommandOutput &&
-			output.Path == features.VerificationReportFilename {
+			output.Path == path {
 			return true
 		}
 	}

@@ -698,6 +698,20 @@
           }
         },
         {
+          "id": "spec-gate-records-an-empty-evaluation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-answered-selected-project-records-no-group",
+              "an-unanswered-selected-project-records-nothing"
+            ]
+          }
+        },
+        {
           "id": "spec-gate-evidence-scope",
           "stage": "coded",
           "evidenceKinds": [

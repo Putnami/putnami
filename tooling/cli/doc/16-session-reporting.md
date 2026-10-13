@@ -72,7 +72,9 @@ gets no credential, and the session's delivery fails (see
 
 Once the receiver acknowledges the events final marker, the session reporter
 sends the spec gate's record, `.putnami/sessions/<id>/spec-verification.json`:
-what each requirement of each judged spec resolved to. The engine writes it
+what each requirement of each judged spec resolved to. A record with no group
+and no diagnostic means the gate ran and no selected project states a
+requirement; a session without the file evaluated nothing. The engine writes it
 before reporting ends, so it is the last artifact the receiver gets. The CLI
 sends the persisted bytes unchanged. A record above 8 MiB is not sent.
 

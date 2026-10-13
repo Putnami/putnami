@@ -1,13 +1,16 @@
 package engine
 
 import (
+	"fmt"
 	"os"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"go.putnami.dev/cli/model/workspace"
 	features "go.putnami.dev/protocol/features"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/specgate"
@@ -54,8 +57,13 @@ type specGateOutcome struct {
 // requirement attested by a dependency the selection did not plan resolve from
 // that dependency's own test cache entry. It may be nil, which disables
 // recovery and leaves every such check unresolvable — and therefore warned.
+//
+// producers names the selected projects a criteria-projection producer applies
+// to. It may be nil, and then a session that projected nothing records
+// nothing.
 func specGateFinalizer(req *Request, ws *workspace.Workspace, planned []*jobs.ScheduledJob,
-	recovery specgate.ObservationRecovery, outcome *specGateOutcome) func(map[string]*jobs.JobResult) {
+	recovery specgate.ObservationRecovery, producers specgate.ProjectionProducers,
+	outcome *specGateOutcome) func(map[string]*jobs.JobResult) {
 	if ws == nil || outcome == nil || !slices.Contains(req.Commands, "test") {
 		return nil
 	}
@@ -63,7 +71,7 @@ func specGateFinalizer(req *Request, ws *workspace.Workspace, planned []*jobs.Sc
 		return nil
 	}
 	return func(results map[string]*jobs.JobResult) {
-		record, err := specgate.Collect(ws, planned, results, time.Now(), recovery)
+		record, err := specgate.Collect(ws, planned, results, time.Now(), recovery, producers)
 		if err != nil {
 			// A collection the workspace's own config makes impossible was
 			// refused before jobs ran; anything left is an internal fault, and a
@@ -119,6 +127,75 @@ func reportSpecGateWarnings(record *features.SpecVerificationRecord) {
 			iox.Fprintf(os.Stderr, "putnami: spec verification: %s: %s\n", project, message)
 		}
 	}
+}
+
+// validateProducerPlan answers specgate.ProjectionProducers with a `validate`
+// plan over the session's selected projects, so the planner's own activation
+// rule decides which projects a criteria-projection producer applies to.
+// extensions is the whole discovered set, never a set the session narrowed:
+// a producer the session excluded still applies to its project. skipped is
+// what discovery failed to load.
+type validateProducerPlan struct {
+	req        *Request
+	ws         *workspace.Workspace
+	projects   []*workspace.Project
+	extensions []*extension.ExtensionDescription
+	skipped    []extension.SkippedExtension
+}
+
+// ApplicableProjects plans `validate` over the selected projects with the
+// run's command params and without its disable lists, and returns the selected
+// projects whose plan holds a criteria-projection producer. A selected project
+// that disables `validate` itself hides whether a producer applies to it, and
+// so does an extension that failed to load or a configured registry extension
+// that is not loaded, disabled or not: each answer is an error.
+func (plan *validateProducerPlan) ApplicableProjects() (map[string]bool, error) {
+	if len(plan.skipped) > 0 {
+		return nil, fmt.Errorf("extension %s failed to load", plan.skipped[0].Name)
+	}
+	if plan.req.Config != nil {
+		configured := *plan.req.Config
+		configured.Disable = nil
+		if missing := missingRegistryExtensions(&configured, plan.extensions); len(missing) > 0 {
+			return nil, fmt.Errorf("extension %s is not loaded", missing[0])
+		}
+	}
+	selected := make(map[string]bool, len(plan.projects))
+	for _, project := range plan.projects {
+		if project == nil {
+			continue
+		}
+		if disablesValidate(project) {
+			return nil, fmt.Errorf("project %s disables validate", project.ID)
+		}
+		selected[project.ID] = true
+	}
+	planned, err := jobs.Plan(plan.ws, []string{"validate"}, plan.projects, plan.extensions,
+		plan.req.CommandParams, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	applicable := make(map[string]bool)
+	for _, job := range planned {
+		if job != nil && job.Project != nil && selected[job.Project.ID] && jobs.ProducesSpecCriteriaProjection(job) {
+			applicable[job.Project.ID] = true
+		}
+	}
+	return applicable, nil
+}
+
+// disablesValidate reports whether a project's own disable list names the
+// `validate` command, alone or under one extension.
+func disablesValidate(project *workspace.Project) bool {
+	if project.Config == nil || project.Config.Disable == nil {
+		return false
+	}
+	for _, job := range project.Config.Disable.Jobs {
+		if job == "validate" || strings.HasSuffix(job, ":validate") {
+			return true
+		}
+	}
+	return false
 }
 
 // specGateResultTask is the synthetic plan name a sanction is reported under.

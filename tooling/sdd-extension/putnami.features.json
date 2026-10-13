@@ -235,6 +235,20 @@
           }
         },
         {
+          "id": "verify-names-an-empty-evaluation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-empty-record-names-no-requirement",
+              "a-record-with-a-diagnostic-keeps-the-session-message"
+            ]
+          }
+        },
+        {
           "id": "authoring-never-grants-a-permission",
           "stage": "coded",
           "evidenceKinds": [

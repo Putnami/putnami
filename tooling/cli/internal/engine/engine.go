@@ -912,7 +912,9 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// memoized file-hash pass built for the execution keys is the one a recovery
 	// lookup keys against; a second manager would walk the tree again.
 	if gate := specGateFinalizer(req, ws, planned,
-		newCachedObservationRecovery(req, ws, planningExtensions, cacheManager), req.specGate); gate != nil {
+		newCachedObservationRecovery(req, ws, planningExtensions, cacheManager),
+		&validateProducerPlan{req: req, ws: ws, projects: selectedProjects, extensions: discovered.Extensions, skipped: discovered.Skipped},
+		req.specGate); gate != nil {
 		finalizers = append(finalizers, gate)
 	}
 	ctx, finalizers, closeOutboxes, err := releaseSetExecution(ctx, req, releaseSetRun, finalizers)

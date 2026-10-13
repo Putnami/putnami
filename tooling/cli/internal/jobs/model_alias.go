@@ -30,6 +30,10 @@ var CanUseCache = model.CanUseCache
 // project's reserved feature verification report.
 var ProducesVerificationReport = model.ProducesVerificationReport
 
+// ProducesSpecCriteriaProjection reports whether a planned job is its
+// project's criteria-projection producer.
+var ProducesSpecCriteriaProjection = model.ProducesSpecCriteriaProjection
+
 // --- Typed identity ---
 
 // TaskIdentityOfKey is the fallback for a result the plan does not name.
