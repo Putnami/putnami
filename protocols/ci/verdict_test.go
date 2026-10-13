@@ -318,6 +318,49 @@ func TestAProjectWithoutCountsIsUnknownNotEmpty(t *testing.T) {
 	}
 }
 
+// A project is named after its directories, so its ID is the workspace root
+// or any workspace path behind a slash.
+func TestVerdictProjectID(t *testing.T) {
+	accepted := []string{
+		"/", "/tooling/cli", "/packages/@acme/ui", "/libs/c++", "/.github/actions/setup",
+		"/_internal", "/-legacy", "/docs/release notes", "/services/café",
+		"/" + strings.Repeat("a", 511),
+	}
+	for _, id := range accepted {
+		if !verdictProjectID(id) {
+			t.Errorf("verdictProjectID(%q) = false, want true", id)
+		}
+	}
+	refused := []string{
+		"", "services/cart", "//", "//services", "/services/", "/services//cart",
+		"/.", "/..", "/services/./cart", "/services/../cart", `/services\cart`,
+		"/ services", "/services ", "/services\ncart", "/" + strings.Repeat("a", 512),
+	}
+	for _, id := range refused {
+		if verdictProjectID(id) {
+			t.Errorf("verdictProjectID(%q) = true, want false", id)
+		}
+	}
+}
+
+// A workspace with one project at its root gets a verdict like any other: the
+// root project is listed, counted and named by its gaps.
+func TestVerdictNamesTheRootProject(t *testing.T) {
+	verdict := readVerdictFixture(t, "passed-root-project.json")
+	projects := verdict.Predicate.Impact.Projects
+	if len(projects) == 0 || projects[0].Project != "/" {
+		t.Fatalf("projects = %+v, want the root project first", projects)
+	}
+	if want := (VerdictGap{Kind: GapNoRequirement, Project: "/"}); !slices.Contains(verdict.Predicate.Gaps, want) {
+		t.Fatalf("gaps = %+v, want %+v", verdict.Predicate.Gaps, want)
+	}
+	for _, project := range projects[1:] {
+		if project.Via != "/" {
+			t.Fatalf("project %+v, want it reached from the root project", project)
+		}
+	}
+}
+
 // verdictCase is one change to a valid verdict and the refusal it causes.
 type verdictCase struct {
 	name    string
@@ -415,6 +458,9 @@ func TestValidateVerdictRefusals(t *testing.T) {
 			`unknown verdict project relation "indirect"`},
 		{"relative project ID", verified, func(v *Verdict) { v.Predicate.Impact.Projects[0].Project = "services/cart" },
 			projects},
+		{"project ID with an empty segment", verified, func(v *Verdict) {
+			v.Predicate.Impact.Projects[0].Project = "/services//cart"
+		}, projects},
 		{"project ID with a dot segment", verified, func(v *Verdict) {
 			v.Predicate.Impact.Projects[0].Project = "/services/../cart"
 		}, projects},
@@ -849,6 +895,7 @@ func TestVerdictSchemaMatchesTheGoVocabulary(t *testing.T) {
 		"$defs/check/properties/phase/pattern":             commandPattern.String(),
 		"$defs/check/properties/reason/pattern":            verdictReasonPattern.String(),
 		"$defs/gap/properties/requirement/pattern":         verdictRequirementPattern.String(),
+		"$defs/projectID/pattern":                          verdictProjectIDPattern.String(),
 		"$defs/channel/properties/channel/pattern":         channelPattern.String(),
 		// The rules the schema states with a condition name the same words.
 		"$defs/predicate/allOf/0/if/properties/mark/const":                          MarkVerified,

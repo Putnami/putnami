@@ -13,6 +13,10 @@
       "answer": "passed",
       "mark": "checked"
     },
+    "passed-root-project.json": {
+      "answer": "passed",
+      "mark": "checked"
+    },
     "passed-unknown-impact.json": {
       "answer": "passed",
       "mark": "checked"

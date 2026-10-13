@@ -37,8 +37,8 @@
     "projectID": {
       "type": "string",
       "maxLength": 512,
-      "pattern": "^/[A-Za-z0-9][A-Za-z0-9._/-]*$",
-      "description": "A workspace project ID, such as /tooling/cli."
+      "pattern": "^/(?:[^/\\\\]|$)",
+      "description": "A workspace project ID: / for the project at the workspace root, else a slash and the project's path, such as /tooling/cli."
     },
     "path": {
       "type": "string",
