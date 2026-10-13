@@ -116,7 +116,7 @@ func TestValidateStructuredFlags_PassthroughIsNeverValidated(t *testing.T) {
 	}
 }
 
-// TestParseArgs_BuiltInRejectsUnreadPassthrough pins #246: a built-in command
+// TestParseArgs_BuiltInRejectsUnreadPassthrough pins that a built-in command
 // that reads no passthrough rejects a "--", so no payload token reaches a
 // handler that would read it as one of its own flags (`version tag -- --push`
 // pushed the tag, `tree verify -- --help` printed the usage).
