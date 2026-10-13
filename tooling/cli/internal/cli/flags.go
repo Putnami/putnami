@@ -101,17 +101,18 @@ func isGlobalFlag(arg string) bool {
 // buildCommandParams turns into job params: splitting only known flags would
 // move every cache key carrying an unknown "--flag=value".
 //
-// For a job command (jobArgs), a token before the passthrough separator stays
-// whole when splitting would misread it (keepsInlineToken), and
-// buildCommandParams binds its inline value itself. A built-in command reads its
-// tokens by exact spelling, and an extension command group forwards them as its
-// process argv, so both always get the split.
+// For a job command (jobArgs), a token stays whole when splitting would misread
+// it (keepsInlineToken), and buildCommandParams binds its inline value itself. A
+// built-in command reads its tokens by exact spelling, and an extension command
+// group forwards them as its process argv, so both always get the split.
+//
+// args never holds the passthrough separator: parseGlobalFlags passes only the
+// tokens before it.
 func splitInlineValues(args []string, jobArgs bool) []string {
-	cut := passthroughCut(args)
 	normalized := make([]string, 0, len(args))
-	for i, arg := range args {
+	for _, arg := range args {
 		idx := strings.Index(arg, "=")
-		if idx <= 0 || !strings.HasPrefix(arg, "--") || (jobArgs && i < cut && keepsInlineToken(arg[:idx], arg[idx+1:])) {
+		if idx <= 0 || !strings.HasPrefix(arg, "--") || (jobArgs && keepsInlineToken(arg[:idx], arg[idx+1:])) {
 			normalized = append(normalized, arg)
 			continue
 		}
@@ -149,15 +150,14 @@ func keepsInlineToken(spelling, value string) bool {
 // before splitInlineValues would part the value from it: `--verbose=true` is
 // `--verbose`, and `--verbose=false` leaves the switch off. Split, the value
 // stayed behind as a stray token while the switch turned ON, whatever it said.
-// Any other inline value on a switch is a usage error. Tokens past the
-// passthrough separator are the user's payload and stay untouched.
+// Any other inline value on a switch is a usage error. Like splitInlineValues,
+// it reads only the tokens before the passthrough separator.
 func resolveSwitchValues(args []string, opts flagParseOptions) ([]string, error) {
-	cut := passthroughCut(args)
 	resolved := make([]string, 0, len(args))
-	for i, arg := range args {
+	for _, arg := range args {
 		spelling, value, inline := strings.Cut(arg, "=")
 		spec, known := globalFlagSpec(spelling)
-		if i >= cut || !inline || !strings.HasPrefix(arg, "--") || !known || spec.Type == commandmeta.FlagValue ||
+		if !inline || !strings.HasPrefix(arg, "--") || !known || spec.Type == commandmeta.FlagValue ||
 			(spec.Long == "--version" && !opts.consumeVersion) {
 			resolved = append(resolved, arg)
 			continue
@@ -202,14 +202,22 @@ func switchOpposite(long string, opts flagParseOptions) (string, bool) {
 // (resolveSwitchValues).
 // Unknown flags are NOT rejected here — only the command-scoped pass in
 // parse.go knows whether an extension could own them.
+//
+// Tokens from the passthrough separator on are the user's payload: they bind
+// no global flag and reach the remainder as spelled. --credential-fd is the
+// one exception, removed wherever it appears, because the CLI that re-executes
+// itself appends it to its own argv, past a separator too
+// (runcredential.withDescriptor), and runcredential.Capture has read it.
 func parseGlobalFlags(args []string, opts flagParseOptions) (GlobalFlags, []string, error) {
 	g := GlobalFlags{}
-	args, err := resolveSwitchValues(args, opts)
+	cut := passthroughCut(args)
+	payload := runcredential.WithoutFlag(args[cut:])
+	flags, err := resolveSwitchValues(args[:cut], opts)
 	if err != nil {
 		return g, nil, err
 	}
-	normalized := splitInlineValues(args, opts.jobArgs)
-	remaining := make([]string, 0, len(normalized))
+	normalized := splitInlineValues(flags, opts.jobArgs)
+	remaining := make([]string, 0, len(normalized)+len(payload))
 
 	for i := 0; i < len(normalized); i++ {
 		arg := normalized[i]
@@ -237,7 +245,7 @@ func parseGlobalFlags(args []string, opts flagParseOptions) (GlobalFlags, []stri
 		}
 	}
 
-	return g, remaining, nil
+	return g, append(remaining, payload...), nil
 }
 
 // applyGlobalFlag binds one recognized global flag onto g. It is a cohesive

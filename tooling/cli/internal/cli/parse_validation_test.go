@@ -381,7 +381,6 @@ func TestSplitInlineValues_KeepsAJobTokenWholeOnlyWhereTheSplitMisreadsIt(t *tes
 		{"a plain value splits", []string{"--target=linux"}, true, []string{"--target", "linux"}},
 		{"a multi-word plain value splits", []string{"--filter=a b"}, true, []string{"--filter", "a b"}},
 		{"a global flag always splits", []string{"--projects=-odd"}, true, []string{"--projects", "-odd"}},
-		{"past the separator every token splits", []string{"--", "--args=--gate"}, true, []string{"--", "--args", "--gate"}},
 		{"a single-dash token never splits", []string{"-x=-1"}, true, []string{"-x=-1"}},
 		{"a built-in or command-group invocation always splits", []string{"--args=--gate", "--watch --port=3000"}, false,
 			[]string{"--args", "--gate", "--watch --port", "3000"}},

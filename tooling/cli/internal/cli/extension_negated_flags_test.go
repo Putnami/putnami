@@ -89,6 +89,14 @@ func TestNegatedGlobalFlagNames(t *testing.T) {
 			flags: map[string]extension.FlagDefinition{"color": {Type: "boolean"}},
 			want:  []string{"color"},
 		},
+		{
+			// Past the separator the token reaches RawJobArgs, where
+			// buildCommandParams turns it into cache=false.
+			name:  "a negation past the passthrough separator is the payload's",
+			args:  []string{"cloud", "ci", "retry", "--", "--no-cache"},
+			flags: boolean,
+			want:  nil,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

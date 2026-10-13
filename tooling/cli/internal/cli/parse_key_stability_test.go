@@ -190,11 +190,11 @@ var keyStabilityCorpus = []keyStabilityCase{
 		wantMarker:   "4e0f808f956c",
 	},
 	{
-		name:         "double dash passthrough",
+		name:         "double dash passthrough keeps a global flag spelling",
 		args:         []string{"run", "--", "--verbose", "arg"},
-		wantParams:   "=string(arg)",
-		wantCacheKey: "f9770592b9539ad73db382ee7a9b25dfbb594c0687483396c6423e8909dcac92",
-		wantMarker:   "48a9f69878fc",
+		wantParams:   "=bool(true) verbose=string(arg)",
+		wantCacheKey: "af5b10be15039be1588a48062d4b0ebcd0ab5e912d51afc1f6ca09b9f827e003",
+		wantMarker:   "ada12317f1d3",
 	},
 	{
 		name:         "double dash after a job flag",
@@ -339,11 +339,11 @@ var keyStabilityCorpus = []keyStabilityCase{
 		wantMarker:   "fd1413125a90",
 	},
 	{
-		name:         "past the separator an inline hyphen word splits",
+		name:         "past the separator an inline hyphen word stays whole",
 		args:         []string{"test", "--", "--args=--gate"},
-		wantParams:   "=bool(true) args=bool(true) gate=bool(true)",
-		wantCacheKey: "72d78d0c5cf39bf70a07085b7dd8af72d0bb40dd7916527e16e213a6408fddfa",
-		wantMarker:   "66a1e0f43e51",
+		wantParams:   "=bool(true) args=string(--gate)",
+		wantCacheKey: "67f8c4a5d2ba738eea705d245ba7be9e901d78f61d48f322907ea301af441c09",
+		wantMarker:   "b649684c5c9a",
 	},
 	{
 		name:         "past the separator a multi-word hyphen token is a value",
