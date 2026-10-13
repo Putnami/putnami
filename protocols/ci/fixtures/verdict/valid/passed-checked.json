@@ -4,8 +4,7 @@
     {
       "name": "https://example.test/acme/shop.git",
       "digest": {
-        "gitCommit": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00",
-        "gitTree": "0123456789abcdef0123456789abcdef01234567"
+        "gitCommit": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00"
       }
     }
   ],
@@ -19,7 +18,7 @@
       "head": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00",
       "base": "8f3c2a1b9d4e5f60718293a4b5c6d7e8f9a0b1c2",
       "tree": "0123456789abcdef0123456789abcdef01234567",
-      "testedCheckout": "fedcba9876543210fedcba9876543210fedcba98"
+      "testedCheckout": "merge"
     },
     "run": {
       "id": "4711",
@@ -82,7 +81,8 @@
       "total": 4,
       "proven": 2,
       "missing": 2,
-      "projectsWithout": 1
+      "projectsWithout": 1,
+      "projectsUnknown": 0
     },
     "declarations": [
       {

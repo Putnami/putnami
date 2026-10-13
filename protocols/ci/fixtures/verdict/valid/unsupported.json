@@ -4,8 +4,7 @@
     {
       "name": "ssh://git.example.test/acme/legacy.git",
       "digest": {
-        "gitCommit": "0f1e2d3c4b5a69780f1e2d3c4b5a69780f1e2d3c4b5a69780f1e2d3c4b5a6978",
-        "gitTree": "a0b1c2d3e4f5a6b7a0b1c2d3e4f5a6b7a0b1c2d3e4f5a6b7a0b1c2d3e4f5a6b7"
+        "gitCommit": "0f1e2d3c4b5a69780f1e2d3c4b5a69780f1e2d3c4b5a69780f1e2d3c4b5a6978"
       }
     }
   ],
@@ -16,7 +15,8 @@
       "repository": "ssh://git.example.test/acme/legacy.git",
       "reference": "refs/heads/main",
       "head": "0f1e2d3c4b5a69780f1e2d3c4b5a69780f1e2d3c4b5a69780f1e2d3c4b5a6978",
-      "tree": "a0b1c2d3e4f5a6b7a0b1c2d3e4f5a6b7a0b1c2d3e4f5a6b7a0b1c2d3e4f5a6b7"
+      "tree": "a0b1c2d3e4f5a6b7a0b1c2d3e4f5a6b7a0b1c2d3e4f5a6b7a0b1c2d3e4f5a6b7",
+      "testedCheckout": "head"
     },
     "run": {
       "id": "run-2026-10-13-0004",
@@ -38,7 +38,8 @@
       "total": 0,
       "proven": 0,
       "missing": 0,
-      "projectsWithout": 0
+      "projectsWithout": 0,
+      "projectsUnknown": 0
     },
     "declarations": [],
     "gaps": [],

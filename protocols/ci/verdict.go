@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 	"regexp"
 	"slices"
@@ -78,11 +79,22 @@ const (
 	LevelAdvisory = "advisory"
 )
 
+// What the tree of a verdict is the tree of.
+const (
+	// TestedCheckoutHead: the run tested Head as it is. Tree is Head's tree.
+	TestedCheckoutHead = "head"
+	// TestedCheckoutMerge: the run tested Head merged into Base. Tree is the
+	// tree of that merge, which may be the tree of no commit in the repository.
+	TestedCheckoutMerge = "merge"
+)
+
 // The relations of an impacted project to the change.
 const (
-	// RelationTouched: the project owns at least one changed path.
+	// RelationTouched: a changed path claims the project itself. The project
+	// owns the path, or reads it as a declared input.
 	RelationTouched = "touched"
-	// RelationReached: the project depends on a touched project.
+	// RelationReached: no changed path claims the project. The change reaches
+	// it from another impacted project, touched or reached.
 	RelationReached = "reached"
 )
 
@@ -130,6 +142,15 @@ const (
 	// GapUnapprovedDeclaration: a declaration the change modifies has no
 	// approval, whether the change weakens it or not.
 	GapUnapprovedDeclaration = "unapproved-declaration"
+	// GapUnknownImpact: the producer does not know which projects the change
+	// reaches. The verdict then lists no impacted project.
+	GapUnknownImpact = "unknown-impact"
+	// GapUnknownRequirements: the producer does not know how an impacted
+	// project's requirements stand. The project then carries no counts.
+	GapUnknownRequirements = "unknown-requirements"
+	// GapUnknownDeclarations: the producer does not know which declarations
+	// the change modifies. The verdict then lists no declaration.
+	GapUnknownDeclarations = "unknown-declarations"
 )
 
 var (
@@ -148,15 +169,18 @@ func VerdictSchema() []byte { return append([]byte(nil), verdictSchemaBytes...) 
 
 // Verdict is the one answer a CI run gives about one change: an unsigned
 // in-toto Statement v1 whose subject is the repository at the change's head
-// commit and tree, and whose predicate says whether the change passed, how
-// well its requirements are proven, which declarations it weakens, and what is
-// missing. A producer may sign it; this package neither signs nor verifies a
-// signature.
+// commit, and whose predicate says which tree the run tested, whether the
+// change passed, how well its requirements are proven, which declarations it
+// modifies, and what is missing or unknown. A producer may sign it; this
+// package neither signs nor verifies a signature.
+//
+// A verdict is an answer about a tested tree. A run that tested no tree, such
+// as one canceled before its checkout, has no verdict.
 type Verdict struct {
 	// Type is always VerdictStatementType.
 	Type string `json:"_type"`
 	// Subject names exactly one resource: the repository at the change's
-	// head commit and tree.
+	// head commit.
 	Subject []VerdictSubject `json:"subject"`
 	// PredicateType is always VerdictPredicateType.
 	PredicateType string `json:"predicateType"`
@@ -165,20 +189,20 @@ type Verdict struct {
 }
 
 // VerdictSubject is an in-toto resource descriptor: the repository, by URL,
-// at one commit and its tree.
+// at one commit.
 type VerdictSubject struct {
 	// Name is the repository URL, VerdictChange.Repository.
 	Name string `json:"name"`
-	// Digest holds the head commit and its tree.
+	// Digest holds the head commit.
 	Digest VerdictDigest `json:"digest"`
 }
 
-// VerdictDigest is the in-toto digest set of a subject.
+// VerdictDigest is the in-toto digest set of a subject. It holds no tree:
+// VerdictChange.Tree is the tree the run tested, which is not always the tree
+// of the head commit.
 type VerdictDigest struct {
 	// GitCommit is VerdictChange.Head.
 	GitCommit string `json:"gitCommit"`
-	// GitTree is VerdictChange.Tree.
-	GitTree string `json:"gitTree"`
 }
 
 // VerdictPredicate is the verdict of one run attempt about one change.
@@ -199,7 +223,8 @@ type VerdictPredicate struct {
 	// Requirements sums the requirement counts of Impact.
 	Requirements VerdictRequirements `json:"requirements"`
 	// Declarations is every declaration the change modifies, the weakening
-	// ones first, then by path.
+	// ones first, then by path. It is empty when the verdict carries a
+	// GapUnknownDeclarations.
 	Declarations []VerdictDeclaration `json:"declarations"`
 	// Gaps is everything that keeps a passed verdict from being verified,
 	// sorted by kind, project, requirement, then path.
@@ -214,8 +239,8 @@ type VerdictPredicate struct {
 	Revision int `json:"revision"`
 }
 
-// VerdictChange identifies the change: a repository, a reference and the
-// commits the run saw.
+// VerdictChange identifies the change: a repository, a reference, the commits
+// the run saw and the tree it tested.
 type VerdictChange struct {
 	// Repository is the credential-free URL of the repository: an https, http
 	// or ssh URL without user, query, fragment or trailing slash.
@@ -228,11 +253,11 @@ type VerdictChange struct {
 	// Base is the full commit ID the change is measured from, when the run
 	// had one.
 	Base string `json:"base,omitempty"`
-	// Tree is the full ID of Head's tree.
+	// Tree is the full ID of the tree the run tested.
 	Tree string `json:"tree"`
-	// TestedCheckout is the full commit ID the run checked out and tested,
-	// when that commit is not Head, such as a merge of Head into its base.
-	TestedCheckout string `json:"testedCheckout,omitempty"`
+	// TestedCheckout says what Tree is the tree of: TestedCheckoutHead or
+	// TestedCheckoutMerge. A merge names its Base.
+	TestedCheckout string `json:"testedCheckout"`
 }
 
 // VerdictRun identifies the run attempt that produced the verdict.
@@ -263,7 +288,8 @@ type VerdictCheck struct {
 
 // VerdictImpact is the project closure the change reaches.
 type VerdictImpact struct {
-	// Projects is every impacted project, sorted by project ID.
+	// Projects is every impacted project, sorted by project ID. It is empty
+	// when the verdict carries a GapUnknownImpact.
 	Projects []VerdictProject `json:"projects"`
 }
 
@@ -273,11 +299,13 @@ type VerdictProject struct {
 	Project string `json:"project"`
 	// Relation is RelationTouched or RelationReached.
 	Relation string `json:"relation"`
-	// Via names another impacted project the dependency reaches this one
-	// through. Only a reached project names one.
+	// Via names the impacted project the change reaches this one from. Only a
+	// reached project names one, and it may name none.
 	Via string `json:"via,omitempty"`
-	// Requirements counts the project's requirements.
-	Requirements VerdictRequirementCounts `json:"requirements"`
+	// Requirements counts the project's requirements. It is absent when the
+	// producer does not know how they stand, and the verdict then records a
+	// GapUnknownRequirements for the project.
+	Requirements *VerdictRequirementCounts `json:"requirements,omitempty"`
 }
 
 // VerdictRequirementCounts counts one project's requirements. Only a
@@ -293,7 +321,8 @@ type VerdictRequirementCounts struct {
 	Missing int `json:"missing"`
 }
 
-// VerdictRequirements sums the requirement counts of every impacted project.
+// VerdictRequirements sums the requirement counts of every impacted project
+// that carries counts.
 type VerdictRequirements struct {
 	// Total sums VerdictRequirementCounts.Total.
 	Total int `json:"total"`
@@ -303,6 +332,8 @@ type VerdictRequirements struct {
 	Missing int `json:"missing"`
 	// ProjectsWithout counts the impacted projects that state no requirement.
 	ProjectsWithout int `json:"projectsWithout"`
+	// ProjectsUnknown counts the impacted projects that carry no counts.
+	ProjectsUnknown int `json:"projectsUnknown"`
 }
 
 // VerdictDeclaration is one declaration the change modifies.
@@ -312,9 +343,11 @@ type VerdictDeclaration struct {
 	Path string `json:"path"`
 	// Kind is the declaration's kind, such as spec.
 	Kind string `json:"kind"`
-	// Weakening reports whether the change weakens what the declaration
-	// promises, such as a removed requirement or a lowered floor. It orders
-	// the declarations; it does not decide whether an approval is needed.
+	// Weakening is true when the producer found that the change weakens what
+	// the declaration promises, such as a removed requirement or a lowered
+	// floor. A producer that does not compare the declaration's content writes
+	// false. It orders the declarations; it does not decide whether an
+	// approval is needed.
 	Weakening bool `json:"weakening"`
 	// Approval records who approved the change to the declaration, when
 	// someone did. A declaration without one is a gap.
@@ -331,10 +364,12 @@ type VerdictApproval struct {
 	At string `json:"at"`
 }
 
-// VerdictGap is one thing that keeps a passed verdict from being verified.
-// Its kind fixes which members it carries: a project for GapNoRequirement, a
-// project and a requirement for GapUnprovenRequirement, a path for
-// GapUnapprovedDeclaration.
+// VerdictGap is one thing that keeps a passed verdict from being verified:
+// something missing, or something the producer does not know. Its kind fixes
+// which members it carries: a project for GapNoRequirement and
+// GapUnknownRequirements, a project and a requirement for
+// GapUnprovenRequirement, a path for GapUnapprovedDeclaration, and none for
+// GapUnknownImpact and GapUnknownDeclarations.
 type VerdictGap struct {
 	// Kind is the gap's kind.
 	Kind string `json:"kind"`
@@ -431,15 +466,33 @@ func ParseVerdict(data []byte) (Verdict, error) {
 }
 
 // ValidateVerdict is the check a consumer runs before it trusts a verdict. It
-// refuses another statement or predicate type, a subject that is not the
-// change's repository at its head commit and tree, a list that is absent or
-// null, malformed identities, an unknown vocabulary value, a list that is
-// unsorted or holds a duplicate, an answer that is not the fold of the
-// required checks, requirement counts that do not add up, gaps that do not
-// match the impact and the declarations, a mark that does not follow the
-// answer and the gaps, a deploy answer that is not the fold of its channels,
-// a computedAt that is not RFC 3339, and a revision below 1. It returns the
-// first refusal, in that order.
+// returns the first refusal, in this order:
+//
+//  1. another statement or predicate type;
+//  2. a list that is absent or null;
+//  3. the change: a malformed repository, reference or object ID, an unknown
+//     tested checkout, a merge without a base;
+//  4. a subject that is not the change's repository at its head commit;
+//  5. a malformed run identity;
+//  6. checks with an unknown answer or level, unsorted, duplicated or
+//     malformed;
+//  7. an answer that is not the fold of the required checks;
+//  8. impacted projects with an unknown relation, unsorted, duplicated or
+//     malformed, counts that do not add up, and sums that are not the sums of
+//     the counts;
+//  9. declarations with an unknown kind or an incomplete approval, unsorted,
+//     duplicated or malformed;
+//  10. gaps with an unknown kind or the members of another kind, unsorted or
+//     duplicated, then a list that holds entries beside the gap that says it
+//     is unknown, then gaps that do not match the impact and the declarations;
+//  11. a mark that does not follow the answer and the gaps;
+//  12. deploy channels that are malformed, unsorted or duplicated, and a
+//     deploy answer that is not their fold;
+//  13. a computedAt that is not RFC 3339;
+//  14. a revision below 1.
+//
+// A list over its bound is refused where the list is checked, before its
+// entries.
 func ValidateVerdict(verdict Verdict) error {
 	if verdict.Type != VerdictStatementType {
 		return errors.New("verdict is not an in-toto Statement v1")
@@ -456,8 +509,8 @@ func ValidateVerdict(verdict Verdict) error {
 		return err
 	}
 	if len(verdict.Subject) != 1 || verdict.Subject[0] != (VerdictSubject{Name: p.Change.Repository,
-		Digest: VerdictDigest{GitCommit: p.Change.Head, GitTree: p.Change.Tree}}) {
-		return errors.New("verdict subject is not the change's repository at its head commit and tree")
+		Digest: VerdictDigest{GitCommit: p.Change.Head}}) {
+		return errors.New("verdict subject is not the change's repository at its head commit")
 	}
 	if !verdictRunIDPattern.MatchString(p.Run.ID) || p.Run.Attempt < 1 || !verdictCodePattern.MatchString(p.Run.Conclusion) {
 		return errors.New("verdict run identity is malformed")
@@ -493,8 +546,8 @@ func ValidateVerdict(verdict Verdict) error {
 }
 
 // validateVerdictChange refuses a repository URL that is not credential-free,
-// a reference that is not a full Git reference, and a revision that is not a
-// full lowercase object ID, or a tested checkout that repeats the head.
+// a reference that is not a full Git reference, a revision that is not a full
+// lowercase object ID, an unknown tested checkout, and a merge without a base.
 func validateVerdictChange(change VerdictChange) error {
 	if !credentialFreeRepositoryURL(change.Repository) {
 		return errors.New("verdict repository is not a credential-free https, http or ssh URL")
@@ -503,12 +556,17 @@ func validateVerdictChange(change VerdictChange) error {
 		return errors.New("verdict reference is not a full Git reference")
 	}
 	if !fullCommitID(change.Head) || !fullCommitID(change.Tree) ||
-		(change.Base != "" && !fullCommitID(change.Base)) ||
-		(change.TestedCheckout != "" && !fullCommitID(change.TestedCheckout)) {
+		(change.Base != "" && !fullCommitID(change.Base)) {
 		return errors.New("verdict revisions must be full lowercase object IDs")
 	}
-	if change.TestedCheckout == change.Head {
-		return errors.New("verdict tested checkout repeats its head")
+	switch change.TestedCheckout {
+	case TestedCheckoutHead:
+	case TestedCheckoutMerge:
+		if change.Base == "" {
+			return errors.New("verdict tested a merge without a base")
+		}
+	default:
+		return fmt.Errorf("unknown verdict tested checkout %q", change.TestedCheckout)
 	}
 	return nil
 }
@@ -538,8 +596,11 @@ func validateVerdictChecks(checks []VerdictCheck) error {
 
 // validateVerdictImpact refuses projects that are not sorted by a
 // well-formed unique ID, an unknown relation, a via on a touched project or
-// one that names no other impacted project, a project whose counts do not add
-// up, and totals that are not the sums of the projects' counts.
+// one that names no other impacted project, a project whose counts are
+// negative or do not add up, and totals that are not the sums of the
+// projects' counts. A project without counts adds to ProjectsUnknown only.
+// Counts whose sum passes the largest integer are refused like counts that do
+// not add up: no sum wraps.
 func validateVerdictImpact(impact VerdictImpact, totals VerdictRequirements) error {
 	projects := impact.Projects
 	if len(projects) > MaxVerdictProjects {
@@ -559,7 +620,12 @@ func validateVerdictImpact(impact VerdictImpact, totals VerdictRequirements) err
 			return errors.New("verdict impacted projects are not canonical")
 		}
 		counts := project.Requirements
-		if counts.Proven < 0 || counts.Missing < 0 || counts.Proven+counts.Missing != counts.Total {
+		if counts == nil {
+			sum.ProjectsUnknown++
+			continue
+		}
+		if counts.Total < 0 || counts.Proven < 0 || counts.Missing < 0 || counts.Total-counts.Proven != counts.Missing ||
+			counts.Total > math.MaxInt-sum.Total {
 			return errors.New("verdict project requirement counts do not add up")
 		}
 		sum.Total += counts.Total
@@ -611,9 +677,13 @@ func declarationSortsBefore(left, right VerdictDeclaration) bool {
 
 // validateVerdictGaps refuses gaps that are not sorted and unique, that carry
 // the members of another kind, or that do not match the predicate: one
+// unknown-requirements gap per impacted project without counts, one
 // no-requirement gap per impacted project that states no requirement, as many
 // unproven-requirement gaps for a project as its missing count, and one
-// unapproved-declaration gap per declaration without an approval.
+// unapproved-declaration gap per declaration without an approval. Only the
+// producer knows whether its impact or its declarations are unknown, so those
+// two gaps are not derived: each one is refused beside the list it says is
+// unknown.
 func validateVerdictGaps(p VerdictPredicate) error {
 	gaps := p.Gaps
 	if len(gaps) > MaxVerdictGaps {
@@ -622,13 +692,15 @@ func validateVerdictGaps(p VerdictPredicate) error {
 	for i, gap := range gaps {
 		var shaped bool
 		switch gap.Kind {
-		case GapNoRequirement:
+		case GapNoRequirement, GapUnknownRequirements:
 			shaped = verdictProjectID(gap.Project) && gap.Requirement == "" && gap.Path == ""
 		case GapUnprovenRequirement:
 			shaped = verdictProjectID(gap.Project) && len(gap.Requirement) <= 512 &&
 				verdictRequirementPattern.MatchString(gap.Requirement) && gap.Path == ""
 		case GapUnapprovedDeclaration:
 			shaped = gap.Project == "" && gap.Requirement == "" && workspacePath(gap.Path)
+		case GapUnknownImpact, GapUnknownDeclarations:
+			shaped = gap == VerdictGap{Kind: gap.Kind}
 		default:
 			return fmt.Errorf("unknown verdict gap kind %q", gap.Kind)
 		}
@@ -638,11 +710,14 @@ func validateVerdictGaps(p VerdictPredicate) error {
 	}
 	want := map[VerdictGap]int{}
 	for _, project := range p.Impact.Projects {
-		if project.Requirements.Total == 0 {
+		counts := project.Requirements
+		switch {
+		case counts == nil:
+			want[VerdictGap{Kind: GapUnknownRequirements, Project: project.Project}] = 1
+		case counts.Total == 0:
 			want[VerdictGap{Kind: GapNoRequirement, Project: project.Project}] = 1
-		}
-		if project.Requirements.Missing > 0 {
-			want[VerdictGap{Kind: GapUnprovenRequirement, Project: project.Project}] = project.Requirements.Missing
+		case counts.Missing > 0:
+			want[VerdictGap{Kind: GapUnprovenRequirement, Project: project.Project}] = counts.Missing
 		}
 	}
 	for _, declaration := range p.Declarations {
@@ -652,6 +727,14 @@ func validateVerdictGaps(p VerdictPredicate) error {
 	}
 	got := map[VerdictGap]int{}
 	for _, gap := range gaps {
+		switch {
+		case gap.Kind == GapUnknownImpact && len(p.Impact.Projects) > 0:
+			return errors.New("verdict lists impacted projects beside an unknown impact")
+		case gap.Kind == GapUnknownDeclarations && len(p.Declarations) > 0:
+			return errors.New("verdict lists declarations beside unknown declarations")
+		case gap.Kind == GapUnknownImpact || gap.Kind == GapUnknownDeclarations:
+			continue
+		}
 		gap.Requirement = ""
 		got[gap]++
 	}

@@ -4,8 +4,7 @@
     {
       "name": "https://example.test/acme/shop.git",
       "digest": {
-        "gitCommit": "8f3c2a1b9d4e5f60718293a4b5c6d7e8f9a0b1c2",
-        "gitTree": "9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d"
+        "gitCommit": "8f3c2a1b9d4e5f60718293a4b5c6d7e8f9a0b1c2"
       }
     }
   ],
@@ -18,7 +17,8 @@
       "reference": "refs/heads/main",
       "head": "8f3c2a1b9d4e5f60718293a4b5c6d7e8f9a0b1c2",
       "base": "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d",
-      "tree": "9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d"
+      "tree": "9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d",
+      "testedCheckout": "head"
     },
     "run": {
       "id": "run-2026-10-13-0001",
@@ -86,7 +86,8 @@
       "total": 6,
       "proven": 6,
       "missing": 0,
-      "projectsWithout": 0
+      "projectsWithout": 0,
+      "projectsUnknown": 0
     },
     "declarations": [
       {

@@ -13,6 +13,14 @@
       "answer": "passed",
       "mark": "checked"
     },
+    "passed-unknown-impact.json": {
+      "answer": "passed",
+      "mark": "checked"
+    },
+    "passed-unknown-requirements.json": {
+      "answer": "passed",
+      "mark": "checked"
+    },
     "passed-verified.json": {
       "answer": "passed",
       "mark": "verified"
@@ -28,21 +36,26 @@
     "answer-not-fold.json": "verdict answer is not the fold of its required checks",
     "counts-do-not-add-up.json": "verdict project requirement counts do not add up",
     "credentials-in-repository.json": "verdict repository is not a credential-free https, http or ssh URL",
+    "declarations-beside-unknown-declarations.json": "verdict lists declarations beside unknown declarations",
     "deploy-not-fold.json": "verdict deploy answer is not the fold of its channels",
     "duplicate-key.json": "verdict is not strict JSON: $.predicate.revision: duplicate object key",
     "mark-on-failed.json": "verdict mark does not follow its answer and gaps",
+    "merge-without-base.json": "verdict tested a merge without a base",
     "missing-gap.json": "verdict gaps do not match its impact and declarations",
     "null-gaps.json": "verdict omits a list or writes it as null",
     "predicate-type-v2.json": "unsupported verdict predicate type \"https://putnami.dev/verdict/v2\"",
+    "projects-beside-unknown-impact.json": "verdict lists impacted projects beside an unknown impact",
     "reason-on-passed.json": "verdict checks are not canonical",
     "revision-zero.json": "verdict revision is below 1",
     "short-head.json": "verdict revisions must be full lowercase object IDs",
     "statement-type.json": "verdict is not an in-toto Statement v1",
-    "subject-not-head.json": "verdict subject is not the change's repository at its head commit and tree",
-    "tested-checkout-is-head.json": "verdict tested checkout repeats its head",
+    "subject-not-head.json": "verdict subject is not the change's repository at its head commit",
+    "subject-with-tree.json": "verdict is not strict JSON: json: unknown field \"gitTree\"",
+    "tested-checkout-is-a-commit.json": "unknown verdict tested checkout \"fedcba9876543210fedcba9876543210fedcba98\"",
     "totals-are-not-sums.json": "verdict requirements are not the sums of its impacted projects",
     "unknown-answer.json": "unknown verdict answer \"skipped\"",
     "unknown-member.json": "verdict is not strict JSON: json: unknown field \"score\"",
+    "unknown-requirements-without-gap.json": "verdict gaps do not match its impact and declarations",
     "verified-with-gaps.json": "verdict mark does not follow its answer and gaps",
     "weakening-sorted-last.json": "verdict declarations are not canonical"
   }
