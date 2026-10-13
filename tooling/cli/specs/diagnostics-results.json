@@ -70,7 +70,7 @@
     },
     {
       "id": "recorded-run-context",
-      "text": "A spec-verification sanction a recorded session lists carries a stable diagnostic code, features.unresolved_requirement or features.verification_unreadable, and every other declared-check failure keeps the code its producer emitted. A recorded session also carries a digest of the declaration files its declared checks read (feature manifests, specs, decisions, architecture manifests and their baselines), captured before its first task ran and separate from the tree fingerprint: editing only a declaration moves it, editing only code does not. A run launched through the MCP server records the agent kind its client named and the agent session id the server environment stated; a terminal run records no agent, and no agent member is inferred."
+      "text": "A failed declared check in a recorded session carries a stable diagnostic code; a spec-verification sanction uses features.unresolved_requirement or features.verification_unreadable. The session carries a digest of the declaration files its declared checks read, taken before its first task and separate from the tree fingerprint: a declaration edit moves it, a code edit does not. An MCP run records the agent kind its client named and the session id its environment stated; a terminal run records no agent."
     },
     {
       "id": "local-evidence-verification",
