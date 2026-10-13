@@ -61,6 +61,9 @@ export function buildJsonResponseWithCache(
 
 /**
  * Execute a loader with optional server-side caching.
+ *
+ * The default cache key is the route, its params and its query string: a
+ * loader that reads `?page=2` caches apart from `?page=3`.
  */
 export async function executeLoaderWithCache(
   loader: (ctx: HttpRequestContext) => unknown,
@@ -69,7 +72,9 @@ export async function executeLoaderWithCache(
   cacheOpts?: LoaderCacheOptions,
 ): Promise<unknown> {
   if (cacheOpts?.ttl) {
-    const cacheKey = cacheOpts.key ? cacheOpts.key(ctx) : `${route}:${serializeParams(ctx.params)}`;
+    const cacheKey = cacheOpts.key
+      ? cacheOpts.key(ctx)
+      : `${route}:${serializeParams(ctx.params)}:${serializeParams(ctx.queryParams())}`;
     return cache('loader')
       .ttl(cacheOpts.ttl)
       .for(cacheKey)

@@ -35,6 +35,7 @@
               "a-loader-is-not-cached-without-a-ttl",
               "a-redirect-is-never-cached",
               "a-successful-action-evicts-both-static-and-computed-keys",
+              "the-default-loader-cache-key-includes-the-query-string",
               "the-default-page-cache-key-includes-a-user-fingerprint",
               "the-default-page-cache-key-includes-the-query-string",
               "the-user-fingerprint-is-stable-for-equivalent-claims"

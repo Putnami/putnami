@@ -64,15 +64,15 @@ async function loaderHandler(opt: {
   // /docs/principles-layout.json). The pattern is supplied by the framework's own
   // route metadata (see resolveLayoutPattern); the request URL already carries the
   // mounted basename, but a reconstructed pattern does not, so it is re-applied.
-  // A page endpoint keeps the request's query string: the suffix goes on the
-  // path (`/tasks.json?page=2`), so the loader reads the same query as on a full
-  // page load.
+  // Both endpoints keep the request's query string: the suffix goes on the path
+  // (`/tasks.json?page=2`), so the loader reads the same query as on a full page
+  // load.
   const requestUrl = new URL(args.request.url);
   const endpointSuffix = `${suffix ? `-${suffix}` : ''}.json`;
   let url: string;
   const pattern = usePattern ? resolveLayoutPattern(args, layoutPattern) : undefined;
   if (pattern !== undefined) {
-    url = `${requestUrl.origin}${clientBasename()}${pattern || '/'}${endpointSuffix}`;
+    url = `${requestUrl.origin}${clientBasename()}${pattern || '/'}${endpointSuffix}${requestUrl.search}`;
   } else {
     requestUrl.pathname += endpointSuffix;
     url = requestUrl.href;

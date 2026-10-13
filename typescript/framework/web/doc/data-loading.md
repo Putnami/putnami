@@ -474,7 +474,7 @@ export default loader()
   });
 ```
 
-Cache keys are auto-generated from the route and parameters. Use a custom key generator for more control:
+Cache keys are auto-generated from the route, its parameters and its query string. Use a custom key generator for more control:
 
 ```typescript
 export default loader()

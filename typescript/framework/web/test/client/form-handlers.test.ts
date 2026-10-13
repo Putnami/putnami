@@ -225,6 +225,20 @@ describe('Client Form Handlers', () => {
       });
     });
 
+    it('keeps the query string after the layout JSON suffix', async () => {
+      await layoutLoaderHandler('/docs')({
+        request: new Request('http://localhost/docs/guide?lang=fr'),
+        params: {},
+        unstable_pattern: '/docs/*',
+        context: undefined,
+      });
+
+      expect(fetchMock).toHaveBeenCalledWith('http://localhost/docs-layout.json?lang=fr', {
+        headers: { Accept: 'application/json', 'X-Putnami-Loader': '1' },
+        signal: expect.any(AbortSignal),
+      });
+    });
+
     it('falls back to unstable_pattern when the framework pattern is not supplied', async () => {
       // Older generated bundles call `layoutLoaderHandler()` without a pattern;
       // the experimental field remains a last-resort fallback.
