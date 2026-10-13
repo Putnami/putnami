@@ -205,6 +205,8 @@ func TemplatesTest(ctx context.Context, args []string) error {
 	var filteredArgs []string
 	for _, a := range args {
 		switch a {
+		case "--":
+			return cmderr.Usagef("putnami dev template test takes no arguments after --")
 		case "--skip-build":
 			skipBuild = true
 		case "--keep":
@@ -359,6 +361,8 @@ func TemplatesPackage(ctx context.Context, args []string) error {
 			}
 		case "--stable":
 			opts.Stable = true
+		case "--":
+			return cmderr.Usagef("putnami dev template package takes no arguments after --")
 		default:
 			filteredArgs = append(filteredArgs, args[i])
 		}

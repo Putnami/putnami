@@ -19,6 +19,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/git"
 )
@@ -826,5 +827,20 @@ func TestVersionUpdate_RejectsBadIntegrity(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "integrity check failed") {
 		t.Errorf("error should mention integrity check failed, got: %v", err)
+	}
+}
+
+// Tokens after `--` are a passthrough payload, and `version` takes none: they
+// set no flag, `--push` included, and the command stops with a usage error.
+func TestVersionRejectsTokensAfterSeparator(t *testing.T) {
+	t.Parallel()
+	for _, args := range [][]string{{"--", "--push"}, {"--dry-run", "--", "v1.0.0"}} {
+		flags, _, err := parseVersionFlags(args)
+		if !errors.Is(err, cmderr.ErrUsage) {
+			t.Fatalf("parseVersionFlags(%q) = %v, want a usage error", args, err)
+		}
+		if flags.Push {
+			t.Fatalf("parseVersionFlags(%q) set --push from the payload", args)
+		}
 	}
 }

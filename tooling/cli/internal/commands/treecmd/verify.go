@@ -64,7 +64,11 @@ func (v Verifier) Run(args []string) error {
 	if stdout == nil {
 		stdout = os.Stdout
 	}
-	if slices.ContainsFunc(args, func(arg string) bool { return arg == "--help" || arg == "-h" }) {
+	options := args
+	if cut := slices.Index(args, "--"); cut >= 0 {
+		options = args[:cut]
+	}
+	if slices.ContainsFunc(options, func(arg string) bool { return arg == "--help" || arg == "-h" }) {
 		_, err := io.WriteString(stdout, VerifyUsage)
 		return err
 	}
@@ -203,6 +207,8 @@ func parseVerifyArgs(args []string) verifyArgs {
 			index++
 			base := flagValue(index, "missing --base value")
 			parsed.base = &base
+		case "--":
+			fail("tree verify takes no arguments after --")
 		default:
 			fail("unknown argument: " + arg)
 		}

@@ -250,6 +250,9 @@ func resolveBinDir(wsRoot string, args []string) string {
 // Version resolution is canonical: --version, then the first positional
 // argument.
 func parseUpgradeFlags(args []string) (lifecycle.UpgradeFlags, error) {
+	if passthroughCut(args) < len(args) {
+		return lifecycle.UpgradeFlags{}, usageErrorf("putnami upgrade takes no arguments after --")
+	}
 	parsed, err := parseCatalogCommandFlags("upgrade", args)
 	if err != nil {
 		return lifecycle.UpgradeFlags{}, err

@@ -1407,6 +1407,12 @@ Global flags end at the first `--`. Every argument after it reaches the job as
 written and sets no global flag, so `putnami run my-job -- --verbose` passes
 `--verbose` to the job and leaves the CLI's own output unchanged.
 
+A built-in command that runs no job sets none of its own flags from those
+arguments either. `version get`, `version tag`, `upgrade`, `dev template
+package` and `dev template test` take no passthrough arguments: a `--` is a
+usage error. `tree verify` answers it with a not-verified verdict, like every
+other argument error, and prints its usage only for a `--help` before `--`.
+
 ### Credential provider: `--providers`
 
 `--providers <list>` lets this process ask the workspace's credential provider

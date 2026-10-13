@@ -187,6 +187,9 @@ func IsExemptInvocation(args []string) bool {
 		}
 	case "upgrade":
 		for _, a := range args[1:] {
+			if a == "--" {
+				break
+			}
 			if a == "--from-source" {
 				return true
 			}
