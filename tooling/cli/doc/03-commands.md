@@ -1591,9 +1591,10 @@ Use the `=` spelling too when the first word of the value holds `=`:
 
 A global switch such as `--verbose` or `--watch` takes no value, but accepts
 an inline boolean: `--verbose=true` is `--verbose`, and `--verbose=false`
-leaves it off. `--watch=false` is `--no-watch`, which turns off a command's own
-`watch` flag, such as the one that keeps `serve` restarting on changes. Any
-other inline value on a switch is a usage error.
+leaves it off. `--color=false` is `--no-color`, and `--no-color=false` is
+`--color`. On `serve`, `--watch=false` is `--no-watch`, which turns off serve's
+own `watch` flag and its restarts on changes. Any other inline value on a
+switch is a usage error.
 
 Unknown flags are passed through to job processes. The CLI provides typo suggestions using Levenshtein distance when a flag doesn't match any known flag.
 

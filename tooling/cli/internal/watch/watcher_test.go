@@ -117,10 +117,12 @@ func TestWatcher_DetectChanges(t *testing.T) {
 	}
 }
 
-// TestWatcher_DropsGitIgnoredChanges is issue #233: a log a serve run writes
-// into an ignored directory restarted the server on every line. A change Git
-// ignores is dropped; a tracked file that matches an ignore rule still counts.
-func TestWatcher_DropsGitIgnoredChanges(t *testing.T) {
+// TestWatcher_DropsChangesInsideGitIgnoredDirectories is issue #233: a log a
+// serve run writes into an ignored directory restarted the server on every
+// line. A change inside a directory Git ignores is dropped. An ignored file
+// outside one, such as conf/.env.local.yaml that config-merge reads, still
+// counts, and so does a tracked file that matches an ignore rule.
+func TestWatcher_DropsChangesInsideGitIgnoredDirectories(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
@@ -144,10 +146,10 @@ func TestWatcher_DropsGitIgnoredChanges(t *testing.T) {
 		}
 	}
 	runGit("init", "-q")
-	write(".gitignore", ".context/\n*.log\n")
-	write("main.go", "package main")
+	write(".gitignore", ".context/\n.playwright-mcp/\n*.log\n.env.local.yaml\n")
+	write("app/main.go", "package main")
 	write("kept.log", "tracked despite the rule")
-	runGit("add", ".gitignore", "main.go")
+	runGit("add", ".gitignore", "app/main.go")
 	runGit("add", "-f", "kept.log")
 
 	w := NewWatcher(WatcherConfig{Roots: []string{dir}, Ignored: gitIgnored(dir)})
@@ -156,13 +158,19 @@ func TestWatcher_DropsGitIgnoredChanges(t *testing.T) {
 	}
 	time.Sleep(10 * time.Millisecond)
 	write(".context/serve.log", "listening")
+	write(".playwright-mcp/page.yml", "snapshot")
 	write("debug.log", "line")
-	write("main.go", "package main\n// edited")
+	write("app/conf/.env.local.yaml", "port: 3001")
+	write("app/main.go", "package main\n// edited")
 	write("kept.log", "edited")
 
 	changed := w.dropIgnored(w.detectChanges())
+	for i := range changed {
+		changed[i] = filepath.ToSlash(changed[i])
+	}
 	slices.Sort(changed)
-	if want := []string{"kept.log", "main.go"}; !slices.Equal(changed, want) {
+	want := []string{"app/conf/.env.local.yaml", "app/main.go", "debug.log", "kept.log"}
+	if !slices.Equal(changed, want) {
 		t.Errorf("changes = %v, want %v", changed, want)
 	}
 }

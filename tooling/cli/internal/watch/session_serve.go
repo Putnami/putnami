@@ -250,7 +250,7 @@ func (s *Session) waitForWorkspaceQuiet(ctx context.Context, quietFor, maxWait t
 		default:
 		}
 
-		if len(s.watcher.detectChanges()) > 0 {
+		if len(s.watcher.dropIgnored(s.watcher.detectChanges())) > 0 {
 			quietSince = time.Now()
 		} else if time.Since(quietSince) >= quietFor {
 			return

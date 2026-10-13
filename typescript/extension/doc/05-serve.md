@@ -105,7 +105,7 @@ The serve command forwards `SIGINT` and `SIGTERM` to the child process. Signal e
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--entrypoint` | `string` | — | Explicit entrypoint file to serve. Overrides `./serve` export resolution |
-| `--watch` / `-w` | `boolean` | `true` | Auto-restart on file changes (Bun's built-in watch mode) |
+| `--watch` / `-w`, `--no-watch` | `boolean` | `true` | Auto-restart on file changes (Bun's built-in watch mode); `--no-watch` or `--watch=false` runs the server once, with no restarts |
 | `--port` | `number` | `3000` | Server port. Also exported as `PORT` env var to the application |
 | `--kill-port` | `boolean` | — | Kill any process using the port before starting. Not available on Windows: it prints a warning instead |
 | `--debug` | `boolean` | — | Set `LOG_LEVEL=debug` in the application environment |

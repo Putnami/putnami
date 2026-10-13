@@ -44,6 +44,27 @@ func TestParseArgs_SwitchTakesAnInlineBoolean(t *testing.T) {
 	}
 }
 
+// Only serve declares a `watch` flag: elsewhere `--watch=false` leaves watch
+// off and hands the job no undeclared --no-watch.
+func TestParseArgs_WatchFalseOutsideServeOnlyLeavesWatchOff(t *testing.T) {
+	t.Parallel()
+	parsed := ParseArgs([]string{"test", "--projects", "app", "--watch=false"}, nil, nil)
+	if parsed.Err != nil || parsed.Global.Watch || len(parsed.RawJobArgs) != 0 {
+		t.Errorf("watch=%v raw=%v err=%v, want watch off and no tokens", parsed.Global.Watch, parsed.RawJobArgs, parsed.Err)
+	}
+}
+
+// `--color=false` is `--no-color`, and the reverse: the pair are one switch.
+func TestParseArgs_FalseOnAPairedSwitchIsItsOtherHalf(t *testing.T) {
+	t.Parallel()
+	for spelling, want := range map[string]bool{"--color=false": false, "--no-color=false": true} {
+		parsed := ParseArgs([]string{"build", spelling}, nil, nil)
+		if parsed.Err != nil || parsed.Global.Color == nil || *parsed.Global.Color != want {
+			t.Errorf("%s: color=%v err=%v, want %v", spelling, parsed.Global.Color, parsed.Err, want)
+		}
+	}
+}
+
 func TestParseArgs_SwitchRefusesAnyOtherInlineValue(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{
@@ -57,11 +78,11 @@ func TestParseArgs_SwitchRefusesAnyOtherInlineValue(t *testing.T) {
 	}
 }
 
-// A token past the passthrough separator is the user's payload.
-func TestParseArgs_SwitchValueAfterPassthroughStaysWhole(t *testing.T) {
+// A token past the passthrough separator is the user's payload: an inline
+// value there is never refused as a switch value.
+func TestParseArgs_SwitchValueAfterPassthroughIsNotRefused(t *testing.T) {
 	t.Parallel()
-	parsed := ParseArgs([]string{"run", "app", "--", "--watch=no"}, nil, nil)
-	if parsed.Err != nil {
+	if parsed := ParseArgs([]string{"run", "app", "--", "--watch=no"}, nil, nil); parsed.Err != nil {
 		t.Fatal(parsed.Err)
 	}
 }

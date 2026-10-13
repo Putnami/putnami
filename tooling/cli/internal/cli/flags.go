@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -40,14 +41,16 @@ func parseCommandFlags(args []string) (GlobalFlags, []string, error) {
 // parseJobFlags is parseCommandFlags for a job command, whose leftover tokens
 // become job params (buildCommandParams) and nothing else; see
 // splitInlineValues for what that changes.
-func parseJobFlags(args []string) (GlobalFlags, []string, error) {
-	return parseGlobalFlags(args, flagParseOptions{consumeVersion: false, jobArgs: true})
+func parseJobFlags(args, commands []string) (GlobalFlags, []string, error) {
+	return parseGlobalFlags(args, flagParseOptions{consumeVersion: false, jobArgs: true, serve: slices.Contains(commands, "serve")})
 }
 
 type flagParseOptions struct {
 	consumeVersion bool
 	// jobArgs marks a job command's arguments (parseJobFlags).
 	jobArgs bool
+	// serve marks a job run whose commands include serve (switchOpposite).
+	serve bool
 }
 
 // reservedGlobalFlags are consumed alongside any command but deliberately kept
@@ -138,12 +141,8 @@ func keepsInlineToken(spelling, value string) bool {
 // before splitInlineValues would part the value from it: `--verbose=true` is
 // `--verbose`, and `--verbose=false` leaves the switch off. Split, the value
 // stayed behind as a stray token while the switch turned ON, whatever it said.
-//
-// `--watch=false` becomes `--no-watch`, which turns off a command's own `watch`
-// flag: serve declares one, documents `--watch=false`, and restarts on changes
-// unless that flag is off (engine.forcesServeWatch). Any other inline value on
-// a switch is a usage error. Tokens past the passthrough separator are the
-// user's payload and stay untouched.
+// Any other inline value on a switch is a usage error. Tokens past the
+// passthrough separator are the user's payload and stay untouched.
 func resolveSwitchValues(args []string, opts flagParseOptions) ([]string, error) {
 	cut := passthroughCut(args)
 	resolved := make([]string, 0, len(args))
@@ -157,10 +156,10 @@ func resolveSwitchValues(args []string, opts flagParseOptions) ([]string, error)
 		}
 		switch value {
 		case "true":
-			resolved = append(resolved, spelling)
+			resolved = append(resolved, spec.Long)
 		case "false":
-			if spec.Long == "--watch" {
-				resolved = append(resolved, "--no-watch")
+			if opposite, ok := switchOpposite(spec.Long, opts); ok {
+				resolved = append(resolved, opposite)
 			}
 		default:
 			return nil, usageErrorf("flag %s is a switch: write %s, or %s=true or %s=false, not %s", spelling, spelling, spelling, spelling, arg)
@@ -169,11 +168,29 @@ func resolveSwitchValues(args []string, opts flagParseOptions) ([]string, error)
 	return resolved, nil
 }
 
+// switchOpposite is the spelling `<switch>=false` stands for when leaving the
+// switch off is not enough. A global pair such as --color and --no-color gives
+// the other half. `--watch=false` on serve is `--no-watch`: serve watches
+// without --watch, and only its own `watch` flag turns that off
+// (engine.forcesServeWatch); the Go serve docs spell it `--watch=false`.
+func switchOpposite(long string, opts flagParseOptions) (string, bool) {
+	if long == "--watch" {
+		return "--no-watch", opts.serve
+	}
+	opposite := "--no-" + strings.TrimPrefix(long, "--")
+	if name, negated := strings.CutPrefix(long, "--no-"); negated {
+		opposite = "--" + name
+	}
+	spec, known := globalFlagSpec(opposite)
+	return opposite, known && spec.Type != commandmeta.FlagValue
+}
+
 // parseGlobalFlags is phase 2 of the parse: syntax-normalized tokens in, bound
 // GlobalFlags plus the untouched remainder out. A value-taking flag with no
-// value, an unparseable --retry, an unrecognized --max-parallel mode and a
-// switch with an inline value other than true or false are hard usage errors
-// here; before this change all of them were silently dropped.
+// value, an unparseable --retry and an unrecognized --max-parallel mode are
+// hard usage errors here; before this change all three were silently dropped.
+// So is a switch with an inline value other than true or false
+// (resolveSwitchValues).
 // Unknown flags are NOT rejected here — only the command-scoped pass in
 // parse.go knows whether an extension could own them.
 func parseGlobalFlags(args []string, opts flagParseOptions) (GlobalFlags, []string, error) {

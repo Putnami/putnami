@@ -122,11 +122,13 @@ func ParseArgs(args []string, userAliases map[string]string, extensionGroups map
 	// than the top-level version shortcut. A job command's leftover tokens become
 	// job params and nothing else, so parseJobFlags may keep an inline value on
 	// its flag (splitInlineValues).
-	parseSelected := parseCommandFlags
-	if !structured {
-		parseSelected = parseJobFlags
+	var globals GlobalFlags
+	var remaining []string
+	if structured {
+		globals, remaining, err = parseCommandFlags(rest)
+	} else {
+		globals, remaining, err = parseJobFlags(rest, commands)
 	}
-	globals, remaining, err := parseSelected(rest)
 	result.Global, result.RawJobArgs = globals, remaining
 	result.Global.Help = result.Global.Help || helpRequested
 	if err != nil {

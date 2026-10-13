@@ -50,10 +50,9 @@ type WatcherConfig struct {
 	Roots []string
 	// IgnorePatterns are directory names to skip.
 	IgnorePatterns []string
-	// Ignored reports which of the changed paths, relative to their root, Git
-	// ignores. Those changes are dropped: a log, a browser snapshot or a build
-	// output written into an ignored directory is not a source edit. Nil drops
-	// nothing.
+	// Ignored reports which of the changed paths, relative to their root, to
+	// drop: a log or a browser snapshot written into a directory Git ignores is
+	// not a source edit (NewSession binds it to gitIgnored). Nil drops nothing.
 	Ignored func(paths []string) map[string]bool
 	// Debounce is the window to coalesce changes.
 	Debounce time.Duration
