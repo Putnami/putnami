@@ -125,7 +125,7 @@ func ParseArgs(args []string, userAliases map[string]string, extensionGroups map
 	var globals GlobalFlags
 	var remaining []string
 	if structured {
-		globals, remaining, err = parseCommandFlags(rest)
+		globals, remaining, err = parseCommandFlags(rest, commands)
 	} else {
 		globals, remaining, err = parseJobFlags(rest, commands)
 	}

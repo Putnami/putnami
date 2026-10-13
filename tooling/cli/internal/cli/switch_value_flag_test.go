@@ -1,6 +1,9 @@
 package cli
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 // Issue #233: `serve --watch=false` turned watch ON and left a stray "false"
 // token. It now turns serve's own watch flag off, as --no-watch does.
@@ -44,7 +47,16 @@ func TestParseArgs_SwitchTakesAnInlineBoolean(t *testing.T) {
 	}
 }
 
-// Only serve declares a `watch` flag: elsewhere `--watch=false` leaves watch
+// compose watches its target by default too, and reads its own --no-watch.
+func TestParseArgs_ComposeWatchFalseIsNoWatch(t *testing.T) {
+	t.Parallel()
+	parsed := ParseArgs([]string{"compose", "app", "--watch=false"}, nil, nil)
+	if parsed.Err != nil || parsed.Global.Watch || !slices.Contains(parsed.RawJobArgs, "--no-watch") {
+		t.Errorf("watch=%v raw=%v err=%v, want --no-watch", parsed.Global.Watch, parsed.RawJobArgs, parsed.Err)
+	}
+}
+
+// Only serve and compose declare a `watch` flag: elsewhere `--watch=false` leaves watch
 // off and hands the job no undeclared --no-watch.
 func TestParseArgs_WatchFalseOutsideServeOnlyLeavesWatchOff(t *testing.T) {
 	t.Parallel()

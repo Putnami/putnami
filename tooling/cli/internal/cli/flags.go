@@ -34,23 +34,30 @@ func parseFlags(args []string) (GlobalFlags, []string, error) {
 // parseCommandFlags is parseFlags after a command has been selected, where
 // --version belongs to the command (`putnami upgrade --version 1.2.3`) rather
 // than to the CLI.
-func parseCommandFlags(args []string) (GlobalFlags, []string, error) {
-	return parseGlobalFlags(args, flagParseOptions{consumeVersion: false})
+func parseCommandFlags(args, commands []string) (GlobalFlags, []string, error) {
+	return parseGlobalFlags(args, flagParseOptions{consumeVersion: false, ownWatch: ownsWatchFlag(commands)})
+}
+
+// ownsWatchFlag reports whether a command watches by default and declares its
+// own `watch` flag to stop it: serve, and compose for its target.
+func ownsWatchFlag(commands []string) bool {
+	return slices.Contains(commands, "serve") || slices.Contains(commands, "compose")
 }
 
 // parseJobFlags is parseCommandFlags for a job command, whose leftover tokens
 // become job params (buildCommandParams) and nothing else; see
 // splitInlineValues for what that changes.
 func parseJobFlags(args, commands []string) (GlobalFlags, []string, error) {
-	return parseGlobalFlags(args, flagParseOptions{consumeVersion: false, jobArgs: true, serve: slices.Contains(commands, "serve")})
+	return parseGlobalFlags(args, flagParseOptions{consumeVersion: false, jobArgs: true, ownWatch: ownsWatchFlag(commands)})
 }
 
 type flagParseOptions struct {
 	consumeVersion bool
 	// jobArgs marks a job command's arguments (parseJobFlags).
 	jobArgs bool
-	// serve marks a job run whose commands include serve (switchOpposite).
-	serve bool
+	// ownWatch marks a run whose command has its own `watch` flag
+	// (ownsWatchFlag, switchOpposite).
+	ownWatch bool
 }
 
 // reservedGlobalFlags are consumed alongside any command but deliberately kept
@@ -170,12 +177,12 @@ func resolveSwitchValues(args []string, opts flagParseOptions) ([]string, error)
 
 // switchOpposite is the spelling `<switch>=false` stands for when leaving the
 // switch off is not enough. A global pair such as --color and --no-color gives
-// the other half. `--watch=false` on serve is `--no-watch`: serve watches
-// without --watch, and only its own `watch` flag turns that off
+// the other half. `--watch=false` on serve or compose is `--no-watch`: both
+// watch without --watch, and only their own `watch` flag turns that off
 // (engine.forcesServeWatch); the Go serve docs spell it `--watch=false`.
 func switchOpposite(long string, opts flagParseOptions) (string, bool) {
 	if long == "--watch" {
-		return "--no-watch", opts.serve
+		return "--no-watch", opts.ownWatch
 	}
 	opposite := "--no-" + strings.TrimPrefix(long, "--")
 	if name, negated := strings.CutPrefix(long, "--no-"); negated {

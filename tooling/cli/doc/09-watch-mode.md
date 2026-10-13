@@ -32,7 +32,7 @@ The watcher polls the workspace for file system changes using a configurable int
 - `__pycache__/`
 - `.venv/`
 
-A change inside a directory Git ignores (through `.gitignore`, `.git/info/exclude` or the global excludes file) is dropped as well, so a log or a browser snapshot written into `.context/` or `.playwright-mcp/` re-runs nothing. An ignored file outside an ignored directory still counts: `.env` and `conf/.env.local.yaml` are ignored by convention, and a runtime or a config task reads them. A tracked file always counts, and outside a Git repository every change counts.
+A change to a path Git ignores (through `.gitignore`, `.git/info/exclude` or the global excludes file) is dropped as well, so a log or a browser snapshot written into `.context/`, `log/` or `.playwright-mcp/` re-runs nothing. A dotenv file still counts: `.env` and `conf/.env.local.yaml` are ignored because they hold local values, and a runtime or a config task reads them. A tracked file always counts, and outside a Git repository every change counts.
 
 ### Change Classification
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
@@ -105,61 +106,32 @@ func NewSession(cfg SessionConfig) *Session {
 }
 
 // gitIgnored answers the watcher's Ignored question with `git check-ignore`
-// run in root: a changed path is ignored when Git ignores it AND one of its
-// parent directories, such as `.context/` or `.playwright-mcp/`. An ignored file
-// outside an ignored directory still counts: `.env` and `conf/.env.local.yaml`
-// are ignored by convention, yet a runtime or a config-merge task reads them.
-// A tracked path is never reported. When Git cannot answer (no repository, no
-// git binary), nothing is ignored and every change counts, as it did before.
+// run in root: a log in `.context/` or `log/`, a browser snapshot in
+// `.playwright-mcp/`. A dotenv file still counts though Git ignores it: `.env`
+// and `conf/.env.local.yaml` are ignored because they hold local values, and a
+// runtime or a config-merge task reads them. A tracked path is never reported.
+// When Git cannot answer (no repository, no git binary), nothing is ignored and
+// every change counts, as it did before.
 func gitIgnored(root string) func(paths []string) map[string]bool {
 	return func(paths []string) map[string]bool {
-		queries := make([]string, 0, 2*len(paths))
-		seen := make(map[string]bool, 2*len(paths))
-		ask := func(query string) {
-			if !seen[query] {
-				seen[query] = true
-				queries = append(queries, query)
-			}
-		}
+		queries := make([]string, 0, len(paths))
 		for _, path := range paths {
-			slashed := filepath.ToSlash(path)
-			ask(slashed)
-			for _, dir := range parentDirs(slashed) {
-				ask(dir)
+			if !strings.HasPrefix(filepath.Base(path), ".env") {
+				queries = append(queries, filepath.ToSlash(path))
 			}
 		}
 		answer, err := runnersource.IgnoredPaths(context.Background(), root, queries)
 		if err != nil || len(answer) == 0 {
 			return nil
 		}
-		ignored := make(map[string]bool, len(paths))
+		ignored := make(map[string]bool, len(answer))
 		for _, path := range paths {
-			slashed := filepath.ToSlash(path)
-			if !answer[slashed] {
-				continue
-			}
-			for _, dir := range parentDirs(slashed) {
-				if answer[dir] {
-					ignored[path] = true
-					break
-				}
+			if answer[filepath.ToSlash(path)] {
+				ignored[path] = true
 			}
 		}
 		return ignored
 	}
-}
-
-// parentDirs lists the directories above a slash path, outermost first, each
-// with the trailing slash that makes `git check-ignore` match it as a directory:
-// "a/b/c.txt" gives "a/" and "a/b/".
-func parentDirs(path string) []string {
-	var dirs []string
-	for i, r := range path {
-		if r == '/' {
-			dirs = append(dirs, path[:i+1])
-		}
-	}
-	return dirs
 }
 
 // Run starts the watch session. It blocks until the context is canceled
