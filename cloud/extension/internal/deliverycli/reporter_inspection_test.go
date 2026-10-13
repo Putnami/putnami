@@ -23,7 +23,10 @@ type reporterUnderTest struct {
 func reportersUnderTest() []reporterUnderTest {
 	return []reporterUnderTest{
 		{
-			name: protocolcli.SessionReporterCommand, tokenEnv: protocolcli.SessionReporterTokenEnv, serve: serveSessionReporter,
+			name: protocolcli.SessionReporterCommand, tokenEnv: protocolcli.SessionReporterTokenEnv,
+			serve: func(env map[string]string, in io.Reader, out, logw io.Writer) error {
+				return serveSessionReporter(env, nil, in, out, logw)
+			},
 			ingest: func(token string) (http.Handler, func() int) {
 				ingest := &fakeIngest{token: token}
 				return ingest, func() int { ingest.mu.Lock(); defer ingest.mu.Unlock(); return len(ingest.posts) }

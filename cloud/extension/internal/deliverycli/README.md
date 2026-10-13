@@ -24,7 +24,9 @@ The aggregator in [`internal/cloudcli`](../cloudcli) imports it.
   The session reporter also posts `plan.json` as the `plan` part and the spec
   gate's record, `spec-verification.json`, as the `spec-verification` part;
   the log reporter refuses both. A receiver that predates a part answers 400,
-  and the engine omits that document.
+  and the engine omits that document. On a developer machine, the session
+  reporter posts under the stored login instead (see
+  [Local mode](#local-mode)).
 - `status_node.go` builds the status node of `putnami cloud ci status` and
   `putnami cloud cache status`. `CIStatusNode` and `CacheStatusNode` are the
   same nodes for the `ci` and `cache` lines of `putnami cloud status`.
@@ -49,6 +51,45 @@ The two reporters post their chunks with hand-written HTTP, because
 delivery-api's contract can describe the octet body of a chunk but not the
 frame's identity. Both call sites
 are listed in [`clientgen.framework.json`](../../clientgen.framework.json).
+
+### Local mode
+
+A gate session run on a developer machine, or in an agent session on it, can
+report to Delivery under the developer's own login. Reporting stays off by
+default. To turn it on:
+
+1. Sign in and link the workspace once:
+
+   ```sh
+   putnami cloud login
+   putnami cloud setup --workspace <workspace-id>
+   ```
+
+2. Select the reporter for the runs you want reported:
+
+   ```sh
+   PUTNAMI_SESSION_REPORTER=@putnami/cloud putnami lint,test,build --impacted
+   ```
+
+The session reporter runs in local mode when it holds no run credential (no
+handshake credential and no `PUTNAMI_SESSION_REPORTER_TOKEN`) and no
+`PUTNAMI_CLOUD_INGEST_URL` is set. It resolves the linked workspace, the
+control-plane URL and a workspace token from the stored login the way every
+`putnami cloud` workspace command does, refreshing the login when it expired.
+It does not use `PUTNAMI_CLOUD_TOKEN`. Each frame is one POST to
+`<control plane>/v1/workspaces/{workspace}/ci/local-sessions/{sessionId}`,
+with the run-session body, the `X-Putnami-Session-Part`,
+`X-Putnami-Session-Seq` and `X-Putnami-Session-Final` headers, and the
+developer's bearer. The route answers with the run-session ingest's status
+codes, so every answer maps to the same acknowledgement. A 401 re-mints the
+bearer once and sends the frame again.
+
+A run credential, an ingest base, or an opened handshake makes the reporter
+hosted, and a hosted reporter never reads the stored login. With no stored
+login, no linked workspace, or a refresh that fails, every frame gets a
+terminal `reporter_not_configured` refusal. The engine records it, and the
+session's own result does not change. The reporter reads the stored login
+only after it denied process inspection, and it never prints a token.
 
 ## Cache provider
 

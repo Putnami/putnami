@@ -1690,7 +1690,7 @@
       "activationFiles": [
         "putnami.extension.json"
       ],
-      "description": "Run as the engine's session reporter over the protocol/cli session-reporting JSONL wire (machine protocol; launched by the engine when PUTNAMI_SESSION_REPORTER selects @putnami/cloud, not for interactive use). Each frame is one POST of the original session.json / events.jsonl bytes to the Delivery run-session ingest under the run credential.",
+      "description": "Run as the engine's session reporter over the protocol/cli session-reporting JSONL wire (machine protocol; launched by the engine when PUTNAMI_SESSION_REPORTER selects @putnami/cloud, not for interactive use). Each frame is one POST of the original session.json / events.jsonl bytes to the Delivery run-session ingest under the run credential. Without a run credential or an ingest base it posts to the linked workspace's local-sessions route under the stored login of putnami cloud login.",
       "run": [
         {
           "id": "session-reporter",
@@ -2972,7 +2972,7 @@
           "network"
         ]
       },
-      "description": "Session reporter provider: reads protocol/cli SessionReportingChunk JSONL on stdin, POSTs each frame to ${PUTNAMI_CLOUD_INGEST_URL}/sessions under the run credential, and writes one SessionReportingAck per frame on stdout. A hosted run hands the run credential over the session reporting protocol 2 handshake (initialize, then authenticate) before the first chunk; otherwise it is PUTNAMI_SESSION_REPORTER_TOKEN. Started by the engine's reserved session-reporter discovery on the explicitly selected extension."
+      "description": "Session reporter provider: reads protocol/cli SessionReportingChunk JSONL on stdin, POSTs each frame to ${PUTNAMI_CLOUD_INGEST_URL}/sessions under the run credential, and writes one SessionReportingAck per frame on stdout. A hosted run hands the run credential over the session reporting protocol 2 handshake (initialize, then authenticate) before the first chunk; otherwise it is PUTNAMI_SESSION_REPORTER_TOKEN. With neither and no ingest base, it POSTs each frame to /v1/workspaces/{workspace}/ci/local-sessions/{sessionId} on the linked workspace's control plane under the stored login of putnami cloud login, and refuses every frame as reporter_not_configured when there is no login or linked workspace. Started by the engine's reserved session-reporter discovery on the explicitly selected extension."
     },
     "cloud-log-reporter": {
       "kind": "command",

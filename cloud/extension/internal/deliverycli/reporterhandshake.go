@@ -72,7 +72,8 @@ func handshakeOp(line []byte) (string, bool) {
 // initialize is accepted once, and only by a process that denied inspection
 // (newReporterConfig): a process that could not refuses it with
 // ackCodeInspectionGuard, so the engine never sends it the credential, and
-// starts it again without one.
+// starts it again without one. An accepted initialize marks the reporter
+// hosted (sessionReporterConfig.hosted), so it never uses a stored login.
 //
 // authenticate is accepted once, after an accepted initialize. Its credential
 // then becomes the bearer of every chunk, in place of any token from the
@@ -91,6 +92,7 @@ func (h *reportingHandshake) answer(op string, line []byte) protocolcli.SessionR
 			return echo.Refuse(ackCodeInspectionGuard)
 		}
 		h.initialized = true
+		h.cfg.initialized = true
 		return echo.Accept()
 	}
 	if !h.initialized || h.authenticated {
