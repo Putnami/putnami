@@ -1,4 +1,6 @@
+import { LOADER_REQUEST_HEADER } from '../../shared/client-redirect';
 import { clientFetchTimeoutMs } from './fetch-timeout';
+import { routerRedirect } from './follow-redirect';
 
 type LoaderHandlerArgs = {
   request: Request;
@@ -73,8 +75,12 @@ async function loaderHandler(opt: {
 
   const url = `${baseUrl}${suffix ? `-${suffix}` : ''}.json`;
 
-  return await fetch(url, {
-    headers: { Accept: 'application/json' },
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json', [LOADER_REQUEST_HEADER]: '1' },
     signal: AbortSignal.timeout(clientFetchTimeoutMs()),
   });
+
+  // A loader that redirects: resolved against the page the router navigates
+  // to, not the JSON endpoint, as the server render does on a full page load.
+  return routerRedirect(res, args.request.url) ?? res;
 }
