@@ -178,9 +178,11 @@ func DownloadBatches(blobs []cache.BlobTransfer) [][]cache.BlobTransfer {
 // DownloadInline sends one download-batch request for blobs and returns the
 // bytes of each blob the answer carries, by digest. Each blob is verified
 // against its digest and declared size. A blob the answer leaves out is not an
-// error: the caller downloads it another way. A failed request, or a blob that
-// does not verify, is an error, and then no blob is returned.
-func (c *Client) DownloadInline(ctx context.Context, blobs []cache.BlobTransfer) (map[string][]byte, error) {
+// error, and neither is a blob that does not verify: it is left out too, and
+// unverified reports why. The caller downloads such a blob another way, so one
+// bad blob does not cost the other blobs of the answer. A failed request is an
+// error, and then no blob is returned.
+func (c *Client) DownloadInline(ctx context.Context, blobs []cache.BlobTransfer) (got map[string][]byte, unverified []error, err error) {
 	size := make(map[string]int64, len(blobs))
 	digests := make([]string, 0, len(blobs))
 	for _, b := range blobs {
@@ -194,22 +196,24 @@ func (c *Client) DownloadInline(ctx context.Context, blobs []cache.BlobTransfer)
 	cache.NormalizeDownloadBatchRequest(req)
 	resp, err := c.DownloadBatch(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	got := make(map[string][]byte, len(resp.Blobs))
+	got = make(map[string][]byte, len(resp.Blobs))
 	for _, b := range resp.Blobs {
 		data, err := verifiedInlineBlob(b, size[b.Digest])
 		if err != nil {
-			return nil, err
+			unverified = append(unverified, err)
+			continue
 		}
 		got[b.Digest] = data
 	}
-	return got, nil
+	return got, unverified, nil
 }
 
 // BatchHitFetcher returns a blob opener for a negotiate hit that first asks the
 // cache server for all small blobs inline through download-batch, then falls
-// back to each blob's presigned GET when the batch path fails or omits a digest.
+// back to each blob's presigned GET when the batch path fails, omits a digest,
+// or carries bytes that do not verify.
 // Large blobs always use their presigned GET to keep response size bounded. It
 // splits the small blobs with DownloadBatches, so one request asks for at most
 // cache.MaxKeysPerRequest blobs and maxDownloadBatchBytes of them.
@@ -236,7 +240,7 @@ func (c *Client) BatchHitFetcher(ctx context.Context, result cache.KeyResult) fu
 	load := func() {
 		got = make(map[string][]byte, len(blobs))
 		for _, chunk := range DownloadBatches(blobs) {
-			data, err := c.DownloadInline(ctx, chunk)
+			data, _, err := c.DownloadInline(ctx, chunk)
 			if err != nil {
 				batch = err
 				return

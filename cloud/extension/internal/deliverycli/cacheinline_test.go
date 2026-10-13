@@ -416,9 +416,10 @@ func TestAFileTheServerLeftOutComesThroughItsOwnDownload(t *testing.T) {
 	}
 }
 
-// An answer with a file that does not match its digest places nothing: the
-// restores ask for their files again in their own download-batch.
-func TestAPrefetchAnswerThatDoesNotVerifyPlacesNothing(t *testing.T) {
+// An answer with a file that does not match its digest places its other files:
+// the restore of the bad file downloads it with its own GET, and no restore
+// asks download-batch again.
+func TestAPrefetchAnswerPlacesEveryFileButTheOneThatDoesNotVerify(t *testing.T) {
 	bad, good := smallBlob("bad", 10), smallBlob("good", 20)
 	a, b := inlineKey(0), inlineKey(1)
 	f := newInlineCacheServer(t, map[string][][]byte{a: {bad}, b: {good}})
@@ -427,11 +428,12 @@ func TestAPrefetchAnswerThatDoesNotVerifyPlacesNothing(t *testing.T) {
 	s, exchangeDir := startInlineSession(t, f, &logw)
 
 	prefetchKeys(t, s, []string{a, b}, nil)
-	if n := exchangeFiles(t, exchangeDir); n != 0 {
-		t.Fatalf("the prefetch placed %d files from an answer that does not verify, want none", n)
+	if n := exchangeFiles(t, exchangeDir); n != 1 {
+		t.Fatalf("the prefetch placed %d files, want the 1 that verifies", n)
 	}
+	wantExchangeBlob(t, exchangeDir, good)
 	if log := logw.String(); !strings.Contains(log, "content-addresses to") {
-		t.Fatalf("the rejected answer must be said, got %q", log)
+		t.Fatalf("the rejected file must be said, got %q", log)
 	}
 	for _, key := range []string{a, b} {
 		if got := restoreKey(t, s, key, false).Status; got != cache.RestoreHit {
@@ -439,9 +441,8 @@ func TestAPrefetchAnswerThatDoesNotVerifyPlacesNothing(t *testing.T) {
 		}
 	}
 	wantExchangeBlob(t, exchangeDir, bad)
-	wantExchangeBlob(t, exchangeDir, good)
-	if asks, gets := f.seen(); len(asks) != 3 || len(gets) != 0 {
-		t.Fatalf("download-batch requests = %d, blob GETs = %d; want the prefetch's and one per restore, and no GET", len(asks), len(gets))
+	if asks, gets := f.seen(); len(asks) != 1 || !slices.Equal(gets, []string{cache.DigestOf(bad)}) {
+		t.Fatalf("download-batch requests = %d, blob GETs = %v; want 1 and the bad file alone", len(asks), gets)
 	}
 }
 

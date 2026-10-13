@@ -131,7 +131,8 @@ fetches the small files of every hit, the files of at most 256 KiB, through
   `download-batch` requests, not one per restored entry.
 - When that request fails, each restore asks for its own small files in one
   `download-batch`, as before. A file the server left out of its answer comes
-  through its own download.
+  through its own download. So does a file whose bytes in the answer do not
+  match its digest or its size: the other files of the answer are kept.
 
 Core computes the key of a task only once the tasks it depends on have
 finished, so it also restores keys the prefetch did not cover. Those restores

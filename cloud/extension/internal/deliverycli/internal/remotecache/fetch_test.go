@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	cache "go.putnami.dev/protocol/cache"
@@ -248,8 +249,8 @@ func TestDownloadInlineReturnsTheVerifiedBlobsOfTheAnswer(t *testing.T) {
 	left := transfers[2].Digest
 	c, asked := inlineServer(t, func(d string) ([]byte, bool) { return blobs[d], d != left })
 
-	got, err := c.DownloadInline(context.Background(), append(transfers, transfers[0]))
-	if err != nil {
+	got, unverified, err := c.DownloadInline(context.Background(), append(transfers, transfers[0]))
+	if err != nil || len(unverified) != 0 {
 		t.Fatalf("DownloadInline: %v", err)
 	}
 	if len(got) != 2 || !bytes.Equal(got[transfers[0].Digest], blobs[transfers[0].Digest]) || !bytes.Equal(got[transfers[1].Digest], blobs[transfers[1].Digest]) {
@@ -260,10 +261,10 @@ func TestDownloadInlineReturnsTheVerifiedBlobsOfTheAnswer(t *testing.T) {
 	}
 }
 
-// One blob that does not match its digest makes the whole answer an error, and
-// no blob of it is returned.
-func TestDownloadInlineRefusesAnAnswerWithABlobThatDoesNotVerify(t *testing.T) {
-	blobs, transfers := smallTransfers(2, 100)
+// One blob that does not match its digest is left out and reported. The other
+// blobs of the answer are returned.
+func TestDownloadInlineLeavesOutABlobThatDoesNotVerify(t *testing.T) {
+	blobs, transfers := smallTransfers(3, 100)
 	bad := transfers[1].Digest
 	c, _ := inlineServer(t, func(d string) ([]byte, bool) {
 		if d == bad {
@@ -272,9 +273,62 @@ func TestDownloadInlineRefusesAnAnswerWithABlobThatDoesNotVerify(t *testing.T) {
 		return blobs[d], true
 	})
 
-	got, err := c.DownloadInline(context.Background(), transfers)
-	if err == nil || !strings.Contains(err.Error(), "content-addresses to") || got != nil {
-		t.Fatalf("DownloadInline = %d blobs, %v; want no blob and the digest error", len(got), err)
+	got, unverified, err := c.DownloadInline(context.Background(), transfers)
+	if err != nil {
+		t.Fatalf("DownloadInline: %v", err)
+	}
+	if len(unverified) != 1 || !strings.Contains(unverified[0].Error(), "content-addresses to") {
+		t.Fatalf("unverified = %v, want the digest error of the one bad blob", unverified)
+	}
+	if _, ok := got[bad]; ok || len(got) != 2 {
+		t.Fatalf("DownloadInline returned %d blobs, want the 2 that verify and not %s", len(got), bad)
+	}
+	for _, tr := range []cache.BlobTransfer{transfers[0], transfers[2]} {
+		if !bytes.Equal(got[tr.Digest], blobs[tr.Digest]) {
+			t.Fatalf("blob %s: wrong bytes", tr.Digest)
+		}
+	}
+}
+
+// A hit with one blob the answer carries wrongly still gets its other small
+// blobs from the answer, and the bad one from its own download.
+func TestBatchHitFetcher_DownloadsOnlyTheBlobThatDoesNotVerify(t *testing.T) {
+	blobs, transfers := smallTransfers(3, 100)
+	bad := transfers[1].Digest
+	var single atomic.Int32
+	object := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		single.Add(1)
+		_, _ = w.Write(blobs[strings.TrimPrefix(r.URL.Path, "/")])
+	}))
+	t.Cleanup(object.Close)
+	for i := range transfers {
+		transfers[i].Method = cache.TransferGet
+		transfers[i].URL = object.URL + "/" + transfers[i].Digest
+	}
+	c, asked := inlineServer(t, func(d string) ([]byte, bool) {
+		if d == bad {
+			return bytes.Repeat([]byte{'x'}, 100), true
+		}
+		return blobs[d], true
+	})
+
+	open := c.BatchHitFetcher(context.Background(), cache.KeyResult{Downloads: transfers})
+	for _, tr := range transfers {
+		rc, err := open(tr.Digest)
+		if err != nil {
+			t.Fatalf("open %s: %v", tr.Digest, err)
+		}
+		data, err := io.ReadAll(rc)
+		_ = rc.Close()
+		if err != nil || !bytes.Equal(data, blobs[tr.Digest]) {
+			t.Fatalf("blob %s: %d bytes, %v; want its content", tr.Digest, len(data), err)
+		}
+	}
+	if n := single.Load(); n != 1 {
+		t.Fatalf("own downloads = %d, want 1 for the blob that does not verify", n)
+	}
+	if requests := asked(); len(requests) != 1 {
+		t.Fatalf("download-batch requests = %d, want 1", len(requests))
 	}
 }
 
