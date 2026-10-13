@@ -311,7 +311,7 @@ func (a *App) runExtensionStructuredCommand(
 // Type counts as boolean because that is how a manifest spells a bare switch.
 func negatedGlobalFlagNames(originalArgs []string, flags map[string]extension.FlagDefinition) []string {
 	var names []string
-	for _, arg := range originalArgs {
+	for _, arg := range originalArgs[:passthroughCut(originalArgs)] {
 		name, negating := strings.CutPrefix(arg, "--no-")
 		if !negating || !isGlobalFlag(arg) {
 			continue

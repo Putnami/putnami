@@ -36,6 +36,10 @@ func TestTelemetryFlagPresence(t *testing.T) {
 		t.Fatalf("flag presence = %+v, want every allowlisted flag present", got)
 	}
 
+	if got := telemetryFlagPresence([]string{"run", "app", "--", "--watch", "--projects", "x"}); got.Watch || got.Projects {
+		t.Fatalf("flag presence = %+v, want no flag past the separator", got)
+	}
+
 	if got := telemetryFlagPresence([]string{"build", "--impacted-strict"}); got.Impacted || got.Coverage || got.Output || got.NoCache || got.Projects || got.Watch {
 		t.Fatalf("flag presence = %+v, want no allowlisted flags", got)
 	}

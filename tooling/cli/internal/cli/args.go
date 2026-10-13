@@ -85,8 +85,9 @@ func ParseArgs(args []string, userAliases map[string]string, extensionGroups map
 		return result
 	}
 
-	// Check for help flag
-	for _, a := range args {
+	// Check for help flag. A --help past the passthrough separator belongs to
+	// the job.
+	for _, a := range args[:passthroughCut(args)] {
 		if a == "--help" || a == "-h" {
 			result.Global.Help = true
 		}

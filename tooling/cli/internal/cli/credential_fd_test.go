@@ -20,6 +20,7 @@ func TestCredentialFDIsConsumedAndBindsNothing(t *testing.T) {
 		{[]string{"build", "--credential-fd", "3", "--projects", "api"}, []string{"build", "--projects", "api"}},
 		{[]string{"test", "--credential-fd=7", "--coverage"}, []string{"test", "--coverage"}},
 		{[]string{"run", "--", "--credential-fd", "3", "arg"}, []string{"run", "--", "arg"}},
+		{[]string{"run", "--", "--credential-fd=3", "--verbose"}, []string{"run", "--", "--verbose"}},
 		{[]string{"projects", "list", "--credential-fd", "3"}, []string{"projects", "list"}},
 	} {
 		with, without := ParseArgs(tc.with, nil, nil), ParseArgs(tc.without, nil, nil)

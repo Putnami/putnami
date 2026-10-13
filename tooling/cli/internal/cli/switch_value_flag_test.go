@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"reflect"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -90,11 +92,45 @@ func TestParseArgs_SwitchRefusesAnyOtherInlineValue(t *testing.T) {
 	}
 }
 
-// A token past the passthrough separator is the user's payload: an inline
-// value there is never refused as a switch value.
-func TestParseArgs_SwitchValueAfterPassthroughIsNotRefused(t *testing.T) {
+// A token past the passthrough separator is the user's payload: it sets no
+// global flag, an inline value there is never refused as a switch value, and
+// the job receives it as spelled.
+func TestParseArgs_PassthroughTokensReachTheJob(t *testing.T) {
 	t.Parallel()
-	if parsed := ParseArgs([]string{"run", "app", "--", "--watch=no"}, nil, nil); parsed.Err != nil {
-		t.Fatal(parsed.Err)
+	cases := []struct {
+		args []string
+		want []string
+	}{
+		{[]string{"run", "app", "--", "--verbose"}, []string{"--", "--verbose"}},
+		{[]string{"run", "app", "--", "--watch=no"}, []string{"--", "--watch=no"}},
+		{[]string{"run", "app", "--", "--help", "-v"}, []string{"--", "--help", "-v"}},
+		{[]string{"run", "app", "--", "--projects", "x", "--output=json"}, []string{"--", "--projects", "x", "--output=json"}},
+		{[]string{"run", "app", "--", "--", "--verbose"}, []string{"--", "--", "--verbose"}},
+	}
+	for _, tc := range cases {
+		parsed := ParseArgs(tc.args, nil, nil)
+		if parsed.Err != nil {
+			t.Fatalf("ParseArgs(%q) = %v", tc.args, parsed.Err)
+		}
+		if !reflect.DeepEqual(parsed.RawJobArgs, tc.want) {
+			t.Errorf("ParseArgs(%q).RawJobArgs = %q, want %q", tc.args, parsed.RawJobArgs, tc.want)
+		}
+		g := parsed.Global
+		if g.Verbose || g.Watch || g.Help || g.Quiet || g.Output != "" || g.Projects != "app" {
+			t.Errorf("ParseArgs(%q) bound a payload token: %+v", tc.args, g)
+		}
+	}
+	parsed := ParseArgs([]string{"run", "app", "--verbose", "--", "--quiet"}, nil, nil)
+	if !parsed.Global.Verbose || parsed.Global.Quiet || !reflect.DeepEqual(parsed.RawJobArgs, []string{"--", "--quiet"}) {
+		t.Errorf("a flag before the separator: %+v %q", parsed.Global, parsed.RawJobArgs)
+	}
+}
+
+// A value-taking global flag never takes the separator as its value.
+func TestParseArgs_ValueFlagBeforePassthroughHasNoValue(t *testing.T) {
+	t.Parallel()
+	parsed := ParseArgs([]string{"build", "--projects", "--", "app"}, nil, nil)
+	if parsed.Err == nil || !strings.Contains(parsed.Err.Error(), "flag --projects requires a value") {
+		t.Errorf("ParseArgs = %v, want a usage error naming --projects", parsed.Err)
 	}
 }
