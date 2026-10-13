@@ -201,7 +201,7 @@ var structuralPins = []structuralPin{
 		name:  "production jobs.Plan call sites",
 		token: "jobs.Plan(",
 		scope: productionFiles,
-		want:  2,
+		want:  3,
 		why: "internal/engine/plan.go only (moved from internal/cli/jobs_run.go by an earlier change, " +
 			"where planning is now an engine stage every adapter calls). A second is a new " +
 			"fork. A0 pinned 4; the next change took it to 3 by deleting " +
@@ -221,7 +221,12 @@ var structuralPins = []structuralPin{
 			"attached — jobs.Plan is pure, and the plan is discarded the moment PrecomputeKeys has " +
 			"read it. It is the only way to ask \"what key would this project's test task have?\" " +
 			"without duplicating the planner, and it stays inside internal/engine so the boundary " +
-			"test above is untouched. A THIRD site that hands its plan to a scheduler is still a fork",
+			"test above is untouched. A later change raises 2\u21923 for the same kind of site: " +
+			"spec_gate.go's validateProducerPlan plans `validate` over the session's selected projects " +
+			"only to ASK which of them a criteria-projection producer applies to, so the spec gate can " +
+			"tell \"no selected project states a requirement\" from \"a producer never answered\". " +
+			"Nothing it produces is scheduled, executed, rendered or attached, and the plan is discarded " +
+			"once read. A FOURTH site that hands its plan to a scheduler is still a fork",
 	},
 	{
 		name:  "jobs.Plan declaration",

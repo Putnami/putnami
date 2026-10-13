@@ -165,7 +165,12 @@ func (plan *validateProducerPlan) ApplicableProjects() (map[string]bool, error) 
 		if project == nil {
 			continue
 		}
-		if disablesValidate(project) {
+		// A project's own disable list hides a producer when it names `validate`,
+		// alone or under one extension.
+		if project.Config != nil && project.Config.Disable != nil &&
+			slices.ContainsFunc(project.Config.Disable.Jobs, func(job string) bool {
+				return job == "validate" || strings.HasSuffix(job, ":validate")
+			}) {
 			return nil, fmt.Errorf("project %s disables validate", project.ID)
 		}
 		selected[project.ID] = true
@@ -182,20 +187,6 @@ func (plan *validateProducerPlan) ApplicableProjects() (map[string]bool, error) 
 		}
 	}
 	return applicable, nil
-}
-
-// disablesValidate reports whether a project's own disable list names the
-// `validate` command, alone or under one extension.
-func disablesValidate(project *workspace.Project) bool {
-	if project.Config == nil || project.Config.Disable == nil {
-		return false
-	}
-	for _, job := range project.Config.Disable.Jobs {
-		if job == "validate" || strings.HasSuffix(job, ":validate") {
-			return true
-		}
-	}
-	return false
 }
 
 // specGateResultTask is the synthetic plan name a sanction is reported under.
