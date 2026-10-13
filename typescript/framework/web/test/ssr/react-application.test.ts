@@ -9,6 +9,7 @@ import {
   type HttpMiddleware,
   HttpPlugin,
   HttpResponse,
+  redirect,
 } from '@putnami/application';
 import { resolve } from 'node:path';
 import React from 'react';
@@ -667,6 +668,65 @@ describe('ReactApplication', () => {
       expect(result).toEqual({ saved: true });
       expect(after).toBe('fresh');
     });
+
+    // `redirect()` throws its response; the action still succeeded.
+    for (const mode of ['eager', 'lazy'] as const) {
+      const registerSave = (handle: () => never) => {
+        const httpPluginMock = { get: mock(), post: mock() };
+        const appWithMock = new ReactApplication(
+          undefined,
+          httpPluginMock as unknown as import('@putnami/application').HttpPlugin,
+        );
+        const actionModule = { default: actionBuilder().evict('loader:users').handle(handle) };
+        appWithMock.reactPage('/save', {
+          page: { default: () => null },
+          action: mode === 'lazy' ? async () => actionModule : actionModule,
+        });
+        const actionCall = httpPluginMock.post.mock.calls.find((call: unknown[]) => call[0] === '/save');
+        return () => actionCall[1](createHttpContext('http://localhost/save'));
+      };
+      const cachedUsers = (value: string) =>
+        cache('loader')
+          .ttl(60_000)
+          .for('users')
+          .fetch(() => value);
+
+      it(`evicts cache patterns when a ${mode} action redirects`, async () => {
+        await clearCache();
+        await cachedUsers('stale');
+        const submit = registerSave(() => redirect('/users'));
+
+        const thrown = await submit().catch((error: unknown) => error);
+
+        expect(thrown).toBeInstanceOf(HttpResponse);
+        expect((thrown as HttpResponse).status).toBe(302);
+        expect(await cachedUsers('fresh')).toBe('fresh');
+      });
+
+      it(`keeps cache patterns when a ${mode} action throws an error`, async () => {
+        await clearCache();
+        await cachedUsers('stale');
+        const submit = registerSave(() => {
+          throw new Error('mutation failed');
+        });
+
+        await expect(submit()).rejects.toThrow('mutation failed');
+        expect(await cachedUsers('fresh')).toBe('stale');
+      });
+
+      it(`keeps cache patterns when a ${mode} action throws a failing response`, async () => {
+        await clearCache();
+        await cachedUsers('stale');
+        const submit = registerSave(() => {
+          throw HttpResponse.json({ errors: ['name'] }, { status: 422 });
+        });
+
+        const thrown = await submit().catch((error: unknown) => error);
+
+        expect((thrown as HttpResponse).status).toBe(422);
+        expect(await cachedUsers('fresh')).toBe('stale');
+      });
+    }
   });
 
   describe('reactLayout with inline middleware', () => {
