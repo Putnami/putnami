@@ -931,6 +931,11 @@ func (generator *strictClientGen) parameterExpression(expression string, schema 
 	}
 	switch schema.Type {
 	case "string":
+		// schemaType gives a string enum its own named type, whatever its
+		// format. url.Values, http.Header and the path map take a plain string.
+		if len(schema.Enum) > 0 {
+			return "string(" + expression + ")", nil
+		}
 		if schema.Format == "date-time" {
 			generator.imports["time"] = true
 			return expression + ".Format(time.RFC3339Nano)", nil
