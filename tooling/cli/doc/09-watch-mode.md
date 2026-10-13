@@ -32,6 +32,8 @@ The watcher polls the workspace for file system changes using a configurable int
 - `__pycache__/`
 - `.venv/`
 
+A change to a path Git ignores (`.gitignore`, `.git/info/exclude` and the global excludes file) is dropped as well, so a log or a browser snapshot written into an ignored directory re-runs nothing. A tracked file still counts when it matches an ignore rule. Outside a Git repository, every change counts.
+
 ### Change Classification
 
 When changes are detected, the classifier:
@@ -48,6 +50,13 @@ When changes are detected, the classifier:
 - **Session recording**: each iteration creates a child session for the audit trail.
 
 ## Serve Mode
+
+`serve` watches without `--watch`. To run the server once, with no restarts, turn serve's own `watch` flag off:
+
+```bash
+putnami serve my-app --no-watch
+putnami serve my-app --watch=false   # the same
+```
 
 When watching with the `serve` command, the behavior is specialized:
 

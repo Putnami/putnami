@@ -146,7 +146,7 @@ keeps every reporter token out of every process environment:
    `log-reporting.json`), and `subscribers.json` records it. The hosted run
    does not replay it. A later `putnami sessions replay` is a separate
    invocation and needs a reporter credential of its own.
-5. `--watch`, and `serve`, which always watches, refuse `--credential-fd` with
+5. `--watch`, and `serve`, which watches by default, refuse `--credential-fd` with
    a usage error before anything starts: each watch iteration starts after
    repository code ran, when no reporter can receive the credential.
 

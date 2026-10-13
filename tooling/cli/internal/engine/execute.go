@@ -201,7 +201,8 @@ func (e *Engine) executeSession(
 		return SessionResult{ExitCode: renderPlan(req, planned, selectedProjects)}
 	}
 
-	// Serve commands always run in watch mode (auto-restart on file changes).
+	// Serve commands run in watch mode (auto-restart on file changes) unless
+	// --no-watch turned serve's own watch flag off.
 	if forcesServeWatch(req, isServeMode) {
 		req.Global.Watch = true
 	}

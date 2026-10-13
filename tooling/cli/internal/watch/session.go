@@ -9,6 +9,7 @@ import (
 	"go.putnami.dev/cli/model/workspace"
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/runnersource"
 )
 
 // IterationResult is the verdict of ONE replanned run.
@@ -91,6 +92,7 @@ func NewSession(cfg SessionConfig) *Session {
 	watcher := NewWatcher(WatcherConfig{
 		Roots:    watchRoots,
 		Debounce: DefaultDebounce,
+		Ignored:  gitIgnored(ws.Root),
 	})
 
 	watchRend := NewWatchRenderer(cfg.Renderer, os.Stderr, cfg.ServeMode)
@@ -99,6 +101,30 @@ func NewSession(cfg SessionConfig) *Session {
 		cfg:       cfg,
 		watcher:   watcher,
 		watchRend: watchRend,
+	}
+}
+
+// gitIgnored answers the watcher's Ignored question with `git check-ignore`
+// run in root. A tracked path is never reported. When Git cannot answer (no
+// repository, no git binary), nothing is ignored and every change counts, as
+// it did before the watcher asked.
+func gitIgnored(root string) func(paths []string) map[string]bool {
+	return func(paths []string) map[string]bool {
+		slashed := make([]string, len(paths))
+		for i, path := range paths {
+			slashed[i] = filepath.ToSlash(path)
+		}
+		answer, err := runnersource.IgnoredPaths(context.Background(), root, slashed)
+		if err != nil || len(answer) == 0 {
+			return nil
+		}
+		ignored := make(map[string]bool, len(answer))
+		for i, path := range paths {
+			if answer[slashed[i]] {
+				ignored[path] = true
+			}
+		}
+		return ignored
 	}
 }
 

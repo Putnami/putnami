@@ -1486,7 +1486,7 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
 - **`putnami upgrade` refuses the flag.** An upgrade rewrites the lock that a
   hosted run executes as committed. Upgrade without the flag and commit the
   lock.
-- **Watch refuses the flag.** `--watch`, and `serve`, which always watches,
+- **Watch refuses the flag.** `--watch`, and `serve`, which watches by default,
   stop with exit 2 before anything starts. Each watch iteration starts after
   repository code ran, when the CLI hands the credential to no new process,
   and a hosted runner runs one finite invocation per fresh sandbox. Run a
@@ -1588,6 +1588,12 @@ Use the `=` spelling too when the first word of the value holds `=`:
 `--args="--port=3000 --watch"` sets `args` to `--port=3000 --watch`, while
 `--args "--port=3000 --watch"` sets `args` to `true` and `port` to
 `3000 --watch`, with no warning when the job declares `port`.
+
+A global switch such as `--verbose` or `--watch` takes no value, but accepts
+an inline boolean: `--verbose=true` is `--verbose`, and `--verbose=false`
+leaves it off. `--watch=false` is `--no-watch`, which turns off a command's own
+`watch` flag, such as the one that keeps `serve` restarting on changes. Any
+other inline value on a switch is a usage error.
 
 Unknown flags are passed through to job processes. The CLI provides typo suggestions using Levenshtein distance when a flag doesn't match any known flag.
 

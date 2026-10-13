@@ -85,3 +85,29 @@ func TestWithholdServeSteps_NonServeCommandsAreNeverWithheld(t *testing.T) {
 		t.Errorf("kept %d of %d jobs", len(kept), len(planned))
 	}
 }
+
+// Issue #233: serve watches by default, and --no-watch, which reaches the run
+// as the serve flag `watch: false`, keeps it out of the restart loop.
+func TestForcesServeWatch_NoWatchKeepsServeOutOfTheLoop(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		watch any // the run's `watch` param; nil leaves it out
+		serve bool
+		want  bool
+	}{
+		{name: "serve by default", serve: true, want: true},
+		{name: "serve --watch=true", watch: true, serve: true, want: true},
+		{name: "serve --no-watch", watch: false, serve: true, want: false},
+		{name: "not serve", serve: false, want: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			params := map[string]any{}
+			if tc.watch != nil {
+				params["watch"] = tc.watch
+			}
+			if got := forcesServeWatch(&Request{CommandParams: params}, tc.serve); got != tc.want {
+				t.Errorf("forcesServeWatch = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

@@ -203,7 +203,7 @@ delivery fails. What it did not deliver stays pending in the session's
 checkpoint, and `subscribers.json` records it. The hosted run does not replay
 it; a later `putnami sessions replay --session <id>` is a separate invocation
 and needs a reporter credential of its own. A hosted run refuses `--watch`,
-and `serve`, which always watches, because every watch iteration starts after
+and `serve`, which watches by default, because every watch iteration starts after
 repository code ran. A reporter keeps the credential in memory only, and
 should deny inspection of its process
 (`go.putnami.dev/sdk/extension/procguard.DenyInspection`) before it answers

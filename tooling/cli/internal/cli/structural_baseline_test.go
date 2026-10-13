@@ -420,7 +420,7 @@ var structuralPins = []structuralPin{
 		token:       "map[string]any",
 		scope:       testFiles,
 		ceilingOnly: true,
-		want:        655,
+		want:        656,
 		why: "test fixtures built from untyped maps; they shrink as the canonical model lands. " +
 			"A0 pinned 516; A2b's scheduler and profiler tests now assert against typed records. " +
 			"An earlier change took it from 513 to 515: the two auto-selection tests that used to call " +
@@ -562,14 +562,17 @@ var structuralPins = []structuralPin{
 			"fold. output/machine_stream_test.go states nine: a cache hit's replayed result with its " +
 			"coverageSummary, an upload's published-member artifact, a batched member's failed result " +
 			"after 800 ordinary lines, and the two reads of the decoded records. Production adds none " +
-			"beyond its ceiling",
+			"beyond its ceiling. A later change raises 655→656 for ONE line in engine/serve_withhold_test.go: " +
+			"serve leaves the restart loop when the run's `watch` param is false (--no-watch), and the " +
+			"fixture Request states that one existing untyped bag; production adds none, because " +
+			"forcesServeWatch reads the CommandParams the Request already carries",
 	},
 	{
 		name:        "all lines mentioning map[string]any",
 		token:       "map[string]any",
 		scope:       allFiles,
 		ceilingOnly: true,
-		want:        911,
+		want:        912,
 		why: "the epic body's headline number: production + test lines. A0 pinned 724; " +
 			"an earlier change took it from 720 to 723 for the reasons named on the two scoped pins " +
 			"above, and a later change closed it at 724 = 205 production + 519 test. Another change " +
@@ -627,7 +630,8 @@ var structuralPins = []structuralPin{
 			"The final change raises 892→893 = 255 production + 638 test for the one test-case decode itemized on the production pin above; tests add none. " +
 			"A later change raises 893→894 = 255 production + 639 test for the one `tree verify` fixture alias itemized on the test pin above; production adds none. " +
 			"Another change raises 894→895 = 256 production + 639 test for jobs.keyInputs, itemized on the production pin above; tests add none. " +
-			"A later change raises 895→911 = 256 production + 655 test for the sixteen test lines of jobs.RawJobEvent.RecordPayload, itemized on the test pin above; production stays at its ceiling",
+			"A later change raises 895→911 = 256 production + 655 test for the sixteen test lines of jobs.RawJobEvent.RecordPayload, itemized on the test pin above; production stays at its ceiling. " +
+			"A later change raises 911→912 for the ONE --no-watch serve fixture line itemized on the test pin above",
 	},
 	{
 		name:  "lines mentioning map[string]interface{}",

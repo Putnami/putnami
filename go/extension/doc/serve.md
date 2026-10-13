@@ -95,7 +95,7 @@ putnami serve . --args "--config ./config.yaml --debug"
 NODE_ENV=production putnami serve .
 
 # Or disable watch explicitly
-putnami serve . --watch=false
+putnami serve . --no-watch
 ```
 
 ## Development Mode Details
@@ -168,7 +168,7 @@ log.Fatal(http.ListenAndServe(":"+port, nil))
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--watch` / `-w` | `true` | Watch for changes and restart (disabled in production mode) |
+| `--watch` / `-w`, `--no-watch` | `true` | Watch for changes and restart (disabled in production mode); `--no-watch` or `--watch=false` turns it off |
 | `--port <n>` | `8080` | Port number; sets the `PORT` environment variable |
 | `--kill-port` | `false` | Terminate any process on the port before starting |
 | `--race` | `false` | Run with the Go race detector |

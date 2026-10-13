@@ -176,6 +176,28 @@ Help:
 `, builtinAliasSummary())
 }
 
+// extensionFlagHelpLine is one manifest flag's help line. A boolean flag on by
+// default also lists the --no- spelling that turns it off: serve's
+// `-w, --watch (default: true)` alone offered no way to stop its restarts.
+func extensionFlagHelpLine(name string, flag extension.FlagDefinition) string {
+	spelling := "--" + name
+	if flag.Short != "" {
+		spelling = flag.Short + ", " + spelling
+	}
+	if on, boolean := flag.Default.(bool); on && boolean && (flag.Type == "" || flag.Type == "boolean") {
+		spelling += ", --no-" + name
+	}
+	def := ""
+	if flag.Default != nil {
+		def = fmt.Sprintf(" (default: %v)", flag.Default)
+	}
+	desc := flag.Description
+	if desc == "" {
+		desc = name
+	}
+	return fmt.Sprintf("  %s  %s%s", spelling, desc, def)
+}
+
 // PrintCommandHelp prints help for a specific command with categorized flags
 // and related commands suggestions.
 func PrintCommandHelp(command string, flags map[string]extension.FlagDefinition) {
@@ -185,20 +207,7 @@ func PrintCommandHelp(command string, flags map[string]extension.FlagDefinition)
 		iox.Fprintln(os.Stdout, "Command Flags:")
 		names := SortedExtensionFlags(flags)
 		for _, name := range names {
-			flag := flags[name]
-			short := ""
-			if flag.Short != "" {
-				short = flag.Short + ", "
-			}
-			def := ""
-			if flag.Default != nil {
-				def = fmt.Sprintf(" (default: %v)", flag.Default)
-			}
-			desc := flag.Description
-			if desc == "" {
-				desc = name
-			}
-			iox.Fprintf(os.Stdout, "  %s--%s  %s%s\n", short, name, desc, def)
+			iox.Fprintln(os.Stdout, extensionFlagHelpLine(name, flags[name]))
 		}
 		iox.Fprintln(os.Stdout)
 	}

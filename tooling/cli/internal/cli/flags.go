@@ -134,14 +134,54 @@ func keepsInlineToken(spelling, value string) bool {
 	return strings.HasPrefix(value, "-") && !strings.ContainsFunc(value, unicode.IsSpace)
 }
 
+// resolveSwitchValues rewrites a global switch spelled with an inline boolean,
+// before splitInlineValues would part the value from it: `--verbose=true` is
+// `--verbose`, and `--verbose=false` leaves the switch off. Split, the value
+// stayed behind as a stray token while the switch turned ON, whatever it said.
+//
+// `--watch=false` becomes `--no-watch`, which turns off a command's own `watch`
+// flag: serve declares one, documents `--watch=false`, and restarts on changes
+// unless that flag is off (engine.forcesServeWatch). Any other inline value on
+// a switch is a usage error. Tokens past the passthrough separator are the
+// user's payload and stay untouched.
+func resolveSwitchValues(args []string, opts flagParseOptions) ([]string, error) {
+	cut := passthroughCut(args)
+	resolved := make([]string, 0, len(args))
+	for i, arg := range args {
+		spelling, value, inline := strings.Cut(arg, "=")
+		spec, known := globalFlagSpec(spelling)
+		if i >= cut || !inline || !strings.HasPrefix(arg, "--") || !known || spec.Type == commandmeta.FlagValue ||
+			(spec.Long == "--version" && !opts.consumeVersion) {
+			resolved = append(resolved, arg)
+			continue
+		}
+		switch value {
+		case "true":
+			resolved = append(resolved, spelling)
+		case "false":
+			if spec.Long == "--watch" {
+				resolved = append(resolved, "--no-watch")
+			}
+		default:
+			return nil, usageErrorf("flag %s is a switch: write %s, or %s=true or %s=false, not %s", spelling, spelling, spelling, spelling, arg)
+		}
+	}
+	return resolved, nil
+}
+
 // parseGlobalFlags is phase 2 of the parse: syntax-normalized tokens in, bound
 // GlobalFlags plus the untouched remainder out. A value-taking flag with no
-// value, an unparseable --retry, and an unrecognized --max-parallel mode are
-// hard usage errors here; before this change all three were silently dropped.
+// value, an unparseable --retry, an unrecognized --max-parallel mode and a
+// switch with an inline value other than true or false are hard usage errors
+// here; before this change all of them were silently dropped.
 // Unknown flags are NOT rejected here — only the command-scoped pass in
 // parse.go knows whether an extension could own them.
 func parseGlobalFlags(args []string, opts flagParseOptions) (GlobalFlags, []string, error) {
 	g := GlobalFlags{}
+	args, err := resolveSwitchValues(args, opts)
+	if err != nil {
+		return g, nil, err
+	}
 	normalized := splitInlineValues(args, opts.jobArgs)
 	remaining := make([]string, 0, len(normalized))
 

@@ -35,11 +35,15 @@ func servePreparationWithoutFiniteSteps(req *Request, planned []*jobs.ScheduledJ
 }
 
 // forcesServeWatch reports whether a run is promoted to watch mode. Serve
-// commands always watch, except an iteration of an outer watch loop, which
-// already owns the replan policy, and a serve preparation whose serve steps were
+// commands watch by default, except an iteration of an outer watch loop, which
+// already owns the replan policy, a serve preparation whose serve steps were
 // left to the supervisor that asked for it (Request.WithholdServeSteps): what
-// remains of that run is finite.
+// remains of that run is finite, and a run that turned serve's own `watch` flag
+// off with --no-watch: restarting it on changes would overrule that flag.
 func forcesServeWatch(req *Request, isServeMode bool) bool {
+	if watch, set := req.CommandParams["watch"].(bool); set && !watch {
+		return false
+	}
 	return isServeMode && !req.Global.Watch && !req.watchIteration && !req.WithholdServeSteps
 }
 
