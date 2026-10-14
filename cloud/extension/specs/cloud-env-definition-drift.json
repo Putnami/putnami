@@ -16,7 +16,7 @@
     },
     {
       "id": "enable-accepts-a-degraded-definition",
-      "text": "putnami cloud env enable asks Control to accept the environment definition at the default-branch head, or at --source-revision, when the environment-definition row reads degraded."
+      "text": "putnami cloud env enable asks Control to accept the environment definition at the default-branch head when the environment-definition row reads degraded."
     },
     {
       "id": "enable-fails-on-a-definition-that-stays-degraded",
