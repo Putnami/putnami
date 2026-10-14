@@ -711,8 +711,10 @@ where each `<entry>` is:
 - Ignored files are outside the tree a gate reasons about, and
   `--exclude-standard` is what leaves them out.
 
-`putnami tree fingerprint` prints this digest and is the only implementation;
-`--output=json` adds `dirty` and `headSHA` under these same member names.
+The Go package `go.putnami.dev/sdk/extension/treefingerprint` is the only
+implementation: `putnami tree fingerprint` prints its digest, and an extension
+that compares a fingerprint links it. `--output=json` adds `dirty` and
+`headSHA` under these same member names.
 
 **When it is captured, and what that means.** The producer takes the measurement
 when the session OPENS, before its first task runs. The recorded fingerprint is

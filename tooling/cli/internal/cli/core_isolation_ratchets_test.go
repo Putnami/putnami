@@ -312,8 +312,9 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // workspace on every path, while `tree fingerprint` must answer inside a
 // throwaway repository that has no putnami.json, and fusing the two would put a
 // workspace-free surface behind a workspace-bound package's name. The
-// calculation itself is NOT here — it lives in internal/git, the git boundary,
-// where the session recorder reads it too; this package holds the choice
+// calculation itself is NOT here — it lives in the SDK's treefingerprint
+// package, which internal/git, the git boundary, exposes to core and which the
+// session recorder reads too; this package holds the choice
 // between the two output shapes, which is what a vertical is for. It also holds
 // `tree verify`, which checks an agent's recorded evidence against that same
 // identity and needs no workspace either; it adds no package.
