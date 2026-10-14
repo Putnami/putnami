@@ -199,18 +199,24 @@ func (r envEnableRun) failStillDegraded(steps []EnvEnableStep, after []EnvDoctor
 	if !degraded {
 		return steps
 	}
-	fix := "push a new commit to the default branch, then run `putnami cloud env enable " + r.environment + "` again"
-	if r.sourceRevision != "" {
-		fix = "run `putnami cloud env enable " + r.environment + "` without --source-revision to accept the default-branch head"
-	}
 	for i, step := range steps {
 		if step.Row == "environment-definition" && step.Status != EnvEnableFailed {
 			steps[i].Status = EnvEnableFailed
 			steps[i].Detail += "; the definition still differs from the default-branch head"
-			steps[i].Fix = fix
+			steps[i].Fix = r.degradedFix()
 		}
 	}
 	return steps
+}
+
+// degradedFix is the next step for a definition row the run left degraded:
+// the default-branch head when --source-revision named another commit, and a
+// new head commit otherwise.
+func (r envEnableRun) degradedFix() string {
+	if r.sourceRevision != "" {
+		return "run `putnami cloud env enable " + r.environment + "` without --source-revision to accept the default-branch head"
+	}
+	return "push a new commit to the default branch, then run `putnami cloud env enable " + r.environment + "` again"
 }
 
 // envEnableReadFailure is the one reason every server row carries when the
@@ -387,7 +393,7 @@ func (r envEnableRun) acceptDefinition(row EnvDoctorRow) (EnvEnableStep, bool) {
 		return EnvEnableStep{Row: row.ID, Action: action, Status: EnvEnableFailed,
 			Detail: fmt.Sprintf("source revision %s (%s) was accepted as revision %d, and Control keeps revision %d: it does not accept a commit a later revision replaced",
 				accepted, source, revision, expected),
-			Fix: "push a new commit to the default branch, then run `putnami cloud env enable " + r.environment + "` again"}, false
+			Fix: r.degradedFix()}, false
 	}
 	if revision <= expected {
 		detail := fmt.Sprintf("source revision %s (%s) is already accepted as revision %d", accepted, source, revision)

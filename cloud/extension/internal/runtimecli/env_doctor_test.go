@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 const doctorWorkspaceID = "0b8f3c9e-6a1d-4f2e-9c7b-3d5e8a1f2b4c"
@@ -845,6 +846,7 @@ func TestEnvDoctorStrictFailsOnAnUnknownRow(t *testing.T) {
 // its fix, not unknown with an upgrade fix, counts as degraded, and fails
 // the command only under --strict.
 func TestEnvDoctorDegradedDefinitionNamesEnableAndFailsOnlyUnderStrict(t *testing.T) {
+	spectest.Proves(t, "cloud/env-definition-drift", "doctor-reads-a-degraded-definition", "env-doctor-degraded-definition")
 	server := &doctorServer{status: http.StatusOK, body: serverRowsJSON(t, EnvDoctorOK, map[string]string{
 		"environment-definition": EnvDoctorDegraded,
 	})}

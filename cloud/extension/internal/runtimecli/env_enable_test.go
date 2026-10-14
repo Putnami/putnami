@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The callers the fixture's control plane names, in the response's order.
@@ -769,6 +770,7 @@ func TestEnvEnableUsage(t *testing.T) {
 // accepts the default-branch head for that row instead of reporting it as
 // unchecked.
 func TestEnvEnableAcceptsADegradedDefinition(t *testing.T) {
+	spectest.Proves(t, "cloud/env-definition-drift", "enable-accepts-a-degraded-definition", "env-enable-degraded-definition")
 	server := freshWorkspace()
 	server.beforeRows = map[string]string{"environment-definition": EnvDoctorDegraded}
 	server.afterRows = map[string]string{}
@@ -805,6 +807,7 @@ func TestEnvEnableAcceptsADegradedDefinition(t *testing.T) {
 // 3, so the row stays degraded: the step fails and says what to do instead
 // of reading skipped.
 func TestEnvEnableFailsWhenADegradedDefinitionReplaysAReplacedCommit(t *testing.T) {
+	spectest.Proves(t, "cloud/env-definition-drift", "enable-fails-on-a-definition-that-stays-degraded", "env-enable-replaced-commit")
 	server := freshWorkspace()
 	server.beforeRows = map[string]string{"environment-definition": EnvDoctorDegraded}
 	server.afterRows = nil
@@ -835,6 +838,7 @@ func TestEnvEnableFailsWhenADegradedDefinitionReplaysAReplacedCommit(t *testing.
 // Control already keeps, the replay writes nothing, and the row still differs
 // from the default-branch head.
 func TestEnvEnableFailsWhenTheDefinitionStaysDegraded(t *testing.T) {
+	spectest.Proves(t, "cloud/env-definition-drift", "enable-fails-on-a-definition-that-stays-degraded", "env-enable-stays-degraded")
 	latest := strings.Repeat("c", 40)
 	server := freshWorkspace()
 	server.beforeRows = map[string]string{"environment-definition": EnvDoctorDegraded}
@@ -855,6 +859,34 @@ func TestEnvEnableFailsWhenTheDefinitionStaysDegraded(t *testing.T) {
 		step.Detail != "source revision "+latest+" (--source-revision) is already accepted as revision 3; the definition still differs from the default-branch head" ||
 		step.Fix != "run `putnami cloud env enable prod` without --source-revision to accept the default-branch head" {
 		t.Fatalf("step = %+v, want a failed step that names the default-branch head", step)
+	}
+}
+
+// TestEnvEnableFailsWhenAnAcceptedCommitDiffersFromTheHead covers the append
+// path: --source-revision names a new commit, Control accepts it as the next
+// revision, and the row still differs from the default-branch head.
+func TestEnvEnableFailsWhenAnAcceptedCommitDiffersFromTheHead(t *testing.T) {
+	spectest.Proves(t, "cloud/env-definition-drift", "enable-fails-on-a-definition-that-stays-degraded", "env-enable-accepted-commit-differs")
+	other := strings.Repeat("d", 40)
+	server := freshWorkspace()
+	server.beforeRows = map[string]string{"environment-definition": EnvDoctorDegraded}
+	server.afterRows = nil
+	server.acceptedRevision = 3
+	srv := httptest.NewServer(server)
+	defer srv.Close()
+
+	_, err := runEnvEnable(t, doctorWorkspace(t), srv, map[string]any{"output": "json", "source-revision": other})
+	if clicore.ExitCode(err) != clicore.ExitFailure || server.appended != 1 {
+		t.Fatalf("exit = %d (%v), appended = %d; want failure after one append", clicore.ExitCode(err), err, server.appended)
+	}
+	envelope := &captureIO{}
+	clicore.WriteErrorResult(err, map[string]any{"output": "json"}, envelope.io(nil))
+	result := decodeEnableResult(t, envelope.stdout)
+	step := stepsByRow(result)["environment-definition"][0]
+	if step.Status != EnvEnableFailed || result.Failed != 1 || result.Applied != 0 ||
+		!strings.HasSuffix(step.Detail, "; the definition still differs from the default-branch head") ||
+		step.Fix != "run `putnami cloud env enable prod` without --source-revision to accept the default-branch head" {
+		t.Fatalf("step = %+v, failed = %d, applied = %d; want one failed step naming the default-branch head", step, result.Failed, result.Applied)
 	}
 }
 

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/env-definition-drift",
+  "outcomes": [
+    "putnami cloud env doctor reads a degraded environment-definition row and names its fix, and putnami cloud env enable accepts the default-branch head for that row or fails when the row stays degraded"
+  ],
+  "nonGoals": [
+    "Comparing the accepted definition with putnami.ci.json. Control compares it with the default-branch head and answers the row; the CLI reads that answer",
+    "Naming the fix in putnami cloud env status for a workload the policy declares and the definition omits. It needs the definition's workloads in Control's channel-follow answer, and comes in a later change"
+  ],
+  "requirements": [
+    {
+      "id": "doctor-reads-a-degraded-definition",
+      "text": "putnami cloud env doctor prints a degraded environment-definition row as degraded with Control's detail and fix, counts it apart from the missing and unchecked rows, and exits 0 unless --strict is set, where it exits 1."
+    },
+    {
+      "id": "enable-accepts-a-degraded-definition",
+      "text": "putnami cloud env enable asks Control to accept the environment definition at the default-branch head, or at --source-revision, when the environment-definition row reads degraded."
+    },
+    {
+      "id": "enable-fails-on-a-definition-that-stays-degraded",
+      "text": "When the environment-definition row still reads degraded after the acceptance step, because Control replayed a commit a later revision replaced or because the accepted commit differs from the default-branch head, the step fails with a fix that names a new default-branch commit or the default-branch head, and putnami cloud env enable exits 1."
+    }
+  ]
+}
