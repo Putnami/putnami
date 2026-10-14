@@ -23,15 +23,19 @@ import (
 //
 // Test files count: a test binary is rebuilt when its test files' imports
 // change, so an allowance that held only for production files would not hold
-// the property.
+// the property. An import only the tests need is a test-only allowance, which
+// a production file fails on.
 
 // jobsSplitPackage is one package split out of internal/jobs.
 type jobsSplitPackage struct {
 	// dir is the module-relative directory of the package.
 	dir string
-	// allowed lists the import path prefixes the package may import besides
-	// the standard library.
+	// allowed lists the import path prefixes every file of the package may
+	// import besides the standard library.
 	allowed []string
+	// testOnly lists the import path prefixes only the package's _test.go
+	// files may import besides allowed.
+	testOnly []string
 	// why states what the package is, so the allowance can be judged.
 	why string
 }
@@ -47,8 +51,9 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"model's RunnerEnvironment types, nothing else",
 	},
 	{
-		dir:     "internal/jobs/procdeadline",
-		allowed: []string{"go.putnami.dev/tooling/cli/internal/fixtureproc"},
+		dir:      "internal/jobs/procdeadline",
+		allowed:  nil,
+		testOnly: []string{"go.putnami.dev/tooling/cli/internal/fixtureproc"},
 		why: "process deadlines: they bound a started child by the time it runs, from the host's own " +
 			"process readings; only the tests start fixture programs",
 	},
@@ -72,7 +77,8 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/tooling/cli/internal/runcredential",
 			"go.putnami.dev/tooling/cli/internal/store",
 			"go.putnami.dev/tooling/cli/internal/workspace",
-			// Tests only.
+		},
+		testOnly: []string{
 			"go.putnami.dev/protocol/features/spectest",
 			"go.putnami.dev/sdk/extension/pkgmeta",
 			"go.putnami.dev/tooling/cli/internal/fixtureproc",
@@ -80,7 +86,7 @@ var jobsSplitPackages = []jobsSplitPackage{
 		},
 		why: "runtime toolchains: they resolve an extension's declared toolchains against the workspace " +
 			"lock, which needs the extension and workspace models, the lock, the artifact store root, " +
-			"and the run credential's custody mark before a probe starts repository code",
+			"and the run credential's custody mark and hosted check before a probe starts repository code",
 	},
 }
 
@@ -109,8 +115,7 @@ func TestJobsSplitPackagesImportOnlyTheirAllowance(t *testing.T) {
 				if err != nil {
 					t.Fatalf("%s: import %s: %v", rel, spec.Path.Value, err)
 				}
-				// The package's own path is allowed: an external test package imports it.
-				if path == jobsSplitModulePath+"/"+pkg.dir || jobsSplitImportAllowed(path, pkg.allowed) {
+				if jobsSplitFileImportAllowed(pkg, entry.Name(), path) {
 					continue
 				}
 				t.Errorf("%s imports %s, which %s does not allow (%s).\n"+
@@ -144,6 +149,41 @@ func TestJobsSplitImportAllowed(t *testing.T) {
 			t.Errorf("jobsSplitImportAllowed(%q) = %v, want %v", path, got, want)
 		}
 	}
+
+	pkg := jobsSplitPackage{
+		dir:      "internal/jobs/example",
+		allowed:  []string{"go.putnami.dev/cli/model/jobs"},
+		testOnly: []string{"go.putnami.dev/tooling/cli/internal/fixtureproc"},
+	}
+	for _, c := range []struct {
+		file, path string
+		want       bool
+	}{
+		{"probe.go", "os", true},
+		{"probe.go", "go.putnami.dev/cli/model/jobs", true},
+		{"probe_test.go", "go.putnami.dev/cli/model/jobs", true},
+		{"probe_test.go", "go.putnami.dev/tooling/cli/internal/jobs/example", true},
+		{"probe_test.go", "go.putnami.dev/tooling/cli/internal/fixtureproc", true},
+		{"probe_linux_test.go", "go.putnami.dev/tooling/cli/internal/fixtureproc", true},
+		{"probe.go", "go.putnami.dev/tooling/cli/internal/fixtureproc", false},
+		{"probe_linux.go", "go.putnami.dev/tooling/cli/internal/fixtureproc", false},
+		{"test_helpers.go", "go.putnami.dev/tooling/cli/internal/fixtureproc", false},
+		{"probe_test.go", "go.putnami.dev/tooling/cli/internal/workspace", false},
+	} {
+		if got := jobsSplitFileImportAllowed(pkg, c.file, c.path); got != c.want {
+			t.Errorf("jobsSplitFileImportAllowed(%s, %q) = %v, want %v", c.file, c.path, got, c.want)
+		}
+	}
+}
+
+// jobsSplitFileImportAllowed reports whether the file named name in pkg may
+// import path: the package's own path, which an external test package
+// imports, or an allowed import, or, in a _test.go file only, a test-only one.
+func jobsSplitFileImportAllowed(pkg jobsSplitPackage, name, path string) bool {
+	if path == jobsSplitModulePath+"/"+pkg.dir || jobsSplitImportAllowed(path, pkg.allowed) {
+		return true
+	}
+	return strings.HasSuffix(name, "_test.go") && jobsSplitImportAllowed(path, pkg.testOnly)
 }
 
 // jobsSplitImportAllowed reports whether path is the standard library or
