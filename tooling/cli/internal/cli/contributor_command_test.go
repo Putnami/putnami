@@ -1,8 +1,14 @@
 package cli
 
 import (
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 func TestFinalizeOptionsRejectsGateExecutionAndAmbiguousArguments(t *testing.T) {
@@ -27,5 +33,36 @@ func TestFinalizeOptionsRejectsGateExecutionAndAmbiguousArguments(t *testing.T) 
 	hosted, err := finalizeOptions([]string{"--gate", "ci", "--workflow-file", ".context/workflow.json"})
 	if err != nil || hosted.Gate != "ci" || hosted.WorkflowFile != ".context/workflow.json" {
 		t.Fatalf("hosted workflow options=%+v err=%v", hosted, err)
+	}
+}
+
+func TestRequirementOwnersKeepOnlyProjectsThatCanHoldARequirement(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/contributor-workflows", "squash-ready-publication", "a-featureless-partial-needs-no-workflow")
+	root := t.TempDir()
+	writeParityFile(t, root, wsproto.WorkspaceConfigFilename, `{"name":"owners","includes":["packages/proto","packages/app","packages/part"]}`)
+	writeParityFile(t, filepath.Join(root, "packages", "proto"), "putnami.json",
+		`{"name":"proto","type":"library","featureAuthority":{"none":"A wire contract, not a user-facing feature."}}`)
+	writeParityFile(t, filepath.Join(root, "packages", "app"), "putnami.json", `{"name":"app","type":"application"}`)
+	writeParityFile(t, filepath.Join(root, "packages", "part"), "putnami.json",
+		`{"name":"part","type":"library","featureAuthority":{"owner":"app/feature"}}`)
+	workspace.InvalidateLoadCache(root)
+	ws, err := workspace.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workspace.RefreshSnapshot(ws, workspace.SnapshotWritePolicy{}); err != nil {
+		t.Fatal(err)
+	}
+	workspace.InvalidateLoadCache(root)
+	t.Cleanup(func() { workspace.InvalidateLoadCache(root) })
+	owners := nativeRequirementOwners(root)
+	got, err := owners([]string{"packages/proto/schema.go", "packages/proto/doc/README.md"})
+	if err != nil || len(got) != 0 {
+		t.Fatalf("featureless change has requirement owners %v: %v", got, err)
+	}
+	got, err = owners([]string{"packages/proto/schema.go", "packages/app/main.go", "packages/part/lib.go", "README.md"})
+	if err != nil || !slices.Equal(got, []string{"/packages/app", "/packages/part", "README.md"}) {
+		t.Fatalf("requirement owners %v: %v", got, err)
 	}
 }

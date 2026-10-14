@@ -37,7 +37,7 @@ func (c *publicationCandidate) recheck(ctx context.Context, f Finalizer) (Verifi
 	if err != nil {
 		return verified, err
 	}
-	if c.opts.Gate != "ci" || c.opts.TaskID == "" {
+	if c.opts.Gate != "ci" || c.opts.TaskID == "" || c.opts.WorkflowFile == "" {
 		return verified, nil
 	}
 	if f.Workflow == nil {
@@ -66,7 +66,7 @@ func (c *publicationCandidate) workflowRequest(status *collab.ProposalStatusResu
 }
 
 func (c *publicationCandidate) promoteHosted(ctx context.Context, f Finalizer, status *collab.ProposalStatusResult) error {
-	if c.opts.TaskID == "" {
+	if c.opts.TaskID == "" || c.opts.WorkflowFile == "" {
 		return nil
 	}
 	if _, err := c.recheck(ctx, f); err != nil {
@@ -131,7 +131,7 @@ func (f Finalizer) optionsPolicy(opts Options) (Policy, error) {
 	if opts.WorkflowFile != "" && opts.Gate != "ci" {
 		return Policy{}, errors.New("--workflow-file requires --gate ci")
 	}
-	if opts.Gate == "ci" && opts.TaskID != "" && opts.WorkflowFile == "" {
+	if opts.Gate == "ci" && opts.TaskID != "" && opts.WorkflowFile == "" && !opts.PartialDelivery {
 		return Policy{}, errors.New("--gate ci with a parent task requires --workflow-file")
 	}
 	if !opts.Draft && (opts.VerificationFile == "") == (opts.Gate != "ci") {
@@ -184,6 +184,9 @@ func (f Finalizer) prepareLocal(c *publicationCandidate) error {
 	if err := ValidateTitle(c.opts.Title, paths); err != nil {
 		return err
 	}
+	if err := f.checkFeaturelessPartial(c, paths); err != nil {
+		return err
+	}
 	c.originalBody, err = os.ReadFile(c.opts.BodyFile)
 	if err != nil {
 		return err
@@ -196,6 +199,27 @@ func (f Finalizer) prepareLocal(c *publicationCandidate) error {
 		return errors.New("partial delivery refuses a closing directive in the title or body")
 	}
 	return f.checkBranchMessages(c)
+}
+
+// checkFeaturelessPartial admits a hosted partial delivery without a workflow
+// record only when no changed project can hold a native requirement: the
+// workflow could name no current unit, so the hosted checks are the evidence.
+func (f Finalizer) checkFeaturelessPartial(c *publicationCandidate, paths []string) error {
+	if c.opts.Gate != "ci" || c.opts.TaskID == "" || c.opts.WorkflowFile != "" {
+		return nil
+	}
+	if f.Owners == nil {
+		return errors.New("native project ownership unavailable")
+	}
+	owners, err := f.Owners(paths)
+	if err != nil {
+		return err
+	}
+	if len(owners) > 0 {
+		return fmt.Errorf("--gate ci with a parent task requires --workflow-file; changed without featureAuthority.none: %s",
+			strings.Join(owners, ", "))
+	}
+	return nil
 }
 
 func (f Finalizer) checkBranchMessages(c *publicationCandidate) error {

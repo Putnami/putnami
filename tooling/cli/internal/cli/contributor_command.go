@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
@@ -20,6 +22,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/mcp"
 	"go.putnami.dev/tooling/cli/internal/output"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // cmdContributor is the native helper namespace registered by the command
@@ -173,6 +176,32 @@ func nativeDossierVerify(root string) proposals.Verify {
 	}
 }
 
+func nativeRequirementOwners(root string) proposals.RequirementOwners {
+	return func(paths []string) ([]string, error) {
+		ws, err := workspace.Load(root)
+		if err != nil {
+			return nil, err
+		}
+		owners := map[string]bool{}
+		for _, path := range paths {
+			projects := workspace.ProjectOwnersForPath(ws, path)
+			if len(projects) == 0 {
+				owners[path] = true
+			}
+			for _, project := range projects {
+				if project.Config == nil || !featureless(project.Config.FeatureAuthority) {
+					owners[project.ID] = true
+				}
+			}
+		}
+		return slices.Sorted(maps.Keys(owners)), nil
+	}
+}
+
+func featureless(authority *wsproto.ProjectFeatureAuthority) bool {
+	return authority != nil && authority.None != "" && authority.Owner == ""
+}
+
 func nativeHostedWorkflowVerify(root string) proposals.HostedWorkflow {
 	return func(ctx context.Context, request proposals.HostedWorkflowRequest) (proposals.HostedWorkflowResult, error) {
 		verifier := treecmd.Verifier{Dir: root, RecoverReport: engine.VerifyCachedVerificationReport}
@@ -202,7 +231,7 @@ func (a *App) runFinalizeCommand(ctx context.Context, parsed *ParsedArgs, cfg *w
 		return ExitUsage
 	}
 	providers, unavailable := collaborationProviders(ctx, root, cfg, discovered)
-	f := proposals.Finalizer{Root: root, Verify: nativeDossierVerify(root), Workflow: nativeHostedWorkflowVerify(root), Call: func(ctx context.Context, contract, operation string, input json.RawMessage) collab.Envelope {
+	f := proposals.Finalizer{Root: root, Verify: nativeDossierVerify(root), Workflow: nativeHostedWorkflowVerify(root), Owners: nativeRequirementOwners(root), Call: func(ctx context.Context, contract, operation string, input json.RawMessage) collab.Envelope {
 		return mcp.CallProviderOperation(ctx, mcp.ProviderEnvironment{WorkspaceRoot: root,
 			Extensions: providers, Unavailable: unavailable, AttachView: cliWorkspaceView(root)}, contract, operation, input)
 	}}

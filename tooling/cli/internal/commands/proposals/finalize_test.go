@@ -577,6 +577,43 @@ func TestHostedPartialPromotesOnlyCurrentUnitsAndKeepsParentOpen(t *testing.T) {
 	}
 }
 
+func TestHostedFeaturelessPartialUsesHostedChecksWithoutWorkflow(t *testing.T) {
+	spectest.Proves(t, "cli/contributor-workflows", "squash-ready-publication", "a-featureless-partial-needs-no-workflow")
+	f, git, provider, opts := finalizerFixture(t)
+	opts.Gate, opts.VerificationFile = "ci", ""
+	opts.TaskSource, opts.TaskID, opts.PartialDelivery = provider.task.Ref.Source, provider.task.Ref.ID, true
+	git.paths = []string{"protocols/infra/schema.go"}
+	provider.checks = collab.Checks{Commit: git.head,
+		Items: []collab.Check{{Name: "Putnami CI", State: collab.CheckStatePassing}}}
+	if _, err := f.Run(context.Background(), opts); err == nil || git.pushes != 0 {
+		t.Fatalf("featureless partial without ownership reached a write: %v", err)
+	}
+	owners := []string{"tooling/cli"}
+	f.Owners = func(paths []string) ([]string, error) {
+		if len(paths) != 1 || paths[0] != git.paths[0] {
+			t.Fatalf("owners asked for %v", paths)
+		}
+		return owners, nil
+	}
+	if _, err := f.Run(context.Background(), opts); err == nil || !strings.Contains(err.Error(), "tooling/cli") || git.pushes != 0 {
+		t.Fatalf("partial with a requirement owner reached a write without a workflow: %v", err)
+	}
+	opts.PartialDelivery = false
+	if _, err := f.Run(context.Background(), opts); err == nil || git.pushes != 0 {
+		t.Fatalf("complete hosted parent without a workflow reached a write: %v", err)
+	}
+	opts.PartialDelivery, owners = true, nil
+	result, err := f.Run(context.Background(), opts)
+	if err != nil || git.pushes != 1 || provider.transitions != 0 || result.State != collab.ProposalStateOpen ||
+		result.Gate != "hosted checks passed on "+git.head || result.WorkflowSHA256 != "" || len(result.ReadyUnits) != 0 ||
+		result.HostedWorkflowReceipt != nil {
+		t.Fatalf("featureless partial was not published on hosted checks: result=%+v err=%v", result, err)
+	}
+	if !strings.Contains(provider.proposal.Body, "Refs https://github.com/acme/app/issues/42") || strings.Contains(provider.proposal.Body, "Closes ") {
+		t.Fatalf("featureless partial lost its non-closing task reference: %s", provider.proposal.Body)
+	}
+}
+
 func TestHostedRequiredCheckNamesFailClosed(t *testing.T) {
 	head := strings.Repeat("a", 40)
 	checks := collab.Checks{Commit: head, State: collab.ChecksStateFailing,

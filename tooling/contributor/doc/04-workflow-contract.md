@@ -99,6 +99,9 @@ semantic scope coverage and material decisions. A local checkpoint that was
 not transferred cannot promise another workspace a working asset.
 
 Hosted publication with a parent task requires its exact `--workflow-file`.
+A partial delivery whose changed projects all declare `featureAuthority.none`
+is the exception: no unit could hold a native requirement, so the hosted
+checks on its head are its evidence and it produces no workflow receipt.
 Native preflight checks whether the outcome can complete after eligible current
 units reach ready; partial delivery preserves pending later obligations. Exact
 policy-named checks on the same full HEAD produce a `hostedWorkflowReceipt`.
