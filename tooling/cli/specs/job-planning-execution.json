@@ -51,7 +51,11 @@
     },
     {
       "id": "release-set-reuse-channel",
-      "text": "A publication may name one reuse channel, resolved after the others and never advanced or used as baseline. A member the plan selects is released from the reuse head's record, rebound to this commit and with no package or publish job, when that record has the run's fingerprint, sorts above the baseline record, matches the run's version but for the commit suffix, and names the final dependency versions. --all and tagged runs never reuse; a plan that reuses nothing keeps its bytes."
+      "text": "A publication may name one reuse channel, resolved last, never advanced or used as baseline. A selected member is released from the reuse head's record, rebound to this commit and the run's tree, with no package or publish job, when that record has the run's fingerprint, sorts above the advanced and baseline heads' records, matches the run's version but for the commit suffix, and names the final dependency versions. --all refuses it, a tagged run ignores it; a plan that reuses nothing keeps its bytes."
+    },
+    {
+      "id": "release-set-reuse-source-revision",
+      "text": "A publication that names a reuse channel names --reuse-source-revision too: the full commit of that channel's reviewed final head. Either flag alone, or a value that is not a full commit, is refused before anything is packaged; a tagged run then ignores both. A member is reused only when its reuse-head record has exactly that revision, so a record the channel inherited from an earlier push is built. The plan and selection.reuse record the revision."
     },
     {
       "id": "release-set-attribution-opt-in",

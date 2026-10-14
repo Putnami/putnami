@@ -305,8 +305,9 @@ type Request struct {
 	// selection FLAGS through Global and gets the resolved answer for free;
 	// nothing it can set overrides what selection actually resolved.
 	selection *protocoljob.Selection
-	// confirmsReleaseSetHead is set when the run's release set changes no
-	// member, so the finalizer confirms the head. planning reads it to
+	// confirmsReleaseSetHead is set when the run's release set builds no
+	// member: none changed, or every changed one is reused from another
+	// channel. The finalizer still releases the set. planning reads it to
 	// accept an empty plan, which is then the session's complete answer.
 	//
 	// UNEXPORTED for the same reason preparation is: it is engine-internal
@@ -1002,12 +1003,14 @@ func buildReleaseSetOptions(req *Request, ws *workspace.Workspace) (jobs.Release
 	channel, _ := req.CommandParams["channel"].(string)
 	baselineChannel, _ := req.CommandParams["baseline-channel"].(string)
 	reuseChannel, _ := req.CommandParams["reuse-channel"].(string)
+	reuseSourceRevision, _ := req.CommandParams["reuse-source-revision"].(string)
 	visibility, _ := req.CommandParams["visibility"].(string)
 	scope, _ := req.CommandParams["scope"].(string)
 	dryRun, _ := req.CommandParams["dry-run"].(bool)
 	return jobs.BuildReleaseSetOptions(jobs.ReleaseSetRequest{
 		Commands: req.Commands, WorkspaceRoot: req.WorkspaceRoot,
-		Channel: channel, BaselineChannel: baselineChannel, ReuseChannel: reuseChannel,
+		Channel: channel, BaselineChannel: baselineChannel,
+		ReuseChannel: reuseChannel, ReuseSourceRevision: reuseSourceRevision,
 		Visibility: visibility, Scope: scope, DryRun: dryRun,
 		Impacted: req.Global.Impacted, All: req.Global.All,
 		Versions: req.runVersions(ws),

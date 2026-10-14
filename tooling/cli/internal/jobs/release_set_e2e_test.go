@@ -1393,7 +1393,8 @@ func useReleaseSetRevision(t *testing.T, revision string) {
 // The behavior the reuse channel exists for, end to end against the stateful
 // in-memory provider. A pull request publishes its changed member into `pr-7`;
 // its merge lands the same tree on main, and the main publication names `pr-7`
-// as its reuse channel: it releases the pull request's artifact into canary
+// as its reuse channel and the pull request's commit as the reuse source
+// revision: it releases the pull request's artifact into canary
 // without packaging or uploading anything, rebound to main's commit. A squash
 // merge leaves the pull request's commit out of main's history, and the
 // rebinding is what keeps canary's head an ancestor of the next main commit.
@@ -1430,7 +1431,7 @@ func TestReleaseSetE2EMainReleasesWhatItsPullRequestPublished(t *testing.T) {
 	// Main publishes the merged tree with pr-7 as its reuse channel.
 	useReleaseSetRevision(t, mainRevision)
 	merged := releaseSetE2EImpactedOptions("canary")
-	merged.ReuseChannel = "pr-7"
+	merged.ReuseChannel, merged.ReuseSourceRevision = "pr-7", pullRequestRevision
 	run = releaseSetE2EPrepare(t, ctx, merged, ws, ws.Projects)
 	if !slices.Equal(run.plan.Reused, []releaseset.MemberRef{{Ecosystem: "npm", Coordinate: downstream.Name}}) || !run.NoImpact() {
 		t.Fatalf("main plan reused %+v and selected %+v; want downstream reused and nothing built", run.plan.Reused, run.plan.SelectedMembers())
@@ -1487,5 +1488,67 @@ func TestReleaseSetE2EMainReleasesWhatItsPullRequestPublished(t *testing.T) {
 	again := releaseSetE2EPrepare(t, ctx, merged, ws, ws.Projects)
 	if !again.NoImpact() || again.plan.Reused != nil {
 		t.Fatalf("next main publish selected %+v and reused %+v", again.plan.SelectedMembers(), again.plan.Reused)
+	}
+}
+
+// A pull-request channel also carries what earlier pushes published. Push 1
+// publishes downstream into pr-7; push 2 changes nothing downstream's
+// fingerprint covers, so its publication builds nothing and pr-7 keeps push 1's
+// record. The reviewed final head is push 2, so the main publication that names
+// it as the reuse source revision builds downstream instead of releasing push
+// 1's artifact: only what the run of the final head built is reused.
+func TestReleaseSetE2EMainBuildsWhatAnEarlierPushPublished(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "release-set-reuse-source-revision", "a-record-inherited-from-an-earlier-push-is-built")
+	const (
+		bootstrapRevision = "1f0d2c3b4a5968778695a4b3c2d1e0f9a8b7c6d5"
+		firstPushRevision = "2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f"
+		finalPushRevision = "5b4a3928170f6e5d4c3b2a19f8e7d6c5b4a39281"
+		mainRevision      = "3d2c1b0a9f8e7d6c5b4a39281706f5e4d3c2b1a0"
+	)
+	ctx := context.Background()
+	ledger := newReleaseSetE2ELedger()
+	useReleaseSetE2EProvider(t, ledger)
+	useReleaseSetProvenance(t, nil)
+	useReleaseSetRevision(t, bootstrapRevision)
+	releaseSetE2EBootstrap(t, ctx, ledger)
+
+	useReleaseSetProvenance(t, map[string]string{"/downstream": releaseSetE2EDigest('9')})
+	ws, _, downstream := releaseSetE2EWorkspace(t, "1.1.0")
+	pullRequest := releaseSetE2EImpactedOptions("pr-7")
+	pullRequest.BaselineChannel = "canary"
+	useReleaseSetRevision(t, firstPushRevision)
+	run := releaseSetE2EPrepare(t, ctx, pullRequest, ws, ws.Projects)
+	results, _ := releaseSetE2EPublish(run.plan, '2', nil)
+	run.Finalizer(ctx)(results)
+	firstPushRef := releaseSetE2EOutcome(t, results).Ref
+
+	useReleaseSetRevision(t, finalPushRevision)
+	run = releaseSetE2EPrepare(t, ctx, pullRequest, ws, ws.Projects)
+	if !run.NoImpact() {
+		t.Fatalf("final push selected %+v; want pr-7's record kept", run.plan.SelectedMembers())
+	}
+	results = map[string]*JobResult{}
+	run.Finalizer(ctx)(results)
+	if head, ok := ledger.head("putnami", "pr-7"); !ok || head != firstPushRef ||
+		releaseSetE2EMember(t, ledger.mustReleaseSet(t, head), downstream.Name).SourceRevision != firstPushRevision {
+		t.Fatalf("pr-7 head = %+v, %v; want push 1's set still carried", head, ok)
+	}
+
+	useReleaseSetRevision(t, mainRevision)
+	merged := releaseSetE2EImpactedOptions("canary")
+	merged.ReuseChannel, merged.ReuseSourceRevision = "pr-7", finalPushRevision
+	run = releaseSetE2EPrepare(t, ctx, merged, ws, ws.Projects)
+	if run.plan.Reused != nil || run.plan.ReuseChannel != "" || run.NoImpact() {
+		t.Fatalf("main plan reused %+v and selected %+v; want downstream built", run.plan.Reused, run.plan.SelectedMembers())
+	}
+	results, registry := releaseSetE2EPublish(run.plan, '5', nil)
+	if registry.uploadCount(downstream.Name) != 1 {
+		t.Fatalf("main registry activity = %+v; want downstream built and uploaded", registry)
+	}
+	run.Finalizer(ctx)(results)
+	canary := ledger.mustReleaseSet(t, releaseSetE2EOutcome(t, results).Ref)
+	inherited := releaseSetE2EMember(t, ledger.mustReleaseSet(t, firstPushRef), downstream.Name)
+	if got := releaseSetE2EMember(t, canary, downstream.Name); got.SourceRevision != mainRevision || got.ArtifactDigest == inherited.ArtifactDigest {
+		t.Fatalf("canary downstream = %+v; want main's own build, not push 1's artifact %s", got, inherited.ArtifactDigest)
 	}
 }

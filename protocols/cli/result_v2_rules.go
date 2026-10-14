@@ -253,6 +253,7 @@ var (
 	sessionSelectionReuseFields = []field{
 		req("channel", nonEmptyString),
 		req("head", nonEmptyString),
+		req("sourceRevision", releaseSourceRevision),
 		req("members", arrayOf(sessionReusedMember)),
 	}
 
@@ -1011,8 +1012,33 @@ func sessionSelection(v *validator, path string, value any) {
 	object(v, path, value, sessionSelectionFields)
 }
 
+// sessionSelectionReuse applies the job contract's rule for the same block
+// (protocols/job validateSelectionReuse) beside the member set: members names
+// at least one member, because a plan that reused nothing reports no block, in
+// (ecosystem, coordinate) order without duplicates. A violation names the
+// members array once.
 func sessionSelectionReuse(v *validator, path string, value any) {
-	object(v, path, value, sessionSelectionReuseFields)
+	obj := object(v, path, value, sessionSelectionReuseFields)
+	members, ok := childArray(obj, "members")
+	if !ok {
+		return
+	}
+	if len(members) == 0 {
+		v.add(ViolationInvalidValue, join(path, "members"))
+		return
+	}
+	var previous [2]string
+	for i, entry := range members {
+		member, _ := entry.(map[string]any)
+		ecosystem, _ := childString(member, "ecosystem")
+		coordinate, _ := childString(member, "coordinate")
+		current := [2]string{ecosystem, coordinate}
+		if i > 0 && (previous[0] > current[0] || (previous[0] == current[0] && previous[1] >= current[1])) {
+			v.add(ViolationInvalidValue, join(path, "members"))
+			return
+		}
+		previous = current
+	}
 }
 
 func sessionReusedMember(v *validator, path string, value any) {
@@ -1626,6 +1652,23 @@ func reportCache(v *validator, path string, value any) {
 
 func reportScheduler(v *validator, path string, value any) {
 	object(v, path, value, reportSchedulerFields)
+}
+
+// releaseSourceRevision accepts a full commit revision as a release-set member
+// records one: exactly 40 lowercase hex characters. It is narrower than
+// gitObjectID because the distribution protocol holds every member revision to
+// that shape, and a reuse block names the revision its reused records carry.
+func releaseSourceRevision(v *validator, path string, value any) {
+	revision, ok := value.(string)
+	if !ok {
+		v.add(ViolationInvalidType, path)
+		return
+	}
+	if len(revision) != 40 {
+		v.add(ViolationInvalidValue, path)
+		return
+	}
+	gitObjectID(v, path, revision)
 }
 
 // gitObjectID accepts a full git object id — 40 lowercase hex for a sha1

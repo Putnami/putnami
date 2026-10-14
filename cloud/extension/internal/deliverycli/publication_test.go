@@ -1373,49 +1373,136 @@ func TestPublicationReleaseCarriesInheritedMembersWhateverTheirAttribution(t *te
 // TestPublicationReleaseCarriesAMemberReusedFromAResolvedHead pins the broker
 // half of protocols/distribution ADR 0007: a release may carry, unplanned, a
 // member another channel's head published with the same fingerprint, rebound
-// to the plan's revision and to this build's tree. It is carried only when
-// this session resolved that head and the member names the plan's revision;
-// any other artifact, or the same artifact under another revision, is a
+// to the plan's revision, with no source tree or the one tree every member
+// bound to that revision shares. It is carried only when this session resolved
+// that head, the plan does not advance that channel, and the member names the
+// plan's revision; any other artifact, the same artifact under another
+// revision or tree, or one only an advanced channel's head carries, is a
 // member nobody planned.
 func TestPublicationReleaseCarriesAMemberReusedFromAResolvedHead(t *testing.T) {
 	reused := pubMember("go", "go.acme.dev/lib", "v1.1.0", pubOtherSource, "b", "c")
 	reused.SourceTree = strings.Repeat("d", 40)
-	pullRequest := distribution.ReleaseSet{ProtocolVersion: distribution.ProtocolVersion, Namespace: pubNamespace, Members: []distribution.ReleaseSetMember{reused}}
+	buildTree := strings.Repeat("f", 40)
 	rebound := reused
 	rebound.SourceRevision, rebound.SourceTree = pubSource, ""
 	cases := []struct {
-		name        string
-		resolveHead bool
+		name string
+		// carrier is the channel whose head carries the reused artifact;
+		// resolved says whether this session resolved it.
+		carrier  string
+		resolved bool
+		// plannedTree is the source tree of every planned member.
+		plannedTree string
 		edit        func(member *distribution.ReleaseSetMember)
+		accepted    bool
 	}{
-		{name: "rebound to the plan's revision", resolveHead: true},
-		{name: "a revision other than the plan's", resolveHead: true, edit: func(member *distribution.ReleaseSetMember) {
+		{name: "rebound to the plan's revision", carrier: "pr-7", resolved: true, accepted: true},
+		{name: "rebound to the run's tree", carrier: "pr-7", resolved: true, plannedTree: buildTree, accepted: true, edit: func(member *distribution.ReleaseSetMember) {
+			member.SourceTree = buildTree
+		}},
+		{name: "rebound with no tree beside the run's", carrier: "pr-7", resolved: true, plannedTree: buildTree, accepted: true},
+		{name: "a revision other than the plan's", carrier: "pr-7", resolved: true, edit: func(member *distribution.ReleaseSetMember) {
 			member.SourceRevision = pubParentSource
 		}},
-		{name: "an artifact no resolved head carries", resolveHead: true, edit: func(member *distribution.ReleaseSetMember) {
+		{name: "a foreign source tree", carrier: "pr-7", resolved: true, edit: func(member *distribution.ReleaseSetMember) {
+			member.SourceTree = strings.Repeat("e", 40)
+		}},
+		{name: "a tree other than the run's", carrier: "pr-7", resolved: true, plannedTree: buildTree, edit: func(member *distribution.ReleaseSetMember) {
+			member.SourceTree = strings.Repeat("e", 40)
+		}},
+		{name: "an artifact no resolved head carries", carrier: "pr-7", resolved: true, edit: func(member *distribution.ReleaseSetMember) {
 			member.ArtifactDigest = pubDigest("e")
 		}},
-		{name: "a head this session did not resolve", resolveHead: false},
+		{name: "a head this session did not resolve", carrier: "pr-7"},
+		{name: "rebound from an advanced channel's head", carrier: pubCanary, resolved: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newPubRig(t, nil)
-			r.put.move("pr-7", pullRequest)
+			carried := pubBaseSet()
+			carried.Members[0] = reused
+			carriedRef := r.put.move(tc.carrier, carried)
 			r.start()
 			channels := []string{pubCanary, pubImmutable}
-			if tc.resolveHead {
-				channels = append(channels, "pr-7")
+			if tc.resolved && tc.carrier != pubCanary {
+				channels = append(channels, tc.carrier)
 			}
 			mustResolved(t, r.resolve(pubResolveRequest(pubNamespace, channels...)))
 			mustOpened(t, r.open(pubOpenParams(t)), pubPlan(t).PlanDigest)
 			release := r.defaultRelease()
+			if tc.carrier == pubCanary {
+				// The release expects the canary head it resolved, so the
+				// carrier is the only difference from an accepted reuse.
+				release.request.Channels[0].Expected = &carriedRef
+			}
 			member := rebound
 			if tc.edit != nil {
 				tc.edit(&member)
 			}
 			release.request.ReleaseSet.Members[0] = member
+			for index := 1; index < len(release.request.ReleaseSet.Members); index++ {
+				release.request.ReleaseSet.Members[index].SourceTree = tc.plannedTree
+			}
 			payload, requestBytes := release.payload(t)
-			if tc.resolveHead && tc.edit == nil {
+			if tc.accepted {
+				if released := mustReleased(t, r.release(payload), requestBytes); released.Outcome != distribution.ReleaseOutcomeReleased {
+					t.Fatalf("outcome = %s, want released", released.Outcome)
+				}
+				return
+			}
+			refusal := mustRefusal(t, r.release(payload), registry.RefusalPlanMismatch)
+			if !strings.Contains(refusal.Message, "neither planned nor carried by a head this session resolved") {
+				t.Fatalf("refusal = %q, want the unplanned member named", refusal.Message)
+			}
+			if _, releases := r.put.calls(); releases != 0 {
+				t.Fatalf("put-server releases = %d, want none", releases)
+			}
+		})
+	}
+}
+
+// TestPublicationReleaseThatOnlyReusesCarriesTheRunTree pins the case where a
+// build plans nothing and reuses every member it selected: the plan has no
+// member to name the run's tree, so the members rebound to its revision name
+// it, and they must name one. Two trees, or a tree beside none, are refused.
+func TestPublicationReleaseThatOnlyReusesCarriesTheRunTree(t *testing.T) {
+	runTree, otherTree := strings.Repeat("f", 40), strings.Repeat("e", 40)
+	built := distribution.ReleaseSet{ProtocolVersion: distribution.ProtocolVersion, Namespace: pubNamespace, Members: []distribution.ReleaseSetMember{
+		pubMember("npm", "@acme/web", "1.2.3", pubOtherSource, "7", "8"),
+		pubMember("put", "acme/app", "1.2.3", pubOtherSource, "9", "a"),
+	}}
+	for index := range built.Members {
+		built.Members[index].SourceTree = strings.Repeat("d", 40)
+	}
+	cases := []struct {
+		name     string
+		trees    [2]string
+		accepted bool
+	}{
+		{name: "every reused member carries the run's tree", trees: [2]string{runTree, runTree}, accepted: true},
+		{name: "no reused member carries a tree", accepted: true},
+		{name: "two trees", trees: [2]string{runTree, otherTree}},
+		{name: "a tree beside none", trees: [2]string{"", runTree}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newPubRig(t, nil)
+			r.put.move("pr-7", built)
+			r.start()
+			mustResolved(t, r.resolve(pubResolveRequest(pubNamespace, pubCanary, pubImmutable, "pr-7")))
+			plan := pubPlan(t)
+			plan.Members = []registry.PublicationPlanMember{}
+			plan = pubSeal(t, plan)
+			mustOpened(t, r.open(registry.OpenParams{Plan: plan, Ancestry: pubAncestry()}), plan.PlanDigest)
+			release := r.defaultRelease()
+			release.planDigest = plan.PlanDigest
+			members := release.request.ReleaseSet.Members
+			for index := 1; index < len(members); index++ {
+				members[index] = built.Members[index-1]
+				members[index].SourceRevision, members[index].SourceTree = pubSource, tc.trees[index-1]
+			}
+			payload, requestBytes := release.payload(t)
+			if tc.accepted {
 				if released := mustReleased(t, r.release(payload), requestBytes); released.Outcome != distribution.ReleaseOutcomeReleased {
 					t.Fatalf("outcome = %s, want released", released.Outcome)
 				}

@@ -176,18 +176,22 @@ defaults are) is the language extension's, the graph is core's.
   two are never confused. It is absent when the session coordinates no release
   set, and when the plan selected no member.
 
-  `reuse` names what a release-set publication took from the channel
+  `reuse` names what the release-set plan takes from the channel
   `--reuse-channel` named instead of building it: `channel`, the `head` set id
-  the publication resolved for it, and `members`, each with its `ecosystem`,
-  `coordinate` and the `version` it was released at. Every member is required
-  and non-blank, the list is non-empty and sorted by ecosystem then coordinate
-  with no duplicate (`job.invalid_value`, `job.missing_field`). It is absent
-  when the publication reused nothing.
+  the publication resolved for it, `sourceRevision`, the commit
+  `--reuse-source-revision` named, which every reused record had to come from,
+  and `members`, each with its `ecosystem`, `coordinate` and the `version` the
+  plan takes. It states the plan, which a dry run or a failed release does not
+  release. Every member is required and non-blank, `sourceRevision` is a full
+  40-hex lowercase commit, and the list is non-empty and sorted by ecosystem
+  then coordinate with no duplicate (`job.invalid_value`, `job.missing_field`).
+  It is absent when the publication reused nothing.
 
   ```json
   "reuse": {
     "channel": "pr-7",
     "head": "rs_9a03…",
+    "sourceRevision": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
     "members": [
       {"ecosystem": "npm", "coordinate": "@acme/widget", "version": "1.2.0-20261014120000-abc1234"}
     ]

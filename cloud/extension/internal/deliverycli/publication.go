@@ -92,9 +92,10 @@ type publisher struct {
 	// a resolved head carries: what a release may carry without planning it.
 	inherited map[string]map[string]bool
 	// rebindable holds, per member key, the same encoding without the source
-	// revision and tree: what a release may carry, rebound to the plan's
-	// revision, without planning it.
-	rebindable map[string]map[string]bool
+	// revision and tree, with the channels whose resolved heads carry it: what
+	// a release may carry from a channel the plan does not advance, rebound to
+	// the plan's revision, without planning it.
+	rebindable map[string]map[string]map[string]bool
 	opening    *pendingAnswer
 	opened     *registry.OpenParams
 	// held is the open plan's immutable channel when it already had a head
@@ -180,7 +181,7 @@ func newPublisher(caller *capabilityCaller, runCredential string, endpoints publ
 		retryWait:      publicationRetryWait,
 		resolved:       make(map[string]map[string]uint64),
 		inherited:      make(map[string]map[string]bool),
-		rebindable:     make(map[string]map[string]bool),
+		rebindable:     make(map[string]map[string]map[string]bool),
 		released:       make(map[string]releaseRecord),
 	}, nil
 }
@@ -247,10 +248,14 @@ func (p *publisher) record(response *distribution.ResolveResponse) {
 			key := memberKey(member.Ecosystem, member.Coordinate)
 			if p.inherited[key] == nil {
 				p.inherited[key] = make(map[string]bool)
-				p.rebindable[key] = make(map[string]bool)
+				p.rebindable[key] = make(map[string]map[string]bool)
 			}
 			p.inherited[key][artifactEncoding(member)] = true
-			p.rebindable[key][rebindEncoding(member)] = true
+			encoding := rebindEncoding(member)
+			if p.rebindable[key][encoding] == nil {
+				p.rebindable[key][encoding] = make(map[string]bool)
+			}
+			p.rebindable[key][encoding][channel] = true
 		}
 	}
 }
@@ -894,9 +899,8 @@ func everyChannelExpects(channels []distribution.ChannelRequest, ref distributio
 // ancestry stated at open, the plan's namespace and channels in order, the
 // immutable flag on exactly the plan's immutable channel, every planned
 // member at its planned version and provenance, and every other member
-// carried from a head this session resolved: unchanged, or reused with its
-// source revision rebound to the plan's and its source tree to this build's.
-// p.mu is held.
+// carried from a head this session resolved: unchanged, or reused from the
+// head of a channel the plan does not advance (reboundLocked). p.mu is held.
 func (p *publisher) mismatchLocked(opened *registry.OpenParams, params *registry.ReleaseParams) publicationAnswer {
 	plan, request := opened.Plan, params.Request
 	if !sameJSON(params.Ancestry, opened.Ancestry) {
@@ -929,17 +933,57 @@ func (p *publisher) mismatchLocked(opened *registry.OpenParams, params *registry
 			return publicationRefusal(registry.RefusalPlanMismatch, "the released set does not carry %s/%s at version %s from the plan's build", want.Ecosystem, want.Coordinate, want.Version)
 		}
 	}
+	tree, shared := p.runSourceTreeLocked(plan, planned, set.Members)
 	for _, member := range set.Members {
 		key := memberKey(member.Ecosystem, member.Coordinate)
-		if planned[key] || p.inherited[key][artifactEncoding(member)] {
-			continue
-		}
-		if member.SourceRevision == plan.SourceRevision && p.rebindable[key][rebindEncoding(member)] {
+		if planned[key] || p.inherited[key][artifactEncoding(member)] || p.reboundLocked(plan, tree, shared, member) {
 			continue
 		}
 		return publicationRefusal(registry.RefusalPlanMismatch, "member %s/%s is neither planned nor carried by a head this session resolved", member.Ecosystem, member.Coordinate)
 	}
 	return publicationAnswer{}
+}
+
+// reboundLocked reports whether a release may carry member, which it did not
+// plan and no resolved head carries unchanged, as an artifact reused from
+// another channel: the head of a channel the plan does not advance carries it,
+// it is rebound to the plan's revision, and its source tree is empty or tree,
+// the one tree every member bound to the plan's revision shares (shared). A
+// head the plan advances never lends an artifact a new revision. p.mu is held.
+func (p *publisher) reboundLocked(plan registry.PublicationPlan, tree string, shared bool, member distribution.ReleaseSetMember) bool {
+	if member.SourceRevision != plan.SourceRevision || (member.SourceTree != "" && (!shared || member.SourceTree != tree)) {
+		return false
+	}
+	for channel := range p.rebindable[memberKey(member.Ecosystem, member.Coordinate)][rebindEncoding(member)] {
+		if !slices.Contains(plan.Channels, channel) {
+			return true
+		}
+	}
+	return false
+}
+
+// runSourceTreeLocked is the source tree every member of the released set
+// bound to the plan's revision records, planned and rebound alike, with shared
+// false when two of them record different trees, an empty one included. An
+// inherited member, carried unchanged from a resolved head, is another
+// publication's record and does not count. A reader names a head by one tree
+// only when every member carrying its revision records the same one, so a
+// rebound member that names a tree must name that one; a second tree would
+// leave the head with none. A rebound member may name no tree: it is optional
+// provenance. p.mu is held.
+func (p *publisher) runSourceTreeLocked(plan registry.PublicationPlan, planned map[string]bool, members []distribution.ReleaseSetMember) (tree string, shared bool) {
+	seen := false
+	for _, member := range members {
+		key := memberKey(member.Ecosystem, member.Coordinate)
+		if member.SourceRevision != plan.SourceRevision || (!planned[key] && p.inherited[key][artifactEncoding(member)]) {
+			continue
+		}
+		if seen && member.SourceTree != tree {
+			return "", false
+		}
+		tree, seen = member.SourceTree, true
+	}
+	return tree, true
 }
 
 // unresolvedLocked refuses a release that expects, on a forward-only channel,

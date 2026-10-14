@@ -1201,15 +1201,21 @@
     "sessionSelectionReuse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["channel", "head", "members"],
-      "description": "The members a release-set publication released from the channel --reuse-channel named instead of building them. Absent when the session reused nothing.",
+      "required": ["channel", "head", "sourceRevision", "members"],
+      "description": "The members the release-set plan takes from the channel --reuse-channel named instead of building them. It states the plan, not the release outcome: a dry run, or a release that fails, records the same block and releases nothing. Absent when the plan reused nothing. Unrelated to run.reuse, which counts tasks served from a cache.",
       "properties": {
         "channel": { "type": "string", "minLength": 1, "description": "The reuse channel. It is read and never advanced." },
         "head": { "type": "string", "minLength": 1, "description": "The id of the reuse channel's head the publication resolved." },
+        "sourceRevision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$",
+          "description": "The commit --reuse-source-revision named, the reviewed final head of the reuse channel: a member is reused only when its record on the reuse head carries exactly this sourceRevision. A full 40-hex lowercase revision, the shape a release-set member records."
+        },
         "members": {
           "type": "array",
+          "minItems": 1,
           "items": { "$ref": "#/$defs/sessionReusedMember" },
-          "description": "Every reused member, sorted by ecosystem then coordinate."
+          "description": "Every reused member, at least one, sorted by ecosystem then coordinate without duplicates."
         }
       }
     },
@@ -1217,7 +1223,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["ecosystem", "coordinate", "version"],
-      "description": "One reused member and the version it was released at, which is the version the reuse head recorded for it.",
+      "description": "One reused member and the version the plan takes for it, which is the version the reuse head recorded.",
       "properties": {
         "ecosystem": { "type": "string", "minLength": 1 },
         "coordinate": { "type": "string", "minLength": 1 },

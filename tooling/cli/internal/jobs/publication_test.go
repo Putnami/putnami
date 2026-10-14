@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -181,6 +182,13 @@ type publicationHarness struct {
 	cache *store.CacheManager
 	// renderer records what the last execute rendered.
 	renderer *mockRenderer
+	// reuseChannel, reuseHead, reuseSourceRevision and reused are what the
+	// plan takes from another channel's head without building it
+	// (reuseMember); empty, the plan reuses nothing.
+	reuseChannel        string
+	reuseHead           *distribution.ChannelHead
+	reuseSourceRevision string
+	reused              []releaseset.PlannedMember
 }
 
 func newPublicationHarness(t *testing.T, config providertest.Config) *publicationHarness {
@@ -233,6 +241,21 @@ func (h *publicationHarness) addMember(ecosystem, coordinate, version, path stri
 	return publishJob
 }
 
+// reuseMember adds to the plan record, which the head of channel carries and
+// the run releases without building it, rebound to the run's revision and to
+// tree, the run's tree, as the CLI rebinds a reused member
+// (protocols/distribution ADR 0007). The project with id projectID owns it,
+// and the record's revision is the run's reuse source revision.
+func (h *publicationHarness) reuseMember(channel string, head *distribution.ChannelHead, record distribution.ReleaseSetMember, projectID, tree string) {
+	h.reuseChannel, h.reuseHead, h.reuseSourceRevision = channel, head, record.SourceRevision
+	h.reused = append(h.reused, releaseset.PlannedMember{
+		Ecosystem: record.Ecosystem, Coordinate: record.Coordinate, Version: record.Version,
+		ArtifactDigest: record.ArtifactDigest, Dependencies: record.Dependencies,
+		SourceRevision: testRevision, SelectionFingerprint: record.SelectionFingerprint,
+		SourceTree: tree, ProjectID: projectID,
+	})
+}
+
 // addGate adds a test job to the project at path that writes marker.
 func (h *publicationHarness) addGate(path, marker string) *ScheduledJob {
 	h.t.Helper()
@@ -255,13 +278,22 @@ func (h *publicationHarness) plan(heads map[string]*distribution.ChannelHead, an
 	if heads == nil {
 		heads = map[string]*distribution.ChannelHead{"canary": nil}
 	}
-	members := slices.Clone(h.members)
+	members := slices.Concat(h.members, h.reused)
 	slices.SortFunc(members, func(a, b releaseset.PlannedMember) int {
 		return strings.Compare(releaseset.MemberKey(a.Ecosystem, a.Coordinate), releaseset.MemberKey(b.Ecosystem, b.Coordinate))
 	})
 	plan := &releaseset.Plan{
 		ProtocolVersion: distribution.ProtocolVersion, Namespace: "putnami",
 		Channels: []string{"canary"}, Heads: heads, Members: members,
+	}
+	if h.reuseChannel != "" {
+		plan.Heads = maps.Clone(heads)
+		plan.Heads[h.reuseChannel] = h.reuseHead
+		plan.ReuseChannel, plan.SourceRevision, plan.ReuseSourceRevision = h.reuseChannel, testRevision, h.reuseSourceRevision
+		for _, member := range h.reused {
+			plan.Reused = append(plan.Reused, releaseset.MemberRef{Ecosystem: member.Ecosystem, Coordinate: member.Coordinate})
+		}
+		plan = releaseset.NormalizePlan(plan)
 	}
 	if err := releaseset.ValidatePlan(plan); err != nil {
 		h.t.Fatalf("plan: %v", err)
@@ -1197,6 +1229,70 @@ func TestNotForwardHeadIsRefusedAtOpen(t *testing.T) {
 	}
 	if _, requests := npm.stored("@putnami/web", "1.2.3"); requests != 0 {
 		t.Fatalf("the registry received %d requests", requests)
+	}
+}
+
+// protocols/distribution ADR 0007 through the reference provider: a plan that
+// builds web and reuses lib from pr-7 opens with web alone, uploads web alone,
+// and releases a set carrying pr-7's lib record rebound to this commit and to
+// the tree web was built from. The provider accepts that release, and canary
+// moves to the set.
+func TestReferenceProviderReleasesAPlanThatReusesAMember(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "release-set-reuse-channel", "a-selected-member-is-released-from-the-reuse-channel")
+	npm := newNPMRegistry(t)
+	h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: []string{serverHost(t, npm.server)}})
+	outbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
+		return []extensionproto.OutboxMember{npmOutboxMember(t, w, npm.server.URL, "/web", "@putnami/web", "1.2.3")}
+	})
+	h.addMember("npm", "@putnami/web", "1.2.3", "web", map[string]string{"npm": registriesEntry("publish", npm.server.URL)},
+		fixtureScript{{"copy-tree", outbox, "$PUTNAMI_PUBLICATION_OUTBOX"}})
+	h.members[0].SourceTree = testTree
+	lib := distribution.ReleaseSetMember{
+		Ecosystem: "npm", Coordinate: "@putnami/lib", Version: "1.1.0", ArtifactDigest: digestFor('c'),
+		Dependencies: []distribution.ReleaseSetDependency{}, SourceRevision: reuseTestRevision, SelectionFingerprint: digestFor('9'),
+		SourceTree: strings.Repeat("d", 40),
+	}
+	pullRequest := distribution.ReleaseSet{ProtocolVersion: distribution.ProtocolVersion, Namespace: "putnami", Members: []distribution.ReleaseSetMember{lib}}
+	ref, err := h.provider.SetHead("putnami", "pr-7", pullRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.reuseMember("pr-7", &distribution.ChannelHead{Ref: ref, Generation: 1, ReleaseSet: distribution.NormalizeReleaseSet(&pullRequest)}, lib, "/lib", testTree)
+	planned, internal := h.plan(nil, fixedAncestry{testRevision}, nil)
+	if opened := h.run.open.Plan; len(opened.Members) != 1 || opened.Members[0].Coordinate != "@putnami/web" || !slices.Equal(opened.Channels, []string{"canary"}) {
+		t.Fatalf("open plan = %+v, want web alone on canary", opened)
+	}
+	results := h.execute(context.Background(), planned, internal, nil)
+
+	if outcome := results[releaseSetResultKey]; outcome == nil || outcome.Status != "success" {
+		t.Fatalf("release: %s", resultMessage(outcome))
+	}
+	canary, moved := h.provider.Head("putnami", "canary")
+	if !moved || h.provider.Releases() != 1 {
+		t.Fatal("the provider did not release the set that reuses lib")
+	}
+	set, _ := h.provider.ReleaseSet(canary)
+	rebound := lib
+	rebound.SourceRevision, rebound.SourceTree = testRevision, testTree
+	for _, member := range set.Members {
+		if member.SourceTree != testTree {
+			t.Fatalf("released %s carries tree %q, want the run's %q on every member", member.Coordinate, member.SourceTree, testTree)
+		}
+		if member.Coordinate == lib.Coordinate && !releaseSetE2EMembersEqual(member, rebound) {
+			t.Fatalf("released lib = %+v, want pr-7's record rebound to this commit %+v", member, rebound)
+		}
+	}
+	if len(set.Members) != 2 {
+		t.Fatalf("released set = %+v, want web and lib", set.Members)
+	}
+	if current, _ := h.provider.Head("putnami", "pr-7"); current != ref {
+		t.Fatal("the release moved the reuse channel")
+	}
+	if data, _ := npm.stored("@putnami/lib", "1.1.0"); data != nil {
+		t.Fatal("the run uploaded the reused member")
+	}
+	if data, _ := npm.stored("@putnami/web", "1.2.3"); data == nil {
+		t.Fatal("the run did not upload the member it built")
 	}
 }
 

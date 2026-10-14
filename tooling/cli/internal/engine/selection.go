@@ -268,6 +268,9 @@ func resolveReleaseSetSelections(
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
 		return options, nil, selectionEvidence{}, protocolcli.ExitCodeForError(err)
 	}
+	if notice := jobs.ReleaseSetReuseNotice(options); notice != "" {
+		iox.Fprintf(os.Stderr, "putnami: %s\n", notice)
+	}
 	if req == nil || !jobs.ReleaseSetPlansEveryProject(options) {
 		return options, nil, selectionEvidence{}, ExitSuccess
 	}

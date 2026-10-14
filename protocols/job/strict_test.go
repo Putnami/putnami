@@ -282,16 +282,18 @@ func TestValidate_SelectionReleaseSetProjectsAreASortedSubset(t *testing.T) {
 }
 
 // The reuse block names the members a release-set publication released from
-// another channel's head. A block that names no member, a member without its
-// identity or version, or members out of identity order would describe a reuse
-// a reader cannot find again, and a member field the contract does not declare
-// is refused from the wire.
+// another channel's head, and the commit their records had to come from. A
+// block that names no member, a member without its identity or version,
+// members out of identity order, or a source revision that is not a full
+// commit would describe a reuse a reader cannot find again or check, and a
+// member field the contract does not declare is refused from the wire.
 func TestValidate_SelectionReuseNamesEveryReusedMemberInOrder(t *testing.T) {
 	for fixture, field := range map[string]string{
-		"selection-reuse-unsorted.json":             "selection.reuse.members",
-		"selection-reuse-no-members.json":           "selection.reuse.members",
-		"selection-reuse-blank-member.json":         "selection.reuse.members[0].version",
-		"selection-reuse-unknown-member-field.json": "",
+		"selection-reuse-unsorted.json":                     "selection.reuse.members",
+		"selection-reuse-no-members.json":                   "selection.reuse.members",
+		"selection-reuse-blank-member.json":                 "selection.reuse.members[0].version",
+		"selection-reuse-unknown-member-field.json":         "",
+		"selection-reuse-source-revision-not-a-commit.json": "selection.reuse.sourceRevision",
 	} {
 		t.Run(fixture, func(t *testing.T) {
 			_, diags := ParseAndValidate(readFixture(t, "fixtures", "v2", "invalid", fixture))
@@ -323,7 +325,7 @@ func TestValidate_SelectionReuseNamesEveryReusedMemberInOrder(t *testing.T) {
 		t.Fatalf("re-encoded document failed strict parse: %v", diags)
 	}
 	reuse := round.Selection.Reuse
-	if reuse == nil || reuse.Channel != "pr-7" || len(reuse.Members) != 2 ||
+	if reuse == nil || reuse.Channel != "pr-7" || reuse.SourceRevision != "4b825dc642cb6eb9a060e54bf8d69288fbee4904" || len(reuse.Members) != 2 ||
 		reuse.Members[1] != (SelectionReusedMember{Ecosystem: "oci", Coordinate: "acme/console", Version: "1.2.0-20261014120000-abc1234"}) {
 		t.Fatalf("round-tripped selection.reuse = %+v", reuse)
 	}

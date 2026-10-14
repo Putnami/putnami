@@ -120,8 +120,8 @@ func buildPlan(
 			return nil, ExitError
 		}
 		reportUnservedSDDCommands(req.Commands, extensions)
-		// A release set that changes no member confirms the head from the
-		// finalizer. A publish-only session, or a gate that selected nothing,
+		// A release set that builds no member is released by the finalizer
+		// alone. A publish-only session, or a gate that selected nothing,
 		// then leaves no job to plan: the empty plan is the whole session, not
 		// a selection that matched nothing, so it goes on to execute.
 		// Like every empty plan, it stays local under --where remote.

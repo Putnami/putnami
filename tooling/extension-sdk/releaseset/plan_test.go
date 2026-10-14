@@ -762,7 +762,8 @@ const (
 
 // reuseTestPlan is testPlan with its one selected member taken from a pr-7
 // head that published the same fingerprint: the member keeps pr-7's artifact
-// record and is rebound to planRevision with no source tree.
+// record and is rebound to planRevision and to the run's tree, which this run
+// does not record.
 func reuseTestPlan(t *testing.T) *Plan {
 	t.Helper()
 	plan := testPlan(t)
@@ -775,6 +776,9 @@ func reuseTestPlan(t *testing.T) *Plan {
 	pr := distribution.ReleaseSet{ProtocolVersion: distribution.ProtocolVersion, Namespace: "putnami"}
 	for _, member := range canary.Members {
 		if member.Coordinate == "@putnami/upstream" {
+			// The pull request's final head built upstream too, so its
+			// record carries that commit like downstream's.
+			member.SourceRevision = reuseRevision
 			pr.Members = append(pr.Members, member)
 		}
 	}
@@ -788,6 +792,7 @@ func reuseTestPlan(t *testing.T) *Plan {
 	plan.ReuseChannel = "pr-7"
 	plan.Reused = []MemberRef{{Ecosystem: "npm", Coordinate: "@putnami/downstream"}}
 	plan.SourceRevision = planRevision
+	plan.ReuseSourceRevision = reuseRevision
 	for i := range plan.Members {
 		if plan.Members[i].Coordinate == "@putnami/downstream" {
 			plan.Members[i] = PlannedMember{
@@ -798,6 +803,18 @@ func reuseTestPlan(t *testing.T) *Plan {
 		}
 	}
 	return NormalizePlan(plan)
+}
+
+// otherTree is a git tree no fixture member was built from.
+var otherTree = strings.Repeat("e", 40)
+
+// selectPlannedUpstream makes the reuse fixture's upstream a member this run
+// builds, under the plan's revision and the run's tree.
+func selectPlannedUpstream(plan *Plan, tree string) {
+	setPlannedMember(plan, "@putnami/upstream", func(member *PlannedMember) {
+		member.Selected, member.ArtifactDigest, member.Platforms = true, "", nil
+		member.SourceRevision, member.ProjectID, member.SourceTree = planRevision, "/upstream", tree
+	})
 }
 
 func setPlannedMember(plan *Plan, coordinate string, edit func(*PlannedMember)) {
@@ -843,7 +860,7 @@ func TestValidatePlanAcceptsAMemberReusedFromAnotherChannel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseParams: %v", err)
 	}
-	if parsed.ReuseChannel != "pr-7" || parsed.SourceRevision != planRevision || !reflect.DeepEqual(parsed.Reused, plan.Reused) {
+	if parsed.ReuseChannel != "pr-7" || parsed.SourceRevision != planRevision || parsed.ReuseSourceRevision != reuseRevision || !reflect.DeepEqual(parsed.Reused, plan.Reused) {
 		t.Fatalf("round trip lost the reuse fields: %+v", parsed)
 	}
 	parsed.Reused[0].Coordinate = "mutated"
@@ -864,6 +881,26 @@ func TestValidatePlanAcceptsAMemberReusedFromAnotherChannel(t *testing.T) {
 	})
 	if err := ValidatePlan(first); err != nil {
 		t.Fatalf("plan reusing every member over an empty channel rejected: %v", err)
+	}
+
+	// A reused member records the run's tree beside a member the run builds,
+	// and so does each member of a plan that reuses them all and builds none.
+	built := reuseTestPlan(t)
+	selectPlannedUpstream(built, testTree)
+	setPlannedMember(built, "@putnami/downstream", func(member *PlannedMember) { member.SourceTree = testTree })
+	if err := ValidatePlan(built); err != nil {
+		t.Fatalf("reused member under the run's tree rejected: %v", err)
+	}
+	for _, coordinate := range []string{"@putnami/downstream", "@putnami/upstream"} {
+		setPlannedMember(first, coordinate, func(member *PlannedMember) { member.SourceTree = testTree })
+	}
+	if err := ValidatePlan(first); err != nil {
+		t.Fatalf("plan reusing every member under the run's tree rejected: %v", err)
+	}
+	for _, member := range first.ReusedMembers() {
+		if member.SourceTree != testTree {
+			t.Fatalf("reused member %s lost the run's tree: %+v", member.Coordinate, member)
+		}
 	}
 }
 
@@ -894,6 +931,15 @@ func TestValidatePlanRefusesAReuseItCannotProve(t *testing.T) {
 		{"reuse without a plan revision", func(plan *Plan) {
 			plan.SourceRevision = ""
 		}, "records no plan revision"},
+		{"reuse source revision without a reuse channel", func(plan *Plan) {
+			plan.ReuseChannel, plan.Reused, plan.SourceRevision = "", nil, ""
+		}, "without a reuse channel"},
+		{"reuse without a reuse source revision", func(plan *Plan) {
+			plan.ReuseSourceRevision = ""
+		}, "records no reuse source revision"},
+		{"reused record from an earlier commit of the reuse channel", func(plan *Plan) {
+			plan.ReuseSourceRevision = planRevision
+		}, `comes from a reuse head record of revision "4b825dc642cb6eb9a060e54bf8d69288fbee4904", not the reuse source revision`},
 		{"reuse channel has no head", func(plan *Plan) {
 			plan.Heads["pr-7"] = nil
 		}, `channel "pr-7", which has no head`},
@@ -922,6 +968,20 @@ func TestValidatePlanRefusesAReuseItCannotProve(t *testing.T) {
 				member.ProjectID = "/upstream"
 			})
 		}, `selected release-set plan member "npm/@putnami/upstream" records revision`},
+		{"reused member records no tree beside a built member's", func(plan *Plan) {
+			selectPlannedUpstream(plan, testTree)
+		}, "records the run's one tree"},
+		{"reused member records another tree than a built member's", func(plan *Plan) {
+			selectPlannedUpstream(plan, testTree)
+			setPlannedMember(plan, "@putnami/downstream", func(member *PlannedMember) { member.SourceTree = otherTree })
+		}, "records the run's one tree"},
+		{"reused members record two trees", func(plan *Plan) {
+			plan.Reused = append(plan.Reused, MemberRef{Ecosystem: "npm", Coordinate: "@putnami/upstream"})
+			setPlannedMember(plan, "@putnami/upstream", func(member *PlannedMember) {
+				member.SourceRevision, member.ProjectID, member.SourceTree = planRevision, "/upstream", otherTree
+			})
+			setPlannedMember(plan, "@putnami/downstream", func(member *PlannedMember) { member.SourceTree = testTree })
+		}, "records the run's one tree"},
 		{"reused member drops its digest", func(plan *Plan) {
 			setPlannedMember(plan, "@putnami/downstream", func(member *PlannedMember) { member.ArtifactDigest = "" })
 		}, "did not carry its artifact digest"},
@@ -952,7 +1012,7 @@ func TestValidatePlanRefusesAReuseItCannotProve(t *testing.T) {
 // reused member as an inherited one.
 func TestPlanHeadsReplayTheResolveThatIncludedTheReuseChannel(t *testing.T) {
 	plan := reuseTestPlan(t)
-	plan.ReuseChannel, plan.Reused, plan.SourceRevision = "", nil, ""
+	plan.ReuseChannel, plan.Reused, plan.SourceRevision, plan.ReuseSourceRevision = "", nil, "", ""
 	if err := ValidatePlan(plan); err == nil || !strings.Contains(err.Error(), "which was not requested") {
 		t.Fatalf("a reuse head read without its reuse fields was accepted: %v", err)
 	}

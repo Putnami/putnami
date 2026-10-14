@@ -695,6 +695,14 @@ func validateSelectionReuse(selection *Selection) []diag.Diagnostic {
 		diags = append(diags, diag.Errorf(ErrorCodeMissingField, "selection.reuse.head",
 			"selection.reuse.head is required"))
 	}
+	switch {
+	case reuse.SourceRevision == "":
+		diags = append(diags, diag.Errorf(ErrorCodeMissingField, "selection.reuse.sourceRevision",
+			"selection.reuse.sourceRevision is required"))
+	case !isReleaseSourceRevision(reuse.SourceRevision):
+		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, "selection.reuse.sourceRevision",
+			"selection.reuse.sourceRevision %q is not a full 40-hex lowercase commit revision", reuse.SourceRevision))
+	}
 	if len(reuse.Members) == 0 {
 		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, "selection.reuse.members",
 			"selection.reuse.members must name at least one member; a session that reused nothing reports no reuse block"))
@@ -722,6 +730,21 @@ func validateSelectionReuse(selection *Selection) []diag.Diagnostic {
 		}
 	}
 	return diags
+}
+
+// isReleaseSourceRevision reports whether value is a full commit revision as a
+// release-set member records one: 40 lowercase hex characters
+// (protocols/distribution sourceRevision).
+func isReleaseSourceRevision(value string) bool {
+	if len(value) != 40 {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		if b := value[i]; (b < '0' || b > '9') && (b < 'a' || b > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 // validateStaging checks the task-owned staging tree.

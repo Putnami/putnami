@@ -425,8 +425,8 @@ func (r Run) SessionFile(commands []string, scheduler, cache any) *protocolcli.S
 // it: a session that published beside its gate planned the union of two
 // selections, and a reader that cannot subtract one from the other reads a
 // project the run only verified as one it published. The reuse block is
-// repeated for the same reason: it is the only statement that a member was
-// released from another channel's head rather than built or inherited.
+// repeated for the same reason: it is the only statement that the plan took a
+// member from another channel's head rather than building or inheriting it.
 func SessionSelection(selection *protocoljob.Selection) *protocolcli.SessionSelection {
 	if selection == nil || selection.Mode == "" {
 		return nil
@@ -448,9 +448,10 @@ func sessionSelectionReuse(reuse *protocoljob.SelectionReuse) *protocolcli.Sessi
 		return nil
 	}
 	projected := &protocolcli.SessionSelectionReuse{
-		Channel: reuse.Channel,
-		Head:    reuse.Head,
-		Members: make([]protocolcli.SessionSelectionReusedMember, 0, len(reuse.Members)),
+		Channel:        reuse.Channel,
+		Head:           reuse.Head,
+		SourceRevision: reuse.SourceRevision,
+		Members:        make([]protocolcli.SessionSelectionReusedMember, 0, len(reuse.Members)),
 	}
 	for _, member := range reuse.Members {
 		projected.Members = append(projected.Members, protocolcli.SessionSelectionReusedMember{

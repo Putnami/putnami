@@ -126,7 +126,10 @@ older set keeps its `rs_` reference, and part of the canonical bytes when
 present. It belongs to the artifact record, so an unchanged member inherits it
 from the head verbatim with the revision it goes with. Whether an equal tree
 lets a publication skip republishing is the consumer's decision; the protocol
-only records it.
+only records it. A member a publication reuses from another channel's head
+records that publication's tree, the one its built members record: its
+selection fingerprint vouches that this content holds the artifact's inputs
+([ADR 0007](doc/adr/0007-a-publication-may-reuse-a-member-another-channel-published-with-the-same-fingerprint.md)).
 
 A publisher records it only on a clean checkout, where HEAD's tree is what it
 built (it reads the tree again when it commits the set and drops a tree the
@@ -227,8 +230,9 @@ whole list, advanced and read together.
 
 A publication may also read one reuse channel, requested after the baseline: a
 member the plan selects is released with the artifact that channel's head
-already carries for it with the same selection fingerprint, rebound to the
-publishing commit, instead of being built again
+already carries for it with the same selection fingerprint, built at the
+reuse source revision the runner states, rebound to the publishing commit,
+instead of being built again
 ([ADR 0007](doc/adr/0007-a-publication-may-reuse-a-member-another-channel-published-with-the-same-fingerprint.md)).
 It is a requested name like the baseline, never a `release` channel, and the
 same bound covers it.

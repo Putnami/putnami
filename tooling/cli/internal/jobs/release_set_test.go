@@ -3081,9 +3081,14 @@ func withReleaseSetSelection(options ReleaseSetOptions, edit func(*ReleaseSetOpt
 	return copied
 }
 
-// reuseTestRevision is the commit a pull request published its members from:
-// another commit than the one the publication under test runs on.
-const reuseTestRevision = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+// reuseTestRevision is the commit a pull request published its members from,
+// its reviewed final head: another commit than the one the publication under
+// test runs on. earlierPushRevision is an earlier push of that pull request,
+// whose records the reuse head may still carry.
+const (
+	reuseTestRevision   = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+	earlierPushRevision = "5c936ed753dc7fa0b171f65cf9e79399fc0f5a15"
+)
 
 // reuseChannelHead is a head of the reuse channel `pr-7` carrying exactly the
 // given records.
@@ -3128,6 +3133,7 @@ func pullRequestDownstream() distribution.ReleaseSetMember {
 // only channel the release advances.
 func TestPrepareReleaseSetReleasesWhatTheReuseChannelPublished(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "release-set-reuse-channel", "a-selected-member-is-released-from-the-reuse-channel")
+	spectest.Proves(t, "cli/job-planning-execution", "release-set-reuse-source-revision", "a-record-the-final-head-built-is-reused")
 	ws, upstream, downstream := releaseSetWorkspace(t)
 	useReleaseSetProvenance(t, map[string]string{downstream.ID: digestFor('9')})
 	heads := releaseSetHead(t)
@@ -3137,7 +3143,7 @@ func TestPrepareReleaseSetReleasesWhatTheReuseChannelPublished(t *testing.T) {
 	useReleaseSetProviderFake(t, provider)
 
 	options := releaseSetRequest()
-	options.ReuseChannel = "pr-7"
+	options.ReuseChannel, options.ReuseSourceRevision = "pr-7", reuseTestRevision
 	run, err := prepareReleaseSet(t, options, ws, ws.Projects, providerDiscovery())
 	if err != nil || run == nil {
 		t.Fatalf("reuse preparation = %+v, %v", run, err)
@@ -3148,7 +3154,7 @@ func TestPrepareReleaseSetReleasesWhatTheReuseChannelPublished(t *testing.T) {
 		t.Fatalf("resolve calls = %d, requests = %+v; want one resolve of canary then pr-7", provider.resolveCalls, provider.resolveRequests)
 	}
 	plan := run.plan
-	if plan.ReuseChannel != "pr-7" || plan.SourceRevision != testRevision ||
+	if plan.ReuseChannel != "pr-7" || plan.SourceRevision != testRevision || plan.ReuseSourceRevision != reuseTestRevision ||
 		plan.Heads["pr-7"] == nil || plan.Heads["pr-7"].Ref != heads["pr-7"].Ref ||
 		!slices.Equal(plan.Reused, []releaseset.MemberRef{{Ecosystem: "npm", Coordinate: downstream.Name}}) {
 		t.Fatalf("plan reuse = channel %q, revision %q, reused %+v, heads %+v", plan.ReuseChannel, plan.SourceRevision, plan.Reused, plan.Heads)
@@ -3172,7 +3178,7 @@ func TestPrepareReleaseSetReleasesWhatTheReuseChannelPublished(t *testing.T) {
 	selection := run.RunSelection(&protocoljob.Selection{Mode: protocoljob.SelectionModeImpacted}, ws.Projects)
 	wantMembers := []protocoljob.SelectionReusedMember{{Ecosystem: "npm", Coordinate: downstream.Name, Version: "1.1.0"}}
 	if selection.Reuse == nil || selection.Reuse.Channel != "pr-7" || selection.Reuse.Head != heads["pr-7"].Ref.ID ||
-		!slices.Equal(selection.Reuse.Members, wantMembers) || selection.ReleaseSetProjects != nil {
+		selection.Reuse.SourceRevision != reuseTestRevision || !slices.Equal(selection.Reuse.Members, wantMembers) || selection.ReleaseSetProjects != nil {
 		t.Fatalf("session selection = %+v, reuse = %+v", selection, selection.Reuse)
 	}
 
@@ -3196,12 +3202,61 @@ func TestPrepareReleaseSetReleasesWhatTheReuseChannelPublished(t *testing.T) {
 	}
 }
 
+// A reused member carries the run's tree, the value a member this run builds
+// records: a reader names a head by one tree only when every member carrying
+// its revision records the same one, so a reused member without it would leave
+// the head without one. Here every selected member is reused and none is built,
+// and the reused one still records the tree. When the checkout moved before
+// the commit, its tree is dropped exactly like a built member's, and the
+// inherited member keeps its head's record.
+func TestReleaseSetReusedMemberCarriesTheRunTree(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "release-set-reuse-channel", "a-selected-member-is-released-from-the-reuse-channel")
+	ws, upstream, downstream := releaseSetWorkspace(t)
+	useReleaseSetProvenance(t, map[string]string{downstream.ID: digestFor('9')})
+	for _, moved := range []bool{false, true} {
+		heads := releaseSetHead(t)
+		heads["pr-7"] = reuseChannelHead(t, headRecord(t, heads["canary"], upstream.Name), pullRequestDownstream())
+		provider := &fakeReleaseSetProvider{heads: heads}
+		useReleaseSetProviderFake(t, provider)
+		options := releaseSetRequest()
+		options.ReuseChannel, options.ReuseSourceRevision = "pr-7", reuseTestRevision
+		options.Policy = sourceTreePolicy()
+		run, err := prepareReleaseSet(t, options, ws, ws.Projects, providerDiscovery())
+		if err != nil {
+			t.Fatal(err)
+		}
+		down, _ := run.plan.Member("npm", downstream.Name)
+		if !run.NoImpact() || !run.plan.Reuses("npm", downstream.Name) || down.SourceTree != testTree || down.SourceRevision != testRevision {
+			t.Fatalf("reused downstream = %+v, want it reused under this commit and the run's tree", down)
+		}
+		want := testTree
+		if moved {
+			want = ""
+		}
+		currentReleaseSourceTree = func(string) string { return want }
+		results := map[string]*JobResult{}
+		run.Finalizer(context.Background())(results)
+		if result := results[releaseSetResultKey]; result == nil || result.Status != "success" || provider.releaseRequest == nil {
+			t.Fatalf("checkout moved %v: release = %+v", moved, result)
+		}
+		released := &distribution.ChannelHead{ReleaseSet: &provider.releaseRequest.ReleaseSet}
+		if got := headRecord(t, released, downstream.Name); got.SourceTree != want || got.SourceRevision != testRevision {
+			t.Fatalf("checkout moved %v: released downstream = %+v, want tree %q", moved, got, want)
+		}
+		if got, inherited := headRecord(t, released, upstream.Name), headRecord(t, heads["canary"], upstream.Name); !releaseSetE2EMembersEqual(got, inherited) || got.SourceTree != inherited.SourceTree {
+			t.Fatalf("checkout moved %v: inherited upstream = %+v, want canary's record", moved, got)
+		}
+	}
+}
+
 // A reuse head offers an artifact, it never vouches for one the run would not
-// have built: a member whose record has another fingerprint, is absent, would
-// move the channel backwards, or differs from this run's version by more than
-// the commit-derived suffix is built as if no reuse channel were named.
+// have built: a member whose record has another fingerprint, comes from another
+// commit than the reuse source revision, is absent, would move the channel
+// backwards, or differs from this run's version by more than the
+// commit-derived suffix is built as if no reuse channel were named.
 func TestReleaseSetReuseBuildsWhatTheReuseHeadCannotVouchFor(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "release-set-reuse-channel", "a-member-the-reuse-head-cannot-vouch-for-is-built")
+	spectest.Proves(t, "cli/job-planning-execution", "release-set-reuse-source-revision", "a-record-inherited-from-an-earlier-push-is-built")
 	const (
 		mainSuffix        = "20261014120000-abc1234"
 		pullRequestSuffix = "20261013110000-def5678"
@@ -3223,6 +3278,10 @@ func TestReleaseSetReuseBuildsWhatTheReuseHeadCannotVouchFor(t *testing.T) {
 		}, reused: true},
 		{name: "another fingerprint", record: func(m *distribution.ReleaseSetMember) bool {
 			m.SelectionFingerprint = digestFor('8')
+			return true
+		}},
+		{name: "a record from an earlier push", record: func(m *distribution.ReleaseSetMember) bool {
+			m.SourceRevision = earlierPushRevision
 			return true
 		}},
 		{name: "absent from the reuse head", record: func(*distribution.ReleaseSetMember) bool { return false }},
@@ -3256,7 +3315,7 @@ func TestReleaseSetReuseBuildsWhatTheReuseHeadCannotVouchFor(t *testing.T) {
 			}
 			heads["pr-7"] = reuseChannelHead(t, records...)
 			options := releaseSetRequest()
-			options.ReuseChannel = "pr-7"
+			options.ReuseChannel, options.ReuseSourceRevision = "pr-7", reuseTestRevision
 			options.Versions = tc.versions
 
 			plan := buildTestPlan(t, options, ws, heads)
@@ -3276,6 +3335,39 @@ func TestReleaseSetReuseBuildsWhatTheReuseHeadCannotVouchFor(t *testing.T) {
 		})
 	}
 
+	// --channel canary,next: next was advanced by another publication. A
+	// reused version must sort above next's record too, or reuse would move
+	// next back to an older build than it serves.
+	for _, next := range []struct {
+		version string
+		reused  bool
+	}{
+		{version: "1.1.0-20261012100000-0a1b2c3", reused: true},
+		{version: "1.1.0-20261014100000-0a1b2c3"},
+	} {
+		t.Run("a second advanced channel at "+next.version, func(t *testing.T) {
+			ws, upstream, downstream := releaseSetWorkspace(t)
+			useReleaseSetProvenance(t, map[string]string{downstream.ID: digestFor('9')})
+			heads := releaseSetHead(t)
+			nextDownstream := headRecord(t, heads["canary"], downstream.Name)
+			nextDownstream.Version = next.version
+			heads["next"] = reuseChannelHead(t, headRecord(t, heads["canary"], upstream.Name), nextDownstream)
+			published := pullRequestDownstream()
+			published.Version = "1.1.0-" + pullRequestSuffix
+			heads["pr-7"] = reuseChannelHead(t, headRecord(t, heads["canary"], upstream.Name), published)
+			options := releaseSetRequest()
+			options.Channels = []string{"canary", "next"}
+			options.ReuseChannel, options.ReuseSourceRevision = "pr-7", reuseTestRevision
+			options.Versions = stamped
+
+			plan := buildTestPlan(t, options, ws, heads)
+			down, _ := plan.Member("npm", downstream.Name)
+			if next.reused != !down.Selected || next.reused != (len(plan.Reused) == 1) {
+				t.Fatalf("downstream = %+v, reused = %+v; want reused %t against next at %s", down, plan.Reused, next.reused, next.version)
+			}
+		})
+	}
+
 	t.Run("a reuse head from another namespace fails the plan", func(t *testing.T) {
 		ws, upstream, downstream := releaseSetWorkspace(t)
 		useReleaseSetProvenance(t, map[string]string{downstream.ID: digestFor('9')})
@@ -3284,7 +3376,7 @@ func TestReleaseSetReuseBuildsWhatTheReuseHeadCannotVouchFor(t *testing.T) {
 		heads["pr-7"].ReleaseSet.Namespace = "elsewhere"
 		refreshHeadRef(t, heads["pr-7"])
 		options := releaseSetRequest()
-		options.ReuseChannel = "pr-7"
+		options.ReuseChannel, options.ReuseSourceRevision = "pr-7", reuseTestRevision
 		options.Fingerprints = releaseSetTestFingerprints(t, ws)
 		options.Versions = testRunVersions(ws)
 		candidates, err := releaseProjects(ws.Projects, testProfiles())
@@ -3319,6 +3411,10 @@ func TestReleaseSetReuseBuildsWhatTheReuseHeadCannotVouchFor(t *testing.T) {
 		releaseVersionAbove("1.0.0", "1.1.0") || releaseVersionAbove("not-a-version", "1.0.0") || releaseVersionAbove("1.1.0", "") {
 		t.Error("releaseVersionAbove does not order strictly by semver precedence")
 	}
+	if !releaseVersionAboveAll("1.1.0", nil) || !releaseVersionAboveAll("1.1.0", []string{"1.0.0", "1.0.9"}) ||
+		releaseVersionAboveAll("1.1.0", []string{"1.0.0", "1.1.0"}) {
+		t.Error("releaseVersionAboveAll does not hold a version above every floor")
+	}
 }
 
 // A reused record states the versions of its dependencies as the reuse head
@@ -3340,7 +3436,7 @@ func TestReleaseSetReuseDemotesAMemberWhoseDependencyIsBuilt(t *testing.T) {
 		record.Dependencies = []distribution.ReleaseSetDependency{{Ecosystem: "npm", Coordinate: upstream.Name, Version: "1.1.0"}}
 		heads["pr-7"] = reuseChannelHead(t, pullRequestUpstream, record)
 		options := releaseSetRequest()
-		options.ReuseChannel = "pr-7"
+		options.ReuseChannel, options.ReuseSourceRevision = "pr-7", reuseTestRevision
 
 		plan := buildTestPlan(t, options, ws, heads)
 		down, _ := plan.Member("npm", downstream.Name)
@@ -3377,7 +3473,7 @@ func TestReleaseSetReuseDemotesAMemberWhoseDependencyIsBuilt(t *testing.T) {
 				published(top, testFingerprint(top.ID), digestFor('c'), middle)),
 		}
 		options := releaseSetRequest()
-		options.ReuseChannel = "pr-7"
+		options.ReuseChannel, options.ReuseSourceRevision = "pr-7", reuseTestRevision
 		options.Versions = RunVersions{"": &JobContextVersion{Base: "1.1.0", Full: "1.1.0-" + mainSuffix, Suffix: mainSuffix}}
 
 		plan := buildTestPlan(t, options, ws, heads)
@@ -3410,7 +3506,7 @@ func TestReleaseSetPlanThatReusesNothingKeepsItsBytes(t *testing.T) {
 	if err := json.Unmarshal(want, &members); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"reuseChannel", "reused", "sourceRevision"} {
+	for _, name := range []string{"reuseChannel", "reuseSourceRevision", "reused", "sourceRevision"} {
 		if _, named := members[name]; named {
 			t.Fatalf("a plan without reuse carries %q: %s", name, want)
 		}
@@ -3429,7 +3525,7 @@ func TestReleaseSetPlanThatReusesNothingKeepsItsBytes(t *testing.T) {
 			heads := releaseSetHead(t)
 			heads["pr-7"] = offer(t, heads["canary"])
 			options := releaseSetRequest()
-			options.ReuseChannel = "pr-7"
+			options.ReuseChannel, options.ReuseSourceRevision = "pr-7", reuseTestRevision
 			got, err := json.Marshal(buildTestPlan(t, options, ws, heads))
 			if err != nil {
 				t.Fatal(err)
@@ -3441,10 +3537,111 @@ func TestReleaseSetPlanThatReusesNothingKeepsItsBytes(t *testing.T) {
 	}
 }
 
+// A runner may pass --reuse-channel to every publication of a branch that also
+// gets tagged. A tagged publish republishes its line at the tag's version,
+// which no other channel carries, so it ignores the flag with one notice line
+// and releases as it would without it: the reuse channel is not resolved, and
+// a tagged publish without --channel is not refused for it. The tagged case is
+// answered before any other.
+func TestReleaseSetTaggedPublicationIgnoresTheReuseChannel(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "release-set-reuse-channel", "a-tagged-publication-ignores-the-reuse-channel")
+	tagged := RunVersions{"": &JobContextVersion{Base: "1.0.0", Full: "1.0.0", Tagged: true, Tag: "v1.0.0"}}
+	for _, channel := range []string{"canary", ""} {
+		options, err := BuildReleaseSetOptions(ReleaseSetRequest{
+			Commands: []string{"publish"}, WorkspaceRoot: t.TempDir(), Channel: channel,
+			ReuseChannel: "pr-7", ReuseSourceRevision: reuseTestRevision, Impacted: true, Versions: tagged,
+		})
+		if err != nil {
+			t.Fatalf("tagged publish with --channel %q = %v, want the flag ignored", channel, err)
+		}
+		if !options.Tagged || options.ReuseChannel != "" || options.ReuseSourceRevision != "" || options.IgnoredReuseChannel != "pr-7" {
+			t.Fatalf("tagged options = tagged %t, reuse %q at %q, ignored %q",
+				options.Tagged, options.ReuseChannel, options.ReuseSourceRevision, options.IgnoredReuseChannel)
+		}
+		if err := ValidateReleaseSetSelection(options); err != nil {
+			t.Fatalf("tagged publish with --channel %q refused: %v", channel, err)
+		}
+		if resolved := releaseSetResolveChannels(options, options.Channels); slices.Contains(resolved, "pr-7") {
+			t.Fatalf("a tagged publish resolves %v, want no reuse channel", resolved)
+		}
+		if notice := ReleaseSetReuseNotice(options); !strings.HasPrefix(notice, "--reuse-channel pr-7 ignored: a tagged publish") || strings.Contains(notice, "\n") {
+			t.Fatalf("notice = %q, want one line naming the ignored channel", notice)
+		}
+	}
+
+	// Options built some other way are answered tagged-first as well.
+	direct := ReleaseSetOptions{
+		Commands: []string{"publish"}, ReuseChannel: "pr-7", ReuseSourceRevision: reuseTestRevision, Tagged: true, Versions: tagged,
+	}
+	if err := ValidateReleaseSetSelection(direct); err != nil {
+		t.Fatalf("a tagged publish without --channel = %v, want no refusal for the reuse channel", err)
+	}
+
+	untagged, err := BuildReleaseSetOptions(ReleaseSetRequest{
+		Commands: []string{"publish"}, WorkspaceRoot: t.TempDir(), Channel: "canary",
+		ReuseChannel: "pr-7", ReuseSourceRevision: reuseTestRevision, Impacted: true,
+	})
+	if err != nil || untagged.ReuseChannel != "pr-7" || untagged.ReuseSourceRevision != reuseTestRevision || untagged.IgnoredReuseChannel != "" || ReleaseSetReuseNotice(untagged) != "" {
+		t.Fatalf("untagged options = %+v, %v; want the reuse channel kept and no notice", untagged, err)
+	}
+}
+
+// --reuse-channel and --reuse-source-revision go together, before anything is
+// packaged. A pull-request channel also carries records it inherited from
+// earlier pushes, so a reuse channel without the reviewed final head's commit
+// is refused rather than trusted whole; a revision without a channel names
+// nothing to reuse; and the revision is a full commit, trimmed and lowercased
+// like every other revision input. A plan that somehow reaches the planner
+// without a revision reuses nothing.
+func TestReleaseSetReuseSourceRevisionGoesWithItsChannel(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "release-set-reuse-source-revision", "a-reuse-channel-without-its-source-revision-is-refused")
+	spectest.Proves(t, "cli/job-planning-execution", "release-set-reuse-source-revision", "a-reuse-source-revision-without-a-reuse-channel-is-refused")
+	spectest.Proves(t, "cli/job-planning-execution", "release-set-reuse-source-revision", "a-reuse-source-revision-that-is-not-a-full-commit-is-refused")
+	if got, err := ParseReleaseSetReuseSourceRevision("  ", ""); err != nil || got != "" {
+		t.Fatalf("no reuse pair = %q, %v; want none", got, err)
+	}
+	if got, err := ParseReleaseSetReuseSourceRevision(" "+strings.ToUpper(reuseTestRevision)+"\n", "pr-7"); err != nil || got != reuseTestRevision {
+		t.Fatalf("ParseReleaseSetReuseSourceRevision = %q, %v; want the trimmed lowercase commit", got, err)
+	}
+	refusals := []struct {
+		name, raw, channel, message string
+	}{
+		{"a reuse channel without its revision", "", "pr-7", "--reuse-channel pr-7 needs --reuse-source-revision"},
+		{"a revision without a reuse channel", reuseTestRevision, "", "but --reuse-channel names none"},
+		{"an abbreviated commit", reuseTestRevision[:12], "pr-7", "is not a full commit revision"},
+		{"a ref name", "main", "pr-7", "is not a full commit revision"},
+		{"a longer object id", reuseTestRevision + "0123456789abcdef0123456789ab", "pr-7", "is not a full commit revision"},
+	}
+	for _, tc := range refusals {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := ParseReleaseSetReuseSourceRevision(tc.raw, tc.channel); err == nil || !strings.Contains(err.Error(), tc.message) {
+				t.Fatalf("ParseReleaseSetReuseSourceRevision(%q, %q) = %v, want %q", tc.raw, tc.channel, err, tc.message)
+			}
+			if _, err := BuildReleaseSetOptions(ReleaseSetRequest{
+				Commands: []string{"publish"}, WorkspaceRoot: t.TempDir(), Channel: "canary",
+				ReuseChannel: tc.channel, ReuseSourceRevision: tc.raw, Impacted: true,
+			}); !errors.Is(err, cmderr.ErrUsage) || !strings.Contains(err.Error(), tc.message) {
+				t.Fatalf("BuildReleaseSetOptions = %v, want a usage error naming %q", err, tc.message)
+			}
+		})
+	}
+
+	ws, upstream, downstream := releaseSetWorkspace(t)
+	useReleaseSetProvenance(t, map[string]string{downstream.ID: digestFor('9')})
+	heads := releaseSetHead(t)
+	heads["pr-7"] = reuseChannelHead(t, headRecord(t, heads["canary"], upstream.Name), pullRequestDownstream())
+	options := releaseSetRequest()
+	options.ReuseChannel = "pr-7"
+	if plan := buildTestPlan(t, options, ws, heads); plan.Reused != nil || plan.ReuseChannel != "" || plan.ReuseSourceRevision != "" {
+		t.Fatalf("a plan without a reuse source revision reused %+v", plan.Reused)
+	}
+}
+
 // A reuse channel is answered before anything is packaged: it must be a
 // portable name, it is never a channel this publication advances or its
 // baseline, it counts toward the one resolve's channel bound, and it applies
-// only to an --impacted publication that advances a channel and is not tagged.
+// only to an --impacted publication that advances a channel. A tagged
+// publication ignores it instead (TestReleaseSetTaggedPublicationIgnoresTheReuseChannel).
 func TestReleaseSetReuseChannelIsRefusedWhereItCannotApply(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "release-set-reuse-channel", "a-reuse-channel-that-cannot-apply-is-refused")
 	if got, err := ParseReleaseSetReuseChannel("  ", []string{"canary"}, ""); err != nil || got != "" {
@@ -3489,12 +3686,13 @@ func TestReleaseSetReuseChannelIsRefusedWhereItCannotApply(t *testing.T) {
 	}
 
 	if _, err := BuildReleaseSetOptions(ReleaseSetRequest{
-		Commands: []string{"publish"}, Channel: "pr-7", BaselineChannel: "canary", ReuseChannel: "canary", Impacted: true,
+		Commands: []string{"publish"}, Channel: "pr-7", BaselineChannel: "canary",
+		ReuseChannel: "canary", ReuseSourceRevision: reuseTestRevision, Impacted: true,
 	}); !errors.Is(err, cmderr.ErrUsage) {
 		t.Fatalf("BuildReleaseSetOptions = %v, want a usage error", err)
 	}
 
-	base := ReleaseSetOptions{Commands: []string{"publish"}, Channels: []string{"canary"}, ReuseChannel: "pr-7"}
+	base := ReleaseSetOptions{Commands: []string{"publish"}, Channels: []string{"canary"}, ReuseChannel: "pr-7", ReuseSourceRevision: reuseTestRevision}
 	cases := []struct {
 		name    string
 		options ReleaseSetOptions
@@ -3502,10 +3700,6 @@ func TestReleaseSetReuseChannelIsRefusedWhereItCannotApply(t *testing.T) {
 	}{
 		{"impacted", withReleaseSetSelection(base, func(o *ReleaseSetOptions) { o.Impacted = true }), false},
 		{"all", withReleaseSetSelection(base, func(o *ReleaseSetOptions) { o.All = true }), true},
-		{"tagged", withReleaseSetSelection(base, func(o *ReleaseSetOptions) {
-			o.Impacted, o.Tagged = true, true
-			o.Versions = RunVersions{"": &JobContextVersion{Base: "1.0.0", Full: "1.0.0", Tagged: true, Tag: "v1.0.0"}}
-		}), true},
 		{"no selection flag", base, true},
 		{"no channel", withReleaseSetSelection(base, func(o *ReleaseSetOptions) {
 			o.Channels, o.Impacted = nil, true
@@ -3530,7 +3724,7 @@ func TestReleaseSetReuseChannelIsRefusedWhereItCannotApply(t *testing.T) {
 	heads := releaseSetHead(t)
 	heads["pr-7"] = reuseChannelHead(t, headRecord(t, heads["canary"], upstream.Name), pullRequestDownstream())
 	all := releaseSetAllOptions()
-	all.ReuseChannel = "pr-7"
+	all.ReuseChannel, all.ReuseSourceRevision = "pr-7", reuseTestRevision
 	if plan := buildTestPlan(t, all, ws, heads); plan.Reused != nil || !plan.SelectsEveryMember() {
 		t.Fatalf("an --all plan reused %+v", plan.Reused)
 	}

@@ -1358,24 +1358,29 @@ type SessionSelection struct {
 	// the caller's own selection asked for. Projects is the union — what ran —
 	// so this member is what lets a consumer attribute each half.
 	ReleaseSetProjects []string `json:"releaseSetProjects,omitempty"`
-	// Reuse names the members this session's release-set plan released from
-	// the reuse channel's head instead of building them. Absent when the
-	// session reused nothing.
+	// Reuse names the members this session's release-set plan takes from the
+	// reuse channel's head instead of building them. It states the plan, not
+	// the release outcome: a dry run or a failed release records it too.
+	// Absent when the plan reused nothing. It is unrelated to RunReuse, which
+	// counts the tasks a cache served.
 	Reuse *SessionSelectionReuse `json:"reuse,omitempty"`
 }
 
-// SessionSelectionReuse is what a release-set publication took from the
-// channel `--reuse-channel` named: the channel, the id of the head the
-// publication resolved for it, and every member released with that head's
-// artifact, sorted by ecosystem then coordinate.
+// SessionSelectionReuse is what the release-set plan takes from the channel
+// `--reuse-channel` named: the channel, the id of the head the publication
+// resolved for it, the commit `--reuse-source-revision` named, which every
+// reused record had to come from (a full 40-hex lowercase revision), and every
+// member the plan takes with that head's artifact, at least one, sorted by
+// ecosystem then coordinate without duplicates.
 type SessionSelectionReuse struct {
-	Channel string                         `json:"channel"`
-	Head    string                         `json:"head"`
-	Members []SessionSelectionReusedMember `json:"members"`
+	Channel        string                         `json:"channel"`
+	Head           string                         `json:"head"`
+	SourceRevision string                         `json:"sourceRevision"`
+	Members        []SessionSelectionReusedMember `json:"members"`
 }
 
-// SessionSelectionReusedMember is one reused member and the version it was
-// released at.
+// SessionSelectionReusedMember is one reused member and the version the plan
+// takes for it.
 type SessionSelectionReusedMember struct {
 	Ecosystem  string `json:"ecosystem"`
 	Coordinate string `json:"coordinate"`

@@ -65,6 +65,11 @@ type Plan struct {
 	// selected member records it, and every reused member is rebound to it.
 	// Set exactly when ReuseChannel is.
 	SourceRevision string `json:"sourceRevision,omitempty"`
+	// ReuseSourceRevision is the commit every reused member's record on the
+	// reuse head carries: the reviewed final head of the reuse channel, which
+	// the runner names. A record that head inherited from an earlier commit is
+	// not reused. Set exactly when ReuseChannel is.
+	ReuseSourceRevision string `json:"reuseSourceRevision,omitempty"`
 }
 
 // MemberRef names one release-set member by its protocol identity.
@@ -78,7 +83,8 @@ type MemberRef struct {
 // (ecosystem, coordinate) remains the distribution authority, and one project
 // may contribute several members. SourceRevision and SelectionFingerprint are
 // the provenance every member records, and SourceTree the optional git tree a
-// selected member was built from; Platforms is filled by publication for
+// selected member was built from, which a reused member records too because
+// the run's fingerprint vouches for it; Platforms is filled by publication for
 // members published as a multi-platform set.
 //
 // Project and Kind are the protocol attribution the published set carries, so
@@ -287,9 +293,12 @@ func ParseParams(params job.Params) (*Plan, error) {
 //
 // ReuseChannel is read and never released either, and is neither an advanced
 // channel nor the baseline. Every member Reused names is unselected, exists in
-// the reuse head, and carries that head's artifact record exactly except for
+// the reuse head with a record whose SourceRevision is ReuseSourceRevision, and
+// carries that record exactly except for
 // SourceRevision, which is the plan's SourceRevision, and SourceTree, which is
-// this publication's. Every selected member records the same SourceRevision.
+// the run's. Every selected member records the same SourceRevision, and in a
+// plan that reuses a member every selected and reused member records one
+// SourceTree, possibly empty (validatePlanRunTree).
 //
 // A project is deliberately allowed to own several selected members: the member
 // key is (ecosystem, coordinate) and the project is provenance, so one project
@@ -378,8 +387,10 @@ func ValidatePlan(plan *Plan) error {
 			if member.SourceRevision != plan.SourceRevision {
 				return fmt.Errorf("reused release-set plan member %q records revision %q, not the plan's %q", printableKey(key), member.SourceRevision, plan.SourceRevision)
 			}
-			record.SourceRevision = member.SourceRevision
-			record.SourceTree = member.SourceTree
+			if record.SourceRevision != plan.ReuseSourceRevision {
+				return fmt.Errorf("reused release-set plan member %q comes from a reuse head record of revision %q, not the reuse source revision %q", printableKey(key), record.SourceRevision, plan.ReuseSourceRevision)
+			}
+			record.SourceRevision, record.SourceTree = member.SourceRevision, member.SourceTree
 			if !sameArtifactRecord(projected, record) {
 				return fmt.Errorf("reused release-set plan member %q does not carry the reuse head's record", printableKey(key))
 			}
@@ -402,6 +413,9 @@ func ValidatePlan(plan *Plan) error {
 	}
 	if reused != len(reuseMembers) {
 		return fmt.Errorf("release-set plan lists %d reused members but carries %d of them unselected", len(reuseMembers), reused)
+	}
+	if err := validatePlanRunTree(plan); err != nil {
+		return err
 	}
 	if selected == 0 && reused == 0 && baseSet == nil {
 		return fmt.Errorf("release-set plan selects no members and has no baseline head to confirm")
@@ -463,13 +477,13 @@ func planResolvedChannels(plan *Plan) []string {
 }
 
 // validatePlanReuseChannel checks the reuse fields against each other and
-// against the other channels before the heads are replayed. The three fields
+// against the other channels before the heads are replayed. The four fields
 // are set together or not at all: a plan that reuses nothing names no reuse
 // channel, which keeps its bytes those of a plan built without the option.
 func validatePlanReuseChannel(plan *Plan) error {
 	if plan.ReuseChannel == "" {
-		if len(plan.Reused) != 0 || plan.SourceRevision != "" {
-			return fmt.Errorf("release-set plan lists reused members or a plan revision without a reuse channel")
+		if len(plan.Reused) != 0 || plan.SourceRevision != "" || plan.ReuseSourceRevision != "" {
+			return fmt.Errorf("release-set plan lists reused members, a plan revision or a reuse source revision without a reuse channel")
 		}
 		return nil
 	}
@@ -484,6 +498,38 @@ func validatePlanReuseChannel(plan *Plan) error {
 	}
 	if plan.SourceRevision == "" {
 		return fmt.Errorf("release-set plan reuses members but records no plan revision")
+	}
+	if plan.ReuseSourceRevision == "" {
+		return fmt.Errorf("release-set plan reuses members but records no reuse source revision")
+	}
+	return nil
+}
+
+// validatePlanRunTree checks that a plan that reuses a member records one
+// source tree, the run's, on every member bound to its revision: each selected
+// member and each reused one. The tree is empty when the repository did not opt
+// in or the checkout was dirty. A reader names a head by one tree only when
+// every member carrying its revision records the same one, so a reused member
+// with another tree, or none beside a built member's, would leave the head
+// without one. A plan that reuses nothing is not checked.
+func validatePlanRunTree(plan *Plan) error {
+	if plan.ReuseChannel == "" {
+		return nil
+	}
+	first, tree := "", ""
+	for _, member := range plan.Members {
+		if !member.Selected && !plan.Reuses(member.Ecosystem, member.Coordinate) {
+			continue
+		}
+		key := MemberKey(member.Ecosystem, member.Coordinate)
+		if first == "" {
+			first, tree = key, member.SourceTree
+			continue
+		}
+		if member.SourceTree != tree {
+			return fmt.Errorf("release-set plan member %q records source tree %q, but %q records %q; a plan that reuses a member records the run's one tree on every member it builds or reuses",
+				printableKey(key), member.SourceTree, printableKey(first), tree)
+		}
 	}
 	return nil
 }

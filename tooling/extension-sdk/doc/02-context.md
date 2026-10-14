@@ -79,8 +79,13 @@ lists those members, `Plan.ReusedMembers()` returns them, and
 `Plan.ReuseHead()` is that head, which rides in `Heads` too. A reused member is
 unselected, so no package or publish step runs for it. It carries the reuse
 head's record of the member, rebound to `Plan.SourceRevision`, the commit the
-plan publishes, and to the plan's source tree (`protocols/distribution` ADR
-0007). A plan that reuses nothing carries none of these fields. An SDK older
+plan publishes, and to the run's source tree: every selected and reused member
+of such a plan records the same `SourceTree`, possibly none
+(`protocols/distribution` ADR 0007). `Plan.ReuseSourceRevision` is the commit
+whose build the reuse channel offered, the pull request's reviewed final head:
+`ValidatePlan` refuses a reused member whose record on the reuse head names
+another revision, so a record an earlier push left on that head is never
+released as reused. A plan that reuses nothing carries none of these fields. An SDK older
 than this field refuses a plan that reuses a member: the reuse head is a head
 it did not request.
 

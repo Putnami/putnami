@@ -58,7 +58,7 @@ func TestSessionSelectionReuseMatchesTheJobContract(t *testing.T) {
 		Mode: protocoljob.SelectionModeImpacted, Scoped: true,
 		ProjectIDs: []string{"/apps/console"}, ReleaseSetProjects: []string{"/apps/console"},
 		Reuse: &protocoljob.SelectionReuse{
-			Channel: "pr-7", Head: "rs_9a03",
+			Channel: "pr-7", Head: "rs_9a03", SourceRevision: "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
 			Members: []protocoljob.SelectionReusedMember{
 				{Ecosystem: "npm", Coordinate: "@acme/widget", Version: "1.2.0-20261014120000-abc1234"},
 				{Ecosystem: "oci", Coordinate: "acme/console", Version: "1.2.0-20261014120000-abc1234"},
