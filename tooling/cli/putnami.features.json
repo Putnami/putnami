@@ -182,7 +182,9 @@
             "kind": "acceptance",
             "checks": [
               "changed-files-select-owners-and-transitive-dependents",
-              "renames-and-assets-select-every-owner"
+              "renames-and-assets-select-every-owner",
+              "the-selection-explains-every-project-it-holds",
+              "why-impacted-walks-the-edges-impacted-widens-through"
             ]
           }
         },
@@ -673,7 +675,8 @@
               "one-project-yields-several-members",
               "member-plans-its-declaring-publisher",
               "selected-member-routes-exact-artifact-steps",
-              "mixed-publication-retains-verification-without-extra-writes"
+              "mixed-publication-retains-verification-without-extra-writes",
+              "distinct-package-provider-and-publication-owner-survive-final-scope"
             ]
           }
         },
@@ -689,7 +692,8 @@
               "canonical-selected-plan-without-credentials",
               "private-callback-and-exact-ack",
               "no-handoff-for-preview-or-dry-run",
-              "member-less-plan-arms-the-head-confirming-release"
+              "member-less-plan-arms-the-head-confirming-release",
+              "callback-without-after-refused"
             ]
           }
         },
