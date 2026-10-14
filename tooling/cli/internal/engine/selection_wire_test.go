@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -192,6 +193,42 @@ func TestSelectProjects_WireSelectionCarriesTheImpactedBaselineAndTier(t *testin
 	})
 }
 
+// A change that only touches workspace-root files selects no project, but the
+// run still plans its workspace-scoped tasks. They read the change since the
+// baseline, so the run reports the impacted no-op with its baseline rather
+// than no selection at all.
+func TestSelectProjects_WireSelectionCarriesTheBaselineOfAnEmptyImpact(t *testing.T) {
+	t.Parallel()
+	wsRoot := t.TempDir()
+	initCLISelectionGitRepo(t, wsRoot)
+	runCLISelectionGit(t, wsRoot, "update-ref", "refs/remotes/origin/main", "HEAD")
+	runCLISelectionGit(t, wsRoot, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+	runCLISelectionGit(t, wsRoot, "checkout", "-b", "feature")
+
+	projects := []*workspace.Project{{ID: "/packages/lib", Name: "lib", Path: "packages/lib"}}
+	ws := workspace.NewWorkspace(wsRoot, &workspacepb.Config{}, projects)
+	if err := os.WriteFile(filepath.Join(wsRoot, "AGENTS.md"), []byte("# Agents\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	req := &Request{Commands: []string{"validate"}, Config: &workspacepb.Config{}, Stdout: io.Discard}
+	req.Global.Impacted = true
+	req.Global.Projects = "[impacted]"
+
+	selected, code := selectProjects(req, ws)
+	if code != ExitSuccess || len(selected) != 0 {
+		t.Fatalf("selection = %v (code %d), want none: a root path belongs to no project", selected, code)
+	}
+	assertWireSelection(t, req.selection, protocoljob.Selection{
+		Mode:           protocoljob.SelectionModeImpacted,
+		Scoped:         true,
+		Baseline:       "origin/main",
+		BaselineSource: "trunk",
+		ProjectIDs:     []string{},
+		EmptyImpact:    true,
+	})
+}
+
 // assertWireSelection compares the resolved block field by field and then runs
 // it through the contract's own validator, so a block that reads right but the
 // contract rejects fails here rather than at the process boundary.
@@ -211,6 +248,9 @@ func assertWireSelection(t *testing.T, got *protocoljob.Selection, want protocol
 	}
 	if got.BaselineSource != want.BaselineSource {
 		t.Errorf("selection.baselineSource = %q, want %q", got.BaselineSource, want.BaselineSource)
+	}
+	if got.EmptyImpact != want.EmptyImpact {
+		t.Errorf("selection.emptyImpact = %t, want %t", got.EmptyImpact, want.EmptyImpact)
 	}
 	if len(got.ProjectIDs) != len(want.ProjectIDs) {
 		t.Fatalf("selection.projects = %v, want %v", got.ProjectIDs, want.ProjectIDs)
