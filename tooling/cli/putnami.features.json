@@ -2664,7 +2664,8 @@
               "the-body-is-the-squash-message",
               "no-publication-names-an-agent",
               "an-explicit-hosted-gate-waits-without-local-execution",
-              "hosted-parent-workflow-completeness"
+              "hosted-parent-workflow-completeness",
+              "a-featureless-partial-needs-no-workflow"
 ]
           }
         },

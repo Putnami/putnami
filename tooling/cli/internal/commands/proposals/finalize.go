@@ -54,6 +54,16 @@ type HostedWorkflowResult struct {
 }
 type HostedWorkflow func(context.Context, HostedWorkflowRequest) (HostedWorkflowResult, error)
 
+// Ownership names what a change touches that can hold a native requirement:
+// owning projects that are not featureless at base and head, and changed
+// paths no project owns.
+type Ownership struct {
+	Projects, Unowned []string
+}
+
+// RequirementOwners resolves the Ownership of paths changed since base.
+type RequirementOwners func(base string, paths []string) (Ownership, error)
+
 // HostedWorkflowReceipt records the native provider status and local inputs
 // that can be checked again against the unchanged workflow file. It does not
 // claim readiness without a fresh native verification of those inputs.
@@ -75,6 +85,7 @@ type Finalizer struct {
 	Git      Git
 	Verify   Verify
 	Workflow HostedWorkflow
+	Owners   RequirementOwners
 	Call     Provider
 	Wait     func(context.Context, time.Duration) error
 	Now      func() time.Time

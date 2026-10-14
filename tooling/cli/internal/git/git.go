@@ -928,3 +928,30 @@ func dedupStrings(ss []string) []string {
 	}
 	return result
 }
+
+// WorkspacePrefix returns dir's path below the repository top level, with a
+// trailing slash, or "" at the top level. Diff paths carry this prefix.
+func WorkspacePrefix(dir string) (string, error) {
+	output, err := run(dir, "rev-parse", "--show-prefix")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(output), nil
+}
+
+// FileAt returns the bytes of path, relative to dir, at revision. found is
+// false when revision has no such file.
+func FileAt(dir, revision, path string) (content []byte, found bool, err error) {
+	if !validRevisionArgument(revision) {
+		return nil, false, fmt.Errorf("invalid revision %q", revision)
+	}
+	listed, err := run(dir, "ls-tree", "-z", "--name-only", revision, "--", path)
+	if err != nil || listed == "" {
+		return nil, false, err
+	}
+	output, err := run(dir, "show", revision+":./"+path)
+	if err != nil {
+		return nil, false, err
+	}
+	return []byte(output), true, nil
+}

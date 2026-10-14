@@ -7,19 +7,27 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"maps"
 	"os"
+	"path"
+	"path/filepath"
+	"slices"
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	featureproto "go.putnami.dev/protocol/features"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/contributor"
 	"go.putnami.dev/tooling/cli/internal/commands/proposals"
 	"go.putnami.dev/tooling/cli/internal/commands/treecmd"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/mcp"
 	"go.putnami.dev/tooling/cli/internal/output"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // cmdContributor is the native helper namespace registered by the command
@@ -135,7 +143,7 @@ func finalizeOptions(args []string) (proposals.Options, error) {
 }
 
 func printFinalizeHelp(w io.Writer) {
-	iox.Fprintln(w, "  finalize --base BRANCH --branch BRANCH --title TITLE --body-file FILE [--task-source SOURCE --task-id ID] [--partial-delivery] [--draft | --verification-file DOSSIER | --gate ci --workflow-file WORKFLOW] [--proof TEXT]")
+	iox.Fprintln(w, "  finalize --base BRANCH --branch BRANCH --title TITLE --body-file FILE [--task-source SOURCE --task-id ID] [--partial-delivery] [--draft | --verification-file DOSSIER | --gate ci [--workflow-file WORKFLOW]] [--proof TEXT]")
 	iox.Fprintln(w, "    Publish a draft or a clean committed proposal with current native proof; --gate ci waits for policy-named hosted checks. The command runs no local gate.")
 }
 
@@ -173,6 +181,75 @@ func nativeDossierVerify(root string) proposals.Verify {
 	}
 }
 
+func nativeRequirementOwners(root string) proposals.RequirementOwners {
+	return func(base string, paths []string) (proposals.Ownership, error) {
+		var ownership proposals.Ownership
+		prefix, err := git.WorkspacePrefix(root)
+		if err != nil {
+			return ownership, fmt.Errorf("resolve changed project ownership: %w", err)
+		}
+		ws, err := workspace.Load(root)
+		if err != nil {
+			return ownership, fmt.Errorf("resolve changed project ownership: %w", err)
+		}
+		checked, holders, unowned := map[string]bool{}, map[string]bool{}, map[string]bool{}
+		for _, changed := range paths {
+			relative, inside := strings.CutPrefix(changed, prefix)
+			var projects []*workspace.Project
+			if inside {
+				projects = workspace.ProjectOwnersForPath(ws, relative)
+			}
+			if len(projects) == 0 {
+				unowned[changed] = true
+			}
+			for _, project := range projects {
+				if checked[project.ID] {
+					continue
+				}
+				checked[project.ID] = true
+				ok, err := featurelessProject(root, base, project)
+				if err != nil {
+					return ownership, fmt.Errorf("resolve changed project ownership: %w", err)
+				}
+				if !ok {
+					holders[project.ID] = true
+				}
+			}
+		}
+		ownership.Projects = slices.Sorted(maps.Keys(holders))
+		ownership.Unowned = slices.Sorted(maps.Keys(unowned))
+		return ownership, nil
+	}
+}
+
+// featurelessProject reports whether a project declares featureAuthority.none
+// and authors no feature both on the branch and at base, so a change cannot
+// exempt its own project. A project new on the branch has only its head state.
+func featurelessProject(root, base string, project *workspace.Project) (bool, error) {
+	if project.Config == nil || !featureless(project.Config.FeatureAuthority) {
+		return false, nil
+	}
+	if _, err := os.Stat(filepath.Join(root, project.Path, featureproto.ManifestFilename)); !errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	manifest, found, err := git.FileAt(root, base, path.Join(project.Path, wsproto.ConfigFilename))
+	if err != nil || !found {
+		return err == nil, err
+	}
+	var config struct {
+		FeatureAuthority *wsproto.ProjectFeatureAuthority `json:"featureAuthority"`
+	}
+	if err := json.Unmarshal(manifest, &config); err != nil || !featureless(config.FeatureAuthority) {
+		return false, nil
+	}
+	_, authored, err := git.FileAt(root, base, path.Join(project.Path, featureproto.ManifestFilename))
+	return err == nil && !authored, err
+}
+
+func featureless(authority *wsproto.ProjectFeatureAuthority) bool {
+	return authority != nil && strings.TrimSpace(authority.None) != "" && strings.TrimSpace(authority.Owner) == ""
+}
+
 func nativeHostedWorkflowVerify(root string) proposals.HostedWorkflow {
 	return func(ctx context.Context, request proposals.HostedWorkflowRequest) (proposals.HostedWorkflowResult, error) {
 		verifier := treecmd.Verifier{Dir: root, RecoverReport: engine.VerifyCachedVerificationReport}
@@ -202,7 +279,7 @@ func (a *App) runFinalizeCommand(ctx context.Context, parsed *ParsedArgs, cfg *w
 		return ExitUsage
 	}
 	providers, unavailable := collaborationProviders(ctx, root, cfg, discovered)
-	f := proposals.Finalizer{Root: root, Verify: nativeDossierVerify(root), Workflow: nativeHostedWorkflowVerify(root), Call: func(ctx context.Context, contract, operation string, input json.RawMessage) collab.Envelope {
+	f := proposals.Finalizer{Root: root, Verify: nativeDossierVerify(root), Workflow: nativeHostedWorkflowVerify(root), Owners: nativeRequirementOwners(root), Call: func(ctx context.Context, contract, operation string, input json.RawMessage) collab.Envelope {
 		return mcp.CallProviderOperation(ctx, mcp.ProviderEnvironment{WorkspaceRoot: root,
 			Extensions: providers, Unavailable: unavailable, AttachView: cliWorkspaceView(root)}, contract, operation, input)
 	}}

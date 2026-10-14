@@ -45,7 +45,7 @@
     },
     {
       "id": "squash-ready-publication",
-      "text": "Build selects one final local or hosted gate after independent review. Native publication consumes a current dossier or explicitly waits for named hosted checks, never executes local gates and reuses current proof at each boundary. Hosted parent publication requires an immutable workflow and native completion eligibility; incomplete parents need partial delivery. Exact hosted proof can advance eligible current units, preserves later obligations and yields a replayable native receipt."
+      "text": "Build selects one final local or hosted gate after independent review. Publication consumes a current dossier or awaits named hosted checks, never runs a local gate and rechecks proof per boundary. Hosted parent publication needs an immutable workflow and completion eligibility; incomplete parents need partial delivery, needing no workflow when only featureAuthority.none projects own its paths. Exact hosted proof can advance eligible current units, keeps later obligations and yields a replayable receipt."
     },
     {
       "id": "native-workflow-validation",

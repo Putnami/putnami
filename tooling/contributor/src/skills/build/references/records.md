@@ -127,7 +127,9 @@ Original reports remain intact when the projection shows a later resolution.
 ## Hosted ready receipts
 
 Hosted finalization naming a parent requires `--workflow-file` with the exact
-current workflow. Native preflight validates completion eligibility before
+current workflow, except a partial delivery whose changed paths all belong to
+projects that declare `featureAuthority.none` and author no feature: the
+hosted checks are its evidence and it emits no receipt. Native preflight validates completion eligibility before
 publication. After every policy-named check succeeds on the same full HEAD, the
 native publisher emits `hostedWorkflowReceipt`: original workflow ref, binding,
 proposal ref, required checks and raw provider status. It can advance eligible

@@ -147,7 +147,10 @@ the pushed commit, and returns the proposal to draft when one fails. It can
 wait up to `verification.ciGate.timeoutMinutes`, so run it in the background
 where the host bounds a command's duration; invoking it again keeps waiting.
 `--gate ci` is explicit and exclusive with `--verification-file`. When naming
-a parent task, pass `--workflow-file <immutable-workflow.json>`. Native
+a parent task, pass `--workflow-file <immutable-workflow.json>`, unless a
+partial delivery changes only paths of projects that declare
+`featureAuthority.none` and author no feature: the hosted checks are then its
+evidence. Native
 preflight rejects an incomplete parent before publication unless partial delivery
 is explicit. Only exact required hosted checks on the current full HEAD can
 advance eligible current units to ready; later obligations remain incomplete.
