@@ -127,11 +127,12 @@ func NewHTTPClient() (*http.Client, error) {
 	if !ok {
 		return nil, errors.New("put registry transport is unavailable")
 	}
-	transport := baseTransport.Clone()
-	transport.Proxy = nil
+	direct := baseTransport.Clone()
+	direct.Proxy = nil
+	transport := registryorigin.Transport(direct, origins)
 	return &http.Client{
 		Timeout:       5 * time.Minute,
-		Transport:     registryorigin.Transport(transport, origins),
+		Transport:     transport,
 		CheckRedirect: refuseRedirect,
 	}, nil
 }
