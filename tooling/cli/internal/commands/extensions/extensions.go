@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -375,12 +376,13 @@ func runExtensionInstallHooks(ctx context.Context, wsRoot string, cfg *wsproto.C
 	}
 
 	hookCfg := configWithExtensionInstallArgs(cfg, args)
-	extensions, err := extension.DiscoverExtensions(wsRoot, hookCfg, nil)
+	discovered, err := extension.DiscoverExtensionsDetailed(wsRoot, hookCfg, nil)
 	if err != nil {
 		return fmt.Errorf("discover extensions: %w", err)
 	}
+	extensions := discovered.Extensions
 
-	specificHookExt := extensionInstallHookTarget(wsRoot, args)
+	specificHookExt := withInstallHookDependencies(extensionInstallHookTarget(wsRoot, args), extensions, discovered.Dependencies)
 	hookExtensions := make([]*extension.ExtensionDescription, 0, len(extensions))
 	for _, ext := range extensions {
 		if specificHookExt != nil && !specificHookExt(ext) {
@@ -483,6 +485,37 @@ func extensionInstallHookTarget(wsRoot string, args []string) func(*extension.Ex
 		}
 	}
 	return nil
+}
+
+// withInstallHookDependencies widens the hook target of a specific install to
+// the extension dependencies its extensions reach (ADR 0066): installing an
+// extension installs its dependencies, so their onInstall hooks run too. A
+// dependency is reached when one of its dependents (GraphDependency.RequiredBy)
+// is. A nil target, which runs every hook, stays nil.
+func withInstallHookDependencies(target func(*extension.ExtensionDescription) bool, extensions []*extension.ExtensionDescription,
+	deps []extension.GraphDependency) func(*extension.ExtensionDescription) bool {
+	if target == nil || len(deps) == 0 {
+		return target
+	}
+	reached := map[string]bool{}
+	for _, ext := range extensions {
+		if ext != nil && target(ext) {
+			reached[ext.Name] = true
+		}
+	}
+	isReached := func(name string) bool { return reached[name] }
+	for grew := true; grew; {
+		grew = false
+		for _, dep := range deps {
+			if !reached[dep.Name] && slices.ContainsFunc(dep.RequiredBy, isReached) {
+				reached[dep.Name] = true
+				grew = true
+			}
+		}
+	}
+	return func(ext *extension.ExtensionDescription) bool {
+		return target(ext) || (ext != nil && reached[ext.Name])
+	}
 }
 
 func normalizeInstallHookWorkspaceRef(ref string) (string, bool) {

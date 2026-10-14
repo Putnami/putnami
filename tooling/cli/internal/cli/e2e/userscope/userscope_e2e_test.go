@@ -565,6 +565,13 @@ func userScopeArchive(t *testing.T, marker string) []byte {
 // extension.
 func userScopeArchiveAt(t *testing.T, marker, version string) []byte {
 	t.Helper()
+	return userScopeArchiveOf(t, marker, userScopeExtensionManifest(userScopeExtensionName, version))
+}
+
+// userScopeArchiveOf is the registry archive of the fixture extension with
+// manifest as its putnami.extension.json.
+func userScopeArchiveOf(t *testing.T, marker, manifest string) []byte {
+	t.Helper()
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(gz)
@@ -572,7 +579,7 @@ func userScopeArchiveAt(t *testing.T, marker, version string) []byte {
 		name, content string
 		mode          int64
 	}{
-		{"putnami.extension.json", userScopeExtensionManifest(userScopeExtensionName, version), 0o644},
+		{"putnami.extension.json", manifest, 0o644},
 		{"run.sh", userScopeExtensionScript(marker), 0o755},
 	} {
 		if err := tw.WriteHeader(&tar.Header{Name: file.name, Mode: file.mode, Size: int64(len(file.content)), Typeflag: tar.TypeReg}); err != nil {
@@ -653,6 +660,71 @@ func TestAppRun_ExtensionsInstallUser_LatestMovesThePin(t *testing.T) {
 		t.Fatalf("user-scope lock entry = %+v (present %v), want version 1.1.0", entry, ok)
 	}
 	assertSameTree(t, "the caller directory", before, snapshotTree(t, callerDir))
+}
+
+// TestAppRun_ExtensionsInstallUser_ARefusalKeepsThePriorPin pins that a
+// refused install leaves the build that worked before it. 2.0.0 names an
+// extension dependency, which the user scope refuses: the stable link still
+// resolves 1.0.0, the lock still pins it, and the command runs it.
+func TestAppRun_ExtensionsInstallUser_ARefusalKeepsThePriorPin(t *testing.T) {
+	userRoot, _ := userScopeTestEnv(t)
+	current := fmt.Sprintf(`"cliContract": %d,`, protocolcli.CurrentContract)
+	dependent := userScopeExtensionManifest(userScopeExtensionName, "2.0.0")
+	if !strings.Contains(dependent, current) {
+		t.Fatalf("the fixture manifest has no %s", current)
+	}
+	dependent = strings.Replace(dependent, current,
+		fmt.Sprintf(`"cliContract": %d, "extensionDependencies": {"@acme/dev": "^1.0.0"},`, protocolcli.ExtensionDependenciesContract), 1)
+	archives := map[string][]byte{
+		"1.0.0": userScopeArchiveAt(t, "user-scope-1.0.0", "1.0.0"),
+		"2.0.0": userScopeArchiveOf(t, "user-scope-2.0.0", dependent),
+	}
+	var latest atomic.Value
+	latest.Store("1.0.0")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		version := latest.Load().(string)
+		if _, ok := archives[r.URL.Query().Get("channel")]; ok {
+			version = r.URL.Query().Get("channel")
+		}
+		archive := archives[version]
+		sum := sha256.Sum256(archive)
+		w.Header().Set("X-Resolved-Version", version)
+		w.Header().Set("X-Integrity", "sha256:"+hex.EncodeToString(sum[:]))
+		_, _ = w.Write(archive)
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv(extension.PutRegistryURLEnv, srv.URL)
+
+	if code, output := runApp(t, "extensions", "install", "--user", userScopeExtensionName); code != cli.ExitSuccess {
+		t.Fatalf("install exit = %d:\n%s", code, output)
+	}
+	latest.Store("2.0.0")
+	code, output := runApp(t, "extensions", "install", "--user", "--latest", userScopeExtensionName)
+	if code == cli.ExitSuccess || !strings.Contains(output, userScopeExtensionName+"@2.0.0 names extension dependencies (@acme/dev)") {
+		t.Fatalf("install --latest exit = %d, want the refusal:\n%s", code, output)
+	}
+
+	stable := layout.StableDir(userRoot, layout.Extensions, userScopeExtensionName)
+	data, err := os.ReadFile(filepath.Join(stable, "putnami.extension.json"))
+	if err != nil {
+		t.Fatalf("after the refusal the stable link does not resolve: %v", err)
+	}
+	var linked struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(data, &linked); err != nil || linked.Version != "1.0.0" {
+		t.Fatalf("after the refusal the stable link resolves version %q (%v), want the pinned 1.0.0", linked.Version, err)
+	}
+	if entry, ok := readUserScopeLock(t, userRoot).GetExtension(userScopeExtensionName); !ok || entry.Version != "1.0.0" {
+		t.Fatalf("user-scope lock entry = %+v (present %v), want version 1.0.0", entry, ok)
+	}
+	code, output = runApp(t, "audit", "run")
+	if code != cli.ExitSuccess {
+		t.Fatalf("audit run exit = %d:\n%s", code, output)
+	}
+	if got := parseUserScopeRun(t, output).marker; got != "user-scope-1.0.0" {
+		t.Fatalf("after the refusal the command ran %q, want user-scope-1.0.0", got)
+	}
 }
 
 // TestAppRun_UserScope_RunsInAJavaScriptMonorepo pins that a root package.json

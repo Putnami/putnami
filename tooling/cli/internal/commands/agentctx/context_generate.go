@@ -169,7 +169,20 @@ func ensureContextExtensions(ctx context.Context, wsRoot string, cfg *wsproto.Co
 			return fmt.Errorf("lock/store mismatch for extension %q (locked %s): cannot load the lock-pinned extension: %w", name, entry.Version, err)
 		}
 	}
-	return nil
+	// The locked dependencies of the declared extensions are inputs too
+	// (ADR 0066). One the lock does not pin is left to discovery, which
+	// reports it with its dependent, like an unpinned declared extension.
+	var restoreErr error
+	extension.WalkWorkspaceGraph(wsRoot, cfg, lf, extension.WalkOptions{
+		Restore: func(name string, entry lockfile.LockEntry) error {
+			err := installer.EnsureExtensionLocked(ctx, name, entry.Version, &entry)
+			if err != nil && restoreErr == nil {
+				restoreErr = fmt.Errorf("lock/store mismatch for extension %q (locked %s): cannot load the lock-pinned extension: %w", name, entry.Version, err)
+			}
+			return err
+		},
+	})
+	return restoreErr
 }
 
 // ReadExtensionGuidance reads the extension-owned AI.md when it is present. It

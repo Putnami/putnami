@@ -82,17 +82,32 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: ReleaseBaselineInputContract for a task that declares the
-// releaseBaseline runtime input, GitInputModeContract (the same rung) for a
-// task that declares a `git:` file pattern, GoEmbedInputsContract for Go embed
-// task inputs/cache-key files, AgentContentContract for an agent-content
-// contribution, CurrentContract otherwise. The highest rung any task reaches
+// the manifest: ExtensionDependenciesContract for extensionDependencies that
+// name a registry extension, ReleaseBaselineInputContract for a task that
+// declares the releaseBaseline runtime input, GitInputModeContract (the same
+// rung) for a task that declares a `git:` file pattern, GoEmbedInputsContract
+// for Go embed task inputs/cache-key files, AgentContentContract for an
+// agent-content contribution, CurrentContract otherwise. The highest rung
 // wins.
 //
-// It is the stamp a packager writes, and the floor LoadManifest enforces. A
-// manifest stamped below it uses vocabulary its stamp does not cover; a
-// manifest stamped at or above it (up to LatestContract) loads.
+// It is the stamp a packager writes on a put archive. A manifest stamped below
+// it uses vocabulary its stamp does not cover; a manifest stamped at or above
+// it (up to LatestContract) loads. LoadManifest enforces RequiredLoadContract,
+// and the CLI adds the dependency rung for the manifests whose dependencies it
+// follows (CheckDependencyContract).
 func RequiredCLIContract(m *Manifest) int {
+	required := RequiredLoadContract(m)
+	if NamesRegistryDependency(m) {
+		required = max(required, protocolcli.ExtensionDependenciesContract)
+	}
+	return required
+}
+
+// RequiredLoadContract is RequiredCLIContract without the dependency rung: the
+// floor LoadManifest enforces whatever the manifest's origin, and the stamp an
+// npm package carries. The dependency rung binds only a manifest loaded from
+// the artifact store or a declared path (CheckDependencyContract).
+func RequiredLoadContract(m *Manifest) int {
 	required := protocolcli.CurrentContract
 	if m.DeclaresAgentContent() {
 		required = protocolcli.AgentContentContract

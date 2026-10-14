@@ -95,7 +95,7 @@ func requireRepository(req *Request) error {
 // this run never builds.
 func reportRepositoryRefusal(req *Request, refusal error) error {
 	if discovered := discoverDeclaredExtensions(req); discovered != nil {
-		missing := missingRegistryExtensions(req.Config, discovered.Extensions)
+		missing := missingRegistryExtensions(req.Config, discovered.Extensions, discovered.MissingDependencies()...)
 		if len(missing) > 0 && len(selectedCommandsWithoutJobs(req.Commands, nil, discovered.Extensions)) > 0 {
 			reportMissingExtensions(missing, discovered.Skipped, "")
 			reportUnservedSDDCommands(req.Commands, discovered.Extensions)

@@ -75,6 +75,7 @@ func ExtensionsInstallUser(ctx context.Context, userRoot string, args []string, 
 	// A local path belongs to a workspace; the user scope has none to resolve it
 	// against, and resolving it from the current directory would read it.
 	ops.installLocal = nil
+	ops.install = refuseUserScopeDependents(ops.install, installer)
 	return installArtifactsWithOptions(ctx, userRoot, &wsproto.Config{}, rest, ops, InstallOptions{
 		OutputFormat: outputFormat,
 		Out:          out,
@@ -197,4 +198,52 @@ func sortedLockNames(entries map[string]lockfile.LockEntry) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// refuseUserScopeDependents wraps a user-scope install so that it refuses an
+// extension whose manifest names a registry dependency. The user scope has no
+// workspace file to name its roots, so it cannot tell a root from a
+// dependency (ADR 0066). The wrapped install has already linked the refused
+// build, so the refusal links the build the user-scope lock pins again
+// (restoreUserScopePin). The lock keeps its pin.
+func refuseUserScopeDependents(install func(context.Context, string, string, *lockfile.LockEntry) (*artifactInstallOutcome, error),
+	installer *extension.Installer) func(context.Context, string, string, *lockfile.LockEntry) (*artifactInstallOutcome, error) {
+	return func(ctx context.Context, name, constraint string, lockEntry *lockfile.LockEntry) (*artifactInstallOutcome, error) {
+		outcome, err := install(ctx, name, constraint, lockEntry)
+		if err != nil || outcome.Manifest == nil || len(outcome.Manifest.Dependencies) == 0 {
+			return outcome, err
+		}
+		refused := fmt.Errorf("%s@%s names extension dependencies (%s); the user scope takes no dependency, because it has no workspace file to name its roots. "+
+			"Declare %s in a workspace's %s instead",
+			name, outcome.Version, strings.Join(sortedStringKeys(outcome.Manifest.Dependencies), ", "), name, wsproto.WorkspaceConfigFilename)
+		if err := restoreUserScopePin(ctx, installer, name); err != nil {
+			return nil, fmt.Errorf("%w; %w", refused, err)
+		}
+		return nil, refused
+	}
+}
+
+// restoreUserScopePin links again the build of name that the user-scope lock
+// pins, so a refused install leaves the build that worked before it. It
+// unlinks name when the lock pins none, or when that build cannot be linked.
+func restoreUserScopePin(ctx context.Context, installer *extension.Installer, name string) error {
+	lf, err := lockfile.ReadLockFile(installer.WorkspaceRoot)
+	if err != nil {
+		_ = installer.Remove(name, "")
+		return fmt.Errorf("read the user-scope lock: %w", err)
+	}
+	var prior lockfile.LockEntry
+	pinned := false
+	if lf != nil {
+		prior, pinned = lf.GetExtension(name)
+	}
+	if !pinned {
+		_ = installer.Remove(name, "")
+		return nil
+	}
+	if err := installer.EnsureExtensionLocked(ctx, name, prior.Version, &prior); err != nil {
+		_ = installer.Remove(name, "")
+		return fmt.Errorf("the pinned %s@%s could not be linked again: %w", name, prior.Version, err)
+	}
+	return nil
 }

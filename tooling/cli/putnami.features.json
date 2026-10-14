@@ -3408,6 +3408,224 @@
           }
         }
       ]
+    },
+    {
+      "id": "cli/extension-dependencies",
+      "type": "feature",
+      "name": "Extension dependencies",
+      "outcome": "Declaring an extension installs, pins and loads every extension it depends on, so the dependency graph decides what a workspace gets",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "install-resolves-the-graph",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "installing-a-dependent-installs-and-pins-its-dependencies",
+              "the-workspace-file-never-receives-a-dependency"
+            ]
+          }
+        },
+        {
+          "id": "what-satisfies-a-dependency",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-satisfied-dependency-installs-nothing",
+              "a-project-never-replaces-a-dependency-build",
+              "the-pre-pass-sets-aside-an-unpinned-dependency-name",
+              "a-global-key-for-a-dependency-is-ignored"
+            ]
+          }
+        },
+        {
+          "id": "node-modules-edges",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "node-modules-edges-are-not-followed",
+              "a-pinned-declared-name-is-followed-from-node-modules"
+            ]
+          }
+        },
+        {
+          "id": "an-explicit-channel-flows-down",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-channel-flows-down-every-hop",
+              "a-version-request-is-not-a-channel",
+              "on-latest-a-range-resolves-as-written"
+            ]
+          }
+        },
+        {
+          "id": "the-lock-wins-while-it-satisfies-the-graph",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-locked-dependency-resolves-from-the-lock",
+              "a-command-line-channel-re-resolves-the-subgraph",
+              "a-stale-lock-entry-moves-to-satisfy-the-graph"
+            ]
+          }
+        },
+        {
+          "id": "an-unmet-range-fails",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unmatched-range-fails-naming-each-dependent",
+              "an-unversioned-channel-answer-fails-a-range",
+              "a-declared-dependency-is-checked-against-its-dependents"
+            ]
+          }
+        },
+        {
+          "id": "the-order-is-deterministic",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-resolution-order-is-level-by-level",
+              "an-explicit-channel-dependent-picks-first",
+              "a-later-level-constraint-is-only-checked",
+              "a-cycle-installs-each-extension-once"
+            ]
+          }
+        },
+        {
+          "id": "the-graph-loads",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "discovery-loads-a-locked-dependency",
+              "root-package-dependencies-skip-a-dependency-name",
+              "a-dependency-that-does-not-load-names-its-dependent"
+            ]
+          }
+        },
+        {
+          "id": "restore-follows-the-lock",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "restore-and-read-preparation-follow-the-graph",
+              "an-unpinned-dependency-is-never-resolved-implicitly"
+            ]
+          }
+        },
+        {
+          "id": "agent-content-may-name-a-dependency",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agent-content-may-name-a-dependency"
+            ]
+          }
+        },
+        {
+          "id": "a-dependency-serves-no-reserved-provider",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dependency-loses-reserved-provider-commands"
+            ]
+          }
+        },
+        {
+          "id": "update-moves-the-graph",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "update-re-resolves-dependencies-without-pinning-them",
+              "dry-run-previews-declared-extensions-only",
+              "list-shows-the-requiring-extension"
+            ]
+          }
+        },
+        {
+          "id": "remove-keeps-the-graph-whole",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "remove-refuses-a-required-dependency-and-prunes-unreachable-ones",
+              "the-root-of-a-cycle-can-be-removed"
+            ]
+          }
+        },
+        {
+          "id": "hosted-installs-the-locked-graph",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-hosted-install-refuses-an-unpinned-dependency"
+            ]
+          }
+        },
+        {
+          "id": "the-user-scope-takes-no-dependency",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-user-install-refuses-a-dependent"
+            ]
+          }
+        },
+        {
+          "id": "an-older-cli-refuses-a-dependent",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dependent-manifest-requires-contract-8",
+              "a-node-modules-manifest-loads-unstamped"
+            ]
+          }
+        },
+        {
+          "id": "the-packager-stamps-a-dependent",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-hook-only-dependent-is-stamped"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

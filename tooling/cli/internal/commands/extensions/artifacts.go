@@ -29,6 +29,12 @@ type artifactInstallOutcome struct {
 	Source       string
 	FromCache    bool
 	Changed      bool
+	// Manifest is the installed extension manifest as a graph install reads
+	// it, nil for a template or when the install left none to read.
+	Manifest *extension.GraphManifest
+	// VersionUnnamed reports a registry answer that did not name the version
+	// it resolved (extension.InstallResult).
+	VersionUnnamed bool
 }
 
 // lockEntryFor builds the lock entry to persist for a freshly installed
@@ -228,6 +234,12 @@ type InstallAction struct {
 	Status    InstallActionStatus
 	FromCache bool
 	Error     string
+	// RequiredBy is the dependent a dependency resolved for, "" for an
+	// extension the workspace declares.
+	RequiredBy string
+	// OldVersion is the version a dependency's lock entry pinned before the
+	// install moved it.
+	OldVersion string
 }
 
 type InstallActionKind string
@@ -307,6 +319,10 @@ type artifactOps struct {
 	workspacePins func(config []byte) (map[string]workspacePin, error)
 	pinLiteral    func(name, version string) string
 
+	// graph reads the extension dependency graph from disk. Nil when the kind
+	// or the scope has no graph.
+	graph *graphOps
+
 	// materialize marks the install as producing a packageable tree for another
 	// platform and/or another store root (`--platform` / `--dest`)
 	// rather than installing into this workspace. The committed lock is then
@@ -352,6 +368,7 @@ func extensionOpsForTarget(wsRoot string, target extension.ArtifactTarget) artif
 	installer.Target = target
 	ops := extensionOpsFor(wsRoot, installer)
 	ops.materialize = target.Materializes()
+	ops.graph = workspaceGraphOps(wsRoot)
 	return ops
 }
 
@@ -378,15 +395,18 @@ func extensionOpsFor(wsRoot string, installer *extension.Installer) artifactOps 
 			if err != nil {
 				return nil, err
 			}
-			return &artifactInstallOutcome{
-				Version:      result.Version,
-				Integrity:    result.Integrity,
-				Integrities:  result.Integrities,
-				ManifestHash: result.ManifestHash,
-				Source:       result.Source,
-				FromCache:    result.FromCache,
-				Changed:      result.Changed,
-			}, nil
+			outcome := &artifactInstallOutcome{
+				Version:        result.Version,
+				Integrity:      result.Integrity,
+				Integrities:    result.Integrities,
+				ManifestHash:   result.ManifestHash,
+				Source:         result.Source,
+				FromCache:      result.FromCache,
+				Changed:        result.Changed,
+				VersionUnnamed: result.VersionUnnamed,
+			}
+			withGraphManifest(outcome, result.InstallDir, name)
+			return outcome, nil
 		},
 		resolve: func(ctx context.Context, name, constraint string) (*artifactInstallOutcome, error) {
 			result, err := installer.Resolve(ctx, name, constraint)
@@ -532,6 +552,8 @@ type artifactInstallWork struct {
 	localLine  string
 	result     *artifactInstallOutcome
 	err        error
+	// requiredBy is the dependent of a dependency, "" for a root.
+	requiredBy string
 }
 
 // installArtifactsWithOptions restores independent artifacts concurrently, but
@@ -574,12 +596,28 @@ func installArtifactsWithOptions(ctx context.Context, wsRoot string, cfg *wsprot
 		return nil
 	}
 
-	work := prepareArtifactInstallWork(lockFile, artMap, specificName, specificVersion, latest, ops, humanOut)
-	runArtifactInstallWorkers(ctx, work, ops)
-
 	persistLock := ops.persistsLock(ctx)
+	// The roots install first. With a graph, a key only the global
+	// configuration declares installs after the graph, unless it names a graph
+	// member (installGraphWork).
+	var globalOnly map[string]bool
+	if ops.graph != nil {
+		globalOnly = ops.graph.globalOnly()
+	}
+	roots, deferred := splitGlobalOnly(artMap, globalOnly, specificName)
+	work := prepareArtifactInstallWork(lockFile, roots, specificName, specificVersion, latest, ops, humanOut)
+	runArtifactInstallWorkers(ctx, work, ops)
+	graphFailed := false
+	if ops.graph != nil {
+		work, graphFailed = installGraphWork(ctx, cfg, lockFile, work, deferred, specificName, specificVersion, latest, persistLock, ops, humanOut, globalOnly, jsonlOut)
+	}
+
 	requested := lockFile.Clone()
 	actions, installed, cached, local, failed := mergeArtifactInstallWork(ctx, lockFile, requested, work, ops, persistLock, jsonlOut)
+	if graphFailed {
+		publishInstallActions(actions, work, opts, false)
+		return graphFailure(work)
+	}
 	if err := refuseHostedLockChange(wsRoot, requested, ops); err != nil {
 		publishInstallActions(actions, work, opts, false)
 		return err
@@ -754,6 +792,12 @@ func installActionFor(ops artifactOps, item *artifactInstallWork, status Install
 	if item.err != nil {
 		action.Error = item.err.Error()
 	}
+	if item.requiredBy != "" {
+		action.RequiredBy = item.requiredBy
+		if item.result != nil && item.hadPrior && item.prior.Version != "" && item.prior.Version != item.result.Version {
+			action.OldVersion = item.prior.Version
+		}
+	}
 	return action
 }
 
@@ -768,29 +812,33 @@ func publishInstallActions(actions []InstallAction, work []artifactInstallWork, 
 		}
 		if jsonlOut {
 			emitArtifactActionJSONL(artifactActionEntry{
-				Kind:      string(action.Kind),
-				Action:    string(action.Action),
-				Name:      action.Name,
-				Version:   action.Version,
-				Source:    action.Source,
-				FromCache: action.FromCache,
-				Status:    legacyInstallStatus(action.Status),
-				Error:     action.Error,
+				Kind:       string(action.Kind),
+				Action:     string(action.Action),
+				Name:       action.Name,
+				Version:    action.Version,
+				OldVersion: action.OldVersion,
+				Source:     action.Source,
+				FromCache:  action.FromCache,
+				Status:     legacyInstallStatus(action.Status),
+				Error:      action.Error,
+				RequiredBy: action.RequiredBy,
 			})
 			continue
 		}
 		if opts.Out == nil && action.Status != InstallStatusFailed {
 			continue
 		}
-		switch action.Status {
-		case InstallStatusFailed:
+		switch {
+		case action.Status == InstallStatusFailed:
 			iox.Fprintf(os.Stderr, "  ✗ %s: %s\n", action.Name, action.Error)
-		case InstallStatusLocal:
+		case action.Status == InstallStatusLocal:
 			iox.Fprintf(opts.Out, "%s", work[i].localLine)
-		case InstallStatusCached, InstallStatusRestored:
-			iox.Fprintf(opts.Out, "  ✓ %s@%s (cached)\n", action.Name, action.Version)
+		case action.OldVersion != "":
+			iox.Fprintf(opts.Out, "  ↑ %s: %s → %s%s\n", action.Name, action.OldVersion, action.Version, requiredBySuffix(action.RequiredBy))
+		case action.Status == InstallStatusCached || action.Status == InstallStatusRestored:
+			iox.Fprintf(opts.Out, "  ✓ %s@%s%s\n", action.Name, action.Version, requiredBySuffix(action.RequiredBy, "cached"))
 		default:
-			iox.Fprintf(opts.Out, "  ✓ %s@%s\n", action.Name, action.Version)
+			iox.Fprintf(opts.Out, "  ✓ %s@%s%s\n", action.Name, action.Version, requiredBySuffix(action.RequiredBy))
 		}
 	}
 }
@@ -845,10 +893,9 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 	// moved maps each name whose workspace pin moves to its new release, and
 	// replaced to the release it replaces.
 	moved, replaced := map[string]string{}, map[string]string{}
-	for name, constraint := range artMap {
-		if specificName != "" && name != specificName {
-			continue
-		}
+	// roots are the declared artifacts this update installed, for the graph.
+	var roots []artifactInstallWork
+	update := func(name, constraint string) {
 		declared := constraint
 		if opts.ConstraintOverride != "" {
 			constraint = opts.ConstraintOverride
@@ -864,13 +911,14 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 				} else {
 					iox.Fprintf(os.Stderr, "  ✗ %s: %v\n", name, localErr)
 				}
-				continue
+				return
 			}
 			if handled {
 				if jsonlOut {
 					emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Status: "local"})
 				}
-				continue
+				roots = append(roots, artifactInstallWork{name: name, local: true})
+				return
 			}
 		}
 
@@ -882,8 +930,9 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 			} else {
 				iox.Fprintf(os.Stderr, "  ✗ %s: %v\n", name, err)
 			}
-			continue
+			return
 		}
+		roots = append(roots, artifactInstallWork{name: name, result: result})
 
 		prior, hadPrior := ops.lockGet(lockFile, name)
 		oldVersion := prior.Version
@@ -920,6 +969,12 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 		}
 	}
 
+	dependencies, err := updateDeclaredArtifacts(ctx, cfg, lockFile, artMap, specificName, ops, opts, jsonlOut, update, func() []artifactInstallWork { return roots })
+	if err != nil {
+		return err
+	}
+	updated += dependencies
+
 	// A workspace file that cannot be rendered stops the update before the
 	// lock is written.
 	renderedPins, err := renderWorkspacePins(wsRoot, ops, moved)
@@ -944,6 +999,44 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 		}
 	}
 	return nil
+}
+
+// updateDeclaredArtifacts updates each declared artifact in name order, then
+// resolves the graph's dependencies again from the roots it installed. With a
+// graph, a key only the global configuration declares updates after the
+// graph, unless it names a graph member. It returns how many dependencies
+// moved.
+func updateDeclaredArtifacts(ctx context.Context, cfg *wsproto.Config, lockFile *lockfile.LockFile, artMap map[string]string, specificName string, ops artifactOps, opts ArtifactUpdateOptions, jsonlOut bool, update func(name, constraint string), roots func() []artifactInstallWork) (int, error) {
+	var globalOnly map[string]bool
+	if ops.graph != nil {
+		globalOnly = ops.graph.globalOnly()
+	}
+	deferred := map[string]string{}
+	for _, name := range sortedStringKeys(artMap) {
+		if specificName != "" && name != specificName {
+			continue
+		}
+		if globalOnly[name] && name != specificName {
+			deferred[name] = artMap[name]
+			continue
+		}
+		update(name, artMap[name])
+	}
+	moved := 0
+	if ops.graph != nil {
+		graph, dependencies, err := updateDependencies(ctx, cfg, lockFile, roots(), globalOnly, opts, ops, jsonlOut)
+		if err != nil {
+			return 0, err
+		}
+		moved = dependencies
+		for name := range graph.ignoredGlobalKeys(deferred, jsonlOut) {
+			delete(deferred, name)
+		}
+	}
+	for _, name := range sortedStringKeys(deferred) {
+		update(name, deferred[name])
+	}
+	return moved, nil
 }
 
 // staleGlobalPin returns the exact release declared pins outside the
@@ -1038,6 +1131,7 @@ func previewArtifactUpdates(ctx context.Context, wsRoot string, cfg *wsproto.Con
 	if !jsonlOut {
 		iox.Fprintf(os.Stdout, "\n  %d resolved\n", resolved)
 	}
+	previewDependencyNote(wsRoot, cfg, ops, jsonlOut)
 	// The preview fails where the update would.
 	_, err := renderWorkspacePins(wsRoot, ops, moved)
 	return err
@@ -1084,6 +1178,11 @@ type artifactListEntry struct {
 	Constraint string `json:"constraint,omitempty"`
 	Installed  string `json:"installed,omitempty"`
 	Source     string `json:"source"`
+	// RequiredBy are the extensions that require a dependency.
+	RequiredBy []string `json:"requiredBy,omitempty"`
+	// RemovedCapabilities are the reserved provider commands a dependency
+	// does not serve.
+	RemovedCapabilities []string `json:"removedCapabilities,omitempty"`
 }
 
 func printArtifactListJSONL(entries []artifactListEntry) error {
@@ -1114,6 +1213,8 @@ type artifactActionEntry struct {
 	// that Version moves away from. That file is not edited, so the pin
 	// disagrees with the lock until someone updates it.
 	GlobalPin string `json:"globalPin,omitempty"`
+	// RequiredBy is the dependent a dependency resolved for (ADR 0066).
+	RequiredBy string `json:"requiredBy,omitempty"`
 }
 
 // emitArtifactActionJSONL writes one artifactActionEntry as a JSON line.

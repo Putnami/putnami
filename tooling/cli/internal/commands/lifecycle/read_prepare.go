@@ -125,5 +125,18 @@ func prepareReadOnly(ctx context.Context, wsRoot string, cfg *wsproto.Config) Re
 			Root: layout.StableDir(wsRoot, layout.Extensions, name),
 		})
 	}
+	// Each locked dependency of a prepared extension is prepared the same
+	// way, and one the lock does not pin is an issue that names its dependent
+	// (ADR 0066). A prepared dependency is not listed in Extensions: discovery
+	// loads it, without the reserved provider commands a dependency does not
+	// serve, and a read keeps that load.
+	walk := extension.WalkWorkspaceGraph(wsRoot, cfg, lf, extension.WalkOptions{
+		Restore: func(name string, entry lockfile.LockEntry) error {
+			return installer.EnsureExtensionLocked(ctx, name, entry.Version, &entry)
+		},
+	})
+	for _, issue := range walk.Issues {
+		report.Issues = append(report.Issues, ReadPreparationIssue{Name: issue.Name, Version: issue.Version, Reason: issue.Reason.Error()})
+	}
 	return report
 }

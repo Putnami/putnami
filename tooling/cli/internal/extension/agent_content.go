@@ -39,6 +39,10 @@ type DeclaredExtension struct {
 	// extension, node_modules/<name> of a package. It is empty for a registry
 	// extension, whose installed tree is located through its lock pin.
 	Dir string
+	// RequiredBy is the dependent of an extension the workspace does not
+	// declare but its graph holds (WalkWorkspaceGraph). Such a dependency is a
+	// registry extension, located through its lock pin.
+	RequiredBy string
 }
 
 // FindDeclaredExtension resolves name to the one declaration of the workspace
@@ -47,6 +51,10 @@ type DeclaredExtension struct {
 // manifest resolves to, exactly as discovery names it. A root package.json
 // devDependency answers to its key when no `extensions` entry provides the
 // name, because discovery reads devDependencies last.
+//
+// A dependency of the workspace's graph answers to its name next, before a
+// devDependency, because discovery loads it first: the workspace chose it
+// through the extension that requires it (ADR 0066).
 //
 // An extension the workspace does not declare, or declares twice, is an error:
 // agent content is only ever taken from an extension the workspace chose, and
@@ -84,6 +92,9 @@ func FindDeclaredExtension(wsRoot string, cfg *wsproto.Config, name string) (Dec
 	}
 	switch len(matches) {
 	case 0:
+		if requiredBy := graphDependent(wsRoot, cfg, name); requiredBy != "" {
+			return DeclaredExtension{Ref: name, Name: name, RequiredBy: requiredBy}, nil
+		}
 		if declaresPackageExtension(wsRoot, name) {
 			return DeclaredExtension{Ref: name, Name: name, Package: true, Dir: installedPackageDir(wsRoot, name)}, nil
 		}
@@ -143,6 +154,20 @@ func DeclaredExtensionNames(wsRoot string, cfg *wsproto.Config) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// graphDependent returns the dependent of name when name is a dependency of
+// the workspace's graph, and "" otherwise.
+func graphDependent(wsRoot string, cfg *wsproto.Config, name string) string {
+	if !extproto.IsRegistryName(name) {
+		return ""
+	}
+	lock, _ := lockfile.ReadLockFile(wsRoot)
+	dep, ok := WalkWorkspaceGraph(wsRoot, cfg, lock, WalkOptions{}).Dependency(name)
+	if !ok || len(dep.RequiredBy) == 0 {
+		return ""
+	}
+	return dep.RequiredBy[0]
 }
 
 func undeclaredExtension(name string) error {
@@ -282,8 +307,12 @@ func LocateAgentContent(wsRoot string, cfg *wsproto.Config, name string) (*Agent
 	case declared.Package:
 		return locatePackageAgentContent(wsRoot, declared)
 	}
-	if err := refuseShadowingPackage(wsRoot, declared.Name); err != nil {
-		return nil, err
+	// A dependency loads from its lock pin whatever node_modules holds, so
+	// no package shadows it.
+	if declared.RequiredBy == "" {
+		if err := refuseShadowingPackage(wsRoot, declared.Name); err != nil {
+			return nil, err
+		}
 	}
 	return locateInstalledAgentContent(wsRoot, declared.Name)
 }

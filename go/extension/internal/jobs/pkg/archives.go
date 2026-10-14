@@ -134,7 +134,7 @@ func createExtensionArchives(ctx *pctx.Context, emit *jsonl.Emitter, packageName
 	// checked under the declared name, with no platform suffix.
 	var baseExecutables []string
 	if !hasBinary && isExtension {
-		if err := gateAndStampManifestContract(baseStageDir); err != nil {
+		if err := gateAndStampManifestContract(baseStageDir, putArchive); err != nil {
 			emit.Diagnostic("error", err.Error(), "", 0)
 			emit.PhaseEnd("package-archives", "failed")
 			return false
@@ -364,7 +364,7 @@ func packagePlatform(run *platformPackaging, p platform.Target) error {
 			executables = append(executables, tools...)
 		}
 		if run.isExtension {
-			if err := gateAndStampManifestContract(stageDir); err != nil {
+			if err := gateAndStampManifestContract(stageDir, putArchive); err != nil {
 				return err
 			}
 			runtimeExecutable, err := validateStagedRuntimeExecutable(stageDir, p.GOOS)

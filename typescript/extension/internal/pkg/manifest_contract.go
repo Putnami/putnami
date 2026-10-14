@@ -14,11 +14,30 @@ import (
 	"go.putnami.dev/sdk/extension/pkgmeta"
 )
 
+// packageForm is the form a packager publishes an extension in. It decides
+// whether the manifest's registry extension dependencies take part in the
+// stamp.
+type packageForm int
+
+const (
+	// putArchive is an archive the CLI installs into its artifact store. The
+	// CLI follows the dependencies of an extension it loads from there, so a
+	// registry dependency is contract surface: the archive is stamped
+	// ExtensionDependenciesContract, even when its manifest declares only
+	// hooks and dependencies.
+	putArchive packageForm = iota
+	// npmPackage is a package the package manager installs into node_modules.
+	// The CLI does not follow the dependencies of an extension it loads from
+	// there, so the stamp leaves them out (proto.RequiredLoadContract), and a
+	// hook-only framework package stays unstamped.
+	npmPackage
+)
+
 // gateAndStampManifestContract is the package-time half of the CLI ↔ extension
 // contract: it validates the STAGED manifest strictly and, on success, stamps
-// into it the lowest contract whose vocabulary covers it
-// (proto.RequiredCLIContract): CurrentContract, or AgentContentContract for a
-// manifest that declares agent content. The stamp is earned, not claimed —
+// into it the lowest contract whose vocabulary covers it for form
+// (packageForm.requiredContract): CurrentContract, or an additive contract for
+// the vocabulary the manifest uses. The stamp is earned, not claimed —
 // strictness lives here, so a manifest with reserved global-flag shadows (or
 // any other protocol violation) fails the package job and never reaches a
 // registry.
@@ -28,7 +47,10 @@ import (
 // Hook-only manifests (e.g. framework packages shipping a preBuild hook with
 // `"commands": {}`) expose neither flags nor agent-facing tools for the
 // contract to govern and intentionally fail full strict validation, so they
-// are left untouched and unstamped (contract 0 → outside the ladder).
+// are left untouched and unstamped (contract 0 → outside the ladder). A put
+// archive whose hook-only manifest names a registry extension dependency is
+// the exception: it is stamped without the full validation
+// (stampDependencyContract).
 //
 // The gate has ONE postcondition, and it covers both arms: whatever this job is
 // about to ship LOADS under this build's loader (verifyStagedManifestLoads),
@@ -46,7 +68,7 @@ import (
 // touched, mirroring how the version is stamped. The stamp is a deterministic
 // function of the manifest and json.MarshalIndent sorts map keys, so the staged
 // manifest stays byte-deterministic.
-func gateAndStampManifestContract(stageDir string) error {
+func gateAndStampManifestContract(stageDir string, form packageForm) error {
 	manifestPath := filepath.Join(stageDir, "putnami.extension.json")
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -58,6 +80,9 @@ func gateAndStampManifestContract(stageDir string) error {
 		return fmt.Errorf("parse staged extension manifest: %w", err)
 	}
 	if !manifestDeclaresContractSurface(raw) {
+		if form == putArchive && namesRegistryDependency(raw) {
+			return stampDependencyContract(stageDir, manifestPath, data, raw)
+		}
 		// Hook-only: nothing to gate and nothing to stamp, but the artifact must
 		// still load.
 		return verifyStagedManifestLoads(manifestPath)
@@ -72,17 +97,36 @@ func gateAndStampManifestContract(stageDir string) error {
 	}
 	contract := protocolcli.CurrentContract
 	if m != nil {
-		contract = proto.RequiredCLIContract(m)
+		contract = form.requiredContract(m)
 	}
 	if errs := diag.Errors(diags); len(errs) > 0 {
-		msgs := make([]string, 0, len(errs))
-		for _, d := range errs {
-			msgs = append(msgs, d.String())
-		}
 		return fmt.Errorf("staged extension manifest does not conform to CLI contract %d and cannot be published: %s",
-			contract, strings.Join(msgs, "; "))
+			contract, diagnosticMessages(errs))
 	}
+	return stampAndVerify(stageDir, manifestPath, data, raw, contract)
+}
 
+// stampDependencyContract is the stamp-only arm of a put archive whose
+// manifest declares only hooks and registry extension dependencies. The CLI
+// follows those dependencies, so the archive must carry the contract that
+// covers them, or an older CLI would load it without them. The strict
+// requirement of a command, tool or agent content does not apply to it; the
+// strict decode and the load postcondition do.
+func stampDependencyContract(stageDir, manifestPath string, data []byte, raw map[string]any) error {
+	if err := rejectFutureContractClaim(raw); err != nil {
+		return err
+	}
+	m, diags := proto.ParseManifest(data)
+	if errs := diag.Errors(diags); len(errs) > 0 || m == nil {
+		return fmt.Errorf("staged extension manifest names extension dependencies but cannot be published: %s",
+			diagnosticMessages(errs))
+	}
+	return stampAndVerify(stageDir, manifestPath, data, raw, proto.RequiredCLIContract(m))
+}
+
+// stampAndVerify writes contract into the staged manifest and checks the
+// gate's postcondition. On failure it puts the staged input back.
+func stampAndVerify(stageDir, manifestPath string, data []byte, raw map[string]any, contract int) error {
 	raw["cliContract"] = contract
 	rewritten, err := json.MarshalIndent(raw, "", "  ")
 	if err != nil {
@@ -106,6 +150,25 @@ func gateAndStampManifestContract(stageDir string) error {
 		return postErr
 	}
 	return nil
+}
+
+// requiredContract is the stamp of a manifest packaged in form: every rung its
+// vocabulary reaches for a put archive (proto.RequiredCLIContract), and every
+// rung but the dependency one for an npm package (proto.RequiredLoadContract).
+func (form packageForm) requiredContract(m *proto.Manifest) int {
+	if form == npmPackage {
+		return proto.RequiredLoadContract(m)
+	}
+	return proto.RequiredCLIContract(m)
+}
+
+// diagnosticMessages joins the messages of diags for a packaging error.
+func diagnosticMessages(diags []diag.Diagnostic) string {
+	msgs := make([]string, 0, len(diags))
+	for _, d := range diags {
+		msgs = append(msgs, d.String())
+	}
+	return strings.Join(msgs, "; ")
 }
 
 // verifyStagedAgentContent is the content half of the postcondition: the
@@ -234,6 +297,31 @@ func manifestDeclaresContractSurface(raw map[string]any) bool {
 		surfaceNeedsGate(raw["commandGroups"]) ||
 		surfaceNeedsGate(raw["tools"]) ||
 		raw["agentContent"] != nil
+}
+
+// namesRegistryDependency reports whether the raw manifest's
+// extensionDependencies names a registry extension (proto.IsRegistryName). A
+// value that does not decode counts, so the strict decode reports it instead
+// of the archive shipping unstamped.
+func namesRegistryDependency(raw map[string]any) bool {
+	value, ok := raw["extensionDependencies"]
+	if !ok || value == nil {
+		return false
+	}
+	data, err := json.Marshal(value)
+	if err != nil {
+		return true
+	}
+	var deps proto.Dependencies
+	if err := json.Unmarshal(data, &deps); err != nil {
+		return true
+	}
+	for name := range deps.List {
+		if proto.IsRegistryName(name) {
+			return true
+		}
+	}
+	return false
 }
 
 // surfaceNeedsGate reports whether a raw command, command-group, or tool value

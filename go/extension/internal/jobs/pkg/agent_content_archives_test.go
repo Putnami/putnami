@@ -175,7 +175,7 @@ func TestGateAndStampManifestContract_StampsTheAdditiveContractOnlyForAgentConte
 		`"name": "@putnami/testext",
 	"cliContract": 5,`, 1)
 	plain := stageManifest(t, claimed)
-	if err := gateAndStampManifestContract(plain); err != nil {
+	if err := gateAndStampManifestContract(plain, putArchive); err != nil {
 		t.Fatalf("gate: %v", err)
 	}
 	if got := stagedContract(t, plain); got != protocolcli.CurrentContract {
@@ -192,7 +192,7 @@ func TestGateAndStampManifestContract_StampsTheAdditiveContractOnlyForAgentConte
 	if _, err := agentartifact.StageExtensionContent(ctx.Project.FullPath, stage, "@putnami/testext", "1.2.3"); err != nil {
 		t.Fatal(err)
 	}
-	if err := gateAndStampManifestContract(stage); err != nil {
+	if err := gateAndStampManifestContract(stage, putArchive); err != nil {
 		t.Fatalf("gate: %v", err)
 	}
 	if got := stagedContract(t, stage); got != protocolcli.AgentContentContract {
@@ -214,7 +214,7 @@ func TestGateAndStampManifestContract_RefusesAgentContentItCannotVerify(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = gateAndStampManifestContract(authored)
+	err = gateAndStampManifestContract(authored, putArchive)
 	if err == nil || !strings.Contains(err.Error(), "as source") {
 		t.Fatalf("err = %v, want the authored form refused", err)
 	}
@@ -233,7 +233,7 @@ func TestGateAndStampManifestContract_RefusesAgentContentItCannotVerify(t *testi
 		t.Fatal(err)
 	}
 	mustWrite(t, filepath.Join(stage, "agent-content", ".agents", "skills", "testext-review", "references", "guide.md"), "tampered\n")
-	if err := gateAndStampManifestContract(stage); err == nil || !strings.Contains(err.Error(), "does not match what it binds") {
+	if err := gateAndStampManifestContract(stage, putArchive); err == nil || !strings.Contains(err.Error(), "does not match what it binds") {
 		t.Fatalf("err = %v, want tampered staged content refused", err)
 	}
 }

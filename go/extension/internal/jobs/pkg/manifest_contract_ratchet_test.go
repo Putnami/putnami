@@ -51,7 +51,7 @@ func stagedContract(t *testing.T, stageDir string) int {
 // about the ARTIFACT, made through the very function a consumer's CLI calls.
 func TestGateAndStampManifestContract_StagedOutputLoadsUnderTheCurrentLoader(t *testing.T) {
 	dir := stageManifest(t, conformingManifest)
-	if err := gateAndStampManifestContract(dir); err != nil {
+	if err := gateAndStampManifestContract(dir, putArchive); err != nil {
 		t.Fatalf("gate should pass a conforming manifest: %v", err)
 	}
 
@@ -82,7 +82,7 @@ func TestGateAndStampManifestContract_RatchetsAStaleLowerClaim(t *testing.T) {
 	"cliContract": %d,`, protocolcli.CurrentContract-1), 1)
 
 	dir := stageManifest(t, stale)
-	if err := gateAndStampManifestContract(dir); err != nil {
+	if err := gateAndStampManifestContract(dir, putArchive); err != nil {
 		t.Fatalf("a stale lower claim must be ratcheted up, not rejected: %v", err)
 	}
 	if got := stagedContract(t, dir); got != protocolcli.CurrentContract {
@@ -106,7 +106,7 @@ func TestGateAndStampManifestContract_RejectsFutureContractClaim(t *testing.T) {
 	"cliContract": %d,`, protocolcli.LatestContract+1), 1)
 
 	dir := stageManifest(t, future)
-	err := gateAndStampManifestContract(dir)
+	err := gateAndStampManifestContract(dir, putArchive)
 	if err == nil {
 		t.Fatal("a manifest claiming a future contract must not be packaged with a downgraded stamp")
 	}
@@ -137,7 +137,7 @@ func TestGateAndStampManifestContract_RejectsUnloadableHookOnlyManifest(t *testi
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := stageManifest(t, manifest)
-			err := gateAndStampManifestContract(dir)
+			err := gateAndStampManifestContract(dir, putArchive)
 			if err == nil {
 				t.Fatal("a hook-only manifest no consumer can load must fail packaging")
 			}
@@ -161,7 +161,7 @@ func TestGateAndStampManifestContract_HookOnlyManifestLoadsUnstamped(t *testing.
 	"hooks": {"preBuild": {"kind": "command", "command": "echo"}}
 }`
 	dir := stageManifest(t, manifest)
-	if err := gateAndStampManifestContract(dir); err != nil {
+	if err := gateAndStampManifestContract(dir, putArchive); err != nil {
 		t.Fatalf("hook-only manifests must not be gated: %v", err)
 	}
 	data, _ := os.ReadFile(filepath.Join(dir, "putnami.extension.json"))
@@ -263,7 +263,7 @@ func TestFirstPartyManifestsSurviveTheGateAndLoad(t *testing.T) {
 				t.Fatalf("%s cannot stage its agent content, so it cannot be published: %v", rel, err)
 			}
 
-			if err := gateAndStampManifestContract(stage); err != nil {
+			if err := gateAndStampManifestContract(stage, putArchive); err != nil {
 				t.Fatalf("%s does not survive the package-time contract gate, so it cannot be published: %v", rel, err)
 			}
 
@@ -271,11 +271,13 @@ func TestFirstPartyManifestsSurviveTheGateAndLoad(t *testing.T) {
 			if err != nil {
 				t.Fatalf("the packaged form of %s does not load: %v", rel, err)
 			}
-			if proto.DeclaresContractSurface(loaded) {
+			// A put archive also stamps a hook-only manifest that names a
+			// registry extension dependency (stampDependencyContract).
+			if proto.DeclaresContractSurface(loaded) || proto.NamesRegistryDependency(loaded) {
 				stampedSurfaces++
 				// The stamp is the contract the manifest's vocabulary requires:
-				// the current one, or the agent-content contract for a
-				// manifest that ships agent content.
+				// the current one, or an additive contract for the vocabulary
+				// the manifest uses.
 				if want := proto.RequiredCLIContract(loaded); loaded.CLIContract != want {
 					t.Errorf("%s packages at cliContract %d, want %d", rel, loaded.CLIContract, want)
 				}
