@@ -116,6 +116,15 @@ absent from action-cache entries: a warm cache hit replays the structured
 summary and verdict, but not the transcript, so `--test-verbose` exposes full
 detail only when the test task executes.
 
+A test binary that exceeds its `--timeout`, or Go's 10-minute default, prints
+`panic: test timed out after <duration>`. When a failed run's output carries
+that line, the job marks its result timed out: `error.timedOut` on a solo
+result, and `timedOut` on each batch item whose failure includes the line,
+either in the project's own output or in the unattributed output the batch
+charges to it. A timeout depends on host load, not on the inputs, so the CLI
+does not record that failure for replay, and the next run executes the tests
+again.
+
 ## Usage
 
 ### Basic

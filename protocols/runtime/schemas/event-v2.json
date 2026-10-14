@@ -292,7 +292,11 @@
       "description": "Structured error information from a failed job.",
       "properties": {
         "message": { "type": "string" },
-        "code": { "type": "string" }
+        "code": { "type": "string" },
+        "timedOut": {
+          "type": "boolean",
+          "description": "True when the failure is a deadline the producer's own tool enforced, not a verdict its inputs produced. A consumer that caches failures by input never records one."
+        }
       }
     }
   }

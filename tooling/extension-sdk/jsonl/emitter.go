@@ -17,6 +17,7 @@ package jsonl
 import (
 	"os"
 	"strconv"
+	"sync/atomic"
 
 	runtime "go.putnami.dev/protocol/runtime"
 )
@@ -24,6 +25,8 @@ import (
 // Emitter writes JSONL events to stdout.
 type Emitter struct {
 	version int
+	// timedOut is set by MarkTimedOut and read by Result.
+	timedOut atomic.Bool
 }
 
 // New creates a JSONL emitter whose stream speaks the protocol version the
@@ -193,9 +196,19 @@ func (e *Emitter) SummaryWithData(message string, data map[string]any) {
 	_ = e.rt().SummaryData(message, data)
 }
 
+// MarkTimedOut records that the job's tool enforced its own deadline and
+// stopped the job. A FAILED result emitted afterwards carries error.timedOut,
+// so the CLI never records the failure for replay. It never changes an OK or
+// SKIP result. It is safe to call from any goroutine.
+func (e *Emitter) MarkTimedOut() { e.timedOut.Store(true) }
+
 // Result emits a result event. Status: OK, FAILED, SKIP.
 func (e *Emitter) Result(status string, data map[string]any) {
-	_ = e.rt().Result(runtime.ResultStatus(status), data, nil)
+	var jobErr *runtime.JobError
+	if runtime.ResultStatus(status) == runtime.ResultFailed && e.timedOut.Load() {
+		jobErr = &runtime.JobError{TimedOut: true}
+	}
+	_ = e.rt().Result(runtime.ResultStatus(status), data, jobErr)
 }
 
 // Ready emits the typed readiness event and reports whether it was written.

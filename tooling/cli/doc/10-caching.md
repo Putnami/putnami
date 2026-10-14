@@ -602,7 +602,10 @@ because both used to surprise:
 explains it, so these five are always re-executed:
 
 - a **timeout** — a deadline depends on host load, not on the key (the result
-  carries a structural `TimedOut` marker; the message is never matched);
+  carries a structural `TimedOut` marker; the message is never matched). The
+  CLI sets it when its own deadline fires, and the extension sets it for its
+  tool's deadline, such as a `go test` binary that exceeds `-timeout`:
+  `error.timedOut` on a result event, or `timedOut` on a batch item;
 - a **sensitive leak** — the guard matches an invocation-scoped artifact's path
   and bytes and the process capabilities a run provisions, none of which the key
   describes;

@@ -36,7 +36,9 @@ import (
 //   - THE FAILURE IS NOT A TIMEOUT. A deadline is a function of host load, not
 //     of the cache key, so pinning one would turn a busy laptop into a
 //     permanent verdict. JobResult.TimedOut is the structural marker every
-//     deadline-to-failure site sets; the message is never string-matched.
+//     deadline-to-failure site sets, and the extension sets it for its own
+//     tool's deadline: error.timedOut on its result event, or timedOut on a
+//     batch member. The message is never string-matched.
 //   - THE RUN IS NOT HOSTED (runcredential.Hosted). A hosted run installs
 //     offline, and a failure from a missing dependency is not in the key of a
 //     task that does not declare the offline signal.

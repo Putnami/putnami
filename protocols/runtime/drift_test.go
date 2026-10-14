@@ -3,7 +3,9 @@ package runtime
 import (
 	"encoding/json"
 	"os"
+	"reflect"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -307,6 +309,53 @@ func assertEnumSync(t *testing.T, label string, schemaVals, goVals []string) {
 	for _, g := range goVals {
 		if !schemaSet[g] {
 			t.Errorf("%s %q exists in Go constants but not in schema", label, g)
+		}
+	}
+}
+
+// TestDrift_JobErrorMembers keeps the result error's members the same in Go
+// and in both event schemas, with the type each schema declares.
+func TestDrift_JobErrorMembers(t *testing.T) {
+	goMembers := map[string]string{}
+	jobError := reflect.TypeOf(JobError{})
+	for i := 0; i < jobError.NumField(); i++ {
+		field := jobError.Field(i)
+		name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+		switch field.Type.Kind() {
+		case reflect.String:
+			goMembers[name] = "string"
+		case reflect.Bool:
+			goMembers[name] = "boolean"
+		default:
+			t.Fatalf("JobError.%s has kind %s, which this test does not map to a schema type", field.Name, field.Type.Kind())
+		}
+	}
+
+	for _, file := range []string{"schemas/event.json", "schemas/event-v2.json"} {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatalf("read schema: %v", err)
+		}
+		var schema struct {
+			Defs map[string]struct {
+				Properties map[string]struct {
+					Type string `json:"type"`
+				} `json:"properties"`
+			} `json:"$defs"`
+		}
+		if err := json.Unmarshal(data, &schema); err != nil {
+			t.Fatalf("parse %s: %v", file, err)
+		}
+		def, ok := schema.Defs["JobError"]
+		if !ok {
+			t.Fatalf("no $defs/JobError in %s", file)
+		}
+		schemaMembers := map[string]string{}
+		for name, property := range def.Properties {
+			schemaMembers[name] = property.Type
+		}
+		if !reflect.DeepEqual(schemaMembers, goMembers) {
+			t.Errorf("%s JobError members = %v, want the Go struct's %v", file, schemaMembers, goMembers)
 		}
 	}
 }

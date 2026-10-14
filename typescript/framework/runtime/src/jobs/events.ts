@@ -225,6 +225,11 @@ export interface ErrorInfo {
 export interface JobError {
   message?: string;
   code?: string;
+  /**
+   * True when the failure is a deadline the producer's own tool enforced,
+   * not a verdict its inputs produced. Omit it otherwise.
+   */
+  timedOut?: boolean;
 }
 
 /**

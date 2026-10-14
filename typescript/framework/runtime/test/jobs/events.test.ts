@@ -114,6 +114,15 @@ describe('runtime job event emitter', () => {
     expect(summary.message).toBe('2 tests');
   });
 
+  it('carries a tool-enforced timeout as error.timedOut, as the Go SDK does', () => {
+    // Counterpart: TestEmitter_MarkTimedOut in tooling/extension-sdk/jsonl.
+    const [line] = captureLines((e) => e.result('FAILED', undefined, { timedOut: true }));
+    expect(line).toContain('"error":{"timedOut":true}');
+    const result = parseRuntimeEvent(line.trimEnd()) as RuntimeEvent;
+    expect(validateRuntimeEvent(result)).toEqual([]);
+    expect(result.data).toEqual({ status: 'FAILED', error: { timedOut: true } });
+  });
+
   it('drops non-finite metric values instead of violating the schema', () => {
     const events = captureEvents((e) => {
       e.metric('bad', Number.NaN, 'count');

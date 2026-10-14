@@ -228,6 +228,10 @@ Emits the final `result` event. Must be the last event emitted.
 | `status` | `string` | `"OK"`, `"FAILED"`, or `"SKIP"` |
 | `data` | `map[string]any` | Structured result data (nil to omit) |
 
+### `(*Emitter) MarkTimedOut()`
+
+Records that the job's tool enforced its own deadline, such as a test binary that exceeded its timeout. A `"FAILED"` result emitted afterwards carries `error.timedOut: true`, and the CLI does not record that failure in its failure-replay cache: the next run executes the job again. An `"OK"` or `"SKIP"` result never carries it. Detect the timeout from your tool's own output; the CLI never reads messages to decide it.
+
 ### `ForwardPipe(emit *Emitter, pipe io.ReadCloser, fallbackLevel string, wg *sync.WaitGroup)`
 
 Reads lines from a pipe and forwards each as a JSONL log event. Calls `wg.Done()` when the pipe is closed. Designed to run as a goroutine.

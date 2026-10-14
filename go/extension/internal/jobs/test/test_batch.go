@@ -107,6 +107,9 @@ type batchProjectResult struct {
 	Diagnostics []parse.ToolDiagnostic `json:"diagnostics,omitempty"`
 	Artifacts   []batchArtifact        `json:"artifacts,omitempty"`
 	Summary     batchSummary           `json:"summary,omitempty"`
+	// TimedOut marks a failure that includes a test binary past its -timeout,
+	// the batch form of a result's error.timedOut: the CLI never replays it.
+	TimedOut bool `json:"timedOut,omitempty"`
 }
 
 type batchArtifact struct {
@@ -846,6 +849,11 @@ func evaluateBatchProject(
 		Diagnostics: diagnostics,
 		Artifacts:   artifacts,
 		Summary:     summarizeDiagnostics(diagnostics),
+		// The member's own output, or the unattributed failure the batch
+		// already charges to it, decides: a timeout either one shows is part
+		// of this member's failure.
+		TimedOut: testFailed &&
+			(parse.TestTimedOut(output) || parse.TestTimedOut(unattributedFailure)),
 	}
 }
 

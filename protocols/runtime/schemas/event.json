@@ -296,6 +296,10 @@
         "code": {
           "type": "string",
           "description": "Machine-readable error code."
+        },
+        "timedOut": {
+          "type": "boolean",
+          "description": "True when the failure is a deadline the producer's own tool enforced, not a verdict its inputs produced. A consumer that caches failures by input never records one."
         }
       }
     }

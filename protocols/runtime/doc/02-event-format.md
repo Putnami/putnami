@@ -161,6 +161,17 @@ On failure, the `data` object may include an `error` field:
 }
 ```
 
+Set `error.timedOut` to `true` when the failure is a deadline the producer's own tool enforced, such as a test binary that exceeds its timeout. The failure then depends on host load, not on the job's inputs, so the Putnami CLI never records it in its failure-replay cache and the next run executes the job again. The member is omitted when it is false.
+
+```json
+{
+  "data": {
+    "status": "FAILED",
+    "error": { "timedOut": true }
+  }
+}
+```
+
 ## Flat vs. Nested Fields
 
 Job subprocesses may use flat top-level fields (e.g., `"severity"`, `"location"`, `"current"`) rather than nesting under `"data"`. The orchestrator normalizes both forms — all non-envelope fields are accessible via `event.Data[key]`.

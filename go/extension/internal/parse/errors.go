@@ -400,6 +400,28 @@ func TestFailureText(output string) string {
 	return text
 }
 
+// testTimeoutPanic starts the line a test binary prints when it exceeds its
+// -timeout: `panic: test timed out after 10m0s`.
+const testTimeoutPanic = "panic: test timed out after "
+
+// TestTimedOut reports whether `go test` output shows a test binary that
+// exceeded its -timeout. It reads `-json` events and plain lines alike, with
+// no line-length limit, so a long log line before the panic cannot hide it.
+func TestTimedOut(output string) bool {
+	scanner := LineScanner(strings.NewReader(output))
+	for scanner.Scan() {
+		line := scanner.Text()
+		var evt TestEvent
+		if json.Unmarshal([]byte(line), &evt) == nil && evt.Action != "" {
+			line = evt.Output
+		}
+		if strings.HasPrefix(line, testTimeoutPanic) {
+			return true
+		}
+	}
+	return false
+}
+
 // maxFailureOutputBytes is the report's public per-message budget. Applying it
 // at the causal selector prevents a later plain-tail cut from discarding the
 // panic, race or FAIL block this package deliberately chose.

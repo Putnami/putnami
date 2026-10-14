@@ -71,12 +71,14 @@ type JobResult struct {
 	// JobResult assembled by hand (tests, older call sites) leaves it empty and
 	// ReuseKind falls back to the booleans.
 	Reuse ReuseKind `json:"-"`
-	// TimedOut records that this result is a failure the task's own deadline
-	// produced, not one its inputs produced. It is set at every site that turns
-	// a context.DeadlineExceeded into a failed result, so a consumer never has
-	// to string-match the error message. A timeout depends on host load rather
-	// than on the cache key, which is why the failure cache refuses to record
-	// one (internal/jobs/task_failure.go).
+	// TimedOut records that this result is a failure a deadline produced, not
+	// one its inputs produced. It is set at every site that turns a
+	// context.DeadlineExceeded into a failed result, and from the extension's
+	// own report: error.timedOut on a result event (ExtractResult) or timedOut
+	// on a batch member. A consumer never has to string-match the error
+	// message. A timeout depends on host load rather than on the cache key,
+	// which is why the failure cache refuses to record one
+	// (internal/jobs/task_failure.go).
 	TimedOut bool `json:"-"`
 	// ReplayedFailure is set when this failed result was served from the local
 	// failure cache instead of executed, because the task's cache key — and
