@@ -2246,7 +2246,11 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-binary-not-built-from-this-tree-is-refused-with-the-putnamiw-recovery"
+              "a-binary-not-built-from-this-tree-is-refused-with-the-putnamiw-recovery",
+              "a-keyed-from-source-run-execs-the-immutable-blob-and-exports-its-key",
+              "a-concurrent-relink-does-not-un-prove-a-running-from-source-engine",
+              "a-borrowed-engine-pin-on-a-foreign-binary-is-still-refused",
+              "a-correct-marker-on-a-foreign-binary-is-still-refused"
             ]
           }
         },
@@ -2259,7 +2263,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "an-edit-anywhere-in-the-keyed-pathspec-rebuilds-and-an-unchanged-tree-reuses"
+              "an-edit-anywhere-in-the-keyed-pathspec-rebuilds-and-an-unchanged-tree-reuses",
+              "a-concurrent-run-at-another-tree-state-never-rewrites-an-earlier-blob"
             ]
           }
         },
