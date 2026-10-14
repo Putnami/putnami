@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path"
@@ -152,3 +153,24 @@ func TestRunRefusesEveryOtherInvocation(t *testing.T) {
 		})
 	}
 }
+
+// TestRunReportsAHandshakeItCannotWrite pins that a runtime-info descriptor
+// the runtime cannot write is a failure the host sees: exit 1 and the write
+// error on stderr, never a silent success.
+func TestRunReportsAHandshakeItCannotWrite(t *testing.T) {
+	t.Parallel()
+	var stderr bytes.Buffer
+	if code := run([]string{"__putnami", "runtime-info"}, failingWriter{}, &stderr); code != 1 {
+		t.Errorf("exit %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), errClosedStdout.Error()) {
+		t.Errorf("stderr %q does not name the write error", stderr.String())
+	}
+}
+
+var errClosedStdout = errors.New("stdout is closed")
+
+// failingWriter refuses every write, as a closed stdout does.
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errClosedStdout }
