@@ -14,28 +14,24 @@ import (
 // extension shows no deploy, and one with no cache provider no --cache-trust.
 //
 // A nil scope hides nothing. That is the help outside a workspace, and the
-// help of a workspace whose extensions do not load. A hosted launcher reads
-// --credential-fd from the help of the pinned CLI run in an empty directory
-// (launch.credentialProbe), so that listing must stay complete.
+// help of a workspace where an extension did not load: its commands are
+// unknown, and help must not hide what it would provide.
 type helpScope struct {
 	commands map[string]bool
 }
 
-// newHelpScope returns the scope of the workspace at wsRoot, discovering its
-// extensions when the caller has not, or nil outside a workspace.
-func newHelpScope(wsRoot string, cfg *wsproto.Config, extensions []*extension.ExtensionDescription) *helpScope {
+// newHelpScope returns the scope of the workspace at wsRoot, or nil outside a
+// workspace and when an extension there did not load.
+func newHelpScope(wsRoot string, cfg *wsproto.Config) *helpScope {
 	if wsRoot == "" {
 		return nil
 	}
-	if extensions == nil {
-		discovered, err := extension.DiscoverExtensions(wsRoot, cfg, projectPathsForRoot(wsRoot))
-		if err != nil {
-			return nil
-		}
-		extensions = discovered
+	result, err := extension.DiscoverExtensionsDetailed(wsRoot, cfg, projectPathsForRoot(wsRoot))
+	if err != nil || len(result.Skipped) > 0 {
+		return nil
 	}
 	scope := &helpScope{commands: map[string]bool{}}
-	for _, ext := range extensions {
+	for _, ext := range result.Extensions {
 		if ext == nil {
 			continue
 		}

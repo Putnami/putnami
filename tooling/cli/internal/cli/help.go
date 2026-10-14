@@ -157,6 +157,12 @@ Usage:
   Multi-command: putnami lint,test,build --impacted
 
 `, names)
+	} else {
+		iox.Fprint(os.Stdout, `Build (from extensions):
+  No extension of this workspace declares a job command. Name a language
+  extension in putnami.workspace.json, then run: putnami extensions install
+
+`)
 	}
 
 	for _, cat := range structuredCommandCategories {

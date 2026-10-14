@@ -43,14 +43,14 @@ func flagNames(scope *helpScope) []string {
 	return names
 }
 
-var providerFlags = []string{"--where", "--providers", "--credential-fd", "--cache-trust"}
+var providerFlags = []string{"--where", "--providers", "--cache-trust"}
 
-// TestHelpOutsideAWorkspaceListsEverything pins the nil scope: a hosted
-// launcher reads --credential-fd from this listing (launch.credentialProbe).
+// TestHelpOutsideAWorkspaceListsEverything pins the nil scope, which is also
+// the help of a workspace where an extension did not load.
 func TestHelpOutsideAWorkspaceListsEverything(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "workspace-scoped-help", "help-lists-what-the-workspace-extensions-provide")
-	if newHelpScope("", nil, nil) != nil {
+	if newHelpScope("", nil) != nil {
 		t.Fatal("outside a workspace the scope must be nil")
 	}
 	if got := jobNames(nil); !slices.Contains(got, "deploy") || !slices.Contains(got, "validate") {
@@ -82,18 +82,20 @@ func TestHelpInAWorkspaceListsWhatItsExtensionsDeclare(t *testing.T) {
 			t.Errorf("help lists %s, which no loaded extension provides", flag)
 		}
 	}
-	if !slices.Contains(flags, "--no-cache") {
-		t.Error("a flag the core gives meaning must stay listed")
+	// A hosted launcher reads --credential-fd from the pinned CLI's help
+	// wherever it runs (launch.credentialProbe).
+	for _, listed := range []string{"--no-cache", "--credential-fd"} {
+		if !slices.Contains(flags, listed) {
+			t.Errorf("help must always list %s", listed)
+		}
 	}
 }
 
 func TestHelpListsAProviderFlagWhenAnExtensionServesIt(t *testing.T) {
 	t.Parallel()
 	flags := flagNames(scopeOf("build", cache.ProviderCommandName))
-	for _, want := range []string{"--cache-trust", "--credential-fd"} {
-		if !slices.Contains(flags, want) {
-			t.Errorf("a cache provider gives %s meaning, help misses it", want)
-		}
+	if !slices.Contains(flags, "--cache-trust") {
+		t.Error("a cache provider gives --cache-trust meaning, help misses it")
 	}
 	for _, hidden := range []string{"--where", "--providers"} {
 		if slices.Contains(flags, hidden) {

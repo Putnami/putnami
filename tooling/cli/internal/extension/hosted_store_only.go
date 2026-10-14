@@ -8,6 +8,11 @@ import (
 	"slices"
 	"strings"
 
+	cache "go.putnami.dev/protocol/cache"
+	protocolcli "go.putnami.dev/protocol/cli"
+	distribution "go.putnami.dev/protocol/distribution"
+	registryproto "go.putnami.dev/protocol/registry"
+	runner "go.putnami.dev/protocol/runner"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -36,8 +41,19 @@ var errPinnedBuildMissing = errors.New("a hosted run (--credential-fd) runs the 
 var errPathExtensionProvider = errors.New("a hosted run takes every provider from an extension installed from the artifact store")
 
 // hostedProviderCommands are the reserved commands through which an extension
-// serves a provider capability (runcredential.ProviderCommands).
-var hostedProviderCommands = runcredential.ProviderCommands()
+// serves a provider capability: the CLI starts the provider for the whole run
+// and hands it the run credential, a credential derived from it, or the run's
+// evidence. registryproto.CredentialProviderCommand also serves the publish
+// purpose and publication-v1, and distribution.ProviderCommandName serves the
+// release sets a publish or a deploy resolves.
+var hostedProviderCommands = []string{
+	registryproto.CredentialProviderCommand,
+	cache.ProviderCommandName,
+	runner.ProviderCommandName,
+	protocolcli.SessionReporterCommand,
+	protocolcli.LogReporterCommand,
+	distribution.ProviderCommandName,
+}
 
 // InArtifactStore reports whether ext is installed from the artifact store:
 // it is not a local source, and its manifest directory resolves inside the

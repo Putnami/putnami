@@ -865,6 +865,10 @@ putnami sessions summary --by-digest    # Task records grouped by input digest
 
 Sessions record every job execution with metadata, git state, timing, and JSONL event streams. The gate hard-fails cache-hit-rate and job-count regressions; timing findings warn unless `timing.severity` is promoted to `error` in the baseline. `--scenario <name>` records the session as a named performance reference point instead of refreshing the budget; scenarios are never evaluated by the gate.
 
+With `--output=json`, `sessions list` puts the sessions under `data` as an
+array at every count: `[]` when none is recorded, and a one-element array for
+one session.
+
 `sessions export` streams the recorded documents themselves, oldest first and deduplicated by session id, so per-run CPU, task counts and cache reuse can leave a worktree before it is deleted. The store keeps 20 records by default; `sessions.keep` in the workspace config changes that (see [05-configuration.md](05-configuration.md#session-retention)).
 
 `sessions summary` reduces the same records to one row per run — commands, selection, task total/executed/reused, `run.cpu.actualMs`, wall and outcome. A run a task spawned is marked nested and never counted as a gate, and `--command <list>` matches the recorded command set exactly, so `--command lint,test,build,validate` lists the gates and none of the builds they spawned. `--by-digest` groups the selected sessions' task records by `inputDigest`, the cache key each task was keyed on, and counts how many executed, reused or failed. See [11-session-recording.md](11-session-recording.md) for details.
@@ -1414,10 +1418,12 @@ putnami help --markdown      # the same, plus per-command flags
 
 Inside a workspace, `putnami help` leaves out a flag that only an absent
 provider gives meaning: `--where` without a runner provider, `--providers`
-without a credential provider, `--cache-trust` without a cache provider, and
-`--credential-fd` without any provider that holds the run credential. The
-parser still accepts them, and help outside a workspace, the man page, the
-Markdown reference and shell completion still list them.
+without a credential provider, and `--cache-trust` without a cache provider.
+It hides nothing when an extension of the workspace does not load. The parser
+still accepts these flags, and help outside a workspace, the man page, the
+Markdown reference and shell completion still list them. `--credential-fd` is
+always listed, because a hosted launcher reads it from the help of the pinned
+CLI.
 
 `putnami help` also documents the smart default selection: with no target, a
 feature branch runs `--impacted` against the trunk, while `main`/`master` uses a

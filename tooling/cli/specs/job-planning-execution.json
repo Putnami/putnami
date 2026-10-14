@@ -23,7 +23,7 @@
     },
     {
       "id": "workspace-scoped-help",
-      "text": "Inside a workspace, help lists only the job commands, built-in aliases and provider-bound global flags that a loaded extension gives meaning; the parser still accepts them all. Outside a workspace help lists everything, so a hosted launcher still reads --credential-fd from it."
+      "text": "Inside a workspace, help lists only the job commands, built-in aliases and provider-bound global flags that a loaded extension gives meaning; the parser still accepts them all. Outside a workspace, or when an extension does not load, help lists everything. --credential-fd is always listed, because a hosted launcher reads it from help."
     },
     {
       "id": "selection-before-plan",

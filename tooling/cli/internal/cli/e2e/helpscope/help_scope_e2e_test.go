@@ -26,7 +26,12 @@ func TestHelpListsWhatTheWorkspaceExtensionsProvide(t *testing.T) {
 			if code != 0 {
 				t.Fatalf("exit %d:\n%s", code, output)
 			}
-			for _, hidden := range []string{"d=deploy", ", deploy", "putnami serve", "--where", "--cache-trust", "--providers", "--credential-fd"} {
+			// A hosted launcher reads --credential-fd from the pinned CLI's help
+			// wherever it runs, so help always lists it.
+			if args[0] == "--help" && !strings.Contains(output, "--credential-fd") {
+				t.Errorf("help must always list --credential-fd:\n%s", output)
+			}
+			for _, hidden := range []string{"d=deploy", ", deploy", "putnami serve", "--where", "--cache-trust", "--providers"} {
 				if strings.Contains(output, hidden) {
 					t.Errorf("help lists %q, which the fixture's extension does not provide:\n%s", hidden, output)
 				}
@@ -38,7 +43,7 @@ func TestHelpListsWhatTheWorkspaceExtensionsProvide(t *testing.T) {
 		t.Errorf("help must list the fixture's job commands (exit %d):\n%s", code, output)
 	}
 	code, output = clitest.RunGateArgs(t, clitest.WhereFixture(t, false, true), "--help")
-	if code != 0 || !strings.Contains(output, "--where") || !strings.Contains(output, "--credential-fd") {
-		t.Errorf("a runner provider gives --where and --credential-fd meaning (exit %d):\n%s", code, output)
+	if code != 0 || !strings.Contains(output, "--where") {
+		t.Errorf("a runner provider gives --where meaning (exit %d):\n%s", code, output)
 	}
 }

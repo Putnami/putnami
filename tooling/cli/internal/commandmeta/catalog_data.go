@@ -1444,6 +1444,10 @@ func userScopeFlag(description string) Flag {
 //     contiguous: GlobalFlagCategories groups by first appearance, exactly like
 //     Categories does for commands.
 //   - Category "" means accepted and completed but not listed in help.
+//   - Providers bind a flag to the reserved commands that give it meaning.
+//     --credential-fd declares none although only a hosted provider uses it:
+//     a hosted launcher reads it from the pinned CLI's --help wherever that
+//     runs (launch.credentialProbe), so help must always list it.
 //   - Values enumerate what completion offers for a FlagValue flag. Leave it nil
 //     when the value is unbounded (a path, a project selector, a count): an
 //     incomplete candidate list reads as "these are the only values".
@@ -1471,7 +1475,7 @@ var globalFlags = []GlobalFlag{
 
 	{Long: "--where", Type: FlagValue, ValueName: "<placement>", Description: "Execution placement: local | remote (local when no runner provider is installed)", Category: "Execution", Values: []string{"local", "remote"}, Providers: []string{runner.ProviderCommandName}},
 	{Long: "--providers", Type: FlagValue, ValueName: "<list>", Description: "Credentials to ask the credential provider for: install, publish (comma list)", Category: "Execution", Values: []string{"install", "publish"}, Providers: []string{registry.CredentialProviderCommand}},
-	{Long: runcredential.Flag, Type: FlagValue, ValueName: "<n>", Description: runcredential.FlagDescription, Category: "Execution", Providers: runcredential.ProviderCommands()},
+	{Long: runcredential.Flag, Type: FlagValue, ValueName: "<n>", Description: runcredential.FlagDescription, Category: "Execution"},
 	{Long: "--no-cache", Description: "Force re-execution (skip cache)", Category: "Execution"},
 	{Long: "--no-cache-projects", Type: FlagValue, ValueName: "<list>", Description: "Force re-execution of these projects only", Category: "Execution"},
 	{Long: "--cache-trust", Type: FlagValue, ValueName: "<policy>", Description: "Remote cache trust: ci | any | none", Category: "Execution", Values: []string{"ci", "any", "none"}, Providers: []string{cache.ProviderCommandName}},

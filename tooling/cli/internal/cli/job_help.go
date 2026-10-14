@@ -21,15 +21,8 @@ func printJobCommandHelp(
 	cfg *wsproto.Config,
 	extensions []*extension.ExtensionDescription,
 ) {
-	if wsRoot != "" && extensions == nil {
-		// Discover once for the flags and the scope. A non-nil empty list is a
-		// workspace with no extension, which the scope must not discover again.
-		if discovered, err := extension.DiscoverExtensions(wsRoot, cfg, projectPathsForRoot(wsRoot)); err == nil {
-			extensions = append([]*extension.ExtensionDescription{}, discovered...)
-		}
-	}
 	flags := mergedJobCommandFlags(command, wsRoot, cfg, extensions)
-	printCommandHelp(command, flags, newHelpScope(wsRoot, cfg, extensions))
+	printCommandHelp(command, flags, newHelpScope(wsRoot, cfg))
 }
 
 func mergedJobCommandFlags(
