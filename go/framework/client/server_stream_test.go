@@ -703,8 +703,11 @@ func TestOpenServerStreamParsesEventsAcrossChunkAndRuneBoundaries(t *testing.T) 
 func TestOpenServerStreamHeartbeatKeepsAnIdleStreamAliveAndTheHandshakeBudgetStopsAtAdmission(t *testing.T) {
 	spectest.Proves(t, "go/typed-service-clients", "sse-admission-and-parsing", "a-heartbeat-comment-keeps-an-idle-stream-alive")
 	spectest.Proves(t, "go/typed-service-clients", "stream-session-budgets", "the-handshake-budget-stops-bounding-the-stream-at-admission")
-	const heartbeats = 6
-	const heartbeatEvery = 20 * time.Millisecond
+	// The margins are seconds, not milliseconds: on a loaded machine the
+	// admission and each heartbeat can be late by far more than a few
+	// milliseconds, and the test must fail only when a budget is applied wrongly.
+	const heartbeats = 8
+	const heartbeatEvery = 500 * time.Millisecond
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/event-stream")
 		writer.WriteHeader(http.StatusOK)
@@ -725,8 +728,8 @@ func TestOpenServerStreamHeartbeatKeepsAnIdleStreamAliveAndTheHandshakeBudgetSto
 	// The handshake budget is shorter than the time the provider takes to send
 	// its first message, and the idle budget is shorter than the whole quiet
 	// period the heartbeats cover. Neither may end this stream.
-	attempt := 40
-	idle := 90
+	attempt := 2000
+	idle := 2500
 	operation := serverStreamOperation(&clientcontract.ResiliencePolicy{
 		AttemptTimeoutMs: &attempt,
 		Stream:           &clientcontract.StreamPolicy{IdleTimeoutMs: &idle},
