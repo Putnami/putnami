@@ -128,3 +128,24 @@ func TestComputeMatchesTheGoldenPreimageAndDigest(t *testing.T) {
 		t.Errorf("the golden preimage does not open with %q", treeFingerprintPreimageVersion)
 	}
 }
+
+// TestThePreimageSpellingsArePinned pins every spelling the preimage carries.
+// The golden fixture writes only some entry kinds, so renaming another kind
+// would change the digest of a tree that holds one without failing the golden
+// test. A changed spelling is a new preimage version, never an edit.
+func TestThePreimageSpellingsArePinned(t *testing.T) {
+	for _, spelling := range []struct{ got, want string }{
+		{treeFingerprintPreimageVersion, "putnami-tree-fingerprint/2"},
+		{treeEntryFile, "file"},
+		{treeEntryExec, "exec"},
+		{treeEntryLink, "link"},
+		{treeEntryDirectory, "dir"},
+		{treeEntryGone, "gone"},
+		{treeEntrySubmodule, "sub"},
+		{treeEntrySubmoduleAbsent, "sub-absent"},
+	} {
+		if spelling.got != spelling.want {
+			t.Errorf("preimage spelling %q, want %q", spelling.got, spelling.want)
+		}
+	}
+}

@@ -244,10 +244,11 @@ build-time manifest validation with a non-aliasing builder, subprocess control,
 the host-identity variable list, checkout-independent generation paths, the
 machine-cache eviction policy, credential confinement and test-environment mode
 selection, neutral infra aggregation, the single writer of the
-package→publish metadata index, and the tree fingerprint. The wire contracts themselves belong to
-[`protocols/extension`](../../protocols/extension), [`protocols/job`](../../protocols/job)
-and [`protocols/runtime`](../../protocols/runtime); this module is the Go
-authoring library over them, and there is no authoring SDK for other languages.
+package→publish metadata index, and the tree fingerprint. The wire contracts
+themselves belong to [`protocols/extension`](../../protocols/extension),
+[`protocols/job`](../../protocols/job) and
+[`protocols/runtime`](../../protocols/runtime); this module is the Go authoring
+library over them, and there is no authoring SDK for other languages.
 Before v1.0.0, minor `0.x` releases may contain documented breaking changes —
 see [RELEASE.md](../../RELEASE.md).
 
