@@ -45,6 +45,15 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	8: ADDITIVE — extensionDependencies that name a registry extension
+//	   (@scope/name). From 8 on, the CLI installs, pins and loads every
+//	   extension such a manifest depends on. An older reader loads the
+//	   manifest without its dependencies, so it must refuse the stamp. The
+//	   floor binds a manifest loaded from the artifact store or from a path
+//	   the workspace declares, whose dependencies the CLI follows. A manifest
+//	   loaded from node_modules keeps loading unstamped: the package manager
+//	   owns its dependencies. For the stamper of a put archive, such a list is
+//	   contract surface, so a hook-only dependent is stamped 8 too.
 //	7: ADDITIVE — two task-input meanings that one CLI release added
 //	   together, and a manifest that uses either is stamped 7:
 //	   - the releaseBaseline runtime task input: the project's version-line
@@ -116,7 +125,13 @@ const ReleaseBaselineInputContract = 7
 // refuse its stamp instead of keying those tasks on bytes alone.
 const GitInputModeContract = ReleaseBaselineInputContract
 
+// ExtensionDependenciesContract is required by a manifest whose
+// extensionDependencies names a registry extension, when the CLI loads it from
+// the artifact store or from a path the workspace declares. Older readers
+// refuse its stamp instead of loading the extension without its dependencies.
+const ExtensionDependenciesContract = 8
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = ReleaseBaselineInputContract
+const LatestContract = ExtensionDependenciesContract

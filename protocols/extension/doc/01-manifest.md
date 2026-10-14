@@ -34,7 +34,7 @@ The smallest valid extension manifest has a single command with at least one pip
 | `cliContract` | no | CLI ↔ extension contract version, stamped by the package job after strict validation (earned, not claimed — see [validation](04-validation.md)) |
 | `commands` | one of `commands`, `tools`, `agentContent` | Public commands exposed to users |
 | `tasks` | no | Atomic executable units referenced by commands |
-| `extensionDependencies` | no | Other extensions this extension depends on |
+| `extensionDependencies` | no | Other extensions this extension needs, each with a version constraint. The CLI installs, pins and loads each registry dependency (`@scope/name`); a manifest that names one requires CLI contract 8 — see below |
 | `workspaceDevDependencies` | no | NPM devDependencies required at workspace root |
 | `autoServe` | no | Whether `serve` auto-discovers projects with this extension |
 | `runtime` | no | The extension's own executable and how to prepare it — see [lifecycles](07-lifecycles.md) |
@@ -168,12 +168,34 @@ to run first, which is exactly the case for `@putnami/web` (it depends on
 `@putnami/application` but generates the server loaders that
 `@putnami/application`'s hook then loads).
 
+## Extension Dependencies
+
+`extensionDependencies` is a list of names or a map from name to version
+constraint. The CLI acts only on a registry name (`@scope/name`). For an
+extension installed from the artifact store or declared by path, and for a
+declared name the lock pins, `putnami install` installs each registry
+dependency, pins it in `putnami.lock.json`, and discovery loads it. Any other
+name, and the dependencies of an extension the package manager installed in
+`node_modules`, are left to that package manager.
+
+A dependency the workspace does not declare loses every reserved provider
+command: credential, cache and runner providers, session and log reporters,
+and the Cloud release set. Declare an extension in `putnami.workspace.json`
+when the workspace must use one of its providers.
+
+A manifest that names a registry dependency requires CLI contract 8
+(`ExtensionDependenciesContract`) when the CLI loads it from the artifact
+store or a declared path. The Go archive packager stamps 8 on it, even when
+it declares only hooks. The npm packager leaves the list out of its stamp, and
+a manifest loaded from `node_modules` loads unstamped.
+
 ## Extension Discovery
 
 Extensions are discovered from:
 1. Workspace-level entries in `putnami.workspace.json` → `extensions`
 2. Scope-level entries in scope `putnami.json` → `extensions`
-3. Project-level `devDependencies` in `package.json`
+3. The dependencies of those extensions that the lock pins
+4. Project-level `devDependencies` in `package.json`, except a dependency name
 
 Use `putnami extensions list` to see all discovered extensions.
 

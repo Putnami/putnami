@@ -49,6 +49,13 @@ Extensions are auto-discovered from:
 
 No manual registration is needed for npm-based extensions.
 
+An extension can depend on other extensions through `extensionDependencies`.
+Declare only the extensions you use: `putnami install` also installs each
+registry extension they depend on, and pins it in `putnami.lock.json`. It
+never adds a dependency to `putnami.workspace.json`. Discovery then loads each
+dependency the lock pins. A workspace project with a dependency's name does
+not replace that dependency's build.
+
 ## Extension caching
 
 Discovered extensions are cached in `.putnami/extensions.cache.json` for fast startup. The cache auto-invalidates when dependencies change.
@@ -87,7 +94,7 @@ Every extension is defined by a `putnami.extension.json` file. The manifest decl
 | `hooks` | no | Lifecycle hooks (e.g., `preBuild`) |
 | `templates` | no | Project templates (see [Templates](/docs/tooling-&-workspace/templates)) |
 | `contracts` | no | Input/output schemas for task validation |
-| `extensionDependencies` | no | Other extensions this one depends on |
+| `extensionDependencies` | no | Other extensions this one needs, each with a version constraint. Installing this extension installs and pins each registry dependency (`@scope/name`), and the manifest then requires CLI contract 8 |
 | `workspaceDevDependencies` | no | NPM devDependencies required at workspace root |
 | `autoServe` | no | Whether `serve` auto-discovers projects with this extension |
 | `runtime` | no | The extension's own executable and how to prepare it (see [Lifecycle primitives](#lifecycle-primitives)) |
@@ -734,14 +741,24 @@ Higher priority value wins (default: 0). Only the highest-priority matching comm
 ## Managing extensions
 
 ```bash
-putnami extensions list              # List extensions with their versions and source
-putnami extensions install           # Install extensions from workspace config
-putnami extensions update            # Update to latest compatible versions
-putnami extensions remove <ext>      # Remove an installed extension
+putnami extensions list              # List extensions with their versions and source, and who requires each dependency
+putnami extensions install           # Install extensions from workspace config, with their dependencies
+putnami extensions update            # Update to latest compatible versions, dependencies included
+putnami extensions remove <ext>      # Remove an installed extension and the dependencies nothing else requires
 putnami extensions validate [path]   # Validate an extension manifest
 putnami extensions test [path]       # Run extension tests
 putnami extensions package [path]    # Package for distribution
 ```
+
+A dependency resolves from the lock while its version satisfies every
+constraint of the graph. When it does not, the install resolves it again and
+reports the move. An install fails without writing the lock when a version
+misses a range, and names each extension that requires it.
+`putnami extensions install @acme/app@canary` resolves the dependencies of
+`@acme/app` on `canary` too. `putnami extensions remove` refuses an extension
+that another declared extension still requires, and names the path.
+`putnami extensions install --user` refuses an extension that has
+dependencies.
 
 To materialize artifacts for a platform other than the invoking machine's — pre-warming an image layer, for example — name the target and a destination:
 

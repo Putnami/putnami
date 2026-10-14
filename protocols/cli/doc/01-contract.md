@@ -187,6 +187,15 @@ manifest that declares one is stamped `5`. Every other manifest keeps contract
 `4` and loads exactly as before, while a contract-4 CLI — whose permissive
 decode would drop the contribution silently — refuses a contract-5 package as
 written for a newer putnami.
+Contract `8` (`ExtensionDependenciesContract`) is additive for
+`extensionDependencies` that name a registry extension (`@scope/name`): from 8
+on, the CLI installs, pins and loads each one. A reader below 8 would load the
+extension without its dependencies, so it refuses the stamp. The floor binds a
+manifest loaded from the artifact store or from a path the workspace declares.
+A manifest loaded from `node_modules` keeps loading unstamped, because the CLI
+does not follow its dependencies. The Go archive packager stamps 8, even on a
+manifest that declares only hooks and dependencies; the npm packager leaves
+the list out of its stamp.
 Contract `6` is additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs. A reader limited to contract 5 refuses that
 manifest before interpreting its inputs; unrelated manifests retain their

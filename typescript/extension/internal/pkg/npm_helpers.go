@@ -808,7 +808,7 @@ func copyHookFiles(projectRoot, outputPath, version string) error {
 	// extension archives, so they deliberately do not require a host executable
 	// here. The Go-owned archive packager stages the matching executable for
 	// every target platform and calls validateStagedRuntimeExecutable there.
-	return gateAndStampManifestContract(outputPath)
+	return gateAndStampManifestContract(outputPath, npmPackage)
 }
 
 // stagedPackageName is the name of the package.json the npm packager staged in

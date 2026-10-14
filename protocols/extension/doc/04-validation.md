@@ -149,14 +149,15 @@ the lowest contract whose vocabulary covers the manifest
 `protocols/cli.GoEmbedInputsContract` (6) for `go-embed:build` or
 `go-embed:test` task inputs/cache-key files, or
 `protocols/cli.ReleaseBaselineInputContract` (7) for a task that declares the
-`releaseBaseline` runtime input. `protocols/cli.GitInputModeContract` names the
-same rung 7 for a task whose input port or cache-key files select a `git:`
-pattern. The gate applies to every non-empty command, command-group, MCP
+`releaseBaseline` runtime input, or `protocols/cli.ExtensionDependenciesContract`
+(8) for `extensionDependencies` that name a registry extension (`@scope/name`).
+`protocols/cli.GitInputModeContract` names the same rung 7 for a task whose
+input port or cache-key files select a `git:` pattern. The gate applies to every non-empty command, command-group, MCP
 tool, or agent-content surface. A non-conforming manifest — for example one
 that shadows a reserved global flag — fails packaging and never reaches a
 registry. A manifest without the field is contract `0` (pre-registry).
 
-Contracts 5, 6 and 7 are **additive**. They add vocabulary a manifest opts into
+Contracts 5, 6, 7 and 8 are **additive**. They add vocabulary a manifest opts into
 and change nothing a manifest without that vocabulary means. An extension without
 agent content, Go embed inputs, a `releaseBaseline` input or a `git:` input keeps
 its contract-4 stamp; one with agent content but no Go embed inputs requires
@@ -165,9 +166,14 @@ declares agent content. A manifest with a `releaseBaseline` input or a `git:` in
 contract 7 whatever else it declares: a reader without the name would key the
 task without the baseline, and a reader before 7 keys a `git:` candidate's bytes
 without its executable bit and keys an unmerged candidate by its bytes. An
-exclusion (`!git:…`) selects nothing and requires no rung. The reader loads
-every stamp from the one the manifest's vocabulary requires up to
-`protocols/cli.LatestContract` (7):
+exclusion (`!git:…`) selects nothing and requires no rung. A manifest whose
+`extensionDependencies` names a registry extension requires contract 8 when
+the CLI loads it from the artifact store or a declared path, because the CLI
+installs and loads those dependencies and an older reader would drop them
+(`CheckDependencyContract`). `LoadManifest` enforces `RequiredLoadContract`,
+which leaves the dependency rung out, so a manifest loaded from
+`node_modules` loads unstamped. The reader loads every stamp from the one the
+manifest's vocabulary requires up to `protocols/cli.LatestContract` (8):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|
@@ -182,6 +188,13 @@ refuses to stamp. `DeclaresContractSurface` is the shared predicate. Agent
 content counts as a surface even though it runs nothing: it is exactly what an
 older reader would drop without a word, so an unstamped content manifest must
 not load as hook-only.
+
+For the Go archive packager, registry `extensionDependencies` are contract
+surface too. A manifest that declares only hooks and such dependencies takes
+the stamp-only arm: the packager stamps 8 without the strict validation's
+requirement of a command, tool or agent content, and the loader postcondition
+still applies. The npm packager leaves the list out of its stamp decision, so
+an npm framework package that declares only hooks stays unstamped.
 
 The exemption is checked AFTER the higher-contract arm, not before it: a
 hook-only manifest stamped above the latest contract was written against rules
@@ -223,6 +236,8 @@ package job.
 | current | contract-6 manifest with Go embed inputs | Loads; Go source and embedded input selection is enforced. |
 | current | Go embed manifest stamped 5 or lower, or unstamped | Rejected: the stamp does not cover Go embed input semantics. |
 | current | agent-content manifest stamped 4, or unstamped | Rejected: the stamp does not cover the contribution. |
+| current | manifest naming a registry dependency, stamped 7 or lower or unstamped, from the artifact store or a declared path | Rejected: the stamp does not cover the dependencies the CLI would install and load. |
+| current | manifest naming a registry dependency, unstamped, from `node_modules` | Loads; the CLI does not follow its dependencies. |
 | current | contract-3 or lower manifest with a surface | Skipped, with the re-package/`putnami extensions update` remediation on the skip record; a contract-3 reader cannot represent `sessionPrerequisites`, so loading it would permit an ungated dependent command. |
 | contract-4 CLI | contract-5 artifact | Rejected by that CLI's own higher-contract arm ("requires a newer putnami"). Its permissive decode would drop `agentContent` silently, which is why the stamp, not the schema, carries the refusal. The remedy is `putnami upgrade`. |
 | contract-5 CLI | contract-6 artifact | Rejected by that CLI's own higher-contract arm. It cannot bind Go embed inputs to cache identity. |

@@ -22,12 +22,33 @@ import (
 type DiscoveryResult struct {
 	Extensions []*ExtensionDescription
 	Skipped    []SkippedExtension
-	// RemovedCapabilities are the provider capabilities a hosted run removed
+	// RemovedCapabilities are the provider capabilities discovery removed
 	// from extensions that loaded and stay in Extensions
-	// (withoutProviderCapabilities). They are not load failures, so they are
-	// kept apart from Skipped; ProviderCause names them where a provider is
-	// absent.
+	// (withoutProviderCapabilities): a hosted run's path extensions, and every
+	// dependency the workspace does not declare. They are not load failures,
+	// so they are kept apart from Skipped; ProviderCause names them where a
+	// provider is absent.
 	RemovedCapabilities []RemovedCapability
+	// Dependencies are the extensions of the workspace's graph that
+	// putnami.workspace.json does not declare (ADR 0066), loaded or not. A
+	// dependency that did not load is also in Skipped, naming its dependent.
+	Dependencies []GraphDependency
+}
+
+// MissingDependencies returns the names of the graph's dependencies that did
+// not load, sorted.
+func (d *DiscoveryResult) MissingDependencies() []string {
+	if d == nil {
+		return nil
+	}
+	var names []string
+	for _, dep := range d.Dependencies {
+		if !dep.Loaded {
+			names = append(names, dep.Name)
+		}
+	}
+	sort.Strings(names)
+	return names
 }
 
 // DiscoverExtensions scans extension paths and builds an extension registry.
@@ -48,7 +69,9 @@ func DiscoverExtensions(workspaceRoot string, cfg *wsproto.Config, projectPaths 
 //  2. Explicitly referenced extensions from workspace config
 //     (checked as workspace path, node_modules, and .putnami/extensions/ via lock file)
 //  3. A project manifest source 1 set aside whose pinned build did not load
-//  4. Extensions from node_modules (devDependencies)
+//  4. The dependencies of the declared extensions, from the install layout
+//     (dependencyDiscovery)
+//  5. Extensions from node_modules (devDependencies), except a dependency name
 //
 // A name is registered once, by the first source that loads it. A workspace
 // config key equal to a project manifest's name, and that is not that
@@ -106,8 +129,13 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 	// 1. Scan workspace projects for extension manifests
 	projectExts, pinnedLocal, projectSkips := scanProjectExtensions(workspaceRoot, cfg, projectPaths)
 	recordSkips(projectSkips)
+	graph := &dependencyDiscovery{
+		workspaceRoot: workspaceRoot, cfg: cfg, lockFile: lockFile, hosted: hosted,
+		installed: make(map[*ExtensionDescription]bool), projects: make(map[*ExtensionDescription]bool),
+	}
 	for _, ext := range projectExts {
 		seen[ext.Name] = true
+		graph.projects[ext] = true
 		extensions = append(extensions, ext)
 	}
 
@@ -188,6 +216,7 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 		collect(skip)
 		if ext != nil && !seen[ext.Name] {
 			seen[ext.Name] = true
+			graph.installed[ext] = true
 			extensions = append(extensions, ext)
 			continue
 		}
@@ -198,7 +227,12 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 	extensions, unsettled := settlePinnedProjects(workspaceRoot, extensions, pinnedLocal, seen, hosted)
 	recordSkips(unsettled)
 
-	// 4. Scan root package.json devDependencies for extension packages.
+	// 4. The dependencies of the declared extensions. Each one is marked seen,
+	// so a development dependency below never loads in its place.
+	extensions, dependencies, unloaded, dependencyRemoved := graph.run(extensions, seen)
+	recordSkips(unloaded)
+
+	// 5. Scan root package.json devDependencies for extension packages.
 	// Quick-check: only attempt full manifest load for packages that
 	// actually have a putnami.extension.json, avoiding wasted I/O for
 	// non-extension devDependencies (typically the majority).
@@ -223,6 +257,7 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 
 	extensions, notHosted, removed := keepHostedExtensions(workspaceRoot, extensions)
 	recordSkips(notHosted)
+	removed = append(dependencyRemoved, removed...)
 
 	// Propagate RelPath to all job definitions as ExtensionPath
 	for _, ext := range extensions {
@@ -236,7 +271,7 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 		}
 	}
 
-	return &DiscoveryResult{Extensions: extensions, Skipped: skipped, RemovedCapabilities: removed}, nil
+	return &DiscoveryResult{Extensions: extensions, Skipped: skipped, RemovedCapabilities: removed, Dependencies: dependencies}, nil
 }
 
 // scanProjectExtensions loads the manifest at each workspace project root. A

@@ -53,10 +53,10 @@ func LoadManifest(path string) (*Manifest, error) {
 //
 //   - contract HIGHER than LatestContract → hard error: a future contract is
 //     never half-interpreted; the remedy is a newer putnami.
-//   - contract from RequiredCLIContract up to LatestContract → enforce
+//   - contract from RequiredLoadContract up to LatestContract → enforce
 //     strictly: the packager stamped compliance, so a reserved global-flag
 //     shadow is a hard error.
-//   - contract absent (0) or below RequiredCLIContract → hard error naming
+//   - contract absent (0) or below RequiredLoadContract → hard error naming
 //     the fix. The stamp is what proves an extension speaks the contracts its
 //     manifest relies on — the four that move together at 3 (task contract
 //     v3, job context v2, runtime event protocol v2, lock format v2), the
@@ -70,6 +70,10 @@ func LoadManifest(path string) (*Manifest, error) {
 // (DeclaresContractSurface): the packager never stamps one, so requiring a
 // stamp from it would reject every hook-only framework package.
 //
+// The dependency rung (ExtensionDependenciesContract) is not negotiated here:
+// it binds only a manifest whose dependencies the CLI follows, and that
+// depends on where the manifest loaded from (CheckDependencyContract).
+//
 // The error return covers unparseable manifests and every contract mismatch;
 // nothing recoverable is left, which is why there is no diagnostic return.
 func NegotiateManifest(path string, data []byte) (*Manifest, error) {
@@ -80,7 +84,7 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	if diags := validateGoEmbedSelectors(&m); diag.HasErrors(diags) {
 		return nil, fmt.Errorf("extension manifest %s: %s", path, formatDiagnostics(diags))
 	}
-	required := RequiredCLIContract(&m)
+	required := RequiredLoadContract(&m)
 	switch {
 	case m.CLIContract > protocolcli.LatestContract:
 		return nil, fmt.Errorf("extension manifest %s requires a newer putnami (contract %d > %d)",

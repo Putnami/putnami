@@ -197,28 +197,35 @@ func LoadWorkspacePathExtension(workspaceRoot, ref string) *ExtensionDescription
 	return ext
 }
 
-// RemovedCapability is a provider capability that a hosted run removed from
-// one of the workspace's path extensions (withoutProviderCapabilities). The
-// extension itself loaded and runs.
+// RemovedCapability is a provider capability that discovery removed from an
+// extension that loaded and runs (withoutProviderCapabilities): from one of the
+// workspace's path extensions on a hosted run, or from a dependency the
+// workspace does not declare on any run.
 type RemovedCapability struct {
-	// Extension is the name of the path extension.
+	// Extension is the name of the extension.
 	Extension string
 	// Path is its manifest directory.
 	Path string
 	// Command is the reserved command the extension declares
 	// (hostedProviderCommands).
 	Command string
+	// RequiredBy is the dependent of a dependency, "" for a path extension.
+	RequiredBy string
 }
 
-// Reason says that the path extension does not serve the capability, and why.
+// Reason says that the extension does not serve the capability, and why.
 func (r RemovedCapability) Reason() error {
+	if r.RequiredBy != "" {
+		return fmt.Errorf("extension %s, a dependency of %s, does not serve the %s capability: %w",
+			r.Extension, r.RequiredBy, r.Command, errDependencyProvider)
+	}
 	return fmt.Errorf("%s: path extension %s does not serve the %s capability: %w",
 		runcredential.Flag, r.Extension, r.Command, errPathExtensionProvider)
 }
 
 // ProviderCause explains why no extension of d serves command, for the
-// message of a run that needs that provider: each path extension a hosted run
-// removed command from (RemovedCapabilities), then the extensions discovery
+// message of a run that needs that provider: each extension discovery removed
+// command from (RemovedCapabilities), then the extensions discovery
 // could not load (SkippedProviderCause). It returns "" when neither applies,
 // and for a nil d.
 func (d *DiscoveryResult) ProviderCause(command string) string {

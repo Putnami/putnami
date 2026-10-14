@@ -139,8 +139,17 @@ func TestAgentContent_AdditiveForEveryOtherFixture(t *testing.T) {
 			if diags := ValidateAgentContent(m); diags != nil {
 				t.Fatalf("agent-content validation spoke about a manifest without the section: %v", diags)
 			}
-			if got := RequiredCLIContract(m); got != protocolcli.CurrentContract {
-				t.Fatalf("RequiredCLIContract = %d, want the base contract %d", got, protocolcli.CurrentContract)
+			// A registry dependency is the one other rung a fixture reaches,
+			// and only for the stamp of a put archive.
+			want := protocolcli.CurrentContract
+			if NamesRegistryDependency(m) {
+				want = protocolcli.ExtensionDependenciesContract
+			}
+			if got := RequiredCLIContract(m); got != want {
+				t.Fatalf("RequiredCLIContract = %d, want %d", got, want)
+			}
+			if got := RequiredLoadContract(m); got != protocolcli.CurrentContract {
+				t.Fatalf("RequiredLoadContract = %d, want the base contract %d", got, protocolcli.CurrentContract)
 			}
 			m.AgentContent = &AgentContentContribution{Path: "../escape", ManifestSHA256: strings.Repeat("a", 64)}
 			if !hasCode(ValidateAgentContent(m), "invalid-agent-content-path") {

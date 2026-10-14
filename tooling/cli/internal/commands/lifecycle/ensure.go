@@ -145,6 +145,18 @@ func ensureLockedExtensions(
 			note(name, err)
 		}
 	}
+	// Each locked dependency of a restored extension restores the same way
+	// (ADR 0066). A dependency the lock does not pin is never resolved here:
+	// discovery reports it with its dependent, and the run plan's
+	// missing-extension check names it.
+	walk := extension.WalkWorkspaceGraph(wsRoot, cfg, lf, extension.WalkOptions{
+		Restore: func(name string, entry lockfile.LockEntry) error {
+			return extInst.EnsureExtension(ctx, name, entry.Version, &entry)
+		},
+	})
+	for _, issue := range walk.Issues {
+		note(issue.Name, issue.Reason)
+	}
 }
 
 // ensureAgentWorkflows is the seam tests replace to observe the agent pass.

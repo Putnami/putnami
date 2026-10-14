@@ -84,6 +84,21 @@ func TestMissingRegistryExtensions(t *testing.T) {
 	}
 }
 
+// A dependency of the graph that did not load is missing like a declared
+// extension, once, unless the workspace disables it or it loaded.
+func TestMissingRegistryExtensionsIncludesDependencies(t *testing.T) {
+	t.Parallel()
+	cfg := &wsproto.Config{
+		Extensions: wsproto.ExtensionsConfig{List: map[string]string{"@acme/app": "", "@acme/tool": ""}},
+		Disable:    &wsproto.DisableConfig{Extensions: []string{"@acme/off"}},
+	}
+	loaded := []*extension.ExtensionDescription{{Name: "@acme/app"}, {Name: "@acme/base"}}
+	got := missingRegistryExtensions(cfg, loaded, "@acme/dev", "@acme/off", "@acme/base", "@acme/tool")
+	if want := "@acme/dev,@acme/tool"; strings.Join(got, ",") != want {
+		t.Fatalf("missingRegistryExtensions = %v, want %s", got, want)
+	}
+}
+
 func TestSelectedCommandsWithoutJobs(t *testing.T) {
 	t.Parallel()
 	// A loaded extension declaring "build" and "test" (but no project-matched

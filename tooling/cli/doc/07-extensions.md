@@ -6,10 +6,11 @@ Extensions provide the actual job implementations (build, test, lint, serve, etc
 
 Extensions are discovered from these sources, in order:
 
-1. **Workspace projects** — Any project containing a `putnami.extension.json` file at its root is an extension, unless the workspace pins its name (see below).
+1. **Workspace projects** — Any project containing a `putnami.extension.json` file at its root is an extension, unless the workspace pins its name (see below) or the name is an [extension dependency](#extension-dependencies) the workspace does not declare.
 2. **Explicit references** — Entries listed in `putnami.workspace.json` → `extensions` are resolved as a workspace path, then in `node_modules/`, then as the installed build the lock file pins.
 3. **Set-aside workspace projects** — A project manifest that step 1 set aside for a pin loads here when the pinned build did not load, with a warning to run `putnami install`.
-4. **Node modules** — Extensions referenced in the root `package.json` `devDependencies` are looked up in `node_modules/`.
+4. **Extension dependencies** — Each dependency of a loaded extension loads from the build the lock pins. A dependency that does not load is reported with the extension that requires it, and a project of that name never loads in its place.
+5. **Node modules** — Extensions referenced in the root `package.json` `devDependencies` are looked up in `node_modules/`. A dependency name is skipped.
 
 Each name is registered once, by the first source that loads it. Use `putnami extensions list` to see all discovered extensions with their version constraint, installed version and source.
 
@@ -55,7 +56,7 @@ Each extension is defined by a `putnami.extension.json` file:
 | `name` | `string` | Extension identifier (e.g., `@putnami/typescript`) |
 | `version` | `string` | Semver version |
 | `autoServe` | `bool` | Whether to auto-serve projects using this extension |
-| `extensionDependencies` | `map[string]string` | Other extensions this depends on (semver constraints) |
+| `extensionDependencies` | `map[string]string` | Other extensions this one needs, each with a version constraint. Installing it installs and pins each registry dependency (`@scope/name`), and a manifest that names one requires CLI contract 8 — see [Extension Dependencies](#extension-dependencies) |
 | `commands` | `map[string]Command` | User-facing job definitions |
 | `tasks` | `map[string]Task` | Atomic executable units |
 | `tools` | `map[string]Tool` | Namespaced MCP tools served by an extension-owned subprocess |
@@ -906,6 +907,58 @@ This is useful for CI/e2e environments where you want to always test against the
 
 When `putnami extensions update` or `putnami upgrade` moves an extension that `putnami.workspace.json` pins to one exact release, it writes the new release to that pin as well as to the lock. Ranges, channels, `latest`, unpinned entries and local paths are left as they are.
 
+### Extension Dependencies
+
+An extension lists the extensions it needs in `extensionDependencies`. The
+extensions `putnami.workspace.json` declares are the roots. Every registry
+extension (`@scope/name`) that a member's manifest names is a dependency, and
+so on down the graph. See
+[ADR 0066](adr/0066-an-extension-installs-and-loads-its-extension-dependencies.md).
+
+- **Install.** `putnami install` installs each dependency and pins it with an
+  ordinary `putnami.lock.json` entry. It never writes a dependency into
+  `putnami.workspace.json`. A dependency appears in the output with the
+  extension that requires it: `✓ @acme/dev@1.2.0 (required by @acme/app)`.
+- **Edges.** The CLI follows the dependencies of an extension installed from
+  the artifact store or declared by path. It follows those of an extension
+  loaded from `node_modules` only when the workspace declares its name and
+  the lock pins it; otherwise the package manager owns them.
+- **What satisfies a dependency.** Only `putnami.workspace.json` does, by name
+  or by a path whose manifest has that name. A dependency it declares is
+  still checked against every constraint. A key of `~/.putnami/config.json`
+  that names a graph member is ignored, with one warning. A workspace project
+  of a dependency name never replaces the dependency's build.
+- **Resolution.** A dependency resolves from its lock entry while that version
+  satisfies every constraint; otherwise it resolves again and the move is
+  reported (`↑ @acme/dev: 1.0.0 → 2.3.0 (required by @acme/app)`). A
+  constraint resolves as written, and an empty one resolves on `latest`. An
+  explicit channel, such as `putnami extensions install @acme/app@canary` or
+  `putnami init --channel canary`, resolves every dependency below that
+  extension on the channel, at every hop. A version or a range is not a
+  channel.
+- **Failure.** The install fails, and writes no lock, when a resolved version
+  misses a range. The error names each dependent with its constraint:
+  `@acme/dev@2.0.5 does not satisfy @acme/app, which requires ^2.0.0;
+  @acme/lint, which requires ^2.1.0`.
+- **Order.** The graph resolves level by level. Within a level, an extension
+  under an explicit channel comes first, then the others by name, so the
+  first dependent in that order picks the request. A constraint found at a
+  later level is only checked. A cycle installs each extension once.
+- **Update and remove.** `putnami extensions update` and `putnami upgrade`
+  resolve every dependency again and write its lock entry. `update --dry-run`
+  previews the declared extensions only, and says so. `putnami extensions
+  remove <name>` refuses while another declared extension still requires
+  `<name>`, and names the path. Otherwise it also removes each dependency no
+  declared extension requires any more.
+- **List.** `putnami extensions list` shows each dependency with the
+  extensions that require it, and the reserved provider commands it lost: a
+  dependency the workspace does not declare serves no credential, cache,
+  runner, session-reporter, log-reporter or Cloud release-set provider.
+- **Implicit installs.** A hosted run, the restore of a new worktree, an
+  implicit install and the MCP read preparation install only the
+  dependencies the lock pins. Each reports an unpinned one with its
+  dependent and `putnami install`.
+
 ### Materializing for Another Platform
 
 `install` normally materializes artifacts for the invoking machine. To produce artifacts for a different target — pre-warming an image layer, for instance — name the platform and a destination:
@@ -955,6 +1008,9 @@ not downloaded again.
   current directory, inside a workspace or not.
 - It takes one registry extension (`@scope/name[@version]`). A local path,
   `--platform` and `--dest` are usage errors.
+- It refuses an extension whose manifest names a registry dependency in
+  `extensionDependencies`. The user scope has no workspace file to name its
+  roots, so declare that extension in a workspace instead.
 
 Outside a workspace, `putnami <group> <subcommand>` resolves against the user
 scope only. A pinned extension whose link is missing is repaired the way a

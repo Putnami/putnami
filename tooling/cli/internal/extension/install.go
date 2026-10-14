@@ -157,6 +157,10 @@ type InstallResult struct {
 	// or materialized new bytes. A warm store hit whose link already points at
 	// the pinned digest is therefore an observable no-op.
 	Changed bool
+	// VersionUnnamed reports a registry answer that did not name the version
+	// it resolved a channel or range to. Version then comes from the
+	// manifest, which a graph install does not check a range against.
+	VersionUnnamed bool
 }
 
 // ArtifactSpec parameterizes the shared install flow over the artifact kind
@@ -317,19 +321,25 @@ func (inst *Installer) InstallArtifact(ctx context.Context, name, constraint str
 		return nil, err
 	}
 
-	if verified {
-		return inst.installShared(ctx, name, resolvedVersion, integrity, constraint, lockEntry, spec, archivePath)
-	}
-	if inst.RequireVerified {
+	unnamed := !isPinnableVersion(resolvedVersion)
+	var result *InstallResult
+	switch {
+	case verified:
+		result, err = inst.installShared(ctx, name, resolvedVersion, integrity, constraint, lockEntry, spec, archivePath)
+	case inst.RequireVerified:
 		return nil, fmt.Errorf("cannot prepare %s@%s: archive bytes are not verified for %s/%s", name, resolvedVersion, spec.OS, spec.Arch)
-	}
-	// A materialization has no per-worktree fallback: its output is a
-	// CAS-shaped tree someone else will run, so unverified bytes would be
-	// laundered into a shape every consumer trusts. Fail loudly instead.
-	if spec.Materialize {
+	case spec.Materialize:
+		// A materialization has no per-worktree fallback: its output is a
+		// CAS-shaped tree someone else will run, so unverified bytes would be
+		// laundered into a shape every consumer trusts. Fail loudly instead.
 		return nil, unverifiableMaterialization(spec, name, resolvedVersion)
+	default:
+		result, err = inst.installPerWorktree(name, resolvedVersion, constraint, lockEntry, spec, archivePath)
 	}
-	return inst.installPerWorktree(name, resolvedVersion, constraint, lockEntry, spec, archivePath)
+	if result != nil {
+		result.VersionUnnamed = unnamed
+	}
+	return result, err
 }
 
 // unverifiableMaterialization is the fail-closed error for a materialization

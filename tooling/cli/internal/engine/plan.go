@@ -53,6 +53,9 @@ func buildPlan(
 	if discovered != nil {
 		loaded, skipped = discovered.Extensions, discovered.Skipped
 	}
+	missingExtensions := func() []string {
+		return missingRegistryExtensions(req.Config, loaded, discovered.MissingDependencies()...)
+	}
 	var disabledJobs, disabledExts []string
 	// A lifecycle run plans against every provider (Request.WorkspaceLifecycle
 	// note 2): the workspace's disable lists describe its BUILDS, and applying
@@ -114,7 +117,7 @@ func buildPlan(
 		// guard that surfaces as a success-shaped "No jobs matched" no-op —
 		// even under --impacted, which returns success — so CI reads green on a
 		// workspace that never actually ran lint/test/build.
-		if missing := missingRegistryExtensions(req.Config, loaded); len(missing) > 0 {
+		if missing := missingExtensions(); len(missing) > 0 {
 			reportMissingExtensions(missing, skipped, "")
 			reportUnservedSDDCommands(req.Commands, extensions)
 			return nil, ExitError
@@ -158,7 +161,7 @@ func buildPlan(
 	// even declares — and only fail while a required extension is in fact
 	// missing. A command a loaded extension declares but that merely matched no
 	// selected project is a legitimate no-op and does not trip this.
-	if missing := missingRegistryExtensions(req.Config, loaded); len(missing) > 0 {
+	if missing := missingExtensions(); len(missing) > 0 {
 		if starved := selectedCommandsWithoutJobs(req.Commands, planned, extensions); len(starved) > 0 {
 			reportMissingExtensions(missing, skipped,
 				"selected command(s) produced no jobs because their extension failed to load: "+strings.Join(starved, ", "))
@@ -335,12 +338,14 @@ func skipReasonFor(name string, skipped []extension.SkippedExtension) (error, bo
 }
 
 // missingRegistryExtensions returns the workspace-declared registry extensions
-// (named like "@scope/name") that are neither loaded nor explicitly disabled.
+// (named like "@scope/name") that are neither loaded nor explicitly disabled,
+// with each of dependencies, the graph's dependencies that did not load
+// (DiscoveryResult.MissingDependencies, ADR 0066), that is not disabled.
 // extensions must be what discovery loaded, never a planning scope: an
 // extension the plan leaves out on purpose is not missing (see buildPlan).
 // A non-empty result means the declared toolchain is not installed, so a run
 // that planned zero jobs is a broken install rather than a legitimate no-op.
-func missingRegistryExtensions(cfg *wsproto.Config, extensions []*extension.ExtensionDescription) []string {
+func missingRegistryExtensions(cfg *wsproto.Config, extensions []*extension.ExtensionDescription, dependencies ...string) []string {
 	if cfg == nil {
 		return nil
 	}
@@ -367,6 +372,11 @@ func missingRegistryExtensions(cfg *wsproto.Config, extensions []*extension.Exte
 			continue
 		}
 		missing = append(missing, name)
+	}
+	for _, name := range dependencies {
+		if !loaded[name] && !disabled[name] && !slices.Contains(missing, name) {
+			missing = append(missing, name)
+		}
 	}
 	sort.Strings(missing)
 	return missing

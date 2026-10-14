@@ -54,7 +54,7 @@ const conformingToolOnlyManifest = `{
 // byte-deterministic (staged manifests feed content-addressed packages).
 func TestGateAndStampManifestContract_StampsEarnedContract(t *testing.T) {
 	dir := stageManifest(t, conformingManifest)
-	if err := gateAndStampManifestContract(dir); err != nil {
+	if err := gateAndStampManifestContract(dir, putArchive); err != nil {
 		t.Fatalf("gate should pass a conforming manifest: %v", err)
 	}
 
@@ -78,7 +78,7 @@ func TestGateAndStampManifestContract_StampsEarnedContract(t *testing.T) {
 
 	// Determinism: gating and stamping the same input again yields identical
 	// bytes (the stamp is a constant; re-stamping is idempotent).
-	if err := gateAndStampManifestContract(dir); err != nil {
+	if err := gateAndStampManifestContract(dir, putArchive); err != nil {
 		t.Fatal(err)
 	}
 	second, err := os.ReadFile(filepath.Join(dir, "putnami.extension.json"))
@@ -95,7 +95,7 @@ func TestGateAndStampManifestContract_StampsEarnedContract(t *testing.T) {
 // prevents an older CLI from silently loading a tool it cannot understand.
 func TestGateAndStampManifestContract_StampsToolOnlyManifest(t *testing.T) {
 	dir := stageManifest(t, conformingToolOnlyManifest)
-	if err := gateAndStampManifestContract(dir); err != nil {
+	if err := gateAndStampManifestContract(dir, putArchive); err != nil {
 		t.Fatalf("gate should pass a conforming tool-only manifest: %v", err)
 	}
 	data, err := os.ReadFile(filepath.Join(dir, "putnami.extension.json"))
@@ -195,7 +195,7 @@ func TestGateAndStampManifestContract_BlocksReservedShadow(t *testing.T) {
 		"tasks": {"t": {"kind": "command", "command": "echo"}}
 	}`)
 
-	err := gateAndStampManifestContract(dir)
+	err := gateAndStampManifestContract(dir, putArchive)
 	if err == nil {
 		t.Fatal("gate must block a shadow-carrying manifest from packaging")
 	}
@@ -220,7 +220,7 @@ func TestGateAndStampManifestContract_SkipsHookOnlyManifest(t *testing.T) {
 	"hooks": {"preBuild": {"kind": "command", "command": "echo"}}
 }`
 	dir := stageManifest(t, manifest)
-	if err := gateAndStampManifestContract(dir); err != nil {
+	if err := gateAndStampManifestContract(dir, putArchive); err != nil {
 		t.Fatalf("hook-only manifests must not be gated: %v", err)
 	}
 	data, _ := os.ReadFile(filepath.Join(dir, "putnami.extension.json"))
@@ -233,7 +233,7 @@ func TestGateAndStampManifestContract_SkipsHookOnlyManifest(t *testing.T) {
 // broken staged manifest fails the package job loudly.
 func TestGateAndStampManifestContract_UnparseableStagedManifest(t *testing.T) {
 	dir := stageManifest(t, "{not json")
-	if err := gateAndStampManifestContract(dir); err == nil {
+	if err := gateAndStampManifestContract(dir, putArchive); err == nil {
 		t.Fatal("an unparseable staged manifest must fail packaging")
 	}
 }
@@ -246,7 +246,7 @@ func TestGateAndStampManifestContract_UnparseableStagedManifest(t *testing.T) {
 func TestGateAndStampManifestContract_GatesMalformedContractSurface(t *testing.T) {
 	for _, m := range []string{`{"commands": []}`, `{"commandGroups": "nope"}`, `{"tools": []}`} {
 		dir := stageManifest(t, m)
-		if err := gateAndStampManifestContract(dir); err == nil {
+		if err := gateAndStampManifestContract(dir, putArchive); err == nil {
 			t.Fatalf("a wrong-typed contract surface must fail the gate, not bypass it: %s", m)
 		}
 		data, _ := os.ReadFile(filepath.Join(dir, "putnami.extension.json"))
