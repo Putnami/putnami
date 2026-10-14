@@ -17,22 +17,17 @@ oci-server, put-server, runtime-api and source-api.
 | --- | --- |
 | Put package | `cloud/doc-contents-cloud-cli-schema` |
 | Channel | `canary` |
-| Version | `0.0.0-20261012142807-9c1fbf2bd`, published on 2026-10-12, archive digest `sha256:aff07a949715c0a713bde6f2f7a4cba71c3da844cc56aea818b972195b6754bd` |
+| Version | `0.0.0-20261014111756-10ec53b5f`, published on 2026-10-14, archive digest `sha256:81201d632697918965f36aadd602534526f2b44d74f886c5331c4725f8dbcccb` |
 | File layout | `docs/cloud-cli-schema/services/<service>/openapi.json` |
 
 Each `<service>/schema/openapi.json` is a byte-for-byte copy of the package
-file, with one exception. The `info.description` of control-api, data-api,
-delivery-api and runtime-api drops the issue numbers, and control-api also
-drops a source path. The public-cut gate rejects both. Apply the same edit
-after each update until the providers drop them. No operation or schema
-differs from the package.
+file.
 
 ## Update the schemas
 
 1. Fetch a newer version of `cloud/doc-contents-cloud-cli-schema`.
 2. Copy each `services/<service>/openapi.json` over
-   `<service>/schema/openapi.json`, then remove the issue numbers and source
-   paths from `info.description`.
+   `<service>/schema/openapi.json`.
 3. Run `./putnamiw clientgen --projects <the client projects>`, for example
    `--projects go.putnami.dev/cloud/clients/put-server`.
 4. Adapt the call sites in `../extension/internal` to the regenerated clients.
