@@ -29,19 +29,24 @@ func EnvDoctorStatusNodeFrom(result EnvDoctorResult) clicore.StatusNode {
 	if result.Missing > 0 {
 		node.Detail += fmt.Sprintf(", %d missing", result.Missing)
 	}
+	if result.Degraded > 0 {
+		node.Detail += fmt.Sprintf(", %d degraded", result.Degraded)
+	}
 	if result.Unchecked > 0 {
 		node.Detail += fmt.Sprintf(", %d could not be checked", result.Unchecked)
 	}
 	node.Metrics = []clicore.StatusMetric{
 		clicore.CountMetric("prerequisites_ok", "prerequisites ok", ok, clicore.MetricHealth).Of(float64(len(result.Rows))),
 		clicore.CountMetric("prerequisites_missing", "prerequisites missing", result.Missing, clicore.MetricHealth),
+		clicore.CountMetric("prerequisites_degraded", "prerequisites degraded", result.Degraded, clicore.MetricHealth),
 		clicore.CountMetric("prerequisites_unchecked", "prerequisites unchecked", result.Unchecked, clicore.MetricHealth),
 	}
 	return node
 }
 
 // EnvDoctorRowNode maps one prerequisite onto the shared scale: ok is ok,
-// missing is failing, anything else could not be checked and is unknown.
+// missing is failing, degraded is degraded, anything else could not be
+// checked and is unknown.
 // The title is the row id, the name the fixes refer to ("see oci-binding");
 // a multi-line fix reads as one line.
 func EnvDoctorRowNode(row EnvDoctorRow) clicore.StatusNode {
@@ -54,6 +59,8 @@ func EnvDoctorRowNode(row EnvDoctorRow) clicore.StatusNode {
 		node.State = clicore.StatusOK
 	case EnvDoctorMissing:
 		node.State = clicore.StatusFailing
+	case EnvDoctorDegraded:
+		node.State = clicore.StatusDegraded
 	default:
 		node.State = clicore.StatusUnknown
 	}

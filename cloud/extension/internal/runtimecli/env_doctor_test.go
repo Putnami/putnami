@@ -362,7 +362,7 @@ func TestEnvDoctorJSONShapeIsStable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"workspace":"ws-acme","environment":"prod","ready":false,"missing":1,"unchecked":8,"rows":[` +
+	want := `{"workspace":"ws-acme","environment":"prod","ready":false,"missing":1,"degraded":0,"unchecked":8,"rows":[` +
 		`{"id":"put-binding","title":"Put namespace binding","status":"missing","detail":"no active put binding","fix":"activate it"},` +
 		`{"id":"oci-registry","title":"OCI publish registry","status":"ok","detail":"images publish to oci.putnami.dev/acme","fix":""},` +
 		`{"id":"oci-binding","title":"OCI namespace binding","status":"unknown","detail":"no check answered this row","fix":"upgrade the Putnami CLI and control-api, then run ` + "`putnami cloud env doctor`" + ` again"},`
@@ -584,10 +584,28 @@ func TestRenderEnvDoctorIndentsMultiLineFixes(t *testing.T) {
 		{ID: "ci-envs", Status: EnvDoctorMissing, Detail: "line one\nline two", Fix: "first\nsecond\n"},
 	}})
 	want := "Environment prod of workspace (unresolved)\n\n" +
-		"missing  ci-envs  line one line two\n" +
-		"                  fix: first\n" +
-		"                       second\n" +
+		"missing   ci-envs  line one line two\n" +
+		"                   fix: first\n" +
+		"                        second\n" +
 		"\nnot ready: 1 missing, 0 could not be checked\n"
+	if text != want {
+		t.Fatalf("render =\n%q\nwant\n%q", text, want)
+	}
+}
+
+// TestRenderEnvDoctorAlignsADegradedRow pins the widest status word: a
+// degraded row keeps its id and fix in the same columns as the others, and
+// the counts name the degraded row.
+func TestRenderEnvDoctorAlignsADegradedRow(t *testing.T) {
+	text := renderEnvDoctor(EnvDoctorResult{Environment: "prod", Ready: true, Degraded: 1, Rows: []EnvDoctorRow{
+		{ID: "put-binding", Status: EnvDoctorOK, Detail: "active put namespace acme"},
+		{ID: "environment-definition", Status: EnvDoctorDegraded, Detail: "stale", Fix: "putnami cloud env enable prod"},
+	}})
+	want := "Environment prod of workspace (unresolved)\n\n" +
+		"ok        put-binding             active put namespace acme\n" +
+		"degraded  environment-definition  stale\n" +
+		"                                  fix: putnami cloud env enable prod\n" +
+		"\nready: 0 missing, 1 degraded, 0 could not be checked\n"
 	if text != want {
 		t.Fatalf("render =\n%q\nwant\n%q", text, want)
 	}
@@ -785,7 +803,10 @@ func TestEnvDoctorServerRowsArePrintableAndJudged(t *testing.T) {
 	if fix.Fix != "line one\n\tline two" {
 		t.Fatalf("fix = %q", fix.Fix)
 	}
-	for _, status := range []string{"passed", "OK", ""} {
+	if kept := envDoctorServerRow(EnvDoctorRow{ID: "environment-definition", Status: EnvDoctorDegraded, Detail: "d", Fix: "f"}); kept.Status != EnvDoctorDegraded || kept.Detail != "d" || kept.Fix != "f" {
+		t.Fatalf("a degraded row must keep its answer: %+v", kept)
+	}
+	for _, status := range []string{"passed", "OK", "Degraded", ""} {
 		judged := envDoctorServerRow(EnvDoctorRow{ID: "put-binding", Status: status, Detail: "d"})
 		if judged.Status != EnvDoctorUnknown || !strings.Contains(judged.Detail, "the server answered status") || judged.Fix == "" {
 			t.Fatalf("status %q = %+v", status, judged)
@@ -815,5 +836,45 @@ func TestEnvDoctorStrictFailsOnAnUnknownRow(t *testing.T) {
 	node := decodeDoctorNode(t, envelope.stdout)
 	if node.State != clicore.StatusUnknown || doctorMetric(t, node, "prerequisites_missing") != 0 || doctorMetric(t, node, "prerequisites_unchecked") != 1 {
 		t.Fatalf("node = %+v; want unknown, 0 missing, 1 unchecked", node)
+	}
+}
+
+// TestEnvDoctorDegradedDefinitionNamesEnableAndFailsOnlyUnderStrict is #254:
+// Control answers the environment-definition row degraded when the accepted
+// definition differs from the default branch. The row prints degraded with
+// its fix, not unknown with an upgrade fix, counts as degraded, and fails
+// the command only under --strict.
+func TestEnvDoctorDegradedDefinitionNamesEnableAndFailsOnlyUnderStrict(t *testing.T) {
+	server := &doctorServer{status: http.StatusOK, body: serverRowsJSON(t, EnvDoctorOK, map[string]string{
+		"environment-definition": EnvDoctorDegraded,
+	})}
+	srv := httptest.NewServer(server)
+	defer srv.Close()
+
+	cap, err := runEnvDoctor(t, doctorWorkspace(t), srv, map[string]any{"output": "json"}, nil, (&okPublish{}).publish)
+	if err != nil {
+		t.Fatalf("default mode: a degraded row alone must not fail the command: %v", err)
+	}
+	node := decodeDoctorNode(t, cap.stdout)
+	if node.State != clicore.StatusDegraded || doctorMetric(t, node, "prerequisites_missing") != 0 ||
+		doctorMetric(t, node, "prerequisites_degraded") != 1 || doctorMetric(t, node, "prerequisites_unchecked") != 0 {
+		t.Fatalf("node = %+v; want degraded, 0 missing, 1 degraded, 0 unchecked", node)
+	}
+	row := doctorChild(t, node, "environment-definition")
+	if row.State != clicore.StatusDegraded || row.Detail != "detail environment-definition" || row.Fix != "fix environment-definition" {
+		t.Fatalf("row = %+v; want the server's degraded answer unchanged", row)
+	}
+
+	cap, err = runEnvDoctor(t, doctorWorkspace(t), srv, nil, nil, (&okPublish{}).publish)
+	if err != nil {
+		t.Fatalf("human view: %v", err)
+	}
+	if first := cap.stdout[0]; !strings.HasPrefix(first, "env doctor prod  degraded  9 of 10 prerequisites ok, 1 degraded") {
+		t.Fatalf("header = %q", first)
+	}
+
+	_, err = runEnvDoctor(t, doctorWorkspace(t), srv, map[string]any{"output": "json", "strict": true}, nil, (&okPublish{}).publish)
+	if clicore.ExitCode(err) != clicore.ExitFailure {
+		t.Fatalf("strict exit = %d (%v), want %d", clicore.ExitCode(err), err, clicore.ExitFailure)
 	}
 }

@@ -560,7 +560,7 @@ func TestEnvEnablePartialFailureReportsEachStep(t *testing.T) {
 		"fix: fix environment-definition",
 		"5 applied, 1 failed",
 		"Environment prod of workspace " + doctorWorkspaceID,
-		"missing  environment-definition",
+		"missing   environment-definition",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("human output lacks %q:\n%s", want, text)
@@ -760,5 +760,40 @@ func TestEnvEnableUsage(t *testing.T) {
 	}
 	if text := strings.Join(cap.stdout, "\n"); !strings.Contains(text, "cloud env enable [") {
 		t.Fatalf("help = %q", text)
+	}
+}
+
+// TestEnvEnableAcceptsADegradedDefinition is #254: Control answers the
+// environment-definition row degraded when the accepted definition differs
+// from the default branch, and names `env enable` as the fix. The command
+// accepts the default-branch head for that row instead of reporting it as
+// unchecked.
+func TestEnvEnableAcceptsADegradedDefinition(t *testing.T) {
+	server := freshWorkspace()
+	server.beforeRows = map[string]string{"environment-definition": EnvDoctorDegraded}
+	server.afterRows = map[string]string{}
+	server.acceptedRevision = 1
+	server.acceptedSources = map[string]int64{strings.Repeat("c", 40): 1}
+	srv := httptest.NewServer(server)
+	defer srv.Close()
+
+	cap, err := runEnvEnable(t, doctorWorkspace(t), srv, map[string]any{"output": "json"})
+	if err != nil {
+		t.Fatalf("exit: %v", err)
+	}
+	if server.appended != 1 {
+		t.Fatalf("appended = %d, want the default-branch head accepted once", server.appended)
+	}
+	acceptances := server.acceptances()
+	if len(acceptances) != 1 || !strings.Contains(acceptances[0].Body, `"expectedRevision":1`) || strings.Contains(acceptances[0].Body, "sourceRevision") {
+		t.Fatalf("acceptances = %+v, want one at the default-branch head expecting revision 1", acceptances)
+	}
+	result := decodeEnableResult(t, cap.stdout)
+	step := stepsByRow(result)["environment-definition"][0]
+	if step.Status != EnvEnableApplied || step.Detail != "accepted revision 2 at source revision "+enableHead+" (the default-branch head; expected revision 1)" {
+		t.Fatalf("step = %+v, want the head applied as revision 2", step)
+	}
+	if !result.Ready || result.Readiness.Degraded != 0 {
+		t.Fatalf("result = %+v, want ready with no degraded row after the acceptance", result)
 	}
 }

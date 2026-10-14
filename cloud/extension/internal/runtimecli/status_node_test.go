@@ -28,6 +28,14 @@ func TestEnvDoctorStatusNodeFromFoldsTheDoctorTable(t *testing.T) {
 			detail: "1 of 2 prerequisites ok, 1 could not be checked",
 		},
 		{
+			name: "a degraded row",
+			result: EnvDoctorResult{Environment: "prod", Ready: true, Degraded: 1, Rows: []EnvDoctorRow{
+				{ID: "put-binding", Status: "ok"}, {ID: "environment-definition", Status: "degraded", Fix: "putnami cloud env enable prod"},
+			}},
+			state:  clicore.StatusDegraded,
+			detail: "1 of 2 prerequisites ok, 1 degraded",
+		},
+		{
 			name: "missing prerequisite",
 			result: EnvDoctorResult{Environment: "dev", Missing: 1, Rows: []EnvDoctorRow{
 				{ID: "put-binding", Status: "ok"}, {ID: "oci-registry", Status: "missing", Fix: "set registries.oci.publish"},
@@ -45,7 +53,8 @@ func TestEnvDoctorStatusNodeFromFoldsTheDoctorTable(t *testing.T) {
 			if len(node.Children) != len(tc.result.Rows) {
 				t.Fatalf("children = %d, want one per row", len(node.Children))
 			}
-			if len(node.Metrics) != 3 || node.Metrics[1].ID != "prerequisites_missing" || int(node.Metrics[1].Value) != tc.result.Missing {
+			if len(node.Metrics) != 4 || node.Metrics[1].ID != "prerequisites_missing" || int(node.Metrics[1].Value) != tc.result.Missing ||
+				node.Metrics[2].ID != "prerequisites_degraded" || int(node.Metrics[2].Value) != tc.result.Degraded {
 				t.Fatalf("metrics = %+v", node.Metrics)
 			}
 		})

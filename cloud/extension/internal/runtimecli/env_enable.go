@@ -307,18 +307,20 @@ func (r envEnableRun) activateBinding(row EnvDoctorRow, protocol string) (EnvEna
 }
 
 // acceptDefinition accepts the environment definition at --source-revision
-// or at the default-branch head. It also runs when the row is ok: the row is
-// ok once any accepted definition declares the environment, so it cannot tell
-// whether putnami.ci.json changed since. The accept route decides by commit,
-// not by content: a commit it accepted before replays its receipt and writes
-// nothing, and any other commit appends the next revision, even when its
-// putnami.ci.json is unchanged. The step is skipped on a replay and applied on
-// an append. A replay of an older commit names the latest revision, which
-// stays the one that applies.
+// or at the default-branch head. It runs when the row is missing, when it is
+// degraded (the accepted definition differs from the default branch), and
+// also when it is ok: an ok row may not have compared the definition with
+// the default branch, when Control could not read it or predates the
+// comparison, and --source-revision may name another commit. The accept
+// route decides by commit, not by content: a commit it accepted before
+// replays its receipt and writes nothing, and any other commit appends the
+// next revision, even when its putnami.ci.json is unchanged. The step is
+// skipped on a replay and applied on an append. A replay of an older commit
+// names the latest revision, which stays the one that applies.
 func (r envEnableRun) acceptDefinition(row EnvDoctorRow) (EnvEnableStep, bool) {
 	action := "accept the environment definition"
 	switch row.Status {
-	case EnvDoctorOK, EnvDoctorMissing:
+	case EnvDoctorOK, EnvDoctorMissing, EnvDoctorDegraded:
 	default:
 		return r.unchecked(row, action), false
 	}
