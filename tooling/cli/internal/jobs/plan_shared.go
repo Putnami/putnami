@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -191,7 +192,7 @@ func executionIdentityParts(
 		"extension=" + job.Extension.Name + "@" + job.Extension.Version,
 		"task=" + job.Step.Task,
 		"contract=" + job.JobDef.ContractDigest,
-		"toolchain=" + cacheToolchainVersion(job),
+		"toolchain=" + toolchain.CacheToolchainVersion(job),
 		"command=" + job.JobDef.Command,
 		"args=" + strings.Join(job.JobDef.Args, "\x1f"),
 		"cwd=" + job.JobDef.Cwd,

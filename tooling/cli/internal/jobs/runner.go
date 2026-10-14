@@ -24,6 +24,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -123,7 +124,7 @@ func envLastValue(env []string, key string) string {
 // preserving the effective caller PATH behind it. Empty entries are omitted so
 // advertising the CLI never adds an implicit current-directory lookup.
 func prependEnvPath(env []string, dir string) []string {
-	return prependPathWith(envkeys.Host, env, dir)
+	return toolchain.PrependPathWith(envkeys.Host, env, dir)
 }
 
 // removeEnvKey removes every occurrence of a key. Appending a later value is
@@ -311,7 +312,7 @@ func buildJobInvocation(
 		cliExecutable = executable
 		env = prependEnvPath(env, filepath.Dir(cliExecutable))
 	}
-	env = applyRuntimeToolchains(env, job.Extension, job.JobDef.Toolchains)
+	env = toolchain.ApplyRuntimeToolchains(env, job.Extension, job.JobDef.Toolchains)
 	if cliExecutable != "" {
 		env = setEnv(env, registryproto.CLIExecutableEnv, cliExecutable)
 	}
@@ -378,7 +379,7 @@ func prepareJobInvocation(
 	versions RunVersions,
 	extraEnv []string,
 ) (context.Context, context.CancelFunc, *jobInvocation, error) {
-	if err := ensureJobRuntimeToolchains(ws, job); err != nil {
+	if err := toolchain.EnsureJobRuntimeToolchains(ws, job); err != nil {
 		return nil, nil, nil, err
 	}
 	runtimePath, runtimeErr := resolvedExtensionRuntime(job)

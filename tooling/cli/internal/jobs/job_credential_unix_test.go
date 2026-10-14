@@ -15,6 +15,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	registryproto "go.putnami.dev/protocol/registry"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -126,7 +127,7 @@ func TestHostedJobsOtherThanTheFetchGetNoDescriptor(t *testing.T) {
 	spectest.Proves(t, "cli/credential-custody", "fetch-before-repository-code", "only-fetch-gets-the-job-credential")
 	hostedJobTest(t)
 	calls := installCountingJobReadCredential(t, testJobCredential(), nil)
-	for _, command := range []string{toolchainProvisioningCommand, "build"} {
+	for _, command := range []string{toolchain.ToolchainProvisioningCommand, "build"} {
 		report, marker := filepath.Join(t.TempDir(), "report"), filepath.Join(t.TempDir(), "marker")
 		ws, job := jobCredentialFixture(t, command, command, fixtureScript{{"read-job-credential", report},
 			{"write-env", runcredential.HostedFetchEnv, marker}})
@@ -305,7 +306,7 @@ func TestOtherJobsKeepTheEngineTemporaryDirectory(t *testing.T) {
 		command string
 	}{
 		{"a hosted build", true, "build"},
-		{"a hosted install", true, toolchainProvisioningCommand},
+		{"a hosted install", true, toolchain.ToolchainProvisioningCommand},
 		{"a local fetch", false, extensionproto.WorkspaceFetchCommand},
 	}
 	for _, tc := range cases {

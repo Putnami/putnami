@@ -13,7 +13,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 )
 
 // errGoUnavailable marks a Go project setup that found no go command, before
@@ -50,20 +50,20 @@ func (g goCommand) run(ctx context.Context, dir string, args ...string) ([]byte,
 // did before tasks resolved their toolchains from the lock, so a host that set
 // Go projects up before keeps doing so. Without one, the error is
 // errGoUnavailable, unless a version probe timed out
-// (jobs.ErrToolchainProbeTimeout): that go is there and slow, and the error
+// (toolchain.ErrToolchainProbeTimeout): that go is there and slow, and the error
 // says so.
 func resolveGoCommand(ctx context.Context, wsRoot, extensionName string) (goCommand, error) {
 	base := os.Environ()
 	env, err := templateToolchainEnvironment(ctx, wsRoot, extensionName, base)
 	if err == nil {
-		if path, lookErr := jobs.ProviderExecutable("go", env); lookErr == nil {
+		if path, lookErr := toolchain.ProviderExecutable("go", env); lookErr == nil {
 			return goCommand{path: path, env: env}, nil
 		}
 	}
 	if path, lookErr := osexec.LookPath("go"); lookErr == nil {
 		return goCommand{path: path, env: base}, nil
 	}
-	if errors.Is(err, jobs.ErrToolchainProbeTimeout) {
+	if errors.Is(err, toolchain.ErrToolchainProbeTimeout) {
 		return goCommand{}, err
 	}
 	if err != nil {
@@ -73,7 +73,7 @@ func resolveGoCommand(ctx context.Context, wsRoot, extensionName string) (goComm
 }
 
 // templateToolchainEnvironment applies the run toolchains of the extension
-// that provided the template (jobs.RunToolchainEnvironment) to base. An
+// that provided the template (toolchain.RunToolchainEnvironment) to base. An
 // extension the workspace does not discover leaves base as it is. Discovery
 // builds a fresh description, so a second call after an install resolves
 // again.
@@ -84,7 +84,7 @@ func templateToolchainEnvironment(ctx context.Context, wsRoot, extensionName str
 	}
 	for _, ext := range discovered {
 		if ext != nil && ext.Name == extensionName {
-			return jobs.RunToolchainEnvironment(ctx, wsRoot, ext, base)
+			return toolchain.RunToolchainEnvironment(ctx, wsRoot, ext, base)
 		}
 	}
 	return append([]string(nil), base...), nil

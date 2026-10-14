@@ -1,6 +1,6 @@
 //go:build darwin
 
-package jobs
+package procdeadline
 
 import (
 	"encoding/binary"
@@ -45,13 +45,13 @@ func TestHostProcessProgressSeesARealProcessRun(t *testing.T) {
 		t.Fatal("the counters of a live child could not be read")
 	}
 	current := sample()
-	for bound := time.Now().Add(progressHangBound); current.held; current = sample() {
+	for bound := time.Now().Add(progressHangBound); current.Held; current = sample() {
 		if time.Now().After(bound) {
 			t.Fatalf("the counters of a polling process did not move in %s", progressHangBound)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if !current.measured {
+	if !current.Measured {
 		t.Error("the wait for a CPU of a live child could not be read")
 	}
 }
@@ -85,7 +85,7 @@ func TestHostProcessProgressSeesAProcessStoppedBeforeItsFirstInstructionHeld(t *
 	}
 	for range 5 {
 		time.Sleep(10 * time.Millisecond)
-		if !sample().held {
+		if !sample().Held {
 			t.Fatal("the counters of a process stopped before its first instruction moved")
 		}
 	}
@@ -131,9 +131,9 @@ func TestHostProcessProgressSeesAProcessThatRanBeforeItsBaselineRunning(t *testi
 	if sample == nil {
 		t.Fatal("the counters of a live child could not be read")
 	}
-	if first := sample(); first.held {
+	if first := sample(); first.Held {
 		t.Error("a process that ran before its baseline reads held at its first sample")
-	} else if !first.measured {
+	} else if !first.Measured {
 		t.Error("the wait for a CPU of a live child could not be read")
 	}
 }
@@ -176,7 +176,7 @@ func TestHostProcessProgressCountsAnUnreadableProcessAsRunning(t *testing.T) {
 	if err := cmd.Wait(); err != nil {
 		t.Fatalf("program: %v", err)
 	}
-	if sample().held {
+	if sample().Held {
 		t.Error("a sample of a reaped process reads as held")
 	}
 	if hostProcessProgress(cmd.Process) != nil {

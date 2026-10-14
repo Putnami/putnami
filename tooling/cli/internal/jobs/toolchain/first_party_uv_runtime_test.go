@@ -1,4 +1,4 @@
-package jobs
+package toolchain
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	model "go.putnami.dev/cli/model/extension"
+	"go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
@@ -57,7 +58,7 @@ func TestFirstPartyUVRuntimeResolvesTheInstallUnderThePutnamiHome(t *testing.T) 
 		if requirement, declared := ext.Runtime.Toolchains["uv"]; !declared || requirement.Lock != "uv" || requirement.Optional {
 			t.Fatalf("python/extension: runtime toolchain \"uv\" is not a required toolchain locked on uv: %+v", requirement)
 		}
-		err := resolveRuntimeToolchainRefs(context.Background(), root, ext, []string{"uv"}, base, resolveStrict)
+		err := resolveRuntimeToolchainRefs(context.Background(), root, ext, []string{"uv"}, base, ResolveStrict)
 		return ext, ext.RuntimeToolchains["uv"], err
 	}
 
@@ -89,8 +90,8 @@ func TestFirstPartyUVRuntimeResolvesTheInstallUnderThePutnamiHome(t *testing.T) 
 			t.Errorf("task %q runs uv but does not require the uv toolchain: %v", name, task.Toolchains)
 			continue
 		}
-		key := cacheToolchainVersion(&ScheduledJob{Extension: ext, JobDef: &extension.JobDefinition{Toolchains: task.Toolchains}})
-		nextKey := cacheToolchainVersion(&ScheduledJob{Extension: nextExt, JobDef: &extension.JobDefinition{Toolchains: task.Toolchains}})
+		key := CacheToolchainVersion(&jobs.ScheduledJob{Extension: ext, JobDef: &extension.JobDefinition{Toolchains: task.Toolchains}})
+		nextKey := CacheToolchainVersion(&jobs.ScheduledJob{Extension: nextExt, JobDef: &extension.JobDefinition{Toolchains: task.Toolchains}})
 		if key == runtime.Version() || key == nextKey {
 			t.Errorf("task %q cache key %q does not follow the pinned uv (uv %s keys it %q)", name, key, next, nextKey)
 		}

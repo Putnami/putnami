@@ -20,7 +20,7 @@ import (
 	"go.putnami.dev/sdk/extension/uvtoolchain"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -360,7 +360,7 @@ func readToolchainDeclarations(wsRoot string, runtimeLocks func() ([]string, err
 }
 
 // MissingPinCause explains why the workspace lock of wsRoot pins no release for
-// the lock identity lock (jobs.MissingPinCause): the uv pin derives from the
+// the lock identity lock (toolchain.MissingPinCause): the uv pin derives from the
 // [tool.uv] required-version of the root pyproject.toml, and when that names no
 // release Putnami can pin, the error names it and the declaration to write
 // (uvtoolchain Declaration.Problem). It returns nil for every other lock
@@ -506,7 +506,7 @@ func goPinRecordPath(wsRoot, version string) (string, bool) {
 			return "", false
 		}
 	}
-	home := jobs.PutnamiHome(wsRoot, os.Environ())
+	home := toolchain.PutnamiHome(wsRoot, os.Environ())
 	return filepath.Join(home, "toolchains", "go", "go-"+version+".pin.json"), true
 }
 

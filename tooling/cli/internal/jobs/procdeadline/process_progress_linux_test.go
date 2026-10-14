@@ -1,6 +1,6 @@
 //go:build linux
 
-package jobs
+package procdeadline
 
 import (
 	"errors"
@@ -72,7 +72,7 @@ func TestHostProcessProgressReadsThisProcess(t *testing.T) {
 	if sample == nil {
 		t.Fatal("a live process has no sampler")
 	}
-	if current := sample(); current.held || !current.measured || current.waitedForCPU < 0 {
+	if current := sample(); current.Held || !current.Measured || current.WaitedForCPU < 0 {
 		t.Errorf("sample = %+v, want a running process whose wait is read", current)
 	}
 }

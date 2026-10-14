@@ -451,7 +451,18 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // internal/jobs no longer reruns the probe tests, and nothing in it names a
 // planner, scheduler or execution symbol. It adds no vertical and no engine
 // stage.
-const internalPackageCountCeiling = 70
+//
+// RAISED 70 → 73: three more packages split out of internal/jobs.
+// internal/jobs/procdeadline bounds a started child process by the time it
+// runs and imports only the standard library.
+// internal/jobs/cachekey frames the labeled fields a cache key or content
+// digest hashes, and imports only the standard library. internal/jobs/toolchain
+// resolves an extension's runtime toolchains against the workspace lock and
+// names their cache-key identity. Each imports only what
+// TestJobsSplitPackagesImportOnlyTheirAllowance allows, so a change elsewhere in
+// internal/jobs no longer reruns their tests. They add no vertical and no
+// engine stage.
+const internalPackageCountCeiling = 73
 
 func TestInternalPackageCountCeiling(t *testing.T) {
 	t.Parallel()

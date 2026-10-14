@@ -22,6 +22,7 @@ import (
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -171,7 +172,7 @@ func isInstalledTreeRecord(record string) bool {
 func installedTreeDigest(root string, storeEntry bool) (string, error) {
 	versionless := versionMetadata(root)
 	h := sha256.New()
-	hashField(h, "schema", []byte(installedTreeDigestSchema))
+	cachekey.HashField(h, "schema", []byte(installedTreeDigestSchema))
 	err := filepath.WalkDir(root, func(full string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -197,23 +198,23 @@ func installedTreeDigest(root string, storeEntry bool) (string, error) {
 			if err != nil {
 				return err
 			}
-			hashField(h, "symlink", []byte(rel))
-			hashField(h, "target", []byte(filepath.ToSlash(target)))
+			cachekey.HashField(h, "symlink", []byte(rel))
+			cachekey.HashField(h, "target", []byte(filepath.ToSlash(target)))
 			return nil
 		case info.Mode().IsRegular():
-			hashField(h, "file", []byte(rel))
+			cachekey.HashField(h, "file", []byte(rel))
 			executable := "-"
 			if info.Mode()&0o111 != 0 {
 				executable = "x"
 			}
-			hashField(h, "executable", []byte(executable))
+			cachekey.HashField(h, "executable", []byte(executable))
 			if drop, ok := versionless[rel]; ok {
 				return hashVersionlessJSON(h, full, drop)
 			}
 			return hashFileBytes(h, full, info.Size())
 		default:
-			hashField(h, "special", []byte(rel))
-			hashField(h, "type", []byte(info.Mode().Type().String()))
+			cachekey.HashField(h, "special", []byte(rel))
+			cachekey.HashField(h, "type", []byte(info.Mode().Type().String()))
 			return nil
 		}
 	})
@@ -271,10 +272,10 @@ func hashVersionlessJSON(h hash.Hash, full string, drop [][]string) error {
 		return err
 	}
 	if canonical, ok := withoutMembers(data, drop); ok {
-		hashField(h, "versionless-json", canonical)
+		cachekey.HashField(h, "versionless-json", canonical)
 		return nil
 	}
-	hashField(h, "raw", data)
+	cachekey.HashField(h, "raw", data)
 	return nil
 }
 
@@ -325,7 +326,7 @@ func hashFileBytes(h hash.Hash, full string, size int64) error {
 	}
 	defer file.Close()
 	counted := &countingReader{reader: io.LimitReader(file, size+1)}
-	if err := hashStream(h, "bytes", size, counted); err != nil {
+	if err := cachekey.HashStream(h, "bytes", size, counted); err != nil {
 		return err
 	}
 	if counted.n != size {

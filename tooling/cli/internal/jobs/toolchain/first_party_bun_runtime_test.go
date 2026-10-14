@@ -1,4 +1,4 @@
-package jobs
+package toolchain
 
 import (
 	"context"
@@ -52,7 +52,7 @@ func TestFirstPartyBunRuntimesResolveTheInstallUnderThePutnamiHome(t *testing.T)
 				if requirement, declared := ext.Runtime.Toolchains[tc.alias]; !declared || requirement.Lock != "bun" {
 					t.Fatalf("%s: runtime toolchain %q is not locked on bun; this test guards nothing", tc.dir, tc.alias)
 				}
-				err := resolveRuntimeToolchainRefs(context.Background(), root, ext, []string{tc.alias}, base, resolveStrict)
+				err := resolveRuntimeToolchainRefs(context.Background(), root, ext, []string{tc.alias}, base, ResolveStrict)
 				return ext.RuntimeToolchains[tc.alias], err
 			}
 

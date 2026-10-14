@@ -1,4 +1,4 @@
-package jobs
+package procdeadline
 
 import (
 	"math"
@@ -12,40 +12,40 @@ import (
 // elapsesNever is a deadline or bound no test outlives.
 const elapsesNever = time.Duration(math.MaxInt64)
 
-// runningAtStart is a processProgress under which a process counts as running
+// runningAtStart is a ProcessProgress under which a process counts as running
 // as soon as exec.Cmd.Start returned, and its wait for a CPU is not measured.
-func runningAtStart(*os.Process) func() processSample { return nil }
+func runningAtStart(*os.Process) func() ProcessSample { return nil }
 
-// neverRunning is a processProgress under which a process is never seen
+// neverRunning is a ProcessProgress under which a process is never seen
 // running, as if the host held it before its first instruction.
-func neverRunning(*os.Process) func() processSample {
-	return func() processSample { return processSample{held: true} }
+func neverRunning(*os.Process) func() ProcessSample {
+	return func() ProcessSample { return ProcessSample{Held: true} }
 }
 
-// neverWaitingForCPU is a processProgress under which a process runs at once
+// neverWaitingForCPU is a ProcessProgress under which a process runs at once
 // and never waits for a CPU, as one blocked in its own work does.
-func neverWaitingForCPU(*os.Process) func() processSample {
-	return func() processSample { return processSample{measured: true} }
+func neverWaitingForCPU(*os.Process) func() ProcessSample {
+	return func() ProcessSample { return ProcessSample{Measured: true} }
 }
 
-// alwaysWaitingForCPU is a processProgress under which a process runs at once
+// alwaysWaitingForCPU is a ProcessProgress under which a process runs at once
 // and then waits for a CPU all the time. Each sample reads a wait an hour
 // longer than the last, which the deadline keeps to the time elapsed.
-func alwaysWaitingForCPU(*os.Process) func() processSample {
+func alwaysWaitingForCPU(*os.Process) func() ProcessSample {
 	var waited time.Duration
-	return func() processSample {
+	return func() ProcessSample {
 		waited += time.Hour
-		return processSample{waitedForCPU: waited, measured: true}
+		return ProcessSample{WaitedForCPU: waited, Measured: true}
 	}
 }
 
 // countedProgress wraps the sampler of progress so that *calls counts its
 // samples. The watch's goroutine is the only one that samples, and stop
 // returns after it ended, so the count can be read once stop returned.
-func countedProgress(progress processProgress, calls *int) processProgress {
-	return func(process *os.Process) func() processSample {
+func countedProgress(progress ProcessProgress, calls *int) ProcessProgress {
+	return func(process *os.Process) func() ProcessSample {
 		sample := progress(process)
-		return func() processSample {
+		return func() ProcessSample {
 			*calls++
 			return sample()
 		}
@@ -60,16 +60,16 @@ func countedProgress(progress processProgress, calls *int) processProgress {
 // host runs.
 func TestProcessDeadlineArmsOnceTheProcessIsSeenRunning(t *testing.T) {
 	t.Parallel()
-	samples := make(chan chan processSample)
-	progress := func(*os.Process) func() processSample {
-		return func() processSample {
-			answer := make(chan processSample)
+	samples := make(chan chan ProcessSample)
+	progress := func(*os.Process) func() ProcessSample {
+		return func() ProcessSample {
+			answer := make(chan ProcessSample)
 			samples <- answer
 			return <-answer
 		}
 	}
 	expirations := 0
-	watch := processDeadline{run: 0, uncounted: elapsesNever, progress: progress}.watch(nil, func() { expirations++ })
+	watch := ProcessDeadline{Run: 0, Uncounted: elapsesNever, Progress: progress}.Watch(nil, func() { expirations++ })
 	const heldSamples = 4
 	for range heldSamples {
 		answer := <-samples
@@ -78,26 +78,26 @@ func TestProcessDeadlineArmsOnceTheProcessIsSeenRunning(t *testing.T) {
 			t.Error("the deadline fired while the process was held")
 		default:
 		}
-		answer <- processSample{held: true}
+		answer <- ProcessSample{Held: true}
 	}
 	answer := <-samples
-	answer <- processSample{}
+	answer <- ProcessSample{}
 	<-watch.expired
-	timing := watch.stop()
+	timing := watch.Stop()
 	if expirations != 1 {
 		t.Errorf("onExpire ran %d times, want once", expirations)
 	}
-	if timing.uncountedPastBound {
+	if timing.UncountedPastBound {
 		t.Error("timing reports the bound on time not counted for a process that ran")
 	}
 	// The first sample comes at once, the next ones 1, 2, 4 and 8 ms apart,
 	// and a timer never fires early, so the fifth sample comes at least 15 ms
 	// after the watch armed.
-	if minimum := 15 * processProgressFirstPoll; timing.held < minimum {
-		t.Errorf("held = %s, want at least %s: the samples before the one that ran", timing.held, minimum)
+	if minimum := 15 * processProgressFirstPoll; timing.Held < minimum {
+		t.Errorf("held = %s, want at least %s: the samples before the one that ran", timing.Held, minimum)
 	}
-	if timing.ran < 0 {
-		t.Errorf("ran = %s, want a duration from the first sample that ran", timing.ran)
+	if timing.Ran < 0 {
+		t.Errorf("ran = %s, want a duration from the first sample that ran", timing.Ran)
 	}
 }
 
@@ -106,13 +106,13 @@ func TestProcessDeadlineArmsOnceTheProcessIsSeenRunning(t *testing.T) {
 func TestProcessDeadlineBoundsTheHold(t *testing.T) {
 	t.Parallel()
 	expirations := 0
-	watch := processDeadline{run: elapsesNever, uncounted: 0, progress: neverRunning}.watch(nil, func() { expirations++ })
+	watch := ProcessDeadline{Run: elapsesNever, Uncounted: 0, Progress: neverRunning}.Watch(nil, func() { expirations++ })
 	<-watch.expired
-	timing := watch.stop()
+	timing := watch.Stop()
 	if expirations != 1 {
 		t.Errorf("onExpire ran %d times, want once", expirations)
 	}
-	if !timing.uncountedPastBound || timing.ran != 0 || timing.waitedForCPU != 0 {
+	if !timing.UncountedPastBound || timing.Ran != 0 || timing.WaitedForCPU != 0 {
 		t.Errorf("timing = %+v, want a hold past the bound and no run", timing)
 	}
 }
@@ -124,28 +124,28 @@ func TestProcessDeadlineStopEndsTheWatch(t *testing.T) {
 	var sampled atomic.Int32
 	var stopped atomic.Bool
 	twice := make(chan struct{})
-	progress := func(*os.Process) func() processSample {
-		return func() processSample {
+	progress := func(*os.Process) func() ProcessSample {
+		return func() ProcessSample {
 			if stopped.Load() {
 				t.Error("the watch sampled the process after stop returned")
 			}
 			if sampled.Add(1) == 2 {
 				close(twice)
 			}
-			return processSample{held: true}
+			return ProcessSample{Held: true}
 		}
 	}
-	watch := processDeadline{run: elapsesNever, uncounted: elapsesNever, progress: progress}.watch(nil, func() {
+	watch := ProcessDeadline{Run: elapsesNever, Uncounted: elapsesNever, Progress: progress}.Watch(nil, func() {
 		t.Error("a stopped watch fired its deadline")
 	})
 	<-twice
 	var wg sync.WaitGroup
-	timings := make([]processTiming, 3)
+	timings := make([]ProcessTiming, 3)
 	for i := range timings {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			timings[i] = watch.stop()
+			timings[i] = watch.Stop()
 		}()
 	}
 	wg.Wait()
@@ -157,7 +157,7 @@ func TestProcessDeadlineStopEndsTheWatch(t *testing.T) {
 			t.Errorf("stop returned %+v and %+v, want one timing", timings[0], timing)
 		}
 	}
-	if timings[0].uncountedPastBound || timings[0].ran != 0 {
+	if timings[0].UncountedPastBound || timings[0].Ran != 0 {
 		t.Errorf("timing = %+v, want a hold that ended at stop", timings[0])
 	}
 	select {
@@ -172,9 +172,9 @@ func TestProcessDeadlineStopEndsTheWatch(t *testing.T) {
 // for a CPU: it counts from the watch, all of the time.
 func TestProcessDeadlineCountsAProcessRunningAtStartAtOnce(t *testing.T) {
 	t.Parallel()
-	watch := processDeadline{run: 0, uncounted: elapsesNever, progress: runningAtStart}.watch(nil, nil)
+	watch := ProcessDeadline{Run: 0, Uncounted: elapsesNever, Progress: runningAtStart}.Watch(nil, nil)
 	<-watch.expired
-	if timing := watch.stop(); timing.uncountedPastBound || timing.waitMeasured {
+	if timing := watch.Stop(); timing.UncountedPastBound || timing.WaitMeasured {
 		t.Errorf("timing = %+v, want a run deadline and no measured wait", timing)
 	}
 }
@@ -188,9 +188,9 @@ func TestProcessDeadlineDoesNotCountTheWaitForACPU(t *testing.T) {
 	t.Parallel()
 	calls := 0
 	reads := make(chan struct{})
-	starved := func(process *os.Process) func() processSample {
+	starved := func(process *os.Process) func() ProcessSample {
 		sample := alwaysWaitingForCPU(process)
-		return func() processSample {
+		return func() ProcessSample {
 			calls++
 			// The first call is the sample that sees the process run.
 			if calls == 4 {
@@ -199,18 +199,18 @@ func TestProcessDeadlineDoesNotCountTheWaitForACPU(t *testing.T) {
 			return sample()
 		}
 	}
-	deadline := processDeadline{run: processDeadlineMinRearm, uncounted: elapsesNever, progress: starved}
-	watch := deadline.watch(nil, func() { t.Error("the deadline of a process waiting for a CPU fired") })
+	deadline := ProcessDeadline{Run: processDeadlineMinRearm, Uncounted: elapsesNever, Progress: starved}
+	watch := deadline.Watch(nil, func() { t.Error("the deadline of a process waiting for a CPU fired") })
 	<-reads
-	timing := watch.stop()
-	if timing.uncountedPastBound || !timing.waitMeasured {
+	timing := watch.Stop()
+	if timing.UncountedPastBound || !timing.WaitMeasured {
 		t.Errorf("timing = %+v, want a measured wait under the deadline", timing)
 	}
-	if minimum := 3 * processDeadlineMinRearm; timing.waitedForCPU < minimum {
-		t.Errorf("waitedForCPU = %s, want at least %s: the time of three reads", timing.waitedForCPU, minimum)
+	if minimum := 3 * processDeadlineMinRearm; timing.WaitedForCPU < minimum {
+		t.Errorf("waitedForCPU = %s, want at least %s: the time of three reads", timing.WaitedForCPU, minimum)
 	}
-	if timing.ran < 0 {
-		t.Errorf("ran = %s, want the time since the last read", timing.ran)
+	if timing.Ran < 0 {
+		t.Errorf("ran = %s, want the time since the last read", timing.Ran)
 	}
 }
 
@@ -221,18 +221,18 @@ func TestProcessDeadlineCountsABlockedProcess(t *testing.T) {
 	t.Parallel()
 	const run = 3 * processDeadlineMinRearm
 	expirations := 0
-	watch := processDeadline{run: run, uncounted: elapsesNever, progress: neverWaitingForCPU}.watch(nil,
+	watch := ProcessDeadline{Run: run, Uncounted: elapsesNever, Progress: neverWaitingForCPU}.Watch(nil,
 		func() { expirations++ })
 	<-watch.expired
-	timing := watch.stop()
+	timing := watch.Stop()
 	if expirations != 1 {
 		t.Errorf("onExpire ran %d times, want once", expirations)
 	}
-	if timing.uncountedPastBound || !timing.waitMeasured || timing.waitedForCPU != 0 {
+	if timing.UncountedPastBound || !timing.WaitMeasured || timing.WaitedForCPU != 0 {
 		t.Errorf("timing = %+v, want a run deadline with a measured wait of zero", timing)
 	}
-	if timing.ran < run {
-		t.Errorf("ran = %s, want at least the deadline %s", timing.ran, run)
+	if timing.Ran < run {
+		t.Errorf("ran = %s, want at least the deadline %s", timing.Ran, run)
 	}
 }
 
@@ -248,24 +248,24 @@ func TestProcessDeadlineCountsTheTimeAProcessDoesNotWait(t *testing.T) {
 		perRead = processDeadlineMinRearm / 2
 	)
 	calls := 0
-	progress := func(*os.Process) func() processSample {
-		return func() processSample {
+	progress := func(*os.Process) func() ProcessSample {
+		return func() ProcessSample {
 			calls++
 			// The first call is the sample that sees the process run.
-			return processSample{waitedForCPU: time.Duration(calls-1) * perRead, measured: true}
+			return ProcessSample{WaitedForCPU: time.Duration(calls-1) * perRead, Measured: true}
 		}
 	}
-	watch := processDeadline{run: run, uncounted: elapsesNever, progress: progress}.watch(nil, nil)
+	watch := ProcessDeadline{Run: run, Uncounted: elapsesNever, Progress: progress}.Watch(nil, nil)
 	<-watch.expired
-	timing := watch.stop()
+	timing := watch.Stop()
 	reads := calls - 1
 	if reads < 1 {
 		t.Fatalf("the deadline fired after %d reads, want at least one before it", reads)
 	}
-	if want := time.Duration(reads) * perRead; timing.waitedForCPU != want || !timing.waitMeasured {
+	if want := time.Duration(reads) * perRead; timing.WaitedForCPU != want || !timing.WaitMeasured {
 		t.Errorf("timing = %+v, want a measured wait of %s from %d reads", timing, want, reads)
 	}
-	if timing.uncountedPastBound || timing.ran < run {
+	if timing.UncountedPastBound || timing.Ran < run {
 		t.Errorf("timing = %+v, want a run deadline that ran at least %s", timing, run)
 	}
 }
@@ -284,40 +284,40 @@ func TestProcessDeadlineCountsTheTimeAProcessDoesNotWait(t *testing.T) {
 func TestProcessDeadlineKeepsTheWaitAlreadyRead(t *testing.T) {
 	t.Parallel()
 	const run = 3 * processDeadlineMinRearm
-	cases := map[string]processSample{
+	cases := map[string]ProcessSample{
 		"a failed read": {},
-		"a lower read":  {measured: true},
+		"a lower read":  {Measured: true},
 	}
 	for name, next := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			calls := 0
-			progress := func(*os.Process) func() processSample {
-				return func() processSample {
+			progress := func(*os.Process) func() ProcessSample {
+				return func() ProcessSample {
 					calls++
 					switch calls {
 					case 1:
 						// The sample that sees the process run.
-						return processSample{measured: true}
+						return ProcessSample{Measured: true}
 					case 2:
-						return processSample{waitedForCPU: time.Hour, measured: true}
+						return ProcessSample{WaitedForCPU: time.Hour, Measured: true}
 					default:
 						return next
 					}
 				}
 			}
-			watch := processDeadline{run: run, uncounted: elapsesNever, progress: progress}.watch(nil, nil)
+			watch := ProcessDeadline{Run: run, Uncounted: elapsesNever, Progress: progress}.Watch(nil, nil)
 			<-watch.expired
-			timing := watch.stop()
+			timing := watch.Stop()
 			if calls < 3 {
 				t.Fatalf("the deadline fired after %d samples, want a read past the one that measured a wait", calls)
 			}
 			// The second sample comes at least run after the process ran, and
 			// its wait is all of that time.
-			if timing.waitedForCPU < run || !timing.waitMeasured {
+			if timing.WaitedForCPU < run || !timing.WaitMeasured {
 				t.Errorf("timing = %+v, want the wait of at least %s read before %s", timing, run, name)
 			}
-			if timing.uncountedPastBound || timing.ran < run {
+			if timing.UncountedPastBound || timing.Ran < run {
 				t.Errorf("timing = %+v, want a run deadline that ran at least %s", timing, run)
 			}
 		})
@@ -337,23 +337,23 @@ func TestProcessDeadlineBoundsTheTimeNotCounted(t *testing.T) {
 	t.Parallel()
 	const bound = 3 * processDeadlineMinRearm
 	expirations := 0
-	watch := processDeadline{run: elapsesNever, uncounted: bound, progress: alwaysWaitingForCPU}.watch(nil,
+	watch := ProcessDeadline{Run: elapsesNever, Uncounted: bound, Progress: alwaysWaitingForCPU}.Watch(nil,
 		func() { expirations++ })
 	<-watch.expired
-	timing := watch.stop()
+	timing := watch.Stop()
 	if expirations != 1 {
 		t.Errorf("onExpire ran %d times, want once", expirations)
 	}
-	if !timing.uncountedPastBound {
+	if !timing.UncountedPastBound {
 		t.Errorf("timing = %+v, want the bound %s on time not counted", timing, bound)
 	}
-	if timing.held >= bound {
-		if timing.waitMeasured || timing.waitedForCPU != 0 {
+	if timing.Held >= bound {
+		if timing.WaitMeasured || timing.WaitedForCPU != 0 {
 			t.Errorf("timing = %+v, want no wait read after a hold that reached the bound %s", timing, bound)
 		}
 		return
 	}
-	if !timing.waitMeasured || timing.held+timing.waitedForCPU < bound {
+	if !timing.WaitMeasured || timing.Held+timing.WaitedForCPU < bound {
 		t.Errorf("timing = %+v, want a hold and a measured wait past the bound %s", timing, bound)
 	}
 }
@@ -366,24 +366,24 @@ func TestProcessDeadlineCountsAnUnreadWaitInFull(t *testing.T) {
 	t.Parallel()
 	const run = 3 * processDeadlineMinRearm
 	cases := map[string]struct {
-		progress processProgress
+		progress ProcessProgress
 		reads    func(calls int) bool
 	}{
 		"unread from the first reading": {
-			progress: func(*os.Process) func() processSample {
-				return func() processSample { return processSample{waitedForCPU: time.Hour} }
+			progress: func(*os.Process) func() ProcessSample {
+				return func() ProcessSample { return ProcessSample{WaitedForCPU: time.Hour} }
 			},
 			reads: func(calls int) bool { return calls == 1 },
 		},
 		"unread after the first reading": {
-			progress: func(*os.Process) func() processSample {
+			progress: func(*os.Process) func() ProcessSample {
 				first := true
-				return func() processSample {
+				return func() ProcessSample {
 					if first {
 						first = false
-						return processSample{waitedForCPU: time.Hour, measured: true}
+						return ProcessSample{WaitedForCPU: time.Hour, Measured: true}
 					}
-					return processSample{waitedForCPU: 2 * time.Hour}
+					return ProcessSample{WaitedForCPU: 2 * time.Hour}
 				}
 			},
 			reads: func(calls int) bool { return calls > 1 },
@@ -393,14 +393,14 @@ func TestProcessDeadlineCountsAnUnreadWaitInFull(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			calls := 0
-			deadline := processDeadline{run: run, uncounted: elapsesNever, progress: countedProgress(tc.progress, &calls)}
-			watch := deadline.watch(nil, nil)
+			deadline := ProcessDeadline{Run: run, Uncounted: elapsesNever, Progress: countedProgress(tc.progress, &calls)}
+			watch := deadline.Watch(nil, nil)
 			<-watch.expired
-			timing := watch.stop()
+			timing := watch.Stop()
 			if !tc.reads(calls) {
 				t.Errorf("the process was sampled %d times", calls)
 			}
-			if timing.uncountedPastBound || timing.waitMeasured || timing.waitedForCPU != 0 || timing.ran < run {
+			if timing.UncountedPastBound || timing.WaitMeasured || timing.WaitedForCPU != 0 || timing.Ran < run {
 				t.Errorf("timing = %+v, want a run deadline that counted all of at least %s", timing, run)
 			}
 		})
@@ -412,20 +412,20 @@ func TestProcessDeadlineCountsAnUnreadWaitInFull(t *testing.T) {
 // than zero nor more than the time elapsed between them.
 func TestCPUWaitBetweenKeepsTheWaitWithinTheTimeElapsed(t *testing.T) {
 	t.Parallel()
-	measured := func(waited time.Duration) processSample {
-		return processSample{waitedForCPU: waited, measured: true}
+	measured := func(waited time.Duration) ProcessSample {
+		return ProcessSample{WaitedForCPU: waited, Measured: true}
 	}
 	cases := []struct {
 		name              string
-		baseline, current processSample
+		baseline, current ProcessSample
 		want              time.Duration
 		wantMeasured      bool
 	}{
 		{"a wait within the time elapsed", measured(time.Second), measured(4 * time.Second), 3 * time.Second, true},
 		{"a wait that shrank", measured(4 * time.Second), measured(time.Second), 0, true},
 		{"a wait longer than the time elapsed", measured(0), measured(time.Hour), 10 * time.Second, true},
-		{"an unmeasured baseline", processSample{}, measured(time.Second), 0, false},
-		{"an unmeasured sample", measured(0), processSample{waitedForCPU: time.Second}, 0, false},
+		{"an unmeasured baseline", ProcessSample{}, measured(time.Second), 0, false},
+		{"an unmeasured sample", measured(0), ProcessSample{WaitedForCPU: time.Second}, 0, false},
 	}
 	for _, tc := range cases {
 		got, gotMeasured := cpuWaitBetween(tc.baseline, tc.current, 10*time.Second)
@@ -439,7 +439,7 @@ func TestCPUWaitBetweenKeepsTheWaitWithinTheTimeElapsed(t *testing.T) {
 // deadline takes at each read.
 func TestProcessDeadlineCheckDecidesFromTheTimeCounted(t *testing.T) {
 	t.Parallel()
-	deadline := processDeadline{run: 10 * time.Second, uncounted: time.Minute}
+	deadline := ProcessDeadline{Run: 10 * time.Second, Uncounted: time.Minute}
 	cases := []struct {
 		name                  string
 		held, elapsed, waited time.Duration
@@ -470,33 +470,33 @@ func TestProcessTimingStatesTheTimeNotCounted(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name   string
-		timing processTiming
+		timing ProcessTiming
 		want   string
 	}{
 		{
 			"a measured wait",
-			processTiming{held: 1200 * time.Millisecond, waitedForCPU: 3 * time.Second, waitMeasured: true, ran: 5 * time.Second},
+			ProcessTiming{Held: 1200 * time.Millisecond, WaitedForCPU: 3 * time.Second, WaitMeasured: true, Ran: 5 * time.Second},
 			"the host held it 1.2s before its first instruction and it waited 3s for a CPU, neither counted",
 		},
 		{
 			"a wait not measured",
-			processTiming{held: 1200 * time.Millisecond, ran: 5 * time.Second},
+			ProcessTiming{Held: 1200 * time.Millisecond, Ran: 5 * time.Second},
 			"the host held it 1.2s before its first instruction, which is not counted, and the time it waited " +
 				"for a CPU could not be read, so it is counted",
 		},
 		{
 			"a hold past the bound",
-			processTiming{held: 2 * time.Minute, uncountedPastBound: true},
+			ProcessTiming{Held: 2 * time.Minute, UncountedPastBound: true},
 			"the host held it 2m0s without letting it run, or it blocked before it was first sampled",
 		},
 		{
 			"a wait past the bound",
-			processTiming{held: time.Second, waitedForCPU: 119 * time.Second, waitMeasured: true, uncountedPastBound: true},
+			ProcessTiming{Held: time.Second, WaitedForCPU: 119 * time.Second, WaitMeasured: true, UncountedPastBound: true},
 			"the host held it 1s before its first instruction and it waited 1m59s for a CPU, neither counted",
 		},
 	}
 	for _, tc := range cases {
-		if got := tc.timing.uncounted(); got != tc.want {
+		if got := tc.timing.Uncounted(); got != tc.want {
 			t.Errorf("%s: uncounted() = %q, want %q", tc.name, got, tc.want)
 		}
 	}

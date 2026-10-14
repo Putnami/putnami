@@ -1,4 +1,4 @@
-package jobs
+package toolchain
 
 import (
 	"os"
@@ -23,7 +23,7 @@ func hostDir(parts ...string) string {
 // The golden path on Windows: the system environment block spells the variable
 // "Path". The job environment prepends the CLI directory, then the resolved
 // toolchain directory, exactly as prepareJobInvocation and
-// applyRuntimeToolchains compose it. The child must keep every system entry
+// ApplyRuntimeToolchains compose it. The child must keep every system entry
 // behind them, under one PATH entry, and PATHEXT must not be mistaken for PATH.
 func TestEnvKeysFoldKeepsTheWindowsSystemPath(t *testing.T) {
 	system32 := hostDir("Windows", "system32")
@@ -41,7 +41,7 @@ func TestEnvKeysFoldKeepsTheWindowsSystemPath(t *testing.T) {
 	}
 
 	keys := envkeys.Keys{Fold: true}
-	env := prependPathWith(keys, append([]string(nil), block...), cliDir)
+	env := PrependPathWith(keys, append([]string(nil), block...), cliDir)
 	env = keys.Set(env, "PATH", minimalRuntimePath(keys.Last(env, "PATH"), []string{toolDir}))
 
 	var pathEntries []string
@@ -70,7 +70,7 @@ func TestEnvKeysFoldKeepsTheWindowsSystemPath(t *testing.T) {
 func TestEnvKeysExactTreatsOtherSpellingsAsOtherVariables(t *testing.T) {
 	cliDir := hostDir("opt", "putnami", "bin")
 	other := "Path=" + windowsLikePath(hostDir("usr", "bin"))
-	env := prependPathWith(envkeys.Keys{}, []string{other, "HOME=" + hostDir("home", "dev")}, cliDir)
+	env := PrependPathWith(envkeys.Keys{}, []string{other, "HOME=" + hostDir("home", "dev")}, cliDir)
 	want := []string{other, "HOME=" + hostDir("home", "dev"), "PATH=" + cliDir}
 	if !slices.Equal(env, want) {
 		t.Fatalf("env = %q, want %q", env, want)

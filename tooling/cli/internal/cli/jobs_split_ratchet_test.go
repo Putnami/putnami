@@ -46,6 +46,42 @@ var jobsSplitPackages = []jobsSplitPackage{
 		why: "machine probes: they read the runner's procfs, sysfs and rusage and publish the " +
 			"model's RunnerEnvironment types, nothing else",
 	},
+	{
+		dir:     "internal/jobs/procdeadline",
+		allowed: []string{"go.putnami.dev/tooling/cli/internal/fixtureproc"},
+		why: "process deadlines: they bound a started child by the time it runs, from the host's own " +
+			"process readings; only the tests start fixture programs",
+	},
+	{
+		dir:     "internal/jobs/cachekey",
+		allowed: nil,
+		why:     "cache key framing: it writes labeled fields to a hash and imports the standard library only",
+	},
+	{
+		dir: "internal/jobs/toolchain",
+		allowed: []string{
+			"go.putnami.dev/cli/model/extension",
+			"go.putnami.dev/cli/model/jobs",
+			"go.putnami.dev/protocol/extension",
+			"go.putnami.dev/sdk/extension/envkeys",
+			"go.putnami.dev/tooling/cli/internal/extension",
+			"go.putnami.dev/tooling/cli/internal/jobs/cachekey",
+			"go.putnami.dev/tooling/cli/internal/jobs/machineprobe",
+			"go.putnami.dev/tooling/cli/internal/jobs/procdeadline",
+			"go.putnami.dev/tooling/cli/internal/lockfile",
+			"go.putnami.dev/tooling/cli/internal/runcredential",
+			"go.putnami.dev/tooling/cli/internal/store",
+			"go.putnami.dev/tooling/cli/internal/workspace",
+			// Tests only.
+			"go.putnami.dev/protocol/features/spectest",
+			"go.putnami.dev/sdk/extension/pkgmeta",
+			"go.putnami.dev/tooling/cli/internal/fixtureproc",
+			"go.putnami.dev/tooling/cli/internal/hometest",
+		},
+		why: "runtime toolchains: they resolve an extension's declared toolchains against the workspace " +
+			"lock, which needs the extension and workspace models, the lock, the artifact store root, " +
+			"and the run credential's custody mark before a probe starts repository code",
+	},
 }
 
 func TestJobsSplitPackagesImportOnlyTheirAllowance(t *testing.T) {

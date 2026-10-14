@@ -32,7 +32,10 @@ internal/
 ├── git/                       Git operations (branch, diff, merge-base)
 ├── hooks/                     Lifecycle hooks: extension (onInstall, preBuild) and workspace
 ├── jobs/                      Planning, DAG scheduling, subprocess execution, caching
-│   └── machineprobe/          Runner CPU, memory and pressure readings, rusage of a finished process
+│   ├── cachekey/              Labeled-field framing every cache key and content digest hashes
+│   ├── machineprobe/          Runner CPU, memory and pressure readings, rusage of a finished process
+│   ├── procdeadline/          Deadline of a started child process, counted from its first instruction
+│   └── toolchain/             Runtime toolchain resolution against the lock, child environment, key identity
 ├── output/                    Renderers (text, live TUI, JSONL, cloud-logging)
 ├── machine/                   Machine-readable run/report documents
 ├── changeplan/                CI impact plan projection
@@ -44,7 +47,7 @@ internal/
 └── workspace_state/           Session recording and audit trails
 ```
 
-Principal packages only. `internal/` holds 70 production packages in all — the rest are small, single-purpose support packages (`abort`, `agentartifacts`, `cmderr`, `env`, `flock`, `iox`, `launch`, `layout`, `lockfile`, `mcp`, `progress`, …). `core_isolation_ratchets_test.go` pins the count as a ceiling, so a new package is a reviewed event.
+Principal packages only. `internal/` holds 73 production packages in all — the rest are small, single-purpose support packages (`abort`, `agentartifacts`, `cmderr`, `env`, `flock`, `iox`, `launch`, `layout`, `lockfile`, `mcp`, `progress`, …). `core_isolation_ratchets_test.go` pins the count as a ceiling, so a new package is a reviewed event.
 
 ### Command verticals — `internal/commands/`
 

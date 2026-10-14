@@ -1,4 +1,4 @@
-package jobs
+package toolchain
 
 import (
 	"testing"
@@ -18,7 +18,7 @@ func TestRuntimeToolchainUnexpandedCandidatesNameWhatIsMissing(t *testing.T) {
 		{From: extensionproto.RuntimeToolchainCandidatePath, Path: "compiler"},
 	}
 	ext := runtimeToolchainExtension(requirement)
-	err := resolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"},
+	err := ResolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"},
 		[]string{"PATH=" + t.TempDir(), "COMPILER_HOME= "})
 	want := `resolve extension "example" runtime toolchain "compiler": no candidate matched locked version "1.2.3"; run ` + "`putnami install`" + ` to install it: ` +
 		`candidate 1 (environment COMPILER_HOME "bin/compiler"): environment variable COMPILER_HOME is not set; ` +
@@ -37,8 +37,8 @@ func TestWithExecutableSuffix(t *testing.T) {
 		{"linux", "/usr/local/go/bin/go", "/usr/local/go/bin/go"},
 	}
 	for _, c := range cases {
-		if got := withExecutableSuffix(c.goos, c.path); got != c.want {
-			t.Errorf("withExecutableSuffix(%q, %q) = %q, want %q", c.goos, c.path, got, c.want)
+		if got := WithExecutableSuffix(c.goos, c.path); got != c.want {
+			t.Errorf("WithExecutableSuffix(%q, %q) = %q, want %q", c.goos, c.path, got, c.want)
 		}
 	}
 }

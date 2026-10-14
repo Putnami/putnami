@@ -19,7 +19,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/hometest"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -206,7 +206,7 @@ func (f goCreateFixture) createUnder(t *testing.T, ctx context.Context, env Life
 
 // testProbeTimeout bounds the go version probe of a test that proves how a
 // timed-out probe is reported, in place of the production 5 s
-// (jobs.WithToolchainProbeTimeout).
+// (toolchain.WithToolchainProbeTimeout).
 const testProbeTimeout = 100 * time.Millisecond
 
 // A consumer who installed only Putnami creates a Go project in a workspace
@@ -446,9 +446,9 @@ func TestProjectsCreateReportsAGoProbeThatTimedOut(t *testing.T) {
 	f.pin(t)
 	f.writeSlowGo(t)
 
-	ctx := jobs.WithToolchainProbeTimeout(context.Background(), testProbeTimeout)
+	ctx := toolchain.WithToolchainProbeTimeout(context.Background(), testProbeTimeout)
 	output, err := f.createUnder(t, ctx, f.refusingGoInstall(t))
-	if !errors.Is(err, jobs.ErrToolchainProbeTimeout) || errors.Is(err, errGoUnavailable) {
+	if !errors.Is(err, toolchain.ErrToolchainProbeTimeout) || errors.Is(err, errGoUnavailable) {
 		t.Fatalf("error = %v, want the probe timeout, not %v\n%s", err, errGoUnavailable, output)
 	}
 	if want := "probe timed out after " + testProbeTimeout.String(); !strings.Contains(err.Error(), want) {

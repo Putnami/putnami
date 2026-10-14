@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -95,7 +96,7 @@ func (s *Scheduler) readyBatch(job *ScheduledJob) (string, int) {
 		job.JobDef.Cwd,
 		stringMapKey(job.JobDef.Env),
 		invocationBatchKey(job),
-		cacheToolchainVersion(job),
+		toolchain.CacheToolchainVersion(job),
 		configDigest,
 		string(params),
 	} {

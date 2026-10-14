@@ -56,6 +56,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/hooks"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/sessionreporter"
 	"go.putnami.dev/tooling/cli/internal/specgate"
 )
@@ -625,7 +626,7 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	// (Request.PlanExtension). A run that ended before synchronization has
 	// nothing to report.
 	if req.synchronizedExtensions != nil {
-		jobs.ReportProvisionedRuntimeToolchains(ctx, req.WorkspaceRoot, req.synchronizedExtensions, result.Plan, req.Commands)
+		toolchain.ReportProvisionedRuntimeToolchains(ctx, req.WorkspaceRoot, req.synchronizedExtensions, result.Plan, req.Commands)
 	}
 
 	// After hooks run even if jobs failed.

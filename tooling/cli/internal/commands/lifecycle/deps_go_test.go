@@ -14,7 +14,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -129,11 +129,11 @@ func TestDepsAddReportsAGoProbeThatTimedOut(t *testing.T) {
 	f.writeSlowGo(t)
 	env := f.refusingGoInstall(t)
 
-	ctx := jobs.WithToolchainProbeTimeout(context.Background(), testProbeTimeout)
+	ctx := toolchain.WithToolchainProbeTimeout(context.Background(), testProbeTimeout)
 	output, err := captureStdout(t, func() error {
 		return DepsAdd(ctx, f.root, []string{"example.com/lib@v1.0.0"}, "", env)
 	})
-	if !errors.Is(err, jobs.ErrToolchainProbeTimeout) || errors.Is(err, errGoUnavailable) {
+	if !errors.Is(err, toolchain.ErrToolchainProbeTimeout) || errors.Is(err, errGoUnavailable) {
 		t.Fatalf("error = %v, want the probe timeout, not %v\n%s", err, errGoUnavailable, output)
 	}
 	if want := "probe timed out after " + testProbeTimeout.String(); !strings.Contains(err.Error(), want) {
@@ -303,12 +303,12 @@ func TestDepsPruneChangesNothingWhenTheGoProbeTimesOut(t *testing.T) {
 		before[file] = string(data)
 	}
 
-	ctx := jobs.WithToolchainProbeTimeout(context.Background(), testProbeTimeout)
+	ctx := toolchain.WithToolchainProbeTimeout(context.Background(), testProbeTimeout)
 	var out bytes.Buffer
 	output, err := captureStdout(t, func() error {
 		return prunePlan(ctx, f.root, ws, "", false, &out, env)
 	})
-	if !errors.Is(err, jobs.ErrToolchainProbeTimeout) || errors.Is(err, errGoUnavailable) {
+	if !errors.Is(err, toolchain.ErrToolchainProbeTimeout) || errors.Is(err, errGoUnavailable) {
 		t.Fatalf("error = %v, want the probe timeout, not %v\n%s%s", err, errGoUnavailable, out.String(), output)
 	}
 	if !strings.Contains(out.String(), "prune app → tool [putnami-json]") {

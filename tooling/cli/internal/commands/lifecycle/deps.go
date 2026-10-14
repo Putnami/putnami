@@ -18,6 +18,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -365,7 +366,7 @@ func goDepsCommand(ctx context.Context, wsRoot, projectPath, action, rerun strin
 	goCmd, err := ensureGoCommand(ctx, wsRoot, projectPath, "", goToolchainExtension(wsRoot), env)
 	if err != nil {
 		next := "putnami install"
-		if errors.Is(err, jobs.ErrToolchainProbeTimeout) {
+		if errors.Is(err, toolchain.ErrToolchainProbeTimeout) {
 			next = rerun
 		}
 		return goCommand{}, protocolcli.WithNext(fmt.Errorf("deps %s: %w", action, err), next)

@@ -21,6 +21,8 @@ import (
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/procdeadline"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -741,7 +743,7 @@ func TestCommandScopedRuntimeSynchronizationIncludesSessionPrerequisiteClosure(t
 			},
 		},
 	}
-	active := commandDependencyClosure(
+	active := toolchain.CommandDependencyClosure(
 		[]*extension.ExtensionDescription{orchestrator, runtimeExtension}, []string{"deploy"},
 	)
 	for _, command := range []string{"deploy", "publish", "lint", "test", "build", "validate", "validate-workspace"} {
@@ -1286,13 +1288,13 @@ func TestRuntimeHandshakeFailsClosed(t *testing.T) {
 // only once the runtime process existed.
 type handshakeClockProbe struct {
 	fire      bool
-	progress  processProgress
+	progress  procdeadline.ProcessProgress
 	pastBound bool
 	onArm     func()
 	armedPids []int
 }
 
-func (p *handshakeClockProbe) clock(process *os.Process) *processWatch {
+func (p *handshakeClockProbe) clock(process *os.Process) *procdeadline.ProcessWatch {
 	pid := 0
 	if process != nil {
 		pid = process.Pid
@@ -1301,17 +1303,17 @@ func (p *handshakeClockProbe) clock(process *os.Process) *processWatch {
 	if p.onArm != nil {
 		p.onArm()
 	}
-	deadline := processDeadline{run: elapsesNever, uncounted: elapsesNever, progress: runningAtStart}
+	deadline := procdeadline.ProcessDeadline{Run: elapsesNever, Uncounted: elapsesNever, Progress: runningAtStart}
 	if p.progress != nil {
-		deadline.progress = p.progress
+		deadline.Progress = p.progress
 	}
 	if p.fire {
-		deadline.run = time.Nanosecond
+		deadline.Run = time.Nanosecond
 	}
 	if p.pastBound {
-		deadline.uncounted = 0
+		deadline.Uncounted = 0
 	}
-	return deadline.watch(process, nil)
+	return deadline.Watch(process, nil)
 }
 
 // TestRuntimeHandshakeTimeoutIsItsOwnVerdict pins the handshake timeout without a wall clock.
@@ -1356,7 +1358,7 @@ func TestRuntimeHandshakeTimeoutIsItsOwnVerdict(t *testing.T) {
 		name        string
 		script      string
 		fire        bool
-		progress    processProgress
+		progress    procdeadline.ProcessProgress
 		pastBound   bool
 		cancel      bool
 		wantCode    string
@@ -1404,7 +1406,7 @@ func TestRuntimeHandshakeTimeoutIsItsOwnVerdict(t *testing.T) {
 			pastBound: true,
 			wantCode:  extensionproto.FailureRuntimeHandshakeTimeout,
 			wantMessage: []string{
-				"timed out at its " + uncountedTimeBound.String() + " bound on time not counted",
+				"timed out at its " + procdeadline.UncountedTimeBound.String() + " bound on time not counted",
 				"the host held it", "without letting it run", "starting the process took", "not a malformed build",
 				"less loaded", "CPU used",
 			},
@@ -1499,12 +1501,12 @@ func TestRuntimeHandshakeTimeoutStatesTheWaitForACPU(t *testing.T) {
 	executable := filepath.Join(t.TempDir(), "runtime")
 	cases := []struct {
 		name   string
-		timing processTiming
+		timing procdeadline.ProcessTiming
 		want   []string
 	}{
 		{
 			name:   "at its deadline",
-			timing: processTiming{held: time.Second, waitedForCPU: 4 * time.Second, waitMeasured: true, ran: 10 * time.Second},
+			timing: procdeadline.ProcessTiming{Held: time.Second, WaitedForCPU: 4 * time.Second, WaitMeasured: true, Ran: 10 * time.Second},
 			want: []string{
 				"the runtime ran 10s without answering", "deadline " + runtimeHandshakeDeadline.String(),
 				"the host held it 1s before its first instruction and it waited 4s for a CPU, neither counted",
@@ -1512,12 +1514,12 @@ func TestRuntimeHandshakeTimeoutStatesTheWaitForACPU(t *testing.T) {
 		},
 		{
 			name: "at the bound on time not counted",
-			timing: processTiming{
-				held: time.Second, waitedForCPU: 119 * time.Second, waitMeasured: true, ran: 2 * time.Second,
-				uncountedPastBound: true,
+			timing: procdeadline.ProcessTiming{
+				Held: time.Second, WaitedForCPU: 119 * time.Second, WaitMeasured: true, Ran: 2 * time.Second,
+				UncountedPastBound: true,
 			},
 			want: []string{
-				"timed out at its " + uncountedTimeBound.String() + " bound on time not counted",
+				"timed out at its " + procdeadline.UncountedTimeBound.String() + " bound on time not counted",
 				"the host held it 1s before its first instruction and it waited 1m59s for a CPU, neither counted",
 			},
 		},

@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -31,7 +30,10 @@ import (
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
+	"go.putnami.dev/tooling/cli/internal/jobs/procdeadline"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -168,7 +170,7 @@ func workspaceRootOf(ws *workspace.Workspace) string {
 
 // synchronizeExtensionRuntimesResolving is SynchronizeExtensionRuntimes whose
 // prepare toolchains resolve as the provisioning command's do when
-// provisioning is set (see provisioningOnlyRun).
+// provisioning is set (see toolchain.ProvisioningOnlyRun).
 func synchronizeExtensionRuntimesResolving(
 	ctx context.Context,
 	workspaceRoot string,
@@ -177,7 +179,7 @@ func synchronizeExtensionRuntimesResolving(
 	provisioning bool,
 ) error {
 	artifacts := artifactstore.New(store.ResolveArtifactStoreRoot(workspaceRoot))
-	if err := resolveRuntimeToolchainsForPreparation(ctx, workspaceRoot, extensions, os.Environ(), provisioning); err != nil {
+	if err := toolchain.ResolveRuntimeToolchainsForPreparation(ctx, workspaceRoot, extensions, os.Environ(), provisioning); err != nil {
 		return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
 			"resolve extension runtime toolchains: %v", err)
 	}
@@ -321,22 +323,22 @@ func SynchronizeExtensionRuntimesForCommands(
 	commands []string,
 	report *PreparationReport,
 ) error {
-	return synchronizeExtensionRuntimesForCommands(ctx, workspaceRootOf(ws), extensions, commands, report, resolveDeferred)
+	return synchronizeExtensionRuntimesForCommands(ctx, workspaceRootOf(ws), extensions, commands, report, toolchain.ResolveDeferred)
 }
 
 // synchronizeExtensionRuntimesForCommands is SynchronizeExtensionRuntimesForCommands
 // for a caller that holds the workspace root rather than the loaded workspace.
 // mode applies to the task toolchains of the active commands other than
-// toolchainProvisioningCommand.
+// toolchain.ToolchainProvisioningCommand.
 func synchronizeExtensionRuntimesForCommands(
 	ctx context.Context,
 	workspaceRoot string,
 	extensions []*extension.ExtensionDescription,
 	commands []string,
 	report *PreparationReport,
-	mode toolchainResolutionMode,
+	mode toolchain.ToolchainResolutionMode,
 ) error {
-	activeCommands := commandDependencyClosure(extensions, commands)
+	activeCommands := toolchain.CommandDependencyClosure(extensions, commands)
 	demanded := make([]*extension.ExtensionDescription, 0, len(extensions))
 	for _, ext := range extensions {
 		if ext == nil {
@@ -351,7 +353,7 @@ func synchronizeExtensionRuntimesForCommands(
 		}
 		demanded = append(demanded, ext)
 	}
-	if err := synchronizeExtensionRuntimesResolving(ctx, workspaceRoot, demanded, report, provisioningOnlyRun(activeCommands)); err != nil {
+	if err := synchronizeExtensionRuntimesResolving(ctx, workspaceRoot, demanded, report, toolchain.ProvisioningOnlyRun(activeCommands)); err != nil {
 		return err
 	}
 	// Task toolchains are resolved for EVERY extension whose active commands
@@ -371,9 +373,9 @@ func resolveCommandRuntimeToolchains(
 	workspaceRoot string,
 	extensions []*extension.ExtensionDescription,
 	activeCommands map[string]bool,
-	mode toolchainResolutionMode,
+	mode toolchain.ToolchainResolutionMode,
 ) error {
-	if err := resolveRuntimeToolchainsForCommandsMode(ctx, workspaceRoot, extensions, activeCommands, os.Environ(), mode); err != nil {
+	if err := toolchain.ResolveRuntimeToolchainsForCommandsMode(ctx, workspaceRoot, extensions, activeCommands, os.Environ(), mode); err != nil {
 		return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
 			"resolve extension runtime toolchains: %v", err)
 	}
@@ -398,54 +400,6 @@ func commandRuntimeUse(
 		return firstHookRuntimeUse(ext, false)
 	}
 	return nil
-}
-
-func commandDependencyClosure(
-	extensions []*extension.ExtensionDescription,
-	commands []string,
-) map[string]bool {
-	active := make(map[string]bool, len(commands))
-	for _, command := range commands {
-		active[command] = true
-	}
-	changed := true
-	for changed {
-		changed = false
-		addDependency := func(rawDependency string) {
-			dependency := strings.TrimPrefix(strings.TrimSpace(rawDependency), "!")
-			if dependency != "" && !active[dependency] {
-				active[dependency] = true
-				changed = true
-			}
-		}
-		for _, ext := range extensions {
-			if ext == nil {
-				continue
-			}
-			for commandName, def := range ext.Jobs {
-				if def == nil {
-					continue
-				}
-				if !active[commandName] {
-					continue
-				}
-				for _, rawDependency := range def.CommandDependsOn {
-					addDependency(rawDependency)
-				}
-				// Session prerequisites are expanded by the planner after this
-				// synchronization stage. Include both their target command and their
-				// gates here so every extension runtime the final DAG can reference is
-				// ready before planning begins.
-				for _, prerequisite := range def.SessionPrerequisites {
-					addDependency(prerequisite.Command)
-					for _, gate := range prerequisite.DependsOn {
-						addDependency(gate)
-					}
-				}
-			}
-		}
-	}
-	return active
 }
 
 func firstHookRuntimeUse(ext *extension.ExtensionDescription, all bool) *extensionRuntimeUse {
@@ -693,7 +647,7 @@ func prepareOrLoadExtensionRuntimeWithDigestAndEnv(
 		for i, arg := range def.Prepare.Args {
 			args[i] = extension.ExpandTemplateVars(arg, vars)
 		}
-		env := applyRuntimeToolchains(prepareEnv, ext, def.Prepare.Toolchains)
+		env := toolchain.ApplyRuntimeToolchains(prepareEnv, ext, def.Prepare.Toolchains)
 		env = setEnv(env, "GOWORK", "off")
 		env = setEnv(env, "PUTNAMI_EXTENSION_ROOT", sourceRoot)
 		env = setEnv(env, "PWD", sourceRoot)
@@ -806,19 +760,19 @@ func extensionRuntimeDigest(ext *extension.ExtensionDescription) (string, error)
 		return "", err
 	}
 	h := sha256.New()
-	hashField(h, "schema", []byte(extensionRuntimeDigestVersion))
-	hashField(h, "extension", []byte(ext.Name))
-	hashField(h, "version", []byte(ext.Version))
-	hashField(h, "platform", []byte(runtime.GOOS+"/"+runtime.GOARCH))
-	hashField(h, "runtime-abi", []byte(fmt.Sprintf("%d", runtimeproto.RuntimeABIVersion)))
-	hashField(h, "toolchains", []byte(runtimeToolchainIdentityForRefs(ext, ext.Runtime.Prepare.Toolchains)))
+	cachekey.HashField(h, "schema", []byte(extensionRuntimeDigestVersion))
+	cachekey.HashField(h, "extension", []byte(ext.Name))
+	cachekey.HashField(h, "version", []byte(ext.Version))
+	cachekey.HashField(h, "platform", []byte(runtime.GOOS+"/"+runtime.GOARCH))
+	cachekey.HashField(h, "runtime-abi", []byte(fmt.Sprintf("%d", runtimeproto.RuntimeABIVersion)))
+	cachekey.HashField(h, "toolchains", []byte(toolchain.RuntimeToolchainIdentityForRefs(ext, ext.Runtime.Prepare.Toolchains)))
 	declaration, err := json.Marshal(ext.Runtime)
 	if err != nil {
 		return "", fmt.Errorf("marshal runtime declaration: %w", err)
 	}
-	hashField(h, "declaration", declaration)
+	cachekey.HashField(h, "declaration", declaration)
 	for _, input := range ext.Runtime.Prepare.Inputs {
-		hashField(h, "input-pattern", []byte(input))
+		cachekey.HashField(h, "input-pattern", []byte(input))
 	}
 	for _, rel := range inputs {
 		full := filepath.Join(root, filepath.FromSlash(rel))
@@ -826,12 +780,12 @@ func extensionRuntimeDigest(ext *extension.ExtensionDescription) (string, error)
 		if err != nil {
 			return "", fmt.Errorf("stat runtime input %s: %w", rel, err)
 		}
-		hashField(h, "input/"+rel+"/mode", []byte(fmt.Sprintf("%o", info.Mode()&(os.ModeType|0o111))))
+		cachekey.HashField(h, "input/"+rel+"/mode", []byte(fmt.Sprintf("%o", info.Mode()&(os.ModeType|0o111))))
 		file, err := os.Open(full)
 		if err != nil {
 			return "", fmt.Errorf("open runtime input %s: %w", rel, err)
 		}
-		if err := hashStream(h, "input/"+rel, info.Size(), file); err != nil {
+		if err := cachekey.HashStream(h, "input/"+rel, info.Size(), file); err != nil {
 			_ = file.Close()
 			return "", fmt.Errorf("hash runtime input %s: %w", rel, err)
 		}
@@ -1417,16 +1371,16 @@ const runtimeHandshakeDeadline = 10 * time.Second
 
 // runtimeHandshakeClock arms the deadline of one handshake. It is called exactly
 // once, after exec.Cmd.Start has returned, so process is the started runtime. It
-// returns the watch whose expired channel closes when the runtime's time to
+// returns the watch whose Expired channel closes when the runtime's time to
 // answer is over.
 //
-// Production arms hostProcessDeadline (hostHandshakeDeadline). A test
+// Production arms procdeadline.HostProcessDeadline (hostHandshakeDeadline). A test
 // substitutes a deadline it controls, so a timeout classification is asserted
 // without a budget that a loaded host could miss.
-type runtimeHandshakeClock func(process *os.Process) *processWatch
+type runtimeHandshakeClock func(process *os.Process) *procdeadline.ProcessWatch
 
-func hostHandshakeDeadline(process *os.Process) *processWatch {
-	return hostProcessDeadline(runtimeHandshakeDeadline).watch(process, nil)
+func hostHandshakeDeadline(process *os.Process) *procdeadline.ProcessWatch {
+	return procdeadline.HostProcessDeadline(runtimeHandshakeDeadline).Watch(process, nil)
 }
 
 // validateRuntimeHandshake proves the resolved executable really is the runtime
@@ -1444,10 +1398,10 @@ func hostHandshakeDeadline(process *os.Process) *processWatch {
 // every other fresh binary on a loaded machine. Once the runtime runs, the
 // deadline does not count the time it is ready to run and waits for a CPU
 // either. Neither consumes the runtime's own time, so neither is charged to
-// the deadline; uncountedTimeBound bounds both together instead. A deadline
-// that does fire is reported as runtime.handshake_timeout, with the measured
-// start, hold, CPU wait, run, and CPU times, so no reader mistakes load for a
-// malformed build.
+// the deadline; procdeadline.UncountedTimeBound bounds both together instead.
+// A deadline that does fire is reported as runtime.handshake_timeout, with the
+// measured start, hold, CPU wait, run, and CPU times, so no reader mistakes
+// load for a malformed build.
 func validateRuntimeHandshake(
 	ctx context.Context,
 	executable string,
@@ -1523,21 +1477,21 @@ func runRuntimeHandshake(
 	waited := make(chan error, 1)
 	go func() {
 		err := cmd.Wait()
-		deadline.stop()
+		deadline.Stop()
 		waited <- err
 	}()
 	deadlineFired := false
 	var runErr error
 	select {
 	case runErr = <-waited:
-	case <-deadline.expired:
+	case <-deadline.Expired():
 		deadlineFired = true
 		// A Kill error means the runtime ended at the same instant. Wait reports
 		// how it ended, and an answer that arrived in time is still honored below.
 		_ = cmd.Process.Kill()
 		runErr = <-waited
 	}
-	timing := deadline.stop()
+	timing := deadline.Stop()
 	if runErr != nil {
 		// A canceled caller context kills the process too. That is an
 		// interruption, not a runtime that ran out of time.
@@ -1588,17 +1542,17 @@ func runtimeHandshakeTimeout(
 	ext *extension.ExtensionDescription,
 	executable string,
 	starting time.Duration,
-	timing processTiming,
+	timing procdeadline.ProcessTiming,
 	cpu time.Duration,
 	stderr string,
 ) error {
-	if timing.uncountedPastBound {
+	if timing.UncountedPastBound {
 		return runtimeFailure(extensionproto.FailureRuntimeHandshakeTimeout,
 			"extension %q runtime-info timed out at its %s bound on time not counted, and the runtime was stopped: "+
 				"%s (starting the process took %s, not counted; CPU used %s). A runtime held or starved of CPU by a "+
 				"loaded host is not a malformed build: rerun when the machine is less loaded, and if it repeats run "+
 				"`%s __putnami runtime-info` by hand: stderr=%q: %s",
-			ext.Name, uncountedTimeBound, timing.uncounted(), starting.Round(time.Millisecond),
+			ext.Name, procdeadline.UncountedTimeBound, timing.Uncounted(), starting.Round(time.Millisecond),
 			cpu, executable, stderr, describeRuntimeExecutable(executable))
 	}
 	return runtimeFailure(extensionproto.FailureRuntimeHandshakeTimeout,
@@ -1606,8 +1560,8 @@ func runtimeHandshakeTimeout(
 			"(deadline %s, counted from its first instruction; starting the process took %s, not counted; "+
 			"%s; CPU used %s). A runtime blocked or starved of CPU is not a malformed build: rerun when the "+
 			"machine is less loaded, and if it repeats run `%s __putnami runtime-info` by hand: stderr=%q: %s",
-		ext.Name, timing.ran.Round(time.Millisecond), runtimeHandshakeDeadline, starting.Round(time.Millisecond),
-		timing.uncounted(), cpu, executable, stderr, describeRuntimeExecutable(executable))
+		ext.Name, timing.Ran.Round(time.Millisecond), runtimeHandshakeDeadline, starting.Round(time.Millisecond),
+		timing.Uncounted(), cpu, executable, stderr, describeRuntimeExecutable(executable))
 }
 
 // hashRuntimeReplacementTree fingerprints exactly the entries stageRuntimeSourceView
@@ -1625,13 +1579,13 @@ func hashRuntimeReplacementTree(h hash.Hash, label, root string) error {
 		if err != nil {
 			return err
 		}
-		hashField(h, label+"/"+rel+"/mode", []byte(fmt.Sprintf("%o", info.Mode()&(os.ModeType|0o111))))
+		cachekey.HashField(h, label+"/"+rel+"/mode", []byte(fmt.Sprintf("%o", info.Mode()&(os.ModeType|0o111))))
 		if entry.symlink {
 			target, err := os.Readlink(full)
 			if err != nil {
 				return err
 			}
-			hashField(h, label+"/"+rel, []byte(target))
+			cachekey.HashField(h, label+"/"+rel, []byte(target))
 			continue
 		}
 		if !info.Mode().IsRegular() {
@@ -1643,7 +1597,7 @@ func hashRuntimeReplacementTree(h hash.Hash, label, root string) error {
 		if err != nil {
 			return err
 		}
-		if err := hashStream(h, label+"/"+rel, info.Size(), file); err != nil {
+		if err := cachekey.HashStream(h, label+"/"+rel, info.Size(), file); err != nil {
 			_ = file.Close()
 			return fmt.Errorf("hash runtime replacement %s/%s: %w", label, rel, err)
 		}
@@ -1652,24 +1606,6 @@ func hashRuntimeReplacementTree(h hash.Hash, label, root string) error {
 		}
 	}
 	return nil
-}
-
-func hashField(h hash.Hash, label string, value []byte) {
-	_ = hashStream(h, label, int64(len(value)), bytes.NewReader(value))
-}
-
-func hashStream(h hash.Hash, label string, size int64, reader io.Reader) error {
-	if err := binary.Write(h, binary.LittleEndian, uint64(len(label))); err != nil {
-		return err
-	}
-	if _, err := io.WriteString(h, label); err != nil {
-		return err
-	}
-	if err := binary.Write(h, binary.LittleEndian, uint64(size)); err != nil {
-		return err
-	}
-	_, err := io.Copy(h, reader)
-	return err
 }
 
 // localDirectivePaths extracts local filesystem operands from simple Go

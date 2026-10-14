@@ -83,6 +83,8 @@ func writeExecutable(t *testing.T, path, contents string) {
 // executable mode elsewhere reopens the "text file busy" race that helper
 // closes. A mode the guard cannot read is refused too, except in a helper
 // listed here that sends every executable mode to writeExecutable itself.
+// The guard reads the tests of the packages split out of internal/jobs too,
+// and each package's own copy of writeExecutable must take the lock.
 func TestExecutableFixturesAreWrittenUnderTheForkLock(t *testing.T) {
 	t.Parallel()
 
@@ -94,6 +96,11 @@ func TestExecutableFixturesAreWrittenUnderTheForkLock(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Fatalf("glob package test files: %v (%d files)", err, len(files))
 	}
+	splitFiles, err := filepath.Glob(filepath.Join("*", "*_test.go"))
+	if err != nil {
+		t.Fatalf("glob split package test files: %v", err)
+	}
+	files = append(files, splitFiles...)
 	fset := token.NewFileSet()
 	helperTakesTheLock := false
 	routesToTheHelper := map[string]bool{}
@@ -108,12 +115,17 @@ func TestExecutableFixturesAreWrittenUnderTheForkLock(t *testing.T) {
 				continue
 			}
 			if fn.Name.Name == "writeExecutable" {
+				takesTheLock := false
 				ast.Inspect(fn.Body, func(node ast.Node) bool {
 					if call, ok := node.(*ast.CallExpr); ok && isSelector(call.Fun, "syscall", "ForkLock", "RLock") {
-						helperTakesTheLock = true
+						takesTheLock = true
 					}
 					return true
 				})
+				if !takesTheLock {
+					t.Errorf("%s: writeExecutable does not call syscall.ForkLock.RLock; a fork in a parallel test can inherit its descriptor", fset.Position(fn.Pos()))
+				}
+				helperTakesTheLock = helperTakesTheLock || takesTheLock
 				continue
 			}
 			ast.Inspect(fn.Body, func(node ast.Node) bool {

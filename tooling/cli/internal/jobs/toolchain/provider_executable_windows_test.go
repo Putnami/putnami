@@ -1,6 +1,6 @@
 //go:build windows
 
-package jobs
+package toolchain
 
 import (
 	"os"

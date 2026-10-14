@@ -1,4 +1,8 @@
-package jobs
+// Package toolchain resolves the runtime toolchains an extension declares
+// against the workspace lock: it probes each candidate executable, records the
+// resolution on the extension, derives the child environment a task runs with,
+// and names the identity every cache key carries for the toolchains a job uses.
+package toolchain
 
 import (
 	"context"
@@ -19,9 +23,13 @@ import (
 	"time"
 
 	model "go.putnami.dev/cli/model/extension"
+	"go.putnami.dev/cli/model/jobs"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/envkeys"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
+	"go.putnami.dev/tooling/cli/internal/jobs/procdeadline"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -30,7 +38,7 @@ import (
 
 const unavailableRuntimeToolchainIdentity = "unavailable"
 
-// toolchainProvisioningCommand is the well-known verb whose tasks install the
+// ToolchainProvisioningCommand is the well-known verb whose tasks install the
 // workspace's language ecosystem. Its run writes the files the lock's toolchain
 // pins derive from (go.work, package.json#packageManager), and `putnami install`
 // pins them only after it succeeds. Its toolchain references therefore resolve
@@ -40,38 +48,38 @@ const unavailableRuntimeToolchainIdentity = "unavailable"
 // reference that a planned job of another command also requires resolves
 // strictly, and a job of any other command never runs on a provisioning
 // resolution while a lock exists (RequirePlannedRuntimeToolchains,
-// ensureJobRuntimeToolchains). The prepare toolchains of a local-source
+// EnsureJobRuntimeToolchains). The prepare toolchains of a local-source
 // extension resolve the same way only in a run whose every active command is
-// toolchainProvisioningCommand (provisioningOnlyRun).
+// ToolchainProvisioningCommand (ProvisioningOnlyRun).
 //
 // extensionproto.WorkspaceFetchCommand resolves the same way: a hosted run
 // fetches the dependencies before the installers run, so the fetch starts
-// before the pinned toolchain may be installed (isToolchainProvisioningCommand).
-const toolchainProvisioningCommand = "workspace-install"
+// before the pinned toolchain may be installed (IsToolchainProvisioningCommand).
+const ToolchainProvisioningCommand = "workspace-install"
 
-// isToolchainProvisioningCommand reports whether command, or the command a
-// pipeline step job belongs to, is toolchainProvisioningCommand or
+// IsToolchainProvisioningCommand reports whether command, or the command a
+// pipeline step job belongs to, is ToolchainProvisioningCommand or
 // extensionproto.WorkspaceFetchCommand, which runs before it.
-func isToolchainProvisioningCommand(command string) bool {
+func IsToolchainProvisioningCommand(command string) bool {
 	switch extensionproto.BaseCommandName(command) {
-	case toolchainProvisioningCommand, extensionproto.WorkspaceFetchCommand:
+	case ToolchainProvisioningCommand, extensionproto.WorkspaceFetchCommand:
 		return true
 	}
 	return false
 }
 
-// provisioningOnlyRun reports whether the run's active commands, dependency
-// closure included, are all toolchainProvisioningCommand. Such a run starts no
+// ProvisioningOnlyRun reports whether the run's active commands, dependency
+// closure included, are all ToolchainProvisioningCommand. Such a run starts no
 // job or hook that another command's pin is meant to stop, so its extension
 // runtimes may be prepared without a usable pin. A prepared runtime's digest
 // carries the unavailable identity, so it is never served to a pinned run.
-func provisioningOnlyRun(activeCommands map[string]bool) bool {
+func ProvisioningOnlyRun(activeCommands map[string]bool) bool {
 	provisioning := false
 	for command, active := range activeCommands {
 		if !active {
 			continue
 		}
-		if !isToolchainProvisioningCommand(command) {
+		if !IsToolchainProvisioningCommand(command) {
 			return false
 		}
 		provisioning = true
@@ -82,7 +90,7 @@ func provisioningOnlyRun(activeCommands map[string]bool) bool {
 // runtimeToolchainMu guards every read and write of
 // ExtensionDescription.RuntimeToolchains. Resolution normally completes in the
 // single-threaded synchronization stage, but a hand-built or internal job can
-// still reach ensureJobRuntimeToolchains from a scheduler worker, and the same
+// still reach EnsureJobRuntimeToolchains from a scheduler worker, and the same
 // extension description is shared by every job that uses it. The critical
 // sections are a map lookup or one probe, so serializing them also stops two
 // workers from probing the same executable twice.
@@ -106,19 +114,19 @@ func resolveRuntimeToolchainsForCommands(
 }
 
 func resolveRuntimeToolchainsForCommandsContext(ctx context.Context, workspaceRoot string, exts []*model.ExtensionDescription, activeCommands map[string]bool, base []string) error {
-	return resolveRuntimeToolchainsForCommandsMode(ctx, workspaceRoot, exts, activeCommands, base, resolveStrict)
+	return ResolveRuntimeToolchainsForCommandsMode(ctx, workspaceRoot, exts, activeCommands, base, ResolveStrict)
 }
 
-// resolveRuntimeToolchainsForCommandsMode resolves the aliases only
-// toolchainProvisioningCommand reaches as if optional, and every other one
+// ResolveRuntimeToolchainsForCommandsMode resolves the aliases only
+// ToolchainProvisioningCommand reaches as if optional, and every other one
 // with mode.
-func resolveRuntimeToolchainsForCommandsMode(ctx context.Context, workspaceRoot string, exts []*model.ExtensionDescription, activeCommands map[string]bool, base []string, mode toolchainResolutionMode) error {
+func ResolveRuntimeToolchainsForCommandsMode(ctx context.Context, workspaceRoot string, exts []*model.ExtensionDescription, activeCommands map[string]bool, base []string, mode ToolchainResolutionMode) error {
 	for _, ext := range exts {
 		required, provisioning := commandRuntimeToolchainRefSets(ext, activeCommands)
 		if err := resolveRuntimeToolchainRefs(ctx, workspaceRoot, ext, required, base, mode); err != nil {
 			return err
 		}
-		if err := resolveRuntimeToolchainRefs(ctx, workspaceRoot, ext, provisioning, base, resolveProvisioning); err != nil {
+		if err := resolveRuntimeToolchainRefs(ctx, workspaceRoot, ext, provisioning, base, ResolveProvisioning); err != nil {
 			return err
 		}
 	}
@@ -138,7 +146,7 @@ func commandRuntimeToolchainRefs(ext *model.ExtensionDescription, activeCommands
 
 // commandRuntimeToolchainRefSets returns the sorted toolchain aliases the
 // active commands of one extension can require, split by how they resolve.
-// provisioning holds the aliases only toolchainProvisioningCommand reaches;
+// provisioning holds the aliases only ToolchainProvisioningCommand reaches;
 // required holds every other one, including an alias the provisioning command
 // shares with another active command. The two sets never overlap.
 //
@@ -156,7 +164,7 @@ func commandRuntimeToolchainRefSets(ext *model.ExtensionDescription, activeComma
 			continue
 		}
 		refs := strict
-		if isToolchainProvisioningCommand(commandName) {
+		if IsToolchainProvisioningCommand(commandName) {
 			refs = lenient
 		}
 		for _, ref := range def.Toolchains {
@@ -181,10 +189,10 @@ func commandRuntimeToolchainRefSets(ext *model.ExtensionDescription, activeComma
 	return sortedRuntimeToolchainRefs(strict), sortedRuntimeToolchainRefs(lenient)
 }
 
-// resolveRuntimeToolchainsForPreparation resolves the prepare toolchains of
+// ResolveRuntimeToolchainsForPreparation resolves the prepare toolchains of
 // every local-source extension, strictly unless provisioning (see
-// provisioningOnlyRun).
-func resolveRuntimeToolchainsForPreparation(ctx context.Context, workspaceRoot string, exts []*model.ExtensionDescription, base []string, provisioning bool) error {
+// ProvisioningOnlyRun).
+func ResolveRuntimeToolchainsForPreparation(ctx context.Context, workspaceRoot string, exts []*model.ExtensionDescription, base []string, provisioning bool) error {
 	for _, ext := range exts {
 		if ext == nil || ext.Runtime == nil || ext.Runtime.Prepare == nil || !ext.LocalSource {
 			continue
@@ -196,24 +204,24 @@ func resolveRuntimeToolchainsForPreparation(ctx context.Context, workspaceRoot s
 	return nil
 }
 
-// ensureJobRuntimeToolchains resolves what a job requires and the run has not
+// EnsureJobRuntimeToolchains resolves what a job requires and the run has not
 // resolved yet. RequirePlannedRuntimeToolchains calls it for each planned job
 // before any key exists, which resolves the toolchains synchronization left
-// unresolved (resolveDeferred). At execution it is the backstop for a job
+// unresolved (ResolveDeferred). At execution it is the backstop for a job
 // neither stage covered — an internal job, or a plan a test builds by hand. Such
 // a job has already been keyed without its toolchain identity, so the backstop
 // keeps it correct; it does not replace resolveRuntimeToolchainsForCommands.
 //
-// A job of toolchainProvisioningCommand resolves what is missing as if
+// A job of ToolchainProvisioningCommand resolves what is missing as if
 // optional. A job of any other command resolves it strictly, and it also
 // refuses a required toolchain the run already resolved unavailable once a lock
 // exists: only a provisioning resolution produces that state, and it must not
 // reach a command the missing pin is meant to stop.
-func ensureJobRuntimeToolchains(ws *workspace.Workspace, job *ScheduledJob) error {
+func EnsureJobRuntimeToolchains(ws *workspace.Workspace, job *jobs.ScheduledJob) error {
 	if job == nil || job.Extension == nil || job.JobDef == nil || len(job.JobDef.Toolchains) == 0 {
 		return nil
 	}
-	provisioning := isToolchainProvisioningCommand(job.CommandName())
+	provisioning := IsToolchainProvisioningCommand(job.CommandName())
 	runtimeToolchainMu.Lock()
 	missing := make([]string, 0, len(job.JobDef.Toolchains))
 	var unavailable []string
@@ -241,26 +249,6 @@ func ensureJobRuntimeToolchains(ws *workspace.Workspace, job *ScheduledJob) erro
 	return resolveRuntimeToolchainRefs(context.Background(), ws.Root, job.Extension, missing, os.Environ(), provisioningMode(provisioning))
 }
 
-// RequirePlannedRuntimeToolchains resolves, before any planned job runs or is
-// served from the cache, each toolchain a planned job requires that runtime
-// synchronization left unresolved (resolveDeferred). A job of another command
-// is checked before a job of toolchainProvisioningCommand, so an alias both
-// need resolves strictly. The error is the one strict resolution returns.
-func RequirePlannedRuntimeToolchains(ws *workspace.Workspace, planned []*ScheduledJob) error {
-	for _, provisioning := range []bool{false, true} {
-		for _, job := range planned {
-			if job == nil || isToolchainProvisioningCommand(job.CommandName()) != provisioning {
-				continue
-			}
-			if err := ensureJobRuntimeToolchains(ws, job); err != nil {
-				return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
-					"resolve extension runtime toolchains: %v", err)
-			}
-		}
-	}
-	return nil
-}
-
 // requiredRuntimeToolchain reports whether ext declares ref as a required
 // toolchain. The caller holds runtimeToolchainMu.
 func requiredRuntimeToolchain(ext *model.ExtensionDescription, ref string) bool {
@@ -285,42 +273,45 @@ func refuseProvisioningRuntimeToolchains(workspaceRoot string, ext *model.Extens
 	}
 	ref := slices.Min(refs)
 	return fmt.Errorf("resolve extension %q runtime toolchain %q: workspace lock has no usable %q pin; only %s and %s run without one",
-		ext.Name, ref, ext.Runtime.Toolchains[ref].Lock, extensionproto.WorkspaceFetchCommand, toolchainProvisioningCommand)
+		ext.Name, ref, ext.Runtime.Toolchains[ref].Lock, extensionproto.WorkspaceFetchCommand, ToolchainProvisioningCommand)
 }
 
-func resolveRuntimeToolchains(workspaceRoot string, ext *model.ExtensionDescription, refs []string, base []string) error {
+// ResolveRuntimeToolchains resolves refs of ext strictly against the workspace
+// lock of workspaceRoot, probing candidates with base, and records each
+// resolution on ext.
+func ResolveRuntimeToolchains(workspaceRoot string, ext *model.ExtensionDescription, refs []string, base []string) error {
 	return resolveRuntimeToolchainsContext(context.Background(), workspaceRoot, ext, refs, base)
 }
 
 func resolveRuntimeToolchainsContext(ctx context.Context, workspaceRoot string, ext *model.ExtensionDescription, refs []string, base []string) error {
-	return resolveRuntimeToolchainRefs(ctx, workspaceRoot, ext, refs, base, resolveStrict)
+	return resolveRuntimeToolchainRefs(ctx, workspaceRoot, ext, refs, base, ResolveStrict)
 }
 
-// toolchainResolutionMode is what a required toolchain the workspace lock does
+// ToolchainResolutionMode is what a required toolchain the workspace lock does
 // not satisfy becomes: no pin, no host integrity, or no matching candidate.
-type toolchainResolutionMode int
+type ToolchainResolutionMode int
 
 const (
-	// resolveStrict fails the resolution.
-	resolveStrict toolchainResolutionMode = iota
-	// resolveProvisioning records the unavailable identity, as for an optional
-	// toolchain (see toolchainProvisioningCommand).
-	resolveProvisioning
-	// resolveDeferred records nothing. A command's toolchains resolve before
+	// ResolveStrict fails the resolution.
+	ResolveStrict ToolchainResolutionMode = iota
+	// ResolveProvisioning records the unavailable identity, as for an optional
+	// toolchain (see ToolchainProvisioningCommand).
+	ResolveProvisioning
+	// ResolveDeferred records nothing. A command's toolchains resolve before
 	// planning, so a run may reach an alias that no job it plans requires: an
 	// extension with no project of its language plans no job.
 	// RequirePlannedRuntimeToolchains fails the run only when a planned job
 	// requires the alias.
-	resolveDeferred
+	ResolveDeferred
 )
 
-// provisioningMode is resolveProvisioning when provisioning holds, and
-// resolveStrict otherwise.
-func provisioningMode(provisioning bool) toolchainResolutionMode {
+// provisioningMode is ResolveProvisioning when provisioning holds, and
+// ResolveStrict otherwise.
+func provisioningMode(provisioning bool) ToolchainResolutionMode {
 	if provisioning {
-		return resolveProvisioning
+		return ResolveProvisioning
 	}
-	return resolveStrict
+	return ResolveStrict
 }
 
 // markRuntimeToolchainProbes records that the run starts repository code
@@ -337,7 +328,7 @@ func markRuntimeToolchainProbes(workspaceRoot string, ext *model.ExtensionDescri
 // resolveRuntimeToolchainRefs resolves refs against the workspace lock and
 // records each resolution on ext. mode decides what a required ref the lock
 // does not satisfy becomes.
-func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext *model.ExtensionDescription, refs []string, base []string, mode toolchainResolutionMode) error {
+func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext *model.ExtensionDescription, refs []string, base []string, mode ToolchainResolutionMode) error {
 	if len(refs) == 0 {
 		return nil
 	}
@@ -391,8 +382,8 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 		if !declared {
 			return fmt.Errorf("resolve extension %q runtime toolchain %q: declaration is missing", ext.Name, ref)
 		}
-		optional := requirement.Optional || mode == resolveProvisioning
-		deferred := !optional && mode == resolveDeferred
+		optional := requirement.Optional || mode == ResolveProvisioning
+		deferred := !optional && mode == ResolveDeferred
 		entry, pinned := locked.GetToolchain(requirement.Lock)
 		if !pinned || strings.TrimSpace(entry.Version) == "" {
 			if optional {
@@ -414,7 +405,7 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 			if deferred {
 				continue
 			}
-			return fmt.Errorf("resolve extension %q runtime toolchain %q: workspace lock has no integrity for %s", ext.Name, ref, HostPlatform())
+			return fmt.Errorf("resolve extension %q runtime toolchain %q: workspace lock has no integrity for %s", ext.Name, ref, machineprobe.HostPlatform())
 		}
 		resolution, rejections, found := resolveRuntimeToolchain(ctx, workspaceRoot, requirement, entry.Version, integrity, base)
 		if ctx.Err() != nil {
@@ -436,7 +427,7 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 					// ended, ReportProvisionedRuntimeToolchains probes again and
 					// warns only about a toolchain that is still missing.
 					//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
-					slog.Debug("runtime toolchain: "+toolchainProvisioningCommand+" starts before the pinned toolchain is installed; no candidate matched the locked version",
+					slog.Debug("runtime toolchain: "+ToolchainProvisioningCommand+" starts before the pinned toolchain is installed; no candidate matched the locked version",
 						"extension", ext.Name, "toolchain", ref, "version", entry.Version, "rejections", detail)
 				}
 				ext.RuntimeToolchains[ref] = unavailableRuntimeToolchainResolution(requirement, entry)
@@ -453,7 +444,7 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 }
 
 // ReportProvisionedRuntimeToolchains reports, once a run of
-// toolchainProvisioningCommand ended, on each required toolchain the run
+// ToolchainProvisioningCommand ended, on each required toolchain the run
 // resolved unavailable while the lock pins it for this host: no candidate
 // matched the pin when the run started, and installing it can be what the run
 // did. Each is probed again. One that now resolves is reported at info level;
@@ -464,14 +455,14 @@ func resolveRuntimeToolchainRefs(ctx context.Context, workspaceRoot string, ext 
 //
 // The extensions are exts and those of the planned jobs, each once: a run that
 // plans a copy of an extension resolves the copy its jobs carry.
-func ReportProvisionedRuntimeToolchains(ctx context.Context, workspaceRoot string, exts []*model.ExtensionDescription, planned []*ScheduledJob, commands []string) {
+func ReportProvisionedRuntimeToolchains(ctx context.Context, workspaceRoot string, exts []*model.ExtensionDescription, planned []*jobs.ScheduledJob, commands []string) {
 	exts = slices.Clone(exts)
 	for _, job := range planned {
 		if job != nil && job.Extension != nil && !slices.Contains(exts, job.Extension) {
 			exts = append(exts, job.Extension)
 		}
 	}
-	if ctx.Err() != nil || !provisioningCommandActive(commandDependencyClosure(exts, commands)) {
+	if ctx.Err() != nil || !provisioningCommandActive(CommandDependencyClosure(exts, commands)) {
 		return
 	}
 	locked, err := lockfile.ReadLockFile(workspaceRoot)
@@ -515,23 +506,23 @@ func ReportProvisionedRuntimeToolchains(ctx context.Context, workspaceRoot strin
 			return
 		}
 		if found {
-			slog.Info("runtime toolchain: "+toolchainProvisioningCommand+" installed the pinned toolchain",
+			slog.Info("runtime toolchain: "+ToolchainProvisioningCommand+" installed the pinned toolchain",
 				"extension", probe.extension, "toolchain", probe.ref, "version", probe.entry.Version)
 			continue
 		}
 		//nolint:gosec // G706 false positive: dynamic values are structured slog attributes, not a format string.
-		slog.Warn("runtime toolchain: the pinned toolchain is still unavailable after "+toolchainProvisioningCommand+"; no candidate matched the locked version",
+		slog.Warn("runtime toolchain: the pinned toolchain is still unavailable after "+ToolchainProvisioningCommand+"; no candidate matched the locked version",
 			"extension", probe.extension, "toolchain", probe.ref, "version", probe.entry.Version,
 			"rejections", runtimeToolchainRejectionText(rejections))
 	}
 }
 
-// provisioningCommandActive reports whether toolchainProvisioningCommand is
+// provisioningCommandActive reports whether ToolchainProvisioningCommand is
 // among the active commands. A fetch alone installs no toolchain: the
 // installers that run after it do, and their run reports.
 func provisioningCommandActive(activeCommands map[string]bool) bool {
 	for command, active := range activeCommands {
-		if active && extensionproto.BaseCommandName(command) == toolchainProvisioningCommand {
+		if active && extensionproto.BaseCommandName(command) == ToolchainProvisioningCommand {
 			return true
 		}
 	}
@@ -641,14 +632,14 @@ func resolveRuntimeToolchain(ctx context.Context, workspaceRoot string, requirem
 		}
 		probeEnv := append([]string(nil), base...)
 		for _, name := range requirement.Probe.Unset {
-			probeEnv = removeEnvKey(probeEnv, name)
+			probeEnv = envkeys.Host.Remove(probeEnv, name)
 		}
 		for name, value := range requirement.Probe.Environment {
-			probeEnv = setEnv(probeEnv, name, strings.ReplaceAll(value, extensionproto.RuntimeToolchainVersionToken, version))
+			probeEnv = envkeys.Host.Set(probeEnv, name, strings.ReplaceAll(value, extensionproto.RuntimeToolchainVersionToken, version))
 		}
-		probeEnv = prependEnvPath(probeEnv, filepath.Dir(realExecutable))
+		probeEnv = PrependPathWith(envkeys.Host, probeEnv, filepath.Dir(realExecutable))
 		got, err := probeRuntimeToolchain(ctx, realExecutable, requirement.Probe.Args, probeEnv,
-			hostProcessDeadline(runtimeToolchainProbeTimeout(ctx)))
+			procdeadline.HostProcessDeadline(runtimeToolchainProbeTimeout(ctx)))
 		if err != nil {
 			rejections = append(rejections, runtimeToolchainRejection{candidate: label, reason: err.Error(), err: err})
 			continue
@@ -737,9 +728,9 @@ func hostedWorkspaceProgram(workspaceRoot string) func(string) bool {
 func runtimeToolchainCandidateEnv(workspaceRoot string, base []string) []string {
 	env := append([]string(nil), base...)
 	if workspaceRoot == "" {
-		return removeEnvKey(env, runtimeToolchainWorkspaceRootEnv)
+		return envkeys.Host.Remove(env, runtimeToolchainWorkspaceRootEnv)
 	}
-	return setEnv(env, runtimeToolchainWorkspaceRootEnv, workspaceRoot)
+	return envkeys.Host.Set(env, runtimeToolchainWorkspaceRootEnv, workspaceRoot)
 }
 
 func runtimeToolchainCandidatePath(workspaceRoot string, candidate extensionproto.RuntimeToolchainCandidate, version string, base []string) string {
@@ -749,7 +740,7 @@ func runtimeToolchainCandidatePath(workspaceRoot string, candidate extensionprot
 	case extensionproto.RuntimeToolchainCandidatePath:
 		path = lookupRuntimePath(base, rel)
 	case extensionproto.RuntimeToolchainCandidateEnvironment:
-		if root := strings.TrimSpace(envLastValue(base, candidate.Environment)); root != "" {
+		if root := strings.TrimSpace(envkeys.Host.Last(base, candidate.Environment)); root != "" {
 			path = filepath.Join(root, rel)
 		}
 	case extensionproto.RuntimeToolchainCandidateHome:
@@ -759,13 +750,13 @@ func runtimeToolchainCandidatePath(workspaceRoot string, candidate extensionprot
 	case extensionproto.RuntimeToolchainCandidatePutnamiHome:
 		path = filepath.Join(PutnamiHome(workspaceRoot, base), rel)
 	}
-	return withExecutableSuffix(runtime.GOOS, path)
+	return WithExecutableSuffix(runtime.GOOS, path)
 }
 
-// withExecutableSuffix adds ".exe" to a Windows path that has no extension. An
+// WithExecutableSuffix adds ".exe" to a Windows path that has no extension. An
 // empty path stays empty: the candidate expanded to nothing, and
 // unexpandedCandidateReason says why.
-func withExecutableSuffix(goos, path string) string {
+func WithExecutableSuffix(goos, path string) string {
 	if goos == "windows" && path != "" && filepath.Ext(path) == "" {
 		return path + ".exe"
 	}
@@ -793,7 +784,7 @@ func unexpandedCandidateReason(candidate extensionproto.RuntimeToolchainCandidat
 // of a runtime toolchain is relative to, so everything the CLI reads or writes
 // beside a toolchain resolves the home through it.
 func PutnamiHome(workspaceRoot string, env []string) string {
-	if root := strings.TrimSpace(envLastValue(env, "PUTNAMI_HOME")); root != "" {
+	if root := strings.TrimSpace(envkeys.Host.Last(env, "PUTNAMI_HOME")); root != "" {
 		return filepath.Clean(root)
 	}
 	if home := runtimeHomeDir(env); home != "" {
@@ -809,7 +800,7 @@ func PutnamiHome(workspaceRoot string, env []string) string {
 // it is also empty in a stripped environment, which would silently skip the
 // candidate instead of finding the tool.
 func runtimeHomeDir(env []string) string {
-	if home := strings.TrimSpace(envLastValue(env, runtimeHomeEnvName())); home != "" {
+	if home := strings.TrimSpace(envkeys.Host.Last(env, runtimeHomeEnvName())); home != "" {
 		return filepath.Clean(home)
 	}
 	home, err := os.UserHomeDir()
@@ -830,7 +821,7 @@ func runtimeHomeEnvName() string {
 }
 
 func lookupRuntimePath(env []string, name string) string {
-	for _, dir := range filepath.SplitList(envLastValue(env, "PATH")) {
+	for _, dir := range filepath.SplitList(envkeys.Host.Last(env, "PATH")) {
 		if dir == "" {
 			continue
 		}
@@ -881,7 +872,7 @@ func runtimeToolchainProbeTimeout(ctx context.Context) time.Duration {
 // version: a timeout (ErrToolchainProbeTimeout), a failed start, a failed
 // exit, output that stays open after the probe exits, or output that is
 // empty, too long, or spans several lines.
-func probeRuntimeToolchain(ctx context.Context, path string, args, env []string, deadline processDeadline) (string, error) {
+func probeRuntimeToolchain(ctx context.Context, path string, args, env []string, deadline procdeadline.ProcessDeadline) (string, error) {
 	probeCtx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
 	out := &boundedBuffer{limit: toolVersionProbeOutputLimit}
@@ -894,8 +885,8 @@ func probeRuntimeToolchain(ctx context.Context, path string, args, env []string,
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("probe failed to start: %w", err)
 	}
-	if timing, err := waitUnderDeadline(cmd, deadline, cancel); err != nil {
-		if ctx.Err() == nil && errors.Is(context.Cause(probeCtx), errProcessDeadline) {
+	if timing, err := procdeadline.WaitUnderDeadline(cmd, deadline, cancel); err != nil {
+		if ctx.Err() == nil && errors.Is(context.Cause(probeCtx), procdeadline.ErrProcessDeadline) {
 			return "", probeTimeout(deadline, timing)
 		}
 		if errors.Is(err, exec.ErrWaitDelay) {
@@ -925,12 +916,12 @@ func probeRuntimeToolchain(ctx context.Context, path string, args, env []string,
 // probeTimeout reports a probe whose deadline fired, with the time the
 // deadline did not count. A mismatch joins the reasons of its candidates with
 // "; ", so the text holds none.
-func probeTimeout(deadline processDeadline, timing processTiming) error {
-	if timing.uncountedPastBound {
+func probeTimeout(deadline procdeadline.ProcessDeadline, timing procdeadline.ProcessTiming) error {
+	if timing.UncountedPastBound {
 		return fmt.Errorf("%w at its %s bound on time not counted: %s",
-			ErrToolchainProbeTimeout, deadline.uncounted, timing.uncounted())
+			ErrToolchainProbeTimeout, deadline.Uncounted, timing.Uncounted())
 	}
-	return fmt.Errorf("%w after %s: %s", ErrToolchainProbeTimeout, deadline.run, timing.uncounted())
+	return fmt.Errorf("%w after %s: %s", ErrToolchainProbeTimeout, deadline.Run, timing.Uncounted())
 }
 
 func deriveRuntimeToolchainEnvironment(executable, version string, bindings map[string]extensionproto.RuntimeToolchainEnvironment) (map[string]string, bool) {
@@ -976,7 +967,7 @@ func validateResolvedRuntimeToolchainEnvironment(ext *model.ExtensionDescription
 	return nil
 }
 
-// applyRuntimeToolchains builds the child environment of a subprocess bound to
+// ApplyRuntimeToolchains builds the child environment of a subprocess bound to
 // the given resolved toolchains.
 //
 // The child's PATH is minimal in the only sense PATH can express safely: the
@@ -994,7 +985,7 @@ func validateResolvedRuntimeToolchainEnvironment(ext *model.ExtensionDescription
 // between the pinned tool winning and every co-located tool staying reachable;
 // this takes both by ordering, and pays for it by not defending against a child
 // that rebuilds PATH from scratch — which no longer inherits ours anyway.
-func applyRuntimeToolchains(base []string, ext *model.ExtensionDescription, refs []string) []string {
+func ApplyRuntimeToolchains(base []string, ext *model.ExtensionDescription, refs []string) []string {
 	env, _ := applyRuntimeToolchainsContext(context.Background(), base, ext, refs)
 	return env
 }
@@ -1023,7 +1014,7 @@ func applyRuntimeToolchainsContext(ctx context.Context, base []string, ext *mode
 			// tool; it never runs against a binary the lock did not pin.
 			for name, binding := range declaration.Environment {
 				if binding.From == extensionproto.RuntimeToolchainEnvironmentExecutable {
-					env = setEnv(env, name, "")
+					env = envkeys.Host.Set(env, name, "")
 				}
 			}
 			continue
@@ -1032,14 +1023,14 @@ func applyRuntimeToolchainsContext(ctx context.Context, base []string, ext *mode
 			resolvedDirs = append(resolvedDirs, filepath.Dir(resolution.Executable))
 		}
 		for name, value := range resolution.Environment {
-			env = setEnv(env, name, value)
+			env = envkeys.Host.Set(env, name, value)
 		}
 	}
 	runtimeToolchainMu.Unlock()
 	if len(resolvedDirs) == 0 {
 		return env, nil
 	}
-	return setEnv(env, "PATH", minimalRuntimePath(envLastValue(env, "PATH"), resolvedDirs)), nil
+	return envkeys.Host.Set(env, "PATH", minimalRuntimePath(envkeys.Host.Last(env, "PATH"), resolvedDirs)), nil
 }
 
 // ProviderRuntimeEnvironment applies the same already-resolved toolchain
@@ -1182,7 +1173,10 @@ func minimalRuntimePath(path string, resolvedDirs []string) string {
 	return strings.Join(kept, string(filepath.ListSeparator))
 }
 
-func runtimeToolchainIdentityForRefs(ext *model.ExtensionDescription, refs []string) string {
+// RuntimeToolchainIdentityForRefs returns the cache-key identity of refs of
+// ext: each alias, in sorted order, with the identity it resolved to, or
+// "unresolved". It is empty when refs is.
+func RuntimeToolchainIdentityForRefs(ext *model.ExtensionDescription, refs []string) string {
 	if ext == nil || len(refs) == 0 {
 		return ""
 	}
@@ -1205,15 +1199,15 @@ func runtimeToolchainIdentityForRefs(ext *model.ExtensionDescription, refs []str
 func runtimeToolchainIdentity(requirement extensionproto.RuntimeToolchain, version, integrity string, available bool) string {
 	h := sha256.New()
 	declaration, _ := json.Marshal(requirement)
-	hashField(h, "declaration", declaration)
-	hashField(h, "version", []byte(version))
-	hashField(h, "platform", []byte(HostPlatform()))
-	hashField(h, "integrity", []byte(integrity))
+	cachekey.HashField(h, "declaration", declaration)
+	cachekey.HashField(h, "version", []byte(version))
+	cachekey.HashField(h, "platform", []byte(machineprobe.HostPlatform()))
+	cachekey.HashField(h, "integrity", []byte(integrity))
 	availability := unavailableRuntimeToolchainIdentity
 	if available {
 		availability = "available"
 	}
-	hashField(h, "availability", []byte(availability))
+	cachekey.HashField(h, "availability", []byte(availability))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
