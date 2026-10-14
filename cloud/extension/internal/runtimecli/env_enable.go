@@ -261,11 +261,15 @@ func (r envEnableRun) report(row EnvDoctorRow, action string) EnvEnableStep {
 	return step
 }
 
-// unchecked is a row the server could not judge: this command does not write
-// on a guess.
+// unchecked is a row the server could not judge, or one in a state this
+// step does not write for: this command does not write on a guess.
 func (r envEnableRun) unchecked(row EnvDoctorRow, action string) EnvEnableStep {
+	reason := "the row could not be checked"
+	if row.Status == EnvDoctorDegraded {
+		reason = "this step writes only a missing row"
+	}
 	return EnvEnableStep{Row: row.ID, Action: action, Status: EnvEnableReported,
-		Detail: "not written: the row could not be checked (" + row.Detail + ")", Fix: row.Fix}
+		Detail: "not written: " + reason + " (" + row.Detail + ")", Fix: row.Fix}
 }
 
 func (r envEnableRun) activateBinding(row EnvDoctorRow, protocol string) (EnvEnableStep, bool) {
@@ -347,6 +351,15 @@ func (r envEnableRun) acceptDefinition(row EnvDoctorRow) (EnvEnableStep, bool) {
 		return EnvEnableStep{Row: row.ID, Action: action, Status: EnvEnableFailed, Detail: "control-api answered no acceptance receipt", Fix: row.Fix}, false
 	}
 	revision, accepted := clicore.Deref(receipt.Revision), envDoctorPrintable(clicore.Deref(receipt.SourceRevision))
+	if revision < expected && row.Status == EnvDoctorDegraded {
+		// Control keeps one revision per commit: a commit a later revision
+		// replaced replays its old revision and never becomes the latest
+		// again, so the degraded row cannot converge from this commit.
+		return EnvEnableStep{Row: row.ID, Action: action, Status: EnvEnableFailed,
+			Detail: fmt.Sprintf("source revision %s (%s) was accepted as revision %d, and Control keeps revision %d: it does not accept a commit a later revision replaced",
+				accepted, source, revision, expected),
+			Fix: "push a new commit to the default branch, then run `putnami cloud env enable " + r.environment + "` again"}, false
+	}
 	if revision <= expected {
 		detail := fmt.Sprintf("source revision %s (%s) is already accepted as revision %d", accepted, source, revision)
 		if revision < expected {

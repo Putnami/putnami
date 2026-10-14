@@ -797,3 +797,46 @@ func TestEnvEnableAcceptsADegradedDefinition(t *testing.T) {
 		t.Fatalf("result = %+v, want ready with no degraded row after the acceptance", result)
 	}
 }
+
+// TestEnvEnableFailsWhenADegradedDefinitionReplaysAReplacedCommit covers the
+// case the accept route cannot converge: the default-branch head was accepted
+// as revision 1, a later revision accepted another commit, and the head's
+// declaration differs from it. Control replays revision 1 and keeps revision
+// 3, so the row stays degraded: the step fails and says what to do instead
+// of reading skipped.
+func TestEnvEnableFailsWhenADegradedDefinitionReplaysAReplacedCommit(t *testing.T) {
+	server := freshWorkspace()
+	server.beforeRows = map[string]string{"environment-definition": EnvDoctorDegraded}
+	server.afterRows = nil
+	server.acceptedRevision = 3
+	server.acceptedSources = map[string]int64{enableHead: 1, strings.Repeat("c", 40): 3}
+	srv := httptest.NewServer(server)
+	defer srv.Close()
+
+	_, err := runEnvEnable(t, doctorWorkspace(t), srv, map[string]any{"output": "json"})
+	if clicore.ExitCode(err) != clicore.ExitFailure {
+		t.Fatalf("exit = %d (%v), want failure", clicore.ExitCode(err), err)
+	}
+	if server.appended != 0 {
+		t.Fatalf("appended = %d, want the replay alone", server.appended)
+	}
+	envelope := &captureIO{}
+	clicore.WriteErrorResult(err, map[string]any{"output": "json"}, envelope.io(nil))
+	step := stepsByRow(decodeEnableResult(t, envelope.stdout))["environment-definition"][0]
+	if step.Status != EnvEnableFailed ||
+		step.Detail != "source revision "+enableHead+" (the default-branch head) was accepted as revision 1, and Control keeps revision 3: it does not accept a commit a later revision replaced" ||
+		step.Fix != "push a new commit to the default branch, then run `putnami cloud env enable prod` again" {
+		t.Fatalf("step = %+v, want a failed step naming the replaced commit", step)
+	}
+}
+
+// TestEnvEnableDoesNotWriteADegradedBinding keeps the binding steps to the
+// state they converge: a degraded binding row is reported with its fix and
+// says why, not that it could not be checked.
+func TestEnvEnableDoesNotWriteADegradedBinding(t *testing.T) {
+	run := envEnableRun{environment: "prod", namespace: "acme"}
+	step, refused := run.activateBinding(EnvDoctorRow{ID: "put-binding", Status: EnvDoctorDegraded, Detail: "d", Fix: "f"}, "put")
+	if refused || step.Status != EnvEnableReported || step.Detail != "not written: this step writes only a missing row (d)" || step.Fix != "f" {
+		t.Fatalf("step = %+v", step)
+	}
+}
