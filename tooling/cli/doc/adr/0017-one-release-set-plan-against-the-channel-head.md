@@ -1,6 +1,8 @@
 # ADR 0017 — One release-set plan, measured against the channel head
 
-- **Status**: accepted. A run whose credential provider negotiates
+- **Status**: accepted, amended by
+  [ADR 0066](0066-a-main-publication-releases-what-its-pull-request-published.md)
+  (decisions 1, 3 and 4: the reuse channel). A run whose credential provider negotiates
   `publication-v1` resolves and releases through that session instead of a
   release-set provider process
   ([ADR 0057](0057-publication-authority-stays-in-the-engine.md)).

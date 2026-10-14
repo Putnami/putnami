@@ -1370,6 +1370,68 @@ func TestPublicationReleaseCarriesInheritedMembersWhateverTheirAttribution(t *te
 	}
 }
 
+// TestPublicationReleaseCarriesAMemberReusedFromAResolvedHead pins the broker
+// half of protocols/distribution ADR 0007: a release may carry, unplanned, a
+// member another channel's head published with the same fingerprint, rebound
+// to the plan's revision and to this build's tree. It is carried only when
+// this session resolved that head and the member names the plan's revision;
+// any other artifact, or the same artifact under another revision, is a
+// member nobody planned.
+func TestPublicationReleaseCarriesAMemberReusedFromAResolvedHead(t *testing.T) {
+	reused := pubMember("go", "go.acme.dev/lib", "v1.1.0", pubOtherSource, "b", "c")
+	reused.SourceTree = strings.Repeat("d", 40)
+	pullRequest := distribution.ReleaseSet{ProtocolVersion: distribution.ProtocolVersion, Namespace: pubNamespace, Members: []distribution.ReleaseSetMember{reused}}
+	rebound := reused
+	rebound.SourceRevision, rebound.SourceTree = pubSource, ""
+	cases := []struct {
+		name        string
+		resolveHead bool
+		edit        func(member *distribution.ReleaseSetMember)
+	}{
+		{name: "rebound to the plan's revision", resolveHead: true},
+		{name: "a revision other than the plan's", resolveHead: true, edit: func(member *distribution.ReleaseSetMember) {
+			member.SourceRevision = pubParentSource
+		}},
+		{name: "an artifact no resolved head carries", resolveHead: true, edit: func(member *distribution.ReleaseSetMember) {
+			member.ArtifactDigest = pubDigest("e")
+		}},
+		{name: "a head this session did not resolve", resolveHead: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newPubRig(t, nil)
+			r.put.move("pr-7", pullRequest)
+			r.start()
+			channels := []string{pubCanary, pubImmutable}
+			if tc.resolveHead {
+				channels = append(channels, "pr-7")
+			}
+			mustResolved(t, r.resolve(pubResolveRequest(pubNamespace, channels...)))
+			mustOpened(t, r.open(pubOpenParams(t)), pubPlan(t).PlanDigest)
+			release := r.defaultRelease()
+			member := rebound
+			if tc.edit != nil {
+				tc.edit(&member)
+			}
+			release.request.ReleaseSet.Members[0] = member
+			payload, requestBytes := release.payload(t)
+			if tc.resolveHead && tc.edit == nil {
+				if released := mustReleased(t, r.release(payload), requestBytes); released.Outcome != distribution.ReleaseOutcomeReleased {
+					t.Fatalf("outcome = %s, want released", released.Outcome)
+				}
+				return
+			}
+			refusal := mustRefusal(t, r.release(payload), registry.RefusalPlanMismatch)
+			if !strings.Contains(refusal.Message, "neither planned nor carried by a head this session resolved") {
+				t.Fatalf("refusal = %q, want the unplanned member named", refusal.Message)
+			}
+			if _, releases := r.put.calls(); releases != 0 {
+				t.Fatalf("put-server releases = %d, want none", releases)
+			}
+		})
+	}
+}
+
 // TestPublicationReleaseAnswersAMovedHeadItDoesNotRestateAsAConflict pins the
 // member guard of a head run: the canary moved, since the engine resolved it,
 // to a head carrying a member this run neither rebuilt nor carries at that

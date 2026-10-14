@@ -91,8 +91,12 @@ type publisher struct {
 	// inherited holds, per member key, the artifact encoding of every member
 	// a resolved head carries: what a release may carry without planning it.
 	inherited map[string]map[string]bool
-	opening   *pendingAnswer
-	opened    *registry.OpenParams
+	// rebindable holds, per member key, the same encoding without the source
+	// revision and tree: what a release may carry, rebound to the plan's
+	// revision, without planning it.
+	rebindable map[string]map[string]bool
+	opening    *pendingAnswer
+	opened     *registry.OpenParams
 	// held is the open plan's immutable channel when it already had a head
 	// at open; nil otherwise.
 	held      *heldChannel
@@ -176,6 +180,7 @@ func newPublisher(caller *capabilityCaller, runCredential string, endpoints publ
 		retryWait:      publicationRetryWait,
 		resolved:       make(map[string]map[string]uint64),
 		inherited:      make(map[string]map[string]bool),
+		rebindable:     make(map[string]map[string]bool),
 		released:       make(map[string]releaseRecord),
 	}, nil
 }
@@ -242,8 +247,10 @@ func (p *publisher) record(response *distribution.ResolveResponse) {
 			key := memberKey(member.Ecosystem, member.Coordinate)
 			if p.inherited[key] == nil {
 				p.inherited[key] = make(map[string]bool)
+				p.rebindable[key] = make(map[string]bool)
 			}
 			p.inherited[key][artifactEncoding(member)] = true
+			p.rebindable[key][rebindEncoding(member)] = true
 		}
 	}
 }
@@ -887,7 +894,9 @@ func everyChannelExpects(channels []distribution.ChannelRequest, ref distributio
 // ancestry stated at open, the plan's namespace and channels in order, the
 // immutable flag on exactly the plan's immutable channel, every planned
 // member at its planned version and provenance, and every other member
-// carried unchanged from a head this session resolved. p.mu is held.
+// carried from a head this session resolved: unchanged, or reused with its
+// source revision rebound to the plan's and its source tree to this build's.
+// p.mu is held.
 func (p *publisher) mismatchLocked(opened *registry.OpenParams, params *registry.ReleaseParams) publicationAnswer {
 	plan, request := opened.Plan, params.Request
 	if !sameJSON(params.Ancestry, opened.Ancestry) {
@@ -922,9 +931,13 @@ func (p *publisher) mismatchLocked(opened *registry.OpenParams, params *registry
 	}
 	for _, member := range set.Members {
 		key := memberKey(member.Ecosystem, member.Coordinate)
-		if !planned[key] && !p.inherited[key][artifactEncoding(member)] {
-			return publicationRefusal(registry.RefusalPlanMismatch, "member %s/%s is neither planned nor carried by a head this session resolved", member.Ecosystem, member.Coordinate)
+		if planned[key] || p.inherited[key][artifactEncoding(member)] {
+			continue
 		}
+		if member.SourceRevision == plan.SourceRevision && p.rebindable[key][rebindEncoding(member)] {
+			continue
+		}
+		return publicationRefusal(registry.RefusalPlanMismatch, "member %s/%s is neither planned nor carried by a head this session resolved", member.Ecosystem, member.Coordinate)
 	}
 	return publicationAnswer{}
 }
@@ -1108,6 +1121,15 @@ func artifactEncoding(member distribution.ReleaseSetMember) string {
 		return ""
 	}
 	return string(encoded)
+}
+
+// rebindEncoding is artifactEncoding without the source revision and tree: the
+// identity of an artifact a release reuses from another channel's head and
+// rebinds to the commit it publishes, which holds the same inputs by selection
+// fingerprint.
+func rebindEncoding(member distribution.ReleaseSetMember) string {
+	member.SourceRevision, member.SourceTree = "", ""
+	return artifactEncoding(member)
 }
 
 func sameJSON(a, b any) bool {

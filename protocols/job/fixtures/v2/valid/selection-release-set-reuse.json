@@ -1,0 +1,38 @@
+{
+  "protocolVersion": 2,
+  "workspaceRoot": "/ws",
+  "outputPath": "/ws/.putnami/out/apps/console/publish",
+  "cacheRoot": "/ws/.putnami/store",
+  "workspace": {"name": "putnami"},
+  "project": {
+    "name": "@acme/console",
+    "path": "apps/console",
+    "fullPath": "/ws/apps/console"
+  },
+  "selection": {
+    "mode": "impacted",
+    "scoped": true,
+    "baseline": "rs_1f3870be274f6c49b3e31a0c6728957f1f3870be274f6c49b3e31a0c6728957f",
+    "baselineSource": "release-set-head",
+    "reuse": {
+      "channel": "pr-7",
+      "head": "rs_9a0364b9e99bb480dd25e1f0284c8555a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "members": [
+        {"ecosystem": "npm", "coordinate": "@acme/widget", "version": "1.2.0-20261014120000-abc1234"},
+        {"ecosystem": "oci", "coordinate": "acme/console", "version": "1.2.0-20261014120000-abc1234"}
+      ]
+    },
+    "projects": ["/apps/console"],
+    "releaseSetProjects": ["/apps/console"]
+  },
+  "extension": {"name": "@putnami/test", "root": "/ws/tooling/test-extension"},
+  "job": {"name": "publish"},
+  "identity": {
+    "key": "/apps/console:publish~npm",
+    "scope": "project",
+    "project": {"id": "/apps/console", "name": "@acme/console"},
+    "task": {"name": "publish~npm", "command": "publish", "kind": "publish"},
+    "provider": {"extension": "@putnami/test"}
+  },
+  "params": {}
+}

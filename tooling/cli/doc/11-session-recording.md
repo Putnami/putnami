@@ -318,6 +318,34 @@ that is the half a selection flag decides (ADR 0017 §2):
 when its plan selected no member. Subtract it from `projects` to read what the
 session verified without publishing.
 
+A publication that named `--reuse-channel` and released at least one member
+from that channel's head records `reuse`: the channel, the id of the head the
+run resolved, and every reused member with the version it released, sorted by
+ecosystem then coordinate. A reused member was neither built nor uploaded by
+the session, so its project is not in `releaseSetProjects`; below, the session
+verified `/libs/widget` and released its package from `pr-7` (ADR 0066):
+
+```json
+{
+  "commands": ["lint", "test", "build", "validate", "publish"],
+  "selection": {
+    "mode": "impacted",
+    "scoped": true,
+    "projects": ["/libs/widget"],
+    "reuse": {
+      "channel": "pr-7",
+      "head": "rs_4f9c…",
+      "members": [
+        { "ecosystem": "npm", "coordinate": "@putnami/widget", "version": "1.4.0-20261014120000-abc1234" }
+      ]
+    }
+  }
+}
+```
+
+`reuse` is absent when the run reused nothing, including when it named a reuse
+channel whose head offered no member.
+
 ### The gated tree
 
 `tree` names **which worktree the session ran against**, by content. `git` names

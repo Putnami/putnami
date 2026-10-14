@@ -40,6 +40,11 @@ const (
 	ReleaseSetBaselineChannelSource = "release-set-baseline-channel"
 )
 
+// releaseOrderedSuffixPattern matches the commit-derived ordered suffix a
+// version carries when its commit is not tagged (git.OrderedSuffix): the
+// fixed-width UTC commit time, the short SHA, and an optional dirty hash.
+var releaseOrderedSuffixPattern = regexp.MustCompile(`-[0-9]{14}-[0-9a-f]+(?:-[0-9a-f]+)?$`)
+
 var releaseSetInternalProject = &workspace.Project{
 	ID: "putnami", Name: "putnami", Path: ".putnami/internal/release-set",
 }
@@ -289,9 +294,15 @@ type ReleaseSetOptions struct {
 	// produced instead of republishing every member (D14, ADR 0006). "" names
 	// none, which is the unchanged behavior.
 	BaselineChannel string
-	Impacted        bool
-	All             bool
-	DryRun          bool
+	// ReuseChannel is one further channel the publication READS and never
+	// advances: a member the plan selects is released with the artifact that
+	// channel's head already carries when that record has the same selection
+	// fingerprint (protocols/distribution ADR 0007). It is never the baseline.
+	// "" names none, which is the unchanged behavior.
+	ReuseChannel string
+	Impacted     bool
+	All          bool
+	DryRun       bool
 	// PlannedPublish is set only by the engine after the final command plan
 	// proves that a dependent command expanded publish in this same session.
 	// It is never CLI/manifest input and cannot turn an unrelated deploy into a
@@ -341,6 +352,10 @@ type ReleaseSetRequest struct {
 	// BaselineChannel is the raw `--baseline-channel <name>` value: one
 	// channel the publication reads and never advances.
 	BaselineChannel string
+	// ReuseChannel is the raw `--reuse-channel <name>` value: one channel
+	// whose already-published members the publication may release instead of
+	// building them again.
+	ReuseChannel string
 	// Visibility is the raw `--visibility <level>` value.
 	Visibility string
 	// Scope is the raw `--scope <line>` value: which version line a tagged
@@ -367,6 +382,10 @@ func BuildReleaseSetOptions(request ReleaseSetRequest) (ReleaseSetOptions, error
 	if err != nil {
 		return ReleaseSetOptions{}, cmderr.Usagef("%v", err)
 	}
+	reuseChannel, err := ParseReleaseSetReuseChannel(request.ReuseChannel, channels, baselineChannel)
+	if err != nil {
+		return ReleaseSetOptions{}, cmderr.Usagef("%v", err)
+	}
 	// The declared policy is read by the runs that distribute, and by them
 	// alone. An invalid CI document fails every publish, not the
 	// lint/test/build gate that never consults it.
@@ -382,7 +401,7 @@ func BuildReleaseSetOptions(request ReleaseSetRequest) (ReleaseSetOptions, error
 	}
 	return ReleaseSetOptions{
 		Commands: request.Commands, Channels: channels, BaselineChannel: baselineChannel,
-		Impacted: request.Impacted, All: request.All, DryRun: request.DryRun,
+		ReuseChannel: reuseChannel, Impacted: request.Impacted, All: request.All, DryRun: request.DryRun,
 		Versions: request.Versions, Tagged: tagged, Line: line,
 		Visibility: request.Visibility, Policy: policy,
 	}, nil
@@ -502,15 +521,56 @@ func ParseReleaseSetBaselineChannel(raw string, advanced []string) (string, erro
 	return name, nil
 }
 
+// ParseReleaseSetReuseChannel reads the `--reuse-channel <name>` value: one
+// portable channel name the publication READS and never advances, or "" for
+// none.
+//
+// It is refused when it names an advanced channel or the baseline channel. An
+// advanced channel's head is the expectation its release compares against and,
+// first, the baseline; the baseline's head is what unchanged members inherit.
+// A reuse head is neither: it only offers artifacts for members the baseline
+// selected, and one head serving two of these roles would make the plan say
+// two different things about it.
+//
+// The bound is the baseline's: the ONE resolve names the advanced channels,
+// the baseline and the reuse channel, and a resolve request carries at most
+// MaxChannelsPerRelease channels.
+func ParseReleaseSetReuseChannel(raw string, advanced []string, baseline string) (string, error) {
+	name := strings.TrimSpace(raw)
+	if name == "" {
+		return "", nil
+	}
+	if !distribution.IsPortableChannel(name) {
+		return "", fmt.Errorf("--reuse-channel %s is not a portable channel name; a channel matches %s", name, distribution.ChannelPattern)
+	}
+	if slices.Contains(advanced, name) {
+		return "", fmt.Errorf("--reuse-channel %s is already advanced by --channel; a reuse channel is read and never advanced", name)
+	}
+	if name == baseline {
+		return "", fmt.Errorf("--reuse-channel %s is already the --baseline-channel; the baseline is inherited from, a reuse channel only offers artifacts for selected members", name)
+	}
+	resolved := len(advanced) + 1
+	if baseline != "" {
+		resolved++
+	}
+	if resolved > distribution.MaxChannelsPerRelease {
+		return "", fmt.Errorf("--channel, --baseline-channel and --reuse-channel name %d channels to resolve, exceeding the limit of %d", resolved, distribution.MaxChannelsPerRelease)
+	}
+	return name, nil
+}
+
 // releaseSetResolveChannels is what the ONE resolve of the publication names:
-// the advanced channels in order, then the baseline when it is not already
-// among them. The baseline's head must come from the SAME read as the others,
-// or the plan would compare a head from one instant against expectations from
-// another.
+// the advanced channels in order, then the baseline, then the reuse channel,
+// each when it is not already among them. Every head must come from the SAME
+// read as the others, or the plan would compare a head from one instant
+// against expectations from another.
 func releaseSetResolveChannels(options ReleaseSetOptions, channels []string) []string {
 	resolved := append([]string(nil), channels...)
 	if options.BaselineChannel != "" && !slices.Contains(resolved, options.BaselineChannel) {
 		resolved = append(resolved, options.BaselineChannel)
+	}
+	if options.ReuseChannel != "" && !slices.Contains(resolved, options.ReuseChannel) {
+		resolved = append(resolved, options.ReuseChannel)
 	}
 	return resolved
 }
@@ -582,6 +642,9 @@ func ValidateReleaseSetSelection(options ReleaseSetOptions) error {
 	if err := validateReleaseSetBaselineChannel(options); err != nil {
 		return err
 	}
+	if err := validateReleaseSetReuseChannel(options); err != nil {
+		return err
+	}
 	if len(options.Channels) == 0 || options.Impacted || options.All || options.Tagged {
 		return nil
 	}
@@ -631,6 +694,37 @@ func validateReleaseSetBaselineChannel(options ReleaseSetOptions) error {
 		return cmderr.Usagef(
 			"--baseline-channel %s names the head impact is measured against, which requires --impacted",
 			options.BaselineChannel)
+	}
+	return nil
+}
+
+// validateReleaseSetReuseChannel refuses a reuse channel on the publications
+// that select no member by fingerprint. Reuse only applies to a member the
+// --impacted plan selected because its fingerprint differs from the baseline:
+// --all and a tagged publish republish their members whatever any head
+// recorded, a publication that advances no channel builds no plan, and a
+// selection that is not --impacted measures no fingerprint at all.
+func validateReleaseSetReuseChannel(options ReleaseSetOptions) error {
+	if options.ReuseChannel == "" {
+		return nil
+	}
+	switch {
+	case len(options.Channels) == 0:
+		return cmderr.Usagef(
+			"--reuse-channel %s offers artifacts to a published channel, but --channel names none to publish",
+			options.ReuseChannel)
+	case options.All:
+		return cmderr.Usagef(
+			"--reuse-channel %s reuses members the impact plan selected, which --all never does; drop one of the two flags",
+			options.ReuseChannel)
+	case options.Tagged:
+		return cmderr.Usagef(
+			"--reuse-channel %s cannot apply to a tagged publish: the tag republishes its whole version line at the tag's version",
+			options.ReuseChannel)
+	case !options.Impacted:
+		return cmderr.Usagef(
+			"--reuse-channel %s reuses members by selection fingerprint, which requires --impacted",
+			options.ReuseChannel)
 	}
 	return nil
 }
@@ -1319,6 +1413,10 @@ func NewRunCacheManager(workspaceRoot, storeRootOverride string) *store.CacheMan
 // members. Those members are reported separately, so a consumer reading
 // the block can tell what the run verified from what the publish owns; the
 // head rewrite stays for a publish-only session, where the two are one list.
+//
+// The members the plan released from the reuse channel's head are reported in
+// both shapes of session (reuseSelection): they are neither built by the run
+// nor inherited from the baseline, and nothing else in the block says so.
 func (run *ReleaseSetRun) RunSelection(previous *protocoljob.Selection, projects []*workspace.Project) *protocoljob.Selection {
 	if previous == nil {
 		return nil
@@ -1332,7 +1430,32 @@ func (run *ReleaseSetRun) RunSelection(previous *protocoljob.Selection, projects
 	}
 	selection := ResolvedRunSelection(mode, baseline, baselineSource, projects)
 	selection.ReleaseSetProjects = run.memberProjectIDs()
+	selection.Reuse = run.reuseSelection()
 	return selection
+}
+
+// reuseSelection reports the reuse channel, the id of its head this run
+// resolved, and every member the plan took from that head, in canonical
+// order. It is nil when the plan reused nothing.
+func (run *ReleaseSetRun) reuseSelection() *protocoljob.SelectionReuse {
+	if run == nil || run.plan == nil {
+		return nil
+	}
+	head, members := run.plan.ReuseHead(), run.plan.ReusedMembers()
+	if head == nil || len(members) == 0 {
+		return nil
+	}
+	reuse := &protocoljob.SelectionReuse{
+		Channel: run.plan.ReuseChannel,
+		Head:    head.Ref.ID,
+		Members: make([]protocoljob.SelectionReusedMember, 0, len(members)),
+	}
+	for _, member := range members {
+		reuse.Members = append(reuse.Members, protocoljob.SelectionReusedMember{
+			Ecosystem: string(member.Ecosystem), Coordinate: member.Coordinate, Version: member.Version,
+		})
+	}
+	return reuse
 }
 
 // memberProjectIDs is the sorted, duplicate-free id list of the projects whose
@@ -1804,17 +1927,9 @@ func buildReleaseSetPlan(
 		return nil, err
 	}
 	head, baselineChannel := releaseSetBaselineHead(options, channels, heads)
-	baseMembers := make(map[string]distribution.ReleaseSetMember)
-	if head != nil {
-		if head.ReleaseSet == nil {
-			return nil, fmt.Errorf("build release-set plan: resolved baseline head carries no snapshot")
-		}
-		if head.ReleaseSet.Namespace != releaseSetNamespace(ws, options.Policy) {
-			return nil, fmt.Errorf("build release-set plan: resolved namespace %q does not match publication namespace %q", head.ReleaseSet.Namespace, releaseSetNamespace(ws, options.Policy))
-		}
-		for _, member := range head.ReleaseSet.Members {
-			baseMembers[releaseset.MemberKey(member.Ecosystem, member.Coordinate)] = member
-		}
+	baseMembers, err := releaseHeadRecords(head, releaseSetNamespace(ws, options.Policy), "baseline")
+	if err != nil {
+		return nil, err
 	}
 
 	tagged := TaggedReleaseSetPublish(options)
@@ -1873,12 +1988,19 @@ func buildReleaseSetPlan(
 		}
 		versions[key] = baseMembers[key].Version
 	}
+	reused, err := reuseSelectedMembers(options, ws, candidates, selected, versions, baseMembers, heads[options.ReuseChannel])
+	if err != nil {
+		return nil, err
+	}
+	for key, record := range reused {
+		versions[key] = record.Version
+	}
 
 	plan := &releaseset.Plan{
 		ProtocolVersion: distribution.ProtocolVersion,
 		Namespace:       releaseSetNamespace(ws, options.Policy),
 		Channels:        channels,
-		Heads:           make(map[string]*distribution.ChannelHead, len(channels)+1),
+		Heads:           make(map[string]*distribution.ChannelHead, len(channels)+2),
 		Members:         make([]releaseset.PlannedMember, 0, len(keys)),
 	}
 	attributed := releaseMemberAttribution(options.Policy)
@@ -1894,8 +2016,13 @@ func buildReleaseSetPlan(
 		plan.BaselineChannel = baselineChannel
 		plan.Heads[baselineChannel] = heads[baselineChannel]
 	}
+	recordReleaseReuse(plan, options.ReuseChannel, heads[options.ReuseChannel], reused, provenance)
 	for _, key := range keys {
 		candidate := candidates[key]
+		if record, ok := reused[key]; ok {
+			plan.Members = append(plan.Members, reusedPlannedMember(record, candidate, provenance, attributed))
+			continue
+		}
 		if _, ok := selected[key]; ok {
 			dependencies, err := releaseDependencies(candidate, candidates, versions)
 			if err != nil {
@@ -1954,6 +2081,192 @@ func buildReleaseSetPlan(
 		return nil, fmt.Errorf("build release-set plan: %w", err)
 	}
 	return plan, nil
+}
+
+// reuseSelectedMembers returns, keyed by member, the reuse head's record of
+// every selected member this publication releases instead of building it
+// (protocols/distribution ADR 0007). Selection is already final: reuse only
+// avoids a build the base selection asked for, it never selects or drops a
+// member, and an --all or tagged publication reuses nothing.
+//
+// A selected member is reusable when the reuse head carries it with the
+// fingerprint this run computed, when its version sorts strictly above the
+// base head's record of it, so the channel never moves backwards, and when its
+// version has the same base as this run's candidate, so the only difference is
+// the commit-derived ordered suffix. The reused records must then agree with
+// the set they join: a reused member whose recorded dependencies are not the
+// final versions of those dependencies is built after all, and a dependent of
+// a member built after all may be demoted in turn, until nothing changes.
+func reuseSelectedMembers(
+	options ReleaseSetOptions,
+	ws *workspace.Workspace,
+	candidates map[string]*releaseCandidate,
+	selected map[string]struct{},
+	versions map[string]string,
+	baseMembers map[string]distribution.ReleaseSetMember,
+	reuseHead *distribution.ChannelHead,
+) (map[string]distribution.ReleaseSetMember, error) {
+	if options.ReuseChannel == "" || options.All || TaggedReleaseSetPublish(options) || reuseHead == nil || len(selected) == 0 {
+		return nil, nil
+	}
+	records, err := releaseHeadRecords(reuseHead, releaseSetNamespace(ws, options.Policy), "reuse")
+	if err != nil {
+		return nil, err
+	}
+	reused := make(map[string]distribution.ReleaseSetMember)
+	for _, key := range slices.Sorted(maps.Keys(selected)) {
+		record, exists := records[key]
+		if !exists || record.SelectionFingerprint != options.Fingerprints[key] || record.ArtifactDigest == "" {
+			continue
+		}
+		if base, inBase := baseMembers[key]; inBase && !releaseVersionAbove(record.Version, base.Version) {
+			continue
+		}
+		suffix := ""
+		if info := VersionInfoForProject(options.Versions, candidates[key].project); info != nil {
+			suffix = info.Suffix
+		}
+		if !releaseVersionsShareBase(versions[key], suffix, record.Version) {
+			continue
+		}
+		reused[key] = record
+	}
+	for changed := true; changed && len(reused) > 0; {
+		changed = false
+		final := maps.Clone(versions)
+		for key, record := range reused {
+			final[key] = record.Version
+		}
+		var demoted []string
+		for _, key := range slices.Sorted(maps.Keys(reused)) {
+			dependencies, err := releaseDependencies(candidates[key], candidates, final)
+			if err != nil {
+				return nil, err
+			}
+			if !sameReleaseDependencies(dependencies, reused[key].Dependencies) {
+				demoted = append(demoted, key)
+			}
+		}
+		for _, key := range demoted {
+			delete(reused, key)
+			changed = true
+		}
+	}
+	return reused, nil
+}
+
+// releaseHeadRecords keys the records of a resolved head by member: empty for
+// a channel without a head. role names the head in an error, the baseline
+// impact is measured against or the reuse head.
+func releaseHeadRecords(head *distribution.ChannelHead, namespace, role string) (map[string]distribution.ReleaseSetMember, error) {
+	records := make(map[string]distribution.ReleaseSetMember)
+	if head == nil {
+		return records, nil
+	}
+	if head.ReleaseSet == nil {
+		return nil, fmt.Errorf("build release-set plan: resolved %s head carries no snapshot", role)
+	}
+	if head.ReleaseSet.Namespace != namespace {
+		return nil, fmt.Errorf("build release-set plan: resolved %s head namespace %q does not match publication namespace %q", role, head.ReleaseSet.Namespace, namespace)
+	}
+	for _, member := range head.ReleaseSet.Members {
+		records[releaseset.MemberKey(member.Ecosystem, member.Coordinate)] = member
+	}
+	return records, nil
+}
+
+// recordReleaseReuse names the reuse channel, its head, the plan's revision and
+// the reused members on plan, and only when the plan takes at least one member
+// from that head: a reuse head that offered nothing leaves no trace, so the
+// plan keeps the bytes it has without the option.
+func recordReleaseReuse(
+	plan *releaseset.Plan,
+	channel string,
+	head *distribution.ChannelHead,
+	reused map[string]distribution.ReleaseSetMember,
+	provenance *releaseSetProvenance,
+) {
+	if len(reused) == 0 {
+		return
+	}
+	plan.ReuseChannel = channel
+	plan.Heads[channel] = head
+	plan.SourceRevision = provenance.revision
+	for _, key := range slices.Sorted(maps.Keys(reused)) {
+		plan.Reused = append(plan.Reused, releaseset.MemberRef{Ecosystem: reused[key].Ecosystem, Coordinate: reused[key].Coordinate})
+	}
+}
+
+// reusedPlannedMember is the reuse head's artifact record verbatim: version,
+// digest, dependencies, fingerprint and platforms belong to the publication
+// that built the artifact. It is rebound to this publication's revision and
+// tree, which hold the same inputs by fingerprint, and attribution follows the
+// inherited members' rule.
+func reusedPlannedMember(
+	record distribution.ReleaseSetMember,
+	candidate *releaseCandidate,
+	provenance *releaseSetProvenance,
+	attributed bool,
+) releaseset.PlannedMember {
+	member := releaseset.PlannedMember{
+		Ecosystem: record.Ecosystem, Coordinate: record.Coordinate, Version: record.Version,
+		ArtifactDigest:       record.ArtifactDigest,
+		Dependencies:         append([]distribution.ReleaseSetDependency(nil), record.Dependencies...),
+		SourceRevision:       provenance.revision,
+		SelectionFingerprint: record.SelectionFingerprint,
+		Platforms:            maps.Clone(record.Platforms),
+		Project:              record.Project,
+		Kind:                 record.Kind,
+		SourceTree:           provenance.tree,
+		Selected:             false, ProjectID: candidate.project.ID,
+	}
+	if attributed {
+		member.Project = releaseMemberProject(candidate.project)
+		member.Kind = releaseset.KindFor(candidate.ecosystem, candidate.packageStep, candidate.publishStep)
+	}
+	return member
+}
+
+// releaseVersionAbove reports whether version sorts strictly above base under
+// semver precedence. A version either side cannot parse is not above.
+func releaseVersionAbove(version, base string) bool {
+	parsed, err := extension.ParseVersion(version)
+	if err != nil {
+		return false
+	}
+	baseline, err := extension.ParseVersion(base)
+	if err != nil {
+		return false
+	}
+	return parsed.Compare(baseline) > 0
+}
+
+// releaseVersionsShareBase reports whether a reused version differs from this
+// run's candidate version by the commit-derived ordered suffix alone. suffix
+// is the candidate's own ordered suffix, "" when the run computed none. Both
+// versions must carry an ordered suffix or neither may: a commit-stamped
+// candidate never takes a release version from another channel, and the
+// reverse.
+func releaseVersionsShareBase(candidate, suffix, reused string) bool {
+	candidateBase, candidateStamped := candidate, false
+	if suffix != "" {
+		candidateBase, candidateStamped = strings.CutSuffix(candidate, "-"+suffix)
+	}
+	reusedBase := releaseOrderedSuffixPattern.ReplaceAllString(reused, "")
+	return candidateStamped == (reusedBase != reused) && candidateBase == reusedBase
+}
+
+// sameReleaseDependencies compares a computed dependency list, already in
+// canonical order, with a recorded one in any order.
+func sameReleaseDependencies(computed, recorded []distribution.ReleaseSetDependency) bool {
+	if len(computed) != len(recorded) {
+		return false
+	}
+	sorted := slices.Clone(recorded)
+	slices.SortFunc(sorted, func(a, b distribution.ReleaseSetDependency) int {
+		return strings.Compare(releaseset.MemberKey(a.Ecosystem, a.Coordinate), releaseset.MemberKey(b.Ecosystem, b.Coordinate))
+	})
+	return slices.Equal(computed, sorted)
 }
 
 // releaseMemberAttribution reports whether this publication records each

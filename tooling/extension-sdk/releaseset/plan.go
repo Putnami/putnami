@@ -31,13 +31,15 @@ const placeholderArtifactDigest = "sha256:00000000000000000000000000000000000000
 // carries the head resolved for each of them — one entry per channel, a nil
 // entry meaning that channel has no head yet — so the release can
 // compare-and-swap every channel from its own expectation without resolving
-// anything a second time. BaselineChannel names one further channel, read and
-// never released, whose head is carried in Heads beside them.
+// anything a second time. BaselineChannel and ReuseChannel each name one
+// further channel, read and never released, whose head is carried in Heads
+// beside them.
 //
 // Members is always the next full snapshot: selected members carry their
 // candidate version, the provenance of the tree being published, and an empty
 // ArtifactDigest until publication; unchanged members inherit every field of
-// the baseline head's record.
+// the baseline head's record; reused members carry the reuse head's record
+// rebound to this publication's SourceRevision and source tree.
 type Plan struct {
 	ProtocolVersion int                                  `json:"protocolVersion"`
 	Namespace       string                               `json:"namespace"`
@@ -49,6 +51,26 @@ type Plan struct {
 	// released. Empty when the first channel's own head was the baseline,
 	// which is every plan that names none.
 	BaselineChannel string `json:"baselineChannel,omitempty"`
+	// ReuseChannel is the channel whose head already published some members
+	// this plan selected by fingerprint. Its head is carried in Heads, it is
+	// never released and never a baseline. Empty unless at least one member
+	// is reused, so a plan that reuses nothing has the bytes of a plan built
+	// without the option.
+	ReuseChannel string `json:"reuseChannel,omitempty"`
+	// Reused lists, in canonical member order, the members taken from the
+	// reuse head. Each one is an unselected member of Members. Set exactly
+	// when ReuseChannel is.
+	Reused []MemberRef `json:"reused,omitempty"`
+	// SourceRevision is the commit this publication is bound to: every
+	// selected member records it, and every reused member is rebound to it.
+	// Set exactly when ReuseChannel is.
+	SourceRevision string `json:"sourceRevision,omitempty"`
+}
+
+// MemberRef names one release-set member by its protocol identity.
+type MemberRef struct {
+	Ecosystem  distribution.Ecosystem `json:"ecosystem"`
+	Coordinate string                 `json:"coordinate"`
 }
 
 // PlannedMember is one full-snapshot member in a Plan. ProjectID is an
@@ -120,6 +142,42 @@ func (p *Plan) BaselineChannelName() string {
 		return p.BaselineChannel
 	}
 	return ""
+}
+
+// ReuseHead is the head reused members were taken from, nil when the plan
+// reuses nothing.
+func (p *Plan) ReuseHead() *distribution.ChannelHead {
+	if p == nil || p.ReuseChannel == "" {
+		return nil
+	}
+	return p.Heads[p.ReuseChannel]
+}
+
+// Reuses reports whether the plan takes one member from the reuse head.
+func (p *Plan) Reuses(ecosystem distribution.Ecosystem, coordinate string) bool {
+	if p == nil {
+		return false
+	}
+	for _, ref := range p.Reused {
+		if ref.Ecosystem == ecosystem && ref.Coordinate == coordinate {
+			return true
+		}
+	}
+	return false
+}
+
+// ReusedMembers returns copies of the reused members in canonical order.
+func (p *Plan) ReusedMembers() []PlannedMember {
+	if p == nil || len(p.Reused) == 0 {
+		return nil
+	}
+	reused := make([]PlannedMember, 0, len(p.Reused))
+	for _, member := range p.Members {
+		if !member.Selected && p.Reuses(member.Ecosystem, member.Coordinate) {
+			reused = append(reused, cloneMember(member))
+		}
+	}
+	return reused
 }
 
 // baselineSet returns the baseline's full snapshot, or nil.
@@ -227,6 +285,12 @@ func ParseParams(params job.Params) (*Plan, error) {
 // channels the plan advances: an advanced channel is already its own baseline,
 // and naming it twice would state two different things about one head.
 //
+// ReuseChannel is read and never released either, and is neither an advanced
+// channel nor the baseline. Every member Reused names is unselected, exists in
+// the reuse head, and carries that head's artifact record exactly except for
+// SourceRevision, which is the plan's SourceRevision, and SourceTree, which is
+// this publication's. Every selected member records the same SourceRevision.
+//
 // A project is deliberately allowed to own several selected members: the member
 // key is (ecosystem, coordinate) and the project is provenance, so one project
 // publishing an npm package and an OCI image contributes two members of one
@@ -245,7 +309,14 @@ func ValidatePlan(plan *Plan) error {
 	if plan.BaselineChannel != "" && slices.Contains(plan.Channels, plan.BaselineChannel) {
 		return fmt.Errorf("release-set plan baseline channel %q is also advanced by the plan; a baseline is read and never released", plan.BaselineChannel)
 	}
+	if err := validatePlanReuseChannel(plan); err != nil {
+		return err
+	}
 	if err := validatePlanHeads(plan); err != nil {
+		return err
+	}
+	reuseMembers, err := planReuseRecords(plan)
+	if err != nil {
 		return err
 	}
 	baseSet := plan.baselineSet()
@@ -266,6 +337,7 @@ func ValidatePlan(plan *Plan) error {
 	}
 	previous := ""
 	selected := 0
+	reused := 0
 	for i, member := range plan.Members {
 		key := MemberKey(member.Ecosystem, member.Coordinate)
 		if previous != "" && key <= previous {
@@ -294,7 +366,23 @@ func ValidatePlan(plan *Plan) error {
 			if len(member.Platforms) != 0 {
 				return fmt.Errorf("selected release-set plan member %q already carries platform digests", printableKey(key))
 			}
+			if plan.SourceRevision != "" && member.SourceRevision != plan.SourceRevision {
+				return fmt.Errorf("selected release-set plan member %q records revision %q, not the plan's %q", printableKey(key), member.SourceRevision, plan.SourceRevision)
+			}
 			projected.ArtifactDigest = placeholderArtifactDigest
+		} else if record, isReused := reuseMembers[key]; isReused {
+			reused++
+			if member.ArtifactDigest == "" {
+				return fmt.Errorf("reused release-set plan member %q did not carry its artifact digest", printableKey(key))
+			}
+			if member.SourceRevision != plan.SourceRevision {
+				return fmt.Errorf("reused release-set plan member %q records revision %q, not the plan's %q", printableKey(key), member.SourceRevision, plan.SourceRevision)
+			}
+			record.SourceRevision = member.SourceRevision
+			record.SourceTree = member.SourceTree
+			if !sameArtifactRecord(projected, record) {
+				return fmt.Errorf("reused release-set plan member %q does not carry the reuse head's record", printableKey(key))
+			}
 		} else {
 			if baseSet == nil {
 				return fmt.Errorf("release-set plan member %q is not selected but the baseline channel has no head to inherit from", printableKey(key))
@@ -312,7 +400,10 @@ func ValidatePlan(plan *Plan) error {
 		}
 		projection.Members = append(projection.Members, projected)
 	}
-	if selected == 0 && baseSet == nil {
+	if reused != len(reuseMembers) {
+		return fmt.Errorf("release-set plan lists %d reused members but carries %d of them unselected", len(reuseMembers), reused)
+	}
+	if selected == 0 && reused == 0 && baseSet == nil {
 		return fmt.Errorf("release-set plan selects no members and has no baseline head to confirm")
 	}
 	if len(projection.Members) == 0 {
@@ -356,15 +447,80 @@ func validatePlanHeads(plan *Plan) error {
 }
 
 // planResolvedChannels is the channel list the plan's one resolve named: the
-// advanced channels in order, then the baseline when it is not already among
-// them. ValidatePlan refuses a baseline that IS among them, so the guard here
-// only keeps this helper independently correct.
+// advanced channels in order, then the baseline, then the reuse channel, each
+// when it is not already among them. ValidatePlan refuses a baseline or a
+// reuse channel that IS among them, so the guards here only keep this helper
+// independently correct.
 func planResolvedChannels(plan *Plan) []string {
 	channels := append([]string(nil), plan.Channels...)
 	if plan.BaselineChannel != "" && !slices.Contains(channels, plan.BaselineChannel) {
 		channels = append(channels, plan.BaselineChannel)
 	}
+	if plan.ReuseChannel != "" && !slices.Contains(channels, plan.ReuseChannel) {
+		channels = append(channels, plan.ReuseChannel)
+	}
 	return channels
+}
+
+// validatePlanReuseChannel checks the reuse fields against each other and
+// against the other channels before the heads are replayed. The three fields
+// are set together or not at all: a plan that reuses nothing names no reuse
+// channel, which keeps its bytes those of a plan built without the option.
+func validatePlanReuseChannel(plan *Plan) error {
+	if plan.ReuseChannel == "" {
+		if len(plan.Reused) != 0 || plan.SourceRevision != "" {
+			return fmt.Errorf("release-set plan lists reused members or a plan revision without a reuse channel")
+		}
+		return nil
+	}
+	if slices.Contains(plan.Channels, plan.ReuseChannel) {
+		return fmt.Errorf("release-set plan reuse channel %q is also advanced by the plan; a reuse channel is read and never released", plan.ReuseChannel)
+	}
+	if plan.ReuseChannel == plan.BaselineChannel {
+		return fmt.Errorf("release-set plan reuse channel %q is also its baseline channel", plan.ReuseChannel)
+	}
+	if len(plan.Reused) == 0 {
+		return fmt.Errorf("release-set plan names reuse channel %q but reuses no member", plan.ReuseChannel)
+	}
+	if plan.SourceRevision == "" {
+		return fmt.Errorf("release-set plan reuses members but records no plan revision")
+	}
+	return nil
+}
+
+// planReuseRecords returns the reuse head's record of every member Reused
+// names, keyed by MemberKey. It runs after validatePlanHeads, so the reuse
+// head, when present, recomputes its own ref from its snapshot.
+func planReuseRecords(plan *Plan) (map[string]distribution.ReleaseSetMember, error) {
+	if plan.ReuseChannel == "" {
+		return nil, nil
+	}
+	head := plan.Heads[plan.ReuseChannel]
+	if head == nil || head.ReleaseSet == nil {
+		return nil, fmt.Errorf("release-set plan reuses members from channel %q, which has no head", plan.ReuseChannel)
+	}
+	if head.ReleaseSet.Namespace != plan.Namespace {
+		return nil, fmt.Errorf("release-set plan reuse head namespace %q does not match %q", head.ReleaseSet.Namespace, plan.Namespace)
+	}
+	carried := make(map[string]distribution.ReleaseSetMember, len(head.ReleaseSet.Members))
+	for _, member := range head.ReleaseSet.Members {
+		carried[MemberKey(member.Ecosystem, member.Coordinate)] = member
+	}
+	records := make(map[string]distribution.ReleaseSetMember, len(plan.Reused))
+	previous := ""
+	for i, ref := range plan.Reused {
+		key := MemberKey(ref.Ecosystem, ref.Coordinate)
+		if previous != "" && key <= previous {
+			return nil, fmt.Errorf("release-set plan reused members are not unique canonical order at index %d", i)
+		}
+		previous = key
+		record, exists := carried[key]
+		if !exists {
+			return nil, fmt.Errorf("reused release-set plan member %q is absent from the reuse head", printableKey(key))
+		}
+		records[key] = record
+	}
+	return records, nil
 }
 
 // sameArtifactRecord compares the artifact record of two members: identity,
@@ -394,6 +550,7 @@ func ClonePlan(plan *Plan) *Plan {
 	}
 	clone := *plan
 	clone.Channels = append([]string(nil), plan.Channels...)
+	clone.Reused = slices.Clone(plan.Reused)
 	if plan.Heads != nil {
 		clone.Heads = make(map[string]*distribution.ChannelHead, len(plan.Heads))
 		for name, head := range plan.Heads {
@@ -433,6 +590,10 @@ func NormalizePlan(plan *Plan) *Plan {
 	sort.Slice(clone.Members, func(i, j int) bool {
 		return MemberKey(clone.Members[i].Ecosystem, clone.Members[i].Coordinate) <
 			MemberKey(clone.Members[j].Ecosystem, clone.Members[j].Coordinate)
+	})
+	sort.Slice(clone.Reused, func(i, j int) bool {
+		return MemberKey(clone.Reused[i].Ecosystem, clone.Reused[i].Coordinate) <
+			MemberKey(clone.Reused[j].Ecosystem, clone.Reused[j].Coordinate)
 	})
 	return clone
 }

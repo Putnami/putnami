@@ -1835,6 +1835,72 @@
       }
     },
     {
+      "id": "session.file.publish-reusing-another-channel",
+      "document": "sessionFile",
+      "expect": "accept",
+      "summary": "A publication that released members from the channel --reuse-channel named records which channel, which head it resolved, and every reused member with the version it was released at, so a consumer can tell a member the run built from one it took from another channel's head.",
+      "value": {
+        "protocolVersion": 2,
+        "sessionId": "20261014-120500-3c4d5e",
+        "startTime": "2026-10-14T12:05:00.000Z",
+        "endTime": "2026-10-14T12:06:10.000Z",
+        "commands": ["publish"],
+        "selection": {
+          "mode": "impacted",
+          "scoped": true,
+          "projects": ["/apps/console"],
+          "releaseSetProjects": ["/apps/console"],
+          "reuse": {
+            "channel": "pr-7",
+            "head": "rs_9a0364b9e99bb480dd25e1f0284c8555a1b2c3d4e5f60718293a4b5c6d7e8f90",
+            "members": [
+              { "ecosystem": "npm", "coordinate": "@acme/widget", "version": "1.2.0-20261014120000-abc1234" }
+            ]
+          }
+        },
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": { "total": 2, "succeeded": 2, "failed": 0, "canceled": 0, "skipped": 0 },
+          "reuse": { "localCache": 1, "remoteCache": 0, "coalesced": 0 },
+          "durationMs": 70000
+        }
+      }
+    },
+    {
+      "id": "invalid.session-file.reuse-without-head-or-member-version",
+      "document": "sessionFile",
+      "expect": "reject",
+      "summary": "A reuse block names the head it took members from and the version of every member, and a reused member carries no member the contract does not declare; without them a consumer cannot find the artifact again.",
+      "value": {
+        "protocolVersion": 2,
+        "sessionId": "20261014-120500-3c4d5e",
+        "startTime": "2026-10-14T12:05:00.000Z",
+        "commands": ["publish"],
+        "selection": {
+          "mode": "impacted",
+          "scoped": true,
+          "projects": ["/apps/console"],
+          "reuse": {
+            "channel": "pr-7",
+            "members": [{ "ecosystem": "npm", "coordinate": "@acme/widget", "digest": "sha256:00" }]
+          }
+        },
+        "run": {
+          "outcome": "success",
+          "exitCode": 0,
+          "counts": { "total": 2, "succeeded": 2, "failed": 0, "canceled": 0, "skipped": 0 },
+          "reuse": { "localCache": 1, "remoteCache": 0, "coalesced": 0 },
+          "durationMs": 70000
+        }
+      },
+      "violations": [
+        { "code": "cli.result.missing_field", "path": "selection.reuse.head" },
+        { "code": "cli.result.unknown_field", "path": "selection.reuse.members[0].digest" },
+        { "code": "cli.result.missing_field", "path": "selection.reuse.members[0].version" }
+      ]
+    },
+    {
       "id": "session.file.unscoped-selection",
       "document": "sessionFile",
       "expect": "accept",

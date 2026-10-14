@@ -221,6 +221,11 @@ type Selection struct {
 	// BaselineSource is the resolution tier that produced Baseline, so a
 	// consumer can distrust a stale fallback ref the same way the run can.
 	BaselineSource string `json:"baselineSource,omitempty"`
+	// Reuse names the members a release-set publication released from
+	// another channel's head instead of building them. Absent when the
+	// session reused nothing, which is every session that names no reuse
+	// channel.
+	Reuse *SelectionReuse `json:"reuse,omitempty"`
 	// ProjectIDs are the selected projects' canonical ids, sorted.
 	ProjectIDs []string `json:"projects"`
 	// ReleaseSetProjects are the canonical ids, sorted, of the projects whose
@@ -239,6 +244,25 @@ type Selection struct {
 	// and a consumer must render it as "nothing to check" rather than as a
 	// failure to find work.
 	EmptyImpact bool `json:"emptyImpact,omitempty"`
+}
+
+// SelectionReuse is what a release-set publication took from its reuse
+// channel: the channel, the id of the head the publication resolved for it,
+// and every member released with that head's artifact, sorted by ecosystem
+// then coordinate. Members is never empty: a publication that reused nothing
+// reports no block.
+type SelectionReuse struct {
+	Channel string                  `json:"channel"`
+	Head    string                  `json:"head"`
+	Members []SelectionReusedMember `json:"members"`
+}
+
+// SelectionReusedMember is one reused member and the version it was released
+// at, which is the version the reuse head recorded for it.
+type SelectionReusedMember struct {
+	Ecosystem  string `json:"ecosystem"`
+	Coordinate string `json:"coordinate"`
+	Version    string `json:"version"`
 }
 
 // PathFor returns the staging directory a declared-output root resolves to, or

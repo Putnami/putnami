@@ -283,6 +283,27 @@ func TestReleaseSetOptionsCarryTheBaselineChannelFlag(t *testing.T) {
 	if _, err := buildReleaseSetOptions(&conflicting, ws); err == nil {
 		t.Fatal("a baseline channel this publication advances was accepted")
 	}
+
+	// --reuse-channel arrives the same way, beside the channels and the
+	// baseline, and is refused at parse time when it repeats either of them.
+	reusing := *req
+	reusing.CommandParams = maps.Clone(req.CommandParams)
+	reusing.CommandParams["reuse-channel"] = "pr-9"
+	options, err = buildReleaseSetOptions(&reusing, ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.ReuseChannel != "pr-9" || options.BaselineChannel != "canary" {
+		t.Fatalf("release-set options = %+v; want pr-9 as the reuse channel beside canary", options)
+	}
+	for _, name := range []string{"pr-7", "canary"} {
+		repeated := reusing
+		repeated.CommandParams = maps.Clone(reusing.CommandParams)
+		repeated.CommandParams["reuse-channel"] = name
+		if _, err := buildReleaseSetOptions(&repeated, ws); err == nil {
+			t.Fatalf("a reuse channel equal to %s was accepted", name)
+		}
+	}
 }
 
 // A degraded line is invisible in its 0.0.0 stamp, so --debug names why, one

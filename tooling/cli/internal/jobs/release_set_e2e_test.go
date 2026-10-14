@@ -1372,3 +1372,120 @@ func TestReleaseSetE2EFirstPullRequestPublishUploadsOnlyWhatChanged(t *testing.T
 		t.Fatalf("release channels = %+v, want pr-7 alone with a null expectation", final.Channels)
 	}
 }
+
+// useReleaseSetRevision makes the fake provenance of useReleaseSetProvenance
+// report revision instead of testRevision: one commit per publication of a
+// test that publishes from several.
+func useReleaseSetRevision(t *testing.T, revision string) {
+	t.Helper()
+	previous := newReleaseSetProvenance
+	newReleaseSetProvenance = func(ws *workspace.Workspace, withTree bool) (*releaseSetProvenance, error) {
+		provenance, err := previous(ws, withTree)
+		if err != nil {
+			return nil, err
+		}
+		provenance.revision = revision
+		return provenance, nil
+	}
+	t.Cleanup(func() { newReleaseSetProvenance = previous })
+}
+
+// The behavior the reuse channel exists for, end to end against the stateful
+// in-memory provider. A pull request publishes its changed member into `pr-7`;
+// its merge lands the same tree on main, and the main publication names `pr-7`
+// as its reuse channel: it releases the pull request's artifact into canary
+// without packaging or uploading anything, rebound to main's commit. A squash
+// merge leaves the pull request's commit out of main's history, and the
+// rebinding is what keeps canary's head an ancestor of the next main commit.
+func TestReleaseSetE2EMainReleasesWhatItsPullRequestPublished(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "release-set-reuse-channel", "a-main-publish-releases-what-its-pull-request-published")
+	const (
+		bootstrapRevision   = "1f0d2c3b4a5968778695a4b3c2d1e0f9a8b7c6d5"
+		pullRequestRevision = "2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f"
+		mainRevision        = "3d2c1b0a9f8e7d6c5b4a39281706f5e4d3c2b1a0"
+		nextMainRevision    = "4c3b2a19f8e7d6c5b4a3928170f6e5d4c3b2a190"
+	)
+	ctx := context.Background()
+	ledger := newReleaseSetE2ELedger()
+	useReleaseSetE2EProvider(t, ledger)
+	useReleaseSetProvenance(t, nil)
+	useReleaseSetRevision(t, bootstrapRevision)
+	canaryRef, canarySet := releaseSetE2EBootstrap(t, ctx, ledger)
+
+	// The pull request changes downstream and publishes it into pr-7.
+	useReleaseSetProvenance(t, map[string]string{"/downstream": releaseSetE2EDigest('9')})
+	useReleaseSetRevision(t, pullRequestRevision)
+	ws, upstream, downstream := releaseSetE2EWorkspace(t, "1.1.0")
+	pullRequest := releaseSetE2EImpactedOptions("pr-7")
+	pullRequest.BaselineChannel = "canary"
+	run := releaseSetE2EPrepare(t, ctx, pullRequest, ws, ws.Projects)
+	results, registry := releaseSetE2EPublish(run.plan, '2', nil)
+	if registry.uploadCount(downstream.Name) != 1 {
+		t.Fatalf("pull-request registry activity = %+v", registry)
+	}
+	run.Finalizer(ctx)(results)
+	pullRequestRef := releaseSetE2EOutcome(t, results).Ref
+	pullRequestDownstream := releaseSetE2EMember(t, ledger.mustReleaseSet(t, pullRequestRef), downstream.Name)
+
+	// Main publishes the merged tree with pr-7 as its reuse channel.
+	useReleaseSetRevision(t, mainRevision)
+	merged := releaseSetE2EImpactedOptions("canary")
+	merged.ReuseChannel = "pr-7"
+	run = releaseSetE2EPrepare(t, ctx, merged, ws, ws.Projects)
+	if !slices.Equal(run.plan.Reused, []releaseset.MemberRef{{Ecosystem: "npm", Coordinate: downstream.Name}}) || !run.NoImpact() {
+		t.Fatalf("main plan reused %+v and selected %+v; want downstream reused and nothing built", run.plan.Reused, run.plan.SelectedMembers())
+	}
+	// A publish-only session plans no job at all for a plan that builds
+	// nothing: no package step, no publish step, no upload.
+	projects, extensions, err := run.ScopePlanning(ws.Projects, nil, releaseSetE2EDiscovery().Extensions, testProfiles(), "publish")
+	if err != nil || projects != nil || extensions != nil {
+		t.Fatalf("main publish scoped %+v / %+v, %v; want nothing to plan", projects, extensions, err)
+	}
+	results, registry = releaseSetE2EPublish(run.plan, '5', nil)
+	if registry.packageCount(downstream.Name) != 0 || registry.uploadCount(downstream.Name) != 0 ||
+		registry.packageCount(upstream.Name) != 0 || registry.uploadCount(upstream.Name) != 0 {
+		t.Fatalf("main publish packaged or uploaded a reused member: %+v", registry)
+	}
+	run.Finalizer(ctx)(results)
+	outcome := releaseSetE2EOutcome(t, results)
+
+	requests := ledger.releaseRequestsSnapshot()
+	if final := requests[len(requests)-1]; len(final.Channels) != 1 || final.Channels[0].Name != "canary" ||
+		final.Channels[0].Expected == nil || *final.Channels[0].Expected != canaryRef {
+		t.Fatalf("main release channels = %+v, want canary alone from its head", final.Channels)
+	}
+	if head, ok := ledger.head("putnami", "canary"); !ok || head != outcome.Ref {
+		t.Fatalf("canary head = %+v, %v; outcome = %+v", head, ok, outcome.Ref)
+	}
+	if head, ok := ledger.head("putnami", "pr-7"); !ok || head != pullRequestRef {
+		t.Fatalf("pr-7 head = %+v, %v; the reuse channel is read and never advanced", head, ok)
+	}
+	canary := ledger.mustReleaseSet(t, outcome.Ref)
+	rebound := pullRequestDownstream
+	rebound.SourceRevision = mainRevision
+	if got := releaseSetE2EMember(t, canary, downstream.Name); !releaseSetE2EMembersEqual(got, rebound) {
+		t.Fatalf("canary downstream = %+v, want pr-7's artifact %+v rebound to main", got, rebound)
+	}
+	if got := releaseSetE2EMember(t, canary, upstream.Name); !releaseSetE2EMembersEqual(got, releaseSetE2EMember(t, canarySet, upstream.Name)) {
+		t.Fatalf("canary upstream = %+v, want the bootstrap record", got)
+	}
+
+	// The next main commit's ancestry holds main and the bootstrap but not
+	// the squashed pull-request commit.
+	ancestry := fixedAncestry{nextMainRevision, mainRevision, bootstrapRevision}
+	if revision, ancestor := headAncestry(ancestry, &distribution.ChannelHead{Ref: outcome.Ref, ReleaseSet: &canary}); !ancestor || revision != mainRevision {
+		t.Fatalf("canary head ancestry = %q, %t; want main's commit, an ancestor", revision, ancestor)
+	}
+	pullRequestSet := ledger.mustReleaseSet(t, pullRequestRef)
+	if revision, ancestor := headAncestry(ancestry, &distribution.ChannelHead{Ref: pullRequestRef, ReleaseSet: &pullRequestSet}); ancestor || revision != pullRequestRevision {
+		t.Fatalf("pr-7 head ancestry = %q, %t; want the pull-request commit, not an ancestor", revision, ancestor)
+	}
+
+	// The next publication of the same tree measures against the new canary
+	// head, finds nothing changed, and reuses nothing.
+	useReleaseSetRevision(t, nextMainRevision)
+	again := releaseSetE2EPrepare(t, ctx, merged, ws, ws.Projects)
+	if !again.NoImpact() || again.plan.Reused != nil {
+		t.Fatalf("next main publish selected %+v and reused %+v", again.plan.SelectedMembers(), again.plan.Reused)
+	}
+}

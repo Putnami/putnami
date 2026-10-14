@@ -1,6 +1,7 @@
 # ADR 0006 — A publication measures against a channel it does not advance
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0007](0007-a-publication-may-reuse-a-member-another-channel-published-with-the-same-fingerprint.md)
 - **Scope**: `go.putnami.dev/protocol/distribution` (`protocols/distribution`),
   `putnami-extension-sdk` (`tooling/extension-sdk/releaseset`), `@putnami/cli`
 

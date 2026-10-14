@@ -225,6 +225,14 @@ That baseline channel is a requested name here and nowhere else — it is never 
 `release` channel, so nothing advances it — and the bound of 16 names covers the
 whole list, advanced and read together.
 
+A publication may also read one reuse channel, requested after the baseline: a
+member the plan selects is released with the artifact that channel's head
+already carries for it with the same selection fingerprint, rebound to the
+publishing commit, instead of being built again
+([ADR 0007](doc/adr/0007-a-publication-may-reuse-a-member-another-channel-published-with-the-same-fingerprint.md)).
+It is a requested name like the baseline, never a `release` channel, and the
+same bound covers it.
+
 ### `release`
 
 One transaction: store the set and advance every listed channel by

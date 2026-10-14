@@ -756,6 +756,31 @@ export interface SessionSelection {
    * this member is what lets a consumer attribute each half.
    */
   releaseSetProjects?: string[];
+  /**
+   * The members this session's release-set plan released from the reuse
+   * channel's head instead of building them. Absent when the session reused
+   * nothing.
+   */
+  reuse?: SessionSelectionReuse;
+}
+
+/**
+ * What a release-set publication took from the channel `--reuse-channel`
+ * named: the channel, the id of the head the publication resolved for it, and
+ * every member released with that head's artifact, sorted by ecosystem then
+ * coordinate.
+ */
+export interface SessionSelectionReuse {
+  channel: string;
+  head: string;
+  members: SessionSelectionReusedMember[];
+}
+
+/** One reused member and the version it was released at. */
+export interface SessionSelectionReusedMember {
+  ecosystem: string;
+  coordinate: string;
+  version: string;
 }
 
 /**
@@ -2014,11 +2039,26 @@ const sessionPlacement: Check = (v, path, value) => {
   }
 };
 
+const sessionReusedMemberFields: Field[] = [
+  req('ecosystem', nonEmptyString),
+  req('coordinate', nonEmptyString),
+  req('version', nonEmptyString),
+];
+const sessionReusedMember: Check = (v, path, value) => object(v, path, value, sessionReusedMemberFields);
+
+const sessionSelectionReuseFields: Field[] = [
+  req('channel', nonEmptyString),
+  req('head', nonEmptyString),
+  req('members', arrayOf(sessionReusedMember)),
+];
+const sessionSelectionReuse: Check = (v, path, value) => object(v, path, value, sessionSelectionReuseFields);
+
 const sessionSelectionFields: Field[] = [
   req('mode', enumOf(...SESSION_SELECTION_MODES)),
   req('scoped', boolean),
   opt('projects', arrayOf(nonEmptyString)),
   opt('releaseSetProjects', arrayOf(nonEmptyString)),
+  opt('reuse', sessionSelectionReuse),
 ];
 const sessionSelection: Check = (v, path, value) => object(v, path, value, sessionSelectionFields);
 
@@ -2889,6 +2929,8 @@ export const V2_FIELD_NAMES: Record<string, { members: string[]; required: strin
       ['sessionAgent', sessionAgentFields],
       ['sessionPlacement', sessionPlacementFields],
       ['sessionProvenance', sessionProvenanceFields],
+      ['sessionSelectionReuse', sessionSelectionReuseFields],
+      ['sessionReusedMember', sessionReusedMemberFields],
       ['sessionEnvironment', sessionEnvironmentFields],
       ['preparationPhaseRecord', preparationPhaseRecordFields],
       ['sessionPreparation', sessionPreparationFields],

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -749,5 +750,235 @@ func TestValidatePlanHoldsTheSourceTreeToTheBaselineRecord(t *testing.T) {
 	}
 	if strings.Contains(string(bare), `"sourceTree"`) {
 		t.Fatalf("a plan without source trees emits the key: %s", bare)
+	}
+}
+
+// reuseRevision is the commit another channel published a member from, and
+// planRevision the commit of the publication that reuses it.
+const (
+	reuseRevision = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+	planRevision  = "9fceb02d0ae598e95dc970b74767f19372d61af8"
+)
+
+// reuseTestPlan is testPlan with its one selected member taken from a pr-7
+// head that published the same fingerprint: the member keeps pr-7's artifact
+// record and is rebound to planRevision with no source tree.
+func reuseTestPlan(t *testing.T) *Plan {
+	t.Helper()
+	plan := testPlan(t)
+	canary := plan.Baseline().ReleaseSet
+	downstream := distribution.ReleaseSetMember{
+		Ecosystem: "npm", Coordinate: "@putnami/downstream", Version: "1.1.0-pr", ArtifactDigest: testDigest('c'),
+		Dependencies:   []distribution.ReleaseSetDependency{{Ecosystem: "npm", Coordinate: "@putnami/upstream", Version: "1.0.0-old"}},
+		SourceRevision: reuseRevision, SelectionFingerprint: testDigest('3'), SourceTree: testTree,
+	}
+	pr := distribution.ReleaseSet{ProtocolVersion: distribution.ProtocolVersion, Namespace: "putnami"}
+	for _, member := range canary.Members {
+		if member.Coordinate == "@putnami/upstream" {
+			pr.Members = append(pr.Members, member)
+		}
+	}
+	pr.Members = append(pr.Members, downstream)
+	pr = *distribution.NormalizeReleaseSet(&pr)
+	ref, diagnostics := distribution.DeriveReleaseSetRef(&pr)
+	if hasDiagnosticErrors(diagnostics) {
+		t.Fatalf("derive reuse ref: %v", diagnostics)
+	}
+	plan.Heads["pr-7"] = &distribution.ChannelHead{Ref: ref, Generation: 2, ReleaseSet: &pr}
+	plan.ReuseChannel = "pr-7"
+	plan.Reused = []MemberRef{{Ecosystem: "npm", Coordinate: "@putnami/downstream"}}
+	plan.SourceRevision = planRevision
+	for i := range plan.Members {
+		if plan.Members[i].Coordinate == "@putnami/downstream" {
+			plan.Members[i] = PlannedMember{
+				Ecosystem: "npm", Coordinate: "@putnami/downstream", Version: "1.1.0-pr", ArtifactDigest: testDigest('c'),
+				Dependencies:   []distribution.ReleaseSetDependency{{Ecosystem: "npm", Coordinate: "@putnami/upstream", Version: "1.0.0-old"}},
+				SourceRevision: planRevision, SelectionFingerprint: testDigest('3'), ProjectID: "/downstream",
+			}
+		}
+	}
+	return NormalizePlan(plan)
+}
+
+func setPlannedMember(plan *Plan, coordinate string, edit func(*PlannedMember)) {
+	for i := range plan.Members {
+		if plan.Members[i].Coordinate == coordinate {
+			edit(&plan.Members[i])
+		}
+	}
+}
+
+// protocols/distribution ADR 0007: a member another channel already published
+// with the same fingerprint is carried with that channel's artifact record,
+// rebound to this publication's revision. The baseline stays the first
+// channel's head, and the reuse head rides in Heads beside it.
+func TestValidatePlanAcceptsAMemberReusedFromAnotherChannel(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "release-plan-compatibility", "reused-members-carry-the-reuse-heads-record")
+	plan := reuseTestPlan(t)
+	if err := ValidatePlan(plan); err != nil {
+		t.Fatalf("reuse plan rejected: %v", err)
+	}
+	if plan.Baseline() != plan.Heads["canary"] || plan.BaselineChannelName() != "canary" {
+		t.Fatalf("baseline = %q, want canary: a reuse head is never a baseline", plan.BaselineChannelName())
+	}
+	if plan.ReuseHead() != plan.Heads["pr-7"] || !plan.Reuses("npm", "@putnami/downstream") || plan.Reuses("npm", "@putnami/upstream") {
+		t.Fatalf("reuse accessors disagree with the plan: %+v", plan.Reused)
+	}
+	if len(plan.SelectedMembers()) != 0 {
+		t.Fatalf("a reused member is selected: %+v", plan.SelectedMembers())
+	}
+	reused := plan.ReusedMembers()
+	if len(reused) != 1 || reused[0].Version != "1.1.0-pr" || reused[0].SourceRevision != planRevision {
+		t.Fatalf("reused members = %+v", reused)
+	}
+	if got := planResolvedChannels(plan); !reflect.DeepEqual(got, []string{"canary", "pr-7"}) {
+		t.Fatalf("resolved channels = %v, want the advanced channel then the reuse channel", got)
+	}
+
+	raw, err := json.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := ParseParams(job.Params{ContextParamName: raw})
+	if err != nil {
+		t.Fatalf("ParseParams: %v", err)
+	}
+	if parsed.ReuseChannel != "pr-7" || parsed.SourceRevision != planRevision || !reflect.DeepEqual(parsed.Reused, plan.Reused) {
+		t.Fatalf("round trip lost the reuse fields: %+v", parsed)
+	}
+	parsed.Reused[0].Coordinate = "mutated"
+	if plan.Reused[0].Coordinate == "mutated" {
+		t.Fatal("ParseParams returned an alias into the reused list")
+	}
+
+	// A member the baseline lacks may be reused too, and a plan that reuses
+	// every member needs no baseline at all.
+	first := reuseTestPlan(t)
+	first.Channels = []string{"pr-9"}
+	first.Heads = map[string]*distribution.ChannelHead{"pr-9": nil, "pr-7": first.Heads["pr-7"]}
+	first.Reused = []MemberRef{{Ecosystem: "npm", Coordinate: "@putnami/downstream"}, {Ecosystem: "npm", Coordinate: "@putnami/upstream"}}
+	first = NormalizePlan(first)
+	setPlannedMember(first, "@putnami/upstream", func(member *PlannedMember) {
+		member.SourceRevision = planRevision
+		member.ProjectID = "/upstream"
+	})
+	if err := ValidatePlan(first); err != nil {
+		t.Fatalf("plan reusing every member over an empty channel rejected: %v", err)
+	}
+}
+
+func TestValidatePlanRefusesAReuseItCannotProve(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "release-plan-compatibility", "reused-members-carry-the-reuse-heads-record")
+	cases := []struct {
+		name string
+		edit func(*Plan)
+		want string
+	}{
+		{"reuse channel is advanced", func(plan *Plan) {
+			plan.Channels = []string{"canary", "pr-7"}
+		}, `reuse channel "pr-7" is also advanced by the plan`},
+		{"reuse channel is the baseline channel", func(plan *Plan) {
+			plan.BaselineChannel = "pr-7"
+		}, "is also its baseline channel"},
+		{"reused list without a reuse channel", func(plan *Plan) {
+			plan.ReuseChannel = ""
+			plan.SourceRevision = ""
+		}, "without a reuse channel"},
+		{"plan revision without a reuse channel", func(plan *Plan) {
+			plan.ReuseChannel = ""
+			plan.Reused = nil
+		}, "without a reuse channel"},
+		{"reuse channel that reuses nothing", func(plan *Plan) {
+			plan.Reused = nil
+		}, "reuses no member"},
+		{"reuse without a plan revision", func(plan *Plan) {
+			plan.SourceRevision = ""
+		}, "records no plan revision"},
+		{"reuse channel has no head", func(plan *Plan) {
+			plan.Heads["pr-7"] = nil
+		}, `channel "pr-7", which has no head`},
+		{"reused member absent from the reuse head", func(plan *Plan) {
+			plan.Reused = append(plan.Reused, MemberRef{Ecosystem: "npm", Coordinate: "@putnami/zzz"})
+		}, "absent from the reuse head"},
+		{"reused list out of order", func(plan *Plan) {
+			plan.Reused = append([]MemberRef{{Ecosystem: "npm", Coordinate: "@putnami/upstream"}}, plan.Reused...)
+		}, "not unique canonical order"},
+		{"reused list names a member twice", func(plan *Plan) {
+			plan.Reused = append(plan.Reused, plan.Reused[0])
+		}, "not unique canonical order"},
+		{"reused list names a selected member", func(plan *Plan) {
+			setPlannedMember(plan, "@putnami/downstream", func(member *PlannedMember) {
+				member.Selected = true
+				member.ArtifactDigest = ""
+			})
+		}, "carries 0 of them unselected"},
+		{"reused member keeps the other channel's revision", func(plan *Plan) {
+			setPlannedMember(plan, "@putnami/downstream", func(member *PlannedMember) { member.SourceRevision = reuseRevision })
+		}, `records revision "4b825dc642cb6eb9a060e54bf8d69288fbee4904", not the plan's`},
+		{"selected member records another revision", func(plan *Plan) {
+			setPlannedMember(plan, "@putnami/upstream", func(member *PlannedMember) {
+				member.Selected = true
+				member.ArtifactDigest = ""
+				member.ProjectID = "/upstream"
+			})
+		}, `selected release-set plan member "npm/@putnami/upstream" records revision`},
+		{"reused member drops its digest", func(plan *Plan) {
+			setPlannedMember(plan, "@putnami/downstream", func(member *PlannedMember) { member.ArtifactDigest = "" })
+		}, "did not carry its artifact digest"},
+		{"reused member changes its digest", func(plan *Plan) {
+			setPlannedMember(plan, "@putnami/downstream", func(member *PlannedMember) { member.ArtifactDigest = testDigest('d') })
+		}, "does not carry the reuse head's record"},
+		{"reused member changes its version", func(plan *Plan) {
+			setPlannedMember(plan, "@putnami/downstream", func(member *PlannedMember) { member.Version = "1.1.0-other" })
+		}, "does not carry the reuse head's record"},
+		{"reused member changes its fingerprint", func(plan *Plan) {
+			setPlannedMember(plan, "@putnami/downstream", func(member *PlannedMember) { member.SelectionFingerprint = testDigest('4') })
+		}, "does not carry the reuse head's record"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := reuseTestPlan(t)
+			tc.edit(plan)
+			if err := ValidatePlan(plan); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("ValidatePlan error = %v, want containing %q", err, tc.want)
+			}
+		})
+	}
+}
+
+// The reuse head is a REQUESTED channel of the publication's one resolve. A
+// reader that ignores the reuse fields, which is every SDK built before them,
+// sees a head nobody asked for and refuses the plan instead of treating the
+// reused member as an inherited one.
+func TestPlanHeadsReplayTheResolveThatIncludedTheReuseChannel(t *testing.T) {
+	plan := reuseTestPlan(t)
+	plan.ReuseChannel, plan.Reused, plan.SourceRevision = "", nil, ""
+	if err := ValidatePlan(plan); err == nil || !strings.Contains(err.Error(), "which was not requested") {
+		t.Fatalf("a reuse head read without its reuse fields was accepted: %v", err)
+	}
+}
+
+// A plan that reuses nothing carries none of the reuse members, so its bytes
+// are those of a plan built before the option existed.
+func TestAPlanWithoutReuseEmitsNoReuseField(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "release-plan-compatibility", "a-plan-without-reuse-keeps-its-bytes")
+	raw, err := json.Marshal(testPlan(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		t.Fatal(err)
+	}
+	keys := make([]string, 0, len(fields))
+	for key := range fields {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	if want := []string{"channels", "heads", "members", "namespace", "protocolVersion"}; !reflect.DeepEqual(keys, want) {
+		t.Fatalf("plan fields = %v, want %v", keys, want)
+	}
+	if clone := ClonePlan(testPlan(t)); clone.Reused != nil {
+		t.Fatalf("clone of a plan without reuse grew a reused list: %+v", clone.Reused)
 	}
 }

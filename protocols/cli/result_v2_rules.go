@@ -247,6 +247,19 @@ var (
 		req("scoped", boolean),
 		opt("projects", arrayOf(nonEmptyString)),
 		opt("releaseSetProjects", arrayOf(nonEmptyString)),
+		opt("reuse", sessionSelectionReuse),
+	}
+
+	sessionSelectionReuseFields = []field{
+		req("channel", nonEmptyString),
+		req("head", nonEmptyString),
+		req("members", arrayOf(sessionReusedMember)),
+	}
+
+	sessionReusedMemberFields = []field{
+		req("ecosystem", nonEmptyString),
+		req("coordinate", nonEmptyString),
+		req("version", nonEmptyString),
 	}
 
 	cgroupThrottleFields = []field{
@@ -589,6 +602,8 @@ var v2FieldSets = map[string][]field{
 	"sessionAgent":             sessionAgentFields,
 	"sessionPlacement":         sessionPlacementFields,
 	"sessionProvenance":        sessionProvenanceFields,
+	"sessionSelectionReuse":    sessionSelectionReuseFields,
+	"sessionReusedMember":      sessionReusedMemberFields,
 	"sessionEnvironment":       sessionEnvironmentFields,
 	"preparationPhaseRecord":   preparationPhaseRecordFields,
 	"sessionPreparation":       sessionPreparationFields,
@@ -994,6 +1009,14 @@ func sessionProvenance(v *validator, path string, value any) {
 
 func sessionSelection(v *validator, path string, value any) {
 	object(v, path, value, sessionSelectionFields)
+}
+
+func sessionSelectionReuse(v *validator, path string, value any) {
+	object(v, path, value, sessionSelectionReuseFields)
+}
+
+func sessionReusedMember(v *validator, path string, value any) {
+	object(v, path, value, sessionReusedMemberFields)
 }
 
 func cgroupThrottle(v *validator, path string, value any) {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -277,6 +278,63 @@ func TestValidate_SelectionReleaseSetProjectsAreASortedSubset(t *testing.T) {
 				t.Fatalf("expected acceptance, got %v", diags)
 			}
 		})
+	}
+}
+
+// The reuse block names the members a release-set publication released from
+// another channel's head. A block that names no member, a member without its
+// identity or version, or members out of identity order would describe a reuse
+// a reader cannot find again, and a member field the contract does not declare
+// is refused from the wire.
+func TestValidate_SelectionReuseNamesEveryReusedMemberInOrder(t *testing.T) {
+	for fixture, field := range map[string]string{
+		"selection-reuse-unsorted.json":             "selection.reuse.members",
+		"selection-reuse-no-members.json":           "selection.reuse.members",
+		"selection-reuse-blank-member.json":         "selection.reuse.members[0].version",
+		"selection-reuse-unknown-member-field.json": "",
+	} {
+		t.Run(fixture, func(t *testing.T) {
+			_, diags := ParseAndValidate(readFixture(t, "fixtures", "v2", "invalid", fixture))
+			if field == "" {
+				if !diag.HasErrors(diags) {
+					t.Fatal("an undeclared reuse member field was accepted")
+				}
+				return
+			}
+			code := ErrorCodeInvalidValue
+			if strings.HasSuffix(field, "].version") {
+				code = ErrorCodeMissingField
+			}
+			assertDiagnostic(t, diags, code, field)
+		})
+	}
+
+	data := readFixture(t, "fixtures", "v2", "valid", "selection-release-set-reuse.json")
+	ctx, diags := ParseAndValidate(data)
+	if diag.HasErrors(diags) {
+		t.Fatalf("strict parse rejected the reuse block: %v", diags)
+	}
+	encoded, err := json.Marshal(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	round, diags := ParseAndValidate(encoded)
+	if diag.HasErrors(diags) {
+		t.Fatalf("re-encoded document failed strict parse: %v", diags)
+	}
+	reuse := round.Selection.Reuse
+	if reuse == nil || reuse.Channel != "pr-7" || len(reuse.Members) != 2 ||
+		reuse.Members[1] != (SelectionReusedMember{Ecosystem: "oci", Coordinate: "acme/console", Version: "1.2.0-20261014120000-abc1234"}) {
+		t.Fatalf("round-tripped selection.reuse = %+v", reuse)
+	}
+
+	// A selection without reuse emits no member, so its bytes are unchanged.
+	bare, err := json.Marshal(&Selection{Mode: SelectionModeAll, ProjectIDs: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(bare), `"reuse"`) {
+		t.Fatalf("a selection without reuse emits the member: %s", bare)
 	}
 }
 

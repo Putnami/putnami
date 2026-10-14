@@ -314,8 +314,9 @@ func acceptedFlagHint(declared []commandmeta.Flag) string {
 
 // coreJobFlags are the flags the CORE reads from a job-running command rather
 // than an extension manifest: the release-set channels, the channel a first
-// publish measures against without advancing it, the visibility a publication
-// confers, the version line a tagged publish releases, the environment a deploy
+// publish measures against without advancing it, the channel whose published
+// members a publication may release instead of building them, the visibility a
+// publication confers, the version line a tagged publish releases, the environment a deploy
 // synchronizes, and the immutable release an upgrade or a deploy names. They are
 // not global flags — they mean nothing outside publish, upgrade and deploy —
 // and no manifest declares them, because the coordinator that reads them is the
@@ -326,8 +327,8 @@ func acceptedFlagHint(declared []commandmeta.Flag) string {
 // the git ref `--impacted` resolves against, and a release-set publish never
 // measures against git (D16), so the two could not share a spelling.
 var coreJobFlags = map[string]bool{
-	"channel": true, "baseline-channel": true, "visibility": true, "scope": true,
-	"release": true, "env": true,
+	"channel": true, "baseline-channel": true, "reuse-channel": true, "visibility": true,
+	"scope": true, "release": true, "env": true,
 }
 
 // undeclaredFlagWarnings is the warning-window half of the policy: one notice

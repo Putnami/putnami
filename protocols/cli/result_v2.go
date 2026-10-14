@@ -1358,6 +1358,28 @@ type SessionSelection struct {
 	// the caller's own selection asked for. Projects is the union — what ran —
 	// so this member is what lets a consumer attribute each half.
 	ReleaseSetProjects []string `json:"releaseSetProjects,omitempty"`
+	// Reuse names the members this session's release-set plan released from
+	// the reuse channel's head instead of building them. Absent when the
+	// session reused nothing.
+	Reuse *SessionSelectionReuse `json:"reuse,omitempty"`
+}
+
+// SessionSelectionReuse is what a release-set publication took from the
+// channel `--reuse-channel` named: the channel, the id of the head the
+// publication resolved for it, and every member released with that head's
+// artifact, sorted by ecosystem then coordinate.
+type SessionSelectionReuse struct {
+	Channel string                         `json:"channel"`
+	Head    string                         `json:"head"`
+	Members []SessionSelectionReusedMember `json:"members"`
+}
+
+// SessionSelectionReusedMember is one reused member and the version it was
+// released at.
+type SessionSelectionReusedMember struct {
+	Ecosystem  string `json:"ecosystem"`
+	Coordinate string `json:"coordinate"`
+	Version    string `json:"version"`
 }
 
 // SessionFile is the recorded session metadata document (session.json).

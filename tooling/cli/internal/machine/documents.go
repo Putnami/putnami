@@ -424,7 +424,9 @@ func (r Run) SessionFile(commands []string, scheduler, cache any) *protocolcli.S
 // The release-set half IS repeated, because nothing else in the record carries
 // it: a session that published beside its gate planned the union of two
 // selections, and a reader that cannot subtract one from the other reads a
-// project the run only verified as one it published.
+// project the run only verified as one it published. The reuse block is
+// repeated for the same reason: it is the only statement that a member was
+// released from another channel's head rather than built or inherited.
 func SessionSelection(selection *protocoljob.Selection) *protocolcli.SessionSelection {
 	if selection == nil || selection.Mode == "" {
 		return nil
@@ -434,7 +436,28 @@ func SessionSelection(selection *protocoljob.Selection) *protocolcli.SessionSele
 		Scoped:             selection.Scoped,
 		Projects:           selection.ProjectIDs,
 		ReleaseSetProjects: selection.ReleaseSetProjects,
+		Reuse:              sessionSelectionReuse(selection.Reuse),
 	}
+}
+
+// sessionSelectionReuse copies the job context's reuse block member for
+// member; the two types are declared separately for the reason above, and
+// their JSON is pinned equal by TestSessionSelectionReuseMatchesTheJobContract.
+func sessionSelectionReuse(reuse *protocoljob.SelectionReuse) *protocolcli.SessionSelectionReuse {
+	if reuse == nil {
+		return nil
+	}
+	projected := &protocolcli.SessionSelectionReuse{
+		Channel: reuse.Channel,
+		Head:    reuse.Head,
+		Members: make([]protocolcli.SessionSelectionReusedMember, 0, len(reuse.Members)),
+	}
+	for _, member := range reuse.Members {
+		projected.Members = append(projected.Members, protocolcli.SessionSelectionReusedMember{
+			Ecosystem: member.Ecosystem, Coordinate: member.Coordinate, Version: member.Version,
+		})
+	}
+	return projected
 }
 
 func (r Run) duration() time.Duration {

@@ -1030,6 +1030,7 @@ spawning task's whole subprocess tree.
 | `scoped` | false only for the unscoped whole-workspace projection; a session may claim workspace coverage only then |
 | `projects` | the selected projects' canonical ids, sorted; absent when the run selected nothing |
 | `releaseSetProjects` | the subset of `projects` whose publish and package steps the session's release-set plan owned, sorted; absent when the session coordinated no release set and when its plan selected no member |
+| `reuse` | the members the release-set plan released from the channel `--reuse-channel` named instead of building them: `channel`, the `head` set id the publication resolved for it, and `members`, each with `ecosystem`, `coordinate` and `version`, sorted by ecosystem then coordinate; absent when the session reused nothing |
 
 It exists because `git.baseline` cannot answer the question: it is present only
 when the user named a baseline, and the selected ids alone cannot separate an
@@ -1043,6 +1044,28 @@ selection asked for. `projects` is the union — what the run planned and execut
 was chosen, because that is the half a selection flag decides. Without
 `releaseSetProjects` a consumer could not tell the two apart, and would read a
 library that was only verified as one the run published.
+
+A reused member is neither built by the session nor inherited from the
+baseline: the session released the artifact another channel's head already
+carried for the same selection fingerprint, rebound to this session's commit.
+Its owner is not in `releaseSetProjects`, because the plan scheduled no publish
+or package step for it, and `reuse` is the only member that says it changed:
+
+```json
+"selection": {
+  "mode": "impacted",
+  "scoped": true,
+  "projects": ["/apps/console"],
+  "releaseSetProjects": ["/apps/console"],
+  "reuse": {
+    "channel": "pr-7",
+    "head": "rs_9a03…",
+    "members": [
+      { "ecosystem": "npm", "coordinate": "@acme/widget", "version": "1.2.0-20261014120000-abc1234" }
+    ]
+  }
+}
+```
 
 A session may not name itself as its own parent. That shape is a producer that
 stamped the ambient parent id beside its own id, and a consumer trusting it

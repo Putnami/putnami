@@ -50,6 +50,10 @@
       "text": "Resolve all heads once in the declared distribution namespace (workspace name by default). Measure impact against the first advanced channel, or, when it has no head, against the named baseline channel, resolved with them and never advanced: republish members whose package execution-key fingerprint (excluding embedded version) changed and their dependents; inherit the rest. One release stores the snapshot and advances every channel by compare-and-swap. Any conflict writes nothing and names every head."
     },
     {
+      "id": "release-set-reuse-channel",
+      "text": "A publication may name one reuse channel, resolved after the others and never advanced or used as baseline. A member the plan selects is released from the reuse head's record, rebound to this commit and with no package or publish job, when that record has the run's fingerprint, sorts above the baseline record, matches the run's version but for the commit suffix, and names the final dependency versions. --all and tagged runs never reuse; a plan that reuses nothing keeps its bytes."
+    },
+    {
       "id": "release-set-attribution-opt-in",
       "text": "A selected member records its source project and artifact kind only when the repository's distribution policy declares memberAttribution; by default the plan handed to publishing extensions and the released set carry neither field, so an extension or provider built before the fields existed decodes them strictly without error. An unchanged member inherits its head record verbatim either way."
     },
@@ -142,6 +146,7 @@
     "tooling/cli/doc/adr/0061-channel-and-ci-commands-leave-the-core-cli.md",
     "tooling/cli/doc/adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md",
     "tooling/cli/doc/adr/0064-an-executing-task-starts-from-an-empty-owned-directory.md",
-    "tooling/cli/doc/adr/0065-an-optional-command-output-directory-is-emptied-on-execution-and-on-an-empty-restore.md"
+    "tooling/cli/doc/adr/0065-an-optional-command-output-directory-is-emptied-on-execution-and-on-an-empty-restore.md",
+    "tooling/cli/doc/adr/0066-a-main-publication-releases-what-its-pull-request-published.md"
   ]
 }

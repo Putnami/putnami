@@ -898,7 +898,8 @@
               "type": "array",
               "items": { "type": "string", "minLength": 1 },
               "description": "The canonical ids, sorted, of the projects whose publish and package steps this session's release-set plan owned. A subset of projects, which stays the union the run planned and executed. Absent when the session coordinated no release set, and when its plan selected no member."
-            }
+            },
+            "reuse": { "$ref": "#/$defs/sessionSelectionReuse" }
           }
         },
         "git": {
@@ -1195,6 +1196,32 @@
           "pattern": "^[0-9a-f]{32}$",
           "description": "The request's idempotency key: the one submission this session answers, however many times the submitting side had to resolve it."
         }
+      }
+    },
+    "sessionSelectionReuse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "head", "members"],
+      "description": "The members a release-set publication released from the channel --reuse-channel named instead of building them. Absent when the session reused nothing.",
+      "properties": {
+        "channel": { "type": "string", "minLength": 1, "description": "The reuse channel. It is read and never advanced." },
+        "head": { "type": "string", "minLength": 1, "description": "The id of the reuse channel's head the publication resolved." },
+        "members": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sessionReusedMember" },
+          "description": "Every reused member, sorted by ecosystem then coordinate."
+        }
+      }
+    },
+    "sessionReusedMember": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ecosystem", "coordinate", "version"],
+      "description": "One reused member and the version it was released at, which is the version the reuse head recorded for it.",
+      "properties": {
+        "ecosystem": { "type": "string", "minLength": 1 },
+        "coordinate": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
       }
     },
     "sessionEnvironment": {

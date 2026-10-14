@@ -616,6 +616,24 @@
           }
         },
         {
+          "id": "release-set-reuse-channel",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-selected-member-is-released-from-the-reuse-channel",
+              "a-member-the-reuse-head-cannot-vouch-for-is-built",
+              "a-reused-member-whose-dependency-is-built-is-built",
+              "a-plan-that-reuses-nothing-keeps-its-bytes",
+              "a-reuse-channel-that-cannot-apply-is-refused",
+              "a-main-publish-releases-what-its-pull-request-published"
+            ]
+          }
+        },
+        {
           "id": "release-set-attribution-opt-in",
           "stage": "coded",
           "evidenceKinds": [

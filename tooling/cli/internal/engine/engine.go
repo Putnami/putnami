@@ -1001,12 +1001,14 @@ func publishFinalizers(ctx context.Context, req *Request, releaseSetRun *jobs.Re
 func buildReleaseSetOptions(req *Request, ws *workspace.Workspace) (jobs.ReleaseSetOptions, error) {
 	channel, _ := req.CommandParams["channel"].(string)
 	baselineChannel, _ := req.CommandParams["baseline-channel"].(string)
+	reuseChannel, _ := req.CommandParams["reuse-channel"].(string)
 	visibility, _ := req.CommandParams["visibility"].(string)
 	scope, _ := req.CommandParams["scope"].(string)
 	dryRun, _ := req.CommandParams["dry-run"].(bool)
 	return jobs.BuildReleaseSetOptions(jobs.ReleaseSetRequest{
 		Commands: req.Commands, WorkspaceRoot: req.WorkspaceRoot,
-		Channel: channel, BaselineChannel: baselineChannel, Visibility: visibility, Scope: scope, DryRun: dryRun,
+		Channel: channel, BaselineChannel: baselineChannel, ReuseChannel: reuseChannel,
+		Visibility: visibility, Scope: scope, DryRun: dryRun,
 		Impacted: req.Global.Impacted, All: req.Global.All,
 		Versions: req.runVersions(ws),
 	})
