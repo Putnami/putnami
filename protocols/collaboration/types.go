@@ -283,7 +283,7 @@ type ProposalFindInput struct {
 	// Change identifies the exact repository/base/head to find proposals for.
 	// A HeadCommit names the commit the caller pushed to the head: a provider
 	// whose proposal head follows the pushed ref answers an open proposal
-	// behind a head ref already at that commit once its head caught up, or
+	// behind a head ref already at that commit once its head catches up, or
 	// answers unavailable and retryable.
 	Change Change `json:"change"`
 	// States restricts the result to these states; empty means every state.

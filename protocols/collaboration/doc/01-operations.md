@@ -86,7 +86,7 @@ repeating it never creates a second.
 A `headCommit` on `find` names the commit the caller pushed to the head. A
 provider whose proposal head follows the pushed ref answers an open proposal
 still behind a head ref that already points at that commit only once its head
-caught up, so its revision covers that commit; one that stays behind is
+catches up, so its revision covers that commit; one that stays behind is
 `unavailable` and retryable. A provider that records the head only on `upsert`
 answers the proposal as recorded.
 
