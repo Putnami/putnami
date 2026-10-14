@@ -27,7 +27,7 @@
     },
     {
       "id": "extension-verb-vocabulary",
-      "text": "An extension manifest may declare a verb vocabulary: an ordered list of verbs, each with a description, aliases, default traits and related commands. The CLI merges the loaded vocabularies in extension-name order; the first declaration of a verb wins, and a second draws a warning. Help, completion and impact-plan read the result. Its aliases resolve before the built-in ones, a workspace alias of the same name hides one with a warning, and an alias never takes a verb, command, command group or core root."
+      "text": "An extension manifest may declare a verb vocabulary: an ordered list of verbs, each with a description, aliases, default traits and related commands. The CLI merges the loaded vocabularies in extension-name order; the first declaration of a verb wins, and a second draws a warning. Help, completion and impact-plan read the result. Its aliases resolve before the built-in ones, a workspace alias that applies hides one with a warning, and an alias never takes a verb, command, command group or core root."
     },
     {
       "id": "vocabulary-default-traits",

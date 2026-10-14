@@ -212,10 +212,9 @@ The CLI reads the vocabularies of the loaded extensions:
   first, then the core's built-in aliases, then the workspace's. A workspace
   alias of the same name hides a vocabulary alias, with a warning. A
   workspace alias named like a built-in alias never applies, so it hides
-  nothing. The CLI
-  drops an alias that an earlier verb claimed, or that names a verb, a
-  command or command group of a loaded extension, or a command of the core
-  catalog, such as `help` or `deploy`. `putnami impact-plan` resolves the same
+  nothing. The CLI drops an alias that an earlier verb claimed, or that
+  names a verb, a command or command group of a loaded extension, or a
+  command of the core catalog, such as `help` or `deploy`. `putnami impact-plan` resolves the same
   aliases. A provider process, the CLI an extension starts, resolves no
   vocabulary alias, as it resolves no workspace alias.
 - **Completion.** Completion offers the merged verbs with their

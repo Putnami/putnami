@@ -59,9 +59,9 @@ per verb and project to every plan, and change every recorded session.
      same name hides a vocabulary alias, with a warning, so an extension
      update never changes what a workspace alias runs. A workspace alias
      named like a built-in alias never applies, so it hides nothing and
-     draws no warning. An alias that an
-     earlier verb claimed, or that names a verb, a command or command group
-     of a loaded extension, or a command of the core catalog, is dropped.
+     draws no warning. An alias that an earlier verb claimed, or that names
+     a verb, a command or command group of a loaded extension, or a command
+     of the core catalog, is dropped.
      `putnami impact-plan` resolves the same aliases. A provider process
      resolves no vocabulary alias.
    - Completion offers the merged verbs and their aliases.
