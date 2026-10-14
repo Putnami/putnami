@@ -443,7 +443,7 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // evaluator stays in the existing commands/shared package, so this adds exactly
 // two production packages and no execution engine or scheduling stage.
 //
-// RAISED 69 → 70 (#256 slice 1a): internal/jobs/machineprobe is the first
+// RAISED 69 → 70: internal/jobs/machineprobe is the first
 // package split out of internal/jobs. It reads the machine a run executes on:
 // the runner's CPU quota, throttling, pressure and steal, its memory capacity
 // and pressure, and the rusage of a finished process. It imports only the

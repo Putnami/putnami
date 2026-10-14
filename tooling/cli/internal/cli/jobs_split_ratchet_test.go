@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// The internal/jobs split (#256 slice 1).
+// The internal/jobs split.
 //
 // internal/jobs is being split into packages so that a change in one part
 // stops recompiling and rerunning the tests of another. Go reruns a package's
