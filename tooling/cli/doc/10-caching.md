@@ -434,6 +434,12 @@ A file wrongly excluded from a key serves a stale result; a file wrongly
 included costs a rebuild. Narrow a declaration only against the action's own
 code, never against an assumption about what it probably reads.
 
+A declaration should not reach into the `.gen` tree another task writes during
+the run: the key computed before any task runs then differs from the key the
+task computes when it starts, and the task misses the entry the run looked up
+for it. The Go source inputs leave out `.gen`, where `build-describe` stages a
+generated client that no Go source task compiles.
+
 ### Outputs written earlier in the session
 
 A run memoizes each file digest, so the steps that share a pattern set read

@@ -713,7 +713,8 @@
         "evidence": {
           "from": "workspace",
           "files": [
-            "**/schema/capabilities.json"
+            "**/schema/capabilities.json",
+            "!**/.gen/**"
           ]
         },
         "policy": {
@@ -1279,7 +1280,8 @@
             "**/specs/*.json",
             "**/putnami.json",
             "putnami.workspace.json",
-            "**/specs.baseline.json"
+            "**/specs.baseline.json",
+            "!**/.gen/**"
           ]
         }
       },

@@ -203,9 +203,12 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 				// the declarations, so it is named in the key like every other
 				// file the task opens. Reading it is what keeps the check
 				// cacheable: the alternative — asking a build to run — would put
-				// unkeyed state behind a restored verdict.
+				// unkeyed state behind a restored verdict. The task reads the
+				// committed manifest only, never the generated copy under a
+				// project's .gen, which a build task of the same run writes.
 				"evidence": {From: "workspace", Files: []string{
 					"**/schema/capabilities.json",
+					"!**/.gen/**",
 				}},
 			},
 			// No `reads` resource. The only files this task opens are the ARC
@@ -234,12 +237,14 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			Inputs: map[string]proto.TaskInputPort{
 				// The whole read set: discovery (manifests and specs), policy
 				// (project and workspace options), and the committed floor.
+				// Nothing under a project's generated .gen tree belongs to it.
 				"floor": {From: "workspace", Files: []string{
 					"**/putnami.features.json",
 					"**/specs/*.json",
 					"**/putnami.json",
 					"putnami.workspace.json",
 					"**/specs.baseline.json",
+					"!**/.gen/**",
 				}},
 			},
 			// No `reads` resource for the same reason as architecture-validate:

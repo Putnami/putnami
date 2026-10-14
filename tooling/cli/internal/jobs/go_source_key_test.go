@@ -414,3 +414,29 @@ func TestGoBuildKeyIgnoresADependencyForeignOptions(t *testing.T) {
 		t.Error("the dependency's own @putnami/go options left a key unmoved")
 	}
 }
+
+// A Go source key ignores the .go files under .gen: build-describe stages a
+// generated client there during the run, and no Go source task compiles it, so
+// it would otherwise move the key the run computed before describe ran. An
+// embed directive that names a file under .gen still binds it.
+func TestGoSourceKeyIgnoresGoFilesUnderTheGeneratedTree(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "go-generated-tree-sources", "go-source-key-ignores-go-files-under-the-generated-tree")
+	for _, task := range []struct{ name, job string }{{"build-compile", "build~compile"}, {"test-exec", "test~test"}} {
+		t.Run(task.name, func(t *testing.T) {
+			fixture := newGoSourceKeyFixture(t, task.name, task.job, false)
+			_, before := fixture.keys(t)
+			writeTestFile(t, filepath.Join(fixture.appDir, ".gen", "clientgen", "go", "client.gen.go"), "package client\n")
+			if _, after := fixture.keys(t); after != before {
+				t.Fatal("a .go file under .gen moved the key")
+			}
+
+			writeTestFile(t, filepath.Join(fixture.appDir, "assets.go"), "package main\nimport _ \"embed\"\n//go:embed .gen/assets/security.txt\nvar asset string\n")
+			writeTestFile(t, filepath.Join(fixture.appDir, ".gen", "assets", "security.txt"), "A")
+			_, embedded := fixture.keys(t)
+			writeTestFile(t, filepath.Join(fixture.appDir, ".gen", "assets", "security.txt"), "B")
+			if _, edited := fixture.keys(t); edited == embedded {
+				t.Fatal("an edit to an embedded file under .gen left the key unmoved")
+			}
+		})
+	}
+}
