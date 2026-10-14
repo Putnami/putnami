@@ -75,6 +75,57 @@
           }
         }
       ]
+    },
+    {
+      "id": "cloud/secret-config-key",
+      "type": "feature",
+      "name": "Secrets stored under the config key the application reads",
+      "outcome": "putnami cloud secrets set stores a secret under the config key the application reads, and refuses the requirement name infra/requirements.json lists for it, naming the config key and the command that stores it",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "requirement-name-refused",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "secrets-set-refuses-requirement-name"
+            ]
+          }
+        },
+        {
+          "id": "declared-key-stored",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "secrets-set-stores-declared-keys"
+            ]
+          }
+        },
+        {
+          "id": "undeclared-key-stored-with-warning",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "secrets-set-undeclared-key-warning",
+              "secrets-set-unreadable-schema-warning",
+              "secrets-set-failed-write-no-warning"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

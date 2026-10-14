@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // secretsFakeServer is a focused in-memory stand-in for control-plane-api.
@@ -315,6 +316,7 @@ func runCRMSecretsSet(t *testing.T, fake *secretsFakeServer, args ...string) (st
 }
 
 func TestSecretsSet_RefusesRequirementNameAndNamesTheField(t *testing.T) {
+	spectest.Proves(t, "cloud/secret-config-key", "requirement-name-refused", "secrets-set-refuses-requirement-name")
 	cases := map[string]struct {
 		args  []string
 		field string
@@ -345,6 +347,7 @@ func TestSecretsSet_RefusesRequirementNameAndNamesTheField(t *testing.T) {
 }
 
 func TestSecretsSet_AcceptsDeclaredKeys(t *testing.T) {
+	spectest.Proves(t, "cloud/secret-config-key", "declared-key-stored", "secrets-set-stores-declared-keys")
 	for _, key := range []string{"crm.apiKey", "crm.oauthApp", "crm.oauthApp.clientSecret", "crm.webhookSecrets.stripe", "integrations.stripe.apiKey"} {
 		fake := newCRMSecretsFake(t)
 		stderr, err := runCRMSecretsSet(t, fake, key)
@@ -363,6 +366,7 @@ func TestSecretsSet_AcceptsDeclaredKeys(t *testing.T) {
 // A schema published before a field existed does not declare it yet, so an
 // undeclared key that is no requirement name is stored with a warning.
 func TestSecretsSet_StoresAnUndeclaredKeyWithAWarning(t *testing.T) {
+	spectest.Proves(t, "cloud/secret-config-key", "undeclared-key-stored-with-warning", "secrets-set-undeclared-key-warning")
 	fake := newCRMSecretsFake(t)
 	stderr, err := runCRMSecretsSet(t, fake, "crm.token")
 	if err != nil {
@@ -376,6 +380,7 @@ func TestSecretsSet_StoresAnUndeclaredKeyWithAWarning(t *testing.T) {
 }
 
 func TestSecretsSet_StoresUncheckedWhenTheSchemaReadFails(t *testing.T) {
+	spectest.Proves(t, "cloud/secret-config-key", "undeclared-key-stored-with-warning", "secrets-set-unreadable-schema-warning")
 	fake := newCRMSecretsFake(t)
 	fake.schemaError = http.StatusForbidden
 	stderr, err := runCRMSecretsSet(t, fake, "crm.api_key")
@@ -389,6 +394,7 @@ func TestSecretsSet_StoresUncheckedWhenTheSchemaReadFails(t *testing.T) {
 }
 
 func TestSecretsSet_FailedWriteKeepsTheWarningUnsaid(t *testing.T) {
+	spectest.Proves(t, "cloud/secret-config-key", "undeclared-key-stored-with-warning", "secrets-set-failed-write-no-warning")
 	fake := newCRMSecretsFake(t)
 	fake.publishHint = true
 	stderr, err := runCRMSecretsSet(t, fake, "crm.token")
