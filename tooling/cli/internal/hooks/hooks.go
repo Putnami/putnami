@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -163,6 +164,10 @@ func RunPreBuildHook(
 	// A hosted run hands its credential to no process started after this one.
 	runcredential.MarkRepositoryCodeStarted("hook " + ext.Name + "/preBuild")
 	if err := cmd.Start(); err != nil {
+		// A deadline that expires while the process starts is the same timeout.
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, fmt.Errorf("hook %s/%s timed out after %dms", ext.Name, "preBuild", timeoutMs)
+		}
 		return nil, fmt.Errorf("start hook %s/%s: %w", ext.Name, "preBuild", err)
 	}
 

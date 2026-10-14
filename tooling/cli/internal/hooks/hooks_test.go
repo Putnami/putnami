@@ -474,6 +474,17 @@ func TestRunPreBuildHook_CallerEnvWinsLast(t *testing.T) {
 	}
 }
 
+func TestRunPreBuildHook_DeadlineBeforeStartIsATimeout(t *testing.T) {
+	ws, ext, proj := preBuildFixture(t, fixtureproc.Program{}, 100)
+	expired, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+
+	result, err := RunPreBuildHook(expired, ws, ext, proj, false, nil)
+	if err == nil || result != nil || !strings.Contains(err.Error(), "timed out after 100ms") {
+		t.Fatalf("result = %+v, error = %v, want a timeout message", result, err)
+	}
+}
+
 func TestRunPreBuildHook_Timeout(t *testing.T) {
 	ws, ext, proj := preBuildFixture(t, fixtureproc.Program{Sleep: 5 * time.Second}, 100)
 
