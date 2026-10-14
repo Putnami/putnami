@@ -36,6 +36,9 @@ type jobsSplitPackage struct {
 	why string
 }
 
+// jobsSplitModulePath is the module path the package directories are relative to.
+const jobsSplitModulePath = "go.putnami.dev/tooling/cli"
+
 var jobsSplitPackages = []jobsSplitPackage{
 	{
 		dir:     "internal/jobs/machineprobe",
@@ -70,7 +73,8 @@ func TestJobsSplitPackagesImportOnlyTheirAllowance(t *testing.T) {
 				if err != nil {
 					t.Fatalf("%s: import %s: %v", rel, spec.Path.Value, err)
 				}
-				if jobsSplitImportAllowed(path, pkg.allowed) {
+				// The package's own path is allowed: an external test package imports it.
+				if path == jobsSplitModulePath+"/"+pkg.dir || jobsSplitImportAllowed(path, pkg.allowed) {
 					continue
 				}
 				t.Errorf("%s imports %s, which %s does not allow (%s).\n"+

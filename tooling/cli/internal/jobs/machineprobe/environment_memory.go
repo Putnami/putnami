@@ -367,23 +367,6 @@ func TotalMemoryBytes() uint64 {
 	return totalMemoryBytesAt(RunnerEnvironmentRoot, readFile)
 }
 
-// StableMemoryCapacityBytes returns the smaller of physical RAM and this
-// process's cgroup memory limit. Both are allocation configuration, not live
-// pressure, so identical machines/plans do not change ceilings because a
-// co-tenant happened to consume memory at sampling time.
-func StableMemoryCapacityBytes(root string, physical uint64) uint64 {
-	sample := EnvironmentSample{}
-	if physical > 0 {
-		sample.memoryCapacity = memoryCapacityReading{physicalBytes: physical, hasPhysical: true}
-	}
-	readCgroupMemoryFrom(root, &sample, readFile)
-	effective, _, ok := sample.memoryCapacity.effectiveBytes()
-	if !ok {
-		return 0
-	}
-	return effective
-}
-
 func totalMemoryBytesAt(root string, read func(string) string) uint64 {
 	for _, line := range strings.Split(read(filepath.Join(root, "proc/meminfo")), "\n") {
 		if !strings.HasPrefix(line, "MemTotal:") {
