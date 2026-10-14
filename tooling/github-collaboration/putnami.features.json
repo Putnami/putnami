@@ -55,6 +55,7 @@
             "checks": [
               "a-fork-with-the-same-branch-is-another-identity",
               "a-head-that-moved-is-a-conflict",
+              "a-find-at-a-pushed-head-commit-waits-for-the-pull-request",
               "another-repository-is-refused"
             ]
           }
