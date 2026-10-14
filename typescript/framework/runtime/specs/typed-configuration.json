@@ -36,7 +36,7 @@
     },
     {
       "id": "secret-names-only",
-      "text": "Emitted infrastructure requirements carry the canonicalized names of sensitive fields and never their values, and the sidecar is removed when no sensitive field remains."
+      "text": "Emitted infrastructure requirements carry the config keys of sensitive fields and never their values, and the sidecar is removed when no sensitive field remains."
     },
     {
       "id": "untrusted-input",

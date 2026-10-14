@@ -954,12 +954,9 @@ never decrypts values. Project commands take `<app> <key>`; keys are dotted
 `--block`/`--field` available as the explicit escape hatch. Writes are
 schema-gated server-side: if the app's schema has not been published yet, the
 CLI surfaces a clear "run `putnami publish` first" hint. A secret is stored
-under its config key (`crm.apiKey`), not under the requirement name
-`infra/requirements.json` lists (`crm.api_key`, or `stripe_signing_key` for a
-Go field bound to `STRIPE_SIGNING_KEY`). Once the schema is published, `set`
-refuses a requirement name and names the config key and the command that
-stores it. It stores any other key the schema does not declare with a warning,
-since the next release may declare it. `reveal` is the only
+under its config key (`crm.apiKey`), the name `infra/requirements.json` lists
+for it. Once the schema is published, `set` stores a key the schema does not
+declare with a warning, since the next release may declare it. `reveal` is the only
 new plaintext verb; it requires an interactive confirmation or `--yes` in
 non-interactive scripts. `get <key> --reveal` remains as a compatibility path.
 `delete` is idempotent (404 returns successfully). Discovery still supports the

@@ -199,8 +199,8 @@ describe('generate hook (subprocess)', () => {
  *  - `analytics.secret` — route-owned, reachable only by importing the generated
  *                      `api-loader`. This is the field the original report lost.
  *  - `billing.apiKey`   — dependency-owned, carried in by
- *                      `registerContributedConfigs()`, and canonicalized to
- *                      `billing.api_key` by the infra name grammar.
+ *                      `registerContributedConfigs()`, and named by its
+ *                      config key.
  */
 describe('generate hook infra requirements (subprocess)', () => {
   let workloadDir: string;
@@ -325,9 +325,8 @@ export const app = () => ({
     expect(run.exitCode).toBe(0);
 
     const fragment = readFragment();
-    // Sorted, deduplicated, canonicalized: `apiKey` becomes `api_key` because
-    // the infra resource-name grammar is lowercase snake_case.
-    expect(fragment.secrets).toEqual(['analytics.secret', 'billing.api_key']);
+    // Sorted and deduplicated, each secret named by its config key.
+    expect(fragment.secrets).toEqual(['analytics.secret', 'billing.apiKey']);
     // The non-sensitive workload block proves the registry was never empty —
     // the defect dropped fields, it did not fail to read anything at all.
     expect(fragment.secrets).not.toContain('server.host');
@@ -347,7 +346,7 @@ export const app = () => ({
     const loaderPath = writeLoader();
     writeMain({ loaderPath, contributed: true });
     expect(runHook().exitCode).toBe(0);
-    expect(readFragment().secrets).toEqual(['analytics.secret', 'billing.api_key']);
+    expect(readFragment().secrets).toEqual(['analytics.secret', 'billing.apiKey']);
 
     // Remove the dependency-owned block only. The route-owned secret must
     // survive: the fragment is rebuilt from the registry, never patched.

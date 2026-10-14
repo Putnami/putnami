@@ -13,41 +13,27 @@ import { getRegisteredConfigDefinitions } from './config-token';
 const INFRA_PROTOCOL_VERSION = 2;
 const INFRA_SCHEMA_URL = 'https://putnami.dev/schemas/putnami-infra.json';
 
-// Canonical infra resource-name grammar, from schemas/infra.json: lowercase
-// letters, digits, '-', '_', '.', '/'; 1–64 chars. The protocol also accepts
-// uppercase letters in a secret name, but this emitter keeps lowercase names
-// until Putnami Cloud reads that grammar (protocols/infra ADR 0004). It fails
-// loudly on a path it cannot name rather than emit a requirement the deployer
-// refuses.
-const INFRA_NAME_RE = /^[a-z0-9][a-z0-9_./-]{0,63}$/;
+// Infra secret-name grammar, from schemas/infra.json: letters, digits, '-',
+// '_', '.', '/'; 1–64 chars. A secret is named by the config key the
+// application reads it at (protocols/infra ADR 0004).
+const SECRET_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_./-]{0,63}$/;
 
 /**
- * Derives an infra-conforming secret name from a config field's dot-path.
- *
- * TS config keys are conventionally camelCase (e.g. `apiKey`,
- * `webhookSecret`), but the infra grammar is lowercase-only, so each camelCase
- * boundary is split into snake_case and the whole path is lowercased
- * (`integrations.stripe.apiKey` → `integrations.stripe.api_key`). The result is
- * validated against {@link INFRA_NAME_RE}; a path that still cannot be
- * canonicalized (non-ASCII, illegal characters, or longer than 64 chars) throws
- * so the developer sees a clear failure at generate time instead of a secret
- * vanishing from the aggregated manifest. Go applies the same camelCase rule
- * in `infra.SecretName` (protocols/infra), to a field's env binding when it
- * has one and to its path otherwise.
- *
- * The result names the requirement, not the config key: the application reads
- * the secret at `fieldPath`, which is where `putnami cloud secrets set` stores it.
+ * Returns the secret name of a sensitive config field: its config key, the
+ * dot-path the application reads it at (`integrations.stripe.apiKey`). A path
+ * the secret-name grammar rejects (non-ASCII, illegal characters, or longer
+ * than 64 chars) throws, so the developer sees a clear failure at generate
+ * time instead of a requirement the deployer refuses.
  */
-function canonicalSecretName(fieldPath: string): string {
-  const name = fieldPath.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
-  if (!INFRA_NAME_RE.test(name)) {
+function secretName(fieldPath: string): string {
+  if (!SECRET_NAME_RE.test(fieldPath)) {
     throw new Error(
-      `Cannot derive a valid infra secret name from sensitive config field "${fieldPath}": ` +
-        `produced "${name}", which violates the infra resource-name grammar ${INFRA_NAME_RE.source}. ` +
-        `Rename the field or config path to lowercase letters, digits, '-', '_', '.', '/' (max 64 chars).`,
+      `Cannot name the secret of sensitive config field "${fieldPath}": ` +
+        `it violates the infra secret-name grammar ${SECRET_NAME_RE.source}. ` +
+        `Rename the field or config path to letters, digits, '-', '_', '.', '/' (max 64 chars).`,
     );
   }
-  return name;
+  return fieldPath;
 }
 
 // Per-producer scratch slug. Each framework producer owns one file at
@@ -70,12 +56,11 @@ export interface InfraRequirementsManifest {
 }
 
 /**
- * Walks a config schema, collecting the canonical name of every field marked
- * `Sensitive`. The canonical secret name is the dot-path from the config block
- * down to the field, canonicalized to the infra grammar (e.g.
- * `database.password`, `integrations.stripe.api_key`) — see
- * {@link canonicalSecretName}. A sensitive object is emitted as a single
- * secret; its children are not walked.
+ * Walks a config schema, collecting the secret name of every field marked
+ * `Sensitive`: the dot-path from the config block down to the field (e.g.
+ * `database.password`, `integrations.stripe.apiKey`) — see
+ * {@link secretName}. A sensitive object is emitted as a single secret; its
+ * children are not walked.
  */
 function collectFromSchema(schema: SchemaDefinition, prefix: string, out: Set<string>): void {
   for (const [key, prop] of Object.entries(schema)) {
@@ -83,7 +68,7 @@ function collectFromSchema(schema: SchemaDefinition, prefix: string, out: Set<st
 
     if (isSchemaDescriptor(prop)) {
       if (prop.sensitive) {
-        out.add(canonicalSecretName(path));
+        out.add(secretName(path));
         continue;
       }
       // A Desc()-wrapped nested object carries its shape on `schema`.
@@ -100,7 +85,7 @@ function collectFromSchema(schema: SchemaDefinition, prefix: string, out: Set<st
 }
 
 /**
- * Collects the canonical names of every sensitive field across the given config
+ * Collects the secret names of every sensitive field across the given config
  * definitions. Names are deduplicated and sorted so the emitted manifest is
  * deterministic and idempotent for a given input.
  */

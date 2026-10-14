@@ -32,9 +32,11 @@ func removeInfraRequirements(projectPath string) error {
 	return infra.RemoveSidecar(projectPath, sidecarSlug)
 }
 
-// collectSecretNames walks every config block, gathers the canonical secret
-// name of each sensitive field (nested objects, array elements, and map values
-// included), and returns them sorted and deduplicated.
+// collectSecretNames walks every config block, gathers the config key of each
+// sensitive field (nested objects, array elements, and map values included),
+// and returns them sorted and deduplicated. A secret is named by the key the
+// application reads it at, even when an env binding also sets the field
+// (protocols/infra ADR 0004).
 func collectSecretNames(blocks []protocfg.Block) []string {
 	seen := make(map[string]bool)
 	var names []string
@@ -65,7 +67,7 @@ func walkSensitive(prefix string, f protocfg.FieldSchema, emit func(string)) {
 		path = joinPath(prefix, f.Name)
 	}
 	if f.Sensitive {
-		emit(secretName(f, path))
+		emit(path)
 	}
 	switch f.Type {
 	case protocfg.FieldTypeObject:
@@ -81,17 +83,6 @@ func walkSensitive(prefix string, f protocfg.FieldSchema, emit func(string)) {
 			walkSensitive(path, *f.Values, emit)
 		}
 	}
-}
-
-// secretName picks the requirement name of a sensitive field. A field with
-// an explicit env binding uses that env-var name (the concrete way the value
-// enters a deployed process); otherwise the field's config dot-path is used.
-// Either way infra.SecretName canonicalizes it to a valid resource name.
-func secretName(f protocfg.FieldSchema, path string) string {
-	if f.Env != "" {
-		return infra.SecretName(f.Env)
-	}
-	return infra.SecretName(path)
 }
 
 // joinPath joins a dot-path prefix and a segment, tolerating an empty prefix.

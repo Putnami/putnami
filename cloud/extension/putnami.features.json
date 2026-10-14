@@ -80,23 +80,10 @@
       "id": "cloud/secret-config-key",
       "type": "feature",
       "name": "Secrets stored under the config key the application reads",
-      "outcome": "putnami cloud secrets set stores a secret under the config key the application reads, and refuses the requirement name infra/requirements.json lists for it, naming the config key and the command that stores it",
+      "outcome": "putnami cloud secrets set stores a secret under the config key the application reads, and warns when the published schema does not declare that key",
       "owner": "cloud",
       "target": "coded",
       "requirements": [
-        {
-          "id": "requirement-name-refused",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "secrets-set-refuses-requirement-name"
-            ]
-          }
-        },
         {
           "id": "declared-key-stored",
           "stage": "coded",

@@ -3,7 +3,7 @@
   "protocolVersion": 2,
   "secrets": [
     "clients.services.credentials.assertion",
-    "clients.services.credentials.client_secret",
+    "clients.services.credentials.clientSecret",
     "clients.services.credentials.parameters",
     "clients.services.credentials.value"
   ]

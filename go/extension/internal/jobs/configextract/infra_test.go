@@ -36,14 +36,14 @@ func TestCollectSecretNames_ZeroSecrets(t *testing.T) {
 	}
 }
 
-func TestCollectSecretNames_OneSecret_UsesEnvBinding(t *testing.T) {
+func TestCollectSecretNames_OneSecret_UsesConfigKeyNotEnvBinding(t *testing.T) {
 	blocks := []protocfg.Block{
 		{Path: "database", Fields: []protocfg.FieldSchema{
 			{Name: "host", Type: protocfg.FieldTypeString},
 			{Name: "password", Type: protocfg.FieldTypeString, Env: "DB_PASSWORD", Sensitive: true},
 		}},
 	}
-	want := []string{"db_password"}
+	want := []string{"database.password"}
 	if got := collectSecretNames(blocks); !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
@@ -58,11 +58,15 @@ func TestCollectSecretNames_MultipleSecrets_SortedAndDeduped(t *testing.T) {
 			{Name: "token", Type: protocfg.FieldTypeString, Env: "SHARED_TOKEN", Sensitive: true},
 		}},
 		{Path: "cache", Fields: []protocfg.FieldSchema{
-			// Same env binding as auth.token → must dedupe to one entry.
+			// Same env binding as auth.token, but another config key.
 			{Name: "token", Type: protocfg.FieldTypeString, Env: "SHARED_TOKEN", Sensitive: true},
 		}},
+		{Path: "stripe", Fields: []protocfg.FieldSchema{
+			// Same config key as the first stripe block → one entry.
+			{Name: "webhookSecret", Type: protocfg.FieldTypeString, Sensitive: true},
+		}},
 	}
-	want := []string{"shared_token", "stripe.webhook_secret"}
+	want := []string{"auth.token", "cache.token", "stripe.webhookSecret"}
 	if got := collectSecretNames(blocks); !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
@@ -79,7 +83,7 @@ func TestCollectSecretNames_Nested(t *testing.T) {
 			}},
 		}},
 	}
-	want := []string{"oauth.keys", "oauth.providers.client_secret"}
+	want := []string{"oauth.keys", "oauth.providers.clientSecret"}
 	if got := collectSecretNames(blocks); !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
@@ -100,8 +104,8 @@ func TestWriteInfraRequirements_EmitsManifest(t *testing.T) {
 	if m.ProtocolVersion != infra.ProtocolVersion {
 		t.Fatalf("protocolVersion = %d, want %d", m.ProtocolVersion, infra.ProtocolVersion)
 	}
-	if !reflect.DeepEqual(m.Secrets, []string{"db_password"}) {
-		t.Fatalf("secrets = %v, want [db_password]", m.Secrets)
+	if !reflect.DeepEqual(m.Secrets, []string{"database.password"}) {
+		t.Fatalf("secrets = %v, want [database.password]", m.Secrets)
 	}
 }
 
@@ -150,8 +154,8 @@ var DatabaseConfig = config.Config[Options]("database")
 	}
 
 	m := readSidecar(t, dir)
-	if !reflect.DeepEqual(m.Secrets, []string{"db_password"}) {
-		t.Fatalf("sidecar secrets = %v, want [db_password]", m.Secrets)
+	if !reflect.DeepEqual(m.Secrets, []string{"database.password"}) {
+		t.Fatalf("sidecar secrets = %v, want [database.password]", m.Secrets)
 	}
 
 	agg, diags := infra.Merge("svc", []infra.ProjectContribution{{
@@ -169,8 +173,8 @@ var DatabaseConfig = config.Config[Options]("database")
 	for _, s := range agg.Secrets {
 		got = append(got, s.Name)
 	}
-	if !reflect.DeepEqual(got, []string{"db_password"}) {
-		t.Fatalf("aggregated secrets = %v, want [db_password]", got)
+	if !reflect.DeepEqual(got, []string{"database.password"}) {
+		t.Fatalf("aggregated secrets = %v, want [database.password]", got)
 	}
 }
 

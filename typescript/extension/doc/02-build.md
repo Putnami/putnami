@@ -129,9 +129,8 @@ derived fragments while the runtime-derived ones land later. TypeScript has no
 such split: the pre-build hook runs `Application.build()` on the same plugin tree
 the runtime composes, so what the hooks emit **is** the converged set.
 
-Manifests carry canonical secret **names** only (`integrations.stripe.api_key`),
-never values. The name grammar is lowercase snake_case, so a camelCase config
-field is canonicalized on the way out.
+Manifests carry secret **names** only, never values. A secret is named by its
+config key (`integrations.stripe.apiKey`), the key the application reads it at.
 
 The scheduler caches the generated `.gen/` tree as the generate task output and restores it in place on cache hits.
 

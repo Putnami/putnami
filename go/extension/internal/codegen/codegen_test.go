@@ -900,8 +900,8 @@ func TestRunSyncsCommittedInfraRequirements(t *testing.T) {
 	if err := json.Unmarshal(data, &m); err != nil {
 		t.Fatalf("parsing infra requirements: %v", err)
 	}
-	if len(m.Secrets) != 1 || m.Secrets[0] != "db_password" {
-		t.Fatalf("requirements secrets = %v, want [db_password]", m.Secrets)
+	if len(m.Secrets) != 1 || m.Secrets[0] != "database.password" {
+		t.Fatalf("requirements secrets = %v, want [database.password]", m.Secrets)
 	}
 }
 
