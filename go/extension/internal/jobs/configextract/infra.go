@@ -1,9 +1,12 @@
 package configextract
 
 import (
+	"fmt"
 	"sort"
+	"strings"
 
 	protocfg "go.putnami.dev/protocol/config"
+	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/infra"
 )
 
@@ -22,7 +25,17 @@ const sidecarSlug = "secrets"
 // being restated. When the schema declares no sensitive fields, any scratch
 // fragment left by a prior build is removed so sync never reads stale data.
 func writeInfraRequirements(projectPath string, configs []protocfg.Block) error {
-	manifest := infra.PerProjectManifest{Secrets: collectSecretNames(configs)}
+	manifest := infra.PerProjectManifest{ProtocolVersion: infra.ProtocolVersion, Secrets: collectSecretNames(configs)}
+	// The generator drops a fragment that fails validation, and every secret
+	// of the project with it, so a config key the secret-name grammar rejects
+	// fails here and is named.
+	if errs := diag.Errors(infra.ValidatePerProjectManifest(&manifest)); len(errs) > 0 {
+		messages := make([]string, 0, len(errs))
+		for _, d := range errs {
+			messages = append(messages, d.String())
+		}
+		return fmt.Errorf("a sensitive config field has a config key that is not a valid secret name; rename the field or its config path: %s", strings.Join(messages, "; "))
+	}
 	return infra.WriteSidecar(projectPath, sidecarSlug, manifest)
 }
 
@@ -32,9 +45,11 @@ func removeInfraRequirements(projectPath string) error {
 	return infra.RemoveSidecar(projectPath, sidecarSlug)
 }
 
-// collectSecretNames walks every config block, gathers the canonical secret
-// name of each sensitive field (nested objects, array elements, and map values
-// included), and returns them sorted and deduplicated.
+// collectSecretNames walks every config block, gathers the config key of each
+// sensitive field (nested objects, array elements, and map values included),
+// and returns them sorted and deduplicated. A secret is named by the key the
+// application reads it at, even when an env binding also sets the field
+// (protocols/infra ADR 0004).
 func collectSecretNames(blocks []protocfg.Block) []string {
 	seen := make(map[string]bool)
 	var names []string
@@ -65,7 +80,7 @@ func walkSensitive(prefix string, f protocfg.FieldSchema, emit func(string)) {
 		path = joinPath(prefix, f.Name)
 	}
 	if f.Sensitive {
-		emit(secretName(f, path))
+		emit(path)
 	}
 	switch f.Type {
 	case protocfg.FieldTypeObject:
@@ -81,17 +96,6 @@ func walkSensitive(prefix string, f protocfg.FieldSchema, emit func(string)) {
 			walkSensitive(path, *f.Values, emit)
 		}
 	}
-}
-
-// secretName picks the requirement name of a sensitive field. A field with
-// an explicit env binding uses that env-var name (the concrete way the value
-// enters a deployed process); otherwise the field's config dot-path is used.
-// Either way infra.SecretName canonicalizes it to a valid resource name.
-func secretName(f protocfg.FieldSchema, path string) string {
-	if f.Env != "" {
-		return infra.SecretName(f.Env)
-	}
-	return infra.SecretName(path)
 }
 
 // joinPath joins a dot-path prefix and a segment, tolerating an empty prefix.

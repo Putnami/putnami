@@ -831,11 +831,7 @@ func walkCapabilitySensitiveField(prefix string, field protocfg.FieldSchema, emi
 		}
 	}
 	if field.Sensitive {
-		name := field.Env
-		if name == "" {
-			name = path
-		}
-		emit(protoinfra.SecretName(name))
+		emit(path)
 	}
 	switch field.Type {
 	case protocfg.FieldTypeObject:

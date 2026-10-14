@@ -20,7 +20,6 @@ type schemaKeySpec struct {
 	Default     string
 	Sensitive   bool
 	Description string
-	Env         string
 }
 
 type configKeyStatus struct {
@@ -485,7 +484,6 @@ func schemaFieldSpecs(prefix string, rawFields any, inheritedSensitive bool) []s
 			Default:     clicore.StringValue(field["default"]),
 			Sensitive:   sensitive,
 			Description: clicore.StringValue(field["description"]),
-			Env:         clicore.StringValue(field["env"]),
 		})
 	}
 	return specs

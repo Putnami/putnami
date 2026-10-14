@@ -18,14 +18,7 @@ const equivalenceFixturePath = "../../../../../protocols/infra/fixtures/equivale
 // TestCrossLanguageEquivalence_Secrets proves the Go secrets producer emits
 // byte-for-byte the same JSON the TypeScript producer emits for the same
 // conceptual inputs: a top-level "database.password" and a nested camelCase
-// "integrations.stripe.apiKey" that canonicalizes to "...api_key", emitted
-// sorted.
-//
-// Neither field uses an env binding on purpose. The Go producer names an
-// env-bound secret after its env var while the TypeScript producer always uses
-// the config path, so an env binding is the one input shape the two producers
-// name differently by design — not a shape divergence — and would make this
-// equivalence assertion meaningless.
+// "integrations.stripe.apiKey", each named by its config key, emitted sorted.
 //
 // The producer stamps $schema while writing the sidecar (WriteSidecar), so the
 // test compares the bytes writeInfraRequirements actually emits.

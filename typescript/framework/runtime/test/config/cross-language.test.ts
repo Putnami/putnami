@@ -20,13 +20,8 @@ describe('cross-language equivalence', () => {
   // implementation that breaks byte-equivalence fails both tests.
   it('secrets producer matches the shared golden fixture', async () => {
     // A top-level "database.password" and a nested camelCase
-    // "integrations.stripe.apiKey" that canonicalizes to "...api_key"; names
-    // are emitted sorted.
-    //
-    // Neither field uses an env binding on purpose: the Go producer names an
-    // env-bound secret after its env var while TypeScript always uses the
-    // config path, so an env binding is the one input shape the two producers
-    // name differently by design — not a shape divergence.
+    // "integrations.stripe.apiKey", each named by its config key; names are
+    // emitted sorted.
     const database = Config('database', { password: Sensitive(String) });
     const integrations = Config('integrations', { stripe: { publishable: String, apiKey: Sensitive(String) } });
 

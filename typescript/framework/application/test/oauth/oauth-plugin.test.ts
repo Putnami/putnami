@@ -66,7 +66,7 @@ describe('OAuthPlugin', () => {
       expect(definitions.map((d) => d.path)).toEqual(['oauth', 'session']);
       expect(sensitive('oauth', 'clientSecret')).toBe(true);
       expect(sensitive('session', 'cookieSecret')).toBe(true);
-      expect(collectSecretNames(definitions)).toEqual(['oauth.client_secret', 'session.cookie_secret']);
+      expect(collectSecretNames(definitions)).toEqual(['oauth.clientSecret', 'session.cookieSecret']);
     });
   });
 

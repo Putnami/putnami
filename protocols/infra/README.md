@@ -39,7 +39,7 @@ The v2 resource kinds are:
 - `databases` — `{ name, engine ∈ {postgres, mysql, sqlite, firestore}, schemas? }`
 - `events` — `{ publishes: [topic], subscribes: [topic | { topic, delivery ∈ {pull, stream, push} }] }` — a subscribe is a bare topic string (delivery `pull`, the default) or an object carrying a non-default delivery; `push` tells the deployer to provision a provider push subscription. The bare-string default keeps pull/stream workloads byte-for-byte unchanged.
 - `storage` — `{ name, access? ∈ {read, write, readwrite}, public?, retention? }` — the deployer-facing projection of [`go.putnami.dev/protocol/storage`](../storage); `retention` is a free-form deployer-defined string
-- `secrets` — `[secret-name]` — a secret name may contain uppercase letters, so it can be the config key the application reads the secret at (`crm.apiKey`); every other resource name is lowercase ([ADR 0004](doc/adr/0004-a-secret-is-named-by-its-config-key.md))
+- `secrets` — `[secret-name]` — a secret is named by the config key the application reads it at (`crm.apiKey`), so a secret name may contain uppercase letters; every other resource name is lowercase ([ADR 0004](doc/adr/0004-a-secret-is-named-by-its-config-key.md))
 - `scheduledJobs` — `{ name, schedule (5-field Cloud Scheduler cron), entrypoint? }`
 - `runtime` — workload-only — `{ ingress?: { domain?, public? }, scaling?: { max?, concurrency? }, protocols?: { http2? } }`
 
@@ -105,7 +105,7 @@ Because a `RequirementManifest` has no `connection` field at all (strict parsing
     "publishes": ["workspace.deploy.completed"],
     "subscribes": []
   },
-  "secrets": ["jwks_signing_key"]
+  "secrets": ["auth.jwksSigningKey"]
 }
 ```
 
@@ -163,7 +163,7 @@ Precedence lets a workload owner *replace* a value, but not *remove* a requireme
   "ignore": {
     "databases": [{ "name": "primary", "engine": "postgres" }],
     "storage": ["legacy-assets"],
-    "secrets": ["unused_key"],
+    "secrets": ["legacy.apiKey"],
     "events": { "publishes": ["deprecated.topic"] },
     "scheduledJobs": ["nightly-rollup"]
   }

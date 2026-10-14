@@ -63,12 +63,12 @@ func TestMergeDependencyBlocks_UnionsWorkloadAndDependency(t *testing.T) {
 	m := readSidecar(t, dir)
 	found := false
 	for _, s := range m.Secrets {
-		if s == "core_client_secret" {
+		if s == "core.clientSecret" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("expected core_client_secret in secrets sidecar, got %v", m.Secrets)
+		t.Fatalf("expected core.clientSecret in secrets sidecar, got %v", m.Secrets)
 	}
 }
 

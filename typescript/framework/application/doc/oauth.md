@@ -59,7 +59,7 @@ oauth:
 
 The plugin contributes the `oauth` and `session` config blocks, so `putnami config-extract` declares both in `schema/config.json`. An app that called `configToken(OAuthConfig)` or `configToken(SessionConfig)` at module level to get them there can delete those calls.
 
-`oauth.clientSecret` and `session.cookieSecret` are sensitive: `infra/requirements.json` lists them as `oauth.client_secret` and `session.cookie_secret`, and Cloud publish skips their values in every `conf/env*.yaml` file. Before the next deploy, store each one as a Cloud secret under its config key:
+`oauth.clientSecret` and `session.cookieSecret` are sensitive: `infra/requirements.json` lists them under those config keys, and Cloud publish skips their values in every `conf/env*.yaml` file. Before the next deploy, store each one as a Cloud secret:
 
 ```bash
 putnami cloud secrets set <app> session.cookieSecret --env <env> --from-stdin

@@ -168,7 +168,7 @@
             "kind": "acceptance",
             "checks": [
               "the-manifest-carries-sorted-secret-names",
-              "secret-names-are-canonicalized-to-the-infra-grammar",
+              "secret-names-are-config-keys",
               "a-stale-sidecar-is-removed-when-no-secret-remains"
             ]
           }

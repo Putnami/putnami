@@ -60,30 +60,27 @@ describe('collectSecretNames', () => {
         clientSecret: Sensitive(String),
       }),
     });
-    expect(collectSecretNames([config])).toEqual(['oauth.provider.client_secret']);
+    expect(collectSecretNames([config])).toEqual(['oauth.provider.clientSecret']);
   });
 
   specTest(
-    'canonicalizes camelCase config keys to the lowercase infra grammar',
+    'names a camelCase field by its config key',
     {
       feature: 'typescript/typed-configuration',
       requirement: 'secret-names-only',
-      check: 'secret-names-are-canonicalized-to-the-infra-grammar',
+      check: 'secret-names-are-config-keys',
     },
     () => {
       const config = Config('integrations', {
         stripe: { publishable: String, apiKey: Sensitive(String), webhookSecret: Sensitive(String) },
       });
-      expect(collectSecretNames([config])).toEqual([
-        'integrations.stripe.api_key',
-        'integrations.stripe.webhook_secret',
-      ]);
+      expect(collectSecretNames([config])).toEqual(['integrations.stripe.apiKey', 'integrations.stripe.webhookSecret']);
     },
   );
 
-  it('throws a clear error when a sensitive field cannot yield a valid infra name', () => {
+  it('throws a clear error when a sensitive field path violates the secret-name grammar', () => {
     const config = Config('svc', { 'bad key': Sensitive(String) });
-    expect(() => collectSecretNames([config])).toThrow(/infra resource-name grammar/);
+    expect(() => collectSecretNames([config])).toThrow(/infra secret-name grammar/);
   });
 
   it('treats a sensitive object as one secret and does not walk its children', () => {

@@ -269,7 +269,7 @@ export const app = () => ({
     const fragment = JSON.parse(readFileSync(join(workloadDir, '.gen', 'infra', 'secrets.json'), 'utf-8')) as {
       secrets: string[];
     };
-    expect(fragment.secrets).toEqual(['analytics.secret', 'billing.api_key']);
+    expect(fragment.secrets).toEqual(['analytics.secret', 'billing.apiKey']);
   }, 30_000);
 
   it('leaves the capability manifest, feature evidence and design graph build-generate owns untouched', () => {
