@@ -201,7 +201,8 @@ func envDeclarations(workspaceRoot string) []EnvDeclaration {
 // EnvStatusNodeFrom folds what `env status` read into its node. A declared
 // workload that is Ready is ok; one still provisioning is degraded; one that
 // failed is failing; one declared and not deployed, or deployed and not
-// declared, is degraded.
+// declared, is degraded. A declared workload the accepted environment
+// definition does not select is degraded too, and its fix is env enable.
 func EnvStatusNodeFrom(facts EnvStatusFacts) clicore.StatusNode {
 	declared := make(map[string]EnvDeclaration, len(facts.Declared))
 	for _, declaration := range facts.Declared {
@@ -290,6 +291,7 @@ type envCounts struct {
 	ready       int
 	notDeployed int
 	undeclared  int
+	unaccepted  int
 	generation  int64
 	followed    bool
 	channel     string
@@ -352,9 +354,18 @@ func envNode(facts EnvStatusFacts, name string, declared map[string]EnvDeclarati
 		node.Children = append(node.Children, clicore.UnknownStatus("env."+name+".deployments", "deployments", facts.DeploymentsErr, ""))
 	}
 	used := map[string]bool{}
+	unaccepted := envUnaccepted(declaration, facts.Follow[name])
 	for _, workload := range declaration.Workloads {
 		counts.declared++
+		if unaccepted[workload.Path] {
+			counts.unaccepted++
+		}
 		if facts.DeploymentsErr != nil {
+			if unaccepted[workload.Path] {
+				node.Children = append(node.Children, envUnacceptedWorkload(clicore.StatusNode{
+					ID: "env." + name + "." + workload.Name, Title: workload.Name, State: clicore.StatusDegraded, Detail: "declared",
+				}, name, facts.Follow[name].DefinitionRevision))
+			}
 			continue
 		}
 		deployment, found := running[workload.Name]
@@ -365,16 +376,23 @@ func envNode(facts EnvStatusFacts, name string, declared map[string]EnvDeclarati
 		}
 		if !found {
 			counts.notDeployed++
-			node.Children = append(node.Children, clicore.StatusNode{
+			child := clicore.StatusNode{
 				ID: "env." + name + "." + workload.Name, Title: workload.Name, State: clicore.StatusDegraded,
 				Detail: "declared, not deployed", Fix: "putnami cloud env doctor " + name,
-			})
+			}
+			if unaccepted[workload.Path] {
+				child = envUnacceptedWorkload(child, name, facts.Follow[name].DefinitionRevision)
+			}
+			node.Children = append(node.Children, child)
 			continue
 		}
 		used[key] = true
 		child := envWorkloadNode(name, workload.Name, deployment)
 		if strings.EqualFold(strings.TrimSpace(deployment.State), "ready") {
 			counts.ready++
+		}
+		if unaccepted[workload.Path] {
+			child = envUnacceptedWorkload(child, name, facts.Follow[name].DefinitionRevision)
 		}
 		node.Children = append(node.Children, child)
 	}
@@ -403,6 +421,9 @@ func envDetail(counts envCounts, unread bool) string {
 	}
 	if counts.undeclared > 0 {
 		detail += fmt.Sprintf(", %d deployed and not declared", counts.undeclared)
+	}
+	if counts.unaccepted > 0 {
+		detail += fmt.Sprintf(", %d not in the accepted definition", counts.unaccepted)
 	}
 	if counts.followed && counts.channel != "" {
 		detail += fmt.Sprintf(", %s gen %d", counts.channel, counts.generation)
@@ -452,6 +473,46 @@ func envWorkloadNode(environment, name string, deployment deploymentSummaryEntry
 	default:
 		node.State = clicore.StatusUnknown
 		node.Detail = "state " + state + revision
+	}
+	return node
+}
+
+// envUnaccepted is the declared workloads the accepted environment
+// definition does not select, by path. It is empty when the channel-follow
+// answer was not read, does not report the definition's workloads, or the
+// declaration itself has a problem: env doctor reports that one.
+func envUnaccepted(declaration EnvDeclaration, follow statusChannelFollow) map[string]bool {
+	if declaration.Problem != "" || follow.Unavailable != "" || follow.Environment == "" || follow.Workloads == nil {
+		return nil
+	}
+	accepted := make(map[string]bool, len(follow.Workloads))
+	for _, selector := range follow.Workloads {
+		accepted[selector] = true
+	}
+	unaccepted := map[string]bool{}
+	for _, workload := range declaration.Workloads {
+		if !accepted[workload.Path] {
+			unaccepted[workload.Path] = true
+		}
+	}
+	return unaccepted
+}
+
+// envUnacceptedWorkload marks a declared workload the accepted environment
+// definition does not select: continuous delivery never deploys it until the
+// definition is accepted again, which env enable does. A failing workload
+// keeps its own fix.
+func envUnacceptedWorkload(node clicore.StatusNode, environment string, revision int64) clicore.StatusNode {
+	definition := "the accepted environment definition"
+	if revision > 0 {
+		definition = fmt.Sprintf("accepted environment definition revision %d", revision)
+	}
+	node.Detail += ", not in " + definition
+	if node.State == clicore.StatusOK {
+		node.State = clicore.StatusDegraded
+	}
+	if node.State != clicore.StatusFailing {
+		node.Fix = "putnami cloud env enable " + environment
 	}
 	return node
 }
@@ -554,18 +615,20 @@ func envChannelNode(environment string, declaration EnvDeclaration, follow statu
 // envMetrics are the counts over every environment, and the CD generation
 // of each one that follows a channel.
 func envMetrics(all []envCounts, perEnvironment bool) []clicore.StatusMetric {
-	var declared, ready, notDeployed, undeclared int
+	var declared, ready, notDeployed, undeclared, unaccepted int
 	for _, counts := range all {
 		declared += counts.declared
 		ready += counts.ready
 		notDeployed += counts.notDeployed
 		undeclared += counts.undeclared
+		unaccepted += counts.unaccepted
 	}
 	metrics := []clicore.StatusMetric{
 		clicore.CountMetric("workloads_declared", "workloads declared", declared, clicore.MetricUsage),
 		clicore.CountMetric("workloads_ready", "workloads ready", ready, clicore.MetricHealth).Of(float64(declared)),
 		clicore.CountMetric("workloads_not_deployed", "workloads not deployed", notDeployed, clicore.MetricHealth),
 		clicore.CountMetric("workloads_not_declared", "workloads not declared", undeclared, clicore.MetricHealth),
+		clicore.CountMetric("workloads_not_accepted", "workloads not in the accepted definition", unaccepted, clicore.MetricHealth),
 	}
 	for _, counts := range all {
 		if !counts.followed {

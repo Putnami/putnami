@@ -131,7 +131,7 @@
       "id": "cloud/env-definition-drift",
       "type": "feature",
       "name": "A stale environment definition read from the Cloud CLI",
-      "outcome": "putnami cloud env doctor reads a degraded environment-definition row and names its fix, and putnami cloud env enable accepts the default-branch head for that row or fails when the row stays degraded",
+      "outcome": "putnami cloud env doctor reads a degraded environment-definition row and names its fix, and putnami cloud env enable accepts the default-branch head for that row or fails when the row stays degraded, and putnami cloud env status names env enable for a declared workload the accepted definition omits",
       "owner": "cloud",
       "target": "coded",
       "requirements": [
@@ -173,6 +173,20 @@
               "env-enable-replaced-commit",
               "env-enable-stays-degraded",
               "env-enable-accepted-commit-differs"
+            ]
+          }
+        },
+        {
+          "id": "status-names-enable-for-an-omitted-workload",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "env-status-omitted-workload",
+              "env-status-reads-definition-workloads"
             ]
           }
         }

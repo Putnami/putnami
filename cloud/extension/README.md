@@ -1209,12 +1209,10 @@ db-gateway, delivery-api, distribution-api, identity-api, observability-api,
 oci-server, put-server, runtime-api and source-api.
 
 The schemas come from the Put package `cloud/doc-contents-cloud-cli-schema`,
-channel `canary`, the build published on 2026-10-11 (archive digest
-`sha256:2e51cc3be3ad5cee1bbfead0d9cdbf7b697088d6a861af181c001cacf73026f8`). Its
-file layout is `cloud-cli-schema/services/<service>/openapi.json`. Each file is
-copied byte for byte, except four `info.description` strings that lose their
-issue numbers; [`../clients/README.md`](../clients/README.md) lists them. To
-update the schemas:
+channel `canary`, version `0.0.0-20261014111756-10ec53b5f` (archive digest
+`sha256:81201d632697918965f36aadd602534526f2b44d74f886c5331c4725f8dbcccb`). Its
+file layout is `docs/cloud-cli-schema/services/<service>/openapi.json`. Each
+file is copied byte for byte. To update the schemas:
 
 1. Fetch a newer version of `cloud/doc-contents-cloud-cli-schema`.
 2. Copy each `services/<service>/openapi.json` over

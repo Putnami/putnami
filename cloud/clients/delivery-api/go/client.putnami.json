@@ -16,7 +16,7 @@
       }
     ]
   },
-  "contractSha256": "f17cf70c854abf2116d705f00bc7024f917b7e29d98f5231de35a3354347f045",
+  "contractSha256": "792e8e09583db12a76962942461d5c81ccca119da2ee2f9a6fa7dc6359fd5a51",
   "operations": [
     {
       "operationId": "getV1_Workspaces_Workspace_Ci_Status",
@@ -262,6 +262,19 @@
       ]
     },
     {
+      "operationId": "postV1_Workspaces_Workspace_Ci_Local-sessions_Session",
+      "service": "delivery-api",
+      "methodSymbol": "CreateV1WorkspacesCiLocalSessions",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/ci/local-sessions/{session}",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
       "operationId": "postV1_Workspaces_Workspace_Ci_Repair",
       "service": "delivery-api",
       "methodSymbol": "CreateV1WorkspacesCiRepair",
@@ -356,7 +369,7 @@
   "files": [
     {
       "path": "client.gen.go",
-      "sha256": "9cf43d530d67a12223ba1c3d55b314c812e5d6ebdf8fc971225fdfd68bc922fa"
+      "sha256": "a7125d6eb809b59ac7b7a9e276fb464fac3a97a07c1200ffa8f34e923666331e"
     }
   ]
 }

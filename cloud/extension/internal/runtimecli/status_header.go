@@ -76,6 +76,9 @@ func fetchChannelFollow(ctx *clicore.WorkspaceContext, reqCtx context.Context, e
 		return out
 	}
 	out.DefinitionRevision = clicore.Deref(resp.DefinitionRevision)
+	if resp.Workloads != nil {
+		out.Workloads = append([]string{}, *resp.Workloads...)
+	}
 	channels := clicore.Deref(resp.Channels)
 	out.Channels = make([]followedChannel, 0, len(channels))
 	for _, channel := range channels {
