@@ -35,6 +35,7 @@ _putnami_subcommands_for() {
             reply=(
                 'generate'
                 'map'
+                'pack'
             )
             ;;
         'contributor')
@@ -159,6 +160,7 @@ _putnami_path_known() {
         'context') return 0 ;;
         'context generate') return 0 ;;
         'context map') return 0 ;;
+        'context pack') return 0 ;;
         'contributor') return 0 ;;
         'contributor language') return 0 ;;
         'contributor machine-load') return 0 ;;
@@ -247,6 +249,12 @@ _putnami_flags_for() {
         'context map')
             reply=(
                 '--print[Render the map to stdout (md by default, or json) and write nothing]'
+            )
+            ;;
+        'context pack')
+            reply=(
+                '--check[Re-derive the documents, write nothing, and fail on drift]'
+                '--project[Project ID, path, or name; default is every workspace project]:selector:'
             )
             ;;
         'contributor language')
@@ -483,6 +491,7 @@ _putnami() {
         'serve:Run the project'\''s dev server until interrupted.'
         't:Alias for test'
         'test:Run the project'\''s tests, emitting test counts and coverage metrics.'
+        'validate:Check the project against its declared specs, contracts and compatibility rules.'
     )
 
     structured_commands=(

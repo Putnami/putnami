@@ -23,9 +23,10 @@ The CLI provides two categories of commands: **job commands** provided dynamical
 Job commands are provided by extensions and operate on workspace projects: an
 extension's manifest declares which commands it serves, so the set a workspace
 has depends on the extensions it installs. `build`, `test`, `lint`, `serve`,
-`format`, `package`, `publish`, `deploy` and `generate` are the conventional
-ones. `putnami help` lists the commands the *current* workspace's extensions
-actually provide — there is no fixed list, which is why one is not printed here.
+`run`, `format`, `package`, `publish`, `deploy`, `generate` and `validate` are
+the conventional ones. Inside a workspace, `putnami help` lists the ones the
+workspace's extensions actually provide, and the built-in aliases of those
+only. Outside a workspace it lists every conventional one.
 
 Job commands support the full set of project selection and execution flags described below.
 
@@ -736,12 +737,23 @@ putnami context generate            # Regenerate the Putnami guidance block in C
 putnami context map                 # Refresh .putnami/context-map/repo-map.{json,md}
 putnami context map --print         # Render the map to stdout (markdown); write nothing
 putnami context map --print=json    # Same, as JSON
+putnami context pack                # Write each project's .gen/agent-context.json
+putnami context pack --check        # Re-derive them, write nothing, fail on drift
 ```
 
 `context generate` writes the guidance block and the agent content of the
 extensions the workspace declares by path and opts into, and nothing else. It
 never writes `.mcp.json`: `init`, `install` and `upgrade` register the MCP
 server, and `putnami mcp install` repairs the registration. See [`mcp`](#mcp).
+
+#### `context pack`
+
+`context pack` writes one deterministic agent-context document per project to
+`<project>/.gen/agent-context.json`; `--project <selector>` limits it to one
+project. `--check` re-derives every document, writes nothing, and exits non-zero
+when one drifted. Both accept `--output=json`. The MCP `agent_context` tool builds
+the same document in memory. The document contract is
+`go.putnami.dev/protocol/agentcontext`.
 
 #### `context map`
 
@@ -852,6 +864,10 @@ putnami sessions summary --by-digest    # Task records grouped by input digest
 ```
 
 Sessions record every job execution with metadata, git state, timing, and JSONL event streams. The gate hard-fails cache-hit-rate and job-count regressions; timing findings warn unless `timing.severity` is promoted to `error` in the baseline. `--scenario <name>` records the session as a named performance reference point instead of refreshing the budget; scenarios are never evaluated by the gate.
+
+With `--output=json`, `sessions list` puts the sessions under `data` as an
+array at every count: `[]` when none is recorded, and a one-element array for
+one session.
 
 `sessions export` streams the recorded documents themselves, oldest first and deduplicated by session id, so per-run CPU, task counts and cache reuse can leave a worktree before it is deleted. The store keeps 20 records by default; `sessions.keep` in the workspace config changes that (see [05-configuration.md](05-configuration.md#session-retention)).
 
@@ -1399,6 +1415,15 @@ generated rather than restated here:
 putnami help                 # categorized global flags
 putnami help --markdown      # the same, plus per-command flags
 ```
+
+Inside a workspace, `putnami help` leaves out a flag that only an absent
+provider gives meaning: `--where` without a runner provider, `--providers`
+without a credential provider, and `--cache-trust` without a cache provider.
+It hides nothing when an extension of the workspace does not load. The parser
+still accepts these flags, and help outside a workspace, the man page, the
+Markdown reference and shell completion still list them. `--credential-fd` is
+always listed, because a hosted launcher reads it from the help of the pinned
+CLI.
 
 `putnami help` also documents the smart default selection: with no target, a
 feature branch runs `--impacted` against the trunk, while `main`/`master` uses a

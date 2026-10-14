@@ -118,6 +118,12 @@ type GlobalFlag struct {
 	// Values are the candidate values shell completion offers for a FlagValue
 	// flag, or nil when the value is unbounded (a path, a project selector).
 	Values []string
+	// Providers are the reserved commands an extension declares to serve the
+	// capability that gives the flag meaning. Help inside a workspace lists the
+	// flag only when a loaded extension declares one of them; the parser,
+	// completion and the command surface keep it. Empty means the core gives
+	// the flag its meaning.
+	Providers []string
 }
 
 // GlobalFlagCategory is one group of help's categorized global-flag listing.

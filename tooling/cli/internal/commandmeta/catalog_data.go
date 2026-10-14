@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	cache "go.putnami.dev/protocol/cache"
+	registry "go.putnami.dev/protocol/registry"
+	runner "go.putnami.dev/protocol/runner"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -88,6 +91,13 @@ var catalog = []Command{
 		Kind:      KindJob,
 		Summary:   "Run code generators.",
 		Related:   []string{"build"},
+		Workspace: requiredWorkspace(),
+	},
+	{
+		Path:      "validate",
+		Kind:      KindJob,
+		Summary:   "Check the project against its declared specs, contracts and compatibility rules.",
+		Related:   []string{"lint", "test", "build"},
 		Workspace: requiredWorkspace(),
 	},
 
@@ -832,6 +842,26 @@ var catalog = []Command{
 		StructuredOutput: true,
 		Workspace:        requiredWorkspace(),
 	},
+	{
+		Path:        "context pack",
+		Kind:        KindStructured,
+		Category:    "Configuration",
+		Summary:     "Write or check each project's agent-context document",
+		Description: "Write one deterministic agent-context document per project to <project>/.gen/agent-context.json: its identity and graph, composition roots, commands, config and contracts. --check re-derives every document, writes nothing, and fails when one drifted. The MCP agent_context tool builds the same document in memory and reports whether the file is fresh",
+		Usage:       "putnami context pack [--project <selector>] [--check] [--output <format>]",
+		Flags: []Flag{
+			{Long: "--project", Type: FlagValue, ValueName: "<selector>", Description: "Project ID, path, or name; default is every workspace project"},
+			{Long: "--check", Description: "Re-derive the documents, write nothing, and fail on drift"},
+		},
+		Examples: []string{
+			"putnami context pack",
+			"putnami context pack --project <project-id>",
+			"putnami context pack --check",
+		},
+		Related:          []string{"context map", "mcp"},
+		StructuredOutput: true,
+		Workspace:        requiredWorkspace(),
+	},
 
 	// ── Diagnostics ──────────────────────────────────────────────────────
 	{
@@ -1414,6 +1444,10 @@ func userScopeFlag(description string) Flag {
 //     contiguous: GlobalFlagCategories groups by first appearance, exactly like
 //     Categories does for commands.
 //   - Category "" means accepted and completed but not listed in help.
+//   - Providers bind a flag to the reserved commands that give it meaning.
+//     --credential-fd declares none although only a hosted provider uses it:
+//     a hosted launcher reads it from the pinned CLI's --help wherever that
+//     runs (launch.credentialProbe), so help must always list it.
 //   - Values enumerate what completion offers for a FlagValue flag. Leave it nil
 //     when the value is unbounded (a path, a project selector, a count): an
 //     incomplete candidate list reads as "these are the only values".
@@ -1439,12 +1473,12 @@ var globalFlags = []GlobalFlag{
 	{Long: "--baseline", Type: FlagValue, ValueName: "<branch>", Description: "Custom git baseline for --impacted", Category: "Project Selection"},
 	{Long: "--impacted-strict", Description: "Fail when baseline can't be resolved", Category: "Project Selection"},
 
-	{Long: "--where", Type: FlagValue, ValueName: "<placement>", Description: "Execution placement: local | remote (local when no runner provider is installed)", Category: "Execution", Values: []string{"local", "remote"}},
-	{Long: "--providers", Type: FlagValue, ValueName: "<list>", Description: "Credentials to ask the credential provider for: install, publish (comma list)", Category: "Execution", Values: []string{"install", "publish"}},
+	{Long: "--where", Type: FlagValue, ValueName: "<placement>", Description: "Execution placement: local | remote (local when no runner provider is installed)", Category: "Execution", Values: []string{"local", "remote"}, Providers: []string{runner.ProviderCommandName}},
+	{Long: "--providers", Type: FlagValue, ValueName: "<list>", Description: "Credentials to ask the credential provider for: install, publish (comma list)", Category: "Execution", Values: []string{"install", "publish"}, Providers: []string{registry.CredentialProviderCommand}},
 	{Long: runcredential.Flag, Type: FlagValue, ValueName: "<n>", Description: runcredential.FlagDescription, Category: "Execution"},
 	{Long: "--no-cache", Description: "Force re-execution (skip cache)", Category: "Execution"},
 	{Long: "--no-cache-projects", Type: FlagValue, ValueName: "<list>", Description: "Force re-execution of these projects only", Category: "Execution"},
-	{Long: "--cache-trust", Type: FlagValue, ValueName: "<policy>", Description: "Remote cache trust: ci | any | none", Category: "Execution", Values: []string{"ci", "any", "none"}},
+	{Long: "--cache-trust", Type: FlagValue, ValueName: "<policy>", Description: "Remote cache trust: ci | any | none", Category: "Execution", Values: []string{"ci", "any", "none"}, Providers: []string{cache.ProviderCommandName}},
 	{Long: "--continue-on-error", Description: "Don't abort on first failure", Category: "Execution"},
 	{Long: "--max-parallel", Type: FlagValue, ValueName: "<mode|n>", Description: "Parallelism: auto | eco | max | number", Category: "Execution", Values: []string{"auto", "eco", "max"}},
 	{Long: "--resource", Type: FlagValue, ValueName: "<name=units>", Description: "Budget for a named shared resource (repeatable)", Category: "Execution"},

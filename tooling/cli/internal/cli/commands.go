@@ -149,6 +149,10 @@ func structuredPayload(captured string) (any, error) {
 	if len(documents) == 1 {
 		return documents[0], nil
 	}
+	if documents == nil {
+		// A nil slice marshals to null, not the [] this function promises.
+		return []any{}, nil
+	}
 	return documents, nil
 }
 

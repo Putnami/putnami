@@ -66,8 +66,10 @@ Windows, and checks it with the `__putnami runtime-info` handshake (identity,
 version, platform, CLI contract and runtime-protocol version) before it runs a
 task. These commands start no shell script, so the Windows archive runs them
 like the macOS and Linux ones. In a source checkout, the CLI prepares the
-runtime once per source digest with `bin/prepare-runtime`, which needs Go and a
-POSIX shell. Contributors work on macOS and Linux.
+runtime once per source digest with `bin/prepare-runtime`, which needs a POSIX
+shell. It builds with the Go version the workspace lock pins (`toolchains.go`),
+found on `GOROOT`, on `PATH` or under the Putnami home, and fails when none
+matches. Contributors work on macOS and Linux.
 
 The `cloud-cache-provider` task runs `{extensionRuntime} cache-provider`. On a
 hosted run the cache provider holds the run credential, so it must be one

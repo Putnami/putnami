@@ -362,7 +362,12 @@ func numberValue(value any) float64 {
 	}
 }
 
+// sessionsListJSONL emits the listed sessions as ONE JSON array, empty
+// included, so the structured result's data is an array at every count (see
+// printSummaryRowsJSON). A line per session put a bare object under data for
+// one session, and a human message for none.
 func sessionsListJSONL(store *workspace_state.SessionStore, sessions []string, latestID string, identities map[string]sessionIdentity) error {
+	entries := make([]any, 0, len(sessions))
 	for _, id := range sessions {
 		meta, err := readSessionMeta(store, id)
 		if err != nil {
@@ -389,9 +394,13 @@ func sessionsListJSONL(store *workspace_state.SessionStore, sessions []string, l
 				entry["placement"] = identity.placement
 			}
 		}
-		data, _ := json.Marshal(entry)
-		iox.Fprintln(os.Stdout, string(data))
+		entries = append(entries, entry)
 	}
+	data, err := json.Marshal(entries)
+	if err != nil {
+		return err
+	}
+	iox.Fprintln(os.Stdout, string(data))
 	return nil
 }
 

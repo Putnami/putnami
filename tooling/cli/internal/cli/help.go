@@ -24,6 +24,9 @@ type FlagInfo struct {
 	Short       string
 	Description string
 	ValueName   string // e.g., "<n>", "<format>", "<path>" — empty for booleans
+	// Providers are the reserved commands that give the flag meaning
+	// (commandmeta.GlobalFlag.Providers); helpScope.listsFlag reads them.
+	Providers []string
 }
 
 // allFlagCategories is the categorized global-flag listing the text, man, and
@@ -45,6 +48,7 @@ func flagCategoriesFromCatalog() []FlagCategory {
 				Short:       flag.Short,
 				Description: flag.Description,
 				ValueName:   flag.ValueName,
+				Providers:   flag.Providers,
 			})
 		}
 		out = append(out, FlagCategory{Name: category.Name, Flags: infos})
@@ -104,10 +108,12 @@ func structuredCommandCategoriesFromCatalog() []CommandCategory {
 	return out
 }
 
-// jobCommandNames returns the job command names joined for prose listings.
-func jobCommandNames() string {
-	names := make([]string, 0, len(jobCommands.Commands))
-	for _, c := range jobCommands.Commands {
+// jobCommandNames returns the job command names scope lists, joined for
+// prose listings.
+func jobCommandNames(scope *helpScope) string {
+	commands := scope.jobCommands()
+	names := make([]string, 0, len(commands))
+	for _, c := range commands {
 		names = append(names, c.Name)
 	}
 	return strings.Join(names, ", ")
@@ -130,18 +136,34 @@ func relatedCommandsFromCatalog() map[string][]string {
 	return out
 }
 
-// PrintHelp prints the top-level help message with categorized flags.
+// PrintHelp prints the complete top-level help message with categorized flags.
 func PrintHelp() {
+	printHelp(nil)
+}
+
+// printHelp prints the top-level help of scope: the job commands, aliases and
+// global flags a workspace's extensions give meaning, or all of them for a nil
+// scope.
+func printHelp(scope *helpScope) {
 	iox.Fprintf(os.Stdout, `putnami %s — polyglot build orchestrator
 
 Usage:
   putnami <command[,command...]> [options]
 
-Build (from extensions):
+`, Version)
+	if names := jobCommandNames(scope); names != "" {
+		iox.Fprintf(os.Stdout, `Build (from extensions):
   %s
   Multi-command: putnami lint,test,build --impacted
 
-`, Version, jobCommandNames())
+`, names)
+	} else {
+		iox.Fprint(os.Stdout, `Build (from extensions):
+  No extension of this workspace declares a job command. Name a language
+  extension in putnami.workspace.json, then run: putnami extensions install
+
+`)
+	}
 
 	for _, cat := range structuredCommandCategories {
 		iox.Fprintf(os.Stdout, "%s:\n", cat.Name)
@@ -151,7 +173,7 @@ Build (from extensions):
 		iox.Fprintln(os.Stdout)
 	}
 
-	for _, cat := range allFlagCategories {
+	for _, cat := range scope.flagCategories() {
 		iox.Fprintf(os.Stdout, "%s:\n", cat.Name)
 		for _, f := range cat.Flags {
 			printFlagLine(f)
@@ -165,15 +187,19 @@ Build (from extensions):
 Positional:
   .                    Current directory scope (project or subtree)
 
-Aliases:
+`)
+	if aliases := builtinAliasSummary(scope); aliases != "" {
+		iox.Fprintf(os.Stdout, `Aliases:
   %s
 
-Help:
+`, aliases)
+	}
+	iox.Fprint(os.Stdout, `Help:
   putnami help <command>   Command help
   putnami help --man       Man page format
   putnami help --markdown  Markdown format
 
-`, builtinAliasSummary())
+`)
 }
 
 // extensionFlagHelpLine is one manifest flag's help line. A boolean flag on by
@@ -201,6 +227,12 @@ func extensionFlagHelpLine(name string, flag extension.FlagDefinition) string {
 // PrintCommandHelp prints help for a specific command with categorized flags
 // and related commands suggestions.
 func PrintCommandHelp(command string, flags map[string]extension.FlagDefinition) {
+	printCommandHelp(command, flags, nil)
+}
+
+// printCommandHelp prints the help of a job command, listing the global flags
+// and related commands of scope.
+func printCommandHelp(command string, flags map[string]extension.FlagDefinition, scope *helpScope) {
 	iox.Fprintf(os.Stdout, "putnami %s\n\n", command)
 
 	if len(flags) > 0 {
@@ -212,24 +244,18 @@ func PrintCommandHelp(command string, flags map[string]extension.FlagDefinition)
 		iox.Fprintln(os.Stdout)
 	}
 
-	// Show global flag categories (abbreviated)
-	iox.Fprintln(os.Stdout, "Global Options:")
-	for _, cat := range allFlagCategories {
-		iox.Fprintf(os.Stdout, "  %s: ", cat.Name)
-		var names []string
-		for _, f := range cat.Flags {
-			names = append(names, f.Long)
-		}
-		iox.Fprintln(os.Stdout, strings.Join(names, ", "))
-	}
-	iox.Fprintln(os.Stdout)
-
-	// Show related commands
-	printRelatedCommands(command)
+	printGlobalOptions(scope)
+	printRelatedCommands(command, scope)
 }
 
 // PrintSubcommandHelp prints help for a structured command subcommand.
 func PrintSubcommandHelp(command, subcommand string) {
+	printSubcommandHelp(command, subcommand, nil)
+}
+
+// printSubcommandHelp prints the help of a built-in command, listing the
+// global flags and related commands of scope.
+func printSubcommandHelp(command, subcommand string, scope *helpScope) {
 	full := command
 	if subcommand != "" {
 		full = command + " " + subcommand
@@ -261,8 +287,14 @@ func PrintSubcommandHelp(command, subcommand string) {
 		}
 	}
 
+	printGlobalOptions(scope)
+	printRelatedCommands(full, scope)
+}
+
+// printGlobalOptions prints the abbreviated global-flag listing of scope.
+func printGlobalOptions(scope *helpScope) {
 	iox.Fprintln(os.Stdout, "Global Options:")
-	for _, cat := range allFlagCategories {
+	for _, cat := range scope.flagCategories() {
 		iox.Fprintf(os.Stdout, "  %s: ", cat.Name)
 		var names []string
 		for _, f := range cat.Flags {
@@ -271,14 +303,17 @@ func PrintSubcommandHelp(command, subcommand string) {
 		iox.Fprintln(os.Stdout, strings.Join(names, ", "))
 	}
 	iox.Fprintln(os.Stdout)
-
-	printRelatedCommands(full)
 }
 
-// printRelatedCommands shows suggested related commands.
-func printRelatedCommands(command string) {
-	related, ok := relatedCommands[command]
-	if !ok || len(related) == 0 {
+// printRelatedCommands shows the suggested related commands scope lists.
+func printRelatedCommands(command string, scope *helpScope) {
+	var related []string
+	for _, r := range relatedCommands[command] {
+		if scope.listsJobCommand(r) {
+			related = append(related, r)
+		}
+	}
+	if len(related) == 0 {
 		return
 	}
 	iox.Fprintln(os.Stdout, "Related Commands:")
@@ -319,8 +354,8 @@ func SortedExtensionFlags(flags map[string]extension.FlagDefinition) []string {
 	return names
 }
 
-func builtinAliasSummary() string {
-	aliases := commandmeta.BuiltinAliasList()
+func builtinAliasSummary(scope *helpScope) string {
+	aliases := scope.aliases()
 	parts := make([]string, 0, len(aliases))
 	for _, alias := range aliases {
 		parts = append(parts, alias.Name+"="+alias.Command)

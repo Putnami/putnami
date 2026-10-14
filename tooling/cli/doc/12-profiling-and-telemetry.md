@@ -396,6 +396,9 @@ putnami telemetry show --output=jsonl
 putnami telemetry off
 ```
 
+With `--output=jsonl`, `telemetry show` puts the buffered events under `data`
+as an array at every count: `[]` when none is buffered.
+
 ### Aggregate ownership and the private read contract
 
 Aggregation belongs to the receiver workload, not to the CLI and not to the

@@ -61,16 +61,21 @@ func TelemetryShow(outputFormat string) error {
 		return err
 	}
 
-	if len(events) == 0 {
-		iox.Fprintln(os.Stdout, "  No buffered telemetry events.")
+	if outputFormat == "jsonl" {
+		// One array document, empty included, so data is an array at every count.
+		if events == nil {
+			events = []telemetry.Event{}
+		}
+		data, err := json.Marshal(events)
+		if err != nil {
+			return err
+		}
+		iox.Fprintln(os.Stdout, string(data))
 		return nil
 	}
 
-	if outputFormat == "jsonl" {
-		for _, ev := range events {
-			data, _ := json.Marshal(ev)
-			iox.Fprintln(os.Stdout, string(data))
-		}
+	if len(events) == 0 {
+		iox.Fprintln(os.Stdout, "  No buffered telemetry events.")
 		return nil
 	}
 

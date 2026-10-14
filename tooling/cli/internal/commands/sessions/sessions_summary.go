@@ -343,10 +343,10 @@ func (f summaryCommandFilter) matches(row sessionSummaryRow) bool {
 // `sessions export` does — would put the rows under `ResultV2.data` in a shape
 // that changes with their COUNT. The shared capture in internal/cli collects the
 // documents a structured command printed and unwraps a stream of exactly one
-// (`structuredPayload`), so a summary with no sessions lands as `data: null` and
-// a summary with exactly one session lands as a bare object. Both break the
-// `.data[]` a ledger is documented to read, and the single-session case is the
-// ordinary shape of `--command lint,test,build,validate` on a fresh worktree.
+// (`structuredPayload`), so a summary with exactly one session would land as a
+// bare object. That breaks the `.data[]` a ledger is documented to read, and the
+// single-session case is the ordinary shape of
+// `--command lint,test,build,validate` on a fresh worktree.
 // One array document is unwrapped to itself, so `data` is an array at every
 // count.
 func printSummaryRowsJSON[Row sessionSummaryRow | digestSummaryRow](rows []Row) error {

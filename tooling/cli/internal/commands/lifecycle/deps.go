@@ -472,7 +472,7 @@ func resolveGoDepsProject(wsRoot string, ws *workspace.Workspace, selector strin
 			return nil, fmt.Errorf("project %q not found in the workspace", selector)
 		}
 		if !goModExists(filepath.Join(wsRoot, p.Path)) {
-			return nil, fmt.Errorf("project %q is not a Go module (no go.mod); for TypeScript, edit package.json and run `putnami deps install`", p.Name)
+			return nil, fmt.Errorf("project %q is not a Go module (no go.mod); `deps add`/`deps remove` support Go modules only: edit the project's own manifest (package.json, pyproject.toml) and run `putnami deps install`", p.Name)
 		}
 		return p, nil
 	}

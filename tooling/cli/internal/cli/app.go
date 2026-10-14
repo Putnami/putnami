@@ -248,7 +248,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		return exitCodeForError(parsed.Err)
 	}
 	if len(parsed.Commands) == 0 {
-		PrintHelp()
+		printHelp(newHelpScope(wsRoot, cfg))
 		return ExitSuccess
 	}
 	printParseWarnings(os.Stderr, parsed.Global, parsed.Warnings)
@@ -429,11 +429,11 @@ func printRequestedHelp(
 	case parsed.Global.HelpMD:
 		PrintHelpMarkdown()
 	case len(parsed.Commands) == 0 || parsed.Commands[0] == "help":
-		PrintHelp()
+		printHelp(newHelpScope(wsRoot, cfg))
 	case extensionGroups[parsed.Commands[0]]:
 		printCommandGroupHelp(ctx, os.Stdout, wsRoot, cfg, extensions, parsed.Commands[0], parsed.Subcommand, parsed.Global.Output)
 	case isStructuredCommand(parsed.Commands[0]):
-		PrintSubcommandHelp(parsed.Commands[0], parsed.Subcommand)
+		printSubcommandHelp(parsed.Commands[0], parsed.Subcommand, newHelpScope(wsRoot, cfg))
 	default:
 		return printJobCommandHelpForWorkspace(parsed.Commands[0], wsRoot, cfg, extensions)
 	}

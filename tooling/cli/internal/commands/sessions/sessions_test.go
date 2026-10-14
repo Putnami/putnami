@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
@@ -60,9 +61,34 @@ func TestSessionsList(t *testing.T) {
 		data, _ := json.MarshalIndent(meta, "", "  ")
 		os.WriteFile(filepath.Join(sessDir, "session.json"), data, 0o644)
 
-		err := SessionsList(dir, "jsonl")
+		out, err := sharedtest.CaptureStdout(t, func() error { return SessionsList(dir, "jsonl") })
 		if err != nil {
 			t.Fatalf("SessionsList() jsonl error: %v", err)
+		}
+		var rows []struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal([]byte(out), &rows); err != nil {
+			t.Fatalf("one session must list as a JSON array, got %q: %v", out, err)
+		}
+		if len(rows) != 1 || rows[0].ID != "20260101-120000-abc123" {
+			t.Fatalf("rows = %v, want the one session", rows)
+		}
+	})
+
+	// The structured result reads this output as one JSON document: a human
+	// message here failed `sessions list --output=json` on a fresh workspace.
+	t.Run("lists no session as an empty JSON array", func(t *testing.T) {
+		for _, revision := range []string{"", "0123456789abcdef0123456789abcdef01234567"} {
+			out, err := sharedtest.CaptureStdout(t, func() error {
+				return SessionsListRevision(t.TempDir(), "jsonl", revision)
+			})
+			if err != nil {
+				t.Fatalf("SessionsListRevision(%q) error: %v", revision, err)
+			}
+			if strings.TrimSpace(out) != "[]" {
+				t.Fatalf("SessionsListRevision(%q) = %q, want []", revision, out)
+			}
 		}
 	})
 }

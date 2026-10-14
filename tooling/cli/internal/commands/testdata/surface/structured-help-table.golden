@@ -49,6 +49,14 @@ example: putnami context map
 example: putnami context map --print
 example: putnami context map --print=json
 example: putnami context map --impacted
+═══ context pack ═══
+description: Write one deterministic agent-context document per project to <project>/.gen/agent-context.json: its identity and graph, composition roots, commands, config and contracts. --check re-derives every document, writes nothing, and fails when one drifted. The MCP agent_context tool builds the same document in memory and reports whether the file is fresh
+usage: putnami context pack [--project <selector>] [--check] [--output <format>]
+flag: --project | <selector> | Project ID, path, or name; default is every workspace project
+flag: --check |  | Re-derive the documents, write nothing, and fail on drift
+example: putnami context pack
+example: putnami context pack --project <project-id>
+example: putnami context pack --check
 ═══ contributor ═══
 description: Run the local contributor helpers used by the build workflow. Language checks read text, tracked files, commit messages, or tasks through the configured collaboration provider; machine-load reads local resource capacity. Neither command runs the project gate
 usage: putnami contributor <language|machine-load> [arguments]

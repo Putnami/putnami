@@ -282,6 +282,20 @@
       "positionals": []
     },
     {
+      "path": "context pack",
+      "flags": [
+        {
+          "long": "--check",
+          "type": "bool"
+        },
+        {
+          "long": "--project",
+          "type": "value"
+        }
+      ],
+      "positionals": []
+    },
+    {
       "path": "contributor",
       "flags": [],
       "positionals": []
@@ -1051,6 +1065,11 @@
           "type": "value"
         }
       ],
+      "positionals": []
+    },
+    {
+      "path": "validate",
+      "flags": [],
       "positionals": []
     },
     {
