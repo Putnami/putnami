@@ -343,6 +343,66 @@ func TestRequireRepository(t *testing.T) {
 	}
 }
 
+// The refusal follows the side effects a command's jobs declare, not its name.
+// A verb of the extension's own that declares registry side effects is refused
+// like publish; a publish whose declared traits name none runs where Git does
+// not manage the root. deploy, which no loaded extension declares, keeps its
+// well-known default and is refused.
+func TestRequireRepository_FollowsTheDeclaredSideEffects(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-without-git", "git-history-is-refused-in-one-line",
+		"a-declared-side-effect-outside-a-repository-names-git")
+	root := rootWithoutRepository(t)
+	step := func(id string) []extensionproto.PipelineStep {
+		return []extensionproto.PipelineStep{{ID: id, Task: "noop"}}
+	}
+	manifest, err := json.Marshal(extensionproto.Manifest{
+		Name: "@test/release", Version: "1.0.0", CLIContract: 4,
+		Commands: map[string]extensionproto.CommandDefinition{
+			"build": {Run: step("build")},
+			"release": {Run: step("release"), Traits: &extensionproto.CommandTraits{
+				SideEffects: extensionproto.SideEffectsRegistry,
+			}},
+			"publish": {Run: step("publish"), Traits: &extensionproto.CommandTraits{InjectPublishChannels: true}},
+		},
+		Tasks: map[string]extensionproto.TaskDefinition{
+			"noop": {Kind: "command", Command: "true", Cwd: "{projectRoot}"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, data := range map[string][]byte{
+		"putnami.workspace.json":           []byte(`{"name":"release","includes":["app","extension"],"extensions":["/extension"]}`),
+		"app/putnami.json":                 []byte(`{"name":"app","extensions":["/extension"]}`),
+		"extension/putnami.json":           []byte(`{"name":"@test/release"}`),
+		"extension/putnami.extension.json": manifest,
+	} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, path)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, path), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	workspace.InvalidateLoadCache(root)
+	request := func(commands ...string) *Request {
+		return &Request{WorkspaceRoot: root, Config: workspacepb.Load(root), Commands: commands}
+	}
+
+	for _, commands := range [][]string{{"release"}, {"build", "release"}, {"deploy"}} {
+		err := requireRepository(request(commands...))
+		what := commands[len(commands)-1]
+		if !errors.Is(err, git.ErrNotRepository) || !strings.HasPrefix(err.Error(), what+" needs git history: ") {
+			t.Errorf("requireRepository(%v) = %v, want the refusal naming %s", commands, err, what)
+		}
+	}
+	for _, commands := range [][]string{{"publish"}, {"build", "publish"}, {"build"}} {
+		if err := requireRepository(request(commands...)); err != nil {
+			t.Errorf("requireRepository(%v) = %v, want nil: no job of the run declares a side effect", commands, err)
+		}
+	}
+}
+
 // readStampScript is the fixture task: it records its run in the file its
 // first argument names, then copies the project's version stamp into its
 // declared output. It uses shell builtins only, so it runs with no other

@@ -3,7 +3,6 @@ package engine
 import (
 	"fmt"
 	"os"
-	"slices"
 
 	internalextension "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
@@ -53,15 +52,16 @@ func captureVersionSnapshot(wsRoot string) (*git.VersionInfo, error) {
 	return nil, nil
 }
 
-// gitHistoryCommands are the commands that ship a commit: each refuses a
-// workspace root Git does not manage.
-var gitHistoryCommands = []string{"publish", "deploy"}
-
 // requireRepository returns the one-line refusal when the run includes a
-// command that ships a commit and Git does not manage the workspace root.
+// command that ships a commit and Git does not manage the workspace root. A
+// command ships a commit when its jobs declare a side effect outside the
+// workspace (internalextension.CommandSideEffects): publish and deploy by
+// default, and any command whose manifest declares sideEffects. The declared
+// trait decides, not the command name.
 //
-// It asks git only when the tree-state capture found no commit and the run
-// includes such a command, so every other run starts no extra process. A run
+// It reads the extensions only when the tree-state capture found no commit,
+// and asks git only when the run also includes such a command, so a run inside
+// a repository does neither and every other run starts no extra process. A run
 // that only previews its plan ships nothing and is not refused. The executing
 // side of a frozen portable request is exempt: the submitter resolved its
 // versions, and the snapshot it runs in carries no repository. A version 2
@@ -70,8 +70,12 @@ func requireRepository(req *Request) error {
 	if req.VersionSnapshot != nil || req.Portable.frozen() || req.Global.Plan || req.previewsOnly() {
 		return nil
 	}
-	for _, command := range gitHistoryCommands {
-		if !slices.Contains(req.Commands, command) {
+	var extensions []*internalextension.ExtensionDescription
+	if discovered := discoverDeclaredExtensions(req); discovered != nil {
+		extensions = discovered.Extensions
+	}
+	for _, command := range req.Commands {
+		if len(internalextension.CommandSideEffects(extensions, command)) == 0 {
 			continue
 		}
 		if unmanaged := git.Unmanaged(req.WorkspaceRoot); unmanaged != nil {
@@ -95,24 +99,28 @@ func requireRepository(req *Request) error {
 // project activates gets the refusal: telling it apart needs the plan, which
 // this run never builds.
 func reportRepositoryRefusal(req *Request, refusal error) error {
-	if discovered := discoverDeclaredExtensions(req); discovered != nil {
-		missing := missingRegistryExtensions(req.Config, discovered.Extensions, discovered.MissingDependencies()...)
-		if len(missing) > 0 && len(selectedCommandsWithoutJobs(req.Commands, nil, discovered.Extensions)) > 0 {
-			reportMissingExtensions(missing, discovered.Skipped, "")
-			reportUnservedSDDCommands(req.Commands, discovered.Extensions)
-			return nil
+	// Only a registry extension can be missing, so the extensions of a
+	// workspace that declares none are not read again.
+	if len(missingRegistryExtensions(req.Config, nil)) > 0 {
+		if discovered := discoverDeclaredExtensions(req); discovered != nil {
+			missing := missingRegistryExtensions(req.Config, discovered.Extensions, discovered.MissingDependencies()...)
+			if len(missing) > 0 && len(selectedCommandsWithoutJobs(req.Commands, nil, discovered.Extensions)) > 0 {
+				reportMissingExtensions(missing, discovered.Skipped, "")
+				reportUnservedSDDCommands(req.Commands, discovered.Extensions)
+				return nil
+			}
 		}
 	}
 	iox.Fprintf(os.Stderr, "putnami: %v\n", refusal)
 	return refusal
 }
 
-// discoverDeclaredExtensions resolves the extensions of a workspace that
-// declares a registry extension, the only kind that can be missing. It returns
-// nil for any other workspace, and when the workspace or its extensions cannot
-// be read: the refusal then stands.
+// discoverDeclaredExtensions resolves the extensions of the workspace before
+// any hook runs. It returns nil when the request carries no workspace config,
+// and when the workspace or its extensions cannot be read: a command is then
+// classified by its well-known verb, and a refusal stands.
 func discoverDeclaredExtensions(req *Request) *internalextension.DiscoveryResult {
-	if len(missingRegistryExtensions(req.Config, nil)) == 0 {
+	if req.Config == nil {
 		return nil
 	}
 	ws, err := workspace.Load(req.WorkspaceRoot)
