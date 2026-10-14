@@ -75,8 +75,8 @@ It keeps and releases any file you edited, and afterwards
 
 `@putnami/contributor` is published with the framework release set, like every
 other extension, and has the `preview` support status. Its project sets
-`options.publish.archives`, and `@putnami/scaffold` packages it under the
-`agent-content` step. It reaches a channel once a release set that includes it
+`options.publish.archives`, and `@putnami/go` packages its content with its
+executable. It reaches a channel once a release set that includes it
 advances that channel: `canary` first, `stable` and `latest` at the next
 promotion. Until the channel a workspace resolves serves it:
 

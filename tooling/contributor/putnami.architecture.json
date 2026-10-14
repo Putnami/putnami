@@ -42,5 +42,135 @@
       }
     }
   ],
-  "imports": []
+  "imports": [
+    {
+      "id": "agent-workflows.extension-runtime.v1",
+      "version": 1,
+      "from": {
+        "domain": "extension-sdk",
+        "export": "extension-sdk.extension-runtime.v1"
+      },
+      "as": "agent-workflows.extension-runtime",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "extension_runtime_api"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/tooling/extension-sdk"
+        }
+      ],
+      "justification": "The contributor extension's runtime is an extension binary: it answers the host's runtime handshake through the SDK runtime instead of writing the descriptor itself, so its answer cannot drift from the one every other Putnami extension gives."
+    },
+    {
+      "id": "agent-workflows.protocol-contracts.v1",
+      "version": 1,
+      "from": {
+        "domain": "protocols",
+        "export": "protocols.wire-contracts.v1"
+      },
+      "as": "agent-workflows.protocol-contracts",
+      "mode": "reference",
+      "status": "active",
+      "facts": [
+        "wire_contract_definitions"
+      ],
+      "bindings": [
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/architecture"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/capabilities"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/cli"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/database"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/diagnostic"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/distribution"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/extension"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/features"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/gomod"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/infra"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/job"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/oci"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/put"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/registry"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/runtime"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/storage"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/workspace"
+        }
+      ],
+      "justification": "The contributor extension's runtime speaks to the CLI through the shared strict wire contracts: the runtime descriptor, the CLI contract and the extension manifest it ships. Its module builds outside the Go workspace, so it resolves every contract module the SDK requires from this repository."
+    }
+  ]
 }

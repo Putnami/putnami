@@ -2,6 +2,7 @@ package agentctx
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -88,12 +89,40 @@ func TestContributorContentRendersEveryEntryPointOnBothHosts(t *testing.T) {
 	}
 }
 
-func TestContributorPackagedAndSourceConsumerMigration(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "canonical-consumer-migration", "packaged-canonical-consumer-content")
-	pkg, err := sdkagentartifact.PackageExtension(contributorRoot(t), "0.1.0")
+// stageContributorPackage stages the contributor's manifest and agent content
+// at version through the SDK step every packager runs, and returns the stage
+// directory and the built content. The contributor declares a runtime, so its
+// language packager ships the executable beside this stage.
+func stageContributorPackage(t *testing.T, version string) (string, *sdkagentartifact.Result) {
+	t.Helper()
+	stage := t.TempDir()
+	authored, err := os.ReadFile(filepath.Join(contributorRoot(t), "putnami.extension.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	var manifest map[string]any
+	if err := json.Unmarshal(authored, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest["version"] = version
+	stamped, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writePathFile(t, stage, "putnami.extension.json", string(stamped)+"\n")
+	content, err := sdkagentartifact.StageExtensionContent(contributorRoot(t), stage, contributorExtension, version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if content == nil {
+		t.Fatal("the contributor manifest declares no agent content to stage")
+	}
+	return stage, content
+}
+
+func TestContributorPackagedAndSourceConsumerMigration(t *testing.T) {
+	spectest.Proves(t, "cli/contributor-workflows", "canonical-consumer-migration", "packaged-canonical-consumer-content")
+	stage, content := stageContributorPackage(t, "0.1.0")
 	for _, packaged := range []bool{false, true} {
 		t.Run(map[bool]string{false: "source", true: "package"}[packaged], func(t *testing.T) {
 			root := t.TempDir()
@@ -102,9 +131,7 @@ func TestContributorPackagedAndSourceConsumerMigration(t *testing.T) {
 				t.Fatal(err)
 			}
 			if packaged {
-				for name, content := range pkg.Members {
-					writePathFile(t, dir, name, string(content))
-				}
+				copyTree(t, stage, dir, "putnami.extension.json", "content")
 			} else {
 				copyTree(t, contributorRoot(t), dir, "putnami.json", "putnami.extension.json", "src")
 			}
@@ -114,7 +141,7 @@ func TestContributorPackagedAndSourceConsumerMigration(t *testing.T) {
 			if err != nil || !changed {
 				t.Fatalf("first install changed=%v, err=%v: %s", changed, err, report.String())
 			}
-			for name, want := range pkg.Content.Files {
+			for name, want := range content.Files {
 				got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
 				if err != nil || !bytes.Equal(got, want) {
 					t.Fatalf("consumer %s differs from packaged source: %v", name, err)

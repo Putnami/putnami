@@ -44,7 +44,7 @@
     },
     {
       "id": "content-only-extension-packaging",
-      "text": "A content-only extension is packaged by the SDK's extension package step into one platform-independent archive, written with identical bytes under every key of the SDK's distribution matrix as <encoded-name>-<os>-<arch>.tar.gz on the archives channel; a dry run writes nothing. An extension that runs something, or breaks its content policy, is refused and writes nothing. @putnami/contributor packages through this job."
+      "text": "A content-only extension is packaged by the SDK's extension package step into one platform-independent archive, written with identical bytes under every key of the SDK's distribution matrix as <encoded-name>-<os>-<arch>.tar.gz on the archives channel; a dry run writes nothing. An extension that runs something, or breaks its content policy, is refused and writes nothing."
     },
     {
       "id": "shared-metadata-index",

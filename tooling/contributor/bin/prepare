@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+output=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --output)
+      [ "$#" -ge 2 ] || { printf '%s\n' "prepare: --output requires a value" >&2; exit 2; }
+      output="$2"
+      shift 2
+      ;;
+    *)
+      printf 'prepare: unknown argument %s\n' "$1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+[ -n "$output" ] || { printf '%s\n' "prepare: --output is required" >&2; exit 2; }
+# PUTNAMI_CONTRIBUTOR_GO is the Go compiler the host resolved for the
+# runtimeCompiler toolchain and probed at the version putnami.lock.json pins.
+# The host publishes it empty when it resolves no compiler at that version. No
+# other Go compiler, from GOROOT or PATH, builds this runtime.
+go_binary="${PUTNAMI_CONTRIBUTOR_GO:-}"
+if [ -z "$go_binary" ] || [ ! -f "$go_binary" ] || [ ! -x "$go_binary" ]; then
+  printf '%s\n' 'prepare: no Go compiler at the version putnami.lock.json pins; run `putnami install`' >&2
+  exit 1
+fi
+mkdir -p "$output/compiled"
+tmp="$output/compiled/putnami-contributor.tmp.$$"
+trap 'rm -f "$tmp"' EXIT INT TERM
+(
+  export GOENV=off
+  export GOFLAGS="-mod=mod -buildvcs=false -trimpath"
+  export GO111MODULE=on
+  export GOWORK=off
+  export GOTOOLCHAIN=local
+  export CGO_ENABLED=0
+
+  # The compiler finds its own root, as the host's version probe did.
+  unset GOROOT
+  # Preserve intentional cache, proxy, and toolchain locations while removing
+  # ambient controls that can change the compiled artifact.
+  unset GOOS GOARCH
+  unset GO386 GOAMD64 GOARM GOARM64 GOMIPS GOMIPS64 GOPPC64 GORISCV64 GOWASM
+  unset GOEXPERIMENT GOFIPS140 GODEBUG GO_EXTLINK_ENABLED GO_LDSO
+
+  "$go_binary" build -o "$tmp" ./cmd/putnami-contributor
+)
+chmod +x "$tmp"
+mv "$tmp" "$output/compiled/putnami-contributor"
+trap - EXIT INT TERM

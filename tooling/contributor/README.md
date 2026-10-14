@@ -1,16 +1,20 @@
 # `@putnami/contributor`
 
-The contributor workflows for agent hosts, shipped as one content-only
-extension: specify, design, build, verify, review independently, repair, and publish
+The contributor workflows for agent hosts, shipped as one extension:
+specify, design, build, verify, review independently, repair, and publish
 under an authorized mandate. It replaces the separately declared
 `@putnami/agent-workflows` and `@putnami/maintainer-workflows` artifacts, which
 its manifest names in `agentContent.supersedes`, with one implementation that
 each repository configures.
 
-The extension runs nothing. Its manifest declares only an `agentContent`
-contribution, which the CLI builds and materializes for Claude Code
-(`.claude/skills`, `.claude/agents`) and Codex (`.agents/skills`,
-`.codex/agents`) under the extension's own version.
+The manifest declares an `agentContent` contribution, which the CLI builds
+and materializes for Claude Code (`.claude/skills`, `.claude/agents`) and Codex
+(`.agents/skills`, `.codex/agents`) under the extension's own version. It also
+declares a compiled runtime, `compiled/putnami-contributor`, which answers only
+the runtime handshake for now
+([ADR 0004](doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md)).
+For a path declaration, the host builds the runtime from `cmd/` with the Go
+release `putnami.lock.json` pins, the first time a command needs it.
 
 ## Use it
 
@@ -92,12 +96,14 @@ dossier can compute `Putnami verified` for the declared local scope.
 - [Workflow records and handoffs](doc/04-workflow-contract.md)
 - [ADR 0001](doc/adr/0001-one-contributor-extension.md)
 - [ADR 0002](doc/adr/0002-build-and-versioned-workflow-record.md)
+- [ADR 0004](doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md)
 
 ## Publication
 
 Every built-in starter declares this extension and opts into its content. The
 extension is published with the framework release set (`preview`), packaged by
-`@putnami/scaffold` under the `agent-content` step. It reaches `canary` first,
+`@putnami/go` into one archive per platform that carries the content and the
+executable. It reaches `canary` first,
 and `stable` and `latest` at the next promotion. Until the channel a workspace
 resolves serves it, `putnami init` keeps the declarations and names
 `putnami install`, and `putnami install` fails in that workspace; the

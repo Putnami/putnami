@@ -22,7 +22,6 @@ its content with the declared policy, stamps the packaged form and
 `cliContract` 5, and refuses an extension that also has a runtime, commands,
 tools, tasks or hooks, which its language extension packages instead
 ([ADR 0004](doc/adr/0004-one-packager-for-every-content-project.md)).
-`@putnami/contributor` is packaged this way.
 
 ```bash
 # Build the archive.

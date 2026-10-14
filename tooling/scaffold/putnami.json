@@ -36,9 +36,6 @@
     "test": {
       "filePatterns": [
         "putnami.extension.json",
-        "../contributor/putnami.json",
-        "../contributor/putnami.extension.json",
-        "../contributor/src/**",
         "../../go/templates/go-library/**",
         "../../go/templates/go-server/**",
         "../../python/templates/python-library/**",
