@@ -96,15 +96,19 @@ plans it.
 - The plan is not a cache-key input, so naming a reuse channel moves no task
   key.
 - `putnami.ci.json` does not declare a reuse channel; the runner passes the
-  two flags, and the revision is the pull request's final head as the runner
-  knows it, not a value the CLI derives from the reuse head. It may pass them
+  two flags, and the revision is the source revision the run of the pull
+  request's final head recorded, as the runner knows it, not a value the CLI
+  derives from the reuse head. A runner that builds a merge commit for a pull
+  request passes that merge commit; any other value matches no record and
+  reuses nothing. It may pass them
   on a branch that gets tagged, because a tagged publish ignores them.
 - A pull request whose final push published nothing for a member, because the
   member's fingerprint did not change since an earlier push, leaves that
   member's record at the earlier commit, and the `main` publication builds it
   again. Reuse trades that rebuild for the guarantee that only artifacts the
-  run of the reviewed final head built are reused. It passes it only once the CLI and every extension it pins know
-  the reuse fields (Distribution ADR 0007, Consequences).
+  run of the reviewed final head built are reused.
+- A runner passes the two flags only once the CLI and every extension it
+  pins know the reuse fields (Distribution ADR 0007, Consequences).
 
 ## Rejected alternatives
 
