@@ -374,7 +374,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "planner",
 		prefix: "internal/jobs/plan",
 		files:  10,
-		funcs:  92,
+		funcs:  86,
 		why: "internal/jobs/plan*.go: the single planner entrypoint (jobs.Plan), its dependency, " +
 			"activation, matching and resource passes, plus the plan contract and its validation. " +
 			"Planning is pure — selection in, typed plan out — and that purity is what lets the " +
@@ -431,7 +431,12 @@ var complexityCeilings = []complexityCeiling{
 			"from — into the ordering-only family the plan already has (SerializeAfter). It reads " +
 			"the same `^` step references resolveExternalDeps resolves and the same planned index, " +
 			"adds no stage, no flag and no cache-key edge, and its one refusal (an edge the plan's " +
-			"existing ordering already runs the other way) is what keeps the DAG a DAG",
+			"existing ordering already runs the other way) is what keeps the DAG a DAG. " +
+			"LOWERED, from 10/92 to 10/86: the task cache key left the planner. Four functions of " +
+			"plan_contract.go and one each of planner_helpers.go and planner_resources.go moved to " +
+			"internal/jobs/cachekey, which computes keys and imports neither the planner nor the " +
+			"scheduler; the files they moved to keep planner names but sit in that package, outside " +
+			"this unit",
 	},
 	{
 		unit:   "scheduler",

@@ -366,9 +366,10 @@ func TestUnresolvableWorkspaceModules_ExcludesSelf(t *testing.T) {
 //
 // SKIP is what keeps such a failure out of the cache: build-tidy declares no
 // `cache.deterministic`, and the orchestrator caches a skip only for a task that
-// does (isCacheableResult, tooling/cli/internal/jobs/executor.go). The proxy
-// here is an empty directory rather than `off`, so the failure is the transient
-// shape — a proxy that answers nothing — and not the configuration one.
+// does (IsCacheableResult, tooling/cli/internal/jobs/cachekey/executor.go).
+// The proxy here is an empty directory rather than `off`, so the failure is
+// the transient shape — a proxy that answers nothing — and not the
+// configuration one.
 func TestRunTidyFailure_EmitsWarningDiagnostic(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "offline-tidy-is-a-cacheable-no-op",
 		"a-tidy-that-ran-and-failed-stays-a-skip")

@@ -278,9 +278,9 @@ func TestModuleAwareCachedTasksKeyWorkspaceGraphFiles(t *testing.T) {
 //
 // The task stays NON-deterministic for the opposite case. A tidy that ran and
 // failed reports a skip, and the orchestrator caches a skip only for a task that
-// declares `cache.deterministic` (isCacheableResult in
-// tooling/cli/internal/jobs/executor.go), so a transient network failure is
-// never recorded. Declaring determinism here would cache it.
+// declares `cache.deterministic` (IsCacheableResult in
+// tooling/cli/internal/jobs/cachekey/executor.go), so a transient network
+// failure is never recorded. Declaring determinism here would cache it.
 func TestTidyKeysOnTheProxyAndCachesNoFailedRun(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "offline-tidy-is-a-cacheable-no-op",
 		"goproxy-is-a-declared-cache-key-input")
@@ -1340,10 +1340,10 @@ func TestGenerateIsTheSingleProducerOfGen(t *testing.T) {
 // stale while the task declared no output, and would actively RESTORE a stale
 // merged file now that a hit reproduces one.
 //
-// The closure includes the seed project (projectDependencyClosure in
-// tooling/cli/internal/jobs/context.go, folded by closureInputsDigest and
-// keyFilePatterns), so the project's own files are not declared a second time
-// through a `project` input.
+// The closure includes the seed project (ProjectDependencyClosure in
+// tooling/cli/internal/jobs/cachekey/context.go, folded by closureInputsDigest
+// and KeyFilePatterns), so the project's own files are not declared a second
+// time through a `project` input.
 func TestConfigMergeKeysOnTheClosureConfigFiles(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "merged-config-survives-a-cache-hit", "a-dependency-config-change-is-a-cache-key-input-of-config-merge")
 	m := loadExtensionManifest(t)

@@ -358,7 +358,7 @@ Two contracts, two pairs of sides:
 | Contract | Producer / client | Consumer / server |
 | --- | --- | --- |
 | HTTP wire (`cache.go`, `strict_*.go`) | the cache-provider extension, which owns the HTTP client | the cloud cache server |
-| Provider RPC (`provider.go`, `provider_strict.go`) | the CLI build scheduler (`tooling/cli/internal/jobs/remote_provider.go` over the `internal/cacheprovider` session harness) | any extension declaring the reserved `cache-provider` command |
+| Provider RPC (`provider.go`, `provider_strict.go`) | the CLI build scheduler (`tooling/cli/internal/jobs/remotecache/remote_provider.go` over the `internal/cacheprovider` session harness) | any extension declaring the reserved `cache-provider` command |
 
 The CLI links **no** HTTP cache client: remote caching is delegated to the
 provider subprocess, and the CLI's persisted `.putnami/cache.json` only says
