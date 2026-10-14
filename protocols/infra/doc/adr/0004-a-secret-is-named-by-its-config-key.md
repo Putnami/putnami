@@ -18,10 +18,12 @@ A secret requirement is named by the config key the application reads it at.
 The secret-name grammar is the resource-name grammar with uppercase letters:
 `^[A-Za-z0-9][A-Za-z0-9_./-]{0,63}$`. It applies to `secrets` in per-project and
 aggregated manifests and to `ignore.secrets` in overrides. Every other resource
-name stays lowercase.
+name stays lowercase. Secret names are case-sensitive: `crm.apiKey` and
+`crm.apikey` are two secrets.
 
-`ProtocolVersion` stays 2. A reader built before this decision refuses a
-camelCase secret name, so the change ships in three steps:
+`ProtocolVersion` stays 2: a new version would make every older reader refuse
+every manifest, while keeping it makes an older reader refuse only a camelCase
+secret name. Because of that refusal, the change ships in three steps:
 
 1. The protocol accepts camelCase secret names. Emitters keep their current
    names.
@@ -35,6 +37,9 @@ camelCase secret name, so the change ships in three steps:
 
 - Until step 3, `infra/requirements.json` still lists the lowercase name, and
   `secrets set` keeps refusing it and naming the config key.
+- Between steps 1 and 2, local validation, the published `putnami-infra.json`
+  schema and editors accept a hand-written `crm.apiKey`, while Putnami Cloud
+  still refuses a deployment that lists it.
 - Step 3 changes every committed manifest that lists a camelCase or
   env-bound secret, and waits for step 2: a deployer on an older version of
   this package refuses those manifests.

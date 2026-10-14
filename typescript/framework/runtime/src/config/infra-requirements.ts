@@ -14,10 +14,11 @@ const INFRA_PROTOCOL_VERSION = 2;
 const INFRA_SCHEMA_URL = 'https://putnami.dev/schemas/putnami-infra.json';
 
 // Canonical infra resource-name grammar, from schemas/infra.json: lowercase
-// letters, digits, '-', '_', '.', '/'; 1–64 chars. Secret names that violate
-// it are rejected by the generator sync/build aggregator, so the emitter must produce
-// conforming names or fail loudly here rather than have the requirement
-// silently dropped at deploy time.
+// letters, digits, '-', '_', '.', '/'; 1–64 chars. The protocol also accepts
+// uppercase letters in a secret name, but this emitter keeps lowercase names
+// until Putnami Cloud reads that grammar (protocols/infra ADR 0004). It fails
+// loudly on a path it cannot name rather than emit a requirement the deployer
+// refuses.
 const INFRA_NAME_RE = /^[a-z0-9][a-z0-9_./-]{0,63}$/;
 
 /**

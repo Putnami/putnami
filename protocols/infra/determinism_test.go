@@ -106,7 +106,7 @@ func TestValidatePerProjectManifest_Deterministic(t *testing.T) {
 			{Name: "Invalid!", Engine: "mongo"},
 			{Name: "another-bad-name!", Engine: EnginePostgres},
 		},
-		Secrets: []string{"INVALID-secret"},
+		Secrets: []string{"invalid secret!"},
 	}
 	canonical := ValidatePerProjectManifest(m)
 	if len(canonical) == 0 {
