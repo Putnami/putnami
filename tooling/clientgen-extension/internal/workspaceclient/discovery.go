@@ -111,9 +111,9 @@ var httpMethods = map[string]bool{
 }
 
 // discover reads the BUILT tree: the generation contract the provider's build
-// wrote (.gen/clientgen/config.json) and the built contract in preference to
-// the committed sidecar. It is the sync, adopt and generation view — a fresh
-// build precedes each of them.
+// wrote (.gen/clientgen/config.json), else the one it commits (clientgen.json),
+// and the built contract in preference to the committed sidecar. It is the
+// sync, adopt and generation view — a fresh build precedes each of them.
 func discover(view workspaceView) ([]provider, []Finding) {
 	return discoverWith(view, builtSpecPath, false)
 }
@@ -141,8 +141,7 @@ func discoverWith(view workspaceView, specPathFor func(files workspaceFiles, pro
 	providers := make([]provider, 0, len(projectPaths))
 	for _, projectRel := range projectPaths {
 		item := &provider{root: filepath.Join(workspaceRoot, filepath.FromSlash(projectRel)), rel: projectRel}
-		configRel := joinRel(projectRel, ".gen/clientgen/config.json")
-		configData, configErr := view.Read(configRel)
+		configData, configRel, configErr := readGenerationConfig(view, projectRel)
 		if configErr == nil {
 			var config clientGenConfig
 			if parseErr := json.Unmarshal(configData, &config); parseErr != nil {
@@ -276,11 +275,37 @@ func discoverWith(view workspaceView, specPathFor func(files workspaceFiles, pro
 		// clone that absence is the only thing there is to read.
 		if item.config == nil && !item.emptyFirstPartyContract() {
 			findings = append(findings, Finding{Code: "clientgen.missing-config", Path: item.rel,
-				ServiceID: metadata.Service.ID, Message: "first-party provider has no .gen/clientgen/config.json"})
+				ServiceID: metadata.Service.ID, Message: "first-party provider has no " + builtConfigFile + " and no " + committedConfigFile})
 		}
 		providers = append(providers, *item)
 	}
 	return providers, findings
+}
+
+// builtConfigFile is the project-relative path of the generation contract a
+// build writes: build-describe for a Go app, build-generate for a TypeScript
+// one. committedConfigFile is the path of the contract a project commits
+// instead, such as a provider slice with no app. It lives outside .gen
+// because build-describe empties .gen/clientgen before it executes.
+const (
+	builtConfigFile     = ".gen/clientgen/config.json"
+	committedConfigFile = "clientgen.json"
+)
+
+// readGenerationConfig reads the project's generation contract: the one a build
+// wrote, and the committed one when no build wrote one. Both views read the same
+// order. In the candidate cut a .gen file exists only when the project commits
+// it, so the guard reads the committed clientgen.json. It returns the
+// workspace-relative path it read, or the committed path when neither exists.
+func readGenerationConfig(view workspaceView, projectRel string) ([]byte, string, error) {
+	built := joinRel(projectRel, builtConfigFile)
+	data, err := view.Read(built)
+	if err == nil || !errors.Is(err, fs.ErrNotExist) {
+		return data, built, err
+	}
+	committed := joinRel(projectRel, committedConfigFile)
+	data, err = view.Read(committed)
+	return data, committed, err
 }
 
 func indexedProjectPaths(workspaceRoot string) ([]string, error) {

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/declared-output-emptied",
+  "version": "1.0.0",
+  "cliContract": 4,
+  "commands": {
+    "build": {
+      "description": "Describe the contracts a later task reads, into directories only this task writes",
+      "run": [{ "id": "describe", "task": "build-describe" }]
+    }
+  },
+  "tasks": {
+    "build-describe": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["describe"],
+      "cwd": "{projectRoot}",
+      "reads": ["sources"],
+      "writes": ["gen"],
+      "cache": { "enabled": true, "deterministic": true },
+      "declares": {
+        "outputs": {
+          "schema": {
+            "kind": "directory",
+            "root": "project",
+            "path": ".gen/schema",
+            "optionalEmpty": true,
+            "emptied": true,
+            "description": "The described contract, absent for a project that emits none. Only this task writes the path, so the engine empties it before the task executes and on a restore of an entry that records it empty (protocol ADR 0009)."
+          },
+          "contracts": {
+            "kind": "directory",
+            "root": "workspace",
+            "path": "dist/contracts",
+            "optionalEmpty": true,
+            "emptied": true,
+            "description": "The same rule under the workspace root."
+          }
+        }
+      }
+    }
+  }
+}

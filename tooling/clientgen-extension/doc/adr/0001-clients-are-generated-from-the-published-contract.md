@@ -1,6 +1,7 @@
 # ADR 0001 — Provider contracts drive generated service clients
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [CLI ADR 0067](../../../cli/doc/adr/0067-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md) (the cache-key invariant)
 - **Scope**: `@putnami/clientgen` (`tooling/clientgen-extension`)
 
 ## Context
@@ -95,7 +96,9 @@ owning project, so the implementation boundary cannot become a consumer waiver.
 - Manifest symbols come from compiled emitters; workspace tooling does not
   recreate language naming rules.
 - Project generation owns the complete dynamic output directory.
-- Everything that decides an emitted byte is a declared cache-key entry.
+- Everything that decides an emitted byte is a declared cache-key entry, or a
+  byte the provider's build writes under `.gen`, which the key of that build
+  fixes and the generator keys fold ([CLI ADR 0067](../../../cli/doc/adr/0067-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md)).
 - Sync and adopt materialize every indexed provider and render in isolation.
 - External classification is explicit and cannot bypass first-party checks.
 - The source guard proposes; it never edits an authored source.

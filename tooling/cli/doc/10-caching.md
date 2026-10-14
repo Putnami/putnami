@@ -438,7 +438,14 @@ A declaration should not reach into the `.gen` tree another task writes during
 the run: the key computed before any task runs then differs from the key the
 task computes when it starts, and the task misses the entry the run looked up
 for it. The Go source inputs leave out `.gen`, where `build-describe` stages a
-generated client that no Go source task compiles.
+generated client that no Go source task compiles. The `clientgen-go` and
+`clientgen-ts` keys leave out `.gen/schema` and `.gen/clientgen`, which the Go
+`build-describe` or the TypeScript `build-generate` writes, and fold the
+producer's key instead. A key may leave out bytes another task writes only when
+a key it folds fixes them: the TypeScript `build-generate` owns `.gen` as a
+required output, and the Go `build-describe` declares both trees `emptied`.
+The keys hash the committed generation contract `clientgen.json` and the
+committed sidecar `schema/openapi.json`, which no task writes.
 
 ### Outputs written earlier in the session
 
@@ -679,7 +686,8 @@ makes the ceded path match the current sources.
 
 **An executing task starts from an empty owned directory.** Before a task
 executes, the scheduler empties each directory output whose path the
-declaration states and that is required or under the command-output directory.
+declaration states and that is required, under the command-output directory, or
+an `optionalEmpty` project or workspace directory that declares `emptied`.
 It removes every entry the task owns there and leaves three things in place:
 
 - each subpath the declaration cedes (`excludes`) or preserves (`preserves`),
@@ -697,8 +705,9 @@ it back.
 
 A restore of an entry that records such an output empty empties it the same
 way, with the same three things left in place. Of the outputs the scheduler
-empties, only an optional command-output directory can be recorded empty, such
-as the `bin` of a run that builds nothing. The restore then leaves the tree the producing execution left, not a
+empties, only an optional one can be recorded empty, such as the `bin` of a run
+that builds nothing, or the `.gen/clientgen` of a Go `build-describe` whose app
+configures no client generator. The restore then leaves the tree the producing execution left, not a
 binary an earlier run wrote beside a green status. The command-output directory
 is detached from an earlier session's link before the emptying. When the
 restore cannot empty the output, the hit is not served: the run falls back as
@@ -733,7 +742,7 @@ Four outputs are not emptied:
 
 | Output | Why |
 | --- | --- |
-| An `optionalEmpty` project or workspace directory | The path can hold a file no task writes, which a run that writes nothing there reads |
+| An `optionalEmpty` project or workspace directory that does not declare `emptied` | The path can hold a file no task writes, which a run that writes nothing there reads |
 | A file | The task replaces it whole |
 | An invocation-scoped output | It lives in a private tree created for the run |
 | A `pathFrom` output | Its path is known only after the task ran |
@@ -746,12 +755,16 @@ restore of that record empties the output too, so an execution and a restore
 still leave the same tree. The engine creates that directory for the command,
 and each output in it has one owner. Under the project or workspace root, an
 optional output can hold a committed file the task reads when it writes
-nothing there, such as `.gen/clientgen/config.json`, so neither an execution
-nor a restore empties it.
+nothing there, so neither an execution nor a restore empties it, unless the
+output declares `emptied`. That flag states that only the task writes the path,
+and the engine then treats the output as it treats an optional command-output
+directory. The Go `build-describe` declares its `.gen/schema` and
+`.gen/clientgen` outputs emptied, and a `cloud/clients` provider slice commits
+its generation contract as `clientgen.json` outside them.
 
 A file that a task stops writing therefore stays in an optional project or
-workspace directory, or in a `pathFrom` directory, and in the entries captured
-from it, until the task removes it.
+workspace directory that does not declare `emptied`, or in a `pathFrom`
+directory, and in the entries captured from it, until the task removes it.
 
 The key of a task with an emptied output carries an `emptiedOutputs` marker
 that names those outputs. An entry stored by a CLI that emptied nothing can hold
@@ -759,12 +772,13 @@ an earlier run's files under the key of the current sources. The marker keeps
 that entry at an address this CLI never asks for, so each such task misses once
 after the upgrade, and so does each task that depends on one. A task with no
 emptied output, including one whose directory outputs are all optional project
-or workspace outputs, keeps its address. The selection fingerprint carries the
+or workspace outputs that do not declare `emptied`, keeps its address. The selection fingerprint carries the
 marker too, so the next publication republishes each release-set member whose
 key moved. See
-[ADR 0064](adr/0064-an-executing-task-starts-from-an-empty-owned-directory.md)
+[ADR 0064](adr/0064-an-executing-task-starts-from-an-empty-owned-directory.md),
+[ADR 0065](adr/0065-an-optional-command-output-directory-is-emptied-on-execution-and-on-an-empty-restore.md)
 and
-[ADR 0065](adr/0065-an-optional-command-output-directory-is-emptied-on-execution-and-on-an-empty-restore.md).
+[ADR 0067](adr/0067-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md).
 
 **`--no-cache` never replaces a stored entry.** A bypassed run neither reads
 nor publishes at its key (see

@@ -68,8 +68,9 @@ func WorkspaceCompileArgs() []string {
 // selection changed under it.
 //
 // The provider list comes from the project documents rather than from
-// discovery, because discovery reads `.gen/clientgen/config.json` — which is
-// what this build PRODUCES. Deriving the selection from the artifact would make
+// discovery, because discovery reads `.gen/clientgen/config.json` first — which
+// is what this build PRODUCES for every provider that does not commit a
+// clientgen.json. Deriving the selection from the artifact would make
 // a cold tree discover no provider, build nothing, and report a clean workspace
 // because it looked at nothing. Reading the declaration has no such
 // chicken-and-egg: a project either names this extension or it does not.

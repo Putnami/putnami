@@ -110,7 +110,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-cacheable-generator-keys-on-the-built-contract-it-reads",
+              "a-cacheable-generator-keys-on-the-committed-contract-and-folds-the-built-one",
               "an-undeclarable-formatter-input-fails-instead-of-being-skipped",
               "every-resolved-formatter-input-is-a-declared-cache-key-entry",
               "the-workspace-root-package-json-keys-the-typescript-target"

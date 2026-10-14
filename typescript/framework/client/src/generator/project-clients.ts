@@ -14,6 +14,14 @@ import { generateTypeScriptClient } from './ts/ts-generator';
 /** Project-relative path of the client-generation contract a build emits. */
 const CONFIG_REL = '.gen/clientgen/config.json';
 
+/**
+ * Project-relative path of a client-generation contract the project commits
+ * instead of building, such as a provider slice with no app. It is read when no
+ * build wrote {@link CONFIG_REL}, and lives outside `.gen` because the Go
+ * `build-describe` empties `.gen/clientgen`.
+ */
+const COMMITTED_CONFIG_REL = 'clientgen.json';
+
 /** Result of {@link generateProjectClients}. */
 export interface ProjectClientResult {
   /** True when a TypeScript client was emitted (ts target enabled + the spec exposed services). */
@@ -66,9 +74,11 @@ interface GeneratedClientManifest {
 const MANIFEST_FILE = 'client.putnami.json';
 
 /**
- * Emit the TypeScript client for a provider from the OpenAPI spec and contract a
- * build already produced under `projectRoot`, writing it into
- * `projectRoot/<ts.output>` (default `clients/ts`).
+ * Emit the TypeScript client for a provider from the OpenAPI spec and the
+ * generation contract of the project at `projectRoot`, writing it into
+ * `projectRoot/<ts.output>` (default `clients/ts`). The contract is the one a
+ * build wrote at `.gen/clientgen/config.json`, or the committed
+ * `clientgen.json` when no build wrote one.
  *
  * This is the standalone, app-less counterpart of {@link ClientGeneratorPlugin}'s
  * in-app `postGenerate()`: the workspace `clientgen` command runs it — in its own
@@ -84,8 +94,10 @@ const MANIFEST_FILE = 'client.putnami.json';
  * or the provider's Biome configuration cannot be applied before writing.
  */
 export function generateProjectClients(projectRoot: string, selected: ProjectClientSource = {}): ProjectClientResult {
-  const configPath = joinPath(projectRoot, CONFIG_REL);
-  if (!fileExists(configPath)) {
+  const configPath = [CONFIG_REL, COMMITTED_CONFIG_REL]
+    .map((rel) => joinPath(projectRoot, rel))
+    .find((path) => fileExists(path));
+  if (configPath === undefined) {
     return { generated: false, outputDir: '', files: [] };
   }
   const config: ClientGenConfig = JSON.parse(readFileSync(configPath, 'utf8'));

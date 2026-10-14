@@ -33,6 +33,46 @@ func TestDiscoveryUsesWorkspaceIndexAndPrefersBuiltContract(t *testing.T) {
 	}
 }
 
+// A provider with no app commits its generation contract as clientgen.json at
+// its root, because build-describe empties .gen/clientgen. Discovery reads it
+// when no build wrote a contract, a contract a build wrote still wins, and a
+// first-party provider with neither is told both paths.
+func TestDiscoveryReadsTheCommittedGenerationContractWhenNoBuildWroteOne(t *testing.T) {
+	root := t.TempDir()
+	writeWorkspaceFile(t, root, ".putnami/workspace-index.json", `{
+  "version": 4,
+  "projects": [{"path":"providers/slice"}]
+}`)
+	writeWorkspaceFile(t, root, "providers/slice/putnami.json", `{"name":"slice"}`)
+	writeWorkspaceFile(t, root, "providers/slice/schema/openapi.json", string(catalogContractForFixture(t)))
+
+	_, findings := discover(indexedView(root))
+	assertFindingCodeList(t, findings, "clientgen.missing-config")
+	for _, finding := range findings {
+		if finding.Code == "clientgen.missing-config" &&
+			(!strings.Contains(finding.Message, ".gen/clientgen/config.json") || !strings.Contains(finding.Message, "clientgen.json")) {
+			t.Errorf("missing-config message = %q, want it to name both contract paths", finding.Message)
+		}
+	}
+
+	writeWorkspaceFile(t, root, "providers/slice/clientgen.json", `{"targets":["go"],"go":{"output":"go"}}`)
+	providers, findings := discover(indexedView(root))
+	for _, finding := range findings {
+		if finding.Code == "clientgen.missing-config" || finding.Code == "clientgen.invalid-config" {
+			t.Errorf("discovery with a committed contract reported %+v", finding)
+		}
+	}
+	if len(providers) != 1 || providers[0].config == nil || !reflect.DeepEqual(providers[0].config.Targets, []string{"go"}) {
+		t.Fatalf("the committed clientgen.json was not read: %+v", providers)
+	}
+
+	writeWorkspaceFile(t, root, "providers/slice/.gen/clientgen/config.json", `{"targets":["ts"]}`)
+	providers, _ = discover(indexedView(root))
+	if len(providers) != 1 || providers[0].config == nil || !reflect.DeepEqual(providers[0].config.Targets, []string{"ts"}) {
+		t.Fatalf("the committed clientgen.json won over the contract a build wrote: %+v", providers)
+	}
+}
+
 func TestDiscoveryIgnoresUnindexedFixturesAndRequiresExplicitThirdParty(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "strict-provider-discovery", "unmarked-contracts-require-explicit-third-party-mode")
 	root := t.TempDir()

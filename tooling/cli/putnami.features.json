@@ -954,6 +954,15 @@
           }
         },
         {
+          "id": "clientgen-key-reads-no-run-written-tree",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["clientgen-key-ignores-the-describe-owned-trees"]
+          }
+        },
+        {
           "id": "result-only-remote-restore",
           "stage": "coded",
           "evidenceKinds": [
@@ -1016,6 +1025,7 @@
               "a-path-from-output-is-left-as-it-stands",
               "an-optional-project-or-workspace-output-is-left-as-it-stands",
               "an-optional-command-output-directory-is-emptied",
+              "an-emptied-optional-project-or-workspace-output-is-emptied",
               "a-restore-of-an-empty-command-output-record-empties-it",
               "a-failure-to-empty-on-restore-executes-the-task",
               "an-entry-stored-without-emptying-is-never-served"

@@ -99,9 +99,7 @@
         "deterministic": true,
         "key": {
           "files": [
-            ".gen/clientgen/config.json",
-            ".gen/schema/openapi.json",
-            ".gen/schema/openapi.json.gz",
+            "clientgen.json",
             "go.mod",
             "schema/openapi.json"
           ]
@@ -115,7 +113,7 @@
             "optionalEmpty": true,
             "preserves": [".gen", "go.mod", "go.sum", "putnami.json"],
             "drift": "fail",
-            "description": "The complete generated Go target selected by .gen/clientgen/config.json. It is committed, so the engine compares what this task writes (or a cache hit restores) with the bytes present before, and fails the task on a difference: the worktree then holds the regenerated client to commit (protocols/extension ADR 0004). The project document and module files a workspace commits inside the directory are preserved: never captured, restored over, or judged (protocols/extension ADR 0005). The client project's own .gen directory, which the engine and that project's tasks write, is preserved the same way."
+            "description": "The complete generated Go target selected by the generation contract: .gen/clientgen/config.json, or the committed clientgen.json when no build wrote one. It is committed, so the engine compares what this task writes (or a cache hit restores) with the bytes present before, and fails the task on a difference: the worktree then holds the regenerated client to commit (protocols/extension ADR 0004). The project document and module files a workspace commits inside the directory are preserved: never captured, restored over, or judged (protocols/extension ADR 0005). The client project's own .gen directory, which the engine and that project's tasks write, is preserved the same way."
           }
         }
       }
@@ -141,10 +139,8 @@
         "key": {
           "files": [
             ".editorconfig",
-            ".gen/clientgen/config.json",
-            ".gen/schema/openapi.json",
-            ".gen/schema/openapi.json.gz",
             "biome.json",
+            "clientgen.json",
             "package.json",
             "schema/openapi.json"
           ],
@@ -159,7 +155,7 @@
             "optionalEmpty": true,
             "preserves": [".gen", "node_modules", "putnami.json"],
             "drift": "fail",
-            "description": "The complete generated TypeScript target selected by .gen/clientgen/config.json. It is committed, so the engine compares what this task writes (or a cache hit restores) with the bytes present before, and fails the task on a difference: the worktree then holds the regenerated client to commit (protocols/extension ADR 0004). The project document a workspace commits inside the directory, and the dependency install the workspace materializes there when the client is a package of its own, are preserved: never captured, restored over, or judged (protocols/extension ADR 0005). Without the install carve-out the capture walked into node_modules, failed on its first symlinked directory, and cached nothing. The client project's own .gen directory, which the engine and that project's tasks write, is preserved the same way."
+            "description": "The complete generated TypeScript target selected by the generation contract: .gen/clientgen/config.json, or the committed clientgen.json when no build wrote one. It is committed, so the engine compares what this task writes (or a cache hit restores) with the bytes present before, and fails the task on a difference: the worktree then holds the regenerated client to commit (protocols/extension ADR 0004). The project document a workspace commits inside the directory, and the dependency install the workspace materializes there when the client is a package of its own, are preserved: never captured, restored over, or judged (protocols/extension ADR 0005). Without the install carve-out the capture walked into node_modules, failed on its first symlinked directory, and cached nothing. The client project's own .gen directory, which the engine and that project's tasks write, is preserved the same way."
           }
         },
         "effects": ["toolchain-cache"]
@@ -181,7 +177,7 @@
       }
     },
     "clientgen-workspace-check": {
-      "description": "Judge every committed generated client against its committed manifest and the committed provider contract (hashes, coverage, forged markers), validate the two inventories, and scan all consumer sources for handwritten first-party transports. It builds nothing, renders nothing and spawns no Putnami: whether a committed client is what the current contract generates is the generator task's own verdict (declared-output drift). It reads the workspace's Git candidate cut (the tracked files and the untracked files no ignore rule excludes) and the member projects the job context names, which the CLI resolves from the committed workspace and scope manifests, and its key is the input `git:**`, which holds that cut. A file Git ignores is neither read nor keyed: the project index .putnami/workspace-index.json, a provider's built .gen/clientgen/config.json and .gen/schema/openapi.json, and an ignored source are absent, as they are from a clone, so a provider's contract is its committed sidecar schema/openapi.json and its targets are its committed client.putnami.json manifests, unless the project commits those .gen files. Editing, adding, deleting or renaming a candidate moves the key, so a cached verdict is replayed only for the bytes it judged, and the verdict is the same on a cold clone and on a tree the session just built.",
+      "description": "Judge every committed generated client against its committed manifest and the committed provider contract (hashes, coverage, forged markers), validate the two inventories, and scan all consumer sources for handwritten first-party transports. It builds nothing, renders nothing and spawns no Putnami: whether a committed client is what the current contract generates is the generator task's own verdict (declared-output drift). It reads the workspace's Git candidate cut (the tracked files and the untracked files no ignore rule excludes) and the member projects the job context names, which the CLI resolves from the committed workspace and scope manifests, and its key is the input `git:**`, which holds that cut. A file Git ignores is neither read nor keyed: the project index .putnami/workspace-index.json, a provider's built .gen/clientgen/config.json and .gen/schema/openapi.json, and an ignored source are absent, as they are from a clone, so a provider's contract is its committed sidecar schema/openapi.json and its targets are those of its committed generation contract clientgen.json, else its committed client.putnami.json manifests, unless the project commits those .gen files. Editing, adding, deleting or renaming a candidate moves the key, so a cached verdict is replayed only for the bytes it judged, and the verdict is the same on a cold clone and on a tree the session just built.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["workspace-check"],

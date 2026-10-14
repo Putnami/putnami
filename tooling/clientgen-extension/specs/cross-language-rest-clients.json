@@ -43,7 +43,7 @@
     },
     {
       "id": "formatter-inputs-are-cache-keyed",
-      "text": "The emitted TypeScript is canonicalized by Biome, so the resolved configuration, its overrides, its extends chain and the EditorConfig beside it are generation inputs, and so is the workspace root package.json, which decides how the TypeScript client depends on @putnami/client. Every one of them is a declared cache-key entry, an input that cannot be declared fails resolution instead of being skipped, and both cacheable generators key on the built contract they read."
+      "text": "The emitted TypeScript is canonicalized by Biome, so the resolved configuration, its overrides, its extends chain and the EditorConfig beside it are generation inputs, and so is the workspace root package.json, which decides how the TypeScript client depends on @putnami/client. Every one of them is a declared cache-key entry, an input that cannot be declared fails resolution instead of being skipped, and both cacheable generators key on the committed generation contract and sidecar they read, and on no file a build of the run writes under .gen, whose bytes the build's key they fold fixes."
     },
     {
       "id": "no-source-mutation",

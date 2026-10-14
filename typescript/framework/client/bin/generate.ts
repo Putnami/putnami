@@ -14,7 +14,8 @@
  *
  * --project defaults to the current directory (the workspace runner sets the task
  * cwd to the project root). The project must already have been built (putnami
- * build) so its .gen/clientgen/config.json and OpenAPI spec exist.
+ * build) so its .gen/clientgen/config.json and OpenAPI spec exist, or commit its
+ * generation contract as clientgen.json and its spec as schema/openapi.json.
  *
  * --format-project names the ORIGINAL provider project root when --project is an
  * isolated mirror of it. Canonicalization then resolves the Biome package,

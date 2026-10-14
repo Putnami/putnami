@@ -182,6 +182,40 @@ func TestGenerateProjectClients_PrefersFreshGeneratedContract(t *testing.T) {
 	}
 }
 
+// A project that commits its generation contract, such as a provider slice
+// with no app, keeps it at clientgen.json: build-describe empties
+// .gen/clientgen, so a contract committed there would be gone before the
+// clientgen task reads it. A contract a build wrote still wins.
+func TestGenerateProjectClients_ReadsTheCommittedContractWhenNoBuildWroteOne(t *testing.T) {
+	root := t.TempDir()
+	writeProjectFile(t, root, CommittedClientGenConfigPath, goTargetConfig)
+	writeProjectFile(t, root, "schema/openapi.json", minimalSpec)
+
+	res, err := GenerateProjectClients(root)
+	if err != nil {
+		t.Fatalf("GenerateProjectClients: %v", err)
+	}
+	if !res.Generated || res.OutputDir != "clients/go" {
+		t.Fatalf("result = %+v, want a client emitted from the committed clientgen.json", res)
+	}
+	if source := readProjectFile(t, root, "clients/go/client.gen.go"); !strings.Contains(source, "package itemsclient") {
+		t.Fatalf("client.gen.go does not follow the committed contract:\n%s", source)
+	}
+
+	if err := os.RemoveAll(filepath.Join(root, "clients")); err != nil {
+		t.Fatal(err)
+	}
+	writeProjectFile(t, root, ".gen/clientgen/config.json",
+		`{"targets":["ts"],"ts":{"output":"clients/ts","packageName":"@x/c"},"go":{"output":"clients/go","modulePath":"","packageName":"client","clientName":"Client"}}`)
+	res, err = GenerateProjectClients(root)
+	if err != nil {
+		t.Fatalf("GenerateProjectClients with a built contract: %v", err)
+	}
+	if res.Generated {
+		t.Fatal("the committed clientgen.json won over the contract a build wrote")
+	}
+}
+
 func TestGenerateProjectClients_RemovesOnlyUnmodifiedManifestOwnedFiles(t *testing.T) {
 	root := t.TempDir()
 	cfg := strings.Replace(goTargetConfig, "\n  \"thirdParty\": true,", "", 1)

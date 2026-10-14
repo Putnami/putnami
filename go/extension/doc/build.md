@@ -607,6 +607,16 @@ nothing to merge writes no merged config file, a workload that authors
 `infra/runtime.json` gets no runtime defaults file,
 and a library's `bin/` is empty because its build evidence is a compile check.
 
+`build-describe`'s `.gen/schema/` and `.gen/clientgen/` also declare `emptied`
+([protocol ADR 0009](../../../protocols/extension/doc/adr/0009-an-optional-project-output-may-ask-to-be-emptied.md),
+[CLI ADR 0067](../../../tooling/cli/doc/adr/0067-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md)).
+The engine empties both before the task executes, including a describe that
+skips because the project has no main package, and on a restore of an entry
+that records them empty. Nothing committed lives under either path: a provider
+slice that commits its generation contract keeps it at `clientgen.json` in its
+root. The task itself rebuilds `.gen/schema/` from generate's staged copy and
+removes `.gen/clientgen/` before the describe binary runs.
+
 `build-generate` does NOT own every subpath of `.gen`. It declares the subtree
 with twelve paths excluded. Seven of them exist because it runs FIRST and its
 snapshot predates everything `build-describe` writes there — so a run serving
@@ -627,8 +637,8 @@ nothing because the task declared no output:
 
 | Ceded subpath | Owner | The later reader that made it a defect |
 |---|---|---|
-| `.gen/schema/` | `build-describe` | `@putnami/clientgen` discovery and `go/framework/api` read `.gen/schema/openapi.json` in PREFERENCE to the committed sidecar; both clientgen tasks name it among their cache-key files |
-| `.gen/clientgen/` | `build-describe` | the same discovery reads `.gen/clientgen/config.json` for generation; the `validate` guard reads committed inputs |
+| `.gen/schema/` | `build-describe` | `@putnami/clientgen` discovery and `go/framework/api` read `.gen/schema/openapi.json` in PREFERENCE to the committed sidecar. The output declares `emptied`, so neither clientgen key hashes it: they fold describe's key |
+| `.gen/clientgen/` | `build-describe` | the same discovery reads `.gen/clientgen/config.json` for generation, and the committed `clientgen.json` at the project root when no build wrote one; the `validate` guard reads committed inputs. The output declares `emptied`, so neither clientgen key hashes it |
 | `.gen/design/` | `build-describe` | `@putnami/sdd`'s feature projection and `putnami context` read `.gen/design/graph.json` |
 | `.gen/migrations.json` | `build-describe` | none; ceded so a project that stops contributing migrations cannot have a stale dump resurrected |
 | `.gen/migration-bundle/` | `build-describe` | release-set migration publication, deploy, `database.ApplyBundle`, the database test provider |

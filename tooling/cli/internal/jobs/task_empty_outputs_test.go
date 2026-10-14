@@ -609,12 +609,12 @@ func TestEntryStoredWithoutEmptyingIsNeverServed(t *testing.T) {
 	assertFilesIn(t, "this engine, restore", f.gen, "public/static/index.html", "version.json")
 }
 
-// An optionalEmpty directory under the project root can hold a file no task
-// wrote, such as a committed configuration the task reads when it writes
-// nothing there. A run that writes nothing is recorded empty, and a restore of
-// that record leaves the path as it stands. An execution that writes nothing
-// must leave it too, so the scheduler never empties an optional project or
-// workspace output.
+// An optionalEmpty directory under the project root that does not declare
+// emptied can hold a file no task wrote, such as a committed configuration the
+// task reads when it writes nothing there. A run that writes nothing is
+// recorded empty, and a restore of that record leaves the path as it stands.
+// An execution that writes nothing must leave it too, so the scheduler never
+// empties such an output.
 func TestOptionalOutputKeepsAFileThroughAnExecutionThatWritesNothing(t *testing.T) {
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-project-or-workspace-output-is-left-as-it-stands")
 	f := newEmptyingFixture(t, false)
@@ -663,6 +663,58 @@ func TestOptionalOutputKeepsAFileThroughAnExecutionThatWritesNothing(t *testing.
 
 	if got := emptyings(); len(got) != 0 {
 		t.Fatalf("emptied %v, want nothing: the task owns no emptied directory", got)
+	}
+}
+
+// An optionalEmpty project directory that declares emptied holds only what
+// its task writes (ADR 0067). The scheduler empties it before the task
+// executes and when it restores an entry that records it empty, and keeps the
+// ceded and preserved subpaths under the same inode, so a contract an earlier
+// run left there survives neither an execution that writes nothing nor the
+// restore of its record.
+func TestEmptiedOptionalOutputIsEmptiedOnExecutionAndOnAnEmptyRestore(t *testing.T) {
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-emptied-optional-project-or-workspace-output-is-emptied")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "ceded-and-preserved-paths-and-the-stamp-stay-untouched")
+	f := newEmptyingFixture(t, false)
+	f.planned[0].Extension.Tasks[emptyingTask] = extension.TaskDefinition{Declares: &extension.TaskDeclaration{
+		Outputs: map[string]extension.DeclaredOutput{
+			"clientgen": {
+				Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: ".gen/clientgen",
+				OptionalEmpty: true, Emptied: true, Excludes: []string{".gen/clientgen/ceded"}, Preserves: []string{"kept"},
+			},
+		},
+	}}
+	emptyings := recordEmptyings(t)
+	clientgen := filepath.Join(f.gen, "clientgen")
+	stale := filepath.Join(clientgen, "config.json")
+
+	// An earlier run left a contract; this one writes nothing under
+	// .gen/clientgen. The execution starts without the contract, and the entry
+	// records the output empty.
+	writeFileAt(t, stale, "{\"targets\":[\"go\"]}\n")
+	first := f.executed(t, "execution over a stale contract", f.run(t, SchedulerConfig{}))[0]
+	assertFilesIn(t, "execution over a stale contract", clientgen)
+	entry, err := store.NewLocalStore(f.storeRoot).LookupTaskEntry(first.CacheKey)
+	if err != nil || entry == nil {
+		t.Fatalf("no entry under %s (err=%v)", first.CacheKey, err)
+	}
+	if recorded, ok := entry.Output("clientgen"); !ok || recorded.State != store.TaskOutputEmpty {
+		t.Fatalf("clientgen recorded as %+v, want the output recorded empty", recorded)
+	}
+
+	// The restore of that record over a stale contract leaves the tree the
+	// execution left: the ceded and preserved subpaths, and nothing else.
+	unowned := writeUnowned(t, clientgen)
+	writeFileAt(t, stale, "{\"targets\":[\"go\"]}\n")
+	f.hit(t, "restore of the empty record", f.run(t, SchedulerConfig{}))
+	assertFilesIn(t, "restore of the empty record", clientgen, "ceded/other", "kept/note.txt")
+	assertUnmoved(t, "restore of the empty record", unowned)
+
+	if got := invocationLog(t, f.logPath); len(got) != 1 {
+		t.Fatalf("invocations = %v, want the one execution", got)
+	}
+	if got, want := emptyings(), []string{clientgen, clientgen}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("emptied %v, want the execution's emptying and the restore's", got)
 	}
 }
 
@@ -974,8 +1026,9 @@ func TestBinaryEntryStoredWithoutEmptyingIsNeverServed(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // emptyingShapesJob declares one output of every shape: a required directory
-// at each of the three durable roots and at the default root, and an optional
-// directory under the command-output root, which are emptied, and the shapes
+// at each of the three durable roots and at the default root, an optional
+// directory under the command-output root, and an optional project and
+// workspace directory that declare emptied, which are emptied, and the shapes
 // that are not.
 func emptyingShapesJob() *ScheduledJob {
 	return declaredJob("build~emit", "emit", &extension.TaskDeclaration{
@@ -993,13 +1046,21 @@ func emptyingShapesJob() *ScheduledJob {
 			},
 			"optional":       dirDeclaration(extension.OutputRootProject, "described", true),
 			"optionalShared": dirDeclaration(extension.OutputRootWorkspace, "dist/optional", true),
-			"tool":           fileDeclaration(extension.OutputRootCommandOutput, "bin/tool", true),
-			"client":         {Kind: extension.OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true},
-			"scratch":        {Kind: extension.OutputKindDirectory, Scope: extensionproto.OutputScopeInvocation, Path: "scratch", OptionalEmpty: true},
-			"socket":         {Kind: extensionproto.OutputKindRuntimeFile, Scope: extensionproto.OutputScopeInvocation, Path: "socket", OptionalEmpty: true},
-			"escape":         {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: "../outside", OptionalEmpty: true},
-			"root":           {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: ".", OptionalEmpty: true},
-			"unknown":        {Kind: extension.OutputKindDirectory, Root: "elsewhere", Path: "out", OptionalEmpty: true},
+			"emptiedOptional": {
+				Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: "contract",
+				OptionalEmpty: true, Emptied: true, Excludes: []string{"contract/ceded"}, Preserves: []string{"kept"},
+			},
+			"emptiedShared": {
+				Kind: extension.OutputKindDirectory, Root: extension.OutputRootWorkspace, Path: "dist/contracts",
+				OptionalEmpty: true, Emptied: true,
+			},
+			"tool":    fileDeclaration(extension.OutputRootCommandOutput, "bin/tool", true),
+			"client":  {Kind: extension.OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true},
+			"scratch": {Kind: extension.OutputKindDirectory, Scope: extensionproto.OutputScopeInvocation, Path: "scratch", OptionalEmpty: true},
+			"socket":  {Kind: extensionproto.OutputKindRuntimeFile, Scope: extensionproto.OutputScopeInvocation, Path: "socket", OptionalEmpty: true},
+			"escape":  {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: "../outside", OptionalEmpty: true},
+			"root":    {Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: ".", OptionalEmpty: true},
+			"unknown": {Kind: extension.OutputKindDirectory, Root: "elsewhere", Path: "out", OptionalEmpty: true},
 		},
 	})
 }
@@ -1033,12 +1094,14 @@ func TestVersionStampWithin(t *testing.T) {
 // the three roots. Nothing beside an output is touched: the project root, the
 // workspace root and the command-output directory are never emptied. The
 // outputs that are not emptied keep what they hold: a committed file in an
-// optionalEmpty project or workspace directory, and an earlier run's files in
-// the other shapes, which for a pathFrom output is the documented limit.
+// optionalEmpty project or workspace directory that does not declare emptied,
+// and an earlier run's files in the other shapes, which for a pathFrom output
+// is the documented limit.
 func TestEmptyOwnedOutputsPerRoot(t *testing.T) {
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-path-from-output-is-left-as-it-stands")
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-project-or-workspace-output-is-left-as-it-stands")
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-command-output-directory-is-emptied")
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-emptied-optional-project-or-workspace-output-is-emptied")
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "ceded-and-preserved-paths-and-the-stamp-stay-untouched")
 	job := emptyingShapesJob()
 	f := newCaptureFixture(t, job)
@@ -1054,6 +1117,9 @@ func TestEmptyOwnedOutputsPerRoot(t *testing.T) {
 		filepath.Join(project, ".gen", "config-schema.json"),
 		filepath.Join(project, "generated", "stale.ts"),
 		filepath.Join(f.ws.Root, "dist", "shared", "stale.txt"),
+		filepath.Join(project, "contract", "openapi.json"),
+		filepath.Join(project, "contract", "nested", "config.json"),
+		filepath.Join(f.ws.Root, "dist", "contracts", "stale.json"),
 	}
 	kept := []string{
 		// Ceded, preserved, and the scheduler's stamp.
@@ -1062,6 +1128,8 @@ func TestEmptyOwnedOutputsPerRoot(t *testing.T) {
 		filepath.Join(project, ".gen", "version.json"),
 		filepath.Join(command, "archives", "ceded", "other.tar.gz"),
 		filepath.Join(command, "archives", "kept", "note.txt"),
+		filepath.Join(project, "contract", "ceded", "other.json"),
+		filepath.Join(project, "contract", "kept", "note.txt"),
 		// Beside the outputs, under each root.
 		filepath.Join(command, "other", "sibling.js"),
 		filepath.Join(project, "src", "main.ts"),
@@ -1138,9 +1206,10 @@ func TestEmptyOwnedOutputsRefusesWithoutAWorkspaceRoot(t *testing.T) {
 
 // The marker moves the key of a task that owns an emptied directory, and of no
 // other task: a task with no declared output, an optionalEmpty project or
-// workspace directory, a file output or a pathFrom output keeps the address an
-// engine that emptied nothing computed for it. An optionalEmpty command-output
-// directory is emptied, so its task moves. The selection key, which a
+// workspace directory that does not declare emptied, a file output or a
+// pathFrom output keeps the address an engine that emptied nothing computed
+// for it. An optionalEmpty command-output directory and an optionalEmpty
+// project directory that declares emptied are emptied, so their tasks move. The selection key, which a
 // release-set member records, moves exactly when the execution key does. A
 // member republishes when its own task owns an emptied directory or when one
 // of its upstream keys moved.
@@ -1168,6 +1237,13 @@ func TestEmptiedOutputsMoveOnlyTheKeysOfTasksThatOwnOne(t *testing.T) {
 		},
 		"optional workspace directory": {
 			outputs: map[string]extension.DeclaredOutput{"shared": dirDeclaration(extension.OutputRootWorkspace, "dist/shared", true)},
+		},
+		"emptied optional project directory": {
+			outputs: map[string]extension.DeclaredOutput{"clientgen": {
+				Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: ".gen/clientgen",
+				OptionalEmpty: true, Emptied: true,
+			}},
+			moves: true,
 		},
 		"optional command-output directory": {
 			outputs: map[string]extension.DeclaredOutput{"bin": dirDeclaration(extension.OutputRootCommandOutput, "bin", true)},

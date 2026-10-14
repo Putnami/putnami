@@ -304,6 +304,16 @@ type DeclaredOutput struct {
 	// an error. Without this flag, a missing declared output means the
 	// declaration and the task disagree.
 	OptionalEmpty bool `json:"optionalEmpty,omitempty"`
+	// Emptied asks the engine to empty an optionalEmpty directory output under
+	// the project or workspace root before its task executes, and on a restore
+	// of an entry that records the output empty (ADR 0009). The engine already
+	// does both for a required directory output and for an optionalEmpty one
+	// under the command-output root, so the flag is valid only on a durable
+	// directory output with a literal path under the project or workspace root
+	// that is optionalEmpty. A task sets it when only the task writes the path:
+	// no committed file and no other task's bytes live there. The output then
+	// holds what the task's last execution or restore wrote, and nothing else.
+	Emptied bool `json:"emptied,omitempty"`
 	// Excludes are literal root-relative subpaths STRICTLY inside Path that a
 	// directory output CEDES: they are not captured with it, not restored with
 	// it, and another task may own them.
@@ -717,7 +727,49 @@ func validateDeclaredOutput(field string, output DeclaredOutput, task TaskDefini
 
 	diags = append(diags, validateOutputExcludes(field, output)...)
 	diags = append(diags, validateOutputPreserves(field, output)...)
+	diags = append(diags, validateOutputEmptied(field, output)...)
 	return append(diags, validateOutputDrift(field, output)...)
+}
+
+// validateOutputEmptied checks that an output asking to be emptied is one the
+// engine can empty and would not empty anyway. Each rule compares statements
+// the same output makes, so it is decidable from the declaration alone.
+func validateOutputEmptied(field string, output DeclaredOutput) []diag.Diagnostic {
+	if !output.Emptied {
+		return nil
+	}
+	var diags []diag.Diagnostic
+	emptiedField := field + ".emptied"
+	// A file is replaced whole, and a runtime file is never captured.
+	if output.Kind != OutputKindDirectory {
+		diags = append(diags, diag.Errorf("invalid-output-emptied", emptiedField,
+			"only a %q output is emptied; this output declares kind %q", OutputKindDirectory, output.Kind))
+	}
+	// An invocation-scoped output lives in a tree created for the run.
+	if output.EffectiveScope() != OutputScopeDurable {
+		diags = append(diags, diag.Errorf("invalid-output-emptied", emptiedField,
+			"only a %q output is emptied: an invocation-scoped output lives in a tree created for the run", OutputScopeDurable))
+	}
+	// The engine empties a path before the task runs, and a pathFrom value is
+	// known only after.
+	if output.PathFrom != "" {
+		diags = append(diags, diag.Errorf("invalid-output-emptied", emptiedField,
+			"an emptied output must declare a literal path: a pathFrom value is unknown until the task runs"))
+	}
+	// The engine empties every optionalEmpty directory under the command-output
+	// root already, and the flag would state nothing.
+	if output.Root == OutputRootCommandOutput {
+		diags = append(diags, diag.Errorf("invalid-output-emptied", emptiedField,
+			"the engine already empties an optional directory under the %q root; the flag applies to the %q and %q roots",
+			OutputRootCommandOutput, OutputRootProject, OutputRootWorkspace))
+	}
+	// The engine empties every required directory output already, and the flag
+	// would state nothing.
+	if !output.OptionalEmpty {
+		diags = append(diags, diag.Errorf("invalid-output-emptied", emptiedField,
+			"the engine already empties a required directory output; the flag applies to an optionalEmpty output"))
+	}
+	return diags
 }
 
 // validateOutputPreserves checks the workspace-owned subpaths one declared

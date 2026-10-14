@@ -130,6 +130,10 @@
       "text": "A Go source task key ignores the .go files under a .gen tree, which another task writes during the run and no Go source task compiles. A file under .gen still moves the key when a go:embed directive names it."
     },
     {
+      "id": "clientgen-key-reads-no-run-written-tree",
+      "text": "The clientgen-go and clientgen-ts keys ignore .gen/schema and .gen/clientgen, which the Go build-describe or the TypeScript build-generate writes during the run, and fold those producers' keys instead: the Go build-describe empties both trees before it executes and on a restore of an entry that records them empty. An edit to the committed clientgen.json or schema/openapi.json moves the keys."
+    },
+    {
       "id": "result-only-remote-restore",
       "text": "With a provider that echoes restore-result-only, a remote hit whose files no job of the run reads, in minimal mode or in toplevel mode outside the selected projects, moves no blob: it reports its cached status, writes nothing, and records a local result-only entry. A task a planned job waits for, by dependency or serialization, keeps its files. A run that reads the files never serves a result-only entry: it restores the full entry or executes. A provider without the capability receives no new field."
     },
@@ -143,7 +147,7 @@
     },
     {
       "id": "executed-directory-output-starts-empty",
-      "text": "Before a task executes, the engine empties each literal-path directory output that is required or under the command-output root, keeping ceded and preserved subpaths and the build stamp. A hit whose entry records such an output empty empties it too, or executes the task when it cannot. Other hits and adopted results empty nothing; a retry empties again; a failure to empty fails the task. Other outputs are not emptied. A key marker keeps entries stored without emptying from being served."
+      "text": "Before a task executes, the engine empties each literal-path directory output that is required, under the command-output root, or an optional project or workspace directory that declares emptied, keeping ceded and preserved subpaths and the build stamp. A hit whose entry records such an output empty empties it too, or executes the task when it cannot. Other hits and adopted results empty nothing; a retry empties again; a failure to empty fails the task. Other outputs are not emptied. A key marker keeps entries stored without emptying from being served."
     },
     {
       "id": "session-written-input-keys",

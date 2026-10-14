@@ -53,16 +53,18 @@
 // must outlive its neighbor's execution has to be ceded by the owner, as the
 // TypeScript build-generate cedes the config-extract schema fallback.
 //
-// A directory output with a literal path is emptied when it is required or
-// when it lives under the command-output root (cachekey.EmptiedOutputDeclarations,
-// ADR 0065). The engine owns the command-output directory and the plan gives
-// each output one owner, so an optionalEmpty output there holds only what its
-// task wrote. A restore of an entry that records such an output empty empties
-// it the same way (materializeDeclaredOutputs), so an execution and a restore
-// that write nothing leave the same directory.
+// A directory output with a literal path is emptied when it is required, when
+// it lives under the command-output root (cachekey.EmptiedOutputDeclarations,
+// ADR 0065), or when it declares emptied (ADR 0067). The engine owns the
+// command-output directory and the plan gives each output one owner, so an
+// optionalEmpty output there holds only what its task wrote; an emptied one
+// states the same of its project or workspace path. A restore of an entry that
+// records such an output empty empties it the same way
+// (materializeDeclaredOutputs), so an execution and a restore that write
+// nothing leave the same directory.
 //
-// An optionalEmpty output under the project or the workspace root is not
-// emptied: it can hold a committed file no task writes, a run that writes
+// Any other optionalEmpty output under the project or the workspace root is
+// not emptied: it can hold a committed file no task writes, a run that writes
 // nothing there is recorded empty, and a restore of that record leaves the
 // path as it stands. A file is not emptied because the task replaces it whole;
 // an invocation-scoped output because it lives in a private tree created for

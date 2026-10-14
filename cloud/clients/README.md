@@ -4,8 +4,14 @@ Each directory here holds the generated Go client of one Putnami Cloud service
 that the extension binary calls. Each one is its own Putnami project,
 `go.putnami.dev/cloud/clients/<service>`, with its Go package under
 `<service>/go`. `./putnamiw clientgen` generates `<service>/go/client.gen.go`
-from `<service>/schema/openapi.json`. Never edit `client.gen.go` by hand;
+from `<service>/schema/openapi.json`, with the targets, package and client
+names in `<service>/clientgen.json`. Never edit `client.gen.go` by hand;
 regenerate it.
+
+`clientgen.json` is the generation contract a provider build writes to
+`.gen/clientgen/config.json`. A slice has no app to build, so it commits the
+contract at its root. Do not commit it under `.gen/clientgen`: the Go
+`build-describe` empties that directory before it runs.
 
 The services are auth-server, cache-server, config-api, control-api, data-api,
 db-gateway, delivery-api, distribution-api, identity-api, observability-api,

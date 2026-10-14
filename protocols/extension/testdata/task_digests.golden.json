@@ -3,6 +3,7 @@
   "command-groups.json#status-exec": "tc1:042f5695f9c18f68bc313fba5d5574ebddb6df20a71bb5b6136d8601dc808185",
   "declared-output-drift.json#build-clients": "tc1:7d7e035ab8bee00b8c3f0934f1afe1d32e7ca9b4f70412e8f5ccd7d1604aeb2e",
   "declared-output-drift.json#build-generate": "tc1:c72278882d5a45ebbe6cb8366128b02631db81ffe6aba2cef1452f91383d5d40",
+  "declared-output-emptied.json#build-describe": "tc1:78fc905748ce8a0fc65a7c0c1df07d6206bbb9c2b513401df40d4c928ce951db",
   "declared-output-preserves.json#build-clients": "tc1:7e3589be89d30032b033ad5d0eaf59c2cce4b3e3e250c5b4b5072a5fdfb55fbc",
   "ecosystem-owner.json#publish-npm-exec": "tc1:a67b6ceecc8091a3ea9821e00e84a959ca6340084717c24ea63fa1cc245e55ac",
   "ecosystem-uses.json#publish-go-exec": "tc1:a67b6ceecc8091a3ea9821e00e84a959ca6340084717c24ea63fa1cc245e55ac",

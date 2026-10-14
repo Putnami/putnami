@@ -207,6 +207,9 @@ func runDescribe(ctx *pctx.Context, emit *jsonl.Emitter) (*describeResult, error
 	if err := resetCededSchemaToGenerateStaging(genDir); err != nil {
 		return nil, fmt.Errorf("reset staged schema: %w", err)
 	}
+	if err := resetClientContract(genDir); err != nil {
+		return nil, fmt.Errorf("reset client contract: %w", err)
+	}
 
 	// Snapshot what's already under .gen/schema/ (e.g. files the static
 	// codegen runner produced earlier in the same build) so we only count
@@ -892,6 +895,19 @@ func resetCededSchemaToGenerateStaging(genDir string) error {
 		}
 		return os.WriteFile(target, body, 0o644)
 	})
+}
+
+// resetClientContract removes .gen/clientgen before the describe binary runs.
+//
+// .gen/clientgen is this task's declared output, and only this task writes it:
+// the binary writes the generation contract (config.json) and the staged client
+// when the app configures a client generator, and nothing when it does not. The
+// tree after the run therefore holds what this run wrote and nothing else, so
+// the clientgen tasks never read a contract the current sources do not produce.
+// A project that commits its generation contract keeps it at clientgen.json in
+// its root, outside this tree.
+func resetClientContract(genDir string) error {
+	return os.RemoveAll(filepath.Join(genDir, "clientgen"))
 }
 
 // schemaSnapshot maps an absolute path under .gen/schema/ to its previous

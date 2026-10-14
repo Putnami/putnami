@@ -33,9 +33,11 @@ type ProjectClientResult struct {
 	Omitted []string
 }
 
-// GenerateProjectClients reads the client-generation contract and OpenAPI spec a
-// build already produced under projectRoot and emits the Go client directly into
-// projectRoot/<go.output> (default clients/go). It is the standalone, app-less
+// GenerateProjectClients reads the client-generation contract and OpenAPI spec of
+// the project at projectRoot and emits the Go client directly into
+// projectRoot/<go.output> (default clients/go). The contract is the one a build
+// wrote at .gen/clientgen/config.json, or the committed clientgen.json when no
+// build wrote one. It is the standalone, app-less
 // counterpart of the [ClientsPlugin] describer: the workspace `clientgen` command
 // runs it — in its own Go toolchain — to emit a Go client for a provider written
 // in ANOTHER language (e.g. a TypeScript service), reading that provider's OWN
@@ -49,8 +51,7 @@ type ProjectClientResult struct {
 // contract, the go target is disabled, or the spec exposes no services, so callers
 // can treat "nothing to do" as success.
 func GenerateProjectClients(projectRoot string) (ProjectClientResult, error) {
-	cfgPath := filepath.Join(projectRoot, ".gen", ClientGenConfigPath)
-	raw, err := readTrustedFile(cfgPath)
+	raw, cfgPath, err := readProjectClientGenConfig(projectRoot)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return ProjectClientResult{}, nil // no client generator configured for this project
@@ -202,6 +203,21 @@ func renderGeneratedGoProject(modulePath string) string {
 // trying the fresh .gen JSON first, then its gzipped companion, and only then
 // the committed fallback. A build is the provider source of truth for a sync;
 // a stale tracked schema must never win over the contract just produced.
+// readProjectClientGenConfig reads the generation contract a build wrote at
+// .gen/clientgen/config.json and, when no build wrote one, the contract the
+// project commits at clientgen.json. It returns the path it read. When neither
+// exists, the error satisfies os.IsNotExist.
+func readProjectClientGenConfig(projectRoot string) ([]byte, string, error) {
+	built := filepath.Join(projectRoot, ".gen", ClientGenConfigPath)
+	raw, err := readTrustedFile(built)
+	if err == nil || !os.IsNotExist(err) {
+		return raw, built, err
+	}
+	committed := filepath.Join(projectRoot, CommittedClientGenConfigPath)
+	raw, err = readTrustedFile(committed)
+	return raw, committed, err
+}
+
 func readProjectSpec(projectRoot string) ([]byte, string, error) {
 	for _, p := range []string{
 		filepath.Join(projectRoot, ".gen", "schema", "openapi.json"),

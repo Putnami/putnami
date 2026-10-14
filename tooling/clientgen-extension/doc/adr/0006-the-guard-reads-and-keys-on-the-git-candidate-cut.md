@@ -49,7 +49,10 @@ committed sidecar `schema/openapi.json`, and the targets are the committed
 because a tracked file is a candidate whatever the ignore rules say. Nothing
 the verdict depends on comes only from an ignored file: discovery already
 preferred the sidecar and the manifests, so that a cold clone and a built tree
-reach one verdict.
+reach one verdict. A provider that commits its generation contract keeps it at
+`clientgen.json` in its root, outside the `.gen/clientgen` tree the Go
+`build-describe` empties ([CLI ADR 0067](../../../cli/doc/adr/0067-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md)). It is a candidate, so the
+check reads it, and its targets win over the manifests.
 
 **4. The task is keyed on `git:**`.** It declares the project-scoped input
 `{"repository": {"from": "project", "files": ["git:**"]}}` and

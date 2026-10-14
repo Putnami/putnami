@@ -172,6 +172,17 @@ func watch() { _, _ = http.NewRequest("GET", "/catalog/watch", nil) }
 		{"the built generation contract leaves the index", func() {
 			gitIn(t, root, "rm", "-q", "--cached", "services/catalog/.gen/clientgen/config.json")
 		}, true, clean},
+		// A provider slice commits its generation contract at clientgen.json,
+		// outside the .gen/clientgen tree build-describe empties. The cut
+		// holds it, so the guard reads it and its key moves with it.
+		{"a committed generation contract adds a TypeScript target", func() {
+			writeWorkspaceFile(t, root, "services/catalog/clientgen.json", builtConfig)
+		}, true, "services/catalog[go:clients/go,ts:clients/ts] | clientgen.missing-manifest@services/catalog/clients/ts/client.putnami.json"},
+		{"the committed generation contract goes", func() {
+			if err := os.Remove(filepath.Join(root, "services", "catalog", "clientgen.json")); err != nil {
+				t.Fatal(err)
+			}
+		}, true, clean},
 		{"the ignore rule for local sources goes", func() {
 			writeWorkspaceFile(t, root, ".gitignore", ".putnami/\n.gen/\n")
 		}, true, "services/catalog[go:clients/go] | clientgen.handwritten-first-party-client@apps/web/catalog.local.go " +

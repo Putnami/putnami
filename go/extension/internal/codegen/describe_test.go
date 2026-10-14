@@ -378,6 +378,46 @@ func TestResetCededSchemaDropsARemovedProducersArtifact(t *testing.T) {
 	}
 }
 
+// An app that no longer configures a client generator leaves no earlier
+// contract behind: the clientgen tasks read .gen/clientgen/config.json before
+// the committed clientgen.json, so a stale one would select targets the
+// current sources do not produce. The reset removes the whole tree and nothing
+// else under .gen.
+func TestResetClientContractDropsAnEarlierRunsContract(t *testing.T) {
+	genDir := filepath.Join(t.TempDir(), ".gen")
+	for rel, body := range map[string]string{
+		"clientgen/config.json":      `{"targets":["go"]}`,
+		"clientgen/go/client.gen.go": "package client\n",
+		"schema/openapi.json":        `{"openapi":"3.1.0"}`,
+		"generate-result.json":       `{}`,
+	} {
+		path := filepath.Join(genDir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := resetClientContract(genDir); err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(genDir, "clientgen")); !os.IsNotExist(err) {
+		t.Errorf("an earlier run's .gen/clientgen survived the reset: %v", err)
+	}
+	for _, rel := range []string{"schema/openapi.json", "generate-result.json"} {
+		if _, err := os.Stat(filepath.Join(genDir, filepath.FromSlash(rel))); err != nil {
+			t.Errorf("the reset removed %s, which it does not own: %v", rel, err)
+		}
+	}
+	// A project that never wrote a contract resets without an error.
+	if err := resetClientContract(genDir); err != nil {
+		t.Errorf("reset of an absent tree: %v", err)
+	}
+}
+
 // A project whose generators produce no contract hands nothing over, and that is
 // not an error: the mirror simply does not exist.
 func TestResetCededSchemaWithoutAMirrorIsANoOp(t *testing.T) {

@@ -22,7 +22,10 @@ A provider lists `/tooling/clientgen-extension` in its `putnami.json`
 `extensions`, then declares its targets — `api.Clients(...)` in Go,
 `clientGenerator(...)` in TypeScript. The provider build writes
 `.gen/clientgen/config.json` and the marked OpenAPI and Proto artifacts; those
-are the only seam between the two toolchains.
+are the only seam between the two toolchains. A provider with no app to build,
+such as a `cloud/clients` slice, commits the same contract as `clientgen.json`
+at its root and its OpenAPI document as `schema/openapi.json`. The emitters and
+the guard read `clientgen.json` when no build wrote `.gen/clientgen/config.json`.
 
 The same-language client is emitted in-app during `putnami build`. The
 cross-language client is emitted by `putnami clientgen`, which runs the other

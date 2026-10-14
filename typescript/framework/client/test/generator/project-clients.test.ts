@@ -262,6 +262,36 @@ describe('generateProjectClients (TypeScript)', () => {
     FORMATTER_TEST_TIMEOUT_MS,
   );
 
+  // A provider slice with no app commits its generation contract as
+  // clientgen.json at its root: the Go build-describe empties .gen/clientgen, so
+  // a contract committed there is gone before the generator reads it.
+  test(
+    'reads the committed clientgen.json when no build wrote a contract, and a built one wins',
+    () => {
+      const root = setupProject({
+        'clientgen.json': TS_CONFIG,
+        'schema/openapi.json': MINIMAL_SPEC,
+      });
+      const committed = generateProjectClients(root);
+      expect(committed.generated).toBe(true);
+      expect(committed.outputDir).toBe('clients/ts');
+      expect(existsSync(join(root, 'clients/ts/src/index.ts'))).toBe(true);
+
+      const built = join(root, '.gen/clientgen/config.json');
+      mkdirSync(dirname(built), { recursive: true });
+      writeFileSync(
+        built,
+        JSON.stringify({
+          targets: ['go'],
+          ts: { output: 'clients/ts', packageName: '@example/c' },
+          go: { output: 'clients/go', modulePath: '', packageName: 'client', clientName: 'Client' },
+        }),
+      );
+      expect(generateProjectClients(root).generated).toBe(false);
+    },
+    FORMATTER_TEST_TIMEOUT_MS,
+  );
+
   test(
     'no-op when the ts target is disabled',
     () => {

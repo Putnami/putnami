@@ -1,6 +1,0 @@
-# The provider slice commits its generation configuration.
-!.gen/
-.gen/*
-!.gen/clientgen/
-.gen/clientgen/*
-!.gen/clientgen/config.json
