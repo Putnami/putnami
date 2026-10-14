@@ -1072,9 +1072,10 @@ current dossier, `--gate ci` waits for policy-named hosted checks, and
 `--workflow-file` supplies an immutable native workflow and is required for
 hosted publication naming a parent task. Native eligibility is checked before
 publication, and exact required checks can advance eligible current units.
-A partial delivery whose changed projects all declare `featureAuthority.none`
-holds no native requirement: it needs no workflow, and the hosted checks on its
-head are its evidence.
+A partial delivery whose changed paths all belong to projects that declare
+`featureAuthority.none` and author no feature, at base and on the branch,
+needs no workflow: the hosted checks on its head are its evidence. Pass
+`--workflow-file` to advance a workflow unit that names such projects.
 `--partial-delivery` preserves an incomplete parent task. The command does not
 add a provider operation or run another local gate. It pushes the branch to the
 `origin` remote and resolves the base from `origin/<base>`, so `origin` must be

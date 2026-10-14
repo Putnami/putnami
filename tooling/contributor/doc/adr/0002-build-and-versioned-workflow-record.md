@@ -97,9 +97,10 @@ Hosted ready is an additional native producer path. A parent task's hosted
 publication requires an immutable workflow, completion eligibility before
 writes, and exact required provider checks on the current full HEAD and tree.
 Only eligible current units advance; later incomplete obligations remain open.
-A partial delivery whose changed projects all declare `featureAuthority.none`
-needs no workflow: no unit could hold a native requirement, so the exact
-required provider checks on its head are its evidence and it emits no receipt.
+Amended 2026-10-14 (#261): a partial delivery whose changed paths all belong
+to projects that declare `featureAuthority.none` and author no feature, at
+base and on the branch, needs no workflow. The exact required provider checks
+on its head are its evidence, and it emits no receipt.
 The native result retains a typed hosted receipt referencing the original
 workflow and raw provider status. A new workflow revision can replay that
 receipt; rewriting the original makes it stale. Standalone planning validation

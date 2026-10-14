@@ -124,7 +124,8 @@ How the pieces combine for one delivery:
   the gate. When the machine's load ratio exceeds `0.7`, build selects
   `proposals finalize --gate ci` instead of running a local impacted gate;
   a parent task requires `--workflow-file` and native completion eligibility before publication,
-  except a partial delivery whose changed projects all declare `featureAuthority.none`;
+  except a partial delivery whose changed paths all belong to projects that declare
+  `featureAuthority.none` and author no feature;
   native finalization waits for that check on the pushed commit. It never
   runs a local gate itself.
 

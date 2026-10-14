@@ -184,9 +184,6 @@ func (f Finalizer) prepareLocal(c *publicationCandidate) error {
 	if err := ValidateTitle(c.opts.Title, paths); err != nil {
 		return err
 	}
-	if err := f.checkFeaturelessPartial(c, paths); err != nil {
-		return err
-	}
 	c.originalBody, err = os.ReadFile(c.opts.BodyFile)
 	if err != nil {
 		return err
@@ -202,24 +199,45 @@ func (f Finalizer) prepareLocal(c *publicationCandidate) error {
 }
 
 // checkFeaturelessPartial admits a hosted partial delivery without a workflow
-// record only when no changed project can hold a native requirement: the
-// workflow could name no current unit, so the hosted checks are the evidence.
-func (f Finalizer) checkFeaturelessPartial(c *publicationCandidate, paths []string) error {
+// record only when every changed path belongs to projects that own and author
+// no feature. The hosted checks on the bound head are then its evidence.
+func (f Finalizer) checkFeaturelessPartial(c *publicationCandidate) error {
 	if c.opts.Gate != "ci" || c.opts.TaskID == "" || c.opts.WorkflowFile != "" {
 		return nil
 	}
 	if f.Owners == nil {
 		return errors.New("native project ownership unavailable")
 	}
-	owners, err := f.Owners(paths)
+	paths, err := f.Git.ChangedPaths(c.base)
 	if err != nil {
 		return err
 	}
-	if len(owners) > 0 {
-		return fmt.Errorf("--gate ci with a parent task requires --workflow-file; changed without featureAuthority.none: %s",
-			strings.Join(owners, ", "))
+	if len(paths) == 0 {
+		return errors.New("hosted partial delivery without --workflow-file has no changed path")
+	}
+	owners, err := f.Owners(c.baseSHA, paths)
+	if err != nil {
+		return err
+	}
+	var reasons []string
+	if len(owners.Projects) > 0 {
+		reasons = append(reasons, "projects without featureAuthority.none or with authored features: "+boundedList(owners.Projects))
+	}
+	if len(owners.Unowned) > 0 {
+		reasons = append(reasons, "paths no project owns: "+boundedList(owners.Unowned))
+	}
+	if len(reasons) > 0 {
+		return fmt.Errorf("--gate ci with a parent task requires --workflow-file; %s", strings.Join(reasons, "; "))
 	}
 	return nil
+}
+
+func boundedList(items []string) string {
+	const shown = 10
+	if len(items) <= shown {
+		return strings.Join(items, ", ")
+	}
+	return fmt.Sprintf("%s and %d more", strings.Join(items[:shown], ", "), len(items)-shown)
 }
 
 func (f Finalizer) checkBranchMessages(c *publicationCandidate) error {
@@ -304,6 +322,9 @@ func (f Finalizer) prepareBinding(ctx context.Context, c *publicationCandidate) 
 		if err != nil {
 			return err
 		}
+	}
+	if err := f.checkFeaturelessPartial(c); err != nil {
+		return err
 	}
 	_, err = c.recheck(ctx, f)
 	return err

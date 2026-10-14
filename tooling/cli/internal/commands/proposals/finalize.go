@@ -54,10 +54,15 @@ type HostedWorkflowResult struct {
 }
 type HostedWorkflow func(context.Context, HostedWorkflowRequest) (HostedWorkflowResult, error)
 
-// RequirementOwners returns the changed projects that can hold a native
-// requirement: each owner of a path that does not declare
-// `featureAuthority.none`, and each path no project owns.
-type RequirementOwners func(paths []string) ([]string, error)
+// Ownership names what a change touches that can hold a native requirement:
+// owning projects that are not featureless at base and head, and changed
+// paths no project owns.
+type Ownership struct {
+	Projects, Unowned []string
+}
+
+// RequirementOwners resolves the Ownership of paths changed since base.
+type RequirementOwners func(base string, paths []string) (Ownership, error)
 
 // HostedWorkflowReceipt records the native provider status and local inputs
 // that can be checked again against the unchanged workflow file. It does not

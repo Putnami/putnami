@@ -585,24 +585,33 @@ func TestHostedFeaturelessPartialUsesHostedChecksWithoutWorkflow(t *testing.T) {
 	git.paths = []string{"protocols/infra/schema.go"}
 	provider.checks = collab.Checks{Commit: git.head,
 		Items: []collab.Check{{Name: "Putnami CI", State: collab.CheckStatePassing}}}
-	if _, err := f.Run(context.Background(), opts); err == nil || git.pushes != 0 {
-		t.Fatalf("featureless partial without ownership reached a write: %v", err)
-	}
-	owners := []string{"tooling/cli"}
-	f.Owners = func(paths []string) ([]string, error) {
-		if len(paths) != 1 || paths[0] != git.paths[0] {
-			t.Fatalf("owners asked for %v", paths)
+	refused := func(want string) {
+		t.Helper()
+		if _, err := f.Run(context.Background(), opts); err == nil || !strings.Contains(err.Error(), want) || git.pushes != 0 || provider.upserts != 0 {
+			t.Fatalf("want refusal %q before a write, got %v (pushes=%d upserts=%d)", want, err, git.pushes, provider.upserts)
 		}
-		return owners, nil
 	}
-	if _, err := f.Run(context.Background(), opts); err == nil || !strings.Contains(err.Error(), "tooling/cli") || git.pushes != 0 {
-		t.Fatalf("partial with a requirement owner reached a write without a workflow: %v", err)
+	refused("native project ownership unavailable")
+	var ownership Ownership
+	var ownershipErr error
+	f.Owners = func(base string, paths []string) (Ownership, error) {
+		if base != git.baseSHA || !slices.Equal(paths, git.paths) {
+			t.Fatalf("owners asked for %s %v", base, paths)
+		}
+		return ownership, ownershipErr
 	}
+	ownership.Projects = []string{"/tooling/cli"}
+	refused("projects without featureAuthority.none or with authored features: /tooling/cli")
+	ownership = Ownership{Unowned: []string{"README.md"}}
+	refused("paths no project owns: README.md")
+	ownership, ownershipErr = Ownership{}, errors.New("ownership failed")
+	refused("ownership failed")
+	ownershipErr, git.paths = nil, nil
+	refused("has no changed path")
+	git.paths = []string{"protocols/infra/schema.go"}
 	opts.PartialDelivery = false
-	if _, err := f.Run(context.Background(), opts); err == nil || git.pushes != 0 {
-		t.Fatalf("complete hosted parent without a workflow reached a write: %v", err)
-	}
-	opts.PartialDelivery, owners = true, nil
+	refused("--gate ci with a parent task requires --workflow-file")
+	opts.PartialDelivery = true
 	result, err := f.Run(context.Background(), opts)
 	if err != nil || git.pushes != 1 || provider.transitions != 0 || result.State != collab.ProposalStateOpen ||
 		result.Gate != "hosted checks passed on "+git.head || result.WorkflowSHA256 != "" || len(result.ReadyUnits) != 0 ||
@@ -611,6 +620,13 @@ func TestHostedFeaturelessPartialUsesHostedChecksWithoutWorkflow(t *testing.T) {
 	}
 	if !strings.Contains(provider.proposal.Body, "Refs https://github.com/acme/app/issues/42") || strings.Contains(provider.proposal.Body, "Closes ") {
 		t.Fatalf("featureless partial lost its non-closing task reference: %s", provider.proposal.Body)
+	}
+}
+
+func TestBoundedListNamesTheRest(t *testing.T) {
+	items := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"}
+	if got := boundedList(items); got != "a, b, c, d, e, f, g, h, i, j and 2 more" {
+		t.Fatalf("bounded list %q", got)
 	}
 }
 
