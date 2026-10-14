@@ -64,6 +64,11 @@ var ValidErrorCodes = map[string]bool{
 // look uniform across protocols.
 var resourceNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_./-]{0,63}$`)
 
+// secretNamePattern matches a secret name. It is the resource-name grammar
+// with uppercase letters, so a secret can be named by the config key the
+// application reads it at ("crm.apiKey"). See doc/adr/0004.
+var secretNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_./-]{0,63}$`)
+
 // ParsePerProjectManifest decodes a per-project requirements manifest
 // from JSON in strict mode (unknown fields rejected). It returns a
 // non-nil manifest only when parsing produced no errors.
@@ -188,7 +193,7 @@ func ValidateAggregatedManifest(m *AggregatedManifest) []diag.Diagnostic {
 	}
 	for i, s := range m.Secrets {
 		field := fmt.Sprintf("secrets[%d]", i)
-		diags = append(diags, validateName(field+".name", s.Name)...)
+		diags = append(diags, validateSecretName(field+".name", s.Name)...)
 		diags = append(diags, validateSources(field+".sources", s.Sources)...)
 	}
 	for i, j := range m.ScheduledJobs {
@@ -238,7 +243,7 @@ func validateResources(dbs []Database, events *Events, storage []StorageBucket, 
 		diags = append(diags, validateStorageBucket(fmt.Sprintf("storage[%d]", i), b.Name, b.Access)...)
 	}
 	for i, s := range secrets {
-		diags = append(diags, validateName(fmt.Sprintf("secrets[%d]", i), s)...)
+		diags = append(diags, validateSecretName(fmt.Sprintf("secrets[%d]", i), s)...)
 	}
 	for i, j := range jobs {
 		diags = append(diags, validateScheduledJob(fmt.Sprintf("scheduledJobs[%d]", i), j.Name, j.Schedule)...)
@@ -418,12 +423,22 @@ func validateDelivery(field string, d Delivery) []diag.Diagnostic {
 // validateName validates a resource name against the canonical
 // resourceNamePattern. Empty names are reported as invalid.
 func validateName(field, name string) []diag.Diagnostic {
+	return validateNamePattern(field, name, resourceNamePattern)
+}
+
+// validateSecretName validates a secret name against secretNamePattern.
+// Empty names are reported as invalid.
+func validateSecretName(field, name string) []diag.Diagnostic {
+	return validateNamePattern(field, name, secretNamePattern)
+}
+
+func validateNamePattern(field, name string, pattern *regexp.Regexp) []diag.Diagnostic {
 	if name == "" {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidName, field, "name is required")}
 	}
-	if !resourceNamePattern.MatchString(name) {
+	if !pattern.MatchString(name) {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidName, field,
-			"name %q does not match canonical pattern %q", name, resourceNamePattern.String())}
+			"name %q does not match canonical pattern %q", name, pattern.String())}
 	}
 	return nil
 }

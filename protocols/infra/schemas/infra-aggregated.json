@@ -48,6 +48,10 @@
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9_./-]{0,63}$"
     },
+    "secretName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_./-]{0,63}$"
+    },
     "engine": {
       "type": "string",
       "enum": ["postgres", "mysql", "sqlite", "firestore"]
@@ -126,7 +130,7 @@
       "additionalProperties": false,
       "required": ["name", "sources"],
       "properties": {
-        "name": { "$ref": "#/$defs/resourceName" },
+        "name": { "$ref": "#/$defs/secretName" },
         "sources": { "$ref": "#/$defs/sourcesList" }
       }
     },

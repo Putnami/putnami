@@ -71,6 +71,34 @@ func TestValidatePerProjectManifest_InvalidName(t *testing.T) {
 	}
 }
 
+// A secret is named by the config key the application reads it at, so a
+// secret name accepts uppercase letters where every other resource name
+// stays lowercase.
+func TestValidate_SecretNameIsAConfigKey(t *testing.T) {
+	perProject := &PerProjectManifest{ProtocolVersion: ProtocolVersion, Secrets: []string{"crm.apiKey", "DB_PASSWORD"}}
+	if diags := ValidatePerProjectManifest(perProject); diag.HasErrors(diags) {
+		t.Errorf("per-project camelCase secret: unexpected errors: %v", diags)
+	}
+	aggregated := &AggregatedManifest{
+		ProtocolVersion: ProtocolVersion,
+		Workload:        "crm",
+		Secrets:         []AggregatedSecret{{Name: "crm.apiKey", Sources: []Source{{Project: "crm", Contributor: FrameworkContributor("config")}}}},
+	}
+	if diags := ValidateAggregatedManifest(aggregated); diag.HasErrors(diags) {
+		t.Errorf("aggregated camelCase secret: unexpected errors: %v", diags)
+	}
+
+	for name, m := range map[string]*PerProjectManifest{
+		"secret with a space":     {ProtocolVersion: ProtocolVersion, Secrets: []string{"crm.api key"}},
+		"secret with a dot first": {ProtocolVersion: ProtocolVersion, Secrets: []string{".apiKey"}},
+		"uppercase storage name":  {ProtocolVersion: ProtocolVersion, Storage: []StorageBucket{{Name: "Uploads"}}},
+	} {
+		if diags := ValidatePerProjectManifest(m); !findCode(diags, ErrorCodeInvalidName) {
+			t.Errorf("%s: want %s, got %v", name, ErrorCodeInvalidName, diags)
+		}
+	}
+}
+
 func TestValidatePerProjectManifest_InvalidEngine(t *testing.T) {
 	m := &PerProjectManifest{
 		ProtocolVersion: ProtocolVersion,

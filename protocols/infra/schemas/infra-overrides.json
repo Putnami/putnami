@@ -20,6 +20,11 @@
       "pattern": "^[a-z0-9][a-z0-9_./-]{0,63}$",
       "description": "Canonical resource identifier: lowercase letters, digits, '-', '_', '.', '/'; 1–64 chars."
     },
+    "secretName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_./-]{0,63}$",
+      "description": "Secret name: the resource identifier grammar with uppercase letters, so a secret can be named by the config key the application reads it at (crm.apiKey); 1–64 chars."
+    },
     "engine": {
       "type": "string",
       "enum": ["postgres", "mysql", "sqlite", "firestore"],
@@ -44,7 +49,7 @@
         "secrets": {
           "type": "array",
           "description": "Secret names to drop.",
-          "items": { "$ref": "#/$defs/resourceName" }
+          "items": { "$ref": "#/$defs/secretName" }
         },
         "scheduledJobs": {
           "type": "array",
