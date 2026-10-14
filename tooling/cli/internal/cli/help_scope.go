@@ -23,11 +23,28 @@ type helpScope struct {
 // newHelpScope returns the scope of the workspace at wsRoot, or nil outside a
 // workspace and when an extension there did not load.
 func newHelpScope(wsRoot string, cfg *wsproto.Config) *helpScope {
+	scope, _ := discoverHelpScope(wsRoot, cfg)
+	return scope
+}
+
+// discoverHelpScope returns the scope of the workspace at wsRoot and the
+// extensions that loaded there, so one discovery serves a help page's scope
+// and its job flags.
+func discoverHelpScope(wsRoot string, cfg *wsproto.Config) (*helpScope, []*extension.ExtensionDescription) {
 	if wsRoot == "" {
-		return nil
+		return nil, nil
 	}
 	result, err := extension.DiscoverExtensionsDetailed(wsRoot, cfg, projectPathsForRoot(wsRoot))
-	if err != nil || len(result.Skipped) > 0 {
+	if err != nil {
+		return nil, nil
+	}
+	return helpScopeOf(result), result.Extensions
+}
+
+// helpScopeOf returns the scope a discovery gives, or nil when an extension
+// did not load.
+func helpScopeOf(result *extension.DiscoveryResult) *helpScope {
+	if len(result.Skipped) > 0 {
 		return nil
 	}
 	scope := &helpScope{commands: map[string]bool{}}

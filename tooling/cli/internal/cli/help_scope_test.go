@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"errors"
 	"slices"
 	"testing"
 
 	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/protocol/features/spectest"
 	runner "go.putnami.dev/protocol/runner"
+	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
 func scopeOf(commands ...string) *helpScope {
@@ -118,5 +120,22 @@ func TestHelpScopeKeepsBuiltinsAndDropsUndeclaredJobs(t *testing.T) {
 	}
 	if scope.listsJobCommand("format") {
 		t.Error("an undeclared job command is not listed")
+	}
+}
+
+// TestHelpScopeHidesNothingWhenAnExtensionDidNotLoad pins the fallback: the
+// commands of an extension that did not load are unknown, so help hides none.
+func TestHelpScopeHidesNothingWhenAnExtensionDidNotLoad(t *testing.T) {
+	t.Parallel()
+	loaded := &extension.ExtensionDescription{Commands: map[string]string{"build": "Build"}}
+	if scope := helpScopeOf(&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{loaded}}); !scope.declares("build") || scope.declares("deploy") {
+		t.Fatalf("every extension loaded: scope = %v, want build only", scope)
+	}
+	result := &extension.DiscoveryResult{
+		Extensions: []*extension.ExtensionDescription{loaded},
+		Skipped:    []extension.SkippedExtension{{Ref: "@acme/deploy", Reason: errors.New("manifest unreadable")}},
+	}
+	if scope := helpScopeOf(result); scope != nil {
+		t.Fatalf("an extension did not load: scope = %v, want nil", scope)
 	}
 }

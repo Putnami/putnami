@@ -21,21 +21,17 @@ func printJobCommandHelp(
 	cfg *wsproto.Config,
 	extensions []*extension.ExtensionDescription,
 ) {
-	flags := mergedJobCommandFlags(command, wsRoot, cfg, extensions)
-	printCommandHelp(command, flags, newHelpScope(wsRoot, cfg))
+	scope, discovered := discoverHelpScope(wsRoot, cfg)
+	// Outside a workspace, job help lists no extension flag.
+	if wsRoot == "" || extensions == nil {
+		extensions = discovered
+	}
+	printCommandHelp(command, jobCommandFlags(command, extensions), scope)
 }
 
-func mergedJobCommandFlags(
-	command string,
-	wsRoot string,
-	cfg *wsproto.Config,
-	extensions []*extension.ExtensionDescription,
-) map[string]extension.FlagDefinition {
-	if wsRoot == "" {
-		return nil
-	}
+func jobCommandFlags(command string, extensions []*extension.ExtensionDescription) map[string]extension.FlagDefinition {
 	if extensions == nil {
-		extensions, _ = extension.DiscoverExtensions(wsRoot, cfg, projectPathsForRoot(wsRoot))
+		return nil
 	}
 	jobMap := extension.BuildJobMap(extensions)
 	return extension.CollectCommandFlags(jobMap[command])
