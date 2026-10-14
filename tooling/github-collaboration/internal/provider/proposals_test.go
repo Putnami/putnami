@@ -116,6 +116,83 @@ func TestAPullRequestBehindItsPushedBranchIsAwaited(t *testing.T) {
 	}
 }
 
+func TestAFindAtAPushedHeadCommitWaitsForThePullRequest(t *testing.T) {
+	spectest.Proves(t, feature, "exact-proposal-identity", "a-find-at-a-pushed-head-commit-waits-for-the-pull-request")
+	h := newHarness(t)
+	var created collab.ProposalUpsertResult
+	h.ok("proposals", "upsert", `{"change":{"base":"main","head":"topic-b","headCommit":"ccccccc"},"title":"t"}`, &created)
+	n := number(t, created.Proposal.Ref)
+	var waits []int
+	wait := func(catchUp func(attempt int)) {
+		waits = nil
+		h.provider.HeadLagPause = func(_ context.Context, attempt int) error {
+			waits = append(waits, attempt)
+			catchUp(attempt)
+			return nil
+		}
+	}
+	find := func(headCommit string) collab.ProposalListResult {
+		t.Helper()
+		var found collab.ProposalListResult
+		h.ok("proposals", "find", `{"change":{"base":"main","head":"topic-b","headCommit":"`+headCommit+`"},"states":["open","draft"]}`, &found)
+		if len(found.Items) != 1 || found.Items[0].Ref != created.Proposal.Ref {
+			t.Fatalf("find at %s: %+v", headCommit, found)
+		}
+		return found
+	}
+
+	// Before the push, the branch is not at the commit: the find answers at once.
+	wait(func(int) {})
+	if before := find("9999999"); len(waits) != 0 || before.Items[0].Revision != created.Proposal.Revision {
+		t.Fatalf("a find before the push waited %v: %+v", waits, before)
+	}
+
+	// After the push, the find answers once the pull request caught up, and
+	// its revision is the one an upsert at the pushed commit is checked against.
+	pushed := strings.Repeat("9", 40)
+	h.fake.moveBranch("topic-b", pushed)
+	wait(func(attempt int) {
+		if attempt == 2 {
+			h.fake.push(n, pushed)
+		}
+	})
+	after := find("9999999")
+	if !slices.Equal(waits, []int{1, 2}) || after.Items[0].Change.HeadCommit != pushed || after.Items[0].Revision == created.Proposal.Revision {
+		t.Fatalf("a find after the push waited %v: %+v", waits, after)
+	}
+	var updated collab.ProposalUpsertResult
+	h.ok("proposals", "upsert", `{"change":{"base":"main","head":"topic-b","headCommit":"9999999"},"title":"t2","expectedRevision":"`+
+		after.Items[0].Revision+`"}`, &updated)
+	if updated.Created || updated.Proposal.Title != "t2" {
+		t.Fatalf("an upsert at the revision the find read: %+v", updated)
+	}
+
+	// A pull request that never catches up is a retryable failure.
+	h.fake.moveBranch("topic-b", strings.Repeat("8", 40))
+	wait(func(int) {})
+	failure := h.fails("proposals", "find", `{"change":{"base":"main","head":"topic-b","headCommit":"8888888"}}`, collab.OutcomeUnavailable)
+	if failure.Reason != reasonHeadLagging || !failure.Retryable || len(waits) != headLagReads {
+		t.Fatalf("a find behind the pushed branch after %v waits: %+v", waits, failure)
+	}
+
+	// Without a head commit, the find answers what GitHub serves.
+	wait(func(int) {})
+	var found collab.ProposalListResult
+	h.ok("proposals", "find", `{"change":{"base":"main","head":"topic-b"}}`, &found)
+	if len(waits) != 0 || len(found.Items) != 1 || found.Items[0].Change.HeadCommit != pushed {
+		t.Fatalf("a find without a head commit waited %v: %+v", waits, found)
+	}
+
+	// GitHub does not move the head of a closed pull request: no wait.
+	h.fake.mu.Lock()
+	h.fake.issues[n].state = "closed"
+	h.fake.mu.Unlock()
+	h.ok("proposals", "find", `{"change":{"base":"main","head":"topic-b","headCommit":"8888888"}}`, &found)
+	if len(waits) != 0 || len(found.Items) != 1 || found.Items[0].State != collab.ProposalStateClosed {
+		t.Fatalf("a find of a closed pull request waited %v: %+v", waits, found)
+	}
+}
+
 func TestAnotherRepositoryIsRefused(t *testing.T) {
 	spectest.Proves(t, feature, "exact-proposal-identity", "another-repository-is-refused")
 	h := newHarness(t)

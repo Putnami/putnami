@@ -153,6 +153,11 @@ GitHub token, from everything it writes.
   its create was answered, and in the search sometimes minutes after. GitHub's
   search serves the first 1,000 matches of a query: a `query` traversal ends
   there, with no next page.
+- GitHub moves a pull request's head seconds after its branch. When `find`
+  or `upsert` names a `headCommit` that the branch already points at, an open
+  pull request still behind it is read again until it catches up, so its
+  revision covers the pushed commit. One still behind after about 10s is
+  `unavailable` (`head.lagging`), retryable, and nothing is written.
 - A fork's head is `owner:branch`. `upsert` checks a `headCommit` of a fork's
   branch in the fork named like this repository: GitHub names no fork by its
   owner alone, so a fork renamed away from that name answers `not_found`

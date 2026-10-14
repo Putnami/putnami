@@ -183,6 +183,9 @@ func (s *proposalSession) listPulls(h head, base, state string) fetchPage[ghPull
 	}
 }
 
+// find lists the pull requests of an exact base and head. With a headCommit,
+// an open pull request behind a branch that already points at it is answered
+// once its head caught up, so its revision covers the pushed commit.
 func (s *proposalSession) find(input any) (any, *collab.Failure) {
 	in, failure := inputOf[*collab.ProposalFindInput](input)
 	if failure != nil {
@@ -223,7 +226,13 @@ func (s *proposalSession) find(input any) (any, *collab.Failure) {
 	}
 	result := &collab.ProposalListResult{Items: make([]collab.Proposal, 0, len(pulls)), Page: collab.Page{Next: next}}
 	for i := range pulls {
-		result.Items = append(result.Items, s.proposal(&pulls[i], repository, h.requested))
+		pull := &pulls[i]
+		if in.Change.HeadCommit != "" && pull.State == "open" {
+			if pull, _, failure = s.awaitHead(h, pull, in.Change.HeadCommit); failure != nil {
+				return nil, failure
+			}
+		}
+		result.Items = append(result.Items, s.proposal(pull, repository, h.requested))
 	}
 	return result, nil
 }
@@ -320,25 +329,41 @@ func (s *proposalSession) upsert(input any) (any, *collab.Failure) {
 	return &collab.ProposalUpsertResult{Proposal: s.proposal(pull, repository, h.requested), Created: created}, nil
 }
 
-// headLagReads is how many times caughtUp re-reads a pull request behind its
+// headLagReads is how many times awaitHead re-reads a pull request behind its
 // branch: with the default pause, for about 10s.
 const headLagReads = 4
 
-// caughtUp returns the pull request once its head is commit. GitHub moves a
+// caughtUp returns the pull request once its head is commit. A branch at
+// another commit is a conflict.
+func (s *proposalSession) caughtUp(h head, pull *ghPull, commit string) (*ghPull, *collab.Failure) {
+	pull, atCommit, failure := s.awaitHead(h, pull, commit)
+	if failure != nil {
+		return nil, failure
+	}
+	if !atCommit {
+		return nil, collab.Fail(collab.OutcomeConflict, reasonHeadMoved,
+			"proposal #%d is at head %s, not %s", pull.Number, pull.Head.SHA, commit)
+	}
+	return pull, nil
+}
+
+// awaitHead returns the pull request once its head is commit. GitHub moves a
 // branch as soon as a push lands, and the head of its pull request seconds
 // later: when the branch already points at commit, the pull request is
-// re-read until it catches up. A branch at another commit is a conflict.
-func (s *proposalSession) caughtUp(h head, pull *ghPull, commit string) (*ghPull, *collab.Failure) {
+// re-read until it catches up, and one that does not catch up within
+// headLagReads reads is a retryable head.lagging failure. When neither the
+// pull request nor its branch is at commit, atCommit is false and the pull
+// request is returned as read.
+func (s *proposalSession) awaitHead(h head, pull *ghPull, commit string) (_ *ghPull, atCommit bool, _ *collab.Failure) {
 	if sameCommit(pull.Head.SHA, commit) {
-		return pull, nil
+		return pull, true, nil
 	}
 	sha, failure := s.headCommit(h)
 	if failure != nil && failure.Outcome != collab.OutcomeNotFound {
-		return nil, failure
+		return nil, false, failure
 	}
 	if failure != nil || !sameCommit(sha, commit) {
-		return nil, collab.Fail(collab.OutcomeConflict, reasonHeadMoved,
-			"proposal #%d is at head %s, not %s", pull.Number, pull.Head.SHA, commit)
+		return pull, false, nil
 	}
 	pause := s.p.HeadLagPause
 	if pause == nil {
@@ -350,14 +375,14 @@ func (s *proposalSession) caughtUp(h head, pull *ghPull, commit string) (*ghPull
 		}
 		var read ghPull
 		if _, err := s.client.Get(s.ctx, s.repo.path("pulls", strconv.Itoa(pull.Number)), nil, &read); err != nil {
-			return nil, fail(err, "read pull request #%d of %s", pull.Number, s.repo.display)
+			return nil, false, fail(err, "read pull request #%d of %s", pull.Number, s.repo.display)
 		}
 		if pull = &read; sameCommit(pull.Head.SHA, commit) {
-			return pull, nil
+			return pull, true, nil
 		}
 	}
-	return nil, retryable(collab.Fail(collab.OutcomeUnavailable, reasonHeadLagging,
-		"branch %s is at %s, and proposal #%d has not caught up with the pushed branch yet: it is still at head %s; retry the upsert",
+	return nil, false, retryable(collab.Fail(collab.OutcomeUnavailable, reasonHeadLagging,
+		"branch %s is at %s, and proposal #%d has not caught up with the pushed branch yet: it is still at head %s; retry the call",
 		h.requested, sha, pull.Number, pull.Head.SHA))
 }
 
