@@ -573,7 +573,7 @@
       "timeoutMs": 600000,
       "inputs": {
         "tests": { "from": "project", "files": ["**/*_test.go"] },
-        "sources": { "from": "project", "files": ["**/*.go", "go-embed:test"] },
+        "sources": { "from": "project", "files": ["**/*.go", "go-embed:test", "!**/.gen/**"] },
         "modules": { "from": "project", "files": ["go.mod", "go.sum", "go.work"] },
         "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
         "config": {
@@ -811,7 +811,7 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 300000,
       "inputs": {
-        "sources": { "from": "project", "files": ["**/*.go", "!**/*_test.go", "go-embed:build"] },
+        "sources": { "from": "project", "files": ["**/*.go", "!**/*_test.go", "go-embed:build", "!**/.gen/**"] },
         "modules": { "from": "project", "files": ["go.mod", "go.sum", "go.work"] },
         "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
         "config": { "from": "project", "files": ["putnami.json", ".putnamirc.json"] },
@@ -861,7 +861,7 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 900000,
       "inputs": {
-        "sources": { "from": "project", "files": ["**/*.go", "!**/*_test.go", "go-embed:build"] },
+        "sources": { "from": "project", "files": ["**/*.go", "!**/*_test.go", "go-embed:build", "!**/.gen/**"] },
         "modules": { "from": "project", "files": ["go.mod", "go.sum", "go.work"] },
         "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
         "config": { "from": "project", "files": ["putnami.json", ".putnamirc.json"] },
@@ -951,7 +951,7 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 900000,
       "inputs": {
-        "sources": { "from": "project", "files": ["**/*.go", "!**/*_test.go", "go-embed:build"] },
+        "sources": { "from": "project", "files": ["**/*.go", "!**/*_test.go", "go-embed:build", "!**/.gen/**"] },
         "modules": { "from": "project", "files": ["go.mod", "go.sum", "go.work"] },
         "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
         "config": { "from": "project", "files": ["putnami.json", ".putnamirc.json"] },
@@ -1007,7 +1007,7 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 900000,
       "inputs": {
-        "sources": { "from": "project", "files": ["**/*.go", "!**/*_test.go", "go-embed:build"] },
+        "sources": { "from": "project", "files": ["**/*.go", "!**/*_test.go", "go-embed:build", "!**/.gen/**"] },
         "modules": { "from": "project", "files": ["go.mod", "go.sum", "go.work"] },
         "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
         "config": { "from": "project", "files": ["putnami.json", ".putnamirc.json"] },
@@ -1135,7 +1135,7 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 600000,
       "inputs": {
-        "sources": { "from": "project", "files": ["**/*.go", "go-embed:test"] },
+        "sources": { "from": "project", "files": ["**/*.go", "go-embed:test", "!**/.gen/**"] },
         "modules": { "from": "project", "files": ["go.mod"] },
         "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
         "config": { "from": "project", "files": [".golangci.yml", ".golangci.yaml"] },
@@ -1179,7 +1179,7 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 600000,
       "inputs": {
-        "sources": { "from": "project", "files": ["**/*.go", "go-embed:test"] },
+        "sources": { "from": "project", "files": ["**/*.go", "go-embed:test", "!**/.gen/**"] },
         "modules": { "from": "project", "files": ["go.mod"] },
         "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
         "config": { "from": "project", "files": [".golangci.yml", ".golangci.yaml"] },
@@ -1269,7 +1269,7 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 300000,
       "inputs": {
-        "sources": { "from": "project", "files": ["**/*.go", "go-embed:test"] },
+        "sources": { "from": "project", "files": ["**/*.go", "go-embed:test", "!**/.gen/**"] },
         "modules": { "from": "project", "files": ["go.mod"] },
         "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },
         "extensionVersion": { "from": "runtime" }
@@ -1486,7 +1486,7 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 300000,
       "inputs": {
-        "sources": { "from": "project", "files": ["**/*.go", "go-embed:test"] },
+        "sources": { "from": "project", "files": ["**/*.go", "go-embed:test", "!**/.gen/**"] },
         "modules": { "from": "project", "files": ["go.mod"] },
         "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] }
       },

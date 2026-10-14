@@ -854,6 +854,15 @@
           }
         },
         {
+          "id": "go-generated-tree-sources",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["go-source-key-ignores-go-files-under-the-generated-tree"]
+          }
+        },
+        {
           "id": "result-only-remote-restore",
           "stage": "coded",
           "evidenceKinds": [
