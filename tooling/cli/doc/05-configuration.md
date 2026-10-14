@@ -739,6 +739,7 @@ use the `PUTNAMI_` prefix:
 | `K_SERVICE` | Google Cloud Run service name (auto-selects cloud-logging output). Read by the CLI process itself; **removed** from test subprocesses — see below | `--output=cloud-logging` |
 | `PUTNAMI_NO_AUTO_INSTALL` | Disable first-use auto-install (any value); the first command on a fresh checkout/worktree will not run `putnami install` for you. See [`install`](03-commands.md#first-use-auto-install). | — |
 | `PUTNAMI_REGISTRY_URL` | Override the CLI update registry URL (default: `https://put.putnami.dev`) | — |
+| `PUTNAMI_REGISTRY_ORIGINS` | Send an image push or a Put publication for a registry host to another address of the same registry, as comma-separated `host=https://origin` pairs. Image references, release coordinates and the publish credential keep the registry host. Use it on a machine that reaches the registry by a private address. A malformed value stops the publication. | — |
 | `PUTNAMI_CHANNEL` | The release channel `putnami init` resolves the extensions, the template and the starter's dependencies on. No other command reads it. See [`workspace`](03-commands.md#workspace). | `init --channel` |
 | `PUTNAMI_STORE_DIR` | Override the machine-global build store location (default: `~/.putnami/store/<repo-id>`) | — |
 | `PUTNAMI_STORE_MAX_BYTES` | Global build-store byte budget for GC (default: 10 GiB) | `store.maxBytes` |

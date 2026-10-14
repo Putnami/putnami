@@ -26,6 +26,7 @@ import (
 	distribution "go.putnami.dev/protocol/distribution"
 	infra "go.putnami.dev/protocol/infra"
 	put "go.putnami.dev/protocol/put"
+	"go.putnami.dev/sdk/extension/registryorigin"
 )
 
 // MaxResponseBytes bounds a registry answer: a stored manifest payload and the
@@ -115,7 +116,13 @@ func ValidateRegistryURL(raw string) (string, error) {
 
 // NewHTTPClient returns the client a publication sends through: no proxy, so
 // the bearer has no second recipient, no redirect, and a five-minute timeout.
+// A registry host that PUTNAMI_REGISTRY_ORIGINS maps is reached at its mapped
+// origin (registryorigin).
 func NewHTTPClient() (*http.Client, error) {
+	origins, err := registryorigin.FromEnv()
+	if err != nil {
+		return nil, err
+	}
 	baseTransport, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
 		return nil, errors.New("put registry transport is unavailable")
@@ -124,7 +131,7 @@ func NewHTTPClient() (*http.Client, error) {
 	transport.Proxy = nil
 	return &http.Client{
 		Timeout:       5 * time.Minute,
-		Transport:     transport,
+		Transport:     registryorigin.Transport(transport, origins),
 		CheckRedirect: refuseRedirect,
 	}, nil
 }

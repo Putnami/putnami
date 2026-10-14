@@ -15,6 +15,8 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+
+	"go.putnami.dev/sdk/extension/registryorigin"
 )
 
 // LayoutTarget names where PushLayout publishes an OCI layout and the manifest
@@ -192,15 +194,20 @@ func checkLayoutTree(dir string) error {
 }
 
 // directTransport returns the default transport without a proxy, so the bearer
-// has no second recipient.
+// has no second recipient. A registry host that PUTNAMI_REGISTRY_ORIGINS maps
+// is reached at its mapped origin (registryorigin).
 func directTransport() (http.RoundTripper, error) {
+	origins, err := registryorigin.FromEnv()
+	if err != nil {
+		return nil, err
+	}
 	base, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
 		return nil, errors.New("OCI registry transport is unavailable")
 	}
 	transport := base.Clone()
 	transport.Proxy = nil
-	return transport, nil
+	return registryorigin.Transport(transport, origins), nil
 }
 
 var bearerCredential = regexp.MustCompile(`(?i)bearer\s+[^\s"',;]+`)
