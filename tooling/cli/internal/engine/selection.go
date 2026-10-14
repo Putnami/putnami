@@ -148,7 +148,12 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 					// trustworthy as the baseline it was computed from.
 					iox.Fprintln(req.stdout(), "  No impacted projects found against "+selection.Baseline+". Nothing to do.")
 				}
-				recordEmptyImpact(req, selection.Baseline, string(selection.BaselineSource))
+				// The engine still plans the workspace-scoped tasks of this run,
+				// and one that reads the change since the baseline, such as the
+				// breaking marker of validate-workspace, needs it.
+				req.selection = jobs.ResolvedRunSelection(
+					protocoljob.SelectionModeImpacted, selection.Baseline, string(selection.BaselineSource), nil)
+				req.selection.EmptyImpact = true
 				return nil, ExitSuccess
 			}
 			// The change's size by category and the areas its code spans:
@@ -186,11 +191,30 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 	})
 
 	if len(selectedProjects) == 0 {
-		if selectionMode == protocoljob.SelectionModeImpacted {
-			// The filters emptied a non-empty impacted set: the same no-op.
-			recordEmptyImpact(req, selectionBaseline, selectionBaselineSource)
+		if autoNote.enabled && req.Global.Impacted {
+			maybePrintAutoProjectSelectionNote(req.stdout(), autoNote, req.Global, 0)
+			return nil, ExitSuccess
 		}
-		return nil, emptySelection(req, ws, autoNote)
+		if !machineOutputRequested(req) {
+			iox.Fprintln(req.stdout(), "  No projects matched. Nothing to do.")
+		}
+		// --impacted's empty set is a legitimate no-op, and so is a lifecycle run
+		// over a workspace with no (matching) projects: `putnami install` on an
+		// empty or fully tag-excluded workspace has always exited 0
+		// (Request.WorkspaceLifecycle note 3).
+		if req.Global.Impacted || req.WorkspaceLifecycle {
+			return nil, ExitSuccess
+		}
+		// The notice above is the HUMAN presentation, and it lands on stdout,
+		// which machine output suppresses so the document is the only thing
+		// there. That left the FAILING exit with nothing on either stream: a
+		// caller running `--output=json` and checking the status saw exit 2, an
+		// empty stderr and no envelope, and could not tell an empty selection
+		// from a crash. A failure names its cause on stderr in every
+		// output format — the channel every other engine failure already uses.
+		iox.Fprintf(os.Stderr, "putnami: no project matched %s; the workspace resolved %d project(s)\n",
+			describeProjectSelection(req.Global), len(ws.Projects))
+		return nil, ExitUsage
 	}
 	if autoNote.enabled {
 		maybePrintAutoProjectSelectionNote(req.stdout(), autoNote, req.Global, len(selectedProjects))
@@ -278,44 +302,6 @@ func adoptVerificationEvidence(req *Request, preparation *jobs.ReleaseSetPrepara
 	}
 }
 
-// emptySelection answers a selection that matched no project: a success for
-// an `--impacted` run or a lifecycle run, a usage error otherwise.
-func emptySelection(req *Request, ws *workspace.Workspace, autoNote autoProjectSelectionNote) int {
-	if autoNote.enabled && req.Global.Impacted {
-		maybePrintAutoProjectSelectionNote(req.stdout(), autoNote, req.Global, 0)
-		return ExitSuccess
-	}
-	if !machineOutputRequested(req) {
-		iox.Fprintln(req.stdout(), "  No projects matched. Nothing to do.")
-	}
-	// --impacted's empty set is a legitimate no-op, and so is a lifecycle run
-	// over a workspace with no (matching) projects: `putnami install` on an
-	// empty or fully tag-excluded workspace has always exited 0
-	// (Request.WorkspaceLifecycle note 3).
-	if req.Global.Impacted || req.WorkspaceLifecycle {
-		return ExitSuccess
-	}
-	// The notice above is the HUMAN presentation, and it lands on stdout,
-	// which machine output suppresses so the document is the only thing
-	// there. That left the FAILING exit with nothing on either stream: a
-	// caller running `--output=json` and checking the status saw exit 2, an
-	// empty stderr and no envelope, and could not tell an empty selection
-	// from a crash. A failure names its cause on stderr in every
-	// output format — the channel every other engine failure already uses.
-	iox.Fprintf(os.Stderr, "putnami: no project matched %s; the workspace resolved %d project(s)\n",
-		describeProjectSelection(req.Global), len(ws.Projects))
-	return ExitUsage
-}
-
-// recordEmptyImpact records an `--impacted` run that selected no project. The
-// engine still plans the workspace-scoped tasks of such a run, and a task that
-// reads the change since the baseline, such as validate-workspace's breaking
-// marker, needs the baseline the selection resolved.
-func recordEmptyImpact(req *Request, baseline, baselineSource string) {
-	req.selection = jobs.ResolvedRunSelection(protocoljob.SelectionModeImpacted, baseline, baselineSource, nil)
-	req.selection.EmptyImpact = true
-}
-
 // verificationSelection is the projection of the caller's own flags a mixed
 // session verifies over. resolveReleaseSetSelections is its only caller and
 // states why it exists; this half answers WHICH projects, and refuses the two
@@ -354,8 +340,8 @@ func verificationSelection(
 		return nil, selectionEvidence{}, code
 	}
 	// An `--impacted` run over an unchanged tree selects no project and records
-	// the impacted no-op (recordEmptyImpact). That is a real answer: verify
-	// nothing, publish what the head requires.
+	// the impacted no-op. That is a real answer: verify nothing, publish what
+	// the head requires.
 	return &jobs.ReleaseSetVerification{
 		Projects: projects, Selection: gate.selection,
 	}, gate.selectionEvidence, ExitSuccess
