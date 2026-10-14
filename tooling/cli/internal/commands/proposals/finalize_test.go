@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -59,6 +60,7 @@ type finalizerProvider struct {
 	proposalRepository                         string
 	upserts, transitions, reviews, statusReads int
 	findReads                                  int
+	findHeadCommits                            []string
 	findExisting                               bool
 	rejectRevision                             bool
 	upsertRevision                             string
@@ -104,6 +106,9 @@ func (p *finalizerProvider) call(_ context.Context, contract, operation string, 
 		return answer(collab.TaskResult{Task: p.task})
 	case "proposals.find":
 		p.findReads++
+		var request collab.ProposalFindInput
+		_ = json.Unmarshal(input, &request)
+		p.findHeadCommits = append(p.findHeadCommits, request.Change.HeadCommit)
 		if !p.findExisting {
 			return answer(collab.ProposalListResult{Items: nil})
 		}
@@ -171,6 +176,9 @@ func TestOwnPushRefreshesExistingProposalRevisionBeforeSingleUpsert(t *testing.T
 		provider.upserts != 1 || provider.upsertRevision != "after-own-push" || git.pushes != 1 {
 		t.Fatalf("own push was not reconciled before one upsert: result=%+v err=%v finds=%d upserts=%d expected=%q pushes=%d",
 			result, err, provider.findReads, provider.upserts, provider.upsertRevision, git.pushes)
+	}
+	if !slices.Equal(provider.findHeadCommits, []string{git.head, git.head}) {
+		t.Fatalf("finds did not name the pushed HEAD, so a provider cannot await its proposal head: %v", provider.findHeadCommits)
 	}
 }
 

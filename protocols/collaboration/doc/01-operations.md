@@ -67,7 +67,7 @@ enforces it.
 
 | Operation | Access | Required | Destructive | Preconditions | Request | Result |
 |---|---|---|---|---|---|---|
-| `find` | read | yes | — | — | `change` (`base`, `head`, optional `repository`), `states`, `page` | `items: [proposal]`, `page` |
+| `find` | read | yes | — | — | `change` (`base`, `head`, optional `repository` and `headCommit`), `states`, `page` | `items: [proposal]`, `page` |
 | `upsert` | mutating | yes | yes | declared | `change` (plus optional `headCommit`), `title`, `body`, `draft`, `expectedRevision` | `proposal`, `created` |
 | `status` | read | yes | — | — | `ref` | `proposal`, `checks`, `reviews` |
 | `review` | mutating | yes | no | — | `ref`, `verdict`, `body`, `commit`, `idempotencyKey` | `review`, `created` |
@@ -83,6 +83,12 @@ answer about a proposal (`[]` when there are none) or on none, and absent
 means it does not report them. An assignee is information, never a lease.
 `upsert` keeps at most one open proposal per exact repository/base/head:
 repeating it never creates a second.
+A `headCommit` on `find` names the commit the caller pushed to the head. A
+provider whose proposal head follows the pushed ref answers an open proposal
+still behind a head ref that already points at that commit only once its head
+caught up, so its revision covers that commit; one that stays behind is
+`unavailable` and retryable. A provider that records the head only on `upsert`
+answers the proposal as recorded.
 
 `checks.state` is `pending`, `passing`, `failing`, `none` (supported, none
 reported) or `unsupported` (the provider has no hosted checks; `detail` says

@@ -26,7 +26,7 @@
     },
     {
       "id": "exact-proposal-identity",
-      "text": "A proposal is found, created and updated for the exact repository, base and head the request names: a fork's branch of the same name is another proposal, a requested head commit that is not the head's is a conflict before anything is written, a find or upsert naming the commit a branch already points at answers an open pull request only once its head caught up, and a pull request that stays behind for about 10s is a retryable failure, and a request naming a repository the binding does not serve is refused."
+      "text": "A proposal is found, created and updated for the exact repository, base and head the request names: a fork's branch of the same name is another proposal, a requested head commit that is not the head's is a conflict before anything is written, a find or upsert naming the commit its branch already points at answers an open pull request only once the head catches up and is a retryable failure when the head stays behind for about 10s, and a request naming a repository the binding does not serve is refused."
     },
     {
       "id": "reported-publication",

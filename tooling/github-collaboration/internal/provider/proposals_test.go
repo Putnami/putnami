@@ -182,6 +182,15 @@ func TestAFindAtAPushedHeadCommitWaitsForThePullRequest(t *testing.T) {
 	if len(waits) != 0 || len(found.Items) != 1 || found.Items[0].Change.HeadCommit != pushed {
 		t.Fatalf("a find without a head commit waited %v: %+v", waits, found)
 	}
+
+	// GitHub does not move the head of a closed pull request: no wait.
+	h.fake.mu.Lock()
+	h.fake.issues[n].state = "closed"
+	h.fake.mu.Unlock()
+	h.ok("proposals", "find", `{"change":{"base":"main","head":"topic-b","headCommit":"8888888"}}`, &found)
+	if len(waits) != 0 || len(found.Items) != 1 || found.Items[0].State != collab.ProposalStateClosed {
+		t.Fatalf("a find of a closed pull request waited %v: %+v", waits, found)
+	}
 }
 
 func TestAnotherRepositoryIsRefused(t *testing.T) {
