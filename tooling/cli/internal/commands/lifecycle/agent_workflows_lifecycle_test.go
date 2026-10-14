@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
 
@@ -461,8 +462,8 @@ func TestAgentWorkflows_LegacyStateIsRefusedWithNothingWritten(t *testing.T) {
 	before := snapshotAgentSurface(t, root)
 
 	_, err := runInstall(t, root)
-	if err == nil || !strings.Contains(err.Error(), "no longer installs") || !strings.Contains(err.Error(), "replace each entry with extension:<name>") {
-		t.Fatalf("install error = %v, want the legacy declaration refused", err)
+	if err == nil || !strings.Contains(err.Error(), "no longer installs") || !strings.Contains(err.Error(), "replace each entry with extension:@putnami/contributor") {
+		t.Fatalf("install error = %v, want the legacy declaration refused and its first-party successor named", err)
 	}
 	err = agentctx.AdoptAgentWorkflows(context.Background(), root, wsproto.Load(root), nil)
 	if !errors.Is(err, protocolcli.ErrInvalidConfig) || !strings.Contains(err.Error(), "no longer installs") {
@@ -1561,9 +1562,10 @@ func newSupersededFixture(t *testing.T) (string, map[string][]byte) {
 // No ordinary command installs anything while a clone still declares or
 // records an artifact the content supersedes: the legacy declarations, and
 // the clone's legacy records once the declarations are gone, are refused with
-// nothing written. Deleting the records the refusal names hands the files to
-// the content: a file with the content's bytes is kept, and one with other
-// bytes is a collision the user resolves.
+// nothing written. Deleting the records and pins the refusal names hands the
+// files to the content: a file with the content's bytes is kept untouched, one
+// with other bytes is a collision the user resolves, and one the content does
+// not ship stays unmanaged.
 func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "superseded-owners-refused", "a-clone-that-still-records-a-superseded-artifact-is-refused")
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "superseded-owners-refused", "deleting-the-record-hands-the-files-to-the-content")
@@ -1571,8 +1573,10 @@ func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 	surface := snapshotAgentSurface(t, root)
 
 	_, err := runInstall(t, root)
-	if err == nil || !strings.Contains(err.Error(), "no longer installs") || !strings.Contains(err.Error(), "replace each entry with extension:<name>") {
-		t.Fatalf("install error = %v, want the legacy declarations refused", err)
+	if err == nil || !strings.Contains(err.Error(), "no longer installs") ||
+		!strings.Contains(err.Error(), "replace each entry with "+contentExtensionOptIn+", declare that extension in extensions, "+
+			"delete the entries' pins under agentArtifacts in putnami.lock.json, then run `putnami install`") {
+		t.Fatalf("install error = %v, want the legacy declarations refused and the declared successor named", err)
 	}
 	if next := protocolcli.SuggestedNext(err); next != "" {
 		t.Fatalf("next step = %q, want none", next)
@@ -1593,7 +1597,8 @@ func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 	assertUnchangedWorkspace(t, surface, snapshotAgentSurface(t, root))
 
 	// Withdrawing the legacy declarations still leaves this clone's records
-	// claiming the files, and that is refused too, naming each record.
+	// claiming the files, and that is refused too, naming each record and each
+	// lock pin, because no command removes a pin once its record is gone.
 	writeContentWorkspaceConfig(t, root, []string{contentExtensionName}, []string{contentExtensionOptIn})
 	_, installErr := runInstall(t, root)
 	upgradeErr := agentctx.AdoptAgentWorkflows(context.Background(), root, wsproto.Load(root), nil)
@@ -1605,11 +1610,10 @@ func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 		}
 		records = append(records, filepath.ToSlash(rel))
 	}
+	want := "delete " + strings.Join(records, ", ") + " and the pins of " + testAgentArtifact + ", " + supersededMaintainer +
+		" under agentArtifacts in " + lockfile.LockFilename + ", then rerun"
 	for name, err := range map[string]error{"install": installErr, "upgrade": upgradeErr} {
-		if err == nil || !strings.Contains(err.Error(), "still records") {
-			t.Fatalf("%s error = %v, want the recorded superseded artifacts refused", name, err)
-		}
-		if want := "delete " + strings.Join(records, ", "); !strings.Contains(err.Error(), want) {
+		if err == nil || !strings.Contains(err.Error(), "still records") || !strings.Contains(err.Error(), want) {
 			t.Fatalf("%s error = %v, want %q", name, err, want)
 		}
 		if next := protocolcli.SuggestedNext(err); next != "" {
@@ -1618,28 +1622,56 @@ func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 	}
 	assertUnchangedWorkspace(t, surface, snapshotAgentSurface(t, root))
 
-	// With the records deleted, a file whose bytes differ from the content is
-	// a collision that aborts the run before its first write.
+	// The user deletes what the refusal names: the records and the pins.
 	for _, record := range records {
 		if err := os.Remove(filepath.Join(root, filepath.FromSlash(record))); err != nil {
 			t.Fatal(err)
 		}
 	}
+	lock, err := lockfile.ReadLockFile(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock.RemoveAgentArtifact(testAgentArtifact)
+	lock.RemoveAgentArtifact(supersededMaintainer)
+	if err := lockfile.WriteLockFile(root, lock); err != nil {
+		t.Fatal(err)
+	}
+
+	// A file whose bytes differ from the content is then a collision that
+	// aborts the run before its first write.
 	surface = snapshotAgentSurface(t, root)
 	if _, err := runInstall(t, root); err == nil || !strings.Contains(err.Error(), supersededChangedCore) {
 		t.Fatalf("install error = %v, want the differing file %s reported", err, supersededChangedCore)
 	}
 	assertUnchangedWorkspace(t, surface, snapshotAgentSurface(t, root))
 
-	// Once the user resolves those files, the content installs and keeps the
-	// file that already had its bytes.
+	// Once the user resolves those files, the content installs. The file that
+	// already had the content's bytes is kept as it is, not written again: same
+	// inode, same modification time.
 	for _, path := range []string{supersededChangedCore, supersededChangedMaintainer} {
 		if err := os.Remove(filepath.Join(root, filepath.FromSlash(path))); err != nil {
 			t.Fatal(err)
 		}
 	}
+	unchanged := filepath.Join(root, filepath.FromSlash(supersededUnchanged))
+	past := time.Date(2020, time.January, 2, 3, 4, 5, 0, time.UTC)
+	if err := os.Chtimes(unchanged, past, past); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(unchanged)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if out, err := runInstall(t, root); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
+	}
+	after, err := os.Stat(unchanged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(before, after) || !after.ModTime().Equal(past) {
+		t.Fatalf("%s was written again (same file %v, modified %s)", supersededUnchanged, os.SameFile(before, after), after.ModTime())
 	}
 	for path, want := range content {
 		if got := readAgentFile(t, root, path); got != string(want) {
@@ -1650,4 +1682,18 @@ func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 	if err != nil || state == nil || len(state.Files) != len(content) {
 		t.Fatalf("extension ownership record = %+v, err %v; want every file the content ships", state, err)
 	}
+
+	// A file only the old artifacts installed stays on disk, and no record
+	// manages it. The lock pins nothing under agentArtifacts.
+	for path, want := range map[string]string{supersededOnlyCore: "# legacy-check\n", supersededOnlyMaintainer: "# legacy-release\n"} {
+		if got := readAgentFile(t, root, path); got != want {
+			t.Fatalf("%s = %q, want the old artifact's bytes kept", path, got)
+		}
+		for _, file := range state.Files {
+			if file.Path == path {
+				t.Fatalf("the extension's record manages %s, which its content does not ship", path)
+			}
+		}
+	}
+	assertNoAgentArtifactPins(t, root)
 }

@@ -109,7 +109,7 @@ func DeclaredAgentArtifacts(wsRoot string, cfg *wsproto.Config) ([]AgentArtifact
 		refs = append(refs, ref)
 	}
 	if len(legacy) > 0 {
-		return nil, legacyAgentArtifactDeclarationsError(legacy)
+		return nil, legacyAgentArtifactDeclarationsError(wsRoot, cfg, legacy)
 	}
 	sort.Slice(refs, func(i, j int) bool { return refs[i].Name < refs[j].Name })
 	return refs, nil

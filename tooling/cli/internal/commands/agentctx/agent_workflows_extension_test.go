@@ -59,8 +59,10 @@ func localContentConfig(rel, name string, entries ...string) *wsproto.Config {
 	}
 }
 
-// Every pass refuses a legacy entry with nothing written and says how to
-// replace it: there is no command that moves it any more.
+// Every pass refuses a legacy entry with nothing written and gives every step
+// that replaces it, naming the extension that supersedes it when one is known:
+// a declared one whose content says so, else the first-party successor. There
+// is no command that moves it any more.
 func TestLegacyEntriesFailClearly(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "legacy-declarations-refused", "every-pass-refuses-a-legacy-entry")
 
@@ -82,7 +84,8 @@ func TestLegacyEntriesFailClearly(t *testing.T) {
 		}
 		for name, err := range passes {
 			if !errors.Is(err, protocolcli.ErrInvalidConfig) || !strings.Contains(err.Error(), `"/tools/workflows" in a form this CLI no longer installs`) ||
-				!strings.Contains(err.Error(), "replace each entry with extension:<name>") {
+				!strings.Contains(err.Error(), "replace each entry with extension:@local/contributor, declare that extension in extensions, "+
+					"delete the entries' pins under agentArtifacts in putnami.lock.json, then run `putnami install`") {
 				t.Fatalf("%s error = %v, want the legacy entry refused", name, err)
 			}
 			if next := protocolcli.SuggestedNext(err); next != "" {
@@ -96,12 +99,19 @@ func TestLegacyEntriesFailClearly(t *testing.T) {
 		}
 	})
 
-	for _, entry := range []string{"@putnami/agent-workflows:stable", "@acme/workflows", "/tooling/agent-workflows"} {
+	for entry, replacement := range map[string]string{
+		"@putnami/agent-workflows:stable": "extension:@putnami/contributor",
+		"@putnami/maintainer-workflows":   "extension:@putnami/contributor",
+		"/tooling/agent-workflows":        "extension:@putnami/contributor",
+		"@acme/workflows:1.2.x":           "extension:<name> for the extension whose agent content supersedes it",
+		"/tools/acme-workflows":           "extension:<name> for the extension whose agent content supersedes it",
+	} {
 		t.Run(entry, func(t *testing.T) {
 			cfg := &wsproto.Config{AgentArtifacts: []string{entry}}
 			_, err := DeclaredAgentArtifacts(t.TempDir(), cfg)
-			if !errors.Is(err, protocolcli.ErrInvalidConfig) || !strings.Contains(err.Error(), fmt.Sprintf("%q", entry)) {
-				t.Fatalf("error = %v, want %q refused", err, entry)
+			if !errors.Is(err, protocolcli.ErrInvalidConfig) || !strings.Contains(err.Error(), fmt.Sprintf("%q", entry)) ||
+				!strings.Contains(err.Error(), "replace each entry with "+replacement+", declare") {
+				t.Fatalf("error = %v, want %q refused and replaced with %s", err, entry, replacement)
 			}
 		})
 	}

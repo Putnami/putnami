@@ -286,14 +286,17 @@ installed, and the compatibility window for them has ended:
 
 - **A workspace that still declares them** fails every agent-content command
   (`install`, `upgrade`, `context generate`, the first-run and session-start
-  passes) with nothing written. The error says to replace each entry with an
-  `extension:<name>` entry for the extension whose content supersedes it. A
-  workspace that cannot do that yet stays on a CLI release before this one,
-  which installs its pins exactly as before.
+  passes) with nothing written. The error gives every step: replace the
+  entries with one `extension:<name>` entry for the extension whose content
+  supersedes them (named when it is known), declare that extension, delete
+  the entries' pins under `agentArtifacts` in `putnami.lock.json`, and run
+  `putnami install`. A workspace that cannot do that yet stays on a CLI
+  release before this one, which installs its pins exactly as before.
 - **A clone that still records them** refuses the opt-in with nothing
-  written, and the error names each ownership record to delete. With the
-  records deleted, `install` keeps every file that already has the content's
-  bytes and reports every other one as a collision.
+  written, and the error names each ownership record and each remaining lock
+  pin to delete. With those deleted, `install` keeps every file that already
+  has the content's bytes and reports every other one as a collision. No
+  command removes such a pin once its record is gone.
 - **No command moves them.** `putnami migrate agent-content` is deleted, with
   no transition window (decision D-013); its rollback is gone with it.
 - **Older CLIs** fail on an updated workspace instead of skipping its
