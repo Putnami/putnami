@@ -50,7 +50,7 @@
           "path": "tooling/extension-sdk/putpublish/putpublish.go",
           "transport": "http",
           "symbol": "http.Client",
-          "fingerprint": "62efef67fbf5b532305665e19efd5c700447e0433ff224f9b01bbce87c3bd505"
+          "fingerprint": "99de0a95b8d00f9bebd31b7cecf9bbdf69d171c863e61da20776c05e3db4b574"
         },
         {
           "path": "tooling/extension-sdk/putpublish/putpublish.go",
