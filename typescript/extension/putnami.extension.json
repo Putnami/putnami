@@ -415,6 +415,9 @@
     },
     "serve": {
       "description": "Serve an application with hot-reload.",
+      "traits": {
+        "requiresRunnable": true
+      },
       "flags": {
         "entrypoint": {
           "type": "string",
@@ -472,6 +475,9 @@
     },
     "run": {
       "description": "Run a workload once for the host and forward its exit code.",
+      "traits": {
+        "requiresRunnable": true
+      },
       "activationFiles": [
         "package.json",
         "src/**/*.ts",
@@ -600,6 +606,9 @@
     },
     "package": {
       "description": "Create distribution packages (npm, docker).",
+      "traits": {
+        "injectPublishChannels": true
+      },
       "flags": {
         "access": {
           "type": "string",
@@ -742,6 +751,10 @@
       "dependsOn": [
         "package"
       ],
+      "traits": {
+        "injectPublishChannels": true,
+        "sideEffects": "registry"
+      },
       "description": "Publish pre-built packages to registries (npm and Docker). Auto-runs package first; that pipeline owns every required build step while its image-project branch stays compiler-free. @putnami/cloud, when installed, provides advanced publishing; otherwise native registry credentials are used.",
       "flags": {
         "access": {

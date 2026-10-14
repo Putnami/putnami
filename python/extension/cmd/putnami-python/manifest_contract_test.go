@@ -648,3 +648,28 @@ func TestUVTasksRequireThePinnedUVToolchain(t *testing.T) {
 		}
 	}
 }
+
+// TestCommandsDeclareTheTraitsOfTheirVerb pins that every command named after a
+// well-known verb with default traits declares those traits itself, with the
+// same values. The effective traits, and with them the plan and its cache keys,
+// do not depend on the core's verb table.
+func TestCommandsDeclareTheTraitsOfTheirVerb(t *testing.T) {
+	m := loadExtensionManifest(t)
+	var checked []string
+	for name, cmd := range m.Commands {
+		defaults := proto.WellKnownVerbs[proto.BaseCommandName(name)].Traits
+		if defaults == (proto.CommandTraits{}) {
+			continue
+		}
+		checked = append(checked, name)
+		if cmd.Traits == nil {
+			t.Errorf("command %q inherits its traits from the core verb table; declare %+v", name, defaults)
+		} else if *cmd.Traits != defaults {
+			t.Errorf("command %q declares traits %+v, want the verb defaults %+v", name, *cmd.Traits, defaults)
+		}
+	}
+	sort.Strings(checked)
+	if want := []string{"run", "serve"}; !slices.Equal(checked, want) {
+		t.Errorf("commands with default traits = %v, want %v", checked, want)
+	}
+}

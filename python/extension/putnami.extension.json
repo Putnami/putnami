@@ -106,6 +106,7 @@
     },
     "serve": {
       "description": "Serve a Python application with hot-reload.",
+      "traits": { "requiresRunnable": true },
       "flags": {
         "entrypoint": {
           "type": "string",
@@ -127,6 +128,7 @@
     },
     "run": {
       "description": "Run a Python workload once for the host and forward its exit code.",
+      "traits": { "requiresRunnable": true },
       "activationFiles": ["pyproject.toml", "src/**/*.py"],
       "flags": {
         "entrypoint": {
