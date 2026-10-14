@@ -77,8 +77,9 @@ func AgentArtifactDeclarationName(declared string) string {
 // legacyAgentArtifactDeclarationsError refuses the entries in the forms
 // earlier releases installed — a registry artifact (`name` or
 // `name:constraint`) or an in-tree project (`/path`) — with nothing written,
-// and gives the steps that replace them in this workspace: an entry is
-// deleted when the extension whose content supersedes it is already opted
+// and gives the steps that replace them in this workspace. The entries are
+// grouped by the extension whose content supersedes them, and each group gets
+// its own steps: its entries are deleted when that extension is already opted
 // into, and replaced otherwise; the extension is declared when it is not yet.
 // `putnami install` then drops the lock pins the entries left.
 func legacyAgentArtifactDeclarationsError(wsRoot string, cfg *wsproto.Config, legacy []string) error {
@@ -86,25 +87,44 @@ func legacyAgentArtifactDeclarationsError(wsRoot string, cfg *wsproto.Config, le
 	for _, declared := range legacy {
 		quoted = append(quoted, fmt.Sprintf("%q", declared))
 	}
-	var steps []string
-	if successor := supersedingExtension(wsRoot, cfg, legacy); successor == "" {
-		steps = append(steps, "replace each entry with extension:<name> for the extension whose agent content supersedes it",
-			"declare that extension in extensions")
-	} else {
-		optIn := extensionAgentContentPrefix + successor
-		if optsInto(cfg, successor) {
-			steps = append(steps, "delete each entry, since "+optIn+" already opts into the content that supersedes it")
+	sources := declaredSupersedingSources(wsRoot, cfg)
+	var successors []string
+	groups := map[string][]string{}
+	for _, declared := range legacy {
+		successor := supersedingExtension(wsRoot, sources, declared)
+		if _, seen := groups[successor]; !seen {
+			successors = append(successors, successor)
+		}
+		groups[successor] = append(groups[successor], fmt.Sprintf("%q", declared))
+	}
+	declaredNames := extension.DeclaredExtensionNames(wsRoot, cfg)
+	steps := make([]string, 0, len(successors))
+	for _, successor := range successors {
+		var group []string
+		if successor == "" {
+			group = append(group, "replace each entry with extension:<name> for the extension whose agent content supersedes it",
+				"declare that extension in extensions")
 		} else {
-			steps = append(steps, "replace each entry with "+optIn)
+			optIn := extensionAgentContentPrefix + successor
+			if optsInto(cfg, successor) {
+				group = append(group, "delete each entry, since "+optIn+" already opts into the content that supersedes it")
+			} else {
+				group = append(group, "replace each entry with "+optIn)
+			}
+			if !slices.Contains(declaredNames, successor) {
+				group = append(group, "declare "+successor+" in extensions")
+			}
 		}
-		if !slices.Contains(extension.DeclaredExtensionNames(wsRoot, cfg), successor) {
-			steps = append(steps, "declare "+successor+" in extensions")
+		step := strings.Join(group, ", ")
+		if len(successors) > 1 {
+			step = "for " + strings.Join(groups[successor], ", ") + ": " + step
 		}
+		steps = append(steps, step)
 	}
 	return protocolcli.Classify(fmt.Errorf(
 		"agentArtifacts declares %s in a form this CLI no longer installs: nothing was changed. "+
 			"Agent content is installed only by an extension, through an extension:<name> entry: %s, then run `putnami install`",
-		strings.Join(quoted, ", "), strings.Join(steps, ", ")), protocolcli.ErrInvalidConfig)
+		strings.Join(quoted, ", "), strings.Join(steps, "; ")), protocolcli.ErrInvalidConfig)
 }
 
 // optsInto reports whether the workspace already opts into the agent content
@@ -130,20 +150,28 @@ var firstPartyAgentContentSuccessors = map[string]string{
 	"@putnami/maintainer-workflows": "@putnami/contributor",
 }
 
-// supersedingExtension names the extension whose agent content supersedes one
-// of the legacy entries: a declared extension whose content says so, else the
-// first-party successor, else "".
-func supersedingExtension(wsRoot string, cfg *wsproto.Config, legacy []string) string {
+// declaredSupersedingSources is the agent content of every declared
+// extension whose content supersedes an artifact, in declaration order.
+func declaredSupersedingSources(wsRoot string, cfg *wsproto.Config) []*extension.AgentContentSource {
+	var sources []*extension.AgentContentSource
 	for _, candidate := range extension.DeclaredExtensionNames(wsRoot, cfg) {
 		source, err := extension.LocateAgentContent(wsRoot, cfg, candidate)
-		if err != nil {
+		if err != nil || len(source.Contribution.Supersedes) == 0 {
 			continue
 		}
+		sources = append(sources, source)
+	}
+	return sources
+}
+
+// supersedingExtension names the extension whose agent content supersedes a
+// legacy entry: a declared extension whose content says so, else the
+// first-party successor, else "".
+func supersedingExtension(wsRoot string, sources []*extension.AgentContentSource, declared string) string {
+	for _, source := range sources {
 		for _, superseded := range source.Contribution.Supersedes {
-			for _, declared := range legacy {
-				if legacyEntryNames(wsRoot, declared, superseded) {
-					return source.Name
-				}
+			if legacyEntryNames(wsRoot, declared, superseded) {
+				return source.Name
 			}
 		}
 	}
@@ -152,11 +180,9 @@ func supersedingExtension(wsRoot string, cfg *wsproto.Config, legacy []string) s
 		firstParty = append(firstParty, name)
 	}
 	sort.Strings(firstParty)
-	for _, declared := range legacy {
-		for _, name := range firstParty {
-			if legacyEntryNames(wsRoot, declared, name) {
-				return firstPartyAgentContentSuccessors[name]
-			}
+	for _, name := range firstParty {
+		if legacyEntryNames(wsRoot, declared, name) {
+			return firstPartyAgentContentSuccessors[name]
 		}
 	}
 	return ""

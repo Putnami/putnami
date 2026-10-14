@@ -204,6 +204,10 @@ func Install(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []str
 			"`putnami install` cannot materialize for another platform or destination; use `putnami extensions install --platform <os>/<arch> [--dest <dir>]`")
 	}
 
+	if err := refuseHostedAgentArtifactPins(ctx, wsRoot); err != nil {
+		return err
+	}
+
 	phaseIO := installPhaseIO{env: env, display: display, phaseWriter: phaseWriter, flush: flushFailureDetails, record: recordAction}
 	if err := installExtensions(ctx, wsRoot, cfg, args, &phaseIO); err != nil {
 		return err
@@ -416,20 +420,32 @@ func installRewriteSnapshot(ctx context.Context, wsRoot string) map[string]strin
 	return before
 }
 
+// refuseHostedAgentArtifactPins fails a hosted explicit install, before any
+// phase runs, when the committed lock still holds a pin under agentArtifacts.
+// No declaration can use such a pin, so an install drops it
+// (dropAgentArtifactPins); a hosted install writes no lock (ADR 0055), so it
+// fails instead, as it does for an extension the lock does not pin
+// (extensions.refuseHostedLockChange).
+func refuseHostedAgentArtifactPins(ctx context.Context, wsRoot string) error {
+	if installWritesWorkspace() || shared.IsImplicitInstall(ctx) {
+		return nil
+	}
+	pins, err := agentctx.AgentArtifactPins(wsRoot)
+	if err != nil || len(pins) == 0 {
+		return err
+	}
+	return fmt.Errorf("%s: the committed %s pins agent artifacts no declaration can use: %s; a hosted run writes no lock, so run `putnami install` without %s and commit the lock",
+		runcredential.Flag, lockfile.LockFilename, strings.Join(pins, ", "), runcredential.Flag)
+}
+
 // dropAgentArtifactPins is the explicit install's step that drops every
 // agentArtifacts lock pin: an earlier release pinned agent artifacts there,
-// and no declaration can use such a pin now. A hosted install writes no lock
-// (ADR 0055), so it fails when the committed lock still holds one, as it does
-// for an extension the lock does not pin (extensions.refuseHostedLockChange).
-// The implicit bootstrap restores the committed lock and never runs it.
+// and no declaration can use such a pin now. A hosted install was refused
+// before its first phase (refuseHostedAgentArtifactPins) and writes nothing
+// here. The implicit bootstrap restores the committed lock and never runs it.
 func dropAgentArtifactPins(wsRoot string, record func(LifecycleAction)) error {
 	if !installWritesWorkspace() {
-		pins, err := agentctx.AgentArtifactPins(wsRoot)
-		if err != nil || len(pins) == 0 {
-			return err
-		}
-		return fmt.Errorf("%s: the committed %s pins agent artifacts no declaration can use: %s; a hosted run writes no lock, so run `putnami install` without %s and commit the lock",
-			runcredential.Flag, lockfile.LockFilename, strings.Join(pins, ", "), runcredential.Flag)
+		return nil
 	}
 	dropped, err := agentctx.DropAgentArtifactPins(wsRoot)
 	if err != nil {

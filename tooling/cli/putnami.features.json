@@ -1545,6 +1545,7 @@
             "kind": "acceptance",
             "checks": [
               "an-explicit-install-drops-every-pin",
+              "the-implicit-bootstrap-keeps-the-lock",
               "a-hosted-install-that-would-drop-a-pin-fails"
             ]
           }

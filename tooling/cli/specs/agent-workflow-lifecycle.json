@@ -24,7 +24,7 @@
   "requirements": [
     {
       "id": "optin",
-      "text": "A command materializes agent content only when putnami.workspace.json opts into it in agentArtifacts; an absent or empty declaration skips the phase without any lock read or output, and a starter that opts into nothing adds nothing."
+      "text": "A command materializes agent content only when putnami.workspace.json opts into it in agentArtifacts; an absent or empty declaration skips the agent phase without any lock read or output, though install still drops any pin under agentArtifacts, and a starter that opts into nothing adds nothing."
     },
     {
       "id": "legacy-declarations-refused",
@@ -80,7 +80,7 @@
     },
     {
       "id": "legacy-pins-dropped",
-      "text": "No declaration uses a pin under agentArtifacts in putnami.lock.json: an `extension:<name>` entry follows its extension's own pin. An explicit putnami install drops every such pin and leaves the ownership records to upgrade. The implicit bootstrap keeps the committed lock as it is, and a hosted install that would drop a pin fails with the lock unchanged and asks for putnami install without the run credential."
+      "text": "No declaration uses a pin under agentArtifacts in putnami.lock.json: an `extension:<name>` entry follows its extension's own pin. An explicit putnami install drops every such pin and leaves the ownership records to upgrade. The implicit bootstrap keeps the committed lock as it is, and a hosted install that would drop a pin fails before any phase runs, with the lock unchanged, and asks for putnami install without the run credential."
     },
     {
       "id": "starter-opts-into-contributor",

@@ -103,6 +103,24 @@ func TestLegacyEntriesFailClearly(t *testing.T) {
 		}
 	})
 
+	// Entries with different successors get their own steps: an opt-in that
+	// supersedes one entry never tells the user to delete another.
+	t.Run("with several successors", func(t *testing.T) {
+		root := t.TempDir()
+		writePathFile(t, filepath.Join(root, "tools", "workflows"), "putnami.json", `{"name":"@local/workflows"}`)
+		writeLocalContentExtension(t, root, "/tools/contributor", "@local/contributor", "local-plan", "Body.\n", "@local/workflows")
+		cfg := localContentConfig("/tools/contributor", "@local/contributor", "/tools/workflows", "@acme/flows", "@putnami/agent-workflows")
+
+		_, err := DeclaredAgentArtifacts(root, cfg)
+		want := `entry: for "/tools/workflows": delete each entry, since extension:@local/contributor already opts into the content that supersedes it; ` +
+			`for "@acme/flows": replace each entry with extension:<name> for the extension whose agent content supersedes it, declare that extension in extensions; ` +
+			`for "@putnami/agent-workflows": replace each entry with extension:@putnami/contributor, declare @putnami/contributor in extensions, ` +
+			"then run `putnami install`"
+		if !errors.Is(err, protocolcli.ErrInvalidConfig) || !strings.HasSuffix(err.Error(), want) {
+			t.Fatalf("error = %v, want the steps grouped by successor: %q", err, want)
+		}
+	})
+
 	const (
 		contributorSteps = "replace each entry with extension:@putnami/contributor, declare @putnami/contributor in extensions, then run `putnami install`"
 		unknownSteps     = "replace each entry with extension:<name> for the extension whose agent content supersedes it, " +

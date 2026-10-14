@@ -536,7 +536,8 @@ func TestAgentWorkflows_UpgradeRetiresARecordNothingDeclares(t *testing.T) {
 // extension's own pin. An explicit install drops every one and leaves the
 // records and files alone, which upgrade retires. The implicit bootstrap
 // restores the committed lock as it is, and a hosted install, which writes no
-// lock, fails and names the pins instead of dropping them.
+// lock, fails before its first phase and names the pins instead of dropping
+// them.
 func TestInstall_DropsEveryAgentArtifactPin(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "legacy-pins-dropped", "an-explicit-install-drops-every-pin")
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "legacy-pins-dropped", "a-hosted-install-that-would-drop-a-pin-fails")
@@ -548,10 +549,20 @@ func TestInstall_DropsEveryAgentArtifactPin(t *testing.T) {
 		seedLegacyArtifact(t, root, secondAgentArtifact, "1.0.0", map[string]string{".agents/skills/acme-change/SKILL.md": "# acme-change\n"}, true)
 		return root
 	}
+	var jobs []string
 	install := func(ctx context.Context, root string) error {
 		var out strings.Builder
+		env := installTestEnv(&out, WorkspaceJobOK)
+		env.RunJob = func(ctx context.Context, req WorkspaceJobRequest) (WorkspaceJobResult, error) {
+			jobs = append(jobs, recordedJob(ctx, req))
+			return WorkspaceJobResult{Outcome: WorkspaceJobOK}, nil
+		}
+		env.BeforeRepositoryCode = func(context.Context) error {
+			jobs = append(jobs, beforeRepositoryCode)
+			return nil
+		}
 		_, err := captureStdout(t, func() error {
-			return Install(ctx, root, wsproto.Load(root), nil, installTestEnv(&out, WorkspaceJobOK))
+			return Install(ctx, root, wsproto.Load(root), nil, env)
 		})
 		return err
 	}
@@ -573,6 +584,7 @@ func TestInstall_DropsEveryAgentArtifactPin(t *testing.T) {
 	})
 
 	t.Run("implicit", func(t *testing.T) {
+		spectest.Proves(t, "cli/agent-workflow-lifecycle", "legacy-pins-dropped", "the-implicit-bootstrap-keeps-the-lock")
 		root := seeded(t)
 		before := readLock(t, root)
 		if err := install(shared.WithImplicitInstall(context.Background()), root); err != nil {
@@ -587,10 +599,14 @@ func TestInstall_DropsEveryAgentArtifactPin(t *testing.T) {
 		root := seeded(t)
 		before := readLock(t, root)
 		t.Cleanup(runcredential.SetForTest("run-bearer"))
+		jobs = nil
 		err := install(context.Background(), root)
 		if err == nil || !strings.Contains(err.Error(), "a hosted run writes no lock") ||
 			!strings.Contains(err.Error(), secondAgentArtifact+", "+testAgentArtifact) {
 			t.Fatalf("hosted Install = %v, want it refused, naming both pins", err)
+		}
+		if len(jobs) != 0 {
+			t.Fatalf("a hosted install ran %q before it refused the pins", jobs)
 		}
 		if after := readLock(t, root); string(after) != string(before) {
 			t.Fatalf("a hosted install changed the committed lock:\n%s\nto\n%s", before, after)

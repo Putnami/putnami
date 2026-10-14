@@ -106,8 +106,9 @@ extension's own lock entry is the pin, and it binds the content end to end. The
 lock pins the extension's manifest digest, the manifest pins the content
 manifest digest, and the content manifest pins every file.
 
-An absent or empty `agentArtifacts` means every command skips agent content
-entirely — no lock read and no output line. There is no flag, no environment
+An absent or empty `agentArtifacts` means every command skips the agent phase
+entirely — no lock read and no output line. `install` still drops any pin
+under `agentArtifacts` in `putnami.lock.json`. There is no flag, no environment
 variable, and no directory sniffing that turns the feature on: one declaration,
 in a file you commit, that every command agrees about.
 
@@ -298,7 +299,7 @@ job. See
 |---|---|
 | `init` with a starter that opts into content | both declarations are written, the extension is installed and pinned, and its content is materialized |
 | `init` with a starter that opts into nothing | nothing is added: no declaration, no files, no install |
-| An existing workspace with no `agentArtifacts` | untouched by every command; the phase is skipped before any lock read |
+| An existing workspace with no `agentArtifacts` | the agent phase is skipped before any lock read; `install` still drops any pin under `agentArtifacts` |
 | `install` with the extension pinned | exactly the content manifest's files are materialized at that release; nothing moves in the lock |
 | The same `install`, run again | byte-for-byte no-op — no file and no ownership record changes |
 | `upgrade` where the content bytes did not change | no file diff |
