@@ -90,7 +90,7 @@ func (f graphFixture) config(t *testing.T, keys ...string) *wsproto.Config {
 	for _, key := range keys {
 		list[key] = ""
 	}
-	writeJSON(t, filepath.Join(f.ws, wsproto.WorkspaceConfigFilename), map[string]any{"extensions": list})
+	writeJSON(t, filepath.Join(f.ws, wsproto.WorkspaceConfigFilename), map[string]map[string]string{"extensions": list})
 	return &wsproto.Config{Extensions: wsproto.ExtensionsConfig{List: list}}
 }
 
@@ -101,10 +101,10 @@ func (f graphFixture) devDependencies(t *testing.T, names ...string) {
 	for _, name := range names {
 		deps[name] = "1.0.0"
 	}
-	writeJSON(t, filepath.Join(f.ws, "package.json"), map[string]any{"devDependencies": deps})
+	writeJSON(t, filepath.Join(f.ws, "package.json"), map[string]map[string]string{"devDependencies": deps})
 }
 
-func writeJSON(t *testing.T, path string, value map[string]any) {
+func writeJSON(t *testing.T, path string, value map[string]map[string]string) {
 	t.Helper()
 	data, err := json.Marshal(value)
 	if err != nil {
@@ -370,7 +370,7 @@ func TestAGlobalKeyForADependencyIsIgnoredByDiscovery(t *testing.T) {
 	f.install(t, "@acme/dev", graphManifest("@acme/dev", 8, ""))
 	f.pin(t, "@acme/app", "@acme/dev")
 	writeExtensionManifest(t, installedPackageDir(f.ws, "@acme/dev"), graphManifest("@acme/dev", 4, ""))
-	writeJSON(t, filepath.Join(f.home, wsproto.GlobalConfigDir, wsproto.GlobalConfigFilename), map[string]any{"extensions": map[string]string{"@acme/dev": "2.0.0"}})
+	writeJSON(t, filepath.Join(f.home, wsproto.GlobalConfigDir, wsproto.GlobalConfigFilename), map[string]map[string]string{"extensions": {"@acme/dev": "2.0.0"}})
 	cfg := f.config(t, "@acme/app")
 	cfg.Extensions.List["@acme/dev"] = "2.0.0"
 

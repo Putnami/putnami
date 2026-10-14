@@ -105,7 +105,7 @@ func (r *graphRegistry) channel(name, channel, answer string) {
 // config and bytes.
 func (r *graphRegistry) declare(extensions map[string]string) (*wsproto.Config, []byte) {
 	r.t.Helper()
-	data, err := json.Marshal(map[string]any{"extensions": extensions})
+	data, err := json.Marshal(map[string]map[string]string{"extensions": extensions})
 	if err != nil {
 		r.t.Fatal(err)
 	}
