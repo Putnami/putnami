@@ -376,6 +376,10 @@ func TestDrift_AgentContentContribution(t *testing.T) {
 	assertFieldParity(t, "AgentContentContribution", schemaFields, goFields)
 }
 
+func TestDrift_VerbDefinition(t *testing.T) {
+	assertFieldParity(t, "VerbDefinition", schemaDefProperties(t, "verbDefinition"), goTypeJSONFields(t, VerbDefinition{}))
+}
+
 func TestDrift_ToolAnnotations(t *testing.T) {
 	schemaFields := schemaDefProperties(t, "toolAnnotations")
 	goFields := goTypeJSONFields(t, ToolAnnotations{})

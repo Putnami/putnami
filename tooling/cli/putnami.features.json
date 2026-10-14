@@ -510,6 +510,35 @@
           }
         },
         {
+          "id": "extension-verb-vocabulary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "help-lists-the-loaded-vocabulary-first",
+              "vocabulary-aliases-resolve-first-and-never-shadow-a-command",
+              "completion-offers-the-loaded-vocabulary"
+            ]
+          }
+        },
+        {
+          "id": "vocabulary-default-traits",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-undeclared-job-takes-its-verbs-default-traits",
+              "a-vocabulary-requires-contract-9"
+            ]
+          }
+        },
+        {
           "id": "selection-before-plan",
           "stage": "coded",
           "evidenceKinds": [

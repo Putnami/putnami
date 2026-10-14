@@ -13,7 +13,7 @@ import (
 
 // DeclaresContractSurface reports whether the manifest exposes anything the
 // CLI ↔ extension contract governs: a command, a command group, an
-// agent-facing tool, or an agent-content contribution.
+// agent-facing tool, an agent-content contribution, or a verb vocabulary.
 //
 // It is the loader's half of the package-time stamper's rule
 // (gateAndStampManifestContract's manifestDeclaresContractSurface): a hook-only
@@ -24,14 +24,16 @@ import (
 // parses); here the manifest has already parsed, so the parsed shape is the
 // same question asked of a document that survived decoding.
 //
-// Agent content is a surface even though it runs nothing: it is exactly the
-// part of a manifest an older reader would drop without a word, so an
-// unstamped manifest that declares it must not load as if it were hook-only.
+// Agent content and a verb vocabulary are surfaces even though they run
+// nothing: each is exactly the part of a manifest an older reader would drop
+// without a word, so an unstamped manifest that declares one must not load as
+// if it were hook-only.
 func DeclaresContractSurface(m *Manifest) bool {
 	if m == nil {
 		return false
 	}
-	return len(m.Commands) > 0 || len(m.CommandGroups) > 0 || len(m.Tools) > 0 || m.DeclaresAgentContent()
+	return len(m.Commands) > 0 || len(m.CommandGroups) > 0 || len(m.Tools) > 0 || m.DeclaresAgentContent() ||
+		m.DeclaresVerbs()
 }
 
 // LoadManifest reads and parses a putnami.extension.json file, negotiating the
@@ -61,7 +63,8 @@ func LoadManifest(path string) (*Manifest, error) {
 //     manifest relies on — the four that move together at 3 (task contract
 //     v3, job context v2, runtime event protocol v2, lock format v2), the
 //     session prerequisites of 4, and, for a manifest that declares agent
-//     content, the additive contract 5. Loading a manifest stamped below that
+//     content or a verb vocabulary, the additive contract 5 or 9. Loading a
+//     manifest stamped below that
 //     would run a task whose outputs the scheduler cannot capture from a
 //     declaration, or accept agent content a reader of its stamp never had
 //     to represent.
@@ -101,7 +104,10 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 		return &m, nil
 	default:
 		reason := ""
-		if m.DeclaresAgentContent() {
+		switch {
+		case required == protocolcli.VerbVocabularyContract && m.DeclaresVerbs():
+			reason = " for its verb vocabulary"
+		case m.DeclaresAgentContent():
 			reason = " for its agent-content contribution"
 		}
 		return nil, fmt.Errorf(

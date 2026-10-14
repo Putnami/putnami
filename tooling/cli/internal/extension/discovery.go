@@ -271,6 +271,10 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 		}
 	}
 
+	// A loaded vocabulary gives its verbs' default traits to the jobs whose
+	// manifest declared none, across extensions.
+	ApplyVocabularyTraits(extensions)
+
 	return &DiscoveryResult{Extensions: extensions, Skipped: skipped, RemovedCapabilities: removed, Dependencies: dependencies}, nil
 }
 

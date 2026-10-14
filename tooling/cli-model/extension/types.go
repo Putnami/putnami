@@ -22,6 +22,7 @@ type SessionPrerequisiteParamBinding = proto.SessionPrerequisiteParamBinding
 type CommandTraits = proto.CommandTraits
 type ToolDefinition = proto.ToolDefinition
 type ToolAnnotations = proto.ToolAnnotations
+type VerbDefinition = proto.VerbDefinition
 
 // Re-exported trait constants from the extension protocol.
 const (
@@ -202,6 +203,9 @@ type ExtensionDescription struct {
 	// language is a manifest and a publish job rather than a CLI change.
 	Ecosystems []proto.EcosystemProfile
 	Uses       []string
+	// Verbs is the verb vocabulary the extension declares, in its declared
+	// order. MergeVocabulary merges the vocabularies of the loaded extensions.
+	Verbs []VerbDefinition
 }
 
 // RuntimeToolchainResolution is the provider-neutral result of one exact
@@ -268,6 +272,9 @@ type JobDefinition struct {
 	Traits          CommandTraits // resolved orchestration traits (verb defaults or manifest override)
 	Heavy           *bool         // per-step heavy override from the pipeline step
 	CPUWeight       *float64      // per-step relative CPU-demand multiplier
+	// TraitsDeclared is set when the manifest declared the command's traits.
+	// ApplyVocabularyTraits leaves such a job alone.
+	TraitsDeclared bool
 	// BoundParams are literal `with: {value: ...}` bindings materialized for
 	// this expanded pipeline step. They are task-local inputs, not command
 	// defaults: execution overlays them after every shared command/config layer

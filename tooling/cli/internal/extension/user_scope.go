@@ -134,6 +134,7 @@ func DiscoverUserScopeExtensions(ctx context.Context, userRoot string, installer
 			result.Extensions = append(result.Extensions, ext)
 		}
 	}
+	ApplyVocabularyTraits(result.Extensions)
 	return result, nil
 }
 

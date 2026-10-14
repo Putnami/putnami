@@ -22,8 +22,8 @@
     "cliContract": {
       "type": "integer",
       "minimum": 4,
-      "maximum": 8,
-      "description": "CLI ↔ extension contract version this manifest was validated against: the lowest contract whose vocabulary covers it. Contract 4 adds same-session prerequisites; older readers must reject rather than silently omit their gates. Contract 5 is additive and is stamped only on a manifest that declares agentContent, so a contract-4 reader refuses that manifest instead of dropping its agent content. Contract 6 covers Go embed inputs, contract 7 the releaseBaseline runtime input and git: file patterns, and contract 8 a registry-named extensionDependencies entry. Earned, not claimed: the package job stamps it after strict validation. Absent means contract 0 (pre-registry); loaders reject a stamp below what the manifest's vocabulary requires, or above the latest contract they read."
+      "maximum": 9,
+      "description": "CLI ↔ extension contract version this manifest was validated against: the lowest contract whose vocabulary covers it. Contract 4 adds same-session prerequisites; older readers must reject rather than silently omit their gates. Contract 5 is additive and is stamped only on a manifest that declares agentContent, so a contract-4 reader refuses that manifest instead of dropping its agent content. Contract 6 covers Go embed inputs, contract 7 the releaseBaseline runtime input and git: file patterns, contract 8 a registry-named extensionDependencies entry, and contract 9 a verbs vocabulary. Earned, not claimed: the package job stamps it after strict validation. Absent means contract 0 (pre-registry); loaders reject a stamp below what the manifest's vocabulary requires, or above the latest contract they read."
     },
     "extensionDependencies": {
       "description": "Other extensions this extension needs: a list of names, or a map from name to version constraint. The CLI installs, pins and loads each registry name (@scope/name) for an extension installed from the artifact store or declared by path, and leaves any other name, and the dependencies of an extension loaded from node_modules, to the package manager. A manifest that names a registry dependency requires cliContract 8 when it loads from the artifact store or a declared path.",
@@ -96,6 +96,14 @@
     },
     "agentContent": {
       "$ref": "#/$defs/agentContentContribution"
+    },
+    "verbs": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The verb vocabulary this extension declares, in display order. A vocabulary runs nothing: help, completion and alias resolution read it, and a job whose manifest declares no traits takes its verb's default traits. The CLI merges loaded vocabularies in extension-name order, and the first declaration of a verb wins. Declaring it requires cliContract 9.",
+      "items": {
+        "$ref": "#/$defs/verbDefinition"
+      }
     },
     "ecosystems": {
       "type": "array",
@@ -1808,6 +1816,46 @@
             "type": "string"
           },
           "description": "Extra selectors to force misses for this step."
+        }
+      }
+    },
+    "verbDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description"],
+      "description": "One verb of a verb vocabulary. See doc/06-verbs.md.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "The command name the verb gives meaning to. A vocabulary names each verb once."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One-line description shown by help and completion."
+        },
+        "aliases": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9-]*$"
+          },
+          "description": "Short names that resolve to the verb. An alias names no verb, command or command group, and the CLI drops one another loaded extension already claims."
+        },
+        "traits": {
+          "$ref": "#/$defs/commandTraits",
+          "description": "Default traits of every job of the verb whose manifest declares none; replaces the well-known verb's defaults wholesale."
+        },
+        "related": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$"
+          },
+          "description": "Commands `putnami help <verb>` suggests, in order."
         }
       }
     },

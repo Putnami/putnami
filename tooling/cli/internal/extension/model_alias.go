@@ -26,6 +26,7 @@ type SessionPrerequisiteParamBinding = model.SessionPrerequisiteParamBinding
 type CommandTraits = model.CommandTraits
 type ToolDefinition = model.ToolDefinition
 type ToolAnnotations = model.ToolAnnotations
+type VerbDefinition = model.VerbDefinition
 
 // Re-exported trait constants from the extension protocol.
 const (
@@ -165,6 +166,18 @@ var ExpandAlsoRunCommands = model.ExpandAlsoRunCommands
 
 // FindExtensionByName returns the extension with the given name, or nil.
 var FindExtensionByName = model.FindExtensionByName
+
+// Vocabulary is the merged verb vocabulary of the loaded extensions, and
+// VerbAlias one of its aliases.
+type Vocabulary = model.Vocabulary
+type VerbAlias = model.VerbAlias
+
+// MergeVocabulary merges the verb vocabularies of the loaded extensions.
+var MergeVocabulary = model.MergeVocabulary
+
+// ApplyVocabularyTraits gives every job whose manifest declared no traits the
+// default traits of its verb in the merged vocabulary.
+var ApplyVocabularyTraits = model.ApplyVocabularyTraits
 
 // --- Manifest loading and resolution ---
 

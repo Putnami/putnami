@@ -65,9 +65,11 @@ Each extension is defined by a `putnami.extension.json` file:
 | `runtime` | `RuntimeDefinition` | The extension's own executable and how to prepare it — see [Lifecycle Primitives](#lifecycle-primitives) |
 | `workspace` | `WorkspaceAdapter` | Project discovery and metadata this extension owns — see [Lifecycle Primitives](#lifecycle-primitives) |
 | `agentContent` | `AgentContentContribution` | Agent instructions (skills, workers, references, helpers) shipped under the extension's own version; materialized only in a workspace that opts in with `extension:<name>` — see [Agent Workflows](18-agent-workflows.md#how-a-workspace-opts-in) |
+| `verbs` | `[]VerbDefinition` | The verb vocabulary: verbs that other extensions run, in help order, with their descriptions, aliases, default traits and related commands. Help, completion and alias resolution read it before the core's own list, and a job whose command declares no traits takes its verb's. Requires CLI contract 9 — see [Well-Known Verbs](../../../protocols/extension/doc/06-verbs.md#declaring-a-verb-vocabulary) |
 
-A manifest contributes at least one command, MCP tool or agent-content
-contribution; a content-only extension needs no runtime.
+A manifest contributes at least one command, MCP tool, agent-content
+contribution or verb vocabulary; a content-only or vocabulary-only extension
+needs no runtime.
 
 ## Commands
 

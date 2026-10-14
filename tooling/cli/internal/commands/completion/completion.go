@@ -68,6 +68,7 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config) completionConte
 	}
 
 	// Add dynamic commands from extensions
+	var vocabulary extension.Vocabulary
 	if wsRoot != "" {
 		projectPaths := []string{}
 		ws, _ := workspace.Load(wsRoot)
@@ -116,6 +117,15 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config) completionConte
 		}
 
 		extensions, _ := extension.DiscoverExtensions(wsRoot, cfg, projectPaths)
+		// The loaded vocabulary describes its verbs ahead of the catalog and of
+		// the commands that serve them.
+		vocabulary = extension.MergeVocabulary(extensions, commandmeta.IsStructuredRoot)
+		for _, verb := range vocabulary.Verbs {
+			addCompletionCommand(&ctx, verb.Name, "")
+			if verb.Description != "" {
+				ctx.commandDesc[verb.Name] = verb.Description
+			}
+		}
 		for _, ext := range extensions {
 			for name, description := range ext.Commands {
 				if ext.CommandVisibility[name] == "internal" {
@@ -148,7 +158,7 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config) completionConte
 	}
 
 	finalizeCompletionContext(&ctx)
-	addCommandAliasCompletions(&ctx)
+	addCommandAliasCompletions(&ctx, vocabulary.Aliases)
 
 	sort.Strings(ctx.commands)
 	sort.Strings(ctx.projects)
@@ -222,8 +232,22 @@ func addCompletionCommand(ctx *completionContext, name, description string) {
 	}
 }
 
-func addCommandAliasCompletions(ctx *completionContext) {
-	for _, alias := range commandmeta.BuiltinAliasList() {
+// addCommandAliasCompletions offers every alias: those of the loaded
+// vocabulary, then the built-in ones whose name the vocabulary leaves free.
+func addCommandAliasCompletions(ctx *completionContext, vocabulary []extension.VerbAlias) {
+	builtin := commandmeta.BuiltinAliasList()
+	aliases := make([]commandmeta.Alias, 0, len(vocabulary)+len(builtin))
+	claimed := make(map[string]bool, len(vocabulary))
+	for _, alias := range vocabulary {
+		claimed[alias.Name] = true
+		aliases = append(aliases, commandmeta.Alias{Name: alias.Name, Command: alias.Verb})
+	}
+	for _, alias := range builtin {
+		if !claimed[alias.Name] {
+			aliases = append(aliases, alias)
+		}
+	}
+	for _, alias := range aliases {
 		addCompletionCommand(ctx, alias.Name, "Alias for "+alias.Command)
 		if flags := ctx.structuredFlags[alias.Command]; len(flags) > 0 {
 			ctx.structuredFlags[alias.Name] = mergeStructuredCompletionFlags(ctx.structuredFlags[alias.Name], flags)

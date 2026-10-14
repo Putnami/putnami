@@ -37,6 +37,7 @@ func Resolve(manifest *Manifest, extPath string) *ExtensionDescription {
 		Workspace:         manifest.Workspace,
 		Ecosystems:        manifest.Ecosystems,
 		Uses:              manifest.Uses,
+		Verbs:             manifest.Verbs,
 	}
 
 	for cmdName, cmd := range manifest.Commands {
@@ -58,6 +59,7 @@ func Resolve(manifest *Manifest, extPath string) *ExtensionDescription {
 			Priority:             cmd.Priority,
 			Quiet:                cmd.Quiet,
 			Traits:               proto.EffectiveTraits(cmdName, cmd.Traits),
+			TraitsDeclared:       cmd.Traits != nil,
 			PipelineSteps:        cmd.Run,
 			PipelineOutputs:      cmd.Outputs,
 		}

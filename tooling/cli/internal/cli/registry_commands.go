@@ -122,7 +122,7 @@ func impactPlanCommands(list string, cfg *wsproto.Config) ([]string, error) {
 	if cfg != nil {
 		aliases = cfg.Aliases
 	}
-	commands, err := resolveCommands(list, aliases)
+	commands, err := resolveCommands(list, commandAliases{user: aliases})
 	if err != nil {
 		return nil, err
 	}
@@ -1000,14 +1000,18 @@ func cmdHelp(env *CommandEnv) error {
 		if len(env.Args) > 0 && !strings.HasPrefix(env.Args[0], "-") {
 			nestedSub = env.Args[0]
 		}
-		command := resolveAliasOrSelf(env.Sub, env.Cfg.Aliases)
+		command := resolveAliasOrSelf(env.Sub, commandAliases{user: env.Cfg.Aliases})
 		if err := refuseHelpOfRemovedCoreRoot(env, command); err != nil {
 			return err
 		}
+		// The aliases of a loaded vocabulary come first, so the command is
+		// resolved again once the help scope knows them.
+		scope, extensions := discoverHelpScope(env.WsRoot, env.Cfg)
+		command = resolveAliasOrSelf(env.Sub, scope.commandAliases(env.Cfg.Aliases))
 		if isStructuredCommand(command) || nestedSub != "" {
-			printSubcommandHelp(command, nestedSub, newHelpScope(env.WsRoot, env.Cfg))
+			printSubcommandHelp(command, nestedSub, scope)
 		} else {
-			printJobCommandHelp(command, env.WsRoot, env.Cfg, nil)
+			printCommandHelp(command, jobCommandFlags(command, extensions), scope)
 		}
 	} else {
 		printHelp(newHelpScope(env.WsRoot, env.Cfg))

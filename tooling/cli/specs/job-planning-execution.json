@@ -26,6 +26,14 @@
       "text": "Inside a workspace, help lists only the job commands, built-in aliases and provider-bound global flags that a loaded extension gives meaning; the parser still accepts them all. Outside a workspace, or when an extension does not load, help lists everything. --credential-fd is always listed, because a hosted launcher reads it from help."
     },
     {
+      "id": "extension-verb-vocabulary",
+      "text": "An extension manifest may declare a verb vocabulary: an ordered list of verbs, each with a description, aliases, default traits and related commands. The CLI merges the loaded vocabularies in extension-name order, and the first declaration of a verb wins. Help lists its verbs first and suggests their related commands, completion offers them, and their aliases resolve before the built-in and workspace aliases. An alias never shadows a verb, a command, a command group or a core root."
+    },
+    {
+      "id": "vocabulary-default-traits",
+      "text": "After discovery loads every extension, a job whose manifest declares no traits takes the default traits of its verb in the merged vocabulary. A verb without traits keeps the well-known defaults, and declared traits always win. A manifest that declares a vocabulary requires CLI contract 9 wherever it loads from, so an older CLI refuses it instead of planning those jobs with other traits."
+    },
+    {
       "id": "selection-before-plan",
       "text": "Every job run resolves one explicit project selection before planning and applies that selection to every requested command. A channel publish sharing the session narrows itself alone: its members come from the channel head, every other command keeps the caller's selection, and the run reports both sets."
     },
@@ -159,6 +167,7 @@
     "tooling/cli/doc/adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md",
     "tooling/cli/doc/adr/0064-an-executing-task-starts-from-an-empty-owned-directory.md",
     "tooling/cli/doc/adr/0065-an-optional-command-output-directory-is-emptied-on-execution-and-on-an-empty-restore.md",
-    "tooling/cli/doc/adr/0066-a-main-publication-releases-what-its-pull-request-published.md"
+    "tooling/cli/doc/adr/0066-a-main-publication-releases-what-its-pull-request-published.md",
+    "tooling/cli/doc/adr/0067-putnami-dev-declares-the-development-verbs.md"
   ]
 }

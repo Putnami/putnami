@@ -308,7 +308,7 @@ func printGlobalOptions(scope *helpScope) {
 // printRelatedCommands shows the suggested related commands scope lists.
 func printRelatedCommands(command string, scope *helpScope) {
 	var related []string
-	for _, r := range relatedCommands[command] {
+	for _, r := range scope.related(command) {
 		if scope.listsJobCommand(r) {
 			related = append(related, r)
 		}

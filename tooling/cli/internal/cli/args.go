@@ -55,6 +55,32 @@ type ParsedArgs struct {
 // when no extension groups are known — only built-in structured commands
 // will then be recognized.
 func ParseArgs(args []string, userAliases map[string]string, extensionGroups map[string]bool) *ParsedArgs {
+	return parseArgs(args, commandAliases{user: userAliases}, extensionGroups)
+}
+
+// commandAliases are the alias tables a command name resolves through, in
+// precedence order: the verb vocabulary of the loaded extensions, the built-in
+// aliases, then the workspace's own.
+type commandAliases struct {
+	vocabulary map[string]string
+	user       map[string]string
+}
+
+// lookup returns the command alias name stands for.
+func (a commandAliases) lookup(name string) (string, bool) {
+	if target, ok := a.vocabulary[name]; ok {
+		return target, true
+	}
+	if target, ok := BuiltinAliases[name]; ok {
+		return target, true
+	}
+	target, ok := a.user[name]
+	return target, ok
+}
+
+// parseArgs is ParseArgs with every alias table: App.Run adds the vocabulary
+// aliases of the extensions it discovered.
+func parseArgs(args []string, aliases commandAliases, extensionGroups map[string]bool) *ParsedArgs {
 	result := &ParsedArgs{
 		OriginalArgs: append([]string(nil), args...),
 		JobFlags:     make(map[string]any),
@@ -98,7 +124,7 @@ func ParseArgs(args []string, userAliases map[string]string, extensionGroups map
 	// structured-vs-job decision. A cyclic alias fails HERE, at use, not at
 	// config load: a dormant cycle in an alias nobody invokes must not brick
 	// every other command in the workspace (epic refinement R9).
-	commands, err := resolveCommands(cmdArg, userAliases)
+	commands, err := resolveCommands(cmdArg, aliases)
 	if err != nil {
 		result.Commands = commands
 		result.Err = err
@@ -162,7 +188,7 @@ func ParseArgs(args []string, userAliases map[string]string, extensionGroups map
 }
 
 // resolveCommands splits comma-separated commands and resolves aliases.
-func resolveCommands(input string, userAliases map[string]string) ([]string, error) {
+func resolveCommands(input string, aliases commandAliases) ([]string, error) {
 	parts := strings.Split(input, ",")
 	commands := make([]string, 0, len(parts))
 	for _, p := range parts {
@@ -170,7 +196,7 @@ func resolveCommands(input string, userAliases map[string]string) ([]string, err
 		if p == "" {
 			continue
 		}
-		resolved, err := resolveAlias(p, userAliases)
+		resolved, err := resolveAlias(p, aliases)
 		if err != nil {
 			return commands, err
 		}
@@ -186,7 +212,7 @@ func resolveCommands(input string, userAliases map[string]string) ([]string, err
 // a cycle instead of silently returning the name unresolved. The error names the
 // chain so the offending alias is obvious, and it fires only when the cyclic
 // alias is actually invoked.
-func resolveAlias(name string, userAliases map[string]string) (string, error) {
+func resolveAlias(name string, aliases commandAliases) (string, error) {
 	visited := map[string]bool{}
 	chain := []string{name}
 	current := name
@@ -197,10 +223,7 @@ func resolveAlias(name string, userAliases map[string]string) (string, error) {
 		}
 		visited[current] = true
 
-		target, ok := BuiltinAliases[current]
-		if !ok && userAliases != nil {
-			target, ok = userAliases[current]
-		}
+		target, ok := aliases.lookup(current)
 		if !ok {
 			return current, nil
 		}
@@ -212,8 +235,8 @@ func resolveAlias(name string, userAliases map[string]string) (string, error) {
 // resolveAliasOrSelf resolves an alias chain for a display-only caller, falling
 // back to the last name reached when the chain is cyclic. Help must render
 // something for a cyclic alias rather than fail.
-func resolveAliasOrSelf(name string, userAliases map[string]string) string {
-	resolved, _ := resolveAlias(name, userAliases)
+func resolveAliasOrSelf(name string, aliases commandAliases) string {
+	resolved, _ := resolveAlias(name, aliases)
 	return resolved
 }
 

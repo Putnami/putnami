@@ -193,8 +193,11 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// stay fast.
 	extensions, extensionGroups := discoverDispatchExtensions(ctx, args, wsRoot, cfg, providerMode)
 
-	aliases := aliasesForProcessMode(cfg, providerMode)
-	parsed := ParseArgs(args, aliases, extensionGroups)
+	aliases := commandAliases{user: aliasesForProcessMode(cfg, providerMode)}
+	if !providerMode {
+		aliases.vocabulary = commandVocabulary(extensions).AliasMap()
+	}
+	parsed := parseArgs(args, aliases, extensionGroups)
 	if providerMode && !extensionGroups[parsed.Commands[0]] {
 		iox.Fprintf(os.Stderr, "putnami: internal release-set provider command group is unavailable\n")
 		return ExitUsage
@@ -708,7 +711,7 @@ func claimPackageRoot(ctx context.Context, args []string, cwd, wsRoot string, pr
 		return packageRootClaim{}
 	}
 	cfg := wsproto.Load(wsRoot)
-	command := resolveAliasOrSelf(args[0], cfg.Aliases)
+	command := resolveAliasOrSelf(args[0], commandAliases{user: cfg.Aliases})
 	if strings.Contains(command, ",") || isStructuredCommand(command) || packageRootProvides(wsRoot, cfg, command) {
 		return packageRootClaim{}
 	}

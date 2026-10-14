@@ -1,0 +1,16 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@acme/verbs",
+  "cliContract": 9,
+  "verbs": [
+    {"name": "Build", "description": "Compile the project."},
+    {"name": "test", "description": " "},
+    {
+      "name": "test",
+      "description": "Run the tests again.",
+      "aliases": ["t", "t", "test", "-x"],
+      "traits": {"sideEffects": "disk"},
+      "related": ["test", "lint", "lint", "Lint"]
+    }
+  ]
+}
