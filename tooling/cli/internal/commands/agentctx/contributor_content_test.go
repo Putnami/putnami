@@ -100,11 +100,15 @@ func stageContributorPackage(t *testing.T, version string) (string, *sdkagentart
 	if err != nil {
 		t.Fatal(err)
 	}
-	var manifest map[string]any
+	var manifest map[string]json.RawMessage
 	if err := json.Unmarshal(authored, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	manifest["version"] = version
+	stampedVersion, err := json.Marshal(version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest["version"] = stampedVersion
 	stamped, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		t.Fatal(err)
