@@ -10,6 +10,11 @@ import (
 	"go.putnami.dev/sdk/extension/sourcebinding"
 )
 
+// hostStatsExecBit reports whether the host filesystem stores the executable
+// bit. Windows does not: every file stats without one there, so a tracked file
+// takes its executable bit from the mode git reports for it instead.
+const hostStatsExecBit = sourcebinding.HostStatsExecBit
+
 // SourceBindingMetrics reports the physical child-process cost of computing a
 // source binding. Enumeration requires two git ls-files calls per snapshot;
 // gitlinks add the rev-parse calls needed to identify their visible worktree.

@@ -168,6 +168,8 @@ var spawnSites = map[string]spawnSite{
 		why: "docker with the digest-pinned postgres image of dbtestenv"},
 	"git/candidate.go:CandidatePaths": {spawns: 1, verdict: noRepositoryCode,
 		why: "git ls-files"},
+	"git/fingerprint.go:FingerprintTree": {spawns: 1, verdict: noRepositoryCode,
+		why: "read verbs only, through treefingerprint.Compute: rev-parse, status, ls-files"},
 	"git/git.go:GetVersionInfo": {spawns: 1, verdict: noRepositoryCode,
 		why: "read verbs only, through linetag.LastRelease: rev-parse, for-each-ref, cat-file"},
 	"git/git.go:runCaptureEnv": {spawns: 1, verdict: noRepositoryCode,
@@ -631,6 +633,7 @@ func scanSpawnSites(t *testing.T, root string) (map[string][]token.Pos, map[stri
 //   - a dbtestenv provider or job starts docker;
 //   - the SDK's exec.Run starts the command it names;
 //   - linetag.LastRelease starts git with read verbs only;
+//   - treefingerprint.Compute starts git with read verbs only;
 //   - the oci daemon helpers start docker: the export saves a daemon image,
 //     and a content push without a layout tags and pushes one. The CLI
 //     uploads a packed layout with oci.PushLayout, which starts nothing.
@@ -653,6 +656,7 @@ var spawnCalls = map[string]map[string]bool{
 	"go.putnami.dev/sdk/extension/oci": {
 		"ExportDaemonImageToLayout": true, "PushContent": true, "PushContentWithDigest": true,
 	},
+	"go.putnami.dev/sdk/extension/treefingerprint": {"Compute": true},
 }
 
 // startMethods are the functions that start a built process: the methods of

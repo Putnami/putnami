@@ -968,7 +968,8 @@ output identical, and a path list would accept the gate.
 It reads the repository and writes nothing — no session record, no workspace
 state — and needs no workspace, so it answers inside any git repository. Every
 recorded session carries the same digest for the tree it opened on, under
-`tree.fingerprint`; this command is the one implementation of the calculation.
+`tree.fingerprint`. The command and the session run the one implementation of
+the calculation, the SDK package `go.putnami.dev/sdk/extension/treefingerprint`.
 See [11-session-recording.md](11-session-recording.md#the-gated-tree).
 
 `tree verify` checks the local evidence of an execute run against that same
