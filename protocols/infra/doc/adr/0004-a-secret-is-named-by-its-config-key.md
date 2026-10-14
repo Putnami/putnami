@@ -10,7 +10,7 @@ application reads its secret at the config key `crm.apiKey`, and
 `putnami cloud secrets set` and the deploy-time secret check use that key. The
 `secrets` list of `infra/requirements.json` names it `crm.api_key`, because the
 resource-name grammar accepts only lowercase letters. An operator who copies the
-requirement name sets a secret the application never reads (#253).
+requirement name sets a secret the application never reads.
 
 ## Decision
 
