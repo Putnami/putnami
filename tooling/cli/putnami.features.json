@@ -3385,6 +3385,79 @@
           }
         }
       ]
+    },
+    {
+      "id": "cli/extension-dependencies",
+      "type": "feature",
+      "name": "Extension dependencies",
+      "outcome": "Declaring an extension installs, pins and loads every extension it depends on, so the dependency graph decides what a workspace gets",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "install-resolves-the-graph",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "installing-a-dependent-installs-and-pins-its-dependencies",
+              "a-satisfied-dependency-installs-nothing",
+              "the-workspace-file-never-receives-a-dependency"
+            ]
+          }
+        },
+        {
+          "id": "dependency-resolution",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-locked-dependency-resolves-from-the-lock",
+              "an-empty-constraint-resolves-on-the-dependent-channel",
+              "an-unmatched-range-fails-naming-each-dependent",
+              "a-cycle-installs-each-extension-once"
+            ]
+          }
+        },
+        {
+          "id": "the-graph-loads",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "discovery-loads-a-locked-dependency",
+              "restore-and-read-preparation-follow-the-graph",
+              "a-dependency-that-does-not-load-names-its-dependent"
+            ]
+          }
+        },
+        {
+          "id": "update-moves-the-graph",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "update-re-resolves-dependencies-without-pinning-them",
+              "list-shows-the-requiring-extension"
+            ]
+          }
+        },
+        {
+          "id": "hosted-installs-the-locked-graph",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-hosted-install-refuses-an-unpinned-dependency"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

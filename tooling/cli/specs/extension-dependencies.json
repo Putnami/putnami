@@ -1,0 +1,42 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/extension-dependencies",
+  "outcomes": [
+    "A user who declares one extension gets every extension its manifest depends on, transitively, without declaring them",
+    "The lock pins every extension of the graph, so a fresh worktree and a hosted run restore the same graph",
+    "A dependency resolves on the channel its dependent was requested on, so init on a channel resolves the whole graph there"
+  ],
+  "nonGoals": [
+    "Writing a dependency into putnami.workspace.json: the workspace keeps the roots its user wrote",
+    "A new lock field or lock format version: the lock binds each manifest by hash, and the manifests carry the edges",
+    "Resolving the dependencies of an extension the package manager installed",
+    "Installing the agent content of a dependency: agent content stays opt-in by declared extension",
+    "Counting dependencies as workspace-wide consumers in impact analysis"
+  ],
+  "requirements": [
+    {
+      "id": "install-resolves-the-graph",
+      "text": "putnami install, putnami extensions install and putnami init install every registry-named extension that a registry-installed or path-declared extension lists in extensionDependencies, transitively, and pin each one in putnami.lock.json as an ordinary extension entry. A dependency that the workspace declares, by name or by a path whose manifest has that name, or that a workspace project's manifest names, installs nothing. putnami.workspace.json is never written for a dependency."
+    },
+    {
+      "id": "dependency-resolution",
+      "text": "A dependency the lock pins resolves from its lock entry unless the run asks for --latest or upgrades. Otherwise a non-empty constraint resolves as written, and an empty one resolves on the channel its dependent was requested on when that request is a portable channel name, else on latest. When several dependents require one dependency, the first in breadth-first order with sorted names resolves it, and every constraint that parses as a semantic version range must match the resolved version, or the install fails naming the dependency, its version and each dependent with its constraint. A cycle installs each extension once."
+    },
+    {
+      "id": "the-graph-loads",
+      "text": "Discovery loads every locked dependency of a loaded extension from the artifact store after the declared extensions. The bootstrap restore and the MCP read preparation restore each locked dependency of a restored extension. Context generation, option ownership and the missing-extension check include dependencies. A dependency that does not load is reported with the extension that requires it. Removing the only dependent from the workspace stops loading the dependency."
+    },
+    {
+      "id": "update-moves-the-graph",
+      "text": "putnami extensions update and putnami upgrade re-resolve every dependency with the dependency-resolution rule and write its lock entry, and never write it into the workspace file's pins. putnami extensions list shows each dependency with the extension that requires it."
+    },
+    {
+      "id": "hosted-installs-the-locked-graph",
+      "text": "A hosted run installs the graph from the committed lock and writes no lock. A dependency the lock does not pin fails the install, as an unpinned declared extension does."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0066-an-extension-installs-and-loads-its-extension-dependencies.md"
+  ]
+}
