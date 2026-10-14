@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -45,13 +46,22 @@ func discoverHelpScope(wsRoot string, cfg *wsproto.Config) (*helpScope, []*exten
 	if err != nil {
 		return nil, nil
 	}
-	return helpScopeOf(result), result.Extensions
+	return helpScopeOf(result, workspaceAliases(cfg)), result.Extensions
 }
 
-// helpScopeOf returns the scope a discovery gives. When an extension did not
-// load, the scope hides nothing and keeps the vocabulary of those that did.
-func helpScopeOf(result *extension.DiscoveryResult) *helpScope {
-	vocabulary := commandVocabulary(result.Extensions)
+// workspaceAliases returns the aliases a workspace configuration declares.
+func workspaceAliases(cfg *wsproto.Config) map[string]string {
+	if cfg == nil {
+		return nil
+	}
+	return cfg.Aliases
+}
+
+// helpScopeOf returns the scope a discovery gives in a workspace whose aliases
+// are user. When an extension did not load, the scope hides nothing and keeps
+// the vocabulary of those that did.
+func helpScopeOf(result *extension.DiscoveryResult, user map[string]string) *helpScope {
+	vocabulary := commandVocabulary(result.Extensions, user)
 	if len(result.Skipped) > 0 {
 		return &helpScope{vocabulary: vocabulary}
 	}
@@ -67,10 +77,37 @@ func helpScopeOf(result *extension.DiscoveryResult) *helpScope {
 	return scope
 }
 
-// commandVocabulary merges the verb vocabularies of extensions. An alias
-// never takes a core structured root.
-func commandVocabulary(extensions []*extension.ExtensionDescription) extension.Vocabulary {
-	return extension.MergeVocabulary(extensions, isStructuredCommand)
+// commandVocabulary merges the verb vocabularies of extensions for a workspace
+// whose aliases are user. A vocabulary alias never takes a command path of the
+// catalog, structured or job, and a workspace alias of the same name hides it.
+func commandVocabulary(extensions []*extension.ExtensionDescription, user map[string]string) extension.Vocabulary {
+	return extension.MergeVocabulary(extensions, func(name string) bool {
+		_, mine := user[name]
+		return mine || isCatalogPath(name)
+	})
+}
+
+// isCatalogPath reports whether name is a command path of the catalog.
+func isCatalogPath(name string) bool {
+	_, ok := commandmeta.Lookup(name)
+	return ok
+}
+
+// hiddenAliasWarnings returns a warning for each vocabulary alias a workspace
+// alias of the same name hides, in merge order.
+func hiddenAliasWarnings(extensions []*extension.ExtensionDescription, user map[string]string) []string {
+	if len(user) == 0 {
+		return nil
+	}
+	var warnings []string
+	for _, alias := range commandVocabulary(extensions, nil).Aliases {
+		if target, mine := user[alias.Name]; mine {
+			warnings = append(warnings, fmt.Sprintf(
+				"warning: the workspace alias %s (%s) hides the alias %s of %s that %s declares",
+				alias.Name, target, alias.Name, alias.Verb, alias.Extension))
+		}
+	}
+	return warnings
 }
 
 // declares reports whether help lists command: always outside a workspace,

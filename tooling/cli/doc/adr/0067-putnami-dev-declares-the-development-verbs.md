@@ -44,17 +44,22 @@ per verb and project to every plan, and change every recorded session.
    documents do not change, except through default traits (point 4).
 2. **Vocabularies merge by extension name.** The CLI merges the
    vocabularies of the loaded extensions in extension-name order, each in
-   its declared order. The first declaration of a verb wins whole.
+   its declared order. The first declaration of a verb wins whole. A second
+   vocabulary that declares the same verb draws a discovery warning that
+   names both extensions.
 3. **The vocabulary comes first, the core falls back.**
    - Help lists the merged verbs first, then the core's job commands the
      vocabulary does not name. Inside a workspace it still lists a verb only
      when a loaded extension declares a command of that name.
    - `putnami help <verb>` suggests the verb's related commands.
    - A command name resolves through the vocabulary's aliases, then the
-     core's built-in aliases, then the user's. An alias that an earlier verb
-     claimed, or that names a verb, a command or command group of a loaded
-     extension, or a core command, is dropped. A provider process resolves
-     no vocabulary alias.
+     core's built-in aliases, then the workspace's. A workspace alias of the
+     same name hides a vocabulary alias, with a warning, so an extension
+     update never changes what a workspace alias runs. An alias that an
+     earlier verb claimed, or that names a verb, a command or command group
+     of a loaded extension, or a command of the core catalog, is dropped.
+     `putnami impact-plan` resolves the same aliases. A provider process
+     resolves no vocabulary alias.
    - Completion offers the merged verbs and their aliases.
    - Without a loaded vocabulary, every output is the one before this
      decision, byte for byte.
@@ -62,7 +67,12 @@ per verb and project to every plan, and change every recorded session.
    extension, a job whose command declares no traits takes its verb's
    traits. A verb that declares none leaves the `WellKnownVerbs` defaults in
    place. A command's own traits still replace both wholesale. The pass runs
-   for the workspace and for the user scope.
+   for the workspace and for the user scope. While `WellKnownVerbs` gives a
+   verb side effects, a vocabulary keeps them: strict validation refuses
+   default traits that change them (`invalid-verb-traits`), and discovery
+   sets such traits of a loaded vocabulary aside with a warning. No
+   vocabulary makes `publish` or `deploy` look harmless to the gates that
+   read side effects.
 5. **A path outside the catalog is not a built-in.** Help listed every
    command path the catalog does not know, as if the core provided it. Now
    help always lists a catalog command that is not a job command, and lists
@@ -79,22 +89,29 @@ per verb and project to every plan, and change every recorded session.
    extensions' jobs are planned, and a reader below 9 would plan them with
    other traits. A vocabulary counts as contract surface, and a manifest
    that declares only a vocabulary is complete.
-7. **The Go and npm packagers do not stamp a vocabulary-only manifest yet.**
-   Their raw surface check counts commands, command groups, tools and agent
-   content. They refuse to package a manifest that declares only a
-   vocabulary, because its unstamped form does not load. Packaging
-   `@putnami/dev` decides which packager stamps it.
+7. **The Go and npm packagers gate a vocabulary.** Their raw surface check
+   counts a `verbs` section, so they validate a vocabulary strictly and
+   stamp 9, a vocabulary-only manifest included. A defective vocabulary
+   fails packaging, even beside a registry extension dependency, which
+   otherwise takes the stamp-only path. The scaffold `package` command
+   (`agentartifact.PackageExtension`) still requires agent content, so it
+   does not package a vocabulary-only `@putnami/dev`.
 
 ### Slice decisions
 
-The owner settled these questions of the `@putnami/dev` slice:
+This decision proposes answers to the open questions of the
+`@putnami/dev` slice. Accepting it adopts them:
 
 - **D1 — contributor skills.** A manifest field on `@putnami/dev` opts the
   workspaces of its dependents into the agent content of
   `@putnami/contributor` (D-012). It is designed with `@putnami/dev`.
-- **D2 — what help lists.** Help lists every verb a loaded extension
-  declares, whether or not a vocabulary names it. A workspace with only
-  `@putnami/cloud` still lists the `build` that cloud declares.
+- **D2 — what help lists.** A requirement on the change that removes the
+  development verbs from the core catalog: help lists every verb a loaded
+  extension's vocabulary declares, even once the catalog is empty. This
+  decision does not provide it. Today help lists the vocabulary verbs and
+  the catalog's job verbs, each only when a loaded extension declares a
+  command of that name, so a declared command that neither names is not
+  listed.
 - **D3 — development flags.** No global flag becomes a development flag in
   this slice. `--profile` and `--dry-run` stay core flags.
 - **D4 — help outside a workspace.** Once the core declares no verb,
@@ -105,8 +122,7 @@ The owner settled these questions of the `@putnami/dev` slice:
   (`lint,test,build`) stay in `protocols/ci` as protocol data. Reading them
   is not the core declaring a verb.
 - **D6 — `version get|tag`.** Where these commands move (D-010) is decided
-  after slice 6, which creates the first tooling extension with an
-  executable.
+  once the first tooling extension with an executable exists.
 - **D7 — the rung-8 stamp.** The rung-8 stamp that a language extension
   takes for its dependency on `@putnami/dev` is not a breaking change, and
   its commit carries no breaking marker.
@@ -126,7 +142,8 @@ The owner settled these questions of the `@putnami/dev` slice:
   of a verb another extension runs. The first vocabulary by extension name
   wins, so two vocabularies never interleave a verb.
 - Removing the development verbs from the core catalog, aliases and
-  `WellKnownVerbs` is a separate, breaking change. This decision removes
-  nothing.
-- The MCP `run_jobs` trait check and impact-plan alias resolution do not
-  read the vocabulary yet. They change with the removal.
+  `WellKnownVerbs` is a separate, breaking change, and it must meet D2. This
+  decision removes nothing.
+- The MCP `run_jobs` trait check reads the traits discovery gives each job,
+  vocabulary defaults included. Only its fallback for a command no loaded
+  extension declares reads `WellKnownVerbs`; it changes with the removal.

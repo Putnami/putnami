@@ -50,9 +50,10 @@ var (
 
 // ValidateVerbs checks the verb vocabulary of one manifest: a non-empty list
 // of uniquely named, described verbs, whose aliases are unique and name no verb
-// or command of the manifest, whose traits use the side-effect vocabulary, and
-// whose related commands are command paths other than the verb itself. It is
-// inert for a manifest that declares no vocabulary.
+// or command of the manifest, whose traits use the side-effect vocabulary and
+// keep the side effects WellKnownVerbs gives a verb, and whose related commands
+// are command paths other than the verb itself. It is inert for a manifest that
+// declares no vocabulary.
 func ValidateVerbs(m *Manifest) []diag.Diagnostic {
 	if !m.DeclaresVerbs() {
 		return nil
@@ -103,8 +104,12 @@ func ValidateVerbs(m *Manifest) []diag.Diagnostic {
 			}
 		}
 		if verb.Traits != nil {
-			switch verb.Traits.SideEffects {
+			switch wellKnown := WellKnownVerbs[verb.Name].Traits.SideEffects; verb.Traits.SideEffects {
 			case SideEffectsNone, SideEffectsRegistry, SideEffectsCloud:
+				if wellKnown != SideEffectsNone && verb.Traits.SideEffects != wellKnown {
+					diags = append(diags, diag.Errorf("invalid-verb-traits", field+".traits.sideEffects",
+						"verb %q must keep the side effects %q the core gives it", verb.Name, wellKnown))
+				}
 			default:
 				diags = append(diags, diag.Errorf("invalid-enum", field+".traits.sideEffects",
 					"sideEffects %q must be %q or %q", verb.Traits.SideEffects, SideEffectsRegistry, SideEffectsCloud))

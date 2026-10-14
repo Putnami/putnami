@@ -95,6 +95,26 @@ func TestVerbs_AnAliasNamesNoCommandOrGroupOfTheManifest(t *testing.T) {
 	}
 }
 
+// While the well-known verb table gives a verb side effects, a vocabulary's
+// default traits for that verb keep them: no vocabulary makes publish or
+// deploy look harmless.
+func TestVerbs_DefaultTraitsKeepAWellKnownVerbsSideEffects(t *testing.T) {
+	t.Parallel()
+	m := &Manifest{Verbs: []VerbDefinition{
+		{Name: "publish", Description: "Publish.", Traits: &CommandTraits{InjectPublishChannels: true}},
+		{Name: "deploy", Description: "Deploy.", Traits: &CommandTraits{SideEffects: SideEffectsRegistry}},
+		{Name: "release", Description: "Release.", Traits: &CommandTraits{}},
+		{Name: "package", Description: "Package.", Traits: &CommandTraits{SideEffects: SideEffectsCloud}},
+	}}
+	diags := ValidateVerbs(m)
+	if got, want := diagCodes(diags), []string{"invalid-verb-traits", "invalid-verb-traits"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("codes = %v, want %v (%v)", got, want, diags)
+	}
+	if !strings.Contains(diags[0].String(), `"registry"`) || !strings.Contains(diags[1].String(), `"cloud"`) {
+		t.Fatalf("diagnostics = %v, want the side effects each verb keeps", diags)
+	}
+}
+
 // An empty vocabulary names nothing: it fails, and it does not stand in for a
 // contribution in a manifest that otherwise declares nothing.
 func TestVerbs_AnEmptyVocabularyIsRejected(t *testing.T) {

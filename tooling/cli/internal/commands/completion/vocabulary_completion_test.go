@@ -53,4 +53,10 @@ func TestGatherCompletionContext_OffersTheLoadedVocabulary(t *testing.T) {
 	if got := ctx.commandDesc["t"]; got != "Alias for test" {
 		t.Errorf("alias t = %q, want the built-in alias the vocabulary leaves free", got)
 	}
+
+	// A workspace alias of the same name hides a vocabulary alias.
+	hidden := gatherCompletionContext(writeVocabularyCompletionWorkspace(t), &wsproto.Config{Aliases: map[string]string{"x": "lint"}})
+	if got := hidden.commandDesc["x"]; got == "Alias for bundle" {
+		t.Error("alias x is offered as the vocabulary's, but the workspace alias hides it")
+	}
 }

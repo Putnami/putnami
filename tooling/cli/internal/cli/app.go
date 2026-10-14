@@ -193,10 +193,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// stay fast.
 	extensions, extensionGroups := discoverDispatchExtensions(ctx, args, wsRoot, cfg, providerMode)
 
-	aliases := commandAliases{user: aliasesForProcessMode(cfg, providerMode)}
-	if !providerMode {
-		aliases.vocabulary = commandVocabulary(extensions).AliasMap()
-	}
+	aliases, aliasWarnings := processAliases(cfg, providerMode, extensions)
 	parsed := parseArgs(args, aliases, extensionGroups)
 	if providerMode && !extensionGroups[parsed.Commands[0]] {
 		iox.Fprintf(os.Stderr, "putnami: internal release-set provider command group is unavailable\n")
@@ -254,7 +251,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		printHelp(newHelpScope(wsRoot, cfg))
 		return ExitSuccess
 	}
-	printParseWarnings(os.Stderr, parsed.Global, parsed.Warnings)
+	printParseWarnings(os.Stderr, parsed.Global, append(aliasWarnings, parsed.Warnings...))
 
 	// PUTNAMI_MACHINE_OUTPUT=v1 no longer selects anything: an earlier change deleted
 	// the v1 emitters, so a run still carrying the canary's rollback lever
@@ -594,13 +591,22 @@ func ensureArtifactsForProcessMode(
 	_ = lifecycle.EnsureArtifacts(ctx, wsRoot, cfg)
 }
 
-func aliasesForProcessMode(cfg *wsproto.Config, providerMode bool) map[string]string {
+// processAliases returns the alias tables this process resolves a command name
+// through, and a warning for each vocabulary alias a workspace alias hides.
+func processAliases(
+	cfg *wsproto.Config,
+	providerMode bool,
+	extensions []*extension.ExtensionDescription,
+) (commandAliases, []string) {
 	if providerMode {
-		// The coordinator owns the exact protocol argv. Repository aliases must
-		// not redirect `cloud` to another structured group or flat command.
-		return nil
+		// The coordinator owns the exact protocol argv. Neither repository
+		// aliases nor an extension's vocabulary aliases may redirect `cloud` to
+		// another structured group or flat command.
+		return commandAliases{}, nil
 	}
-	return cfg.Aliases
+	user := workspaceAliases(cfg)
+	vocabulary := commandVocabulary(extensions, user).AliasMap()
+	return commandAliases{vocabulary: vocabulary, user: user}, hiddenAliasWarnings(extensions, user)
 }
 
 // shouldDiscoverExtensions reports whether App.Run should pre-load extensions

@@ -95,7 +95,10 @@ func cmdImpactPlan(env *CommandEnv) error {
 	if env.Global.Baseline != "" || env.Global.Impacted || env.Global.Projects != "" || env.Global.All {
 		return usageErrorf("impact-plan owns impact selection; use --base instead of --baseline, --impacted, --projects, or --all")
 	}
-	commands, err := impactPlanCommands(parsed.positionals[0], env.Cfg)
+	// The aliases of the loaded vocabulary resolve here as they do for
+	// `putnami <command>`.
+	scope, _ := discoverHelpScope(env.WsRoot, env.Cfg)
+	commands, err := impactPlanCommands(parsed.positionals[0], scope.commandAliases(workspaceAliases(env.Cfg)))
 	if err != nil {
 		return err
 	}
@@ -113,16 +116,12 @@ func cmdImpactPlan(env *CommandEnv) error {
 }
 
 // impactPlanCommands parses the command list of impact-plan the way the CLI
-// parses `putnami <command[,command...]>`: comma-separated, with built-in and
-// workspace aliases resolved, in order. A command named twice, and an alias
-// that expands to several commands, are usage errors: the plan names each
-// command once, by its own name.
-func impactPlanCommands(list string, cfg *wsproto.Config) ([]string, error) {
-	var aliases map[string]string
-	if cfg != nil {
-		aliases = cfg.Aliases
-	}
-	commands, err := resolveCommands(list, commandAliases{user: aliases})
+// parses `putnami <command[,command...]>`: comma-separated, with the
+// vocabulary, built-in and workspace aliases resolved, in order. A command
+// named twice, and an alias that expands to several commands, are usage
+// errors: the plan names each command once, by its own name.
+func impactPlanCommands(list string, aliases commandAliases) ([]string, error) {
+	commands, err := resolveCommands(list, aliases)
 	if err != nil {
 		return nil, err
 	}

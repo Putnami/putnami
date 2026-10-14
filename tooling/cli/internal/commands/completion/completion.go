@@ -118,8 +118,18 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config) completionConte
 
 		extensions, _ := extension.DiscoverExtensions(wsRoot, cfg, projectPaths)
 		// The loaded vocabulary describes its verbs ahead of the catalog and of
-		// the commands that serve them.
-		vocabulary = extension.MergeVocabulary(extensions, commandmeta.IsStructuredRoot)
+		// the commands that serve them. As in the CLI's own alias tables, a
+		// vocabulary alias never takes a catalog command, and a workspace alias
+		// of the same name hides it.
+		vocabulary = extension.MergeVocabulary(extensions, func(name string) bool {
+			if cfg != nil {
+				if _, mine := cfg.Aliases[name]; mine {
+					return true
+				}
+			}
+			_, catalog := commandmeta.Lookup(name)
+			return catalog
+		})
 		for _, verb := range vocabulary.Verbs {
 			addCompletionCommand(&ctx, verb.Name, "")
 			if verb.Description != "" {

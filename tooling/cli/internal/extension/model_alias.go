@@ -176,7 +176,8 @@ type VerbAlias = model.VerbAlias
 var MergeVocabulary = model.MergeVocabulary
 
 // ApplyVocabularyTraits gives every job whose manifest declared no traits the
-// default traits of its verb in the merged vocabulary.
+// default traits of its verb in the merged vocabulary, and returns the merge's
+// warnings.
 var ApplyVocabularyTraits = model.ApplyVocabularyTraits
 
 // --- Manifest loading and resolution ---

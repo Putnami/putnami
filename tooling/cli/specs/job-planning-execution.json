@@ -27,11 +27,11 @@
     },
     {
       "id": "extension-verb-vocabulary",
-      "text": "An extension manifest may declare a verb vocabulary: an ordered list of verbs, each with a description, aliases, default traits and related commands. The CLI merges the loaded vocabularies in extension-name order, and the first declaration of a verb wins. Help lists its verbs first and suggests their related commands, completion offers them, and their aliases resolve before the built-in and workspace aliases. An alias never shadows a verb, a command, a command group or a core root."
+      "text": "An extension manifest may declare a verb vocabulary: an ordered list of verbs, each with a description, aliases, default traits and related commands. The CLI merges the loaded vocabularies in extension-name order; the first declaration of a verb wins, and a second draws a warning. Help, completion and impact-plan read the result. Its aliases resolve before the built-in ones, a workspace alias of the same name hides one with a warning, and an alias never takes a verb, command, command group or core root."
     },
     {
       "id": "vocabulary-default-traits",
-      "text": "After discovery loads every extension, a job whose manifest declares no traits takes the default traits of its verb in the merged vocabulary. A verb without traits keeps the well-known defaults, and declared traits always win. A manifest that declares a vocabulary requires CLI contract 9 wherever it loads from, so an older CLI refuses it instead of planning those jobs with other traits."
+      "text": "After discovery loads every extension, a job whose manifest declares no traits takes the default traits of its verb in the merged vocabulary. A verb without traits keeps the well-known defaults, declared traits win, and a vocabulary never changes the side effects of a well-known verb. A manifest that declares a vocabulary requires CLI contract 9 wherever it loads from, and the packagers validate and stamp it, so an older CLI refuses it instead of planning those jobs with other traits."
     },
     {
       "id": "selection-before-plan",

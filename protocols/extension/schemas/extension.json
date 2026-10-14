@@ -1832,8 +1832,8 @@
         },
         "description": {
           "type": "string",
-          "minLength": 1,
-          "description": "One-line description shown by help and completion."
+          "pattern": "\\S",
+          "description": "One-line description shown by help and completion. It contains at least one character that is not whitespace."
         },
         "aliases": {
           "type": "array",

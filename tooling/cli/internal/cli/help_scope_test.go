@@ -128,14 +128,14 @@ func TestHelpScopeKeepsBuiltinsAndDropsUndeclaredJobs(t *testing.T) {
 func TestHelpScopeHidesNothingWhenAnExtensionDidNotLoad(t *testing.T) {
 	t.Parallel()
 	loaded := &extension.ExtensionDescription{Commands: map[string]string{"build": "Build"}}
-	if scope := helpScopeOf(&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{loaded}}); !scope.declares("build") || scope.declares("deploy") {
+	if scope := helpScopeOf(&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{loaded}}, nil); !scope.declares("build") || scope.declares("deploy") {
 		t.Fatalf("every extension loaded: scope = %v, want build only", scope)
 	}
 	result := &extension.DiscoveryResult{
 		Extensions: []*extension.ExtensionDescription{loaded},
 		Skipped:    []extension.SkippedExtension{{Ref: "@acme/deploy", Reason: errors.New("manifest unreadable")}},
 	}
-	if scope := helpScopeOf(result); !scope.declares("deploy") || !slices.Equal(jobNames(scope), jobNames(nil)) {
+	if scope := helpScopeOf(result, nil); !scope.declares("deploy") || !slices.Equal(jobNames(scope), jobNames(nil)) {
 		t.Fatalf("an extension did not load: scope = %v, want one that hides nothing", scope)
 	}
 }
@@ -156,7 +156,7 @@ func vocabularyDiscovery() *extension.DiscoveryResult {
 func TestHelpReadsTheLoadedVocabularyFirst(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "extension-verb-vocabulary", "help-lists-the-loaded-vocabulary-first")
-	scope := helpScopeOf(vocabularyDiscovery())
+	scope := helpScopeOf(vocabularyDiscovery(), nil)
 	if got, want := jobNames(scope), []string{"bundle", "build", "test"}; !slices.Equal(got, want) {
 		t.Errorf("job commands = %v, want the vocabulary's declared verbs, then the catalog's: %v", got, want)
 	}
@@ -189,7 +189,7 @@ func TestHelpKeepsTheVocabularyWhenAnExtensionDidNotLoad(t *testing.T) {
 	t.Parallel()
 	result := vocabularyDiscovery()
 	result.Skipped = []extension.SkippedExtension{{Ref: "@acme/deploy", Reason: errors.New("manifest unreadable")}}
-	scope := helpScopeOf(result)
+	scope := helpScopeOf(result, nil)
 	names := jobNames(scope)
 	if want := []string{"bundle", "build", "ship", "test"}; len(names) < len(want) || !slices.Equal(names[:len(want)], want) {
 		t.Fatalf("job commands = %v, want %v first", names, want)
@@ -213,7 +213,7 @@ func TestHelpWithoutAVocabularyIsUnchanged(t *testing.T) {
 	}
 	scope := helpScopeOf(&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{
 		{Name: "@acme/go", Commands: map[string]string{"build": "", "test": ""}},
-	}})
+	}}, nil)
 	if got, want := jobNames(scope), []string{"build", "test"}; !slices.Equal(got, want) {
 		t.Errorf("job commands = %v, want %v", got, want)
 	}

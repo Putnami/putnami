@@ -195,11 +195,14 @@ though they run nothing: each is exactly what an older reader would drop
 without a word, so an unstamped content or vocabulary manifest must not load
 as hook-only.
 
-The Go archive and npm packagers do not count a verb vocabulary as surface
-yet. They refuse to package a manifest that declares only a vocabulary,
-because its unstamped form does not load. Every packager, the SDK's
-`agentartifact.PackageExtension` included, stamps 9 on a manifest that
-declares a vocabulary beside a command, tool or agent content.
+The Go archive and npm packagers count a verb vocabulary as surface too. They
+validate a manifest that declares one strictly and stamp it 9, a
+vocabulary-only manifest included, and a defective vocabulary fails packaging
+unstamped, even beside a registry extension dependency. The SDK's
+`agentartifact.PackageExtension`, which the scaffold `package` command runs,
+stamps 9 on a content-only extension that declares a vocabulary beside its
+agent content. It still requires agent content, so it does not package a
+vocabulary-only extension.
 
 For the Go archive packager, registry `extensionDependencies` are contract
 surface too. A manifest that declares only hooks and such dependencies takes

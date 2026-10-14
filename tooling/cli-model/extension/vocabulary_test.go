@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	proto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func vocabularyExtension(name string, verbs ...VerbDefinition) *ExtensionDescription {
@@ -35,12 +36,65 @@ func TestMergeVocabulary_MergesInExtensionNameOrderAndTheFirstDeclarationWins(t 
 	}
 	// The losing declaration of build contributes nothing, and the first claim
 	// of an alias wins.
-	want := []VerbAlias{{Name: "t", Verb: "test"}, {Name: "c", Verb: "test"}, {Name: "b", Verb: "build"}}
+	want := []VerbAlias{
+		{Name: "t", Verb: "test", Extension: "@acme/alpha"},
+		{Name: "c", Verb: "test", Extension: "@acme/alpha"},
+		{Name: "b", Verb: "build", Extension: "@acme/alpha"},
+	}
 	if !reflect.DeepEqual(got.Aliases, want) {
 		t.Fatalf("aliases = %v, want %v", got.Aliases, want)
 	}
 	if aliases := got.AliasMap(); aliases["c"] != "test" || len(aliases) != 3 {
 		t.Fatalf("alias map = %v", aliases)
+	}
+}
+
+func TestMergeVocabulary_WarnsWhenTwoVocabulariesDeclareOneVerb(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "extension-verb-vocabulary", "two-vocabularies-declaring-one-verb-warn")
+	registry := proto.CommandTraits{InjectPublishChannels: true, SideEffects: proto.SideEffectsRegistry}
+	zeta := vocabularyExtension("@acme/zeta", VerbDefinition{Name: "publish", Description: "Zeta publish.", Traits: &registry})
+	alpha := vocabularyExtension("@acme/alpha",
+		VerbDefinition{Name: "publish", Description: "Alpha publish."},
+		VerbDefinition{Name: "publish", Description: "Repeated in one vocabulary."},
+	)
+	got := MergeVocabulary([]*ExtensionDescription{zeta, alpha}, nil)
+	want := []string{`the vocabularies of @acme/alpha and @acme/zeta both declare the verb "publish"; the declaration of @acme/alpha applies`}
+	if !reflect.DeepEqual(got.Warnings, want) {
+		t.Fatalf("warnings = %q, want %q", got.Warnings, want)
+	}
+	if publish, _ := got.Verb("publish"); publish.Description != "Alpha publish." {
+		t.Fatalf("publish = %q, want the first declaration, by extension name", publish.Description)
+	}
+}
+
+func TestMergeVocabulary_AVocabularyNeverChangesTheSideEffectsOfAWellKnownVerb(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "a-vocabulary-never-changes-a-well-known-verbs-side-effects")
+	manifest := &Manifest{Name: "@acme/go", Commands: map[string]CommandDefinition{"deploy": {}, "publish": {}, "package": {}}}
+	jobs := Resolve(manifest, "/ext")
+	harmless := proto.CommandTraits{InjectPublishChannels: true}
+	cloud := proto.CommandTraits{SideEffects: proto.SideEffectsCloud}
+	dev := vocabularyExtension("@acme/dev",
+		VerbDefinition{Name: "publish", Description: "Publish.", Traits: &harmless},
+		VerbDefinition{Name: "deploy", Description: "Deploy.", Traits: &cloud},
+		VerbDefinition{Name: "package", Description: "Package.", Traits: &cloud},
+	)
+	warnings := ApplyVocabularyTraits([]*ExtensionDescription{jobs, dev})
+
+	cases := map[string]CommandTraits{
+		"publish": proto.WellKnownVerbs["publish"].Traits, // the lowered traits are ignored
+		"deploy":  cloud,                                  // the same side effects apply
+		"package": cloud,                                  // package has no side effects to keep
+	}
+	for name, want := range cases {
+		if got := jobs.Jobs[name].Traits; got != want {
+			t.Errorf("%s traits = %+v, want %+v", name, got, want)
+		}
+	}
+	want := []string{`the vocabulary of @acme/dev gives the verb "publish" the side effects "" instead of "registry"; its default traits are ignored`}
+	if !reflect.DeepEqual(warnings, want) {
+		t.Fatalf("warnings = %q, want %q", warnings, want)
 	}
 }
 
@@ -56,7 +110,7 @@ func TestMergeVocabulary_AnAliasNeverShadowsAVerbCommandGroupOrReservedName(t *t
 		CommandGroups: map[string]CommandGroupDefinition{"cloud": {}},
 	}
 	got := MergeVocabulary([]*ExtensionDescription{vocabulary, other}, func(name string) bool { return name == "help" })
-	if want := []VerbAlias{{Name: "b", Verb: "build"}}; !reflect.DeepEqual(got.Aliases, want) {
+	if want := []VerbAlias{{Name: "b", Verb: "build", Extension: "@acme/dev"}}; !reflect.DeepEqual(got.Aliases, want) {
 		t.Fatalf("aliases = %v, want %v", got.Aliases, want)
 	}
 }
