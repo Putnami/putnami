@@ -3,7 +3,8 @@
 - **Status**: accepted, amended by decision D-013 in the root
   `decisions.json`: `putnami migrate agent-content` is deleted, so the
   refusals in §2 name no command. They say which entry to replace or which
-  ownership record and lock pin to delete.
+  ownership record to delete, and `putnami install` drops every pin under
+  `agentArtifacts`.
 - **Scope**: `@putnami/cli` (`internal/commands/agentctx`, `internal/extension`,
   `internal/commands/lifecycle`), the `agentArtifacts` workspace declaration,
   the built-in starters

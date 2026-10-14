@@ -1536,6 +1536,20 @@
           }
         },
         {
+          "id": "legacy-pins-dropped",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-explicit-install-drops-every-pin",
+              "a-hosted-install-that-would-drop-a-pin-fails"
+            ]
+          }
+        },
+        {
           "id": "starter-opts-into-contributor",
           "stage": "coded",
           "evidenceKinds": [

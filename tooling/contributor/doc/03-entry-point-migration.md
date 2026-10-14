@@ -56,13 +56,13 @@ A workspace that still declares `@putnami/agent-workflows` or
 nothing written. The CLI no longer installs separately declared artifacts,
 both projects are deleted, and no command moves them. To switch:
 
-1. Declare `@putnami/contributor` in `extensions`, replace the two
-   `agentArtifacts` entries with `extension:@putnami/contributor`, and delete
-   their pins under `agentArtifacts` in `putnami.lock.json`.
+1. Declare `@putnami/contributor` in `extensions`, and replace the two
+   `agentArtifacts` entries with `extension:@putnami/contributor`.
 2. Delete this clone's ownership records of the two artifacts. The refusal
-   names each one, and any pin left in the lock.
-3. Run `putnami install`. A file that differs from the content is a
-   collision that writes nothing: move or delete it, then rerun.
+   names each one.
+3. Run `putnami install`. It drops the two artifacts' pins from
+   `putnami.lock.json`. A file that differs from the content is a collision
+   that writes nothing: move or delete it, then rerun.
 4. Commit `putnami.workspace.json`, `putnami.lock.json` and the host files.
 
 A clone that already materialized the old artifacts keeps their ownership

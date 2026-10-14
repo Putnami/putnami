@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/versioncmd"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -288,6 +289,9 @@ func Install(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []str
 	// here because the installers can write the declaration a pin derives from.
 	if !shared.IsImplicitInstall(ctx) {
 		display.phase("lock metadata")
+		if err := dropAgentArtifactPins(wsRoot, recordAction); err != nil {
+			return err
+		}
 		changed, err := refreshLockMetadataGuarded(ctx, wsRoot, env.CLIVersion, out, display, trackedBefore)
 		if err != nil {
 			return err
@@ -410,6 +414,32 @@ func installRewriteSnapshot(ctx context.Context, wsRoot string) map[string]strin
 	}
 	before, _ := git.TrackedDirtyDigests(wsRoot)
 	return before
+}
+
+// dropAgentArtifactPins is the explicit install's step that drops every
+// agentArtifacts lock pin: an earlier release pinned agent artifacts there,
+// and no declaration can use such a pin now. A hosted install writes no lock
+// (ADR 0055), so it fails when the committed lock still holds one, as it does
+// for an extension the lock does not pin (extensions.refuseHostedLockChange).
+// The implicit bootstrap restores the committed lock and never runs it.
+func dropAgentArtifactPins(wsRoot string, record func(LifecycleAction)) error {
+	if !installWritesWorkspace() {
+		pins, err := agentctx.AgentArtifactPins(wsRoot)
+		if err != nil || len(pins) == 0 {
+			return err
+		}
+		return fmt.Errorf("%s: the committed %s pins agent artifacts no declaration can use: %s; a hosted run writes no lock, so run `putnami install` without %s and commit the lock",
+			runcredential.Flag, lockfile.LockFilename, strings.Join(pins, ", "), runcredential.Flag)
+	}
+	dropped, err := agentctx.DropAgentArtifactPins(wsRoot)
+	if err != nil {
+		return err
+	}
+	if len(dropped) > 0 {
+		record(LifecycleAction{Kind: "lock", Name: lockfile.LockFilename,
+			Description: "Agent artifact pins no declaration uses dropped: " + strings.Join(dropped, ", ")})
+	}
+	return nil
 }
 
 // refreshLockMetadataGuarded is the last phase of an explicit install: the

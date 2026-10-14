@@ -23,10 +23,12 @@ import (
 	sdkagentartifact "go.putnami.dev/sdk/extension/agentartifact"
 	"go.putnami.dev/tooling/cli/internal/agentartifacts"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
 // The agent-content lifecycle acceptance matrix. Every case below runs the
@@ -528,6 +530,72 @@ func TestAgentWorkflows_UpgradeRetiresARecordNothingDeclares(t *testing.T) {
 	if err != nil || applies {
 		t.Fatalf("phase applies after retirement = %v, %v", applies, err)
 	}
+}
+
+// No declaration can use a pin under agentArtifacts: an opt-in follows its
+// extension's own pin. An explicit install drops every one and leaves the
+// records and files alone, which upgrade retires. The implicit bootstrap
+// restores the committed lock as it is, and a hosted install, which writes no
+// lock, fails and names the pins instead of dropping them.
+func TestInstall_DropsEveryAgentArtifactPin(t *testing.T) {
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "legacy-pins-dropped", "an-explicit-install-drops-every-pin")
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "legacy-pins-dropped", "a-hosted-install-that-would-drop-a-pin-fails")
+	hometest.Temp(t)
+	seeded := func(t *testing.T) string {
+		t.Helper()
+		root := agentWorkspaceDeclaring(t)
+		seedLegacyArtifact(t, root, testAgentArtifact, "1.4.2", map[string]string{".agents/skills/fix/SKILL.md": "# fix\n"}, true)
+		seedLegacyArtifact(t, root, secondAgentArtifact, "1.0.0", map[string]string{".agents/skills/acme-change/SKILL.md": "# acme-change\n"}, true)
+		return root
+	}
+	install := func(ctx context.Context, root string) error {
+		var out strings.Builder
+		_, err := captureStdout(t, func() error {
+			return Install(ctx, root, wsproto.Load(root), nil, installTestEnv(&out, WorkspaceJobOK))
+		})
+		return err
+	}
+
+	t.Run("explicit", func(t *testing.T) {
+		root := seeded(t)
+		if err := install(context.Background(), root); err != nil {
+			t.Fatalf("Install: %v", err)
+		}
+		assertNoAgentArtifactPins(t, root)
+		for _, name := range []string{testAgentArtifact, secondAgentArtifact} {
+			if state, err := agentartifacts.LoadState(root, name); err != nil || state == nil {
+				t.Fatalf("ownership record of %s = %+v, %v; install retires nothing", name, state, err)
+			}
+		}
+		if got := readWorkspaceFile(t, root, ".agents/skills/fix/SKILL.md"); got != "# fix\n" {
+			t.Fatalf("install touched a recorded file: %q", got)
+		}
+	})
+
+	t.Run("implicit", func(t *testing.T) {
+		root := seeded(t)
+		before := readLock(t, root)
+		if err := install(shared.WithImplicitInstall(context.Background()), root); err != nil {
+			t.Fatalf("implicit Install: %v", err)
+		}
+		if after := readLock(t, root); string(after) != string(before) {
+			t.Fatalf("the implicit bootstrap changed the committed lock:\n%s\nto\n%s", before, after)
+		}
+	})
+
+	t.Run("hosted", func(t *testing.T) {
+		root := seeded(t)
+		before := readLock(t, root)
+		t.Cleanup(runcredential.SetForTest("run-bearer"))
+		err := install(context.Background(), root)
+		if err == nil || !strings.Contains(err.Error(), "a hosted run writes no lock") ||
+			!strings.Contains(err.Error(), secondAgentArtifact+", "+testAgentArtifact) {
+			t.Fatalf("hosted Install = %v, want it refused, naming both pins", err)
+		}
+		if after := readLock(t, root); string(after) != string(before) {
+			t.Fatalf("a hosted install changed the committed lock:\n%s\nto\n%s", before, after)
+		}
+	})
 }
 
 // An unparseable workspace config answers as an empty one. Retirement must not
@@ -1562,10 +1630,10 @@ func newSupersededFixture(t *testing.T) (string, map[string][]byte) {
 // No ordinary command installs anything while a clone still declares or
 // records an artifact the content supersedes: the legacy declarations, and
 // the clone's legacy records once the declarations are gone, are refused with
-// nothing written. Deleting the records and pins the refusal names hands the
-// files to the content: a file with the content's bytes is kept untouched, one
-// with other bytes is a collision the user resolves, and one the content does
-// not ship stays unmanaged.
+// nothing written. Deleting the records the refusal names hands the files to
+// the content: a file with the content's bytes is kept untouched, one with
+// other bytes is a collision the user resolves, and one the content does not
+// ship stays unmanaged. The install that succeeds drops the lock pins.
 func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "superseded-owners-refused", "a-clone-that-still-records-a-superseded-artifact-is-refused")
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "superseded-owners-refused", "deleting-the-record-hands-the-files-to-the-content")
@@ -1574,9 +1642,8 @@ func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 
 	_, err := runInstall(t, root)
 	if err == nil || !strings.Contains(err.Error(), "no longer installs") ||
-		!strings.Contains(err.Error(), "replace each entry with "+contentExtensionOptIn+", declare that extension in extensions, "+
-			"delete the entries' pins under agentArtifacts in putnami.lock.json, then run `putnami install`") {
-		t.Fatalf("install error = %v, want the legacy declarations refused and the declared successor named", err)
+		!strings.HasSuffix(err.Error(), "entry: replace each entry with "+contentExtensionOptIn+", then run `putnami install`") {
+		t.Fatalf("install error = %v, want the legacy declarations refused, the declared successor named and not declared again", err)
 	}
 	if next := protocolcli.SuggestedNext(err); next != "" {
 		t.Fatalf("next step = %q, want none", next)
@@ -1597,8 +1664,7 @@ func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 	assertUnchangedWorkspace(t, surface, snapshotAgentSurface(t, root))
 
 	// Withdrawing the legacy declarations still leaves this clone's records
-	// claiming the files, and that is refused too, naming each record and each
-	// lock pin, because no command removes a pin once its record is gone.
+	// claiming the files, and that is refused too, naming each record.
 	writeContentWorkspaceConfig(t, root, []string{contentExtensionName}, []string{contentExtensionOptIn})
 	_, installErr := runInstall(t, root)
 	upgradeErr := agentctx.AdoptAgentWorkflows(context.Background(), root, wsproto.Load(root), nil)
@@ -1610,10 +1676,9 @@ func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 		}
 		records = append(records, filepath.ToSlash(rel))
 	}
-	want := "delete " + strings.Join(records, ", ") + " and the pins of " + testAgentArtifact + ", " + supersededMaintainer +
-		" under agentArtifacts in " + lockfile.LockFilename + ", then rerun"
+	want := "delete " + strings.Join(records, ", ") + ", then rerun"
 	for name, err := range map[string]error{"install": installErr, "upgrade": upgradeErr} {
-		if err == nil || !strings.Contains(err.Error(), "still records") || !strings.Contains(err.Error(), want) {
+		if err == nil || !strings.Contains(err.Error(), "still records") || !strings.HasSuffix(err.Error(), want) {
 			t.Fatalf("%s error = %v, want %q", name, err, want)
 		}
 		if next := protocolcli.SuggestedNext(err); next != "" {
@@ -1622,20 +1687,12 @@ func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 	}
 	assertUnchangedWorkspace(t, surface, snapshotAgentSurface(t, root))
 
-	// The user deletes what the refusal names: the records and the pins.
+	// The user deletes what the refusal names: the records. The lock is not
+	// edited by hand.
 	for _, record := range records {
 		if err := os.Remove(filepath.Join(root, filepath.FromSlash(record))); err != nil {
 			t.Fatal(err)
 		}
-	}
-	lock, err := lockfile.ReadLockFile(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	lock.RemoveAgentArtifact(testAgentArtifact)
-	lock.RemoveAgentArtifact(supersededMaintainer)
-	if err := lockfile.WriteLockFile(root, lock); err != nil {
-		t.Fatal(err)
 	}
 
 	// A file whose bytes differ from the content is then a collision that
@@ -1647,8 +1704,8 @@ func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 	assertUnchangedWorkspace(t, surface, snapshotAgentSurface(t, root))
 
 	// Once the user resolves those files, the content installs. The file that
-	// already had the content's bytes is kept as it is, not written again: same
-	// inode, same modification time.
+	// already had the content's bytes is kept as it is, not written again: its
+	// modification time does not move.
 	for _, path := range []string{supersededChangedCore, supersededChangedMaintainer} {
 		if err := os.Remove(filepath.Join(root, filepath.FromSlash(path))); err != nil {
 			t.Fatal(err)
@@ -1659,10 +1716,6 @@ func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 	if err := os.Chtimes(unchanged, past, past); err != nil {
 		t.Fatal(err)
 	}
-	before, err := os.Stat(unchanged)
-	if err != nil {
-		t.Fatal(err)
-	}
 	if out, err := runInstall(t, root); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
@@ -1670,8 +1723,8 @@ func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !os.SameFile(before, after) || !after.ModTime().Equal(past) {
-		t.Fatalf("%s was written again (same file %v, modified %s)", supersededUnchanged, os.SameFile(before, after), after.ModTime())
+	if !after.ModTime().Equal(past) {
+		t.Fatalf("%s was written again (modified %s)", supersededUnchanged, after.ModTime())
 	}
 	for path, want := range content {
 		if got := readAgentFile(t, root, path); got != string(want) {
@@ -1684,7 +1737,7 @@ func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 	}
 
 	// A file only the old artifacts installed stays on disk, and no record
-	// manages it. The lock pins nothing under agentArtifacts.
+	// manages it. The install dropped every pin under agentArtifacts.
 	for path, want := range map[string]string{supersededOnlyCore: "# legacy-check\n", supersededOnlyMaintainer: "# legacy-release\n"} {
 		if got := readAgentFile(t, root, path); got != want {
 			t.Fatalf("%s = %q, want the old artifact's bytes kept", path, got)

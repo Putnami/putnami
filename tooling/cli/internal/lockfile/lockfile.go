@@ -134,7 +134,7 @@ type LockFile struct {
 	Templates map[string]LockEntry `json:"templates"`
 	// AgentArtifacts maps legacy agent-workflow artifact names to the exact,
 	// platform-independent v4 pins earlier releases installed. Nothing adds
-	// one: `putnami upgrade` removes the pin of an artifact it retires.
+	// one, and `putnami install` drops every one.
 	AgentArtifacts map[string]AgentArtifactLockEntry `json:"agentArtifacts,omitempty"`
 }
 

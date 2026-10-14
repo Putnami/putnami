@@ -286,17 +286,20 @@ installed, and the compatibility window for them has ended:
 
 - **A workspace that still declares them** fails every agent-content command
   (`install`, `upgrade`, `context generate`, the first-run and session-start
-  passes) with nothing written. The error gives every step: replace the
-  entries with one `extension:<name>` entry for the extension whose content
-  supersedes them (named when it is known), declare that extension, delete
-  the entries' pins under `agentArtifacts` in `putnami.lock.json`, and run
+  passes) with nothing written. The error gives the steps that apply:
+  replace the entries with one `extension:<name>` entry for the extension
+  whose content supersedes them (named when it is known), or delete them when
+  that entry exists, declare that extension when it is not declared, and run
   `putnami install`. A workspace that cannot do that yet stays on a CLI
   release before this one, which installs its pins exactly as before.
 - **A clone that still records them** refuses the opt-in with nothing
-  written, and the error names each ownership record and each remaining lock
-  pin to delete. With those deleted, `install` keeps every file that already
-  has the content's bytes and reports every other one as a collision. No
-  command removes such a pin once its record is gone.
+  written, and the error names each ownership record to delete. With those
+  deleted, `install` keeps every file that already has the content's bytes
+  and reports every other one as a collision.
+- **Their lock pins** are dropped by `putnami install`, because no
+  declaration uses one. A hosted install writes no lock, so it fails and
+  names them; run `putnami install` without the run credential and commit
+  the lock.
 - **No command moves them.** `putnami migrate agent-content` is deleted, with
   no transition window (decision D-013); its rollback is gone with it.
 - **Older CLIs** fail on an updated workspace instead of skipping its
@@ -324,6 +327,7 @@ See [ADR 0047](adr/0047-extension-owned-agent-content.md) and
 | Support catalog exact-version rejection | `protocols/support/support_test.go` |
 | Command-surface read window | `protocols/cli/command_surface_test.go` (`TestAReaderReadsEveryVersionUpToItsOwn`), `tooling/cli/internal/lockfile/prior_release_test.go` |
 | Superseded artifacts are refused with nothing written until replaced | `tooling/cli/internal/commands/lifecycle/agent_workflows_lifecycle_test.go` (`TestAgentWorkflows_LegacyStateIsRefusedWithNothingWritten`, `TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted`) |
+| `install` drops their lock pins, and a hosted install refuses to | `tooling/cli/internal/commands/lifecycle/agent_workflows_lifecycle_test.go` (`TestInstall_DropsEveryAgentArtifactPin`) |
 | A CLI that predates the `extension:` opt-in fails closed on an updated workspace | `protocols/workspace/agent_content_opt_in_test.go` (`TestAgentContentOptIn_OlderReaderFailsClosed`) |
 
 The lock fixtures are **recovered bytes**, not regenerated ones: each is a

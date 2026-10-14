@@ -8,6 +8,7 @@
     "cli/agent-workflow-lifecycle#extension-agent-content-integrity",
     "cli/agent-workflow-lifecycle#idempotent",
     "cli/agent-workflow-lifecycle#legacy-declarations-refused",
+    "cli/agent-workflow-lifecycle#legacy-pins-dropped",
     "cli/agent-workflow-lifecycle#no-secret-leak",
     "cli/agent-workflow-lifecycle#npm-extension-agent-content",
     "cli/agent-workflow-lifecycle#optin",

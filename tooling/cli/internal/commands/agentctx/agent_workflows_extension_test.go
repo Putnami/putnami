@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	extproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/agentartifacts"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -59,10 +61,12 @@ func localContentConfig(rel, name string, entries ...string) *wsproto.Config {
 	}
 }
 
-// Every pass refuses a legacy entry with nothing written and gives every step
-// that replaces it, naming the extension that supersedes it when one is known:
-// a declared one whose content says so, else the first-party successor. There
-// is no command that moves it any more.
+// Every pass refuses a legacy entry with nothing written and gives the steps
+// that replace it in this workspace, naming the extension that supersedes it
+// when one is known: a declared one whose content says so, else the
+// first-party successor. An entry is deleted when that extension is already
+// opted into, and the extension is declared only when it is not yet. There is
+// no command that moves it any more, and no step edits the lock.
 func TestLegacyEntriesFailClearly(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "legacy-declarations-refused", "every-pass-refuses-a-legacy-entry")
 
@@ -84,9 +88,9 @@ func TestLegacyEntriesFailClearly(t *testing.T) {
 		}
 		for name, err := range passes {
 			if !errors.Is(err, protocolcli.ErrInvalidConfig) || !strings.Contains(err.Error(), `"/tools/workflows" in a form this CLI no longer installs`) ||
-				!strings.Contains(err.Error(), "replace each entry with extension:@local/contributor, declare that extension in extensions, "+
-					"delete the entries' pins under agentArtifacts in putnami.lock.json, then run `putnami install`") {
-				t.Fatalf("%s error = %v, want the legacy entry refused", name, err)
+				!strings.HasSuffix(err.Error(), "entry: delete each entry, since extension:@local/contributor already opts into the content that supersedes it, "+
+					"then run `putnami install`") {
+				t.Fatalf("%s error = %v, want the legacy entry refused with only the steps that apply", name, err)
 			}
 			if next := protocolcli.SuggestedNext(err); next != "" {
 				t.Fatalf("%s next step = %q, want none", name, next)
@@ -99,21 +103,62 @@ func TestLegacyEntriesFailClearly(t *testing.T) {
 		}
 	})
 
-	for entry, replacement := range map[string]string{
-		"@putnami/agent-workflows:stable": "extension:@putnami/contributor",
-		"@putnami/maintainer-workflows":   "extension:@putnami/contributor",
-		"/tooling/agent-workflows":        "extension:@putnami/contributor",
-		"@acme/workflows:1.2.x":           "extension:<name> for the extension whose agent content supersedes it",
-		"/tools/acme-workflows":           "extension:<name> for the extension whose agent content supersedes it",
+	const (
+		contributorSteps = "replace each entry with extension:@putnami/contributor, declare @putnami/contributor in extensions, then run `putnami install`"
+		unknownSteps     = "replace each entry with extension:<name> for the extension whose agent content supersedes it, " +
+			"declare that extension in extensions, then run `putnami install`"
+	)
+	for entry, steps := range map[string]string{
+		"@putnami/agent-workflows:stable": contributorSteps,
+		"@putnami/maintainer-workflows":   contributorSteps,
+		"/tooling/agent-workflows":        contributorSteps,
+		"@acme/workflows:1.2.x":           unknownSteps,
+		"/tools/acme-workflows":           unknownSteps,
 	} {
 		t.Run(entry, func(t *testing.T) {
 			cfg := &wsproto.Config{AgentArtifacts: []string{entry}}
 			_, err := DeclaredAgentArtifacts(t.TempDir(), cfg)
 			if !errors.Is(err, protocolcli.ErrInvalidConfig) || !strings.Contains(err.Error(), fmt.Sprintf("%q", entry)) ||
-				!strings.Contains(err.Error(), "replace each entry with "+replacement+", declare") {
-				t.Fatalf("error = %v, want %q refused and replaced with %s", err, entry, replacement)
+				!strings.HasSuffix(err.Error(), "entry: "+steps) {
+				t.Fatalf("error = %v, want %q refused with the steps %q", err, entry, steps)
 			}
 		})
+	}
+
+	// An in-tree entry is named by its project's putnami.json, so a directory
+	// named like a first-party artifact does not make it one; the directory
+	// name answers only when the project is gone.
+	for name, steps := range map[string]string{
+		"@acme/agent-workflows":    unknownSteps,
+		"@putnami/agent-workflows": contributorSteps,
+	} {
+		t.Run("/tools/agent-workflows holding "+name, func(t *testing.T) {
+			root := t.TempDir()
+			writePathFile(t, filepath.Join(root, "tools", "agent-workflows"), "putnami.json", fmt.Sprintf(`{"name":%q}`, name))
+			_, err := DeclaredAgentArtifacts(root, &wsproto.Config{AgentArtifacts: []string{"/tools/agent-workflows"}})
+			if !errors.Is(err, protocolcli.ErrInvalidConfig) || !strings.HasSuffix(err.Error(), "entry: "+steps) {
+				t.Fatalf("error = %v, want the steps %q", err, steps)
+			}
+		})
+	}
+}
+
+// The first-party successors the legacy refusal names are exactly what the
+// contributor extension's manifest supersedes, so the two cannot drift apart.
+func TestFirstPartySuccessorsMatchTheContributorManifest(t *testing.T) {
+	manifest, err := extproto.LoadManifest(filepath.Join(driftRepositoryRoot(t), "tooling", "contributor", "putnami.extension.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.AgentContent == nil {
+		t.Fatalf("%s ships no agent content", manifest.Name)
+	}
+	want := make(map[string]string, len(manifest.AgentContent.Supersedes))
+	for _, superseded := range manifest.AgentContent.Supersedes {
+		want[superseded] = manifest.Name
+	}
+	if !maps.Equal(firstPartyAgentContentSuccessors, want) {
+		t.Fatalf("first-party successors = %v, want %v from the contributor manifest", firstPartyAgentContentSuccessors, want)
 	}
 }
 

@@ -28,7 +28,7 @@
     },
     {
       "id": "legacy-declarations-refused",
-      "text": "An agentArtifacts entry in a form earlier releases installed, a registry artifact (`name` or `name:channel`) or an in-tree project path (`/path`), is never installed: every agent-content command refuses it with nothing written and gives every step that replaces it: an `extension:<name>` entry for the extension whose content supersedes it, named when a declared extension or a first-party successor is known, that extension declared, and the entry's lock pin deleted."
+      "text": "An agentArtifacts entry in a form earlier releases installed, a registry artifact (`name` or `name:channel`) or an in-tree project path (`/path`), is never installed: every agent-content command refuses it with nothing written and gives only the steps that apply: replace it with an `extension:<name>` entry for the extension whose content supersedes it, or delete it when that entry exists, and declare that extension when it is not. A declared extension or a first-party successor is named."
     },
     {
       "id": "record-last",
@@ -76,7 +76,11 @@
     },
     {
       "id": "superseded-owners-refused",
-      "text": "While a workspace opts into an extension's agent content, every agent-content command refuses it when this clone still records an artifact that content supersedes (agentContent.supersedes), writes nothing and names each ownership record and lock pin to delete. With those deleted, the next run keeps every file that already has the content's bytes and reports every other one as a collision."
+      "text": "While a workspace opts into an extension's agent content, every agent-content command refuses it when this clone still records an artifact that content supersedes (agentContent.supersedes), writes nothing and names each ownership record to delete. With those deleted, the next run keeps every file that already has the content's bytes and reports every other one as a collision."
+    },
+    {
+      "id": "legacy-pins-dropped",
+      "text": "No declaration uses a pin under agentArtifacts in putnami.lock.json: an `extension:<name>` entry follows its extension's own pin. An explicit putnami install drops every such pin and leaves the ownership records to upgrade. The implicit bootstrap keeps the committed lock as it is, and a hosted install that would drop a pin fails with the lock unchanged and asks for putnami install without the run credential."
     },
     {
       "id": "starter-opts-into-contributor",

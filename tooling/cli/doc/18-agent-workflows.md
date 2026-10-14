@@ -160,14 +160,13 @@ To replace them:
 
 1. In `putnami.workspace.json`, declare the extension in `extensions`, and
    replace the separately declared `agentArtifacts` entries with one
-   `extension:<name>` entry, such as `extension:@putnami/contributor`. Delete
-   their pins under `agentArtifacts` in `putnami.lock.json`. The refusal of
-   the old entries gives these steps and names the extension when a declared
-   extension's content or a first-party successor supersedes them.
+   `extension:<name>` entry, such as `extension:@putnami/contributor`. The
+   refusal of the old entries gives the steps that apply to your workspace,
+   and names the extension when a declared extension's content or a
+   first-party successor supersedes them.
 2. Delete the ownership record of each superseded artifact. The refusal names
    each one, for example
-   `.putnami/agent-artifacts/putnami-agent-workflows.json`, and any pin step 1
-   left in the lock. No command removes such a pin once its record is gone.
+   `.putnami/agent-artifacts/putnami-agent-workflows.json`.
 3. Install the extension and its content:
 
    ```bash
@@ -178,9 +177,11 @@ To replace them:
    bytes is a collision: the install writes nothing and names the file, so
    you move or delete it, then rerun. A file the old artifacts installed that
    the content does not ship stays where it is, and no command manages it.
+   The install also drops every pin under `agentArtifacts` in
+   `putnami.lock.json`: no declaration uses one.
 4. Commit `putnami.workspace.json`, `putnami.lock.json` and the host files.
-   Every other clone pulls the commit, which already drops the pins, deletes
-   the records its install refusal names, and runs `putnami install`.
+   Every other clone pulls the commit, deletes the records its install
+   refusal names, and runs `putnami install`.
 
 For in-tree artifacts (`/tools/workflows`), declare the local extension by
 path instead; nothing is pinned, and `putnami context generate` builds its
@@ -305,8 +306,9 @@ job. See
 | A file the content declares that no run installed | **preserved**; the run aborts before the first write and the error names the path |
 | A managed file you edited since it was installed | **preserved**; your edit and the previous record both survive |
 | A tampered content file or a digest that does not match the pin | refused before the workspace is read; nothing written |
-| A separately declared artifact (`name`, `name:channel`, `/path`) | refused by every command with nothing written, giving every step that replaces it with an `extension:<name>` entry and naming that extension when it is known |
-| An opt-in while this clone still records an artifact the content supersedes | refused with nothing written, naming each ownership record and lock pin to delete |
+| A separately declared artifact (`name`, `name:channel`, `/path`) | refused by every command with nothing written, giving the steps that replace it with an `extension:<name>` entry and naming that extension when it is known |
+| An opt-in while this clone still records an artifact the content supersedes | refused with nothing written, naming each ownership record to delete |
+| A pin under `agentArtifacts` in `putnami.lock.json` | dropped by `install`; a hosted install fails and names it instead |
 | An agent session starts in a worktree whose record names another release than the pin | the pinned content is copied from the installed extension before the first request; a collision is a warning, never a refused session |
 
 Errors name the owner and every conflicting path with its reason, and nothing

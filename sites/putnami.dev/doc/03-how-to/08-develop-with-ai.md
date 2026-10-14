@@ -131,10 +131,10 @@ unrecorded or locally modified file is preserved as a collision.
 A workspace that still declares workflows as a separate artifact, such as
 `@putnami/agent-workflows`, is refused by every command with nothing written.
 Replace that entry with `extension:@putnami/contributor`, declare the
-extension, delete the entry's pin under `agentArtifacts` in
-`putnami.lock.json` and the ownership records the refusal names, and run
-`./putnamiw install`. A file that differs from the content is a collision
-that writes nothing: move or delete it, then rerun.
+extension, delete the ownership records the refusal names, and run
+`./putnamiw install`, which also drops the entry's old lock pin. A file that
+differs from the content is a collision that writes nothing: move or delete
+it, then rerun.
 
 ## Reach the MCP server
 
