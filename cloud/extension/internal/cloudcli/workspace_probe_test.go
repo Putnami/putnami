@@ -138,10 +138,10 @@ func TestCloudWorkspaceProbeRoutesContentOnlyExtensionsToScaffold(t *testing.T) 
 		},
 		{
 			name: "content-only extension",
-			project: `{"name":"@putnami/contributor","extensions":["@putnami/scaffold"],
+			project: `{"name":"@acme/review-workflows","extensions":["@putnami/scaffold"],
 				"options":{"publish":{"archives":true},"agent-artifact":{"requiredSkills":["plan"]}}}`,
-			manifest:   `{"name":"@putnami/contributor","cliContract":5,"agentContent":{"path":"content"}}`,
-			coordinate: "putnami/contributor", owner: "@putnami/scaffold", step: "agent-content",
+			manifest:   `{"name":"@acme/review-workflows","cliContract":5,"agentContent":{"path":"content"}}`,
+			coordinate: "acme/review-workflows", owner: "@putnami/scaffold", step: "agent-content",
 		},
 		{
 			name:       "a null agentContent is no content",

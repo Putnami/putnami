@@ -1,7 +1,8 @@
 # ADR 0004 — One packager for every content project
 
 - **Status**: accepted
-- **Scope**: `@putnami/scaffold` (`tooling/scaffold`), `@putnami/contributor`
+- **Scope**: `@putnami/scaffold` (`tooling/scaffold`), and `@putnami/contributor`
+  until contributor ADR 0004
 
 ## Context
 

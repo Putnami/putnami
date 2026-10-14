@@ -38,6 +38,10 @@
         "environment": {
           "PUTNAMI_CONTRIBUTOR_GO": {
             "from": "executable"
+          },
+          "PUTNAMI_CONTRIBUTOR_GO_VERSION": {
+            "from": "literal",
+            "value": "go{version}"
           }
         }
       }

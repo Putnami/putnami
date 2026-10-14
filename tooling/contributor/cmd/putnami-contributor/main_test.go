@@ -37,8 +37,9 @@ func readManifest(t *testing.T) *extension.Manifest {
 
 // TestTheManifestDeclaresThisRuntime holds the shipped manifest to strict
 // validation and to this command. The runtime it declares is the executable
-// bin/prepare builds from this directory with the lock's Go toolchain, the
-// agent content stays declared, and the manifest claims the contract the
+// bin/prepare builds from this directory with the lock's Go toolchain, whose
+// path and pinned version the host passes to bin/prepare, the agent content
+// stays declared, and the manifest claims the contract the
 // packager stamps on it, with no extension dependency.
 func TestTheManifestDeclaresThisRuntime(t *testing.T) {
 	t.Parallel()
@@ -77,6 +78,9 @@ func TestTheManifestDeclaresThisRuntime(t *testing.T) {
 	}
 	if binding := compiler.Environment[lockedCompilerEnvironment]; binding.From != extension.RuntimeToolchainEnvironmentExecutable {
 		t.Errorf("runtimeCompiler publishes %s as %+v, want the resolved executable", lockedCompilerEnvironment, binding)
+	}
+	if binding := compiler.Environment[lockedVersionEnvironment]; binding.From != extension.RuntimeToolchainEnvironmentLiteral || binding.Value != compiler.Probe.Expect {
+		t.Errorf("runtimeCompiler publishes %s as %+v, want the literal %q the probe expects", lockedVersionEnvironment, binding, compiler.Probe.Expect)
 	}
 	if manifest.AgentContent == nil || manifest.AgentContent.Source != "src" || manifest.AgentContent.Path != "content" {
 		t.Errorf("agentContent %+v, want source src packaged at content", manifest.AgentContent)

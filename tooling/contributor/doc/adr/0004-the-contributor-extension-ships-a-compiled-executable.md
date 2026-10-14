@@ -14,9 +14,7 @@ in the core CLI (`putnami tree verify`, `putnami proposals finalize`,
 `putnami contributor language|machine-load`, `putnami sessions
 export|summary`). Decision D-011 in the root `decisions.json` settles that
 `@putnami/contributor` ships a compiled executable and owns those commands.
-The commands leave the core one family per pull request. This record fixes
-what the extension ships before the first one moves, and the choices every
-move follows.
+This record fixes what the extension ships before any of them moves.
 
 ## Decision
 
@@ -36,12 +34,15 @@ lowest contract that covers agent content, and names no extension dependency.
 
 For a path declaration, the host runs `bin/prepare`. Its `runtimeCompiler`
 toolchain resolves a Go compiler whose `go env GOVERSION` equals the Go
-version `putnami.lock.json` pins, and passes it as `PUTNAMI_CONTRIBUTOR_GO`.
-`bin/prepare` builds with that compiler only. It never falls back to a `go`
-on `PATH` or under `GOROOT`, and it fails naming `putnami install` when the
-host resolved none. It builds outside any Go workspace (`GOWORK=off`), with
-`GOTOOLCHAIN=local`, without cgo, a VCS stamp or host paths, and ignores an
-ambient target platform.
+version `putnami.lock.json` pins. The host passes that compiler as
+`PUTNAMI_CONTRIBUTOR_GO` and the pinned version, `go{version}`, as
+`PUTNAMI_CONTRIBUTOR_GO_VERSION`. `bin/prepare` builds with that compiler
+only. It never falls back to a `go` on `PATH` or under `GOROOT`, and it fails
+naming `putnami install` when the host resolved none. Before it builds, it
+asks the compiler for its `GOVERSION` in the build environment and fails when
+the answer differs from the pinned version. It builds outside any Go
+workspace (`GOWORK=off`), with `GOTOOLCHAIN=local`, without cgo, a VCS stamp
+or host paths, and ignores an ambient target platform.
 
 The host prepares a runtime the first time a command, tool or hook runs it.
 `putnami install` installs the agent content and builds no runtime that
@@ -59,24 +60,10 @@ The project does not name `@putnami/scaffold`. Both packagers own
 [scaffold ADR 0004](../../../scaffold/doc/adr/0004-one-packager-for-every-content-project.md)
 §2 leaves an extension that runs something to its language extension.
 
-### 4. Settled choices for the moved commands
-
-- A subcommand whose root stays in the core is respelled under the
-  extension's own `contributor` group: `tree verify` becomes
-  `putnami contributor verify`, `sessions export|summary` becomes
-  `putnami contributor sessions export|summary`, and `proposals finalize`
-  becomes `putnami contributor finalize`. `putnami contributor
-  language|machine-load` keep their spelling. The core keeps
-  `tree fingerprint` and `sessions list|inspect|replay`.
-- The extension reaches collaboration providers and the cached-report
-  verifier by running the host CLI that `PUTNAMI_CLI_EXECUTABLE` names, until
-  a typed RPC (remote procedure call) between the extension and the host
-  exists for them.
-
 ## Invariants
 
 - The extension's runtime is built only by the Go release the workspace lock
-  pins.
+  pins, and `bin/prepare` checks that version itself before it builds.
 - One packager, `@putnami/go`, owns the project's `<command-output>/archives`.
 - Adding the runtime changes no generated agent-content file.
 - The packaged manifest claims the contract the packager stamps for it: 5
@@ -90,15 +77,8 @@ The project does not name `@putnami/scaffold`. Both packagers own
 - **Keep `@putnami/scaffold` beside `@putnami/go`.** Two tasks would own the
   same archive directory, and the scaffold packager refuses an extension that
   runs something.
-- **Let an extension add a subcommand to a core root.** It needs a host
-  mechanism and changes discovery, parsing, help and completion for every
-  core root; respelling under the extension's own group needs none.
 
 ## Consequences
 
 - A hosted run that loads this path-declared extension's runtime builds it
   from source with the locked Go release.
-- Each command move is a breaking change of the core command surface and
-  ships as its own pull request.
-- Until the typed RPC exists, a moved command that reaches a provider spawns
-  one host CLI process per call.
