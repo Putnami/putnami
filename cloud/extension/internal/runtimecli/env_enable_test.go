@@ -830,6 +830,34 @@ func TestEnvEnableFailsWhenADegradedDefinitionReplaysAReplacedCommit(t *testing.
 	}
 }
 
+// TestEnvEnableFailsWhenTheDefinitionStaysDegraded keeps the run from
+// exiting 0 on a row it did not converge: --source-revision names the commit
+// Control already keeps, the replay writes nothing, and the row still differs
+// from the default-branch head.
+func TestEnvEnableFailsWhenTheDefinitionStaysDegraded(t *testing.T) {
+	latest := strings.Repeat("c", 40)
+	server := freshWorkspace()
+	server.beforeRows = map[string]string{"environment-definition": EnvDoctorDegraded}
+	server.afterRows = nil
+	server.acceptedRevision = 3
+	server.acceptedSources = map[string]int64{latest: 3}
+	srv := httptest.NewServer(server)
+	defer srv.Close()
+
+	_, err := runEnvEnable(t, doctorWorkspace(t), srv, map[string]any{"output": "json", "source-revision": latest})
+	if clicore.ExitCode(err) != clicore.ExitFailure {
+		t.Fatalf("exit = %d (%v), want failure", clicore.ExitCode(err), err)
+	}
+	envelope := &captureIO{}
+	clicore.WriteErrorResult(err, map[string]any{"output": "json"}, envelope.io(nil))
+	step := stepsByRow(decodeEnableResult(t, envelope.stdout))["environment-definition"][0]
+	if step.Status != EnvEnableFailed ||
+		step.Detail != "source revision "+latest+" (--source-revision) is already accepted as revision 3; the definition still differs from the default-branch head" ||
+		step.Fix != "run `putnami cloud env enable prod` without --source-revision to accept the default-branch head" {
+		t.Fatalf("step = %+v, want a failed step that names the default-branch head", step)
+	}
+}
+
 // TestEnvEnableDoesNotWriteADegradedBinding keeps the binding steps to the
 // state they converge: a degraded binding row is reported with its fix and
 // says why, not that it could not be checked.

@@ -182,7 +182,35 @@ func envEnable(params map[string]any, positional, workspaceRoot string, env map[
 	after := fetchEnvReadiness(reqCtx, wctx, environment, workloads, false)
 	result.Readiness = envDoctorMerge(wctx.WorkspaceID, environment, local, after.rows)
 	result.Readiness.Ready = result.Readiness.Ready && after.answered
+	result.Steps = run.failStillDegraded(result.Steps, result.Readiness.Rows)
 	return writeEnvEnable(params, ioctx, envEnableCount(result))
+}
+
+// failStillDegraded fails the definition step when the row still reads
+// degraded after it: the accepted commit does not match the default-branch
+// head, so running the same command again changes nothing.
+func (r envEnableRun) failStillDegraded(steps []EnvEnableStep, after []EnvDoctorRow) []EnvEnableStep {
+	degraded := false
+	for _, row := range after {
+		if row.ID == "environment-definition" {
+			degraded = row.Status == EnvDoctorDegraded
+		}
+	}
+	if !degraded {
+		return steps
+	}
+	fix := "push a new commit to the default branch, then run `putnami cloud env enable " + r.environment + "` again"
+	if r.sourceRevision != "" {
+		fix = "run `putnami cloud env enable " + r.environment + "` without --source-revision to accept the default-branch head"
+	}
+	for i, step := range steps {
+		if step.Row == "environment-definition" && step.Status != EnvEnableFailed {
+			steps[i].Status = EnvEnableFailed
+			steps[i].Detail += "; the definition still differs from the default-branch head"
+			steps[i].Fix = fix
+		}
+	}
+	return steps
 }
 
 // envEnableReadFailure is the one reason every server row carries when the
@@ -320,7 +348,8 @@ func (r envEnableRun) activateBinding(row EnvDoctorRow, protocol string) (EnvEna
 // replays its receipt and writes nothing, and any other commit appends the
 // next revision, even when its putnami.ci.json is unchanged. The step is
 // skipped on a replay and applied on an append. A replay of an older commit
-// names the latest revision, which stays the one that applies.
+// names the latest revision, which stays the one that applies; for a
+// degraded row that replay fails the step, because the row cannot converge.
 func (r envEnableRun) acceptDefinition(row EnvDoctorRow) (EnvEnableStep, bool) {
 	action := "accept the environment definition"
 	switch row.Status {
