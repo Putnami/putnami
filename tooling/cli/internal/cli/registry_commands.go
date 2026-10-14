@@ -1005,12 +1005,12 @@ func cmdHelp(env *CommandEnv) error {
 			return err
 		}
 		if isStructuredCommand(command) || nestedSub != "" {
-			PrintSubcommandHelp(command, nestedSub)
+			printSubcommandHelp(command, nestedSub, newHelpScope(env.WsRoot, env.Cfg, nil))
 		} else {
 			printJobCommandHelp(command, env.WsRoot, env.Cfg, nil)
 		}
 	} else {
-		PrintHelp()
+		printHelp(newHelpScope(env.WsRoot, env.Cfg, nil))
 	}
 	return nil
 }

@@ -60,6 +60,7 @@ complete -c putnami -n '__fish_use_subcommand' -a 's' -d 'Alias for serve'
 complete -c putnami -n '__fish_use_subcommand' -a 'serve' -d 'Run the project\'s dev server until interrupted.'
 complete -c putnami -n '__fish_use_subcommand' -a 't' -d 'Alias for test'
 complete -c putnami -n '__fish_use_subcommand' -a 'test' -d 'Run the project\'s tests, emitting test counts and coverage metrics.'
+complete -c putnami -n '__fish_use_subcommand' -a 'validate' -d 'Check the project against its declared specs, contracts and compatibility rules.'
 
 # Structured commands
 complete -c putnami -n '__fish_use_subcommand' -a 'cache' -d 'Manage cache'
@@ -103,6 +104,7 @@ complete -c putnami -n '__putnami_complete_children config' -a 'set'
 complete -c putnami -n '__putnami_complete_children config' -a 'show'
 complete -c putnami -n '__putnami_complete_children context' -a 'generate'
 complete -c putnami -n '__putnami_complete_children context' -a 'map'
+complete -c putnami -n '__putnami_complete_children context' -a 'pack'
 complete -c putnami -n '__putnami_complete_children contributor' -a 'language'
 complete -c putnami -n '__putnami_complete_children contributor' -a 'machine-load'
 complete -c putnami -n '__putnami_complete_children deps' -a 'add'
@@ -188,6 +190,8 @@ complete -c putnami -n '__putnami_seen_path compose' -l 'port' -d 'Proxy port of
 complete -c putnami -n '__putnami_seen_path compose' -l 'ready-timeout' -d 'Deadline for each member\'s typed ready event; default 60s' -r
 complete -c putnami -n '__putnami_seen_path context generate' -l 'force' -d 'Rewrite a guidance block that was edited or written by an older release'
 complete -c putnami -n '__putnami_seen_path context map' -l 'print' -d 'Render the map to stdout (md by default, or json) and write nothing'
+complete -c putnami -n '__putnami_seen_path context pack' -l 'check' -d 'Re-derive the documents, write nothing, and fail on drift'
+complete -c putnami -n '__putnami_seen_path context pack' -l 'project' -d 'Project ID, path, or name; default is every workspace project' -r
 complete -c putnami -n '__putnami_seen_path contributor language' -l 'diff' -d 'With files: inspect tracked files changed in a Git revision range' -r
 complete -c putnami -n '__putnami_seen_path contributor language' -l 'label' -d 'With text: label the input in findings' -r
 complete -c putnami -n '__putnami_seen_path contributor language' -l 'limit' -d 'With tasks: maximum number of task records to inspect' -r

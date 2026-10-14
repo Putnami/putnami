@@ -45,6 +45,50 @@
   ],
   "runtime": {
     "executable": "compiled/putnami-cloud",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
     "prepare": {
       "command": "{extensionRoot}/bin/prepare-runtime",
       "args": [
@@ -57,6 +101,9 @@
         "go.mod",
         "go.sum",
         "internal/**"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
       ]
     }
   },

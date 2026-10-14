@@ -48,6 +48,9 @@ Converge a cloud environment on the workload's aggregated infra manifest.
 .TP
 .B generate
 Run code generators.
+.TP
+.B validate
+Check the project against its declared specs, contracts and compatibility rules.
 .SH COMMON OPTIONS
 .TP
 .BR -v " , " --verbose
@@ -257,6 +260,9 @@ Regenerate AI context.
 .TP
 .B context map
 Build or print the workspace orientation map.
+.TP
+.B context pack
+Write or check each project's agent-context document.
 .SS Diagnostics
 .TP
 .B doctor
@@ -663,6 +669,18 @@ putnami context map [--print[=json|md]] [--projects <list>] [--impacted] [--outp
 .TP
 .B --print
 Render the map to stdout (md by default, or json) and write nothing.
+.SS context pack
+Write one deterministic agent-context document per project to <project>/.gen/agent-context.json: its identity and graph, composition roots, commands, config and contracts. --check re-derives every document, writes nothing, and fails when one drifted. The MCP agent_context tool builds the same document in memory and reports whether the file is fresh.
+.PP
+.B Usage:
+.br
+putnami context pack [--project <selector>] [--check] [--output <format>]
+.TP
+.B --project
+Project ID, path, or name; default is every workspace project.
+.TP
+.B --check
+Re-derive the documents, write nothing, and fail on drift.
 .SS doctor
 Run a read-only production-readiness preflight over the selected projects: derives production-safety findings (incomplete capabilities, missing required config, invalid committed schemas, config shadowing) from committed manifests and grades them by deployment profile. Under --profile production a high/critical finding fails with exit 2; dev/test stay advisory. Config values are never read or emitted.
 .PP

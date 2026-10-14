@@ -1,0 +1,44 @@
+// Package helpscope drives `putnami --help` through the real CLI in a fixture
+// workspace: help lists the job commands, aliases and provider flags of the
+// extensions the workspace loads. These tests swap the process streams and the
+// working directory, so they run in their own test binary.
+package helpscope
+
+import (
+	"os"
+	"strings"
+	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+)
+
+func TestMain(m *testing.M) {
+	os.Exit(clitest.Main(m))
+}
+
+func TestHelpListsWhatTheWorkspaceExtensionsProvide(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "workspace-scoped-help", "help-lists-what-the-workspace-extensions-provide")
+	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
+	for _, args := range [][]string{{"--help"}, {"help"}, {"help", "build"}} {
+		t.Run(strings.Join(args, " ")+" without a provider", func(t *testing.T) {
+			code, output := clitest.RunGateArgs(t, clitest.WhereFixture(t, false, false), args...)
+			if code != 0 {
+				t.Fatalf("exit %d:\n%s", code, output)
+			}
+			for _, hidden := range []string{"d=deploy", ", deploy", "putnami serve", "--where", "--cache-trust", "--providers", "--credential-fd"} {
+				if strings.Contains(output, hidden) {
+					t.Errorf("help lists %q, which the fixture's extension does not provide:\n%s", hidden, output)
+				}
+			}
+		})
+	}
+	code, output := clitest.RunGateArgs(t, clitest.WhereFixture(t, false, false), "--help")
+	if code != 0 || !strings.Contains(output, "build, test, lint, format, validate") {
+		t.Errorf("help must list the fixture's job commands (exit %d):\n%s", code, output)
+	}
+	code, output = clitest.RunGateArgs(t, clitest.WhereFixture(t, false, true), "--help")
+	if code != 0 || !strings.Contains(output, "--where") || !strings.Contains(output, "--credential-fd") {
+		t.Errorf("a runner provider gives --where and --credential-fd meaning (exit %d):\n%s", code, output)
+	}
+}

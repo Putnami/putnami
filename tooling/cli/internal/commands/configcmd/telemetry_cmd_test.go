@@ -134,6 +134,18 @@ func TestTelemetryShow_NoEvents(t *testing.T) {
 	}
 }
 
+func TestTelemetryShow_NoEventsJSONL(t *testing.T) {
+	telemetryHome(t)
+
+	out, err := sharedtest.CaptureStdout(t, func() error { return TelemetryShow("jsonl") })
+	if err != nil {
+		t.Fatalf("TelemetryShow: %v", err)
+	}
+	if strings.TrimSpace(out) != "[]" {
+		t.Errorf("output = %q, want an empty JSON array", out)
+	}
+}
+
 func TestTelemetryShow_TextFormat(t *testing.T) {
 	home := telemetryHome(t)
 	buffer := `{"name":"build","timestamp":"2026-01-01T00:00:00Z","data":{"duration":42}}` + "\n"
@@ -170,13 +182,13 @@ func TestTelemetryShow_JSONLFormat(t *testing.T) {
 		t.Fatalf("TelemetryShow: %v", err)
 	}
 	line := strings.TrimSpace(out)
-	var ev struct {
+	var events []struct {
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal([]byte(line), &ev); err != nil {
-		t.Fatalf("parse JSONL output %q: %v", line, err)
+	if err := json.Unmarshal([]byte(line), &events); err != nil {
+		t.Fatalf("parse JSON array output %q: %v", line, err)
 	}
-	if ev.Name != "test" {
-		t.Errorf("event name = %q, want test", ev.Name)
+	if len(events) != 1 || events[0].Name != "test" {
+		t.Errorf("events = %v, want the one test event", events)
 	}
 }

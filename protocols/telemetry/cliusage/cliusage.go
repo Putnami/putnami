@@ -92,6 +92,7 @@ var Commands = []string{
 	"publish",
 	"deploy",
 	"generate",
+	"validate",
 }
 
 var commandSet = stringSet(Commands...)

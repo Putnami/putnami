@@ -495,6 +495,19 @@
           }
         },
         {
+          "id": "workspace-scoped-help",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "help-lists-what-the-workspace-extensions-provide"
+            ]
+          }
+        },
+        {
           "id": "selection-before-plan",
           "stage": "coded",
           "evidenceKinds": [

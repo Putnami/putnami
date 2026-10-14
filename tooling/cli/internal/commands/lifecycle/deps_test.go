@@ -82,7 +82,7 @@ func TestResolveGoDepsProject_NonGoSelectorErrors(t *testing.T) {
 		&workspace.Project{Name: "web", Path: "web"}, // TS project, no go.mod
 	)
 	_, err := resolveGoDepsProject(root, ws, "web")
-	if err == nil || !strings.Contains(err.Error(), "not a Go module") {
+	if err == nil || !strings.Contains(err.Error(), "not a Go module") || !strings.Contains(err.Error(), "pyproject.toml") {
 		t.Fatalf("want a not-a-Go-module error, got %v", err)
 	}
 }

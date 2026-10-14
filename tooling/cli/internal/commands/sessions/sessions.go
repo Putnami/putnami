@@ -43,6 +43,10 @@ func SessionsListRevision(wsRoot string, outputFormat string, revision string) e
 		sessions = append(sessions, id)
 	}
 
+	if outputFormat == "jsonl" {
+		return sessionsListJSONL(store, sessions, store.LatestID(), identities)
+	}
+
 	if len(sessions) == 0 {
 		if revision != "" {
 			iox.Fprintf(os.Stdout, "  No recorded session judged revision %s.\n", revision)
@@ -53,10 +57,6 @@ func SessionsListRevision(wsRoot string, outputFormat string, revision string) e
 	}
 
 	latestID := store.LatestID()
-
-	if outputFormat == "jsonl" {
-		return sessionsListJSONL(store, sessions, latestID, identities)
-	}
 
 	iox.Fprintln(os.Stdout)
 	if revision != "" {

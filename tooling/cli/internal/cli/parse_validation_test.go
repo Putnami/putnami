@@ -95,12 +95,14 @@ func TestValidateStructuredFlags_RejectsRemovedPreOSSAliases(t *testing.T) {
 
 // TestValidateStructuredFlags_LeavesUnknownPathsAlone keeps the rejection
 // provable: when the catalog does not know the exact path, it cannot prove a
-// flag wrong, so it must not guess. `context pack` is a real, undocumented
-// subcommand that reads --check.
+// flag wrong, so it must not guess.
 func TestValidateStructuredFlags_LeavesUnknownPathsAlone(t *testing.T) {
 	t.Parallel()
-	if err := validateStructuredFlags("context", "pack", []string{"--check"}); err != nil {
+	if err := validateStructuredFlags("context", "uncataloged", []string{"--check"}); err != nil {
 		t.Errorf("an unknown catalog path must stay lenient: %v", err)
+	}
+	if err := validateStructuredFlags("context", "pack", []string{"--project", "web", "--check"}); err != nil {
+		t.Errorf("context pack declares --project and --check: %v", err)
 	}
 	if err := validateStructuredFlags("cloud", "deploy", []string{"--env", "prod"}); err != nil {
 		t.Errorf("an extension group is not a built-in path: %v", err)

@@ -4,7 +4,7 @@ Usage:
   putnami <command[,command...]> [options]
 
 Build (from extensions):
-  build, test, lint, serve, run, format, package, publish, deploy, generate
+  build, test, lint, serve, run, format, package, publish, deploy, generate, validate
   Multi-command: putnami lint,test,build --impacted
 
 CI:
@@ -48,6 +48,7 @@ Configuration:
   config set                   Set a configuration value
   context generate             Regenerate AI context
   context map                  Build or print the workspace orientation map
+  context pack                 Write or check each project's agent-context document
 
 Diagnostics:
   doctor                       Preflight production readiness under a deployment profile

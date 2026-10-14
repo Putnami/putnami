@@ -369,8 +369,8 @@ func TestResolveFlags_FollowsDetailFromAndReportsUnknownPaths(t *testing.T) {
 		t.Errorf("init has %d flags, workspace init has %d — DetailFrom must carry the flag surface", len(alias), len(source))
 	}
 
-	if flags, ok := ResolveFlags("context pack"); ok {
-		t.Errorf("ResolveFlags(%q) = %v, true — an uncataloged path must report unknown so the parser stays lenient", "context pack", flags)
+	if flags, ok := ResolveFlags("context uncataloged"); ok {
+		t.Errorf("ResolveFlags(%q) = %v, true — an uncataloged path must report unknown so the parser stays lenient", "context uncataloged", flags)
 	}
 
 	// A catalog path with no flags is still KNOWN: only globals are accepted.
