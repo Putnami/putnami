@@ -46,6 +46,62 @@
       "settled": "2026-10-02",
       "settledBy": "fdumay",
       "reviewOnly": true
+    },
+    {
+      "id": "D-006",
+      "statement": "the core CLI declares no development verb: build, test, lint, serve, run, format, package, publish, deploy, generate and validate come from @putnami/dev, which the language extensions depend on",
+      "settled": "2026-10-14",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-007",
+      "statement": "there is no kit or profile concept: installing an extension installs its extensionDependencies, and that graph decides what a workspace gets",
+      "settled": "2026-10-14",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-008",
+      "statement": "putnami init --extension <language> installs that language extension, and its dependencies bring the rest",
+      "settled": "2026-10-14",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-009",
+      "statement": "anonymous usage telemetry stays in the core CLI",
+      "settled": "2026-10-14",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-010",
+      "statement": "the core CLI computes a tree's version before any cache key; the version get|tag and changelog commands belong to @putnami/dev",
+      "settled": "2026-10-14",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-011",
+      "statement": "@putnami/contributor ships a compiled executable and owns tree verify, proposals finalize, contributor language|machine-load and sessions export|summary",
+      "settled": "2026-10-14",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-012",
+      "statement": "@putnami/dev depends on @putnami/contributor, so only a development workspace receives the contributor skills",
+      "settled": "2026-10-14",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-013",
+      "statement": "putnami migrate agent-content is deleted in the next minor release, with no transition window",
+      "settled": "2026-10-14",
+      "settledBy": "fdumay",
+      "reviewOnly": true
     }
   ]
 }
