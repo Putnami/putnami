@@ -30,11 +30,11 @@
     },
     {
       "id": "an-explicit-channel-flows-down",
-      "text": "An explicit channel other than latest, from --channel, PUTNAMI_CHANNEL or the install record during init, or from a name@channel argument, flows down: every dependency below the requested extension resolves on it at every hop, and its own constraint is checked against the resolved version. A semantic version or a range is not a channel. Otherwise a non-empty constraint resolves as written and an empty one on latest."
+      "text": "An explicit channel, in the portable channel alphabet and other than latest, from --channel, PUTNAMI_CHANNEL or the install record during init, or from a name@channel argument, flows down: every dependency below the requested extension resolves on it at every hop, and its own constraint is checked against the resolved version. A semantic version or a range is not a channel. Otherwise a non-empty constraint resolves as written, the registry picking the highest match, and an empty one on latest."
     },
     {
       "id": "the-lock-wins-while-it-satisfies-the-graph",
-      "text": "A locked dependency resolves from its lock entry while it satisfies every constraint known when it resolves. A channel named on the command line re-resolves the requested subgraph, --latest and putnami upgrade re-resolve the graph, and a locked version that misses a constraint resolves again and the move is reported."
+      "text": "A locked dependency resolves from its lock entry while it satisfies every constraint known when it resolves. An explicit channel named on the command line re-resolves the requested subgraph, --latest and putnami upgrade re-resolve the graph, and a locked version that misses a constraint resolves again and the move is reported."
     },
     {
       "id": "an-unmet-range-fails",
@@ -42,7 +42,7 @@
     },
     {
       "id": "the-order-is-deterministic",
-      "text": "The graph resolves level by level, whatever order the workers finish in: dependents resolved under an explicit channel first, then dependents by manifest name, then dependencies by name. A node resolves once, at its first level, and a dependency reached earlier from outside a channel's subgraph keeps its request. A later-level constraint is only checked, and a cycle installs each extension once."
+      "text": "The graph resolves level by level, whatever order the workers finish in: dependents resolved under an explicit channel first, then dependents by manifest name, then dependencies by name. A node resolves once, at its first level, and a dependency reached earlier from outside a channel's subgraph keeps its request, and the channel only checks it. A later-level constraint is only checked, and a cycle installs each extension once."
     },
     {
       "id": "the-graph-loads",
@@ -54,7 +54,7 @@
     },
     {
       "id": "agent-content-may-name-a-dependency",
-      "text": "An agent-content opt-in may name any extension of the graph. Installing a dependency does not opt into its agent content."
+      "text": "An agent-content opt-in may name any extension of the graph."
     },
     {
       "id": "a-dependency-serves-no-reserved-provider",
