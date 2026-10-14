@@ -638,7 +638,7 @@
     },
     "/v1/workspaces/{workspace}/source/github/pull-requests": {
       "get": {
-        "description": "List durable open GitHub pull requests for the workspace. Requires platform.workspace.read; CI state is composed by Surfaces from Delivery.\n\nRequired scopes: platform.workspace.read.",
+        "description": "List durable GitHub pull requests for the workspace, newest update first: open by default, or closed or all through the state query. Requires platform.workspace.read; CI state is composed by Surfaces from Delivery.\n\nRequired scopes: platform.workspace.read.",
         "operationId": "getV1_Workspaces_Workspace_Source_Github_Pull-requests",
         "parameters": [
           {
@@ -666,6 +666,15 @@
               "maximum": 100,
               "minimum": 0,
               "type": "integer"
+            }
+          },
+          {
+            "description": "Which pull requests to list: open (the default), closed (merged or not), or all. Any other value answers 422.",
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -721,7 +730,7 @@
                 }
               }
             },
-            "description": "Invalid cursor or page limit"
+            "description": "Invalid state, cursor or page limit"
           },
           "500": {
             "content": {
@@ -809,13 +818,22 @@
     },
     "/v1/workspaces/{workspace}/source/github/sessions": {
       "post": {
-        "description": "Start or restart browser-assisted GitHub repository onboarding. Requires platform.workspace.manage resolved at the target workspace.\n\nRequired scopes: platform.workspace.manage.",
+        "description": "Start or restart browser-assisted GitHub repository onboarding. The return_origin query names where the GitHub return pages link back to. Requires platform.workspace.manage resolved at the target workspace.\n\nRequired scopes: platform.workspace.manage.",
         "operationId": "postV1_Workspaces_Workspace_Source_Github_Sessions",
         "parameters": [
           {
             "in": "path",
             "name": "workspace",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Origin the GitHub return pages link back to, such as https://app.putnami.xyz. Empty means the console. Any origin Source does not list answers 422.",
+            "in": "query",
+            "name": "return_origin",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -874,6 +892,16 @@
           },
           "403": {
             "description": "Insufficient workspace permissions"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceGitHubError"
+                }
+              }
+            },
+            "description": "Return origin not allowed"
           },
           "500": {
             "content": {
@@ -941,6 +969,10 @@
             {
               "code": "forbidden",
               "status": 403
+            },
+            {
+              "code": "http.unprocessable_entity",
+              "status": 422
             },
             {
               "code": "http.internal_server",

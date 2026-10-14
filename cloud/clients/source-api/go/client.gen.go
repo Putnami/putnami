@@ -325,6 +325,7 @@ type GetV1WorkspacesSourceGithubPullRequestsPath struct {
 type GetV1WorkspacesSourceGithubPullRequestsQuery struct {
 	Cursor *string `json:"cursor,omitempty"`
 	Limit  *int64  `json:"limit,omitempty"`
+	State  *string `json:"state,omitempty"`
 }
 
 // GetV1WorkspacesSourceGithubPullRequestsInput is the complete typed input for getV1_Workspaces_Workspace_Source_Github_Pull-requests.
@@ -413,9 +414,14 @@ type CreateV1WorkspacesSourceGithubSessionsPath struct {
 	Workspace string `json:"workspace"`
 }
 
+type CreateV1WorkspacesSourceGithubSessionsQuery struct {
+	ReturnOrigin *string `json:"return_origin,omitempty"`
+}
+
 // CreateV1WorkspacesSourceGithubSessionsInput is the complete typed input for postV1_Workspaces_Workspace_Source_Github_Sessions.
 type CreateV1WorkspacesSourceGithubSessionsInput struct {
-	Path CreateV1WorkspacesSourceGithubSessionsPath `json:"path"`
+	Path  CreateV1WorkspacesSourceGithubSessionsPath  `json:"path"`
+	Query CreateV1WorkspacesSourceGithubSessionsQuery `json:"query"`
 }
 
 // CreateV1WorkspacesSourceGithubSessionsResult is the result of postV1_Workspaces_Workspace_Source_Github_Sessions: the declared success status the
@@ -457,6 +463,17 @@ func (typed *CreateV1WorkspacesSourceGithubSessionsForbiddenError) Error() strin
 	return typed.Remote.Error()
 }
 func (typed *CreateV1WorkspacesSourceGithubSessionsForbiddenError) Unwrap() error {
+	return typed.Remote
+}
+
+// CreateV1WorkspacesSourceGithubSessionsHttpUnprocessableEntityError is the "http.unprocessable_entity" error declared by postV1_Workspaces_Workspace_Source_Github_Sessions. It carries no details body, so
+// the stable code and the HTTP status are read from Remote.
+type CreateV1WorkspacesSourceGithubSessionsHttpUnprocessableEntityError struct{ Remote *client.RemoteError }
+
+func (typed *CreateV1WorkspacesSourceGithubSessionsHttpUnprocessableEntityError) Error() string {
+	return typed.Remote.Error()
+}
+func (typed *CreateV1WorkspacesSourceGithubSessionsHttpUnprocessableEntityError) Unwrap() error {
 	return typed.Remote
 }
 
@@ -505,6 +522,8 @@ func decodeCreateV1WorkspacesSourceGithubSessionsError(err error) error {
 		return &CreateV1WorkspacesSourceGithubSessionsUnauthorizedError{Remote: remote}
 	case "forbidden":
 		return &CreateV1WorkspacesSourceGithubSessionsForbiddenError{Remote: remote}
+	case "http.unprocessable_entity":
+		return &CreateV1WorkspacesSourceGithubSessionsHttpUnprocessableEntityError{Remote: remote}
 	case "http.internal_server":
 		return &CreateV1WorkspacesSourceGithubSessionsHttpInternalServerError{Remote: remote}
 	case "http.bad_gateway":
@@ -887,6 +906,9 @@ func (c *SourceClient) GetV1WorkspacesSourceGithubPullRequests(ctx context.Conte
 	if in.Query.Limit != nil {
 		query.Add("limit", fmt.Sprint(*in.Query.Limit))
 	}
+	if in.Query.State != nil {
+		query.Add("state", *in.Query.State)
+	}
 	var body []byte
 	var err error
 	request := &client.Request{Method: "GET", Path: path, QueryValues: query, Headers: headers, Body: body}
@@ -898,7 +920,7 @@ func (c *SourceClient) GetV1WorkspacesSourceGithubPullRequests(ctx context.Conte
 	return &result, nil
 }
 
-var createV1WorkspacesSourceGithubSessionsOperation = client.MustOperation("postV1_Workspaces_Workspace_Source_Github_Sessions", "{\"stream\":\"unary\",\"transports\":[{\"protocol\":\"rest-json\",\"path\":\"/v1/workspaces/{workspace}/source/github/sessions\",\"encoding\":\"json\"}],\"security\":{\"alternatives\":[{\"allOf\":[{\"profile\":\"user\",\"scopes\":[\"platform.workspace.manage\"]}]}]},\"errors\":[{\"status\":400,\"code\":\"http.bad_request\"},{\"status\":401,\"code\":\"unauthorized\"},{\"status\":403,\"code\":\"forbidden\"},{\"status\":500,\"code\":\"http.internal_server\"},{\"status\":502,\"code\":\"http.bad_gateway\"},{\"status\":503,\"code\":\"http.service_unavailable\"}],\"idempotency\":{\"kind\":\"non-idempotent\"}}", "[{\"status\":200,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/SourceGitHubOnboardingStart\"}}]},{\"status\":201,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/SourceGitHubOnboardingStart\"}}]}]")
+var createV1WorkspacesSourceGithubSessionsOperation = client.MustOperation("postV1_Workspaces_Workspace_Source_Github_Sessions", "{\"stream\":\"unary\",\"transports\":[{\"protocol\":\"rest-json\",\"path\":\"/v1/workspaces/{workspace}/source/github/sessions\",\"encoding\":\"json\"}],\"security\":{\"alternatives\":[{\"allOf\":[{\"profile\":\"user\",\"scopes\":[\"platform.workspace.manage\"]}]}]},\"errors\":[{\"status\":400,\"code\":\"http.bad_request\"},{\"status\":401,\"code\":\"unauthorized\"},{\"status\":403,\"code\":\"forbidden\"},{\"status\":422,\"code\":\"http.unprocessable_entity\"},{\"status\":500,\"code\":\"http.internal_server\"},{\"status\":502,\"code\":\"http.bad_gateway\"},{\"status\":503,\"code\":\"http.service_unavailable\"}],\"idempotency\":{\"kind\":\"non-idempotent\"}}", "[{\"status\":200,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/SourceGitHubOnboardingStart\"}}]},{\"status\":201,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/SourceGitHubOnboardingStart\"}}]}]")
 
 // CreateV1WorkspacesSourceGithubSessions calls postV1_Workspaces_Workspace_Source_Github_Sessions through its generated service binding.
 func (c *SourceClient) CreateV1WorkspacesSourceGithubSessions(ctx context.Context, in CreateV1WorkspacesSourceGithubSessionsInput) (*CreateV1WorkspacesSourceGithubSessionsResult, error) {
@@ -908,6 +930,9 @@ func (c *SourceClient) CreateV1WorkspacesSourceGithubSessions(ctx context.Contex
 	path = strings.ReplaceAll(path, "{workspace}", url.PathEscape(params["workspace"]))
 	query := url.Values{}
 	headers := make(http.Header)
+	if in.Query.ReturnOrigin != nil {
+		query.Add("return_origin", *in.Query.ReturnOrigin)
+	}
 	var body []byte
 	var err error
 	request := &client.Request{Method: "POST", Path: path, QueryValues: query, Headers: headers, Body: body}

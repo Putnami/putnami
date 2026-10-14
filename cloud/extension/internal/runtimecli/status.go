@@ -75,10 +75,12 @@ type statusResult struct {
 // statusChannelFollow is one environment's CD header. Channels is the
 // server's answer — an empty array for an environment that follows no channel —
 // and is null when the header could not be read, in which case Unavailable
-// says why.
+// says why. Workloads is the workload selectors of the accepted environment
+// definition, nil when the control plane does not report them.
 type statusChannelFollow struct {
 	Environment        string            `json:"environment"`
 	DefinitionRevision int64             `json:"definition_revision,omitempty"`
+	Workloads          []string          `json:"workloads,omitempty"`
 	Channels           []followedChannel `json:"channels"`
 	Unavailable        string            `json:"unavailable,omitempty"`
 }

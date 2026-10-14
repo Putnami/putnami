@@ -620,6 +620,10 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/CIRunVerdictResponse",
+            "nullable": true
           }
         },
         "type": "object"
@@ -933,6 +937,34 @@
         },
         "type": "object"
       },
+      "CIRunVerdictResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "type": "string"
+          },
+          "computedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "gaps": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "mark": {
+            "type": "string"
+          },
+          "revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "CIStatusDimension": {
         "additionalProperties": false,
         "properties": {
@@ -1157,12 +1189,249 @@
         },
         "type": "object"
       },
+      "CIUsageEfficacy": {
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/CIUsageEfficacyDay"
+            },
+            "type": "array"
+          },
+          "formulaVersion": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "repository": {
+            "type": "string"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/CIUsageEfficacyTotals"
+          }
+        },
+        "type": "object"
+      },
+      "CIUsageEfficacyDay": {
+        "additionalProperties": false,
+        "properties": {
+          "day": {
+            "type": "string"
+          },
+          "escapes": {
+            "$ref": "#/components/schemas/CIUsageEscapes",
+            "nullable": true
+          },
+          "fixShare": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "fixes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "linksUnavailable": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "medianDaysToFix": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "mergedPullRequests": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "mergedWithoutGreenGate": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "revertRate": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "reverts": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "strictPairRate": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "strictPairs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "withoutGreenGateRate": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "CIUsageEfficacyTotals": {
+        "additionalProperties": false,
+        "properties": {
+          "escapes": {
+            "$ref": "#/components/schemas/CIUsageEscapeTotals",
+            "nullable": true
+          },
+          "fixShare": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "fixes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "linksUnavailable": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "medianDaysToFix": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "mergedPullRequests": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "mergedWithoutGreenGate": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "revertRate": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "reverts": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "strictPairRate": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "strictPairs": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "withoutGreenGateRate": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "CIUsageEscapeCohort": {
+        "additionalProperties": false,
+        "properties": {
+          "escaped": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "medianSize": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          },
+          "pullRequests": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "rate": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "CIUsageEscapeTotals": {
+        "additionalProperties": false,
+        "properties": {
+          "cohorts": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "green": {
+            "$ref": "#/components/schemas/CIUsageEscapeCohort"
+          },
+          "other": {
+            "$ref": "#/components/schemas/CIUsageEscapeCohort"
+          }
+        },
+        "type": "object"
+      },
+      "CIUsageEscapes": {
+        "additionalProperties": false,
+        "properties": {
+          "cohortDay": {
+            "type": "string"
+          },
+          "green": {
+            "$ref": "#/components/schemas/CIUsageEscapeCohort"
+          },
+          "other": {
+            "$ref": "#/components/schemas/CIUsageEscapeCohort"
+          }
+        },
+        "type": "object"
+      },
       "CIUsageResponse": {
         "additionalProperties": false,
         "properties": {
           "billed": {
             "$ref": "#/components/schemas/CIUsageBilled",
             "nullable": true
+          },
+          "efficacy": {
+            "$ref": "#/components/schemas/CIUsageEfficacy",
+            "nullable": true
+          },
+          "efficacyUnavailable": {
+            "type": "boolean"
           },
           "gate": {
             "additionalProperties": {
@@ -1682,6 +1951,42 @@
             "maximum": 9223372036854775807,
             "minimum": -9223372036854775808,
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "LocalSessionChunkIngestResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "bytes": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "derived": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "final": {
+            "type": "boolean"
+          },
+          "part": {
+            "type": "string"
+          },
+          "seq": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "sessionId": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -4332,6 +4637,170 @@
         }
       }
     },
+    "/v1/workspaces/{workspace}/ci/local-sessions/{session}": {
+      "post": {
+        "description": "Store one ordered chunk of a local gate session record: a session a developer machine or an agent session ran and uploaded under the developer's own login. The body is the chunk's raw bytes. The request carries the headers X-Putnami-Session-Part (plan, session, events or spec-verification), X-Putnami-Session-Seq (the chunk's sequence within its part, an integer >= 0) and, on the chunk that closes the part, X-Putnami-Session-Final: true. Only the session part is stored. A chunk of another part is checked, then acknowledged with applied=true and dropped. The session part follows the CI run session ingest's sequence protocol: an identical replay answers applied=false, a gap answers 409 with expectedSeq, and a conflicting replay answers 409. The session id is YYYYMMDD-HHMMSS-hhhhhh. The first accepted chunk binds it to the caller within the workspace; another user's chunk for it is refused. Closing the session part stores the session's outcome, commands, branch and commit once, as evidence for the CI efficacy rollup; it creates no run. Requires delivery.run.manage at the path workspace; workspace machine tokens are denied.\n\nRequired scopes: delivery.run.manage.",
+        "operationId": "postV1_Workspaces_Workspace_Ci_Local-sessions_Session",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              },
+              "x-putnami-max-bytes": 1048576
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalSessionChunkIngestResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid session id, part, sequence or final header, or an invalid chunk"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Manage permission required, workspace mismatch, machine token denied, or the session belongs to another user"
+          },
+          "404": {
+            "description": "The part is not known to the session store"
+          },
+          "409": {
+            "description": "A sequence gap (the body names expectedSeq) or a replay that conflicts with the committed chunk"
+          },
+          "413": {
+            "description": "The chunk exceeds 1 MiB"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "500": {
+            "description": "Local session ingestion is not configured, or the store failed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.payload_too_large",
+              "retryable": false,
+              "status": 413
+            },
+            {
+              "code": "http.unsupported_media_type",
+              "retryable": false,
+              "status": 415
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "delivery.run.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/ci/local-sessions/{session}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
     "/v1/workspaces/{workspace}/ci/repair": {
       "post": {
         "description": "Run one safe, idempotent CI recovery pass within the path workspace: stale queued/in-progress runs become errored/timed_out, persisted compute is canceled, abandoned phases become timed_out, and existing terminal aggregate/phase checks are reconciled. Never fabricates success and never redispatches accepted work. The historical check scan is bounded and reports scanLowerBound when capped. Requires delivery.run.manage; workspace machine tokens are denied.\n\nRequired scopes: delivery.run.manage.",
@@ -4954,7 +5423,7 @@
     },
     "/v1/workspaces/{workspace}/ci/usage": {
       "get": {
-        "description": "Aggregate a workspace's CI runs over a reporting window (default 7d, `window` a Go duration) into counts by substrate outcome, profile, and resolution source, a gate wall-time summary per substrate, a terminal-outcome taxonomy, and an estimated spend. When the daily billing read has run, `billed` adds the cost the GCP billing export charged per UTC day, from the day the window starts in to yesterday (seven days for the default window), split into compute, egress, gateway, cache, and logs. Each day is a whole UTC day with its own run count, so `billed.runs` is the sum over the listed days, not the window's run count. The gateway figure is an upper bound because the gateway also serves the console and the APIs. Requires delivery.run.read at the path workspace; workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
+        "description": "Aggregate a workspace's CI runs over a reporting window (default 7d, `window` a Go duration) into counts by substrate outcome, profile, and resolution source, a gate wall-time summary per substrate, a terminal-outcome taxonomy, and an estimated spend. When the daily billing read has run, `billed` adds the cost the GCP billing export charged per UTC day, from the day the window starts in to yesterday (seven days for the default window), split into compute, egress, gateway, cache, and logs. Each day is a whole UTC day with its own run count, so `billed.runs` is the sum over the listed days, not the window's run count. The gateway figure is an upper bound because the gateway also serves the console and the APIs. When the daily efficacy job has run, `efficacy` adds, over the same UTC days and oldest first, the outcome of the pull requests merged into the workspace's repository: merged, reverted, fixed, strict fix pairs, merged without a green hosted gate, their rates over merged pull requests, the median days to fix, and the escape rate of the pull requests merged 14 days earlier, split by green gate. When the efficacy store cannot be read, `efficacy` is absent and `efficacyUnavailable` is true. Requires delivery.run.read at the path workspace; workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
         "operationId": "getV1_Workspaces_Workspace_Ci_Usage",
         "parameters": [
           {
@@ -5152,7 +5621,7 @@
     },
     "/v1/workspaces/{workspace}/runs": {
       "get": {
-        "description": "List a workspace's CI runs newest-first with offset pagination and immutable subject references, optionally filtered by repository, branch, ref (a commit SHA prefix or a branch name), pull request, status or conclusion, phase, creation time and run id prefix. A filtered page carries a filter member naming the filters it applied; the caller applies any other one itself. Requires delivery.run.read at the path workspace; workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
+        "description": "List a workspace's CI runs newest-first with offset pagination and immutable subject references, optionally filtered by repository, branch, ref (a commit SHA prefix or a branch name), pull request, status or conclusion, phase, creation time and run id prefix. A filtered page carries a filter member naming the filters it applied; the caller applies any other one itself. With verdict=true each run carries its stored verdict in brief: answer, mark, gap count and revision. Requires delivery.run.read at the path workspace; workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
         "operationId": "getV1_Workspaces_Workspace_Runs",
         "parameters": [
           {
@@ -5250,6 +5719,14 @@
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "verdict",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -5474,7 +5951,7 @@
     },
     "/v1/workspaces/{workspace}/runs/{run}": {
       "get": {
-        "description": "Get one workspace CI run with its immutable subject reference and per-phase attempts. With detail=true it also carries each failed task's error, diagnostics and last output lines from the derived failure digest, and, on a finished run, the session record's delivery account. Requires delivery.run.read at the path workspace; a run from another workspace remains not found and workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
+        "description": "Get one workspace CI run with its immutable subject reference and per-phase attempts. With detail=true it also carries each failed task's error, diagnostics and last output lines from the derived failure digest, and, on a finished run, the session record's delivery account. With verdict=true it carries the run's stored verdict in brief: answer, mark, gap count and revision. Requires delivery.run.read at the path workspace; a run from another workspace remains not found and workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
         "operationId": "getV1_Workspaces_Workspace_Runs_Run",
         "parameters": [
           {
@@ -5496,6 +5973,14 @@
           {
             "in": "query",
             "name": "detail",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "verdict",
             "required": false,
             "schema": {
               "type": "boolean"

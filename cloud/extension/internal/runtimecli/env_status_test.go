@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // envStatusFacts is a prod environment that declares three workloads and
@@ -210,6 +211,13 @@ func TestEnvStatusWithNothingDeclaredOrDeployed(t *testing.T) {
 // read of the doctor workspace, and fails the test on any other path.
 func envStatusServer(t *testing.T, readinessCalls *int) *httptest.Server {
 	t.Helper()
+	return envStatusServerWith(t, readinessCalls, "")
+}
+
+// envStatusServerWith is envStatusServer whose channel-follow answer carries
+// the extra members in follow, such as `"workloads":[...],`.
+func envStatusServerWith(t *testing.T, readinessCalls *int, follow string) *httptest.Server {
+	t.Helper()
 	base := "/v1/workspaces/" + doctorWorkspaceID
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -219,7 +227,7 @@ func envStatusServer(t *testing.T, readinessCalls *int) *httptest.Server {
 				{"project":"shop/workloads/api","environment":"prod","revision":"api-00042","state":"Ready","last_release_id":"cm_310"},
 				{"project":"shop-web","environment":"prod","revision":"web-00007","state":"Ready","last_release_id":"cm_310"}]}`))
 		case base + "/environments/prod/channel-follow":
-			_, _ = w.Write([]byte(`{"workspace_id":"` + doctorWorkspaceID + `","environment":"prod","definition_revision":3,"channels":[
+			_, _ = w.Write([]byte(`{"workspace_id":"` + doctorWorkspaceID + `","environment":"prod","definition_revision":3,` + follow + `"channels":[
 				{"channel":"canary","receipt":{"namespace":"acme","channel":"canary","generation":310,"release_set_id":"rs_ab12cd34ef567890","moved_at":"2026-10-04T10:02:30Z","received_at":"2026-10-04T10:02:31Z","disposition":"opened","release_ids":["cm_310"],"settled":true}}]}`))
 		default:
 			if strings.HasSuffix(r.URL.Path, "/readiness") {
@@ -333,5 +341,95 @@ func TestEnvStatusNodeIsUnknownWithoutAWorkspace(t *testing.T) {
 	node := EnvStatusNode(map[string]any{}, t.TempDir(), map[string]string{"HOME": t.TempDir()}, clicore.IO{})
 	if node.State != clicore.StatusUnknown || node.Detail == "" || node.ID != "env" {
 		t.Fatalf("node = %+v, want unknown with the reason", node)
+	}
+}
+
+// TestEnvStatusNamesEnableForAWorkloadTheDefinitionOmits: a declared workload
+// the accepted environment definition does not select is degraded with env
+// enable as its fix, whether it is deployed or not, and a failing workload
+// keeps its own fix.
+func TestEnvStatusNamesEnableForAWorkloadTheDefinitionOmits(t *testing.T) {
+	spectest.Proves(t, "cloud/env-definition-drift", "status-names-enable-for-an-omitted-workload", "env-status-omitted-workload")
+	facts := envStatusFacts()
+	facts.Named = "prod"
+	follow := facts.Follow["prod"]
+	follow.DefinitionRevision = 1
+	follow.Workloads = []string{"shop/workloads/web"}
+	facts.Follow["prod"] = follow
+	node := EnvStatusNodeFrom(facts)
+	children := map[string]clicore.StatusNode{}
+	for _, child := range node.Children {
+		children[child.ID] = child
+	}
+	for id, want := range map[string]struct {
+		state  clicore.StatusState
+		detail string
+		fix    string
+	}{
+		"env.prod.shop/workloads/api":  {clicore.StatusDegraded, "ready, revision api-00042, not in accepted environment definition revision 1", "putnami cloud env enable prod"},
+		"env.prod.shop/workloads/jobs": {clicore.StatusDegraded, "declared, not deployed, not in accepted environment definition revision 1", "putnami cloud env enable prod"},
+		"env.prod.shop-web":            {clicore.StatusFailing, "failed, revision web-00007: container exited 1", "putnami cloud deploy status cm_web"},
+	} {
+		if got := children[id]; got.State != want.state || got.Detail != want.detail || got.Fix != want.fix {
+			t.Errorf("%s = %+v, want %+v", id, got, want)
+		}
+	}
+	if !strings.HasSuffix(node.Detail, ", 1 deployed and not declared, 2 not in the accepted definition, canary gen 310") {
+		t.Fatalf("detail = %q", node.Detail)
+	}
+	metrics := map[string]float64{}
+	for _, metric := range node.Metrics {
+		metrics[metric.ID] = metric.Value
+	}
+	if metrics["workloads_not_accepted"] != 2 {
+		t.Fatalf("metrics = %+v, want 2 workloads not accepted", node.Metrics)
+	}
+	if node.State != clicore.StatusFailing || node.Fix != "putnami cloud deploy status cm_web" {
+		t.Fatalf("node = %s %q, want the failed workload's fix ahead of env enable", node.State, node.Fix)
+	}
+
+	facts.Deployments, facts.DeploymentsErr = nil, errors.New("503 Service Unavailable")
+	node = EnvStatusNodeFrom(facts)
+	if fix := firstFixIn(node.Children, clicore.StatusDegraded); fix != "putnami cloud env enable prod" {
+		t.Fatalf("children = %+v, want the omitted workloads named without the summary", node.Children)
+	}
+
+	follow.Workloads = []string{}
+	facts.Follow["prod"] = follow
+	facts.Deployments, facts.DeploymentsErr = envStatusFacts().Deployments, nil
+	if detail := EnvStatusNodeFrom(facts).Detail; !strings.Contains(detail, ", 3 not in the accepted definition") {
+		t.Fatalf("detail = %q, want every declared workload outside a definition that selects none", detail)
+	}
+
+	follow.Workloads = nil
+	facts.Follow["prod"] = follow
+	for _, child := range EnvStatusNodeFrom(facts).Children {
+		if strings.Contains(child.Detail, "accepted environment definition") {
+			t.Fatalf("child %+v judged against a definition the control plane did not report", child)
+		}
+	}
+}
+
+// TestEnvStatusReadsTheDefinitionWorkloadsFromChannelFollow runs the command
+// against a control plane whose channel-follow answer lists the accepted
+// definition's workloads: shop-web is declared and omitted.
+func TestEnvStatusReadsTheDefinitionWorkloadsFromChannelFollow(t *testing.T) {
+	spectest.Proves(t, "cloud/env-definition-drift", "status-names-enable-for-an-omitted-workload", "env-status-reads-definition-workloads")
+	readiness := 0
+	srv := envStatusServerWith(t, &readiness, `"workloads":["shop/workloads/api"],`)
+	defer srv.Close()
+	env := map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL}
+
+	cap := &captureIO{}
+	if err := EnvStatus(map[string]any{"output": "json"}, []string{"prod"}, doctorWorkspace(t), env, cap.io(srv.Client())); err != nil {
+		t.Fatalf("EnvStatus: %v", err)
+	}
+	var node clicore.StatusNode
+	if err := decodeResultData([]byte(strings.Join(cap.stdout, "\n")), &node); err != nil {
+		t.Fatal(err)
+	}
+	if node.State != clicore.StatusDegraded || node.Fix != "putnami cloud env enable prod" ||
+		!strings.Contains(node.Detail, "1 not in the accepted definition") {
+		t.Fatalf("node = %+v, want degraded naming env enable", node)
 	}
 }

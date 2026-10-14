@@ -16,7 +16,7 @@
       }
     ]
   },
-  "contractSha256": "3de8a7898ce82892bc67738092a9850e713001e073239042011f7ccacdc06e44",
+  "contractSha256": "456733113d3862f697f7db74cc6ad735bc245c39898072e3d4c7bdfe4bf99eea",
   "operations": [
     {
       "operationId": "deleteV1_Workspaces_Workspace_Source_Github",
@@ -113,7 +113,7 @@
   "files": [
     {
       "path": "client.gen.go",
-      "sha256": "5bf9d03a54c4616cf27f7512f8df87e968e4ae26cd004c3416104a4ff1b8fbc2"
+      "sha256": "d809c15761e7b46ef6efb3b2c432cd5f2eb99d9c718f7fdd35ac66913fe82862"
     }
   ]
 }
