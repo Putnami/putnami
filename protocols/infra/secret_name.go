@@ -22,7 +22,7 @@ import (
 // A requirement name is not a config key: the application reads the secret
 // at its config dot-path, and that is the key the secret is stored under.
 // The protocol accepts the config key as a secret name; producers keep this
-// rule until Putnami Cloud reads that grammar (doc/adr/0004).
+// rule until Putnami Cloud accepts uppercase secret names (doc/adr/0004).
 func SecretName(s string) string {
 	var split strings.Builder
 	var prev rune
