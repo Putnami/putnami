@@ -840,7 +840,7 @@ func TestEnvDoctorStrictFailsOnAnUnknownRow(t *testing.T) {
 	}
 }
 
-// TestEnvDoctorDegradedDefinitionNamesEnableAndFailsOnlyUnderStrict is #254:
+// TestEnvDoctorDegradedDefinitionNamesEnableAndFailsOnlyUnderStrict:
 // Control answers the environment-definition row degraded when the accepted
 // definition differs from the default branch. The row prints degraded with
 // its fix, not unknown with an upgrade fix, counts as degraded, and fails

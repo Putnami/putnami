@@ -764,7 +764,7 @@ func TestEnvEnableUsage(t *testing.T) {
 	}
 }
 
-// TestEnvEnableAcceptsADegradedDefinition is #254: Control answers the
+// TestEnvEnableAcceptsADegradedDefinition: Control answers the
 // environment-definition row degraded when the accepted definition differs
 // from the default branch, and names `env enable` as the fix. The command
 // accepts the default-branch head for that row instead of reporting it as
