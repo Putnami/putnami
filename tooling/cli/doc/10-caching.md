@@ -1183,8 +1183,10 @@ Resolution is explicit and source-aware: `--cache-trust` wins over
 `PUTNAMI_CACHE_TRUST`, which wins over the command's workspace option
 (`options.<command>.cache-trust`), then the environment default. For a
 multi-command run, differing command options combine to the strictest policy.
-`publish`, `tag`, and `version tag` force at least `ci` even when `any` was
-requested; `none` remains a stricter opt-out.
+A command whose jobs declare `sideEffects: registry` (`publish` by default),
+`tag`, and `version tag` force at least `ci` even when `any` was requested;
+`none` remains a stricter opt-out. A `cloud` side effect alone, such as
+`deploy`'s, does not raise the policy.
 
 Older providers do not return a channel. Under `any` they retain their previous
 behavior. Under `ci` their entries are treated as hints, so they cannot turn an

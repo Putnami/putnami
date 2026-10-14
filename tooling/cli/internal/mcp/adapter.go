@@ -12,8 +12,8 @@ import (
 
 	"go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
-	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/engine"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/machine"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -896,69 +896,30 @@ func rejectLongLivedCommands(commands []string) error {
 //
 // The classification is NOT a second list of names. The extension protocol
 // already types it as CommandTraits.SideEffects ("registry" for publish, "cloud"
-// for deploy), resolved per command by proto.EffectiveTraits, so an extension's
-// own release verb is covered by declaring the trait — which a hardcoded pair of
-// well-known names would let walk straight through.
+// for deploy), and extension.CommandSideEffects resolves it per command from
+// the loaded extensions, so an extension's own release verb is covered by
+// declaring the trait — which a hardcoded pair of well-known names would let
+// walk straight through.
+//
+// Discovery failure loads no extension, which leaves every command on the
+// well-known verb table: an unreadable manifest must not open the gate for
+// `publish` and `deploy`.
 //
 // Only EXECUTION is gated: dryRun returns before this, exactly as it does for
 // rejectLongLivedCommands.
 func (s *Server) rejectSideEffectingCommands(commands []string) error {
-	declared := s.declaredSideEffects()
+	var extensions []*extension.ExtensionDescription
+	if discovered, err := s.discoverExtensions(); err == nil {
+		extensions = discovered.Extensions
+	}
 	for _, command := range commands {
-		name := proto.BaseCommandName(command)
-		effects, isDeclared := declared[name]
-		if !isDeclared {
-			// Nothing this workspace loaded declares the command, so the
-			// well-known verb table is the whole classification — the same answer
-			// EffectiveTraits gives a manifest that declares no traits of its own,
-			// and the one that keeps `deploy` refused when the extension owning it
-			// is not installed here.
-			effects = proto.EffectiveTraits(name, nil).SideEffects
-		}
-		if effects != proto.SideEffectsNone {
+		if effects := extension.CommandSideEffects(extensions, command); len(effects) > 0 {
 			return fmt.Errorf("run_jobs cannot run %q: it mutates %s outside the workspace, "+
 				"which is not a decision an agent tool call can make. Run it in a terminal instead",
-				command, effects)
+				command, strings.Join(effects, " and "))
 		}
 	}
 	return nil
-}
-
-// declaredSideEffects maps each command the workspace's extensions declare to
-// its resolved SideEffects trait. Resolution is the protocol's own
-// (extension.Resolve applies proto.EffectiveTraits at load), so a
-// manifest-declared `sideEffects` on a custom verb counts exactly as publish's
-// default does, and a manifest that overrides a well-known verb's traits owns
-// the answer for it — the same resolved traits the planner schedules by.
-//
-// A command several extensions declare keeps the side-effecting classification
-// if ANY of them carries one: run_jobs would schedule all of them.
-//
-// Discovery failure yields no entries rather than an error, which leaves the
-// caller on the well-known verb table: an unreadable manifest must not open the
-// gate for `publish` and `deploy`.
-func (s *Server) declaredSideEffects() map[string]string {
-	discovered, err := s.discoverExtensions()
-	if err != nil {
-		return nil
-	}
-	declared := make(map[string]string)
-	for _, ext := range discovered.Extensions {
-		if ext == nil {
-			continue
-		}
-		for name, job := range ext.Jobs {
-			if job == nil {
-				continue
-			}
-			base := proto.BaseCommandName(name)
-			if effects, seen := declared[base]; seen && effects != proto.SideEffectsNone {
-				continue
-			}
-			declared[base] = job.Traits.SideEffects
-		}
-	}
-	return declared
 }
 
 // diagnosticsFrom projects canonical task diagnostics onto the wire shape. The
