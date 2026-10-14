@@ -94,7 +94,12 @@ func devVocabulary(t *testing.T, jobs map[string]CommandTraits, withTraits bool)
 		}
 		verbs = append(verbs, verb)
 	}
-	data, err := json.Marshal(map[string]any{"name": "@putnami/dev", "cliContract": 9, "verbs": verbs})
+	type vocabularyManifest struct {
+		Name        string                 `json:"name"`
+		CLIContract int                    `json:"cliContract"`
+		Verbs       []proto.VerbDefinition `json:"verbs"`
+	}
+	data, err := json.Marshal(vocabularyManifest{Name: "@putnami/dev", CLIContract: 9, Verbs: verbs})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -79,29 +79,25 @@ func helpScopeOf(result *extension.DiscoveryResult, user map[string]string) *hel
 
 // commandVocabulary merges the verb vocabularies of extensions for a workspace
 // whose aliases are user. A vocabulary alias never takes a command path of the
-// catalog, structured or job, and a workspace alias of the same name hides it.
+// catalog, structured or job, and a workspace alias of the same name that
+// applies hides it (commandmeta.ReservesVocabularyAlias).
 func commandVocabulary(extensions []*extension.ExtensionDescription, user map[string]string) extension.Vocabulary {
 	return extension.MergeVocabulary(extensions, func(name string) bool {
-		_, mine := user[name]
-		return mine || isCatalogPath(name)
+		return commandmeta.ReservesVocabularyAlias(name, user)
 	})
 }
 
-// isCatalogPath reports whether name is a command path of the catalog.
-func isCatalogPath(name string) bool {
-	_, ok := commandmeta.Lookup(name)
-	return ok
-}
-
 // hiddenAliasWarnings returns a warning for each vocabulary alias a workspace
-// alias of the same name hides, in merge order.
+// alias of the same name hides, in merge order. A workspace alias named like a
+// built-in alias never applied, so it hides nothing and draws no warning.
 func hiddenAliasWarnings(extensions []*extension.ExtensionDescription, user map[string]string) []string {
 	if len(user) == 0 {
 		return nil
 	}
 	var warnings []string
 	for _, alias := range commandVocabulary(extensions, nil).Aliases {
-		if target, mine := user[alias.Name]; mine {
+		if commandmeta.WorkspaceAliasApplies(alias.Name, user) {
+			target := user[alias.Name]
 			warnings = append(warnings, fmt.Sprintf(
 				"warning: the workspace alias %s (%s) hides the alias %s of %s that %s declares",
 				alias.Name, target, alias.Name, alias.Verb, alias.Extension))

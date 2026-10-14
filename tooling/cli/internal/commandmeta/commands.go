@@ -35,6 +35,31 @@ func BuiltinAliases() map[string]string {
 	return aliases
 }
 
+// WorkspaceAliasApplies reports whether workspace declares an alias named name
+// that a command name can resolve through. The built-in aliases resolve before
+// the workspace's, so a workspace alias named like a built-in one never applies.
+func WorkspaceAliasApplies(name string, workspace map[string]string) bool {
+	if _, mine := workspace[name]; !mine {
+		return false
+	}
+	for _, alias := range builtinAliases {
+		if alias.Name == name {
+			return false
+		}
+	}
+	return true
+}
+
+// ReservesVocabularyAlias reports whether a vocabulary alias may not take name
+// in a workspace whose aliases are workspace: a command path of the catalog
+// has it, or a workspace alias that applies does.
+func ReservesVocabularyAlias(name string, workspace map[string]string) bool {
+	if _, ok := Lookup(name); ok {
+		return true
+	}
+	return WorkspaceAliasApplies(name, workspace)
+}
+
 // BuiltinAliasList returns built-in aliases in display order.
 func BuiltinAliasList() []Alias {
 	return append([]Alias(nil), builtinAliases...)

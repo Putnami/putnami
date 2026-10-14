@@ -210,7 +210,9 @@ The CLI reads the vocabularies of the loaded extensions:
   commands instead of the core's.
 - **Aliases.** A command name resolves through the vocabulary's aliases
   first, then the core's built-in aliases, then the workspace's. A workspace
-  alias of the same name hides a vocabulary alias, with a warning. The CLI
+  alias of the same name hides a vocabulary alias, with a warning. A
+  workspace alias named like a built-in alias never applies, so it hides
+  nothing. The CLI
   drops an alias that an earlier verb claimed, or that names a verb, a
   command or command group of a loaded extension, or a command of the core
   catalog, such as `help` or `deploy`. `putnami impact-plan` resolves the same

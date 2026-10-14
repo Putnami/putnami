@@ -1811,7 +1811,9 @@ An extension's
 [verb vocabulary](../../../protocols/extension/doc/06-verbs.md#declaring-a-verb-vocabulary)
 can declare aliases for its verbs. A vocabulary alias never takes the name of
 a verb, an extension command or command group, or a command of the core
-catalog. A workspace alias of the same name hides it, with a warning.
+catalog. A workspace alias of the same name hides it, with a warning. A
+workspace alias named like a built-in alias never applies, so it hides
+nothing.
 
 ### User-Defined Aliases
 

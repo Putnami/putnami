@@ -50,12 +50,16 @@ per verb and project to every plan, and change every recorded session.
 3. **The vocabulary comes first, the core falls back.**
    - Help lists the merged verbs first, then the core's job commands the
      vocabulary does not name. Inside a workspace it still lists a verb only
-     when a loaded extension declares a command of that name.
+     when a loaded extension declares a command of that name. A declared
+     command that neither the vocabulary nor the catalog names is not listed
+     until the change that meets D2.
    - `putnami help <verb>` suggests the verb's related commands.
    - A command name resolves through the vocabulary's aliases, then the
      core's built-in aliases, then the workspace's. A workspace alias of the
      same name hides a vocabulary alias, with a warning, so an extension
-     update never changes what a workspace alias runs. An alias that an
+     update never changes what a workspace alias runs. A workspace alias
+     named like a built-in alias never applies, so it hides nothing and
+     draws no warning. An alias that an
      earlier verb claimed, or that names a verb, a command or command group
      of a loaded extension, or a command of the core catalog, is dropped.
      `putnami impact-plan` resolves the same aliases. A provider process
@@ -99,19 +103,22 @@ per verb and project to every plan, and change every recorded session.
 
 ### Slice decisions
 
-This decision proposes answers to the open questions of the
-`@putnami/dev` slice. Accepting it adopts them:
+This ADR states D1 to D10 as proposals that answer the open questions of
+the `@putnami/dev` slice. Merging this ADR adopts them. The change that
+implements D9 records it in the root `decisions.json` as an amendment of
+D-009, and the change that implements D2 records it in
+`tooling/cli/decisions.json`.
 
 - **D1 — contributor skills.** A manifest field on `@putnami/dev` opts the
   workspaces of its dependents into the agent content of
   `@putnami/contributor` (D-012). It is designed with `@putnami/dev`.
-- **D2 — what help lists.** A requirement on the change that removes the
-  development verbs from the core catalog: help lists every verb a loaded
-  extension's vocabulary declares, even once the catalog is empty. This
-  decision does not provide it. Today help lists the vocabulary verbs and
-  the catalog's job verbs, each only when a loaded extension declares a
-  command of that name, so a declared command that neither names is not
-  listed.
+- **D2 — what help lists.** Help lists the public commands that loaded
+  extensions declare: vocabulary verbs first, in vocabulary order, then the
+  other declared commands in name order. A workspace with only
+  `@putnami/cloud` still lists the `build` that cloud declares, and a
+  declared command such as `clientgen` is listed. This is a requirement on the
+  change that removes the development verbs from the core catalog. This
+  decision does not provide it (point 3).
 - **D3 — development flags.** No global flag becomes a development flag in
   this slice. `--profile` and `--dry-run` stay core flags.
 - **D4 — help outside a workspace.** Once the core declares no verb,

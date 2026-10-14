@@ -63,27 +63,27 @@ func TestAWorkspaceAliasWinsOverAVocabularyAlias(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "extension-verb-vocabulary", "a-workspace-alias-wins-over-a-vocabulary-alias")
 	cfg := &wsproto.Config{Aliases: map[string]string{"x": "test", "b": "lint"}}
 	aliases, warnings := processAliases(cfg, false, aliasingExtensions())
+	// The workspace alias b never applied, because the built-in b resolves
+	// first: it hides nothing and draws no warning.
 	want := []string{
-		"warning: the workspace alias b (lint) hides the alias b of bundle that @acme/dev declares",
 		"warning: the workspace alias x (test) hides the alias x of bundle that @acme/dev declares",
 	}
 	if !slices.Equal(warnings, want) {
 		t.Fatalf("warnings = %q, want %q", warnings, want)
 	}
-	// x is the workspace's; b keeps its built-in meaning, which a workspace
-	// alias never overrides; w stays the vocabulary's.
+	// x is the workspace's; b and w stay the vocabulary's.
 	parsed := parseArgs([]string{"x,b,w"}, aliases, nil)
 	if parsed.Err != nil {
 		t.Fatal(parsed.Err)
 	}
-	if want := []string{"test", "build", "bundle"}; !slices.Equal(parsed.Commands, want) {
+	if want := []string{"test", "bundle", "bundle"}; !slices.Equal(parsed.Commands, want) {
 		t.Fatalf("commands = %v, want %v", parsed.Commands, want)
 	}
 
 	// Help and impact-plan read the same tables.
 	scope := helpScopeOf(&extension.DiscoveryResult{Extensions: aliasingExtensions()}, cfg.Aliases)
-	if got := scope.commandAliases(cfg.Aliases); !maps.Equal(got.vocabulary, map[string]string{"w": "bundle"}) {
-		t.Errorf("help alias tables = %+v, want only the vocabulary alias no workspace alias hides", got)
+	if got := scope.commandAliases(cfg.Aliases); !maps.Equal(got.vocabulary, map[string]string{"b": "bundle", "w": "bundle"}) {
+		t.Errorf("help alias tables = %+v, want the vocabulary aliases no applying workspace alias hides", got)
 	}
 }
 

@@ -332,6 +332,25 @@ func TestBuiltinAliasesResolveToCatalogCommands(t *testing.T) {
 	}
 }
 
+// TestWorkspaceAliasReservesOnlyWhatApplies keeps the reservation rule that
+// help, completion and dispatch share: a workspace alias named like a built-in
+// alias never applies, so it reserves no name from a vocabulary.
+func TestWorkspaceAliasReservesOnlyWhatApplies(t *testing.T) {
+	workspace := map[string]string{"b": "lint", "x": "test"}
+	if WorkspaceAliasApplies("b", workspace) || ReservesVocabularyAlias("b", workspace) {
+		t.Error("workspace alias b applies, want the built-in b to resolve first")
+	}
+	if !WorkspaceAliasApplies("x", workspace) || !ReservesVocabularyAlias("x", workspace) {
+		t.Error("workspace alias x does not apply, want it to reserve x")
+	}
+	if WorkspaceAliasApplies("y", workspace) || ReservesVocabularyAlias("y", workspace) {
+		t.Error("y is reserved, want no workspace alias and no catalog command to reserve it")
+	}
+	if !ReservesVocabularyAlias("deploy", nil) {
+		t.Error("deploy is free, want every catalog command reserved")
+	}
+}
+
 func TestPublicJobCommands_MatchCatalogOrder(t *testing.T) {
 	var want []string
 	for _, command := range catalog {
