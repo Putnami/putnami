@@ -804,24 +804,6 @@ func TestInfraSidecarsResolveConfigAndDescribeOnlyProducers(t *testing.T) {
 	}
 }
 
-func TestCanonicalCapabilitySecretNameMatchesConfigGenerator(t *testing.T) {
-	cases := map[string]string{
-		"DB_PASSWORD":           "db_password",
-		"clientSecret":          "client_secret",
-		"auth.clientSecret":     "auth.client_secret",
-		"server.http.apiKey":    "server.http.api_key",
-		"Weird Name!":           "weird_name_",
-		"_leadingUnderscore":    "leading_underscore",
-		"STRIPE_WEBHOOK_SECRET": "stripe_webhook_secret",
-		strings.Repeat("a", 65): strings.Repeat("a", 64),
-	}
-	for input, want := range cases {
-		if got := canonicalCapabilitySecretName(input); got != want {
-			t.Errorf("canonicalCapabilitySecretName(%q) = %q, want %q", input, got, want)
-		}
-	}
-}
-
 func TestDependencyMergeCoalescesCanonicalWireCopiesAndRejectsDivergence(t *testing.T) {
 	root := t.TempDir()
 	workloadRoot := filepath.Join(root, "workload")

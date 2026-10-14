@@ -21,6 +21,7 @@ type secretsFakeServer struct {
 	store       map[string]map[string]string // path → field → value
 	updatedAt   string
 	publishHint bool
+	schema      map[string]any // the published schema; nil answers 404
 	requests    []map[string]any
 }
 
@@ -32,6 +33,11 @@ func (s *secretsFakeServer) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 
 	switch {
+	case strings.Contains(req.URL.Path, "/schemas") && req.Method == http.MethodGet:
+		if s.schema == nil {
+			return jsonResponse(http.StatusNotFound, map[string]any{"error": "schema not found"}), nil
+		}
+		return jsonResponse(http.StatusOK, s.schema), nil
 	case req.URL.Path == "/.well-known/openid-configuration":
 		return jsonResponse(http.StatusOK, map[string]any{
 			"issuer": testBaseURL, "token_endpoint": testBaseURL + "/token",
@@ -251,6 +257,89 @@ func TestSecretsSet_PublishFirstHint(t *testing.T) {
 			t.Errorf("error %q missing fragment %q", msg, fragment)
 		}
 	}
+}
+
+// crmSchema declares the config block crm with the sensitive field apiKey,
+// whose requirement name is crm.api_key, the sensitive object oauthApp and
+// the sensitive map webhookSecrets.
+func crmSchema() map[string]any {
+	return map[string]any{
+		"appName": "crm",
+		"configs": []map[string]any{{
+			"path": "crm",
+			"fields": []map[string]any{
+				{"name": "apiKey", "type": "string", "sensitive": true},
+				{"name": "region", "type": "string"},
+				{"name": "webhookSecrets", "type": "map", "sensitive": true},
+				{"name": "oauthApp", "type": "object", "sensitive": true, "fields": []map[string]any{
+					{"name": "clientId", "type": "string"},
+					{"name": "clientSecret", "type": "string"},
+				}},
+			},
+		}},
+	}
+}
+
+func runCRMSecretsSet(t *testing.T, key string) (*secretsFakeServer, error) {
+	t.Helper()
+	home := t.TempDir()
+	workspaceRoot := t.TempDir()
+	writeTestAuth(t, home)
+	writeLinkFile(t, workspaceRoot)
+
+	fake := newSecretsFake(t)
+	fake.schema = crmSchema()
+	ioctx, _, _ := commonIO(t, home, &http.Client{Transport: fake})
+	ioctx.Env["PUTNAMI_WORKSPACE_ROOT"] = workspaceRoot
+	return fake, runSecrets(ioctx, []string{"set", "crm", key, "--value", "s3cret"})
+}
+
+func TestSecretsSet_RefusesRequirementNameAndNamesTheField(t *testing.T) {
+	fake, err := runCRMSecretsSet(t, "crm.api_key")
+	if err == nil {
+		t.Fatal("expected crm.api_key to be refused")
+	}
+	if len(fake.requests) != 0 {
+		t.Fatalf("stored %v, want no write", fake.requests)
+	}
+	if clicore.ExitCode(err) != clicore.ExitUsage {
+		t.Fatalf("exit = %d, want ExitUsage", clicore.ExitCode(err))
+	}
+	for _, fragment := range []string{"crm.api_key", "requirement name of crm.apiKey", "putnami cloud secrets set crm crm.apiKey --env prod --from-stdin"} {
+		assertContains(t, err.Error(), fragment)
+	}
+}
+
+func TestSecretsSet_RefusesAnUndeclaredKey(t *testing.T) {
+	fake, err := runCRMSecretsSet(t, "crm.token")
+	if err == nil {
+		t.Fatal("expected crm.token to be refused")
+	}
+	if len(fake.requests) != 0 {
+		t.Fatalf("stored %v, want no write", fake.requests)
+	}
+	assertContains(t, err.Error(), "crm.token is not a config key of crm")
+	assertContains(t, err.Error(), "putnami cloud config show crm --env prod --secret-keys")
+}
+
+func TestSecretsSet_AcceptsDeclaredKeys(t *testing.T) {
+	for _, key := range []string{"crm.apiKey", "crm.oauthApp", "crm.oauthApp.clientSecret", "crm.webhookSecrets.stripe"} {
+		fake, err := runCRMSecretsSet(t, key)
+		if err != nil {
+			t.Fatalf("set %s: %v", key, err)
+		}
+		if len(fake.requests) != 1 {
+			t.Fatalf("set %s: requests = %d, want 1", key, len(fake.requests))
+		}
+	}
+}
+
+func TestSecretsSet_RequirementNameOfASensitiveObject(t *testing.T) {
+	_, err := runCRMSecretsSet(t, "crm.oauth_app")
+	if err == nil {
+		t.Fatal("expected crm.oauth_app to be refused")
+	}
+	assertContains(t, err.Error(), "requirement name of crm.oauthApp,")
 }
 
 func TestSecretsSet_RequiresKeyForm(t *testing.T) {
