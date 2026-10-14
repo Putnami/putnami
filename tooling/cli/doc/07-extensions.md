@@ -919,6 +919,8 @@ so on down the graph. See
   ordinary `putnami.lock.json` entry. It never writes a dependency into
   `putnami.workspace.json`. A dependency appears in the output with the
   extension that requires it: `✓ @acme/dev@1.2.0 (required by @acme/app)`.
+  `putnami extensions install <name>` installs `<name>` and its dependencies
+  only, and runs their `onInstall` hooks.
 - **Edges.** The CLI follows the dependencies of an extension installed from
   the artifact store or declared by path. It follows those of an extension
   loaded from `node_modules` only when the workspace declares its name and
@@ -1010,7 +1012,8 @@ not downloaded again.
   `--platform` and `--dest` are usage errors.
 - It refuses an extension whose manifest names a registry dependency in
   `extensionDependencies`. The user scope has no workspace file to name its
-  roots, so declare that extension in a workspace instead.
+  roots, so declare that extension in a workspace instead. The version the
+  user-scope lock pinned before stays installed and pinned.
 
 Outside a workspace, `putnami <group> <subcommand>` resolves against the user
 scope only. A pinned extension whose link is missing is repaired the way a

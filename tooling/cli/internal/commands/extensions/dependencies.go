@@ -524,8 +524,9 @@ func splitGlobalOnly(artMap map[string]string, globalOnly map[string]bool, speci
 }
 
 // installGraphWork installs the dependency graph of the roots work installed,
-// then the global-only entries of deferred that name no graph member, and
-// returns every work item, sorted by name, with whether the graph failed.
+// then, unless the run installs one specific extension, the global-only
+// entries of deferred that name no graph member. It returns every work item,
+// sorted by name, with whether the graph failed.
 func installGraphWork(ctx context.Context, cfg *wsproto.Config, lockFile *lockfile.LockFile, work []artifactInstallWork, deferred map[string]string,
 	specificName, specificVersion string, latest, persist bool, ops artifactOps, humanOut io.Writer, globalOnly map[string]bool, quiet bool) ([]artifactInstallWork, bool) {
 	graph := newInstallGraph(ops, lockFile, persist)
@@ -548,6 +549,10 @@ func installGraphWork(ctx context.Context, cfg *wsproto.Config, lockFile *lockfi
 	work = append(work, graph.work()...)
 
 	ignored := graph.ignoredGlobalKeys(deferred, quiet)
+	if specificName != "" {
+		// A specific install installs that extension and its graph only.
+		deferred = nil
+	}
 	rest := map[string]string{}
 	for name, constraint := range deferred {
 		if !ignored[name] {
@@ -613,6 +618,9 @@ func updateDependencies(ctx context.Context, cfg *wsproto.Config, lockFile *lock
 		failures = append(failures, artifactInstallWork{name: name, err: err})
 	}
 	failures = append(failures, graph.work()...)
+	// By name, as an install reports them, so the report does not depend on
+	// map order.
+	sort.SliceStable(failures, func(i, j int) bool { return failures[i].name < failures[j].name })
 	failed := false
 	for _, item := range failures {
 		if item.err == nil {

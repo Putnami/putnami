@@ -21,6 +21,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -36,6 +37,8 @@ type graphRelease struct {
 	contract int
 	// commands are reserved commands it serves besides build.
 	commands []string
+	// hooks is its hooks object, a JSON value, or "" for none.
+	hooks string
 }
 
 // graphRegistry is a registry double for graph installs. Its install writes
@@ -76,6 +79,19 @@ func (r *graphRegistry) publishRelease(name, version string, release graphReleas
 		r.releases[name] = map[string]graphRelease{}
 	}
 	r.releases[name][version] = release
+}
+
+// publishWithInstallHook publishes a release whose onInstall hook records
+// each run in marker, a file of the workspace.
+func (r *graphRegistry) publishWithInstallHook(name, version, deps, marker string) {
+	r.t.Helper()
+	dir := filepath.Join(r.store, "extensions", layout.EncodeName(name)+"@"+version)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		r.t.Fatal(err)
+	}
+	command := writeInstallHookProgram(r.t, dir, filepath.Join(r.ws, marker), fixtureproc.Program{})
+	r.publishRelease(name, version, graphRelease{deps: deps,
+		hooks: fmt.Sprintf(`{"onInstall": {"kind": "command", "command": %q, "cwd": "{workspaceRoot}"}}`, command)})
 }
 
 func (r *graphRegistry) channel(name, channel, answer string) {
@@ -184,6 +200,9 @@ func registryManifest(name, version string, release graphRelease) string {
 	deps := ""
 	if release.deps != "" {
 		deps = `"extensionDependencies": ` + release.deps + ", "
+	}
+	if release.hooks != "" {
+		deps += `"hooks": ` + release.hooks + ", "
 	}
 	return fmt.Sprintf(`{"name": %q, "version": %q, "cliContract": %d, %s"commands": {%s}, "tasks": {"t": {"kind": "command", "command": "echo"}}}`,
 		name, version, contract, deps, strings.Join(served, ", "))
@@ -478,6 +497,39 @@ func TestAGlobalKeyForADependencyIsIgnoredByAnInstall(t *testing.T) {
 	}
 	if strings.Count(stderr, extension.GlobalConfigDisplay+" declares @acme/dev") != 1 {
 		t.Errorf("update stderr = %q, want the warning once", stderr)
+	}
+}
+
+// A specific install installs that extension and its graph only. An unpinned
+// key that only the global configuration declares is neither requested nor
+// pinned, and a global key for a dependency still warns once.
+func TestASpecificInstallLeavesGlobalOnlyKeysAlone(t *testing.T) {
+	r := newGraphRegistry(t)
+	r.publish("@acme/app", "1.0.0", `{"@acme/dev": "^1.0.0"}`)
+	r.publish("@acme/dev", "1.0.0", "")
+	r.publish("@acme/tool", "1.0.0", "")
+	home := os.Getenv("HOME")
+	if err := os.MkdirAll(filepath.Join(home, wsproto.GlobalConfigDir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, wsproto.GlobalConfigDir, wsproto.GlobalConfigFilename),
+		[]byte(`{"extensions": {"@acme/dev": "1.0.0", "@acme/tool": ""}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _ := r.declare(map[string]string{})
+	cfg.Extensions.List["@acme/dev"] = "1.0.0"
+	cfg.Extensions.List["@acme/tool"] = ""
+
+	_, stderr, err := r.run(cfg, "@acme/app")
+	if err != nil {
+		t.Fatalf("install @acme/app: %v\nstderr: %s", err, stderr)
+	}
+	if got := requestsFor(r.takeRequests(), "@acme/tool"); len(got) != 0 {
+		t.Errorf("a specific install requested the global-only key @acme/tool: %v", got)
+	}
+	wantPins(t, r.locked(), map[string]string{"@acme/app": "1.0.0", "@acme/dev": "1.0.0"})
+	if strings.Count(stderr, extension.GlobalConfigDisplay+" declares @acme/dev") != 1 {
+		t.Errorf("stderr = %q, want one warning that names %s and @acme/dev", stderr, extension.GlobalConfigDisplay)
 	}
 }
 
@@ -922,6 +974,52 @@ func TestUpdateReResolvesDependenciesWithoutPinningThem(t *testing.T) {
 	}
 }
 
+// An update that fails on several extensions reports them by name, so its
+// error and its failure lines are the same on every run, and it writes no
+// lock.
+func TestAnUpdateReportsItsFailuresByName(t *testing.T) {
+	r := newGraphRegistry(t)
+	r.publish("@acme/app", "1.0.0", `{"@acme/a": "^1.0.0", "@acme/b": "^1.0.0"}`)
+	r.publish("@acme/a", "1.0.0", "")
+	r.publish("@acme/b", "1.0.0", "")
+	cfg, _ := r.declare(map[string]string{"@acme/app": "", "@acme/a": "1.0.0", "@acme/b": "1.0.0"})
+	r.mustRun(cfg)
+	r.publish("@acme/app", "2.0.0", `{"@acme/a": "^2.0.0", "@acme/b": "^2.0.0"}`)
+	before := r.lockBytes()
+
+	var first string
+	for run := range 20 {
+		var err error
+		stderr := sharedtest.CaptureStderr(t, func() {
+			_, err = sharedtest.CaptureStdout(t, func() error {
+				return updateArtifacts(context.Background(), r.ws, cfg, nil, r.ops(), ArtifactUpdateOptions{}, "")
+			})
+		})
+		want := "@acme/a: @acme/a@1.0.0 does not satisfy @acme/app, which requires ^2.0.0"
+		if !errors.Is(err, errGraphUnresolved) || !strings.Contains(err.Error(), want) {
+			t.Fatalf("update %d = %v, want the first failure by name, %q", run, err, want)
+		}
+		var lines []string
+		for _, line := range strings.Split(stderr, "\n") {
+			if strings.HasPrefix(strings.TrimSpace(line), "✗") {
+				lines = append(lines, strings.TrimSpace(line))
+			}
+		}
+		if len(lines) != 2 || !strings.HasPrefix(lines[0], "✗ @acme/a:") || !strings.HasPrefix(lines[1], "✗ @acme/b:") {
+			t.Fatalf("update %d failure lines = %q, want @acme/a then @acme/b", run, lines)
+		}
+		report := err.Error() + "\n" + strings.Join(lines, "\n")
+		if first == "" {
+			first = report
+		} else if report != first {
+			t.Fatalf("update %d reported\n%s\nwant the same report as the first update\n%s", run, report, first)
+		}
+	}
+	if !bytes.Equal(r.lockBytes(), before) {
+		t.Error("a failed update wrote the lock")
+	}
+}
+
 // A dry run previews the declared extensions only, says so, and resolves no
 // dependency.
 func TestDryRunPreviewsDeclaredExtensionsOnly(t *testing.T) {
@@ -1138,6 +1236,32 @@ func TestAnImplicitInstallNeverResolvesAnUnpinnedDependency(t *testing.T) {
 	}
 	if !bytes.Equal(r.lockBytes(), before) {
 		t.Error("an implicit install wrote the lock")
+	}
+}
+
+// Installing an extension runs the onInstall hooks of the dependencies it
+// reaches, transitively, and no hook of an extension it does not reach.
+func TestInstallingADependentRunsItsDependenciesInstallHooks(t *testing.T) {
+	r := newGraphRegistry(t)
+	r.publish("@acme/app", "1.0.0", `{"@acme/dev": ""}`)
+	r.publishWithInstallHook("@acme/dev", "1.0.0", `{"@acme/base": ""}`, "dev-ran")
+	r.publishWithInstallHook("@acme/base", "1.0.0", "", "base-ran")
+	r.publishWithInstallHook("@acme/other", "1.0.0", "", "other-ran")
+	cfg, _ := r.declare(map[string]string{"@acme/other": ""})
+	r.mustRun(cfg)
+	r.mustRun(cfg, "@acme/app")
+
+	var out bytes.Buffer
+	if err := runExtensionInstallHooks(context.Background(), r.ws, cfg, []string{"@acme/app"}, "", &out); err != nil {
+		t.Fatalf("install hooks: %v\n%s", err, out.String())
+	}
+	for marker, want := range map[string]int{"dev-ran": 1, "base-ran": 1, "other-ran": 0} {
+		if got := len(fixtureproc.Runs(t, filepath.Join(r.ws, marker))); got != want {
+			t.Errorf("%s: the hook ran %d times, want %d\n%s", marker, got, want, out.String())
+		}
+	}
+	if !strings.Contains(out.String(), "✓ @acme/dev onInstall") || !strings.Contains(out.String(), "✓ @acme/base onInstall") {
+		t.Errorf("output lacks the dependencies' hooks:\n%s", out.String())
 	}
 }
 
