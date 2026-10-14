@@ -148,6 +148,12 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 					// trustworthy as the baseline it was computed from.
 					iox.Fprintln(req.stdout(), "  No impacted projects found against "+selection.Baseline+". Nothing to do.")
 				}
+				// The engine still plans the workspace-scoped tasks of this run,
+				// and one that reads the change since the baseline, such as the
+				// breaking marker of validate-workspace, needs it.
+				req.selection = jobs.ResolvedRunSelection(
+					protocoljob.SelectionModeImpacted, selection.Baseline, string(selection.BaselineSource), nil)
+				req.selection.EmptyImpact = true
 				return nil, ExitSuccess
 			}
 			// The change's size by category and the areas its code spans:
@@ -218,12 +224,6 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 	if code := resolveNoCacheProjects(req, ws); code != ExitSuccess {
 		return nil, code
 	}
-	// `emptyImpact` is never set here, and that is not an omission: the engine
-	// returns early on an empty impacted set above, so no job is planned and no
-	// context is written. The member IS reachable on the interactive extension
-	// path, which resolves through shared.ResolveProjectSelection and still runs
-	// the subprocess so the extension can report the no-op itself. Forcing the
-	// branch here would mean planning work for a run the engine has declined.
 	req.selection = jobs.ResolvedRunSelection(
 		selectionMode, selectionBaseline, selectionBaselineSource, selectedProjects)
 	return selectedProjects, ExitSuccess
@@ -339,18 +339,11 @@ func verificationSelection(
 	if code != ExitSuccess {
 		return nil, selectionEvidence{}, code
 	}
-	// selectProjects returns early, with no selection block, when `--impacted`
-	// resolved cleanly over an unchanged tree. That is a real answer — verify
-	// nothing, publish what the head requires — and it is reported as the
-	// impacted no-op rather than as an absent selection.
-	selection := gate.selection
-	if selection == nil {
-		selection = jobs.ResolvedRunSelection(
-			protocoljob.SelectionModeImpacted, gate.Global.Baseline, "", nil)
-		selection.EmptyImpact = true
-	}
+	// An `--impacted` run over an unchanged tree selects no project and records
+	// the impacted no-op. That is a real answer: verify nothing, publish what
+	// the head requires.
 	return &jobs.ReleaseSetVerification{
-		Projects: projects, Selection: selection,
+		Projects: projects, Selection: gate.selection,
 	}, gate.selectionEvidence, ExitSuccess
 }
 
