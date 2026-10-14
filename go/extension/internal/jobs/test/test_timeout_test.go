@@ -107,9 +107,13 @@ func TestRun_AnOrdinaryFailureLeavesItsResultUnmarked(t *testing.T) {
 }
 
 // TestRunBatchMarksOnlyTheMembersATimeoutFailed pins the batch form: a member
-// carries timedOut when its own output, or the unattributed failure charged
-// to it, shows a test binary past -timeout, and never otherwise.
+// carries timedOut when its own output shows a test binary past -timeout, or
+// when the batch charged it a failure no failing test of its own explains and
+// the invocation's output shows one, and never otherwise.
 func TestRunBatchMarksOnlyTheMembersATimeoutFailed(t *testing.T) {
+	// Go emits build output as events with an ImportPath and no Package, so
+	// the batch cannot attribute them and charges the failure to every member.
+	strayBuildOutput := `{"ImportPath":"example.com/a.test","Action":"build-output","Output":"ld: warning: duplicate -rpath\n"}`
 	cases := []struct {
 		name   string
 		output []string
@@ -138,6 +142,42 @@ func TestRunBatchMarksOnlyTheMembersATimeoutFailed(t *testing.T) {
 				testEvent("pass", "example.com/b", "", ""),
 			},
 			want: map[string]bool{"/a": true, "/b": true},
+		},
+		{
+			name: "a passing batch mate charged with a timeout through stray output",
+			output: []string{
+				strayBuildOutput,
+				testEvent("run", "example.com/a", "TestSlow", ""),
+				testEvent("output", "example.com/a", "TestSlow", "panic: test timed out after 1s\n"),
+				testEvent("fail", "example.com/a", "TestSlow", ""),
+				testEvent("fail", "example.com/a", "", ""),
+				testEvent("pass", "example.com/b", "TestB", ""),
+				testEvent("pass", "example.com/b", "", ""),
+			},
+			want: map[string]bool{"/a": true, "/b": true},
+		},
+		{
+			name: "a batch mate's own failure beside a timeout",
+			output: []string{
+				strayBuildOutput,
+				testEvent("output", "example.com/a", "TestSlow", "*** Test killed: ran too long (1m1s).\n"),
+				testEvent("fail", "example.com/a", "", ""),
+				testEvent("output", "example.com/b", "TestB", "    b_test.go:9: boom\n"),
+				testEvent("fail", "example.com/b", "TestB", ""),
+				testEvent("fail", "example.com/b", "", ""),
+			},
+			want: map[string]bool{"/a": true, "/b": false},
+		},
+		{
+			name: "a passing batch mate charged through stray output without a timeout",
+			output: []string{
+				strayBuildOutput,
+				testEvent("output", "example.com/a", "TestA", "    a_test.go:3: boom\n"),
+				testEvent("fail", "example.com/a", "TestA", ""),
+				testEvent("fail", "example.com/a", "", ""),
+				testEvent("pass", "example.com/b", "", ""),
+			},
+			want: map[string]bool{"/a": false, "/b": false},
 		},
 		{
 			name: "no package timed out",

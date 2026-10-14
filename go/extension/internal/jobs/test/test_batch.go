@@ -351,12 +351,14 @@ func executeBatchGroup(
 	outputs := make(map[string]string, len(group.projects))
 	failed := make(map[string]bool, len(group.projects))
 	unattributedFailures := make(map[string]string, len(group.projects))
+	invocationTimedOut := make(map[string]bool, len(group.projects))
 	// Invocations run one after another: the batch holds one scheduler slot,
 	// and each `go test` already spreads its own packages over the CPUs.
 	for _, invocation := range invocations {
 		args := batchTestArgs(options, tempDir, invocation.coverFile, invocation.coverPackages, invocation.patterns)
 		output, commandErr := runGoCommand(goBinary, args, group.root, runEnv)
 		runOutputs, runFailed, unattributedFailure := splitBatchTestOutput(string(output), invocation.projects, commandErr != nil)
+		timedOut := parse.TestTimedOut(string(output))
 
 		if invocation.coverFile != "" {
 			splitErr := splitBatchCoverage(invocation.coverFile, invocation.projects)
@@ -382,6 +384,7 @@ func executeBatchGroup(
 			outputs[project.ref.ID] = runOutputs[project.ref.ID]
 			failed[project.ref.ID] = runFailed[project.ref.ID]
 			unattributedFailures[project.ref.ID] = unattributedFailure
+			invocationTimedOut[project.ref.ID] = timedOut
 		}
 	}
 
@@ -410,6 +413,7 @@ func executeBatchGroup(
 			outputs[project.ref.ID],
 			failed[project.ref.ID],
 			unattributedFailures[project.ref.ID],
+			invocationTimedOut[project.ref.ID],
 		)
 		attachBatchVerification(&result, fragments, project)
 		results = append(results, result)
@@ -746,6 +750,7 @@ func evaluateBatchProject(
 	output string,
 	testFailed bool,
 	unattributedFailure string,
+	invocationTimedOut bool,
 ) batchProjectResult {
 	testCounts := parse.TestJSON(output)
 	var coverageResult parse.CoverageResult
@@ -849,11 +854,11 @@ func evaluateBatchProject(
 		Diagnostics: diagnostics,
 		Artifacts:   artifacts,
 		Summary:     summarizeDiagnostics(diagnostics),
-		// The member's own output, or the unattributed failure the batch
-		// already charges to it, decides: a timeout either one shows is part
-		// of this member's failure.
-		TimedOut: testFailed &&
-			(parse.TestTimedOut(output) || parse.TestTimedOut(unattributedFailure)),
+		// A failed member timed out when its own output shows a timeout, or
+		// when no failing test of its own explains the failure the batch
+		// charged to it and its invocation's output shows one.
+		TimedOut: testFailed && (parse.TestTimedOut(output) ||
+			(invocationTimedOut && !testOutputFailed(output))),
 	}
 }
 

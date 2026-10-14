@@ -75,7 +75,9 @@ type JobResult struct {
 	// one its inputs produced. It is set at every site that turns a
 	// context.DeadlineExceeded into a failed result, and from the extension's
 	// own report: error.timedOut on a result event (ExtractResult) or timedOut
-	// on a batch member. A consumer never has to string-match the error
+	// on a batch member. It is the CLI's only timeout marker: JobError.TimedOut
+	// is the wire member it is read from, and the CLI never sets it on Error.
+	// A consumer never has to string-match the error
 	// message. A timeout depends on host load rather than on the cache key,
 	// which is why the failure cache refuses to record one
 	// (internal/jobs/task_failure.go).

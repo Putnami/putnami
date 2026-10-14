@@ -1158,12 +1158,59 @@ func TestTestTimedOut(t *testing.T) {
 			}, "\n"),
 		},
 		{
+			name:   "after output a test left without a newline",
+			output: event("output", "TestSlow", "progress 40%panic: test timed out after 1s\n"),
+			want:   true,
+		},
+		{
+			name:   "plain, after output a test left without a newline",
+			output: "=== RUN   TestSlow\nprogress 40%panic: test timed out after 1s\n\trunning tests:\n",
+			want:   true,
+		},
+		{
+			name:   "cmd/go killed the binary",
+			output: event("output", "", "*** Test killed: ran too long (1m1s).\n"),
+			want:   true,
+		},
+		{
+			name:   "cmd/go killed the binary with a signal",
+			output: event("output", "", "*** Test killed with quit: ran too long (1m1s).\n"),
+			want:   true,
+		},
+		{
+			name:   "plain, cmd/go killed the binary",
+			output: "=== RUN   TestSlow\n*** Test killed: ran too long (1m1s).\nFAIL\tpkg\t61.004s\n",
+			want:   true,
+		},
+		{
+			name:   "plain, cmd/go killed the binary with a signal",
+			output: "=== RUN   TestSlow\n*** Test killed with quit: ran too long (1m1s).\nFAIL\tpkg\t61.004s\n",
+			want:   true,
+		},
+		{
+			name:   "cmd/go killed the binary after output left without a newline",
+			output: event("output", "TestSlow", "waiting*** Test killed: ran too long (1m1s).\n"),
+			want:   true,
+		},
+		{
 			name: "a test that logs the timeout text",
 			output: strings.Join([]string{
 				event("output", "TestOne", "    one_test.go:9: panic: test timed out after 1s\n"),
 				event("fail", "TestOne", ""),
 			}, "\n"),
 		},
+		{
+			name: "a subtest that logs the kill text",
+			output: strings.Join([]string{
+				event("output", "TestOne/sub", "        one_test.go:9: *** Test killed: ran too long (1m1s).\n"),
+				event("fail", "TestOne/sub", ""),
+			}, "\n"),
+		},
+		{
+			name:   "a test log continuation line",
+			output: "    one_test.go:9: first line\n        panic: test timed out after 1s\n",
+		},
+		{name: "a kill line without its reason", output: "*** Test killed\n"},
 		{name: "another panic", output: "panic: runtime error: index out of range [1] with length 1\n"},
 		{name: "no output"},
 	}
