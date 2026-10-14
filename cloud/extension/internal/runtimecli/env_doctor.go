@@ -2,11 +2,13 @@ package runtimecli
 
 // env_doctor.go backs `putnami cloud env doctor [<env>]`: a read-only
 // preflight that prints one row per continuous-delivery prerequisite, each ok,
-// missing or unknown, with the fix for every row that is not ok. It prints the
-// shared status node and exits by the shared rule: 1 when any row is
-// missing, 0 otherwise. An unknown row could not be checked, so it is counted
-// and printed but does not fail the command unless --strict asks for every
-// row ok; a control-api that does not answer leaves its rows unknown.
+// missing, degraded or unknown, with the fix for every row that is not ok. It
+// prints the shared status node and exits by the shared rule: 1 when any row
+// is missing, 0 otherwise. A degraded row is in place but out of date (an
+// accepted environment definition that differs from the default branch); an
+// unknown row could not be checked. Both are counted and printed but do not
+// fail the command unless --strict asks for every row ok; a control-api that
+// does not answer leaves its rows unknown.
 // --output=json carries the node: one child per row, and the counts as
 // metrics.
 //
@@ -42,11 +44,12 @@ import (
 // command nor the workspace link names one.
 const EnvDoctorDefaultEnvironment = "prod"
 
-// Row statuses, the same three words the server answers.
+// Row statuses, the same words the server answers.
 const (
-	EnvDoctorOK      = "ok"
-	EnvDoctorMissing = "missing"
-	EnvDoctorUnknown = "unknown"
+	EnvDoctorOK       = "ok"
+	EnvDoctorMissing  = "missing"
+	EnvDoctorDegraded = "degraded"
+	EnvDoctorUnknown  = "unknown"
 )
 
 // Checkout row identifiers.
@@ -121,13 +124,14 @@ type EnvDoctorPublish func(workspaceRoot, namespace string, workloads []EnvDocto
 
 // EnvDoctorResult is the --output data: stable keys, rows in envDoctorOrder.
 // Ready means no row is missing and control-api answered. Missing counts the
-// missing rows; Unchecked counts the rows that could not be checked (every
-// status but ok and missing).
+// missing rows, Degraded the degraded ones; Unchecked counts the rows that
+// could not be checked (every other status but ok).
 type EnvDoctorResult struct {
 	Workspace   string         `json:"workspace"`
 	Environment string         `json:"environment"`
 	Ready       bool           `json:"ready"`
 	Missing     int            `json:"missing"`
+	Degraded    int            `json:"degraded"`
 	Unchecked   int            `json:"unchecked"`
 	Rows        []EnvDoctorRow `json:"rows"`
 }
@@ -167,7 +171,7 @@ func Env(params map[string]any, args []string, workspaceRoot string, env map[str
 func envHelp(params map[string]any, ioctx clicore.IO) error {
 	commands := []map[string]string{
 		{"command": "cloud env status [<env>]", "description": "compare what putnami.ci.json declares with what runs, per environment and workload, and print each channel's newest move with its release ids; exits 1 when a workload failed; --strict also fails on degraded or unknown; --health and --provenance print the deployment table of one environment (default: the linked environment, then prod)"},
-		{"command": "cloud env doctor [<env>]", "description": "check every prerequisite continuous delivery needs for one environment; read-only; exits 1 when any is missing; --strict also fails on unknown"},
+		{"command": "cloud env doctor [<env>]", "description": "check every prerequisite continuous delivery needs for one environment; read-only; exits 1 when any is missing; --strict also fails on degraded or unknown"},
 		{"command": "cloud env enable [<env>]", "description": "apply the fix of every workspace-owned prerequisite that is missing (namespace bindings, environment definition, Runtime grants), report the rest, then print the table again; idempotent; needs platform.workspace.manage; --source-revision <sha> accepts that commit instead of the default-branch head"},
 	}
 	if clicore.StructuredOutput(params) {
@@ -219,11 +223,12 @@ func collectEnvDoctor(params map[string]any, positional, workspaceRoot string, e
 	// A control plane that never answered checked nothing on the server side.
 	// Calling that ready would pass a preflight that looked at half the table.
 	result.Ready = result.Ready && answered
-	// --strict is the gate for CI: every row must be ok. Without it an
-	// unknown row (a machine token cannot read the Runtime grants, say) is
-	// reported and counted but does not fail the command.
+	// --strict is the gate for CI: every row must be ok. Without it a
+	// degraded row (a stale environment definition) or an unknown one (a
+	// machine token cannot read the Runtime grants, say) is reported and
+	// counted but does not fail the command.
 	if clicore.BoolParam(params, false, "strict") {
-		result.Ready = result.Ready && result.Unchecked == 0
+		result.Ready = result.Ready && result.Degraded == 0 && result.Unchecked == 0
 	}
 	return result, nil
 }
@@ -309,7 +314,7 @@ func envDoctorServerRow(row EnvDoctorRow) EnvDoctorRow {
 	row.Status = envDoctorPrintable(row.Status)
 	row.Detail, row.Fix = envDoctorPrintable(row.Detail), envDoctorPrintable(row.Fix)
 	switch row.Status {
-	case EnvDoctorOK, EnvDoctorMissing, EnvDoctorUnknown:
+	case EnvDoctorOK, EnvDoctorMissing, EnvDoctorDegraded, EnvDoctorUnknown:
 	default:
 		row.Detail = fmt.Sprintf("the server answered status %q: %s", row.Status, row.Detail)
 		row.Status = EnvDoctorUnknown
@@ -399,6 +404,8 @@ func envDoctorMerge(workspaceID, environment string, local, server []EnvDoctorRo
 		case EnvDoctorOK:
 		case EnvDoctorMissing:
 			result.Missing++
+		case EnvDoctorDegraded:
+			result.Degraded++
 		default:
 			result.Unchecked++
 		}
@@ -425,7 +432,11 @@ func writeEnvDoctor(params map[string]any, ioctx clicore.IO, result EnvDoctorRes
 }
 
 // envDoctorCounts is the summary both the verdict line and the error use.
+// A degraded count is named only when a row is degraded.
 func envDoctorCounts(result EnvDoctorResult) string {
+	if result.Degraded > 0 {
+		return fmt.Sprintf("%d missing, %d degraded, %d could not be checked", result.Missing, result.Degraded, result.Unchecked)
+	}
 	return fmt.Sprintf("%d missing, %d could not be checked", result.Missing, result.Unchecked)
 }
 
@@ -434,9 +445,9 @@ func envDoctorCounts(result EnvDoctorResult) string {
 //
 //	Environment prod of workspace ws-acme
 //
-//	ok       put-binding        active put namespace acme
-//	missing  oci-registry       putnami.workspace.json has no registries.oci.publish
-//	         fix: set "registries": {"oci": {"publish": "oci.putnami.dev/<ns>"}} in putnami.workspace.json
+//	ok        put-binding        active put namespace acme
+//	missing   oci-registry       putnami.workspace.json has no registries.oci.publish
+//	          fix: set "registries": {"oci": {"publish": "oci.putnami.dev/<ns>"}} in putnami.workspace.json
 //
 //	not ready: 1 missing, 2 could not be checked
 func renderEnvDoctor(result EnvDoctorResult) string {
@@ -450,9 +461,9 @@ func renderEnvDoctor(result EnvDoctorResult) string {
 	for _, row := range result.Rows {
 		idWidth = max(idWidth, len(row.ID))
 	}
-	indent := strings.Repeat(" ", 9+idWidth+2)
+	indent := strings.Repeat(" ", 10+idWidth+2)
 	for _, row := range result.Rows {
-		fmt.Fprintf(&b, "%-7s  %-*s  %s\n", row.Status, idWidth, row.ID, statusOneLine(row.Detail))
+		fmt.Fprintf(&b, "%-8s  %-*s  %s\n", row.Status, idWidth, row.ID, statusOneLine(row.Detail))
 		if row.Status == EnvDoctorOK || strings.TrimSpace(row.Fix) == "" {
 			continue
 		}

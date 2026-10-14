@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The callers the fixture's control plane names, in the response's order.
@@ -560,7 +561,7 @@ func TestEnvEnablePartialFailureReportsEachStep(t *testing.T) {
 		"fix: fix environment-definition",
 		"5 applied, 1 failed",
 		"Environment prod of workspace " + doctorWorkspaceID,
-		"missing  environment-definition",
+		"missing   environment-definition",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("human output lacks %q:\n%s", want, text)
@@ -760,5 +761,142 @@ func TestEnvEnableUsage(t *testing.T) {
 	}
 	if text := strings.Join(cap.stdout, "\n"); !strings.Contains(text, "cloud env enable [") {
 		t.Fatalf("help = %q", text)
+	}
+}
+
+// TestEnvEnableAcceptsADegradedDefinition: Control answers the
+// environment-definition row degraded when the accepted definition differs
+// from the default branch, and names `env enable` as the fix. The command
+// accepts the default-branch head for that row instead of reporting it as
+// unchecked.
+func TestEnvEnableAcceptsADegradedDefinition(t *testing.T) {
+	spectest.Proves(t, "cloud/env-definition-drift", "enable-accepts-a-degraded-definition", "env-enable-degraded-definition")
+	server := freshWorkspace()
+	server.beforeRows = map[string]string{"environment-definition": EnvDoctorDegraded}
+	server.afterRows = map[string]string{}
+	server.acceptedRevision = 1
+	server.acceptedSources = map[string]int64{strings.Repeat("c", 40): 1}
+	srv := httptest.NewServer(server)
+	defer srv.Close()
+
+	cap, err := runEnvEnable(t, doctorWorkspace(t), srv, map[string]any{"output": "json"})
+	if err != nil {
+		t.Fatalf("exit: %v", err)
+	}
+	if server.appended != 1 {
+		t.Fatalf("appended = %d, want the default-branch head accepted once", server.appended)
+	}
+	acceptances := server.acceptances()
+	if len(acceptances) != 1 || !strings.Contains(acceptances[0].Body, `"expectedRevision":1`) || strings.Contains(acceptances[0].Body, "sourceRevision") {
+		t.Fatalf("acceptances = %+v, want one at the default-branch head expecting revision 1", acceptances)
+	}
+	result := decodeEnableResult(t, cap.stdout)
+	step := stepsByRow(result)["environment-definition"][0]
+	if step.Status != EnvEnableApplied || step.Detail != "accepted revision 2 at source revision "+enableHead+" (the default-branch head; expected revision 1)" {
+		t.Fatalf("step = %+v, want the head applied as revision 2", step)
+	}
+	if !result.Ready || result.Readiness.Degraded != 0 {
+		t.Fatalf("result = %+v, want ready with no degraded row after the acceptance", result)
+	}
+}
+
+// TestEnvEnableFailsWhenADegradedDefinitionReplaysAReplacedCommit covers the
+// case the accept route cannot converge: the default-branch head was accepted
+// as revision 1, a later revision accepted another commit, and the head's
+// declaration differs from it. Control replays revision 1 and keeps revision
+// 3, so the row stays degraded: the step fails and says what to do instead
+// of reading skipped.
+func TestEnvEnableFailsWhenADegradedDefinitionReplaysAReplacedCommit(t *testing.T) {
+	spectest.Proves(t, "cloud/env-definition-drift", "enable-fails-on-a-definition-that-stays-degraded", "env-enable-replaced-commit")
+	server := freshWorkspace()
+	server.beforeRows = map[string]string{"environment-definition": EnvDoctorDegraded}
+	server.afterRows = nil
+	server.acceptedRevision = 3
+	server.acceptedSources = map[string]int64{enableHead: 1, strings.Repeat("c", 40): 3}
+	srv := httptest.NewServer(server)
+	defer srv.Close()
+
+	_, err := runEnvEnable(t, doctorWorkspace(t), srv, map[string]any{"output": "json"})
+	if clicore.ExitCode(err) != clicore.ExitFailure {
+		t.Fatalf("exit = %d (%v), want failure", clicore.ExitCode(err), err)
+	}
+	if server.appended != 0 {
+		t.Fatalf("appended = %d, want the replay alone", server.appended)
+	}
+	envelope := &captureIO{}
+	clicore.WriteErrorResult(err, map[string]any{"output": "json"}, envelope.io(nil))
+	step := stepsByRow(decodeEnableResult(t, envelope.stdout))["environment-definition"][0]
+	if step.Status != EnvEnableFailed ||
+		step.Detail != "source revision "+enableHead+" (the default-branch head) was accepted as revision 1, and Control keeps revision 3: it does not accept a commit a later revision replaced" ||
+		step.Fix != "push a new commit to the default branch, then run `putnami cloud env enable prod` again" {
+		t.Fatalf("step = %+v, want a failed step naming the replaced commit", step)
+	}
+}
+
+// TestEnvEnableFailsWhenTheDefinitionStaysDegraded keeps the run from
+// exiting 0 on a row it did not converge: --source-revision names the commit
+// Control already keeps, the replay writes nothing, and the row still differs
+// from the default-branch head.
+func TestEnvEnableFailsWhenTheDefinitionStaysDegraded(t *testing.T) {
+	spectest.Proves(t, "cloud/env-definition-drift", "enable-fails-on-a-definition-that-stays-degraded", "env-enable-stays-degraded")
+	latest := strings.Repeat("c", 40)
+	server := freshWorkspace()
+	server.beforeRows = map[string]string{"environment-definition": EnvDoctorDegraded}
+	server.afterRows = nil
+	server.acceptedRevision = 3
+	server.acceptedSources = map[string]int64{latest: 3}
+	srv := httptest.NewServer(server)
+	defer srv.Close()
+
+	_, err := runEnvEnable(t, doctorWorkspace(t), srv, map[string]any{"output": "json", "source-revision": latest})
+	if clicore.ExitCode(err) != clicore.ExitFailure {
+		t.Fatalf("exit = %d (%v), want failure", clicore.ExitCode(err), err)
+	}
+	envelope := &captureIO{}
+	clicore.WriteErrorResult(err, map[string]any{"output": "json"}, envelope.io(nil))
+	step := stepsByRow(decodeEnableResult(t, envelope.stdout))["environment-definition"][0]
+	if step.Status != EnvEnableFailed ||
+		step.Detail != "source revision "+latest+" (--source-revision) is already accepted as revision 3; the definition still differs from the default-branch head" ||
+		step.Fix != "run `putnami cloud env enable prod` without --source-revision to accept the default-branch head" {
+		t.Fatalf("step = %+v, want a failed step that names the default-branch head", step)
+	}
+}
+
+// TestEnvEnableFailsWhenAnAcceptedCommitDiffersFromTheHead covers the append
+// path: --source-revision names a new commit, Control accepts it as the next
+// revision, and the row still differs from the default-branch head.
+func TestEnvEnableFailsWhenAnAcceptedCommitDiffersFromTheHead(t *testing.T) {
+	spectest.Proves(t, "cloud/env-definition-drift", "enable-fails-on-a-definition-that-stays-degraded", "env-enable-accepted-commit-differs")
+	other := strings.Repeat("d", 40)
+	server := freshWorkspace()
+	server.beforeRows = map[string]string{"environment-definition": EnvDoctorDegraded}
+	server.afterRows = nil
+	server.acceptedRevision = 3
+	srv := httptest.NewServer(server)
+	defer srv.Close()
+
+	_, err := runEnvEnable(t, doctorWorkspace(t), srv, map[string]any{"output": "json", "source-revision": other})
+	if clicore.ExitCode(err) != clicore.ExitFailure || server.appended != 1 {
+		t.Fatalf("exit = %d (%v), appended = %d; want failure after one append", clicore.ExitCode(err), err, server.appended)
+	}
+	envelope := &captureIO{}
+	clicore.WriteErrorResult(err, map[string]any{"output": "json"}, envelope.io(nil))
+	result := decodeEnableResult(t, envelope.stdout)
+	step := stepsByRow(result)["environment-definition"][0]
+	if step.Status != EnvEnableFailed || result.Failed != 1 || result.Applied != 0 ||
+		!strings.HasSuffix(step.Detail, "; the definition still differs from the default-branch head") ||
+		step.Fix != "run `putnami cloud env enable prod` without --source-revision to accept the default-branch head" {
+		t.Fatalf("step = %+v, failed = %d, applied = %d; want one failed step naming the default-branch head", step, result.Failed, result.Applied)
+	}
+}
+
+// TestEnvEnableDoesNotWriteADegradedBinding keeps the binding steps to the
+// state they converge: a degraded binding row is reported with its fix and
+// says why, not that it could not be checked.
+func TestEnvEnableDoesNotWriteADegradedBinding(t *testing.T) {
+	run := envEnableRun{environment: "prod", namespace: "acme"}
+	step, refused := run.activateBinding(EnvDoctorRow{ID: "put-binding", Status: EnvDoctorDegraded, Detail: "d", Fix: "f"}, "put")
+	if refused || step.Status != EnvEnableReported || step.Detail != "not written: this step writes only a missing row (d)" || step.Fix != "f" {
+		t.Fatalf("step = %+v", step)
 	}
 }

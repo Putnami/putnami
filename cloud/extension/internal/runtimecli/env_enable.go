@@ -182,7 +182,41 @@ func envEnable(params map[string]any, positional, workspaceRoot string, env map[
 	after := fetchEnvReadiness(reqCtx, wctx, environment, workloads, false)
 	result.Readiness = envDoctorMerge(wctx.WorkspaceID, environment, local, after.rows)
 	result.Readiness.Ready = result.Readiness.Ready && after.answered
+	result.Steps = run.failStillDegraded(result.Steps, result.Readiness.Rows)
 	return writeEnvEnable(params, ioctx, envEnableCount(result))
+}
+
+// failStillDegraded fails the definition step when the row still reads
+// degraded after it: the accepted commit does not match the default-branch
+// head, so running the same command again changes nothing.
+func (r envEnableRun) failStillDegraded(steps []EnvEnableStep, after []EnvDoctorRow) []EnvEnableStep {
+	degraded := false
+	for _, row := range after {
+		if row.ID == "environment-definition" {
+			degraded = row.Status == EnvDoctorDegraded
+		}
+	}
+	if !degraded {
+		return steps
+	}
+	for i, step := range steps {
+		if step.Row == "environment-definition" && step.Status != EnvEnableFailed {
+			steps[i].Status = EnvEnableFailed
+			steps[i].Detail += "; the definition still differs from the default-branch head"
+			steps[i].Fix = r.degradedFix()
+		}
+	}
+	return steps
+}
+
+// degradedFix is the next step for a definition row the run left degraded:
+// the default-branch head when --source-revision named another commit, and a
+// new head commit otherwise.
+func (r envEnableRun) degradedFix() string {
+	if r.sourceRevision != "" {
+		return "run `putnami cloud env enable " + r.environment + "` without --source-revision to accept the default-branch head"
+	}
+	return "push a new commit to the default branch, then run `putnami cloud env enable " + r.environment + "` again"
 }
 
 // envEnableReadFailure is the one reason every server row carries when the
@@ -261,11 +295,15 @@ func (r envEnableRun) report(row EnvDoctorRow, action string) EnvEnableStep {
 	return step
 }
 
-// unchecked is a row the server could not judge: this command does not write
-// on a guess.
+// unchecked is a row the server could not judge, or one in a state this
+// step does not write for: this command does not write on a guess.
 func (r envEnableRun) unchecked(row EnvDoctorRow, action string) EnvEnableStep {
+	reason := "the row could not be checked"
+	if row.Status == EnvDoctorDegraded {
+		reason = "this step writes only a missing row"
+	}
 	return EnvEnableStep{Row: row.ID, Action: action, Status: EnvEnableReported,
-		Detail: "not written: the row could not be checked (" + row.Detail + ")", Fix: row.Fix}
+		Detail: "not written: " + reason + " (" + row.Detail + ")", Fix: row.Fix}
 }
 
 func (r envEnableRun) activateBinding(row EnvDoctorRow, protocol string) (EnvEnableStep, bool) {
@@ -307,18 +345,21 @@ func (r envEnableRun) activateBinding(row EnvDoctorRow, protocol string) (EnvEna
 }
 
 // acceptDefinition accepts the environment definition at --source-revision
-// or at the default-branch head. It also runs when the row is ok: the row is
-// ok once any accepted definition declares the environment, so it cannot tell
-// whether putnami.ci.json changed since. The accept route decides by commit,
-// not by content: a commit it accepted before replays its receipt and writes
-// nothing, and any other commit appends the next revision, even when its
-// putnami.ci.json is unchanged. The step is skipped on a replay and applied on
-// an append. A replay of an older commit names the latest revision, which
-// stays the one that applies.
+// or at the default-branch head. It runs when the row is missing, when it is
+// degraded (the accepted definition differs from the default branch), and
+// also when it is ok: an ok row may not have compared the definition with
+// the default branch, when Control could not read it or predates the
+// comparison, and --source-revision may name another commit. The accept
+// route decides by commit, not by content: a commit it accepted before
+// replays its receipt and writes nothing, and any other commit appends the
+// next revision, even when its putnami.ci.json is unchanged. The step is
+// skipped on a replay and applied on an append. A replay of an older commit
+// names the latest revision, which stays the one that applies; for a
+// degraded row that replay fails the step, because the row cannot converge.
 func (r envEnableRun) acceptDefinition(row EnvDoctorRow) (EnvEnableStep, bool) {
 	action := "accept the environment definition"
 	switch row.Status {
-	case EnvDoctorOK, EnvDoctorMissing:
+	case EnvDoctorOK, EnvDoctorMissing, EnvDoctorDegraded:
 	default:
 		return r.unchecked(row, action), false
 	}
@@ -345,6 +386,15 @@ func (r envEnableRun) acceptDefinition(row EnvDoctorRow) (EnvEnableStep, bool) {
 		return EnvEnableStep{Row: row.ID, Action: action, Status: EnvEnableFailed, Detail: "control-api answered no acceptance receipt", Fix: row.Fix}, false
 	}
 	revision, accepted := clicore.Deref(receipt.Revision), envDoctorPrintable(clicore.Deref(receipt.SourceRevision))
+	if revision < expected && row.Status == EnvDoctorDegraded {
+		// Control keeps one revision per commit: a commit a later revision
+		// replaced replays its old revision and never becomes the latest
+		// again, so the degraded row cannot converge from this commit.
+		return EnvEnableStep{Row: row.ID, Action: action, Status: EnvEnableFailed,
+			Detail: fmt.Sprintf("source revision %s (%s) was accepted as revision %d, and Control keeps revision %d: it does not accept a commit a later revision replaced",
+				accepted, source, revision, expected),
+			Fix: r.degradedFix()}, false
+	}
 	if revision <= expected {
 		detail := fmt.Sprintf("source revision %s (%s) is already accepted as revision %d", accepted, source, revision)
 		if revision < expected {
