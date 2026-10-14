@@ -74,10 +74,7 @@ describe('collectSecretNames', () => {
       const config = Config('integrations', {
         stripe: { publishable: String, apiKey: Sensitive(String), webhookSecret: Sensitive(String) },
       });
-      expect(collectSecretNames([config])).toEqual([
-        'integrations.stripe.apiKey',
-        'integrations.stripe.webhookSecret',
-      ]);
+      expect(collectSecretNames([config])).toEqual(['integrations.stripe.apiKey', 'integrations.stripe.webhookSecret']);
     },
   );
 
