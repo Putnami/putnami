@@ -4,6 +4,7 @@
   "commands": {
     "package": {
       "description": "Package a content project into a distributable archive: a project template, or a content-only extension that declares agentContent.",
+      "traits": { "injectPublishChannels": true },
       "activationFiles": ["putnami.template.json", "putnami.extension.json"],
       "flags": {
         "stable": {

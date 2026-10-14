@@ -3,18 +3,24 @@ package cloudcli
 import (
 	"os"
 	"path/filepath"
-	"slices"
-	"sort"
 	"testing"
 
 	extensionproto "go.putnami.dev/protocol/extension"
 )
 
-// TestCommandsDeclareTheTraitsOfTheirVerb pins that every command named after a
-// well-known verb with default traits declares those traits itself, with the
-// same values. The effective traits, and with them the plan and its cache keys,
-// do not depend on the core's verb table.
+// TestCommandsDeclareTheTraitsOfTheirVerb pins the traits each command named
+// after serve, run, package, publish or deploy declares itself. The expected
+// values are written here, not read from the core's verb table, so the plan and
+// its cache keys keep them when that table no longer gives these verbs
+// defaults. A command named after another verb is not checked.
 func TestCommandsDeclareTheTraitsOfTheirVerb(t *testing.T) {
+	verbTraits := map[string]extensionproto.CommandTraits{
+		"serve":   {RequiresRunnable: true},
+		"run":     {RequiresRunnable: true},
+		"package": {InjectPublishChannels: true},
+		"publish": {InjectPublishChannels: true, SideEffects: extensionproto.SideEffectsRegistry},
+		"deploy":  {SideEffects: extensionproto.SideEffectsCloud},
+	}
 	data, err := os.ReadFile(filepath.Join("..", "..", "putnami.extension.json"))
 	if err != nil {
 		t.Fatalf("read extension manifest: %v", err)
@@ -23,21 +29,19 @@ func TestCommandsDeclareTheTraitsOfTheirVerb(t *testing.T) {
 	if len(diagnostics) != 0 {
 		t.Fatalf("strict extension parse diagnostics = %+v", diagnostics)
 	}
-	var checked []string
-	for name, cmd := range manifest.Commands {
-		defaults := extensionproto.WellKnownVerbs[extensionproto.BaseCommandName(name)].Traits
-		if defaults == (extensionproto.CommandTraits{}) {
-			continue
-		}
-		checked = append(checked, name)
-		if cmd.Traits == nil {
-			t.Errorf("command %q inherits its traits from the core verb table; declare %+v", name, defaults)
-		} else if *cmd.Traits != defaults {
-			t.Errorf("command %q declares traits %+v, want the verb defaults %+v", name, *cmd.Traits, defaults)
+	for _, verb := range []string{"package", "publish"} {
+		if _, ok := manifest.Commands[verb]; !ok {
+			t.Errorf("the manifest declares no %s command", verb)
 		}
 	}
-	sort.Strings(checked)
-	if want := []string{"package", "publish"}; !slices.Equal(checked, want) {
-		t.Errorf("commands with default traits = %v, want %v", checked, want)
+	for name, cmd := range manifest.Commands {
+		want, ok := verbTraits[extensionproto.BaseCommandName(name)]
+		switch {
+		case !ok:
+		case cmd.Traits == nil:
+			t.Errorf("command %q declares no traits, so it depends on the core's verb table; declare %+v", name, want)
+		case *cmd.Traits != want:
+			t.Errorf("command %q declares traits %+v, want %+v", name, *cmd.Traits, want)
+		}
 	}
 }
