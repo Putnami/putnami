@@ -286,7 +286,8 @@ installed, and the compatibility window for them has ended:
 
 - **A workspace that still declares them** fails every agent-content command
   (`install`, `upgrade`, `context generate`, the first-run and session-start
-  passes) with nothing written. The error gives the steps that apply:
+  passes) with nothing written. The error groups the entries by the
+  extension that supersedes them and gives each group the steps that apply:
   replace the entries with one `extension:<name>` entry for the extension
   whose content supersedes them (named when it is known), or delete them when
   that entry exists, declare that extension when it is not declared, and run
