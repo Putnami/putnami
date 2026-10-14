@@ -3,6 +3,7 @@ package configextract
 import (
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	protocfg "go.putnami.dev/protocol/config"
@@ -106,6 +107,22 @@ func TestWriteInfraRequirements_EmitsManifest(t *testing.T) {
 	}
 	if !reflect.DeepEqual(m.Secrets, []string{"database.password"}) {
 		t.Fatalf("secrets = %v, want [database.password]", m.Secrets)
+	}
+}
+
+func TestWriteInfraRequirements_RefusesAnInvalidSecretName(t *testing.T) {
+	dir := t.TempDir()
+	blocks := []protocfg.Block{
+		{Path: "billing", Fields: []protocfg.FieldSchema{
+			{Name: "api key", Type: protocfg.FieldTypeString, Sensitive: true},
+		}},
+	}
+	err := writeInfraRequirements(dir, blocks)
+	if err == nil || !strings.Contains(err.Error(), "billing.api key") {
+		t.Fatalf("err = %v, want an error naming billing.api key", err)
+	}
+	if _, statErr := os.Stat(sidecarPath(dir)); !os.IsNotExist(statErr) {
+		t.Fatalf("expected no sidecar file, stat err = %v", statErr)
 	}
 }
 

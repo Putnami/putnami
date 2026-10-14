@@ -352,14 +352,14 @@ func TestSecretsSet_StoresUncheckedWhenTheSchemaReadFails(t *testing.T) {
 	spectest.Proves(t, "cloud/secret-config-key", "undeclared-key-stored-with-warning", "secrets-set-unreadable-schema-warning")
 	fake := newCRMSecretsFake(t)
 	fake.schemaError = http.StatusForbidden
-	stderr, err := runCRMSecretsSet(t, fake, "crm.api_key")
+	stderr, err := runCRMSecretsSet(t, fake, "crm.token")
 	if err != nil {
 		t.Fatalf("set: %v", err)
 	}
 	if len(fake.requests) != 1 {
 		t.Fatalf("requests = %d, want 1", len(fake.requests))
 	}
-	assertContains(t, stderr, "crm.api_key is stored unchecked")
+	assertContains(t, stderr, "crm.token is stored unchecked")
 }
 
 func TestSecretsSet_FailedWriteKeepsTheWarningUnsaid(t *testing.T) {
