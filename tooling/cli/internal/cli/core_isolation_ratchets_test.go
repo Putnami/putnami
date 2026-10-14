@@ -442,7 +442,16 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // two distinct command surfaces under ADR 0006. Their shared pure language
 // evaluator stays in the existing commands/shared package, so this adds exactly
 // two production packages and no execution engine or scheduling stage.
-const internalPackageCountCeiling = 69
+//
+// RAISED 69 → 70 (#256 slice 1a): internal/jobs/machineprobe is the first
+// package split out of internal/jobs. It reads the machine a run executes on:
+// the runner's CPU quota, throttling, pressure and steal, its memory capacity
+// and pressure, and the rusage of a finished process. It imports only the
+// standard library and go.putnami.dev/cli/model/jobs, so a change elsewhere in
+// internal/jobs no longer reruns the probe tests, and nothing in it names a
+// planner, scheduler or execution symbol. It adds no vertical and no engine
+// stage.
+const internalPackageCountCeiling = 70
 
 func TestInternalPackageCountCeiling(t *testing.T) {
 	t.Parallel()

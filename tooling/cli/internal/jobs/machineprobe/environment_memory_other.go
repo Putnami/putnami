@@ -1,6 +1,6 @@
 //go:build !windows
 
-package jobs
+package machineprobe
 
 // platformPhysicalMemoryBytes reads nothing outside Windows: Linux publishes
 // the physical memory in /proc/meminfo and darwin through sysctl, which

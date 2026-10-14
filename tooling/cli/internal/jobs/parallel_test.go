@@ -8,6 +8,7 @@ import (
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -384,7 +385,7 @@ func TestStableMemoryCapacityUsesPhysicalOrCgroupLimitWithHeadroom(t *testing.T)
 		"proc/self/cgroup":                "0::/runner\n",
 		"sys/fs/cgroup/runner/memory.max": "2147483648\n",
 	})
-	capacity := stableMemoryCapacityBytes(root, eightGiB)
+	capacity := machineprobe.StableMemoryCapacityBytes(root, eightGiB)
 	if capacity != 2*1024*1024*1024 {
 		t.Fatalf("stable capacity = %d, want 2 GiB cgroup limit", capacity)
 	}
@@ -396,7 +397,7 @@ func TestStableMemoryCapacityUsesPhysicalOrCgroupLimitWithHeadroom(t *testing.T)
 		"proc/self/cgroup":         "0::/\n",
 		"sys/fs/cgroup/memory.max": "max\n",
 	})
-	if got := stableMemoryCapacityBytes(unlimited, eightGiB); got != eightGiB {
+	if got := machineprobe.StableMemoryCapacityBytes(unlimited, eightGiB); got != eightGiB {
 		t.Fatalf("unlimited cgroup capacity = %d, want physical RAM %d", got, eightGiB)
 	}
 }
@@ -407,7 +408,7 @@ func TestStableMemoryCapacitySupportsCgroupV1(t *testing.T) {
 		"proc/self/cgroup": "5:memory:/docker/abc\n",
 		"sys/fs/cgroup/memory/docker/abc/memory.limit_in_bytes": "3221225472\n",
 	})
-	if got := stableMemoryCapacityBytes(root, physical); got != 3*1024*1024*1024 {
+	if got := machineprobe.StableMemoryCapacityBytes(root, physical); got != 3*1024*1024*1024 {
 		t.Fatalf("v1 stable capacity = %d, want 3 GiB", got)
 	}
 }

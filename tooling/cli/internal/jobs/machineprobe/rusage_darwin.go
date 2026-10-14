@@ -1,13 +1,13 @@
 //go:build darwin
 
-package jobs
+package machineprobe
 
 import (
 	"os"
 	"syscall"
 )
 
-// processRusage reads peak RSS and the block-IO counters off a finished
+// ProcessRusage reads peak RSS and the block-IO counters off a finished
 // process's rusage.
 //
 // UNIT, stated once: darwin's ru_maxrss is in BYTES (xnu fills it from the
@@ -24,7 +24,7 @@ import (
 // for is 64-bit (internal/commands.supportedPlatform), where darwin's rusage
 // members are already int64. A 32-bit target would stop compiling here rather
 // than silently truncating a peak, which is the failure mode worth having.
-func processRusage(ps *os.ProcessState) (maxRSSBytes, inBlocks, outBlocks int64) {
+func ProcessRusage(ps *os.ProcessState) (maxRSSBytes, inBlocks, outBlocks int64) {
 	rusage, ok := ps.SysUsage().(*syscall.Rusage)
 	if !ok || rusage == nil {
 		return 0, 0, 0

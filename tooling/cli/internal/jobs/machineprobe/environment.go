@@ -1,4 +1,8 @@
-package jobs
+// Package machineprobe measures the machine a run executes on: the runner's
+// CPU quota, throttling, pressure and steal, its memory capacity and pressure,
+// and the peak memory and block IO of a finished process. A value it cannot
+// read is reported as absent, and no read fails a run.
+package machineprobe
 
 import (
 	"os"
@@ -10,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"go.putnami.dev/cli/model/jobs"
 )
 
 // The RUNNER, and how much of it a session actually got.
@@ -50,14 +56,14 @@ import (
 // different cgroups; that block is dropped rather than clamped, because a
 // clamped counter is indistinguishable from a real zero.
 
-// runnerEnvironmentRoot is the filesystem the probes read. It is a parameter
+// RunnerEnvironmentRoot is the filesystem the probes read. It is a parameter
 // rather than a constant baked into each path so the tests can point the whole
 // capture at a fixture tree containing exactly the files a given runner has —
 // which is the only way to test the DEGRADATION paths on a developer machine
 // that has none of them.
-const runnerEnvironmentRoot = "/"
+const RunnerEnvironmentRoot = "/"
 
-// cpuBandwidthCores is how many whole CPUs this sample's cgroup permits, or 0
+// CPUBandwidthCores is how many whole CPUs this sample's cgroup permits, or 0
 // when nothing bounds the process below the core count.
 //
 // It answers the only question the scheduler needs before it starts handing out
@@ -71,17 +77,25 @@ const runnerEnvironmentRoot = "/"
 //
 // A fractional quota rounds down but never to zero: half a CPU still runs jobs,
 // one at a time.
-func (s environmentSample) cpuBandwidthCores() int {
+func (s EnvironmentSample) CPUBandwidthCores() int {
 	if !s.hasCgroup || s.quotaUs <= 0 || s.periodUs <= 0 {
 		return 0
 	}
 	return max(int(s.quotaUs/s.periodUs), 1)
 }
 
-// environmentSample is one reading of the runner's cumulative counters. Each
+// EffectiveMemoryBytes is the memory this sample lets the run use: the smaller
+// of the physical memory and the cgroup limit it read, and the source that
+// bounds it (jobs.MemoryCapacityPhysical or jobs.MemoryCapacityCgroupLimit).
+// ok is false when the sample read neither.
+func (s EnvironmentSample) EffectiveMemoryBytes() (bytes uint64, source string, ok bool) {
+	return s.memoryCapacity.effectiveBytes()
+}
+
+// EnvironmentSample is one reading of the runner's cumulative counters. Each
 // block carries its own presence flag, because "the file was not there" and
 // "the file said zero" are different facts and only one of them is publishable.
-type environmentSample struct {
+type EnvironmentSample struct {
 	at time.Time
 
 	hasCgroup   bool
@@ -107,14 +121,14 @@ type environmentSample struct {
 	memoryPressure memoryPressureSample
 }
 
-// captureEnvironmentSample reads every counter the runner exposes, once.
+// CaptureEnvironmentSample reads every counter the runner exposes, once.
 //
 // It never fails and never blocks on anything but a procfs/sysfs read. A path
 // that does not exist leaves its block's presence flag false, which is what
 // carries "this platform cannot measure this" all the way to an absent member
 // on the wire.
-func captureEnvironmentSample(root string) environmentSample {
-	sample := environmentSample{at: time.Now()}
+func CaptureEnvironmentSample(root string) EnvironmentSample {
+	sample := EnvironmentSample{at: time.Now()}
 	readCgroupCPU(root, &sample)
 	readCPUPressure(root, &sample)
 	readHostCPUTime(root, &sample)
@@ -122,7 +136,7 @@ func captureEnvironmentSample(root string) environmentSample {
 	return sample
 }
 
-// resolveRunnerEnvironment folds an opening and a closing sample into the
+// ResolveRunnerEnvironment folds an opening and a closing sample into the
 // session's environment: static facts as they are, cumulative counters as
 // deltas over the window between the two.
 //
@@ -131,8 +145,8 @@ func captureEnvironmentSample(root string) environmentSample {
 // one window — the cgroup was replaced, or the kernel reset the counter — and
 // reporting the clamped difference would present a broken measurement as a
 // legitimate zero.
-func resolveRunnerEnvironment(root string, begin, end environmentSample) RunnerEnvironment {
-	environment := RunnerEnvironment{
+func ResolveRunnerEnvironment(root string, begin, end EnvironmentSample) jobs.RunnerEnvironment {
+	environment := jobs.RunnerEnvironment{
 		OS:          runtime.GOOS,
 		Arch:        runtime.GOARCH,
 		LogicalCPUs: runtime.NumCPU(),
@@ -153,11 +167,11 @@ func resolveRunnerEnvironment(root string, begin, end environmentSample) RunnerE
 // closing value is the one that was in force for the tail of the run — but a
 // mid-run change is rare enough that either would do, and taking one of them
 // deliberately avoids publishing two numbers a reader would have to reconcile.
-func resolveCgroupCPU(begin, end environmentSample) *CgroupCPU {
+func resolveCgroupCPU(begin, end EnvironmentSample) *jobs.CgroupCPU {
 	if !begin.hasCgroup || !end.hasCgroup || end.periodUs <= 0 {
 		return nil
 	}
-	cgroup := &CgroupCPU{PeriodUs: end.periodUs, QuotaUs: max(end.quotaUs, 0)}
+	cgroup := &jobs.CgroupCPU{PeriodUs: end.periodUs, QuotaUs: max(end.quotaUs, 0)}
 	if begin.hasUsage && end.hasUsage {
 		if delta, ok := windowDelta(begin.usageUs, end.usageUs); ok {
 			cgroup.UsageUs, cgroup.HasUsage = delta, true
@@ -171,7 +185,7 @@ func resolveCgroupCPU(begin, end environmentSample) *CgroupCPU {
 		// members came from different windows; the pair is dropped rather than
 		// published as an impossible ratio.
 		if periodsOK && throttledOK && usOK && throttled <= periods {
-			cgroup.Throttle = &CgroupThrottle{
+			cgroup.Throttle = &jobs.CgroupThrottle{
 				Periods:          periods,
 				ThrottledPeriods: throttled,
 				ThrottledUs:      throttledUs,
@@ -181,7 +195,7 @@ func resolveCgroupCPU(begin, end environmentSample) *CgroupCPU {
 	return cgroup
 }
 
-func resolveCPUPressure(begin, end environmentSample) *CPUPressure {
+func resolveCPUPressure(begin, end EnvironmentSample) *jobs.CPUPressure {
 	if !begin.hasPressure || !end.hasPressure {
 		return nil
 	}
@@ -189,13 +203,13 @@ func resolveCPUPressure(begin, end environmentSample) *CPUPressure {
 	if !ok {
 		return nil
 	}
-	return &CPUPressure{SomeStalledUs: stalled}
+	return &jobs.CPUPressure{SomeStalledUs: stalled}
 }
 
 // resolveHostCPUTime windows the /proc/stat aggregate. Steal and iowait are
 // COLUMNS of the same total, so a delta where either exceeds the total is not a
 // runner fact but a sampling error, and the block is dropped.
-func resolveHostCPUTime(begin, end environmentSample) *HostCPUTime {
+func resolveHostCPUTime(begin, end EnvironmentSample) *jobs.HostCPUTime {
 	if !begin.hasHostCPU || !end.hasHostCPU {
 		return nil
 	}
@@ -205,7 +219,7 @@ func resolveHostCPUTime(begin, end environmentSample) *HostCPUTime {
 	if !stealOK || !ioWaitOK || !totalOK || steal > total || ioWait > total {
 		return nil
 	}
-	return &HostCPUTime{StealTicks: steal, IOWaitTicks: ioWait, TotalTicks: total}
+	return &jobs.HostCPUTime{StealTicks: steal, IOWaitTicks: ioWait, TotalTicks: total}
 }
 
 // windowDelta subtracts two readings of one cumulative counter. A negative
@@ -227,21 +241,21 @@ func windowDelta(begin, end int64) (int64, bool) {
 // controller discovery must never depend on listing the mount — nor on the
 // membership directory /proc/self/cgroup advertises actually existing, which is
 // the second way that substrate misreports its own topology.
-func readCgroupCPU(root string, sample *environmentSample) {
+func readCgroupCPU(root string, sample *EnvironmentSample) {
 	readCgroupCPUFrom(root, sample, readFile)
 }
 
 // readCgroupCPUFrom carries the filesystem read as a parameter so tests can
 // model gVisor faithfully: exact paths have content while directory discovery
 // has no surface at all.
-func readCgroupCPUFrom(root string, sample *environmentSample, read func(string) string) {
+func readCgroupCPUFrom(root string, sample *EnvironmentSample, read func(string) string) {
 	if readCgroupV2CPU(root, sample, read) {
 		return
 	}
 	readCgroupV1CPU(root, sample, read)
 }
 
-func readCgroupV2CPU(root string, sample *environmentSample, read func(string) string) bool {
+func readCgroupV2CPU(root string, sample *EnvironmentSample, read func(string) string) bool {
 	mount := filepath.Join(root, "sys/fs/cgroup")
 	candidates := make([]string, 0, 2)
 	if relative := unifiedCgroupPath(read(filepath.Join(root, "proc/self/cgroup"))); relative != "" {
@@ -276,7 +290,7 @@ type cgroupV1Membership struct {
 	hierarchy string
 }
 
-func readCgroupV1CPU(root string, sample *environmentSample, read func(string) string) {
+func readCgroupV1CPU(root string, sample *EnvironmentSample, read func(string) string) {
 	memberships := cgroupV1Memberships(read(filepath.Join(root, "proc/self/cgroup")))
 	cpuMembership, ok := memberships["cpu"]
 	if !ok {
@@ -582,7 +596,7 @@ func parseKeyedCounters(content string) map[string]int64 {
 // the same line are decaying averages over windows that are not this session's,
 // so nothing else in the recorded document could be reconciled against them;
 // the cumulative total, delta'd over the run, can.
-func readCPUPressure(root string, sample *environmentSample) {
+func readCPUPressure(root string, sample *EnvironmentSample) {
 	for _, line := range strings.Split(readFile(filepath.Join(root, "proc/pressure/cpu")), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) == 0 || fields[0] != "some" {
@@ -618,7 +632,7 @@ const (
 // readHostCPUTime reads the /proc/stat aggregate line — the hypervisor's view
 // of this machine, whose `steal` column is the only place a shared host admits
 // it took our ticks away.
-func readHostCPUTime(root string, sample *environmentSample) {
+func readHostCPUTime(root string, sample *EnvironmentSample) {
 	for _, line := range strings.Split(readFile(filepath.Join(root, "proc/stat")), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) == 0 || fields[0] != "cpu" {
@@ -664,7 +678,7 @@ func hostCPUModel(root string) string {
 	// sysctl is consulted only for the REAL filesystem: a test pointing the
 	// capture at a fixture tree is describing a machine, and must not have the
 	// developer's own CPU leak into it.
-	if root == runnerEnvironmentRoot && runtime.GOOS == "darwin" {
+	if root == RunnerEnvironmentRoot && runtime.GOOS == "darwin" {
 		out, err := exec.Command("sysctl", "-n", "machdep.cpu.brand_string").Output()
 		if err != nil {
 			return ""
