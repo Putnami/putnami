@@ -146,6 +146,14 @@ func TestValidateOverrides_BadEngineAndName(t *testing.T) {
 	}
 }
 
+func TestValidateOverrides_IgnoresASecretByConfigKey(t *testing.T) {
+	ov := &Overrides{Ignore: &IgnoreRules{Secrets: []string{"crm.apiKey"}, Storage: []string{"Uploads"}}}
+	diags := ValidateOverrides(ov)
+	if len(diags) != 1 || diags[0].Code != ErrorCodeInvalidName || diags[0].Field != "ignore.storage[0]" {
+		t.Errorf("want one %s on ignore.storage[0], got %v", ErrorCodeInvalidName, diags)
+	}
+}
+
 func TestLoadOverrides_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, OverridesFilename)

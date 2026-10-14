@@ -98,7 +98,7 @@ func ValidateOverrides(ov *Overrides) []diag.Diagnostic {
 		diags = append(diags, validateName(fmt.Sprintf("ignore.storage[%d]", i), name)...)
 	}
 	for i, name := range ig.Secrets {
-		diags = append(diags, validateName(fmt.Sprintf("ignore.secrets[%d]", i), name)...)
+		diags = append(diags, validateSecretName(fmt.Sprintf("ignore.secrets[%d]", i), name)...)
 	}
 	for i, name := range ig.ScheduledJobs {
 		diags = append(diags, validateName(fmt.Sprintf("ignore.scheduledJobs[%d]", i), name)...)

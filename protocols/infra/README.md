@@ -39,7 +39,7 @@ The v2 resource kinds are:
 - `databases` — `{ name, engine ∈ {postgres, mysql, sqlite, firestore}, schemas? }`
 - `events` — `{ publishes: [topic], subscribes: [topic | { topic, delivery ∈ {pull, stream, push} }] }` — a subscribe is a bare topic string (delivery `pull`, the default) or an object carrying a non-default delivery; `push` tells the deployer to provision a provider push subscription. The bare-string default keeps pull/stream workloads byte-for-byte unchanged.
 - `storage` — `{ name, access? ∈ {read, write, readwrite}, public?, retention? }` — the deployer-facing projection of [`go.putnami.dev/protocol/storage`](../storage); `retention` is a free-form deployer-defined string
-- `secrets` — `[secret-name]`
+- `secrets` — `[secret-name]` — a secret name may contain uppercase letters, so it can be the config key the application reads the secret at (`crm.apiKey`); every other resource name is lowercase ([ADR 0004](doc/adr/0004-a-secret-is-named-by-its-config-key.md))
 - `scheduledJobs` — `{ name, schedule (5-field Cloud Scheduler cron), entrypoint? }`
 - `runtime` — workload-only — `{ ingress?: { domain?, public? }, scaling?: { max?, concurrency? }, protocols?: { http2? } }`
 
@@ -308,7 +308,7 @@ formatter override is needed. The collapse rule lives in `marshalCommitted`
 | ---- | ---- |
 | `infra.parse_error` | JSON-level parse failure or nil manifest. |
 | `infra.unknown_field` | Strict parse rejected an unknown field (per-project or aggregated). A field this protocol retired (`RemovedRuntimeFields`) is named as retired, with the reason and the migration, rather than reported as a typo. |
-| `infra.invalid_name` | Resource name violates the canonical regex `^[a-z0-9][a-z0-9_./-]{0,63}$`. |
+| `infra.invalid_name` | Resource name violates the canonical regex `^[a-z0-9][a-z0-9_./-]{0,63}$`, or a secret name violates `^[A-Za-z0-9][A-Za-z0-9_./-]{0,63}$`. |
 | `infra.invalid_engine` | `databases[].engine` is not an accepted engine. The message lists the accepted set, built from `ValidEngines` so it cannot drift. |
 | `infra.invalid_protocol_version` | Manifest declares a `protocolVersion` this parser does not support. A manifest left at an *earlier* version gets the migration steps in the message, because the reader drops the contribution and the aggregator only warns. |
 | `infra.invalid_contributor` | `Source.Contributor` is not `manual` or `framework:<name>`, or `Source.Project` is empty. |
