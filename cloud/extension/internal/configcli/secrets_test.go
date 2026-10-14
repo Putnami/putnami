@@ -266,8 +266,8 @@ func TestSecretsSet_PublishFirstHint(t *testing.T) {
 
 // crmSchema declares the config block crm with the sensitive field apiKey,
 // whose requirement name is crm.api_key, the sensitive object oauthApp, the
-// sensitive map webhookSecrets and the field signingKey bound to
-// STRIPE_SIGNING_KEY. The block integrations.stripe has a nested path.
+// sensitive map webhookSecrets, the field signingKey bound to
+// STRIPE_SIGNING_KEY and the object extras without declared fields. The block integrations.stripe has a nested path.
 func crmSchema() map[string]any {
 	return map[string]any{
 		"appName": "crm",
@@ -279,6 +279,7 @@ func crmSchema() map[string]any {
 					{"name": "region", "type": "string"},
 					{"name": "webhookSecrets", "type": "map", "sensitive": true},
 					{"name": "signingKey", "type": "string", "sensitive": true, "env": "STRIPE_SIGNING_KEY"},
+					{"name": "extras", "type": "object", "sensitive": true},
 					{"name": "oauthApp", "type": "object", "sensitive": true, "fields": []map[string]any{
 						{"name": "clientId", "type": "string"},
 						{"name": "clientSecret", "type": "string"},
@@ -348,7 +349,7 @@ func TestSecretsSet_RefusesRequirementNameAndNamesTheField(t *testing.T) {
 
 func TestSecretsSet_AcceptsDeclaredKeys(t *testing.T) {
 	spectest.Proves(t, "cloud/secret-config-key", "declared-key-stored", "secrets-set-stores-declared-keys")
-	for _, key := range []string{"crm.apiKey", "crm.oauthApp", "crm.oauthApp.clientSecret", "crm.webhookSecrets.stripe", "integrations.stripe.apiKey"} {
+	for _, key := range []string{"crm.apiKey", "crm.oauthApp", "crm.oauthApp.clientSecret", "crm.webhookSecrets.stripe", "crm.extras.region", "integrations.stripe.apiKey"} {
 		fake := newCRMSecretsFake(t)
 		stderr, err := runCRMSecretsSet(t, fake, key)
 		if err != nil {
