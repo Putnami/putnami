@@ -191,10 +191,10 @@ func TestCloudlessReleaseFixture_PublicManifestsHaveNoCloudDependency(t *testing
 
 // TestCloudlessReleaseFixture_WritesNoExecutableFile pins that the fixture
 // executes no file it wrote: its tasks run fixture.sh through /bin/sh, and no
-// fixture file carries an execute bit, so a task that named its script as the
-// command would fail at once rather than time out.
+// fixture file carries an execute bit.
 func TestCloudlessReleaseFixture_WritesNoExecutableFile(t *testing.T) {
 	t.Parallel()
+	requireShell(t)
 	root := writeCloudlessReleaseFixture(t)
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() {
@@ -352,8 +352,7 @@ func writeCloudlessReleaseFixture(t *testing.T) string {
 
 // cloudlessFixtureScript is the script of every fixture task. A task passes it
 // to /bin/sh, and the fixture writes it without an execute bit: the fixture
-// executes no file it wrote, so a task's timeoutMs times the script alone,
-// never the operating system's first-execution check of a new file.
+// executes no file it wrote, and a task's timeoutMs times the script alone.
 const cloudlessFixtureScript = `#!/bin/sh
 set -eu
 
