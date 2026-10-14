@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // secretsFakeServer is a focused in-memory stand-in for control-plane-api.
@@ -21,6 +22,8 @@ type secretsFakeServer struct {
 	store       map[string]map[string]string // path → field → value
 	updatedAt   string
 	publishHint bool
+	schema      map[string]any // the published schema; nil answers 404
+	schemaError int            // a status that fails the schema read
 	requests    []map[string]any
 }
 
@@ -32,6 +35,14 @@ func (s *secretsFakeServer) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 
 	switch {
+	case strings.Contains(req.URL.Path, "/schemas") && req.Method == http.MethodGet:
+		if s.schemaError != 0 {
+			return jsonResponse(s.schemaError, map[string]any{"error": "schema read failed"}), nil
+		}
+		if s.schema == nil {
+			return jsonResponse(http.StatusNotFound, map[string]any{"error": "schema not found"}), nil
+		}
+		return jsonResponse(http.StatusOK, s.schema), nil
 	case req.URL.Path == "/.well-known/openid-configuration":
 		return jsonResponse(http.StatusOK, map[string]any{
 			"issuer": testBaseURL, "token_endpoint": testBaseURL + "/token",
@@ -251,6 +262,158 @@ func TestSecretsSet_PublishFirstHint(t *testing.T) {
 			t.Errorf("error %q missing fragment %q", msg, fragment)
 		}
 	}
+}
+
+// crmSchema declares the config block crm with the sensitive field apiKey,
+// whose requirement name is crm.api_key, the sensitive object oauthApp, the
+// sensitive map webhookSecrets, the field signingKey bound to
+// STRIPE_SIGNING_KEY and the object extras without declared fields. The block integrations.stripe has a nested path.
+func crmSchema() map[string]any {
+	return map[string]any{
+		"appName": "crm",
+		"configs": []map[string]any{
+			{
+				"path": "crm",
+				"fields": []map[string]any{
+					{"name": "apiKey", "type": "string", "sensitive": true},
+					{"name": "region", "type": "string"},
+					{"name": "webhookSecrets", "type": "map", "sensitive": true},
+					{"name": "signingKey", "type": "string", "sensitive": true, "env": "STRIPE_SIGNING_KEY"},
+					{"name": "extras", "type": "object", "sensitive": true},
+					{"name": "oauthApp", "type": "object", "sensitive": true, "fields": []map[string]any{
+						{"name": "clientId", "type": "string"},
+						{"name": "clientSecret", "type": "string"},
+					}},
+				},
+			},
+			{
+				"path":   "integrations.stripe",
+				"fields": []map[string]any{{"name": "apiKey", "type": "string", "sensitive": true}},
+			},
+		},
+	}
+}
+
+func newCRMSecretsFake(t *testing.T) *secretsFakeServer {
+	t.Helper()
+	fake := newSecretsFake(t)
+	fake.schema = crmSchema()
+	return fake
+}
+
+// runCRMSecretsSet runs `secrets set crm <args>` against fake and returns
+// what it printed on stderr.
+func runCRMSecretsSet(t *testing.T, fake *secretsFakeServer, args ...string) (string, error) {
+	t.Helper()
+	home := t.TempDir()
+	workspaceRoot := t.TempDir()
+	writeTestAuth(t, home)
+	writeLinkFile(t, workspaceRoot)
+
+	ioctx, _, stderr := commonIO(t, home, &http.Client{Transport: fake})
+	ioctx.Env["PUTNAMI_WORKSPACE_ROOT"] = workspaceRoot
+	err := runSecrets(ioctx, append([]string{"set", "crm"}, append(args, "--value", "s3cret")...))
+	return strings.Join(*stderr, "\n"), err
+}
+
+func TestSecretsSet_RefusesRequirementNameAndNamesTheField(t *testing.T) {
+	spectest.Proves(t, "cloud/secret-config-key", "requirement-name-refused", "secrets-set-refuses-requirement-name")
+	cases := map[string]struct {
+		args  []string
+		field string
+	}{
+		"camelCase field":       {[]string{"crm.api_key"}, "crm.apiKey"},
+		"block and field flags": {[]string{"--block", "crm", "--field", "api_key"}, "crm.apiKey"},
+		"nested block path":     {[]string{"integrations.stripe.api_key"}, "integrations.stripe.apiKey"},
+		"sensitive object":      {[]string{"crm.oauth_app"}, "crm.oauthApp"},
+		"env binding":           {[]string{"stripe_signing_key"}, "crm.signingKey"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			fake := newCRMSecretsFake(t)
+			_, err := runCRMSecretsSet(t, fake, tc.args...)
+			if err == nil {
+				t.Fatalf("expected %v to be refused", tc.args)
+			}
+			if len(fake.requests) != 0 {
+				t.Fatalf("stored %v, want no write", fake.requests)
+			}
+			if clicore.ExitCode(err) != clicore.ExitUsage {
+				t.Fatalf("exit = %d, want ExitUsage", clicore.ExitCode(err))
+			}
+			assertContains(t, err.Error(), "requirement name of "+tc.field+",")
+			assertContains(t, err.Error(), "putnami cloud secrets set crm "+tc.field+" --env prod --from-stdin")
+		})
+	}
+}
+
+func TestSecretsSet_AcceptsDeclaredKeys(t *testing.T) {
+	spectest.Proves(t, "cloud/secret-config-key", "declared-key-stored", "secrets-set-stores-declared-keys")
+	for _, key := range []string{"crm.apiKey", "crm.oauthApp", "crm.oauthApp.clientSecret", "crm.webhookSecrets.stripe", "crm.extras.region", "integrations.stripe.apiKey"} {
+		fake := newCRMSecretsFake(t)
+		stderr, err := runCRMSecretsSet(t, fake, key)
+		if err != nil {
+			t.Fatalf("set %s: %v", key, err)
+		}
+		if len(fake.requests) != 1 {
+			t.Fatalf("set %s: requests = %d, want 1", key, len(fake.requests))
+		}
+		if stderr != "" {
+			t.Fatalf("set %s: stderr = %q, want none", key, stderr)
+		}
+	}
+}
+
+// A schema published before a field existed does not declare it yet, so an
+// undeclared key that is no requirement name is stored with a warning.
+func TestSecretsSet_StoresAnUndeclaredKeyWithAWarning(t *testing.T) {
+	spectest.Proves(t, "cloud/secret-config-key", "undeclared-key-stored-with-warning", "secrets-set-undeclared-key-warning")
+	fake := newCRMSecretsFake(t)
+	stderr, err := runCRMSecretsSet(t, fake, "crm.token")
+	if err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if fake.store["crm"]["token"] != "s3cret" {
+		t.Fatalf("store = %v", fake.store)
+	}
+	assertContains(t, stderr, "the published schema of crm declares no crm.token")
+	assertContains(t, stderr, "putnami cloud config show crm --env prod --secret-keys")
+}
+
+func TestSecretsSet_StoresUncheckedWhenTheSchemaReadFails(t *testing.T) {
+	spectest.Proves(t, "cloud/secret-config-key", "undeclared-key-stored-with-warning", "secrets-set-unreadable-schema-warning")
+	fake := newCRMSecretsFake(t)
+	fake.schemaError = http.StatusForbidden
+	stderr, err := runCRMSecretsSet(t, fake, "crm.api_key")
+	if err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if len(fake.requests) != 1 {
+		t.Fatalf("requests = %d, want 1", len(fake.requests))
+	}
+	assertContains(t, stderr, "crm.api_key is stored unchecked")
+}
+
+func TestSecretsSet_FailedWriteKeepsTheWarningUnsaid(t *testing.T) {
+	spectest.Proves(t, "cloud/secret-config-key", "undeclared-key-stored-with-warning", "secrets-set-failed-write-no-warning")
+	fake := newCRMSecretsFake(t)
+	fake.publishHint = true
+	stderr, err := runCRMSecretsSet(t, fake, "crm.token")
+	if err == nil {
+		t.Fatal("expected the write to fail")
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want no warning for a write that failed", stderr)
+	}
+}
+
+func TestSecretsSet_DotlessKeyWithoutMatchKeepsTheKeyFormError(t *testing.T) {
+	fake := newCRMSecretsFake(t)
+	_, err := runCRMSecretsSet(t, fake, "token")
+	if err == nil {
+		t.Fatal("expected a dotless key to be refused")
+	}
+	assertContains(t, err.Error(), "block.field form")
 }
 
 func TestSecretsSet_RequiresKeyForm(t *testing.T) {

@@ -85,26 +85,6 @@ func TestCollectSecretNames_Nested(t *testing.T) {
 	}
 }
 
-func TestCanonicalizeName_NeedsCanonicalization(t *testing.T) {
-	// Output is snake_case so it matches the TypeScript runtime's
-	// canonicalSecretName — same source field in either language produces
-	// the same canonical name in the aggregated manifest.
-	cases := map[string]string{
-		"DB_PASSWORD":           "db_password",
-		"clientSecret":          "client_secret",
-		"auth.clientSecret":     "auth.client_secret",
-		"server.http.apiKey":    "server.http.api_key",
-		"Weird Name!":           "weird_name_",
-		"_leadingUnderscore":    "leading_underscore",
-		"STRIPE_WEBHOOK_SECRET": "stripe_webhook_secret",
-	}
-	for in, want := range cases {
-		if got := canonicalizeName(in); got != want {
-			t.Errorf("canonicalizeName(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
 func TestWriteInfraRequirements_EmitsManifest(t *testing.T) {
 	dir := t.TempDir()
 	blocks := []protocfg.Block{

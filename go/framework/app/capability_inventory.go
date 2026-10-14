@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-	"unicode"
 
 	"go.putnami.dev/migration"
 	protocaps "go.putnami.dev/protocol/capabilities"
@@ -836,7 +835,7 @@ func walkCapabilitySensitiveField(prefix string, field protocfg.FieldSchema, emi
 		if name == "" {
 			name = path
 		}
-		emit(canonicalCapabilitySecretName(name))
+		emit(protoinfra.SecretName(name))
 	}
 	switch field.Type {
 	case protocfg.FieldTypeObject:
@@ -852,32 +851,6 @@ func walkCapabilitySensitiveField(prefix string, field protocfg.FieldSchema, emi
 			walkCapabilitySensitiveField(path, *field.Values, emit)
 		}
 	}
-}
-
-func canonicalCapabilitySecretName(value string) string {
-	var split strings.Builder
-	var previous rune
-	for index, current := range value {
-		if index > 0 && unicode.IsUpper(current) && (unicode.IsLower(previous) || unicode.IsDigit(previous)) {
-			split.WriteByte('_')
-		}
-		split.WriteRune(current)
-		previous = current
-	}
-	var canonical strings.Builder
-	for _, current := range strings.ToLower(split.String()) {
-		switch {
-		case current >= 'a' && current <= 'z', current >= '0' && current <= '9', current == '_', current == '.', current == '/', current == '-':
-			canonical.WriteRune(current)
-		default:
-			canonical.WriteByte('_')
-		}
-	}
-	out := strings.TrimLeft(canonical.String(), "_./-")
-	if len(out) > 64 {
-		out = out[:64]
-	}
-	return out
 }
 
 func mergeDependencyCapabilityManifests(projectRoot, capabilityRoot string, target *protocaps.ManifestV2, inv *capabilityInventory) error {

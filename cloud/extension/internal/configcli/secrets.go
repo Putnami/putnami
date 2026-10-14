@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/client"
 	configapiclient "go.putnami.dev/cloud/clients/config-api/go"
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/protocol/infra"
 )
 
 // SecretsDefaultEnvironment is the env used when `--env` is unset.
@@ -96,9 +97,22 @@ func secretsRunSet(params map[string]any, args []string, workspaceRoot string, e
 	if err != nil {
 		return err
 	}
-	block, field, err := resolveKey(params, args)
+	block, field, keyErr := resolveKey(params, args)
+	key := block + "." + field
+	if keyErr != nil {
+		// A requirement name derived from an env binding has no dot; the
+		// schema still names the field it belongs to.
+		key = clicore.FirstString(clicore.StringParam(params, "key"), secretsKeyPositional(args))
+		if key == "" {
+			return keyErr
+		}
+	}
+	warning, err := checkSecretKey(ctx, key)
 	if err != nil {
 		return err
+	}
+	if keyErr != nil {
+		return keyErr
 	}
 	value, err := resolveValue(params, ioctx)
 	if err != nil {
@@ -115,6 +129,9 @@ func secretsRunSet(params map[string]any, args []string, workspaceRoot string, e
 	if err != nil {
 		return mapSecretsError(err, ctx, "set")
 	}
+	if warning != "" {
+		ioctx.Stderr("warning: " + warning)
+	}
 	clicore.WriteResult(map[string]any{
 		"status":      "encrypted",
 		"app":         ctx.app,
@@ -124,6 +141,84 @@ func secretsRunSet(params map[string]any, args []string, workspaceRoot string, e
 		"response":    resp,
 	}, params, ioctx, fmt.Sprintf("Secret %s.%s stored for %s/%s.", block, field, ctx.app, ctx.environment))
 	return nil
+}
+
+// checkSecretKey compares a key with the published schema of ctx.app before
+// a write. The application reads a secret only at its config key, so a
+// requirement name from infra/requirements.json (crm.api_key for the field
+// crm.apiKey, stripe_webhook_secret for a field bound to
+// STRIPE_WEBHOOK_SECRET) is refused, and the error names the declared key it
+// belongs to. Any other key the schema does not declare is stored with a
+// warning, because the schema of the next release may declare it. The check
+// is skipped for the shared "*" layer, which no schema governs, and for an
+// app with no published schema, which config-api answers itself.
+func checkSecretKey(ctx *secretsCtx, key string) (warning string, err error) {
+	if ctx.app == "*" {
+		return "", nil
+	}
+	schema, err := ctx.configAPI().fetchSchema(ctx.app)
+	if configStatus(err) == http.StatusNotFound {
+		return "", nil
+	}
+	if err != nil {
+		return fmt.Sprintf("%s is stored unchecked: reading the published schema of %s failed: %v", key, ctx.app, mapConfigError(err, ctx, "fetch schema")), nil
+	}
+	specs := schemaKeySpecs(schema)
+	for _, spec := range specs {
+		if secretKeyDeclared(spec, key) {
+			return "", nil
+		}
+	}
+	if matches := keysWithSecretName(specs, infra.SecretName(key)); len(matches) > 0 {
+		commands := make([]string, 0, len(matches))
+		for _, match := range matches {
+			commands = append(commands, "  "+secretSetCommand(ctx, match))
+		}
+		return "", clicore.NewError(fmt.Sprintf(
+			"%s is not a config key of %s: it is the requirement name of %s, and the application reads the secret only at its config key. Store it with:\n%s",
+			key, ctx.app, strings.Join(matches, " or "), strings.Join(commands, "\n")), clicore.ExitUsage)
+	}
+	return fmt.Sprintf(
+		"the published schema of %s declares no %s; the application reads it only once a release declares it. Run `putnami cloud config show %s --env %s --secret-keys` to list the declared secret keys.",
+		ctx.app, key, ctx.app, ctx.environment), nil
+}
+
+// secretKeyDeclared reports whether spec declares key: the field itself, an
+// object that holds it, or an entry of a map or an object without declared
+// fields.
+func secretKeyDeclared(spec schemaKeySpec, key string) bool {
+	if spec.Key == key || strings.HasPrefix(spec.Key, key+".") {
+		return true
+	}
+	openEnded := spec.Type == "map" || spec.Type == "object"
+	return openEnded && strings.HasPrefix(key, spec.Key+".")
+}
+
+// keysWithSecretName returns, sorted, each declared key or object path whose
+// requirement name is name, derived from its env binding or its path.
+func keysWithSecretName(specs []schemaKeySpec, name string) []string {
+	found := map[string]bool{}
+	for _, spec := range specs {
+		if spec.Env != "" && infra.SecretName(spec.Env) == name {
+			found[spec.Key] = true
+		}
+		for path := spec.Key; ; {
+			if infra.SecretName(path) == name {
+				found[path] = true
+			}
+			idx := strings.LastIndex(path, ".")
+			if idx <= 0 {
+				break
+			}
+			path = path[:idx]
+		}
+	}
+	keys := make([]string, 0, len(found))
+	for key := range found {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func secretsRunGet(params map[string]any, args []string, workspaceRoot string, env map[string]string, ioctx clicore.IO) error {

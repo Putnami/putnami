@@ -2,8 +2,6 @@ package configextract
 
 import (
 	"sort"
-	"strings"
-	"unicode"
 
 	protocfg "go.putnami.dev/protocol/config"
 	"go.putnami.dev/protocol/infra"
@@ -85,15 +83,15 @@ func walkSensitive(prefix string, f protocfg.FieldSchema, emit func(string)) {
 	}
 }
 
-// secretName picks the canonical identifier for a sensitive field. A field with
+// secretName picks the requirement name of a sensitive field. A field with
 // an explicit env binding uses that env-var name (the concrete way the value
 // enters a deployed process); otherwise the field's config dot-path is used.
-// Either way the result is canonicalized to a valid infra resource name.
+// Either way infra.SecretName canonicalizes it to a valid resource name.
 func secretName(f protocfg.FieldSchema, path string) string {
 	if f.Env != "" {
-		return canonicalizeName(f.Env)
+		return infra.SecretName(f.Env)
 	}
-	return canonicalizeName(path)
+	return infra.SecretName(path)
 }
 
 // joinPath joins a dot-path prefix and a segment, tolerating an empty prefix.
@@ -102,44 +100,4 @@ func joinPath(prefix, segment string) string {
 		return segment
 	}
 	return prefix + "." + segment
-}
-
-// canonicalizeName maps an arbitrary config path or env-var name to the infra
-// resource-name vocabulary: lowercase letters, digits, and '-', '_', '.', '/',
-// starting with a letter or digit and at most 64 characters
-// (^[a-z0-9][a-z0-9_./-]{0,63}$). camelCase and digit→letter boundaries are
-// split with '_' so word breaks survive the lowercasing
-// (e.g. "clientSecret" → "client_secret", "DB_PASSWORD" → "db_password").
-//
-// Snake_case matches the TypeScript runtime's canonicalSecretName
-// (typescript/framework/runtime/src/config/infra-requirements.ts), so a
-// workload that aggregates secrets from both Go and TypeScript projects
-// sees the same canonical name for the same source field. Any other
-// character that the grammar doesn't accept is rewritten to '_' too.
-func canonicalizeName(s string) string {
-	var split strings.Builder
-	var prev rune
-	for i, r := range s {
-		if i > 0 && unicode.IsUpper(r) && (unicode.IsLower(prev) || unicode.IsDigit(prev)) {
-			split.WriteByte('_')
-		}
-		split.WriteRune(r)
-		prev = r
-	}
-
-	var b strings.Builder
-	for _, r := range strings.ToLower(split.String()) {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '_', r == '.', r == '/', r == '-':
-			b.WriteRune(r)
-		default:
-			b.WriteByte('_')
-		}
-	}
-
-	out := strings.TrimLeft(b.String(), "_./-")
-	if len(out) > 64 {
-		out = out[:64]
-	}
-	return out
 }

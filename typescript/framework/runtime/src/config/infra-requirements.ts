@@ -30,7 +30,12 @@ const INFRA_NAME_RE = /^[a-z0-9][a-z0-9_./-]{0,63}$/;
  * validated against {@link INFRA_NAME_RE}; a path that still cannot be
  * canonicalized (non-ASCII, illegal characters, or longer than 64 chars) throws
  * so the developer sees a clear failure at generate time instead of a secret
- * vanishing from the aggregated manifest.
+ * vanishing from the aggregated manifest. Go applies the same camelCase rule
+ * in `infra.SecretName` (protocols/infra), to a field's env binding when it
+ * has one and to its path otherwise.
+ *
+ * The result names the requirement, not the config key: the application reads
+ * the secret at `fieldPath`, which is where `putnami cloud secrets set` stores it.
  */
 function canonicalSecretName(fieldPath: string): string {
   const name = fieldPath.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
