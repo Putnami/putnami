@@ -20,6 +20,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	infra "go.putnami.dev/protocol/infra"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -115,7 +116,7 @@ func Analyze(commands []string, first, second, hit Run) Report {
 	// One contract set per project, resolved once: write ownership is a
 	// PROJECT-level surface (see writeAllowed), so every task of a project is
 	// scored against the same declarations.
-	projectContracts := make(map[string][]jobs.VerificationContract)
+	projectContracts := make(map[string][]cachekey.VerificationContract)
 	for _, project := range projectsOfPlan(first.Plan) {
 		projectContracts[project.ID] = contractsForProject(first, project.ID)
 	}
@@ -154,11 +155,11 @@ func analyzeTask(
 	job *jobs.ScheduledJob,
 	first, second, hit Run,
 	firstStore, secondStore *store.LocalStore,
-	projectContracts []jobs.VerificationContract,
+	projectContracts []cachekey.VerificationContract,
 ) Task {
 	key := job.Key()
 	a, b, h := first.Results[key], second.Results[key], hit.Results[key]
-	contract, err := jobs.VerificationContractOf(first.Workspace, job, a)
+	contract, err := cachekey.VerificationContractOf(first.Workspace, job, a)
 	task := Task{Key: key, Project: job.Project.ID, Deterministic: contract.Deterministic,
 		DoubleRun: "passed", HitLive: "passed", WriteClosure: "passed"}
 	if a != nil {
@@ -188,7 +189,7 @@ func analyzeTaskKeysAndArtifacts(
 	report *Report,
 	job *jobs.ScheduledJob,
 	task *Task,
-	contract jobs.VerificationContract,
+	contract cachekey.VerificationContract,
 	a, b, hit *jobs.JobResult,
 	firstStore, secondStore *store.LocalStore,
 ) {
@@ -228,8 +229,8 @@ func analyzeTaskWrites(
 	report *Report,
 	job *jobs.ScheduledJob,
 	task *Task,
-	contract jobs.VerificationContract,
-	projectContracts []jobs.VerificationContract,
+	contract cachekey.VerificationContract,
+	projectContracts []cachekey.VerificationContract,
 	result *jobs.JobResult,
 ) {
 	if result.VerificationError != "" {
@@ -292,7 +293,7 @@ func addFinding(report *Report, finding Finding) {
 func artifactDigest(
 	local *store.LocalStore,
 	key string,
-	contract jobs.VerificationContract,
+	contract cachekey.VerificationContract,
 	opts overrides,
 ) (string, bool, error) {
 	entry, err := local.LookupTaskEntry(key)
@@ -321,7 +322,7 @@ func artifactDigest(
 // for the live-versus-hit tree check.
 func comparableArtifacts(
 	entry *store.TaskEntry,
-	contract jobs.VerificationContract,
+	contract cachekey.VerificationContract,
 	opts overrides,
 ) ([]store.TaskEntryOutput, any) {
 	outputs := append([]store.TaskEntryOutput(nil), entry.Outputs...)
@@ -332,7 +333,7 @@ func comparableArtifacts(
 	manifest := &cache.Manifest{Files: make([]cache.FileEntry, 0, len(entry.Manifest.Files))}
 	for _, file := range entry.Manifest.Files {
 		if projectPath, ok := projectArtifactPath(entry.Outputs, file.Path); ok &&
-			classify(projectPath, []jobs.VerificationContract{contract}, opts) == ClassEphemeral {
+			classify(projectPath, []cachekey.VerificationContract{contract}, opts) == ClassEphemeral {
 			continue
 		}
 		manifest.Files = append(manifest.Files, file)
@@ -531,13 +532,13 @@ func safeGenPattern(value string) bool {
 		!strings.Contains(value, "\x00") && !strings.Contains(value, "../") && !strings.HasSuffix(value, "/..")
 }
 
-func contractsForProject(run Run, projectID string) []jobs.VerificationContract {
-	var result []jobs.VerificationContract
+func contractsForProject(run Run, projectID string) []cachekey.VerificationContract {
+	var result []cachekey.VerificationContract
 	for _, job := range run.Plan {
 		if job == nil || job.Project == nil || job.Project.ID != projectID {
 			continue
 		}
-		contract, err := jobs.VerificationContractOf(run.Workspace, job, run.Results[job.Key()])
+		contract, err := cachekey.VerificationContractOf(run.Workspace, job, run.Results[job.Key()])
 		if err == nil {
 			result = append(result, contract)
 		}
@@ -545,7 +546,7 @@ func contractsForProject(run Run, projectID string) []jobs.VerificationContract 
 	return result
 }
 
-func classify(item string, contracts []jobs.VerificationContract, opts overrides) string {
+func classify(item string, contracts []cachekey.VerificationContract, opts overrides) string {
 	for _, pattern := range opts.ephemeral {
 		if matchesPath(item, pattern) {
 			return ClassEphemeral
@@ -608,8 +609,8 @@ func classify(item string, contracts []jobs.VerificationContract, opts overrides
 // project, and must include the writing task's own.
 func writeAllowed(
 	job *jobs.ScheduledJob,
-	contract jobs.VerificationContract,
-	projectContracts []jobs.VerificationContract,
+	contract cachekey.VerificationContract,
+	projectContracts []cachekey.VerificationContract,
 	item string,
 	opts overrides,
 ) bool {

@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
 // serializeWriteResources adds write-serialization edges (ScheduledJob.SerializeAfter)
@@ -214,37 +215,12 @@ func resourceConflictKey(projectID string, ref extension.ResourceRef) string {
 	return "proj::" + projectID + "::" + ref.ID
 }
 
-// functionalDegrees returns the job index, in-plan indegree, and dependents
-// adjacency of the plan over functional dependencies (DependsOn) alone.
-// Dependencies outside the planned set are ignored. Dependent lists follow the
-// jobs slice order.
-func functionalDegrees(jobs []*ScheduledJob) (byKey map[string]*ScheduledJob, indegree map[string]int, dependents map[string][]string) {
-	byKey = make(map[string]*ScheduledJob, len(jobs))
-	for _, job := range jobs {
-		byKey[job.Key()] = job
-	}
-
-	indegree = make(map[string]int, len(jobs))
-	dependents = make(map[string][]string)
-	for _, job := range jobs {
-		n := 0
-		for _, dep := range job.DependsOn {
-			if _, ok := byKey[dep]; ok {
-				n++
-				dependents[dep] = append(dependents[dep], job.Key())
-			}
-		}
-		indegree[job.Key()] = n
-	}
-	return byKey, indegree, dependents
-}
-
 // functionalTopoOrder returns a deterministic topological ordering of the plan
 // over functional dependencies alone, as a map of job key → position. The ready
 // queue is drained in sorted-key order so the result does not depend on slice
 // order or map iteration. ok is false when the functional graph has a cycle.
 func functionalTopoOrder(jobs []*ScheduledJob) (map[string]int, bool) {
-	_, indegree, dependents := functionalDegrees(jobs)
+	_, indegree, dependents := cachekey.FunctionalDegrees(jobs)
 
 	var ready []string
 	for _, job := range jobs {

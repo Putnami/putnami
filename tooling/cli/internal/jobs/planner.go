@@ -7,6 +7,7 @@ import (
 
 	protocoljob "go.putnami.dev/protocol/job"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -281,7 +282,7 @@ func expandJob(
 	// project options → CLI flags. This matches the TS SDK's evalJobOptions
 	// so plan-time `if` conditions see the full resolved params.
 	mergedParams := mergeCommandParams(ws, proj, ext, cmdName, jobDef, commandParams)
-	mergedParams, _ = projectParamAliases(mergedParams)
+	mergedParams, _ = cachekey.ProjectParamAliases(mergedParams)
 	opts := pipelineExpansionOptions(ws, proj, ext, namespace, cache)
 	expanded, err := extension.ExpandPipelineWithOptions(cmdName, jobDef, jobDef.PipelineSteps, ext, mergedParams, opts)
 	if err != nil {

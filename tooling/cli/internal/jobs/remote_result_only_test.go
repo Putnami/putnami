@@ -2,7 +2,6 @@ package jobs
 
 import (
 	"context"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,11 +10,10 @@ import (
 	"testing"
 
 	cache "go.putnami.dev/protocol/cache"
-	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
-	protocoljob "go.putnami.dev/protocol/job"
-	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -46,20 +44,20 @@ func publishMatrixEntry(t *testing.T, server *fakeCacheServer) (string, map[stri
 
 // resultOnlyConsumer is a fresh workspace, with an empty store, whose runs
 // materialize in mode.
-func resultOnlyConsumer(t *testing.T, server *fakeCacheServer, mode cache.Mode) (*captureFixture, *RemoteCache) {
+func resultOnlyConsumer(t *testing.T, server *fakeCacheServer, mode cache.Mode) (*captureFixture, *remotecache.RemoteCache) {
 	t.Helper()
-	t.Setenv(cacheModeEnv, string(mode))
+	t.Setenv(remotecache.CacheModeEnv, string(mode))
 	return matrixFixture(t, server)
 }
 
 // attachRemote gives f a new provider session in mode, as the next run of
 // the same workspace has.
-func attachRemote(t *testing.T, f *captureFixture, mode cache.Mode) *RemoteCache {
+func attachRemote(t *testing.T, f *captureFixture, mode cache.Mode) *remotecache.RemoteCache {
 	t.Helper()
-	t.Setenv(cacheModeEnv, string(mode))
-	remote, notice := LoadRemoteCache(context.Background(), f.ws.Root,
-		[]*extension.ExtensionDescription{fakeProviderExtension(t, nil)}, nil, store.CacheTrustAny)
-	if remote == nil || !remote.isProviderBacked() {
+	t.Setenv(remotecache.CacheModeEnv, string(mode))
+	remote, notice := remotecache.LoadRemoteCache(context.Background(), f.ws.Root,
+		[]*extension.ExtensionDescription{fakeProviderExtension(t, nil)}, nil, store.CacheTrustAny, fakeProviderLaunch)
+	if remote == nil || !remote.IsProviderBacked() {
 		t.Fatalf("expected a provider-backed remote cache, got %+v (notice %q)", remote, notice)
 	}
 	t.Cleanup(remote.Close)
@@ -97,7 +95,7 @@ func TestResultOnlyHitPlacesNoBlobAndWritesNothing(t *testing.T) {
 
 	consumer, remote := resultOnlyConsumer(t, server, cache.ModeMinimal)
 	job := matrixJob()
-	remote.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, CacheBypass{})
+	remote.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, cachekey.CacheBypass{})
 	if got := server.prefetchedResultOnly(); !slices.Equal(got, []string{remoteKey}) {
 		t.Fatalf("result-only prefetch keys = %v, want [%s]", got, remoteKey)
 	}
@@ -147,7 +145,7 @@ func TestNegotiateCountsALocalResultOnlyEntryAsALocalHit(t *testing.T) {
 
 	consumer, remote := resultOnlyConsumer(t, server, cache.ModeMinimal)
 	job := matrixJob()
-	remote.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, CacheBypass{})
+	remote.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, cachekey.CacheBypass{})
 	if result := consumer.runDeclaredLookup(t, job, hash); result == nil || result.Reuse != ReuseRemoteCache {
 		t.Fatalf("first run = %+v, want a remote-cache hit", result)
 	}
@@ -157,8 +155,8 @@ func TestNegotiateCountsALocalResultOnlyEntryAsALocalHit(t *testing.T) {
 
 	rerun := attachRemote(t, consumer, cache.ModeMinimal)
 	prefetches := server.requestCount(cache.OpPrefetch)
-	rerun.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, CacheBypass{})
-	if !rerun.localHits[hash] {
+	rerun.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, cachekey.CacheBypass{})
+	if !rerun.LocalHits[hash] {
 		t.Fatal("negotiate did not count the local result-only entry as a local hit")
 	}
 	if got := server.requestCount(cache.OpPrefetch); got != prefetches {
@@ -177,8 +175,8 @@ func TestNegotiateCountsALocalResultOnlyEntryAsALocalHit(t *testing.T) {
 	}
 
 	full := attachRemote(t, consumer, cache.ModeFull)
-	full.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, CacheBypass{})
-	if full.localHits[hash] {
+	full.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, cachekey.CacheBypass{})
+	if full.LocalHits[hash] {
 		t.Fatal("a run that reads the files counted the result-only entry as a local hit")
 	}
 	if got := server.prefetched(); !slices.Contains(got, remoteKey) || server.requestCount(cache.OpPrefetch) != prefetches+1 {
@@ -199,9 +197,9 @@ func TestResultOnlyHintIsAQuietMiss(t *testing.T) {
 	server.channel = cache.ChannelHint
 
 	consumer, remote := resultOnlyConsumer(t, server, cache.ModeMinimal)
-	remote.trust = store.CacheTrustCI
+	remote.Trust = store.CacheTrustCI
 	job := matrixJob()
-	remote.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, CacheBypass{})
+	remote.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, cachekey.CacheBypass{})
 
 	placed := server.placedBlobs()
 	if result := consumer.runDeclaredLookup(t, job, hash); result != nil {
@@ -248,11 +246,11 @@ func TestResultOnlyRestoresTheFilesOfATaskALaterJobWaitsFor(t *testing.T) {
 			later := declaredJob("test~check", "check", &extension.TaskDeclaration{})
 			wait(later, job)
 			planned := []*ScheduledJob{job, later}
-			keys, err := PrecomputeKeys(consumer.ws, planned, nil, nil, consumer.cache, CacheBypass{})
+			keys, err := cachekey.PrecomputeKeys(consumer.ws, planned, nil, nil, consumer.cache, cachekey.CacheBypass{})
 			if err != nil || keys[later.Key()] == "" {
 				t.Fatalf("precompute keys: %v (keys %v)", err, keys)
 			}
-			remote.Negotiate(t.Context(), consumer.ws, planned, nil, nil, consumer.cache, CacheBypass{})
+			remote.Negotiate(t.Context(), consumer.ws, planned, nil, nil, consumer.cache, cachekey.CacheBypass{})
 			wantResultOnly := []string{store.RemoteTaskEntryKey(keys[later.Key()])}
 			if got := server.prefetchedResultOnly(); !slices.Equal(got, wantResultOnly) {
 				t.Fatalf("result-only prefetch keys = %v, want only the later job's %v", got, wantResultOnly)
@@ -301,7 +299,7 @@ func TestRunThatReadsTheFilesNeverServesAResultOnlyEntry(t *testing.T) {
 
 			consumer, remote := resultOnlyConsumer(t, server, cache.ModeMinimal)
 			job := matrixJob()
-			remote.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, CacheBypass{})
+			remote.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, cachekey.CacheBypass{})
 			if result := consumer.runDeclaredLookup(t, job, hash); result == nil || result.Reuse != ReuseRemoteCache {
 				t.Fatalf("minimal run = %+v, want a remote-cache hit", result)
 			}
@@ -314,7 +312,7 @@ func TestRunThatReadsTheFilesNeverServesAResultOnlyEntry(t *testing.T) {
 
 			full := attachRemote(t, consumer, cache.ModeFull)
 			resultOnlyBefore := server.prefetchedResultOnly()
-			full.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, CacheBypass{})
+			full.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, cachekey.CacheBypass{})
 			if got := server.prefetchedResultOnly(); !slices.Equal(got, resultOnlyBefore) {
 				t.Fatalf("a full run named result-only keys: %v", got)
 			}
@@ -354,12 +352,12 @@ func TestAFailedFullRestoreNeverFallsBackToTheResultOnlyEntry(t *testing.T) {
 
 	consumer, remote := resultOnlyConsumer(t, server, cache.ModeMinimal)
 	job := matrixJob()
-	remote.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, CacheBypass{})
+	remote.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, cachekey.CacheBypass{})
 	if result := consumer.runDeclaredLookup(t, job, hash); result == nil || result.Reuse != ReuseRemoteCache {
 		t.Fatalf("minimal run = %+v, want a remote-cache hit", result)
 	}
 	full := attachRemote(t, consumer, cache.ModeFull)
-	full.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, CacheBypass{})
+	full.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, cachekey.CacheBypass{})
 	if result := consumer.runDeclaredLookup(t, job, hash); result == nil || result.Reuse != ReuseRemoteCache {
 		t.Fatalf("full run = %+v, want a remote-cache hit restored with its files", result)
 	}
@@ -386,8 +384,8 @@ func TestAFailedFullRestoreNeverFallsBackToTheResultOnlyEntry(t *testing.T) {
 	// learns its echo even though the matrix task is a local hit.
 	rerun := attachRemote(t, consumer, cache.ModeMinimal)
 	publisher := declaredJob("publish~ship", "ship", &extension.TaskDeclaration{})
-	rerun.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job, publisher}, nil, nil, consumer.cache, CacheBypass{})
-	if rerun.taskFilesNeeded(job) {
+	rerun.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job, publisher}, nil, nil, consumer.cache, cachekey.CacheBypass{})
+	if rerun.TaskFilesNeeded(job) {
 		t.Fatal("the rerun needs the files, so it cannot tell the two lookup orders apart")
 	}
 	// The full fallback finds the same local entry, fails the same way, and
@@ -412,7 +410,7 @@ func TestProviderWithoutTheEchoKeepsTheFullRestore(t *testing.T) {
 
 	consumer, remote := resultOnlyConsumer(t, server, cache.ModeMinimal)
 	job := matrixJob()
-	remote.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, CacheBypass{})
+	remote.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, cachekey.CacheBypass{})
 	result := consumer.runDeclaredLookup(t, job, hash)
 	if result == nil || result.Reuse != ReuseRemoteCache {
 		t.Fatalf("lookup = %+v, want a remote-cache hit", result)
@@ -531,11 +529,11 @@ func (f *resultOnlyRun) jobs(withCheck bool) []*ScheduledJob {
 // provider session and the object-cache fixture's scheduler runner.
 func (f *resultOnlyRun) run(t *testing.T, mode cache.Mode, storeDir string, planned []*ScheduledJob) (*SchedulerResult, *store.CacheManager) {
 	t.Helper()
-	t.Setenv(cacheModeEnv, string(mode))
+	t.Setenv(remotecache.CacheModeEnv, string(mode))
 	cm := store.NewCacheManager(store.NewLocalStore(storeDir))
-	remote, notice := LoadRemoteCache(context.Background(), f.ws.Root,
-		[]*extension.ExtensionDescription{fakeProviderExtension(t, nil)}, nil, store.CacheTrustAny)
-	if remote == nil || !remote.isProviderBacked() {
+	remote, notice := remotecache.LoadRemoteCache(context.Background(), f.ws.Root,
+		[]*extension.ExtensionDescription{fakeProviderExtension(t, nil)}, nil, store.CacheTrustAny, fakeProviderLaunch)
+	if remote == nil || !remote.IsProviderBacked() {
 		t.Fatalf("expected a provider-backed remote cache, got %+v (notice %q)", remote, notice)
 	}
 	t.Cleanup(remote.Close)
@@ -587,7 +585,7 @@ func TestMinimalRunServesEveryHitWithoutItsFiles(t *testing.T) {
 		t.Fatalf("producer run failed: %s", runOutcome(produced))
 	}
 	planned := f.jobs(true)
-	keys, err := PrecomputeKeys(f.ws, planned, nil, nil, producerStore, CacheBypass{})
+	keys, err := cachekey.PrecomputeKeys(f.ws, planned, nil, nil, producerStore, cachekey.CacheBypass{})
 	if err != nil {
 		t.Fatalf("precompute keys: %v", err)
 	}
@@ -648,148 +646,6 @@ func TestMinimalRunServesEveryHitWithoutItsFiles(t *testing.T) {
 // the rule
 // ---------------------------------------------------------------------------
 
-// initializedSession returns a session that completed initialize against the
-// fake provider, which echoes cache.CapabilityRestoreResultOnly when echo is
-// set. The session is the only record of the echo.
-func initializedSession(t *testing.T, mode cache.Mode, echo bool) *cacheprovider.Session {
-	t.Helper()
-	server := newFakeCacheServer()
-	if echo {
-		server.echoResultOnly()
-	}
-	reqR, reqW := io.Pipe()
-	respR, respW := io.Pipe()
-	go func() {
-		serveSharedFakeProvider(reqR, respW, server)
-		_ = respW.Close()
-		_ = reqR.Close()
-	}()
-	sess := cacheprovider.Connect(reqW, respR)
-	t.Cleanup(func() { _ = sess.Close() })
-	if _, err := sess.Initialize(t.Context(), &cache.InitializeParams{
-		ProtocolVersion: cache.ProviderProtocolVersion,
-		BlobExchangeDir: t.TempDir(),
-		Mode:            mode,
-	}); err != nil {
-		t.Fatalf("initialize: %v", err)
-	}
-	if got := sess.RestoreResultOnly(); got != echo {
-		t.Fatalf("session echo = %v, want %v", got, echo)
-	}
-	return sess
-}
-
-func resultOnlyRemote(t *testing.T, mode cache.Mode, echo bool, dependedOn ...string) *RemoteCache {
-	t.Helper()
-	waited := map[string]bool{}
-	for _, key := range dependedOn {
-		waited[key] = true
-	}
-	return &RemoteCache{
-		provider:   &providerRemote{mode: mode, ready: true, session: initializedSession(t, mode, echo)},
-		dependedOn: waited,
-	}
-}
-
-func selectedJob(selected ...string) *ScheduledJob {
-	job := matrixJob()
-	job.Selection = &protocoljob.Selection{ProjectIDs: selected}
-	return job
-}
-
-func TestTaskFilesNeeded(t *testing.T) {
-	leaf := selectedJob("/other")
-	cases := []struct {
-		name   string
-		remote *RemoteCache
-		job    *ScheduledJob
-		want   bool
-	}{
-		{"no remote cache", nil, leaf, true},
-		{"provider without the echo", resultOnlyRemote(t, cache.ModeMinimal, false), leaf, true},
-		{"plan never negotiated", &RemoteCache{provider: &providerRemote{mode: cache.ModeMinimal, ready: true, session: initializedSession(t, cache.ModeMinimal, true)}}, leaf, true},
-		{"provider not started", &RemoteCache{provider: &providerRemote{mode: cache.ModeMinimal}, dependedOn: map[string]bool{}}, leaf, true},
-		{"provider not ready", &RemoteCache{provider: &providerRemote{mode: cache.ModeMinimal, session: initializedSession(t, cache.ModeMinimal, true)}, dependedOn: map[string]bool{}}, leaf, true},
-		{"full mode", resultOnlyRemote(t, cache.ModeFull, true), leaf, true},
-		{"minimal mode, nothing waits", resultOnlyRemote(t, cache.ModeMinimal, true), leaf, false},
-		{"minimal mode, a job waits", resultOnlyRemote(t, cache.ModeMinimal, true, leaf.Key()), leaf, true},
-		{"toplevel mode, project not selected", resultOnlyRemote(t, cache.ModeToplevel, true), leaf, false},
-		{"toplevel mode, project selected", resultOnlyRemote(t, cache.ModeToplevel, true), selectedJob("/" + captureTestProject), true},
-		{"toplevel mode, no selection", resultOnlyRemote(t, cache.ModeToplevel, true), matrixJob(), true},
-		{"toplevel mode, workspace-once job", resultOnlyRemote(t, cache.ModeToplevel, true), func() *ScheduledJob {
-			job := selectedJob("/other")
-			job.SelectedProjects = []*workspace.Project{{ID: "/other"}}
-			return job
-		}(), true},
-		{"minimal mode, post-run report", resultOnlyRemote(t, cache.ModeMinimal, true), declaredJob("test~verify", "verify",
-			&extension.TaskDeclaration{Outputs: map[string]extension.DeclaredOutput{
-				"report": fileDeclaration(extension.OutputRootCommandOutput, features.VerificationReportFilename, true),
-			}}), true},
-		{"minimal mode, policed drift", resultOnlyRemote(t, cache.ModeMinimal, true), func() *ScheduledJob {
-			output := dirDeclaration(extension.OutputRootProject, "client", false)
-			output.Drift = extension.OutputDriftFail
-			return declaredJob("generate~client", "client",
-				&extension.TaskDeclaration{Outputs: map[string]extension.DeclaredOutput{"client": output}})
-		}(), true},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.remote.taskFilesNeeded(tc.job); got != tc.want {
-				t.Fatalf("taskFilesNeeded = %v, want %v", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestDeclaresPostRunReport(t *testing.T) {
-	commandOutputFile := func(path string) extension.DeclaredOutput {
-		return fileDeclaration(extension.OutputRootCommandOutput, path, true)
-	}
-	runTimeFile := extension.DeclaredOutput{Kind: extension.OutputKindFile, Root: extension.OutputRootCommandOutput, PathFrom: "report"}
-	cases := map[string]struct {
-		output extension.DeclaredOutput
-		want   bool
-	}{
-		"verification report":          {commandOutputFile(features.VerificationReportFilename), true},
-		"criteria projection":          {commandOutputFile(features.SpecCriteriaProjectionFilename), true},
-		"command-output run-time file": {runTimeFile, true},
-		"command-output directory":     {dirDeclaration(extension.OutputRootCommandOutput, "bin", false), false},
-		"other command-output file":    {commandOutputFile("package.tgz"), false},
-		"report name in the project":   {fileDeclaration(extension.OutputRootProject, features.VerificationReportFilename, true), false},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			job := declaredJob("test~task", "task", &extension.TaskDeclaration{
-				Outputs: map[string]extension.DeclaredOutput{"out": tc.output},
-			})
-			if got := declaresPostRunReport(job); got != tc.want {
-				t.Fatalf("declaresPostRunReport = %v, want %v", got, tc.want)
-			}
-		})
-	}
-	if declaresPostRunReport(declaredJob("test~task", "task", nil)) {
-		t.Fatal("a job without a declaration declares no report")
-	}
-}
-
-// TestNegotiateNamesAKeyResultOnlyOnlyWhenNoJobSharingItReadsTheFiles pins the
-// subset rule: a key two planned jobs restore is result-only only when neither
-// reads the files.
-func TestNegotiateNamesAKeyResultOnlyOnlyWhenNoJobSharingItReadsTheFiles(t *testing.T) {
-	remote := resultOnlyRemote(t, cache.ModeMinimal, true, "/proj:reader")
-	leaf := matrixJob()
-	waited := declaredJob("reader", "reader", &extension.TaskDeclaration{})
-	declared := map[string][]*ScheduledJob{
-		"k-leaf":   {leaf},
-		"k-shared": {leaf, waited},
-		"k-waited": {waited},
-	}
-	got := remote.resultOnlyKeys([]string{"k-waited", "k-leaf", "k-shared", "k-leaf", "k-legacy"}, declared)
-	if want := []string{"k-leaf"}; !slices.Equal(got, want) {
-		t.Fatalf("resultOnlyKeys = %v, want %v", got, want)
-	}
-}
-
 // TestStatusOnlyHitRefusesASourceMutatingResult pins the source-rewriter rule
 // on the status-only path: recorded edits must reach the worktree, so the
 // result cannot serve without them.
@@ -801,7 +657,7 @@ func TestStatusOnlyHitRefusesASourceMutatingResult(t *testing.T) {
 	hashes := map[string]string{}
 	mutated := &store.ResultOnlyTaskEntry{
 		Key:    captureHashA,
-		Result: entryResultFromJobResult(&JobResult{Status: "success", SourceMutated: true}),
+		Result: cachekey.EntryResultFromJobResult(&JobResult{Status: "success", SourceMutated: true}),
 	}
 	if result := f.sched.serveStatusOnlyHit(job, captureHashA, mutated, ReuseRemoteCache, &mu, hashes); result != nil {
 		t.Fatalf("a source-mutating result served as a status-only hit: %+v", result)

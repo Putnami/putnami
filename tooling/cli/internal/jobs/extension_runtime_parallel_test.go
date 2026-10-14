@@ -16,6 +16,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -189,7 +190,7 @@ func TestRuntimeSyncCancellationLeavesNoTornState(t *testing.T) {
 	})
 	ext := runtimeTestExtension(root)
 
-	digest, err := extensionRuntimeDigest(ext)
+	digest, err := cachekey.ExtensionRuntimeDigest(ext)
 	if err != nil {
 		t.Fatal(err)
 	}

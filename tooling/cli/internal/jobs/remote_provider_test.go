@@ -4,22 +4,23 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/protocol/cache/objectcachetest"
-	"go.putnami.dev/protocol/features/spectest"
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
-	"go.putnami.dev/tooling/cli/internal/store"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 )
 
 const fakeProviderBlobContent = "provider artifact"
@@ -166,7 +167,7 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 			}
 			negotiatedVersion := req.ProtocolVersion
 			if p != nil && providerProtocolVersion >= cache.ProviderProtocolProvenanceVersion &&
-				containsString(p.Capabilities, cache.CapabilityProviderProtocolV2) {
+				slices.Contains(p.Capabilities, cache.CapabilityProviderProtocolV2) {
 				negotiatedVersion = providerProtocolVersion
 			}
 			if capabilitiesOut != "" && p != nil {
@@ -176,7 +177,7 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 			// socket is created under the blob-exchange directory core named.
 			var capabilities []string
 			socketPath := ""
-			if objectCache && p != nil && containsString(p.Capabilities, cache.CapabilityObjectCache) {
+			if objectCache && p != nil && slices.Contains(p.Capabilities, cache.CapabilityObjectCache) {
 				serverOpts := []objectcachetest.Option{}
 				if objectChannel != "" {
 					serverOpts = append(serverOpts, objectcachetest.WithChannel(objectChannel))
@@ -187,7 +188,7 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 					socketPath = started.Path()
 				}
 			}
-			if runCredentialEcho && p != nil && containsString(p.Capabilities, cache.CapabilityRunCredential) {
+			if runCredentialEcho && p != nil && slices.Contains(p.Capabilities, cache.CapabilityRunCredential) {
 				capabilities = append(capabilities, cache.CapabilityRunCredential)
 			}
 			ok(req.ProtocolVersion, req.ID, &cache.InitializeResult{
@@ -360,8 +361,8 @@ func applyFakeRestoreProvenance(res *cache.RestoreResult, channel cache.Channel,
 // end-to-end spawn integration test.
 func useInProcessFakeProvider(t *testing.T) {
 	t.Helper()
-	orig := spawnProviderSession
-	spawnProviderSession = func(_ context.Context, spec cacheprovider.LaunchSpec, opts ...cacheprovider.Option) (*cacheprovider.Session, error) {
+	orig := remotecache.SpawnProviderSession
+	remotecache.SpawnProviderSession = func(_ context.Context, spec cacheprovider.LaunchSpec, opts ...cacheprovider.Option) (*cacheprovider.Session, error) {
 		env := make(map[string]string, len(spec.Env))
 		for _, kv := range spec.Env {
 			if k, v, found := strings.Cut(kv, "="); found {
@@ -377,7 +378,7 @@ func useInProcessFakeProvider(t *testing.T) {
 		}()
 		return cacheprovider.Connect(reqW, respR, opts...), nil
 	}
-	t.Cleanup(func() { spawnProviderSession = orig })
+	t.Cleanup(func() { remotecache.SpawnProviderSession = orig })
 }
 
 func diagString(v any) string {
@@ -437,347 +438,38 @@ func fakeProviderExtension(t *testing.T, env map[string]string) *extension.Exten
 	}
 }
 
+// fakeProviderLaunch stands in for the runner's provider launch
+// (jobs.PrepareProviderLaunch): it expands the provider command's templates,
+// working directory and environment the same way, and prepares no runtime.
+// The tests of the launch itself pass the runner's launch instead.
+func fakeProviderLaunch(_ context.Context, workspaceRoot string, ext *extension.ExtensionDescription, command string) (cacheprovider.LaunchSpec, error) {
+	job := ext.Jobs[command]
+	if job == nil || strings.TrimSpace(job.Command) == "" {
+		return cacheprovider.LaunchSpec{}, fmt.Errorf("provider command %q of %s has no executable", command, ext.Name)
+	}
+	vars := extension.BuildTemplateVars(workspaceRoot, workspaceRoot, ext.Path, filepath.Join(workspaceRoot, ".putnami", "out"))
+	vars[extensionproto.TemplateVarExtensionRuntime] = ext.RuntimeExecutable
+	launch := cacheprovider.LaunchSpec{
+		Command: extension.ExpandTemplateVars(job.Command, vars),
+		Args:    make([]string, 0, len(job.Args)),
+		Dir:     workspaceRoot,
+		Env:     os.Environ(),
+	}
+	for _, arg := range job.Args {
+		launch.Args = append(launch.Args, extension.ExpandTemplateVars(arg, vars))
+	}
+	if job.Cwd != "" {
+		launch.Dir = extension.ExpandTemplateVars(job.Cwd, vars)
+	}
+	for _, key := range slices.Sorted(maps.Keys(job.Env)) {
+		launch.Env = append(launch.Env, key+"="+extension.ExpandTemplateVars(job.Env[key], vars))
+	}
+	return launch, nil
+}
+
 func enableProviderRemoteCache(t *testing.T) {
 	t.Helper()
-	t.Setenv(cacheURLEnv, "https://cache.example")
-}
-
-func TestLoadRemoteCache_UnconfiguredIsSilent(t *testing.T) {
-	// No cache.json and no PUTNAMI_CACHE_* override: local-only is the expected
-	// default, not a degradation, so there must be no cache and no notice.
-	// Pin the override to empty: the suite must assert the unconfigured default
-	// even when the invoking environment (CI, the scripts/bench-cache.sh benchmark)
-	// exports a real PUTNAMI_CACHE_URL.
-	t.Setenv(cacheURLEnv, "")
-	remote, notice := LoadRemoteCache(context.Background(), t.TempDir(), nil, nil, store.CacheTrustAny)
-	if remote != nil {
-		t.Fatalf("unconfigured workspace must build locally (nil cache), got %+v", remote)
-	}
-	if notice != "" {
-		t.Fatalf("unconfigured remote cache must be silent, got notice %q", notice)
-	}
-}
-
-func TestLoadRemoteCache_UnconfiguredWithProviderIsSilent(t *testing.T) {
-	// Installing a provider extension alone must not activate remote caching. A
-	// provider command is usable only after cache.json or PUTNAMI_CACHE_URL opts in.
-	t.Setenv(cacheURLEnv, "")
-	remote, notice := LoadRemoteCache(context.Background(), t.TempDir(), []*extension.ExtensionDescription{
-		fakeProviderExtension(t, nil),
-	}, nil, store.CacheTrustAny)
-	if remote != nil {
-		t.Fatalf("unconfigured workspace must build locally (nil cache), got %+v", remote)
-	}
-	if notice != "" {
-		t.Fatalf("unconfigured remote cache must be silent, got notice %q", notice)
-	}
-}
-
-func TestLoadRemoteCache_ConfiguredWithoutProviderEmitsNotice(t *testing.T) {
-	enableProviderRemoteCache(t)
-	// Caching is configured but no installed extension declares the provider
-	// command, so it cannot be served. The degradation policy requires a
-	// one-line notice rather than a silent fall back to local-only.
-	remote, notice := LoadRemoteCache(context.Background(), t.TempDir(), nil, nil, store.CacheTrustAny)
-	if remote != nil {
-		t.Fatalf("a configured cache with no provider must build locally, got %+v", remote)
-	}
-	if notice == "" {
-		t.Fatal("a configured-but-unusable remote cache must emit a one-line notice")
-	}
-	// The actionable identity is the RESERVED COMMAND, not a vendor: any
-	// extension declaring it can serve the cache.
-	if !strings.Contains(notice, cache.ProviderCommandName) {
-		t.Fatalf("notice should name the reserved provider command so the hint is actionable, got %q", notice)
-	}
-}
-
-// TestLoadRemoteCache_SkippedExtensionCitesRootCause proves an UNLOADABLE
-// extension is still distinguishable from an uninstalled one now that the gate
-// no longer knows which product ships the provider: the notice carries the skip
-// records discovery collected, so a contract-too-new manifest is a fixable
-// fault instead of a silent local-only run.
-func TestLoadRemoteCache_SkippedExtensionCitesRootCause(t *testing.T) {
-	enableProviderRemoteCache(t)
-	remote, notice := LoadRemoteCache(context.Background(), t.TempDir(), nil, &extension.DiscoveryResult{Skipped: []extension.SkippedExtension{
-		{Ref: "@acme/cache", Name: "@acme/cache", Reason: errors.New("requires a newer putnami (contract 4 > 3)")},
-	}}, store.CacheTrustAny)
-	if remote != nil {
-		t.Fatalf("a configured cache with no loadable provider must build locally, got %+v", remote)
-	}
-	for _, want := range []string{"@acme/cache", "requires a newer putnami"} {
-		if !strings.Contains(notice, want) {
-			t.Fatalf("notice %q should cite the skip cause %q", notice, want)
-		}
-	}
-}
-
-// A hosted run that removed the cache provider from a path extension builds
-// locally and names that removal, never an unloadable extension or an install
-// remedy: the path extension loaded. A removal of another capability is not
-// named.
-func TestLoadRemoteCache_RemovedCapabilityNamesThePathExtension(t *testing.T) {
-	spectest.Proves(t, "cli/credential-custody", "hostile-process-finds-nothing", "path-extension-serves-no-provider")
-	enableProviderRemoteCache(t)
-	remote, notice := LoadRemoteCache(context.Background(), t.TempDir(), nil, &extension.DiscoveryResult{
-		RemovedCapabilities: []extension.RemovedCapability{
-			{Extension: "@acme/local", Command: cache.ProviderCommandName},
-			{Extension: "@acme/other", Command: "credential-provider"},
-		},
-	}, store.CacheTrustAny)
-	if remote != nil {
-		t.Fatalf("a configured cache whose only provider was removed must build locally, got %+v", remote)
-	}
-	if want := "path extension @acme/local does not serve the " + cache.ProviderCommandName + " capability"; !strings.Contains(notice, want) {
-		t.Errorf("notice %q does not name the removal %q", notice, want)
-	}
-	for _, unwanted := range []string{"@acme/other", "could not be loaded", "putnami upgrade"} {
-		if strings.Contains(notice, unwanted) {
-			t.Errorf("notice %q holds %q", notice, unwanted)
-		}
-	}
-}
-
-// TestLoadRemoteCache_AmbiguousProviderFails pins the one resolution failure
-// that survived: two extensions declaring the reserved command. Picking one
-// silently would make the active provider a function of discovery order.
-func TestLoadRemoteCache_AmbiguousProviderFails(t *testing.T) {
-	enableProviderRemoteCache(t)
-	first := fakeProviderExtension(t, nil)
-	second := fakeProviderExtension(t, nil)
-	second.Name = "@other/cache"
-	_, _, err := loadProviderRemoteCache(context.Background(), t.TempDir(),
-		[]*extension.ExtensionDescription{first, second}, nil, store.CacheTrustAny)
-	if !errors.Is(err, extension.ErrProviderAmbiguous) {
-		t.Fatalf("error = %v, want ErrProviderAmbiguous", err)
-	}
-}
-
-func TestLoadRemoteCache_NoneIgnoresConfiguredRemote(t *testing.T) {
-	enableProviderRemoteCache(t)
-	remote, notice := LoadRemoteCache(context.Background(), t.TempDir(), nil, nil, store.CacheTrustNone)
-	if remote != nil || notice != "" {
-		t.Fatalf("cache trust none = remote %#v, notice %q; want remote ignored silently", remote, notice)
-	}
-}
-
-func TestLoadRemoteCache_ShaStampedProviderVersionIsAccepted(t *testing.T) {
-	enableProviderRemoteCache(t)
-	// The fake provider's version is a lexically-minimal SHA stamp
-	// (fakeProviderVersion). Every published cloud build carries such a stamp,
-	// and stamps are unordered, so the gate must accept it without a notice: a
-	// semver version floor here once rejected builds NEWER than the floor as
-	// "older", permanently disabling the remote cache.
-	remote, notice := LoadRemoteCache(context.Background(), t.TempDir(), []*extension.ExtensionDescription{
-		fakeProviderExtension(t, nil),
-	}, nil, store.CacheTrustAny)
-	if remote == nil || !remote.isProviderBacked() {
-		t.Fatalf("a SHA-stamped provider version must be accepted, got %+v", remote)
-	}
-	defer remote.Close()
-	if notice != "" {
-		t.Fatalf("a compatible provider must load without a notice, got %q", notice)
-	}
-}
-
-func TestLoadRemoteCacheProvider_RunMarkers(t *testing.T) {
-	enableProviderRemoteCache(t)
-	useInProcessFakeProvider(t)
-	wsRoot := t.TempDir()
-	markerOut := filepath.Join(wsRoot, "marker.txt")
-	ext := fakeProviderExtension(t, map[string]string{
-		"FAKE_MARKER_SHA": "cafef00d",
-		"FAKE_MARKER_OUT": markerOut,
-	})
-
-	remote, _ := LoadRemoteCache(context.Background(), wsRoot, []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny)
-	if remote == nil || !remote.isProviderBacked() {
-		t.Fatalf("expected provider-backed remote cache, got %+v", remote)
-	}
-	defer remote.Close()
-
-	sha, ok := remote.LookupRunMarker(context.Background(), "ws-id", "main", []string{"build"}, "")
-	if !ok || sha != "cafef00d" {
-		t.Fatalf("LookupRunMarker = %q, %v; want cafef00d, true", sha, ok)
-	}
-
-	// The scheduler calls Stop() at the end of the run; the CLI publishes the
-	// success marker afterwards (recordSuccessfulBuild). Stop must not tear down
-	// the provider session, or the publish below silently writes nothing.
-	remote.Stop()
-
-	remote.PublishRunMarker(context.Background(), "ws-id", "main", []string{"build"}, "", "deadbeef", "")
-	got, err := os.ReadFile(markerOut)
-	if err != nil {
-		t.Fatalf("read marker write: %v", err)
-	}
-	if string(got) != "deadbeef" {
-		t.Fatalf("published marker = %q, want deadbeef", got)
-	}
-}
-
-func TestLoadRemoteCacheProvider_CITrustRejectsUnprovenRunMarker(t *testing.T) {
-	enableProviderRemoteCache(t)
-	useInProcessFakeProvider(t)
-	wsRoot := t.TempDir()
-	lookupOut := filepath.Join(wsRoot, "marker-lookup.txt")
-	ext := fakeProviderExtension(t, map[string]string{
-		"FAKE_MARKER_SHA":        "cafef00d",
-		"FAKE_MARKER_LOOKUP_OUT": lookupOut,
-	})
-
-	remote, _ := LoadRemoteCache(context.Background(), wsRoot, []*extension.ExtensionDescription{ext}, nil, store.CacheTrustCI)
-	if remote == nil || !remote.isProviderBacked() {
-		t.Fatalf("expected provider-backed remote cache, got %+v", remote)
-	}
-	defer remote.Close()
-
-	if sha, ok := remote.LookupRunMarker(context.Background(), "ws-id", "main", []string{"build"}, ""); ok || sha != "" {
-		t.Fatalf("LookupRunMarker = %q, %v; want unproven marker rejected", sha, ok)
-	}
-	if _, err := os.Stat(lookupOut); !os.IsNotExist(err) {
-		t.Fatalf("CI trust contacted provider for an unproven marker: %v", err)
-	}
-}
-
-// readProviderOps returns the ops the fake recorded in path, then removes it.
-func readProviderOps(t *testing.T, path string) []string {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Remove(path); err != nil {
-		t.Fatal(err)
-	}
-	return strings.Split(strings.TrimSpace(string(data)), "\n")
-}
-
-// A run credential reaches the cache provider in one authenticate, right
-// after initialize and before any other op, and never through the provider's
-// launch environment: that environment is the one a run without a credential
-// gets. Without a credential nothing is authenticated.
-func TestLoadRemoteCacheProvider_RunCredentialAuthenticatesOverTheRPC(t *testing.T) {
-	spectest.Proves(t, "cli/credential-custody", "providers-receive-it-over-rpc", "cache-provider-authenticates-after-the-capability")
-	enableProviderRemoteCache(t)
-	useInProcessFakeProvider(t)
-	inProcess := spawnProviderSession
-	var launchEnv []string
-	spawnProviderSession = func(ctx context.Context, spec cacheprovider.LaunchSpec, opts ...cacheprovider.Option) (*cacheprovider.Session, error) {
-		launchEnv = append([]string(nil), spec.Env...)
-		return inProcess(ctx, spec, opts...)
-	}
-	t.Cleanup(func() { spawnProviderSession = inProcess })
-
-	const secret = "prc_jobs-run-credential"
-	wsRoot := t.TempDir()
-	opsOut := filepath.Join(wsRoot, "ops.txt")
-	ext := fakeProviderExtension(t, map[string]string{"FAKE_RUN_CREDENTIAL_ECHO": "1", "FAKE_OPS_OUT": opsOut})
-	run := func(options ...RemoteCacheOption) ([]string, []string) {
-		t.Helper()
-		launchEnv = nil
-		remote, notice := LoadRemoteCache(context.Background(), wsRoot, []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny, options...)
-		if remote == nil || notice != "" {
-			t.Fatalf("expected a provider-backed remote cache, got %+v, notice %q", remote, notice)
-		}
-		remote.LookupRunMarker(context.Background(), "ws-id", "main", []string{"build"}, "")
-		remote.Close()
-		return readProviderOps(t, opsOut), launchEnv
-	}
-
-	plainOps, plainEnv := run()
-	runOps, runEnv := run(WithCacheRunCredential(secret))
-	if len(plainOps) < 2 || plainOps[0] != "initialize" || plainOps[1] != "marker-lookup" || strings.Contains(strings.Join(plainOps, "\n"), "authenticate") {
-		t.Fatalf("ops without a run credential = %q, want initialize then marker-lookup and no authenticate", plainOps)
-	}
-	if len(runOps) != len(plainOps)+1 || runOps[0] != "initialize" || runOps[1] != "authenticate "+secret ||
-		strings.Join(runOps[2:], "\n") != strings.Join(plainOps[1:], "\n") {
-		t.Fatalf("ops with a run credential = %q, want %q with one authenticate right after initialize", runOps, plainOps)
-	}
-	if len(runEnv) == 0 || strings.Join(runEnv, "\n") != strings.Join(plainEnv, "\n") {
-		t.Fatal("the run credential changed the provider's launch environment")
-	}
-	for _, entry := range runEnv {
-		if strings.Contains(entry, secret) {
-			t.Fatal("the run credential reached the provider's launch environment")
-		}
-	}
-}
-
-// A provider that does not echo the capability receives no authenticate and
-// keeps serving the run.
-func TestLoadRemoteCacheProvider_RunCredentialWithoutEchoSendsNothing(t *testing.T) {
-	enableProviderRemoteCache(t)
-	useInProcessFakeProvider(t)
-	const secret = "prc_jobs-run-credential"
-	wsRoot := t.TempDir()
-	opsOut := filepath.Join(wsRoot, "ops.txt")
-	ext := fakeProviderExtension(t, map[string]string{"FAKE_MARKER_SHA": "cafef00d", "FAKE_OPS_OUT": opsOut})
-	remote, _ := LoadRemoteCache(context.Background(), wsRoot, []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny, WithCacheRunCredential(secret))
-	if remote == nil || !remote.isProviderBacked() {
-		t.Fatalf("expected a provider-backed remote cache, got %+v", remote)
-	}
-	if sha, ok := remote.LookupRunMarker(context.Background(), "ws-id", "main", []string{"build"}, ""); !ok || sha != "cafef00d" {
-		t.Fatalf("LookupRunMarker = %q, %v; want the session to keep serving", sha, ok)
-	}
-	remote.Close()
-	for _, op := range readProviderOps(t, opsOut) {
-		if strings.HasPrefix(op, "authenticate") || strings.Contains(op, secret) {
-			t.Fatalf("a provider that did not echo the capability received %q", op)
-		}
-	}
-}
-
-// A refused authenticate degrades like a failed initialize: the session is
-// closed, its exchange directory removed, the run builds locally, and the
-// provider is not started again.
-func TestLoadRemoteCacheProvider_RefusedAuthenticateBuildsLocally(t *testing.T) {
-	enableProviderRemoteCache(t)
-	useInProcessFakeProvider(t)
-	const secret = "prc_jobs-run-credential"
-	wsRoot := t.TempDir()
-	opsOut := filepath.Join(wsRoot, "ops.txt")
-	ext := fakeProviderExtension(t, map[string]string{
-		"FAKE_RUN_CREDENTIAL_ECHO": "1", "FAKE_AUTHENTICATE_FAIL": "1", "FAKE_MARKER_SHA": "cafef00d", "FAKE_OPS_OUT": opsOut,
-	})
-	remote, _ := LoadRemoteCache(context.Background(), wsRoot, []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny, WithCacheRunCredential(secret))
-	if remote == nil || !remote.isProviderBacked() {
-		t.Fatalf("expected a provider-backed remote cache, got %+v", remote)
-	}
-	for attempt := range 2 {
-		if sha, ok := remote.LookupRunMarker(context.Background(), "ws-id", "main", []string{"build"}, ""); ok || sha != "" {
-			t.Fatalf("attempt %d: LookupRunMarker = %q, %v; want a local build", attempt, sha, ok)
-		}
-	}
-	p := remote.provider
-	p.mu.Lock()
-	initErr, session, exchangeDir := p.initErr, p.session, p.exchangeDir
-	p.mu.Unlock()
-	if initErr == nil || session != nil || exchangeDir != "" {
-		t.Fatalf("after a refused authenticate: initErr=%v session=%v exchangeDir=%q; want the failed-initialize state", initErr, session != nil, exchangeDir)
-	}
-	remote.Close()
-	if ops := readProviderOps(t, opsOut); strings.Join(ops, ",") != "initialize,authenticate "+secret+",shutdown" {
-		t.Fatalf("ops = %q, want one initialize, one authenticate, then shutdown", ops)
-	}
-}
-
-func TestRemoteRestoreEstimatedCostUsesLeaseCoalescingFloor(t *testing.T) {
-	job := cacheableJob("build", "/proj", "proj", "proj")
-	floor := store.CoalescingFloor.Milliseconds()
-
-	job.ExpectedWallMs = floor - 1
-	if store.WorthCoalescing(remoteRestoreEstimatedCost(job)) {
-		t.Fatal("a known sub-floor remote restore should bypass leasing")
-	}
-	job.ExpectedWallMs = floor
-	if !store.WorthCoalescing(remoteRestoreEstimatedCost(job)) {
-		t.Fatal("a remote restore at the coalescing floor should coalesce")
-	}
-	job.ExpectedWallMs = 0
-	if !store.WorthCoalescing(remoteRestoreEstimatedCost(job)) {
-		t.Fatal("an unknown cold-key cost should remain eligible for coalescing")
-	}
+	t.Setenv(remotecache.CacheURLEnv, "https://cache.example")
 }
 
 // TestProviderRemoteCache_FilesLessRequiredInputRestore pins the required-input

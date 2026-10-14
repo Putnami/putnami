@@ -14,6 +14,8 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -790,7 +792,7 @@ func TestDeclaredCapturePortPathOutput(t *testing.T) {
 			Outputs: map[string]extension.DeclaredOutput{
 				"client": {Kind: extension.OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true},
 			},
-		}, extension.ResourceRef{ID: clientsResourceID, Scope: extension.ResourceScopeProject})
+		}, extension.ResourceRef{ID: remotecache.ClientsResourceID, Scope: extension.ResourceScopeProject})
 	}
 
 	t.Run("port reports a path", func(t *testing.T) {
@@ -841,7 +843,7 @@ func TestDeclaredCaptureRefusesToPublishWithoutARequiredOutput(t *testing.T) {
 			"gen":      dirDeclaration(extension.OutputRootProject, ".gen", false),
 			"optional": dirDeclaration(extension.OutputRootCommandOutput, "extras", true),
 		},
-	}, extension.ResourceRef{ID: genResourceID, Scope: extension.ResourceScopeProject})
+	}, extension.ResourceRef{ID: cachekey.GenResourceID, Scope: extension.ResourceScopeProject})
 	f := newCaptureFixture(t, job)
 
 	// The optional output exists; the required one does not.
@@ -993,7 +995,7 @@ func TestPackageDeclaredCaptureRoundTrip(t *testing.T) {
 	job := declaredJob("package~owned", "owned", declaration)
 	f := newCaptureFixture(t, job)
 
-	if !usesDeclaredCapture(job) || !isCacheEnabled(job, CacheBypass{}) {
+	if !usesDeclaredCapture(job) || !cachekey.IsCacheEnabled(job, cachekey.CacheBypass{}) {
 		t.Fatal("a package step whose declaration covers what it writes must use task-owned caching")
 	}
 	// The same declaration under another command is eligible too: eligibility is
@@ -1092,13 +1094,13 @@ func TestCleanSourceRewriterPublishesReusableStatusEntry(t *testing.T) {
 
 	sourcePath := filepath.Join(f.ws.Root, captureTestProject, "index.ts")
 	writeFileAt(t, sourcePath, "const clean = true;\n")
-	hash, err := computeJobCacheHash(f.ws, job, nil, nil, f.cache, map[string]string{
+	hash, err := cachekey.ComputeJobCacheHash(f.ws, job, nil, nil, f.cache, map[string]string{
 		"/workspace-install": "dependency-before",
 	})
 	if err != nil || hash == "" {
 		t.Fatalf("compute source-rewriter key: %q (err=%v)", hash, err)
 	}
-	if !isCacheEnabled(job, CacheBypass{}) {
+	if !cachekey.IsCacheEnabled(job, cachekey.CacheBypass{}) {
 		t.Fatal("a declared source rewriter did not reach clean-only caching")
 	}
 	sourceHash, err := sourceInputDigest(f.ws, job, nil, f.cache)
@@ -1131,7 +1133,7 @@ func TestMutatingSourceRewriterEntryIsNeverReused(t *testing.T) {
 
 	sourcePath := filepath.Join(f.ws.Root, captureTestProject, "index.ts")
 	writeFileAt(t, sourcePath, "const dirty=true\n")
-	hash, err := computeJobCacheHash(f.ws, job, nil, nil, f.cache, nil)
+	hash, err := cachekey.ComputeJobCacheHash(f.ws, job, nil, nil, f.cache, nil)
 	if err != nil || hash == "" {
 		t.Fatalf("compute pre-fix key: %q (err=%v)", hash, err)
 	}
@@ -1152,7 +1154,7 @@ func TestMutatingSourceRewriterEntryIsNeverReused(t *testing.T) {
 	if err != nil || entry == nil {
 		t.Fatalf("lookup mutation marker: entry=%v err=%v", entry, err)
 	}
-	stored := jobResultFromEntryResult(entry.Result)
+	stored := cachekey.JobResultFromEntryResult(entry.Result)
 	if !stored.SourceMutated {
 		t.Fatal("task-owned entry lost the source-mutation marker")
 	}
@@ -1177,7 +1179,7 @@ func TestPatternlessSourceRewriterIsNeverProvenClean(t *testing.T) {
 		t.Fatal("a source rewriter with no keyed patterns produced a digest; its key is blind to what it rewrites")
 	}
 
-	hash, err := computeJobCacheHash(f.ws, job, nil, nil, f.cache, nil)
+	hash, err := cachekey.ComputeJobCacheHash(f.ws, job, nil, nil, f.cache, nil)
 	if err != nil || hash == "" {
 		t.Fatalf("compute patternless key: %q (err=%v)", hash, err)
 	}
@@ -1213,7 +1215,7 @@ func TestSourceRewriterDetectsWorkspaceKeyedRewrite(t *testing.T) {
 	workspaceFile := filepath.Join(f.ws.Root, "biome.json")
 	writeFileAt(t, workspaceFile, "{\"indentWidth\":2}\n")
 
-	hash, err := computeJobCacheHash(f.ws, job, nil, nil, f.cache, nil)
+	hash, err := cachekey.ComputeJobCacheHash(f.ws, job, nil, nil, f.cache, nil)
 	if err != nil || hash == "" {
 		t.Fatalf("compute key: %q (err=%v)", hash, err)
 	}
@@ -1230,17 +1232,6 @@ func TestSourceRewriterDetectsWorkspaceKeyedRewrite(t *testing.T) {
 		true, hash, sourceHash, &mu, map[string]string{})
 	if !result.SourceMutated {
 		t.Fatal("a rewrite of a keyed workspace file was recorded as clean")
-	}
-}
-
-// A v2 source writer still executes uncached: no inferred directory capture
-// remains after the v3 cutover.
-func TestV2SourceWriterStaysUncachedWithoutDeclaration(t *testing.T) {
-	sources := extension.ResourceRef{ID: extension.ResourceIDSources, Scope: extension.ResourceScopeProject}
-	job := declaredJob("lint~fix", "fix", nil, sources)
-	job.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{NoOutput: true}
-	if isCacheEnabled(job, CacheBypass{}) {
-		t.Fatal("a v2 source writer reached a cache path without a declaration")
 	}
 }
 
@@ -1264,15 +1255,15 @@ func TestSourceRewritersStillInvalidateMemoizedInputDigests(t *testing.T) {
 	sourcePath := filepath.Join(f.ws.Root, captureTestProject, "index.ts")
 	writeFileAt(t, sourcePath, "const a=1\n")
 
-	before, err := computeJobCacheHash(f.ws, consumer, nil, nil, f.cache, nil)
+	before, err := cachekey.ComputeJobCacheHash(f.ws, consumer, nil, nil, f.cache, nil)
 	if err != nil || before == "" {
-		t.Fatalf("computeJobCacheHash: %q (err=%v)", before, err)
+		t.Fatalf("cachekey.ComputeJobCacheHash: %q (err=%v)", before, err)
 	}
 
 	// The fixer rewrites the source it read. Without the invalidation the memo
 	// still holds the pre-fix digest for this (dir, patterns) pair.
 	writeFileAt(t, sourcePath, "const a = 1;\n")
-	if memoized, err := computeJobCacheHash(f.ws, consumer, nil, nil, f.cache, nil); err != nil || memoized != before {
+	if memoized, err := cachekey.ComputeJobCacheHash(f.ws, consumer, nil, nil, f.cache, nil); err != nil || memoized != before {
 		t.Fatalf("the memo did not hold the pre-fix digest, so this test cannot prove anything: %q vs %q (err=%v)",
 			memoized, before, err)
 	}
@@ -1281,94 +1272,12 @@ func TestSourceRewritersStillInvalidateMemoizedInputDigests(t *testing.T) {
 	f.sched.finalizeExecutedJob(t.Context(), fixer, capturedResult(nil),
 		false, "", "", &mu, map[string]string{})
 
-	after, err := computeJobCacheHash(f.ws, consumer, nil, nil, f.cache, nil)
+	after, err := cachekey.ComputeJobCacheHash(f.ws, consumer, nil, nil, f.cache, nil)
 	if err != nil {
-		t.Fatalf("computeJobCacheHash after the rewrite: %v", err)
+		t.Fatalf("cachekey.ComputeJobCacheHash after the rewrite: %v", err)
 	}
 	if after == before {
 		t.Fatal("a v3 source rewriter left the memoized input digests in place; " +
 			"every later job in this run would key off the pre-fix tree")
-	}
-}
-
-// Capture resolves every declared command-output path, including one at the
-// root of the directory. It used to refuse a closed set of "unowned merge
-// point" paths; a later fix gave those paths owners, so the refusal would now reject
-// the declaration that fixed them. Who may own a path is decided where
-// ownership is decided — the manifest validator and validatePlanContract.
-func TestResolveDeclaredOutputsResolvesAnOwnedCommandOutputFile(t *testing.T) {
-	for _, path := range []string{"metadata.json", "npm/metadata.json"} {
-		job := declaredJob("package~owned", "owned", &extension.TaskDeclaration{
-			Outputs: map[string]extension.DeclaredOutput{
-				"manifest": fileDeclaration(extension.OutputRootCommandOutput, path, false),
-			},
-		})
-		plans, err := resolveDeclaredOutputs(workspaceRoots{root: "/ws"}, job, nil)
-		if err != nil {
-			t.Fatalf("declared command-output file %q failed to resolve: %v", path, err)
-		}
-		if len(plans) != 1 || plans[0].spec.Path != path {
-			t.Fatalf("resolved %+v, want the declared path %q", plans, path)
-		}
-	}
-}
-
-func TestResolveDeclaredOutputsResolvesRootsAbsolutely(t *testing.T) {
-	job := declaredJob("build~emit", "emit", &extension.TaskDeclaration{
-		Outputs: map[string]extension.DeclaredOutput{
-			"cmd":  dirDeclaration(extension.OutputRootCommandOutput, "lib", false),
-			"proj": dirDeclaration(extension.OutputRootProject, ".gen", false),
-			"ws":   fileDeclaration(extension.OutputRootWorkspace, "bun.lock", false),
-		},
-	})
-	plans, err := resolveDeclaredOutputs(workspaceRoots{root: "/ws"}, job, nil)
-	if err != nil {
-		t.Fatalf("resolve: %v", err)
-	}
-	got := map[string]string{}
-	for _, plan := range plans {
-		got[plan.spec.ID] = plan.src
-	}
-	want := map[string]string{
-		"cmd":  filepath.Join("/ws", ".putnami", "out", captureTestProject, "build", "lib"),
-		"proj": filepath.Join("/ws", captureTestProject, ".gen"),
-		"ws":   filepath.Join("/ws", "bun.lock"),
-	}
-	for id, wantPath := range want {
-		if got[id] != wantPath {
-			t.Errorf("output %q resolved to %q, want %q", id, got[id], wantPath)
-		}
-	}
-}
-
-// Capture and ownership must honor the SAME carve-outs. A cede on a pathFrom
-// output is undecidable from the manifest — validation rejects it, and the
-// ownership refs drop it — so capture ignores it too. Honoring it on one side
-// only is how a subtree ends up owned by one task and captured by neither.
-func TestDeclaredCarveOutsAreIgnoredOnAPortPath(t *testing.T) {
-	port := extension.DeclaredOutput{
-		Kind:     extension.OutputKindDirectory,
-		PathFrom: "clientOutputs",
-		Excludes: []string{"clients/go/vendor"},
-	}
-	if got := declaredExcludesOf(port); got != nil {
-		t.Errorf("declaredExcludesOf(port output) = %v, want nothing", got)
-	}
-	if got := outputRelativeExcludes("clients/go", declaredExcludesOf(port)); got != nil {
-		t.Errorf("capture honored %v on a runtime-reported path the ownership check drops", got)
-	}
-
-	// Control: the same carve-out on a literal path IS honored and is rebased
-	// onto the output, so the assertions above are about the port rather than
-	// about carve-outs in general.
-	literal := extension.DeclaredOutput{
-		Kind:     extension.OutputKindDirectory,
-		Root:     extension.OutputRootProject,
-		Path:     ".gen",
-		Excludes: []string{".gen/migration-bundle"},
-	}
-	got := outputRelativeExcludes(".gen", declaredExcludesOf(literal))
-	if len(got) != 1 || got[0] != "migration-bundle" {
-		t.Errorf("literal-path carve-out = %v, want the output-relative subpath", got)
 	}
 }

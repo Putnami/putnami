@@ -108,15 +108,15 @@ var providerVocabularyAllowlist = map[string]providerVocabularyResidue{
 			"TestQuarantineAdapterIsPinned pins its exact shape so it can neither grow " +
 			"nor be quietly reshaped while it waits",
 	},
-	"internal/jobs/extension_runtime.go": {
+	"internal/jobs/cachekey/extension_runtime.go": {
 		sites: 1,
-		why: "BOOTSTRAP RESIDUE. runtimeReplacementClosure reads the go.mod files of a LOCAL " +
+		why: "BOOTSTRAP RESIDUE. RuntimeReplacementClosure reads the go.mod files of a LOCAL " +
 			"extension's module and its workspace siblings so a from-source extension can be built " +
 			"at all. It is the chicken-and-egg floor of the runtime primitive: the first extension " +
 			"has to be buildable before any extension exists to build it. It goes when local " +
 			"extensions are resolved as prepared artifacts rather than compiled in place",
 	},
-	"internal/jobs/planner_helpers.go": {
+	"internal/jobs/cachekey/planner_helpers.go": {
 		sites: 1,
 		why: "A WALK EXCLUSION, not a branch: `node_modules` sits beside `.git`, `dist` and " +
 			"`vendor` in the directories a content probe refuses to descend into. Nothing " +

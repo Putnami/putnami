@@ -24,6 +24,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	runtimeproto "go.putnami.dev/protocol/runtime"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -437,7 +438,7 @@ func batchProjectLogs(aggregate *JobResult) map[string][]RawJobEvent {
 			}
 			seen[projectID] = struct{}{}
 			owned := projected
-			owned.Data = cloneEventData(projected.Data)
+			owned.Data = cachekey.CloneEventData(projected.Data)
 			logs[projectID] = append(logs[projectID], owned)
 		}
 	}
@@ -704,7 +705,7 @@ func canonicalTaskEvents(job *ScheduledJob, task TaskResult, data map[string]any
 		})
 	}
 	for _, artifact := range task.Artifacts {
-		events = append(events, taskArtifactEvent(artifact))
+		events = append(events, cachekey.TaskArtifactEvent(artifact))
 	}
 	for _, metric := range task.Metrics {
 		events = append(events, batchMetricEvent(metric.Name, metric.Value, metric.Unit))

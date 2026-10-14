@@ -6,6 +6,7 @@ import (
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -73,7 +74,7 @@ func contractPlan(t *testing.T, providerDependsOnClient bool) []*ScheduledJob {
 // the contract edge in the plan: the client's generate waits for the provider's
 // generate, and the provider contributes nothing to the client's cache key.
 //
-// cacheKeyDependencies names exactly the plan keys computeJobCacheHashWith
+// cachekey.CacheKeyDependencies names exactly the plan keys cachekey.ComputeJobCacheHashWith
 // folds into a job's key, so the provider's absence from it IS the key
 // independence: a provider implementation change with an unchanged contract
 // leaves the client's key where it was and the cache answers.
@@ -91,9 +92,9 @@ func TestPlan_ContractEdgeOrdersWithoutFoldingTheProvidersKey(t *testing.T) {
 		t.Errorf("client generate SerializeAfter = %v, want it to wait for %s",
 			clientGenerate.SerializeAfter, providerGenerate)
 	}
-	if slices.Contains(cacheKeyDependencies(clientGenerate), providerGenerate) {
+	if slices.Contains(cachekey.CacheKeyDependencies(clientGenerate), providerGenerate) {
 		t.Errorf("client generate cache-key edges %v fold the provider's key; the contract is its only provider-side input",
-			cacheKeyDependencies(clientGenerate))
+			cachekey.CacheKeyDependencies(clientGenerate))
 	}
 
 	// Nothing downstream of the client picks the provider up either: the fold
@@ -102,8 +103,8 @@ func TestPlan_ContractEdgeOrdersWithoutFoldingTheProvidersKey(t *testing.T) {
 	if clientTranspile == nil {
 		t.Fatal("client transpile missing from plan")
 	}
-	if slices.Contains(cacheKeyDependencies(clientTranspile), providerGenerate) {
-		t.Errorf("client transpile cache-key edges %v fold the provider's key", cacheKeyDependencies(clientTranspile))
+	if slices.Contains(cachekey.CacheKeyDependencies(clientTranspile), providerGenerate) {
+		t.Errorf("client transpile cache-key edges %v fold the provider's key", cachekey.CacheKeyDependencies(clientTranspile))
 	}
 }
 
@@ -268,9 +269,9 @@ func TestPlan_ContractClientJobsWaitForTheProviderTreeWriter(t *testing.T) {
 		if !slices.Contains(job.SerializeAfter, treeWriter) {
 			t.Errorf("%s SerializeAfter = %v, want it to wait for %s", job.Key(), job.SerializeAfter, treeWriter)
 		}
-		if slices.Contains(cacheKeyDependencies(job), treeWriter) {
+		if slices.Contains(cachekey.CacheKeyDependencies(job), treeWriter) {
 			t.Errorf("%s cache-key edges %v fold the provider's writer; the edge is ordering alone",
-				job.Key(), cacheKeyDependencies(job))
+				job.Key(), cachekey.CacheKeyDependencies(job))
 		}
 		// A literal directory and a pathFrom FILE are not a client tree.
 		if slices.Contains(job.SerializeAfter, treeProvider+":build~transpile") {

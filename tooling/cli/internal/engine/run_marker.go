@@ -8,7 +8,7 @@ import (
 	"go.putnami.dev/cli/model/workspace"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
 
@@ -24,7 +24,7 @@ func recordSuccessfulBuild(
 	commands []string,
 	params map[string]any,
 	debug bool,
-	remote *jobs.RemoteCache,
+	remote *remotecache.RemoteCache,
 	observedSHA string,
 ) {
 	if sessStore == nil || wsRoot == "" {
@@ -53,7 +53,7 @@ func recordSuccessfulBuild(
 	if err := sessStore.RecordSuccessfulBuild(branch, commands, params, sha); err != nil && debug {
 		iox.Fprintf(os.Stderr, "[debug] last build state skipped: %v\n", err)
 	}
-	remote.PublishRunMarker(context.Background(), jobs.RunMarkerWorkspaceID(ws), branch, commands, workspace_state.LastBuildParamsHash(params), sha, observedSHA)
+	remote.PublishRunMarker(context.Background(), remotecache.RunMarkerWorkspaceID(ws), branch, commands, workspace_state.LastBuildParamsHash(params), sha, observedSHA)
 }
 
 func observedRunMarkerSHA(req *Request) string {

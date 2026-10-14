@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	model "go.putnami.dev/cli/model/extension"
 	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
@@ -21,56 +20,11 @@ import (
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/procdeadline"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
-
-func TestExtensionRuntimeDigestDeterministicAndComplete(t *testing.T) {
-	root := t.TempDir()
-	mustWriteRuntimeFile(t, filepath.Join(root, "bin", "prepare"), "#!/bin/sh\n", 0o755)
-	mustWriteRuntimeFile(t, filepath.Join(root, "cmd", "main.go"), "package main\n", 0o644)
-	ext := runtimeTestExtension(root)
-
-	first, err := extensionRuntimeDigest(ext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := extensionRuntimeDigest(ext)
-	if err != nil || first != second {
-		t.Fatalf("determinism: %q, %q, %v", first, second, err)
-	}
-
-	mustWriteRuntimeFile(t, filepath.Join(root, "cmd", "main.go"), "package main\n// changed\n", 0o644)
-	changedInput, _ := extensionRuntimeDigest(ext)
-	if changedInput == first {
-		t.Fatal("declared input content did not invalidate runtime digest")
-	}
-	ext.Name = "@putnami/other"
-	changedIdentity, _ := extensionRuntimeDigest(ext)
-	if changedIdentity == changedInput {
-		t.Fatal("extension identity did not invalidate runtime digest")
-	}
-	ext.Runtime.Prepare.Args = append(ext.Runtime.Prepare.Args, "--changed")
-	changedDeclaration, _ := extensionRuntimeDigest(ext)
-	if changedDeclaration == changedIdentity {
-		t.Fatal("prepare declaration did not invalidate runtime digest")
-	}
-}
-
-func TestCollectRuntimeInputsRejectsSymlink(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("symlink permissions differ on Windows")
-	}
-	root := t.TempDir()
-	mustWriteRuntimeFile(t, filepath.Join(root, "real"), "x", 0o644)
-	if err := os.Symlink("real", filepath.Join(root, "linked")); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := collectRuntimeInputs(root, []string{"**"}); err == nil || !strings.Contains(err.Error(), "symlink") {
-		t.Fatalf("collectRuntimeInputs error = %v, want symlink rejection", err)
-	}
-}
 
 func TestRuntimeReplacementCoveragePackageIsStagedAndDigested(t *testing.T) {
 	root := t.TempDir()
@@ -92,12 +46,12 @@ replace example.dev/sdk => ../sdk
 
 	ext := runtimeTestExtension(extensionRoot)
 	ext.Runtime.Prepare.Inputs = append(ext.Runtime.Prepare.Inputs, "go.mod")
-	before, err := extensionRuntimeDigest(ext)
+	before, err := cachekey.ExtensionRuntimeDigest(ext)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	inputs, err := collectRuntimeInputs(extensionRoot, ext.Runtime.Prepare.Inputs)
+	inputs, err := cachekey.CollectRuntimeInputs(extensionRoot, ext.Runtime.Prepare.Inputs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +65,7 @@ replace example.dev/sdk => ../sdk
 	}
 
 	mustWriteRuntimeFile(t, coverageSource, "package coverage\n\nconst Enabled = false\n", 0o644)
-	after, err := extensionRuntimeDigest(ext)
+	after, err := cachekey.ExtensionRuntimeDigest(ext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +91,7 @@ func TestRuntimeReplacementVendorAndDistStayStagedAndDigested(t *testing.T) {
 
 			ext := runtimeTestExtension(extensionRoot)
 			ext.Runtime.Prepare.Inputs = append(ext.Runtime.Prepare.Inputs, "go.mod")
-			before, err := extensionRuntimeDigest(ext)
+			before, err := cachekey.ExtensionRuntimeDigest(ext)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -149,7 +103,7 @@ func TestRuntimeReplacementVendorAndDistStayStagedAndDigested(t *testing.T) {
 			}
 
 			mustWriteRuntimeFile(t, source, "package dep\n\nconst Enabled = false\n", 0o644)
-			after, err := extensionRuntimeDigest(ext)
+			after, err := cachekey.ExtensionRuntimeDigest(ext)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -182,13 +136,13 @@ replace example.dev/sdk => ../sdk
 
 	ext := runtimeTestExtension(extensionRoot)
 	ext.Runtime.Prepare.Inputs = append(ext.Runtime.Prepare.Inputs, "go.mod")
-	before, err := extensionRuntimeDigest(ext)
+	before, err := cachekey.ExtensionRuntimeDigest(ext)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	mustWriteRuntimeFile(t, versionStamp, `{"buildTime":"2026-07-30T12:01:00Z"}`, 0o644)
-	after, err := extensionRuntimeDigest(ext)
+	after, err := cachekey.ExtensionRuntimeDigest(ext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +150,7 @@ replace example.dev/sdk => ../sdk
 		t.Fatal("scheduler-owned replacement .gen state invalidated runtime digest")
 	}
 
-	inputs, err := collectRuntimeInputs(extensionRoot, ext.Runtime.Prepare.Inputs)
+	inputs, err := cachekey.CollectRuntimeInputs(extensionRoot, ext.Runtime.Prepare.Inputs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,7 +185,7 @@ replace example.dev/sdk => ../sdk
 
 func stageRuntimeReplacementView(t *testing.T, extensionRoot string, ext *extension.ExtensionDescription) string {
 	t.Helper()
-	inputs, err := collectRuntimeInputs(extensionRoot, ext.Runtime.Prepare.Inputs)
+	inputs, err := cachekey.CollectRuntimeInputs(extensionRoot, ext.Runtime.Prepare.Inputs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,7 +226,7 @@ func TestRuntimeReplacementInstallOutputIsExcludedFromDigestAndStaging(t *testin
 
 	ext := runtimeTestExtension(extensionRoot)
 	ext.Runtime.Prepare.Inputs = append(ext.Runtime.Prepare.Inputs, "go.mod")
-	installed, err := extensionRuntimeDigest(ext)
+	installed, err := cachekey.ExtensionRuntimeDigest(ext)
 	if err != nil {
 		t.Fatalf("digest refused an installed replacement module: %v", err)
 	}
@@ -292,7 +246,7 @@ func TestRuntimeReplacementInstallOutputIsExcludedFromDigestAndStaging(t *testin
 	if err := os.RemoveAll(filepath.Join(tsPackage, "node_modules")); err != nil {
 		t.Fatal(err)
 	}
-	uninstalled, err := extensionRuntimeDigest(ext)
+	uninstalled, err := cachekey.ExtensionRuntimeDigest(ext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +255,7 @@ func TestRuntimeReplacementInstallOutputIsExcludedFromDigestAndStaging(t *testin
 	}
 
 	mustWriteRuntimeFile(t, goClient, "package client\n\nconst Changed = true\n", 0o644)
-	edited, err := extensionRuntimeDigest(ext)
+	edited, err := cachekey.ExtensionRuntimeDigest(ext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,7 +284,7 @@ func TestRuntimeReplacementContainedSymlinkIsStagedAsLink(t *testing.T) {
 
 	ext := runtimeTestExtension(extensionRoot)
 	ext.Runtime.Prepare.Inputs = append(ext.Runtime.Prepare.Inputs, "go.mod")
-	before, err := extensionRuntimeDigest(ext)
+	before, err := cachekey.ExtensionRuntimeDigest(ext)
 	if err != nil {
 		t.Fatalf("digest refused a contained symlink: %v", err)
 	}
@@ -374,7 +328,7 @@ func TestRuntimeReplacementContainedSymlinkIsStagedAsLink(t *testing.T) {
 	if err := os.Symlink(filepath.Join("..", "OTHER"), link); err != nil {
 		t.Fatal(err)
 	}
-	after, err := extensionRuntimeDigest(ext)
+	after, err := cachekey.ExtensionRuntimeDigest(ext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,7 +352,7 @@ func TestRuntimeReplacementContainedDirectoryLinkIsStagedAsLink(t *testing.T) {
 
 	ext := runtimeTestExtension(extensionRoot)
 	ext.Runtime.Prepare.Inputs = append(ext.Runtime.Prepare.Inputs, "go.mod")
-	if _, err := extensionRuntimeDigest(ext); err != nil {
+	if _, err := cachekey.ExtensionRuntimeDigest(ext); err != nil {
 		t.Fatalf("digest refused a contained directory link: %v", err)
 	}
 	stagedRoot := stageRuntimeReplacementView(t, extensionRoot, ext)
@@ -461,7 +415,7 @@ replace example.dev/inner => ../sdk/inner
 
 	ext := runtimeTestExtension(extensionRoot)
 	ext.Runtime.Prepare.Inputs = append(ext.Runtime.Prepare.Inputs, "go.mod")
-	if _, err := extensionRuntimeDigest(ext); err != nil {
+	if _, err := cachekey.ExtensionRuntimeDigest(ext); err != nil {
 		t.Fatalf("digest refused nested replacements: %v", err)
 	}
 	stagedRoot := stageRuntimeReplacementView(t, extensionRoot, ext)
@@ -503,12 +457,12 @@ func TestRuntimeReplacementEscapingSymlinkIsRefusedByDigestAndStaging(t *testing
 
 			ext := runtimeTestExtension(extensionRoot)
 			ext.Runtime.Prepare.Inputs = append(ext.Runtime.Prepare.Inputs, "go.mod")
-			_, digestErr := extensionRuntimeDigest(ext)
+			_, digestErr := cachekey.ExtensionRuntimeDigest(ext)
 			if digestErr == nil || !strings.Contains(digestErr.Error(), "outside the replacement root") {
 				t.Fatalf("digest error = %v, want an escaping-symlink refusal", digestErr)
 			}
 
-			inputs, err := collectRuntimeInputs(extensionRoot, ext.Runtime.Prepare.Inputs)
+			inputs, err := cachekey.CollectRuntimeInputs(extensionRoot, ext.Runtime.Prepare.Inputs)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1593,38 +1547,6 @@ func TestExtensionRuntimeInterruptionAndAbsentToolchain(t *testing.T) {
 	if !errors.As(err, &runtimeErr) || runtimeErr.code != extensionproto.FailureRuntimePrepareFailed {
 		t.Fatalf("absent toolchain error = %v, want %s", err, extensionproto.FailureRuntimePrepareFailed)
 	}
-}
-
-// TestExtensionRuntimeDigestFollowsThePrepareToolchainIdentity pins the input
-// that makes toolchain pinning observable: the prepared binary is stored under
-// a digest that includes WHICH compiler produced it. Without it, upgrading the
-// locked toolchain would keep serving the artifact the previous one built.
-func TestExtensionRuntimeDigestFollowsThePrepareToolchainIdentity(t *testing.T) {
-	root := t.TempDir()
-	writeRuntimeFixture(t, root, "@putnami/test", "1.2.3")
-	ext := runtimeTestExtension(root)
-	ext.Runtime.Toolchains = map[string]extensionproto.RuntimeToolchain{
-		"compiler": {Lock: "compiler"},
-	}
-	ext.Runtime.Prepare.Toolchains = []string{"compiler"}
-	ext.RuntimeToolchains = map[string]model.RuntimeToolchainResolution{
-		"compiler": {Available: true, Identity: "identity-a"},
-	}
-
-	first, err := extensionRuntimeDigest(ext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ext.RuntimeToolchains["compiler"] = model.RuntimeToolchainResolution{Available: true, Identity: "identity-b"}
-	second, err := extensionRuntimeDigest(ext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first == second {
-		t.Fatalf("runtime digest did not move with the resolved compiler identity: %q", first)
-	}
-	spectest.Proves(t, "cli/runtime-toolchain-pinning", "identity-keys-results",
-		"a-prepared-runtime-digest-follows-the-resolved-identity")
 }
 
 func runtimeTestExtension(root string) *extension.ExtensionDescription {

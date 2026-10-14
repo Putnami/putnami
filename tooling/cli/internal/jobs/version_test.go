@@ -13,60 +13,10 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
-
-// A project takes the version of ITS line, not one answer for the run.
-func TestVersionInfoForProject_ResolvesTheProjectsLine(t *testing.T) {
-	t.Parallel()
-	versions := RunVersions{
-		"typescript": &JobContextVersion{Base: "0.4.0", Full: "0.4.0-abc1234", Line: "typescript"},
-		"go":         &JobContextVersion{Base: "1.2.0", Full: "1.2.0-abc1234", Line: "go"},
-	}
-	got := VersionInfoForProject(versions, &workspace.Project{Line: "go"})
-	if got == nil || got.Full != "1.2.0-abc1234" {
-		t.Fatalf("version = %+v, want the go line's", got)
-	}
-	if base := LineBaseVersion(versions, &workspace.Project{Line: "typescript"}); base != "0.4.0" {
-		t.Errorf("LineBaseVersion = %q, want the typescript line's base", base)
-	}
-}
-
-// A project outside every declared line falls back to the root line, which is
-// the answer a workspace that declares no line gives every project.
-func TestVersionInfoForProject_FallsBackToTheRootLine(t *testing.T) {
-	t.Parallel()
-	versions := RunVersions{"": &JobContextVersion{Base: "0.0.0", Full: "0.0.0-abc1234"}}
-	got := VersionInfoForProject(versions, &workspace.Project{Line: "unknown"})
-	if got == nil || got.Full != "0.0.0-abc1234" {
-		t.Fatalf("version = %+v, want the root line's", got)
-	}
-	if base := LineBaseVersion(nil, &workspace.Project{}); base != "" {
-		t.Errorf("LineBaseVersion without versions = %q, want none", base)
-	}
-	if info := VersionInfoForProject(nil, nil); info != nil {
-		t.Errorf("VersionInfoForProject without versions = %+v, want nil", info)
-	}
-}
-
-// Primary is the reporting answer for a whole run: the root line when there is
-// one, else the first line in sorted order, so two runs over one workspace file
-// their report the same way.
-func TestRunVersionsPrimary(t *testing.T) {
-	t.Parallel()
-	root := &JobContextVersion{Base: "1.0.0"}
-	if got := (RunVersions{"": root, "go": {Base: "2.0.0"}}).Primary(); got != root {
-		t.Errorf("Primary = %+v, want the root line's", got)
-	}
-	first := &JobContextVersion{Base: "2.0.0", Line: "go"}
-	if got := (RunVersions{"typescript": {Base: "3.0.0"}, "go": first}).Primary(); got != first {
-		t.Errorf("Primary = %+v, want the first line in sorted order", got)
-	}
-	if got := (RunVersions{}).Primary(); got != nil {
-		t.Errorf("Primary of nothing = %+v, want nil", got)
-	}
-}
 
 func TestGenerateVersionFiles_WritesFullVersion(t *testing.T) {
 	t.Parallel()
@@ -84,7 +34,7 @@ func TestGenerateVersionFiles_WritesFullVersion(t *testing.T) {
 		JobDef:    &extension.JobDefinition{Name: "publish"},
 	}
 
-	versionInfo := rootLineVersions(&JobContextVersion{
+	versionInfo := rootLineVersions(&cachekey.JobContextVersion{
 		Base:    "0.0.0",
 		Full:    "0.0.0-b49fb6f.81b85cc",
 		SHA:     "b49fb6f",
@@ -139,7 +89,7 @@ func TestPreserveMatchingVersionFilesKeepsCachedBuildTime(t *testing.T) {
 		Extension: &extension.ExtensionDescription{Name: "ext"},
 		JobDef:    &extension.JobDefinition{Name: "build"},
 	}
-	version := rootLineVersions(&JobContextVersion{SHA: "b49fb6f", Branch: "main", Suffix: "b49fb6f"})
+	version := rootLineVersions(&cachekey.JobContextVersion{SHA: "b49fb6f", Branch: "main", Suffix: "b49fb6f"})
 	oldBuildTime := "2026-07-20T10:00:00Z"
 	newBuildTime := "2026-07-20T12:00:00Z"
 
@@ -188,7 +138,7 @@ func TestGenerateVersionFiles_UsesTheProjectsLineVersion(t *testing.T) {
 		JobDef:    &extension.JobDefinition{Name: "build"},
 	}
 
-	versionInfo := rootLineVersions(&JobContextVersion{
+	versionInfo := rootLineVersions(&cachekey.JobContextVersion{
 		Base: "1.2.3", Full: "1.2.3-abc1234", SHA: "abc1234", Suffix: "abc1234"})
 	generateVersionFilesAt(ws, []*ScheduledJob{job}, versionInfo, "2026-07-20T12:00:00Z", false)
 
@@ -231,7 +181,7 @@ func TestGenerateVersionFiles_StampsTransitiveCapabilityPackageGraph(t *testing.
 
 	// Every project of the closure is stamped at the tree version, whatever
 	// version Git resolved for the line (ADR 0060).
-	versions := rootLineVersions(&JobContextVersion{Base: "2.0.0", Full: "2.0.0-abc1234", Suffix: "abc1234"})
+	versions := rootLineVersions(&cachekey.JobContextVersion{Base: "2.0.0", Full: "2.0.0-abc1234", Suffix: "abc1234"})
 	generateVersionFilesAt(ws, []*ScheduledJob{job}, versions, "2026-07-20T12:00:00Z", false)
 	data, err := os.ReadFile(filepath.Join(wsRoot, projects[0].Path, ".gen", "version.json"))
 	if err != nil {
@@ -293,7 +243,7 @@ func TestGenerateVersionFiles_CapabilityStampsCoverWorkspaceProjectsOnly(t *test
 
 	// Every project of the closure is stamped at the tree version, whatever
 	// version Git resolved for the line (ADR 0060).
-	versions := rootLineVersions(&JobContextVersion{Base: "2.0.0", Full: "2.0.0-abc1234", Suffix: "abc1234"})
+	versions := rootLineVersions(&cachekey.JobContextVersion{Base: "2.0.0", Full: "2.0.0-abc1234", Suffix: "abc1234"})
 	generateVersionFilesAt(ws, []*ScheduledJob{job}, versions, "2026-07-20T12:00:00Z", false)
 	data, err := os.ReadFile(filepath.Join(wsRoot, projects[0].Path, ".gen", "version.json"))
 	if err != nil {
@@ -368,7 +318,7 @@ func TestCacheKeyStableAcrossVersionFileRefresh(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	version := rootLineVersions(&JobContextVersion{SHA: "b49fb6f", Branch: "main", Suffix: "b49fb6f"})
+	version := rootLineVersions(&cachekey.JobContextVersion{SHA: "b49fb6f", Branch: "main", Suffix: "b49fb6f"})
 	mkJob := func() *ScheduledJob {
 		return &ScheduledJob{
 			Project:   &workspace.Project{ID: "/proj", Name: "proj", Path: "proj"},
@@ -387,7 +337,7 @@ func TestCacheKeyStableAcrossVersionFileRefresh(t *testing.T) {
 	// not inherit the previous one's memoized file hashes.
 	keyFor := func(job *ScheduledJob) string {
 		t.Helper()
-		hash, err := computeJobCacheHash(ws, job, nil, version, store.NewCacheManager(localStore), nil)
+		hash, err := cachekey.ComputeJobCacheHash(ws, job, nil, version, store.NewCacheManager(localStore), nil)
 		if err != nil {
 			t.Fatalf("compute cache key: %v", err)
 		}
@@ -415,13 +365,13 @@ func TestCacheKeyStableAcrossVersionFileRefresh(t *testing.T) {
 
 	// Run C: the same tree at a new commit. The stamp now names that commit, and
 	// the key is the one run A stored.
-	newVersion := rootLineVersions(&JobContextVersion{SHA: "c51ac7e", Branch: "release", Suffix: "c51ac7e"})
+	newVersion := rootLineVersions(&cachekey.JobContextVersion{SHA: "c51ac7e", Branch: "release", Suffix: "c51ac7e"})
 	jobC := mkJob()
 	preserveMatchingVersionFiles(ws, []*ScheduledJob{jobC}, newVersion, "2026-07-20T13:00:00Z")
 	if stamp := readVersionStamp(t, filepath.Join(ws.Root, "proj")); stamp.SHA != "c51ac7e" {
 		t.Fatalf("stamp sha = %q, want the new commit seeded before the key is computed", stamp.SHA)
 	}
-	keyC, err := computeJobCacheHash(ws, jobC, nil, newVersion, store.NewCacheManager(localStore), nil)
+	keyC, err := cachekey.ComputeJobCacheHash(ws, jobC, nil, newVersion, store.NewCacheManager(localStore), nil)
 	if err != nil {
 		t.Fatalf("compute cache key: %v", err)
 	}
@@ -432,7 +382,7 @@ func TestCacheKeyStableAcrossVersionFileRefresh(t *testing.T) {
 	// The stamp still carries real invalidation: a field that describes the tree
 	// changes the key.
 	mergeStampField(t, filepath.Join(ws.Root, "proj"), "contentHash", producedContentHash)
-	keyD, err := computeJobCacheHash(ws, mkJob(), nil, newVersion, store.NewCacheManager(localStore), nil)
+	keyD, err := cachekey.ComputeJobCacheHash(ws, mkJob(), nil, newVersion, store.NewCacheManager(localStore), nil)
 	if err != nil {
 		t.Fatalf("compute cache key: %v", err)
 	}
@@ -504,7 +454,7 @@ func TestGenerateVersionFiles_PreservesExtensionOwnedStampFields(t *testing.T) {
 
 	// A producing run: the scheduler stamps the identity, then the extension
 	// merges in the fields it owns.
-	first := rootLineVersions(&JobContextVersion{Base: "0.0.0", Full: "0.0.0-aaaa111", SHA: "aaaa111", Branch: "main", Suffix: "aaaa111"})
+	first := rootLineVersions(&cachekey.JobContextVersion{Base: "0.0.0", Full: "0.0.0-aaaa111", SHA: "aaaa111", Branch: "main", Suffix: "aaaa111"})
 	generateVersionFilesAt(ws, []*ScheduledJob{job}, first, "2026-07-30T10:00:00Z", false)
 	doc := readDoc()
 	doc["contentHash"] = "sha256:cafebabe"
@@ -533,7 +483,7 @@ func TestGenerateVersionFiles_PreservesExtensionOwnedStampFields(t *testing.T) {
 	//    field that is now empty, and carry the unowned ones through.
 	//    The new commit has no suffix, so `suffix` must VANISH rather than linger
 	//    as the previous commit's identity.
-	second := rootLineVersions(&JobContextVersion{Base: "0.0.0", Full: "0.0.0", SHA: "bbbb222", Branch: "release"})
+	second := rootLineVersions(&cachekey.JobContextVersion{Base: "0.0.0", Full: "0.0.0", SHA: "bbbb222", Branch: "release"})
 	generateVersionFilesAt(ws, []*ScheduledJob{job}, second, "2026-07-31T09:00:00Z", true)
 	doc = readDoc()
 
@@ -593,7 +543,7 @@ func TestSchedulerCapabilitySourceBindingsMemoizedAcrossFullyCachedRestamps(t *t
 	scheduler := &Scheduler{
 		ws: ws, planned: jobs, renderer: &mockRenderer{}, versionFiles: make(map[string]bool),
 		capabilitySourceBindings: newCapabilitySourceBindingMemo(),
-		cacheStats:               &CacheStats{},
+		cacheStats:               &cachekey.CacheStats{},
 	}
 	calls := make(map[string]int)
 	resolve := scheduler.capabilitySourceBindings.resolve
@@ -877,9 +827,9 @@ func TestCapabilityPackageStamps_InsideARepositoryCarryTheSourceBinding(t *testi
 
 // rootLineVersions is a run's versions for a workspace made of one root line,
 // which is what every fixture in this package builds.
-func rootLineVersions(info *JobContextVersion) RunVersions {
+func rootLineVersions(info *cachekey.JobContextVersion) cachekey.RunVersions {
 	if info == nil {
 		return nil
 	}
-	return RunVersions{"": info}
+	return cachekey.RunVersions{"": info}
 }

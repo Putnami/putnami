@@ -15,6 +15,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/hooks"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/machine"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/profiler"
@@ -224,7 +225,7 @@ func (e *Engine) executeSession(
 	// --no-cache drops it for everything below that means "reuse is allowed" —
 	// the remote cache and the opportunistic store GC, both gated on `cache !=
 	// nil`. The SCHEDULER keeps it. The flag resolves into the per-job bypass
-	// (jobs.NewCacheBypass), which already refuses every lookup, restore,
+	// (cachekey.NewCacheBypass), which already refuses every lookup, restore,
 	// lease, publication and failure replay one task at a time, while the
 	// scheduler still needs the local store for the one write a bypassed run
 	// may make: deleting a recorded failure its own SUCCESS has just disproved.
@@ -330,7 +331,7 @@ func (e *Engine) executeSession(
 	if cache != nil && !runcredential.Hosted() {
 		setupStart := time.Now()
 		var cacheNotice string
-		remote, cacheNotice = jobs.LoadRemoteCache(ctx, wsRoot, extensions, discovered, store.CacheTrust(req.Global.CacheTrust), remoteCacheOptions()...)
+		remote, cacheNotice = remotecache.LoadRemoteCache(ctx, wsRoot, extensions, discovered, store.CacheTrust(req.Global.CacheTrust), launchCacheProvider, remoteCacheOptions()...)
 		// Per the missing-cloud policy, a configured-but-unusable remote cache must
 		// never degrade to local-only silently — surface the one-line notice.
 		if cacheNotice != "" {
@@ -411,7 +412,7 @@ func (e *Engine) executeSession(
 		Config:                         schedCfg,
 		Renderer:                       renderer,
 		Cache:                          schedulerCache,
-		Remote:                         remote,
+		Remote:                         schedulerRemote(remote),
 		StoreBudget:                    store.NewRunBudget(wsRoot, store.ConfigFromWorkspace(req.Config), cache.Store()),
 		SessionEvents:                  sessionEvents,
 		OpeningSessionEvents:           req.selectionEvidence.openingEvents,

@@ -46,7 +46,7 @@
 // a required one holds only what that run wrote, the scheduler empties what
 // the task owns in it before the task executes (emptyOwnedOutputs, ADR 0064):
 // every entry but the subpaths the declaration cedes or preserves
-// (outputSkippedSubpaths) and the scheduler's own build stamp. That is the set
+// (cachekey.OutputSkippedSubpaths) and the scheduler's own build stamp. That is the set
 // a restore replaces, so an execution and a restore leave the same paths
 // untouched. A file another task wrote inside the owned region is removed with
 // the rest, exactly as a restore of the owner's entry removes it: a path that
@@ -54,7 +54,7 @@
 // TypeScript build-generate cedes the config-extract schema fallback.
 //
 // A directory output with a literal path is emptied when it is required or
-// when it lives under the command-output root (emptiedOutputDeclarations,
+// when it lives under the command-output root (cachekey.EmptiedOutputDeclarations,
 // ADR 0065). The engine owns the command-output directory and the plan gives
 // each output one owner, so an optionalEmpty output there holds only what its
 // task wrote. A restore of an entry that records such an output empty empties
@@ -91,7 +91,7 @@
 // Source rewriters use the same task-owned status entry, plus a cache-private
 // result marker. The scheduler captures the keyed project-source digest before
 // execution and recomputes it afterward. That digest and the key read a keyed
-// project config as raw bytes (jobConfigScope), so a layout-only rewrite of one
+// project config as raw bytes (cachekey.JobConfigScope), so a layout-only rewrite of one
 // counts as a source edit. A clean run publishes an ordinary
 // reusable verdict; a run whose source digest moved is marked and every restore
 // rejects it, so another worktree executes the fixer instead of receiving green
@@ -101,7 +101,7 @@
 //
 // Tasks on this path DO consult the remote cache: a declared miss
 // asks the provider before claiming the lease, under the format-qualified key
-// store.RemoteTaskEntryKey — see jobs/remote_task.go for the delivery and
+// store.RemoteTaskEntryKey — see jobs/remotecache/remote_task.go for the delivery and
 // store/task_remote.go for how a format-2 entry travels the unchanged wire. A
 // remote hit is published into the local store as an ordinary task-owned entry
 // and then materialized by restoreDeclaredCacheHit, so local, remote and
@@ -117,31 +117,23 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"slices"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 const sourcesResourceID = "sources"
 
-// taskMutatesSources reports whether the job's v3 declaration states that it
-// rewrites the source tree it reads.
-func taskMutatesSources(job *ScheduledJob) bool {
-	declaration := taskDeclarationOf(job)
-	return declaration != nil && declaration.MutatesSources
-}
-
 // sourceInputDigest hashes exactly the file inputs that contribute this task's
 // cache-key file content — the project-relative set, plus the workspace-relative
 // set a task may also declare. Capturing this component before execution avoids
 // mistaking a changed dependency hash, runtime identity, or other non-source key
-// field for a source rewrite. It shares keyFilePatterns with the key itself, so
+// field for a source rewrite. It shares cachekey.KeyFilePatterns with the key itself, so
 // the detector cannot observe a narrower set than the key trusts.
 //
 // A task with NO project-relative patterns is an error, not an empty digest: its
@@ -155,12 +147,12 @@ func sourceInputDigest(
 	commandParams map[string]any,
 	cache *store.CacheManager,
 ) (string, error) {
-	patterns, workspacePatterns := keyFilePatterns(ws, job, commandParams)
+	patterns, workspacePatterns := cachekey.KeyFilePatterns(ws, job, commandParams)
 	if len(patterns) == 0 {
 		return "", fmt.Errorf(
 			"task %q rewrites its sources but declares no keyed file patterns", job.JobDef.Name)
 	}
-	scope := jobConfigScope(ws, job)
+	scope := cachekey.JobConfigScope(ws, job)
 	digest, err := cache.HashFiles(filepath.Join(ws.Root, job.Project.Path), patterns, scope)
 	if err != nil {
 		return "", err
@@ -195,93 +187,6 @@ func declaresCommandOutput(job *ScheduledJob) bool {
 	return false
 }
 
-// emptiedOutputDeclaration is one declared output the scheduler empties before
-// its task executes, with its path in canonical form.
-type emptiedOutputDeclaration struct {
-	id     string
-	rel    string
-	output extension.DeclaredOutput
-}
-
-// emptiedOutputDeclarations returns, in id order, the declared outputs of job
-// that the scheduler empties before the job executes: every durable directory
-// output whose path the declaration states, when it is required or lives under
-// the command-output root.
-//
-// A required output is recorded present in every entry, so a restore prunes
-// exactly what the emptying removes. An optionalEmpty output under the
-// command-output root is emptied too. The engine owns that directory, nothing
-// there is committed, and the plan gives each output one owner
-// (validatePlanContract), so the emptying removes only what this task wrote
-// on an earlier run. An entry can record it empty, and a restore of that
-// record empties it the same way (materializeDeclaredOutputs).
-//
-// An optionalEmpty output under the project or the workspace root is left out.
-// It can hold a file no task writes, such as a committed configuration the
-// task reads when it writes nothing there, and a restore of an entry that
-// records it empty leaves it as it stands (store.TaskOutputEmpty).
-//
-// A pathFrom output is left out because its path is known only after the run,
-// and an invocation-scoped one because it lives in a tree created for the run.
-// An output whose path does not normalize is left out too: manifest validation
-// reports it, and no capture is taken from a path nobody can name. A literal
-// path never names its root (extension.NormalizeOutputPath), so the project
-// root, the workspace root and a command-output directory are never emptied.
-//
-// It reads the plan node's declaration alone, because the cache key names the
-// same set (emptiedOutputIDs): what an execution empties, what a restore
-// empties, and the address an entry is stored at are decided by one predicate.
-func emptiedOutputDeclarations(job *ScheduledJob) []emptiedOutputDeclaration {
-	declaration := taskDeclarationOf(job)
-	if declaration == nil {
-		return nil
-	}
-	ids := make([]string, 0, len(declaration.Outputs))
-	for id := range declaration.Outputs {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-
-	var emptied []emptiedOutputDeclaration
-	for _, id := range ids {
-		output := declaration.Outputs[id]
-		if output.Kind != extension.OutputKindDirectory || output.PathFrom != "" || output.IsInvocationScoped() {
-			continue
-		}
-		switch output.EffectiveRoot() {
-		case extension.OutputRootCommandOutput:
-		case extension.OutputRootProject, extension.OutputRootWorkspace:
-			if output.OptionalEmpty {
-				continue
-			}
-		default:
-			continue
-		}
-		rel, err := extension.NormalizeOutputPath(output.Path)
-		if err != nil {
-			continue
-		}
-		emptied = append(emptied, emptiedOutputDeclaration{id: id, rel: rel, output: output})
-	}
-	return emptied
-}
-
-// emptiedOutputIDs returns the ids of the outputs the scheduler empties before
-// job executes, which is the value the cache key carries for them
-// (store.CacheKey.EmptiedOutputs). It is a variable only so a test can key a
-// job the way an engine that emptied nothing did.
-var emptiedOutputIDs = func(job *ScheduledJob) []string {
-	emptied := emptiedOutputDeclarations(job)
-	if len(emptied) == 0 {
-		return nil
-	}
-	ids := make([]string, 0, len(emptied))
-	for _, output := range emptied {
-		ids = append(ids, output.id)
-	}
-	return ids
-}
-
 // versionStampWithin returns the path of the scheduler's build stamp relative
 // to a directory output at rel under root, and whether that output holds it.
 // The stamp lives under the project root only. The containment folds case, as
@@ -298,7 +203,7 @@ func versionStampWithin(root, rel string) (string, bool) {
 }
 
 // emptyOwnedOutputs empties what job owns in each of its declared directory
-// outputs (emptiedOutputDeclarations), so the execution that follows writes
+// outputs (cachekey.EmptiedOutputDeclarations), so the execution that follows writes
 // into a directory holding nothing of an earlier run.
 //
 // What it leaves in place is what a restore of the same output leaves in place
@@ -318,7 +223,7 @@ func versionStampWithin(root, rel string) (string, bool) {
 // caller fails the task instead of executing it: a capture of that directory
 // would publish those files under this run's key.
 func (s *Scheduler) emptyOwnedOutputs(job *ScheduledJob) error {
-	for _, declared := range emptiedOutputDeclarations(job) {
+	for _, declared := range cachekey.EmptiedOutputDeclarations(job) {
 		if err := s.emptyDeclaredOutput(job, declared); err != nil {
 			return err
 		}
@@ -327,44 +232,44 @@ func (s *Scheduler) emptyOwnedOutputs(job *ScheduledJob) error {
 }
 
 // emptyDeclaredOutput empties what job owns in one output of
-// emptiedOutputDeclarations, and keeps what emptyOwnedOutputs keeps. An
+// cachekey.EmptiedOutputDeclarations, and keeps what emptyOwnedOutputs keeps. An
 // execution calls it, and so does a restore that empties an output, so the
 // two remove the same entries. The caller holds the locks and has detached the
 // command-output directory, as emptyOwnedOutputs states.
-func (s *Scheduler) emptyDeclaredOutput(job *ScheduledJob, declared emptiedOutputDeclaration) error {
+func (s *Scheduler) emptyDeclaredOutput(job *ScheduledJob, declared cachekey.EmptiedOutputDeclaration) error {
 	roots := s.outputRoots()
-	if roots.root == "" {
+	if roots.Root == "" {
 		// Without a workspace root an output path would resolve against the
 		// working directory, which is nobody's declared output.
 		return fmt.Errorf("no workspace root to resolve declared outputs against")
 	}
-	root := declared.output.EffectiveRoot()
-	base, ok := roots.outputRoot(job, root)
+	root := declared.Output.EffectiveRoot()
+	base, ok := roots.OutputRoot(job, root)
 	if !ok {
-		return fmt.Errorf("declared output %q has unknown root %q", declared.id, root)
+		return fmt.Errorf("declared output %q has unknown root %q", declared.ID, root)
 	}
-	keep := outputSkippedSubpaths(declared.rel, declared.output)
-	if stamp, held := versionStampWithin(root, declared.rel); held {
+	keep := cachekey.OutputSkippedSubpaths(declared.Rel, declared.Output)
+	if stamp, held := versionStampWithin(root, declared.Rel); held {
 		keep = append(append([]string(nil), keep...), stamp)
 	}
-	dest := filepath.Join(base, filepath.FromSlash(declared.rel))
-	if err := emptyTaskOutput(dest, store.ResolveScratchRoot(roots.root), keep...); err != nil {
-		return fmt.Errorf("declared output %q: %w", declared.id, err)
+	dest := filepath.Join(base, filepath.FromSlash(declared.Rel))
+	if err := emptyTaskOutput(dest, store.ResolveScratchRoot(roots.Root), keep...); err != nil {
+		return fmt.Errorf("declared output %q: %w", declared.ID, err)
 	}
 	return nil
 }
 
 // emptiedByRestore returns, by id, the outputs a restore of entry empties:
-// each output of emptiedOutputDeclarations that entry records empty. A
+// each output of cachekey.EmptiedOutputDeclarations that entry records empty. A
 // required output is never recorded empty, so in practice this is an
 // optionalEmpty output under the command-output root. A restore of such an
 // entry leaves the directory the execution that produced the entry left: the
 // kept subpaths and nothing else.
-func emptiedByRestore(job *ScheduledJob, entry *store.TaskEntry) map[string]emptiedOutputDeclaration {
-	emptied := map[string]emptiedOutputDeclaration{}
-	for _, declared := range emptiedOutputDeclarations(job) {
-		if recorded, ok := entry.Output(declared.id); ok && !recorded.Present() {
-			emptied[declared.id] = declared
+func emptiedByRestore(job *ScheduledJob, entry *store.TaskEntry) map[string]cachekey.EmptiedOutputDeclaration {
+	emptied := map[string]cachekey.EmptiedOutputDeclaration{}
+	for _, declared := range cachekey.EmptiedOutputDeclarations(job) {
+		if recorded, ok := entry.Output(declared.ID); ok && !recorded.Present() {
+			emptied[declared.ID] = declared
 		}
 	}
 	return emptied
@@ -374,236 +279,12 @@ func emptiedByRestore(job *ScheduledJob, entry *store.TaskEntry) map[string]empt
 // make the emptying fail.
 var emptyTaskOutput = store.EmptyTaskOutput
 
-// declaredOutputPlan is one declared output resolved for the run being
-// captured: what the entry must record, and where its bytes actually live.
-type declaredOutputPlan struct {
-	spec store.DeclaredEntryOutput
-	// src is the absolute REAL location of the output — the path the task wrote
-	// and the path a restore puts it back at. It is never recorded in the entry:
-	// the store is machine-global, so entries carry root-relative paths only.
-	src string
-	// excludes are the subpaths the declaration cedes, relative to the output's
-	// own path (src), in slash form. Staging skips them, so the entry never
-	// holds bytes this task does not own.
-	//
-	// They are deliberately NOT recorded in the entry. The excluded bytes are
-	// never staged, so a restore has nothing to put back for them, and cache
-	// key v5 folds the task-contract digest: a declaration that gains or loses
-	// a carve-out relocates the key rather than reusing an entry captured under
-	// the other shape.
-	excludes []string
-}
-
-// resolveDeclaredOutputs turns the job's declaration into the concrete set the
-// ingest must satisfy, in canonical id order.
-//
-// data is the executed task's result data, which supplies the value of any
-// pathFrom port. An OPTIONAL output whose port reports nothing is dropped from
-// the set entirely — the task legitimately produced no such artifact, and an
-// output whose path is unknown cannot be recorded. A REQUIRED one is an error:
-// publishing the rest would produce an entry that restores less than the
-// declaration promises.
-func resolveDeclaredOutputs(
-	ws workspaceRoots,
-	job *ScheduledJob,
-	data map[string]any,
-) ([]declaredOutputPlan, error) {
-	declaration := taskDeclarationOf(job)
-	if declaration == nil {
-		return nil, fmt.Errorf("task has no v3 declaration")
-	}
-
-	ids := make([]string, 0, len(declaration.Outputs))
-	for id := range declaration.Outputs {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-
-	plans := make([]declaredOutputPlan, 0, len(ids))
-	for _, id := range ids {
-		output := declaration.Outputs[id]
-		root := output.EffectiveRoot()
-		base, ok := ws.outputRoot(job, root)
-		if !ok {
-			return nil, fmt.Errorf("declared output %q has unknown root %q", id, root)
-		}
-
-		rel, ok, err := declaredOutputPath(output, data)
-		if err != nil {
-			return nil, fmt.Errorf("declared output %q: %w", id, err)
-		}
-		if !ok {
-			// An optional output whose port reported no path: nothing to record.
-			continue
-		}
-		plans = append(plans, declaredOutputPlan{
-			spec: store.DeclaredEntryOutput{
-				ID:       id,
-				Kind:     output.Kind,
-				Root:     root,
-				Path:     rel,
-				Optional: output.OptionalEmpty,
-			},
-			src: filepath.Join(base, filepath.FromSlash(rel)),
-			// A carve-out on a pathFrom output is undecidable from the manifest
-			// and validation rejects it. Ignoring it here rather than resolving
-			// it against the runtime-reported path keeps capture in exact
-			// agreement with the ownership check, which drops it too
-			// (DeclaredOutput.Ref): one of them honoring a carve-out the other
-			// ignores is how a subtree ends up owned by one task and captured
-			// by neither.
-			excludes: outputSkippedSubpaths(rel, output),
-		})
-	}
-	return plans, nil
-}
-
-// declaredExcludesOf returns the carve-outs a declaration states, and nothing
-// for an output whose path the task reports at runtime.
-func declaredExcludesOf(output extension.DeclaredOutput) []string {
-	if output.PathFrom != "" {
-		return nil
-	}
-	return output.Excludes
-}
-
-// outputSkippedSubpaths returns every output-relative subpath the engine
-// leaves alone for one declared output at rel: the subpaths it CEDES to another
-// task (protocol ADR 0003) and the ones it PRESERVES for the workspace (protocol
-// ADR 0005). Capture skips them, a restore keeps whatever the destination
-// holds at them, and a drift comparison judges neither side of them. Every one
-// of those three paths resolves the set here, so they cannot disagree.
-func outputSkippedSubpaths(rel string, output extension.DeclaredOutput) []string {
-	skipped := outputRelativeExcludes(rel, declaredExcludesOf(output))
-	preserved := extension.DecidablePreserves(output)
-	if len(preserved) == 0 {
-		return skipped
-	}
-	merged := make([]string, 0, len(skipped)+len(preserved))
-	merged = append(merged, skipped...)
-	merged = append(merged, preserved...)
-	sort.Strings(merged)
-	return slices.Compact(merged)
-}
-
-// outputRelativeExcludes rebases a declaration's ceded subpaths onto the output
-// they sit inside, which is the form the staging walk compares against.
-//
-// Only DECIDABLE carve-outs survive (extension.DecidableExcludes): an entry
-// that does not normalize, or does not sit strictly inside the output's path,
-// is dropped rather than guessed at. Dropping it keeps the bytes in the capture,
-// which is the safe direction for a defect manifest validation already reports —
-// the alternative would silently stop capturing a subtree because a carve-out
-// was misspelled.
-func outputRelativeExcludes(rel string, excludes []string) []string {
-	decidable := extension.DecidableExcludes(rel, excludes)
-	if len(decidable) == 0 {
-		return nil
-	}
-	relative := make([]string, 0, len(decidable))
-	for _, exclude := range decidable {
-		// DecidableExcludes guarantees each entry is strictly inside rel, so the
-		// remainder after the separator is non-empty. The prefix is dropped by
-		// LENGTH rather than by string match because the containment test that
-		// admitted it is case-insensitive, exactly like every other ownership
-		// comparison.
-		relative = append(relative, exclude[len(rel)+1:])
-	}
-	return relative
-}
-
-// declaredOutputPath resolves one declaration to its root-relative path.
-// Returns ok=false only for an optional pathFrom output whose port reported
-// nothing usable.
-func declaredOutputPath(output extension.DeclaredOutput, data map[string]any) (string, bool, error) {
-	if output.PathFrom == "" {
-		normalized, err := extension.NormalizeOutputPath(output.Path)
-		if err != nil {
-			return "", false, fmt.Errorf("invalid path %q: %w", output.Path, err)
-		}
-		return normalized, true, nil
-	}
-
-	raw, ok := declaredPortPathValue(data, output.PathFrom)
-	if !ok {
-		if output.OptionalEmpty {
-			return "", false, nil
-		}
-		return "", false, fmt.Errorf("output port %q reported no path", output.PathFrom)
-	}
-	normalized, err := extension.NormalizeOutputPath(raw)
-	if err != nil {
-		return "", false, fmt.Errorf("output port %q reported invalid path %q: %w", output.PathFrom, raw, err)
-	}
-	return normalized, true, nil
-}
-
-// declaredPortPathValue reads a task output port's reported path from the
-// executed result data. Both wire shapes the extensions use are accepted: a
-// single string (typescript's clientOutput) and a list (go's clientOutputs), of
-// which the first usable entry wins, keeping the recorded path deterministic
-// when a task reports more than one client directory.
-func declaredPortPathValue(data map[string]any, port string) (string, bool) {
-	if data == nil || port == "" {
-		return "", false
-	}
-	switch raw := data[port].(type) {
-	case string:
-		return cleanProjectRelSlash(raw)
-	case []string:
-		for _, value := range raw {
-			if rel, ok := cleanProjectRelSlash(value); ok {
-				return rel, true
-			}
-		}
-	case []any:
-		for _, value := range raw {
-			text, ok := value.(string)
-			if !ok {
-				continue
-			}
-			if rel, ok := cleanProjectRelSlash(text); ok {
-				return rel, true
-			}
-		}
-	}
-	return "", false
-}
-
-// cleanProjectRelSlash is cleanProjectRel in slash form, which is what a
-// declared output path is.
-func cleanProjectRelSlash(rel string) (string, bool) {
-	clean, ok := cleanProjectRel(rel)
-	if !ok {
-		return "", false
-	}
-	return filepath.ToSlash(clean), true
-}
-
-// workspaceRoots resolves a symbolic output root to the absolute directory the
-// job writes it under. It mirrors declaredOutputBase (plan_contract.go) with
-// filesystem paths instead of the slash form the ownership comparison uses.
-type workspaceRoots struct{ root string }
-
-func (w workspaceRoots) outputRoot(job *ScheduledJob, root string) (string, bool) {
-	switch root {
-	case extension.OutputRootWorkspace:
-		return w.root, true
-	case extension.OutputRootProject:
-		return filepath.Join(w.root, projectRelPath(job)), true
-	case extension.OutputRootCommandOutput:
-		return filepath.Join(w.root, ".putnami", "out", projectRelPath(job), jobCommandName(job)), true
-	default:
-		return "", false
-	}
-}
-
-func (s *Scheduler) outputRoots() workspaceRoots {
+func (s *Scheduler) outputRoots() cachekey.WorkspaceRoots {
 	root := ""
 	if s.ws != nil {
 		root = s.ws.Root
 	}
-	return workspaceRoots{root: root}
+	return cachekey.WorkspaceRoots{Root: root}
 }
 
 // storeDeclaredCapture publishes a task-owned entry holding exactly the job's
@@ -617,7 +298,7 @@ func (s *Scheduler) outputRoots() workspaceRoots {
 // would restore less than the declaration promises on every future hit, on
 // every machine that pulls it.
 //
-// A cacheable SKIP (a deterministic in-job skip, isCacheableResult) is captured
+// A cacheable SKIP (a deterministic in-job skip, cachekey.IsCacheableResult) is captured
 // from an EMPTY staging root rather than from the workspace. A skip produced no
 // files, and the paths its declaration names may still hold an earlier run's
 // bytes — capturing those would publish, under this key, a tree this execution
@@ -634,7 +315,7 @@ func (s *Scheduler) storeDeclaredCapture(job *ScheduledJob, result *JobResult, h
 		report = slog.Debug
 	}
 
-	plans, err := resolveDeclaredOutputs(s.outputRoots(), job, result.Data)
+	plans, err := cachekey.ResolveDeclaredOutputs(s.outputRoots(), job, result.Data)
 	if err != nil {
 		report("declared capture skipped: cannot resolve declared outputs",
 			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
@@ -658,13 +339,13 @@ func (s *Scheduler) storeDeclaredCapture(job *ScheduledJob, result *JobResult, h
 	specs := make([]store.DeclaredEntryOutput, 0, len(plans))
 	for _, plan := range plans {
 		if produced {
-			if err := stageDeclaredOutput(plan, store.TaskStagingPath(staging, plan.spec)); err != nil {
+			if err := stageDeclaredOutput(plan, store.TaskStagingPath(staging, plan.Spec)); err != nil {
 				slog.Warn("declared capture skipped: cannot stage declared output",
-					"project", job.Project.Name, "job", job.JobDef.Name, "output", plan.spec.ID, "error", err)
+					"project", job.Project.Name, "job", job.JobDef.Name, "output", plan.Spec.ID, "error", err)
 				return false
 			}
 		}
-		specs = append(specs, plan.spec)
+		specs = append(specs, plan.Spec)
 	}
 
 	meta := &store.EntryMetadata{
@@ -675,7 +356,7 @@ func (s *Scheduler) storeDeclaredCapture(job *ScheduledJob, result *JobResult, h
 	}
 	entry, err := s.cache.IngestTaskEntry(staging, store.TaskEntrySpec{
 		Key:      hash,
-		Result:   entryResultFromJobResult(result),
+		Result:   cachekey.EntryResultFromJobResult(result),
 		Metadata: meta,
 		Outputs:  specs,
 	})
@@ -728,8 +409,8 @@ func (s *Scheduler) storeDeclaredCapture(job *ScheduledJob, result *JobResult, h
 // unchanged — a PRESENT output swaps the current sources' bytes in, and an
 // optionalEmpty absence leaves a project or workspace path alone and empties a
 // command-output one (materializeDeclaredOutputs).
-func stageDeclaredOutput(plan declaredOutputPlan, dst string) error {
-	src := plan.src
+func stageDeclaredOutput(plan cachekey.DeclaredOutputPlan, dst string) error {
+	src := plan.Src
 	info, err := os.Lstat(src)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -738,7 +419,7 @@ func stageDeclaredOutput(plan declaredOutputPlan, dst string) error {
 		return err
 	}
 
-	if plan.spec.Kind == extension.OutputKindFile {
+	if plan.Spec.Kind == extension.OutputKindFile {
 		if info.IsDir() {
 			return fmt.Errorf("declared a file but %s is a directory", src)
 		}
@@ -756,7 +437,7 @@ func stageDeclaredOutput(plan declaredOutputPlan, dst string) error {
 		if err != nil {
 			return err
 		}
-		if isExcludedOutputPath(plan.excludes, filepath.ToSlash(rel)) {
+		if isExcludedOutputPath(plan.Excludes, filepath.ToSlash(rel)) {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
@@ -840,8 +521,8 @@ func (s *Scheduler) restoreDeclaredCacheHit(
 		return nil
 	}
 
-	result := jobResultFromEntryResult(entry.Result)
-	if declaredSourceRewriter(job) && result.SourceMutated {
+	result := cachekey.JobResultFromEntryResult(entry.Result)
+	if cachekey.DeclaredSourceRewriter(job) && result.SourceMutated {
 		// The entry is keyed by the source bytes before the fixer ran. Reusing its
 		// successful status would skip the edits in this worktree.
 		return nil
@@ -862,8 +543,8 @@ func (s *Scheduler) restoreDeclaredCacheHit(
 	drift := s.snapshotRestoredDrift(job, entry)
 	// A restore rewrites every recorded output, so the memoized input digests
 	// those paths can move are dropped once it ended, whether or not it
-	// completed (key_movement.go).
-	restored := restoredOutputPaths(s.outputRoots(), job, entry)
+	// completed (cachekey/key_movement.go).
+	restored := cachekey.RestoredOutputPaths(s.outputRoots(), job, entry)
 	if err := s.materializeDeclaredOutputs(job, entry); err != nil {
 		s.invalidateCapabilitySourceBindingsForRestore(job, entry)
 		s.cache.InvalidateFileHashesUnder(restored)
@@ -883,7 +564,7 @@ func (s *Scheduler) restoreDeclaredCacheHit(
 	// that capability carry none. Recover the reserved artifacts whose exact
 	// presence the verified task-owned descriptor proves before consumers and
 	// renderers observe the hit.
-	restoreReservedDeclaredArtifactEvents(job, entry, result)
+	cachekey.RestoreReservedDeclaredArtifactEvents(job, entry, result)
 	// Judged after the restore is complete and before the hit is published as
 	// this task's result: the diagnostic is this run's, never the entry's.
 	result = s.judgeRestoredDrift(job, entry, result, drift)
@@ -949,7 +630,7 @@ func (s *Scheduler) materializeDeclaredOutputs(job *ScheduledJob, entry *store.T
 			}
 			continue
 		}
-		base, ok := roots.outputRoot(job, output.Root)
+		base, ok := roots.OutputRoot(job, output.Root)
 		if !ok {
 			return fmt.Errorf("recorded output %q has unknown root %q", output.ID, output.Root)
 		}
@@ -963,14 +644,14 @@ func (s *Scheduler) materializeDeclaredOutputs(job *ScheduledJob, entry *store.T
 }
 
 // cededSubpathsOf returns the subpaths a recorded directory output cedes or
-// preserves (outputSkippedSubpaths), output-relative and in slash form, so its
+// preserves (cachekey.OutputSkippedSubpaths), output-relative and in slash form, so its
 // restore leaves them alone the way its capture skipped them. They come from the job's CURRENT declaration, not
 // from the entry: the entry never records them (protocol ADR 0003), and it does
 // not need to, because cache key v5 folds the task-contract digest — an entry
 // is only ever served to the exact declaration it was captured under, so the
 // carve-outs at restore are the carve-outs at capture.
 //
-// The resolution is the capture's (outputSkippedSubpaths over the same
+// The resolution is the capture's (cachekey.OutputSkippedSubpaths over the same
 // declaration), which is what keeps the two sides symmetric: a carve-out the
 // capture honored is one the restore honors, and one the capture dropped as
 // undecidable is dropped here too.
@@ -986,7 +667,7 @@ func cededSubpathsOf(job *ScheduledJob, output store.TaskEntryOutput) []string {
 	if !ok {
 		return nil
 	}
-	return outputSkippedSubpaths(output.Path, declared)
+	return cachekey.OutputSkippedSubpaths(output.Path, declared)
 }
 
 // restoreReplacesVersionStamp reports whether materializing this entry's
@@ -1098,11 +779,11 @@ func (s *Scheduler) lookupDeclaredEntry(
 	noop := func() {}
 
 	keyStarted := time.Now()
-	hash, err := computeJobCacheHash(s.ws, job, s.commandParams, s.cfg.VersionInfo, s.cache, hashCopy)
-	s.cacheStats.recordLocalKeys(keyStarted, time.Now())
+	hash, err := cachekey.ComputeJobCacheHash(s.ws, job, s.commandParams, s.cfg.VersionInfo, s.cache, hashCopy)
+	s.cacheStats.RecordLocalKeys(keyStarted, time.Now())
 	if err != nil || hash == "" {
 		if err != nil && !errors.Is(err, store.ErrGoEmbedInput) {
-			if semanticErr := validateUnkeyedGoEmbedInputs(s.ws, job, s.commandParams); semanticErr != nil {
+			if semanticErr := cachekey.ValidateUnkeyedGoEmbedInputs(s.ws, job, s.commandParams); semanticErr != nil {
 				err = semanticErr
 			}
 		}
@@ -1117,29 +798,29 @@ func (s *Scheduler) lookupDeclaredEntry(
 	entry, err := s.cache.LookupTaskEntry(hash)
 	if err == nil && entry != nil {
 		if result := s.restoreDeclaredCacheHit(ctx, job, hash, entry, mu, hashes); result != nil {
-			s.cacheStats.recordLocalRestoreVerify(restoreStarted, time.Now())
-			s.cacheStats.recordLocalHit()
+			s.cacheStats.RecordLocalRestoreVerify(restoreStarted, time.Now())
+			s.cacheStats.RecordLocalHit()
 			return hash, result, noop
 		}
 	}
 	// A run that reads none of this task's files may be served the result an
 	// earlier result-only restore recorded; a run that reads them never is, and
-	// restores the full entry below or executes (remote_result_only.go). The
+	// restores the full entry below or executes (remotecache/remote_result_only.go). The
 	// result-only path applies only when no full local entry exists: a full
 	// entry whose restore failed keeps the full fallback, so a partly restored
 	// tree is rewritten by the provider's restore or by the execution.
-	resultOnly := err == nil && entry == nil && !s.remote.taskFilesNeeded(job)
+	resultOnly := err == nil && entry == nil && s.remote != nil && !s.remote.TaskFilesNeeded(job)
 	if resultOnly {
 		if recorded := s.cache.LookupResultOnlyTaskEntry(hash); recorded != nil {
 			if result := s.serveStatusOnlyHit(job, hash, recorded, ReuseLocalCache, mu, hashes); result != nil {
-				s.cacheStats.recordLocalRestoreVerify(restoreStarted, time.Now())
-				s.cacheStats.recordLocalHit()
+				s.cacheStats.RecordLocalRestoreVerify(restoreStarted, time.Now())
+				s.cacheStats.RecordLocalHit()
 				return hash, result, noop
 			}
 		}
 	}
-	s.cacheStats.recordLocalRestoreVerify(restoreStarted, time.Now())
-	s.cacheStats.recordLocalMiss()
+	s.cacheStats.RecordLocalRestoreVerify(restoreStarted, time.Now())
+	s.cacheStats.RecordLocalMiss()
 
 	if resultOnly {
 		if recorded, reuse := s.remote.RestoreTaskResult(ctx, hash, job, s.cache); recorded != nil {
@@ -1147,16 +828,18 @@ func (s *Scheduler) lookupDeclaredEntry(
 				return hash, result, noop
 			}
 		}
-	} else if remoteEntry, reuse := s.remote.RestoreTaskEntry(ctx, hash, job, s.cache); remoteEntry != nil {
-		// The provider publishes into the local store, so what comes back here
-		// is an ordinary task-owned entry: recency is already stamped on its
-		// address by the materialize, and the restore below is the same one a
-		// local hit takes. Only the reported provenance differs — and the remote
-		// step reports it, because it is the step that knows whether the entry
-		// was fetched or published by the lease owner while it waited.
-		if result := s.restoreDeclaredCacheHit(ctx, job, hash, remoteEntry, mu, hashes); result != nil {
-			result.MarkReuse(reuse)
-			return hash, result, noop
+	} else if s.remote != nil {
+		if remoteEntry, reuse := s.remote.RestoreTaskEntry(ctx, hash, job, s.cache); remoteEntry != nil {
+			// The provider publishes into the local store, so what comes back here
+			// is an ordinary task-owned entry: recency is already stamped on its
+			// address by the materialize, and the restore below is the same one a
+			// local hit takes. Only the reported provenance differs — and the remote
+			// step reports it, because it is the step that knows whether the entry
+			// was fetched or published by the lease owner while it waited.
+			if result := s.restoreDeclaredCacheHit(ctx, job, hash, remoteEntry, mu, hashes); result != nil {
+				result.MarkReuse(reuse)
+				return hash, result, noop
+			}
 		}
 	}
 

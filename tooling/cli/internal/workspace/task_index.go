@@ -73,7 +73,7 @@ type indexedTask struct {
 	// files are the project-relative patterns the task's inputs select, in the
 	// exact flattened, sorted form DeriveTaskCacheKey hands the cache hasher.
 	// A `closure` port's patterns are here too, for the reason
-	// keyFilePatterns states: the closure covers the seed project.
+	// cachekey.KeyFilePatterns states: the closure covers the seed project.
 	files []string
 	// workspaceFiles are the patterns a `from: "workspace"` port selects,
 	// matched against the workspace-relative path itself.
@@ -542,7 +542,7 @@ func (idx *taskIndex) extensionRefTasks(ref string) []string {
 
 // readsAsGenerateAsset reports whether a path is one of the project's
 // cross-project generate assets. Such a file is folded into EVERY job's key of
-// the declaring project (jobs.generateAssetFiles), so every task reads it.
+// the declaring project (cachekey.GenerateAssetFiles), so every task reads it.
 func (idx *taskIndex) readsAsGenerateAsset(project *Project, path string) bool {
 	for _, source := range idx.assets[project.ID] {
 		source = filepath.ToSlash(filepath.Clean(source))

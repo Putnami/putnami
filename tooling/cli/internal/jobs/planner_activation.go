@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -50,12 +51,12 @@ func pipelineExpansionOptions(
 			return nil
 		}
 		if cache == nil {
-			return projectClosureRoots(ws, proj)
+			return cachekey.ProjectClosureRoots(ws, proj)
 		}
 		if roots, ok := cache.closureRoots[proj.ID]; ok {
 			return roots
 		}
-		roots := projectClosureRoots(ws, proj)
+		roots := cachekey.ProjectClosureRoots(ws, proj)
 		cache.closureRoots[proj.ID] = roots
 		return roots
 	}

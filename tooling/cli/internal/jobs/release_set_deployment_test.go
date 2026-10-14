@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/sdk/extension/profiles"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -83,7 +84,7 @@ func deploymentWorkload(t *testing.T) *workspace.Workspace {
 // its inputs do not move: one per member, so moving one member's inputs leaves
 // the other member of the same project unselected.
 func deploymentMemberFingerprint(ecosystem distribution.Ecosystem, coordinate string) string {
-	return testFingerprint(printableMemberKey(releaseset.MemberKey(ecosystem, coordinate)))
+	return testFingerprint(cachekey.PrintableMemberKey(releaseset.MemberKey(ecosystem, coordinate)))
 }
 
 // prepareDeploymentReleaseSet prepares an attributed, impact-based publication
@@ -292,7 +293,7 @@ func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing
 		// A fresh manager each time: the memoized file hashes would otherwise
 		// hide the content change the key is supposed to see.
 		cache := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
-		got, err := SelectionFingerprints(ws, planned, params, cache, deploymentProfiles(t), members)
+		got, err := cachekey.SelectionFingerprints(ws, planned, params, cache, deploymentProfiles(t), members)
 		if err != nil {
 			t.Fatalf("SelectionFingerprints: %v", err)
 		}
@@ -338,7 +339,7 @@ func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing
 		}
 	}
 	cache := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
-	_, err := SelectionFingerprints(ws, unplanned, nil, cache, deploymentProfiles(t), members)
+	_, err := cachekey.SelectionFingerprints(ws, unplanned, nil, cache, deploymentProfiles(t), members)
 	if err == nil || !strings.Contains(err.Error(), `package step "deployment"`) {
 		t.Fatalf("keying the member without its package step = %v, want a refusal naming the step", err)
 	}

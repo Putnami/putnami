@@ -58,9 +58,44 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"process readings; only the tests start fixture programs",
 	},
 	{
-		dir:     "internal/jobs/cachekey",
+		dir:     "internal/jobs/cachekey/framing",
 		allowed: nil,
 		why:     "cache key framing: it writes labeled fields to a hash and imports the standard library only",
+	},
+	{
+		dir: "internal/jobs/cachekey",
+		allowed: []string{
+			"go.putnami.dev/cli/model/jobs",
+			"go.putnami.dev/protocol/cache",
+			"go.putnami.dev/protocol/distribution",
+			"go.putnami.dev/protocol/extension",
+			"go.putnami.dev/protocol/features",
+			"go.putnami.dev/protocol/runtime",
+			"go.putnami.dev/protocol/workspace",
+			"go.putnami.dev/sdk/extension/dirlink",
+			"go.putnami.dev/sdk/extension/releaseset",
+			"go.putnami.dev/tooling/cli/internal/artifactstore",
+			"go.putnami.dev/tooling/cli/internal/extension",
+			"go.putnami.dev/tooling/cli/internal/git",
+			"go.putnami.dev/tooling/cli/internal/jobs/cachekey/framing",
+			"go.putnami.dev/tooling/cli/internal/jobs/machineprobe",
+			"go.putnami.dev/tooling/cli/internal/jobs/toolchain",
+			"go.putnami.dev/tooling/cli/internal/store",
+			"go.putnami.dev/tooling/cli/internal/workspace",
+		},
+		testOnly: []string{
+			"go.putnami.dev/cli/model/extension",
+			"go.putnami.dev/cli/model/workspace",
+			"go.putnami.dev/protocol/cli",
+			"go.putnami.dev/protocol/job",
+			"go.putnami.dev/sdk/extension/profiles",
+		},
+		why: "task cache keys: a key hashes the task's declared files and params, its project and " +
+			"workspace membership, its extension's installed tree or runtime sources, its runtime " +
+			"toolchains, the host platform and the release baseline the git history names; it reads " +
+			"them through the workspace, extension and store models, and never imports the scheduler " +
+			"or the runner. It also converts a task's result to and from its cache entry, whose events " +
+			"name protocol features",
 	},
 	{
 		dir: "internal/jobs/toolchain",
@@ -70,23 +105,47 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/protocol/extension",
 			"go.putnami.dev/sdk/extension/envkeys",
 			"go.putnami.dev/tooling/cli/internal/extension",
-			"go.putnami.dev/tooling/cli/internal/jobs/cachekey",
+			"go.putnami.dev/tooling/cli/internal/jobs/cachekey/framing",
 			"go.putnami.dev/tooling/cli/internal/jobs/machineprobe",
 			"go.putnami.dev/tooling/cli/internal/jobs/procdeadline",
 			"go.putnami.dev/tooling/cli/internal/lockfile",
 			"go.putnami.dev/tooling/cli/internal/runcredential",
 			"go.putnami.dev/tooling/cli/internal/store",
-			"go.putnami.dev/tooling/cli/internal/workspace",
 		},
 		testOnly: []string{
+			"go.putnami.dev/cli/model/workspace",
 			"go.putnami.dev/protocol/features/spectest",
 			"go.putnami.dev/sdk/extension/pkgmeta",
 			"go.putnami.dev/tooling/cli/internal/fixtureproc",
 			"go.putnami.dev/tooling/cli/internal/hometest",
 		},
-		why: "runtime toolchains: they resolve an extension's declared toolchains against the workspace " +
-			"lock, which needs the extension and workspace models, the lock, the artifact store root, " +
-			"and the run credential's custody mark and hosted check before a probe starts repository code",
+		why: "runtime toolchains: they resolve an extension's declared toolchains against the lock of " +
+			"the workspace root the caller names, which needs the extension model, the lock, the " +
+			"artifact store root, and the run credential's custody mark and hosted check before a " +
+			"probe starts repository code",
+	},
+	{
+		dir: "internal/jobs/remotecache",
+		allowed: []string{
+			"go.putnami.dev/cli/model/jobs",
+			"go.putnami.dev/protocol/cache",
+			"go.putnami.dev/protocol/extension",
+			"go.putnami.dev/protocol/features",
+			"go.putnami.dev/tooling/cli/internal/cacheprovider",
+			"go.putnami.dev/tooling/cli/internal/extension",
+			"go.putnami.dev/tooling/cli/internal/flock",
+			"go.putnami.dev/tooling/cli/internal/git",
+			"go.putnami.dev/tooling/cli/internal/jobs/cachekey",
+			"go.putnami.dev/tooling/cli/internal/runcredential",
+			"go.putnami.dev/tooling/cli/internal/store",
+			"go.putnami.dev/tooling/cli/internal/workspace",
+		},
+		testOnly: []string{
+			"go.putnami.dev/protocol/job",
+		},
+		why: "remote cache client: it negotiates, restores and shares task cache entries with a cache " +
+			"provider session, under the run credential and trust policy; the caller hands it the " +
+			"provider's launch, so it never imports the scheduler or the runner",
 	},
 }
 

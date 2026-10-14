@@ -462,7 +462,19 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // TestJobsSplitPackagesImportOnlyTheirAllowance allows, so a change elsewhere in
 // internal/jobs no longer reruns their tests. They add no vertical and no
 // engine stage.
-const internalPackageCountCeiling = 73
+//
+// RAISED 73 → 74: internal/jobs/cachekey now computes a task's cache key, and
+// the hash framing it held moves to internal/jobs/cachekey/framing. The
+// toolchain package hashes its identity with that framing and the cache key
+// reads that identity, so one package would be an import cycle. The framing
+// leaf imports only the standard library. It adds no vertical and no engine
+// stage.
+//
+// RAISED 74 → 75: the remote cache client moves to internal/jobs/remotecache.
+// The scheduler reaches it through the cachekey.RemoteCache interface and the
+// engine hands it the provider's launch, so it imports neither the scheduler
+// nor the runner. It adds no vertical and no engine stage.
+const internalPackageCountCeiling = 75
 
 func TestInternalPackageCountCeiling(t *testing.T) {
 	t.Parallel()

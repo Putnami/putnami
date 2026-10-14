@@ -14,6 +14,7 @@ import (
 	runner "go.putnami.dev/protocol/runner"
 	internalextension "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
 func portableJob(project *workspace.Project, name string, dependsOn ...string) *jobs.ScheduledJob {
@@ -178,7 +179,7 @@ func TestPortableRequestFreezesInvocationSelectionAndEnvironment(t *testing.T) {
 		selection:         &protocoljob.Selection{Mode: protocoljob.SelectionModeProjects, Scoped: true, ProjectIDs: []string{"/lib", "/app"}},
 		selectionEvidence: selectionEvidence{requestedMode: protocoljob.SelectionModeProjects, diagnostics: []string{"note"}},
 		noCacheProjects:   map[string]bool{"/app": true},
-		versions:          jobs.RunVersions{"": &jobs.JobContextVersion{Base: "1.0.0", Full: "1.0.0-x", SHA: "abc", Branch: "main"}},
+		versions:          cachekey.RunVersions{"": &cachekey.JobContextVersion{Base: "1.0.0", Full: "1.0.0-x", SHA: "abc", Branch: "main"}},
 	}
 	extensions := []*extension.ExtensionDescription{{Name: "@b/ext", Version: "2"}, {Name: "@a/ext", Version: "1"}}
 	request, err := portableRequest(req, nil, &internalextension.DiscoveryResult{Extensions: extensions}, portablePlan(), []string{"app/conf/local.txt"})

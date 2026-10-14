@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -34,7 +35,7 @@ func batchProjectLimit(policy *extension.TaskBatchPolicy, params extension.Param
 	}
 	raw, ok := params[name]
 	if !ok && strings.Contains(name, "-") {
-		raw, ok = params[kebabToCamel(name)]
+		raw, ok = params[cachekey.KebabToCamel(name)]
 	}
 	if !ok || raw == nil {
 		return policy.MaxProjects, true, nil

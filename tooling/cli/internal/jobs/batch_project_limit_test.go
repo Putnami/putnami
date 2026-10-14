@@ -7,9 +7,7 @@ import (
 	"testing"
 
 	wsproto "go.putnami.dev/protocol/workspace"
-
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -260,36 +258,6 @@ func TestGoTestBatchesHonourTheWorkspaceProjectCap(t *testing.T) {
 	setGoTestOptions(ws, extension.ParamMap{batchCapOption: 4.0})
 	if err := validateBatchProjectLimits(planned, ws, nil); err != nil {
 		t.Fatalf("valid cap refused: %v", err)
-	}
-}
-
-// TestBatchProjectCapNeverKeysTheTask proves the option groups jobs without
-// moving the task cache key: setting it hits the entry an unset run wrote.
-// The declared race flag moving the same key shows the comparison is not
-// vacuous.
-func TestBatchProjectCapNeverKeysTheTask(t *testing.T) {
-	t.Parallel()
-	ws, planned := makeGoTestBatchFixture(t)
-	job := planned[0]
-	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(ws.Root, ".putnami", "store")))
-	keyWith := func(options extension.ParamMap) string {
-		t.Helper()
-		setGoTestOptions(ws, options)
-		hash, err := computeJobCacheHash(ws, job, nil, nil, cache, nil)
-		if err != nil {
-			t.Fatalf("compute task cache key: %v", err)
-		}
-		return hash
-	}
-
-	unset := keyWith(nil)
-	for _, value := range []any{2.0, 6.0, 1.0} {
-		if got := keyWith(extension.ParamMap{batchCapOption: value}); got != unset {
-			t.Errorf("%s=%v moved the task cache key", batchCapOption, value)
-		}
-	}
-	if got := keyWith(extension.ParamMap{"race": true}); got == unset {
-		t.Fatal("a declared flag did not move the task cache key; the comparison above proves nothing")
 	}
 }
 

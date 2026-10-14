@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -69,7 +70,7 @@ func TestBuildRunVersionsResolvesEachLineSeparately(t *testing.T) {
 	if go_.SHA != snapshot.SHA || go_.Branch != snapshot.Branch {
 		t.Errorf("go tree state = %q/%q, want the snapshot's %q/%q", go_.SHA, go_.Branch, snapshot.SHA, snapshot.Branch)
 	}
-	if got := VersionInfoForProject(versions, ws.ProjectByID("/go/api")); got != go_ {
+	if got := cachekey.VersionInfoForProject(versions, ws.ProjectByID("/go/api")); got != go_ {
 		t.Errorf("project version = %+v, want its own line's", got)
 	}
 }

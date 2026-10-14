@@ -8,6 +8,7 @@ import (
 
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -66,7 +67,7 @@ func TestAnalyzeRejectsUnclassifiedGeneratedPaths(t *testing.T) {
 
 func TestWriteAllowedResolvesProjectAndWorkspaceOutputRoots(t *testing.T) {
 	job := &jobs.ScheduledJob{Project: &workspace.Project{ID: "/app", Path: "apps/app"}}
-	contract := jobs.VerificationContract{Outputs: []jobs.VerificationOutput{
+	contract := cachekey.VerificationContract{Outputs: []cachekey.VerificationOutput{
 		{Root: extension.OutputRootProject, Path: ".gen/client/**"},
 		{Root: extension.OutputRootWorkspace, Path: "shared/report.json"},
 	}}
@@ -79,7 +80,7 @@ func TestWriteAllowedResolvesProjectAndWorkspaceOutputRoots(t *testing.T) {
 		{path: "apps/other/.gen/client/index.ts", want: false},
 	}
 	for _, testCase := range tests {
-		if got := writeAllowed(job, contract, []jobs.VerificationContract{contract}, testCase.path, overrides{}); got != testCase.want {
+		if got := writeAllowed(job, contract, []cachekey.VerificationContract{contract}, testCase.path, overrides{}); got != testCase.want {
 			t.Errorf("writeAllowed(%q) = %v, want %v", testCase.path, got, testCase.want)
 		}
 	}
@@ -94,11 +95,11 @@ func TestWriteAllowedResolvesProjectAndWorkspaceOutputRoots(t *testing.T) {
 func TestWriteAllowedHonorsProjectLevelOwnership(t *testing.T) {
 	job := &jobs.ScheduledJob{Project: &workspace.Project{ID: "/app", Path: "apps/app"}}
 	// The writer declares nothing, exactly like build~describe's staging write.
-	writer := jobs.VerificationContract{}
-	owner := jobs.VerificationContract{Outputs: []jobs.VerificationOutput{
+	writer := cachekey.VerificationContract{}
+	owner := cachekey.VerificationContract{Outputs: []cachekey.VerificationOutput{
 		{Root: extension.OutputRootProject, Path: ".gen"},
 	}}
-	projectContracts := []jobs.VerificationContract{writer, owner}
+	projectContracts := []cachekey.VerificationContract{writer, owner}
 
 	if !writeAllowed(job, writer, projectContracts, "apps/app/.gen/schema/capabilities.json", overrides{}) {
 		t.Error("a write into the sibling-owned .gen subtree must be allowed")

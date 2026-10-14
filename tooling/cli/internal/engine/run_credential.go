@@ -6,9 +6,12 @@ import (
 	"sync"
 	"time"
 
+	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -17,11 +20,30 @@ import (
 // remoteCacheOptions hands the hosted run's credential to the cache provider
 // over its RPC. Without a run credential it is empty, and the provider session
 // is byte-identical to one without the option.
-func remoteCacheOptions() []jobs.RemoteCacheOption {
+func remoteCacheOptions() []remotecache.RemoteCacheOption {
 	if bearer, ok := runcredential.Current(); ok {
-		return []jobs.RemoteCacheOption{jobs.WithCacheRunCredential(bearer)}
+		return []remotecache.RemoteCacheOption{remotecache.WithCacheRunCredential(bearer)}
 	}
 	return nil
+}
+
+// launchCacheProvider starts the cache provider the way the CLI starts every
+// provider it owns (jobs.PrepareProviderLaunch). The engine hands it to the
+// remote cache loader, so the remote cache client never imports the runner.
+func launchCacheProvider(ctx context.Context, workspaceRoot string, ext *extension.ExtensionDescription, command string) (cacheprovider.LaunchSpec, error) {
+	launch, err := jobs.PrepareProviderLaunch(ctx, workspaceRoot, ext, command)
+	return cacheprovider.LaunchSpec(launch), err
+}
+
+// schedulerRemote is the remote cache a run's scheduler reads: remote, or a
+// nil interface when remote is nil. A nil *RemoteCache stored in the
+// interface is not nil, so the scheduler would treat a local-only run as one
+// with a remote cache whose every method must accept a nil receiver.
+func schedulerRemote(remote *remotecache.RemoteCache) cachekey.RemoteCache {
+	if remote == nil {
+		return nil
+	}
+	return remote
 }
 
 // HostedRemoteCache is the remote cache of a hosted invocation, whose
@@ -37,7 +59,7 @@ func remoteCacheOptions() []jobs.RemoteCacheOption {
 type HostedRemoteCache struct {
 	mu      sync.Mutex
 	started bool
-	remote  *jobs.RemoteCache
+	remote  *remotecache.RemoteCache
 	err     error
 }
 
@@ -48,7 +70,7 @@ type HostedRemoteCache struct {
 // --no-cache, and a watch iteration under the trust policy "none". Every
 // later request gets what the first start gave, a refusal and nothing
 // included: the provider never starts twice.
-func (h *HostedRemoteCache) Start(ctx context.Context, req *Request) (*jobs.RemoteCache, error) {
+func (h *HostedRemoteCache) Start(ctx context.Context, req *Request) (*remotecache.RemoteCache, error) {
 	if !readsHostedRemoteCache(req) {
 		return nil, nil
 	}
@@ -100,7 +122,7 @@ func readsHostedRemoteCache(req *Request) bool {
 // It resolves the workspace and its extensions as the hooks will find them;
 // the run resolves them again after the hooks, and reads the remote cache
 // through the provider started here (Request.hostedRemote).
-func startHostedRemoteCache(ctx context.Context, req *Request) (*jobs.RemoteCache, error) {
+func startHostedRemoteCache(ctx context.Context, req *Request) (*remotecache.RemoteCache, error) {
 	if !readsHostedRemoteCache(req) {
 		return nil, nil
 	}
@@ -118,8 +140,8 @@ func startHostedRemoteCache(ctx context.Context, req *Request) (*jobs.RemoteCach
 		return nil, nil
 	}
 	setupStart := time.Now()
-	remote, notice := jobs.LoadRemoteCache(ctx, req.WorkspaceRoot, discovered.Extensions, discovered,
-		trust, remoteCacheOptions()...)
+	remote, notice := remotecache.LoadRemoteCache(ctx, req.WorkspaceRoot, discovered.Extensions, discovered,
+		trust, launchCacheProvider, remoteCacheOptions()...)
 	if notice != "" {
 		iox.Fprintln(os.Stderr, notice)
 	}
@@ -140,18 +162,18 @@ func startHostedRemoteCache(ctx context.Context, req *Request) (*jobs.RemoteCach
 // remote cache is loaded again, silently, because startHostedRemoteCache
 // already printed its notice. A cache configured only now has a provider that
 // would start after repository code, and the error is its refusal
-// (jobs.RemoteCache.StartProvider): the run fails and never builds locally in
+// (remotecache.RemoteCache.StartProvider): the run fails and never builds locally in
 // its place. It returns nil without a run credential, under --no-cache, and
 // when cache is nil.
-func hostedRunRemoteCache(ctx context.Context, req *Request, ws *workspace.Workspace, discovered *extension.DiscoveryResult, cache *store.CacheManager) (*jobs.RemoteCache, error) {
+func hostedRunRemoteCache(ctx context.Context, req *Request, ws *workspace.Workspace, discovered *extension.DiscoveryResult, cache *store.CacheManager) (*remotecache.RemoteCache, error) {
 	if !runcredential.Hosted() || req.Global.NoCache || cache == nil {
 		return nil, nil
 	}
 	if req.hostedRemote != nil {
 		return req.hostedRemote, nil
 	}
-	remote, _ := jobs.LoadRemoteCache(ctx, req.WorkspaceRoot, discovered.Extensions, discovered,
-		store.CacheTrust(req.Global.CacheTrust), remoteCacheOptions()...)
+	remote, _ := remotecache.LoadRemoteCache(ctx, req.WorkspaceRoot, discovered.Extensions, discovered,
+		store.CacheTrust(req.Global.CacheTrust), launchCacheProvider, remoteCacheOptions()...)
 	if err := remote.StartProvider(ctx, ws, cache); err != nil {
 		remote.Close()
 		return nil, err

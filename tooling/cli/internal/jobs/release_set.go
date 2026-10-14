@@ -22,6 +22,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -325,7 +326,7 @@ type ReleaseSetOptions struct {
 	PlannedPublish bool
 	// Versions is the run's version per line. A member is stamped with the
 	// version of its own project's line, never with one version for the run.
-	Versions RunVersions
+	Versions cachekey.RunVersions
 	// Profiles is the workspace's resolved ecosystem registry. The coordinator
 	// names no ecosystem itself: what `npm` or `oci` means, and which extension
 	// owns it, comes from here (D12).
@@ -384,7 +385,7 @@ type ReleaseSetRequest struct {
 	// Impacted and All are the run's project-selection flags.
 	Impacted, All bool
 	// Versions is the run's version per line, derived from git.
-	Versions RunVersions
+	Versions cachekey.RunVersions
 }
 
 // BuildReleaseSetOptions turns one run request into the typed release-set
@@ -460,7 +461,7 @@ func distributingRun(commands []string) bool {
 // seeding commit that tags every line, or a runner checkout that carries every
 // tag of the commit — `--scope` names the one being released; without it the
 // publish is refused rather than guessing which cohort was meant (D9).
-func taggedRunLine(commands []string, versions RunVersions, scope string) (string, bool, error) {
+func taggedRunLine(commands []string, versions cachekey.RunVersions, scope string) (string, bool, error) {
 	if !slices.Contains(commands, "publish") {
 		return "", false, nil
 	}
@@ -849,7 +850,7 @@ func TaggedReleaseSetPublish(options ReleaseSetOptions) bool {
 
 // taggedLineVersion is the version of the line a tagged publish releases, or
 // nil when this publication is not a tagged one.
-func taggedLineVersion(options ReleaseSetOptions) *JobContextVersion {
+func taggedLineVersion(options ReleaseSetOptions) *cachekey.JobContextVersion {
 	if !options.Tagged {
 		return nil
 	}
@@ -1447,7 +1448,7 @@ func resolveSelectionFingerprints(
 	if len(members) == 0 {
 		return options, nil
 	}
-	fingerprints, err := SelectionFingerprints(ws, keying, commandParams, cache, profiles, members)
+	fingerprints, err := cachekey.SelectionFingerprints(ws, keying, commandParams, cache, profiles, members)
 	if err != nil {
 		return options, err
 	}
@@ -2460,7 +2461,7 @@ func releaseMemberProject(project *workspace.Project) string {
 // without the CLI naming the go ecosystem.
 func releaseCandidateVersion(options ReleaseSetOptions, ws *workspace.Workspace, candidate *releaseCandidate) (string, error) {
 	version := ""
-	if info := VersionInfoForProject(options.Versions, candidate.project); info != nil {
+	if info := cachekey.VersionInfoForProject(options.Versions, candidate.project); info != nil {
 		version = info.Full
 	}
 	if strings.TrimSpace(version) == "" {

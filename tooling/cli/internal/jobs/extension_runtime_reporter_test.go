@@ -8,6 +8,7 @@ import (
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
 func TestReporterRuntimePreparationHonorsContextWhileWaitingForArtifact(t *testing.T) {
@@ -15,7 +16,7 @@ func TestReporterRuntimePreparationHonorsContextWhileWaitingForArtifact(t *testi
 	root := t.TempDir()
 	writeRuntimeFixture(t, root, "@putnami/test", "1.2.3")
 	ext := runtimeTestExtension(root)
-	digest, err := extensionRuntimeDigest(ext)
+	digest, err := cachekey.ExtensionRuntimeDigest(ext)
 	if err != nil {
 		t.Fatal(err)
 	}

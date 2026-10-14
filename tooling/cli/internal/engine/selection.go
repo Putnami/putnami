@@ -15,6 +15,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -455,9 +456,9 @@ func applyBareProjectSelection(req *Request, ws *workspace.Workspace, extensions
 		// repository code ran.
 		remote := req.hostedRemote
 		if !runcredential.Hosted() {
-			remote, _ = jobs.LoadRemoteCache(context.Background(), ws.Root, extensions, nil, trust, remoteCacheOptions()...)
+			remote, _ = remotecache.LoadRemoteCache(context.Background(), ws.Root, extensions, nil, trust, launchCacheProvider, remoteCacheOptions()...)
 		}
-		remoteSHA, ok := remote.LookupRunMarker(context.Background(), jobs.RunMarkerWorkspaceID(ws), branch, commands, paramsHash)
+		remoteSHA, ok := remote.LookupRunMarker(context.Background(), remotecache.RunMarkerWorkspaceID(ws), branch, commands, paramsHash)
 		if remote != req.hostedRemote {
 			remote.Close()
 		}

@@ -10,6 +10,7 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -276,7 +277,7 @@ func TestProviderGenerationNeverOverlapsAGeneratedTreeRewrite(t *testing.T) {
 		// describe declares only a read of gen, yet it writes the very file the
 		// generators read, .gen/clientgen/config.json. It is ordered through the
 		// generate step it depends on, so it must be ordered here too.
-		if writesProjectGen(job) || (job.Step != nil && job.Step.Task == "build-describe") {
+		if cachekey.WritesProjectGen(job) || (job.Step != nil && job.Step.Task == "build-describe") {
 			writers = append(writers, job.Key())
 		}
 		if job.CommandName() == "clientgen" {

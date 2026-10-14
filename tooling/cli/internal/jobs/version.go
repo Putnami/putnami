@@ -12,9 +12,9 @@ import (
 	"sort"
 	"strings"
 
-	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -135,11 +135,11 @@ var versionStampOwnedFields = map[string]bool{
 // snapshot to stamp it with — beside versions that are otherwise complete.
 // Without it a 0.0.0 stamp cannot tell a git call that failed from a line that
 // is really untagged.
-func BuildRunVersions(ws *workspace.Workspace, snapshot *putnamigit.VersionInfo) (versions RunVersions, degraded error) {
+func BuildRunVersions(ws *workspace.Workspace, snapshot *putnamigit.VersionInfo) (versions cachekey.RunVersions, degraded error) {
 	if ws == nil {
 		return nil, nil
 	}
-	versions = make(RunVersions, len(ws.Lines)+1)
+	versions = make(cachekey.RunVersions, len(ws.Lines)+1)
 	var lineErrs []error
 	// An unusable support catalog degrades the bump to the stable reading,
 	// the larger one, instead of failing a build that releases nothing.
@@ -148,7 +148,7 @@ func BuildRunVersions(ws *workspace.Workspace, snapshot *putnamigit.VersionInfo)
 		lineErrs = append(lineErrs, fmt.Errorf("every version line reads each commit as stable: %w", catalogErr))
 	}
 	for _, line := range runVersionLines(ws) {
-		pattern := lineTagPattern(ws, line)
+		pattern := cachekey.LineTagPattern(ws, line)
 		spec := putnamigit.LineSpec{ScopePath: line, TagPattern: pattern, Stable: stable}
 		if line != "" {
 			spec.Pathspecs = []string{line}
@@ -173,7 +173,7 @@ func BuildRunVersions(ws *workspace.Workspace, snapshot *putnamigit.VersionInfo)
 				info.Full = info.Base + "-" + info.Suffix
 			}
 		}
-		versions[line] = &JobContextVersion{
+		versions[line] = &cachekey.JobContextVersion{
 			Base: info.Base, Full: info.Full, SHA: info.SHA, Branch: info.Branch,
 			Tag: info.Tag, Suffix: info.Suffix, Tagged: info.Tagged,
 			IsDirty: info.IsDirty, Line: line,
@@ -198,15 +198,6 @@ func DegradedVersionLines(degraded error) []string {
 		lines = append(lines, strings.Join(strings.Fields(reason.Error()), " "))
 	}
 	return lines
-}
-
-// lineTagPattern is the tag pattern of a version line: the one the line's scope
-// declares, or the default for its scope path. "" is the root line.
-func lineTagPattern(ws *workspace.Workspace, line string) string {
-	if pattern, ok := ws.Lines[line]; ok {
-		return pattern
-	}
-	return wsproto.LineTagPattern(line, nil)
 }
 
 // runVersionLines is every line a project of this workspace can belong to: the
@@ -327,7 +318,7 @@ func readVersionStampDocument(path string) map[string]any {
 func preserveMatchingVersionFiles(
 	ws *workspace.Workspace,
 	planned []*ScheduledJob,
-	versions RunVersions,
+	versions cachekey.RunVersions,
 	buildTime string,
 ) {
 	generateVersionFilesAt(ws, planned, versions, buildTime, true)
@@ -336,7 +327,7 @@ func preserveMatchingVersionFiles(
 func generateVersionFilesAt(
 	ws *workspace.Workspace,
 	planned []*ScheduledJob,
-	versions RunVersions,
+	versions cachekey.RunVersions,
 	buildTime string,
 	preserveMatching bool,
 ) {
@@ -352,7 +343,7 @@ func generateVersionFilesAt(
 func generateVersionFilesAtWithSourceBindings(
 	ws *workspace.Workspace,
 	planned []*ScheduledJob,
-	versions RunVersions,
+	versions cachekey.RunVersions,
 	buildTime string,
 	preserveMatching bool,
 	sourceBindings *capabilitySourceBindingMemo,
@@ -370,7 +361,7 @@ func generateVersionFilesAtWithSourceBindings(
 		}
 		seen[proj.Name] = true
 
-		projVersion := VersionInfoForProject(versions, proj)
+		projVersion := cachekey.VersionInfoForProject(versions, proj)
 
 		info := VersionInfo{
 			Name:               proj.Name,

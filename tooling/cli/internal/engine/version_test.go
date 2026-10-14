@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/tooling/cli/internal/git"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -50,7 +50,7 @@ func mustCaptureVersionSnapshot(t *testing.T, dir string) *git.VersionInfo {
 
 // mustBuildVersionInfo is BuildVersionInfo for a test that sets no
 // PUTNAMI_SOURCE_REVISION, where it cannot fail.
-func mustBuildVersionInfo(t *testing.T, ws *workspace.Workspace) jobs.RunVersions {
+func mustBuildVersionInfo(t *testing.T, ws *workspace.Workspace) cachekey.RunVersions {
 	t.Helper()
 	versions, err := BuildVersionInfo(ws)
 	if err != nil {

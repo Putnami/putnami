@@ -11,13 +11,13 @@ import (
 
 	model "go.putnami.dev/cli/model/extension"
 	"go.putnami.dev/cli/model/jobs"
+	"go.putnami.dev/cli/model/workspace"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
-	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // provisioningToolchainExtension declares one required toolchain every task of
@@ -240,19 +240,18 @@ func TestEnsureJobRuntimeToolchainsKeepsAProvisioningResolutionFromOtherCommands
 	writeRuntimeToolchainLock(t, root, "other", "1.2.3", "integrity-a")
 	t.Setenv("PATH", t.TempDir())
 	project := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
-	ws := workspace.NewWorkspace(root, nil, []*workspace.Project{project})
 	job := func(ext *model.ExtensionDescription, name string) *jobs.ScheduledJob {
 		return &jobs.ScheduledJob{Project: project, Extension: ext, JobDef: &model.JobDefinition{Name: name, Toolchains: []string{"compiler"}}}
 	}
 
 	ext := provisioningToolchainExtension()
-	if err := EnsureJobRuntimeToolchains(ws, job(ext, ToolchainProvisioningCommand+"~install")); err != nil {
+	if err := EnsureJobRuntimeToolchains(root, job(ext, ToolchainProvisioningCommand+"~install")); err != nil {
 		t.Fatalf("provisioning job backstop: %v", err)
 	}
 	if resolved, ok := ext.RuntimeToolchains["compiler"]; !ok || resolved.Available {
 		t.Fatalf("provisioning job resolution = %+v (present %v), want unavailable", resolved, ok)
 	}
-	err := EnsureJobRuntimeToolchains(ws, job(ext, "build~compile"))
+	err := EnsureJobRuntimeToolchains(root, job(ext, "build~compile"))
 	want := `resolve extension "example" runtime toolchain "compiler": workspace lock has no usable "compiler" pin; only workspace-fetch and workspace-install run without one`
 	if err == nil || err.Error() != want {
 		t.Fatalf("build job on a provisioning resolution: error = %v, want %q", err, want)
@@ -262,14 +261,14 @@ func TestEnsureJobRuntimeToolchainsKeepsAProvisioningResolutionFromOtherCommands
 	requirement := optional.Runtime.Toolchains["compiler"]
 	requirement.Optional = true
 	optional.Runtime.Toolchains["compiler"] = requirement
-	if err := EnsureJobRuntimeToolchains(ws, job(optional, "build~compile")); err != nil {
+	if err := EnsureJobRuntimeToolchains(root, job(optional, "build~compile")); err != nil {
 		t.Fatalf("an optional toolchain resolved unavailable must not stop the job: %v", err)
 	}
 
 	if err := os.Remove(filepath.Join(root, lockfile.LockFilename)); err != nil {
 		t.Fatal(err)
 	}
-	if err := EnsureJobRuntimeToolchains(ws, job(ext, "build~compile")); err != nil {
+	if err := EnsureJobRuntimeToolchains(root, job(ext, "build~compile")); err != nil {
 		t.Fatalf("without a lock the unavailable identity is the bootstrap floor: %v", err)
 	}
 	spectest.Proves(t, "cli/runtime-toolchain-pinning", "provisioning-runs-unpinned",

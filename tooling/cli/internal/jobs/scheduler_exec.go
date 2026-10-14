@@ -11,6 +11,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/hooks"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -222,7 +223,7 @@ func (s *Scheduler) openTask(
 		}}
 	}
 
-	cacheEnabled := isCacheEnabled(job, s.bypass)
+	cacheEnabled := cachekey.IsCacheEnabled(job, s.bypass)
 	cacheHash, cachedResult, release := s.lookupRestoreOrClaim(ctx, job, cacheEnabled, mu, hashes)
 	if cachedResult != nil {
 		cachedResult.CacheKey = cacheHash
@@ -346,8 +347,8 @@ func (s *Scheduler) prepareTask(
 	}
 
 	s.renderer.JobStart(job)
-	if item.cacheEnabled && declaredSourceRewriter(job) {
-		// computeJobCacheHash already populated this exact memoized digest during
+	if item.cacheEnabled && cachekey.DeclaredSourceRewriter(job) {
+		// cachekey.ComputeJobCacheHash already populated this exact memoized digest during
 		// lookup. Keep the value across execution because another project's
 		// source fixer may invalidate the shared memo concurrently.
 		item.sourceInputHash, _ = sourceInputDigest(s.ws, job, s.commandParams, s.cache)
@@ -550,10 +551,10 @@ func (s *Scheduler) runSharedAttempt(ctx context.Context, work []taskWork) map[s
 // a singleton dispatch runs and what a failed batch member re-executes as.
 func (s *Scheduler) runTaskAttempt(ctx context.Context, job *ScheduledJob) *JobResult {
 	ctx = s.processCapabilities.contextForJob(ctx, job)
-	var before verificationTreeSnapshot
+	var before cachekey.VerificationTreeSnapshot
 	var observationErr error
 	if s.cfg.CacheVerification {
-		before, observationErr = snapshotJobWorkspaceTree(s.ws, job)
+		before, observationErr = cachekey.SnapshotJobWorkspaceTree(s.ws, job)
 	}
 	result, err := runJob(
 		ctx,
@@ -569,14 +570,14 @@ func (s *Scheduler) runTaskAttempt(ctx context.Context, job *ScheduledJob) *JobR
 		result = spawnFailureResult(ctx, err)
 	}
 	if s.cfg.CacheVerification {
-		after, err := snapshotJobWorkspaceTree(s.ws, job)
+		after, err := cachekey.SnapshotJobWorkspaceTree(s.ws, job)
 		if observationErr == nil {
 			observationErr = err
 		}
 		if observationErr != nil {
 			result.VerificationError = observationErr.Error()
 		} else {
-			result.VerificationWrites = diffVerificationTreeSnapshots(before, after)
+			result.VerificationWrites = cachekey.DiffVerificationTreeSnapshots(before, after)
 		}
 	}
 	return result
@@ -714,7 +715,7 @@ func (s *Scheduler) jobProcessEnv() []string {
 		env = append(env, protocolcli.ParentSessionEnv+"="+s.cfg.SessionID)
 	}
 	if s.remote != nil && !s.cfg.NoCache {
-		env = append(env, s.remote.objectCacheJobEnv()...)
+		env = append(env, s.remote.ObjectCacheJobEnv()...)
 	}
 	return env
 }
@@ -756,14 +757,14 @@ func (s *Scheduler) finalizeExecutedJob(
 	// The task wrote its declared outputs, whatever its verdict. Every memoized
 	// input digest those paths can move is dropped before its result is
 	// published, so a task that reads them keys the bytes it reads
-	// (key_movement.go).
-	s.cache.InvalidateFileHashesUnder(declaredOutputPaths(s.outputRoots(), job, result))
+	// (cachekey/key_movement.go).
+	s.cache.InvalidateFileHashesUnder(cachekey.DeclaredOutputPaths(s.outputRoots(), job, result))
 
 	// A task that may have rewritten the worktree's sources invalidates the
 	// memoized input digests for every later job. When caching is active,
 	// recompute its keyed project-source digest: only unchanged source bytes
 	// prove that a stored green verdict can be reused without skipping edits.
-	if result.Status == "success" && rewritesSourceTree(job) && s.cache != nil {
+	if result.Status == "success" && cachekey.RewritesSourceTree(job) && s.cache != nil {
 		s.cache.InvalidateFileHashes()
 		if cacheEnabled && cacheHash != "" {
 			afterSourceHash, err := sourceInputDigest(s.ws, job, s.commandParams, s.cache)
@@ -778,15 +779,15 @@ func (s *Scheduler) finalizeExecutedJob(
 	// feed another bypassed key — and without it a --no-cache run would derive a
 	// different key for the same inputs, which is the address the forget below
 	// has to name to be worth anything.
-	if cacheHash != "" && isCacheableResult(job, result) {
+	if cacheHash != "" && cachekey.IsCacheableResult(job, result) {
 		mu.Lock()
 		hashes[job.Key()] = cacheHash
 		mu.Unlock()
 	}
 
 	// Cache store (on success, or a deterministic in-job skip) always publishes
-	// a task-owned entry. isCacheEnabled admits only usesDeclaredCapture jobs.
-	if cacheEnabled && s.cache != nil && cacheHash != "" && isCacheableResult(job, result) {
+	// a task-owned entry. cachekey.IsCacheEnabled admits only usesDeclaredCapture jobs.
+	if cacheEnabled && s.cache != nil && cacheHash != "" && cachekey.IsCacheableResult(job, result) {
 		stored := s.storeDeclaredCapture(job, result, cacheHash)
 		if stored && !result.SourceMutated && s.remote != nil {
 			s.remote.UploadTaskEntry(ctx, cacheHash, job, s.cache)
@@ -813,20 +814,20 @@ func (s *Scheduler) lookupRestoreOrClaim(
 ) (string, *JobResult, func()) {
 	noop := func() {}
 	if s.cache == nil {
-		if err := validateUnkeyedGoEmbedInputs(s.ws, job, s.commandParams); err != nil {
+		if err := cachekey.ValidateUnkeyedGoEmbedInputs(s.ws, job, s.commandParams); err != nil {
 			s.renderer.JobStart(job)
 			return "", &JobResult{Status: string(TaskStatusFailed), Error: &JobError{Message: err.Error()}}, noop
 		}
 		return "", nil, noop
 	}
 
-	// computeJobCacheHash only mixes in the cache keys of this job's direct
+	// cachekey.ComputeJobCacheHash only mixes in the cache keys of this job's direct
 	// dependencies, so copy just those entries under the lock rather than the
 	// whole (growing) hashes map. This keeps the per-job copy O(deps) instead
 	// of O(N) and shortens the critical section every worker contends on.
 	mu.Lock()
 	hashCopy := make(map[string]string, len(job.DependsOn))
-	for _, depKey := range cacheKeyDependencies(job) {
+	for _, depKey := range cachekey.CacheKeyDependencies(job) {
 		if value, ok := hashes[depKey]; ok {
 			hashCopy[depKey] = value
 		}
@@ -848,16 +849,16 @@ func (s *Scheduler) lookupRestoreOrClaim(
 	// serving anything.
 	if !cacheEnabled {
 		if !CanUseCache(job) {
-			if err := validateUnkeyedGoEmbedInputs(s.ws, job, s.commandParams); err != nil {
+			if err := cachekey.ValidateUnkeyedGoEmbedInputs(s.ws, job, s.commandParams); err != nil {
 				s.renderer.JobStart(job)
 				return "", &JobResult{Status: string(TaskStatusFailed), Error: &JobError{Message: err.Error()}}, noop
 			}
 			return "", nil, noop
 		}
-		hash, err := computeJobCacheHash(s.ws, job, s.commandParams, s.cfg.VersionInfo, s.cache, hashCopy)
+		hash, err := cachekey.ComputeJobCacheHash(s.ws, job, s.commandParams, s.cfg.VersionInfo, s.cache, hashCopy)
 		if err != nil {
 			if !errors.Is(err, store.ErrGoEmbedInput) {
-				if semanticErr := validateUnkeyedGoEmbedInputs(s.ws, job, s.commandParams); semanticErr != nil {
+				if semanticErr := cachekey.ValidateUnkeyedGoEmbedInputs(s.ws, job, s.commandParams); semanticErr != nil {
 					err = semanticErr
 				}
 			}
@@ -962,7 +963,7 @@ func (s *Scheduler) cacheLeaseWaitTimeout(job *ScheduledJob) time.Duration {
 //
 // Cache keys do not include the CLI version, so entries written before result
 // events were captured survive an upgrade with result.Data but no cached
-// result event. When the replayed set lacks one, synthesizeResultEvent rebuilds
+// result event. When the replayed set lacks one, cachekey.SynthesizeResultEvent rebuilds
 // it from the restored result so those legacy warm streams still carry
 // testSummary/coverageSummary and fold like a cold run — emitted last, matching
 // the order a cold subprocess streams its result event.
@@ -992,7 +993,7 @@ func (s *Scheduler) replayResultEvents(job *ScheduledJob, result *JobResult) {
 		s.renderer.JobEvent(job, ev)
 	}
 	if !sawResult {
-		if ev, ok := synthesizeResultEvent(result); ok {
+		if ev, ok := cachekey.SynthesizeResultEvent(result); ok {
 			s.renderer.JobEvent(job, ev)
 		}
 	}
@@ -1012,7 +1013,7 @@ func (s *Scheduler) refreshVersionFile(job *ScheduledJob) {
 	spawned := generateVersionFilesAtWithSourceBindings(
 		s.ws, []*ScheduledJob{job}, s.cfg.VersionInfo, s.versionBuildTime, false, s.capabilitySourceBindings,
 	)
-	s.cacheStats.recordLocalBindings(started, time.Now(), spawned)
+	s.cacheStats.RecordLocalBindings(started, time.Now(), spawned)
 }
 
 // restampRestoredVersionStamp puts THIS run's build stamp back after a cache hit
@@ -1062,7 +1063,7 @@ func (s *Scheduler) restampRestoredVersionStamp(job *ScheduledJob, entry *store.
 	spawned := generateVersionFilesAtWithSourceBindings(
 		s.ws, []*ScheduledJob{job}, s.cfg.VersionInfo, s.versionBuildTime, true, s.capabilitySourceBindings,
 	)
-	s.cacheStats.recordLocalBindings(started, time.Now(), spawned)
+	s.cacheStats.RecordLocalBindings(started, time.Now(), spawned)
 }
 
 // emitSessionJobEnd emits a session event for job completion.

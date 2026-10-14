@@ -19,6 +19,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -387,7 +388,7 @@ func runInteractiveExtensionCommand(
 	ws *workspace.Workspace,
 	job *jobs.ScheduledJob,
 	commandParams map[string]any,
-	versions jobs.RunVersions,
+	versions cachekey.RunVersions,
 	stdin io.Reader,
 	stdout, stderr io.Writer,
 ) int {

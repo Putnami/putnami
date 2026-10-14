@@ -21,6 +21,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -50,7 +51,7 @@ const custodyProviderName = "@fixture/cache"
 // configureRemoteCache writes the remote-cache configuration of wsRoot.
 func configureRemoteCache(t *testing.T, wsRoot string) {
 	t.Helper()
-	path := jobs.RemoteCacheConfigPath(wsRoot)
+	path := remotecache.RemoteCacheConfigPath(wsRoot)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +355,7 @@ func TestAHostedRunWhoseCacheProviderCannotStartRunsNoHook(t *testing.T) {
 func TestAHostedRunWhoseHookConfiguresTheCacheRecordsNoSession(t *testing.T) {
 	requireSh(t)
 	wsRoot, cfg := hostedCacheWorkspace(t)
-	configPath := jobs.RemoteCacheConfigPath(wsRoot)
+	configPath := remotecache.RemoteCacheConfigPath(wsRoot)
 	if err := os.Remove(configPath); err != nil {
 		t.Fatal(err)
 	}
@@ -440,7 +441,7 @@ func TestHostedRunRemoteCacheNeverStartsAProviderAfterRepositoryCode(t *testing.
 	req := &Request{WorkspaceRoot: wsRoot, Global: GlobalFlags{CacheTrust: string(store.CacheTrustAny)}}
 
 	t.Cleanup(runcredential.SetForTest("prc_engine_custody"))
-	started, _ := jobs.LoadRemoteCache(context.Background(), wsRoot, discovered.Extensions, nil, store.CacheTrustAny)
+	started, _ := remotecache.LoadRemoteCache(context.Background(), wsRoot, discovered.Extensions, nil, store.CacheTrustAny, launchCacheProvider)
 	if started == nil {
 		t.Fatal("the fixture configures no provider-backed remote cache")
 	}
@@ -473,5 +474,18 @@ func TestHostedRunRemoteCacheNeverStartsAProviderAfterRepositoryCode(t *testing.
 	if remote, err := hostedRunRemoteCache(context.Background(), req, ws, discovered, cm); remote != nil || err != nil {
 		remote.Close()
 		t.Errorf("without a run credential: hostedRunRemoteCache = %v, %v; want nothing", remote, err)
+	}
+}
+
+// A local-only run hands the scheduler a nil interface, not a nil pointer
+// wrapped in one; a remote cache reaches it unchanged.
+func TestSchedulerRemoteIsANilInterfaceForALocalRun(t *testing.T) {
+	t.Parallel()
+	if remote := schedulerRemote(nil); remote != nil {
+		t.Fatalf("schedulerRemote(nil) = %#v, want a nil interface", remote)
+	}
+	client := &remotecache.RemoteCache{}
+	if remote := schedulerRemote(client); remote != client {
+		t.Fatalf("schedulerRemote(client) = %#v, want the same client", remote)
 	}
 }

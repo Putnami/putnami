@@ -668,7 +668,7 @@ func reportCache(cache *jobs.CacheStatsSnapshot) *protocolcli.ReportCache {
 	}
 	hits := nonNegative64(cache.Hits)
 	// A restore promotes its key to a hit in the same reducer
-	// (jobs.CacheStats.recordProviderHit), so restored is a subset of hits by
+	// (cachekey.CacheStats.RecordProviderHit), so restored is a subset of hits by
 	// construction. The floor is the same guard nonNegative64 is: it keeps a
 	// counter that drifted from producing a document a consumer must reject.
 	restored := nonNegative64(cache.Restored)

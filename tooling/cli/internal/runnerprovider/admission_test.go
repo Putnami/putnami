@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	runner "go.putnami.dev/protocol/runner"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/runnersource"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -93,7 +93,7 @@ func TestGoEmbedSourceLinkReferentIsCapturedAndMaterialized(t *testing.T) {
 	if !slices.Contains(files, "app/.source.txt") || !slices.Contains(files, "app/assets/payload.sql") {
 		t.Fatalf("collector omitted source referent or embed payload: %v", files)
 	}
-	inputs := jobs.PortablePlanInputs{Tasks: []jobs.PortableTaskInputs{{Key: "/app:build~describe", Files: files}}}
+	inputs := cachekey.PortablePlanInputs{Tasks: []cachekey.PortableTaskInputs{{Key: "/app:build~describe", Files: files}}}
 	admission, err := AdmitInputs(context.Background(), root, inputs)
 	if err != nil || !slices.Equal(admission.Bound, []string{"app/.source.txt"}) {
 		t.Fatalf("source referent admission = %+v, %v", admission, err)
@@ -134,7 +134,7 @@ func TestGoEmbedSemanticInputsUnderLifecycleRootsMustTravelOrRefuse(t *testing.T
 			t.Fatal(err)
 		}
 	}
-	plan := func(t *testing.T, root string, outputs ...string) jobs.PortablePlanInputs {
+	plan := func(t *testing.T, root string, outputs ...string) cachekey.PortablePlanInputs {
 		t.Helper()
 		selection, err := store.CollectKeyFileSelection(filepath.Join(root, "app"), []string{"**/*.go", "go-embed:build"})
 		if err != nil {
@@ -151,7 +151,7 @@ func TestGoEmbedSemanticInputsUnderLifecycleRootsMustTravelOrRefuse(t *testing.T
 			}
 			return result
 		}
-		return jobs.PortablePlanInputs{Tasks: []jobs.PortableTaskInputs{{
+		return cachekey.PortablePlanInputs{Tasks: []cachekey.PortableTaskInputs{{
 			Key: "/app:build~describe", Files: relative(selection.Files), GoEmbedFiles: relative(selection.GoEmbed),
 		}}, Outputs: outputs}
 	}
@@ -280,7 +280,7 @@ func TestGoSourceAliasesSelectedByGoInputsCaptureTheirReferents(t *testing.T) {
 			if !slices.Contains(files, test.link) || !slices.Contains(semantic, "app/.source.txt") {
 				t.Fatalf("source alias or referent omitted: files=%v semantic=%v", files, semantic)
 			}
-			inputs := jobs.PortablePlanInputs{Tasks: []jobs.PortableTaskInputs{{Key: "/app:build~describe", Files: files, GoEmbedFiles: semantic}}}
+			inputs := cachekey.PortablePlanInputs{Tasks: []cachekey.PortableTaskInputs{{Key: "/app:build~describe", Files: files, GoEmbedFiles: semantic}}}
 			admission, err := AdmitInputs(context.Background(), root, inputs)
 			if err != nil || !slices.Contains(admission.Bound, "app/.source.txt") {
 				t.Fatalf("source alias admission = %+v, %v", admission, err)
@@ -325,7 +325,7 @@ func TestGoSourceAliasUnderIgnoredLifecycleRootMustBeTrackedOrRefused(t *testing
 	if err := os.Symlink("../.source.txt", link); err != nil {
 		t.Skipf("source-file symlinks unavailable: %v", err)
 	}
-	plan := func() jobs.PortablePlanInputs {
+	plan := func() cachekey.PortablePlanInputs {
 		t.Helper()
 		selection, err := store.CollectKeyFileSelection(filepath.Join(root, "app"), []string{"**/*.go", "go-embed:build"})
 		if err != nil {
@@ -342,7 +342,7 @@ func TestGoSourceAliasUnderIgnoredLifecycleRootMustBeTrackedOrRefused(t *testing
 			}
 			return names
 		}
-		return jobs.PortablePlanInputs{Tasks: []jobs.PortableTaskInputs{{
+		return cachekey.PortablePlanInputs{Tasks: []cachekey.PortableTaskInputs{{
 			Key: "/app:build~describe", Files: relative(selection.Files), GoEmbedFiles: relative(selection.GoEmbed),
 		}}}
 	}
@@ -384,8 +384,8 @@ func TestGoSourceAliasUnderIgnoredLifecycleRootMustBeTrackedOrRefused(t *testing
 func TestAdmitInputsBindsOnlyRequiredIgnoredFiles(t *testing.T) {
 	t.Parallel()
 	root := admissionRepo(t)
-	inputs := jobs.PortablePlanInputs{
-		Tasks: []jobs.PortableTaskInputs{
+	inputs := cachekey.PortablePlanInputs{
+		Tasks: []cachekey.PortableTaskInputs{
 			{Key: "/app:build~compile", Files: []string{"app/.gen/generated.txt", "app/conf/local.txt", "app/conf/new.txt", "app/conf/tracked.txt", "app/dist/bundle.js", "app/node_modules/dep.js"}},
 			{Key: "/app:test~run", Files: []string{".putnami/state.json", "app/conf/local.txt"}},
 		},
@@ -408,7 +408,7 @@ func TestAdmitInputsBindsOnlyRequiredIgnoredFiles(t *testing.T) {
 	if err != nil || strings.Join(admission.Bound, ",") != "app/conf/local.txt,app/dist/bundle.js" {
 		t.Fatalf("bound without outputs = %v (%v)", admission.Bound, err)
 	}
-	if empty, err := AdmitInputs(context.Background(), root, jobs.PortablePlanInputs{}); err != nil || empty.Bound != nil || empty.Unbound != nil {
+	if empty, err := AdmitInputs(context.Background(), root, cachekey.PortablePlanInputs{}); err != nil || empty.Bound != nil || empty.Unbound != nil {
 		t.Fatalf("an empty plan admitted %+v (%v)", empty, err)
 	}
 	if _, err := AdmitInputs(context.Background(), t.TempDir(), inputs); err == nil || errors.Is(err, ErrInadmissible) {
@@ -441,7 +441,7 @@ func TestAdmitInputsReportsFallbackInputsInsteadOfBindingThem(t *testing.T) {
 		}
 		fallback = append(fallback, name)
 	}
-	admission, err := AdmitInputs(context.Background(), root, jobs.PortablePlanInputs{Tasks: []jobs.PortableTaskInputs{
+	admission, err := AdmitInputs(context.Background(), root, cachekey.PortablePlanInputs{Tasks: []cachekey.PortableTaskInputs{
 		{Key: "/app:test~run", FallbackFiles: fallback},
 		{Key: "/app:build~compile", Files: []string{"app/conf/local.txt"}},
 	}})
@@ -482,7 +482,7 @@ func TestAdmitInputsReportsFallbackInputsInsteadOfBindingThem(t *testing.T) {
 func TestAdmitInputsRefusesWhatCannotTravel(t *testing.T) {
 	t.Parallel()
 	root := admissionRepo(t)
-	_, err := AdmitInputs(context.Background(), root, jobs.PortablePlanInputs{Tasks: []jobs.PortableTaskInputs{
+	_, err := AdmitInputs(context.Background(), root, cachekey.PortablePlanInputs{Tasks: []cachekey.PortableTaskInputs{
 		{Key: "/app:build~compile", Files: []string{"app/conf/local.txt"}},
 		{Key: "/app:test~run", Env: []string{"DATABASE_URL", "TARGET"}},
 	}})
@@ -491,7 +491,7 @@ func TestAdmitInputsRefusesWhatCannotTravel(t *testing.T) {
 	}
 	// A directory is never bound: paths only. The projection never names one,
 	// and a caller that does is refused with the task and the path.
-	_, err = AdmitInputs(context.Background(), root, jobs.PortablePlanInputs{Tasks: []jobs.PortableTaskInputs{
+	_, err = AdmitInputs(context.Background(), root, cachekey.PortablePlanInputs{Tasks: []cachekey.PortableTaskInputs{
 		{Key: "/app:build~compile", Files: []string{"app/dist"}},
 	}})
 	if !errors.Is(err, ErrInadmissible) || !strings.Contains(err.Error(), "/app:build~compile") || !strings.Contains(err.Error(), "app/dist") || !strings.Contains(err.Error(), "regular file or symlink") {
@@ -502,7 +502,7 @@ func TestAdmitInputsRefusesWhatCannotTravel(t *testing.T) {
 func TestVerifyAdmissionRefusesADivergentBoundSet(t *testing.T) {
 	t.Parallel()
 	root := admissionRepo(t)
-	inputs := jobs.PortablePlanInputs{Tasks: []jobs.PortableTaskInputs{
+	inputs := cachekey.PortablePlanInputs{Tasks: []cachekey.PortableTaskInputs{
 		{Key: "/app:build~compile", Files: []string{"app/.gen/generated.txt", "app/conf/local.txt", "app/conf/tracked.txt"}},
 	}}
 	if err := VerifyAdmission(root, []string{"app/conf/local.txt"}, inputs); err != nil {
@@ -526,12 +526,12 @@ func TestVerifyAdmissionRefusesADivergentBoundSet(t *testing.T) {
 	if err := VerifyAdmission(root, []string{"app/conf/local.txt"}, inputs); err == nil || !strings.Contains(err.Error(), "admitted inputs differ") {
 		t.Errorf("an absent bound input was accepted: %v", err)
 	}
-	if err := VerifyAdmission(root, nil, jobs.PortablePlanInputs{Tasks: []jobs.PortableTaskInputs{{Key: "/app:test~run", Env: []string{"TARGET"}}}}); !errors.Is(err, ErrInadmissible) {
+	if err := VerifyAdmission(root, nil, cachekey.PortablePlanInputs{Tasks: []cachekey.PortableTaskInputs{{Key: "/app:test~run", Env: []string{"TARGET"}}}}); !errors.Is(err, ErrInadmissible) {
 		t.Errorf("an env-keyed re-planned graph was accepted: %v", err)
 	}
 	// A path the executing tree only reaches through the whole-tree fallback
 	// is not a declaration, so it cannot admit a bound path here either.
-	fallbackOnly := jobs.PortablePlanInputs{Tasks: []jobs.PortableTaskInputs{{Key: "/app:test~run", FallbackFiles: []string{"app/conf/tracked.txt"}}}}
+	fallbackOnly := cachekey.PortablePlanInputs{Tasks: []cachekey.PortableTaskInputs{{Key: "/app:test~run", FallbackFiles: []string{"app/conf/tracked.txt"}}}}
 	if err := VerifyAdmission(root, []string{"app/conf/tracked.txt"}, fallbackOnly); err == nil || !strings.Contains(err.Error(), "not a declared input") {
 		t.Errorf("a fallback-only path admitted a bound input: %v", err)
 	}

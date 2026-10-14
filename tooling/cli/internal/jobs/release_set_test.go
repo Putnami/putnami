@@ -34,6 +34,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
 const testRevision = "8d5edb7513d93b9165ba2a7cb48466d022fc3f63"
@@ -1472,7 +1473,7 @@ func TestReleaseCandidateVersionMatchesPackageFallbackWhenMissing(t *testing.T) 
 	project := &workspace.Project{ID: "/library", Name: "@putnami/library", Type: "library", Metadata: releaseSetProjectMetadata(t, "npm", "@putnami/library")}
 	ws := workspace.NewWorkspace(t.TempDir(), &wsproto.Config{Name: "putnami"}, []*workspace.Project{project})
 	stamped := ReleaseSetOptions{Channels: []string{"canary"}, Impacted: true, Profiles: testProfiles(),
-		Versions: RunVersions{"": &JobContextVersion{Base: "0.0.0", Full: "0.0.0-next", Suffix: "next"}}}
+		Versions: cachekey.RunVersions{"": &cachekey.JobContextVersion{Base: "0.0.0", Full: "0.0.0-next", Suffix: "next"}}}
 	plan := buildTestPlan(t, stamped, ws, nil)
 	if got := plan.Members[0].Version; got != "0.0.0-next" {
 		t.Fatalf("candidate version = %q, want package fallback 0.0.0-next", got)
@@ -2293,10 +2294,10 @@ func prepareReleaseSet(
 // at the version its projects state. The fixtures put the version on the
 // projects because that is where a reader looks for it; the run resolves it per
 // LINE, so one entry answers for the whole fixture.
-func testRunVersions(ws *workspace.Workspace) RunVersions {
+func testRunVersions(ws *workspace.Workspace) cachekey.RunVersions {
 	for _, project := range ws.Projects {
 		if project != nil && project.Version != "" {
-			return RunVersions{"": &JobContextVersion{Base: project.Version, Full: project.Version}}
+			return cachekey.RunVersions{"": &cachekey.JobContextVersion{Base: project.Version, Full: project.Version}}
 		}
 	}
 	return nil
@@ -2587,8 +2588,8 @@ func taggedLineHead(t *testing.T) map[string]*distribution.ChannelHead {
 
 // taggedLineVersions is the run's versions for taggedLineWorkspace: the
 // typescript line is at its tag, the tooling line is an ordinary pre-release.
-func taggedLineVersions() RunVersions {
-	return RunVersions{
+func taggedLineVersions() cachekey.RunVersions {
+	return cachekey.RunVersions{
 		"typescript": {Base: "0.3.0", Full: "0.3.0", Tag: "ts/v0.3.0", Tagged: true, Line: "typescript"},
 		"tooling":    {Base: "0.2.1", Full: "0.2.1-20260904120000-abcdef1", Line: "tooling"},
 	}
@@ -2794,7 +2795,7 @@ func TestBuildReleaseSetOptionsReadsTheTagAndThePolicy(t *testing.T) {
 	// Two tagged lines at once: --scope names the one being released, and
 	// without it the publish is refused rather than guessing.
 	versions := taggedLineVersions()
-	versions["tooling"] = &JobContextVersion{Base: "0.3.0", Full: "0.3.0", Tag: "tooling/v0.3.0", Tagged: true, Line: "tooling"}
+	versions["tooling"] = &cachekey.JobContextVersion{Base: "0.3.0", Full: "0.3.0", Tag: "tooling/v0.3.0", Tagged: true, Line: "tooling"}
 	if _, err := BuildReleaseSetOptions(ReleaseSetRequest{
 		Commands: []string{"publish"}, WorkspaceRoot: root, Versions: versions,
 	}); err == nil || !errors.Is(err, protocolcli.ErrUsage) {
@@ -3048,7 +3049,7 @@ func TestReleaseSetBaselineChannelIsRefusedWhereItCannotBeRead(t *testing.T) {
 		{"all", withReleaseSetSelection(base, func(o *ReleaseSetOptions) { o.All = true }), true},
 		{"tagged", withReleaseSetSelection(base, func(o *ReleaseSetOptions) {
 			o.Impacted, o.Tagged = true, true
-			o.Versions = RunVersions{"": &JobContextVersion{Base: "1.0.0", Full: "1.0.0", Tagged: true, Tag: "v1.0.0"}}
+			o.Versions = cachekey.RunVersions{"": &cachekey.JobContextVersion{Base: "1.0.0", Full: "1.0.0", Tagged: true, Tag: "v1.0.0"}}
 		}), true},
 		{"no selection flag", base, true},
 		// No channel at all is not a release-set publication: the run falls to

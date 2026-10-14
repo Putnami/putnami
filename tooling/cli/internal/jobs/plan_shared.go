@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -21,7 +22,7 @@ import (
 // across an 11-project set, and the duplication costs ~8% of a clean run's
 // physical time. The cache
 // cannot collapse it: a task-owned entry is addressed partly by the JOB NAME
-// (`cacheTaskName`), so `test~describe` can never reach `build~describe`'s
+// (`cachekey.CacheTaskName`), so `test~describe` can never reach `build~describe`'s
 // entry no matter how identical the work is.
 //
 // The epic settled the mechanism (refinement decision F3): a plan-level SHARED
@@ -44,7 +45,7 @@ import (
 //     generate finished, deleting it outright when the suite fails. A shared
 //     node captures each member's entry from the tree as it stands when that
 //     member is served, so a subtree other tasks write into cannot be shared
-//     until that ownership violation is fixed. `writesProjectGen` is the gate.
+//     until that ownership violation is fixed. `cachekey.WritesProjectGen` is the gate.
 //   - Any step carrying literal `with:` bindings (`test`'s `mode: "test"`,
 //     `serve`/`run`'s `mode: "serve"`). Those bindings are inert today — the
 //     planner never merges them into task params — but a manifest that DECLARES
@@ -199,15 +200,15 @@ func executionIdentityParts(
 		"env=" + canonicalStrings(env),
 		"sideEffects=" + job.JobDef.Traits.SideEffects,
 		"timeout=" + strconv.Itoa(job.EffectiveTimeoutMs()),
-		"files=" + canonicalStrings(append(append([]string(nil), job.JobDef.FilePatterns...), projectFilePatterns(ws, job)...)),
-		"envInputs=" + canonicalStrings(projectEnvInputs(ws, job)),
+		"files=" + canonicalStrings(append(append([]string(nil), job.JobDef.FilePatterns...), cachekey.ProjectFilePatterns(ws, job)...)),
+		"envInputs=" + canonicalStrings(cachekey.ProjectEnvInputs(ws, job)),
 		"keyEnv=" + canonicalStrings(key.Env),
-		"runtime=" + canonicalStrings(taskRuntimeIdentity(job)),
+		"runtime=" + canonicalStrings(cachekey.TaskRuntimeIdentity(job)),
 		"closure=" + canonicalStrings(key.ClosureFiles),
-		"assets=" + canonicalStrings(generateAssetFiles(ws, job)),
+		"assets=" + canonicalStrings(cachekey.GenerateAssetFiles(ws, job)),
 		"writes=" + canonicalResourceRefs(job.Project.ID, job.JobDef.Writes),
 		"reads=" + canonicalResourceRefs(job.Project.ID, job.JobDef.Reads),
-		"selected=" + canonicalStrings(selectedProjectIDs(job.SelectedProjects)),
+		"selected=" + canonicalStrings(cachekey.SelectedProjectIDs(job.SelectedProjects)),
 		"params=" + canonicalDeclaredParams(ws, job, commandParams),
 	}
 }
@@ -318,7 +319,7 @@ func sharedProducerComparable(job *ScheduledJob) bool {
 	}
 	if job.Step.Task == "" || job.JobDef.ContractDigest == "" ||
 		job.JobDef.TaskCachePolicy == nil || job.JobDef.TaskCachePolicy.Key == nil ||
-		!taskIsDeterministic(job) || isFinalizerJob(job) ||
+		!cachekey.TaskIsDeterministic(job) || isFinalizerJob(job) ||
 		job.InvocationProducer != nil || job.Invocation != nil {
 		return false
 	}
@@ -358,7 +359,7 @@ func sharedExecutionEligible(job *ScheduledJob) bool {
 	// `cache.deterministic` is the manifest's own statement that identical
 	// inputs produce identical outputs — precisely the claim a shared node makes
 	// on the task's behalf.
-	if !taskIsDeterministic(job) {
+	if !cachekey.TaskIsDeterministic(job) {
 		return false
 	}
 	// A task that declares no write resource has side effects the planner cannot
@@ -370,7 +371,7 @@ func sharedExecutionEligible(job *ScheduledJob) bool {
 	// The project `gen` subtree is written by tasks that do not own it (the
 	// manifest says so, and the W2a audit measured the TypeScript instance), so a
 	// capture of it taken on another node's behalf is not that node's output.
-	if writesProjectGen(job) {
+	if cachekey.WritesProjectGen(job) {
 		return false
 	}
 	// A command-output directory resolves per command, so a leader never writes
@@ -423,7 +424,7 @@ func canonicalDeclaredParams(
 	if ws != nil && ws.Config != nil {
 		configDefaults = ws.Config.GetCommandDefaults(jobCommandName(job), job.Extension.Name)
 	}
-	resolved := resolvedJobParams(job, commandParams, configDefaults)
+	resolved := cachekey.ResolvedJobParams(job, commandParams, configDefaults)
 
 	names := make([]string, 0, len(namesSet))
 	for name := range namesSet {
@@ -434,7 +435,7 @@ func canonicalDeclaredParams(
 	for _, name := range names {
 		value, ok := resolved[name]
 		if !ok && strings.Contains(name, "-") {
-			value, ok = resolved[kebabToCamel(name)]
+			value, ok = resolved[cachekey.KebabToCamel(name)]
 		}
 		if !ok {
 			parts = append(parts, name+"=<absent>")

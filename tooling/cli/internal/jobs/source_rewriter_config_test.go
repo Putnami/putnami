@@ -7,6 +7,7 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
 // The two layouts of one project manifest. They decode to the same document,
@@ -64,7 +65,7 @@ func TestSourceRewriterDetectsProjectConfigReformat(t *testing.T) {
 			manifest := filepath.Join(f.ws.Root, tc.manifest)
 			writeFileAt(t, manifest, expandedManifest)
 
-			hash, err := computeJobCacheHash(f.ws, job, nil, nil, f.cache, nil)
+			hash, err := cachekey.ComputeJobCacheHash(f.ws, job, nil, nil, f.cache, nil)
 			if err != nil || hash == "" {
 				t.Fatalf("compute pre-format key: %q (err=%v)", hash, err)
 			}
@@ -103,7 +104,7 @@ func TestSourceRewriterKeysProjectConfigBytes(t *testing.T) {
 		t.Helper()
 		writeFileAt(t, manifest, body)
 		f.cache.InvalidateFileHashes()
-		hash, err := computeJobCacheHash(f.ws, rewriter, nil, nil, f.cache, nil)
+		hash, err := cachekey.ComputeJobCacheHash(f.ws, rewriter, nil, nil, f.cache, nil)
 		if err != nil || hash == "" {
 			t.Fatalf("compute rewriter key: %q (err=%v)", hash, err)
 		}
@@ -160,7 +161,7 @@ func TestProjectConfigKeyFollowsHowTheTaskReadsIt(t *testing.T) {
 		f.cache.InvalidateFileHashes()
 		out := make([]string, len(jobs))
 		for i, job := range jobs {
-			hash, err := computeJobCacheHash(f.ws, job, nil, nil, f.cache, nil)
+			hash, err := cachekey.ComputeJobCacheHash(f.ws, job, nil, nil, f.cache, nil)
 			if err != nil || hash == "" {
 				t.Fatalf("compute %s key: %q (err=%v)", job.JobDef.Name, hash, err)
 			}

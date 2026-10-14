@@ -11,6 +11,8 @@ import (
 	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -27,7 +29,7 @@ func driftJob(policy, path, port string) *ScheduledJob {
 	}
 	return declaredJob("build~generate", "generate", &extension.TaskDeclaration{
 		Outputs: map[string]extension.DeclaredOutput{"client": output},
-	}, extension.ResourceRef{ID: clientsResourceID, Scope: extension.ResourceScopeProject})
+	}, extension.ResourceRef{ID: remotecache.ClientsResourceID, Scope: extension.ResourceScopeProject})
 }
 
 // portResult is a successful result whose data reports one pathFrom port.
@@ -288,7 +290,7 @@ func TestDriftReferenceIsNeverACacheKeyInput(t *testing.T) {
 	}
 	hash := func(policy string) string {
 		t.Helper()
-		got, err := computeJobCacheHash(ws, newJob(policy), nil, nil, cache, nil)
+		got, err := cachekey.ComputeJobCacheHash(ws, newJob(policy), nil, nil, cache, nil)
 		if err != nil {
 			t.Fatalf("compute task cache key: %v", err)
 		}
@@ -374,7 +376,7 @@ func TestPreservedInstallTreeNeverReachesTheCapture(t *testing.T) {
 			Kind: extension.OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true,
 			Drift: extension.OutputDriftFail, Preserves: []string{"node_modules", "putnami.json"},
 		}},
-	}, extension.ResourceRef{ID: clientsResourceID, Scope: extension.ResourceScopeProject})
+	}, extension.ResourceRef{ID: remotecache.ClientsResourceID, Scope: extension.ResourceScopeProject})
 
 	f := newCaptureFixture(t, job)
 	dir := filepath.Join(f.ws.Root, captureTestProject, "clients", "ts")
@@ -456,7 +458,7 @@ func TestPreservedSubpathsAreNeitherCapturedRestoredNorJudged(t *testing.T) {
 			Kind: extension.OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true,
 			Drift: extension.OutputDriftFail, Preserves: []string{"putnami.json", "go.sum"},
 		}},
-	}, extension.ResourceRef{ID: clientsResourceID, Scope: extension.ResourceScopeProject})
+	}, extension.ResourceRef{ID: remotecache.ClientsResourceID, Scope: extension.ResourceScopeProject})
 
 	f := newCaptureFixture(t, job)
 	dir := filepath.Join(f.ws.Root, captureTestProject, "clients", "go")

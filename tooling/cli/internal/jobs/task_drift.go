@@ -57,6 +57,7 @@ import (
 
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -89,29 +90,12 @@ type driftReferenceEntry struct {
 	err        error
 }
 
-// policedOutputs returns the job's declared outputs carrying a drift policy, in
-// output-id order.
-func policedOutputs(job *ScheduledJob) []string {
-	declaration := taskDeclarationOf(job)
-	if declaration == nil {
-		return nil
-	}
-	var ids []string
-	for id, output := range declaration.Outputs {
-		if output.Drift != "" {
-			ids = append(ids, id)
-		}
-	}
-	sort.Strings(ids)
-	return ids
-}
-
 // snapshotExecutedDrift takes the reference for a task about to execute, or
 // returns nil when the task polices nothing. The root is resolved exactly as
-// declared capture resolves it (workspaceRoots.outputRoot), so the snapshot
+// declared capture resolves it (cachekey.WorkspaceRoots.OutputRoot), so the snapshot
 // and the capture agree about where the output lives.
 func (s *Scheduler) snapshotExecutedDrift(job *ScheduledJob) *driftReference {
-	ids := policedOutputs(job)
+	ids := cachekey.PolicedOutputs(job)
 	if len(ids) == 0 {
 		return nil
 	}
@@ -120,7 +104,7 @@ func (s *Scheduler) snapshotExecutedDrift(job *ScheduledJob) *driftReference {
 	reference := &driftReference{entries: make(map[string]driftReferenceEntry, len(ids))}
 	for _, id := range ids {
 		output := declaration.Outputs[id]
-		base, ok := roots.outputRoot(job, output.EffectiveRoot())
+		base, ok := roots.OutputRoot(job, output.EffectiveRoot())
 		if !ok {
 			reference.entries[id] = driftReferenceEntry{output: output, err: fmt.Errorf("unknown root %q", output.EffectiveRoot())}
 			continue
@@ -136,7 +120,7 @@ func (s *Scheduler) snapshotExecutedDrift(job *ScheduledJob) *driftReference {
 				entry.err = err
 			} else {
 				entry.base = filepath.Join(base, filepath.FromSlash(rel))
-				entry.tree, entry.err = walkDriftTree(entry.base, outputSkippedSubpaths(rel, output))
+				entry.tree, entry.err = walkDriftTree(entry.base, cachekey.OutputSkippedSubpaths(rel, output))
 			}
 		}
 		reference.entries[id] = entry
@@ -152,7 +136,7 @@ func (s *Scheduler) judgeExecutedDrift(job *ScheduledJob, result *JobResult, ref
 	if reference == nil || result == nil || result.Status != string(TaskStatusSuccess) {
 		return result
 	}
-	plans, err := resolveDeclaredOutputs(s.outputRoots(), job, result.Data)
+	plans, err := cachekey.ResolveDeclaredOutputs(s.outputRoots(), job, result.Data)
 	if err != nil {
 		slog.Warn("drift not judged: cannot resolve declared outputs",
 			"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
@@ -160,23 +144,23 @@ func (s *Scheduler) judgeExecutedDrift(job *ScheduledJob, result *JobResult, ref
 	}
 	appendedFrom := len(result.Events)
 	for _, plan := range plans {
-		entry, ok := reference.entries[plan.spec.ID]
+		entry, ok := reference.entries[plan.Spec.ID]
 		if !ok {
 			continue
 		}
-		before, ok := entry.referenceFor(plan.spec.Path, plan.excludes)
+		before, ok := entry.referenceFor(plan.Spec.Path, plan.Excludes)
 		if !ok {
 			slog.Warn("drift not judged: no reference for the resolved output path",
-				"project", job.Project.Name, "job", job.JobDef.Name, "output", plan.spec.ID, "path", plan.spec.Path, "error", entry.err)
+				"project", job.Project.Name, "job", job.JobDef.Name, "output", plan.Spec.ID, "path", plan.Spec.Path, "error", entry.err)
 			continue
 		}
-		after, err := walkDriftTree(plan.src, plan.excludes)
+		after, err := walkDriftTree(plan.Src, plan.Excludes)
 		if err != nil {
 			slog.Warn("drift not judged: cannot read the produced output",
-				"project", job.Project.Name, "job", job.JobDef.Name, "output", plan.spec.ID, "error", err)
+				"project", job.Project.Name, "job", job.JobDef.Name, "output", plan.Spec.ID, "error", err)
 			continue
 		}
-		result = s.applyDriftVerdict(job, result, entry.output, plan.spec.ID, plan.spec.Root, plan.spec.Path, compareDriftTrees(before, after))
+		result = s.applyDriftVerdict(job, result, entry.output, plan.Spec.ID, plan.Spec.Root, plan.Spec.Path, compareDriftTrees(before, after))
 	}
 	// A WARN verdict leaves the task successful, and the renderers print a
 	// successful task's diagnostics only as they stream; these were appended
@@ -196,7 +180,7 @@ func (s *Scheduler) judgeExecutedDrift(job *ScheduledJob, result *JobResult, ref
 // declaration polices drift, before the swap. The recorded path is known, so
 // no root-wide walk is needed on this path.
 func (s *Scheduler) snapshotRestoredDrift(job *ScheduledJob, entry *store.TaskEntry) *driftReference {
-	ids := policedOutputs(job)
+	ids := cachekey.PolicedOutputs(job)
 	if len(ids) == 0 || entry == nil {
 		return nil
 	}
@@ -208,7 +192,7 @@ func (s *Scheduler) snapshotRestoredDrift(job *ScheduledJob, entry *store.TaskEn
 		if !ok || declared.Drift == "" {
 			continue
 		}
-		base, ok := roots.outputRoot(job, output.Root)
+		base, ok := roots.OutputRoot(job, output.Root)
 		if !ok {
 			continue
 		}
@@ -269,7 +253,7 @@ func (s *Scheduler) judgeRestoredDrift(job *ScheduledJob, entry *store.TaskEntry
 // slash form). For a literal output the snapshot IS that tree; for a pathFrom
 // output it is the subtree of the root snapshot at rel, which exists only when
 // no segment of rel is one the walk skips. The root walk could not know the
-// output's skipped subpaths (outputSkippedSubpaths) before the path was
+// output's skipped subpaths (cachekey.OutputSkippedSubpaths) before the path was
 // reported, so they are dropped from the subtree here, exactly as the
 // after-walk skips them: a preserved project document is judged on neither
 // side.
@@ -316,11 +300,11 @@ func underSkippedSegment(rel string) bool {
 // skipDriftDir is the ONE walk rule both sides of a comparison apply to a
 // directory strictly below the walk root: repository and tool state
 // (dot-directories) and the content-probe exclusions every project walk in
-// this package refuses to descend into (projectWalkExcludedDirs: dependency
+// this package refuses to descend into (cachekey.ProjectWalkExcludedDirs: dependency
 // installs, vendored trees, build output) are never committed generated
 // output, and a generated client that contains one must not report it.
 func skipDriftDir(name string) bool {
-	return strings.HasPrefix(name, ".") || projectWalkExcludedDirs[name]
+	return strings.HasPrefix(name, ".") || cachekey.ProjectWalkExcludedDirs[name]
 }
 
 // walkDriftTree digests every regular file under root. A missing root is an
@@ -488,7 +472,7 @@ func (s *Scheduler) applyDriftVerdict(
 func driftOutputLocation(job *ScheduledJob, root, rel string) string {
 	switch root {
 	case extension.OutputRootProject:
-		return path.Join(filepath.ToSlash(projectRelPath(job)), rel)
+		return path.Join(filepath.ToSlash(cachekey.ProjectRelPath(job)), rel)
 	default:
 		return rel
 	}

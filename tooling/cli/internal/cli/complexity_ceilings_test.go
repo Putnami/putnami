@@ -84,8 +84,15 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  25,
-		funcs:  178,
-		why: "RAISED 177→178 (cli/job-planning-execution, spec-gate-records-an-empty-evaluation): " +
+		funcs:  180,
+		why: "RAISED 178→180 (the internal/jobs split): the remote cache client leaves internal/jobs " +
+			"and the scheduler reads it through the cachekey.RemoteCache interface, so the engine is " +
+			"where the client meets the runner. run_credential.go holds launchCacheProvider, the " +
+			"launcher the engine hands the remote cache loader so the client starts its provider the " +
+			"way the CLI starts every provider without importing the runner, and schedulerRemote, " +
+			"which hands a local-only run's scheduler a nil interface instead of a nil pointer inside " +
+			"one. They add no stage, flag or store; files stay at 25. " +
+			"RAISED 177→178 (cli/job-planning-execution, spec-gate-records-an-empty-evaluation): " +
 			"spec_gate.go adds validateProducerPlan.ApplicableProjects, the one seam that answers which " +
 			"selected projects a criteria-projection producer applies to. It plans through the existing " +
 			"planner and adds no run stage, scheduler or store. " +

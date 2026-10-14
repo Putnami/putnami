@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"time"
 
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -26,7 +27,7 @@ func RunJobInteractive(
 	ws *workspace.Workspace,
 	job *ScheduledJob,
 	commandParams, configDefaults map[string]any,
-	versions RunVersions,
+	versions cachekey.RunVersions,
 ) (*JobResult, error) {
 	return RunJobInteractiveWithStreams(
 		ctx, ws, job, commandParams, configDefaults, versions,
@@ -43,7 +44,7 @@ func RunJobInteractiveWithStreams(
 	ws *workspace.Workspace,
 	job *ScheduledJob,
 	commandParams, configDefaults map[string]any,
-	versions RunVersions,
+	versions cachekey.RunVersions,
 	stdin io.Reader,
 	stdout, stderr io.Writer,
 ) (*JobResult, error) {

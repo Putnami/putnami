@@ -14,6 +14,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -306,7 +307,7 @@ func TestScheduler_ProcessCapabilityEchoIsRedactedFromEveryPublishingSurface(t *
 		{name: "renderer", value: rendered},
 		{name: "job result", value: effectResult},
 		{name: "session", value: sessions},
-		{name: "cache", value: entryResultFromJobResult(effectResult)},
+		{name: "cache", value: cachekey.EntryResultFromJobResult(effectResult)},
 	}
 	for _, surface := range surfaces {
 		encoded, err := json.Marshal(surface.value)
@@ -363,7 +364,7 @@ func TestScheduler_ProcessCapabilityInJSONKeysFailsClosedWithoutPublishingTheKey
 		{name: "renderer", value: rendered},
 		{name: "job result", value: effectResult},
 		{name: "session", value: sessions},
-		{name: "cache", value: entryResultFromJobResult(effectResult)},
+		{name: "cache", value: cachekey.EntryResultFromJobResult(effectResult)},
 	} {
 		encoded, err := json.Marshal(surface.value)
 		if err != nil {
@@ -402,7 +403,7 @@ func TestProcessCapabilityBatchAggregateResultIsRedactedWithoutLiveSink(t *testi
 	}{
 		{name: "job result", value: got},
 		{name: "retained events", value: got.Events},
-		{name: "cache", value: entryResultFromJobResult(got)},
+		{name: "cache", value: cachekey.EntryResultFromJobResult(got)},
 	} {
 		encoded, err := json.Marshal(surface.value)
 		if err != nil {
@@ -1275,14 +1276,14 @@ func TestCapturedCloudCapabilityStaysOutOfAmbientPlanContextAndCacheKey(t *testi
 	cacheFor := func() *store.CacheManager {
 		return store.NewCacheManager(store.NewLocalStore(filepath.Join(t.TempDir(), "store")))
 	}
-	firstKey, err := computeJobCacheHash(ws, job, nil, nil, cacheFor(), nil)
+	firstKey, err := cachekey.ComputeJobCacheHash(ws, job, nil, nil, cacheFor(), nil)
 	if err != nil {
 		t.Fatalf("compute first cache key: %v", err)
 	}
 
 	const second = "second-private-cloud-capability"
 	secondCtx := capturedCapabilityContext(t, second, after)
-	secondKey, err := computeJobCacheHash(ws, job, nil, nil, cacheFor(), nil)
+	secondKey, err := cachekey.ComputeJobCacheHash(ws, job, nil, nil, cacheFor(), nil)
 	if err != nil {
 		t.Fatalf("compute second cache key: %v", err)
 	}

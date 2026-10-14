@@ -35,7 +35,7 @@
 //     producer never started. invocation_finalize.go owns the single claim, the
 //     two dispatch paths that fold through it, and the settlement.
 //   - CACHE IDENTITY FROM THE ACTION. A consumer's cache key folds in the
-//     PRODUCING ACTION's digest (executor.go), never the secret's content, so a
+//     PRODUCING ACTION's digest (cachekey/executor.go), never the secret's content, so a
 //     warm consumer is warm because its inputs are unchanged and not because a
 //     secret happened to repeat.
 //
@@ -56,6 +56,7 @@ import (
 	"sync"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -452,10 +453,10 @@ func (rt *invocationRuntime) isPruned(job *ScheduledJob, present func(consumer *
 // and malformed expressions keep the lifecycle: an optimization may waste work
 // when uncertain, but it must never swallow an imperative side effect.
 //
-// A consumer key a planned write may move (planKeyMovement) is only an
+// A consumer key a planned write may move (cachekey.PlanKeyMovement) is only an
 // estimate here: the consumer will look its entry up at the key it computes
 // when it starts. Such a relation is pruned only when every job that can move
-// that key finishes before the producer starts (settlesBefore), and the
+// that key finishes before the producer starts (cachekey.SettlesBefore), and the
 // producer confirms the decision then, from the keys the consumers compute at
 // that moment (isPruned). Otherwise it is not pruned: a consumer that
 // missed its entry would run against a resource nobody provisioned.
@@ -463,19 +464,19 @@ func (rt *invocationRuntime) prune(
 	ws *workspace.Workspace,
 	planned []*ScheduledJob,
 	commandParams map[string]any,
-	versions RunVersions,
+	versions cachekey.RunVersions,
 	cache *store.CacheManager,
-	bypass CacheBypass,
-	stats *CacheStats,
+	bypass cachekey.CacheBypass,
+	stats *cachekey.CacheStats,
 ) {
 	if rt == nil || cache == nil || bypass.All {
 		return
 	}
-	keys, err := PrecomputeKeys(ws, planned, commandParams, versions, cache, bypass, stats)
+	keys, err := cachekey.PrecomputeKeys(ws, planned, commandParams, versions, cache, bypass, stats)
 	if err != nil {
 		return
 	}
-	var movement *keyMovement
+	var movement *cachekey.KeyMovement
 	var byKey map[string]*ScheduledJob
 	for _, rel := range rt.relations {
 		allHit := len(rel.consumers) > 0
@@ -497,17 +498,17 @@ func (rt *invocationRuntime) prune(
 			}
 		}
 		if movement == nil {
-			decided := planKeyMovement(keyInputs{ws: ws, commandParams: commandParams}, planned)
+			decided := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: ws, CommandParams: commandParams}, planned)
 			movement = &decided
-			byKey = jobsByKey(planned)
+			byKey = cachekey.JobsByKey(planned)
 		}
 		recheck, settled := false, true
 		for _, consumer := range rel.consumers {
-			if !movement.moving[consumer.Key()] {
+			if !movement.Moving[consumer.Key()] {
 				continue
 			}
 			recheck = true
-			if !settlesBefore(rel.producer, consumer, *movement, byKey) {
+			if !cachekey.SettlesBefore(rel.producer, consumer, *movement, byKey) {
 				settled = false
 				break
 			}
@@ -525,6 +526,6 @@ func (rt *invocationRuntime) prune(
 // cachedEntryPresent reports whether the local store already holds the job's
 // entry at hash, using the same address the execution path would look it up at.
 func cachedEntryPresent(cache *store.CacheManager, job *ScheduledJob, hash string) bool {
-	present, err := CacheEntryPresent(cache, job, hash)
+	present, err := cachekey.CacheEntryPresent(cache, job, hash)
 	return err == nil && present
 }

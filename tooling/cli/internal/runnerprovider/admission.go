@@ -12,7 +12,7 @@ import (
 
 	runner "go.putnami.dev/protocol/runner"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/runnersource"
 )
 
@@ -85,7 +85,7 @@ const maxReportedUnbound = 5
 //
 // An env-keyed task is refused outright: the values never travel, so the
 // request could not describe the same execution.
-func AdmitInputs(ctx context.Context, wsRoot string, inputs jobs.PortablePlanInputs) (Admission, error) {
+func AdmitInputs(ctx context.Context, wsRoot string, inputs cachekey.PortablePlanInputs) (Admission, error) {
 	var admission Admission
 	if err := rejectAmbientEnvironment(inputs); err != nil {
 		return admission, err
@@ -128,7 +128,7 @@ func AdmitInputs(ctx context.Context, wsRoot string, inputs jobs.PortablePlanInp
 // admissionCandidates groups every candidate path by the tasks that select it,
 // separating an explicit declaration from the whole-tree fallback, and returns
 // the sorted union to ask Git about in one call.
-func admissionCandidates(inputs jobs.PortablePlanInputs) (declared, fallback map[string][]string, names []string) {
+func admissionCandidates(inputs cachekey.PortablePlanInputs) (declared, fallback map[string][]string, names []string) {
 	declared, fallback = map[string][]string{}, map[string][]string{}
 	seen := map[string]bool{}
 	add := func(into map[string][]string, name, task string) {
@@ -183,7 +183,7 @@ func (a Admission) ReportUnbound(w io.Writer) {
 // rejectAmbientEnvironment refuses a plan whose cacheable task keys on
 // environment values: the request stays credential-free and machine-free by
 // construction, so the only honest answer is to not submit it.
-func rejectAmbientEnvironment(inputs jobs.PortablePlanInputs) error {
+func rejectAmbientEnvironment(inputs cachekey.PortablePlanInputs) error {
 	for _, task := range inputs.Tasks {
 		if len(task.Env) > 0 {
 			return fmt.Errorf("%w: task %s keys on environment variable(s) %s, which never travel with a remote request; run it locally or declare the input as a file", ErrInadmissible, task.Key, strings.Join(task.Env, ", "))
@@ -238,7 +238,7 @@ func admissibleBoundPath(wsRoot, name string) error {
 // the snapshot, the plan or an extension diverged from what was admitted, and
 // nothing is scheduled — the same answer validateExpectedPlan gives a
 // divergent graph.
-func VerifyAdmission(wsRoot string, admitted []string, inputs jobs.PortablePlanInputs) error {
+func VerifyAdmission(wsRoot string, admitted []string, inputs cachekey.PortablePlanInputs) error {
 	if err := rejectAmbientEnvironment(inputs); err != nil {
 		return fmt.Errorf("the re-planned graph keys on ambient environment: %w", err)
 	}

@@ -14,6 +14,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
 // A directory junction inside a replaced module is refused by the digest and
@@ -29,10 +30,10 @@ func TestRuntimeReplacementJunctionIsRefusedByDigestAndStaging(t *testing.T) {
 
 	ext := runtimeTestExtension(extensionRoot)
 	ext.Runtime.Prepare.Inputs = append(ext.Runtime.Prepare.Inputs, "go.mod")
-	if _, err := extensionRuntimeDigest(ext); err == nil || !strings.Contains(err.Error(), want) {
+	if _, err := cachekey.ExtensionRuntimeDigest(ext); err == nil || !strings.Contains(err.Error(), want) {
 		t.Fatalf("digest error = %v, want a refusal containing %s", err, want)
 	}
-	inputs, err := collectRuntimeInputs(extensionRoot, ext.Runtime.Prepare.Inputs)
+	inputs, err := cachekey.CollectRuntimeInputs(extensionRoot, ext.Runtime.Prepare.Inputs)
 	if err != nil {
 		t.Fatal(err)
 	}
