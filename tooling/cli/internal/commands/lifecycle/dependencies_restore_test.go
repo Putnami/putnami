@@ -122,8 +122,8 @@ func checkDependencyRestore(t *testing.T, ws string, registry *dependencyGraphRe
 // dependency the lock does not pin is never resolved: each reports it with
 // its dependent.
 func TestRestoreAndReadPreparationFollowTheGraph(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "the-graph-loads", "restore-and-read-preparation-follow-the-graph")
-	spectest.Proves(t, dependenciesFeature, "the-graph-loads", "an-unpinned-dependency-is-never-resolved-implicitly")
+	spectest.Proves(t, dependenciesFeature, "restore-follows-the-lock", "restore-and-read-preparation-follow-the-graph")
+	spectest.Proves(t, dependenciesFeature, "restore-follows-the-lock", "an-unpinned-dependency-is-never-resolved-implicitly")
 	const unpinned = "@acme/app requires @acme/tool: putnami.lock.json does not pin it; run `putnami install`"
 
 	t.Run("read preparation", func(t *testing.T) {

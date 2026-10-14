@@ -376,7 +376,7 @@ func TestInstallingADependentInstallsAndPinsItsDependencies(t *testing.T) {
 // name installs once, as a root, and one it declares by a path whose manifest
 // has that name installs nothing.
 func TestASatisfiedDependencyInstallsNothing(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "install-resolves-the-graph", "a-satisfied-dependency-installs-nothing")
+	spectest.Proves(t, dependenciesFeature, "what-satisfies-a-dependency", "a-satisfied-dependency-installs-nothing")
 	r := newGraphRegistry(t)
 	r.publish("@acme/app", "1.0.0", `{"@acme/dev": "^1.0.0", "@acme/local": ""}`)
 	r.publish("@acme/dev", "1.1.0", "")
@@ -405,8 +405,8 @@ func TestASatisfiedDependencyInstallsNothing(t *testing.T) {
 // An install follows no edge of an extension that loads from node_modules,
 // unless the workspace declares its name and the lock pins it.
 func TestAnInstallFollowsNodeModulesEdgesOnlyForAPinnedDeclaredName(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "install-resolves-the-graph", "node-modules-edges-are-not-followed")
-	spectest.Proves(t, dependenciesFeature, "install-resolves-the-graph", "a-pinned-declared-name-is-followed-from-node-modules")
+	spectest.Proves(t, dependenciesFeature, "node-modules-edges", "node-modules-edges-are-not-followed")
+	spectest.Proves(t, dependenciesFeature, "node-modules-edges", "a-pinned-declared-name-is-followed-from-node-modules")
 	r := newGraphRegistry(t)
 	r.publish("@acme/app", "1.0.0", "")
 	r.publish("@acme/runtime", "1.0.0", "")
@@ -455,7 +455,7 @@ func TestAnInstallFollowsNodeModulesEdgesOnlyForAPinnedDeclaredName(t *testing.T
 // warning that names the global configuration; the graph resolves the
 // extension. A global key that names no member still installs.
 func TestAGlobalKeyForADependencyIsIgnoredByAnInstall(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "install-resolves-the-graph", "a-global-key-for-a-dependency-is-ignored")
+	spectest.Proves(t, dependenciesFeature, "what-satisfies-a-dependency", "a-global-key-for-a-dependency-is-ignored")
 	r := newGraphRegistry(t)
 	r.publish("@acme/app", "1.0.0", `{"@acme/dev": "^1.0.0"}`)
 	r.publish("@acme/dev", "1.0.0", "")
@@ -536,7 +536,7 @@ func TestASpecificInstallLeavesGlobalOnlyKeysAlone(t *testing.T) {
 // A locked dependency resolves from its lock entry while that version
 // satisfies every constraint.
 func TestALockedDependencyResolvesFromTheLock(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "dependency-resolution", "a-locked-dependency-resolves-from-the-lock")
+	spectest.Proves(t, dependenciesFeature, "the-lock-wins-while-it-satisfies-the-graph", "a-locked-dependency-resolves-from-the-lock")
 	r := newGraphRegistry(t)
 	r.publish("@acme/app", "1.0.0", `{"@acme/dev": "^1.0.0"}`)
 	r.publish("@acme/dev", "1.0.0", "")
@@ -557,7 +557,7 @@ func TestALockedDependencyResolvesFromTheLock(t *testing.T) {
 // Under an explicit channel, every dependency below the requested extension
 // resolves on that channel, at every hop, and no hop reads latest.
 func TestAChannelFlowsDownEveryHop(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "dependency-resolution", "a-channel-flows-down-every-hop")
+	spectest.Proves(t, dependenciesFeature, "an-explicit-channel-flows-down", "a-channel-flows-down-every-hop")
 	r := newGraphRegistry(t)
 	r.publish("@acme/app", "1.0.0", `{"@acme/dev": "^1.0.0"}`)
 	r.publish("@acme/app", "2.0.0", `{"@acme/dev": "^2.0.0"}`)
@@ -580,7 +580,7 @@ func TestAChannelFlowsDownEveryHop(t *testing.T) {
 // A version or a range on the command line is not a channel: the
 // dependencies resolve on their own constraints.
 func TestAVersionRequestIsNotAChannel(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "dependency-resolution", "a-version-request-is-not-a-channel")
+	spectest.Proves(t, dependenciesFeature, "an-explicit-channel-flows-down", "a-version-request-is-not-a-channel")
 	for _, request := range []string{"1.0.0", "^1.0.0"} {
 		r := newGraphRegistry(t)
 		r.publish("@acme/app", "1.0.0", `{"@acme/dev": "~1.1.0"}`)
@@ -600,7 +600,7 @@ func TestAVersionRequestIsNotAChannel(t *testing.T) {
 // the registry picks the highest match; an empty one, *, and latest resolve on
 // latest.
 func TestOnLatestARangeResolvesAsWritten(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "dependency-resolution", "on-latest-a-range-resolves-as-written")
+	spectest.Proves(t, dependenciesFeature, "an-explicit-channel-flows-down", "on-latest-a-range-resolves-as-written")
 	r := newGraphRegistry(t)
 	r.publish("@acme/app", "1.0.0", `{"@acme/ranged": "^1.0.0", "@acme/bare": "", "@acme/star": "*"}`)
 	for _, name := range []string{"@acme/ranged", "@acme/bare", "@acme/star"} {
@@ -624,7 +624,7 @@ func TestOnLatestARangeResolvesAsWritten(t *testing.T) {
 // extension's subgraph on that channel, whatever the lock holds, and leaves
 // the rest of the graph on the lock. --latest re-resolves the whole graph.
 func TestACommandLineChannelReResolvesTheSubgraph(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "dependency-resolution", "a-command-line-channel-re-resolves-the-subgraph")
+	spectest.Proves(t, dependenciesFeature, "the-lock-wins-while-it-satisfies-the-graph", "a-command-line-channel-re-resolves-the-subgraph")
 	r := newGraphRegistry(t)
 	r.publish("@acme/app", "1.0.0", `{"@acme/dev": ""}`)
 	r.publish("@acme/other", "1.0.0", `{"@acme/lib": ""}`)
@@ -663,7 +663,7 @@ func TestACommandLineChannelReResolvesTheSubgraph(t *testing.T) {
 // A locked version that misses a constraint resolves again, and the install
 // reports the move with the dependent.
 func TestAStaleLockEntryMovesToSatisfyTheGraph(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "dependency-resolution", "a-stale-lock-entry-moves-to-satisfy-the-graph")
+	spectest.Proves(t, dependenciesFeature, "the-lock-wins-while-it-satisfies-the-graph", "a-stale-lock-entry-moves-to-satisfy-the-graph")
 	r := newGraphRegistry(t)
 	r.publish("@acme/app", "1.0.0", `{"@acme/dev": "^1.0.0"}`)
 	r.publish("@acme/dev", "1.0.0", "")
@@ -700,7 +700,7 @@ func TestAStaleLockEntryMovesToSatisfyTheGraph(t *testing.T) {
 // dependency, its version and each dependent with its constraint. The lock is
 // not written.
 func TestAnUnmatchedRangeFailsNamingEachDependent(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "dependency-resolution", "an-unmatched-range-fails-naming-each-dependent")
+	spectest.Proves(t, dependenciesFeature, "an-unmet-range-fails", "an-unmatched-range-fails-naming-each-dependent")
 	r := newGraphRegistry(t)
 	r.publish("@acme/app", "1.0.0", `{"@acme/dev": "^2.0.0"}`)
 	r.publish("@acme/lint", "1.0.0", `{"@acme/dev": "^2.1.0"}`)
@@ -727,7 +727,7 @@ func TestAnUnmatchedRangeFailsNamingEachDependent(t *testing.T) {
 // fails a dependency whose dependent states a range; without a range it
 // installs.
 func TestAnUnversionedChannelAnswerFailsARange(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "dependency-resolution", "an-unversioned-channel-answer-fails-a-range")
+	spectest.Proves(t, dependenciesFeature, "an-unmet-range-fails", "an-unversioned-channel-answer-fails-a-range")
 	for _, tc := range []struct {
 		constraint string
 		fails      bool
@@ -759,7 +759,7 @@ func TestAnUnversionedChannelAnswerFailsARange(t *testing.T) {
 // A dependency the workspace declares by name satisfies the edge, and its
 // version is still checked against every dependent's constraint.
 func TestADeclaredDependencyIsCheckedAgainstItsDependents(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "dependency-resolution", "a-declared-dependency-is-checked-against-its-dependents")
+	spectest.Proves(t, dependenciesFeature, "an-unmet-range-fails", "a-declared-dependency-is-checked-against-its-dependents")
 	r := newGraphRegistry(t)
 	r.publish("@acme/app", "1.0.0", `{"@acme/dev": "^2.0.0"}`)
 	r.publish("@acme/dev", "1.0.0", "")
@@ -784,7 +784,7 @@ func TestADeclaredDependencyIsCheckedAgainstItsDependents(t *testing.T) {
 // of a level sort by name, so the first dependent by name picks the request,
 // and two runs give the same lock and the same report.
 func TestTheResolutionOrderIsLevelByLevel(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "dependency-resolution", "the-resolution-order-is-level-by-level")
+	spectest.Proves(t, dependenciesFeature, "the-order-is-deterministic", "the-resolution-order-is-level-by-level")
 	setup := func() (*graphRegistry, *wsproto.Config) {
 		r := newGraphRegistry(t)
 		r.publish("@acme/a", "1.0.0", `{"@acme/x": "", "@acme/y": "^1.0.0"}`)
@@ -835,7 +835,7 @@ func TestTheResolutionOrderIsLevelByLevel(t *testing.T) {
 // dependent outside the channel's subgraph reaches at an earlier level keeps
 // its request, and the channel only checks it.
 func TestAnExplicitChannelDependentPicksFirst(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "dependency-resolution", "an-explicit-channel-dependent-picks-first")
+	spectest.Proves(t, dependenciesFeature, "the-order-is-deterministic", "an-explicit-channel-dependent-picks-first")
 	r := newGraphRegistry(t)
 	r.publish("@acme/a", "1.0.0", `{"@acme/c": "^1.0.0"}`)
 	r.publish("@acme/z", "1.0.0", `{"@acme/c": ""}`)
@@ -884,7 +884,7 @@ func TestAnExplicitChannelDependentPicksFirst(t *testing.T) {
 // A constraint found at a later level than its target is only checked: a
 // match installs nothing more, and a miss fails naming every dependent.
 func TestALaterLevelConstraintIsOnlyChecked(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "dependency-resolution", "a-later-level-constraint-is-only-checked")
+	spectest.Proves(t, dependenciesFeature, "the-order-is-deterministic", "a-later-level-constraint-is-only-checked")
 	for _, tc := range []struct {
 		later string
 		fails bool
@@ -916,7 +916,7 @@ func TestALaterLevelConstraintIsOnlyChecked(t *testing.T) {
 // A cycle installs each extension once, and the declared root of a cycle is
 // not installed again as a dependency.
 func TestACycleInstallsEachExtensionOnce(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "dependency-resolution", "a-cycle-installs-each-extension-once")
+	spectest.Proves(t, dependenciesFeature, "the-order-is-deterministic", "a-cycle-installs-each-extension-once")
 	r := newGraphRegistry(t)
 	r.publish("@acme/a", "1.0.0", `{"@acme/b": ""}`)
 	r.publish("@acme/b", "1.0.0", `{"@acme/c": ""}`)
@@ -936,7 +936,7 @@ func TestACycleInstallsEachExtensionOnce(t *testing.T) {
 // An update re-resolves each dependency, writes its lock entry and reports it
 // with its dependent, and never writes it into the workspace file's pins.
 func TestUpdateReResolvesDependenciesWithoutPinningThem(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "update-remove-keep-the-graph-whole", "update-re-resolves-dependencies-without-pinning-them")
+	spectest.Proves(t, dependenciesFeature, "update-moves-the-graph", "update-re-resolves-dependencies-without-pinning-them")
 	r := newGraphRegistry(t)
 	r.publish("@acme/app", "1.0.0", `{"@acme/dev": "^1.0.0"}`)
 	r.publish("@acme/dev", "1.0.0", "")
@@ -1023,7 +1023,7 @@ func TestAnUpdateReportsItsFailuresByName(t *testing.T) {
 // A dry run previews the declared extensions only, says so, and resolves no
 // dependency.
 func TestDryRunPreviewsDeclaredExtensionsOnly(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "update-remove-keep-the-graph-whole", "dry-run-previews-declared-extensions-only")
+	spectest.Proves(t, dependenciesFeature, "update-moves-the-graph", "dry-run-previews-declared-extensions-only")
 	r := newGraphRegistry(t)
 	r.publish("@acme/app", "1.0.0", `{"@acme/dev": ""}`)
 	r.publish("@acme/dev", "1.0.0", "")
@@ -1058,7 +1058,7 @@ func runRemove(t *testing.T, r *graphRegistry, cfg *wsproto.Config, name string)
 // members on that path. Otherwise it removes the lock entry of the name and of
 // each dependency the remaining declarations no longer reach.
 func TestRemoveRefusesARequiredDependencyAndPrunesUnreachableOnes(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "update-remove-keep-the-graph-whole", "remove-refuses-a-required-dependency-and-prunes-unreachable-ones")
+	spectest.Proves(t, dependenciesFeature, "remove-keeps-the-graph-whole", "remove-refuses-a-required-dependency-and-prunes-unreachable-ones")
 	r := newGraphRegistry(t)
 	r.publish("@acme/app", "1.0.0", `{"@acme/dev": "", "@acme/only": "", "@acme/shared": ""}`)
 	r.publish("@acme/tool", "1.0.0", `{"@acme/shared": ""}`)
@@ -1106,7 +1106,7 @@ func TestRemoveRefusesARequiredDependencyAndPrunesUnreachableOnes(t *testing.T) 
 // The remaining roots of a remove are the declarations without the name, so
 // the declared root of a cycle can be removed, and the cycle with it.
 func TestTheRootOfACycleCanBeRemoved(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "update-remove-keep-the-graph-whole", "the-root-of-a-cycle-can-be-removed")
+	spectest.Proves(t, dependenciesFeature, "remove-keeps-the-graph-whole", "the-root-of-a-cycle-can-be-removed")
 	r := newGraphRegistry(t)
 	r.publish("@acme/a", "1.0.0", `{"@acme/b": ""}`)
 	r.publish("@acme/b", "1.0.0", `{"@acme/a": ""}`)
@@ -1123,7 +1123,7 @@ func TestTheRootOfACycleCanBeRemoved(t *testing.T) {
 // putnami extensions list shows each dependency with the extensions that
 // require it, and the reserved provider commands it does not serve.
 func TestListShowsTheRequiringExtension(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "update-remove-keep-the-graph-whole", "list-shows-the-requiring-extension")
+	spectest.Proves(t, dependenciesFeature, "update-moves-the-graph", "list-shows-the-requiring-extension")
 	spectest.Proves(t, dependenciesFeature, "a-dependency-serves-no-reserved-provider", "a-dependency-loses-reserved-provider-commands")
 	r := newGraphRegistry(t)
 	r.publish("@acme/app", "1.0.0", `{"@acme/dev": ""}`)
@@ -1215,7 +1215,7 @@ func mustLock(t *testing.T, ws string) *lockfile.LockFile {
 // lock does not pin: it reports the dependency with its dependent and
 // `putnami install`.
 func TestAnImplicitInstallNeverResolvesAnUnpinnedDependency(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "the-graph-loads", "an-unpinned-dependency-is-never-resolved-implicitly")
+	spectest.Proves(t, dependenciesFeature, "restore-follows-the-lock", "an-unpinned-dependency-is-never-resolved-implicitly")
 	r := newGraphRegistry(t)
 	r.publish("@acme/app", "1.0.0", `{"@acme/dev": ""}`)
 	r.publish("@acme/dev", "1.0.0", "")

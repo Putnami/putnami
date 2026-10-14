@@ -237,7 +237,7 @@ func TestADependencyThatDoesNotLoadNamesItsDependent(t *testing.T) {
 // the workspace declares its name and the lock pins it. Such a manifest loads
 // below rung 8, and a hook-only one loads with no stamp at all.
 func TestNodeModulesEdgesAreNotFollowed(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "install-resolves-the-graph", "node-modules-edges-are-not-followed")
+	spectest.Proves(t, dependenciesFeature, "node-modules-edges", "node-modules-edges-are-not-followed")
 	spectest.Proves(t, dependenciesFeature, "an-older-cli-refuses-a-dependent", "a-node-modules-manifest-loads-unstamped")
 	f := newGraphFixture(t)
 	writeExtensionManifest(t, installedPackageDir(f.ws, "@acme/web"), graphManifest("@acme/web", 4, `{"@acme/runtime": "^1.0.0"}`))
@@ -263,7 +263,7 @@ func TestNodeModulesEdgesAreNotFollowed(t *testing.T) {
 // A declared name the lock pins has its edges followed wherever discovery
 // finds it, node_modules included, and loads there without the rung.
 func TestAPinnedDeclaredNameIsFollowedFromNodeModules(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "install-resolves-the-graph", "a-pinned-declared-name-is-followed-from-node-modules")
+	spectest.Proves(t, dependenciesFeature, "node-modules-edges", "a-pinned-declared-name-is-followed-from-node-modules")
 	f := newGraphFixture(t)
 	writeExtensionManifest(t, installedPackageDir(f.ws, "@acme/web"), graphManifest("@acme/web", 4, `{"@acme/runtime": "^1.0.0"}`))
 	f.install(t, "@acme/runtime", graphManifest("@acme/runtime", 8, ""))
@@ -292,7 +292,7 @@ func TestAPinnedDeclaredNameIsFollowedFromNodeModules(t *testing.T) {
 // build is not installed the project does not load in its place, locally or
 // on a hosted run.
 func TestAProjectNeverReplacesADependencyBuild(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "install-resolves-the-graph", "a-project-never-replaces-a-dependency-build")
+	spectest.Proves(t, dependenciesFeature, "what-satisfies-a-dependency", "a-project-never-replaces-a-dependency-build")
 	f := newGraphFixture(t)
 	f.install(t, "@acme/app", graphManifest("@acme/app", 8, `{"@acme/dev": ""}`))
 	f.install(t, "@acme/dev", graphManifest("@acme/dev", 8, ""))
@@ -334,7 +334,7 @@ func TestAProjectNeverReplacesADependencyBuild(t *testing.T) {
 // reported with its dependent. A path declaration of that project satisfies
 // the dependency instead.
 func TestThePrePassSetsAsideAnUnpinnedDependencyName(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "install-resolves-the-graph", "the-pre-pass-sets-aside-an-unpinned-dependency-name")
+	spectest.Proves(t, dependenciesFeature, "what-satisfies-a-dependency", "the-pre-pass-sets-aside-an-unpinned-dependency-name")
 	f := newGraphFixture(t)
 	f.install(t, "@acme/app", graphManifest("@acme/app", 8, `{"@acme/dev": ""}`))
 	writeExtensionManifest(t, filepath.Join(f.ws, "tools", "dev"), graphManifest("@acme/dev", 8, ""))
@@ -364,7 +364,7 @@ func TestThePrePassSetsAsideAnUnpinnedDependencyName(t *testing.T) {
 // warning that names the global configuration: the dependency loads from its
 // lock pin, not from where the key would load it.
 func TestAGlobalKeyForADependencyIsIgnoredByDiscovery(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "install-resolves-the-graph", "a-global-key-for-a-dependency-is-ignored")
+	spectest.Proves(t, dependenciesFeature, "what-satisfies-a-dependency", "a-global-key-for-a-dependency-is-ignored")
 	f := newGraphFixture(t)
 	f.install(t, "@acme/app", graphManifest("@acme/app", 8, `{"@acme/dev": ""}`))
 	f.install(t, "@acme/dev", graphManifest("@acme/dev", 8, ""))
@@ -488,7 +488,7 @@ func TestADependentManifestRequiresContract8(t *testing.T) {
 // resolves through the lock pin, and a node_modules package of that name does
 // not shadow it. Without the dependent, the name is not declared.
 func TestAgentContentMayNameADependency(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "the-graph-loads", "agent-content-may-name-a-dependency")
+	spectest.Proves(t, dependenciesFeature, "agent-content-may-name-a-dependency", "agent-content-may-name-a-dependency")
 	f := newGraphFixture(t)
 	f.install(t, "@acme/app", graphManifest("@acme/app", 8, fmt.Sprintf(`{%q: ""}`, contentExtension)))
 	manifest := packagedContentManifest("1.2.0")
@@ -522,7 +522,7 @@ func TestAgentContentMayNameADependency(t *testing.T) {
 // semantic version, with or without a leading v, nor a range. Only a channel
 // other than latest is explicit.
 func TestChannelRequests(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "dependency-resolution", "a-version-request-is-not-a-channel")
+	spectest.Proves(t, dependenciesFeature, "an-explicit-channel-flows-down", "a-version-request-is-not-a-channel")
 	for request, want := range map[string][2]bool{
 		"canary":       {true, true},
 		"beta-2":       {true, true},

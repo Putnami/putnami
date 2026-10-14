@@ -18,23 +18,55 @@
   "requirements": [
     {
       "id": "install-resolves-the-graph",
-      "text": "putnami install, putnami extensions install and putnami init install from the registry every registry-named extension that an extension loaded from the artifact store or from a declared workspace path lists in extensionDependencies, transitively, and pin each one in putnami.lock.json as an ordinary extension entry. Only putnami.workspace.json satisfies a dependency, by name or by a path whose manifest has that name. A global-configuration key that names a graph member is ignored with one warning. An undeclared workspace project never satisfies or replaces a dependency, even when its build does not load. The edges of an extension loaded from node_modules are not followed, unless the workspace declares its name and the lock pins it. An undeclared project of a dependency's name is set aside whether or not the lock pins the dependency. putnami.workspace.json is never written for a dependency."
+      "text": "putnami install, putnami extensions install and putnami init install from the registry every registry-named extension that an extension loaded from the artifact store or from a declared workspace path lists in extensionDependencies, transitively, and pin each one in putnami.lock.json as an ordinary extension entry. putnami.workspace.json is never written for a dependency."
     },
     {
-      "id": "dependency-resolution",
-      "text": "An explicit channel (a --channel, PUTNAMI_CHANNEL or install record during init, or a name@channel argument, other than latest, in the portable alphabet and not a semantic version or range) flows down: every dependency below the requested extension resolves on it at every hop, and its own non-empty constraint is checked against the resolved version. Otherwise a non-empty constraint resolves as written, the registry picking the highest match, and an empty one on latest. A locked dependency resolves from its lock entry while it satisfies every constraint known when it resolves; an explicit channel on the command line re-resolves the requested subgraph, --latest and upgrade re-resolve the graph, and a locked version that misses a constraint resolves again with the move reported. A resolved version that misses a semantic-version range, or a channel answer with no resolved version when a range must be checked, fails the install naming the dependency, its version and each dependent with its constraint, also for a dependency the workspace declares by name. The graph resolves level by level, a dependent resolved under an explicit channel first, then dependents sorted by manifest name, then dependencies by name, whatever order the workers finish in; a node resolves once at its first level (a dependency reached earlier from outside a channel's subgraph keeps that request and the channel only checks it), a later-level constraint is only checked, and a cycle installs each extension once."
+      "id": "what-satisfies-a-dependency",
+      "text": "Only putnami.workspace.json satisfies a dependency, by name or by a path whose manifest has that name. A global-configuration key that names a graph member is ignored with one warning. An undeclared workspace project of a dependency's name is set aside, whether or not the lock pins the dependency, and never loads in its place."
+    },
+    {
+      "id": "node-modules-edges",
+      "text": "The edges of an extension loaded from node_modules are not followed, unless the workspace declares its name and the lock pins it."
+    },
+    {
+      "id": "an-explicit-channel-flows-down",
+      "text": "An explicit channel other than latest, from --channel, PUTNAMI_CHANNEL or the install record during init, or from a name@channel argument, flows down: every dependency below the requested extension resolves on it at every hop, and its own constraint is checked against the resolved version. A semantic version or a range is not a channel. Otherwise a non-empty constraint resolves as written and an empty one on latest."
+    },
+    {
+      "id": "the-lock-wins-while-it-satisfies-the-graph",
+      "text": "A locked dependency resolves from its lock entry while it satisfies every constraint known when it resolves. A channel named on the command line re-resolves the requested subgraph, --latest and putnami upgrade re-resolve the graph, and a locked version that misses a constraint resolves again and the move is reported."
+    },
+    {
+      "id": "an-unmet-range-fails",
+      "text": "A resolved version that misses a semantic-version range, or a channel answer without a resolved version when a range must be checked, fails the install. The error names the dependency, its version and each dependent with its constraint, also for a dependency the workspace declares by name."
+    },
+    {
+      "id": "the-order-is-deterministic",
+      "text": "The graph resolves level by level, whatever order the workers finish in: dependents resolved under an explicit channel first, then dependents by manifest name, then dependencies by name. A node resolves once, at its first level, and a dependency reached earlier from outside a channel's subgraph keeps its request. A later-level constraint is only checked, and a cycle installs each extension once."
     },
     {
       "id": "the-graph-loads",
-      "text": "Discovery loads every locked dependency of a loaded extension from the artifact store after the declared extensions and before the root package.json development dependencies, which skip a dependency name. The bootstrap restore and the MCP read preparation restore each locked dependency of a restored extension, and never resolve one the lock does not pin: they report it with its dependent and putnami install. Context generation, option ownership and the missing-extension check include dependencies. A dependency that does not load is reported with the extension that requires it. Removing the only dependent from the workspace stops loading the dependency. An agent-content opt-in may name any extension of the graph."
+      "text": "Discovery loads every locked dependency of a loaded extension from the artifact store, after the declared extensions and before the root package.json development dependencies, which skip a dependency name. Context generation, option ownership and the missing-extension check include dependencies. A dependency that does not load is reported with the extension that requires it, and removing its only dependent stops loading it."
+    },
+    {
+      "id": "restore-follows-the-lock",
+      "text": "The bootstrap restore and the MCP read preparation restore each locked dependency of a restored extension, and never resolve one the lock does not pin: they report it with its dependent and putnami install."
+    },
+    {
+      "id": "agent-content-may-name-a-dependency",
+      "text": "An agent-content opt-in may name any extension of the graph. Installing a dependency does not opt into its agent content."
     },
     {
       "id": "a-dependency-serves-no-reserved-provider",
       "text": "A dependency the workspace does not declare loses every reserved provider command: credential provider, cache provider, runner provider, session reporter, log reporter and Cloud release set. Discovery records each removal and putnami extensions list names it."
     },
     {
-      "id": "update-remove-keep-the-graph-whole",
-      "text": "putnami extensions update and putnami upgrade re-resolve every dependency with the dependency-resolution rule, write its lock entry and never write it into the workspace file's pins; update --dry-run previews the declared extensions only and says so. putnami extensions remove refuses when the name is still reachable from the workspace declarations without it, naming the members on that path, so the root of a cycle can be removed; otherwise it removes the lock entry of the name and of each dependency those declarations no longer reach. putnami extensions list shows each dependency with the extension that requires it."
+      "id": "update-moves-the-graph",
+      "text": "putnami extensions update and putnami upgrade re-resolve every dependency by the resolution rules, write its lock entry and never write it into the workspace file's pins. update --dry-run previews the declared extensions only, and says so. putnami extensions list shows each dependency with the extension that requires it."
+    },
+    {
+      "id": "remove-keeps-the-graph-whole",
+      "text": "putnami extensions remove refuses when the name is still reachable from the workspace declarations without it, and names the members on that path, so the root of a cycle can be removed. Otherwise it removes the lock entry of the name and of each dependency those declarations no longer reach."
     },
     {
       "id": "hosted-installs-the-locked-graph",
@@ -46,7 +78,11 @@
     },
     {
       "id": "an-older-cli-refuses-a-dependent",
-      "text": "A manifest whose extensionDependencies names a registry dependency requires CLI contract 8, ExtensionDependenciesContract. The Go archive packager stamps 8 on every extension it packages with such a list, and an extension that declares only hooks and dependencies takes the stamp without the strict requirement of a command, tool or agent content. The TypeScript npm packager leaves the list out of its stamp decision. The floor applies to a manifest loaded from the artifact store or a declared path, which a CLI below rung 8 refuses as requiring a newer putnami. A manifest loaded from node_modules, such as the published @putnami/web, keeps loading unstamped."
+      "text": "A manifest whose extensionDependencies names a registry dependency requires CLI contract 8, ExtensionDependenciesContract. A CLI below rung 8 refuses such a manifest loaded from the artifact store or a declared path as requiring a newer putnami. A manifest loaded from node_modules, such as the published @putnami/web, keeps loading unstamped."
+    },
+    {
+      "id": "the-packager-stamps-a-dependent",
+      "text": "The Go archive packager stamps contract 8 on every extension it packages with a registry dependency, and an extension that declares only hooks and dependencies takes the stamp without the strict requirement of a command, tool or agent content. The TypeScript npm packager leaves the list out of its stamp decision."
     }
   ],
   "decisions": [
