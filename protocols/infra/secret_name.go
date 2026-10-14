@@ -14,7 +14,9 @@ import (
 // "DB_PASSWORD" → "db_password"). Any other character the grammar rejects
 // becomes '_', leading separators are dropped, and the result is cut to 64
 // characters. The TypeScript runtime's canonicalSecretName applies the same
-// rule, so a field gets one requirement name in either language.
+// camelCase rule to a config path, so a camelCase field path gets one
+// requirement name in either language. It ignores env bindings, and it
+// refuses a path the grammar rejects instead of rewriting it.
 //
 // A requirement name is not a config key: the application reads the secret
 // at its config dot-path, and that is the key the secret is stored under.

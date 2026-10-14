@@ -31,10 +31,10 @@ the Config logic behind `config publish`, `config validate` and
   YAML, or diffs the committed `conf/env*.yaml` against the published config
   plane. `drift` exits non-zero on drift.
 - `putnami cloud secrets set | get | reveal | list | delete`: manages
-  workspace and project secrets. `set` reads the published schema first and
-  refuses a key no field declares; given a requirement name from
-  `infra/requirements.json`, such as `crm.api_key`, it names the config key,
-  `crm.apiKey`, that the application reads.
+  workspace and project secrets. `set` reads the published schema first. It
+  refuses a requirement name from `infra/requirements.json`, such as
+  `crm.api_key`, and names the config key, `crm.apiKey`, that the application
+  reads. It stores any other undeclared key with a warning.
 - `putnami cloud config publish`: outside a release set, the compatibility
   path that publishes a project's config and schema through `/api/configs` and
   `/api/schemas`. A release set is the immutable record of what one publishing
