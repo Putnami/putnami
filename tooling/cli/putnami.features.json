@@ -1364,7 +1364,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "every-pass-refuses-a-legacy-entry-and-names-the-migration",
+              "every-pass-refuses-a-legacy-entry",
               "install-and-upgrade-refuse-legacy-state-with-nothing-written"
             ]
           }
@@ -1531,42 +1531,7 @@
             "kind": "acceptance",
             "checks": [
               "a-clone-that-still-records-a-superseded-artifact-is-refused",
-              "a-clone-that-pulled-the-migration-converges-with-apply"
-            ]
-          }
-        },
-        {
-          "id": "agent-content-migration",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "check-lists-the-mechanical-and-the-semantic-change",
-              "apply-moves-declarations-pins-and-ownership",
-              "a-clone-without-records-adopts-only-identical-bytes",
-              "in-tree-artifacts-move-to-a-local-extension",
-              "a-backend-substitution-changes-no-content"
-            ]
-          }
-        },
-        {
-          "id": "agent-content-migration-safety",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "user-edits-block-or-are-released",
-              "duplicate-ownership-is-refused",
-              "a-stopped-migration-resumes-or-rolls-back",
-              "rollback-restores-the-previous-state",
-              "unsupported-releases-fail-clearly",
-              "concurrent-migrations-are-refused"
+              "deleting-the-record-hands-the-files-to-the-content"
             ]
           }
         },

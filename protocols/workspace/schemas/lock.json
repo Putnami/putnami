@@ -165,7 +165,7 @@
     },
     "agentArtifacts": {
       "type": "object",
-      "description": "Map of legacy agent-workflow artifact names to the exact, platform-independent pins earlier releases installed. A current CLI never adds one: `putnami migrate agent-content` removes them, and its rollback restores them.",
+      "description": "Map of legacy agent-workflow artifact names to the exact, platform-independent pins earlier releases installed. A current CLI never adds one, and `putnami upgrade` removes the pin of an artifact it retires.",
       "additionalProperties": {
         "type": "object",
         "required": ["version", "integrity", "manifestHash"],

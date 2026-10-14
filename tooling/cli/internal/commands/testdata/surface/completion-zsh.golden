@@ -77,7 +77,6 @@ _putnami_subcommands_for() {
             ;;
         'migrate')
             reply=(
-                'agent-content'
                 'vnext'
             )
             ;;
@@ -186,7 +185,6 @@ _putnami_path_known() {
         'mcp') return 0 ;;
         'mcp install') return 0 ;;
         'migrate') return 0 ;;
-        'migrate agent-content') return 0 ;;
         'migrate vnext') return 0 ;;
         'pin') return 0 ;;
         'projects') return 0 ;;
@@ -321,13 +319,6 @@ _putnami_flags_for() {
         'install')
             reply=(
                 '--latest[Ignore the lock file and resolve the latest extension and template versions]'
-            )
-            ;;
-        'migrate agent-content')
-            reply=(
-                '--apply[Perform the migration, or finish one that stopped]'
-                '--check[Plan the migration without writing (default); exits non-zero when a migration is pending]'
-                '--rollback[Restore the declarations, pins, ownership records and files recorded before the migration]'
             )
             ;;
         'migrate vnext')

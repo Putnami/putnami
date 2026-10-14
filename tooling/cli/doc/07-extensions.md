@@ -1101,7 +1101,7 @@ The top-level `version` field is the lock **format** version, and it is load-bea
 | `1` | Resolved versions, `integrity`/`integrities`, `manifestHash`, `source`. **No longer read** since 0.3.0. |
 | `2` | `taskContract` per entry — the task-contract protocol version the pinned extension's manifest declares (`2`, or `3` when any of its tasks carries a `declares` block). The current read floor. |
 | `3` | Top-level `toolchains` pins, plus `cli.protocolVersion` for machine-output preflight. Current writers pin Go, Bun and uv only; historical Node entries remain readable. |
-| `4` | Platform-independent `agentArtifacts` pins, which only `putnami migrate agent-content` reads and removes today. The current write default. |
+| `4` | Platform-independent `agentArtifacts` pins of separately declared agent workflows, which no current command adds. The current write default. |
 
 The read window is `[2, 4]`. Existing v2 and v3 locks remain readable; ordinary
 reads and writes preserve the recorded version. `putnami migrate vnext --apply`

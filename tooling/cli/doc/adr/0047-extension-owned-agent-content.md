@@ -1,6 +1,9 @@
 # ADR 0047 — An extension is the only way agent content is installed, and the extension's pin is its pin
 
-- **Status**: accepted
+- **Status**: accepted, amended by decision D-013 in the root
+  `decisions.json`: `putnami migrate agent-content` is deleted, so the
+  refusals in §2 name no command. They say which entry to replace or which
+  ownership record to delete.
 - **Scope**: `@putnami/cli` (`internal/commands/agentctx`, `internal/extension`,
   `internal/commands/lifecycle`), the `agentArtifacts` workspace declaration,
   the built-in starters

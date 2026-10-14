@@ -118,7 +118,6 @@ complete -c putnami -n '__putnami_complete_children extensions' -a 'remove'
 complete -c putnami -n '__putnami_complete_children extensions' -a 'update'
 complete -c putnami -n '__putnami_complete_children infra' -a 'plan'
 complete -c putnami -n '__putnami_complete_children mcp' -a 'install'
-complete -c putnami -n '__putnami_complete_children migrate' -a 'agent-content'
 complete -c putnami -n '__putnami_complete_children migrate' -a 'vnext'
 complete -c putnami -n '__putnami_complete_children projects' -a 'create'
 complete -c putnami -n '__putnami_complete_children projects' -a 'describe'
@@ -218,9 +217,6 @@ complete -c putnami -n '__putnami_seen_path init' -l 'project' -d 'Create an ini
 complete -c putnami -n '__putnami_seen_path init' -l 'project-path' -d 'Workspace-relative path for the initial project' -r
 complete -c putnami -n '__putnami_seen_path init' -l 'workspace' -d 'Workspace name override' -r
 complete -c putnami -n '__putnami_seen_path install' -l 'latest' -d 'Ignore the lock file and resolve the latest extension and template versions'
-complete -c putnami -n '__putnami_seen_path migrate agent-content' -l 'apply' -d 'Perform the migration, or finish one that stopped'
-complete -c putnami -n '__putnami_seen_path migrate agent-content' -l 'check' -d 'Plan the migration without writing (default); exits non-zero when a migration is pending'
-complete -c putnami -n '__putnami_seen_path migrate agent-content' -l 'rollback' -d 'Restore the declarations, pins, ownership records and files recorded before the migration'
 complete -c putnami -n '__putnami_seen_path migrate vnext' -l 'apply' -d 'Perform the migration, atomically and idempotently'
 complete -c putnami -n '__putnami_seen_path migrate vnext' -l 'check' -d 'Report the pending migration without writing (default); exits non-zero when a migration is needed'
 complete -c putnami -n '__putnami_seen_path pin' -l 'remove' -d 'Remove the CLI version pin'

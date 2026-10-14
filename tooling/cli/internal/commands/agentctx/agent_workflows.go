@@ -40,11 +40,10 @@ import (
 //
 // An entry in the forms earlier releases installed — a registry artifact
 // (`name` or `name:constraint`) or an in-tree project (`/path`) — is refused by
-// every pass with nothing written. `putnami migrate agent-content` is the only
-// reader of those entries (agent_content_legacy.go).
+// every pass with nothing written.
 
 // AgentArtifactRef names one owner of agent files: an `extension:<name>`
-// opt-in, or, inside the migration and the overlap checks, an ownership record.
+// opt-in, or, inside the overlap checks, an ownership record.
 type AgentArtifactRef struct {
 	// Name is the owner's identity. It also names the ownership record under
 	// .putnami/agent-artifacts/.
@@ -82,8 +81,7 @@ type preparedAgentArtifact struct {
 // workspace alone" rather than as an error.
 //
 // A repeated opt-in is dropped. An entry in a form this CLI no longer installs
-// fails the whole declaration and names the migration that moves it to an
-// extension, or the unfinished migration that must complete first.
+// fails the whole declaration.
 func DeclaredAgentArtifacts(wsRoot string, cfg *wsproto.Config) ([]AgentArtifactRef, error) {
 	if cfg == nil {
 		return nil, nil
@@ -111,12 +109,7 @@ func DeclaredAgentArtifacts(wsRoot string, cfg *wsproto.Config) ([]AgentArtifact
 		refs = append(refs, ref)
 	}
 	if len(legacy) > 0 {
-		// A migration that stopped partway leaves legacy entries behind; only
-		// finishing or rolling it back resolves that, so it is named first.
-		if err := requireNoUnfinishedAgentContentMigration(wsRoot); err != nil {
-			return nil, err
-		}
-		return nil, legacyAgentArtifactDeclarationsError(wsRoot, cfg, legacy)
+		return nil, legacyAgentArtifactDeclarationsError(legacy)
 	}
 	sort.Slice(refs, func(i, j int) bool { return refs[i].Name < refs[j].Name })
 	return refs, nil
@@ -196,9 +189,6 @@ func MaterializeLocalAgentContent(wsRoot string, cfg *wsproto.Config, out io.Wri
 	if len(refs) == 0 {
 		return false, nil
 	}
-	if err := requireNoUnfinishedAgentContentMigration(wsRoot); err != nil {
-		return false, err
-	}
 	prepared := make([]preparedAgentArtifact, 0, len(refs))
 	for _, ref := range refs {
 		local, err := localExtensionAgentContent(wsRoot, cfg, ref)
@@ -266,9 +256,6 @@ func InstallAgentWorkflowsWithResult(_ context.Context, wsRoot string, cfg *wspr
 	if len(refs) == 0 {
 		return nil, nil
 	}
-	if err := requireNoUnfinishedAgentContentMigration(wsRoot); err != nil {
-		return nil, err
-	}
 	prepared := make([]preparedAgentArtifact, 0, len(refs))
 	for _, ref := range refs {
 		// The extension's own pin was installed by the extensions phase; its
@@ -303,9 +290,6 @@ func InstallAgentWorkflowsWithResult(_ context.Context, wsRoot string, cfg *wspr
 func AdoptAgentWorkflows(_ context.Context, wsRoot string, cfg *wsproto.Config, out io.Writer) error {
 	refs, err := DeclaredAgentArtifacts(wsRoot, cfg)
 	if err != nil {
-		return err
-	}
-	if err := requireNoUnfinishedAgentContentMigration(wsRoot); err != nil {
 		return err
 	}
 	if len(refs) == 0 {
@@ -657,9 +641,6 @@ func EnsureAgentWorkflows(_ context.Context, wsRoot string, cfg *wsproto.Config)
 	if err != nil {
 		return err
 	}
-	if err := requireNoUnfinishedAgentContentMigration(wsRoot); err != nil {
-		return err
-	}
 	prepared := make([]preparedAgentArtifact, 0, len(refs))
 	for _, ref := range refs {
 		resolution, pinned, err := pinnedExtensionAgentContent(wsRoot, cfg, lf, ref)
@@ -726,9 +707,6 @@ func ReconcileAgentWorkflows(_ context.Context, wsRoot string, cfg *wsproto.Conf
 	}
 	lf, err := lockfile.ReadLockFile(wsRoot)
 	if err != nil {
-		return err
-	}
-	if err := requireNoUnfinishedAgentContentMigration(wsRoot); err != nil {
 		return err
 	}
 	var problems []error

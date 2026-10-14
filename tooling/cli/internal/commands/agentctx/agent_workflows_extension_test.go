@@ -59,13 +59,12 @@ func localContentConfig(rel, name string, entries ...string) *wsproto.Config {
 	}
 }
 
-// Every pass refuses a legacy entry with nothing written, names the migration,
-// and names the extension that supersedes it: a declared one whose content
-// says so, else the first-party successor, else a placeholder.
-func TestLegacyEntriesFailClearlyAndNameTheMigration(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "legacy-declarations-refused", "every-pass-refuses-a-legacy-entry-and-names-the-migration")
+// Every pass refuses a legacy entry with nothing written and says how to
+// replace it: there is no command that moves it any more.
+func TestLegacyEntriesFailClearly(t *testing.T) {
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "legacy-declarations-refused", "every-pass-refuses-a-legacy-entry")
 
-	t.Run("a declared local extension that supersedes it", func(t *testing.T) {
+	t.Run("beside an opt-in", func(t *testing.T) {
 		root := t.TempDir()
 		writePathFile(t, filepath.Join(root, "tools", "workflows"), "putnami.json", `{"name":"@local/workflows"}`)
 		writeLocalContentExtension(t, root, "/tools/contributor", "@local/contributor", "local-plan", "Body.\n", "@local/workflows")
@@ -83,11 +82,11 @@ func TestLegacyEntriesFailClearlyAndNameTheMigration(t *testing.T) {
 		}
 		for name, err := range passes {
 			if !errors.Is(err, protocolcli.ErrInvalidConfig) || !strings.Contains(err.Error(), `"/tools/workflows" in a form this CLI no longer installs`) ||
-				!strings.Contains(err.Error(), "Move the declarations, pins and ownership records to extension @local/contributor") {
+				!strings.Contains(err.Error(), "replace each entry with extension:<name>") {
 				t.Fatalf("%s error = %v, want the legacy entry refused", name, err)
 			}
-			if next := protocolcli.SuggestedNext(err); next != "putnami migrate agent-content @local/contributor" {
-				t.Fatalf("%s next step = %q", name, next)
+			if next := protocolcli.SuggestedNext(err); next != "" {
+				t.Fatalf("%s next step = %q, want none", name, next)
 			}
 		}
 		for _, host := range []string{".agents", ".claude", ".codex", ".putnami"} {
@@ -97,119 +96,27 @@ func TestLegacyEntriesFailClearlyAndNameTheMigration(t *testing.T) {
 		}
 	})
 
-	for name, tc := range map[string]struct {
-		extensions []string
-		entry      string
-		step, next string
-	}{
-		"a first-party artifact before its successor is declared": {
-			entry: "@putnami/agent-workflows:stable",
-			step:  "Declare extension @putnami/contributor in extensions, run `putnami install`",
-			next:  "putnami migrate agent-content @putnami/contributor",
-		},
-		"a first-party artifact whose successor is declared but not installed": {
-			extensions: []string{"@putnami/contributor"},
-			entry:      "@putnami/maintainer-workflows",
-			step:       "Run `putnami install` to install extension @putnami/contributor",
-			next:       "putnami migrate agent-content @putnami/contributor",
-		},
-		"a first-party in-tree artifact whose project is gone": {
-			entry: "/tooling/agent-workflows",
-			step:  "Declare extension @putnami/contributor in extensions, run `putnami install`",
-			next:  "putnami migrate agent-content @putnami/contributor",
-		},
-		"an artifact no known extension supersedes": {
-			entry: "@acme/workflows:1.2.x",
-			step:  "Declare the extension whose agent content supersedes them",
-			next:  "putnami migrate agent-content <extension>",
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			root := t.TempDir()
-			list := map[string]string{}
-			for _, ext := range tc.extensions {
-				list[ext] = ""
-			}
-			cfg := &wsproto.Config{Extensions: wsproto.ExtensionsConfig{List: list}, AgentArtifacts: []string{tc.entry}}
-			_, err := DeclaredAgentArtifacts(root, cfg)
-			if !errors.Is(err, protocolcli.ErrInvalidConfig) || !strings.Contains(err.Error(), fmt.Sprintf("%q", tc.entry)) || !strings.Contains(err.Error(), tc.step) {
-				t.Fatalf("error = %v, want %q refused with %q", err, tc.entry, tc.step)
-			}
-			if next := protocolcli.SuggestedNext(err); next != tc.next {
-				t.Fatalf("next step = %q, want %q", next, tc.next)
+	for _, entry := range []string{"@putnami/agent-workflows:stable", "@acme/workflows", "/tooling/agent-workflows"} {
+		t.Run(entry, func(t *testing.T) {
+			cfg := &wsproto.Config{AgentArtifacts: []string{entry}}
+			_, err := DeclaredAgentArtifacts(t.TempDir(), cfg)
+			if !errors.Is(err, protocolcli.ErrInvalidConfig) || !strings.Contains(err.Error(), fmt.Sprintf("%q", entry)) {
+				t.Fatalf("error = %v, want %q refused", err, entry)
 			}
 		})
 	}
 }
 
-func TestParseLegacyAgentArtifactNamesItsArtifact(t *testing.T) {
-	root := t.TempDir()
-	writePathFile(t, filepath.Join(root, "tools", "workflows"), "putnami.json", `{"name":"@local/workflows"}`)
-	writePathFile(t, filepath.Join(root, "tools", "nameless"), "putnami.json", `{}`)
-
-	for _, tc := range []struct{ declared, want string }{
-		{" /tools/workflows/ ", "@local/workflows"},
-		{"@putnami/agent-workflows:stable", "@putnami/agent-workflows"},
-		{"@putnami/agent-workflows", "@putnami/agent-workflows"},
-	} {
-		got, err := parseLegacyAgentArtifact(root, tc.declared)
-		if err != nil || got.Name != tc.want || got.Declared != strings.TrimSpace(tc.declared) {
-			t.Errorf("parseLegacyAgentArtifact(%q) = %+v, %v; want %s", tc.declared, got, err, tc.want)
-		}
-	}
-	for declared, want := range map[string]string{
-		"/../outside":      "leaves the workspace",
-		"/tools/../escape": "leaves the workspace",
-		"/":                "names the workspace root",
-		"/tools/missing":   "has no readable project config",
-		"/tools/nameless":  "declares no project name",
-		`/tools\workflows`: "must use / separators",
-		":stable":          "names no artifact",
-	} {
-		if _, err := parseLegacyAgentArtifact(root, declared); err == nil || !strings.Contains(err.Error(), want) {
-			t.Errorf("parseLegacyAgentArtifact(%q) error = %v, want %q", declared, err, want)
-		}
-	}
-}
-
-// An in-tree entry whose project is gone is named by the one candidate whose
-// unscoped name is the path's last segment, and by nothing else.
-func TestNameMissingLegacyProjectMatchesOneCandidateBySegment(t *testing.T) {
-	root := t.TempDir()
-	_, err := parseLegacyAgentArtifact(root, "/tooling/agent-workflows")
-	var missing *missingLegacyProjectError
-	if !errors.As(err, &missing) {
-		t.Fatalf("error = %v, want a missing project", err)
-	}
-	for _, tc := range []struct {
-		candidates []string
-		want       string
-	}{
-		{[]string{"@putnami/maintainer-workflows", "@putnami/agent-workflows"}, "@putnami/agent-workflows"},
-		{[]string{"agent-workflows"}, "agent-workflows"},
-		{[]string{"@putnami/agent-workflows", "@putnami/agent-workflows"}, "@putnami/agent-workflows"},
-		{[]string{"@putnami/agent-workflows", "@acme/agent-workflows"}, ""},
-		{[]string{"@putnami/workflows"}, ""},
-		{nil, ""},
-	} {
-		if got := nameMissingLegacyProject(missing, tc.candidates); got != tc.want {
-			t.Errorf("nameMissingLegacyProject(%v) = %q, want %q", tc.candidates, got, tc.want)
-		}
-	}
-}
-
-func TestAgentArtifactDeclarationNameNamesBothForms(t *testing.T) {
-	root := t.TempDir()
-	writePathFile(t, filepath.Join(root, "tools", "workflows"), "putnami.json", `{"name":"@local/workflows"}`)
+func TestAgentArtifactDeclarationNameNamesOptIns(t *testing.T) {
 	for _, tc := range []struct{ declared, want string }{
 		{"extension:@putnami/contributor", "@putnami/contributor"},
-		{"@putnami/agent-workflows:stable", "@putnami/agent-workflows"},
-		{"/tools/workflows", "@local/workflows"},
-		{"/tools/missing", ""},
+		{" extension:@putnami/contributor ", "@putnami/contributor"},
+		{"@putnami/agent-workflows:stable", ""},
+		{"/tools/workflows", ""},
 		{"extension:Not A Name", ""},
 		{"   ", ""},
 	} {
-		if got := AgentArtifactDeclarationName(root, tc.declared); got != tc.want {
+		if got := AgentArtifactDeclarationName(tc.declared); got != tc.want {
 			t.Errorf("AgentArtifactDeclarationName(%q) = %q, want %q", tc.declared, got, tc.want)
 		}
 	}

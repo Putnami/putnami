@@ -302,9 +302,6 @@ Run a workload's derived smoke contract against a target and emit one verdict.
 .TP
 .B migrate vnext
 Migrate putnami.lock.json to the current format.
-.TP
-.B migrate agent-content
-Move superseded agent artifacts to an extension's agent content.
 .SS Authoring
 .TP
 .B dev extension validate
@@ -837,21 +834,6 @@ Report the pending migration without writing (default); exits non-zero when a mi
 .TP
 .B --apply
 Perform the migration, atomically and idempotently.
-.SS migrate agent-content
-Check, apply or roll back the move of separately declared agent artifacts that an installed extension's agent content supersedes: their declarations, pins and ownership records move to the extension, and every file the content adds, changes or removes is listed before anything is written.
-.PP
-.B Usage:
-.br
-putnami migrate agent-content <extension> [--check] [--apply] [--rollback] [--output <format>]
-.TP
-.B --check
-Plan the migration without writing (default); exits non-zero when a migration is pending.
-.TP
-.B --apply
-Perform the migration, or finish one that stopped.
-.TP
-.B --rollback
-Restore the declarations, pins, ownership records and files recorded before the migration.
 .SS dev extension
 Develop extensions: validate manifests against the protocol.
 .PP

@@ -613,29 +613,6 @@
       "positionals": []
     },
     {
-      "path": "migrate agent-content",
-      "flags": [
-        {
-          "long": "--apply",
-          "type": "bool"
-        },
-        {
-          "long": "--check",
-          "type": "bool"
-        },
-        {
-          "long": "--rollback",
-          "type": "bool"
-        }
-      ],
-      "positionals": [
-        {
-          "name": "extension",
-          "required": true
-        }
-      ]
-    },
-    {
       "path": "migrate vnext",
       "flags": [
         {

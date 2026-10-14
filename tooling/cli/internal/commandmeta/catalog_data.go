@@ -1132,28 +1132,6 @@ var catalog = []Command{
 			Note: "cmdMigrate falls back to os.Getwd(): vnext migrates the lock file found at the workspace root or the current directory",
 		},
 	},
-	{
-		Path:        "migrate agent-content",
-		Kind:        KindStructured,
-		Category:    "Migration",
-		Summary:     "Move superseded agent artifacts to an extension's agent content",
-		Description: "Check, apply or roll back the move of separately declared agent artifacts that an installed extension's agent content supersedes: their declarations, pins and ownership records move to the extension, and every file the content adds, changes or removes is listed before anything is written",
-		Usage:       "putnami migrate agent-content <extension> [--check] [--apply] [--rollback] [--output <format>]",
-		Positionals: []Positional{{Name: "extension", Required: true}},
-		Flags: []Flag{
-			{Long: "--check", Description: "Plan the migration without writing (default); exits non-zero when a migration is pending"},
-			{Long: "--apply", Description: "Perform the migration, or finish one that stopped"},
-			{Long: "--rollback", Description: "Restore the declarations, pins, ownership records and files recorded before the migration"},
-		},
-		Examples: []string{
-			"putnami migrate agent-content @putnami/contributor",
-			"putnami migrate agent-content @putnami/contributor --apply",
-			"putnami migrate agent-content @putnami/contributor --rollback",
-		},
-		Related:          []string{"extensions install", "install", "upgrade"},
-		StructuredOutput: true,
-		Workspace:        requiredWorkspace(),
-	},
 
 	// ── Authoring ────────────────────────────────────────────────────────
 	{

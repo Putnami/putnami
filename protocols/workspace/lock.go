@@ -33,11 +33,10 @@ type Lock struct {
 	Extensions map[string]LockEntry          `json:"extensions"`
 	Templates  map[string]LockEntry          `json:"templates"`
 	// AgentArtifacts is v4 vocabulary: the pins of the legacy agent artifacts
-	// earlier releases installed. A current CLI never adds one; it reads them
-	// only to migrate them to extension content, and restores them only when
-	// that migration is rolled back. It uses a distinct entry type because
-	// agent workflows are platform-independent and every accepted pin must bind
-	// both the archive and its manifest.
+	// earlier releases installed. A current CLI never adds one, and removes
+	// the pin of an artifact `putnami upgrade` retires. It uses a distinct
+	// entry type because agent workflows are platform-independent and every
+	// accepted pin must bind both the archive and its manifest.
 	AgentArtifacts map[string]LockAgentArtifactEntry `json:"agentArtifacts,omitempty"`
 }
 

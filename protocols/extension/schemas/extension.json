@@ -151,7 +151,7 @@
             "type": "string",
             "pattern": "^(@[a-z0-9-]+/[a-z0-9-]+|[a-z0-9][a-z0-9-]*)$"
           },
-          "description": "Agent-artifact identities this content replaces: separately declared registry or in-tree artifacts whose workflows the extension now ships. A workspace that opts into this content while still declaring one of them is refused, and `putnami migrate agent-content` moves their declarations, pins and ownership records to this content. Never the extension's own name. Kept by the package step."
+          "description": "Agent-artifact identities this content replaces: separately declared registry or in-tree artifacts whose workflows the extension now ships. A workspace that opts into this content while still declaring, or still recording as installed, one of them is refused. Never the extension's own name. Kept by the package step."
         }
       },
       "oneOf": [

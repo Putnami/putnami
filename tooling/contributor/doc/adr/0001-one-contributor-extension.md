@@ -1,6 +1,9 @@
 # ADR 0001 — One contributor extension, configured by repository policy, publishing through the collaboration contracts
 
-- **Status**: accepted
+- **Status**: accepted, amended by decision D-013 in the root
+  `decisions.json`: `putnami migrate agent-content` is deleted. A clone that
+  still holds ownership records of the superseded artifacts deletes the
+  records its install refusal names.
 - **Scope**: `@putnami/contributor` (`tooling/contributor`), this repository's
   `putnami.workspace.json`, the generated `.agents/`, `.claude/` and `.codex/`
   trees

@@ -129,13 +129,11 @@ The content owns only the manifest paths and byte digests it recorded; an
 unrecorded or locally modified file is preserved as a collision.
 
 A workspace that still declares workflows as a separate artifact, such as
-`@putnami/agent-workflows`, is refused by every command, which names the one
-that moves it:
-
-```bash
-./putnamiw migrate agent-content @putnami/contributor           # review
-./putnamiw migrate agent-content @putnami/contributor --apply   # move
-```
+`@putnami/agent-workflows`, is refused by every command with nothing written.
+Replace that entry with `extension:@putnami/contributor`, declare the
+extension, delete the ownership records the refusal names, and run
+`./putnamiw install`. A file that differs from the content is a collision
+that writes nothing: move or delete it, then rerun.
 
 ## Reach the MCP server
 

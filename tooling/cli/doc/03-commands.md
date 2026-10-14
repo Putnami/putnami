@@ -404,7 +404,7 @@ putnami install
 
 When `putnami.workspace.json` opts into an extension's agent content (`extension:<name>` in `agentArtifacts`), `install` materializes it **from the extension release the committed lock pins**. It resolves nothing for the content and never rewrites the lock for it, so a clone and a CI runner reproduce exactly the files the lock describes. For an npm extension the root `package.json` declares in `devDependencies`, the content comes from the package the package manager installs into `node_modules`, so `install` materializes it after the workspace installers ran.
 
-Content whose bytes do not match the extension's pin, or a file you own that the content would overwrite, fails the command with a non-zero exit and leaves your files unchanged. A separately declared artifact (`name`, `name:channel` or `/path`) is refused with nothing written and names `putnami migrate agent-content <extension>`. A workspace that declares no `agentArtifacts` skips the phase entirely. See [Agent Workflows](18-agent-workflows.md#lifecycle-init-install-upgrade).
+Content whose bytes do not match the extension's pin, or a file you own that the content would overwrite, fails the command with a non-zero exit and leaves your files unchanged. A separately declared artifact (`name`, `name:channel` or `/path`) is refused with nothing written and says to replace it with an `extension:<name>` entry. A workspace that declares no `agentArtifacts` skips the phase entirely. See [Agent Workflows](18-agent-workflows.md#lifecycle-init-install-upgrade).
 
 #### Private registries: credentials at install time
 
@@ -1230,26 +1230,6 @@ Since 0.3.0 every other command **refuses** a v1 lock, so this is the command th
 - `--check` (the default) writes nothing. It exits `0` when the lock is already migrated and `2` when a migration is pending, so CI can gate on it. `--output=json` emits the plan in the standard result envelope.
 - `--apply` performs the conversion atomically (temp file + rename) and is idempotent — running it twice leaves identical bytes.
 - A pinned extension that is not installed cannot have its contract read, so it is reported under "Not recorded" and left alone rather than guessed at. Install it and re-run to record it.
-
-```bash
-putnami migrate agent-content @acme/contributor              # Plan the move (read-only)
-putnami migrate agent-content @acme/contributor --apply      # Perform or finish it
-putnami migrate agent-content @acme/contributor --rollback   # Restore the previous state
-```
-
-`agent-content` moves the separately declared agent artifacts that an installed extension's content supersedes (`agentContent.supersedes`) to that content. No other command installs or reads those artifacts, and every agent-content command refuses them until they move:
-
-- their `agentArtifacts` entries become one `extension:<name>` entry;
-- their pins leave the lock;
-- their ownership records merge into the extension's record.
-
-It never resolves or downloads anything: the extension must already be installed at a pinned release, or be declared by path. A clone without ownership records hands over no ownership, so the content adopts only files already identical to what it ships.
-
-- `--check` (the default) writes nothing. It lists what moves and every file the content adds, changes, removes or releases. It exits `2` while a migration is pending. `--output=json` emits the report in the standard result envelope.
-- `--apply` plans everything first and writes only when the plan has no blocking file. It keeps a journal under `.putnami/agent-content-migrations/`, so a rerun finishes a migration that stopped.
-- `--rollback` restores the previous declarations, pins, ownership records and files from that journal. It refuses rather than overwrite a change made since. A completed journal stays as the rollback point, so a second migration to the same extension is refused until you roll the first back or remove its journal directory.
-
-See [agent workflows](18-agent-workflows.md#migrating-separate-artifacts-to-an-extensions-content).
 
 ### `dev`
 

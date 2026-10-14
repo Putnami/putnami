@@ -134,8 +134,7 @@ type LockFile struct {
 	Templates map[string]LockEntry `json:"templates"`
 	// AgentArtifacts maps legacy agent-workflow artifact names to the exact,
 	// platform-independent v4 pins earlier releases installed. Nothing adds
-	// one: `putnami migrate agent-content` reads and removes them, and its
-	// rollback restores them.
+	// one: `putnami upgrade` removes the pin of an artifact it retires.
 	AgentArtifacts map[string]AgentArtifactLockEntry `json:"agentArtifacts,omitempty"`
 }
 
@@ -798,10 +797,10 @@ func (lf *LockFile) GetAgentArtifact(name string) (AgentArtifactLockEntry, bool)
 	return entry, ok
 }
 
-// SetAgentArtifact adds or updates a legacy agent-workflow artifact pin: the
-// rollback of an agent-content migration restores one. Callers migrating an
-// older lock must invoke MigrateLockFileToCurrent first; an older format's
-// canonical projection deliberately omits this v4-only vocabulary.
+// SetAgentArtifact adds or updates a legacy agent-workflow artifact pin. No
+// command adds one; it reproduces the lock an earlier release wrote. Callers
+// migrating an older lock must invoke MigrateLockFileToCurrent first; an older
+// format's canonical projection deliberately omits this v4-only vocabulary.
 func (lf *LockFile) SetAgentArtifact(name string, entry AgentArtifactLockEntry) {
 	if lf.AgentArtifacts == nil {
 		lf.AgentArtifacts = make(map[string]AgentArtifactLockEntry)

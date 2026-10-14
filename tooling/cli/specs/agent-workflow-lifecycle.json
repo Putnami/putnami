@@ -11,7 +11,7 @@
     "A v2 or v3 workspace can explicitly migrate its lock to v4",
     "A workspace that opts into an extension's agent content receives the instructions of exactly the extension version it installed",
     "A workspace that installs an extension from npm receives its agent content from the same installed package as its commands and tools",
-    "A workspace that still declares its workflows as separate artifacts is refused and told the one command that moves them to the extension that supersedes them, a step it can review, resume and roll back"
+    "A workspace that still declares or records its workflows as separate artifacts is refused with nothing written and told what to replace or delete"
   ],
   "nonGoals": [
     "A force-overwrite flag, or any other way to discard a user-owned file",
@@ -28,7 +28,7 @@
     },
     {
       "id": "legacy-declarations-refused",
-      "text": "An agentArtifacts entry in a form earlier releases installed, a registry artifact (`name` or `name:channel`) or an in-tree project path (`/path`), is never installed: every agent-content command refuses it with nothing written and names `putnami migrate agent-content` with the extension whose content supersedes it."
+      "text": "An agentArtifacts entry in a form earlier releases installed, a registry artifact (`name` or `name:channel`) or an in-tree project path (`/path`), is never installed: every agent-content command refuses it with nothing written and says to replace it with an `extension:<name>` entry for the extension whose content supersedes it."
     },
     {
       "id": "record-last",
@@ -76,15 +76,7 @@
     },
     {
       "id": "superseded-owners-refused",
-      "text": "While a workspace opts into an extension's agent content, every agent-content command refuses it when this clone still records an artifact that content supersedes (agentContent.supersedes), writes nothing and names `putnami migrate agent-content <extension> --apply`; that one command moves the records to the extension, keeps every file the user edited, and leaves one owner."
-    },
-    {
-      "id": "agent-content-migration",
-      "text": "`putnami migrate agent-content <extension>` moves the legacy artifacts an installed extension's content supersedes to it: their entries become one `extension:<name>` entry, their pins leave the lock and their ownership records merge into the extension's record, with nothing resolved or downloaded. A clone without records hands over no ownership. The check writes nothing and lists every file the content adds, changes, removes or releases."
-    },
-    {
-      "id": "agent-content-migration-safety",
-      "text": "A migration is planned in full before its first write: an edited file the content still ships, or a path two owners record with different bytes, blocks it with zero writes. A journal records every piece's before and after state; a stopped migration resumes on rerun, `--rollback` restores the previous declarations, pins, ownership records and files, and a concurrent run is refused. A completed journal stays the rollback point: a new migration to that extension is refused until it is rolled back."
+      "text": "While a workspace opts into an extension's agent content, every agent-content command refuses it when this clone still records an artifact that content supersedes (agentContent.supersedes), writes nothing and names each ownership record to delete. With those records deleted, the next run keeps every file that already has the content's bytes and reports every other one as a collision."
     },
     {
       "id": "starter-opts-into-contributor",
@@ -95,7 +87,6 @@
     "tooling/cli/doc/adr/0004-agent-artifact-ownership.md",
     "tooling/cli/doc/adr/0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md",
     "tooling/cli/doc/adr/0047-extension-owned-agent-content.md",
-    "tooling/cli/doc/adr/0048-migrating-agent-artifacts-to-extension-content.md",
     "protocols/extension/doc/adr/0006-agent-content-is-an-additive-contract.md"
   ]
 }

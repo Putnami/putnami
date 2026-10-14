@@ -10,19 +10,16 @@ declares it and opts into its content, and this repository opts into it too.
 Workflows declared as separate artifacts — a registry reference such as
 `@putnami/agent-workflows:stable` or an in-tree project path such as
 `/tooling/agent-workflows` — are no longer installed. Every command refuses
-them, writes nothing, and names `putnami migrate agent-content`, which moves
-them to the extension whose content supersedes them. See
-[Migrating separate artifacts](#migrating-separate-artifacts-to-an-extensions-content).
+them and writes nothing. See
+[Replacing separate artifacts](#replacing-separate-artifacts-with-an-extensions-content).
 
 The materializer lives in `internal/agentartifacts`, and `init`, `install`,
-`upgrade` and `context generate` drive it. Three documents split the
+`upgrade` and `context generate` drive it. Two documents split the
 responsibility: [ADR 0004](adr/0004-agent-artifact-ownership.md) decides what
-happens to a file that already exists,
+happens to a file that already exists, and
 [ADR 0047](adr/0047-extension-owned-agent-content.md) decides who asks, where
 the version comes from, and that an extension is the only way agent content is
-installed, and
-[ADR 0048](adr/0048-migrating-agent-artifacts-to-extension-content.md) moves a
-workspace off separately declared artifacts.
+installed.
 
 ## The three onboarding layers
 
@@ -148,112 +145,49 @@ copy is preserved and blocks the run like any other managed file. The Putnami
 repository works this way: it edits `tooling/contributor/src`, runs
 `./putnamiw context generate`, and commits both.
 
-### Migrating separate artifacts to an extension's content
+### Replacing separate artifacts with an extension's content
 
 An extension's content replaces workflows installed as separate artifacts when
 its manifest names them in `agentContent.supersedes`; `@putnami/contributor`
 supersedes `@putnami/agent-workflows` and `@putnami/maintainer-workflows`. This
 CLI never installs a separately declared artifact: every command refuses the
-declaration with nothing written and names the migration. Every command also
-refuses an `extension:` opt-in while this clone still records an artifact the
-content supersedes, because two ownership records would claim the same files.
+declaration with nothing written. Every command also refuses an `extension:`
+opt-in while this clone still records an artifact the content supersedes,
+because two ownership records would claim the same files. No command moves
+them for you: `putnami migrate agent-content` is deleted (decision D-013).
 
-To migrate:
+To replace them:
 
-1. Declare the extension in `extensions` in `putnami.workspace.json` and
-   install it. `putnami install` pins it at an exact release; the migration
-   itself never resolves or downloads anything. The install fails at its agent
-   step while the old declarations remain — that failure names the next step.
+1. In `putnami.workspace.json`, declare the extension in `extensions`, and
+   replace the separately declared `agentArtifacts` entries with one
+   `extension:<name>` entry, such as `extension:@putnami/contributor`. Delete
+   their pins under `agentArtifacts` in `putnami.lock.json`.
+2. Delete the ownership record of each superseded artifact. The refusal names
+   each one, for example
+   `.putnami/agent-artifacts/putnami-agent-workflows.json`.
+3. Install the extension and its content:
 
    ```bash
    putnami install
    ```
 
-2. Review the plan. Nothing is written, and the command exits 2 while a
-   migration is pending.
-
-   ```bash
-   putnami migrate agent-content @putnami/contributor
-   ```
-
-   The plan has two halves:
-
-   - **Moves** (mechanical): each superseded `agentArtifacts` entry gives way
-     to one `extension:@putnami/contributor` entry, its lock pin is dropped, and
-     its ownership record merges into the extension's record.
-   - **Content** (semantic): every file the extension's content adds, changes
-     or no longer ships, and every edited file it releases. Merging two
-     artifacts into one content can change bytes, and this list shows each
-     change.
-
-3. Apply it.
-
-   ```bash
-   putnami migrate agent-content @putnami/contributor --apply
-   ```
-
+   A file that already has the content's bytes is kept. A file with other
+   bytes is a collision: the install writes nothing and names the file, so
+   you move or delete it, then rerun. A file the old artifacts installed that
+   the content does not ship stays where it is, and no command manages it.
 4. Commit `putnami.workspace.json`, `putnami.lock.json` and the host files.
+   Every other clone pulls the commit, deletes the records its install
+   refusal names, and runs `putnami install`.
 
-5. In every other clone, pull the commit and run the same `--apply`. The
-   declarations and pins have already moved, so it only moves that clone's
-   ownership records. A clone of the Putnami repository runs
-   `./putnamiw migrate agent-content @putnami/contributor --apply` once after
-   pulling the change that removed `tooling/agent-workflows` and
-   `tooling/maintainer-workflows`.
+For in-tree artifacts (`/tools/workflows`), declare the local extension by
+path instead; nothing is pinned, and `putnami context generate` builds its
+content.
 
-What the migration protects:
-
-- **Your edits.** A file you edited that the content still ships blocks the
-  migration with nothing written: revert or move it, then rerun. A file you
-  edited that the content no longer ships is kept, reported as `released`, and
-  no longer managed.
-- **Ownership.** Ownership moves only with a record. A clone without records
-  (one that commits its generated files) hands over none: the content adopts
-  the files already identical to what it ships, and a file with other bytes
-  blocks the migration as yours until you move it. Two records that claim one
-  path with different bytes are refused as duplicate ownership, naming both.
-- **Interruption.** The whole migration is planned before its first write.
-  That write is a journal under `.putnami/agent-content-migrations/`, holding
-  every piece's before and after state and a copy of every file it replaces.
-  The pieces then move in order: files, the extension's record, the lock, the
-  declarations, the old records. If a run stops, rerun `--apply` to finish.
-  Until you do, other agent-content commands refuse to act. `--apply` and
-  `--rollback` hold `.putnami/agent-content-migrations.lock`, so a second run
-  started meanwhile changes nothing and says so.
-- **Rollback.** `putnami migrate agent-content @putnami/contributor --rollback`
-  restores the previous declarations, pins, ownership records and files,
-  byte for byte. It works in the clone that ran the migration, until something
-  it moved changes. It never overwrites a change made since. The restored state
-  is the separately declared one, so this CLI refuses it again; an earlier
-  release that still installs separately declared artifacts installs it. The journal of a completed migration stays as that rollback
-  point, so a second migration to the same extension is refused until you roll
-  the first one back, which lets the next `--apply` move everything at once,
-  or remove its directory under `.putnami/agent-content-migrations/` to give
-  the rollback up.
-- **Older CLIs.** A clone whose CLI predates the `extension:` opt-in fails on
-  the migrated workspace instead of running it without its content. It reads
-  `extension:@putnami/contributor` as an agent artifact named `extension` on
-  the channel `@putnami/contributor`, which no lock pins, and writes nothing:
-
-  ```text
-  putnami: agent workflows install: extension: workspace lock pins no agent artifact: putnami.lock.json records no extension entry
-  ```
-
-  Its `putnami upgrade` looks that artifact up in the registry and fails the
-  same phase, because the registry serves none. A CLI before contract 5 also
-  refuses the extension package itself with `extension requires a newer
-  putnami`. Every one of these messages means the same thing: move that
-  clone to a CLI release that carries the opt-in (the workspace's CLI pin),
-  then pull and run the migration's `--apply`.
-
-The same command moves in-tree artifacts (`/tools/workflows`) to a local
-extension declared by path. Nothing is pinned before or after, and
-`putnami context generate` regenerates the result as a no-op. An in-tree entry
-whose project was already deleted, for example by a pulled commit, is named by
-its last path segment: `/tooling/agent-workflows` names the superseded
-`@putnami/agent-workflows`. An entry that names no superseded artifact stays
-declared as it is and does not block the migration. See
-[ADR 0048](adr/0048-migrating-agent-artifacts-to-extension-content.md).
+A clone whose CLI predates the `extension:` opt-in fails on the updated
+workspace instead of running it without its content. It reads
+`extension:@putnami/contributor` as an agent artifact named `extension`, which
+no lock pins, and writes nothing. Move that clone to a CLI release that carries
+the opt-in (the workspace's CLI pin).
 
 ## Where the version comes from
 
@@ -312,7 +246,7 @@ a workspace. It **merges** the starter's opt-in with the declarations already
 there, by what each entry names, and your committed entry wins, so
 re-initializing cannot un-declare content whose files are installed. A
 separately declared artifact survives the merge too; the next command then
-names the migration instead of orphaning its files.
+refuses it instead of orphaning its files.
 
 ### `putnami install`
 
@@ -368,8 +302,8 @@ job. See
 | A file the content declares that no run installed | **preserved**; the run aborts before the first write and the error names the path |
 | A managed file you edited since it was installed | **preserved**; your edit and the previous record both survive |
 | A tampered content file or a digest that does not match the pin | refused before the workspace is read; nothing written |
-| A separately declared artifact (`name`, `name:channel`, `/path`) | refused by every command with nothing written, naming `putnami migrate agent-content <extension>` |
-| An opt-in while this clone still records an artifact the content supersedes | refused with nothing written, naming `putnami migrate agent-content <extension> --apply` |
+| A separately declared artifact (`name`, `name:channel`, `/path`) | refused by every command with nothing written, saying to replace it with an `extension:<name>` entry |
+| An opt-in while this clone still records an artifact the content supersedes | refused with nothing written, naming each ownership record to delete |
 | An agent session starts in a worktree whose record names another release than the pin | the pinned content is copied from the installed extension before the first request; a collision is a warning, never a refused session |
 
 Errors name the owner and every conflicting path with its reason, and nothing

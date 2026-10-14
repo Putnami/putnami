@@ -2,8 +2,6 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
-    "cli/agent-workflow-lifecycle#agent-content-migration",
-    "cli/agent-workflow-lifecycle#agent-content-migration-safety",
     "cli/agent-workflow-lifecycle#collision-aborts",
     "cli/agent-workflow-lifecycle#explicit-v4-migration",
     "cli/agent-workflow-lifecycle#extension-agent-content",
