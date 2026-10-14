@@ -388,6 +388,18 @@ func TestSecretsSet_StoresUncheckedWhenTheSchemaReadFails(t *testing.T) {
 	assertContains(t, stderr, "crm.api_key is stored unchecked")
 }
 
+func TestSecretsSet_FailedWriteKeepsTheWarningUnsaid(t *testing.T) {
+	fake := newCRMSecretsFake(t)
+	fake.publishHint = true
+	stderr, err := runCRMSecretsSet(t, fake, "crm.token")
+	if err == nil {
+		t.Fatal("expected the write to fail")
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want no warning for a write that failed", stderr)
+	}
+}
+
 func TestSecretsSet_DotlessKeyWithoutMatchKeepsTheKeyFormError(t *testing.T) {
 	fake := newCRMSecretsFake(t)
 	_, err := runCRMSecretsSet(t, fake, "token")

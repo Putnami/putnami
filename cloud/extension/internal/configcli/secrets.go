@@ -114,9 +114,6 @@ func secretsRunSet(params map[string]any, args []string, workspaceRoot string, e
 	if keyErr != nil {
 		return keyErr
 	}
-	if warning != "" {
-		ioctx.Stderr("warning: " + warning)
-	}
 	value, err := resolveValue(params, ioctx)
 	if err != nil {
 		return err
@@ -131,6 +128,9 @@ func secretsRunSet(params map[string]any, args []string, workspaceRoot string, e
 	resp, err := ctx.configAPI().putSecret(body)
 	if err != nil {
 		return mapSecretsError(err, ctx, "set")
+	}
+	if warning != "" {
+		ioctx.Stderr("warning: " + warning)
 	}
 	clicore.WriteResult(map[string]any{
 		"status":      "encrypted",
