@@ -2,6 +2,7 @@ package cli
 
 import (
 	"maps"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -50,6 +51,7 @@ func TestRequirementOwnersKeepOnlyProjectsThatCanHoldARequirement(t *testing.T) 
 		"part":     `{"name":"part","featureAuthority":{"owner":"app/feature"}}`,
 		"flipped":  `{"name":"flipped"}`,
 		"authored": `{"name":"authored",` + none + `}`,
+		"dropped":  `{"name":"dropped",` + none + `}`,
 		"blank":    `{"name":"blank","featureAuthority":{"none":"  "}}`,
 	}
 	includes := []string{}
@@ -60,12 +62,16 @@ func TestRequirementOwnersKeepOnlyProjectsThatCanHoldARequirement(t *testing.T) 
 	includes = append(includes, `"packages/fresh"`)
 	writeParityFile(t, root, wsproto.WorkspaceConfigFilename, `{"name":"owners","includes":[`+strings.Join(includes, ",")+`]}`)
 	writeParityFile(t, filepath.Join(root, "packages", "authored"), "putnami.features.json", `{}`)
+	writeParityFile(t, filepath.Join(root, "packages", "dropped"), "putnami.features.json", `{}`)
 	ownersGit(t, repo, "init", "-q")
 	ownersGit(t, repo, "add", "-A")
 	ownersGit(t, repo, "commit", "-q", "-m", "base")
 	base := strings.TrimSpace(ownersGit(t, repo, "rev-parse", "HEAD"))
 	writeParityFile(t, filepath.Join(root, "packages", "flipped"), "putnami.json", `{"name":"flipped",`+none+`}`)
 	writeParityFile(t, filepath.Join(root, "packages", "fresh"), "putnami.json", `{"name":"fresh",`+none+`}`)
+	if err := os.Remove(filepath.Join(root, "packages", "dropped", "putnami.features.json")); err != nil {
+		t.Fatal(err)
+	}
 	workspace.InvalidateLoadCache(root)
 	t.Cleanup(func() { workspace.InvalidateLoadCache(root) })
 	owners := nativeRequirementOwners(root)
@@ -78,7 +84,7 @@ func TestRequirementOwnersKeepOnlyProjectsThatCanHoldARequirement(t *testing.T) 
 		changed = append(changed, "ws/packages/"+name+"/source.go")
 	}
 	got, err = owners(base, changed)
-	if err != nil || !slices.Equal(got.Projects, []string{"/packages/app", "/packages/authored", "/packages/blank", "/packages/flipped", "/packages/part"}) ||
+	if err != nil || !slices.Equal(got.Projects, []string{"/packages/app", "/packages/authored", "/packages/blank", "/packages/dropped", "/packages/flipped", "/packages/part"}) ||
 		!slices.Equal(got.Unowned, []string{"outside.txt"}) {
 		t.Fatalf("requirement owners %+v: %v", got, err)
 	}
