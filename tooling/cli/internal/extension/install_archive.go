@@ -33,7 +33,7 @@ func RegistryRef(name string) (namespace, pkg string) {
 // SHA-256 hash the resolver advertised for the archive (empty string when
 // the resolver did not provide an integrity header).
 func (inst *Installer) download(ctx context.Context, name, constraint string, spec ArtifactSpec) (string, string, string, error) {
-	resp, _, err := inst.openArtifact(ctx, name, constraint, spec)
+	resp, _, err := inst.openArtifact(ctx, name, constraint, spec, false)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -59,8 +59,10 @@ func (inst *Installer) download(ctx context.Context, name, constraint string, sp
 	return tmpFile.Name(), resolvedVersion, advertisedIntegrity, nil
 }
 
+// ResolveArtifact reads the version and digest the registry resolves for name
+// at constraint, without downloading the archive.
 func (inst *Installer) ResolveArtifact(ctx context.Context, name, constraint string, spec ArtifactSpec) (*InstallResult, error) {
-	resp, source, err := inst.openArtifact(ctx, name, constraint, spec)
+	resp, source, err := inst.openArtifact(ctx, name, constraint, spec, true)
 	if err != nil {
 		return nil, err
 	}
@@ -103,12 +105,10 @@ func (inst *Installer) ResolveArtifactIntegrity(ctx context.Context, name, versi
 		return "", fmt.Errorf("no exact version to pin (got %q)", version)
 	}
 
-	resp, _, err := inst.openArtifact(ctx, name, version, spec)
+	resp, _, err := inst.openArtifact(ctx, name, version, spec, true)
 	if err != nil {
 		return "", err
 	}
-	// Deliberately not drained: the body is the archive we are choosing not to
-	// transfer.
 	defer resp.Body.Close()
 
 	// If the registry served some other version for this version-pinned channel,
@@ -129,7 +129,10 @@ func (inst *Installer) ResolveArtifactIntegrity(ctx context.Context, name, versi
 	return digest, nil
 }
 
-func (inst *Installer) openArtifact(ctx context.Context, name, constraint string, spec ArtifactSpec) (*http.Response, string, error) {
+// openArtifact requests the archive of name at constraint from the registry.
+// With headersOnly it sends HEAD, so the caller reads the resolved version and
+// digest and the registry sends no archive.
+func (inst *Installer) openArtifact(ctx context.Context, name, constraint string, spec ArtifactSpec, headersOnly bool) (*http.Response, string, error) {
 	if err := ValidateRegistryURL(inst.ResolverURL); err != nil {
 		return nil, "", err
 	}
@@ -154,7 +157,11 @@ func (inst *Installer) openArtifact(ctx context.Context, name, constraint string
 		}
 	}
 
-	resp, err := DoWithRetry(ctx, inst.HTTPClient, req)
+	send := DoWithRetry
+	if headersOnly {
+		send = DoHeadWithRetry
+	}
+	resp, err := send(ctx, inst.HTTPClient, req)
 	if err != nil {
 		return nil, "", fmt.Errorf("download %s: %w", name, err)
 	}

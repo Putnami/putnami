@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -158,5 +159,57 @@ func TestInstallerPlatform_IsHostPlatform(t *testing.T) {
 	inst := &Installer{WorkspaceRoot: t.TempDir()}
 	if got, want := inst.Platform(), lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH); got != want {
 		t.Errorf("Platform() = %q, want %q", got, want)
+	}
+}
+
+// TestResolveOnlyLookupsSendHead pins that a lookup reading only the resolved
+// version and digest sends HEAD, so the registry sends no archive, while an
+// install still sends GET: the local platform's digest comes from hashing the
+// downloaded bytes.
+func TestResolveOnlyLookupsSendHead(t *testing.T) {
+	body := buildExtensionArchive(t, "@putnami/test", "2.0.0")
+	var methods []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		methods = append(methods, r.Method)
+		w.Header().Set("X-Resolved-Version", "2.0.0")
+		w.Header().Set("X-Integrity", "sha256:"+sha256Bytes(body))
+		w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+	inst := &Installer{WorkspaceRoot: t.TempDir(), ResolverURL: srv.URL, HTTPClient: srv.Client(), AnonymousRegistry: true}
+	spec := extensionSpec()
+	spec.OS, spec.Arch = "linux", "amd64"
+
+	cases := []struct {
+		name string
+		call func() error
+		want string
+	}{
+		{"ResolveArtifact", func() error {
+			_, err := inst.ResolveArtifact(context.Background(), "@putnami/test", "canary", spec)
+			return err
+		}, http.MethodHead},
+		{"ResolveArtifactIntegrity", func() error {
+			_, err := inst.ResolveArtifactIntegrity(context.Background(), "@putnami/test", "2.0.0", spec)
+			return err
+		}, http.MethodHead},
+		{"download", func() error {
+			path, _, _, err := inst.download(context.Background(), "@putnami/test", "2.0.0", spec)
+			if err == nil {
+				os.Remove(path)
+			}
+			return err
+		}, http.MethodGet},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			methods = nil
+			if err := tc.call(); err != nil {
+				t.Fatalf("%s: %v", tc.name, err)
+			}
+			if len(methods) != 1 || methods[0] != tc.want {
+				t.Errorf("methods = %v, want [%s]", methods, tc.want)
+			}
+		})
 	}
 }

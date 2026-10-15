@@ -342,7 +342,7 @@ func TestArchiveInstallerUsesInvocationBrokerWithoutCredentialBootstrap(t *testi
 	ResolveRegistryToken = func(string) (string, string) { t.Error("archive broker queried credential provider"); return "", "" }
 	t.Cleanup(func() { ResolveRegistryToken = previous })
 	installer := NewInstaller(t.TempDir())
-	response, _, err := installer.openArtifact(t.Context(), "@putnami/go", "1.2.3", ArtifactSpec{OS: "linux", Arch: "x64"})
+	response, _, err := installer.openArtifact(t.Context(), "@putnami/go", "1.2.3", ArtifactSpec{OS: "linux", Arch: "x64"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
