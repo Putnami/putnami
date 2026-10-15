@@ -541,7 +541,9 @@
               "a-vocabulary-requires-contract-9",
               "a-vocabulary-never-changes-a-well-known-verbs-side-effects",
               "first-party-jobs-keep-their-traits",
-              "the-packagers-validate-and-stamp-a-vocabulary"
+              "the-go-packager-stamps-a-vocabulary-only-manifest",
+              "the-go-packager-validates-a-vocabulary-next-to-a-dependency",
+              "the-npm-packager-validates-and-stamps-a-vocabulary"
             ]
           }
         },
