@@ -35,6 +35,10 @@
       "text": "An implicit impacted baseline resolves from reviewed workspace and trunk candidates and never compares a branch with its own published counterpart."
     },
     {
+      "id": "explicit-baseline",
+      "text": "A job command given --baseline <ref> with no target, --all or --impacted selects the projects impacted against <ref>, as --impacted --baseline <ref> does, and tag filters narrow that set. Beside named projects or --all, --baseline changes no selection."
+    },
+    {
       "id": "version-lines-are-scopes",
       "text": "A scope that declares a line block versions and tags its projects together under the line's tag pattern; a project's line is its nearest ancestor line, exactly one; a workspace without a line block is one line."
     },

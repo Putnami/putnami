@@ -123,11 +123,10 @@ func TestSelectProjects_ImpactedOutsideARepositoryNamesGit(t *testing.T) {
 	t.Run("baseline", func(t *testing.T) {
 		req := &Request{Commands: []string{"build"}, Config: &workspacepb.Config{}}
 		req.Global.Baseline = "main"
-		var selected []*workspace.Project
 		var code int
-		stderr := captureStderr(t, func() { selected, code = selectProjects(req, ws) })
-		if code != ExitError || selected != nil {
-			t.Fatalf("selection = %v (code %d), want a refusal", selected, code)
+		stderr := captureStderr(t, func() { code = applyStandaloneBaseline(req, ws) })
+		if code != ExitError {
+			t.Fatalf("applyStandaloneBaseline exit code = %d, want a refusal", code)
 		}
 		oneLineRefusal(t, stderr, "--baseline", root)
 	})
@@ -143,7 +142,11 @@ func TestSelectProjects_ImpactedOutsideARepositoryNamesGit(t *testing.T) {
 			mutate(&req.Global)
 			var selected []*workspace.Project
 			var code int
-			stderr := captureStderr(t, func() { selected, code = selectProjects(req, ws) })
+			stderr := captureStderr(t, func() {
+				if code = applyStandaloneBaseline(req, ws); code == ExitSuccess {
+					selected, code = selectProjects(req, ws)
+				}
+			})
 			if code != ExitSuccess || len(selected) == 0 || stderr != "" {
 				t.Fatalf("%s: selection = %v (code %d, stderr %q), want the target, unrefused", name, selected, code, stderr)
 			}

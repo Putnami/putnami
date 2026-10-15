@@ -274,6 +274,7 @@ const releaseSetFixtureManifest = `{
     "validate": {"run": [{"id": "rules", "task": "noop"}]},
     "package": {"run": [{"id": "artifact", "task": "noop"}]},
     "publish": {"dependsOn": ["package"], "run": [{"id": "artifact", "task": "noop"}]},
+    "deploy": {"run": [{"id": "rollout", "task": "noop"}]},
     "cloud-release-set": {"visibility": "internal", "run": [{"id": "provider", "task": "noop"}]}
   },
   "tasks": {
@@ -357,6 +358,47 @@ func TestRun_MixedGateAndChannelPublishUnderImpactedKeepsTheGitImpactedSet(t *te
 	assertNotPlanned(t, keys,
 		"/other:test~test", "/other:lint~check", "/other:publish~artifact", "/other:package~artifact")
 	assertPlanned(t, keys, "/lib:test~test", "/app:publish~artifact")
+}
+
+// A channel publish given a baseline alone is the impacted publish it asks
+// for: the release-set mode reads --impacted, so the baseline must become one
+// before that mode is derived, or the channel is refused as needing --impacted.
+func TestRun_ChannelPublishWithABaselineAloneIsImpacted(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "explicit-baseline", "a-baseline-alone-selects-the-projects-impacted-against-it")
+	root, req := releaseSetSessionFixture(t)
+	touchFixtureProject(t, root, "lib")
+	req.Global.Impacted, req.Global.Projects, req.Global.Baseline = false, "", "origin/main"
+
+	result, err := New().Run(context.Background(), req, discardEvents{})
+	if err != nil || result.ExitCode != ExitSuccess {
+		t.Fatalf("baseline-only channel session = exit %d, err %v", result.ExitCode, err)
+	}
+	keys := planKeys(t, result.Plan)
+	assertNotPlanned(t, keys, "/other:test~test", "/other:publish~artifact")
+	assertPlanned(t, keys, "/lib:test~test", "/app:publish~artifact")
+	if selection := plannedSelection(t, result.Plan); selection.Mode != protocoljob.SelectionModeImpacted || selection.Baseline != "origin/main" {
+		t.Fatalf("selection = %+v, want impacted against origin/main", selection)
+	}
+}
+
+// A channel deploy given a baseline alone resolves it strictly, as an impacted
+// channel deploy does: a ref git cannot resolve must not widen the deploy to
+// every project the channel never released.
+func TestRun_ChannelDeployWithAnUnresolvedBaselineAloneRefuses(t *testing.T) {
+	root, req := releaseSetSessionFixture(t)
+	touchFixtureProject(t, root, "lib")
+	req.Commands = []string{"deploy"}
+	req.Global.Impacted, req.Global.Projects, req.Global.Baseline = false, "", "refs/heads/no-such-ref"
+
+	var result SessionResult
+	var err error
+	stderr := captureStderr(t, func() { result, err = New().Run(context.Background(), req, discardEvents{}) })
+	if result.ExitCode == ExitSuccess {
+		t.Fatalf("baseline-only channel deploy = exit %d, err %v, want a refusal", result.ExitCode, err)
+	}
+	if !strings.Contains(stderr, "--impacted failed") {
+		t.Fatalf("stderr = %q, want the strict impacted refusal", stderr)
+	}
 }
 
 // Both halves are reported, and each keeps its own provenance: the mode and the

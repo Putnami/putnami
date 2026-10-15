@@ -1463,7 +1463,7 @@ var globalFlags = []GlobalFlag{
 	{Long: "--tag", Type: FlagValue, ValueName: "<tags>", Description: "Filter by tags", Category: "Project Selection"},
 	{Long: "--exclude-tag", Type: FlagValue, ValueName: "<tags>", Description: "Exclude by tags", Category: "Project Selection"},
 	{Long: "--exclude", Type: FlagValue, ValueName: "<names>", Description: "Exclude by name", Category: "Project Selection"},
-	{Long: "--baseline", Type: FlagValue, ValueName: "<branch>", Description: "Custom git baseline for --impacted", Category: "Project Selection"},
+	{Long: "--baseline", Type: FlagValue, ValueName: "<branch>", Description: "Custom git baseline for --impacted; a job command with no target or --all implies --impacted", Category: "Project Selection"},
 	{Long: "--impacted-strict", Description: "Fail when baseline can't be resolved", Category: "Project Selection"},
 
 	{Long: "--where", Type: FlagValue, ValueName: "<placement>", Description: "Execution placement: local | remote (local when no runner provider is installed)", Category: "Execution", Values: []string{"local", "remote"}, Providers: []string{runner.ProviderCommandName}},

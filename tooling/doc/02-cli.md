@@ -226,7 +226,7 @@ putnami build /a,/b,-/c                      # Union and subtraction
 | `--tag <tags>` | Filter by tags (comma-separated). Overrides workspace `excludeTags` for matched tags. |
 | `--exclude-tag <tags>` | Exclude by tags (comma-separated) |
 | `--exclude <names>` | Exclude by name (comma-separated) |
-| `--baseline <branch>` | Custom git baseline for `--impacted` (otherwise resolves workspace `baseline`, upstream, `origin/HEAD`, then local `main`/`master`) |
+| `--baseline <branch>` | Custom git baseline for `--impacted`. Without it, `--impacted` resolves workspace `baseline`, upstream, `origin/HEAD`, then local `main`/`master`. A job command given `--baseline` with no target or `--all` implies `--impacted`. |
 
 ### Default behavior
 

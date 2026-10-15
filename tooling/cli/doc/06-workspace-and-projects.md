@@ -434,6 +434,8 @@ putnami test --impacted --baseline develop
 putnami test --impacted --baseline origin/release/v2
 ```
 
+A job command given `--baseline` with no target, no `--all` and no `--impacted` runs as `--impacted` against that ref, so `putnami test --baseline develop` selects what `putnami test --impacted --baseline develop` selects. `--tag`, `--exclude-tag` and `--exclude` narrow that set. Beside named projects or `--all`, `--baseline` changes no selection.
+
 Workspace config can also declare a default baseline, and name long-lived integration branches so their sub-branches measure against the epic instead of the trunk:
 
 ```json

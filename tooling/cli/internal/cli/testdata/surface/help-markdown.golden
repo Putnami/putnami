@@ -46,7 +46,7 @@ Multi-command: `putnami lint,test,build --impacted`
 | `--tag` <tags> | Filter by tags |
 | `--exclude-tag` <tags> | Exclude by tags |
 | `--exclude` <names> | Exclude by name |
-| `--baseline` <branch> | Custom git baseline for --impacted |
+| `--baseline` <branch> | Custom git baseline for --impacted; a job command with no target or --all implies --impacted |
 | `--impacted-strict` | Fail when baseline can't be resolved |
 
 ## Execution Options
