@@ -11,7 +11,9 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
+	gitutil "go.putnami.dev/tooling/cli/internal/git"
 )
 
 func gitInputWrite(t *testing.T, root, path, data string) {
@@ -407,5 +409,83 @@ func TestGitInputsRefuseUnmergedAndSubmoduleCandidates(t *testing.T) {
 	}
 	if digest, err := (&CacheKey{ProjectRoot: root, FilePatterns: []string{"git:**"}}).ComputeHashUsing(NewCacheManager(nil)); err == nil || digest != "" {
 		t.Fatalf("a submodule candidate returned digest %q, error %v", digest, err)
+	}
+}
+
+// A `git:` input lists only the candidates at or below the bound of its
+// patterns, so a key that reads one file does not list the whole repository,
+// and it selects exactly the files the whole listing selects: the key reads the
+// same bytes. A pattern with no bound, `git:**` among them, lists the whole cut.
+func TestGitInputsListOnlyBelowTheBoundOfTheirPatterns(t *testing.T) {
+	root := gitInputPhysicalRoot(t)
+	gitInputWrite(t, root, ".gitignore", ".gen/\n")
+	gitInputWrite(t, root, "top.txt", "top")
+	gitInputWrite(t, root, "doc/a.md", "a wildcard after .. also matches ..")
+	gitInputWrite(t, root, "tools/gate/clientgen.json", "{}")
+	gitInputWrite(t, root, "tools/gate/.gen/clientgen/config.json", "{\"targets\":[]}")
+	gitInputWrite(t, root, "tools/gate/.gen/clientgen/built.json", "ignored")
+	gitInputWrite(t, root, "tools/other/doc/a.md", "untracked candidate")
+	gitInputWrite(t, root, "tools/other/doc/b.md", "tracked")
+	gitInputRun(t, root, "add", ".gitignore", "top.txt", "tools/other/doc/b.md")
+	gitInputRun(t, root, "add", "-f", "tools/gate/.gen/clientgen/config.json")
+	project := filepath.Join(root, "tools", "gate")
+	var listed [][]string
+	saved := candidatePaths
+	candidatePaths = func(root string, prefixes ...string) ([]string, error) {
+		listed = append(listed, prefixes)
+		return saved(root, prefixes...)
+	}
+	t.Cleanup(func() { candidatePaths = saved })
+
+	whole, err := gitutil.CandidatePaths(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		patterns []string
+		bound    []string
+	}{
+		{[]string{"git:.gen/clientgen/config.json"}, []string{"tools/gate/.gen/clientgen/config.json"}},
+		{[]string{"git:.gen/clientgen/*.json"}, []string{"tools/gate/.gen/clientgen"}},
+		{[]string{"git:clientgen.json", "git:../other/doc/**", "!git:../other/doc/b.md"}, []string{"tools/gate/clientgen.json", "tools/other/doc"}},
+		{[]string{"git:../../top.txt"}, []string{"top.txt"}},
+		{[]string{"git:../*/doc/a.md"}, nil},
+		{[]string{"git:../../*.txt"}, nil},
+		{[]string{"git:**"}, nil},
+		{[]string{"git:clientgen.json", "git:**/*.md"}, nil},
+	} {
+		includes, excludes := wsproto.SplitFilePatterns(tc.patterns)
+		if got := gitInputPrefixes(root, project, includes); !reflect.DeepEqual(got, tc.bound) {
+			t.Errorf("bound of %v = %v, want %v", tc.patterns, got, tc.bound)
+		}
+		var want []string
+		for _, path := range whole {
+			rel, relErr := filepath.Rel(project, filepath.Join(root, filepath.FromSlash(path)))
+			if relErr != nil {
+				t.Fatal(relErr)
+			}
+			if wsproto.MatchesAnyFilePattern(rel, includes) && !wsproto.MatchesAnyFilePattern(rel, excludes) {
+				want = append(want, filepath.Join(root, filepath.FromSlash(path)))
+			}
+		}
+		listed = nil
+		got, collectErr := CollectKeyFiles(project, tc.patterns)
+		if collectErr != nil {
+			t.Fatal(collectErr)
+		}
+		if len(listed) != 1 || !reflect.DeepEqual(listed[0], tc.bound) {
+			t.Errorf("%v listed its candidates under %v, want one listing under %v", tc.patterns, listed, tc.bound)
+		}
+		if len(got) == 0 || !reflect.DeepEqual(got, want) {
+			t.Errorf("%v selected %v, want the whole listing's selection %v", tc.patterns, got, want)
+		}
+	}
+
+	bounded, err := gitutil.CandidatePaths(root, "tools/other/doc", "top.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"tools/other/doc/a.md", "tools/other/doc/b.md", "top.txt"}; !reflect.DeepEqual(bounded, want) {
+		t.Fatalf("bounded listing = %v, want %v", bounded, want)
 	}
 }

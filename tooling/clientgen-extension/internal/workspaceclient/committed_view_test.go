@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -131,6 +132,87 @@ func committedCatalogWorkspace(t *testing.T) (string, []string) {
 	return root, []string{"apps/web", "services/catalog", "services/orders"}
 }
 
+// A workspace that does not ignore .gen holds each build's output there as a
+// Git candidate, so the guard reports it and asks first to ignore .gen. Its
+// message names the Git command for a tracked copy only as a condition: the
+// key does not hold whether Git tracks a candidate, so staging the same bytes
+// keeps both the key and every message.
+func TestTheCheckAsksToIgnoreGenForACandidateNoRuleExcludes(t *testing.T) {
+	spectest.Proves(t, clientgenFeature, "native-validation-gate", "the-guard-asks-to-ignore-gen-for-a-candidate-no-rule-excludes")
+	root, members := committedCatalogWorkspace(t)
+	writeWorkspaceFile(t, root, ".gitignore", ".putnami/\n*.local.go\n")
+	const (
+		config = "services/catalog/.gen/clientgen/config.json"
+		output = "services/catalog/.gen/schema/asyncapi.json"
+	)
+	writeWorkspaceFile(t, root, config, `{"targets":["go"],"go":{"output":"clients/go"}}`)
+	writeWorkspaceFile(t, root, output, "{}\n")
+	messages := func() map[string]string {
+		got := map[string]string{}
+		for _, finding := range InspectCommitted(root, members).Findings {
+			if finding.Code == committedGeneratedContractCode {
+				got[finding.Path] = finding.Message
+			}
+		}
+		return got
+	}
+	untracked, key := messages(), cutFingerprint(t, root)
+	for path, remedy := range map[string]string{
+		config: "git mv " + config + " services/catalog/clientgen.json",
+		output: "git rm --cached " + output,
+	} {
+		want := path + " sits in " + filepath.ToSlash(filepath.Dir(path)) + ", which a build owns whole, and no ignore rule excludes it, " +
+			"so each build's output there is a Git candidate: ignore .gen in .gitignore and drop any rule that re-includes the file, and if Git tracks it, first run " + remedy
+		if untracked[path] != want {
+			t.Errorf("finding for %s = %q, want %q", path, untracked[path], want)
+		}
+	}
+
+	gitIn(t, root, "add", config, output)
+	if got := cutFingerprint(t, root); got != key {
+		t.Fatalf("staging the same bytes moved the key from %s to %s", key, got)
+	}
+	if tracked := messages(); !reflect.DeepEqual(tracked, untracked) {
+		t.Fatalf("staging the same bytes changed the messages under one key:\n%v\nwant\n%v", tracked, untracked)
+	}
+
+	// A rule that re-includes the contract under an ignored .gen, the
+	// carve-out a provider once kept, leaves it a candidate no rule excludes:
+	// the guard still asks to drop that rule. The ignored output is in the cut
+	// only because Git tracks it.
+	writeWorkspaceFile(t, root, "services/catalog/.gitignore", ".gen/*\n!.gen/clientgen/\n.gen/clientgen/*\n!.gen/clientgen/config.json\n")
+	carvedOut := messages()
+	if carvedOut[config] != untracked[config] {
+		t.Errorf("finding for a carved-out %s = %q, want %q", config, carvedOut[config], untracked[config])
+	}
+	if want := output + " sits in services/catalog/.gen/schema, which a build owns whole, and Git tracks it; " +
+		"committing a file there is no longer supported: run git rm --cached " + output; carvedOut[output] != want {
+		t.Errorf("finding for an ignored tracked %s = %q, want %q", output, carvedOut[output], want)
+	}
+}
+
+// The command that takes a candidate out of a tree a build owns: a git mv to
+// the contract's committed home, with the mkdir the home's directory needs,
+// and a git rm --cached for a file a build writes or a contract whose home
+// exists.
+func TestTheGeneratedContractRemedyNamesTheGitCommand(t *testing.T) {
+	root := t.TempDir()
+	writeWorkspaceFile(t, root, "services/catalog/schema/openapi.json", "{}")
+	files := workspaceFiles{root: root}
+	for _, tc := range []struct{ project, rel, want string }{
+		{".", ".gen/clientgen/config.json", "git mv .gen/clientgen/config.json clientgen.json"},
+		{"services/orders", "services/orders/.gen/schema/openapi.json",
+			"mkdir -p services/orders/schema && git mv services/orders/.gen/schema/openapi.json services/orders/schema/openapi.json"},
+		{"services/catalog", "services/catalog/.gen/schema/openapi.json",
+			"git rm --cached services/catalog/.gen/schema/openapi.json, since services/catalog/schema/openapi.json already exists"},
+		{"services/catalog", "services/catalog/.gen/clientgen/extra.json", "git rm --cached services/catalog/.gen/clientgen/extra.json"},
+	} {
+		if got := generatedContractRemedy(files, tc.project, tc.rel); got != tc.want {
+			t.Errorf("remedy for %s = %q, want %q", tc.rel, got, tc.want)
+		}
+	}
+}
+
 // TestTheCheckVerdictFollowsItsGitKey proves the guard's `git:**` key is
 // sound: the check reads the candidate cut and the membership the job context
 // carries, so a file Git ignores — a source, a generated-marked file in an
@@ -237,10 +319,16 @@ func TestTheCheckReportsAFileCommittedInsideABuildWrittenTree(t *testing.T) {
 			messages[finding.Path] = finding.Message
 		}
 	}
-	for path, home := range map[string]string{config: "services/catalog/clientgen.json", schema: "services/catalog/schema/openapi.json"} {
-		if message := messages[path]; !strings.Contains(message, path) || !strings.Contains(message, "move it to "+home) ||
-			!strings.Contains(message, "delete it from .gen") {
-			t.Errorf("finding for %s = %q, want the file, its move to %s and its deletion from .gen", path, message, home)
+	// .gen is ignored, so each candidate there is one Git tracks. The contract
+	// moves to its home with git mv; the OpenAPI document's home already
+	// exists, so the tracked copy leaves the index.
+	for path, remedy := range map[string]string{
+		config: "run git mv " + config + " services/catalog/clientgen.json",
+		schema: "run git rm --cached " + schema + ", since services/catalog/schema/openapi.json already exists",
+	} {
+		if message := messages[path]; !strings.Contains(message, path+" sits in ") || !strings.Contains(message, "and Git tracks it") ||
+			!strings.HasSuffix(message, remedy) {
+			t.Errorf("finding for %s = %q, want the tracked file and %q", path, message, remedy)
 		}
 	}
 

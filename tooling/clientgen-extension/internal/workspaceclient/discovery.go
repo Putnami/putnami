@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
@@ -136,13 +137,16 @@ func discoverCommitted(view workspaceView) ([]provider, []Finding) {
 // inside a tree a build writes.
 const committedGeneratedContractCode = "clientgen.committed-generated-contract"
 
-// generatedContractTrees are the trees a provider build writes and empties,
-// each with the committed home of what a project used to commit there: the Go
-// build-describe declares .gen/clientgen and .gen/schema emptied, and the
-// TypeScript build-generate owns .gen whole (CLI ADR 0068).
-var generatedContractTrees = []struct{ dir, content, home string }{
-	{".gen/clientgen", "a generation contract", committedConfigFile},
-	{".gen/schema", "an OpenAPI document", "schema/openapi.json"},
+// generatedContractTrees are the trees a provider build writes and empties:
+// the Go build-describe declares .gen/clientgen and .gen/schema emptied, and
+// the TypeScript build-generate owns .gen whole (CLI ADR 0068).
+var generatedContractTrees = []string{".gen/clientgen", ".gen/schema"}
+
+// generatedContractHomes maps the project-relative path of each contract a
+// project used to commit inside those trees to its committed home.
+var generatedContractHomes = map[string]string{
+	builtConfigFile:            committedConfigFile,
+	".gen/schema/openapi.json": "schema/openapi.json",
 }
 
 // committedGeneratedContracts reports each candidate a member project holds
@@ -160,6 +164,15 @@ var generatedContractTrees = []struct{ dir, content, home string }{
 // it without serving one verdict to two trees; build-describe still fails on
 // it, because the index tracks it (CLI ADR 0068). Outside a Git
 // work tree there is no cut, and every .gen file is a build's output.
+//
+// The key does not hold whether Git tracks a candidate: staging or unstaging
+// a file whose bytes stay the same keeps it. So the message never depends on
+// that. It depends on whether an ignore rule excludes the candidate, which the
+// rules the cut is listed with decide: such a candidate is in the cut only
+// because Git tracks it, and its message names the git mv that moves it out.
+// Any other candidate is one a build's output can be too, and its message asks
+// first to ignore .gen and to drop a rule that re-includes the file, such as
+// the carve-out a provider once kept for .gen/clientgen/config.json.
 func committedGeneratedContracts(view workspaceView) []Finding {
 	if view.tree == nil {
 		return nil
@@ -168,22 +181,95 @@ func committedGeneratedContracts(view workspaceView) []Finding {
 	if err != nil {
 		return nil // discoverWith reports the membership error.
 	}
+	type candidate struct{ projectRel, dir, rel string }
 	var findings []Finding
+	var candidates []candidate
 	for _, projectRel := range projects {
 		for _, tree := range generatedContractTrees {
-			files, listErr := view.List(joinRel(projectRel, tree.dir))
+			dir := joinRel(projectRel, tree)
+			files, listErr := view.List(dir)
 			if listErr != nil {
-				findings = append(findings, Finding{Code: committedGeneratedContractCode, Path: joinRel(projectRel, tree.dir), Message: listErr.Error()})
+				findings = append(findings, Finding{Code: committedGeneratedContractCode, Path: dir, Message: listErr.Error()})
 				continue
 			}
 			for _, rel := range files {
-				findings = append(findings, Finding{Code: committedGeneratedContractCode, Path: rel, Message: fmt.Sprintf(
-					"%s sits in %s, which a build owns whole, and Git tracks it or does not ignore it; committing %s there is no longer supported: move it to %s, delete it from .gen, and have Git ignore .gen",
-					rel, joinRel(projectRel, tree.dir), tree.content, joinRel(projectRel, tree.home))})
+				candidates = append(candidates, candidate{projectRel: projectRel, dir: dir, rel: rel})
 			}
 		}
 	}
+	if len(candidates) == 0 {
+		return findings
+	}
+	rels := make([]string, 0, len(candidates))
+	for _, item := range candidates {
+		rels = append(rels, item.rel)
+	}
+	ignored, ignoreErr := ignoredByRules(view.root, rels)
+	for _, item := range candidates {
+		remedy := generatedContractRemedy(view.workspaceFiles, item.projectRel, item.rel)
+		var message string
+		switch {
+		case ignoreErr != nil:
+			message = fmt.Sprintf("%s sits in %s, which a build owns whole, and cannot be told apart from a build's output: %v", item.rel, item.dir, ignoreErr)
+		case ignored[item.rel]:
+			message = fmt.Sprintf("%s sits in %s, which a build owns whole, and Git tracks it; committing a file there is no longer supported: run %s",
+				item.rel, item.dir, remedy)
+		default:
+			message = fmt.Sprintf("%s sits in %s, which a build owns whole, and no ignore rule excludes it, so each build's output there is a Git candidate: ignore .gen in .gitignore and drop any rule that re-includes the file, and if Git tracks it, first run %s",
+				item.rel, item.dir, remedy)
+		}
+		findings = append(findings, Finding{Code: committedGeneratedContractCode, Path: item.rel, Message: message})
+	}
 	return findings
+}
+
+// generatedContractRemedy is the Git command that takes the candidate rel of
+// the project at projectRel out of the tree a build owns: a git mv to the
+// committed home of a contract a project used to commit there, after the
+// mkdir its directory may need, and a git rm --cached for any other file,
+// which a build writes, or for a contract whose home the cut already holds.
+func generatedContractRemedy(files workspaceFiles, projectRel, rel string) string {
+	inner := rel
+	if projectRel != "." {
+		inner = strings.TrimPrefix(rel, projectRel+"/")
+	}
+	home, known := generatedContractHomes[inner]
+	if !known {
+		return "git rm --cached " + rel
+	}
+	homeRel := joinRel(projectRel, home)
+	if files.isRegularFile(homeRel) {
+		return "git rm --cached " + rel + ", since " + homeRel + " already exists"
+	}
+	if dir := path.Dir(home); dir != "." {
+		return "mkdir -p " + joinRel(projectRel, dir) + " && git mv " + rel + " " + homeRel
+	}
+	return "git mv " + rel + " " + homeRel
+}
+
+// ignoredByRules reports which of the slash paths rels, relative to root, an
+// ignore rule excludes, whether or not Git tracks them: git check-ignore
+// --no-index reads the rules the candidate cut is listed with. It runs once,
+// and only when the guard has a candidate to report.
+func ignoredByRules(root string, rels []string) (map[string]bool, error) {
+	cmd := exec.Command("git", "check-ignore", "--no-index", "-z", "--stdin")
+	cmd.Dir = root
+	cmd.Stdin = strings.NewReader(strings.Join(rels, "\x00") + "\x00")
+	out, err := cmd.Output()
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == 1 {
+		return map[string]bool{}, nil // No rule excludes any of them.
+	}
+	if err != nil {
+		return nil, fmt.Errorf("git check-ignore: %w", err)
+	}
+	ignored := map[string]bool{}
+	for _, rel := range strings.Split(string(out), "\x00") {
+		if rel != "" {
+			ignored[rel] = true
+		}
+	}
+	return ignored, nil
 }
 
 // specPathResolver names the OpenAPI document a view reads for the provider at

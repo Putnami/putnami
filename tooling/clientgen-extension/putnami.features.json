@@ -287,6 +287,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "the-guard-asks-to-ignore-gen-for-a-candidate-no-rule-excludes",
               "the-guard-reads-the-git-candidate-cut-and-keys-on-it",
               "the-guard-reports-a-file-committed-inside-a-build-written-tree",
               "the-guard-task-is-reachable-only-from-validate-and-the-explicit-check-command",

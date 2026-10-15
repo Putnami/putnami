@@ -77,12 +77,13 @@ Only the task's author knows that no committed file lives in the directory.
   commits one there
   ([CLI ADR 0068](../../../../tooling/cli/doc/adr/0068-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md)
   decision 6). To
-  migrate, move `.gen/clientgen/config.json` to `clientgen.json` at the
-  project root and `.gen/schema/openapi.json` to `schema/openapi.json`, then
-  delete both from `.gen`. The `@putnami/clientgen` workspace check reports
-  each file still committed there as `clientgen.committed-generated-contract`.
-  Under D-004 the change ships in a minor release, whose notes name this
-  step.
+  migrate, run `git mv <project>/.gen/clientgen/config.json <project>/clientgen.json`
+  and `mkdir -p <project>/schema && git mv <project>/.gen/schema/openapi.json <project>/schema/openapi.json`,
+  then ignore `.gen` in `.gitignore` and drop any rule that re-includes a file
+  under it, such as a `!config.json` carve-out. The `@putnami/clientgen`
+  workspace check reports each Git candidate still under either tree as
+  `clientgen.committed-generated-contract`, with the command to run. Under
+  D-004 the change ships in a minor release, whose notes name these steps.
 - A later task that reads an emptied output keys on the producer's key
   instead of the bytes, so its key does not move when the producer writes the
   path during the run.

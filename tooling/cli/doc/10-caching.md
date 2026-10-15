@@ -368,7 +368,10 @@ project-relative matching and exclusions. `git:**` covers every candidate,
 including files outside the project's directory. It never walks ignored local
 directories. Missing tracked files are absent from the candidate; additions,
 edits, a change of the executable bit, renames and deletions change the key.
-Staging unchanged bytes does not.
+Staging unchanged bytes does not. When every `git:` pattern of an input has a
+literal segment before its first wildcard, Git lists only the candidates below
+those segments; that listing selects the same files, so the key does not move.
+A pattern with no such segment, such as `git:**`, lists the whole repository.
 
 Candidate inputs hash raw file bytes and symlink target text, with separate
 file-type markers, and each regular file's executable bit as a source binding
@@ -736,9 +739,14 @@ output whether it tracks a file under the output's path, outside the kept
 subpaths. A tracked file deleted from the worktree counts. When the index
 tracks one, the execution fails before its subprocess starts, with an error
 that names the output, its path and the first tracked file: an emptied output
-owns its path whole, so move the committed files out of it. A hit is not
-served, so the task executes and fails the same way. Outside a Git work tree
-the scheduler asks nothing, and the output is emptied as before. A required or
+owns its path whole, so move the committed files out of it with `git mv`. For
+a clientgen provider, run
+`git mv <project>/.gen/clientgen/config.json <project>/clientgen.json`. When
+that file is gone from the worktree, the error says Git still tracks it and
+names the `git rm --cached` that stages its removal. A hit is not served, so
+the task executes and fails the same way. Outside a Git work tree the output
+is emptied as before. A workspace with a Git entry at or above its root but no
+git program fails the task, naming the missing program. A required or
 command-output directory is emptied without the question.
 
 A file that another task writes inside the owned region is removed with the

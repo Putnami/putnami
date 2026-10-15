@@ -1036,7 +1036,8 @@
               "an-entry-stored-without-emptying-is-never-served",
               "an-emptied-output-that-holds-a-tracked-file-is-never-emptied",
               "a-hit-over-a-tracked-file-in-an-emptied-output-is-not-served",
-              "outside-a-git-work-tree-an-emptied-output-is-emptied"
+              "outside-a-git-work-tree-an-emptied-output-is-emptied",
+              "a-git-work-tree-without-a-git-program-fails-closed"
             ]
           }
         },

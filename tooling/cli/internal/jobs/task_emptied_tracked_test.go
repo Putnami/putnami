@@ -3,6 +3,7 @@ package jobs
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -46,20 +47,23 @@ func newTrackedEmptiedFixture(t *testing.T, git bool) (*emptyingFixture, string)
 	return f, filepath.Join(f.gen, "clientgen")
 }
 
+// heldTrackedFile is what the refusal says about a tracked file in the
+// output's worktree: the file, and the command that moves it out.
+var heldTrackedFile = []string{
+	"holds the Git-tracked file " + committedContractRel,
+	"an emptied output owns its path whole, so move the committed files out of it with git mv",
+}
+
 // refused fails unless the session's one task failed before its subprocess
-// started, with the error that names the output, its path and the tracked
-// file.
-func (f *emptyingFixture) refused(t *testing.T, leg string, result *SchedulerResult) {
+// started, with the error that names the output and its path and says each of
+// want.
+func (f *emptyingFixture) refused(t *testing.T, leg string, result *SchedulerResult, want ...string) {
 	t.Helper()
 	row := f.rows(t, leg, result)[0]
 	if result.Success || row.Status != "failed" || row.CacheHit || row.Error == nil {
 		t.Fatalf("%s: row = %+v (success=%v), want a task that failed without a hit", leg, row, result.Success)
 	}
-	for _, want := range []string{
-		`declared output "clientgen" (` + emptyingProject + `/.gen/clientgen)`,
-		"holds the Git-tracked file " + committedContractRel,
-		"an emptied output owns its path whole, so move the committed files out of it",
-	} {
+	for _, want := range append([]string{`declared output "clientgen" (` + emptyingProject + `/.gen/clientgen)`}, want...) {
 		if !strings.Contains(row.Error.Message, want) {
 			t.Errorf("%s: error %q does not say %q", leg, row.Error.Message, want)
 		}
@@ -68,9 +72,11 @@ func (f *emptyingFixture) refused(t *testing.T, leg string, result *SchedulerRes
 
 // The execution fails before its subprocess starts and leaves every file in
 // the output, the ignored one included, and so does a tracked file a build of
-// an older engine already deleted, since the index still tracks it. A tracked
-// file under a kept subpath is never removed, so it does not count. Once the
-// index no longer tracks the file, the execution empties the output as before.
+// an older engine or a move without git mv already deleted, since the index
+// still tracks it: the error then says the file is missing from the worktree
+// and names the git rm --cached that stages its removal. A tracked file under
+// a kept subpath is never removed, so it does not count. Once the index no
+// longer tracks the file, the execution empties the output as before.
 func TestAnEmptiedOutputThatHoldsATrackedFileIsNeverEmptied(t *testing.T) {
 	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-emptied-output-that-holds-a-tracked-file-is-never-emptied")
 	f, clientgen := newTrackedEmptiedFixture(t, true)
@@ -81,13 +87,15 @@ func TestAnEmptiedOutputThatHoldsATrackedFileIsNeverEmptied(t *testing.T) {
 	writeFileAt(t, filepath.Join(clientgen, "kept", "note.txt"), "kept\n")
 	treeKeyedGit(t, f.ws.Root, "add", "-f", committedContractRel, emptyingProject+"/.gen/clientgen/kept/note.txt")
 
-	f.refused(t, "execution over a tracked file", f.run(t, SchedulerConfig{Retry: 2}))
+	f.refused(t, "execution over a tracked file", f.run(t, SchedulerConfig{Retry: 2}), heldTrackedFile...)
 	assertFilesIn(t, "execution over a tracked file", clientgen, "built.json", "config.json", "kept/note.txt")
 
 	if err := os.Remove(committed); err != nil {
 		t.Fatal(err)
 	}
-	f.refused(t, "execution over a tracked file deleted from the worktree", f.run(t, SchedulerConfig{}))
+	f.refused(t, "execution over a tracked file deleted from the worktree", f.run(t, SchedulerConfig{}),
+		committedContractRel+" is still tracked by Git but missing from the worktree",
+		"run git rm --cached "+committedContractRel)
 	assertFilesIn(t, "execution over a tracked file deleted from the worktree", clientgen, "built.json", "kept/note.txt")
 
 	if got := invocationLog(t, f.logPath); len(got) != 0 {
@@ -126,7 +134,7 @@ func TestAHitOverATrackedFileInAnEmptiedOutputIsNotServed(t *testing.T) {
 	emptyings := recordEmptyings(t)
 	writeFileAt(t, filepath.Join(clientgen, "config.json"), "{\"targets\":[\"go\"]}\n")
 	treeKeyedGit(t, f.ws.Root, "add", "-f", committedContractRel)
-	f.refused(t, "a hit over a tracked file", f.run(t, SchedulerConfig{}))
+	f.refused(t, "a hit over a tracked file", f.run(t, SchedulerConfig{}), heldTrackedFile...)
 	assertFilesIn(t, "a hit over a tracked file", clientgen, "config.json")
 	if got := emptyings(); len(got) != 0 {
 		t.Fatalf("emptied %v, want nothing while the output holds a tracked file", got)
@@ -163,4 +171,45 @@ func TestOutsideAGitWorkTreeAnEmptiedOutputIsEmptied(t *testing.T) {
 	if len(unmanaged) != 1 {
 		t.Fatalf("the scheduler asked Git %d times and was told it does not manage the workspace, want once", len(unmanaged))
 	}
+}
+
+// A workspace with a Git entry at or above its root but no git program to read
+// the index fails closed: the engine cannot tell whether the output holds a
+// tracked file, so the execution fails before its subprocess starts and names
+// the missing program. Without a Git entry the workspace is no work tree, and
+// the output is emptied as before.
+func TestAGitWorkTreeWithoutAGitProgramFailsClosed(t *testing.T) {
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-git-work-tree-without-a-git-program-fails-closed")
+	f, clientgen := newTrackedEmptiedFixture(t, true)
+	mkdir, err := exec.LookPath("mkdir")
+	if err != nil {
+		t.Skip("the fixture tool needs mkdir")
+	}
+	bin := t.TempDir()
+	if err := os.Symlink(mkdir, filepath.Join(bin, "mkdir")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	if _, err := exec.LookPath("git"); err == nil {
+		t.Fatal("git is still on PATH")
+	}
+	emptyings := recordEmptyings(t)
+	writeFileAt(t, filepath.Join(clientgen, "config.json"), "{\"targets\":[\"go\"]}\n")
+
+	f.refused(t, "execution in a work tree without git", f.run(t, SchedulerConfig{}),
+		filepath.Join(f.ws.Root, ".git")+" marks a Git work tree, but no git program is on PATH",
+		"install git")
+	assertFilesIn(t, "execution in a work tree without git", clientgen, "config.json")
+	if got := invocationLog(t, f.logPath); len(got) != 0 {
+		t.Fatalf("invocations = %v, want none: the tool ran over an output nobody could check", got)
+	}
+	if got := emptyings(); len(got) != 0 {
+		t.Fatalf("emptied %v, want nothing in a work tree without git", got)
+	}
+
+	if err := os.RemoveAll(filepath.Join(f.ws.Root, ".git")); err != nil {
+		t.Fatal(err)
+	}
+	f.executed(t, "execution without git outside a work tree", f.run(t, SchedulerConfig{}))
+	assertFilesIn(t, "execution without git outside a work tree", clientgen)
 }

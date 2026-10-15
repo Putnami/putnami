@@ -27,11 +27,23 @@ and rejects any contract semantic that the shared client IR cannot represent.
 that ships in a minor release. The Go `build-describe` owns both directories
 whole, so it fails while Git tracks a file there: the engine never empties an
 emptied output that holds a tracked file (CLI ADR 0068). The TypeScript
-`build-generate` owns `.gen` whole and deletes such a file. Move
-`.gen/clientgen/config.json` to `clientgen.json` at the project root and
-`.gen/schema/openapi.json` to `schema/openapi.json`, then delete both from
-`.gen`. The workspace check reports each file still committed there as
-`clientgen.committed-generated-contract`.
+`build-generate` owns `.gen` whole and deletes such a file. Migrate each
+provider in three steps:
+
+1. Run `git mv <project>/.gen/clientgen/config.json <project>/clientgen.json`.
+2. Run `mkdir -p <project>/schema && git mv <project>/.gen/schema/openapi.json <project>/schema/openapi.json`.
+   When `schema/openapi.json` already exists, run
+   `git rm --cached <project>/.gen/schema/openapi.json` instead.
+3. Ignore `.gen` in `.gitignore`, and drop any rule that re-includes a file
+   under it, such as a `!config.json` carve-out. A workspace that does not
+   ignore it holds
+   each build's output there as a Git candidate, which the workspace check
+   reports and which the clientgen keys read.
+
+A plain `mv` leaves the old path in the Git index, and describe then fails
+naming the `git rm --cached` to run. The workspace check reports each Git
+candidate still under either tree as `clientgen.committed-generated-contract`,
+with the command to run.
 
 Generate every configured target:
 

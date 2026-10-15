@@ -3,6 +3,8 @@ package jobs
 import (
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -23,9 +25,16 @@ var trackedUnder = putnamigit.TrackedUnder
 // counts too. A file under a kept subpath (ceded, preserved, or the build
 // stamp) is never removed, so it does not count.
 //
+// The error names the first such file and the Git command that takes it out
+// of the output: git mv for a file in the worktree, and git rm --cached for one
+// the index still tracks after it left the worktree.
+//
 // A required or command-output directory is emptied without the flag (ADR
 // 0064, ADR 0065), and the scheduler asks nothing about it. Outside a Git work
-// tree there is no index, and the outputs are emptied as before.
+// tree there is no index, and the outputs are emptied as before. A workspace
+// with a Git entry at or above its root but no git program to read the index
+// fails instead: the engine cannot tell whether the output holds a tracked
+// file there.
 func (s *Scheduler) refuseTrackedEmptiedOutputs(job *ScheduledJob) error {
 	roots := s.outputRoots()
 	if roots.Root == "" {
@@ -48,6 +57,10 @@ func (s *Scheduler) refuseTrackedEmptiedOutputs(job *ScheduledJob) error {
 		tracked, err := trackedUnder(roots.Root, rel)
 		var unmanaged *putnamigit.UnmanagedError
 		if errors.As(err, &unmanaged) {
+			if entry, inside := putnamigit.WorkTreeEntry(roots.Root); inside && errors.Is(err, putnamigit.ErrNoProgram) {
+				return fmt.Errorf("declared output %q (%s): %s marks a Git work tree, but no git program is on PATH, so the engine cannot tell whether the output holds a Git-tracked file: install git",
+					declared.ID, rel, entry)
+			}
 			return nil
 		}
 		if err != nil {
@@ -58,7 +71,11 @@ func (s *Scheduler) refuseTrackedEmptiedOutputs(job *ScheduledJob) error {
 			if inner, below := strings.CutPrefix(path, rel+"/"); below && keptPath(keep, inner) {
 				continue
 			}
-			return fmt.Errorf("declared output %q (%s) holds the Git-tracked file %s: an emptied output owns its path whole, so move the committed files out of it",
+			if _, statErr := os.Lstat(filepath.Join(roots.Root, filepath.FromSlash(path))); errors.Is(statErr, fs.ErrNotExist) {
+				return fmt.Errorf("declared output %q (%s): %s is still tracked by Git but missing from the worktree, and an emptied output owns its path whole: run git rm --cached %s",
+					declared.ID, rel, path, path)
+			}
+			return fmt.Errorf("declared output %q (%s) holds the Git-tracked file %s: an emptied output owns its path whole, so move the committed files out of it with git mv",
 				declared.ID, rel, path)
 		}
 	}

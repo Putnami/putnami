@@ -83,11 +83,17 @@ no task writes. Each `cloud/clients` provider slice committed
    one does, the execution fails before its subprocess starts, as a failure to
    empty does (ADR 0064 point 6), with an error that names the output, its
    path and the first tracked file, and says that an emptied output owns its
-   path whole, so the committed files move out of it. A restore, which would
+   path whole, so the committed files move out of it with `git mv`. When that
+   file is gone from the worktree, the error says that Git still tracks it and
+   names the `git rm --cached` that stages its removal. A restore, which would
    empty or replace the output, is refused the same way: that is a restore
    failure (ADR 0065 point 5), so the task executes and fails. Outside a Git
    work tree there is no index, and the output is emptied as before. A
-   required or command-output directory is emptied without the question.
+   workspace with a Git entry at or above its root (`$GIT_DIR`, or a `.git`
+   directory or file below every `GIT_CEILING_DIRECTORIES` entry) but no git
+   program to read the index is a work tree the engine cannot check: the task
+   fails, naming the missing program. A required or command-output directory
+   is emptied without the question.
 
 With this decision, point 7 of ADR 0064 and point 2 of ADR 0065 read as
 follows. An `optionalEmpty` project or workspace output is emptied when it
@@ -118,21 +124,44 @@ declares `emptied`, and is not otherwise.
 - **This is a breaking change.** A Go provider that commits a file under
   `.gen/clientgen` or `.gen/schema` fails at describe's next execution
   (decision 6). A TypeScript provider already lost such a file, since its
-  `build-generate` owns `.gen` as a required output. To migrate, move
-  `.gen/clientgen/config.json` to `clientgen.json` at the project root and
-  `.gen/schema/openapi.json` to `schema/openapi.json`, then delete both from
-  `.gen`. Under D-004 the change ships in a minor release, whose notes name
-  this step.
+  `build-generate` owns `.gen` as a required output. To migrate a provider:
+  1. Run `git mv <project>/.gen/clientgen/config.json <project>/clientgen.json`.
+  2. Run `mkdir -p <project>/schema && git mv <project>/.gen/schema/openapi.json <project>/schema/openapi.json`.
+     When `schema/openapi.json` already exists, run
+     `git rm --cached <project>/.gen/schema/openapi.json` instead.
+  3. Ignore `.gen` in `.gitignore`, and drop any rule that re-includes a file
+     under it, such as a `!config.json` carve-out. A workspace that does not
+     ignore `.gen` holds each build's output there as a Git candidate, which
+     the workspace check reports and `git:.gen/clientgen/config.json` hashes.
+
+  A plain `mv` leaves the old path in the index, and describe then fails
+  naming the `git rm --cached` to run. Under D-004 the change ships in a
+  minor release, whose notes name these steps.
 - An unmigrated workspace fails at its first build: describe fails with the
   engine error and leaves the committed file in place. When describe is not
-  planned, `validate` reports each such file with the migration
+  planned, `validate` reports each such file
   (`clientgen.committed-generated-contract`), because the file stays in the
-  Git candidate set the workspace check reads. A tracked file an older CLI
+  Git candidate set the workspace check reads. The finding names the
+  `git mv` or `git rm --cached` to run when an ignore rule excludes the file,
+  so only Git's index holds it, and asks to ignore `.gen` in `.gitignore`
+  when no rule does, since each build's output there is then a candidate
+  too. A tracked file an older CLI
   already deleted is not in that set, and that tree's `git:**` key equals the
   key of a tree that never tracked it, so the check does not report it;
   describe still fails on it, because the index tracks it.
 - Each execution and restore of a task with an emptied output runs
   `git ls-files` once per such output: twice for `build-describe`.
+- Each computation of a clientgen key lists the Git candidates below
+  `.gen/clientgen/config.json` only, because a `git:` input lists its
+  candidates under the bound of its patterns. The bound selects exactly the
+  files the whole listing selects, so no key moves, and a pattern with no
+  bound, such as `git:**`, still lists the whole repository. In this
+  repository the bounded listing takes 19 ms where the whole one takes 71 ms.
+- An ignored `.gen/clientgen/config.json` left by earlier builds in a project
+  that stops planning describe, because its `go.mod` dropped
+  `go.putnami.dev/app`, is neither keyed nor emptied, and every reader still
+  takes it, so a fresh clone computes the same `clientgen-go` key over a
+  different contract. Delete `.gen` after you drop `go.putnami.dev/app`.
 - A `git:` entry needs a Git work tree. Outside one, `clientgen-go` and
   `clientgen-ts` run uncached, as every task with a `git:` input does.
 - An optional project or workspace output that does not declare `emptied`

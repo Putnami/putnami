@@ -403,6 +403,12 @@ func gitInputDirectory(dir string, patterns []string) (string, error) {
 // does not store the executable bit takes a tracked file's bit from the index
 // mode, and an unmerged path has no single mode, so a selected one produces no
 // key.
+//
+// Both listings are bounded to the literal prefixes of the include patterns
+// (gitInputPrefixes) when every pattern has one, so a key that reads one file
+// does not list the whole repository. The bounded listing holds every path the
+// whole one would select, so the key reads the same files and hashes the same
+// bytes; a pattern such as `git:**` has no prefix and lists the whole cut.
 func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, error) {
 	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
 	cmd.Dir = dir
@@ -411,11 +417,12 @@ func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, erro
 		return nil, fmt.Errorf("resolve Git input repository: %w", err)
 	}
 	root := strings.TrimSuffix(string(out), "\n")
-	paths, err := gitutil.CandidatePaths(root)
+	prefixes := gitInputPrefixes(root, dir, includes)
+	paths, err := candidatePaths(root, prefixes...)
 	if err != nil {
 		return nil, err
 	}
-	index, err := gitutil.ReadIndexModes(root)
+	index, err := gitutil.ReadIndexModes(root, prefixes...)
 	if err != nil {
 		return nil, err
 	}
@@ -445,6 +452,32 @@ func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, erro
 		files = append(files, fileEntry{path: full, info: info, gitCandidate: true, indexMode: index.Modes[path]})
 	}
 	return files, nil
+}
+
+// candidatePaths is gitutil.CandidatePaths. It is a variable only so a test
+// can read the bound a key lists its candidates under.
+var candidatePaths = gitutil.CandidatePaths
+
+// gitInputPrefixes returns, as slash paths relative to the repository root,
+// the directory or file every candidate each include pattern selects lies at
+// or below: its bound from gitPatternRoot, the one FileInputRegion reads. It
+// returns nil, for a listing of the whole cut, when a pattern is unbounded, as
+// `**` is, or when a bound is the root or lies outside it.
+func gitInputPrefixes(root, dir string, includes []string) []string {
+	prefixes := make([]string, 0, len(includes))
+	for _, include := range includes {
+		pattern, _ := wsproto.GitFilePattern(include)
+		bound, bounded := gitPatternRoot(dir, pattern)
+		if !bounded {
+			return nil
+		}
+		rel, err := filepath.Rel(root, bound)
+		if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return nil
+		}
+		prefixes = append(prefixes, filepath.ToSlash(rel))
+	}
+	return prefixes
 }
 
 // Candidate readers inspect raw bytes: project-config task tuning and every

@@ -175,3 +175,38 @@ func TestIsShallow_OtherGitFailureKeepsItsDetail(t *testing.T) {
 		t.Fatalf("message dropped the git failure: %q", err.Error())
 	}
 }
+
+// WorkTreeEntry finds a .git directory or gitfile at or above a directory from
+// the filesystem alone, never walks up into a ceiling directory, and takes
+// $GIT_DIR when it is set.
+func TestWorkTreeEntryFindsTheGitEntryWithoutAGitProgram(t *testing.T) {
+	outer := t.TempDir()
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(outer))
+	t.Setenv("GIT_DIR", "")
+	t.Setenv("PATH", t.TempDir())
+	nested := filepath.Join(outer, "repo", "services", "catalog")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if entry, found := WorkTreeEntry(nested); found {
+		t.Fatalf("WorkTreeEntry(plain directory) = %q, want none", entry)
+	}
+
+	gitfile := filepath.Join(outer, "repo", ".git")
+	if err := os.WriteFile(gitfile, []byte("gitdir: /elsewhere\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if entry, found := WorkTreeEntry(nested); !found || entry != gitfile {
+		t.Fatalf("WorkTreeEntry(below a gitfile) = %q, %v, want %q", entry, found, gitfile)
+	}
+
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Join(outer, "repo"))
+	if entry, found := WorkTreeEntry(nested); found {
+		t.Fatalf("WorkTreeEntry(below a ceiling) = %q, want none: Git does not walk up into a ceiling", entry)
+	}
+
+	t.Setenv("GIT_DIR", "/explicit/.git")
+	if entry, found := WorkTreeEntry(nested); !found || entry != "/explicit/.git" {
+		t.Fatalf("WorkTreeEntry(with GIT_DIR) = %q, %v, want $GIT_DIR", entry, found)
+	}
+}
