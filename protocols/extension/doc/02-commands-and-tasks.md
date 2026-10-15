@@ -258,12 +258,14 @@ contract increment is needed (see
 Every job a command runs, planned or interactive, receives the complete
 workspace membership in the `workspaceProjects` member of its job context.
 Each entry carries the project's resolved `type`: the type its `putnami.json`
-authors, else the type its provider reported. The Go extension reports
-`library` for a Go module without a `main` package, so a Go library whose
-`putnami.json` authors no type still reads `library`. A command that acts on
-deployable workloads reads `type` there and does not classify projects itself.
-An empty `type` means nothing classified the project: read it as
-`application`, the workspace default. The job context protocol
+authors, else the type its provider reported, else `application`, the
+workspace default. The Go extension reports `library` for a Go module without
+a `main` package, so a Go library whose `putnami.json` authors no type still
+reads `library`. A command that acts on deployable workloads reads `type` there
+and does not classify projects itself. Inside `workspaceProjects`, whose
+producer resolves every classification, an entry without `type` comes from a
+CLI that predates the member: a command that acts on workloads declines rather
+than reading it as `application`. The job context protocol
 (`protocols/job/README.md`) defines the member.
 
 ## Tasks

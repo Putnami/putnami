@@ -294,11 +294,14 @@ or non-Putnami producer supplied no authored config, so fail closed rather than
 scanning manifests to reconstruct it.
 
 `Type` is the project's resolved classification: the authored `putnami.json`
-type, else the one the owning provider's workspace probe reported. Read it, not
-`Config`, to tell a deployable workload from a library: a provider classifies
-projects whose `putnami.json` authors no type, and the Go extension classifies
-every Go module that way. Empty means nothing classified the project; read it
-as `"application"`, the workspace default.
+type, else the one the owning provider's workspace probe reported, else
+`"application"`, the workspace default. Read it, not `Config`, to tell a
+deployable workload from a library: a provider classifies projects whose
+`putnami.json` authors no type, and the Go extension classifies every Go module
+it can read that way. Inside `WorkspaceProjects`, whose producer resolves every
+classification, an entry without `Type` comes from a producer that predates the
+member. A task that acts on workloads declines rather than reading it as
+`"application"`.
 
 ### Project Bin Field
 

@@ -336,16 +336,19 @@ them:
   workspace task needs to know which extension's option blocks apply to a
   sibling: a block keyed by `@putnami/go` applies to Go projects only.
 
-- **`type`** (v2 only) — the project's **resolved** classification, the value
-  `project.type` carries for the job's own project: the authored `putnami.json`
-  type, else the one the owning provider's workspace probe reported. It is
-  populated inside `workspaceProjects`, where a task that acts on deployable
-  workloads tells them from libraries. `config` holds only the authored type,
-  and a provider classifies projects whose `putnami.json` authors none (the Go
-  extension classifies every Go module), so a task reads `type`, not `config`.
-  Empty means nothing classified the project, and a task reads it as
-  `"application"`, the workspace default. A v1 document carrying it is
-  rejected (`job.unexpected_field`).
+- **`type`** (v2 only) — the project's **resolved** classification: the
+  authored `putnami.json` type, else the one the owning provider's workspace
+  probe reported, else `"application"`, the workspace default. It is populated
+  inside `workspaceProjects`, where a task that acts on deployable workloads
+  tells them from libraries. `config` holds only the authored type, and a
+  provider classifies projects whose `putnami.json` authors none (the Go
+  extension classifies every Go module it can read), so a task reads `type`,
+  not `config`. A v1 document carrying it is rejected (`job.unexpected_field`).
+
+  Absence is read from the **containing** member. Inside `workspaceProjects`,
+  whose producer resolves every classification, an entry without `type` comes
+  from a producer that predates the member, and a consumer that acts on
+  workloads declines rather than reading it as `"application"`.
 
 All seven are omitempty, so a producer that has nothing to say emits none.
 

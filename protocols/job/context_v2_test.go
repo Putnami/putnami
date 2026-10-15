@@ -597,7 +597,10 @@ func TestV2WorkspaceProjectsCarryTheResolvedExtensions(t *testing.T) {
 
 // TestV2WorkspaceProjectsCarryTheResolvedType asserts the member a workspace
 // task reads to tell a deployable workload from a library, and that a
-// reference without it encodes as it did before the member.
+// reference without it encodes as it did before the member. The fixture's
+// /libs/legacy entry carries no type: it models a producer that predates the
+// member, which a consumer acting on workloads declines, and the document
+// stays valid.
 func TestV2WorkspaceProjectsCarryTheResolvedType(t *testing.T) {
 	t.Parallel()
 	ctx, diags := ParseAndValidate(readFixture(t, "fixtures", "v2", "valid", "project-references.json"))
