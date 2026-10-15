@@ -100,6 +100,7 @@
         "key": {
           "files": [
             "clientgen.json",
+            "git:.gen/clientgen/config.json",
             "go.mod",
             "schema/openapi.json"
           ]
@@ -141,6 +142,7 @@
             ".editorconfig",
             "biome.json",
             "clientgen.json",
+            "git:.gen/clientgen/config.json",
             "package.json",
             "schema/openapi.json"
           ],

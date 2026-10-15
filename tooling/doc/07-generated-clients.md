@@ -25,7 +25,9 @@ A provider lists `/tooling/clientgen-extension` in its `putnami.json`
 are the only seam between the two toolchains. A provider with no app to build,
 such as a `cloud/clients` slice, commits the same contract as `clientgen.json`
 at its root and its OpenAPI document as `schema/openapi.json`. The emitters and
-the guard read `clientgen.json` when no build wrote `.gen/clientgen/config.json`.
+the guard read `clientgen.json` when no build wrote `.gen/clientgen/config.json`,
+and the emitters then read `schema/openapi.json` only, never a `.gen/schema`
+an earlier build left.
 
 The same-language client is emitted in-app during `putnami build`. The
 cross-language client is emitted by `putnami clientgen`, which runs the other
@@ -95,6 +97,7 @@ caches is the worktree.
 | A manifest's `omittedOperations` names an operation the provider does not declare (`clientgen.omitted-operation-drift`) | Remove the name from `go.omitOperations`, then sync |
 | A handwritten transport call reaches a first-party provider | Replace it with the generated binding, or classify it (below) |
 | An unmarked OpenAPI document is generated without `thirdParty: true` | Mark the provider, or declare the contract external |
+| A project commits a file under `.gen/clientgen` or `.gen/schema`, which a build owns whole (`clientgen.committed-generated-contract`) | Move `.gen/clientgen/config.json` to `clientgen.json` and `.gen/schema/openapi.json` to `schema/openapi.json` at the project root, then delete both from `.gen` |
 
 Every transport callsite the scanner finds is either associated with a
 first-party provider — which fails, because a generated binding must replace it

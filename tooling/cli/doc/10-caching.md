@@ -445,7 +445,10 @@ producer's key instead. A key may leave out bytes another task writes only when
 a key it folds fixes them: the TypeScript `build-generate` owns `.gen` as a
 required output, and the Go `build-describe` declares both trees `emptied`.
 The keys hash the committed generation contract `clientgen.json` and the
-committed sidecar `schema/openapi.json`, which no task writes.
+committed sidecar `schema/openapi.json`, which no task writes. They also read
+`.gen/clientgen/config.json` as a Git candidate, so a project that still
+commits its contract there, which is no longer supported, moves its key when
+it edits it, while the one a build writes is ignored and no candidate.
 
 ### Outputs written earlier in the session
 
@@ -726,6 +729,18 @@ when the output is a mount of its own. When the emptying fails, the task fails
 before its subprocess starts, with an error that names the output, and nothing
 is stored.
 
+**An emptied output never loses a committed file.** Before the scheduler
+empties an `optionalEmpty` directory that declares `emptied`, and before a
+restore writes anything for its task, it asks the Git index once per such
+output whether it tracks a file under the output's path, outside the kept
+subpaths. A tracked file deleted from the worktree counts. When the index
+tracks one, the execution fails before its subprocess starts, with an error
+that names the output, its path and the first tracked file: an emptied output
+owns its path whole, so move the committed files out of it. A hit is not
+served, so the task executes and fails the same way. Outside a Git work tree
+the scheduler asks nothing, and the output is emptied as before. A required or
+command-output directory is emptied without the question.
+
 A file that another task writes inside the owned region is removed with the
 rest, exactly as a restore of the owner's entry removes it. A path that must
 outlive the owner's execution has to be ceded by the owner. The TypeScript
@@ -778,7 +793,7 @@ key moved. See
 [ADR 0064](adr/0064-an-executing-task-starts-from-an-empty-owned-directory.md),
 [ADR 0065](adr/0065-an-optional-command-output-directory-is-emptied-on-execution-and-on-an-empty-restore.md)
 and
-[ADR 0067](adr/0067-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md).
+[ADR 0068](adr/0068-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md).
 
 **`--no-cache` never replaces a stored entry.** A bypassed run neither reads
 nor publishes at its key (see

@@ -1,6 +1,7 @@
 package jobs
 
 import (
+	"fmt"
 	"io/fs"
 	"path/filepath"
 	"sort"
@@ -56,6 +57,18 @@ import (
 // invocation-scoped, command-output or workspace-rooted output is not in the
 // project tree. A task's own outputs are not a conflict for it, and a path an
 // output cedes (excludes) is not inside that output.
+//
+// The guard does not see two more kinds of reach:
+//   - a workspaceFiles pattern against a workspace-rooted output, since it
+//     reads project-rooted patterns and project-rooted outputs only;
+//   - a file a task writes without declaring it as an output, such as the
+//     sidecars build-describe commits under schema/.
+//
+// A key may leave out bytes another task writes only when a key it folds fixes
+// them: the writer is cached, and its execution and its restore both leave the
+// output holding what its key produced. That holds for a required output and
+// for an optional directory that declares emptied, and not for any other
+// optional output. The failure message advises dropping the pattern only then.
 
 // keyOutputConflict is one cache key pattern that selects a file inside a
 // literal declared output of another task.
@@ -72,6 +85,10 @@ type keyOutputConflict struct {
 // them and the plan marks it movable (planKeyMovement). An entry that no
 // longer matches a conflict fails the guard, so the list only shrinks.
 var keyOutputAllowlist = map[keyOutputConflict]string{
+	{"@putnami/clientgen clientgen-go", "git:.gen/clientgen/config.json", "@putnami/go build-describe", ".gen/clientgen"}:                   "Only a contract a project commits is a Git candidate there, since the workspace ignores the one describe writes; committing one is unsupported and the clientgen guard reports it, and the key reads it so an unmigrated provider is not served a client of another contract.",
+	{"@putnami/clientgen clientgen-go", "git:.gen/clientgen/config.json", "@putnami/typescript build-generate", ".gen"}:                     "Only a contract a project commits is a Git candidate there, since the workspace ignores the one build-generate writes; committing one is unsupported and the clientgen guard reports it, and the key reads it so an unmigrated provider is not served a client of another contract.",
+	{"@putnami/clientgen clientgen-ts", "git:.gen/clientgen/config.json", "@putnami/go build-describe", ".gen/clientgen"}:                   "Only a contract a project commits is a Git candidate there, since the workspace ignores the one describe writes; committing one is unsupported and the clientgen guard reports it, and the key reads it so an unmigrated provider is not served a client of another contract.",
+	{"@putnami/clientgen clientgen-ts", "git:.gen/clientgen/config.json", "@putnami/typescript build-generate", ".gen"}:                     "Only a contract a project commits is a Git candidate there, since the workspace ignores the one build-generate writes; committing one is unsupported and the clientgen guard reports it, and the key reads it so an unmigrated provider is not served a client of another contract.",
 	{"@putnami/clientgen clientgen-go", "schema/openapi.json", "@putnami/typescript build-generate", "schema/openapi.json"}:                 "build-generate polices this committed contract with drift fail: a run that succeeds rewrites it unchanged, and a run that changes it fails build-generate.",
 	{"@putnami/clientgen clientgen-ts", "schema/openapi.json", "@putnami/typescript build-generate", "schema/openapi.json"}:                 "build-generate polices this committed contract with drift fail: a run that succeeds rewrites it unchanged, and a run that changes it fails build-generate.",
 	{"@putnami/cloud cloud-validate-config-project", ".gen/conf/.env.prod.yaml", "@putnami/typescript build-generate", ".gen"}:              "No TypeScript task writes .gen/conf: the merged env files come from the Go config-merge, to which the Go build-generate cedes .gen/conf.",
@@ -107,10 +124,15 @@ func TestNoCacheKeyReadsAnotherTasksLiteralOutput(t *testing.T) {
 		t.Fatal("no task has a cache key; the guard would be vacuously green")
 	}
 
+	byWriter := make(map[[2]string]literalOutput, len(outputs))
+	for _, output := range outputs {
+		byWriter[[2]string{output.writer, output.path}] = output
+	}
 	for _, conflict := range sortedKeyOutputConflicts(found) {
 		if reason := keyOutputAllowlist[conflict]; reason == "" {
-			t.Errorf("%s: key pattern %q reads inside output %s, which %s can write during the run; exclude the output from the key, or allowlist {%q, %q, %q, %q} with the reason the key must read those bytes",
+			t.Errorf("%s: key pattern %q reads inside output %s, which %s can write during the run; %s {%q, %q, %q, %q} with the reason the key must read those bytes",
 				conflict.reader, conflict.pattern, conflict.output, conflict.writer,
+				keyOutputRemedy(byWriter[[2]string{conflict.writer, conflict.output}]),
 				conflict.reader, conflict.pattern, conflict.writer, conflict.output)
 		}
 	}
@@ -176,6 +198,43 @@ func TestKeyOutputGuardReadsKeysTheWayTheKeyCodeDoes(t *testing.T) {
 	}
 }
 
+// TestKeyOutputGuardAdvisesDroppingAPatternOnlyWhenTheWriterFixesTheBytes
+// pins the remedy the failure message gives: dropping the pattern is advised
+// only for an output whose writer is cached and empties or rewrites it whole.
+func TestKeyOutputGuardAdvisesDroppingAPatternOnlyWhenTheWriterFixesTheBytes(t *testing.T) {
+	directory := func(optional, emptied bool) extension.DeclaredOutput {
+		return extension.DeclaredOutput{Kind: extension.OutputKindDirectory, Path: ".gen/tree", OptionalEmpty: optional, Emptied: emptied}
+	}
+	for _, tc := range []struct {
+		name   string
+		keyed  bool
+		output extension.DeclaredOutput
+		drop   bool
+	}{
+		{"a required directory of a cached writer", true, directory(false, false), true},
+		{"a required file of a cached writer", true, extension.DeclaredOutput{Kind: extension.OutputKindFile, Path: "schema/contract.json"}, true},
+		{"an emptied optional directory of a cached writer", true, directory(true, true), true},
+		{"an optional directory that is not emptied", true, directory(true, false), false},
+		{"an optional file", true, extension.DeclaredOutput{Kind: extension.OutputKindFile, Path: "schema/contract.json", OptionalEmpty: true}, false},
+		{"a required directory of a writer that caches nothing", false, directory(false, false), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			outputs := literalProjectOutputs(t, []guardTask{{id: "writer", keyed: tc.keyed, outputs: map[string]extension.DeclaredOutput{"out": tc.output}}})
+			if len(outputs) != 1 {
+				t.Fatalf("outputs = %+v, want one", outputs)
+			}
+			remedy := keyOutputRemedy(outputs[0])
+			if drop := strings.HasPrefix(remedy, "drop the pattern only if"); drop != tc.drop {
+				t.Fatalf("remedy %q advises dropping the pattern = %v, want %v", remedy, drop, tc.drop)
+			}
+			if !tc.drop && !strings.Contains(remedy, "fold its key and make its output emptied, or allowlist") &&
+				!strings.Contains(remedy, "fold the writer's key and make its output emptied, or allowlist") {
+				t.Fatalf("remedy %q does not point to emptied or the allowlist", remedy)
+			}
+		})
+	}
+}
+
 // guardTask is one task of a repository manifest, with the project-rooted
 // patterns its cache key reads.
 type guardTask struct {
@@ -192,6 +251,27 @@ type literalOutput struct {
 	path      string
 	directory bool
 	excludes  []string
+	// cached says the writer is cacheable, so the run computes its key.
+	cached bool
+	// fixed says the writer's execution and its restore both leave the output
+	// holding what its key produced: the output is required, or an optional
+	// directory that declares emptied.
+	fixed bool
+}
+
+// keyOutputRemedy says how to resolve a conflict with the output. Dropping
+// the pattern from the key is sound only when the writer's key fixes the
+// output's bytes and the reader folds that key; otherwise it removes bytes no
+// folded key fixes, the hazard this guard exists for.
+func keyOutputRemedy(output literalOutput) string {
+	switch {
+	case !output.cached:
+		return fmt.Sprintf("do not drop the pattern: %s caches nothing, so no folded key fixes those bytes; make it cacheable, fold its key and make its output emptied, or allowlist", output.writer)
+	case !output.fixed:
+		return fmt.Sprintf("do not drop the pattern: %s can leave an earlier run's files in this optional output, so its key does not fix those bytes; fold the writer's key and make its output emptied, or allowlist", output.writer)
+	default:
+		return fmt.Sprintf("drop the pattern only if this key folds the key of %s, which fixes those bytes because it empties or rewrites the whole output; otherwise allowlist", output.writer)
+	}
 }
 
 // contains reports whether the slash path rel lies inside the output: at or
@@ -339,7 +419,10 @@ func literalProjectOutputs(t *testing.T, tasks []guardTask) []literalOutput {
 			if err != nil {
 				t.Fatalf("%s output %s: %v", task.id, id, err)
 			}
-			output := literalOutput{writer: task.id, path: normalized, directory: declared.Kind == extension.OutputKindDirectory}
+			output := literalOutput{
+				writer: task.id, path: normalized, directory: declared.Kind == extension.OutputKindDirectory,
+				cached: task.keyed, fixed: task.keyed && (!declared.OptionalEmpty || declared.Emptied),
+			}
 			for _, ceded := range declared.Excludes {
 				cededPath, err := extension.NormalizeOutputPath(ceded)
 				if err != nil {

@@ -332,7 +332,7 @@ type ownerRow struct {
 	drift string
 	// emptied asks the engine to empty an optional directory output before its
 	// task executes and on a restore of an entry that records it empty
-	// (protocols/extension ADR 0009, CLI ADR 0067). Only the two describe trees
+	// (protocols/extension ADR 0009, CLI ADR 0068). Only the two describe trees
 	// a later key leaves out carry it: .gen/schema and .gen/clientgen hold no
 	// byte describe's key does not fix, so the clientgen keys fold that key
 	// instead of hashing the bytes describe writes during the run.

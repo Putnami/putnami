@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"slices"
 	"sort"
+	"strings"
 )
 
 // CandidatePaths lists the current cut: tracked paths plus non-ignored new
@@ -40,6 +42,24 @@ func CandidatePaths(root string) ([]string, error) {
 		}
 	}
 	return unique, nil
+}
+
+// TrackedUnder lists the paths the index of the repository holding dir tracks
+// at or below rel, a slash path relative to dir. The paths are relative to
+// dir, in slash form, sorted and unique. It reads the index alone, so a
+// tracked file deleted from the worktree is listed, and rel need not exist.
+// When Git does not manage dir, the error is an *UnmanagedError.
+func TrackedUnder(dir, rel string) ([]string, error) {
+	stdout, stderr, err := runCapture(dir, "ls-files", "-z", "--cached", "--", ":(literal)"+rel)
+	if err != nil {
+		if unmanaged := Unmanaged(dir); unmanaged != nil {
+			return nil, unmanaged
+		}
+		return nil, fmt.Errorf("git ls-files (in %s): %w: %s", dir, err, strings.TrimSpace(stderr))
+	}
+	paths := splitNUL(stdout)
+	sort.Strings(paths)
+	return slices.Compact(paths), nil
 }
 
 // IndexModes is what the index records for each tracked path of a repository:

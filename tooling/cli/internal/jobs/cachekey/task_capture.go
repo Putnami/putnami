@@ -52,7 +52,7 @@ type EmptiedOutputDeclaration struct {
 // record empties it the same way (materializeDeclaredOutputs).
 //
 // An optionalEmpty output under the project or the workspace root is emptied
-// when it declares emptied (ADR 0067): its task states that only it writes the
+// when it declares emptied (ADR 0068): its task states that only it writes the
 // path, so the output holds what the task wrote and the subpaths it cedes or
 // preserves. Without the flag it is left out. It can hold a file no task
 // writes, such as a committed configuration the task reads when it writes

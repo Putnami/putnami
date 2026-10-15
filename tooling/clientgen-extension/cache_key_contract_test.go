@@ -61,20 +61,28 @@ func TestClientgenTsCacheKeyCoversEveryResolvedFormatterInput(t *testing.T) {
 // files it reads: the generation contract clientgen.json and the sidecar
 // schema/openapi.json.
 //
-// Neither key names a file under .gen. build-describe (Go) and build-generate
-// (TypeScript) write .gen/clientgen and .gen/schema during the run, so a key that
-// hashed them would differ between the value the run computes before any task
-// starts and the value the job computes when it starts, and the job would miss
-// the entry the run looked up. Those bytes are fixed by the producer's key,
-// which these keys fold through build-infra: the TypeScript build-generate owns
-// .gen as a required output, and the Go build-describe declares both trees
-// emptied (protocols/extension ADR 0009, CLI ADR 0067). The clientgen command
-// depends on build, which TestWorkspaceCommandsOwnTheirBuildAndTheProjectCommandDependsOnBuild
-// pins.
+// Neither key names a built file under .gen. build-describe (Go) and
+// build-generate (TypeScript) write .gen/clientgen and .gen/schema during the
+// run, so a key that hashed them would differ between the value the run
+// computes before any task starts and the value the job computes when it
+// starts, and the job would miss the entry the run looked up. Those bytes are
+// fixed by the producer's key, which these keys fold through build-infra: the
+// TypeScript build-generate owns .gen as a required output, and the Go
+// build-describe declares both trees emptied (protocols/extension ADR 0009, CLI
+// ADR 0068). The clientgen command depends on build, which
+// TestWorkspaceCommandsOwnTheirBuildAndTheProjectCommandDependsOnBuild pins.
+//
+// A project whose describe is not planned can still commit its generation
+// contract at .gen/clientgen/config.json, and every reader takes that file
+// first. No folded key fixes it, so each key reads it as a Git candidate
+// (git:.gen/clientgen/config.json): a committed file is a candidate and its
+// edit moves the key, and a built one that the workspace ignores is not, so a
+// build of the run never moves the key through it. A plain .gen entry fails
+// here.
 func TestGenerationTasksKeyOnTheCommittedContractAndFoldTheBuiltOne(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "formatter-inputs-are-cache-keyed", "a-cacheable-generator-keys-on-the-committed-contract-and-folds-the-built-one")
 	manifest := loadExtensionManifest(t)
-	wantContractInputs := []string{"clientgen.json", "schema/openapi.json"}
+	wantContractInputs := []string{"clientgen.json", "git:.gen/clientgen/config.json", "schema/openapi.json"}
 	for _, name := range []string{"clientgen-go", "clientgen-ts"} {
 		task := manifest.Tasks[name]
 		if !task.Cache.IsEnabled() {
@@ -89,7 +97,7 @@ func TestGenerationTasksKeyOnTheCommittedContractAndFoldTheBuiltOne(t *testing.T
 		for _, glob := range task.Cache.Key.Files {
 			declared[glob] = true
 			if glob == ".gen" || strings.HasPrefix(glob, ".gen/") {
-				t.Errorf("task %q cache key names %q, which a build of the run writes: the key would differ between the run's lookup and the job's start", name, glob)
+				t.Errorf("task %q cache key names %q, which a build of the run writes: the key would differ between the run's lookup and the job's start; read a committed file there as a Git candidate (git:%s)", name, glob, glob)
 			}
 		}
 		for _, want := range wantContractInputs {

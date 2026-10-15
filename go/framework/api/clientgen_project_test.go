@@ -216,6 +216,42 @@ func TestGenerateProjectClients_ReadsTheCommittedContractWhenNoBuildWroteOne(t *
 	}
 }
 
+// The spec pairs with the contract's origin. A committed clientgen.json reads
+// the committed schema/openapi.json only, even when an earlier build left a
+// different .gen/schema/openapi.json: no cache key covers that file in a
+// project whose build does not write the contract. A contract a build wrote
+// still prefers the fresh .gen spec.
+func TestGenerateProjectClients_ACommittedContractReadsOnlyTheCommittedSpec(t *testing.T) {
+	root := t.TempDir()
+	writeProjectFile(t, root, CommittedClientGenConfigPath, goTargetConfig)
+	writeProjectFile(t, root, "schema/openapi.json", minimalSpec)
+	writeProjectFile(t, root, ".gen/schema/openapi.json", strings.ReplaceAll(minimalSpec, "/items/{id}", "/stale/{id}"))
+
+	if _, err := GenerateProjectClients(root); err != nil {
+		t.Fatalf("GenerateProjectClients: %v", err)
+	}
+	source := readProjectFile(t, root, "clients/go/client.gen.go")
+	if !strings.Contains(source, "/items/{id}") || strings.Contains(source, "/stale/{id}") {
+		t.Fatalf("a committed contract did not generate from the committed spec:\n%s", source)
+	}
+
+	if err := os.Remove(filepath.Join(root, "schema", "openapi.json")); err != nil {
+		t.Fatal(err)
+	}
+	_, err := GenerateProjectClients(root)
+	if err == nil || !strings.Contains(err.Error(), "must commit its OpenAPI spec as schema/openapi.json") {
+		t.Fatalf("a committed contract without a committed spec: err = %v, want it to name schema/openapi.json", err)
+	}
+
+	writeProjectFile(t, root, ".gen/clientgen/config.json", goTargetConfig)
+	if _, err = GenerateProjectClients(root); err != nil {
+		t.Fatalf("GenerateProjectClients with a built contract: %v", err)
+	}
+	if source = readProjectFile(t, root, "clients/go/client.gen.go"); !strings.Contains(source, "/stale/{id}") {
+		t.Fatalf("a built contract did not generate from the .gen spec:\n%s", source)
+	}
+}
+
 func TestGenerateProjectClients_RemovesOnlyUnmodifiedManifestOwnedFiles(t *testing.T) {
 	root := t.TempDir()
 	cfg := strings.Replace(goTargetConfig, "\n  \"thirdParty\": true,", "", 1)

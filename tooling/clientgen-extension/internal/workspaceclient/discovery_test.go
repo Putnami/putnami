@@ -1,6 +1,8 @@
 package workspaceclient
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -70,6 +72,47 @@ func TestDiscoveryReadsTheCommittedGenerationContractWhenNoBuildWroteOne(t *test
 	providers, _ = discover(indexedView(root))
 	if len(providers) != 1 || providers[0].config == nil || !reflect.DeepEqual(providers[0].config.Targets, []string{"ts"}) {
 		t.Fatalf("the committed clientgen.json won over the contract a build wrote: %+v", providers)
+	}
+}
+
+// The OpenAPI document pairs with the generation contract's origin, as both
+// language emitters pair it. With the committed clientgen.json, discovery reads
+// the committed schema/openapi.json even when an earlier build left a different
+// .gen/schema/openapi.json, which no cache key covers in a project whose build
+// does not write the contract, and reports the contract missing when the
+// project commits none. A contract a build wrote still reads the .gen document.
+func TestDiscoveryPairsTheOpenAPIDocumentWithTheContractOrigin(t *testing.T) {
+	spectest.Proves(t, clientgenFeature, "strict-provider-discovery", "a-committed-generation-contract-reads-only-the-committed-sidecar")
+	root := t.TempDir()
+	writeWorkspaceFile(t, root, ".putnami/workspace-index.json", `{
+  "version": 4,
+  "projects": [{"path":"providers/slice"}]
+}`)
+	writeWorkspaceFile(t, root, "providers/slice/putnami.json", `{"name":"slice"}`)
+	writeWorkspaceFile(t, root, "providers/slice/clientgen.json", `{"targets":[]}`)
+	writeWorkspaceFile(t, root, "providers/slice/schema/openapi.json", markedOpenAPI("committed"))
+	writeWorkspaceFile(t, root, "providers/slice/.gen/schema/openapi.json", markedOpenAPI("leftover"))
+
+	providers, findings := discover(indexedView(root))
+	if len(findings) != 0 {
+		t.Fatalf("discovery findings = %+v", findings)
+	}
+	if len(providers) != 1 || providers[0].specPath != "providers/slice/schema/openapi.json" ||
+		providers[0].document == nil || providers[0].document.Service.ID != "committed" {
+		t.Fatalf("a committed contract did not read the committed document: %+v", providers)
+	}
+
+	if err := os.Remove(filepath.Join(root, "providers", "slice", "schema", "openapi.json")); err != nil {
+		t.Fatal(err)
+	}
+	_, findings = discover(indexedView(root))
+	assertFindingCodeList(t, findings, "clientgen.missing-contract")
+
+	writeWorkspaceFile(t, root, "providers/slice/.gen/clientgen/config.json", `{"targets":[]}`)
+	providers, findings = discover(indexedView(root))
+	if len(findings) != 0 || len(providers) != 1 || providers[0].specPath != "providers/slice/.gen/schema/openapi.json" ||
+		providers[0].document == nil || providers[0].document.Service.ID != "leftover" {
+		t.Fatalf("a built contract did not read the .gen document: providers=%+v findings=%+v", providers, findings)
 	}
 }
 

@@ -667,7 +667,7 @@ func TestOptionalOutputKeepsAFileThroughAnExecutionThatWritesNothing(t *testing.
 }
 
 // An optionalEmpty project directory that declares emptied holds only what
-// its task writes (ADR 0067). The scheduler empties it before the task
+// its task writes (ADR 0068). The scheduler empties it before the task
 // executes and when it restores an entry that records it empty, and keeps the
 // ceded and preserved subpaths under the same inode, so a contract an earlier
 // run left there survives neither an execution that writes nothing nor the

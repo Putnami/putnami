@@ -609,7 +609,7 @@ and a library's `bin/` is empty because its build evidence is a compile check.
 
 `build-describe`'s `.gen/schema/` and `.gen/clientgen/` also declare `emptied`
 ([protocol ADR 0009](../../../protocols/extension/doc/adr/0009-an-optional-project-output-may-ask-to-be-emptied.md),
-[CLI ADR 0067](../../../tooling/cli/doc/adr/0067-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md)).
+[CLI ADR 0068](../../../tooling/cli/doc/adr/0068-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md)).
 The engine empties both before the task executes, including a describe that
 skips because the project has no main package, and on a restore of an entry
 that records them empty. Nothing committed lives under either path: a provider

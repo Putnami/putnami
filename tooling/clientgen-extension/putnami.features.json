@@ -158,6 +158,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "a-committed-generation-contract-reads-only-the-committed-sidecar",
               "an-operation-an-external-authority-owns-is-not-a-provider-operation",
               "built-contracts-win-over-stale-committed-copies",
               "only-indexed-projects-are-provider-authorities",
@@ -287,6 +288,7 @@
             "kind": "acceptance",
             "checks": [
               "the-guard-reads-the-git-candidate-cut-and-keys-on-it",
+              "the-guard-reports-a-file-committed-inside-a-build-written-tree",
               "the-guard-task-is-reachable-only-from-validate-and-the-explicit-check-command",
               "validate-contributes-exactly-one-workspace-guard-for-any-selection",
               "validate-waits-for-the-selected-providers-generation"

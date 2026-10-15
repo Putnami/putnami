@@ -1,4 +1,4 @@
-# ADR 0067 — An emptied optional project output is emptied on execution and on an empty restore
+# ADR 0068 — An emptied optional project output is emptied on execution and on an empty restore
 
 - **Status**: accepted
 - **Scope**: `@putnami/cli` (`internal/jobs`), `@putnami/go`
@@ -54,11 +54,40 @@ no task writes. Each `cloud/clients` provider slice committed
    slice commits it as `clientgen.json` at the project root. The clientgen
    discovery, the generator tasks and both language emitters read
    `.gen/clientgen/config.json` first and `clientgen.json` when no build wrote
-   one.
-5. **The clientgen keys name committed files only.** `clientgen-go` and
-   `clientgen-ts` drop the three `.gen` entries and hash `clientgen.json` and
-   `schema/openapi.json`. What a build writes under `.gen` is fixed by the
-   producer's key, which they fold.
+   one, and each takes the OpenAPI document of the same origin. With the built
+   contract, that is `.gen/schema/openapi.json` or its `.gz`, then
+   `schema/openapi.json`. With `clientgen.json`, it is `schema/openapi.json`
+   only: a `.gen/schema` beside it is whatever an earlier build left, and no
+   key covers it when `build-describe` is not planned, because the Go
+   `build-generate` cedes `.gen/schema` and does not restore it on a hit. A
+   provider that commits `clientgen.json` and no `schema/openapi.json` fails
+   generation with an error that names `schema/openapi.json`. A file
+   committed under `.gen/clientgen` or `.gen/schema` is no longer supported,
+   and the `@putnami/clientgen` workspace check reports each one in the Git
+   candidate set as `clientgen.committed-generated-contract`.
+5. **The clientgen keys hash no file a build of the run writes.**
+   `clientgen-go` and `clientgen-ts` drop the three `.gen` entries and hash
+   `clientgen.json` and `schema/openapi.json`. What a build writes under
+   `.gen` is fixed by the producer's key, which they fold. Each key also reads
+   `.gen/clientgen/config.json` as a Git candidate
+   (`git:.gen/clientgen/config.json`), so a project that has not migrated
+   still moves its key when it edits the contract it commits there. A
+   workspace ignores `.gen`, so the one a build writes is no candidate and
+   never moves the key during the run; the workspace check reports a
+   workspace that does not ignore it.
+6. **The engine never empties an emptied output that holds a Git-tracked
+   file.** Before the scheduler empties an output that declares `emptied`, and
+   before a restore writes anything for its task, it asks the Git index once
+   per such output whether it tracks a file under the output's path outside
+   the kept subpaths. A tracked file deleted from the worktree counts. When
+   one does, the execution fails before its subprocess starts, as a failure to
+   empty does (ADR 0064 point 6), with an error that names the output, its
+   path and the first tracked file, and says that an emptied output owns its
+   path whole, so the committed files move out of it. A restore, which would
+   empty or replace the output, is refused the same way: that is a restore
+   failure (ADR 0065 point 5), so the task executes and fails. Outside a Git
+   work tree there is no index, and the output is emptied as before. A
+   required or command-output directory is emptied without the question.
 
 With this decision, point 7 of ADR 0064 and point 2 of ADR 0065 read as
 follows. An `optionalEmpty` project or workspace output is emptied when it
@@ -86,6 +115,25 @@ declares `emptied`, and is not otherwise.
   store format stays `v9`: keys move only to addresses no earlier entry
   occupies, the rule
   [ADR 0063](0063-a-git-input-keys-the-executable-bit.md) applies.
-- Nothing breaks for a consumer, so the change ships in a patch (D-004).
+- **This is a breaking change.** A Go provider that commits a file under
+  `.gen/clientgen` or `.gen/schema` fails at describe's next execution
+  (decision 6). A TypeScript provider already lost such a file, since its
+  `build-generate` owns `.gen` as a required output. To migrate, move
+  `.gen/clientgen/config.json` to `clientgen.json` at the project root and
+  `.gen/schema/openapi.json` to `schema/openapi.json`, then delete both from
+  `.gen`. Under D-004 the change ships in a minor release, whose notes name
+  this step.
+- An unmigrated workspace fails at its first build: describe fails with the
+  engine error and leaves the committed file in place. When describe is not
+  planned, `validate` reports each such file with the migration
+  (`clientgen.committed-generated-contract`), because the file stays in the
+  Git candidate set the workspace check reads. A tracked file an older CLI
+  already deleted is not in that set, and that tree's `git:**` key equals the
+  key of a tree that never tracked it, so the check does not report it;
+  describe still fails on it, because the index tracks it.
+- Each execution and restore of a task with an emptied output runs
+  `git ls-files` once per such output: twice for `build-describe`.
+- A `git:` entry needs a Git work tree. Outside one, `clientgen-go` and
+  `clientgen-ts` run uncached, as every task with a `git:` input does.
 - An optional project or workspace output that does not declare `emptied`
   keeps the behavior ADR 0064 states, including a committed file inside it.

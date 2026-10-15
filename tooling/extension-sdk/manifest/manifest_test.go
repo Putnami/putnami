@@ -18,7 +18,7 @@ import (
 
 // validBuilder is the authoring-time analog of the protocol's valid v3
 // fixture: it exercises every declaration feature — both kinds, all three
-// roots, literal and port-supplied paths, optional-empty outputs, cacheable and
+// roots, literal and port-supplied paths, optional-empty and emptied outputs, cacheable and
 // external effects, and source mutation — and must build cleanly. Every
 // rejection case below is one compiling mutation of this manifest, so a case
 // that fails proves the rule fired and not that the base was already broken.
@@ -59,6 +59,7 @@ func validBuilder() *Builder {
 				Output("lock", File("bun.lock", InWorkspace())),
 				Output("clients", DirectoryFromPort("clientOutput", OptionalEmpty())),
 				Output("report", FileFromPort("reportPath", InCommandOutput())),
+				Output("schemas", Directory("schemas", OptionalEmpty(), Emptied())),
 				Effects(proto.EffectToolchainCache, proto.EffectNetwork),
 			),
 		}).
@@ -143,6 +144,7 @@ func TestBuild_DeclarationFeatures(t *testing.T) {
 		"lock":     {Kind: proto.OutputKindFile, Root: proto.OutputRootWorkspace, Path: "bun.lock"},
 		"clients":  {Kind: proto.OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true},
 		"report":   {Kind: proto.OutputKindFile, Root: proto.OutputRootCommandOutput, PathFrom: "reportPath"},
+		"schemas":  {Kind: proto.OutputKindDirectory, Path: "schemas", OptionalEmpty: true, Emptied: true},
 	}
 	for id, want := range cases {
 		if got := outputs[id]; !reflect.DeepEqual(got, want) {
@@ -289,6 +291,27 @@ func TestBuild_RejectsContractViolations(t *testing.T) {
 				})
 			},
 			code: "duplicate-effect",
+		},
+		{
+			name: "EMPTIED: a required directory is emptied without the flag",
+			mutate: func(b *Builder) {
+				b.Task("build-generate", proto.TaskDefinition{
+					Kind: "command", Command: "echo",
+					Declares: Declares(Output("gen", Directory(".gen", Emptied()))),
+				})
+			},
+			code: "invalid-output-emptied",
+		},
+		{
+			name: "EMPTIED: a pathFrom directory has no path to empty before the task runs",
+			mutate: func(b *Builder) {
+				b.Task("build-compile", proto.TaskDefinition{
+					Kind: "command", Command: "echo",
+					Outputs:  map[string]proto.TaskOutputPort{"clientOutput": {Description: "configured client dir"}},
+					Declares: Declares(Output("clients", DirectoryFromPort("clientOutput", OptionalEmpty(), Emptied()))),
+				})
+			},
+			code: "invalid-output-emptied",
 		},
 		{
 			name: "HONEST EFFECTS: source mutation without the sources write resource",

@@ -418,6 +418,53 @@ func TestResetClientContractDropsAnEarlierRunsContract(t *testing.T) {
 	}
 }
 
+// runDescribe removes an earlier run's .gen/clientgen before the describe
+// binary starts, so a binary that writes no contract leaves none behind. The
+// stand-in binary records whether the tree exists when it runs.
+func TestRunDescribeStartsTheBinaryWithoutAnEarlierClientContract(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script stand-in not portable to Windows")
+	}
+	workspace := t.TempDir()
+	projectDir := filepath.Join(workspace, "svc")
+	for rel, body := range map[string]string{
+		"go.mod":                     "module example.com/svc\n\nrequire go.putnami.dev/app v0.1.0\n",
+		"main.go":                    "package main\n\nimport _ \"go.putnami.dev/app\"\n\nfunc main() {}\n",
+		".gen/clientgen/config.json": `{"targets":["go"],"go":{"output":"clients/go"}}`,
+		".gen/clientgen/go/old.go":   "package client\n",
+	} {
+		path := filepath.Join(projectDir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	observed := filepath.Join(t.TempDir(), "observed")
+	binPath := writeShellBinary(t, `#!/bin/sh
+if [ -e "$PUTNAMI_DESCRIBE_OUT/clientgen" ]; then echo present > '`+observed+`'; else echo absent > '`+observed+`'; fi
+`)
+	compile := compileDescribeHost
+	compileDescribeHost = func(*pctx.Context, string) (string, func(), error) { return binPath, func() {}, nil }
+	t.Cleanup(func() { compileDescribeHost = compile })
+
+	ctx := &pctx.Context{WorkspaceRoot: workspace, CacheRoot: t.TempDir(), Project: pctx.Project{Path: "svc", FullPath: projectDir}, Params: pctx.Params{}}
+	if _, err := runDescribe(ctx, jsonl.New()); err != nil {
+		t.Fatalf("runDescribe: %v", err)
+	}
+	seen, err := os.ReadFile(observed)
+	if err != nil {
+		t.Fatalf("the describe binary did not run: %v", err)
+	}
+	if got := strings.TrimSpace(string(seen)); got != "absent" {
+		t.Errorf("the describe binary started with .gen/clientgen %s, want it removed first", got)
+	}
+	if _, err := os.Stat(filepath.Join(projectDir, ".gen", "clientgen")); !os.IsNotExist(err) {
+		t.Errorf("a describe whose binary writes no contract left .gen/clientgen behind: %v", err)
+	}
+}
+
 // A project whose generators produce no contract hands nothing over, and that is
 // not an error: the mirror simply does not exist.
 func TestResetCededSchemaWithoutAMirrorIsANoOp(t *testing.T) {

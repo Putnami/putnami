@@ -168,7 +168,9 @@ func watch() { _, _ = http.NewRequest("GET", "/catalog/watch", nil) }
 		}, false, clean},
 		{"the built generation contract is committed", func() {
 			gitIn(t, root, "add", "-f", "services/catalog/.gen/clientgen/config.json")
-		}, true, "services/catalog[go:clients/go,ts:clients/ts] | clientgen.missing-manifest@services/catalog/clients/ts/client.putnami.json"},
+		}, true, "services/catalog[go:clients/go,ts:clients/ts] | " +
+			"clientgen.committed-generated-contract@services/catalog/.gen/clientgen/config.json " +
+			"clientgen.missing-manifest@services/catalog/clients/ts/client.putnami.json"},
 		{"the built generation contract leaves the index", func() {
 			gitIn(t, root, "rm", "-q", "--cached", "services/catalog/.gen/clientgen/config.json")
 		}, true, clean},
@@ -193,6 +195,75 @@ func watch() { _, _ = http.NewRequest("GET", "/catalog/watch", nil) }
 			"clientgen.handwritten-first-party-client@apps/web/catalog.local.go " +
 			"clientgen.uninventoried-generated-file@services/catalog/clients/go/extra.local.go"},
 	})
+}
+
+// TestTheCheckReportsAFileCommittedInsideABuildWrittenTree pins the migration
+// finding for a workspace that commits what a build writes: the Go
+// build-describe owns .gen/clientgen and .gen/schema whole, and the TypeScript
+// build-generate owns .gen whole, so committing a file there is not supported.
+// Each such candidate is a finding that names the committed home to move it
+// to, while an ignored built file is none.
+//
+// The finding reads the candidate cut, as the rest of the check does. A
+// tracked file deleted from the worktree is not in the cut:
+// the tree's `git:**` key equals the key of a tree that never tracked it, so
+// the check must reach that tree's verdict, or a replayed entry would differ
+// from a fresh run. git status still lists the deletion.
+func TestTheCheckReportsAFileCommittedInsideABuildWrittenTree(t *testing.T) {
+	spectest.Proves(t, clientgenFeature, "native-validation-gate", "the-guard-reports-a-file-committed-inside-a-build-written-tree")
+	root, members := committedCatalogWorkspace(t)
+	const (
+		config = "services/catalog/.gen/clientgen/config.json"
+		schema = "services/catalog/.gen/schema/openapi.json"
+		clean  = "services/catalog[go:clients/go] | clean"
+	)
+	writeWorkspaceFile(t, root, config, `{"targets":["go"],"go":{"output":"clients/go"}}`)
+	writeWorkspaceFile(t, root, schema, string(catalogContractForFixture(t)))
+	neverTracked := cutFingerprint(t, root)
+	report := func() Report { return InspectCommitted(root, members) }
+	verdict := func() string { return checkVerdict(report()) }
+	assertVerdictFollowsTheKey(t, root, verdict, clean, []cutStep{
+		{"a provider commits its generation contract under .gen/clientgen", func() {
+			gitIn(t, root, "add", "-f", config)
+		}, true, "services/catalog[go:clients/go] | clientgen.committed-generated-contract@" + config},
+		{"the provider commits its OpenAPI document under .gen/schema", func() {
+			gitIn(t, root, "add", "-f", schema)
+		}, true, "services/catalog[go:clients/go] | clientgen.committed-generated-contract@" + config +
+			" clientgen.committed-generated-contract@" + schema},
+	})
+	messages := map[string]string{}
+	for _, finding := range report().Findings {
+		if finding.Code == committedGeneratedContractCode {
+			messages[finding.Path] = finding.Message
+		}
+	}
+	for path, home := range map[string]string{config: "services/catalog/clientgen.json", schema: "services/catalog/schema/openapi.json"} {
+		if message := messages[path]; !strings.Contains(message, path) || !strings.Contains(message, "move it to "+home) ||
+			!strings.Contains(message, "delete it from .gen") {
+			t.Errorf("finding for %s = %q, want the file, its move to %s and its deletion from .gen", path, message, home)
+		}
+	}
+
+	// The files leave the worktree, as a hand edit or an older engine's build
+	// removes them, but stay in the index.
+	for _, rel := range []string{config, schema} {
+		if err := os.Remove(filepath.Join(root, filepath.FromSlash(rel))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	listed, err := exec.Command("git", "-C", root, "ls-files", "--", config, schema).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Fields(string(listed)); len(got) != 2 {
+		t.Fatalf("the index lists %v, want both deleted files still tracked", got)
+	}
+	if got := cutFingerprint(t, root); got != neverTracked {
+		t.Fatalf("the key of a tree whose tracked files a build deleted = %s, want the never-tracked key %s", got, neverTracked)
+	}
+	if got := verdict(); got != clean {
+		t.Fatalf("verdict after a build deleted the tracked files = %q, want the never-tracked verdict %q", got, clean)
+	}
 }
 
 // TestTheCheckTakesItsMembershipFromTheJobContext pins that the check never

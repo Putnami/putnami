@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Scope**: `go.putnami.dev/protocol/extension` (`protocols/extension`), the
   `emptied` member of a declared output, and the CLI's emptying and restore
-  paths ([CLI ADR 0067](../../../../tooling/cli/doc/adr/0067-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md))
+  paths ([CLI ADR 0068](../../../../tooling/cli/doc/adr/0068-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md))
 
 ## Context
 
@@ -48,8 +48,13 @@ Only the task's author knows that no committed file lives in the directory.
 4. **The field enters under CLI contract 4**, for the reason in
    [ADR 0002](0002-runtime-toolchains-are-lock-pinned-under-the-current-contract.md)
    decision 7. `RequiredCLIContract` does not change for a manifest that
-   declares it. A CLI that predates the field drops it and leaves the output
-   as it stands, which is what the output meant before it declared the field.
+   declares it. A CLI that predates the field would drop it and leave the
+   output as it stands, and that is not harmless: a task that reads the
+   output keys on the producer's key in place of its bytes, so that CLI would
+   serve the task a result computed from files an earlier run left there. No
+   such CLI reads these manifests, because the lock pins the CLI
+   (`putnami.lock.json#cli`) together with the extensions that declare the
+   field.
 
 ## Rejected alternatives
 
@@ -65,7 +70,19 @@ Only the task's author knows that no committed file lives in the directory.
 ## Consequences
 
 - `@putnami/go` `build-describe` sets the flag on its `schema` and `clientgen`
-  outputs. A project that commits a file under either path moves it out.
+  outputs.
+- **This is a breaking change.** Committing a file under `.gen/schema` or
+  `.gen/clientgen` is no longer supported. The CLI never empties an emptied
+  output that holds a Git-tracked file, so describe fails while a project
+  commits one there
+  ([CLI ADR 0068](../../../../tooling/cli/doc/adr/0068-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md)
+  decision 6). To
+  migrate, move `.gen/clientgen/config.json` to `clientgen.json` at the
+  project root and `.gen/schema/openapi.json` to `schema/openapi.json`, then
+  delete both from `.gen`. The `@putnami/clientgen` workspace check reports
+  each file still committed there as `clientgen.committed-generated-contract`.
+  Under D-004 the change ships in a minor release, whose notes name this
+  step.
 - A later task that reads an emptied output keys on the producer's key
   instead of the bytes, so its key does not move when the producer writes the
   path during the run.

@@ -112,7 +112,7 @@ var httpMethods = map[string]bool{
 
 // discover reads the BUILT tree: the generation contract the provider's build
 // wrote (.gen/clientgen/config.json), else the one it commits (clientgen.json),
-// and the built contract in preference to the committed sidecar. It is the
+// and the OpenAPI document of the same origin (see builtSpecPath). It is the
 // sync, adopt and generation view — a fresh build precedes each of them.
 func discover(view workspaceView) ([]provider, []Finding) {
 	return discoverWith(view, builtSpecPath, false)
@@ -125,12 +125,73 @@ func discover(view workspaceView) ([]provider, []Finding) {
 // build never ran here still names its targets through the committed
 // client.putnami.json manifests under its tree. A provider the session did
 // build converged the sidecar it commits, so the two views agree for it. In
-// the candidate cut a .gen file exists only when the project commits it.
+// the candidate cut a .gen file exists only when the project commits it, and
+// each such file under .gen/clientgen or .gen/schema is a finding.
 func discoverCommitted(view workspaceView) ([]provider, []Finding) {
-	return discoverWith(view, committedSpecPath, true)
+	providers, findings := discoverWith(view, committedSpecPath, true)
+	return providers, append(findings, committedGeneratedContracts(view)...)
 }
 
-func discoverWith(view workspaceView, specPathFor func(files workspaceFiles, projectRel string) string, targetsFromManifests bool) ([]provider, []Finding) {
+// committedGeneratedContractCode is the finding for a file a project commits
+// inside a tree a build writes.
+const committedGeneratedContractCode = "clientgen.committed-generated-contract"
+
+// generatedContractTrees are the trees a provider build writes and empties,
+// each with the committed home of what a project used to commit there: the Go
+// build-describe declares .gen/clientgen and .gen/schema emptied, and the
+// TypeScript build-generate owns .gen whole (CLI ADR 0068).
+var generatedContractTrees = []struct{ dir, content, home string }{
+	{".gen/clientgen", "a generation contract", committedConfigFile},
+	{".gen/schema", "an OpenAPI document", "schema/openapi.json"},
+}
+
+// committedGeneratedContracts reports each candidate a member project holds
+// under .gen/clientgen or .gen/schema. A build owns both trees whole, so the
+// Go build-describe fails on a tracked file there and the TypeScript
+// build-generate deletes one, and committing one is no longer supported: the
+// generation contract lives at clientgen.json and the OpenAPI document at
+// schema/openapi.json.
+//
+// It reads the candidate cut, which is what the guard's `git:**` key holds: a
+// tracked file present on disk, or an untracked one no ignore rule excludes,
+// which a workspace that does not ignore .gen holds after every build.
+// A tracked file deleted from the worktree is not in the cut, and its key
+// equals the key of a tree that never tracked it, so the guard cannot report
+// it without serving one verdict to two trees; build-describe still fails on
+// it, because the index tracks it (CLI ADR 0068). Outside a Git
+// work tree there is no cut, and every .gen file is a build's output.
+func committedGeneratedContracts(view workspaceView) []Finding {
+	if view.tree == nil {
+		return nil
+	}
+	projects, err := view.members()
+	if err != nil {
+		return nil // discoverWith reports the membership error.
+	}
+	var findings []Finding
+	for _, projectRel := range projects {
+		for _, tree := range generatedContractTrees {
+			files, listErr := view.List(joinRel(projectRel, tree.dir))
+			if listErr != nil {
+				findings = append(findings, Finding{Code: committedGeneratedContractCode, Path: joinRel(projectRel, tree.dir), Message: listErr.Error()})
+				continue
+			}
+			for _, rel := range files {
+				findings = append(findings, Finding{Code: committedGeneratedContractCode, Path: rel, Message: fmt.Sprintf(
+					"%s sits in %s, which a build owns whole, and Git tracks it or does not ignore it; committing %s there is no longer supported: move it to %s, delete it from .gen, and have Git ignore .gen",
+					rel, joinRel(projectRel, tree.dir), tree.content, joinRel(projectRel, tree.home))})
+			}
+		}
+	}
+	return findings
+}
+
+// specPathResolver names the OpenAPI document a view reads for the provider at
+// projectRel. committedContract is true when the generation contract the view
+// read is the committed clientgen.json.
+type specPathResolver func(files workspaceFiles, projectRel string, committedContract bool) string
+
+func discoverWith(view workspaceView, specPathFor specPathResolver, targetsFromManifests bool) ([]provider, []Finding) {
 	var findings []Finding
 	workspaceRoot := view.root
 	projectPaths, err := view.members()
@@ -152,7 +213,8 @@ func discoverWith(view workspaceView, specPathFor func(files workspaceFiles, pro
 		} else if !errors.Is(configErr, fs.ErrNotExist) {
 			findings = append(findings, Finding{Code: "clientgen.invalid-config", Path: configRel, Message: configErr.Error()})
 		}
-		item.specPath = specPathFor(view.workspaceFiles, projectRel)
+		committedContract := configErr == nil && configRel == joinRel(projectRel, committedConfigFile)
+		item.specPath = specPathFor(view.workspaceFiles, projectRel, committedContract)
 		if item.config == nil && targetsFromManifests {
 			// No build wrote a contract here, but the tree may commit generated
 			// targets: each committed manifest names its own language and
@@ -335,9 +397,17 @@ func indexedProjectPaths(workspaceRoot string) ([]string, error) {
 	return paths, nil
 }
 
-// builtSpecPath prefers the contract the provider's build wrote over the
-// committed sidecar: after a build the built one is the authority.
-func builtSpecPath(files workspaceFiles, projectRel string) string {
+// builtSpecPath pairs the OpenAPI document with the generation contract's
+// origin, exactly as both language emitters do. With a contract a build wrote,
+// or none, it prefers the document the provider's build wrote over the
+// committed sidecar: after a build the built one is the authority. With the
+// committed clientgen.json it reads the committed sidecar only: no build wrote
+// the contract then, so a .gen/schema file is whatever an earlier build left,
+// and no cache key covers it.
+func builtSpecPath(files workspaceFiles, projectRel string, committedContract bool) string {
+	if committedContract {
+		return firstSpecPath(files, projectRel, "schema/openapi.json")
+	}
 	return firstSpecPath(files, projectRel,
 		".gen/schema/openapi.json",
 		".gen/schema/openapi.json.gz",
@@ -347,8 +417,9 @@ func builtSpecPath(files workspaceFiles, projectRel string) string {
 // committedSpecPath prefers the committed sidecar: it is what the checkout
 // holds, whether or not anything under .gen exists or is current. A provider
 // with no sidecar resolves to a contract under .gen only when one is there to
-// read, which in the candidate cut means the project commits it.
-func committedSpecPath(files workspaceFiles, projectRel string) string {
+// read, which in the candidate cut means the project commits it. It reads
+// that order whatever contract the guard read.
+func committedSpecPath(files workspaceFiles, projectRel string, _ bool) string {
 	return firstSpecPath(files, projectRel,
 		"schema/openapi.json",
 		".gen/schema/openapi.json",

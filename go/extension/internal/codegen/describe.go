@@ -186,7 +186,7 @@ func runDescribe(ctx *pctx.Context, emit *jsonl.Emitter) (*describeResult, error
 	defer unlock()
 
 	emit.Progress(1, 4, "Compiling host binary")
-	binPath, releaseBinary, err := compileHostBinary(ctx, projectPath)
+	binPath, releaseBinary, err := compileDescribeHost(ctx, projectPath)
 	if err != nil {
 		return nil, fmt.Errorf("compile host binary: %w", err)
 	}
@@ -559,6 +559,10 @@ func hostBinaryTarget(ctx *pctx.Context) string {
 	}
 	return filepath.Join(cacheRoot, describeHostBinaryDir, cleaned, describeHostBinaryName)
 }
+
+// compileDescribeHost is the compile step runDescribe takes. A test replaces it
+// with a stand-in binary to observe the tree the describe binary starts from.
+var compileDescribeHost = compileHostBinary
 
 // compileHostBinary runs `go build -o <target>` for the project's describe
 // entrypoint and returns the binary plus the release the caller must defer. We

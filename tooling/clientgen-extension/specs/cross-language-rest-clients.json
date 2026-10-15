@@ -55,7 +55,7 @@
     },
     {
       "id": "strict-provider-discovery",
-      "text": "Provider authority comes from the Putnami workspace project index and each project's contract; unindexed trees and fixtures cannot become providers, an unmarked contract requires explicit thirdParty mode, and an x-putnami-external-contract operation is not a provider operation. Sync reads the built contract over a stale committed copy; the check reads the committed sidecar over whatever build last wrote, and names a provider's targets from its committed manifests when no build wrote a generation contract."
+      "text": "Provider authority comes from the Putnami workspace project index and each project's contract; unindexed trees and fixtures cannot become providers, an unmarked contract requires explicit thirdParty mode, and an x-putnami-external-contract operation is not a provider operation. Sync reads the built contract over a stale committed copy, and a provider that commits its generation contract as clientgen.json reads its committed sidecar only, never a .gen document no key covers; the check reads the committed sidecar over whatever build last wrote, and names a provider's targets from its committed manifests when no build wrote a generation contract."
     },
     {
       "id": "external-authority",
@@ -87,7 +87,7 @@
     },
     {
       "id": "native-validation-gate",
-      "text": "The check joins validate as a workspace-once command: one guard runs per session whatever the selection, and no project opts out by not declaring the extension. Only validate and the explicit check command reach the guard. Validate depends on the !clientgen barrier: each selected provider regenerates in place, the engine judging drift, before the guard reads it; a consumer-only selection plans no generation. The guard declares a workspace read, reads only the Git candidate cut and is keyed on `git:**`."
+      "text": "The check joins validate as a workspace-once command: one guard runs per session whatever the selection, and no project opts out by not declaring the extension. Only validate and the explicit check command reach the guard. Validate depends on the !clientgen barrier: each selected provider regenerates in place, the engine judging drift, before the guard reads it; a consumer-only selection plans no generation. The guard declares a workspace read, reads only the Git candidate cut and is keyed on `git:**`. A file a member project commits under `.gen/clientgen` or `.gen/schema`, trees a build owns whole, is a `clientgen.committed-generated-contract` finding that names where to move it: `clientgen.json` or `schema/openapi.json` at the project root."
     },
     {
       "id": "censused-pending-transports",
