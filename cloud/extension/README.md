@@ -1029,7 +1029,9 @@ signed-in user.
 
 **Override.** Set `PUTNAMI_CACHE_TOKEN` to a pre-minted bearer to bypass every
 other source. When it is set, it wins. A member's machine token set this way
-reads the shared cache only. `PUTNAMI_CACHE_URL` and `PUTNAMI_CACHE_MODE`
+reads the shared cache only. `putnami cloud cache status` names
+`PUTNAMI_CACHE_TOKEN` on its identity line while it is set. With no signed-in
+user, it does not read the last CI run. `PUTNAMI_CACHE_URL` and `PUTNAMI_CACHE_MODE`
 override the persisted `url` and `mode` for a single run.
 
 **Successful run markers.** The managed cache also stores a separate CI baseline

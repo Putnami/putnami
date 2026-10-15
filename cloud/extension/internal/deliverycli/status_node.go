@@ -355,9 +355,11 @@ func CacheStatusNode(params map[string]any, workspaceRoot string, env map[string
 	identity := cacheIdentity(built, env)
 	var lastRun *CIStatusResponse
 	var lastRunErr error
-	// The ci status route denies workspace machine tokens, so a session that
-	// reads the cache with one does not ask it for the last run.
-	if cfgErr == nil && cfg != nil && cfg.Enabled && cfg.URL != "" && identity[machineTokenIdentityKey] == nil {
+	// The ci status route needs a signed-in user, so a session that reads the
+	// cache with a token from its environment and has no user does not ask it
+	// for the last run.
+	readsLastRun := cacheTokenVariable(identity) == "" || localIdentity(env) != nil
+	if cfgErr == nil && cfg != nil && cfg.Enabled && cfg.URL != "" && readsLastRun {
 		lastRun, lastRunErr = readLastRunCache(params, workspaceRoot, env, ioctx)
 	}
 	return CacheStatusNodeFrom(cfg, cfgErr, identity, lastRun, lastRunErr)
@@ -408,10 +410,19 @@ func cacheModeText(mode string) string {
 // the token, never the token.
 const machineTokenIdentityKey = "machine_token_env"
 
+// cacheTokenIdentityKey marks the identity of a session whose PUTNAMI_CACHE_TOKEN
+// overrides every configured token source. Its value names the variable, never
+// the token.
+const cacheTokenIdentityKey = "cache_token_env" //nolint:gosec // G101: an identity map key, not a credential
+
 // cacheIdentity is the identity a build with the config built reads the cache
-// with: the signed-in user, or the workspace machine token of a session that
-// holds PUTNAMI_CLOUD_TOKEN and no stored user session.
+// with: PUTNAMI_CACHE_TOKEN when it is set, then the signed-in user, then the
+// workspace machine token of a session that holds PUTNAMI_CLOUD_TOKEN and no
+// stored user session.
 func cacheIdentity(built builtCacheConfig, env map[string]string) map[string]any {
+	if built.cfg.Active() && built.cfg.Token.Class() == remotecache.TokenClassEnv {
+		return map[string]any{cacheTokenIdentityKey: remotecache.TokenEnv}
+	}
 	if identity := localIdentity(env); identity != nil {
 		return identity
 	}
@@ -419,6 +430,15 @@ func cacheIdentity(built builtCacheConfig, env map[string]string) map[string]any
 		return map[string]any{machineTokenIdentityKey: cloudTokenEnv}
 	}
 	return nil
+}
+
+// cacheTokenVariable names the environment variable an identity reads the
+// cache with, or "" when the identity is a signed-in user or none.
+func cacheTokenVariable(identity map[string]any) string {
+	return clicore.FirstString(
+		clicore.StringValue(identity[machineTokenIdentityKey]),
+		clicore.StringValue(identity[cacheTokenIdentityKey]),
+	)
 }
 
 func readLastRunCache(params map[string]any, workspaceRoot string, env map[string]string, ioctx clicore.IO) (*CIStatusResponse, error) {
@@ -504,12 +524,17 @@ func CacheStatusNodeFrom(cfg *CacheConfig, cfgErr error, identity map[string]any
 
 // cacheIdentityNode says who the cache token source signs in as. An enabled
 // cache without a token source, or without a session, cannot read the cache.
-// A session that reads the cache with a workspace machine token needs neither:
-// the node names the variable that carries the token.
+// A session that reads the cache with a workspace machine token or with
+// PUTNAMI_CACHE_TOKEN needs neither: the node names the variable that carries
+// the token.
 func cacheIdentityNode(cfg *CacheConfig, identity map[string]any) clicore.StatusNode {
 	node := clicore.StatusNode{ID: "cache.identity", Title: "identity", State: clicore.StatusOK}
 	if variable := clicore.StringValue(identity[machineTokenIdentityKey]); variable != "" {
 		node.Detail = "workspace machine token from " + variable + ", no signed-in user"
+		return node
+	}
+	if variable := clicore.StringValue(identity[cacheTokenIdentityKey]); variable != "" {
+		node.Detail = "cache token from " + variable
 		return node
 	}
 	who := identityText(identity)

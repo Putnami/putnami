@@ -49,3 +49,24 @@ func TestMintUserRegistryTokenNeverHandsTheMachineTokenToALoopbackRegistry(t *te
 		})
 	}
 }
+
+// A session on PUTNAMI_CLOUD_TOKEN alone cannot sign in. The registry token
+// command says why it has no credential instead of telling it to sign in, and
+// sends nothing.
+func TestRegistryTokenTellsAMachineTokenSessionWhyItHasNoCredential(t *testing.T) {
+	root, _, ioctx := distributionWorkflowFixture(t)
+	env := map[string]string{"PUTNAMI_HOME": t.TempDir(), "PUTNAMI_CLOUD_TOKEN": "pkt_machine_token_0123456789abcdef"}
+	ioctx.Env = env
+	ioctx.Client = &http.Client{Transport: workflowRoundTrip(func(request *http.Request) (*http.Response, error) {
+		t.Errorf("unexpected request %s %s", request.Method, request.URL)
+		return nil, http.ErrUseLastResponse
+	})}
+
+	err := RegistryToken(map[string]any{"for": "npm", "materialize": true}, root, env, ioctx)
+	if clicore.ExitCode(err) != clicore.ExitAuth {
+		t.Fatalf("error = %v, want exit %d", err, clicore.ExitAuth)
+	}
+	if got, want := err.Error(), "needs a signed-in user; PUTNAMI_CLOUD_TOKEN cannot read it"; got != want {
+		t.Fatalf("error = %q, want %q", got, want)
+	}
+}

@@ -623,8 +623,8 @@ func TestCacheStatusNamesTheMachineTokenIdentity(t *testing.T) {
 		t.Fatalf("custom command: identity = %v, want none", identity)
 	}
 	t.Setenv(remotecache.TokenEnv, "pkt_cache_override")
-	if identity := cacheIdentity(statusBuild(root), env); identity != nil {
-		t.Fatalf("cache token override: identity = %v, want none", identity)
+	if identity := cacheIdentity(statusBuild(root), env); identity[machineTokenIdentityKey] != nil || identity[cacheTokenIdentityKey] != remotecache.TokenEnv {
+		t.Fatalf("cache token override: identity = %v, want the cache token variable", identity)
 	}
 	t.Setenv(remotecache.TokenEnv, "")
 	t.Setenv(remotecache.ReadOnlyEnv, "not-a-boolean")
@@ -714,6 +714,39 @@ func TestMachineTokenCacheStatusIsTruthful(t *testing.T) {
 	}
 	if len(fake.requests) != 0 {
 		t.Fatalf("the cache status sent %d request(s) with the machine token, want none", len(fake.requests))
+	}
+}
+
+// PUTNAMI_CACHE_TOKEN overrides every configured token source. With no
+// signed-in user, the cache status names that variable instead of asking for a
+// sign-in, and does not ask the ci status route for the last run.
+func TestCacheTokenOverrideCacheStatusIsTruthful(t *testing.T) {
+	machineTokenSession(t, "")
+	t.Setenv(remotecache.TokenEnv, "cache-token-override")
+	fake := ciStatusFake(CIStatusResponse{Workspace: "ws-acme", Healthy: true, Dimensions: []CIStatusDimension{}})
+	root := t.TempDir()
+	writeReportLinkFile(t, root)
+	ioctx := clicore.IO{
+		Env:    hometest.Env(t.TempDir(), map[string]string{cloudTokenEnv: testMachineToken, "NO_COLOR": "1"}),
+		Stderr: func(string) {},
+		Client: &http.Client{Transport: fake},
+	}
+	text := runCacheStatus(t, root, ioctx)
+	want := strings.Join([]string{
+		"cache  ok  enabled",
+		"",
+		"  STATE  CHECK     DETAIL",
+		"  ok     config    enabled from the workspace link, " + DefaultCacheURL + "; no " + CacheFileRelative,
+		"  ok     identity  cache token from " + remotecache.TokenEnv,
+	}, "\n")
+	if text != want {
+		t.Fatalf("cache status = %q, want %q", text, want)
+	}
+	if len(fake.requests) != 0 {
+		t.Fatalf("the cache status sent %d request(s) with no signed-in user, want none", len(fake.requests))
+	}
+	if strings.Contains(text, "cache-token-override") {
+		t.Fatal("the cache status carries the cache token")
 	}
 }
 
@@ -813,5 +846,10 @@ func TestCacheStatusKeepsTheSignedInUser(t *testing.T) {
 	}
 	if identity := cacheIdentity(statusBuild(root), env); identity[machineTokenIdentityKey] != nil {
 		t.Fatalf("identity = %v, want no machine token marker for a signed-in user", identity)
+	}
+	// PUTNAMI_CACHE_TOKEN still wins over the signed-in user: a build sends it.
+	t.Setenv(remotecache.TokenEnv, "cache-token-override")
+	if identity := cacheIdentity(statusBuild(root), env); identity[cacheTokenIdentityKey] != remotecache.TokenEnv {
+		t.Fatalf("identity = %v, want the cache token variable over the signed-in user", identity)
 	}
 }

@@ -208,6 +208,15 @@ func classifyMaterializeFailure(err error, host, stderr string) Outcome {
 	lower := strings.ToLower(detail)
 
 	switch {
+	case code == protocolcli.ExitAuth && detail != "" && !mentionsNoSession(lower):
+		// The cloud says why it has no credential, and a sign-in is not its
+		// remedy: a session that holds only a workspace machine token cannot
+		// sign in. Its words are the message.
+		return Outcome{
+			Kind:    KindNotSignedIn,
+			Level:   "warn",
+			Message: "no registry credential for " + host + ": " + detail + "; continuing with the existing credential",
+		}
 	case code == protocolcli.ExitAuth || mentionsNoSession(lower):
 		return Outcome{
 			Kind:    KindNotSignedIn,

@@ -116,6 +116,24 @@ func TestEnsureNativeCredential_AuthExitWarnsWithTheExactHint(t *testing.T) {
 	}
 }
 
+// A session that holds only a workspace machine token cannot sign in. The
+// cloud says so, and the warning repeats its words instead of the sign-in hint.
+func TestEnsureNativeCredential_MachineTokenSessionIsNotToldToSignIn(t *testing.T) {
+	recordedCloudCLI(t, recordedExchange(t, "machine-token-materialize"))
+	resetMaterializedForTest()
+	t.Cleanup(resetMaterializedForTest)
+	outcome := EnsureNativeCredential(context.Background(), "", "npm.putnami.dev")
+	if outcome.Kind != KindNotSignedIn || outcome.Level != "warn" {
+		t.Fatalf("outcome = %+v, want a KindNotSignedIn warning", outcome)
+	}
+	if strings.Contains(outcome.Message, SignInHint) {
+		t.Errorf("Message = %q, want no sign-in hint", outcome.Message)
+	}
+	if !strings.Contains(outcome.Message, "PUTNAMI_CLOUD_TOKEN") || !strings.Contains(outcome.Message, "continuing") {
+		t.Errorf("Message = %q, want the cloud's reason and that the install continues", outcome.Message)
+	}
+}
+
 func TestEnsureNativeCredential_UnclassifiedAuthTextStillWarnsWithTheHint(t *testing.T) {
 	// A cloud that exits 1 for everything still says so in words.
 	fakeMaterializeCLI(t, fakeCLI{Stderr: "not signed in to Putnami Cloud\n", Exit: 1})
