@@ -37,8 +37,8 @@ const extensionScopeSeparator = "#"
 //   - its project is not task-scoped: it runs every task, as before;
 //   - the scope names its task — `<command>~<step>`, or the command alone for a
 //     job with no pipeline step;
-//   - its command's traits declare side effects (`sideEffects` is `registry`
-//     or `cloud`, from the manifest or the well-known verb's default): the
+//   - its command's traits declare side effects, or its well-known verb
+//     has a default one that a declaration never removes: the
 //     release-set coordinator decides which members a session releases, and a
 //     scope narrows what the diff VERIFIES, never what the session RELEASES;
 //   - its command is `validate` or `validate-workspace`
@@ -69,8 +69,13 @@ func narrowToTaskScopes(ws *workspace.Workspace, planned []*jobs.ScheduledJob, s
 			continue
 		}
 		scope, scoped := scopes[job.Project.ID]
-		if !scoped || job.JobDef.Traits.SideEffects != extensionproto.SideEffectsNone ||
-			neverNarrowedCommands[modeljobs.JobCommandName(job)] || jobInScope(ws, job, scope) {
+		// A manifest's traits add side effects but never remove a well-known
+		// verb's, so `publish` and `deploy` keep their jobs whatever their
+		// manifest declares.
+		command := modeljobs.JobCommandName(job)
+		sideEffects := job.JobDef.Traits.SideEffects != extensionproto.SideEffectsNone ||
+			extensionproto.EffectiveTraits(command, nil).SideEffects != extensionproto.SideEffectsNone
+		if !scoped || sideEffects || neverNarrowedCommands[command] || jobInScope(ws, job, scope) {
 			kept[job.Key()] = true
 			frontier = append(frontier, job)
 		}

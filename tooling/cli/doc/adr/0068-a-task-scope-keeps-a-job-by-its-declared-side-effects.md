@@ -16,8 +16,7 @@ commands, chosen by name: `publish`, `deploy`, `validate` and
 `validate-workspace`.
 
 A command name is not a declaration. An extension that releases through a
-command named `ship` has its release jobs dropped by a diff, and a manifest
-that gives `publish` traits without side effects still has its jobs kept.
+command named `ship` has its release jobs dropped by a diff.
 D-006 moves every development verb out of the core, so a rule keyed on a
 verb's name no longer belongs there.
 
@@ -84,8 +83,9 @@ plan holds, so each needs the owner's decision.
 ## Consequences
 
 - A command with any name that declares side effects keeps its jobs on a
-  task-scoped project. A `publish` or `deploy` whose manifest declares traits
-  without side effects is narrowed like any other command. `--impacted` plans,
+  task-scoped project. A declaration adds side effects but never removes a
+  well-known verb's, so `publish` and `deploy` keep their jobs whatever their
+  manifest declares. `--impacted` plans,
   and the `impact-plan` output built from them, follow the declaration.
 - A portable request carries its task scopes, and the executing side
   re-plans with the same rule to prove the graph equal. A submitter and an
