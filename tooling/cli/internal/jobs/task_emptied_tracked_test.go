@@ -78,7 +78,7 @@ func (f *emptyingFixture) refused(t *testing.T, leg string, result *SchedulerRes
 // a kept subpath is never removed, so it does not count. Once the index no
 // longer tracks the file, the execution empties the output as before.
 func TestAnEmptiedOutputThatHoldsATrackedFileIsNeverEmptied(t *testing.T) {
-	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-emptied-output-that-holds-a-tracked-file-is-never-emptied")
+	spectest.Proves(t, emptyingFeature, "emptied-output-keeps-tracked-files", "an-emptied-output-that-holds-a-tracked-file-is-never-emptied")
 	f, clientgen := newTrackedEmptiedFixture(t, true)
 	emptyings := recordEmptyings(t)
 	committed := filepath.Join(clientgen, "config.json")
@@ -124,7 +124,7 @@ func TestAnEmptiedOutputThatHoldsATrackedFileIsNeverEmptied(t *testing.T) {
 // is not served: the restore refuses it before it writes anything, the task
 // executes, and the execution fails as above. The file stays.
 func TestAHitOverATrackedFileInAnEmptiedOutputIsNotServed(t *testing.T) {
-	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-hit-over-a-tracked-file-in-an-emptied-output-is-not-served")
+	spectest.Proves(t, emptyingFeature, "emptied-output-keeps-tracked-files", "a-hit-over-a-tracked-file-in-an-emptied-output-is-not-served")
 	f, clientgen := newTrackedEmptiedFixture(t, true)
 	first := f.executed(t, "execution of an empty output", f.run(t, SchedulerConfig{}))[0]
 	if got := f.storedOutput(t, first.CacheKey, "clientgen"); len(got) != 0 {
@@ -148,7 +148,7 @@ func TestAHitOverATrackedFileInAnEmptiedOutputIsNotServed(t *testing.T) {
 // as before: the scheduler asks once per emptied output and the answer is
 // that Git does not manage the workspace.
 func TestOutsideAGitWorkTreeAnEmptiedOutputIsEmptied(t *testing.T) {
-	spectest.Proves(t, emptyingFeature, emptyingRequirement, "outside-a-git-work-tree-an-emptied-output-is-emptied")
+	spectest.Proves(t, emptyingFeature, "emptied-output-keeps-tracked-files", "outside-a-git-work-tree-an-emptied-output-is-emptied")
 	f, clientgen := newTrackedEmptiedFixture(t, false)
 	if err := putnamigit.Unmanaged(f.ws.Root); err == nil {
 		t.Fatalf("the fixture workspace %s is inside a Git work tree", f.ws.Root)
@@ -179,7 +179,7 @@ func TestOutsideAGitWorkTreeAnEmptiedOutputIsEmptied(t *testing.T) {
 // the missing program. Without a Git entry the workspace is no work tree, and
 // the output is emptied as before.
 func TestAGitWorkTreeWithoutAGitProgramFailsClosed(t *testing.T) {
-	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-git-work-tree-without-a-git-program-fails-closed")
+	spectest.Proves(t, emptyingFeature, "emptied-output-keeps-tracked-files", "a-git-work-tree-without-a-git-program-fails-closed")
 	f, clientgen := newTrackedEmptiedFixture(t, true)
 	mkdir, err := exec.LookPath("mkdir")
 	if err != nil {

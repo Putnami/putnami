@@ -138,7 +138,7 @@ func committedCatalogWorkspace(t *testing.T) (string, []string) {
 // key does not hold whether Git tracks a candidate, so staging the same bytes
 // keeps both the key and every message.
 func TestTheCheckAsksToIgnoreGenForACandidateNoRuleExcludes(t *testing.T) {
-	spectest.Proves(t, clientgenFeature, "native-validation-gate", "the-guard-asks-to-ignore-gen-for-a-candidate-no-rule-excludes")
+	spectest.Proves(t, clientgenFeature, "committed-generated-contract-finding", "the-guard-asks-to-ignore-gen-for-a-candidate-no-rule-excludes")
 	root, members := committedCatalogWorkspace(t)
 	writeWorkspaceFile(t, root, ".gitignore", ".putnami/\n*.local.go\n")
 	const (
@@ -292,7 +292,7 @@ func watch() { _, _ = http.NewRequest("GET", "/catalog/watch", nil) }
 // the check must reach that tree's verdict, or a replayed entry would differ
 // from a fresh run. git status still lists the deletion.
 func TestTheCheckReportsAFileCommittedInsideABuildWrittenTree(t *testing.T) {
-	spectest.Proves(t, clientgenFeature, "native-validation-gate", "the-guard-reports-a-file-committed-inside-a-build-written-tree")
+	spectest.Proves(t, clientgenFeature, "committed-generated-contract-finding", "the-guard-reports-a-file-committed-inside-a-build-written-tree")
 	root, members := committedCatalogWorkspace(t)
 	const (
 		config = "services/catalog/.gen/clientgen/config.json"

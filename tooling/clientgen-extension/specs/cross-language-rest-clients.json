@@ -43,7 +43,7 @@
     },
     {
       "id": "formatter-inputs-are-cache-keyed",
-      "text": "The emitted TypeScript is canonicalized by Biome, so the resolved configuration, its overrides, its extends chain and the EditorConfig beside it are generation inputs, and so is the workspace root package.json, which decides how the TypeScript client depends on @putnami/client. Every one of them is a declared cache-key entry, an input that cannot be declared fails resolution instead of being skipped, and both cacheable generators key on the committed generation contract and sidecar they read, and on no file a build of the run writes under .gen, whose bytes the build's key they fold fixes."
+      "text": "The emitted TypeScript is canonicalized by Biome, so the resolved configuration, its overrides, its extends chain and the EditorConfig beside it are generation inputs, and so is the workspace root package.json, which decides how the TypeScript client depends on @putnami/client. Every one of them is a declared cache-key entry, an input that cannot be declared fails resolution, and both generators key on the committed contract and sidecar, never on a .gen file a build of the run writes."
     },
     {
       "id": "no-source-mutation",
@@ -55,7 +55,7 @@
     },
     {
       "id": "strict-provider-discovery",
-      "text": "Provider authority comes from the Putnami workspace project index and each project's contract; unindexed trees and fixtures cannot become providers, an unmarked contract requires explicit thirdParty mode, and an x-putnami-external-contract operation is not a provider operation. Sync reads the built contract over a stale committed copy, and a provider that commits its generation contract as clientgen.json reads its committed sidecar only, never a .gen document no key covers; the check reads the committed sidecar over whatever build last wrote, and names a provider's targets from its committed manifests when no build wrote a generation contract."
+      "text": "Provider authority comes from the workspace project index and each project's contract; unindexed trees and fixtures cannot be providers, an unmarked contract requires explicit thirdParty mode, and an x-putnami-external-contract operation is no provider operation. Sync prefers the built contract to a stale committed copy, but a committed clientgen.json reads only its sidecar; the check prefers the committed sidecar to any build's copy, and names targets from committed manifests when no build wrote one."
     },
     {
       "id": "external-authority",
@@ -87,7 +87,11 @@
     },
     {
       "id": "native-validation-gate",
-      "text": "The check joins validate as a workspace-once command: one guard runs per session whatever the selection, and no project opts out by not declaring the extension. Only validate and the explicit check command reach the guard. Validate depends on the !clientgen barrier: each selected provider regenerates in place, the engine judging drift, before the guard reads it; a consumer-only selection plans no generation. The guard declares a workspace read, reads only the Git candidate cut and is keyed on `git:**`. A Git candidate a member project holds under `.gen/clientgen` or `.gen/schema`, trees a build owns whole, is a `clientgen.committed-generated-contract` finding. When an ignore rule excludes it, Git tracks it, and the finding names the git mv to `clientgen.json` or `schema/openapi.json` at the project root, or the git rm --cached for a build's output; otherwise it asks to ignore .gen in .gitignore and drop any rule that re-includes the file, and names that command only for a tracked copy, because the key does not hold whether Git tracks a candidate."
+      "text": "The check joins validate as a workspace-once command: one guard runs per session whatever the selection, and no project opts out by not declaring the extension. Only validate and the explicit check command reach the guard. Validate depends on the !clientgen barrier: each selected provider regenerates in place, the engine judging drift, before the guard reads it; a consumer-only selection plans no generation. The guard declares a workspace read, reads only the Git candidate cut and is keyed on `git:**`."
+    },
+    {
+      "id": "committed-generated-contract-finding",
+      "text": "A Git candidate a member project holds under .gen/clientgen or .gen/schema, trees a build owns whole, is a clientgen.committed-generated-contract finding. When an ignore rule excludes it, Git tracks it, and the finding names the git mv to clientgen.json or schema/openapi.json at the project root, or the git rm --cached for a build output; otherwise it asks to ignore .gen and drop any rule that re-includes the file, naming that command only for a tracked copy: the key does not see the index."
     },
     {
       "id": "censused-pending-transports",
