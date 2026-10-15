@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -64,7 +65,7 @@ func TestAHandoffAfterAPathExtensionRuntimeIsRefused(t *testing.T) {
 					wsRoot, ext := pathExtension(t)
 					ext.Runtime.Toolchains = map[string]extensionproto.RuntimeToolchain{"compiler": runtimeToolchainFixture("compiler")}
 					writeRuntimeToolchainLock(t, wsRoot, "compiler", "1.2.3", "integrity-a")
-					if err := resolveRuntimeToolchains(wsRoot, ext, []string{"compiler"}, []string{"PATH=" + bin}); err != nil {
+					if err := toolchain.ResolveRuntimeToolchains(wsRoot, ext, []string{"compiler"}, []string{"PATH=" + bin}); err != nil {
 						t.Fatal(err)
 					}
 					if runs := fixtureproc.Runs(t, record); len(runs) != 1 {
@@ -151,7 +152,7 @@ func TestAStoreExtensionToolchainProbeAndRuntimeKeepCustody(t *testing.T) {
 	}
 	ext.Runtime.Toolchains = map[string]extensionproto.RuntimeToolchain{"compiler": runtimeToolchainFixture("compiler")}
 	writeRuntimeToolchainLock(t, wsRoot, "compiler", "1.2.3", "integrity-a")
-	if err := resolveRuntimeToolchains(wsRoot, ext, []string{"compiler"}, []string{"PATH=" + bin}); err != nil {
+	if err := toolchain.ResolveRuntimeToolchains(wsRoot, ext, []string{"compiler"}, []string{"PATH=" + bin}); err != nil {
 		t.Fatal(err)
 	}
 	if runs := fixtureproc.Runs(t, probeRecord); len(runs) != 1 {

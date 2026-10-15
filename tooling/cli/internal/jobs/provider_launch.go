@@ -13,6 +13,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	registryproto "go.putnami.dev/protocol/registry"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 )
 
 // ProviderLaunch is how the CLI starts a provider subprocess it owns: the
@@ -89,13 +90,13 @@ func PrepareProviderLaunch(ctx context.Context, workspaceRoot string, ext *exten
 	}
 
 	var err error
-	if launch.Env, err = ProviderRuntimeEnvironment(ctx, launch.Env, ext, job.Toolchains); err != nil {
+	if launch.Env, err = toolchain.ProviderRuntimeEnvironment(ctx, launch.Env, ext, job.Toolchains); err != nil {
 		return ProviderLaunch{}, err
 	}
 	if cliExecutable != "" {
 		launch.Env = setEnv(launch.Env, registryproto.CLIExecutableEnv, cliExecutable)
 	}
-	if launch.Command, err = ProviderExecutable(launch.Command, launch.Env); err != nil {
+	if launch.Command, err = toolchain.ProviderExecutable(launch.Command, launch.Env); err != nil {
 		return ProviderLaunch{}, err
 	}
 	return launch, nil
@@ -107,17 +108,17 @@ func PrepareProviderLaunch(ctx context.Context, workspaceRoot string, ext *exten
 // the command's toolchains are still resolved.
 func prepareProviderRuntime(ctx context.Context, workspaceRoot string, ext *extension.ExtensionDescription, command string) error {
 	extensions := []*extension.ExtensionDescription{ext}
-	activeCommands := commandDependencyClosure(extensions, []string{command})
+	activeCommands := toolchain.CommandDependencyClosure(extensions, []string{command})
 	slot, memoized := providerRuntimeSlotFor(ext, activeCommands)
 	if memoized {
 		if record, ok := providerRuntimes.current(slot, ext); ok {
 			if ext.RuntimeExecutable != record.executable || ext.RuntimeDigest != record.digest {
 				ext.RuntimeExecutable, ext.RuntimeDigest = record.executable, record.digest
 			}
-			return resolveCommandRuntimeToolchains(ctx, workspaceRoot, extensions, activeCommands, resolveStrict)
+			return resolveCommandRuntimeToolchains(ctx, workspaceRoot, extensions, activeCommands, toolchain.ResolveStrict)
 		}
 	}
-	if err := synchronizeExtensionRuntimesForCommands(ctx, workspaceRoot, extensions, []string{command}, nil, resolveStrict); err != nil {
+	if err := synchronizeExtensionRuntimesForCommands(ctx, workspaceRoot, extensions, []string{command}, nil, toolchain.ResolveStrict); err != nil {
 		return err
 	}
 	if memoized {

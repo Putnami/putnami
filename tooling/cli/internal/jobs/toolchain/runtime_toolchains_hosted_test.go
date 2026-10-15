@@ -1,4 +1,4 @@
-package jobs
+package toolchain
 
 import (
 	"path/filepath"
@@ -37,7 +37,7 @@ func TestHostedRunProbesNoToolchainInsideTheWorkspace(t *testing.T) {
 		restore := runcredential.SetForTest(bearer)
 		defer restore()
 		ext := runtimeToolchainExtension(requirement)
-		if err := resolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"}, base); err != nil {
+		if err := ResolveRuntimeToolchains(workspaceRoot, ext, []string{"compiler"}, base); err != nil {
 			t.Fatal(err)
 		}
 		return ext.RuntimeToolchains["compiler"].Executable

@@ -1,4 +1,4 @@
-package jobs
+package toolchain
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	model "go.putnami.dev/cli/model/extension"
+	"go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
@@ -50,10 +51,10 @@ func TestCacheToolchainVersionIncludesResolvedRuntimeRequirements(t *testing.T) 
 	ext := &extension.ExtensionDescription{RuntimeToolchains: map[string]model.RuntimeToolchainResolution{
 		"compiler": {Available: true, Identity: "lock-a"},
 	}}
-	job := &ScheduledJob{Extension: ext, JobDef: &extension.JobDefinition{Toolchains: []string{"compiler"}}}
-	first := cacheToolchainVersion(job)
+	job := &jobs.ScheduledJob{Extension: ext, JobDef: &extension.JobDefinition{Toolchains: []string{"compiler"}}}
+	first := CacheToolchainVersion(job)
 	ext.RuntimeToolchains["compiler"] = model.RuntimeToolchainResolution{Available: true, Identity: "lock-b"}
-	second := cacheToolchainVersion(job)
+	second := CacheToolchainVersion(job)
 
 	if want := runtime.Version() + ";runtime-tools=compiler=lock-a"; first != want {
 		t.Fatalf("runtime toolchain key = %q, want %q", first, want)
@@ -68,8 +69,8 @@ func TestCacheToolchainVersionIncludesResolvedRuntimeRequirements(t *testing.T) 
 func TestCacheToolchainVersionLeavesTasksWithoutRequirementsStable(t *testing.T) {
 	t.Parallel()
 
-	job := &ScheduledJob{Extension: &extension.ExtensionDescription{Name: "example"}, JobDef: &extension.JobDefinition{}}
-	if got := cacheToolchainVersion(job); got != runtime.Version() {
+	job := &jobs.ScheduledJob{Extension: &extension.ExtensionDescription{Name: "example"}, JobDef: &extension.JobDefinition{}}
+	if got := CacheToolchainVersion(job); got != runtime.Version() {
 		t.Fatalf("task toolchain cache key = %q, want %q", got, runtime.Version())
 	}
 }

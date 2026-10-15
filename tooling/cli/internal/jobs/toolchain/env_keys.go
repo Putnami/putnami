@@ -1,4 +1,4 @@
-package jobs
+package toolchain
 
 import (
 	"os"
@@ -8,9 +8,9 @@ import (
 	"go.putnami.dev/sdk/extension/envkeys"
 )
 
-// prependPathWith puts dir first on the effective PATH of env, matching names
+// PrependPathWith puts dir first on the effective PATH of env, matching names
 // with keys, and keeps every other non-empty entry behind it, in order.
-func prependPathWith(keys envkeys.Keys, env []string, dir string) []string {
+func PrependPathWith(keys envkeys.Keys, env []string, dir string) []string {
 	cleanDir := filepath.Clean(dir)
 	parts := []string{cleanDir}
 	for _, part := range filepath.SplitList(keys.Last(env, "PATH")) {

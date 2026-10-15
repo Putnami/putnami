@@ -1,9 +1,8 @@
-package jobs
+package toolchain
 
 import (
 	"bytes"
 	"context"
-	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -11,10 +10,12 @@ import (
 	"testing"
 
 	model "go.putnami.dev/cli/model/extension"
+	"go.putnami.dev/cli/model/jobs"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -27,7 +28,7 @@ func provisioningToolchainExtension() *model.ExtensionDescription {
 	ext.Runtime.RunToolchains = []string{"compiler"}
 	ext.Tasks = map[string]model.TaskDefinition{"install": {}, "compile": {}}
 	ext.Jobs = map[string]*model.JobDefinition{
-		toolchainProvisioningCommand: {PipelineSteps: []extensionproto.PipelineStep{{ID: "install", Task: "install"}}},
+		ToolchainProvisioningCommand: {PipelineSteps: []extensionproto.PipelineStep{{ID: "install", Task: "install"}}},
 		"build":                      {PipelineSteps: []extensionproto.PipelineStep{{ID: "compile", Task: "compile"}}},
 	}
 	return ext
@@ -60,7 +61,7 @@ func TestRuntimeToolchainProvisioningCommandRunsWithoutAUsablePin(t *testing.T) 
 					t.Fatal(err)
 				}
 			},
-			strictErr: "workspace lock has no integrity for " + HostPlatform(),
+			strictErr: "workspace lock has no integrity for " + machineprobe.HostPlatform(),
 		},
 		{
 			name: "no matching candidate",
@@ -77,8 +78,8 @@ func TestRuntimeToolchainProvisioningCommandRunsWithoutAUsablePin(t *testing.T) 
 
 			provisioning := provisioningToolchainExtension()
 			if err := resolveRuntimeToolchainsForCommands(root, []*model.ExtensionDescription{provisioning},
-				map[string]bool{toolchainProvisioningCommand: true}, base); err != nil {
-				t.Fatalf("%s refused a lock it exists to repair: %v", toolchainProvisioningCommand, err)
+				map[string]bool{ToolchainProvisioningCommand: true}, base); err != nil {
+				t.Fatalf("%s refused a lock it exists to repair: %v", ToolchainProvisioningCommand, err)
 			}
 			resolved, ok := provisioning.RuntimeToolchains["compiler"]
 			if !ok || resolved.Available || resolved.Identity == "" {
@@ -87,7 +88,7 @@ func TestRuntimeToolchainProvisioningCommandRunsWithoutAUsablePin(t *testing.T) 
 
 			for _, active := range []map[string]bool{
 				{"build": true},
-				{"build": true, toolchainProvisioningCommand: true},
+				{"build": true, ToolchainProvisioningCommand: true},
 			} {
 				strict := provisioningToolchainExtension()
 				err := resolveRuntimeToolchainsForCommands(root, []*model.ExtensionDescription{strict}, active, base)
@@ -118,7 +119,7 @@ func resolveForProvisioning(t *testing.T, root string) *model.ExtensionDescripti
 	t.Helper()
 	ext := provisioningToolchainExtension()
 	if err := resolveRuntimeToolchainsForCommands(root, []*model.ExtensionDescription{ext},
-		map[string]bool{toolchainProvisioningCommand: true}, os.Environ()); err != nil {
+		map[string]bool{ToolchainProvisioningCommand: true}, os.Environ()); err != nil {
 		t.Fatal(err)
 	}
 	if resolved := ext.RuntimeToolchains["compiler"]; resolved.Available {
@@ -147,10 +148,10 @@ func TestRuntimeToolchainProvisioningMismatchNamesTheCommandInItsWarning(t *test
 	if got := logs.String(); got != "" {
 		t.Fatalf("resolution before the install logged %q, want nothing at the default level", got)
 	}
-	ReportProvisionedRuntimeToolchains(context.Background(), root, []*model.ExtensionDescription{ext}, nil, []string{toolchainProvisioningCommand})
+	ReportProvisionedRuntimeToolchains(context.Background(), root, []*model.ExtensionDescription{ext}, nil, []string{ToolchainProvisioningCommand})
 	got := logs.String()
 	if strings.Count(got, "\n") != 1 || !strings.Contains(got, "level=WARN") ||
-		!strings.Contains(got, "still unavailable after "+toolchainProvisioningCommand) ||
+		!strings.Contains(got, "still unavailable after "+ToolchainProvisioningCommand) ||
 		!strings.Contains(got, "toolchain=compiler") || !strings.Contains(got, `version \"0.9.0\" does not match locked \"1.2.3\"`) {
 		t.Fatalf("provisioning mismatch warning = %q", got)
 	}
@@ -174,11 +175,11 @@ func TestRuntimeToolchainProvisioningReportsTheToolchainItInstalled(t *testing.T
 	writeRuntimeTool(t, filepath.Join(bin, "compiler"), "1.2.3")
 	// The extension reaches the report through two planned jobs, as a planned
 	// copy of an extension does, and is reported once.
-	planned := []*ScheduledJob{{Extension: ext}, {Extension: ext}}
-	ReportProvisionedRuntimeToolchains(context.Background(), root, nil, planned, []string{toolchainProvisioningCommand})
+	planned := []*jobs.ScheduledJob{{Extension: ext}, {Extension: ext}}
+	ReportProvisionedRuntimeToolchains(context.Background(), root, nil, planned, []string{ToolchainProvisioningCommand})
 	got := logs.String()
 	if strings.Count(got, "\n") != 1 || !strings.Contains(got, "level=INFO") ||
-		!strings.Contains(got, toolchainProvisioningCommand+" installed the pinned toolchain") ||
+		!strings.Contains(got, ToolchainProvisioningCommand+" installed the pinned toolchain") ||
 		!strings.Contains(got, "toolchain=compiler") || !strings.Contains(got, "version=1.2.3") {
 		t.Fatalf("report after the install = %q, want one info line", got)
 	}
@@ -202,7 +203,7 @@ func TestRuntimeToolchainProvisioningReportSkipsOtherRuns(t *testing.T) {
 	ReportProvisionedRuntimeToolchains(context.Background(), root, []*model.ExtensionDescription{ext}, nil, []string{"build"})
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
-	ReportProvisionedRuntimeToolchains(canceled, root, []*model.ExtensionDescription{ext}, nil, []string{toolchainProvisioningCommand})
+	ReportProvisionedRuntimeToolchains(canceled, root, []*model.ExtensionDescription{ext}, nil, []string{ToolchainProvisioningCommand})
 	if got := logs.String(); got != "" {
 		t.Fatalf("report outside a provisioning run logged %q", got)
 	}
@@ -216,15 +217,15 @@ func TestRuntimeToolchainCommandSetsKeepASharedAliasStrict(t *testing.T) {
 	ext.Runtime.Toolchains["installer"] = runtimeToolchainFixture("installer")
 	ext.Tasks["install"] = model.TaskDefinition{Toolchains: []string{"installer"}}
 
-	required, provisioning := commandRuntimeToolchainRefSets(ext, map[string]bool{toolchainProvisioningCommand: true})
+	required, provisioning := commandRuntimeToolchainRefSets(ext, map[string]bool{ToolchainProvisioningCommand: true})
 	if len(required) != 0 || strings.Join(provisioning, ",") != "compiler,installer" {
 		t.Fatalf("provisioning alone: required %v, provisioning %v", required, provisioning)
 	}
-	required, provisioning = commandRuntimeToolchainRefSets(ext, map[string]bool{toolchainProvisioningCommand: true, "build": true})
+	required, provisioning = commandRuntimeToolchainRefSets(ext, map[string]bool{ToolchainProvisioningCommand: true, "build": true})
 	if strings.Join(required, ",") != "compiler" || strings.Join(provisioning, ",") != "installer" {
 		t.Fatalf("provisioning with build: required %v, provisioning %v", required, provisioning)
 	}
-	if got := commandRuntimeToolchainRefs(ext, map[string]bool{toolchainProvisioningCommand: true, "build": true}); strings.Join(got, ",") != "compiler,installer" {
+	if got := commandRuntimeToolchainRefs(ext, map[string]bool{ToolchainProvisioningCommand: true, "build": true}); strings.Join(got, ",") != "compiler,installer" {
 		t.Fatalf("all refs = %v, want compiler,installer", got)
 	}
 }
@@ -240,18 +241,18 @@ func TestEnsureJobRuntimeToolchainsKeepsAProvisioningResolutionFromOtherCommands
 	t.Setenv("PATH", t.TempDir())
 	project := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
 	ws := workspace.NewWorkspace(root, nil, []*workspace.Project{project})
-	job := func(ext *model.ExtensionDescription, name string) *ScheduledJob {
-		return &ScheduledJob{Project: project, Extension: ext, JobDef: &model.JobDefinition{Name: name, Toolchains: []string{"compiler"}}}
+	job := func(ext *model.ExtensionDescription, name string) *jobs.ScheduledJob {
+		return &jobs.ScheduledJob{Project: project, Extension: ext, JobDef: &model.JobDefinition{Name: name, Toolchains: []string{"compiler"}}}
 	}
 
 	ext := provisioningToolchainExtension()
-	if err := ensureJobRuntimeToolchains(ws, job(ext, toolchainProvisioningCommand+"~install")); err != nil {
+	if err := EnsureJobRuntimeToolchains(ws, job(ext, ToolchainProvisioningCommand+"~install")); err != nil {
 		t.Fatalf("provisioning job backstop: %v", err)
 	}
 	if resolved, ok := ext.RuntimeToolchains["compiler"]; !ok || resolved.Available {
 		t.Fatalf("provisioning job resolution = %+v (present %v), want unavailable", resolved, ok)
 	}
-	err := ensureJobRuntimeToolchains(ws, job(ext, "build~compile"))
+	err := EnsureJobRuntimeToolchains(ws, job(ext, "build~compile"))
 	want := `resolve extension "example" runtime toolchain "compiler": workspace lock has no usable "compiler" pin; only workspace-fetch and workspace-install run without one`
 	if err == nil || err.Error() != want {
 		t.Fatalf("build job on a provisioning resolution: error = %v, want %q", err, want)
@@ -261,14 +262,14 @@ func TestEnsureJobRuntimeToolchainsKeepsAProvisioningResolutionFromOtherCommands
 	requirement := optional.Runtime.Toolchains["compiler"]
 	requirement.Optional = true
 	optional.Runtime.Toolchains["compiler"] = requirement
-	if err := ensureJobRuntimeToolchains(ws, job(optional, "build~compile")); err != nil {
+	if err := EnsureJobRuntimeToolchains(ws, job(optional, "build~compile")); err != nil {
 		t.Fatalf("an optional toolchain resolved unavailable must not stop the job: %v", err)
 	}
 
 	if err := os.Remove(filepath.Join(root, lockfile.LockFilename)); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureJobRuntimeToolchains(ws, job(ext, "build~compile")); err != nil {
+	if err := EnsureJobRuntimeToolchains(ws, job(ext, "build~compile")); err != nil {
 		t.Fatalf("without a lock the unavailable identity is the bootstrap floor: %v", err)
 	}
 	spectest.Proves(t, "cli/runtime-toolchain-pinning", "provisioning-runs-unpinned",
@@ -306,13 +307,13 @@ func TestFirstPartyWorkspaceInstallRunsBeforeTheLockPinsItsToolchain(t *testing.
 			}
 
 			install := load()
-			active := commandDependencyClosure(exts(install), []string{toolchainProvisioningCommand})
+			active := CommandDependencyClosure(exts(install), []string{ToolchainProvisioningCommand})
 			if err := resolveRuntimeToolchainsForCommands(root, exts(install), active, os.Environ()); err != nil {
 				t.Fatalf("workspace-install on a lock with no %q pin: %v", tc.lock, err)
 			}
 
 			build := load()
-			active = commandDependencyClosure(exts(build), []string{"build"})
+			active = CommandDependencyClosure(exts(build), []string{"build"})
 			err := resolveRuntimeToolchainsForCommands(root, exts(build), active, os.Environ())
 			if want := `workspace lock has no exact "` + tc.lock + `" pin`; err == nil || !strings.Contains(err.Error(), want) {
 				t.Fatalf("build on a lock with no %q pin: error = %v, want it to contain %q", tc.lock, err, want)
@@ -322,7 +323,7 @@ func TestFirstPartyWorkspaceInstallRunsBeforeTheLockPinsItsToolchain(t *testing.
 			// with the extension and no project of its language plans no job
 			// that needs it.
 			deferred := load()
-			if err := resolveRuntimeToolchainsForCommandsMode(context.Background(), root, exts(deferred), active, os.Environ(), resolveDeferred); err != nil {
+			if err := ResolveRuntimeToolchainsForCommandsMode(context.Background(), root, exts(deferred), active, os.Environ(), ResolveDeferred); err != nil {
 				t.Fatalf("build synchronization on a lock with no %q pin: %v", tc.lock, err)
 			}
 			if resolved, ok := deferred.RuntimeToolchains["runtimeCompiler"]; ok {
@@ -330,86 +331,6 @@ func TestFirstPartyWorkspaceInstallRunsBeforeTheLockPinsItsToolchain(t *testing.
 			}
 		})
 	}
-}
-
-// TestRuntimeToolchainUnsatisfiedByTheLockFailsOnlyAPlannedJob pins that a
-// run's synchronization stage leaves a required toolchain the lock does not
-// satisfy unresolved, and the run fails only when its plan holds a job that
-// requires it, with the error strict resolution returns.
-func TestRuntimeToolchainUnsatisfiedByTheLockFailsOnlyAPlannedJob(t *testing.T) {
-	bin := t.TempDir()
-	writeRuntimeTool(t, filepath.Join(bin, "compiler"), "0.9.0")
-	t.Setenv("PATH", bin)
-	cases := []struct {
-		name, want string
-		lock       func(t *testing.T, root string)
-	}{
-		{
-			name: "no pin",
-			lock: func(t *testing.T, root string) { writeRuntimeToolchainLock(t, root, "other", "1.2.3", "integrity-a") },
-			want: `resolve extension runtime toolchains: resolve extension "example" runtime toolchain "compiler": ` +
-				"workspace lock has no exact \"compiler\" pin: add a project that declares it, or run `putnami install` to record the declared one",
-		},
-		{
-			name: "no matching candidate",
-			lock: func(t *testing.T, root string) {
-				writeRuntimeToolchainLock(t, root, "compiler", "1.2.3", "integrity-a")
-			},
-			want: `no candidate matched locked version "1.2.3"`,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			root := t.TempDir()
-			tc.lock(t, root)
-			project := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
-			ws := workspace.NewWorkspace(root, nil, []*workspace.Project{project})
-			job := func(ext *model.ExtensionDescription, name string) *ScheduledJob {
-				return &ScheduledJob{Project: project, Extension: ext, JobDef: &model.JobDefinition{Name: name, Toolchains: []string{"compiler"}}}
-			}
-			synchronized := func() *model.ExtensionDescription {
-				t.Helper()
-				ext := provisioningToolchainExtension()
-				active := map[string]bool{"build": true, toolchainProvisioningCommand: true}
-				if err := resolveRuntimeToolchainsForCommandsMode(context.Background(), root, []*model.ExtensionDescription{ext},
-					active, os.Environ(), resolveDeferred); err != nil {
-					t.Fatalf("synchronization failed on a toolchain no planned job requires yet: %v", err)
-				}
-				if resolved, ok := ext.RuntimeToolchains["compiler"]; ok {
-					t.Fatalf("synchronization recorded %+v, want the alias left unresolved", resolved)
-				}
-				return ext
-			}
-
-			synchronized()
-			other := &model.ExtensionDescription{Name: "other"}
-			if err := RequirePlannedRuntimeToolchains(ws, []*ScheduledJob{nil, {Project: project, Extension: other, JobDef: &model.JobDefinition{Name: "build~compile"}}}); err != nil {
-				t.Fatalf("a plan with no job of the extension: %v", err)
-			}
-
-			// The build job is checked first, so the alias it shares with the
-			// provisioning job resolves strictly.
-			ext := synchronized()
-			err := RequirePlannedRuntimeToolchains(ws, []*ScheduledJob{
-				job(ext, toolchainProvisioningCommand+"~install"), job(ext, "build~compile"),
-			})
-			var runtimeErr *extensionRuntimeError
-			if !errors.As(err, &runtimeErr) || runtimeErr.code != extensionproto.FailureRuntimePrepareFailed ||
-				!strings.Contains(err.Error(), tc.want) {
-				t.Fatalf("a planned build job: error = %v, want %s containing %q", err, extensionproto.FailureRuntimePrepareFailed, tc.want)
-			}
-
-			ext = synchronized()
-			if err := RequirePlannedRuntimeToolchains(ws, []*ScheduledJob{job(ext, toolchainProvisioningCommand+"~install")}); err != nil {
-				t.Fatalf("a plan of only %s: %v", toolchainProvisioningCommand, err)
-			}
-			if resolved, ok := ext.RuntimeToolchains["compiler"]; !ok || resolved.Available {
-				t.Fatalf("%s resolution = %+v (present %v), want the unavailable identity", toolchainProvisioningCommand, resolved, ok)
-			}
-		})
-	}
-	spectest.Proves(t, "cli/runtime-toolchain-pinning", "unplanned-toolchains-do-not-stop-the-run",
-		"only-a-planned-job-fails-on-an-unsatisfied-toolchain")
 }
 
 // TestPrepareToolchainsResolveUnpinnedOnlyInAProvisioningRun pins how a
@@ -426,13 +347,13 @@ func TestPrepareToolchainsResolveUnpinnedOnlyInAProvisioningRun(t *testing.T) {
 		return ext
 	}
 
-	provisioning := map[string]bool{toolchainProvisioningCommand: true}
-	if !provisioningOnlyRun(provisioning) {
-		t.Fatalf("a run of only %s is not a provisioning run", toolchainProvisioningCommand)
+	provisioning := map[string]bool{ToolchainProvisioningCommand: true}
+	if !ProvisioningOnlyRun(provisioning) {
+		t.Fatalf("a run of only %s is not a provisioning run", ToolchainProvisioningCommand)
 	}
 	ext := prepared()
-	if err := resolveRuntimeToolchainsForPreparation(context.Background(), root,
-		[]*model.ExtensionDescription{ext}, nil, provisioningOnlyRun(provisioning)); err != nil {
+	if err := ResolveRuntimeToolchainsForPreparation(context.Background(), root,
+		[]*model.ExtensionDescription{ext}, nil, ProvisioningOnlyRun(provisioning)); err != nil {
 		t.Fatalf("a provisioning run refused to prepare without a pin: %v", err)
 	}
 	if resolved, ok := ext.RuntimeToolchains["compiler"]; !ok || resolved.Available || resolved.Identity == "" {
@@ -442,13 +363,13 @@ func TestPrepareToolchainsResolveUnpinnedOnlyInAProvisioningRun(t *testing.T) {
 	for _, active := range []map[string]bool{
 		{},
 		{"build": true},
-		{"build": true, toolchainProvisioningCommand: true},
+		{"build": true, ToolchainProvisioningCommand: true},
 	} {
-		if provisioningOnlyRun(active) {
+		if ProvisioningOnlyRun(active) {
 			t.Fatalf("commands %v: counted as a provisioning run", active)
 		}
-		err := resolveRuntimeToolchainsForPreparation(context.Background(), root,
-			[]*model.ExtensionDescription{prepared()}, nil, provisioningOnlyRun(active))
+		err := ResolveRuntimeToolchainsForPreparation(context.Background(), root,
+			[]*model.ExtensionDescription{prepared()}, nil, ProvisioningOnlyRun(active))
 		if want := `workspace lock has no exact "compiler" pin`; err == nil || !strings.Contains(err.Error(), want) {
 			t.Fatalf("commands %v: error = %v, want it to contain %q", active, err, want)
 		}
@@ -481,13 +402,13 @@ func TestTheFetchProvisionsLikeTheInstall(t *testing.T) {
 	}
 	for _, active := range []map[string]bool{
 		{fetch: true},
-		{fetch: true, toolchainProvisioningCommand: true},
+		{fetch: true, ToolchainProvisioningCommand: true},
 	} {
-		if !provisioningOnlyRun(active) {
+		if !ProvisioningOnlyRun(active) {
 			t.Errorf("commands %v: not a provisioning run", active)
 		}
 	}
-	if provisioningOnlyRun(map[string]bool{fetch: true, "build": true}) {
+	if ProvisioningOnlyRun(map[string]bool{fetch: true, "build": true}) {
 		t.Error("a run with build counted as a provisioning run")
 	}
 

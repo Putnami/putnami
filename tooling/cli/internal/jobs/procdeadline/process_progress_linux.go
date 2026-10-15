@@ -1,6 +1,6 @@
 //go:build linux
 
-package jobs
+package procdeadline
 
 import (
 	"errors"
@@ -18,14 +18,14 @@ import (
 // process have waited for a CPU. A process whose threads cannot be read, such
 // as on a kernel built without schedstats, has its wait not measured, so its
 // deadline counts every moment of it.
-func hostProcessProgress(process *os.Process) func() processSample {
+func hostProcessProgress(process *os.Process) func() ProcessSample {
 	if process == nil {
 		return nil
 	}
 	tasks := filepath.Join("/proc", strconv.Itoa(process.Pid), "task")
-	return func() processSample {
+	return func() ProcessSample {
 		waited, err := readRunDelay(tasks)
-		return processSample{waitedForCPU: waited, measured: err == nil}
+		return ProcessSample{WaitedForCPU: waited, Measured: err == nil}
 	}
 }
 

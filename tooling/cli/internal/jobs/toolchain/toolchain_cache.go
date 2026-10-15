@@ -1,8 +1,10 @@
-package jobs
+package toolchain
 
 import (
 	"runtime"
 	"time"
+
+	"go.putnami.dev/cli/model/jobs"
 )
 
 // toolVersionProbeTimeout bounds a runtime toolchain's version probe. The
@@ -15,14 +17,15 @@ import (
 // loaded CI box while still bounding a tool that wedges while it runs to one
 // short stall per probe.
 //
-// The deadline counts from the probe's first instruction (hostProcessDeadline).
-// The time the host holds a new process before that, such as darwin's check of
-// a freshly written executable, is not charged to it, and neither is the time
-// the probe then waits for a CPU: uncountedTimeBound bounds both together. A
-// tool that blocks before its first sample reads as running once it got past
-// its loader, so a wrapper waiting on a hung child stops at this deadline. The
-// CPU wait of the probe's children is not read: a wrapper waiting on a child
-// that waits for a CPU is charged for that time.
+// The deadline counts from the probe's first instruction
+// (procdeadline.HostProcessDeadline). The time the host holds a new process
+// before that, such as darwin's check of a freshly written executable, is not
+// charged to it, and neither is the time the probe then waits for a CPU:
+// procdeadline.UncountedTimeBound bounds both together. A tool that blocks
+// before its first sample reads as running once it got past its loader, so a
+// wrapper waiting on a hung child stops at this deadline. The CPU wait of the
+// probe's children is not read: a wrapper waiting on a child that waits for a
+// CPU is charged for that time.
 const toolVersionProbeTimeout = 5 * time.Second
 
 // toolVersionProbeWaitDelay bounds the drain AFTER the deadline kills the child.
@@ -69,18 +72,18 @@ func (b *boundedBuffer) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// cacheToolchainVersion returns the CLI runtime identity used by every task.
+// CacheToolchainVersion returns the CLI runtime identity used by every task.
 // A task that uses runtime toolchains additionally includes their lock
 // identities: a TypeScript task's Bun produces its transpilation, type-check,
 // test, and compile outputs, and neither the static extension version nor the
 // declared lockfile inputs name that Bun, so omitting this signal would
 // restore artifacts produced by a different compiler.
-func cacheToolchainVersion(job *ScheduledJob) string {
+func CacheToolchainVersion(job *jobs.ScheduledJob) string {
 	base := runtime.Version()
 	if job == nil || job.Extension == nil || job.JobDef == nil {
 		return base
 	}
-	if identity := runtimeToolchainIdentityForRefs(job.Extension, job.JobDef.Toolchains); identity != "" {
+	if identity := RuntimeToolchainIdentityForRefs(job.Extension, job.JobDef.Toolchains); identity != "" {
 		return base + ";runtime-tools=" + identity
 	}
 	return base

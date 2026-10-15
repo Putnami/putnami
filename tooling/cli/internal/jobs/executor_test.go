@@ -12,6 +12,7 @@ import (
 	protocoljob "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -431,7 +432,7 @@ func TestDeclaredHostPlatformReachesTheCacheKey(t *testing.T) {
 	}
 
 	declaring := mkJob([]string{"hostPlatform", "extensionVersion"})
-	if got, want := taskRuntimeIdentity(declaring), []string{"hostPlatform=" + HostPlatform()}; !reflect.DeepEqual(got, want) {
+	if got, want := taskRuntimeIdentity(declaring), []string{"hostPlatform=" + machineprobe.HostPlatform()}; !reflect.DeepEqual(got, want) {
 		t.Errorf("taskRuntimeIdentity = %v, want %v; `extensionVersion` must resolve to nothing because the "+
 			"version is already an unconditional key field", got, want)
 	}

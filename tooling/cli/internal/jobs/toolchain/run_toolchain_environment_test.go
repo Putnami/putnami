@@ -1,4 +1,4 @@
-package jobs
+package toolchain
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	model "go.putnami.dev/cli/model/extension"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/envkeys"
 )
 
 // A command that starts a pinned tool outside the task graph, as `projects
@@ -46,13 +47,13 @@ func TestRunToolchainEnvironmentResolvesLikeAnOrdinaryTask(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := strings.Split(envLastValue(env, "PATH"), string(os.PathListSeparator)); len(got) != 2 || got[0] != filepath.Dir(binary) || got[1] != ambient {
+		if got := strings.Split(envkeys.Host.Last(env, "PATH"), string(os.PathListSeparator)); len(got) != 2 || got[0] != filepath.Dir(binary) || got[1] != ambient {
 			t.Fatalf("PATH = %q, want the pinned directory before %q", got, ambient)
 		}
-		if got, want := envLastValue(env, "COMPILER_ROOT"), filepath.Dir(filepath.Dir(binary)); got != want {
+		if got, want := envkeys.Host.Last(env, "COMPILER_ROOT"), filepath.Dir(filepath.Dir(binary)); got != want {
 			t.Fatalf("COMPILER_ROOT = %q, want %q", got, want)
 		}
-		if envLastValue(env, "KEEP") != "1" {
+		if envkeys.Host.Last(env, "KEEP") != "1" {
 			t.Fatalf("environment = %v, want the base kept", env)
 		}
 		if path, err := ProviderExecutable("compiler", env); err != nil || path != binary {

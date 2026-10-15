@@ -21,6 +21,7 @@ import (
 	registryproto "go.putnami.dev/protocol/registry"
 	"go.putnami.dev/sdk/extension/registrycred"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -117,7 +118,7 @@ func TestReceivesJobCredential(t *testing.T) {
 		{"the fetch without a resolved runtime", jobCredentialTestJob(fetch, fetch, runtimeCommand), "", true, false},
 		{"the fetch another program runs", jobCredentialTestJob(fetch, fetch, "{extensionRoot}/bin/fetch"), "/ext/runtime", true, false},
 		{"the fetch of a local extension", localSourceJob(jobCredentialTestJob(fetch, fetch, runtimeCommand)), "/ext/runtime", true, false},
-		{"the install", jobCredentialTestJob(toolchainProvisioningCommand, toolchainProvisioningCommand, runtimeCommand), "/ext/runtime", false, false},
+		{"the install", jobCredentialTestJob(toolchain.ToolchainProvisioningCommand, toolchain.ToolchainProvisioningCommand, runtimeCommand), "/ext/runtime", false, false},
 		{"a build", jobCredentialTestJob("build~compile", "build", runtimeCommand), "/ext/runtime", false, false},
 		{"a command that only starts like the fetch", jobCredentialTestJob(fetch+"er", fetch+"er", runtimeCommand), "/ext/runtime", false, false},
 		{"no job", nil, "/ext/runtime", false, false},
@@ -199,7 +200,7 @@ func TestAttachJobCredentialLeavesOtherSpawnsAlone(t *testing.T) {
 		job    *ScheduledJob
 	}{
 		{"a local run's fetch", "", WithDependencyFetch(context.Background()), jobCredentialTestJob(fetch, fetch, runtimeCommand)},
-		{"a hosted run's install", "run-bearer", context.Background(), jobCredentialTestJob(toolchainProvisioningCommand, toolchainProvisioningCommand, runtimeCommand)},
+		{"a hosted run's install", "run-bearer", context.Background(), jobCredentialTestJob(toolchain.ToolchainProvisioningCommand, toolchain.ToolchainProvisioningCommand, runtimeCommand)},
 		{"a hosted run's build", "run-bearer", context.Background(), jobCredentialTestJob("build~compile", "build", runtimeCommand)},
 	}
 	for _, tc := range cases {
@@ -518,7 +519,7 @@ func TestJobEnvironmentOfAHostedRun(t *testing.T) {
 		offline []string
 	}{
 		{"a build", jobCredentialTestJob("build~compile", "build", "true"), []string{"1"}},
-		{"the install", jobCredentialTestJob(toolchainProvisioningCommand, toolchainProvisioningCommand, runtimeCommand), []string{"1"}},
+		{"the install", jobCredentialTestJob(toolchain.ToolchainProvisioningCommand, toolchain.ToolchainProvisioningCommand, runtimeCommand), []string{"1"}},
 		{"the fetch", jobCredentialTestJob(fetch, fetch, runtimeCommand), nil},
 		{"the fetch another program runs", jobCredentialTestJob(fetch, fetch, "/bin/fetch"), nil},
 	}

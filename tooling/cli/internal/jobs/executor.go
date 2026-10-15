@@ -10,7 +10,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -19,15 +18,11 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
-
-// HostPlatform is the GOOS/GOARCH of the machine running the CLI, in the same
-// `os/arch` spelling extensions use for platform requests.
-func HostPlatform() string {
-	return runtime.GOOS + "/" + runtime.GOARCH
-}
 
 // taskRuntimeIdentity resolves the ambient runtime facts a task DECLARED as
 // cache-key inputs into `name=value` pairs.
@@ -51,7 +46,7 @@ func taskRuntimeIdentity(job *ScheduledJob) []string {
 	var identity []string
 	for _, name := range job.JobDef.TaskCachePolicy.Key.Runtime {
 		if name == extproto.RuntimeInputHostPlatform {
-			identity = append(identity, name+"="+HostPlatform())
+			identity = append(identity, name+"="+machineprobe.HostPlatform())
 		}
 	}
 	return identity
@@ -966,7 +961,7 @@ func computeJobCacheHashWith(
 		job.Extension.Name,
 		job.Extension.Version,
 		extensionImplementationDigest,
-		cacheToolchainVersion(job),
+		toolchain.CacheToolchainVersion(job),
 		cacheTaskName(job),
 		jobContractDigest(job),
 		job.Project.Name,

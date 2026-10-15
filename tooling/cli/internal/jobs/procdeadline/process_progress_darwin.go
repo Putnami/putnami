@@ -1,6 +1,6 @@
 //go:build darwin
 
-package jobs
+package procdeadline
 
 import (
 	"encoding/binary"
@@ -80,14 +80,14 @@ type taskProgress struct {
 // waited for a CPU. A process whose counters cannot be read counts as
 // running, at the baseline or at any later sample, and a wait that cannot be
 // read is not measured.
-func hostProcessProgress(process *os.Process) func() processSample {
+func hostProcessProgress(process *os.Process) func() ProcessSample {
 	if process == nil {
 		return nil
 	}
 	return watchTaskProgress(process.Pid)
 }
 
-func watchTaskProgress(pid int) func() processSample {
+func watchTaskProgress(pid int) func() ProcessSample {
 	baseline, err := readTaskProgress(pid)
 	if err != nil {
 		return nil
@@ -95,14 +95,14 @@ func watchTaskProgress(pid int) func() processSample {
 	// A process that ran and then blocked before the baseline keeps still
 	// counters too: only its memory tells it from a held one.
 	ran := hasRunItsOwnCode(pid)
-	return func() processSample {
+	return func() ProcessSample {
 		if !ran {
 			if current, err := readTaskProgress(pid); err == nil && current == baseline {
-				return processSample{held: true}
+				return ProcessSample{Held: true}
 			}
 		}
 		waited, err := readCPUWait(pid)
-		return processSample{waitedForCPU: waited, measured: err == nil}
+		return ProcessSample{WaitedForCPU: waited, Measured: err == nil}
 	}
 }
 
