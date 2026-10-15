@@ -127,6 +127,8 @@ Resolution order:
 2. Session-stored access token, refreshed via `refresh_token` when expired.
 3. `throw redirect(loginRoute)` — unless `{ redirect: false }`.
 
+A refresh token the provider rejects with 400 `invalid_grant` (expired or revoked) logs `OAuth refresh token rejected` at WARN. Any other token endpoint failure, such as a network error, a 5xx answer or `invalid_client`, logs at ERROR. Both records carry the OAuth `error` code, never the response body.
+
 ### `useUser<T>(options?)`
 
 ```ts

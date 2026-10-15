@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
-import { resetConfigLoader, runInContext, useConfig } from '@putnami/runtime';
+import { type LogEntry, resetConfigLoader, runInContext, useConfig } from '@putnami/runtime';
 import { MemoryLogger } from '@putnami/runtime/testing';
 import type { HttpRequestContext } from '../../src/http';
 import { OAuthConfig } from '../../src/oauth/oauth.config';
@@ -277,6 +277,78 @@ describe('OAuthService', () => {
       const result = await runInContext(context, () => service.clientToken());
       expect(result).toBeUndefined();
       expect(logger.entries.some((e) => e.level === 'error')).toBe(true);
+    });
+
+    async function failedTokenRecords(
+      respond: () => Promise<Response>,
+      call: (service: OAuthService) => Promise<unknown>,
+    ): Promise<LogEntry[]> {
+      globalThis.fetch = mock(respond) as typeof fetch;
+      const service = new OAuthService();
+      service.confInit = { clientId: 'c', clientSecret: 's', tokenUri: TOKEN_URI };
+      const logger = new MemoryLogger();
+      const context = createHttpContext();
+      (context as Record<string, unknown>).logger = logger;
+      expect(await runInContext(context, () => call(service))).toBeUndefined();
+      return logger.entries.filter((e) => e.level === 'warn' || e.level === 'error');
+    }
+
+    const oauthError = (status: number, error: string) =>
+      Promise.resolve(
+        new Response(JSON.stringify({ error, error_description: 'secret detail' }), {
+          status,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+
+    it('logs a refresh grant answered 400 invalid_grant at warn with the error code only', async () => {
+      const records = await failedTokenRecords(
+        () => oauthError(400, 'invalid_grant'),
+        (service) => service.refreshToken('expired'),
+      );
+      expect(records.map((e) => [e.level, e.message])).toEqual([['warn', 'OAuth refresh token rejected']]);
+      expect(records[0]?.data).toEqual([
+        { status: 400, grantType: 'refresh_token', tokenUri: TOKEN_URI, error: 'invalid_grant' },
+      ]);
+      expect(JSON.stringify(records[0])).not.toContain('secret detail');
+    });
+
+    it('logs invalid_client on a refresh grant at error', async () => {
+      const records = await failedTokenRecords(
+        () => oauthError(401, 'invalid_client'),
+        (service) => service.refreshToken('r'),
+      );
+      expect(records.map((e) => [e.level, e.message])).toEqual([['error', 'OAuth token request failed']]);
+      expect(records[0]?.data).toEqual([
+        { status: 401, grantType: 'refresh_token', tokenUri: TOKEN_URI, error: 'invalid_client' },
+      ]);
+    });
+
+    it('logs invalid_grant on another grant at error', async () => {
+      const records = await failedTokenRecords(
+        () => oauthError(400, 'invalid_grant'),
+        (service) => service.exchangeCode({ code: 'used', redirectUri: 'https://app.test/callback' }),
+      );
+      expect(records.map((e) => [e.level, e.message])).toEqual([['error', 'OAuth token request failed']]);
+    });
+
+    it('logs a 5xx answer on a refresh grant at error without its raw body', async () => {
+      const records = await failedTokenRecords(
+        () => Promise.resolve(new Response('<html>upstream detail</html>', { status: 503 })),
+        (service) => service.refreshToken('r'),
+      );
+      expect(records.map((e) => [e.level, e.message])).toEqual([['error', 'OAuth token request failed']]);
+      expect(records[0]?.data).toEqual([
+        { status: 503, grantType: 'refresh_token', tokenUri: TOKEN_URI, error: undefined },
+      ]);
+    });
+
+    it('logs a network error on a refresh grant at error', async () => {
+      const records = await failedTokenRecords(
+        () => Promise.reject(new TypeError('fetch failed')),
+        (service) => service.refreshToken('r'),
+      );
+      expect(records.map((e) => [e.level, e.message])).toEqual([['error', 'OAuth token request errored']]);
     });
   });
 });

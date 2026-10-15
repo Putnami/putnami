@@ -114,6 +114,22 @@ function formUrlEncode(value: string): string {
 }
 
 /**
+ * Reads the OAuth `error` code of a token endpoint error response (RFC 6749
+ * §5.2). The rest of the body is never logged.
+ */
+async function readOAuthErrorCode(res: Response): Promise<string | undefined> {
+  try {
+    const data: unknown = await res.json();
+    if (typeof data === 'object' && data !== null && 'error' in data && typeof data.error === 'string') {
+      return data.error;
+    }
+  } catch {
+    // Not a JSON body.
+  }
+  return undefined;
+}
+
+/**
  * Computes a session `expireAt` from a token response's `expires_in` (seconds).
  * Tolerates missing / non-positive values by falling back to the default; subtracts
  * a small clock-skew margin from the advertised lifetime.
@@ -624,13 +640,16 @@ export class OAuthService {
       return (await res.json()) as TokenInfo;
     }
 
-    const errorBody = await res.text().catch(() => 'Unable to read response body');
-    useLogger().error('OAuth token request failed', {
-      status: res.status,
-      grantType: body['grant_type'],
-      tokenUri,
-      error: errorBody,
-    });
+    const grantType = body['grant_type'];
+    const error = await readOAuthErrorCode(res);
+    const fields = { status: res.status, grantType, tokenUri, error };
+    // An expired or revoked refresh token is an expected outcome: the caller
+    // sends the user to sign in again.
+    if (grantType === 'refresh_token' && res.status === 400 && error === 'invalid_grant') {
+      useLogger().warn('OAuth refresh token rejected', fields);
+    } else {
+      useLogger().error('OAuth token request failed', fields);
+    }
     return undefined;
   }
 }
