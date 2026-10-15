@@ -16,7 +16,7 @@
     "/tooling/sdd-extension",
     "/tooling/contributor",
     "/tooling/github-collaboration",
-    "@putnami/cloud",
+    "/cloud/extension",
     "@putnami/intelligence"
   ],
   "agentArtifacts": [
