@@ -1364,17 +1364,20 @@ func TestMain(m *testing.M) {
 // deadline, by a fifth of it and at most goRegistryDeadlineMarginCapMs.
 func TestGoRegistryContextEndsBeforeTheTaskDeadline(t *testing.T) {
 	started := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
-	for deadline, want := range map[string]time.Duration{
-		"60000":   48 * time.Second,
-		"600000":  570 * time.Second,
-		" 10000 ": 8 * time.Second,
+	for _, tc := range []struct {
+		deadline string
+		want     time.Duration
+	}{
+		{"60000", 48 * time.Second},
+		{"600000", 570 * time.Second},
+		{" 10000 ", 8 * time.Second},
 	} {
-		t.Setenv(extproto.TaskDeadlineMsEnv, deadline)
+		t.Setenv(extproto.TaskDeadlineMsEnv, tc.deadline)
 		ctx, cancel := goRegistryContext(started)
 		got, ok := ctx.Deadline()
 		cancel()
-		if !ok || got.Sub(started) != want {
-			t.Errorf("deadline %q gives %v (%t), want %v after the start", deadline, got.Sub(started), ok, want)
+		if !ok || got.Sub(started) != tc.want {
+			t.Errorf("deadline %q gives %v (%t), want %v after the start", tc.deadline, got.Sub(started), ok, tc.want)
 		}
 	}
 	for _, deadline := range []string{"", "0", "-5", "soon"} {

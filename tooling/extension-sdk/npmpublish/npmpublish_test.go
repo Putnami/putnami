@@ -252,6 +252,49 @@ func TestPublishRetriesATransientPut(t *testing.T) {
 	}
 }
 
+// A PUT sent again that the registry refuses because the first PUT landed in
+// the meantime is a stored version when the registry serves the artifact.
+func TestPublishAcceptsARefusedResendWhenTheArtifactIsServed(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-publish-retries-a-transient-failure")
+	for name, tc := range map[string]struct {
+		landed bool
+		want   string
+	}{
+		"the first PUT landed":       {true, ""},
+		"the first PUT never landed": {false, "managed npm publish failed: registry returned 409 Conflict after 2 attempts"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			waits := recordWaits(t)
+			registry := newFakeRegistry(t)
+			registry.answer = func(w http.ResponseWriter, req *http.Request, count int) bool {
+				if req.Method != http.MethodPut {
+					return false
+				}
+				if count == 1 {
+					w.WriteHeader(http.StatusGatewayTimeout)
+					return true
+				}
+				if tc.landed {
+					registry.store(httptest.NewRecorder(), req)
+				}
+				w.WriteHeader(http.StatusConflict)
+				return true
+			}
+			reused, err := Publish(context.Background(), testClient(t), registry.server.URL, testToken, testArtifact("tarball bytes"))
+			if tc.want == "" {
+				if err != nil || reused {
+					t.Fatalf("Publish = %t, %v, want a fresh upload", reused, err)
+				}
+			} else if err == nil || err.Error() != tc.want {
+				t.Fatalf("Publish = %v, want %q", err, tc.want)
+			}
+			if registry.counts[http.MethodPut] != 2 || fmt.Sprint(*waits) != "[1s]" {
+				t.Fatalf("%d PUTs waited %v, want 2 PUTs and one wait", registry.counts[http.MethodPut], *waits)
+			}
+		})
+	}
+}
+
 func TestPublishVerifiesTheUploadedBytes(t *testing.T) {
 	var puts int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

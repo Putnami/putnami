@@ -4,14 +4,13 @@
 //   - an answer of 408, 429, 500, 502, 503 or 504, the statuses
 //     go-containerregistry retries for an image push;
 //   - a failure before the request obtained a connection, a dial or TLS
-//     handshake timeout included, since nothing reached the registry;
+//     handshake timeout included;
 //   - a failure after the request obtained a connection that is not a
 //     timeout, such as a connection reset before the answer or during its
 //     body.
 //
 // Every other failure is final: a timeout after the request obtained a
-// connection, because the client timeout bounds one attempt; a host the
-// resolver does not know; a registry certificate the client refuses; and a
+// connection; a host the resolver does not know; a registry certificate the client refuses; and a
 // caller context that ended. Between two attempts Do waits a doubling,
 // randomized delay, or the longer wait a Retry-After header asks for. An
 // answer that asks for more than MaxRetryAfter ends the retries. A caller

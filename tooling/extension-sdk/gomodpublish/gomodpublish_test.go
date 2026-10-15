@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -324,19 +325,29 @@ func TestUploadZipDoesNotRetryAClientTimeout(t *testing.T) {
 	waits := recordWaits(t)
 	release := make(chan struct{})
 	var sent atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		sent.Add(1)
+	zip := []byte("zip bytes")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if sent.Add(1) == 1 {
+			w.WriteHeader(http.StatusCreated)
+			_, _ = fmt.Fprintf(w, `{"digest":%q}`, Digest(zip))
+			return
+		}
 		<-release
 	}))
 	t.Cleanup(server.Close)
 	t.Cleanup(func() { close(release) })
+	// The first upload is answered, so the timed upload reuses its connection.
 	client := testClient(t)
-	client.Timeout = 100 * time.Millisecond
-	if _, err := UploadZip(context.Background(), client, nil, server.URL, testToken, testModule, []byte("zip bytes")); !errors.Is(err, context.DeadlineExceeded) {
+	if _, err := UploadZip(context.Background(), client, nil, server.URL, testToken, testModule, zip); err != nil {
+		t.Fatal(err)
+	}
+	timed := *client
+	timed.Timeout = 100 * time.Millisecond
+	if _, err := UploadZip(context.Background(), &timed, nil, server.URL, testToken, testModule, zip); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("UploadZip = %v, want the client timeout", err)
 	}
-	if sent.Load() != 1 || len(*waits) != 0 {
-		t.Fatalf("%d uploads waited %v, want one upload and no wait", sent.Load(), *waits)
+	if sent.Load() != 2 || len(*waits) != 0 {
+		t.Fatalf("%d uploads waited %v, want one timed upload and no wait", sent.Load(), *waits)
 	}
 }
 
@@ -417,6 +428,45 @@ func TestVerifyRetriesATransientDownloadFailure(t *testing.T) {
 			}
 			if len(*waits) != 3 {
 				t.Fatalf("waits = %v, want 3", *waits)
+			}
+
+			waits = recordWaits(t)
+			var cut atomic.Int32
+			truncating := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				served := mod
+				if strings.HasSuffix(r.URL.Path, ".zip") {
+					served = zip
+				}
+				if cut.Add(1) > 1 {
+					_, _ = w.Write(served)
+					return
+				}
+				w.Header().Set("Content-Length", strconv.Itoa(len(served)))
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write(served[:len(served)/2])
+				w.(http.Flusher).Flush()
+				dropConnection(w)
+			}))
+			t.Cleanup(truncating.Close)
+			if err := verify(context.Background(), testClient(t), truncating.URL); err != nil {
+				t.Fatalf("verify = %v, want the second download verified after a body cut short", err)
+			}
+			if cut.Load() != 2 || fmt.Sprint(*waits) != "[1s]" {
+				t.Fatalf("%d downloads waited %v, want 2 downloads and one wait of 1s", cut.Load(), *waits)
+			}
+
+			waits = recordWaits(t)
+			var mismatched atomic.Int32
+			other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				mismatched.Add(1)
+				_, _ = w.Write([]byte("other bytes"))
+			}))
+			t.Cleanup(other.Close)
+			if err := verify(context.Background(), testClient(t), other.URL); err == nil || !strings.Contains(err.Error(), "does not match") {
+				t.Fatalf("verify = %v, want a mismatch", err)
+			}
+			if mismatched.Load() != 1 || len(*waits) != 0 {
+				t.Fatalf("%d downloads waited %v, want one download for a mismatch", mismatched.Load(), *waits)
 			}
 		})
 	}

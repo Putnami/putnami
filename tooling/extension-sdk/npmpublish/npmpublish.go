@@ -278,8 +278,11 @@ func CheckIdentity(artifact Artifact) error {
 // with other bytes is an error, before and after the upload. A transient
 // failure (package retry) sends a probe again, up to retry.Attempts times in
 // all. After a transient PUT failure, Publish probes first: a registry that
-// serves the artifact's digest and size holds the version, and any other
-// answer sends the PUT again, up to retry.Attempts PUT attempts in all.
+// serves the artifact's digest and size holds the version, and a 404 sends
+// the PUT again, up to retry.Attempts attempts in all, a failed probe
+// counting as one. A PUT sent again that gets an answer neither 2xx nor
+// transient is followed by one more probe, and a registry that serves the
+// artifact's digest and size then holds the version.
 func Publish(ctx context.Context, client *http.Client, registry, token string, artifact Artifact) (reused bool, err error) {
 	if err := CheckIdentity(artifact); err != nil {
 		return false, err
@@ -307,7 +310,14 @@ func Publish(ctx context.Context, client *http.Client, registry, token string, a
 				return answer, err
 			}
 		}
-		return put(ctx, client, registry, token, payload)
+		answer, err := put(ctx, client, registry, token, payload)
+		if err != nil && sends > 1 && answer.Status != 0 && !retry.Transient(answer.Status) {
+			if landed, probed, probeErr := probe(ctx, client, registry, token, artifact.Name, artifact.Version, digest, size); probeErr == nil && landed {
+				stored = true
+				return probed, nil
+			}
+		}
+		return answer, err
 	})
 	if err != nil {
 		return false, fmt.Errorf("managed npm publish failed: %w%s", err, retry.Note(answer, attempts))

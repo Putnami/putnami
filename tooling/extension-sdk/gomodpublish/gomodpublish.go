@@ -325,41 +325,63 @@ func proxyURL(registryURL, modulePath, version, extension string) (string, error
 	return registryURL + "/" + escapedPath + "/@v/" + escapedVersion + extension, nil
 }
 
-// download GETs a standard Go proxy projection and returns the open response
-// when it answers 200. A transient failure (package retry) sends the GET
-// again, up to retry.Attempts times in all.
-func download(ctx context.Context, client *http.Client, target, token, name string) (*http.Response, error) {
+// download GETs a standard Go proxy projection and hands the body of a 200
+// answer to consume. A transient failure (package retry), a failure to read
+// that body included, sends the GET again, up to retry.Attempts times in
+// all. Any other error consume returns is final.
+func download(ctx context.Context, client *http.Client, target, token, name string, consume func(io.Reader) error) error {
 	client, err := withoutRedirects(client)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	authorize(req, token)
-	var served *http.Response
 	answer, attempts, err := retryPolicy.Do(ctx, func() (retry.Answer, error) {
 		watched, exchange := retry.Watch(ctx)
 		resp, err := client.Do(req.Clone(watched)) //nolint:gosec // the URL is built from validated publish configuration
 		if err != nil {
 			return retry.Answer{}, exchange.Failed(err, err)
 		}
-		if resp.StatusCode == http.StatusOK {
-			served = resp
-			return retry.Answer{Status: resp.StatusCode}, nil
+		defer func() { _ = resp.Body.Close() }()
+		answer := retry.Answer{Status: resp.StatusCode, Header: resp.Header}
+		if resp.StatusCode != http.StatusOK {
+			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, MaxResponseBytes))
+			return answer, nil
 		}
-		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, MaxResponseBytes))
-		_ = resp.Body.Close()
-		return retry.Answer{Status: resp.StatusCode, Header: resp.Header}, nil
+		body := &readRecorder{reader: resp.Body}
+		if err := consume(body); err != nil {
+			if body.err != nil {
+				return answer, exchange.Failed(body.err, err)
+			}
+			return answer, err
+		}
+		return answer, nil
 	})
 	if err != nil {
-		return nil, outcome{attempts: attempts, err: err}.failure(name + " download failed")
+		return outcome{attempts: attempts, err: err}.failure(name + " download failed")
 	}
 	if answer.Status != http.StatusOK {
-		return nil, fmt.Errorf("%s download returned %d%s", name, answer.Status, retry.Note(answer, attempts))
+		return fmt.Errorf("%s download returned %d%s", name, answer.Status, retry.Note(answer, attempts))
 	}
-	return served, nil
+	return nil
+}
+
+// readRecorder reads from reader and keeps the first error other than io.EOF
+// that reader returned.
+type readRecorder struct {
+	reader io.Reader
+	err    error
+}
+
+func (r *readRecorder) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	if err != nil && !errors.Is(err, io.EOF) && r.err == nil {
+		r.err = err
+	}
+	return n, err
 }
 
 // VerifyZip downloads the module zip the registry serves to consumers and
@@ -370,20 +392,17 @@ func VerifyZip(ctx context.Context, client *http.Client, registryURL, token, mod
 	if err != nil {
 		return err
 	}
-	resp, err := download(ctx, client, target, token, "module zip")
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	hash := sha256.New()
-	if _, err := io.Copy(hash, io.LimitReader(resp.Body, MaxZipBytes+1)); err != nil {
-		return fmt.Errorf("hash downloaded module zip: %w", err)
-	}
-	gotDigest := fmt.Sprintf("sha256:%x", hash.Sum(nil))
-	if gotDigest != wantDigest {
-		return fmt.Errorf("downloaded module zip digest %q does not match uploaded digest %q", gotDigest, wantDigest)
-	}
-	return nil
+	return download(ctx, client, target, token, "module zip", func(body io.Reader) error {
+		hash := sha256.New()
+		if _, err := io.Copy(hash, io.LimitReader(body, MaxZipBytes+1)); err != nil {
+			return fmt.Errorf("hash downloaded module zip: %w", err)
+		}
+		gotDigest := fmt.Sprintf("sha256:%x", hash.Sum(nil))
+		if gotDigest != wantDigest {
+			return fmt.Errorf("downloaded module zip digest %q does not match uploaded digest %q", gotDigest, wantDigest)
+		}
+		return nil
+	})
 }
 
 // VerifyMod downloads the go.mod the registry serves to consumers and refuses
@@ -394,19 +413,16 @@ func VerifyMod(ctx context.Context, client *http.Client, registryURL, token, mod
 	if err != nil {
 		return err
 	}
-	resp, err := download(ctx, client, target, token, "go.mod")
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	got, err := io.ReadAll(io.LimitReader(resp.Body, int64(len(want))+1))
-	if err != nil {
-		return fmt.Errorf("read downloaded go.mod: %w", err)
-	}
-	if !bytes.Equal(got, want) {
-		return fmt.Errorf("downloaded go.mod does not match submitted bytes")
-	}
-	return nil
+	return download(ctx, client, target, token, "go.mod", func(body io.Reader) error {
+		got, err := io.ReadAll(io.LimitReader(body, int64(len(want))+1))
+		if err != nil {
+			return fmt.Errorf("read downloaded go.mod: %w", err)
+		}
+		if !bytes.Equal(got, want) {
+			return fmt.Errorf("downloaded go.mod does not match submitted bytes")
+		}
+		return nil
+	})
 }
 
 // Publish uploads mod's zip, sends its version PUT, and reads the served zip

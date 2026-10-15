@@ -749,18 +749,25 @@ func TestUploadBlobDoesNotRetryAClientTimeout(t *testing.T) {
 	t.Cleanup(func() { close(release) })
 	var sent atomic.Int32
 	registry.answer = func(http.ResponseWriter, *http.Request) bool {
-		sent.Add(1)
+		if sent.Add(1) == 1 {
+			return false
+		}
 		<-release
 		return true
 	}
+	// The first upload is answered, so the timed upload reuses its connection.
 	client := testClient(t)
-	client.Timeout = 100 * time.Millisecond
-	err := UploadBlob(context.Background(), client, registry.server.URL, testToken, "acme/doc-contents", blob)
+	if err := UploadBlob(context.Background(), client, registry.server.URL, testToken, "acme/doc-contents", blob); err != nil {
+		t.Fatal(err)
+	}
+	timed := *client
+	timed.Timeout = 100 * time.Millisecond
+	err := UploadBlob(context.Background(), &timed, registry.server.URL, testToken, "acme/doc-contents", blob)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("UploadBlob = %v, want the client timeout", err)
 	}
-	if sent.Load() != 1 || len(*waits) != 0 {
-		t.Fatalf("%d uploads waited %v, want one upload and no wait", sent.Load(), *waits)
+	if sent.Load() != 2 || len(*waits) != 0 {
+		t.Fatalf("%d uploads waited %v, want one timed upload and no wait", sent.Load(), *waits)
 	}
 }
 
@@ -828,7 +835,7 @@ func TestUploadBlobStopsWhenTheContextEnds(t *testing.T) {
 			t.Fatalf("%d uploads were sent, want 1", len(*sent))
 		}
 	})
-	t.Run("before the wait", func(t *testing.T) {
+	t.Run("while the answer arrives", func(t *testing.T) {
 		waits := recordWaits(t)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
