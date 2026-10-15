@@ -413,7 +413,7 @@ const machineTokenIdentityKey = "machine_token_env"
 // cacheTokenIdentityKey marks the identity of a session whose PUTNAMI_CACHE_TOKEN
 // overrides every configured token source. Its value names the variable, never
 // the token.
-const cacheTokenIdentityKey = "cache_token_env"
+const cacheTokenIdentityKey = "cache_token_env" //nolint:gosec // G101: an identity map key, not a credential
 
 // cacheIdentity is the identity a build with the config built reads the cache
 // with: PUTNAMI_CACHE_TOKEN when it is set, then the signed-in user, then the
