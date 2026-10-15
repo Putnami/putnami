@@ -656,7 +656,7 @@ func (r *LiveRenderer) taskCommandOrder() []string {
 		}
 	}
 	sort.SliceStable(cmds, func(i, j int) bool {
-		ri, rj := commandRank(cmds[i]), commandRank(cmds[j])
+		ri, rj := commandRank(r.verbOrder, cmds[i]), commandRank(r.verbOrder, cmds[j])
 		if ri != rj {
 			return ri < rj
 		}

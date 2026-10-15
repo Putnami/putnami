@@ -2,6 +2,7 @@ package output
 
 import (
 	"bytes"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -204,6 +205,7 @@ func TestTruncate(t *testing.T) {
 }
 
 func TestCommandRankOrder(t *testing.T) {
+	commandRank := func(name string) int { return commandRank(nil, name) }
 	if commandRank("lint") >= commandRank("test") {
 		t.Error("lint should rank before test")
 	}
@@ -218,6 +220,64 @@ func TestCommandRankOrder(t *testing.T) {
 	}
 	if commandRank("unknown") <= commandRank("deploy") {
 		t.Error("unknown commands should rank after known ones")
+	}
+	if commandRank("unknown") != unknownCommandRank {
+		t.Errorf("unknown command rank = %d, want %d", commandRank("unknown"), unknownCommandRank)
+	}
+}
+
+// TestCommandRankFollowsTheVocabulary: the verbs of the loaded vocabularies
+// rank first, in vocabulary order; the fallback verbs they do not name follow
+// in fallback order; a command neither names ranks last.
+func TestCommandRankFollowsTheVocabulary(t *testing.T) {
+	vocabulary := []string{"build", "test", "audit", "lint"}
+	names := []string{"serve", "unknown", "lint", "generate", "deploy", "audit", "test", "format", "build"}
+	slices.SortStableFunc(names, func(a, b string) int {
+		return commandRank(vocabulary, a) - commandRank(vocabulary, b)
+	})
+	want := []string{"build", "test", "audit", "lint", "generate", "format", "deploy", "serve", "unknown"}
+	if !slices.Equal(names, want) {
+		t.Errorf("order = %v, want %v", names, want)
+	}
+	if got := commandRank(vocabulary, "unknown"); got != unknownCommandRank {
+		t.Errorf("unknown command rank = %d, want %d", got, unknownCommandRank)
+	}
+
+	long := make([]string, unknownCommandRank+1)
+	for i := range long {
+		long[i] = fmt.Sprintf("verb-%03d", i)
+	}
+	if commandRank(long, "unknown") <= commandRank(long, long[len(long)-1]) {
+		t.Error("a command no vocabulary names must rank after a vocabulary of more than 100 verbs")
+	}
+}
+
+// TestLiveColumnsFollowTheVocabulary: the renderer orders each row's commands
+// and the summary columns by the vocabulary it was given.
+func TestLiveColumnsFollowTheVocabulary(t *testing.T) {
+	initial := ColorsEnabled()
+	SetColorsEnabled(false)
+	t.Cleanup(func() { SetColorsEnabled(initial) })
+
+	r := NewLiveRenderer(&bytes.Buffer{}, &bytes.Buffer{})
+	r.verbOrder = []string{"build", "test"}
+	r.width = 200
+	r.Start([]*jobs.ScheduledJob{
+		makeLiveTestJob("app", "lint"),
+		makeLiveTestJob("app", "test"),
+		makeLiveTestJob("app", "build"),
+	})
+	stopSpinner(r)
+
+	want := []string{"build", "test", "lint"}
+	if !slices.Equal(r.rowByID["app"].commandOrder, want) {
+		t.Errorf("row command order = %v, want %v", r.rowByID["app"].commandOrder, want)
+	}
+	if !slices.Equal(r.colOrder, want) {
+		t.Errorf("column order = %v, want %v", r.colOrder, want)
+	}
+	if got := r.taskCommandOrder(); !slices.Equal(got, want) {
+		t.Errorf("summary command order = %v, want %v", got, want)
 	}
 }
 
