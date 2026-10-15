@@ -115,8 +115,8 @@ func stricterCacheTrust(left, right store.CacheTrust) bool {
 // whose jobs declare registry side effects (extension.CommandSideEffects),
 // publish by default, or a release tag. The declared trait decides, not the
 // command name. A cloud side effect alone, such as deploy's, does not raise
-// the trust. The tag arms still read names: `version tag` is a core command,
-// which declares no traits, and they go when it leaves the core.
+// the trust. The tag arms read names: `version tag` is a core command, which
+// declares no traits.
 func releaseCacheTrustRequired(extensions []*extension.ExtensionDescription, commands []string, subcommand string) bool {
 	for _, command := range commands {
 		if slices.Contains(extension.CommandSideEffects(extensions, command), extension.SideEffectsRegistry) {

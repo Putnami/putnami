@@ -75,7 +75,7 @@ A declared `sideEffects` still replaces the verb's. Per-step heaviness uses
 | `heavy` | Worker tuning leaves the command's jobs CPU/memory headroom. |
 | `requiresRunnable` | The command is skipped for `library` projects. |
 | `injectPublishChannels` | The project's `publish: [...]` channels are auto-activated as boolean params. |
-| `sideEffects` | `registry` or `cloud`; documents what the command mutates outside the workspace, and keeps the command's jobs on a task-scoped `--impacted` project. `publish` and `deploy` keep theirs whatever a declaration says. |
+| `sideEffects` | `registry` or `cloud`: what the command mutates outside the workspace. Any side effect refuses a root Git does not manage, makes MCP `run_jobs` refuse the command, and keeps the command's jobs on a task-scoped `--impacted` project; `registry` raises remote cache trust to at least `ci`. Declared traits add to a well-known verb's side effects and never remove them. |
 
 ### Gated capability transport is not server authorization
 
