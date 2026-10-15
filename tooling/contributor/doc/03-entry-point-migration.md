@@ -53,23 +53,23 @@ configured `integrations.contentBump` block and remains explicit-only.
 
 A workspace that still declares `@putnami/agent-workflows` or
 `@putnami/maintainer-workflows` is refused by every agent-content command, with
-nothing written; the error names the migration. The CLI no longer installs
-separately declared artifacts, and both projects are deleted. To switch:
+nothing written. The CLI no longer installs separately declared artifacts,
+both projects are deleted, and no command moves them. To switch:
 
-1. Declare `@putnami/contributor` in `extensions`, and run `putnami install`.
-2. Review the move: `putnami migrate agent-content @putnami/contributor`.
-3. Apply it: `putnami migrate agent-content @putnami/contributor --apply`. The
-   two `agentArtifacts` entries become `extension:@putnami/contributor`, their
-   lock pins go, and this clone's ownership records merge into the extension's.
+1. Declare `@putnami/contributor` in `extensions`, and replace the two
+   `agentArtifacts` entries with `extension:@putnami/contributor`.
+2. Delete this clone's ownership records of the two artifacts. The refusal
+   names each one.
+3. Run `putnami install`. It drops the two artifacts' pins from
+   `putnami.lock.json`. A file that differs from the content is a collision
+   that writes nothing: move or delete it, then rerun.
 4. Commit `putnami.workspace.json`, `putnami.lock.json` and the host files.
 
 A clone that already materialized the old artifacts keeps their ownership
 records after it pulls the switch, and every command refuses the contributor
-opt-in until they move. Run the same `--apply` once in that clone; in this
-repository that is `./putnamiw migrate agent-content @putnami/contributor --apply`.
-It keeps and releases any file you edited, and afterwards
-`putnami context generate` and `putnami install` change nothing. See the
-[CLI migration guide](../../cli/doc/18-agent-workflows.md#migrating-separate-artifacts-to-an-extensions-content).
+opt-in until they are deleted. Delete the records the refusal names, then run
+`./putnamiw install` in this repository. See
+[Replacing separate artifacts](../../cli/doc/18-agent-workflows.md#replacing-separate-artifacts-with-an-extensions-content).
 
 ## Publication and compatibility window
 
@@ -91,10 +91,9 @@ promotion. Until the channel a workspace resolves serves it:
   both entries, or resolve `canary`, and add them back once the channel
   serves it.
 - A workspace that declared `@putnami/agent-workflows` or
-  `@putnami/maintainer-workflows` either migrates with this CLI (above) or
-  stays on an earlier CLI release, which installs its pins exactly as before
-  ([CLI ADR 0048](../../cli/doc/adr/0048-migrating-agent-artifacts-to-extension-content.md),
-  section 7).
+  `@putnami/maintainer-workflows` either switches by hand with this CLI
+  (above) or stays on an earlier CLI release, which installs its pins exactly
+  as before.
 
 Which CLI reads the content:
 

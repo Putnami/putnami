@@ -189,15 +189,6 @@ example: putnami mcp install
 description: Write the putnami entry into .mcp.json at the workspace root so agent IDEs (Claude Code, Cursor, VS Code) auto-discover the MCP server. init, install and upgrade already add a missing entry; this explicit write is the only one that also rewrites a diverged putnami entry. Merge-aware: other servers and unknown keys are preserved, and an unparseable file is refused untouched.
 usage: putnami mcp install
 example: putnami mcp install
-═══ migrate agent-content ═══
-description: Check, apply or roll back the move of separately declared agent artifacts that an installed extension's agent content supersedes: their declarations, pins and ownership records move to the extension, and every file the content adds, changes or removes is listed before anything is written
-usage: putnami migrate agent-content <extension> [--check] [--apply] [--rollback] [--output <format>]
-flag: --check |  | Plan the migration without writing (default); exits non-zero when a migration is pending
-flag: --apply |  | Perform the migration, or finish one that stopped
-flag: --rollback |  | Restore the declarations, pins, ownership records and files recorded before the migration
-example: putnami migrate agent-content @putnami/contributor
-example: putnami migrate agent-content @putnami/contributor --apply
-example: putnami migrate agent-content @putnami/contributor --rollback
 ═══ migrate vnext ═══
 description: Check or atomically migrate putnami.lock.json to the current format while preserving pins and recording any missing installed extension task-contract metadata
 usage: putnami migrate vnext [--check] [--apply] [--output <format>]

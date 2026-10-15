@@ -54,12 +54,11 @@ type AgentContentContribution struct {
 	ManifestSHA256 string `json:"manifestSha256,omitempty"`
 	// Supersedes names the agent-artifact identities this content replaces:
 	// separately declared artifacts (registry or in-tree) whose workflows the
-	// extension now ships itself. It is a statement by the extension's author,
-	// and it has two consumers: a workspace that opts into this content while
-	// still declaring a superseded artifact is refused rather than given two
-	// competing sets of instructions, and `putnami migrate agent-content`
-	// moves the superseded declarations, pins and ownership records to this
-	// content. Present in both forms; the package step keeps it.
+	// extension now ships itself. It is a statement by the extension's author:
+	// a workspace that opts into this content while still declaring, or still
+	// recording as installed, a superseded artifact is refused rather than
+	// given two competing sets of instructions. Present in both forms; the
+	// package step keeps it.
 	Supersedes []string `json:"supersedes,omitempty"`
 }
 

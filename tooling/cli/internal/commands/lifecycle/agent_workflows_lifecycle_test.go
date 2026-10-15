@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
 
@@ -24,15 +25,15 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
 // The agent-content lifecycle acceptance matrix. Every case below runs the
 // real command entry point — WorkspaceInit, Install, the upgrade phase, the
-// ensure and reconcile passes, `migrate agent-content` — against a real
+// ensure and reconcile passes — against a real
 // workspace on disk. Extensions are packaged by the SDK's real package step
 // and served from a local registry; nothing between the archive bytes and the
 // workspace files is replaced.
@@ -438,7 +439,7 @@ func TestAgentWorkflows_InitWithUninstallableStarterContentPointsAtInstall(t *te
 
 // Re-initializing merges by what each entry names, and the committed entry
 // wins: an existing opt-in keeps its place, and a legacy entry survives so the
-// next command names the migration instead of orphaning its files.
+// next command refuses it instead of orphaning its files.
 func TestAgentWorkflows_InitPreservesAnExistingOptIn(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "reinit-preserves-optin", "init-force-unions-the-declaration")
 	root := agentWorkspaceDeclaring(t, "extension:@acme/other", testAgentArtifact+":1.4.x", "extension:"+starterAgentContent)
@@ -454,8 +455,7 @@ func TestAgentWorkflows_InitPreservesAnExistingOptIn(t *testing.T) {
 
 // A clone an earlier CLI installed a legacy artifact into — its declaration,
 // its pin, its record and its files — is refused by install and upgrade with
-// nothing written, and both name the migration to the extension that
-// supersedes it.
+// nothing written, and both say how to replace the declaration.
 func TestAgentWorkflows_LegacyStateIsRefusedWithNothingWritten(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "legacy-declarations-refused", "install-and-upgrade-refuse-legacy-state-with-nothing-written")
 	root := agentWorkspaceDeclaring(t, testAgentArtifact+":stable")
@@ -464,20 +464,17 @@ func TestAgentWorkflows_LegacyStateIsRefusedWithNothingWritten(t *testing.T) {
 	before := snapshotAgentSurface(t, root)
 
 	_, err := runInstall(t, root)
-	if err == nil || !strings.Contains(err.Error(), "no longer installs") {
-		t.Fatalf("install error = %v, want the legacy declaration refused", err)
-	}
-	if next := protocolcli.SuggestedNext(err); next != "putnami migrate agent-content @putnami/contributor" {
-		t.Fatalf("install next step = %q", next)
+	if err == nil || !strings.Contains(err.Error(), "no longer installs") || !strings.Contains(err.Error(), "replace each entry with extension:@putnami/contributor") {
+		t.Fatalf("install error = %v, want the legacy declaration refused and its first-party successor named", err)
 	}
 	err = agentctx.AdoptAgentWorkflows(context.Background(), root, wsproto.Load(root), nil)
-	if !errors.Is(err, protocolcli.ErrInvalidConfig) || protocolcli.SuggestedNext(err) != "putnami migrate agent-content @putnami/contributor" {
+	if !errors.Is(err, protocolcli.ErrInvalidConfig) || !strings.Contains(err.Error(), "no longer installs") {
 		t.Fatalf("upgrade error = %v", err)
 	}
 	var dryRun strings.Builder
 	agentctx.DescribeAgentWorkflowPlan(root, wsproto.Load(root), &dryRun)
-	if !strings.Contains(dryRun.String(), "Next: putnami migrate agent-content @putnami/contributor") {
-		t.Fatalf("dry run = %q, want the migration named", dryRun.String())
+	if !strings.Contains(dryRun.String(), "no longer installs") || strings.Contains(dryRun.String(), "Next:") {
+		t.Fatalf("dry run = %q, want the legacy declaration refused with no command to run", dryRun.String())
 	}
 	if err := agentctx.EnsureAgentWorkflows(context.Background(), root, wsproto.Load(root)); err == nil {
 		t.Fatal("the first-run pass installed a legacy declaration")
@@ -533,6 +530,88 @@ func TestAgentWorkflows_UpgradeRetiresARecordNothingDeclares(t *testing.T) {
 	if err != nil || applies {
 		t.Fatalf("phase applies after retirement = %v, %v", applies, err)
 	}
+}
+
+// No declaration can use a pin under agentArtifacts: an opt-in follows its
+// extension's own pin. An explicit install drops every one and leaves the
+// records and files alone, which upgrade retires. The implicit bootstrap
+// restores the committed lock as it is, and a hosted install, which writes no
+// lock, fails before its first phase and names the pins instead of dropping
+// them.
+func TestInstall_DropsEveryAgentArtifactPin(t *testing.T) {
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "legacy-pins-dropped", "an-explicit-install-drops-every-pin")
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "legacy-pins-dropped", "a-hosted-install-that-would-drop-a-pin-fails")
+	hometest.Temp(t)
+	seeded := func(t *testing.T) string {
+		t.Helper()
+		root := agentWorkspaceDeclaring(t)
+		seedLegacyArtifact(t, root, testAgentArtifact, "1.4.2", map[string]string{".agents/skills/fix/SKILL.md": "# fix\n"}, true)
+		seedLegacyArtifact(t, root, secondAgentArtifact, "1.0.0", map[string]string{".agents/skills/acme-change/SKILL.md": "# acme-change\n"}, true)
+		return root
+	}
+	var jobs []string
+	install := func(ctx context.Context, root string) error {
+		var out strings.Builder
+		env := installTestEnv(&out, WorkspaceJobOK)
+		env.RunJob = func(ctx context.Context, req WorkspaceJobRequest) (WorkspaceJobResult, error) {
+			jobs = append(jobs, recordedJob(ctx, req))
+			return WorkspaceJobResult{Outcome: WorkspaceJobOK}, nil
+		}
+		env.BeforeRepositoryCode = func(context.Context) error {
+			jobs = append(jobs, beforeRepositoryCode)
+			return nil
+		}
+		_, err := captureStdout(t, func() error {
+			return Install(ctx, root, wsproto.Load(root), nil, env)
+		})
+		return err
+	}
+
+	t.Run("explicit", func(t *testing.T) {
+		root := seeded(t)
+		if err := install(context.Background(), root); err != nil {
+			t.Fatalf("Install: %v", err)
+		}
+		assertNoAgentArtifactPins(t, root)
+		for _, name := range []string{testAgentArtifact, secondAgentArtifact} {
+			if state, err := agentartifacts.LoadState(root, name); err != nil || state == nil {
+				t.Fatalf("ownership record of %s = %+v, %v; install retires nothing", name, state, err)
+			}
+		}
+		if got := readWorkspaceFile(t, root, ".agents/skills/fix/SKILL.md"); got != "# fix\n" {
+			t.Fatalf("install touched a recorded file: %q", got)
+		}
+	})
+
+	t.Run("implicit", func(t *testing.T) {
+		spectest.Proves(t, "cli/agent-workflow-lifecycle", "legacy-pins-dropped", "the-implicit-bootstrap-keeps-the-lock")
+		root := seeded(t)
+		before := readLock(t, root)
+		if err := install(shared.WithImplicitInstall(context.Background()), root); err != nil {
+			t.Fatalf("implicit Install: %v", err)
+		}
+		if after := readLock(t, root); string(after) != string(before) {
+			t.Fatalf("the implicit bootstrap changed the committed lock:\n%s\nto\n%s", before, after)
+		}
+	})
+
+	t.Run("hosted", func(t *testing.T) {
+		root := seeded(t)
+		before := readLock(t, root)
+		t.Cleanup(runcredential.SetForTest("run-bearer"))
+		jobs = nil
+		err := install(context.Background(), root)
+		if err == nil || !strings.Contains(err.Error(), "a hosted run writes no lock") ||
+			!strings.Contains(err.Error(), secondAgentArtifact+", "+testAgentArtifact) {
+			t.Fatalf("hosted Install = %v, want it refused, naming both pins", err)
+		}
+		if len(jobs) != 0 {
+			t.Fatalf("a hosted install ran %q before it refused the pins", jobs)
+		}
+		if after := readLock(t, root); string(after) != string(before) {
+			t.Fatalf("a hosted install changed the committed lock:\n%s\nto\n%s", before, after)
+		}
+	})
 }
 
 // An unparseable workspace config answers as an empty one. Retirement must not
@@ -1487,28 +1566,27 @@ func TestExtensionAgentContent_NPMAndRegistryDeclarationsAreRefused(t *testing.T
 	assertUnchangedWorkspace(t, before, snapshotContentSurface(t, root))
 }
 
-// Migrating separately declared artifacts to extension-owned content, end to
-// end. A consumer clone that an earlier CLI installed two pinned legacy
-// artifacts into moves them to the agent content of an extension that
-// supersedes both, through the real `migrate agent-content` entry point. The
-// extension is packaged by the SDK and served from the local registry; the
-// legacy state is written directly, because no current command installs it.
+// Agent content that supersedes separately declared artifacts. A consumer
+// clone that an earlier CLI installed two pinned legacy artifacts into opts
+// into the agent content of an extension that supersedes both. The extension
+// is packaged by the SDK and served from the local registry; the legacy state
+// is written directly, because no current command installs it.
 
 const supersededMaintainer = "@putnami/maintainer-workflows"
 
-// The paths the three sources share, and what the migration does to each.
+// The paths the three sources share.
 const (
 	// The core artifact already ships the content's exact bytes.
-	migrationUnchanged = ".agents/skills/fixture-review/SKILL.md"
+	supersededUnchanged = ".agents/skills/fixture-review/SKILL.md"
 	// Managed by the core artifact; the content ships other bytes.
-	migrationChangedCore = ".agents/skills/fixture-review/references/guide.md"
+	supersededChangedCore = ".agents/skills/fixture-review/references/guide.md"
 	// Managed by the maintainer artifact; the content ships other bytes.
-	migrationChangedMaintainer = ".claude/agents/fixture-reviewer.md"
-	// Managed by an artifact; the content no longer ships them.
-	migrationRemovedCore       = ".agents/skills/legacy-check/SKILL.md"
-	migrationRemovedMaintainer = ".agents/skills/legacy-release/SKILL.md"
+	supersededChangedMaintainer = ".claude/agents/fixture-reviewer.md"
+	// Managed by an artifact; the content does not ship them.
+	supersededOnlyCore       = ".agents/skills/legacy-check/SKILL.md"
+	supersededOnlyMaintainer = ".agents/skills/legacy-release/SKILL.md"
 	// Added by the content.
-	migrationAdded = ".codex/agents/fixture-reviewer.toml"
+	supersededAdded = ".codex/agents/fixture-reviewer.toml"
 )
 
 // supersedingExtensionFiles is the fixture extension whose content declares
@@ -1534,20 +1612,16 @@ func packageSupersedingExtension(t *testing.T, revision, version string, superse
 	return pkg
 }
 
-// migrationFixture is a consumer clone in which an earlier CLI installed the
-// core and the maintainer artifacts at pinned versions, and which declares —
-// without opting into — the extension whose content supersedes both.
-type migrationFixture struct {
-	root    string
-	content map[string][]byte
-}
-
-func newMigrationFixture(t *testing.T, supersedes []string) *migrationFixture {
+// newSupersededFixture is a consumer clone in which an earlier CLI installed
+// the core and the maintainer artifacts at pinned versions, and which declares
+// — without opting into — the extension whose content supersedes both. It
+// returns the root and the files the content ships.
+func newSupersededFixture(t *testing.T) (string, map[string][]byte) {
 	t.Helper()
 	registry := newContentRegistry(t)
-	pkg := packageSupersedingExtension(t, "r1", "1.0.0", supersedes)
+	pkg := packageSupersedingExtension(t, "r1", "1.0.0", []string{testAgentArtifact, supersededMaintainer})
 	registry.publish(pkg)
-	for _, path := range []string{migrationUnchanged, migrationChangedCore, migrationChangedMaintainer, migrationAdded} {
+	for _, path := range []string{supersededUnchanged, supersededChangedCore, supersededChangedMaintainer, supersededAdded} {
 		if _, ok := pkg.Content.Files[path]; !ok {
 			t.Fatalf("the fixture content does not ship %s", path)
 		}
@@ -1558,775 +1632,137 @@ func newMigrationFixture(t *testing.T, supersedes []string) *migrationFixture {
 	}
 	writeContentWorkspaceConfig(t, root, []string{contentExtensionName}, []string{testAgentArtifact + ":stable", supersededMaintainer + ":stable"})
 	seedLegacyArtifact(t, root, testAgentArtifact, "1.4.2", map[string]string{
-		migrationUnchanged:   string(pkg.Content.Files[migrationUnchanged]),
-		migrationChangedCore: "Review guide of the core workflows.\n",
-		migrationRemovedCore: "# legacy-check\n",
+		supersededUnchanged:   string(pkg.Content.Files[supersededUnchanged]),
+		supersededChangedCore: "Review guide of the core workflows.\n",
+		supersededOnlyCore:    "# legacy-check\n",
 	}, true)
 	seedLegacyArtifact(t, root, supersededMaintainer, "1.4.2", map[string]string{
-		migrationChangedMaintainer: "The maintainer reviewer.\n",
-		migrationRemovedMaintainer: "# legacy-release\n",
+		supersededChangedMaintainer: "The maintainer reviewer.\n",
+		supersededOnlyMaintainer:    "# legacy-release\n",
 	}, true)
-	return &migrationFixture{root: root, content: pkg.Content.Files}
+	return root, pkg.Content.Files
 }
 
-// migrationLock is the migration command's lock file. It outlives every run
-// by design, so a comparison of the workspace before and after a run ignores
-// it by name, like the install marker.
-var migrationLock = ".putnami/" + agentctx.AgentContentMigrationLockFilename
-
-func snapshotMigration(t *testing.T, root string, ignore ...string) map[string]string {
-	t.Helper()
-	return snapshotWorkspace(t, root, append(ignore, migrationLock)...)
-}
-
-// runMigration runs `putnami migrate agent-content` in one mode.
-func runMigration(t *testing.T, root, mode string) (string, error) {
-	t.Helper()
-	return captureStdout(t, func() error {
-		return agentctx.MigrateAgentContent(context.Background(), root, wsproto.Load(root), contentExtensionName, mode, "")
-	})
-}
-
-func migrationReport(t *testing.T, err error) agentctx.AgentContentMigrationReport {
-	t.Helper()
-	report, ok := shared.ResultData(err).(agentctx.AgentContentMigrationReport)
-	if !ok {
-		t.Fatalf("error %v carries no migration report", err)
-	}
-	return report
-}
-
-func workspaceDeclarations(t *testing.T, root string) []string {
-	t.Helper()
-	var config struct {
-		AgentArtifacts []string `json:"agentArtifacts"`
-	}
-	if err := json.Unmarshal([]byte(readWorkspaceFile(t, root, wsproto.WorkspaceConfigFilename)), &config); err != nil {
-		t.Fatal(err)
-	}
-	return config.AgentArtifacts
-}
-
-// assertMigrated checks the complete after state: one opt-in, no superseded
-// pin, the extension pin untouched, one ownership record naming the pinned
-// extension release, and exactly the content's bytes on disk.
-func assertMigrated(t *testing.T, f *migrationFixture, extensionPinBefore lockfile.LockEntry) {
-	t.Helper()
-	if got := workspaceDeclarations(t, f.root); strings.Join(got, ",") != contentExtensionOptIn {
-		t.Fatalf("agentArtifacts = %v, want only %s", got, contentExtensionOptIn)
-	}
-	assertNoAgentArtifactPins(t, f.root)
-	pin, ok := extensionPin(t, f.root, contentExtensionName)
-	if !ok || pin.Version != extensionPinBefore.Version || pin.ManifestHash != extensionPinBefore.ManifestHash {
-		t.Fatalf("extension pin = %+v, want the unchanged %+v", pin, extensionPinBefore)
-	}
-	state, err := agentartifacts.LoadState(f.root, contentExtensionName)
-	if err != nil || state == nil || state.ArtifactVersion != "1.0.0" || state.ArchiveDigest != pin.ManifestHash {
-		t.Fatalf("extension ownership record = %+v, err %v", state, err)
-	}
-	if len(state.Files) != len(f.content) {
-		t.Fatalf("the extension records %d files, want the %d its content ships", len(state.Files), len(f.content))
-	}
-	for _, name := range []string{testAgentArtifact, supersededMaintainer} {
-		if record, err := agentartifacts.LoadState(f.root, name); err != nil || record != nil {
-			t.Fatalf("superseded record %s = %+v, err %v; want none", name, record, err)
-		}
-	}
-	for path, content := range f.content {
-		if got := readAgentFile(t, f.root, path); got != string(content) {
-			t.Fatalf("%s = %q, want the content's bytes", path, got)
-		}
-	}
-	assertFileMissing(t, f.root, migrationRemovedCore)
-	assertFileMissing(t, f.root, migrationRemovedMaintainer)
-}
-
-// Before the migration no ordinary command installs anything: the legacy
-// declarations, and a clone's legacy records once the declarations are gone,
-// are refused with nothing written and the migration named. The migration
-// then leaves one owner.
-func TestAgentContentMigration_LegacyStateIsRefusedUntilMigrated(t *testing.T) {
+// No ordinary command installs anything while a clone still declares or
+// records an artifact the content supersedes: the legacy declarations, and
+// the clone's legacy records once the declarations are gone, are refused with
+// nothing written. Deleting the records the refusal names hands the files to
+// the content: a file with the content's bytes is kept untouched, one with
+// other bytes is a collision the user resolves, and one the content does not
+// ship stays unmanaged. The install that succeeds drops the lock pins.
+func TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "superseded-owners-refused", "a-clone-that-still-records-a-superseded-artifact-is-refused")
-	f := newMigrationFixture(t, []string{testAgentArtifact, supersededMaintainer})
-	extensionPinBefore, _ := extensionPin(t, f.root, contentExtensionName)
-	surface := snapshotAgentSurface(t, f.root)
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "superseded-owners-refused", "deleting-the-record-hands-the-files-to-the-content")
+	root, content := newSupersededFixture(t)
+	surface := snapshotAgentSurface(t, root)
 
-	_, err := runInstall(t, f.root)
+	_, err := runInstall(t, root)
 	if err == nil || !strings.Contains(err.Error(), "no longer installs") ||
-		!strings.Contains(err.Error(), "Move the declarations, pins and ownership records to extension "+contentExtensionName) {
-		t.Fatalf("install error = %v, want the legacy declarations refused", err)
+		!strings.HasSuffix(err.Error(), "entry: replace each entry with "+contentExtensionOptIn+", then run `putnami install`") {
+		t.Fatalf("install error = %v, want the legacy declarations refused, the declared successor named and not declared again", err)
 	}
-	if next := protocolcli.SuggestedNext(err); next != "putnami migrate agent-content "+contentExtensionName {
-		t.Fatalf("next step = %q", next)
+	if next := protocolcli.SuggestedNext(err); next != "" {
+		t.Fatalf("next step = %q, want none", next)
 	}
-	assertUnchangedWorkspace(t, surface, snapshotAgentSurface(t, f.root))
+	assertUnchangedWorkspace(t, surface, snapshotAgentSurface(t, root))
 
 	// A mixed declaration is refused the same way, by install and upgrade.
-	writeContentWorkspaceConfig(t, f.root, []string{contentExtensionName},
+	writeContentWorkspaceConfig(t, root, []string{contentExtensionName},
 		[]string{testAgentArtifact + ":stable", supersededMaintainer + ":stable", contentExtensionOptIn})
-	surface = snapshotAgentSurface(t, f.root)
-	if _, err := runInstall(t, f.root); err == nil || !strings.Contains(err.Error(), "no longer installs") {
+	surface = snapshotAgentSurface(t, root)
+	if _, err := runInstall(t, root); err == nil || !strings.Contains(err.Error(), "no longer installs") {
 		t.Fatalf("install error = %v, want the mixed declaration refused", err)
 	}
-	if err := agentctx.AdoptAgentWorkflows(context.Background(), f.root, wsproto.Load(f.root), nil); err == nil ||
+	if err := agentctx.AdoptAgentWorkflows(context.Background(), root, wsproto.Load(root), nil); err == nil ||
 		!strings.Contains(err.Error(), "no longer installs") {
 		t.Fatalf("upgrade error = %v, want the mixed declaration refused", err)
 	}
-	assertUnchangedWorkspace(t, surface, snapshotAgentSurface(t, f.root))
+	assertUnchangedWorkspace(t, surface, snapshotAgentSurface(t, root))
 
-	// The migration resolves the mixed declaration to one opt-in.
-	_, err = runMigration(t, f.root, agentctx.AgentContentMigrationCheck)
-	if report := migrationReport(t, err); strings.Join(report.Declarations.After, ",") != contentExtensionOptIn {
-		t.Fatalf("declarations after = %v, want the one opt-in", report.Declarations.After)
-	}
-
-	// Withdrawing the legacy declarations by hand still leaves this clone's
-	// records claiming the files, and that is refused too.
-	writeContentWorkspaceConfig(t, f.root, []string{contentExtensionName}, []string{contentExtensionOptIn})
-	_, installErr := runInstall(t, f.root)
-	upgradeErr := agentctx.AdoptAgentWorkflows(context.Background(), f.root, wsproto.Load(f.root), nil)
-	for name, err := range map[string]error{"install": installErr, "upgrade": upgradeErr} {
-		if err == nil || !strings.Contains(err.Error(), "still records") {
-			t.Fatalf("%s error = %v, want the recorded superseded artifacts refused", name, err)
-		}
-		if next := protocolcli.SuggestedNext(err); next != "putnami migrate agent-content "+contentExtensionName+" --apply" {
-			t.Fatalf("%s next step = %q", name, next)
-		}
-	}
-	assertUnchangedWorkspace(t, surface, snapshotAgentSurface(t, f.root))
-
-	if out, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply); err != nil {
-		t.Fatalf("migrate: %v\n%s", err, out)
-	}
-	assertMigrated(t, f, extensionPinBefore)
-}
-
-// A clone that pulls a teammate's migration commit gets the committed opt-in
-// and host files, but keeps its own records of the superseded artifacts. The
-// ordinary commands refuse until one `migrate agent-content --apply` moves the
-// records; it keeps the file the user edited, and afterwards every command is
-// a byte-for-byte no-op.
-func TestAgentContentMigration_AClonePullingTheMigrationConvergesWithApply(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "superseded-owners-refused", "a-clone-that-pulled-the-migration-converges-with-apply")
-	root := contentWorkspace(t, []string{"/tools/contributor"}, []string{contentExtensionOptIn})
-	files := supersedingExtensionFiles("local", nil)
-	files["putnami.extension.json"] = fmt.Sprintf(`{"name":%q,"cliContract":%d,"agentContent":{"path":"agent-content","source":"agent-src","supersedes":[%q,%q]}}`,
-		contentExtensionName, protocolcli.AgentContentContract, testAgentArtifact, supersededMaintainer)
-	writeTree(t, filepath.Join(root, "tools", "contributor"), files)
-
-	// The teammate's commit carries the host files the content builds.
-	source, err := sdkagentartifact.BuildExtensionContent(filepath.Join(root, "tools", "contributor"), "agent-src", contentExtensionName, "0.0.0-local")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for path, content := range source.Files {
-		writeAgentFile(t, root, path, string(content))
-	}
-	// This clone's records still name the superseded artifacts: one path the
-	// content ships again with other bytes, one git deleted on pull, and one
-	// only a superseded artifact shipped, which the user edited.
-	seedLegacyArtifact(t, root, testAgentArtifact, "1.4.2", map[string]string{
-		migrationChangedCore: "Review guide of the core workflows.\n",
-		migrationRemovedCore: "# legacy-check\n",
-	}, false)
-	seedLegacyArtifact(t, root, supersededMaintainer, "1.4.2", map[string]string{
-		migrationRemovedMaintainer: "# legacy-release\n",
-	}, false)
-	writeAgentFile(t, root, migrationChangedCore, string(source.Files[migrationChangedCore]))
-	if err := os.Remove(filepath.Join(root, filepath.FromSlash(migrationRemovedCore))); err != nil {
-		t.Fatal(err)
-	}
-	writeAgentFile(t, root, migrationRemovedMaintainer, "my own release notes\n")
-
-	before := snapshotMigration(t, root)
-	if _, err := agentctx.MaterializeLocalAgentContent(root, wsproto.Load(root), nil); err == nil ||
-		protocolcli.SuggestedNext(err) != "putnami migrate agent-content "+contentExtensionName+" --apply" {
-		t.Fatalf("context generate error = %v, want the recorded superseded artifacts refused", err)
-	}
-	assertUnchangedWorkspace(t, before, snapshotMigration(t, root))
-
-	out, err := runMigration(t, root, agentctx.AgentContentMigrationApply)
-	if err != nil {
-		t.Fatalf("apply: %v\n%s", err, out)
-	}
-	if !strings.Contains(out, "released  "+migrationRemovedMaintainer) {
-		t.Fatalf("the edited file is not reported as released:\n%s", out)
-	}
-	if got := readAgentFile(t, root, migrationRemovedMaintainer); got != "my own release notes\n" {
-		t.Fatalf("the user's edit was lost: %q", got)
-	}
-	if got := workspaceDeclarations(t, root); strings.Join(got, ",") != contentExtensionOptIn {
-		t.Fatalf("agentArtifacts = %v", got)
-	}
+	// Withdrawing the legacy declarations still leaves this clone's records
+	// claiming the files, and that is refused too, naming each record.
+	writeContentWorkspaceConfig(t, root, []string{contentExtensionName}, []string{contentExtensionOptIn})
+	_, installErr := runInstall(t, root)
+	upgradeErr := agentctx.AdoptAgentWorkflows(context.Background(), root, wsproto.Load(root), nil)
+	records := make([]string, 0, 2)
 	for _, name := range []string{testAgentArtifact, supersededMaintainer} {
-		if record, err := agentartifacts.LoadState(root, name); err != nil || record != nil {
-			t.Fatalf("superseded record %s = %+v, err %v; want none", name, record, err)
-		}
-	}
-	for path, content := range source.Files {
-		if got := readAgentFile(t, root, path); got != string(content) {
-			t.Fatalf("%s = %q, want the committed content", path, got)
-		}
-	}
-	settled := snapshotMigration(t, root)
-	if changed, err := agentctx.MaterializeLocalAgentContent(root, wsproto.Load(root), nil); err != nil || changed {
-		t.Fatalf("context generate after the migration changed=%v err=%v", changed, err)
-	}
-	if err := agentctx.InstallAgentWorkflows(context.Background(), root, wsproto.Load(root), nil); err != nil {
-		t.Fatalf("install after the migration: %v", err)
-	}
-	assertUnchangedWorkspace(t, settled, snapshotMigration(t, root))
-}
-
-// The check lists both halves — what moves and what changes on disk — and
-// writes nothing; apply then performs exactly that, and repeating it or any
-// ordinary command afterwards changes no byte.
-func TestAgentContentMigration_CheckThenApplyMovesDeclarationsPinsAndOwnership(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "agent-content-migration", "check-lists-the-mechanical-and-the-semantic-change")
-	f := newMigrationFixture(t, []string{testAgentArtifact, supersededMaintainer})
-	extensionPinBefore, _ := extensionPin(t, f.root, contentExtensionName)
-	before := snapshotMigration(t, f.root)
-
-	out, err := runMigration(t, f.root, agentctx.AgentContentMigrationCheck)
-	if !errors.Is(err, protocolcli.ErrInvalidConfig) {
-		t.Fatalf("check error = %v, want a pending migration (exit 2)", err)
-	}
-	assertUnchangedWorkspace(t, before, snapshotMigration(t, f.root))
-	report := migrationReport(t, err)
-	if report.Outcome != agentctx.AgentContentMigrationPending || report.Version != "1.0.0" {
-		t.Fatalf("report = %+v", report)
-	}
-	wantSuperseded := []agentctx.AgentContentMigrationArtifact{
-		{Name: testAgentArtifact, Declared: testAgentArtifact + ":stable", Pin: "1.4.2", Ownership: agentctx.AgentContentOwnershipRecord, Files: 3},
-		{Name: supersededMaintainer, Declared: supersededMaintainer + ":stable", Pin: "1.4.2", Ownership: agentctx.AgentContentOwnershipRecord, Files: 2},
-	}
-	if fmt.Sprint(report.Superseded) != fmt.Sprint(wantSuperseded) {
-		t.Fatalf("superseded = %+v, want %+v", report.Superseded, wantSuperseded)
-	}
-	if strings.Join(report.Declarations.After, ",") != contentExtensionOptIn {
-		t.Fatalf("declarations after = %v", report.Declarations.After)
-	}
-	changes := map[string]string{}
-	for _, file := range report.Files {
-		changes[file.Path] = file.Change
-	}
-	for path, want := range map[string]string{
-		migrationChangedCore:       agentctx.AgentContentFileChanged,
-		migrationChangedMaintainer: agentctx.AgentContentFileChanged,
-		migrationRemovedCore:       agentctx.AgentContentFileRemoved,
-		migrationRemovedMaintainer: agentctx.AgentContentFileRemoved,
-		migrationAdded:             agentctx.AgentContentFileAdded,
-	} {
-		if changes[path] != want {
-			t.Errorf("%s change = %q, want %q", path, changes[path], want)
-		}
-	}
-	if _, listed := changes[migrationUnchanged]; listed || report.Unchanged != 1 {
-		t.Errorf("the identical file must count as unchanged: listed %v, unchanged %d", listed, report.Unchanged)
-	}
-	if len(report.Files) != len(f.content)-1+2 {
-		t.Errorf("report lists %d changes, want every content file but the identical one plus the two removals", len(report.Files))
-	}
-	for _, want := range []string{"Moves (mechanical", "Content (semantic", "changed   " + migrationChangedCore, "removed   " + migrationRemovedMaintainer} {
-		if !strings.Contains(out, want) {
-			t.Errorf("check output lacks %q:\n%s", want, out)
-		}
-	}
-
-	t.Run("apply", func(t *testing.T) {
-		spectest.Proves(t, "cli/agent-workflow-lifecycle", "agent-content-migration", "apply-moves-declarations-pins-and-ownership")
-		if out, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply); err != nil {
-			t.Fatalf("apply: %v\n%s", err, out)
-		}
-		assertMigrated(t, f, extensionPinBefore)
-
-		// The migrated workspace is an ordinary opted-in workspace: install,
-		// the first-run pass and the session-start reconcile change nothing.
-		settled := snapshotMigration(t, f.root, installStateMarker)
-		if out, err := runInstall(t, f.root); err != nil {
-			t.Fatalf("install after the migration: %v\n%s", err, out)
-		}
-		if err := agentctx.EnsureAgentWorkflows(context.Background(), f.root, wsproto.Load(f.root)); err != nil {
-			t.Fatalf("ensure: %v", err)
-		}
-		if err := agentctx.ReconcileAgentWorkflows(context.Background(), f.root, wsproto.Load(f.root)); err != nil {
-			t.Fatalf("reconcile: %v", err)
-		}
-		assertUnchangedWorkspace(t, settled, snapshotMigration(t, f.root, installStateMarker))
-
-		// Nothing is left to migrate, and saying so writes nothing.
-		settled = snapshotMigration(t, f.root)
-		for _, mode := range []string{agentctx.AgentContentMigrationCheck, agentctx.AgentContentMigrationApply} {
-			out, err := runMigration(t, f.root, mode)
-			if err != nil || !strings.Contains(out, "nothing to migrate") {
-				t.Fatalf("%s after the migration: %v\n%s", mode, err, out)
-			}
-		}
-		structured, err := captureStdout(t, func() error {
-			return agentctx.MigrateAgentContent(context.Background(), f.root, wsproto.Load(f.root), contentExtensionName, agentctx.AgentContentMigrationCheck, "json")
-		})
-		if err != nil || !strings.Contains(structured, `"outcome":"clean"`) {
-			t.Fatalf("structured check = %s (err %v)", structured, err)
-		}
-		assertUnchangedWorkspace(t, settled, snapshotMigration(t, f.root))
-	})
-}
-
-// A user edit is never overwritten: one the content still ships blocks the
-// whole migration with zero writes, and one the content no longer ships is
-// kept, reported and released while the rest migrates.
-func TestAgentContentMigration_UserEditsBlockOrAreReleased(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "agent-content-migration-safety", "user-edits-block-or-are-released")
-
-	for name, edit := range map[string]struct{ path, reason string }{
-		"an edit the content still ships":           {migrationChangedCore, agentartifacts.ReasonModified},
-		"an unrecorded file where content is added": {migrationAdded, agentartifacts.ReasonUnmanaged},
-	} {
-		t.Run(name, func(t *testing.T) {
-			f := newMigrationFixture(t, []string{testAgentArtifact, supersededMaintainer})
-			writeAgentFile(t, f.root, edit.path, "my own notes\n")
-			before := snapshotMigration(t, f.root)
-			for _, mode := range []string{agentctx.AgentContentMigrationCheck, agentctx.AgentContentMigrationApply} {
-				_, err := runMigration(t, f.root, mode)
-				if !errors.Is(err, agentartifacts.ErrCollision) || !strings.Contains(err.Error(), edit.path+" ["+edit.reason+"]") {
-					t.Fatalf("%s error = %v, want a collision naming %s", mode, err, edit.path)
-				}
-				assertUnchangedWorkspace(t, before, snapshotMigration(t, f.root))
-			}
-		})
-	}
-
-	t.Run("an edit the content no longer ships", func(t *testing.T) {
-		f := newMigrationFixture(t, []string{testAgentArtifact, supersededMaintainer})
-		extensionPinBefore, _ := extensionPin(t, f.root, contentExtensionName)
-		writeAgentFile(t, f.root, migrationRemovedCore, "my own notes\n")
-		out, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply)
+		rel, err := filepath.Rel(root, agentartifacts.StatePath(root, name))
 		if err != nil {
-			t.Fatalf("apply: %v\n%s", err, out)
-		}
-		if !strings.Contains(out, "released  "+migrationRemovedCore+" (edited; kept, no longer managed)") {
-			t.Fatalf("the released file is not reported:\n%s", out)
-		}
-		if got := readAgentFile(t, f.root, migrationRemovedCore); got != "my own notes\n" {
-			t.Fatalf("the user's edit was lost: %q", got)
-		}
-		state, _ := agentartifacts.LoadState(f.root, contentExtensionName)
-		for _, file := range state.Files {
-			if file.Path == migrationRemovedCore {
-				t.Fatal("a released file is still managed")
-			}
-		}
-		// Everything else migrated.
-		if err := os.Remove(filepath.Join(f.root, filepath.FromSlash(migrationRemovedCore))); err != nil {
 			t.Fatal(err)
 		}
-		assertMigrated(t, f, extensionPinBefore)
-	})
-}
+		records = append(records, filepath.ToSlash(rel))
+	}
+	want := "delete " + strings.Join(records, ", ") + ", then rerun"
+	for name, err := range map[string]error{"install": installErr, "upgrade": upgradeErr} {
+		if err == nil || !strings.Contains(err.Error(), "still records") || !strings.HasSuffix(err.Error(), want) {
+			t.Fatalf("%s error = %v, want %q", name, err, want)
+		}
+		if next := protocolcli.SuggestedNext(err); next != "" {
+			t.Fatalf("%s next step = %q, want none", name, next)
+		}
+	}
+	assertUnchangedWorkspace(t, surface, snapshotAgentSurface(t, root))
 
-// A clone without ownership records hands over no ownership: the content
-// adopts only the files already identical to what it ships, a file with other
-// bytes is the user's and blocks with zero writes, and once the user moves it
-// the migration completes without touching anything it never proved.
-func TestAgentContentMigration_ACloneWithoutRecordsAdoptsOnlyIdenticalBytes(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "agent-content-migration", "a-clone-without-records-adopts-only-identical-bytes")
-	f := newMigrationFixture(t, []string{testAgentArtifact, supersededMaintainer})
-	if err := os.RemoveAll(filepath.Join(f.root, ".putnami", agentartifacts.StateDirName)); err != nil {
+	// The user deletes what the refusal names: the records. The lock is not
+	// edited by hand.
+	for _, record := range records {
+		if err := os.Remove(filepath.Join(root, filepath.FromSlash(record))); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// A file whose bytes differ from the content is then a collision that
+	// aborts the run before its first write.
+	surface = snapshotAgentSurface(t, root)
+	if _, err := runInstall(t, root); err == nil || !strings.Contains(err.Error(), supersededChangedCore) {
+		t.Fatalf("install error = %v, want the differing file %s reported", err, supersededChangedCore)
+	}
+	assertUnchangedWorkspace(t, surface, snapshotAgentSurface(t, root))
+
+	// Once the user resolves those files, the content installs. The file that
+	// already had the content's bytes is kept as it is, not written again: its
+	// modification time does not move.
+	for _, path := range []string{supersededChangedCore, supersededChangedMaintainer} {
+		if err := os.Remove(filepath.Join(root, filepath.FromSlash(path))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	unchanged := filepath.Join(root, filepath.FromSlash(supersededUnchanged))
+	past := time.Date(2020, time.January, 2, 3, 4, 5, 0, time.UTC)
+	if err := os.Chtimes(unchanged, past, past); err != nil {
 		t.Fatal(err)
 	}
-	before := snapshotMigration(t, f.root)
-	_, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply)
-	if !errors.Is(err, agentartifacts.ErrCollision) ||
-		!strings.Contains(err.Error(), migrationChangedCore+" ["+agentartifacts.ReasonUnmanaged+"]") ||
-		!strings.Contains(err.Error(), migrationChangedMaintainer+" ["+agentartifacts.ReasonUnmanaged+"]") {
-		t.Fatalf("error = %v, want the unproven files blocking", err)
+	if out, err := runInstall(t, root); err != nil {
+		t.Fatalf("install: %v\n%s", err, out)
 	}
-	assertUnchangedWorkspace(t, before, snapshotMigration(t, f.root))
-
-	for _, path := range []string{migrationChangedCore, migrationChangedMaintainer} {
-		if err := os.Remove(filepath.Join(f.root, filepath.FromSlash(path))); err != nil {
-			t.Fatal(err)
-		}
-	}
-	out, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply)
+	after, err := os.Stat(unchanged)
 	if err != nil {
-		t.Fatalf("apply: %v\n%s", err, out)
+		t.Fatal(err)
 	}
-	if !strings.Contains(out, testAgentArtifact+": "+testAgentArtifact+":stable; 1.4.2; ownership none (0 files)") {
-		t.Fatalf("the missing ownership is not reported:\n%s", out)
+	if !after.ModTime().Equal(past) {
+		t.Fatalf("%s was written again (modified %s)", supersededUnchanged, after.ModTime())
 	}
-	for _, path := range []string{migrationRemovedCore, migrationRemovedMaintainer} {
-		readAgentFile(t, f.root, path)
-	}
-	for path, content := range f.content {
-		if got := readAgentFile(t, f.root, path); got != string(content) {
+	for path, want := range content {
+		if got := readAgentFile(t, root, path); got != string(want) {
 			t.Fatalf("%s = %q, want the content's bytes", path, got)
 		}
 	}
-}
-
-// The repository that authors its workflows moves its in-tree artifact to a
-// local extension it also authors: nothing is pinned before or after, and the
-// migrated workspace regenerates as a no-op.
-func TestAgentContentMigration_InTreeArtifactMovesToALocalExtension(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "agent-content-migration", "in-tree-artifacts-move-to-a-local-extension")
-	root := contentWorkspace(t, []string{"/tools/contributor"}, []string{"/tools/workflows"})
-	writeTree(t, filepath.Join(root, "tools", "workflows"), map[string]string{"putnami.json": `{"name":"@local/workflows"}`})
-	files := supersedingExtensionFiles("local", nil)
-	files["putnami.extension.json"] = fmt.Sprintf(`{"name":%q,"cliContract":%d,"agentContent":{"path":"agent-content","source":"agent-src","supersedes":["@local/workflows"]}}`,
-		contentExtensionName, protocolcli.AgentContentContract)
-	writeTree(t, filepath.Join(root, "tools", "contributor"), files)
-	seedLegacyArtifact(t, root, "@local/workflows", "0.0.0-local-0123456789ab", map[string]string{
-		".agents/skills/local-plan/SKILL.md": "---\nname: local-plan\ndescription: Plan locally\n---\n\nFirst body.\n",
-	}, false)
-
-	out, err := runMigration(t, root, agentctx.AgentContentMigrationApply)
-	if err != nil {
-		t.Fatalf("apply: %v\n%s", err, out)
+	state, err := agentartifacts.LoadState(root, contentExtensionName)
+	if err != nil || state == nil || len(state.Files) != len(content) {
+		t.Fatalf("extension ownership record = %+v, err %v; want every file the content ships", state, err)
 	}
-	if got := workspaceDeclarations(t, root); strings.Join(got, ",") != contentExtensionOptIn {
-		t.Fatalf("agentArtifacts = %v", got)
-	}
-	assertFileMissing(t, root, ".agents/skills/local-plan/SKILL.md")
-	if got := readAgentFile(t, root, ".claude/skills/fixture-review/SKILL.md"); !strings.Contains(got, "Review revision local.") {
-		t.Fatalf("local content = %q", got)
-	}
-	if lf, _ := lockfile.ReadLockFile(root); lf != nil && len(lf.AgentArtifacts) != 0 {
-		t.Fatalf("a local migration pinned something: %+v", lf.AgentArtifacts)
-	}
-	settled := snapshotMigration(t, root)
-	if changed, err := agentctx.MaterializeLocalAgentContent(root, wsproto.Load(root), nil); err != nil || changed {
-		t.Fatalf("context generate after the migration changed=%v err=%v", changed, err)
-	}
-	if err := agentctx.InstallAgentWorkflows(context.Background(), root, wsproto.Load(root), nil); err != nil {
-		t.Fatalf("install after the migration: %v", err)
-	}
-	assertUnchangedWorkspace(t, settled, snapshotMigration(t, root))
-}
 
-// A clone that pulls the commit deleting an in-tree artifact's project still
-// migrates: the entry is named by the superseded artifact its path names, and
-// an entry that names none stays as declared instead of blocking the move.
-func TestAgentContentMigration_AnInTreeArtifactWhoseProjectIsGoneStillMoves(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "agent-content-migration", "in-tree-artifacts-move-to-a-local-extension")
-	root := contentWorkspace(t, []string{"/tools/contributor"}, []string{"/tools/unrelated", "/tools/workflows"})
-	files := supersedingExtensionFiles("local", nil)
-	files["putnami.extension.json"] = fmt.Sprintf(`{"name":%q,"cliContract":%d,"agentContent":{"path":"agent-content","source":"agent-src","supersedes":["@local/workflows"]}}`,
-		contentExtensionName, protocolcli.AgentContentContract)
-	writeTree(t, filepath.Join(root, "tools", "contributor"), files)
-	seedLegacyArtifact(t, root, "@local/workflows", "0.0.0-local-0123456789ab", map[string]string{
-		".agents/skills/local-plan/SKILL.md": "---\nname: local-plan\ndescription: Plan locally\n---\n\nFirst body.\n",
-	}, false)
-
-	out, err := runMigration(t, root, agentctx.AgentContentMigrationCheck)
-	report := migrationReport(t, err)
-	if len(report.Superseded) != 1 || report.Superseded[0].Name != "@local/workflows" || report.Superseded[0].Declared != "/tools/workflows" {
-		t.Fatalf("superseded = %+v, want /tools/workflows named @local/workflows\n%s", report.Superseded, out)
-	}
-	if out, err := runMigration(t, root, agentctx.AgentContentMigrationApply); err != nil {
-		t.Fatalf("apply: %v\n%s", err, out)
-	}
-	if got := workspaceDeclarations(t, root); strings.Join(got, ",") != "/tools/unrelated,"+contentExtensionOptIn {
-		t.Fatalf("agentArtifacts = %v, want the unrelated entry kept and the opt-in in place of the moved one", got)
-	}
-	assertFileMissing(t, root, ".agents/skills/local-plan/SKILL.md")
-	if record, err := agentartifacts.LoadState(root, "@local/workflows"); err != nil || record != nil {
-		t.Fatalf("superseded record = %+v, err %v; want none", record, err)
-	}
-}
-
-// Two owners of one path with different bytes cannot be resolved by rule, and
-// a content path another artifact keeps recording would leave two owners:
-// both refuse with zero writes.
-func TestAgentContentMigration_DuplicateOwnershipIsRefused(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "agent-content-migration-safety", "duplicate-ownership-is-refused")
-
-	t.Run("two superseded records", func(t *testing.T) {
-		f := newMigrationFixture(t, []string{testAgentArtifact, supersededMaintainer})
-		record, err := agentartifacts.LoadState(f.root, supersededMaintainer)
-		if err != nil || record == nil {
-			t.Fatalf("maintainer record = %+v, err %v", record, err)
+	// A file only the old artifacts installed stays on disk, and no record
+	// manages it. The install dropped every pin under agentArtifacts.
+	for path, want := range map[string]string{supersededOnlyCore: "# legacy-check\n", supersededOnlyMaintainer: "# legacy-release\n"} {
+		if got := readAgentFile(t, root, path); got != want {
+			t.Fatalf("%s = %q, want the old artifact's bytes kept", path, got)
 		}
-		record.Files = append(record.Files, agentartifacts.File{Path: migrationChangedCore, SHA256: lockfile.HashBytes([]byte("other bytes"))})
-		if err := agentartifacts.WriteState(f.root, record); err != nil {
-			t.Fatal(err)
-		}
-		before := snapshotMigration(t, f.root)
-		_, err = runMigration(t, f.root, agentctx.AgentContentMigrationApply)
-		if err == nil || !strings.Contains(err.Error(), "duplicate ownership: "+migrationChangedCore) ||
-			!strings.Contains(err.Error(), testAgentArtifact) || !strings.Contains(err.Error(), supersededMaintainer) {
-			t.Fatalf("error = %v, want the duplicate owners named", err)
-		}
-		assertUnchangedWorkspace(t, before, snapshotMigration(t, f.root))
-	})
-
-	t.Run("an artifact that keeps its record", func(t *testing.T) {
-		f := newMigrationFixture(t, []string{testAgentArtifact, supersededMaintainer})
-		if err := agentartifacts.WriteState(f.root, &agentartifacts.State{
-			Version: agentartifacts.StateVersion, Name: secondAgentArtifact, ArtifactVersion: "1.0.0",
-			ArchiveDigest: strings.Repeat("a", 64), ManifestHash: strings.Repeat("b", 64),
-			Files: []agentartifacts.File{{Path: migrationAdded, SHA256: strings.Repeat("c", 64)}},
-		}); err != nil {
-			t.Fatal(err)
-		}
-		before := snapshotMigration(t, f.root)
-		_, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply)
-		if !errors.Is(err, agentartifacts.ErrCollision) || !strings.Contains(err.Error(), "duplicate ownership after the migration") ||
-			!strings.Contains(err.Error(), migrationAdded) {
-			t.Fatalf("error = %v, want the remaining owner refused", err)
-		}
-		assertUnchangedWorkspace(t, before, snapshotMigration(t, f.root))
-	})
-}
-
-func interruptAgentContentMigrationAfter(t *testing.T, step string) {
-	t.Helper()
-	original := agentctx.AgentContentMigrationInterrupt
-	agentctx.AgentContentMigrationInterrupt = func(current string) error {
-		if step != "" && current == step {
-			return errors.New("interrupted")
-		}
-		return nil
-	}
-	t.Cleanup(func() { agentctx.AgentContentMigrationInterrupt = original })
-}
-
-// A migration stopped after any step is refused by every ordinary command,
-// then either finishes on a rerun or rolls back to the exact previous bytes.
-func TestAgentContentMigration_AStoppedMigrationResumesOrRollsBack(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "agent-content-migration-safety", "a-stopped-migration-resumes-or-rolls-back")
-	steps := agentctx.AgentContentMigrationSteps[:len(agentctx.AgentContentMigrationSteps)-1]
-	for _, step := range steps {
-		for _, finish := range []string{agentctx.AgentContentMigrationApply, agentctx.AgentContentMigrationRollback} {
-			t.Run(step+" then "+finish, func(t *testing.T) {
-				f := newMigrationFixture(t, []string{testAgentArtifact, supersededMaintainer})
-				extensionPinBefore, _ := extensionPin(t, f.root, contentExtensionName)
-				original := snapshotMigration(t, f.root)
-
-				interruptAgentContentMigrationAfter(t, step)
-				_, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply)
-				if err == nil || !strings.Contains(err.Error(), "stopped during "+step) {
-					t.Fatalf("error = %v, want the stop reported", err)
-				}
-				interruptAgentContentMigrationAfter(t, "")
-
-				// Between two steps the pieces describe neither side, so the
-				// ordinary passes refuse instead of acting on either.
-				stopped := snapshotMigration(t, f.root)
-				if err := agentctx.InstallAgentWorkflows(context.Background(), f.root, wsproto.Load(f.root), nil); err == nil ||
-					!strings.Contains(err.Error(), "did not finish") {
-					t.Fatalf("install during a stopped migration = %v", err)
-				}
-				if err := agentctx.EnsureAgentWorkflows(context.Background(), f.root, wsproto.Load(f.root)); err == nil {
-					t.Fatal("the first-run pass acted during a stopped migration")
-				}
-				assertUnchangedWorkspace(t, stopped, snapshotMigration(t, f.root))
-
-				out, err := runMigration(t, f.root, finish)
-				if err != nil {
-					t.Fatalf("%s: %v\n%s", finish, err, out)
-				}
-				if finish == agentctx.AgentContentMigrationRollback {
-					assertUnchangedWorkspace(t, original, snapshotMigration(t, f.root))
-					return
-				}
-				if !strings.Contains(out, "resuming a migration that stopped") {
-					t.Errorf("the rerun did not say it resumed:\n%s", out)
-				}
-				assertMigrated(t, f, extensionPinBefore)
-			})
-		}
-	}
-}
-
-// A completed migration rolls back to the exact previous bytes — declarations,
-// pins, ownership records and files. A rollback never overwrites a change made
-// since, and a stopped rollback finishes on a rerun.
-func TestAgentContentMigration_RollbackRestoresThePreviousState(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "agent-content-migration-safety", "rollback-restores-the-previous-state")
-
-	t.Run("after a completed migration", func(t *testing.T) {
-		f := newMigrationFixture(t, []string{testAgentArtifact, supersededMaintainer})
-		original := snapshotMigration(t, f.root)
-		if out, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply); err != nil {
-			t.Fatalf("apply: %v\n%s", err, out)
-		}
-		out, err := runMigration(t, f.root, agentctx.AgentContentMigrationRollback)
-		if err != nil {
-			t.Fatalf("rollback: %v\n%s", err, out)
-		}
-		assertUnchangedWorkspace(t, original, snapshotMigration(t, f.root))
-		// The restored state is the legacy one: this CLI refuses it again, and
-		// names the migration.
-		if _, err := runInstall(t, f.root); err == nil || !strings.Contains(err.Error(), "no longer installs") {
-			t.Fatalf("install after the rollback = %v, want the legacy state refused", err)
-		}
-		if _, err := runMigration(t, f.root, agentctx.AgentContentMigrationRollback); !errors.Is(err, protocolcli.ErrNotFound) {
-			t.Fatalf("a second rollback = %v, want nothing to roll back", err)
-		}
-	})
-
-	t.Run("a change made since is never overwritten", func(t *testing.T) {
-		f := newMigrationFixture(t, []string{testAgentArtifact, supersededMaintainer})
-		if out, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply); err != nil {
-			t.Fatalf("apply: %v\n%s", err, out)
-		}
-		writeAgentFile(t, f.root, migrationAdded, "edited after the migration\n")
-		before := snapshotMigration(t, f.root)
-		_, err := runMigration(t, f.root, agentctx.AgentContentMigrationRollback)
-		if !errors.Is(err, agentartifacts.ErrCollision) || !strings.Contains(err.Error(), migrationAdded) {
-			t.Fatalf("rollback error = %v, want the edited file named", err)
-		}
-		assertUnchangedWorkspace(t, before, snapshotMigration(t, f.root))
-	})
-
-	t.Run("a second migration keeps the first rollback point", func(t *testing.T) {
-		f := newMigrationFixture(t, []string{testAgentArtifact, supersededMaintainer})
-		original := snapshotMigration(t, f.root)
-		if out, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply); err != nil {
-			t.Fatalf("apply: %v\n%s", err, out)
-		}
-		migratedConfig := readWorkspaceFile(t, f.root, wsproto.WorkspaceConfigFilename)
-		// A later pull declares a superseded artifact again: a second, smaller
-		// migration would start a journal over the completed one.
-		writeContentWorkspaceConfig(t, f.root, []string{contentExtensionName}, []string{testAgentArtifact + ":stable", contentExtensionOptIn})
-		before := snapshotMigration(t, f.root)
-		for _, mode := range []string{agentctx.AgentContentMigrationCheck, agentctx.AgentContentMigrationApply} {
-			_, err := runMigration(t, f.root, mode)
-			if err == nil || !strings.Contains(err.Error(), "keeps its rollback point") {
-				t.Fatalf("%s error = %v, want the completed migration's rollback point kept", mode, err)
+		for _, file := range state.Files {
+			if file.Path == path {
+				t.Fatalf("the extension's record manages %s, which its content does not ship", path)
 			}
-			if next := protocolcli.SuggestedNext(err); next != "putnami migrate agent-content "+contentExtensionName+" --rollback" {
-				t.Fatalf("%s next step = %q", mode, next)
-			}
-			assertUnchangedWorkspace(t, before, snapshotMigration(t, f.root))
-		}
-		// The completed migration still rolls back in full.
-		writeAgentFile(t, f.root, wsproto.WorkspaceConfigFilename, migratedConfig)
-		if out, err := runMigration(t, f.root, agentctx.AgentContentMigrationRollback); err != nil {
-			t.Fatalf("rollback: %v\n%s", err, out)
-		}
-		assertUnchangedWorkspace(t, original, snapshotMigration(t, f.root))
-	})
-
-	t.Run("a stopped rollback finishes on a rerun", func(t *testing.T) {
-		f := newMigrationFixture(t, []string{testAgentArtifact, supersededMaintainer})
-		original := snapshotMigration(t, f.root)
-		if out, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply); err != nil {
-			t.Fatalf("apply: %v\n%s", err, out)
-		}
-		interruptAgentContentMigrationAfter(t, "lock")
-		if _, err := runMigration(t, f.root, agentctx.AgentContentMigrationRollback); err == nil || !strings.Contains(err.Error(), "stopped during lock") {
-			t.Fatalf("rollback error = %v, want the stop reported", err)
-		}
-		interruptAgentContentMigrationAfter(t, "")
-		if _, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply); err == nil || !strings.Contains(err.Error(), "rollback") {
-			t.Fatalf("apply during a stopped rollback = %v, want it refused", err)
-		}
-		if out, err := runMigration(t, f.root, agentctx.AgentContentMigrationRollback); err != nil {
-			t.Fatalf("rollback rerun: %v\n%s", err, out)
-		}
-		assertUnchangedWorkspace(t, original, snapshotMigration(t, f.root))
-	})
-}
-
-// A release that states no supersession offers no migration, an extension
-// that is declared but not installed is never resolved on the migration's
-// behalf, and a journal this CLI cannot read stops every command.
-func TestAgentContentMigration_UnsupportedStatesFailClearly(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "agent-content-migration-safety", "unsupported-releases-fail-clearly")
-
-	t.Run("a release without supersedes", func(t *testing.T) {
-		f := newMigrationFixture(t, nil)
-		before := snapshotMigration(t, f.root)
-		_, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply)
-		if err == nil || !strings.Contains(err.Error(), "names no agent artifact its content supersedes") {
-			t.Fatalf("error = %v", err)
-		}
-		assertUnchangedWorkspace(t, before, snapshotMigration(t, f.root))
-	})
-
-	t.Run("an extension that is not installed", func(t *testing.T) {
-		registry := newContentRegistry(t)
-		registry.publish(packageSupersedingExtension(t, "r1", "1.0.0", []string{testAgentArtifact}))
-		root := contentWorkspace(t, []string{contentExtensionName}, []string{testAgentArtifact})
-		// The run takes its lock before it plans, which creates the gitignored
-		// .putnami/ directory of a workspace that never had one.
-		before := snapshotMigration(t, root, ".putnami")
-		_, err := runMigration(t, root, agentctx.AgentContentMigrationApply)
-		if err == nil || !strings.Contains(err.Error(), "pins no extension "+contentExtensionName) {
-			t.Fatalf("error = %v, want the missing pin named", err)
-		}
-		registry.mu.Lock()
-		hits := registry.hits
-		registry.mu.Unlock()
-		if hits != 0 {
-			t.Fatalf("the migration reached the registry %d times", hits)
-		}
-		assertUnchangedWorkspace(t, before, snapshotMigration(t, root, ".putnami"))
-	})
-
-	t.Run("a journal of another version", func(t *testing.T) {
-		f := newMigrationFixture(t, []string{testAgentArtifact, supersededMaintainer})
-		writeAgentFile(t, f.root, ".putnami/agent-content-migrations/"+layout.EncodeName(contentExtensionName)+"/journal.json", `{"version":2}`+"\n")
-		if err := agentctx.InstallAgentWorkflows(context.Background(), f.root, wsproto.Load(f.root), nil); err == nil ||
-			!strings.Contains(err.Error(), "is unusable") {
-			t.Fatalf("install error = %v, want the unreadable journal refused", err)
-		}
-		if _, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply); err == nil || !strings.Contains(err.Error(), "is unusable") {
-			t.Fatalf("migration error = %v, want the unreadable journal refused", err)
-		}
-	})
-}
-
-// The content carries no backend: moving the task provider binding from one
-// backend to another is a configuration change that rewrites no skill file.
-func TestAgentContentMigration_BackendSubstitutionChangesNoContent(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "agent-content-migration", "a-backend-substitution-changes-no-content")
-	f := newMigrationFixture(t, []string{testAgentArtifact, supersededMaintainer})
-	if out, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply); err != nil {
-		t.Fatalf("apply: %v\n%s", err, out)
-	}
-	bind := func(provider string) {
-		config := fmt.Sprintf(`{"name":"content-ws","extensions":[%q],"agentArtifacts":[%q],`+
-			`"options":{"collaboration":{"tasks":{"provider":%q,"version":1}}}}`+"\n",
-			contentExtensionName, contentExtensionOptIn, provider)
-		if err := os.WriteFile(filepath.Join(f.root, wsproto.WorkspaceConfigFilename), []byte(config), 0o644); err != nil {
-			t.Fatal(err)
 		}
 	}
-	bind("@putnami/local-collaboration")
-	if out, err := runInstall(t, f.root); err != nil {
-		t.Fatalf("install bound to the local provider: %v\n%s", err, out)
-	}
-	content := snapshotContentSurface(t, f.root)
-	bind("@putnami/github-collaboration")
-	if out, err := runInstall(t, f.root); err != nil {
-		t.Fatalf("install bound to the GitHub provider: %v\n%s", err, out)
-	}
-	assertUnchangedWorkspace(t, content, snapshotContentSurface(t, f.root))
-}
-
-// Two runs that write never interleave: while one holds the workspace's
-// migration lock, another apply or rollback changes nothing and says why.
-func TestAgentContentMigration_ConcurrentRunsAreRefused(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "agent-content-migration-safety", "concurrent-migrations-are-refused")
-	f := newMigrationFixture(t, []string{testAgentArtifact, supersededMaintainer})
-	held, err := flock.Acquire(filepath.Join(f.root, filepath.FromSlash(migrationLock)), true, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	before := snapshotMigration(t, f.root)
-	for _, mode := range []string{agentctx.AgentContentMigrationApply, agentctx.AgentContentMigrationRollback} {
-		if _, err := runMigration(t, f.root, mode); err == nil || !strings.Contains(err.Error(), "another agent-content migration is running") {
-			t.Fatalf("%s while another run holds the lock = %v", mode, err)
-		}
-	}
-	assertUnchangedWorkspace(t, before, snapshotMigration(t, f.root))
-	if err := held.Release(); err != nil {
-		t.Fatal(err)
-	}
-	if out, err := runMigration(t, f.root, agentctx.AgentContentMigrationApply); err != nil {
-		t.Fatalf("apply once the lock is free: %v\n%s", err, out)
-	}
+	assertNoAgentArtifactPins(t, root)
 }

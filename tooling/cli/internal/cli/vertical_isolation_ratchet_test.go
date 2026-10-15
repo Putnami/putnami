@@ -239,10 +239,9 @@ var verticalCrossImportExceptions = []verticalCrossImportException{
 	{
 		file:    "internal/commands/lifecycle/agent_workflows_lifecycle_test.go",
 		imports: "agentctx",
-		why: whyLifecycleAgentctx + ". This file stubs package-private vars on BOTH sides " +
-			"(lifecycle's own install stages and agentctx's AgentContentMigrationInterrupt " +
-			"seam), which only one package can do from inside a _test.go " +
-			"file, so it lives in lifecycle and reaches agentctx through its exported seams",
+		why: whyLifecycleAgentctx + ". This file stubs lifecycle's own package-private " +
+			"install stages, which only a _test.go file inside lifecycle can do, so it " +
+			"lives in lifecycle and reaches agentctx through its exported seams",
 	},
 	{file: "internal/commands/lifecycle/install.go", imports: "extensions", why: whyLifecycleExtensions},
 	{file: "internal/commands/lifecycle/upgrade.go", imports: "extensions", why: whyLifecycleExtensions},

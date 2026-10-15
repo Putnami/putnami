@@ -475,59 +475,15 @@ func TestCmdMigrateVNext_FlagWiring(t *testing.T) {
 			t.Errorf("err = %v, want the available sources to include vnext", err)
 		}
 	})
-}
 
-// TestCmdMigrateAgentContent_FlagWiring pins the dispatch half of
-// `migrate agent-content`: it needs a workspace and exactly one extension, its
-// three modes are mutually exclusive, and a bare invocation is the read-only
-// check, so it can never write the workspace.
-func TestCmdMigrateAgentContent_FlagWiring(t *testing.T) {
-	t.Parallel()
-	cmd, ok := lookupCommand("migrate")
-	if !ok {
-		t.Fatal("migrate command is not registered")
-	}
-	newEnv := func(root string, args ...string) *CommandEnv {
-		return &CommandEnv{
+	t.Run("agent-content is no longer a migration source", func(t *testing.T) {
+		env := &CommandEnv{
 			Ctx: context.Background(), Cfg: &wsproto.Config{},
-			WsRoot: root, Sub: "agent-content", Args: args,
+			WsRoot: t.TempDir(), Sub: "agent-content", Args: []string{"@putnami/contributor"},
 		}
-	}
-
-	for name, args := range map[string][]string{
-		"no extension":            nil,
-		"two extensions":          {"@acme/one", "@acme/two"},
-		"two modes":               {"@acme/one", "--apply", "--rollback"},
-		"an undeclared flag":      {"@acme/one", "--force"},
-		"an invalid name":         {"../escape"},
-		"check and apply at once": {"@acme/one", "--check", "--apply"},
-	} {
-		t.Run(name, func(t *testing.T) {
-			if err := cmd.run(newEnv(t.TempDir(), args...)); !errors.Is(err, cmderr.ErrUsage) {
-				t.Fatalf("err = %v, want ErrUsage", err)
-			}
-		})
-	}
-
-	t.Run("a workspace is required", func(t *testing.T) {
-		if err := cmd.run(newEnv("", "@acme/one")); !errors.Is(err, cmderr.ErrNoWorkspace) {
-			t.Fatalf("err = %v, want ErrNoWorkspace", err)
-		}
-	})
-
-	t.Run("default mode is read-only", func(t *testing.T) {
-		root := t.TempDir()
-		config := filepath.Join(root, wsproto.WorkspaceConfigFilename)
-		if err := os.WriteFile(config, []byte(`{"name":"ws"}`+"\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		err := cmd.run(newEnv(root, "@acme/one"))
-		if err == nil || !strings.Contains(err.Error(), "declares no extension @acme/one") {
-			t.Fatalf("err = %v, want the undeclared extension named", err)
-		}
-		entries, err := os.ReadDir(root)
-		if err != nil || len(entries) != 1 {
-			t.Fatalf("a bare `migrate agent-content` wrote into the workspace: %v (err %v)", entries, err)
+		err := cmd.run(env)
+		if !errors.Is(err, cmderr.ErrUsage) || !strings.Contains(err.Error(), "unknown migration source: agent-content") {
+			t.Fatalf("err = %v, want agent-content refused as an unknown source", err)
 		}
 	})
 }

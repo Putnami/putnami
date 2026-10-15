@@ -561,10 +561,11 @@ func initRegistries(cwd string, extConfig initExtensionConfig) map[string]json.R
 // — the next `install` would then report every one of them as an unmanaged
 // collision. Re-initializing must not be able to do that.
 //
-// It merges by what each entry NAMES, not by how it is spelled, and the
-// existing declaration wins. An entry in a form this CLI no longer installs is
-// kept as well: dropping it would orphan its files and records, while keeping
-// it makes every later command name the migration that moves it.
+// It merges each opt-in by the extension it NAMES, not by how it is spelled,
+// and the existing declaration wins. An entry in a form this CLI no longer
+// installs is kept under its own spelling: dropping it would orphan its files
+// and records, while keeping it makes every later command refuse it and say
+// how to replace it.
 func initAgentArtifacts(cwd string, extConfig initExtensionConfig) []string {
 	byName := make(map[string]string)
 	record := func(references []string, overwrite bool) {
@@ -573,7 +574,7 @@ func initAgentArtifacts(cwd string, extConfig initExtensionConfig) []string {
 			if reference == "" {
 				continue
 			}
-			name := agentctx.AgentArtifactDeclarationName(cwd, reference)
+			name := agentctx.AgentArtifactDeclarationName(reference)
 			if name == "" {
 				// Unreadable, but still the user's declaration: keep it under
 				// its own spelling rather than drop it.

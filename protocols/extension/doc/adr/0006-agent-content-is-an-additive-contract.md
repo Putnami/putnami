@@ -1,6 +1,8 @@
 # ADR 0006 — Agent content is an extension contribution under an additive contract
 
-- **Status**: accepted
+- **Status**: accepted, amended by decision D-013 in the root
+  `decisions.json`: `putnami migrate agent-content` is deleted, so
+  `supersedes` has one consumer, the refusal.
 - **Scope**: `go.putnami.dev/protocol/extension` (`agentContent`),
   `go.putnami.dev/protocol/cli` (`protocols/cli/contract.go`), and the SDK
   package step (`tooling/extension-sdk/agentartifact`)

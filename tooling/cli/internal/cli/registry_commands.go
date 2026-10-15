@@ -665,43 +665,9 @@ func cmdMigrate(env *CommandEnv) error {
 	switch env.Sub {
 	case "vnext":
 		return cmdMigrateVNext(env, root)
-	case "agent-content":
-		return cmdMigrateAgentContent(env)
 	default:
-		return usageErrorf("unknown migration source: %s\n  Available: vnext, agent-content", env.Sub)
+		return usageErrorf("unknown migration source: %s\n  Available: vnext", env.Sub)
 	}
-}
-
-// cmdMigrateAgentContent binds `migrate agent-content`'s three modes. They are
-// mutually exclusive, because they differ in whether and in which direction the
-// workspace is written; none means --check, the read-only mode.
-func cmdMigrateAgentContent(env *CommandEnv) error {
-	if err := env.requireWorkspace(); err != nil {
-		return err
-	}
-	parsed, err := parseCatalogCommandFlags("migrate agent-content", env.Args)
-	if err != nil {
-		return err
-	}
-	if len(parsed.positionals) != 1 {
-		return usageErrorf("migrate agent-content takes exactly one extension name, the extension whose agent content receives the superseded artifacts")
-	}
-	mode := agentctx.AgentContentMigrationCheck
-	selected := 0
-	for _, candidate := range []struct{ flag, mode string }{
-		{"--check", agentctx.AgentContentMigrationCheck},
-		{"--apply", agentctx.AgentContentMigrationApply},
-		{"--rollback", agentctx.AgentContentMigrationRollback},
-	} {
-		if parsed.has(candidate.flag) {
-			mode = candidate.mode
-			selected++
-		}
-	}
-	if selected > 1 {
-		return usageErrorf("migrate agent-content: --check, --apply and --rollback are mutually exclusive")
-	}
-	return agentctx.MigrateAgentContent(env.Ctx, env.WsRoot, env.Cfg, parsed.positionals[0], mode, env.OutputFormat)
 }
 
 // cmdMigrateVNext binds `migrate vnext`'s two modes. They are mutually

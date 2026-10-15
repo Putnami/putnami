@@ -2,8 +2,10 @@ package agentctx
 
 import (
 	"fmt"
+	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -60,6 +62,172 @@ func parseExtensionAgentContentReference(declared string) (AgentArtifactRef, boo
 	return AgentArtifactRef{Name: name, Extension: name}, true, nil
 }
 
+// AgentArtifactDeclarationName names the extension an `extension:<name>`
+// opt-in declares. It returns "" for an entry that is not a valid opt-in. It
+// installs nothing; `putnami init --force` uses it to merge declarations by
+// what they name rather than by how they are spelled.
+func AgentArtifactDeclarationName(declared string) string {
+	ref, ok, err := parseExtensionAgentContentReference(strings.TrimSpace(declared))
+	if !ok || err != nil {
+		return ""
+	}
+	return ref.Name
+}
+
+// legacyAgentArtifactDeclarationsError refuses the entries in the forms
+// earlier releases installed — a registry artifact (`name` or
+// `name:constraint`) or an in-tree project (`/path`) — with nothing written,
+// and gives the steps that replace them in this workspace. The entries are
+// grouped by the extension whose content supersedes them, and each group gets
+// its own steps: its entries are deleted when that extension is already opted
+// into, and replaced otherwise; the extension is declared when it is not yet.
+// `putnami install` then drops the lock pins the entries left.
+func legacyAgentArtifactDeclarationsError(wsRoot string, cfg *wsproto.Config, legacy []string) error {
+	quoted := make([]string, 0, len(legacy))
+	for _, declared := range legacy {
+		quoted = append(quoted, fmt.Sprintf("%q", declared))
+	}
+	sources := declaredSupersedingSources(wsRoot, cfg)
+	var successors []string
+	groups := map[string][]string{}
+	for _, declared := range legacy {
+		successor := supersedingExtension(wsRoot, sources, declared)
+		if _, seen := groups[successor]; !seen {
+			successors = append(successors, successor)
+		}
+		groups[successor] = append(groups[successor], fmt.Sprintf("%q", declared))
+	}
+	declaredNames := extension.DeclaredExtensionNames(wsRoot, cfg)
+	steps := make([]string, 0, len(successors))
+	for _, successor := range successors {
+		var group []string
+		if successor == "" {
+			group = append(group, "replace each entry with extension:<name> for the extension whose agent content supersedes it",
+				"declare that extension in extensions")
+		} else {
+			optIn := extensionAgentContentPrefix + successor
+			if optsInto(cfg, successor) {
+				group = append(group, "delete each entry, since "+optIn+" already opts into the content that supersedes it")
+			} else {
+				group = append(group, "replace each entry with "+optIn)
+			}
+			if !slices.Contains(declaredNames, successor) {
+				group = append(group, "declare "+successor+" in extensions")
+			}
+		}
+		step := strings.Join(group, ", ")
+		if len(successors) > 1 {
+			step = "for " + strings.Join(groups[successor], ", ") + ": " + step
+		}
+		steps = append(steps, step)
+	}
+	return protocolcli.Classify(fmt.Errorf(
+		"agentArtifacts declares %s in a form this CLI no longer installs: nothing was changed. "+
+			"Agent content is installed only by an extension, through an extension:<name> entry: %s, then run `putnami install`",
+		strings.Join(quoted, ", "), strings.Join(steps, "; ")), protocolcli.ErrInvalidConfig)
+}
+
+// optsInto reports whether the workspace already opts into the agent content
+// of the extension name.
+func optsInto(cfg *wsproto.Config, name string) bool {
+	if cfg == nil {
+		return false
+	}
+	for _, declared := range cfg.AgentArtifacts {
+		if AgentArtifactDeclarationName(declared) == name {
+			return true
+		}
+	}
+	return false
+}
+
+// firstPartyAgentContentSuccessors names the extension whose agent content
+// supersedes each agent artifact Putnami published separately, for a
+// workspace that does not declare that extension yet. A test holds it equal
+// to the supersedes list of the contributor extension's manifest.
+var firstPartyAgentContentSuccessors = map[string]string{
+	"@putnami/agent-workflows":      "@putnami/contributor",
+	"@putnami/maintainer-workflows": "@putnami/contributor",
+}
+
+// declaredSupersedingSources is the agent content of every declared
+// extension whose content supersedes an artifact, in declaration order.
+func declaredSupersedingSources(wsRoot string, cfg *wsproto.Config) []*extension.AgentContentSource {
+	var sources []*extension.AgentContentSource
+	for _, candidate := range extension.DeclaredExtensionNames(wsRoot, cfg) {
+		source, err := extension.LocateAgentContent(wsRoot, cfg, candidate)
+		if err != nil || len(source.Contribution.Supersedes) == 0 {
+			continue
+		}
+		sources = append(sources, source)
+	}
+	return sources
+}
+
+// supersedingExtension names the extension whose agent content supersedes a
+// legacy entry: a declared extension whose content says so, else the
+// first-party successor, else "".
+func supersedingExtension(wsRoot string, sources []*extension.AgentContentSource, declared string) string {
+	for _, source := range sources {
+		for _, superseded := range source.Contribution.Supersedes {
+			if legacyEntryNames(wsRoot, declared, superseded) {
+				return source.Name
+			}
+		}
+	}
+	firstParty := make([]string, 0, len(firstPartyAgentContentSuccessors))
+	for name := range firstPartyAgentContentSuccessors {
+		firstParty = append(firstParty, name)
+	}
+	sort.Strings(firstParty)
+	for _, name := range firstParty {
+		if legacyEntryNames(wsRoot, declared, name) {
+			return firstPartyAgentContentSuccessors[name]
+		}
+	}
+	return ""
+}
+
+// legacyEntryNames reports whether a legacy entry names the artifact: a
+// registry entry by what precedes its constraint, an in-tree entry by the name
+// its project's putnami.json declares, or, when that project is gone, by its
+// last path segment, which is the artifact's unscoped name.
+func legacyEntryNames(wsRoot, declared, artifact string) bool {
+	declared = strings.TrimSpace(declared)
+	if !strings.HasPrefix(declared, "/") {
+		name, _, _ := strings.Cut(declared, ":")
+		return strings.TrimSpace(name) == artifact
+	}
+	if name := legacyProjectName(wsRoot, declared); name != "" {
+		return name == artifact
+	}
+	unscoped := artifact
+	if strings.HasPrefix(artifact, "@") {
+		if _, rest, ok := strings.Cut(artifact, "/"); ok {
+			unscoped = rest
+		}
+	}
+	return path.Base(path.Clean(declared)) == unscoped
+}
+
+// legacyProjectName is the name the putnami.json of an in-tree entry's project
+// declares, or "" when it declares none or is gone. An entry that leaves the
+// workspace is not read.
+func legacyProjectName(wsRoot, declared string) string {
+	if strings.ContainsAny(declared, `\:`) || slices.Contains(strings.Split(declared, "/"), "..") {
+		return ""
+	}
+	clean := strings.TrimPrefix(path.Clean(declared), "/")
+	if clean == "" {
+		return ""
+	}
+	project := wsproto.LoadProjectConfig(filepath.Join(wsRoot, filepath.FromSlash(clean)))
+	if project == nil {
+		return ""
+	}
+	return strings.TrimSpace(project.Name)
+}
+
 // extensionNameFormat is the extension manifest's `name` grammar
 // (protocols/extension/schemas/extension.json).
 var extensionNameFormat = regexp.MustCompile(`^(@[a-z0-9-]+/[a-z0-9-]+|[a-z0-9][a-z0-9-]*)$`)
@@ -78,8 +246,7 @@ var extensionNameFormat = regexp.MustCompile(`^(@[a-z0-9-]+/[a-z0-9-]+|[a-z0-9][
 // packager's builder on every run and staged in this worktree only.
 //
 // A contribution that supersedes an artifact this clone still records as
-// installed is refused: two owners would claim the same files, and moving one
-// to the other is the explicit `putnami migrate agent-content` step.
+// installed is refused: two owners would claim the same files.
 func resolveExtensionAgentContent(wsRoot string, cfg *wsproto.Config, ref AgentArtifactRef) (AgentArtifactResolution, error) {
 	source, err := extension.LocateAgentContent(wsRoot, cfg, ref.Extension)
 	if err != nil {
@@ -117,10 +284,12 @@ func resolveAgentContentSource(wsRoot string, source *extension.AgentContentSour
 // content that supersedes an artifact (agentContent.supersedes) cannot be
 // installed while this clone still records that artifact as installed: its
 // ownership record would claim the files the extension's record claims. The
-// state is resolved by moving the record to the extension explicitly, never by
-// picking one owner silently. A superseded artifact the workspace still
-// declares never reaches this check: DeclaredAgentArtifacts refuses the
-// declaration first.
+// user resolves it by deleting that record, which the refusal names, never
+// Putnami by picking one owner silently; the next run keeps every file whose
+// bytes match the content and reports every other one as a collision, and
+// `putnami install` drops the artifact's lock pin. A superseded artifact the
+// workspace still declares never reaches this check: DeclaredAgentArtifacts
+// refuses the declaration first.
 func refuseSupersededOwners(wsRoot string, source *extension.AgentContentSource) error {
 	superseded := source.Contribution.Supersedes
 	if len(superseded) == 0 {
@@ -130,7 +299,7 @@ func refuseSupersededOwners(wsRoot string, source *extension.AgentContentSource)
 	for _, name := range superseded {
 		names[name] = true
 	}
-	var recorded []string
+	var recorded, records []string
 	for _, name := range sortedNames(names) {
 		state, err := agentartifacts.LoadState(wsRoot, name)
 		if err != nil {
@@ -138,15 +307,26 @@ func refuseSupersededOwners(wsRoot string, source *extension.AgentContentSource)
 		}
 		if state != nil {
 			recorded = append(recorded, name)
+			records = append(records, agentArtifactStateRelPath(wsRoot, name))
 		}
 	}
-	if len(recorded) > 0 {
-		return protocolcli.WithNext(fmt.Errorf(
-			"this clone still records %s as installed, and the agent content of extension %s supersedes it: nothing was changed. "+
-				"Its ownership record would claim the files the extension's content claims; move that ownership to the extension",
-			strings.Join(recorded, ", "), source.Name), "putnami migrate agent-content "+source.Name+" --apply")
+	if len(recorded) == 0 {
+		return nil
 	}
-	return nil
+	return fmt.Errorf(
+		"this clone still records %s as installed, and the agent content of extension %s supersedes it: nothing was changed. "+
+			"Its ownership record would claim the files the extension's content claims; delete %s, then rerun",
+		strings.Join(recorded, ", "), source.Name, strings.Join(records, ", "))
+}
+
+// agentArtifactStateRelPath names an ownership record by its workspace path,
+// with / separators, so a refusal tells the user which file to delete.
+func agentArtifactStateRelPath(wsRoot, name string) string {
+	record := agentartifacts.StatePath(wsRoot, name)
+	if rel, err := filepath.Rel(wsRoot, record); err == nil {
+		return filepath.ToSlash(rel)
+	}
+	return record
 }
 
 func sortedNames(set map[string]bool) []string {

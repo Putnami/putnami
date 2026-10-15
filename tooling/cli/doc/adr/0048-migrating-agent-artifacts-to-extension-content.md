@@ -1,6 +1,10 @@
 # ADR 0048 — Separate agent artifacts move to extension content in one explicit, journaled step
 
-- **Status**: accepted
+- **Status**: superseded by decision D-013 in the root `decisions.json`:
+  `putnami migrate agent-content` is deleted, with no transition window. A
+  workspace that still declares or records a superseded artifact is refused
+  with nothing written, and the refusal says which entry to replace or which
+  ownership record to delete. `putnami install` drops the lock pins.
 - **Scope**: `@putnami/cli` (`internal/commands/agentctx`, the `migrate`
   command), the `agentArtifacts` workspace declaration, lock format v4
   `agentArtifacts`, the ownership records under `.putnami/agent-artifacts/`

@@ -114,12 +114,10 @@ optional, belongs to both forms, and the package step keeps it:
 ```
 
 Each entry is a registry name (`@scope/name` or `name`), appears once, and is
-never the extension's own name (`invalid-agent-content-supersedes`). The field
-has two consumers in the CLI. A workspace that opts into this content while it
-still declares, or still records as installed, a superseded artifact is refused
-instead of receiving two competing sets of instructions. And
-`putnami migrate agent-content <name>` moves the superseded declarations, pins
-and ownership records to this content. See
+never the extension's own name (`invalid-agent-content-supersedes`). A
+workspace that opts into this content while it still declares, or still records
+as installed, a superseded artifact is refused instead of receiving two
+competing sets of instructions. See
 [ADR 0006](adr/0006-agent-content-is-an-additive-contract.md).
 
 ## Option Namespaces

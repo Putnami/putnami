@@ -40,11 +40,10 @@ import (
 //
 // An entry in the forms earlier releases installed — a registry artifact
 // (`name` or `name:constraint`) or an in-tree project (`/path`) — is refused by
-// every pass with nothing written. `putnami migrate agent-content` is the only
-// reader of those entries (agent_content_legacy.go).
+// every pass with nothing written.
 
 // AgentArtifactRef names one owner of agent files: an `extension:<name>`
-// opt-in, or, inside the migration and the overlap checks, an ownership record.
+// opt-in, or, inside the overlap checks, an ownership record.
 type AgentArtifactRef struct {
 	// Name is the owner's identity. It also names the ownership record under
 	// .putnami/agent-artifacts/.
@@ -82,8 +81,7 @@ type preparedAgentArtifact struct {
 // workspace alone" rather than as an error.
 //
 // A repeated opt-in is dropped. An entry in a form this CLI no longer installs
-// fails the whole declaration and names the migration that moves it to an
-// extension, or the unfinished migration that must complete first.
+// fails the whole declaration.
 func DeclaredAgentArtifacts(wsRoot string, cfg *wsproto.Config) ([]AgentArtifactRef, error) {
 	if cfg == nil {
 		return nil, nil
@@ -111,11 +109,6 @@ func DeclaredAgentArtifacts(wsRoot string, cfg *wsproto.Config) ([]AgentArtifact
 		refs = append(refs, ref)
 	}
 	if len(legacy) > 0 {
-		// A migration that stopped partway leaves legacy entries behind; only
-		// finishing or rolling it back resolves that, so it is named first.
-		if err := requireNoUnfinishedAgentContentMigration(wsRoot); err != nil {
-			return nil, err
-		}
 		return nil, legacyAgentArtifactDeclarationsError(wsRoot, cfg, legacy)
 	}
 	sort.Slice(refs, func(i, j int) bool { return refs[i].Name < refs[j].Name })
@@ -196,9 +189,6 @@ func MaterializeLocalAgentContent(wsRoot string, cfg *wsproto.Config, out io.Wri
 	if len(refs) == 0 {
 		return false, nil
 	}
-	if err := requireNoUnfinishedAgentContentMigration(wsRoot); err != nil {
-		return false, err
-	}
 	prepared := make([]preparedAgentArtifact, 0, len(refs))
 	for _, ref := range refs {
 		local, err := localExtensionAgentContent(wsRoot, cfg, ref)
@@ -266,9 +256,6 @@ func InstallAgentWorkflowsWithResult(_ context.Context, wsRoot string, cfg *wspr
 	if len(refs) == 0 {
 		return nil, nil
 	}
-	if err := requireNoUnfinishedAgentContentMigration(wsRoot); err != nil {
-		return nil, err
-	}
 	prepared := make([]preparedAgentArtifact, 0, len(refs))
 	for _, ref := range refs {
 		// The extension's own pin was installed by the extensions phase; its
@@ -305,9 +292,6 @@ func AdoptAgentWorkflows(_ context.Context, wsRoot string, cfg *wsproto.Config, 
 	if err != nil {
 		return err
 	}
-	if err := requireNoUnfinishedAgentContentMigration(wsRoot); err != nil {
-		return err
-	}
 	if len(refs) == 0 {
 		// Nothing to adopt, but an opt-in the user removed still has files to
 		// retire.
@@ -319,7 +303,7 @@ func AdoptAgentWorkflows(_ context.Context, wsRoot string, cfg *wsproto.Config, 
 		if err != nil {
 			return err
 		}
-		return commitAgentArtifacts(wsRoot, nil, retiredAgentArtifacts{items: retired, released: released}, out)
+		return commitAgentArtifacts(wsRoot, nil, retiredAgentArtifacts{items: retired, released: released, dropPins: true}, out)
 	}
 	// Content that supersedes an artifact this clone still records is refused
 	// here, before retirement removes a file: retiring the superseded record
@@ -369,7 +353,7 @@ func AdoptAgentWorkflows(_ context.Context, wsRoot string, cfg *wsproto.Config, 
 			return err
 		}
 	}
-	return commitAgentArtifacts(wsRoot, prepared, retiredAgentArtifacts{items: retired, released: released}, out)
+	return commitAgentArtifacts(wsRoot, prepared, retiredAgentArtifacts{items: retired, released: released, dropPins: true}, out)
 }
 
 // rejectCollisionsRetirementKeeps refuses, before retirement removes a file,
@@ -438,10 +422,13 @@ func planResolvedAgentArtifact(wsRoot, name string, resolution AgentArtifactReso
 }
 
 // retiredAgentArtifacts is the completed removal phase: what was retired and,
-// per owner, the edited files released to the user.
+// per owner, the edited files released to the user. dropPins is set by the
+// adopting command, which writes the lock: it drops every agentArtifacts pin
+// with the retirement (DropAgentArtifactPins).
 type retiredAgentArtifacts struct {
 	items    []retiredAgentArtifact
 	released map[string][]string
+	dropPins bool
 }
 
 // applyAgentArtifactRemovals deletes what each retired owner still manages. It
@@ -475,9 +462,10 @@ func applyAgentArtifactRemovals(wsRoot string, retired []retiredAgentArtifact) (
 //     itself transactional per contribution (stage, then atomic rename), so
 //     the only residue a failure here can leave is a completed EARLIER
 //     contribution, which reruns as unchanged.
-//  3. RETIRE — the pins and records of retired owners are dropped last: until
-//     a record is gone it still authorizes the removals already applied, so
-//     an interrupted run converges on a rerun.
+//  3. RETIRE — the agentArtifacts pins, when the run drops them, and the
+//     records of retired owners are dropped last: until a record is gone it
+//     still authorizes the removals already applied, so an interrupted run
+//     converges on a rerun.
 func commitAgentArtifacts(wsRoot string, prepared []preparedAgentArtifact, retired retiredAgentArtifacts, out io.Writer) error {
 	if err := rejectAgentArtifactCollisions(prepared); err != nil {
 		return err
@@ -495,8 +483,10 @@ func commitAgentArtifacts(wsRoot string, prepared []preparedAgentArtifact, retir
 		}
 		reports = append(reports, agentartifacts.NewReport(item.plan, true))
 	}
-	if err := dropRetiredAgentArtifactPins(wsRoot, retired.items); err != nil {
-		return err
+	if retired.dropPins {
+		if _, err := DropAgentArtifactPins(wsRoot); err != nil {
+			return err
+		}
 	}
 	for _, item := range retired.items {
 		if !item.state {
@@ -518,10 +508,9 @@ func commitAgentArtifacts(wsRoot string, prepared []preparedAgentArtifact, retir
 // retiredAgentArtifact is one owner the workspace recorded but no longer opts
 // into, carried to the last point before its files are removed.
 type retiredAgentArtifact struct {
-	name   string
-	plan   *agentartifacts.Plan
-	pinned bool
-	state  bool
+	name  string
+	plan  *agentartifacts.Plan
+	state bool
 }
 
 // planUndeclaredAgentArtifacts finds every owner this clone recorded as
@@ -557,17 +546,6 @@ func planUndeclaredAgentArtifacts(wsRoot string, declared []AgentArtifactRef) ([
 			return nil, agentArtifactFailure(state.Name, nil, err)
 		}
 		byName[state.Name] = &retiredAgentArtifact{name: state.Name, plan: plan, state: true}
-	}
-	if len(byName) > 0 {
-		lf, err := lockfile.ReadLockFile(wsRoot)
-		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", lockfile.LockFilename, err)
-		}
-		if lf != nil {
-			for name, item := range byName {
-				_, item.pinned = lf.GetAgentArtifact(name)
-			}
-		}
 	}
 	names := make([]string, 0, len(byName))
 	for name := range byName {
@@ -657,9 +635,6 @@ func EnsureAgentWorkflows(_ context.Context, wsRoot string, cfg *wsproto.Config)
 	if err != nil {
 		return err
 	}
-	if err := requireNoUnfinishedAgentContentMigration(wsRoot); err != nil {
-		return err
-	}
 	prepared := make([]preparedAgentArtifact, 0, len(refs))
 	for _, ref := range refs {
 		resolution, pinned, err := pinnedExtensionAgentContent(wsRoot, cfg, lf, ref)
@@ -726,9 +701,6 @@ func ReconcileAgentWorkflows(_ context.Context, wsRoot string, cfg *wsproto.Conf
 	}
 	lf, err := lockfile.ReadLockFile(wsRoot)
 	if err != nil {
-		return err
-	}
-	if err := requireNoUnfinishedAgentContentMigration(wsRoot); err != nil {
 		return err
 	}
 	var problems []error
@@ -895,41 +867,47 @@ func rejectAgentArtifactCollisions(prepared []preparedAgentArtifact) error {
 		agentartifacts.ErrCollision, strings.Join(blocked, "; "))
 }
 
-// dropRetiredAgentArtifactPins removes, in ONE lock update, the lock pins of
-// retired owners that still carry one: a pin moves with the record it belongs
-// to. A run that retires nothing pinned leaves the committed lock untouched.
-func dropRetiredAgentArtifactPins(wsRoot string, retired []retiredAgentArtifact) error {
-	dropping := make([]string, 0, len(retired))
-	for _, item := range retired {
-		if item.pinned {
-			dropping = append(dropping, item.name)
-		}
+// AgentArtifactPins names every pin the lock holds under agentArtifacts,
+// sorted. No declaration can use one: an extension:<name> opt-in follows the
+// extension's own pin, and every other form is refused
+// (DeclaredAgentArtifacts). Only an earlier release wrote them.
+func AgentArtifactPins(wsRoot string) ([]string, error) {
+	_, names, err := readAgentArtifactPins(wsRoot)
+	return names, err
+}
+
+// DropAgentArtifactPins removes every pin under agentArtifacts in ONE lock
+// update and returns their names, sorted. A lock that holds none is left
+// untouched. `putnami install` and `putnami upgrade` drop them, so no user
+// edits the lock by hand.
+func DropAgentArtifactPins(wsRoot string) ([]string, error) {
+	lf, names, err := readAgentArtifactPins(wsRoot)
+	if err != nil || len(names) == 0 {
+		return nil, err
 	}
-	if len(dropping) == 0 {
-		return nil
-	}
-	lf, err := lockfile.ReadLockFile(wsRoot)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", lockfile.LockFilename, err)
-	}
-	if lf == nil {
-		return nil
-	}
-	changed := false
-	for _, name := range dropping {
-		if _, ok := lf.GetAgentArtifact(name); !ok {
-			continue
-		}
+	for _, name := range names {
 		lf.RemoveAgentArtifact(name)
-		changed = true
-	}
-	if !changed {
-		return nil
 	}
 	if err := lockfile.WriteLockFile(wsRoot, lf); err != nil {
-		return fmt.Errorf("write %s: %w", lockfile.LockFilename, err)
+		return nil, fmt.Errorf("write %s: %w", lockfile.LockFilename, err)
 	}
-	return nil
+	return names, nil
+}
+
+func readAgentArtifactPins(wsRoot string) (*lockfile.LockFile, []string, error) {
+	lf, err := lockfile.ReadLockFile(wsRoot)
+	if err != nil {
+		return nil, nil, fmt.Errorf("read %s: %w", lockfile.LockFilename, err)
+	}
+	if lf == nil || len(lf.AgentArtifacts) == 0 {
+		return lf, nil, nil
+	}
+	names := make([]string, 0, len(lf.AgentArtifacts))
+	for name := range lf.AgentArtifacts {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return lf, names, nil
 }
 
 // agentArtifactFailure names the owner a failure belongs to and redacts any

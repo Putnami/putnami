@@ -14,7 +14,7 @@ _putnami_subcommands_for() {
         'extensions') printf '%s\n' 'install list remove update' ;;
         'infra') printf '%s\n' 'plan' ;;
         'mcp') printf '%s\n' 'install' ;;
-        'migrate') printf '%s\n' 'agent-content vnext' ;;
+        'migrate') printf '%s\n' 'vnext' ;;
         'projects') printf '%s\n' 'create describe list sync tag' ;;
         'scopes') printf '%s\n' 'list' ;;
         'sessions') printf '%s\n' 'export inspect list replay summary' ;;
@@ -69,7 +69,6 @@ _putnami_path_known() {
         'mcp') return 0 ;;
         'mcp install') return 0 ;;
         'migrate') return 0 ;;
-        'migrate agent-content') return 0 ;;
         'migrate vnext') return 0 ;;
         'pin') return 0 ;;
         'projects') return 0 ;;
@@ -130,7 +129,6 @@ _putnami_flags_for() {
         'impact-plan') printf '%s\n' '--base --head' ;;
         'init') printf '%s\n' '--channel --extension --force --project --project-path --workspace' ;;
         'install') printf '%s\n' '--latest' ;;
-        'migrate agent-content') printf '%s\n' '--apply --check --rollback' ;;
         'migrate vnext') printf '%s\n' '--apply --check' ;;
         'pin') printf '%s\n' '--remove' ;;
         'projects create') printf '%s\n' '--force --path --template' ;;

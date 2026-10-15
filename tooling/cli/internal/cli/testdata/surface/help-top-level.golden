@@ -67,7 +67,6 @@ Execution:
 
 Migration:
   migrate vnext                Migrate putnami.lock.json to the current format
-  migrate agent-content        Move superseded agent artifacts to an extension's agent content
 
 Authoring:
   dev extension validate       Validate an extension manifest

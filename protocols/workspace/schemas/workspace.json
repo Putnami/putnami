@@ -116,7 +116,7 @@
     "agentArtifacts": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Opt-ins, spelled `extension:<name>`, into the agent content of a declared extension, materialized into this workspace at the version the extension resolves to. The forms earlier releases installed — registry references (`name` or `name:channel`) and in-tree project paths (`/path`) — are refused; `putnami migrate agent-content <name>` moves them to the extension whose content supersedes them. A CLI that predates the opt-in reads `extension:<name>` as an agent artifact named `extension`, which no lock pins, and its install fails with nothing written."
+      "description": "Opt-ins, spelled `extension:<name>`, into the agent content of a declared extension, materialized into this workspace at the version the extension resolves to. The forms earlier releases installed — registry references (`name` or `name:channel`) and in-tree project paths (`/path`) — are refused with nothing written; replace each with `extension:<name>` for the extension whose content supersedes it. A CLI that predates the opt-in reads `extension:<name>` as an agent artifact named `extension`, which no lock pins, and its install fails with nothing written."
     },
     "hooks": {
       "type": "object",

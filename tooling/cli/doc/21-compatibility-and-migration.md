@@ -103,7 +103,7 @@ This CLI accepts lock format versions 2 – 4 and writes new locks at version 4.
 | 1 | Resolved versions, archive integrity digests, manifest hashes, source URLs. **No longer read.** |
 | 2 | `taskContract` per entry — the pinned extension's task-contract level, readable without resolving the manifest. |
 | 3 | The `toolchains` section, and `cli.protocolVersion` — the machine-output protocol the pinned CLI emits. |
-| 4 | The `agentArtifacts` section — platform-independent pins of separately declared agent workflows. No current command adds one; `putnami migrate agent-content` removes them and its rollback restores them. |
+| 4 | The `agentArtifacts` section — platform-independent pins of separately declared agent workflows. No current command adds one. |
 
 ### What migrates
 
@@ -284,39 +284,36 @@ earlier releases installed — `agentArtifacts` entries with a lock pin
 (`name`, `name:channel`) and in-tree `/path` entries — are no longer
 installed, and the compatibility window for them has ended:
 
-- **An unmigrated workspace** fails every agent-content command (`install`,
-  `upgrade`, `context generate`, the first-run and session-start passes) with
-  nothing written. The error names `putnami migrate agent-content <extension>`
-  and the extension whose content supersedes the artifact. A workspace that
-  cannot migrate yet stays on a CLI release before this one, which installs
-  its pins exactly as before.
-- **The migration** is `putnami migrate agent-content <extension> --apply`. It
-  is the one command that still reads the old declarations, lock pins and
-  ownership records, and it only moves them. It resolves and downloads
-  nothing: the extension must already be installed at a pinned release, or be
-  declared by path. An extension release that declares no `supersedes` offers
-  no migration, and the command says so.
-- **A clone that pulled a migration** still holds its own records of the old
-  artifacts. Every command refuses the opt-in there until the same `--apply`
-  moves them; it keeps every file you edited.
-- **Rollback** is `putnami migrate agent-content <extension> --rollback`. It
-  restores the previous declarations, pins, ownership records and files byte
-  for byte, in the clone that ran the migration, until something the
-  migration moved changes. The restored state is the separately declared one:
-  this CLI refuses it again, and a release before this one installs it.
-- **Older CLIs** fail on a migrated workspace instead of skipping its content.
-  A CLI before contract 5 refuses the extension package with `extension
-  requires a newer putnami`. A CLI that predates the `extension:` opt-in reads
-  it as an agent artifact named `extension`, which no lock pins, and its
-  install fails with nothing written: `agent workflows install: extension:
-  workspace lock pins no agent artifact: putnami.lock.json records no
-  extension entry`. The remedy for both is a CLI release that carries the
-  opt-in; see the
-  [migration guide](18-agent-workflows.md#migrating-separate-artifacts-to-an-extensions-content).
+- **A workspace that still declares them** fails every agent-content command
+  (`install`, `upgrade`, `context generate`, the first-run and session-start
+  passes) with nothing written. The error groups the entries by the
+  extension that supersedes them and gives each group the steps that apply:
+  replace the entries with one `extension:<name>` entry for the extension
+  whose content supersedes them (named when it is known), or delete them when
+  that entry exists, declare that extension when it is not declared, and run
+  `putnami install`. A workspace that cannot do that yet stays on a CLI
+  release before this one, which installs its pins exactly as before.
+- **A clone that still records them** refuses the opt-in with nothing
+  written, and the error names each ownership record to delete. With those
+  deleted, `install` keeps every file that already has the content's bytes
+  and reports every other one as a collision.
+- **Their lock pins** are dropped by `putnami install`, because no
+  declaration uses one. A hosted install writes no lock, so it fails and
+  names them; run `putnami install` without the run credential and commit
+  the lock.
+- **No command moves them.** `putnami migrate agent-content` is deleted, with
+  no transition window (decision D-013); its rollback is gone with it.
+- **Older CLIs** fail on an updated workspace instead of skipping its
+  content. A CLI before contract 5 refuses the extension package with
+  `extension requires a newer putnami`. A CLI that predates the `extension:`
+  opt-in reads it as an agent artifact named `extension`, which no lock pins,
+  and its install fails with nothing written: `agent workflows install:
+  extension: workspace lock pins no agent artifact: putnami.lock.json records
+  no extension entry`. The remedy for both is a CLI release that carries the
+  opt-in.
 
-See [ADR 0047](adr/0047-extension-owned-agent-content.md),
-[ADR 0048](adr/0048-migrating-agent-artifacts-to-extension-content.md) and
-the [migration guide](18-agent-workflows.md#migrating-separate-artifacts-to-an-extensions-content).
+See [ADR 0047](adr/0047-extension-owned-agent-content.md) and
+[Replacing separate artifacts](18-agent-workflows.md#replacing-separate-artifacts-with-an-extensions-content).
 
 ## Evidence
 
@@ -330,8 +327,9 @@ the [migration guide](18-agent-workflows.md#migrating-separate-artifacts-to-an-e
 | Result v1 is readable and unwritable | `protocols/cli/result_test.go`, `tooling/cli/internal/cli/v1_bridge_ratchet_test.go` |
 | Support catalog exact-version rejection | `protocols/support/support_test.go` |
 | Command-surface read window | `protocols/cli/command_surface_test.go` (`TestAReaderReadsEveryVersionUpToItsOwn`), `tooling/cli/internal/lockfile/prior_release_test.go` |
-| Superseded artifacts install until migrated; the migration resumes and rolls back | `tooling/cli/internal/commands/lifecycle/agent_workflows_lifecycle_test.go` (`TestAgentContentMigration_*`) |
-| A CLI that predates the `extension:` opt-in fails closed on a migrated workspace | `protocols/workspace/agent_content_opt_in_test.go` (`TestAgentContentOptIn_OlderReaderFailsClosed`) |
+| Superseded artifacts are refused with nothing written until replaced | `tooling/cli/internal/commands/lifecycle/agent_workflows_lifecycle_test.go` (`TestAgentWorkflows_LegacyStateIsRefusedWithNothingWritten`, `TestSupersededOwners_AreRefusedUntilTheRecordIsDeleted`) |
+| `install` drops their lock pins, and a hosted install refuses to | `tooling/cli/internal/commands/lifecycle/agent_workflows_lifecycle_test.go` (`TestInstall_DropsEveryAgentArtifactPin`) |
+| A CLI that predates the `extension:` opt-in fails closed on an updated workspace | `protocols/workspace/agent_content_opt_in_test.go` (`TestAgentContentOptIn_OlderReaderFailsClosed`) |
 
 The lock fixtures are **recovered bytes**, not regenerated ones: each is a
 `putnami.lock.json` as committed at the commit that shipped its format version,

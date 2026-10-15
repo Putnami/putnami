@@ -181,7 +181,6 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 | Command | Description |
 |---------|-------------|
 | `putnami migrate vnext` | Migrate putnami.lock.json to the current format |
-| `putnami migrate agent-content` | Move superseded agent artifacts to an extension's agent content |
 
 ## Authoring
 
@@ -1161,30 +1160,6 @@ putnami migrate vnext [--check] [--apply] [--output <format>]
 - `putnami migrate vnext --check`
 - `putnami migrate vnext --check --output=json`
 - `putnami migrate vnext --apply`
-
-### `putnami migrate agent-content`
-
-Check, apply or roll back the move of separately declared agent artifacts that an installed extension's agent content supersedes: their declarations, pins and ownership records move to the extension, and every file the content adds, changes or removes is listed before anything is written
-
-**Usage**
-
-```
-putnami migrate agent-content <extension> [--check] [--apply] [--rollback] [--output <format>]
-```
-
-**Flags**
-
-| Flag | Description |
-|------|-------------|
-| `--check` | Plan the migration without writing (default); exits non-zero when a migration is pending |
-| `--apply` | Perform the migration, or finish one that stopped |
-| `--rollback` | Restore the declarations, pins, ownership records and files recorded before the migration |
-
-**Examples**
-
-- `putnami migrate agent-content @putnami/contributor`
-- `putnami migrate agent-content @putnami/contributor --apply`
-- `putnami migrate agent-content @putnami/contributor --rollback`
 
 ### `putnami dev extension`
 
