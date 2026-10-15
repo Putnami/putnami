@@ -1,6 +1,7 @@
 # ADR 0044 — Selection is task-level
 
-- **Status**: accepted
+- **Status**: accepted, superseded in part by
+  [ADR 0068](0068-a-task-scope-keeps-a-job-by-its-declared-side-effects.md)
 - **Scope**: `@putnami/cli-model` (`workspace.TraceChangeImpact`,
   `TaskImpactIndex`), `@putnami/cli` (`internal/workspace.NewTaskIndex`,
   `internal/engine` plan narrowing)

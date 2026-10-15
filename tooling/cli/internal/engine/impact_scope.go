@@ -7,35 +7,23 @@ import (
 
 	modelext "go.putnami.dev/cli/model/extension"
 	modeljobs "go.putnami.dev/cli/model/jobs"
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// neverNarrowedCommands are never narrowed by a task scope, for two different
-// reasons.
+// neverNarrowedCommands are the commands whose jobs a task scope never narrows
+// by name (ADR 0068). `validate` and `validate-workspace` check what the
+// session verified, including the spec gate's criteria projection on every
+// project that runs `test`. A scope names the tasks a change's declared inputs
+// reach, and no declaration names the tasks these two follow, so their names
+// stand in for that declaration. A kept `validate~specs` keeps in turn the
+// `test` command whose reports it judges (narrowToTaskScopes).
 //
-// `publish` and `deploy`: a release session's members are decided by the
-// release-set coordinator, not by the diff, and a member that is also a
-// task-scoped verification project must still publish. The scope narrows what
-// the diff VERIFIES, never what the session RELEASES.
-//
-// `validate` and `validate-workspace`: their steps read the verification
-// reports the session recorded, not files. `validate~features` declares no
-// input and depends on no task, so no changed file ever names it and the scope
-// drops it — and `validate~specs`, which depends on it, with it. That retires
-// the spec gate for exactly the projects this selection newly makes
-// task-scoped, silently: `test~test` re-runs green and no criteria projection
-// is written for the finalizer to join. A kept `validate~specs` keeps in turn
-// the `test` command whose reports it judges (narrowToTaskScopes).
-//
-// Both entries are a command-level answer to the same general gap: a task that
-// declares no file input has said nothing about what it reads, and the index
-// reads that silence as "reads nothing". Fixing it there — silence means the
-// task runs whenever its project runs anything — is the durable repair; it also
-// drags a finalizer's successors into scopes that never asked for them, so it
-// needs its own change.
+// Every other command is kept or dropped by its declarations alone: see
+// narrowToTaskScopes.
 var neverNarrowedCommands = map[string]bool{
-	"publish": true, "deploy": true, "validate": true, "validate-workspace": true,
+	"validate": true, "validate-workspace": true,
 }
 
 // extensionScopeSeparator joins an extension project id to a task scope inside
@@ -50,8 +38,12 @@ const extensionScopeSeparator = "#"
 //   - its project is not task-scoped: it runs every task, as before;
 //   - the scope names its task — `<command>~<step>`, or the command alone for a
 //     job with no pipeline step;
-//   - its command is never narrowed (neverNarrowedCommands): a release
-//     command, or a `validate` whose steps read session state and not files;
+//   - its command's traits declare side effects (`sideEffects` is `registry`
+//     or `cloud`, from the manifest or the well-known verb's default): the
+//     release-set coordinator decides which members a session releases, and a
+//     scope narrows what the diff VERIFIES, never what the session RELEASES;
+//   - its command is `validate` or `validate-workspace`
+//     (neverNarrowedCommands);
 //   - it is a `test` job, and a kept job of the same project projects the
 //     spec criteria judged against that command's verification reports: the
 //     spec gate reads the reports a full plan gives it, and an unchanged test
@@ -83,7 +75,8 @@ func narrowToTaskScopes(ws *workspace.Workspace, planned []*jobs.ScheduledJob, s
 			continue
 		}
 		scope, scoped := scopes[job.Project.ID]
-		if !scoped || neverNarrowedCommands[modeljobs.JobCommandName(job)] || jobInScope(ws, job, scope) {
+		if !scoped || job.JobDef.Traits.SideEffects != extensionproto.SideEffectsNone ||
+			neverNarrowedCommands[modeljobs.JobCommandName(job)] || jobInScope(ws, job, scope) {
 			kept[job.Key()] = true
 			frontier = append(frontier, job)
 			if scoped && jobs.ProducesSpecCriteriaProjection(job) {
