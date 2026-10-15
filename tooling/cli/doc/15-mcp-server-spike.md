@@ -263,10 +263,13 @@ preserved, and an unparseable file is left untouched. A diverged `putnami`
 entry is kept by the implicit path and rewritten only by `putnami mcp install`,
 which is what repairs a hand-edited registration. The bare `putnami` command
 name resolves from PATH per machine, so the committed file is portable across
-the team.
+the team. A source workspace refuses the global binary, so when its root holds
+a `putnamiw` file the entry's command is `./putnamiw`. That choice reads only
+committed content (the lock and the wrapper), never the file mode, so macOS,
+Linux and Windows write the same entry for the same commit.
 
-This repository now commits its own root `.mcp.json`, giving the team the
-zero-setup path once they use a CLI release that carries the `mcp` subcommand.
+This repository commits its own root `.mcp.json`. It is a source workspace, so
+the entry runs `./putnamiw mcp`, which builds the CLI from the tree.
 
 ### Optional agent request provenance
 

@@ -373,9 +373,11 @@ yourself when you have repository rules to state, and Putnami only reads it
 
 `putnami init`, `putnami install` and `putnami upgrade` add the `putnami` entry
 to `.mcp.json` when it is missing, so a new agent session finds the server with
-no manual step. They merge into an existing file, preserve other servers and
-unknown keys, keep a diverged `putnami` entry as written, and leave a file they
-cannot parse untouched with a warning. `putnami context generate` and the
+no manual step. The entry runs `putnami mcp`, or `./putnamiw mcp` in a source
+workspace whose root holds a `putnamiw` file, since such a workspace refuses
+the global binary. They merge into an existing file, preserve other servers
+and unknown keys, keep a diverged `putnami` entry as written, and leave a file
+they cannot parse untouched with a warning. `putnami context generate` and the
 first-use install that runs before another command never write it.
 `putnami mcp install` is the explicit form: it also rewrites a diverged entry,
 and it refuses a file it cannot parse

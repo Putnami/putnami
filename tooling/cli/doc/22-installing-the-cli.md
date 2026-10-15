@@ -112,7 +112,8 @@ Host precedence and trust still apply. Claude local/project entries override
 the user entry, and a checked-in `.mcp.json` server requires the host's one-time
 project approval. `putnami init`, `putnami install` and `putnami upgrade` add
 the `putnami` entry to that file when it is missing, and `putnami mcp install`
-repairs a diverged one. Codex
+repairs a diverged one. In a source workspace whose root holds an executable
+`putnamiw`, that entry runs `./putnamiw mcp`, not the user launcher. Codex
 loads `.codex/config.toml` only after the project is trusted, and a project
 entry can replace the user launcher. Inspect a preserved
 override with `claude mcp get putnami` or `codex mcp get putnami`. A host session

@@ -1395,17 +1395,24 @@ Agent IDEs (Claude Code, Cursor, VS Code) auto-discover the server through a
 }
 ```
 
+A source workspace, whose `putnami.lock.json` records `cli.source: "workspace"`,
+refuses the global `putnami`. When its root holds a `putnamiw` file, the entry's
+`command` is `./putnamiw` instead, so the server runs the CLI built from the
+tree. Only committed content decides, never the file mode, so every platform
+writes the same entry.
+
 `putnami init`, `putnami install` and `putnami upgrade` add the `putnami` entry
 to this file when it is missing, so a new agent session finds the server with no
 manual step. The first-use install that runs before another command does not.
 The write is merge-aware and non-destructive: other servers and unknown keys in
 an existing file are preserved, a `putnami` entry that differs from the one
-above is kept as written, and a `.mcp.json` that fails to parse is left
-untouched with a warning.
+this workspace registers is kept as written, and a `.mcp.json` that fails to
+parse is left untouched with a warning.
 
 `putnami mcp install` is the explicit form of the same write. It is the one
 command that rewrites a diverged `putnami` entry, which is what repairs a
-hand-edited one, and it fails on a file it cannot parse. See
+hand-edited one or a source workspace's stale `putnami` entry, and it fails on
+a file it cannot parse. See
 [ADR 0040](adr/0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md).
 
 Agent request provenance is disabled by default. A harness can opt in and

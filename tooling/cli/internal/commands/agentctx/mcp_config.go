@@ -2,25 +2,27 @@ package agentctx
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/launch"
+	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
 
 // mcpConfigPath is the workspace-relative MCP registration file that agent
 // IDEs (Claude Code, Cursor, VS Code) auto-discover at the project root.
 const mcpConfigPath = ".mcp.json"
 
-// mcpServerEntry is the canonical registration for the putnami MCP server.
-// The bare binary name resolves from PATH on each machine, so the file is
-// portable across the team and safe to commit.
-func mcpServerEntry() map[string]any {
+// mcpServerEntry is the canonical registration for the putnami MCP server in
+// a workspace whose server starts with command (see mcpServerCommand).
+func mcpServerEntry(command string) map[string]any {
 	return map[string]any{
-		"command": "putnami",
+		"command": command,
 		"args":    []any{"mcp"},
 		// The default keeps compatible hosts on their launch cwd. Claude also
 		// injects CLAUDE_PROJECT_DIR directly into stdio servers; the launcher
@@ -30,6 +32,49 @@ func mcpServerEntry() map[string]any {
 		},
 	}
 }
+
+// mcpServerCommand names the command that starts the MCP server in wsRoot.
+// It is the bare binary name, which resolves from PATH on each machine, so the
+// file is portable across the team and safe to commit. A source workspace (the
+// lock records cli.source "workspace") refuses that global binary (ADR 0028),
+// so when its root holds a putnamiw file the server starts through
+// `./putnamiw`, which builds the CLI from the tree. Only committed content
+// decides: the file mode is not read, because Windows reports no executable
+// bit and the same commit would then have two canonical entries. The path is
+// relative to the host's launch directory, the workspace root, as in
+// .codex/config.toml. A lock that cannot be read is an error: it cannot rule a
+// source workspace out.
+func mcpServerCommand(wsRoot string) (string, error) {
+	lf, err := lockfile.ReadLockFile(wsRoot)
+	if err != nil {
+		return "", &mcpLockError{err: err}
+	}
+	if lf == nil {
+		return "putnami", nil
+	}
+	if cli, declared := lf.GetCLI(); !declared || !cli.IsWorkspaceSource() {
+		return "putnami", nil
+	}
+	info, err := os.Stat(filepath.Join(wsRoot, "putnamiw"))
+	if err != nil || !info.Mode().IsRegular() {
+		return "putnami", nil
+	}
+	return "./putnamiw", nil
+}
+
+// mcpLockError is a putnami.lock.json that cannot be read while choosing the
+// entry's command. It names the lock, not .mcp.json, as the file to fix.
+type mcpLockError struct{ err error }
+
+func (e *mcpLockError) Error() string {
+	msg := e.err.Error()
+	if !strings.Contains(msg, lockfile.LockFilename) {
+		msg = "read " + lockfile.LockFilename + ": " + msg
+	}
+	return msg + " (" + mcpConfigPath + " left untouched)"
+}
+
+func (e *mcpLockError) Unwrap() error { return e.err }
 
 // mcpConfigStatus reports what ensureMCPConfig did to .mcp.json.
 type mcpConfigStatus int
@@ -63,15 +108,21 @@ const (
 // putnami MCP server. The file is shared with user-managed content (other MCP
 // servers), so it is merged, never clobbered: unknown keys and other servers
 // are preserved. A file that cannot be parsed is left untouched and reported,
-// since rewriting it could destroy the user's other servers. policy decides
-// the one remaining case, a putnami entry that differs from the canonical one.
+// since rewriting it could destroy the user's other servers. The canonical
+// entry is the one this workspace starts its server with (mcpServerCommand).
+// policy decides the one remaining case, a putnami entry that differs from it.
 func ensureMCPConfig(wsRoot string, policy mcpEntryPolicy) (mcpConfigStatus, error) {
 	path := filepath.Join(wsRoot, mcpConfigPath)
+	command, err := mcpServerCommand(wsRoot)
+	if err != nil {
+		return mcpConfigUnchanged, err
+	}
+	entry := mcpServerEntry(command)
 
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		root := map[string]any{
-			"mcpServers": map[string]any{"putnami": mcpServerEntry()},
+			"mcpServers": map[string]any{"putnami": entry},
 		}
 		return mcpConfigCreated, writeMCPConfig(path, root)
 	}
@@ -102,7 +153,7 @@ func ensureMCPConfig(wsRoot string, policy mcpEntryPolicy) (mcpConfigStatus, err
 		if err != nil {
 			return mcpConfigUnchanged, fmt.Errorf("read the existing %s putnami entry: %w (file left untouched)", mcpConfigPath, err)
 		}
-		if encoded == canonicalMCPServerEntry() {
+		if encoded == canonicalMCPServerEntry(command) {
 			return mcpConfigUnchanged, nil
 		}
 		if policy == mcpKeepDivergedEntry {
@@ -110,7 +161,7 @@ func ensureMCPConfig(wsRoot string, policy mcpEntryPolicy) (mcpConfigStatus, err
 		}
 	}
 
-	servers["putnami"] = mcpServerEntry()
+	servers["putnami"] = entry
 	if exists {
 		return mcpConfigUpdated, writeMCPConfig(path, root)
 	}
@@ -129,8 +180,8 @@ func canonicalJSON(value any) (string, error) {
 	return string(encoded), nil
 }
 
-func canonicalMCPServerEntry() string {
-	encoded, err := canonicalJSON(mcpServerEntry())
+func canonicalMCPServerEntry(command string) string {
+	encoded, err := canonicalJSON(mcpServerEntry(command))
 	if err != nil {
 		// mcpServerEntry is a literal of JSON-representable types.
 		panic("agentctx: canonical MCP entry is not encodable: " + err.Error())
@@ -177,7 +228,8 @@ func MCPInstall(wsRoot string) error {
 //
 //   - a putnami entry that differs from the canonical one is kept as written;
 //   - a file that cannot be read or parsed is left untouched and reported on
-//     warn, and the calling command carries on.
+//     warn, naming the file to fix (.mcp.json, or putnami.lock.json when the
+//     lock is what failed), and the calling command carries on.
 //
 // It reports whether .mcp.json was created or gained the entry. A nil warn
 // discards the warning.
@@ -185,7 +237,12 @@ func RegisterMCPServer(wsRoot string, warn io.Writer) bool {
 	status, err := ensureMCPConfig(wsRoot, mcpKeepDivergedEntry)
 	if err != nil {
 		if warn != nil {
-			iox.Fprintf(warn, "putnami: warning: the putnami MCP server is not registered: %v. Fix the file, then run `putnami mcp install`.\n", err)
+			file := mcpConfigPath
+			var lockErr *mcpLockError
+			if errors.As(err, &lockErr) {
+				file = lockfile.LockFilename
+			}
+			iox.Fprintf(warn, "putnami: warning: the putnami MCP server is not registered: %v. Fix %s, then run `putnami mcp install`.\n", err, file)
 		}
 		return false
 	}

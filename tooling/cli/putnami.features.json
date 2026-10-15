@@ -357,7 +357,8 @@
               "a-diverged-entry-is-kept-byte-for-byte",
               "an-unparseable-file-is-a-warning-and-stays-untouched",
               "install-registers-and-the-first-use-bootstrap-does-not",
-              "init-registers-the-mcp-server"
+              "init-registers-the-mcp-server",
+              "a-source-workspace-registers-its-putnamiw"
             ]
           }
         },
