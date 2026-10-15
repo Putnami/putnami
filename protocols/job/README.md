@@ -348,9 +348,12 @@ them:
   Absence is read from the **containing** member. Inside `workspaceProjects`,
   whose producer resolves every classification, an entry without `type` comes
   from a producer that predates the member, and a consumer that acts on
-  workloads declines rather than reading it as `"application"`.
+  workloads declines rather than reading it as `"application"`. The job's own
+  `project.type` keeps `""` for an unclassified project; the two agree once
+  the default is applied.
 
-All seven are omitempty, so a producer that has nothing to say emits none.
+All seven are omitempty, so a producer that has nothing to say emits none,
+except that a `workspaceProjects` entry always carries `type`.
 
 ## Environment variable mirror
 
