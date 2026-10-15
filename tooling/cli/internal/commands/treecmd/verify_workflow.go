@@ -309,8 +309,9 @@ func (r *verifyRun) workflowVerdicts(record *features.SpecVerificationRecord, se
 		// The collector reclassifies, in one decision per group, every
 		// requirement features.Unobservable admits once an attester could not be
 		// consulted, and warns. Which attester was unreachable is cache state the
-		// record does not carry, so the replay checks the rest: the warning, and
-		// the state on exactly the rows the pure evaluator finds unobservable.
+		// record does not carry, so the replay checks what it can: the state on
+		// exactly the rows the pure evaluator finds unobservable, and, as a
+		// consistency check only, the warning the collector emits with them.
 		reclassified := slices.ContainsFunc(group.Requirements, func(verdict features.SpecRequirementVerdict) bool {
 			return verdict.State == features.RequirementUnobserved
 		})

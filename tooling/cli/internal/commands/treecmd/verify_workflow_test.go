@@ -460,19 +460,32 @@ func TestWorkflowReplaysUnobservedReclassification(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name, reason string
-		change       func(f *verifyFixture, group fxObj)
+		change       func(f *verifyFixture, w, group fxObj)
 	}{
-		{"every unobservable row reclassified", "", func(*verifyFixture, fxObj) {}},
-		{"no native warning", "without the native warning", func(_ *verifyFixture, group fxObj) {
+		{"every unobservable row reclassified", "", func(*verifyFixture, fxObj, fxObj) {}},
+		// Every attester answered: the collector warns with the same code and
+		// leaves the rows missing, which the replay also accepts.
+		{"exhausted scope left missing", "", func(_ *verifyFixture, _, group fxObj) {
+			fxObjAt(group, "requirements", 1)["state"] = "missing"
+			fxObjAt(group, "requirements", 2)["state"] = "missing"
+		}},
+		{"no native warning", "without the native warning", func(_ *verifyFixture, _, group fxObj) {
 			group["diagnostics"] = fxArr{}
 		}},
-		{"one unobservable row left missing", "does not match native producer observations", func(_ *verifyFixture, group fxObj) {
+		{"one unobservable row left missing", "does not match native producer observations", func(_ *verifyFixture, _, group fxObj) {
 			fxObjAt(group, "requirements", 1)["state"] = "missing"
 		}},
-		{"verified row reclassified", "does not match native producer observations", func(_ *verifyFixture, group fxObj) {
+		{"verified row reclassified", "does not match native producer observations", func(_ *verifyFixture, _, group fxObj) {
 			fxObjAt(group, "requirements", 0)["state"] = "unobserved"
 		}},
-		{"skipped check reclassified", "does not match native producer observations", func(f *verifyFixture, group fxObj) {
+		{"current unobserved requirement", "current unit lacks passing native checks", func(_ *verifyFixture, w, _ fxObj) {
+			row := fxObjAt(w, "requirements", 2)
+			row["disposition"], row["unit"] = "current", "first"
+			delete(row, "reason")
+			delete(row, "authority")
+			fxAppend(fxObjAt(w, "units", 0), "requirements", workflowFeature+"#large-data")
+		}},
+		{"skipped check reclassified", "does not match native producer observations", func(f *verifyFixture, _, group fxObj) {
 			report := f.readJSON(".context/verification-report.json")
 			report["observations"] = append(fxArrAt(report, "observations"), fxObj{
 				"feature": workflowFeature, "requirement": "large-data", "check": "large-data-check", "status": "skipped",
@@ -502,7 +515,7 @@ func TestWorkflowReplaysUnobservedReclassification(t *testing.T) {
 			}
 			group["diagnostics"] = fxArr{fxObj{"severity": "warning", "code": "features.unobserved_requirement",
 				"message": "2 requirement(s) have checks that NO observation source reported.", "field": ".context/specs/workflow.json"}}
-			tc.change(f, group)
+			tc.change(f, w, group)
 			counts := fxObj{"specRequirements": 3, "executable": 3, "verified": 0, "unmapped": 0,
 				"unexecutable": 0, "missing": 0, "stale": 0, "contradicted": 0}
 			blocked := false
