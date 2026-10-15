@@ -588,6 +588,21 @@ var catalog = []Command{
 		Workspace: userScopeWorkspace(),
 	},
 	{
+		Path:        "extensions prepare",
+		Kind:        KindStructured,
+		Category:    "Extensions & Templates",
+		Summary:     "Prepare the provider runtimes of a source workspace",
+		Description: "Prepare into the artifact store the runtime of each path extension that serves a provider in a workspace that builds its own CLI. A hosted run of the same tree starts these runtimes and prepares none itself. ./putnamiw --print-engine runs this command after it builds the CLI",
+		Usage:       "putnami extensions prepare [--output <format>]",
+		Examples: []string{
+			"putnami extensions prepare",
+			"putnami extensions prepare --output=jsonl",
+		},
+		Related:          []string{"extensions list", "extensions install"},
+		StructuredOutput: true,
+		Workspace:        requiredWorkspace(),
+	},
+	{
 		Path:       "templates",
 		Kind:       KindStructured,
 		Summary:    "Manage templates",

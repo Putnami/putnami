@@ -290,6 +290,11 @@ func cmdExtensions(env *CommandEnv) error {
 			return err
 		}
 		return extensions.ExtensionsRemove(env.WsRoot, env.Cfg, env.Args)
+	case "prepare":
+		if err := env.requireWorkspace(); err != nil {
+			return err
+		}
+		return extensions.ExtensionsPrepare(env.Ctx, env.WsRoot, env.Cfg, env.OutputFormat)
 	default:
 		return usageErrorf("unknown subcommand: extensions %s", env.Sub)
 	}

@@ -162,7 +162,10 @@ func workspaceRootOf(ws *workspace.Workspace) string {
 
 // synchronizeExtensionRuntimesResolving is SynchronizeExtensionRuntimes whose
 // prepare toolchains resolve as the provisioning command's do when
-// provisioning is set (see toolchain.ProvisioningOnlyRun).
+// provisioning is set (see toolchain.ProvisioningOnlyRun). An extension this
+// run starts from the source build (extension.FromSourceBuild) resolves no
+// toolchain and prepares nothing: its runtime loads from the store
+// (loadSourceBuiltRuntimes).
 func synchronizeExtensionRuntimesResolving(
 	ctx context.Context,
 	workspaceRoot string,
@@ -171,11 +174,150 @@ func synchronizeExtensionRuntimesResolving(
 	provisioning bool,
 ) error {
 	artifacts := artifactstore.New(store.ResolveArtifactStoreRoot(workspaceRoot))
-	if err := toolchain.ResolveRuntimeToolchainsForPreparation(ctx, workspaceRoot, extensions, os.Environ(), provisioning); err != nil {
+	var built []*extension.ExtensionDescription
+	prepared := make([]*extension.ExtensionDescription, 0, len(extensions))
+	for _, ext := range extensions {
+		if extension.FromSourceBuild(workspaceRoot, ext) {
+			built = append(built, ext)
+			continue
+		}
+		prepared = append(prepared, ext)
+	}
+	if err := loadSourceBuiltRuntimes(ctx, workspaceRoot, built, report, artifacts); err != nil {
+		return err
+	}
+	if err := toolchain.ResolveRuntimeToolchainsForPreparation(ctx, workspaceRoot, prepared, os.Environ(), provisioning); err != nil {
 		return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
 			"resolve extension runtime toolchains: %v", err)
 	}
-	return synchronizeExtensionRuntimesWithEnv(ctx, extensions, report, artifacts, os.Environ())
+	return synchronizeExtensionRuntimesWithEnv(ctx, prepared, report, artifacts, os.Environ())
+}
+
+// loadSourceBuiltRuntimes loads the runtime of each extension of built, which
+// this run starts from the source build (extension.FromSourceBuild), and
+// records the time it took in report.
+func loadSourceBuiltRuntimes(
+	ctx context.Context,
+	workspaceRoot string,
+	built []*extension.ExtensionDescription,
+	report *PreparationReport,
+	artifacts *artifactstore.Store,
+) error {
+	if len(built) == 0 {
+		return nil
+	}
+	started := time.Now()
+	spans := &preparationSpans{}
+	defer func() {
+		report.merge(spans)
+		report.observeStage(time.Since(started), 1)
+	}()
+	for _, ext := range built {
+		if err := loadSourceBuiltRuntime(ctx, workspaceRoot, ext, spans, artifacts); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// loadSourceBuiltRuntime sets the runtime of ext, which this run starts from
+// the source build (extension.FromSourceBuild), to the one artifacts holds
+// under the digest of its tested inputs (sourceBuiltRuntimeDigest). It runs no
+// prepare command and no toolchain probe, and records no repository code: the
+// one process it starts is the runtime-info handshake of that runtime. A
+// runtime the store lacks is an error, because this run never prepares one.
+func loadSourceBuiltRuntime(
+	ctx context.Context,
+	workspaceRoot string,
+	ext *extension.ExtensionDescription,
+	spans *preparationSpans,
+	artifacts *artifactstore.Store,
+) error {
+	resolving := time.Now()
+	digest, err := sourceBuiltRuntimeDigest(workspaceRoot, ext)
+	spans.since(PreparationResolution, resolving)
+	if err != nil {
+		return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
+			"digest extension %q runtime inputs: %v", ext.Name, err)
+	}
+	if !artifacts.Has(digest) {
+		return runtimeFailure(extensionproto.FailureRuntimeExecutableMissing,
+			"extension %q has no runtime for these sources in the artifact store %s: a hosted run of a source workspace starts the runtime that ./putnamiw --print-engine prepared before the run, and prepares none itself",
+			ext.Name, artifacts.Root())
+	}
+	artifacts.Touch(digest)
+	executable := runtimeExecutablePath(filepath.Join(artifacts.Path(digest), "runtime"), ext.Runtime.Executable, runtime.GOOS)
+	verifying := time.Now()
+	if err := validateRuntimeExecutable(executable); err != nil {
+		spans.since(PreparationVerification, verifying)
+		return runtimeFailure(extensionproto.FailureRuntimeExecutableMissing,
+			"extension %q runtime prepared by the source build is unavailable: %v", ext.Name, err)
+	}
+	spans.since(PreparationVerification, verifying)
+	if err := validateRuntimeHandshake(ctx, executable, ext, spans); err != nil {
+		return err
+	}
+	ext.RuntimeExecutable = executable
+	ext.RuntimeDigest = digest
+	return nil
+}
+
+// sourceBuiltRuntimeDigest is the runtime input digest under which `putnami
+// extensions prepare` admitted the runtime of ext. The identity of its prepare
+// toolchains comes from the workspace lock
+// (toolchain.LockedRuntimeToolchainIdentityForRefs), not from a probe.
+func sourceBuiltRuntimeDigest(workspaceRoot string, ext *extension.ExtensionDescription) (string, error) {
+	identity, err := toolchain.LockedRuntimeToolchainIdentityForRefs(workspaceRoot, ext, ext.Runtime.Prepare.Toolchains)
+	if err != nil {
+		return "", err
+	}
+	return cachekey.ExtensionRuntimeDigestWithToolchains(ext, identity)
+}
+
+// runtimeInputDigest is the runtime input digest of ext, whose runtime
+// runtime.prepare builds from local source, as synchronization computes it
+// in this run.
+func runtimeInputDigest(workspaceRoot string, ext *extension.ExtensionDescription) (string, error) {
+	if extension.FromSourceBuild(workspaceRoot, ext) {
+		return sourceBuiltRuntimeDigest(workspaceRoot, ext)
+	}
+	return cachekey.ExtensionRuntimeDigest(ext)
+}
+
+// PrepareSourceBuiltRuntimes prepares into the artifact store the runtime of
+// each extension of built, whose runtime the source build prepares
+// (extension.PreparedBySourceBuild), and fails unless a hosted run of the same
+// tree finds it there. Its provider commands must probe no runtime toolchain:
+// a hosted run records repository code before such a probe
+// (toolchain.CommandRuntimeToolchainRefs), so the provider would receive no
+// credential. The runtime must sit under the digest the hosted run computes
+// from the workspace lock (sourceBuiltRuntimeDigest), not only under the one
+// this run's probes gave.
+func PrepareSourceBuiltRuntimes(ctx context.Context, ws *workspace.Workspace, built []*extension.ExtensionDescription) error {
+	for _, ext := range built {
+		for _, command := range extension.ProviderCommands(ext) {
+			active := toolchain.CommandDependencyClosure([]*extension.ExtensionDescription{ext}, []string{command})
+			if refs := toolchain.CommandRuntimeToolchainRefs(ext, active); len(refs) > 0 {
+				return fmt.Errorf("extension %q: provider command %q resolves the runtime toolchains %s, and a hosted run probes no toolchain before it hands the run credential to a provider",
+					ext.Name, command, strings.Join(refs, ", "))
+			}
+		}
+	}
+	if err := SynchronizeExtensionRuntimes(ctx, ws, built, nil); err != nil {
+		return err
+	}
+	root := workspaceRootOf(ws)
+	for _, ext := range built {
+		digest, err := sourceBuiltRuntimeDigest(root, ext)
+		if err != nil {
+			return fmt.Errorf("extension %q: digest the runtime a hosted run starts: %w", ext.Name, err)
+		}
+		if digest != ext.RuntimeDigest {
+			return fmt.Errorf("extension %q: the runtime prepared here has the digest %s, and a hosted run looks for %s: a prepare toolchain resolved to another identity than the workspace lock records",
+				ext.Name, ext.RuntimeDigest, digest)
+		}
+	}
+	return nil
 }
 
 // synchronizeExtensionRuntimes carries the artifact store as an explicit stage

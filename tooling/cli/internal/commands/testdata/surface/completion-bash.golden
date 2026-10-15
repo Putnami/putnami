@@ -11,7 +11,7 @@ _putnami_subcommands_for() {
         'contributor') printf '%s\n' 'language machine-load' ;;
         'deps') printf '%s\n' 'add install remove' ;;
         'dev') printf '%s\n' 'extension template' ;;
-        'extensions') printf '%s\n' 'install list remove update' ;;
+        'extensions') printf '%s\n' 'install list prepare remove update' ;;
         'infra') printf '%s\n' 'plan' ;;
         'mcp') printf '%s\n' 'install' ;;
         'migrate') printf '%s\n' 'vnext' ;;
@@ -58,6 +58,7 @@ _putnami_path_known() {
         'extensions') return 0 ;;
         'extensions install') return 0 ;;
         'extensions list') return 0 ;;
+        'extensions prepare') return 0 ;;
         'extensions remove') return 0 ;;
         'extensions update') return 0 ;;
         'help') return 0 ;;

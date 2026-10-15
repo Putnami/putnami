@@ -223,6 +223,9 @@ Update extensions.
 .B extensions remove
 Remove an extension.
 .TP
+.B extensions prepare
+Prepare the provider runtimes of a source workspace.
+.TP
 .B templates install
 Install templates from config.
 .TP
@@ -585,6 +588,12 @@ putnami extensions remove <name> [--user]
 .TP
 .B --user
 Remove the extension from the user scope (~/.putnami/user) instead of the workspace.
+.SS extensions prepare
+Prepare into the artifact store the runtime of each path extension that serves a provider in a workspace that builds its own CLI. A hosted run of the same tree starts these runtimes and prepares none itself. ./putnamiw --print-engine runs this command after it builds the CLI.
+.PP
+.B Usage:
+.br
+putnami extensions prepare [--output <format>]
 .SS templates install
 Install templates from workspace configuration.
 .PP

@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/layout"
+	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -325,6 +326,95 @@ func TestHostedDiscoveryRemovesTheProviderCapabilitiesOfAPathExtension(t *testin
 	}
 	if len(local.RemovedCapabilities) != 0 {
 		t.Errorf("a local run removed %+v, want nothing", local.RemovedCapabilities)
+	}
+}
+
+// In a source workspace, whose lock records the workspace as the source of its
+// CLI, a hosted run keeps the provider capabilities of a path extension whose
+// runtime.prepare builds its runtime: `./putnamiw --print-engine` prepared it
+// from the tested tree before the run (PreparedBySourceBuild). It still removes
+// them from a path extension that declares no runtime.prepare, and from every
+// path extension of a workspace whose lock pins a published CLI or that has no
+// lock.
+func TestHostedDiscoveryKeepsTheProvidersOfASourceBuiltPathExtension(t *testing.T) {
+	spectest.Proves(t, "cli/credential-custody", "source-built-providers", "a-source-workspace-path-extension-keeps-its-providers-on-a-hosted-run")
+	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
+	providers := []string{"credential-provider", "cache-provider", "runner-provider", "session-reporter", "log-reporter", "cloud-release-set"}
+	manifest := func(name, runtime string) string {
+		commands := []string{`"build": {"run": [{"id": "b", "task": "t"}]}`}
+		for _, command := range providers {
+			commands = append(commands, fmt.Sprintf(`%q: {"visibility": "internal", "run": [{"id": "p", "task": "t"}]}`, command))
+		}
+		return fmt.Sprintf(`{
+	"name": %q,
+	"version": "1.0.0",
+	"cliContract": 4,
+	%s
+	"commands": {%s},
+	"tasks": {"t": {"kind": "command", "command": "echo"}}
+}`, name, runtime, strings.Join(commands, ", "))
+	}
+	ws := t.TempDir()
+	writeExtensionManifest(t, filepath.Join(ws, "tools", "built"), manifest("@acme/built",
+		`"runtime": {"executable": "compiled/built", "prepare": {"command": "{extensionRoot}/bin/prepare", "args": ["--output", "{runtimeOutput}"], "inputs": ["cmd/**"]}},`))
+	writeExtensionManifest(t, filepath.Join(ws, "tools", "plain"), manifest("@acme/plain", ""))
+	projects := []string{"tools/built", "tools/plain"}
+
+	restore := runcredential.SetForTest("run-bearer")
+	t.Cleanup(restore)
+	for _, c := range []struct {
+		name string
+		cli  *lockfile.LockEntry
+		kept []string
+	}{
+		{name: "a source workspace", cli: &lockfile.LockEntry{Source: lockfile.SourceWorkspace}, kept: []string{"@acme/built"}},
+		{name: "a published CLI", cli: &lockfile.LockEntry{Version: "1.0.0"}},
+		{name: "no lock"},
+	} {
+		if err := os.Remove(filepath.Join(ws, lockfile.LockFilename)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			t.Fatal(err)
+		}
+		if c.cli != nil {
+			locked := lockfile.NewLockFile()
+			locked.SetCLI(*c.cli)
+			if err := lockfile.WriteLockFile(ws, locked); err != nil {
+				t.Fatal(err)
+			}
+		}
+		hosted, err := DiscoverExtensionsDetailed(ws, &wsproto.Config{}, projects)
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		for _, name := range []string{"@acme/built", "@acme/plain"} {
+			ext := FindExtensionByName(hosted.Extensions, name)
+			if ext == nil {
+				t.Fatalf("%s: a hosted run discovered %v, want %s", c.name, extensionNames(hosted.Extensions), name)
+			}
+			keeps := slices.Contains(c.kept, name)
+			if PreparedBySourceBuild(ws, ext) != keeps {
+				t.Errorf("%s: PreparedBySourceBuild(%s) = %v, want %v", c.name, name, !keeps, keeps)
+			}
+			for _, command := range providers {
+				if kept := ext.Jobs[command] != nil; kept != keeps {
+					t.Errorf("%s: a hosted run kept the %s capability of %s = %v, want %v", c.name, command, name, kept, keeps)
+				}
+			}
+			if _, ok := ext.Commands["build"]; !ok || ext.Jobs["build"] == nil {
+				t.Errorf("%s: a hosted run removed the build command of %s", c.name, name)
+			}
+		}
+		removed := map[string]int{}
+		for _, removal := range hosted.RemovedCapabilities {
+			removed[removal.Extension]++
+		}
+		wantBuilt := len(providers)
+		if slices.Contains(c.kept, "@acme/built") {
+			wantBuilt = 0
+		}
+		if removed["@acme/plain"] != len(providers) || removed["@acme/built"] != wantBuilt {
+			t.Errorf("%s: a hosted run removed %+v, want the %d providers of @acme/plain and %d of @acme/built",
+				c.name, hosted.RemovedCapabilities, len(providers), wantBuilt)
+		}
 	}
 }
 

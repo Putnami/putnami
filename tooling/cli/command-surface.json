@@ -456,6 +456,11 @@
       "positionals": []
     },
     {
+      "path": "extensions prepare",
+      "flags": [],
+      "positionals": []
+    },
+    {
       "path": "extensions remove",
       "flags": [
         {

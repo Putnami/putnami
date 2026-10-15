@@ -32,6 +32,7 @@ Extensions & Templates:
   extensions list              List extensions
   extensions update            Update extensions
   extensions remove            Remove an extension
+  extensions prepare           Prepare the provider runtimes of a source workspace
   templates install            Install templates from config
   templates list               List installed templates
   templates update             Update templates

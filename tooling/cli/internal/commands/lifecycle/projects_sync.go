@@ -455,7 +455,7 @@ func discoverWorkspaceAdapters(ctx context.Context, wsRoot string, cfg *wsproto.
 					Extension:         ext.Name,
 					Dir:               wsRoot,
 					Resolve:           syncRuntimeResolver(ctx, wsRoot, ext),
-					FromArtifactStore: extension.InArtifactStore(wsRoot, ext),
+					PreparedBeforeRun: !extension.StartsRepositoryCode(wsRoot, ext),
 				},
 			},
 		})

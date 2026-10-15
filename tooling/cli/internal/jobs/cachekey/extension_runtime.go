@@ -45,6 +45,17 @@ func ExtensionRuntimeDigest(ext *extension.ExtensionDescription) (string, error)
 	if ext == nil || ext.Runtime == nil || ext.Runtime.Prepare == nil {
 		return "", errors.New("runtime preparation is not declared")
 	}
+	return ExtensionRuntimeDigestWithToolchains(ext, toolchain.RuntimeToolchainIdentityForRefs(ext, ext.Runtime.Prepare.Toolchains))
+}
+
+// ExtensionRuntimeDigestWithToolchains is ExtensionRuntimeDigest with the
+// identity of the prepare toolchains given, rather than read from the
+// resolutions recorded on ext. A hosted run of a source workspace computes it
+// from the workspace lock alone (toolchain.LockedRuntimeToolchainIdentityForRefs).
+func ExtensionRuntimeDigestWithToolchains(ext *extension.ExtensionDescription, toolchains string) (string, error) {
+	if ext == nil || ext.Runtime == nil || ext.Runtime.Prepare == nil {
+		return "", errors.New("runtime preparation is not declared")
+	}
 	// The root is walked, so it must be the directory itself: a directory
 	// link at ext.Path, a junction on Windows included, is followed first.
 	root, err := dirlink.Resolve(ext.Path)
@@ -61,7 +72,7 @@ func ExtensionRuntimeDigest(ext *extension.ExtensionDescription) (string, error)
 	framing.HashField(h, "version", []byte(ext.Version))
 	framing.HashField(h, "platform", []byte(runtime.GOOS+"/"+runtime.GOARCH))
 	framing.HashField(h, "runtime-abi", []byte(fmt.Sprintf("%d", runtimeproto.RuntimeABIVersion)))
-	framing.HashField(h, "toolchains", []byte(toolchain.RuntimeToolchainIdentityForRefs(ext, ext.Runtime.Prepare.Toolchains)))
+	framing.HashField(h, "toolchains", []byte(toolchains))
 	declaration, err := json.Marshal(ext.Runtime)
 	if err != nil {
 		return "", fmt.Errorf("marshal runtime declaration: %w", err)

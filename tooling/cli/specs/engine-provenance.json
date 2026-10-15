@@ -8,7 +8,7 @@
     "The committed declaration survives every ordinary read, refresh, and write unchanged, so no unrelated command dirties it",
     "The from-source build is reused whenever the sources have not changed, and rebuilt whenever they have, without anyone remembering a flag",
     "Concurrent work in one checkout is safe: running the wrapper never invalidates an engine another run is already executing, nor the children that engine spawns",
-    "A launcher can build the engine without running it, then start that exact binary itself as the workspace's own engine"
+    "A launcher can build the engine, and prepare the provider runtimes of the workspace's own extensions with it, without running a workspace command, then start that exact binary itself as the workspace's own engine"
   ],
   "nonGoals": [
     "Changing how a consumer workspace resolves, verifies, or escapes a published CLI pin",
@@ -30,7 +30,11 @@
     },
     {
       "id": "build-only-engine",
-      "text": "`./putnamiw --print-engine` builds or reuses the content-keyed store blob exactly as a normal run does, starts nothing, writes nothing under .putnami/bin, and prints one JSON line: the absolute blob path, the source key, and the absolute workspace root. That blob, started with PUTNAMI_FROM_SOURCE, PUTNAMI_FROM_SOURCE_KEY and the same PUTNAMI_HOME, is admitted as the workspace's own engine. Every failure or refusal exits non-zero with nothing on stdout."
+      "text": "`./putnamiw --print-engine` builds or reuses the content-keyed store blob like a normal run, writes nothing under .putnami/bin, runs only `putnami extensions prepare` with it, and prints one JSON line on stdout: the absolute blob path, the source key and the absolute workspace root. Started with PUTNAMI_FROM_SOURCE, PUTNAMI_FROM_SOURCE_KEY and the same PUTNAMI_HOME, that blob is admitted as the workspace's own engine. Any failure or refusal, a failed prepare included, exits non-zero with nothing on stdout."
+    },
+    {
+      "id": "print-engine-installs-the-locked-go",
+      "text": "Before `./putnamiw --print-engine` runs `putnami extensions prepare`, on a run that builds the blob and on one that reuses it, it installs the Go release the workspace lock pins under the Putnami home, unless the home holds it already or the go on PATH runs as it with GOROOT unset and GOTOOLCHAIN=local. It installs that release only at the SHA-256 the lock records or go.dev publishes, and a Go it cannot install stops the mode before the command starts, with nothing on stdout."
     },
     {
       "id": "build-toolchain-stays-in-the-build",

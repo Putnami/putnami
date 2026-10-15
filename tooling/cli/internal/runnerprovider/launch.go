@@ -38,8 +38,9 @@ func LaunchSpecFor(ctx context.Context, wsRoot string, extensions []*extension.E
 		return LaunchSpec{}, fmt.Errorf("prepare runner provider %s: %w", provider.ExtensionName, err)
 	}
 	// The provider runs the extension's code. An extension installed from the
-	// artifact store is registry code; any other one is repository code.
-	if !internalextension.InArtifactStore(wsRoot, ext) {
+	// artifact store is registry code, and a runtime the source build prepared
+	// is the engine's own build; any other one is repository code.
+	if internalextension.StartsRepositoryCode(wsRoot, ext) {
 		runcredential.MarkRepositoryCodeStarted("runner provider " + ext.Name)
 	}
 	return LaunchSpec(launch), nil

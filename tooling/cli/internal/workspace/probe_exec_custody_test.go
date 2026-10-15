@@ -8,23 +8,23 @@ import (
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
-// A workspace probe starts its extension's executable. When the extension is
-// not installed from the artifact store, that executable is repository code:
-// a hosted run records it before the spawn, and hands its credential to no
-// process started after. A store-installed provider is registry code.
+// A workspace probe starts its extension's executable. Unless the runtime was
+// prepared before the run, from the artifact store or by the source build,
+// that executable is repository code: a hosted run records it before the
+// spawn, and hands its credential to no process started after.
 func TestExecProbeProvider_RecordsRepositoryCodeOutsideTheStore(t *testing.T) {
 	for name, c := range map[string]struct {
-		fromStore bool
-		records   bool
+		preparedBeforeRun bool
+		records           bool
 	}{
-		"outside the store":        {records: true},
-		"installed from the store": {fromStore: true},
+		"repository code":         {records: true},
+		"prepared before the run": {preparedBeforeRun: true},
 	} {
 		restore := runcredential.SetForTest("run-bearer")
 		provider := &ExecProbeProvider{
 			Extension:         "@acme/probe",
 			Executable:        filepath.Join(t.TempDir(), "does-not-exist"),
-			FromArtifactStore: c.fromStore,
+			PreparedBeforeRun: c.preparedBeforeRun,
 		}
 		// The executable is missing, so the probe fails at the spawn; the record
 		// comes first.

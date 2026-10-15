@@ -2340,7 +2340,20 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "print-engine-names-the-keyed-blob-and-runs-nothing"
+              "print-engine-names-the-keyed-blob-and-runs-only-extensions-prepare"
+            ]
+          }
+        },
+        {
+          "id": "print-engine-installs-the-locked-go",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "print-engine-installs-the-locked-go-before-extensions-prepare"
             ]
           }
         },
@@ -3018,6 +3031,21 @@
               "hosted-run-ignores-the-workspace-registry",
               "hosted-run-probes-no-workspace-toolchain",
               "no-credential-after-repository-code"
+            ]
+          }
+        },
+        {
+          "id": "source-built-providers",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-source-workspace-path-extension-keeps-its-providers-on-a-hosted-run",
+              "extensions-prepare-prepares-the-source-built-runtimes",
+              "a-hosted-run-loads-a-source-built-runtime-from-the-store-without-preparing-it",
+              "a-source-built-runtime-the-store-lacks-fails-the-launch",
+              "a-hosted-source-workspace-run-authenticates-the-prepared-provider-before-repository-code"
             ]
           }
         },

@@ -13,6 +13,7 @@ import (
 	distribution "go.putnami.dev/protocol/distribution"
 	registryproto "go.putnami.dev/protocol/registry"
 	runner "go.putnami.dev/protocol/runner"
+	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -38,7 +39,8 @@ var errPinnedBuildMissing = errors.New("a hosted run (--credential-fd) runs the 
 
 // errPathExtensionProvider is the reason a hosted run removes a provider
 // capability from a path extension.
-var errPathExtensionProvider = errors.New("a hosted run takes every provider from an extension installed from the artifact store")
+var errPathExtensionProvider = errors.New("a hosted run takes every provider from an extension installed from the artifact store, " +
+	"or, in a source workspace, from a path extension whose runtime.prepare builds the runtime that ./putnamiw --print-engine prepares")
 
 // hostedProviderCommands are the reserved commands through which an extension
 // serves a provider capability: the CLI starts the provider for the whole run
@@ -108,6 +110,66 @@ func within(root, path string) bool {
 // extensions (pathExtensionRefusal).
 func WorkspacePathExtension(workspaceRoot string, ext *ExtensionDescription) bool {
 	return pathExtensionRefusal(workspaceRoot, ext) == nil
+}
+
+// PreparedBySourceBuild reports whether the source build of workspaceRoot
+// prepares the runtime of ext: the workspace lock records the workspace as the
+// source of its CLI (lockfile.SourceWorkspace), ext is one of the workspace's
+// own path extensions (WorkspacePathExtension), runtime.prepare builds its
+// runtime, and it declares a provider command (hostedProviderCommands).
+// `putnami extensions prepare`, which `./putnamiw --print-engine` runs after
+// it builds the engine, prepares exactly these runtimes.
+func PreparedBySourceBuild(workspaceRoot string, ext *ExtensionDescription) bool {
+	if ext == nil || ext.Runtime == nil || ext.Runtime.Prepare == nil || len(ProviderCommands(ext)) == 0 {
+		return false
+	}
+	return sourceWorkspace(workspaceRoot) && WorkspacePathExtension(workspaceRoot, ext)
+}
+
+// FromSourceBuild reports whether this run holds the run credential and
+// starts the runtime of ext from the source build (PreparedBySourceBuild). Such
+// a run loads that runtime from the artifact store by the digest of the tested
+// inputs, and never prepares it: the runner's source build is the one
+// repository step before the gate, and in a source workspace the gate's engine
+// is repository code that the same build produced.
+func FromSourceBuild(workspaceRoot string, ext *ExtensionDescription) bool {
+	return runcredential.Hosted() && PreparedBySourceBuild(workspaceRoot, ext)
+}
+
+// StartsRepositoryCode reports whether starting the runtime of ext starts
+// repository code: ext is neither installed from the artifact store
+// (InArtifactStore) nor started from the source build (FromSourceBuild).
+func StartsRepositoryCode(workspaceRoot string, ext *ExtensionDescription) bool {
+	return !InArtifactStore(workspaceRoot, ext) && !FromSourceBuild(workspaceRoot, ext)
+}
+
+// sourceWorkspace reports whether the workspace lock of workspaceRoot records
+// the workspace as the source of its CLI. A lock that cannot be read records
+// nothing.
+func sourceWorkspace(workspaceRoot string) bool {
+	if workspaceRoot == "" {
+		return false
+	}
+	locked, err := lockfile.ReadLockFile(workspaceRoot)
+	return err == nil && locked != nil && locked.CLI != nil && locked.CLI.IsWorkspaceSource()
+}
+
+// ProviderCommands returns the provider commands (hostedProviderCommands) that
+// ext declares, as a command or as a job, in the order of
+// hostedProviderCommands.
+func ProviderCommands(ext *ExtensionDescription) []string {
+	if ext == nil {
+		return nil
+	}
+	var commands []string
+	for _, command := range hostedProviderCommands {
+		_, declared := ext.Commands[command]
+		_, hasJob := ext.Jobs[command]
+		if declared || hasJob {
+			commands = append(commands, command)
+		}
+	}
+	return commands
 }
 
 // pathExtensionRefusal returns nil when ext is one of the workspace's own path
@@ -247,8 +309,9 @@ func (d *DiscoveryResult) ProviderCause(command string) string {
 
 // keepHostedExtensions returns the extensions a hosted run may run, a skip
 // record for each extension it drops, and each provider capability it removes
-// from an extension it keeps. It keeps an extension installed from the
-// artifact store (InArtifactStore) whole. It keeps one of the workspace's own
+// from an extension it keeps. It keeps whole an extension installed from the
+// artifact store (InArtifactStore) and one whose runtime the source build
+// prepared (PreparedBySourceBuild). It keeps any other of the workspace's own
 // path extensions (WorkspacePathExtension) without its provider capabilities
 // (withoutProviderCapabilities): a hosted run starts its runtime only after
 // custody ended, and every handoff of the run credential happens before. It
@@ -262,7 +325,7 @@ func keepHostedExtensions(workspaceRoot string, extensions []*ExtensionDescripti
 	var skipped []SkippedExtension
 	var removed []RemovedCapability
 	for _, ext := range extensions {
-		if InArtifactStore(workspaceRoot, ext) {
+		if InArtifactStore(workspaceRoot, ext) || PreparedBySourceBuild(workspaceRoot, ext) {
 			kept = append(kept, ext)
 			continue
 		}

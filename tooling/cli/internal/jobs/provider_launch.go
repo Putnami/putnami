@@ -13,7 +13,6 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	registryproto "go.putnami.dev/protocol/registry"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 )
 
@@ -112,7 +111,7 @@ func prepareProviderRuntime(ctx context.Context, workspaceRoot string, ext *exte
 	activeCommands := toolchain.CommandDependencyClosure(extensions, []string{command})
 	slot, memoized := providerRuntimeSlotFor(ext, activeCommands)
 	if memoized {
-		if record, ok := providerRuntimes.current(slot, ext); ok {
+		if record, ok := providerRuntimes.current(workspaceRoot, slot, ext); ok {
 			if ext.RuntimeExecutable != record.executable || ext.RuntimeDigest != record.digest {
 				ext.RuntimeExecutable, ext.RuntimeDigest = record.executable, record.digest
 			}
@@ -175,8 +174,9 @@ func providerRuntimeSlotFor(ext *extension.ExtensionDescription, activeCommands 
 
 // current returns the record for slot while its runtime identity holds. For a
 // prepared runtime it hashes the inputs of ext, the check synchronization
-// itself makes; a digest it cannot compute is not a match.
-func (m *providerRuntimeMemo) current(slot providerRuntimeSlot, ext *extension.ExtensionDescription) (providerRuntimeRecord, bool) {
+// itself makes in workspaceRoot (runtimeInputDigest); a digest it cannot
+// compute is not a match.
+func (m *providerRuntimeMemo) current(workspaceRoot string, slot providerRuntimeSlot, ext *extension.ExtensionDescription) (providerRuntimeRecord, bool) {
 	m.mu.Lock()
 	record, ok := m.records[slot]
 	m.mu.Unlock()
@@ -184,7 +184,7 @@ func (m *providerRuntimeMemo) current(slot providerRuntimeSlot, ext *extension.E
 		return providerRuntimeRecord{}, false
 	}
 	if slot.prepared {
-		digest, err := cachekey.ExtensionRuntimeDigest(ext)
+		digest, err := runtimeInputDigest(workspaceRoot, ext)
 		if err != nil || digest != record.digest {
 			return providerRuntimeRecord{}, false
 		}
