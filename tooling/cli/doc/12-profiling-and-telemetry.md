@@ -350,12 +350,15 @@ a monthly-rotating random device ID. Every attribute is checked against a
 compiled-in closed vocabulary before it is written or exported.
 
 The command vocabulary (`cliusage.Commands` in `protocols/telemetry`) lists the
-public job commands of the CLI catalog and every public command that an
-extension of the `@putnami` scope declares. The CLI records a requested command
-only when it is in that vocabulary and a loaded `@putnami` extension declares
-it public. A command that only another extension declares is omitted, even
-when its name matches one in the vocabulary, so no name a user or a third
-party chose leaves the machine. The receiver drops a record that names a
+eleven original job commands of the CLI catalog and every public command that
+an extension of the `@putnami` scope declares. The CLI records a requested
+command only when it is in that vocabulary and a loaded `@putnami` extension
+declares it public. A command that only another extension declares is omitted,
+even when its name matches one in the vocabulary, so no name a user or a third
+party chose leaves the machine. A structured subcommand
+(`putnami <group> <sub>`, such as `putnami cloud deploy`) runs without an
+observer and records nothing; only a flat command, such as
+`putnami cloud-deploy`, is recorded. The receiver drops a record that names a
 command outside the vocabulary, so a receiver that knows a new command must be
 deployed before a CLI that sends it.
 

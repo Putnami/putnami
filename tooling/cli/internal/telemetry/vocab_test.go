@@ -9,47 +9,45 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/telemetry/cliusage"
-	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
-// The shared command vocabulary is exactly what Putnami ships: the public job
-// commands of the catalog in catalog order, then every public command that a
-// manifest of FirstPartyScope in this repository declares, sorted. A public
-// command added to such a manifest fails here until the wire contract, the
-// receiver and the Legitimate Interests Assessment change with it.
+// firstJobCommands are the eleven job commands the CLI catalog listed when the
+// command vocabulary first shipped, in catalog order. They head the vocabulary
+// whatever the catalog lists today, because a released CLI sends them.
+var firstJobCommands = []string{
+	"build", "test", "lint", "serve", "run", "format",
+	"package", "publish", "deploy", "generate", "validate",
+}
+
+// The shared command vocabulary names every public command that a manifest of
+// FirstPartyScope in this repository declares: a public command added to such
+// a manifest fails here until the wire contract, the receiver and the
+// Legitimate Interests Assessment change with it. A name that no manifest
+// declares any more stays, because a released CLI sends it; the protocol test
+// of cliusage keeps it there.
 func TestCommandVocabularyMatchesFirstPartyCommands(t *testing.T) {
 	t.Parallel()
-	var want []string
-	for _, command := range commandmeta.PublicJobCommands() {
-		want = append(want, command.Name)
+	head := len(firstJobCommands)
+	if len(cliusage.Commands) < head || !slices.Equal(cliusage.Commands[:head], firstJobCommands) {
+		t.Fatalf("the vocabulary must start with %v", firstJobCommands)
 	}
-	var declared []string
+	if tail := cliusage.Commands[head:]; !slices.IsSorted(tail) {
+		t.Errorf("the names after the first %d are not sorted: %v", head, tail)
+	}
+
+	var missing []string
 	for _, ext := range firstPartyExtensions(t) {
 		for name := range ext.Commands {
-			if ext.CommandVisibility[name] == "internal" || slices.Contains(want, name) || slices.Contains(declared, name) {
+			if ext.CommandVisibility[name] == "internal" || slices.Contains(cliusage.Commands, name) || slices.Contains(missing, name) {
 				continue
 			}
-			declared = append(declared, name)
+			missing = append(missing, name)
 		}
 	}
-	slices.Sort(declared)
-	want = append(want, declared...)
-
-	if !slices.Equal(cliusage.Commands, want) {
-		var missing, extra []string
-		for _, name := range want {
-			if !slices.Contains(cliusage.Commands, name) {
-				missing = append(missing, name)
-			}
-		}
-		for _, name := range cliusage.Commands {
-			if !slices.Contains(want, name) {
-				extra = append(extra, name)
-			}
-		}
-		t.Fatalf("telemetry command vocabulary differs from the first-party commands\nmissing: %v\nextra:   %v\nwant order: %v",
-			missing, extra, want)
+	if len(missing) > 0 {
+		slices.Sort(missing)
+		t.Errorf("public first-party commands missing from the telemetry command vocabulary: %v", missing)
 	}
 }
 
