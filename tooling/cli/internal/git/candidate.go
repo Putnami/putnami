@@ -52,9 +52,11 @@ func CandidatePaths(root string, prefixes ...string) ([]string, error) {
 // at or below rel, a slash path relative to dir. The paths are relative to
 // dir, in slash form, sorted and unique. It reads the index alone, so a
 // tracked file deleted from the worktree is listed, and rel need not exist.
+// It folds case, as the emptying does: on a case-insensitive filesystem the
+// index can spell a path another way than rel, and that path is listed too.
 // When Git does not manage dir, the error is an *UnmanagedError.
 func TrackedUnder(dir, rel string) ([]string, error) {
-	stdout, stderr, err := runCapture(dir, "ls-files", "-z", "--cached", "--", ":(literal)"+rel)
+	stdout, stderr, err := runCapture(dir, "ls-files", "-z", "--cached", "--", ":(literal,icase)"+rel)
 	if err != nil {
 		if unmanaged := Unmanaged(dir); unmanaged != nil {
 			return nil, unmanaged

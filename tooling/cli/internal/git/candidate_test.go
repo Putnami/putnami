@@ -46,7 +46,8 @@ func TestReadIndexModes(t *testing.T) {
 
 // TrackedUnder answers from the index: a tracked file deleted from the
 // worktree is listed, an untracked file is not, a sibling whose name shares
-// the prefix is not, and a path that does not exist lists nothing. Outside a
+// the prefix is not, a path spelled in another case lists what the index
+// tracks under it, and a path that does not exist lists nothing. Outside a
 // repository the answer is an *UnmanagedError.
 func TestTrackedUnderListsWhatTheIndexTracksBelowAPath(t *testing.T) {
 	repo := initGitRepo(t)
@@ -63,6 +64,7 @@ func TestTrackedUnderListsWhatTheIndexTracksBelowAPath(t *testing.T) {
 
 	for rel, want := range map[string][]string{
 		"out":     {"out/a.txt", "out/nested/b.txt"},
+		"OUT":     {"out/a.txt", "out/nested/b.txt"},
 		"out[x]":  {"out[x]/c.txt"},
 		"missing": nil,
 	} {

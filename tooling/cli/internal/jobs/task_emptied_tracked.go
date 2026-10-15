@@ -68,7 +68,7 @@ func (s *Scheduler) refuseTrackedEmptiedOutputs(job *ScheduledJob) error {
 		}
 		keep := emptyingKeep(declared)
 		for _, path := range tracked {
-			if inner, below := strings.CutPrefix(path, rel+"/"); below && keptPath(keep, inner) {
+			if inner, below := cutPrefixFold(path, rel+"/"); below && keptPath(keep, inner) {
 				continue
 			}
 			if _, statErr := os.Lstat(filepath.Join(roots.Root, filepath.FromSlash(path))); errors.Is(statErr, fs.ErrNotExist) {
@@ -80,6 +80,14 @@ func (s *Scheduler) refuseTrackedEmptiedOutputs(job *ScheduledJob) error {
 		}
 	}
 	return nil
+}
+
+// cutPrefixFold is strings.CutPrefix that folds case, as TrackedUnder does.
+func cutPrefixFold(path, prefix string) (string, bool) {
+	if len(path) < len(prefix) || !strings.EqualFold(path[:len(prefix)], prefix) {
+		return path, false
+	}
+	return path[len(prefix):], true
 }
 
 // keptPath reports whether the output-relative slash path inner is a kept

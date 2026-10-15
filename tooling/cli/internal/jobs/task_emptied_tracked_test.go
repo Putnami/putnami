@@ -120,6 +120,20 @@ func TestAnEmptiedOutputThatHoldsATrackedFileIsNeverEmptied(t *testing.T) {
 	}
 }
 
+// The index question and the kept subpaths fold case, as the emptying does: a
+// tracked file under the kept subpath spelled in another case is never
+// removed, so it does not count, and the execution empties the rest.
+func TestATrackedFileUnderAKeptSubpathSpelledInAnotherCaseDoesNotCount(t *testing.T) {
+	spectest.Proves(t, emptyingFeature, "emptied-output-keeps-tracked-files", "an-emptied-output-that-holds-a-tracked-file-is-never-emptied")
+	f, clientgen := newTrackedEmptiedFixture(t, true)
+	writeFileAt(t, filepath.Join(clientgen, "KEPT", "note.txt"), "kept\n")
+	writeFileAt(t, filepath.Join(clientgen, "built.json"), "{}\n")
+	treeKeyedGit(t, f.ws.Root, "add", "-f", emptyingProject+"/.gen/clientgen/KEPT/note.txt")
+
+	f.executed(t, "execution over a tracked kept file", f.run(t, SchedulerConfig{}))
+	assertFilesIn(t, "execution over a tracked kept file", clientgen, "KEPT/note.txt")
+}
+
 // A hit whose restore would empty an emptied output that holds a tracked file
 // is not served: the restore refuses it before it writes anything, the task
 // executes, and the execution fails as above. The file stays.
