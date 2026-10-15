@@ -11,6 +11,7 @@ their own.
 | `settled/` | `putnami cloud registry-token --host put.putnami.dev`, signed in, lock settled. CLI built from this repository; `@putnami/cloud` `0.0.0-20260914013011-2aa9b861-c3db1d2` | 2026-09-17 |
 | `not-authenticated/` | Same command with `PUTNAMI_HOME` pointing at a home that holds the installed artifacts and no `auth.json` | 2026-09-17 |
 | `not-authenticated-materialize/` | The `--materialize` form of the same run, for `npm.putnami.dev` | 2026-09-17 |
+| `machine-token-materialize/` | `putnami cloud registry-token --host npm.putnami.dev --materialize` with `PUTNAMI_CLOUD_TOKEN` set to a random value in the workspace machine token format (`pkt_…`) and a `PUTNAMI_HOME` that holds the installed artifacts and no `auth.json`. CLI and `@putnami/cloud` built from this repository | 2026-10-15 |
 | `core-only-cli/` | Same command in a workspace with no extension and an empty `PUTNAMI_HOME`. The released CLI `0.0.0-20260916061023-7194fc35-02f32ca` and a CLI built from this repository printed identical bytes | 2026-09-17 |
 | `core-only-cli-materialize/` | The `--materialize` form of the same core-only run | 2026-09-17 |
 | `lock-changed/` | The first call after `putnami.lock.json` changed, captured by a `PATH` shim during the incident the fix addressed | 2026-09-15 |

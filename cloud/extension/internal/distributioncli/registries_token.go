@@ -60,7 +60,9 @@ func RegistryToken(params map[string]any, workspaceRoot string, env map[string]s
 	}
 	token, err := mintUserRegistryToken(params, workspaceRoot, env, ioctx, endpoint)
 	if err != nil {
-		return err
+		// A session on PUTNAMI_CLOUD_TOKEN alone cannot sign in, so it is not
+		// told to.
+		return clicore.UserSessionError(err, env)
 	}
 	if !regproto.ValidBearer(token) {
 		return clicore.NewError("auth server returned an empty or malformed registry bearer", clicore.ExitAuth)

@@ -118,7 +118,8 @@ same refresh before it reads registry metadata.
 The refresh never blocks an install. If `@putnami/cloud` is not installed, if
 you are not signed in (`run putnami cloud login`), or if the registry is not an
 `https` host, the install logs one line and runs with whatever credential your
-machine already has.
+machine already has. A session that holds only `PUTNAMI_CLOUD_TOKEN` cannot
+sign in, so its line gives the cloud's reason instead of the sign-in hint.
 
 ## Hosted runs: fetch, then install
 
