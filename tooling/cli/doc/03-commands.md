@@ -664,10 +664,11 @@ command of the extension resolves a runtime toolchain, when the runtime it
 prepared has another digest than the one a hosted run looks for, and when it
 runs with `--credential-fd`.
 
-`./putnamiw --print-engine` runs it with the CLI it built, after it installs
-the Go release the lock pins when the `go` on `PATH` runs as another one. A
-hosted run of the same tree (`--credential-fd`) then starts those runtimes as
-providers before any repository code, and prepares none itself. See
+`./putnamiw --print-engine` runs it with the CLI it built. Before that, it
+installs the Go release the lock pins under the Putnami home, unless the home
+holds it already, or `$GOROOT/bin/go` or the `go` on `PATH` runs as that
+release. A hosted run of the same tree (`--credential-fd`) then starts those
+runtimes as providers before any repository code, and prepares none itself. See
 [Run credential](#run-credential---credential-fd).
 
 ### `templates`

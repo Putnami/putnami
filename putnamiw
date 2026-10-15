@@ -28,9 +28,10 @@
 # reused, it runs `putnami extensions prepare`, which prepares the runtimes of
 # the workspace's path extensions that a hosted run starts as providers. That
 # command needs the exact Go release the workspace lock pins, so the mode first
-# installs that release under the Putnami home when neither the home nor the go
-# on PATH has it. Progress, the output of that command and errors go to stderr;
-# on failure it exits non-zero and prints nothing on stdout.
+# installs that release under the Putnami home, unless the home holds it
+# already, or $GOROOT/bin/go or the go on PATH runs as it. Progress, the output
+# of that command and errors go to stderr; on failure it exits non-zero and
+# prints nothing on stdout.
 #
 # A workspace whose lock records cli.source "workspace" admits the printed
 # binary when the process that starts it sets:
@@ -927,19 +928,22 @@ install_managed_go() {
 }
 
 # ensure_locked_go installs the Go release the workspace lock pins under the
-# Putnami home, unless it is there already or the go on PATH runs as that
-# release. `putnami extensions prepare` resolves a prepare toolchain to exactly
-# the locked release and installs none, while resolve_go accepts any Go at or
-# above the go.work version and does not run when a cached CLI is reused. The
-# probe matches the CLI's: GOROOT unset and GOTOOLCHAIN=local.
+# Putnami home, unless it is there already, or $GOROOT/bin/go or the go on PATH
+# runs as that release. `putnami extensions prepare` resolves a prepare
+# toolchain to exactly the locked release and installs none, while resolve_go
+# accepts any Go at or above the go.work version and does not run when a cached
+# CLI is reused. The probe matches the CLI's: in the workspace root, with
+# GOROOT unset and GOTOOLCHAIN=local.
 ensure_locked_go() {
-  local locked system_version
+  local locked want candidate version
   locked="$(locked_go_version)" || return 0
   [ -x "$GO_MANAGED_DIR/go-$locked/go/bin/go" ] && return 0
-  if command -v go >/dev/null 2>&1; then
-    system_version="$(unset GOROOT; go_binary_version_mode "$(command -v go)" "local" || true)"
-    [ "$system_version" = "$(normalize_go_version "$locked")" ] && return 0
-  fi
+  want="$(normalize_go_version "$locked")"
+  for candidate in "${GOROOT:+$GOROOT/bin/go}" "$(command -v go 2>/dev/null || true)"; do
+    [ -n "$candidate" ] && [ -x "$candidate" ] || continue
+    version="$(cd "$SCRIPT_DIR" && unset GOROOT && go_binary_version_mode "$candidate" "local" || true)"
+    [ "$version" = "$want" ] && return 0
+  done
   install_managed_go "$locked"
 }
 

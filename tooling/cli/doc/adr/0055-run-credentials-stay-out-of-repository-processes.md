@@ -296,7 +296,8 @@ construction: the tree under test built it.
   command fails, the build-only mode fails and prints nothing on stdout. The
   command resolves each prepare toolchain to exactly the release the lock pins
   and installs none, so the mode first installs the Go release the lock pins
-  under the Putnami home, unless the `go` on `PATH` runs as that release.
+  under the Putnami home, unless the home holds it already, or
+  `$GOROOT/bin/go` or the `go` on `PATH` runs as that release.
 - `putnami extensions prepare` prepares into the artifact store the runtime of
   each path extension of the workspace that declares a provider command (§2)
   and whose `runtime.prepare` builds its runtime. It runs the prepare command

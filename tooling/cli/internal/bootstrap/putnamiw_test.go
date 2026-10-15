@@ -1795,9 +1795,10 @@ func TestPutnamiwPrintEngine_FailsWithNothingOnStdout(t *testing.T) {
 // `extensions prepare` resolves a prepare toolchain to exactly the Go release
 // the lock pins and installs none. So before it runs that command,
 // --print-engine installs that release under the Putnami home, on a run that
-// builds the blob and on one that reuses it, unless the go on PATH runs as that
-// release. A Go it cannot verify stops the mode before the command starts, with
-// nothing on stdout.
+// builds the blob and on one that reuses it, unless $GOROOT/bin/go or the go on
+// PATH runs as that release, probed as the CLI probes it: GOROOT unset and
+// GOTOOLCHAIN=local. A Go it cannot verify stops the mode before the command
+// starts, with nothing on stdout.
 func TestPutnamiwPrintEngine_InstallsTheLockedGoBeforeExtensionsPrepare(t *testing.T) {
 	requireGoDownloadPlatform(t)
 	const archive = "FAKE-GO-ARCHIVE"
@@ -1859,6 +1860,27 @@ func TestPutnamiwPrintEngine_InstallsTheLockedGoBeforeExtensionsPrepare(t *testi
 		decodeEngine(t, stdout)
 		if got := downloads(t, curlLog); got != 0 {
 			t.Errorf("%d downloads, want none: the go on PATH runs as the locked release", got)
+		}
+		if _, err := os.Stat(managed); !os.IsNotExist(err) {
+			t.Errorf("a Go was installed at %s: %v", managed, err)
+		}
+	})
+
+	t.Run("GOROOT holds the locked release", func(t *testing.T) {
+		repo, managed, curlLog, env := setup(t, "1.30.0", digest)
+		goroot := t.TempDir()
+		writeExec(t, filepath.Join(goroot, "bin", "go"), `#!/usr/bin/env bash
+if [ "$1 $2" = "env GOVERSION" ] && [ -z "${GOROOT:-}" ] && [ "${GOTOOLCHAIN:-}" = local ]; then echo go1.30.0; fi
+exit 0
+`)
+		env = append(env, "GOROOT="+goroot, "SENTINEL_NEEDS=")
+		stdout, stderr, code := runSplit(t, repo, env, "--print-engine")
+		if code != 0 {
+			t.Fatalf("--print-engine failed (%d):\n%s", code, stderr)
+		}
+		decodeEngine(t, stdout)
+		if got := downloads(t, curlLog); got != 0 {
+			t.Errorf("%d downloads, want none: $GOROOT/bin/go runs as the locked release", got)
 		}
 		if _, err := os.Stat(managed); !os.IsNotExist(err) {
 			t.Errorf("a Go was installed at %s: %v", managed, err)

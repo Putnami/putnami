@@ -131,8 +131,8 @@ start it through `./putnamiw`. The build-only mode serves it.
   extensions, which a hosted run of the tree starts before repository code
   (ADR 0055 §5). It resolves their prepare toolchains to exactly the releases
   the lock pins and installs none, so the mode first installs the Go release
-  the lock pins under the Putnami home, unless the `go` on `PATH` runs as that
-  release.
+  the lock pins under the Putnami home, unless the home holds it already, or
+  `$GOROOT/bin/go` or the `go` on `PATH` runs as that release.
 - Every failure or refusal, a failed `extensions prepare` included, exits
   non-zero with nothing on stdout. The mode refuses a workspace without
   `tooling/cli`, a checkout with no content key, a command after the flag, and

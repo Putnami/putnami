@@ -34,7 +34,7 @@
     },
     {
       "id": "print-engine-installs-the-locked-go",
-      "text": "Before `./putnamiw --print-engine` runs `putnami extensions prepare`, on a run that builds the blob and on one that reuses it, it installs the Go release the workspace lock pins under the Putnami home, unless the home holds it already or the go on PATH runs as it with GOROOT unset and GOTOOLCHAIN=local. It installs that release only at the SHA-256 the lock records or go.dev publishes, and a Go it cannot install stops the mode before the command starts, with nothing on stdout."
+      "text": "Before `./putnamiw --print-engine` runs `putnami extensions prepare`, whether it builds or reuses the blob, it installs the Go release the workspace lock pins under the Putnami home, unless the home holds it already, or $GOROOT/bin/go or the go on PATH runs as it in the workspace root with GOROOT unset and GOTOOLCHAIN=local. It installs that release only at the SHA-256 the lock records or go.dev publishes, and a Go it cannot install stops the mode before the command starts, with nothing on stdout."
     },
     {
       "id": "build-toolchain-stays-in-the-build",
