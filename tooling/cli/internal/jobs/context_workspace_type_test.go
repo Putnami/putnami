@@ -32,21 +32,25 @@ func typedMembership(libraryType string) *workspace.Workspace {
 // A task that acts on the workspace's deployable workloads reads each member's
 // resolved type from workspaceProjects. The authored config alone cannot answer
 // it: a Go module's type comes from the provider probe, so its putnami.json
-// authors none.
+// authors none. Every entry carries a type, the workspace default included, so
+// an entry without one comes from a producer that predates the member. The
+// selection and the dependency closure carry none.
 func TestBuildJobContext_WorkspaceProjectsCarryTheResolvedType(t *testing.T) {
 	t.Parallel()
 	ws := typedMembership("library")
+	app := ws.ProjectByID("/go/app")
 	ctx := BuildJobContext(ws, &ScheduledJob{
-		Project:   ws.ProjectByID("/go/app"),
-		Extension: &extension.ExtensionDescription{Name: "@putnami/cloud", Path: "/workspace/cloud"},
-		JobDef:    &extension.JobDefinition{Name: "cloud-infra-plan", ExtensionName: "@putnami/cloud"},
+		Project:          app,
+		SelectedProjects: []*workspace.Project{app},
+		Extension:        &extension.ExtensionDescription{Name: "@putnami/cloud", Path: "/workspace/cloud"},
+		JobDef:           &extension.JobDefinition{Name: "cloud-infra-plan", ExtensionName: "@putnami/cloud"},
 	}, nil, nil, nil)
 
 	types := map[string]string{}
 	for _, ref := range ctx.WorkspaceProjects {
 		types[ref.ID] = ref.Type
 	}
-	for id, want := range map[string]string{"/go/app": "application", "/go/lib": "library", "/tools/plain": ""} {
+	for id, want := range map[string]string{"/go/app": "application", "/go/lib": "library", "/tools/plain": "application"} {
 		if got := types[id]; got != want {
 			t.Errorf("workspaceProjects %s type = %q, want %q", id, got, want)
 		}
@@ -65,11 +69,23 @@ func TestBuildJobContext_WorkspaceProjectsCarryTheResolvedType(t *testing.T) {
 			t.Errorf("parsed %s type = %q, want the produced %q", ref.ID, ref.Type, types[ref.ID])
 		}
 	}
-	plain, err := json.Marshal(ctx.WorkspaceProjects[2])
+
+	if len(ctx.Project.DependencyClosure) == 0 {
+		t.Fatal("dependencyClosure is empty, want at least the project itself")
+	}
+	for _, ref := range ctx.Project.DependencyClosure {
+		if ref.Type != "" {
+			t.Errorf("dependencyClosure %s type = %q, want none", ref.ID, ref.Type)
+		}
+	}
+	if len(ctx.SelectedProjects) == 0 {
+		t.Fatal("selectedProjects is empty, want the selected application")
+	}
+	selected, err := json.Marshal(ctx.SelectedProjects)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(plain), `"type"`) {
-		t.Errorf("unclassified member = %s, want type omitted", plain)
+	if strings.Contains(string(selected), `"type"`) {
+		t.Errorf("selectedProjects = %s, want no type", selected)
 	}
 }
