@@ -982,3 +982,34 @@ func TestLintDocsIsKeyedOnTheCandidateCut(t *testing.T) {
 		t.Errorf("lint-docs declares %+v, want no output, no effect and no source rewrite", task.Declares)
 	}
 }
+
+// TestCommandsDeclareTheTraitsOfTheirVerb pins the traits each command named
+// after serve, run, package, publish or deploy declares itself. The expected
+// values are written here, not read from the core's verb table, so the plan and
+// its cache keys keep them when that table no longer gives these verbs
+// defaults. A command named after another verb is not checked.
+func TestCommandsDeclareTheTraitsOfTheirVerb(t *testing.T) {
+	verbTraits := map[string]proto.CommandTraits{
+		"serve":   {RequiresRunnable: true},
+		"run":     {RequiresRunnable: true},
+		"package": {InjectPublishChannels: true},
+		"publish": {InjectPublishChannels: true, SideEffects: proto.SideEffectsRegistry},
+		"deploy":  {SideEffects: proto.SideEffectsCloud},
+	}
+	m := loadExtensionManifest(t)
+	for _, verb := range []string{"serve", "run", "package", "publish"} {
+		if _, ok := m.Commands[verb]; !ok {
+			t.Errorf("the manifest declares no %s command", verb)
+		}
+	}
+	for name, cmd := range m.Commands {
+		want, ok := verbTraits[proto.BaseCommandName(name)]
+		switch {
+		case !ok:
+		case cmd.Traits == nil:
+			t.Errorf("command %q declares no traits, so it depends on the core's verb table; declare %+v", name, want)
+		case *cmd.Traits != want:
+			t.Errorf("command %q declares traits %+v, want %+v", name, *cmd.Traits, want)
+		}
+	}
+}

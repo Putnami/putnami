@@ -1802,6 +1802,7 @@
     },
     "package": {
       "activation": "workspace",
+      "traits": {"injectPublishChannels": true},
       "sessionPrerequisites": [
         {
           "command": "build",
@@ -1857,6 +1858,7 @@
     },
     "publish": {
       "activation": "workspace",
+      "traits": {"injectPublishChannels": true, "sideEffects": "registry"},
       "dependsOn": [
         "build",
         "package"

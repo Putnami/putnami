@@ -108,6 +108,35 @@ func TestPackageStepsSelectContentForms(t *testing.T) {
 	}
 }
 
+// TestCommandsDeclareTheTraitsOfTheirVerb pins the traits each command named
+// after serve, run, package, publish or deploy declares itself. The expected
+// values are written here, not read from the core's verb table, so the plan and
+// its cache keys keep them when that table no longer gives these verbs
+// defaults. A command named after another verb is not checked.
+func TestCommandsDeclareTheTraitsOfTheirVerb(t *testing.T) {
+	verbTraits := map[string]proto.CommandTraits{
+		"serve":   {RequiresRunnable: true},
+		"run":     {RequiresRunnable: true},
+		"package": {InjectPublishChannels: true},
+		"publish": {InjectPublishChannels: true, SideEffects: proto.SideEffectsRegistry},
+		"deploy":  {SideEffects: proto.SideEffectsCloud},
+	}
+	m := loadExtensionManifest(t)
+	if _, ok := m.Commands["package"]; !ok {
+		t.Error("the manifest declares no package command")
+	}
+	for name, cmd := range m.Commands {
+		want, ok := verbTraits[proto.BaseCommandName(name)]
+		switch {
+		case !ok:
+		case cmd.Traits == nil:
+			t.Errorf("command %q declares no traits, so it depends on the core's verb table; declare %+v", name, want)
+		case *cmd.Traits != want:
+			t.Errorf("command %q declares traits %+v, want %+v", name, *cmd.Traits, want)
+		}
+	}
+}
+
 // TestEveryTaskCarriesAV3Declaration pins that the migration is COMPLETE. v3 is
 // additive per task, so a task that quietly loses (or never gains) its
 // `declares` block keeps v2 inferred capture while the rest of the manifest is

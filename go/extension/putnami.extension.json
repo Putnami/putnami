@@ -267,6 +267,7 @@
     },
     "serve": {
       "description": "Run Go application with hot-reload. Build-and-exec: the served process is compiled and run in one step, and no binary is emitted.",
+      "traits": { "requiresRunnable": true },
       "activationFiles": ["**/*.go", "go.mod"],
       "flags": {
         "entrypoint": { "type": "string", "description": "Entry point to serve (main.go file or package path)" },
@@ -301,6 +302,7 @@
     },
     "run": {
       "description": "Build a Go workload for the host, run it once, and forward its exit code.",
+      "traits": { "requiresRunnable": true },
       "activationFiles": ["**/*.go", "go.mod"],
       "flags": {
         "entrypoint": { "type": "string", "description": "Entry point to run (main.go file or package path)" },
@@ -392,6 +394,7 @@
     },
     "package": {
       "description": "Create distribution packages (archives, binaries, Docker images, Go modules).",
+      "traits": { "injectPublishChannels": true },
       "sessionPrerequisites": [
         { "command": "build", "if": "params.image" }
       ],
@@ -474,6 +477,7 @@
     },
     "publish": {
       "dependsOn": ["package"],
+      "traits": { "injectPublishChannels": true, "sideEffects": "registry" },
       "description": "Publish pre-built packages to registries (Go module, Docker). Auto-runs package first; that pipeline owns every required build step while its image-project branch stays compiler-free. @putnami/cloud, when installed, provides the go.putnami.dev registry credential and the oci tag-digest fast path; otherwise explicit credentials / native docker auth are used.",
       "flags": {
         "docker-package-publisher": { "type": "string", "description": "Extension whose package command produces this OCI member; defaults to @putnami/go" },
