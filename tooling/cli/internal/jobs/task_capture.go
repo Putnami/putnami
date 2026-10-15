@@ -53,16 +53,18 @@
 // must outlive its neighbor's execution has to be ceded by the owner, as the
 // TypeScript build-generate cedes the config-extract schema fallback.
 //
-// A directory output with a literal path is emptied when it is required or
-// when it lives under the command-output root (cachekey.EmptiedOutputDeclarations,
-// ADR 0065). The engine owns the command-output directory and the plan gives
-// each output one owner, so an optionalEmpty output there holds only what its
-// task wrote. A restore of an entry that records such an output empty empties
-// it the same way (materializeDeclaredOutputs), so an execution and a restore
-// that write nothing leave the same directory.
+// A directory output with a literal path is emptied when it is required, when
+// it lives under the command-output root (cachekey.EmptiedOutputDeclarations,
+// ADR 0065), or when it declares emptied (ADR 0068). The engine owns the
+// command-output directory and the plan gives each output one owner, so an
+// optionalEmpty output there holds only what its task wrote; an emptied one
+// states the same of its project or workspace path. A restore of an entry that
+// records such an output empty empties it the same way
+// (materializeDeclaredOutputs), so an execution and a restore that write
+// nothing leave the same directory.
 //
-// An optionalEmpty output under the project or the workspace root is not
-// emptied: it can hold a committed file no task writes, a run that writes
+// Any other optionalEmpty output under the project or the workspace root is
+// not emptied: it can hold a committed file no task writes, a run that writes
 // nothing there is recorded empty, and a restore of that record leaves the
 // path as it stands. A file is not emptied because the task replaces it whole;
 // an invocation-scoped output because it lives in a private tree created for
@@ -219,10 +221,16 @@ func versionStampWithin(root, rel string) (string, bool) {
 // must already be detached from a previous session's link
 // (ensureCommandOutputWritable), so no rename here reaches a store blob.
 //
+// An output that declares emptied and holds a Git-tracked file is refused
+// before anything is emptied (refuseTrackedEmptiedOutputs).
+//
 // An error leaves an output that may still hold an earlier run's files. The
 // caller fails the task instead of executing it: a capture of that directory
 // would publish those files under this run's key.
 func (s *Scheduler) emptyOwnedOutputs(job *ScheduledJob) error {
+	if err := s.refuseTrackedEmptiedOutputs(job); err != nil {
+		return err
+	}
 	for _, declared := range cachekey.EmptiedOutputDeclarations(job) {
 		if err := s.emptyDeclaredOutput(job, declared); err != nil {
 			return err
@@ -248,21 +256,29 @@ func (s *Scheduler) emptyDeclaredOutput(job *ScheduledJob, declared cachekey.Emp
 	if !ok {
 		return fmt.Errorf("declared output %q has unknown root %q", declared.ID, root)
 	}
-	keep := cachekey.OutputSkippedSubpaths(declared.Rel, declared.Output)
-	if stamp, held := versionStampWithin(root, declared.Rel); held {
-		keep = append(append([]string(nil), keep...), stamp)
-	}
 	dest := filepath.Join(base, filepath.FromSlash(declared.Rel))
-	if err := emptyTaskOutput(dest, store.ResolveScratchRoot(roots.Root), keep...); err != nil {
+	if err := emptyTaskOutput(dest, store.ResolveScratchRoot(roots.Root), emptyingKeep(declared)...); err != nil {
 		return fmt.Errorf("declared output %q: %w", declared.ID, err)
 	}
 	return nil
 }
 
+// emptyingKeep returns the output-relative slash subpaths an emptying of
+// declared leaves in place: the ceded and preserved subpaths, and the build
+// stamp when the output holds it.
+func emptyingKeep(declared cachekey.EmptiedOutputDeclaration) []string {
+	keep := cachekey.OutputSkippedSubpaths(declared.Rel, declared.Output)
+	if stamp, held := versionStampWithin(declared.Output.EffectiveRoot(), declared.Rel); held {
+		keep = append(append([]string(nil), keep...), stamp)
+	}
+	return keep
+}
+
 // emptiedByRestore returns, by id, the outputs a restore of entry empties:
 // each output of cachekey.EmptiedOutputDeclarations that entry records empty. A
 // required output is never recorded empty, so in practice this is an
-// optionalEmpty output under the command-output root. A restore of such an
+// optionalEmpty output under the command-output root, or an optionalEmpty
+// project or workspace directory that declares emptied. A restore of such an
 // entry leaves the directory the execution that produced the entry left: the
 // kept subpaths and nothing else.
 func emptiedByRestore(job *ScheduledJob, entry *store.TaskEntry) map[string]cachekey.EmptiedOutputDeclaration {
@@ -597,7 +613,13 @@ func (s *Scheduler) restoreDeclaredCacheHit(
 // decides that: MaterializeTaskOutput leaves the destination of an empty
 // record untouched, and only the engine knows the declaration. A failure to
 // empty is a restore failure like any other, so the caller executes the task.
+// So is an output that declares emptied and holds a Git-tracked file, which
+// the restore refuses before it writes anything (refuseTrackedEmptiedOutputs):
+// the execution that follows refuses it too, and the task fails.
 func (s *Scheduler) materializeDeclaredOutputs(job *ScheduledJob, entry *store.TaskEntry) error {
+	if err := s.refuseTrackedEmptiedOutputs(job); err != nil {
+		return err
+	}
 	roots := s.outputRoots()
 	// A restore stages under the workspace scratch root that declared capture
 	// stages under, so a restore adds nothing to a destination's parent but the

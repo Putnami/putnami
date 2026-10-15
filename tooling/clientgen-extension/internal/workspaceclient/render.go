@@ -67,13 +67,15 @@ func Synchronize(workspaceRoot string) error {
 // SynchronizeTarget regenerates one configured language target and returns the
 // project-relative output directory when it exists.
 //
-// A missing .gen/clientgen/config.json means "nothing to generate" only for a
+// The generation contract is the one a build wrote at
+// .gen/clientgen/config.json, else the one the project commits at
+// clientgen.json. A missing contract means "nothing to generate" only for a
 // provider that commits no client in that language. When the provider commits
 // one, the contract is missing, not empty: a writer of .gen may be mid-rewrite,
 // and reporting no output would let the engine empty the committed target
 // while the task succeeds. That case fails and leaves the target alone.
 func SynchronizeTarget(workspaceRoot, projectRoot string, language clientcontract.GeneratedLanguage) (string, bool, error) {
-	data, err := os.ReadFile(filepath.Join(projectRoot, ".gen", "clientgen", "config.json")) //nolint:gosec
+	data, err := readProjectGenerationConfig(projectRoot)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", false, requireNoCommittedTarget(workspaceRoot, projectRoot, language)
@@ -112,6 +114,17 @@ func SynchronizeTarget(workspaceRoot, projectRoot string, language clientcontrac
 	return output, true, nil
 }
 
+// readProjectGenerationConfig reads the generation contract of the project at
+// projectRoot in the order discovery reads it: the one a build wrote, else the
+// committed one. When neither exists, the error satisfies os.IsNotExist.
+func readProjectGenerationConfig(projectRoot string) ([]byte, error) {
+	data, err := os.ReadFile(filepath.Join(projectRoot, filepath.FromSlash(builtConfigFile))) //nolint:gosec // fixed project-relative path
+	if err == nil || !os.IsNotExist(err) {
+		return data, err
+	}
+	return os.ReadFile(filepath.Join(projectRoot, committedConfigFile)) //nolint:gosec // fixed project-relative path
+}
+
 // requireNoCommittedTarget fails when the provider commits a generated client
 // in language, or a manifest nobody can read as one, while its generation
 // contract is missing. It reads the committed manifests through the same
@@ -123,7 +136,7 @@ func requireNoCommittedTarget(workspaceRoot, projectRoot string, language client
 	}
 	committed, findings := configFromCommittedManifests(workspaceFiles{root: workspaceRoot}, filepath.ToSlash(projectRel))
 	if len(findings) > 0 {
-		return fmt.Errorf("%s has no .gen/clientgen/config.json and %s: %s", projectRoot, findings[0].Path, findings[0].Message)
+		return fmt.Errorf("%s has no %s or %s and %s: %s", projectRoot, builtConfigFile, committedConfigFile, findings[0].Path, findings[0].Message)
 	}
 	if committed == nil || !hasConfiguredTarget(committed.Targets, string(language)) {
 		return nil
@@ -132,9 +145,10 @@ func requireNoCommittedTarget(workspaceRoot, projectRoot string, language client
 	if language == clientcontract.GeneratedLanguageTypeScript {
 		output = committed.TS.Output
 	}
-	return fmt.Errorf("%s commits a %s client at %s but has no .gen/clientgen/config.json, so the committed "+
-		"client is left untouched: run the provider's build, or delete the committed client if the provider "+
-		"no longer generates one", projectRoot, language, output)
+	return fmt.Errorf("%s commits a %s client at %s but has no %s or %s, so the committed "+
+		"client is left untouched: run the provider's build, commit its generation contract as %s, or delete "+
+		"the committed client if the provider no longer generates one",
+		projectRoot, language, output, builtConfigFile, committedConfigFile, committedConfigFile)
 }
 
 // mirrorRootInputs are the workspace-root files whose presence or bytes decide
@@ -176,7 +190,8 @@ func copyProviderInputs(workspaceRoot, tempRoot string, provider provider) error
 	// them here would create a second, silently divergent copy of the same
 	// inputs. FormatterInputs derives that same resolution for the cache key.
 	inputs := []string{
-		joinRel(provider.rel, ".gen/clientgen/config.json"),
+		joinRel(provider.rel, builtConfigFile),
+		joinRel(provider.rel, committedConfigFile),
 		provider.specPath,
 		joinRel(provider.rel, "package.json"),
 		joinRel(provider.rel, "go.mod"),

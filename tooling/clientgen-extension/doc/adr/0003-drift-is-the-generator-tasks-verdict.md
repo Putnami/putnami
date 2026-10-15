@@ -79,7 +79,9 @@ can only shrink. This repository has no census.
 - `thirdParty` lives only in `.gen/clientgen/config.json`, which a build
   writes. On a cold clone the guard reads an unmarked third-party provider as
   first-party and reports `clientgen.missing-first-party-marker` until
-  `putnami build --projects <provider>` runs.
+  `putnami build --projects <provider>` runs. A provider that commits its
+  generation contract as `clientgen.json` has it read on every tree
+  ([CLI ADR 0068](../../../cli/doc/adr/0068-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md)).
 - A provider that `disable.tags` keeps out of `--impacted` (both sample
   providers here carry `e2e`) has its drift judged only when selected
   explicitly. The committed-input checks still run for it on every `validate`.
@@ -101,3 +103,14 @@ can only shrink. This repository has no census.
   holds.
 - **Allowlist debt by folder, file or transport.** A class-based exemption keeps
   matching callsites nobody enumerated, including new ones.
+
+## Note (2026-10-15)
+
+`thirdParty` no longer lives in a committed `.gen/clientgen/config.json`. A
+file committed under `.gen/clientgen` or `.gen/schema` is no longer supported,
+because a build owns both trees whole
+([CLI ADR 0068](../../../cli/doc/adr/0068-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md)),
+and the workspace check reports each one as
+`clientgen.committed-generated-contract`
+([ADR 0006](0006-the-guard-reads-and-keys-on-the-git-candidate-cut.md)). A
+provider that needs the marker on a cold clone commits it in `clientgen.json`.

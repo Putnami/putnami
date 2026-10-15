@@ -50,8 +50,8 @@ func TestGenerateTargetRequiresAProjectAndSkipsAnUnconfiguredLanguage(t *testing
 	}
 }
 
-// A provider that commits a client but has no .gen/clientgen/config.json is a
-// contract caught mid-rewrite, not a provider with nothing to generate. Reporting
+// A provider that commits a client but has neither a .gen/clientgen/config.json
+// nor a committed clientgen.json is a contract caught mid-rewrite, not a provider with nothing to generate. Reporting
 // OK with no output port would let the engine empty the committed target while
 // the task succeeds.
 func TestGenerateTargetFailsWhenACommittedClientHasNoGenerationContract(t *testing.T) {
@@ -73,7 +73,7 @@ func TestGenerateTargetFailsWhenACommittedClientHasNoGenerationContract(t *testi
 
 	status, output, err := generateTarget(clientcontract.GeneratedLanguageGo)(jobContext, nil, nil)
 	if status != "FAILED" || err == nil || !strings.Contains(err.Error(), "clients/go") ||
-		!strings.Contains(err.Error(), ".gen/clientgen/config.json") {
+		!strings.Contains(err.Error(), ".gen/clientgen/config.json") || !strings.Contains(err.Error(), "clientgen.json") {
 		t.Fatalf("missing contract with a committed Go client = status %q output %v err %v", status, output, err)
 	}
 	for rel, body := range committed {
@@ -125,6 +125,42 @@ func TestGenerateTargetRunsTheConfiguredPackageShimAndReportsItsOutputPort(t *te
 	}, nil, nil)
 	if err != nil || status != "OK" || output["typescriptClientOutput"] != "clients/ts" {
 		t.Fatalf("configured TS target result = status %q output %v err %v", status, output, err)
+	}
+}
+
+// A provider slice with no app commits its generation contract as clientgen.json
+// at its root, outside the .gen/clientgen tree build-describe empties. The
+// target reads it when no build wrote a contract, and a contract a build wrote
+// still wins.
+func TestGenerateTargetReadsTheCommittedGenerationContract(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fixture uses a POSIX executable script")
+	}
+	root := t.TempDir()
+	project := filepath.Join(root, "provider")
+	writeMainTestFile(t, root, "provider/clientgen.json", `{
+  "targets":["ts"],
+  "ts":{"output":"clients/ts"},
+  "go":{}
+}`)
+	shim := filepath.Join(project, "clients", "ts", "node_modules", ".bin", "putnami-client-generate")
+	writeMainTestFile(t, root, "provider/clients/ts/node_modules/.bin/putnami-client-generate", "#!/bin/sh\nexit 0\n")
+	if err := os.Chmod(shim, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	jobContext := &pctx.Context{
+		WorkspaceRoot: root,
+		Project:       pctx.Project{Name: "provider", Path: "provider"},
+	}
+	status, output, err := generateTarget(clientcontract.GeneratedLanguageTypeScript)(jobContext, nil, nil)
+	if err != nil || status != "OK" || output["typescriptClientOutput"] != "clients/ts" {
+		t.Fatalf("committed TS target result = status %q output %v err %v", status, output, err)
+	}
+
+	writeMainTestFile(t, root, "provider/.gen/clientgen/config.json", `{"targets":["go"],"go":{},"ts":{}}`)
+	status, output, err = generateTarget(clientcontract.GeneratedLanguageTypeScript)(jobContext, nil, nil)
+	if err != nil || status != "OK" || len(output) != 0 {
+		t.Fatalf("a built contract without a TS target = status %q output %v err %v, want the built contract to win", status, output, err)
 	}
 }
 

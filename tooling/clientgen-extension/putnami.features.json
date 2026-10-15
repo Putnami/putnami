@@ -110,7 +110,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-cacheable-generator-keys-on-the-built-contract-it-reads",
+              "a-cacheable-generator-keys-on-the-committed-contract-and-folds-the-built-one",
               "an-undeclarable-formatter-input-fails-instead-of-being-skipped",
               "every-resolved-formatter-input-is-a-declared-cache-key-entry",
               "the-workspace-root-package-json-keys-the-typescript-target"
@@ -158,6 +158,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "a-committed-generation-contract-reads-only-the-committed-sidecar",
               "an-operation-an-external-authority-owns-is-not-a-provider-operation",
               "built-contracts-win-over-stale-committed-copies",
               "only-indexed-projects-are-provider-authorities",
@@ -290,6 +291,20 @@
               "the-guard-task-is-reachable-only-from-validate-and-the-explicit-check-command",
               "validate-contributes-exactly-one-workspace-guard-for-any-selection",
               "validate-waits-for-the-selected-providers-generation"
+            ]
+          }
+        },
+        {
+          "id": "committed-generated-contract-finding",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-guard-asks-to-ignore-gen-for-a-candidate-no-rule-excludes",
+              "the-guard-reports-a-file-committed-inside-a-build-written-tree"
             ]
           }
         },

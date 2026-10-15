@@ -186,7 +186,7 @@ func runDescribe(ctx *pctx.Context, emit *jsonl.Emitter) (*describeResult, error
 	defer unlock()
 
 	emit.Progress(1, 4, "Compiling host binary")
-	binPath, releaseBinary, err := compileHostBinary(ctx, projectPath)
+	binPath, releaseBinary, err := compileDescribeHost(ctx, projectPath)
 	if err != nil {
 		return nil, fmt.Errorf("compile host binary: %w", err)
 	}
@@ -206,6 +206,9 @@ func runDescribe(ctx *pctx.Context, emit *jsonl.Emitter) (*describeResult, error
 	// or was restored, AND drops whatever an earlier build left there.
 	if err := resetCededSchemaToGenerateStaging(genDir); err != nil {
 		return nil, fmt.Errorf("reset staged schema: %w", err)
+	}
+	if err := resetClientContract(genDir); err != nil {
+		return nil, fmt.Errorf("reset client contract: %w", err)
 	}
 
 	// Snapshot what's already under .gen/schema/ (e.g. files the static
@@ -557,6 +560,10 @@ func hostBinaryTarget(ctx *pctx.Context) string {
 	return filepath.Join(cacheRoot, describeHostBinaryDir, cleaned, describeHostBinaryName)
 }
 
+// compileDescribeHost is the compile step runDescribe takes. A test replaces it
+// with a stand-in binary to observe the tree the describe binary starts from.
+var compileDescribeHost = compileHostBinary
+
 // compileHostBinary runs `go build -o <target>` for the project's describe
 // entrypoint and returns the binary plus the release the caller must defer. We
 // compile a host-platform binary because we're about to run it locally.
@@ -892,6 +899,19 @@ func resetCededSchemaToGenerateStaging(genDir string) error {
 		}
 		return os.WriteFile(target, body, 0o644)
 	})
+}
+
+// resetClientContract removes .gen/clientgen before the describe binary runs.
+//
+// .gen/clientgen is this task's declared output, and only this task writes it:
+// the binary writes the generation contract (config.json) and the staged client
+// when the app configures a client generator, and nothing when it does not. The
+// tree after the run therefore holds what this run wrote and nothing else, so
+// the clientgen tasks never read a contract the current sources do not produce.
+// A project that commits its generation contract keeps it at clientgen.json in
+// its root, outside this tree.
+func resetClientContract(genDir string) error {
+	return os.RemoveAll(filepath.Join(genDir, "clientgen"))
 }
 
 // schemaSnapshot maps an absolute path under .gen/schema/ to its previous

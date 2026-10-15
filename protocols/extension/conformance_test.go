@@ -27,6 +27,7 @@ func TestConformance_SchemaConditionalsValidateFixtures(t *testing.T) {
 		"declared-output-drift-uncommitted.json",
 		"declared-output-drift-path-from-workspace.json",
 		"declared-output-preserve-invalid.json",
+		"declared-output-emptied-invalid.json",
 	} {
 		t.Run("reject "+fixture, func(t *testing.T) {
 			outputs := fixtureDeclaredOutputs(t, filepath.Join("fixtures/invalid", fixture))
@@ -40,7 +41,10 @@ func TestConformance_SchemaConditionalsValidateFixtures(t *testing.T) {
 		})
 	}
 
-	for _, fixture := range []string{lifecycleFixturePath, "fixtures/valid/declared-output-drift.json", "fixtures/valid/declared-output-preserves.json"} {
+	for _, fixture := range []string{
+		lifecycleFixturePath, "fixtures/valid/declared-output-drift.json", "fixtures/valid/declared-output-preserves.json",
+		"fixtures/valid/declared-output-emptied.json",
+	} {
 		for _, output := range fixtureDeclaredOutputs(t, fixture) {
 			if violations := conditionalSchemaViolations(declaredOutput, output); violations != 0 {
 				t.Errorf("%s valid output violates %d schema conditions: %v", fixture, violations, output)
@@ -305,6 +309,10 @@ var v3ValidFixtures = map[string]bool{
 	// project document and module files are preserved on a pathFrom output
 	// (protocol ADR 0005).
 	"declared-output-preserves.json": true,
+	// A described contract only its task writes, emptied before the task
+	// executes and on a restore of an empty record, under the project and the
+	// workspace root (protocol ADR 0009).
+	"declared-output-emptied.json": true,
 }
 
 // v3InvalidFixtureCodes maps each v3 conformance counter-example to the exact
@@ -363,6 +371,14 @@ var v3InvalidFixtureCodes = map[string][]string{
 	// PRESERVES — a file has no subpath, an entry never escapes the output,
 	// and one path is preserved once, however it is spelled.
 	"declared-output-preserve-invalid.json": {"invalid-output-path", "duplicate-output-preserve", "invalid-output-preserve"},
+	// EMPTIED — the flag names an optional project or workspace directory the
+	// engine can empty before the run: not an optional command-output
+	// directory or a required one, which it empties already, and not a file, a
+	// pathFrom output or an invocation-scoped output.
+	"declared-output-emptied-invalid.json": {
+		"invalid-output-emptied", "invalid-output-emptied", "invalid-output-emptied", "invalid-output-emptied",
+		"invalid-output-emptied",
+	},
 }
 
 // lifecycleInvalidFixtureCodes is the manifest-level counterpart of
@@ -488,6 +504,9 @@ func TestConformance_TaskContracts_CoversEveryFeature(t *testing.T) {
 				if output.OptionalEmpty {
 					covered["optionalEmpty"] = true
 				}
+				if output.Emptied {
+					covered["emptied"] = true
+				}
 				if len(output.Excludes) != 0 {
 					covered["excludes"] = true
 				}
@@ -499,7 +518,7 @@ func TestConformance_TaskContracts_CoversEveryFeature(t *testing.T) {
 	}
 
 	features := []string{
-		"mutatesSources", "pathFrom", "path", "optionalEmpty", "sensitive", "excludes",
+		"mutatesSources", "pathFrom", "path", "optionalEmpty", "emptied", "sensitive", "excludes",
 		"kind:" + OutputKindFile, "kind:" + OutputKindDirectory, "kind:" + OutputKindRuntimeFile,
 		"root:" + OutputRootProject, "root:" + OutputRootWorkspace, "root:" + OutputRootCommandOutput,
 		"root:" + OutputRootInvocation,

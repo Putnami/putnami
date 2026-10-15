@@ -40,8 +40,8 @@ type EmptiedOutputDeclaration struct {
 
 // EmptiedOutputDeclarations returns, in id order, the declared outputs of job
 // that the scheduler empties before the job executes: every durable directory
-// output whose path the declaration states, when it is required or lives under
-// the command-output root.
+// output whose path the declaration states, when it is required, lives under
+// the command-output root, or declares emptied.
 //
 // A required output is recorded present in every entry, so a restore prunes
 // exactly what the emptying removes. An optionalEmpty output under the
@@ -51,10 +51,13 @@ type EmptiedOutputDeclaration struct {
 // on an earlier run. An entry can record it empty, and a restore of that
 // record empties it the same way (materializeDeclaredOutputs).
 //
-// An optionalEmpty output under the project or the workspace root is left out.
-// It can hold a file no task writes, such as a committed configuration the
-// task reads when it writes nothing there, and a restore of an entry that
-// records it empty leaves it as it stands (store.TaskOutputEmpty).
+// An optionalEmpty output under the project or the workspace root is emptied
+// when it declares emptied (ADR 0068): its task states that only it writes the
+// path, so the output holds what the task wrote and the subpaths it cedes or
+// preserves. Without the flag it is left out. It can hold a file no task
+// writes, such as a committed configuration the task reads when it writes
+// nothing there, and a restore of an entry that records it empty leaves it as
+// it stands (store.TaskOutputEmpty).
 //
 // A pathFrom output is left out because its path is known only after the run,
 // and an invocation-scoped one because it lives in a tree created for the run.
@@ -86,7 +89,7 @@ func EmptiedOutputDeclarations(job *jobmodel.ScheduledJob) []EmptiedOutputDeclar
 		switch output.EffectiveRoot() {
 		case extension.OutputRootCommandOutput:
 		case extension.OutputRootProject, extension.OutputRootWorkspace:
-			if output.OptionalEmpty {
+			if output.OptionalEmpty && !output.Emptied {
 				continue
 			}
 		default:

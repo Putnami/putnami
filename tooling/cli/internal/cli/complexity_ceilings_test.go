@@ -601,7 +601,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "cache",
 		prefix: "internal/store/",
 		files:  34,
-		funcs:  305,
+		funcs:  306,
 		why: "internal/store: the content-addressed local cache — entries, task entries, CAS, " +
 			"leases, GC, generations and the remote bridge. Cache-key completeness and atomicity " +
 			"under concurrency are the two invariants this repository has been burned by most " +
@@ -803,7 +803,13 @@ var complexityCeilings = []complexityCeiling{
 			"across an invalidation only when that invalidation named a path in its region, or " +
 			"when the memo no longer remembers what it named, so a task finishing elsewhere no " +
 			"longer costs the next reader of a large tree a second hash. None reads, writes, " +
-			"addresses or evicts an entry",
+			"addresses or evicts an entry. " +
+			"RAISED, from 34/305 to 34/306, with no new file. gitInputPrefixes bounds the Git " +
+			"candidate listing of a `git:` input to the roots gitPatternRoot already gives " +
+			"FileInputRegion, so a key that reads one file no longer lists the whole repository. " +
+			"The bounded listing selects the same files, so every key hashes the same bytes " +
+			"(cache_git_test.go pins it), and an unbounded pattern such as `**` lists the whole " +
+			"cut as before. It reads, writes, addresses or evicts no entry",
 	},
 	{
 		unit:   "output",

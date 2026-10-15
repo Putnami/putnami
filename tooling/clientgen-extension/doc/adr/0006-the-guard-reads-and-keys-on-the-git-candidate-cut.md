@@ -49,7 +49,10 @@ committed sidecar `schema/openapi.json`, and the targets are the committed
 because a tracked file is a candidate whatever the ignore rules say. Nothing
 the verdict depends on comes only from an ignored file: discovery already
 preferred the sidecar and the manifests, so that a cold clone and a built tree
-reach one verdict.
+reach one verdict. A provider that commits its generation contract keeps it at
+`clientgen.json` in its root, outside the `.gen/clientgen` tree the Go
+`build-describe` empties ([CLI ADR 0068](../../../cli/doc/adr/0068-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md)). It is a candidate, so the
+check reads it, and its targets win over the manifests.
 
 **4. The task is keyed on `git:**`.** It declares the project-scoped input
 `{"repository": {"from": "project", "files": ["git:**"]}}` and
@@ -79,3 +82,23 @@ on another branch or in another directory is a hit.
   unchanged tree costs every `validate` its scan.
 - **Read the index from the cut.** Git ignores it, so it is absent from every
   cut.
+
+## Note (2026-10-15)
+
+A file committed under `.gen/clientgen` or `.gen/schema` is no longer
+supported. The Go `build-describe` owns both trees whole and fails while Git
+tracks a file there, and the TypeScript `build-generate` owns `.gen` whole and
+deletes such a file
+([CLI ADR 0068](../../../cli/doc/adr/0068-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md)).
+This is a breaking change, and under D-004 it ships in a minor release.
+Decision 3 still reads such a file when the cut holds it, and the check now
+also reports each one as `clientgen.committed-generated-contract`, naming its
+committed home: `clientgen.json` for the generation contract and
+`schema/openapi.json` for the OpenAPI document, each at the project root. An
+unmarked third-party provider now reads as first-party unless the project
+commits `thirdParty` in `clientgen.json`.
+
+The finding reads the cut, as decision 4 keys it. A tracked file deleted from
+the worktree is not in the cut, and that tree's key equals the key of a tree
+that never tracked the file, so the check does not report it; the Go
+`build-describe` still fails on it, because the index tracks it.

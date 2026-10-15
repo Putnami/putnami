@@ -331,11 +331,18 @@ type ownerRow struct {
 	// task is the first writer of that directory in a session, so it is the
 	// only place the pre-write bytes can be compared with.
 	drift string
+	// emptied asks the engine to empty an optional directory output before its
+	// task executes and on a restore of an entry that records it empty
+	// (protocols/extension ADR 0009, CLI ADR 0068). Only the two describe trees
+	// a later key leaves out carry it: .gen/schema and .gen/clientgen hold no
+	// byte describe's key does not fix, so the clientgen keys fold that key
+	// instead of hashing the bytes describe writes during the run.
+	emptied bool
 }
 
 func (r ownerRow) String() string {
-	return fmt.Sprintf("%s.%s = %s %s:%s optionalEmpty=%t excludes=[%s] drift=%q",
-		r.task, r.id, r.kind, r.root, r.path, r.optionalEmpty, r.excludes, r.drift)
+	return fmt.Sprintf("%s.%s = %s %s:%s optionalEmpty=%t emptied=%t excludes=[%s] drift=%q",
+		r.task, r.id, r.kind, r.root, r.path, r.optionalEmpty, r.emptied, r.excludes, r.drift)
 }
 
 // TestDeclaredOutputOwnerTable pins the declared output ownership as a
@@ -379,6 +386,13 @@ func (r ownerRow) String() string {
 //   - The committed `schema/config.json` pair has three writers (build-generate,
 //     build-describe, config-extract-exec). Resolved by SINGLE DECLARED OWNER:
 //     config-extract-exec, the one task whose cache hit must reproduce it.
+//   - build-describe's `.gen/schema` and `.gen/clientgen` are the only
+//     optional project outputs that declare `emptied`. No committed file lives
+//     in either: a provider slice commits its generation contract as
+//     clientgen.json at its root. The engine empties both before describe
+//     executes and on a restore of an entry that records them empty, so a
+//     describe that skips or writes nothing leaves no earlier run's bytes for
+//     the clientgen tasks to read.
 //   - test-env-up's two rows are the only INVOCATION-scoped outputs here (an
 //     earlier migration). They collide with nothing by construction: they live in
 //     the orchestrator's private per-invocation tree, not in the project or the
@@ -400,11 +414,11 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 		{task: "build-compile", id: "bin", kind: "directory", root: "command-output", path: "bin", optionalEmpty: true},
 		{task: "build-cross-compile", id: "bin", kind: "directory", root: "command-output", path: "bin", optionalEmpty: true},
 		{task: "build-describe", id: "client", kind: "directory", root: "project", path: "clientOutputs", optionalEmpty: true, drift: "fail"},
-		{task: "build-describe", id: "clientgen", kind: "directory", root: "project", path: ".gen/clientgen", optionalEmpty: true},
+		{task: "build-describe", id: "clientgen", kind: "directory", root: "project", path: ".gen/clientgen", optionalEmpty: true, emptied: true},
 		{task: "build-describe", id: "design", kind: "directory", root: "project", path: ".gen/design", optionalEmpty: true},
 		{task: "build-describe", id: "migrationBundle", kind: "directory", root: "project", path: ".gen/migration-bundle", optionalEmpty: true},
 		{task: "build-describe", id: "migrations", kind: "file", root: "project", path: ".gen/migrations.json", optionalEmpty: true},
-		{task: "build-describe", id: "schema", kind: "directory", root: "project", path: ".gen/schema", optionalEmpty: true},
+		{task: "build-describe", id: "schema", kind: "directory", root: "project", path: ".gen/schema", optionalEmpty: true, emptied: true},
 		{task: "build-generate", id: "gen", kind: "directory", root: "project", path: ".gen", excludes: strings.Join(cededGenSubpaths, ",")},
 		// The aggregated deployability manifest and its runtime defaults
 		// sidecar, at the ceded .gen/requirements.json and
@@ -471,6 +485,7 @@ func declaredOwnerRows(m *proto.Manifest) []ownerRow {
 				optionalEmpty: output.OptionalEmpty,
 				excludes:      strings.Join(output.Excludes, ","),
 				drift:         output.Drift,
+				emptied:       output.Emptied,
 			})
 		}
 	}

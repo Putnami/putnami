@@ -22,7 +22,12 @@ A provider lists `/tooling/clientgen-extension` in its `putnami.json`
 `extensions`, then declares its targets — `api.Clients(...)` in Go,
 `clientGenerator(...)` in TypeScript. The provider build writes
 `.gen/clientgen/config.json` and the marked OpenAPI and Proto artifacts; those
-are the only seam between the two toolchains.
+are the only seam between the two toolchains. A provider with no app to build,
+such as a `cloud/clients` slice, commits the same contract as `clientgen.json`
+at its root and its OpenAPI document as `schema/openapi.json`. The emitters and
+the guard read `clientgen.json` when no build wrote `.gen/clientgen/config.json`,
+and the emitters then read `schema/openapi.json` only, never a `.gen/schema`
+an earlier build left.
 
 The same-language client is emitted in-app during `putnami build`. The
 cross-language client is emitted by `putnami clientgen`, which runs the other
@@ -92,6 +97,7 @@ caches is the worktree.
 | A manifest's `omittedOperations` names an operation the provider does not declare (`clientgen.omitted-operation-drift`) | Remove the name from `go.omitOperations`, then sync |
 | A handwritten transport call reaches a first-party provider | Replace it with the generated binding, or classify it (below) |
 | An unmarked OpenAPI document is generated without `thirdParty: true` | Mark the provider, or declare the contract external |
+| A project commits a file under `.gen/clientgen` or `.gen/schema`, which a build owns whole, or does not ignore `.gen` (`clientgen.committed-generated-contract`) | Run the command the finding names: `git mv <project>/.gen/clientgen/config.json <project>/clientgen.json`, `mkdir -p <project>/schema && git mv <project>/.gen/schema/openapi.json <project>/schema/openapi.json`, or `git rm --cached` for a build's output. Then ignore `.gen` in `.gitignore` and drop any `!config.json` carve-out under it |
 
 Every transport callsite the scanner finds is either associated with a
 first-party provider — which fails, because a generated binding must replace it

@@ -33,9 +33,12 @@ type ProjectClientResult struct {
 	Omitted []string
 }
 
-// GenerateProjectClients reads the client-generation contract and OpenAPI spec a
-// build already produced under projectRoot and emits the Go client directly into
-// projectRoot/<go.output> (default clients/go). It is the standalone, app-less
+// GenerateProjectClients reads the client-generation contract and OpenAPI spec of
+// the project at projectRoot and emits the Go client directly into
+// projectRoot/<go.output> (default clients/go). The contract is the one a build
+// wrote at .gen/clientgen/config.json, or the committed clientgen.json when no
+// build wrote one; the spec comes from the same origin (see readProjectSpec).
+// It is the standalone, app-less
 // counterpart of the [ClientsPlugin] describer: the workspace `clientgen` command
 // runs it — in its own Go toolchain — to emit a Go client for a provider written
 // in ANOTHER language (e.g. a TypeScript service), reading that provider's OWN
@@ -49,8 +52,7 @@ type ProjectClientResult struct {
 // contract, the go target is disabled, or the spec exposes no services, so callers
 // can treat "nothing to do" as success.
 func GenerateProjectClients(projectRoot string) (ProjectClientResult, error) {
-	cfgPath := filepath.Join(projectRoot, ".gen", ClientGenConfigPath)
-	raw, err := readTrustedFile(cfgPath)
+	raw, cfgPath, err := readProjectClientGenConfig(projectRoot)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return ProjectClientResult{}, nil // no client generator configured for this project
@@ -70,7 +72,8 @@ func GenerateProjectClients(projectRoot string) (ProjectClientResult, error) {
 		return result, nil
 	}
 
-	specJSON, specPath, err := readProjectSpec(projectRoot)
+	built := cfgPath == filepath.Join(projectRoot, ".gen", ClientGenConfigPath)
+	specJSON, specPath, err := readProjectSpec(projectRoot, built)
 	if err != nil {
 		return result, err
 	}
@@ -198,17 +201,43 @@ func renderGeneratedGoProject(modulePath string) string {
 	return string(body) + "\n"
 }
 
-// readProjectSpec resolves the OpenAPI spec a build produced for projectRoot,
-// trying the fresh .gen JSON first, then its gzipped companion, and only then
-// the committed fallback. A build is the provider source of truth for a sync;
-// a stale tracked schema must never win over the contract just produced.
-func readProjectSpec(projectRoot string) ([]byte, string, error) {
-	for _, p := range []string{
-		filepath.Join(projectRoot, ".gen", "schema", "openapi.json"),
-	} {
-		if body, err := readTrustedFile(p); err == nil {
-			return body, p, nil
+// readProjectClientGenConfig reads the generation contract a build wrote at
+// .gen/clientgen/config.json and, when no build wrote one, the contract the
+// project commits at clientgen.json. It returns the path it read. When neither
+// exists, the error satisfies os.IsNotExist.
+func readProjectClientGenConfig(projectRoot string) ([]byte, string, error) {
+	built := filepath.Join(projectRoot, ".gen", ClientGenConfigPath)
+	raw, err := readTrustedFile(built)
+	if err == nil || !os.IsNotExist(err) {
+		return raw, built, err
+	}
+	committed := filepath.Join(projectRoot, CommittedClientGenConfigPath)
+	raw, err = readTrustedFile(committed)
+	return raw, committed, err
+}
+
+// readProjectSpec resolves the OpenAPI spec that pairs with the generation
+// contract GenerateProjectClients read. With a contract a build wrote (built),
+// it tries the fresh .gen JSON first, then its gzipped companion, and only then
+// the committed fallback: a build is the provider source of truth for a sync,
+// and a stale tracked schema must never win over the contract just produced.
+// With the committed clientgen.json, it reads the committed schema/openapi.json
+// only: no build wrote the contract then, so a .gen/schema file is whatever an
+// earlier build left, and no cache key covers it.
+func readProjectSpec(projectRoot string, built bool) ([]byte, string, error) {
+	committed := filepath.Join(projectRoot, "schema", "openapi.json")
+	if !built {
+		body, err := readTrustedFile(committed)
+		if err != nil {
+			return nil, committed, fmt.Errorf(
+				"clientgen: %s commits its generation contract as %s, so it must commit its OpenAPI spec as schema/openapi.json: %w",
+				projectRoot, CommittedClientGenConfigPath, err)
 		}
+		return body, committed, nil
+	}
+	fresh := filepath.Join(projectRoot, ".gen", "schema", "openapi.json")
+	if body, err := readTrustedFile(fresh); err == nil {
+		return body, fresh, nil
 	}
 	gz := filepath.Join(projectRoot, ".gen", "schema", "openapi.json.gz")
 	if body, err := readTrustedFile(gz); err == nil {
@@ -226,7 +255,6 @@ func readProjectSpec(projectRoot string) ([]byte, string, error) {
 		}
 		return decoded, gz, nil
 	}
-	committed := filepath.Join(projectRoot, "schema", "openapi.json")
 	if body, err := readTrustedFile(committed); err == nil {
 		return body, committed, nil
 	}

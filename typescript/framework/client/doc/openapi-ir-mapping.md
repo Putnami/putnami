@@ -93,7 +93,9 @@ nested object degrades (it is *not* a named type).
 ## `.gen/clientgen/config.json`
 
 The `clientGenerator()` plugin writes this contract during `postGenerate()` —
-the single source of truth every emitter reads.
+the single source of truth every emitter reads. A project with no app to build
+commits the same contract as `clientgen.json` at its root, and every emitter
+reads that file when no build wrote `.gen/clientgen/config.json`.
 
 ```jsonc
 {

@@ -131,7 +131,8 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 
 // TestAConfigChosenOutputIsNeverClaimedAtALiteralPath is the descendant of the
 // recorded gap this project used to carry. The generated client directory is
-// chosen by the provider's `.gen/clientgen/config.json`, so a literal `path`
+// chosen by the provider's generation contract (`.gen/clientgen/config.json`,
+// or the committed `clientgen.json`), so a literal `path`
 // would be a claim the configuration can move out from under. Until the
 // generators reported their output the only honest answer was to claim nothing;
 // now they report it, and the only honest answer is a pathFrom naming that

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "build": {
+      "run": [
+        { "id": "generate", "task": "build-generate" },
+        { "id": "scratch", "task": "build-scratch" }
+      ]
+    }
+  },
+  "tasks": {
+    "build-generate": {
+      "kind": "command",
+      "command": "echo",
+      "outputs": {
+        "clientOutput": { "description": "Project-relative directory of the generated client." }
+      },
+      "declares": {
+        "outputs": {
+          "bin": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "bin",
+            "optionalEmpty": true,
+            "emptied": true,
+            "description": "The engine already empties an optional command-output directory."
+          },
+          "file": {
+            "kind": "file",
+            "path": "dist/app.js",
+            "optionalEmpty": true,
+            "emptied": true,
+            "description": "A file is replaced whole."
+          },
+          "port": {
+            "kind": "directory",
+            "pathFrom": "clientOutput",
+            "optionalEmpty": true,
+            "emptied": true,
+            "description": "A pathFrom value is unknown until the task runs."
+          },
+          "required": {
+            "kind": "directory",
+            "path": ".gen/required",
+            "emptied": true,
+            "description": "The engine already empties a required directory output."
+          }
+        }
+      }
+    },
+    "build-scratch": {
+      "kind": "command",
+      "command": "echo",
+      "cache": { "enabled": false },
+      "declares": {
+        "outputs": {
+          "scratch": {
+            "kind": "directory",
+            "scope": "invocation",
+            "path": "scratch",
+            "optionalEmpty": true,
+            "emptied": true,
+            "description": "An invocation-scoped output lives in a tree created for the run."
+          }
+        }
+      }
+    }
+  }
+}

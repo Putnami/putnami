@@ -208,6 +208,22 @@ func TestTaskContractDigest_ContractMembersMove(t *testing.T) {
 	}
 }
 
+// The engine empties an emptied output before an execution and on a restore of
+// an empty record, so the flag changes the tree a hit leaves and moves the
+// digest on its own.
+func TestTaskContractDigest_EmptiedMoves(t *testing.T) {
+	optional := func(emptied bool) TaskDefinition {
+		task := digestTask()
+		task.Declares.Outputs["report"] = DeclaredOutput{
+			Kind: OutputKindDirectory, Path: "out", OptionalEmpty: true, Emptied: emptied,
+		}
+		return task
+	}
+	if TaskContractDigest(optional(true)) == TaskContractDigest(optional(false)) {
+		t.Fatal("emptied did not move the digest")
+	}
+}
+
 func TestTaskContractDigest_DoesNotMutateItsArgument(t *testing.T) {
 	task := digestTask()
 	task.Declares.Effects = []string{"network", "locks"} // deliberately unsorted

@@ -1,7 +1,16 @@
 import { describe, expect, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { specTest } from '@putnami/runtime/spectest';
@@ -262,6 +271,36 @@ describe('generateProjectClients (TypeScript)', () => {
     FORMATTER_TEST_TIMEOUT_MS,
   );
 
+  // A provider slice with no app commits its generation contract as
+  // clientgen.json at its root: the Go build-describe empties .gen/clientgen, so
+  // a contract committed there is gone before the generator reads it.
+  test(
+    'reads the committed clientgen.json when no build wrote a contract, and a built one wins',
+    () => {
+      const root = setupProject({
+        'clientgen.json': TS_CONFIG,
+        'schema/openapi.json': MINIMAL_SPEC,
+      });
+      const committed = generateProjectClients(root);
+      expect(committed.generated).toBe(true);
+      expect(committed.outputDir).toBe('clients/ts');
+      expect(existsSync(join(root, 'clients/ts/src/index.ts'))).toBe(true);
+
+      const built = join(root, '.gen/clientgen/config.json');
+      mkdirSync(dirname(built), { recursive: true });
+      writeFileSync(
+        built,
+        JSON.stringify({
+          targets: ['go'],
+          ts: { output: 'clients/ts', packageName: '@example/c' },
+          go: { output: 'clients/go', modulePath: '', packageName: 'client', clientName: 'Client' },
+        }),
+      );
+      expect(generateProjectClients(root).generated).toBe(false);
+    },
+    FORMATTER_TEST_TIMEOUT_MS,
+  );
+
   test(
     'no-op when the ts target is disabled',
     () => {
@@ -307,6 +346,30 @@ describe('generateProjectClients (TypeScript)', () => {
       const source = readFileSync(join(root, 'clients/ts/src/fresh-client.ts'), 'utf8');
       expect(source).toContain("'/fresh/{id}'");
       expect(existsSync(join(root, 'clients/ts/src/stale-client.ts'))).toBe(false);
+    },
+    FORMATTER_TEST_TIMEOUT_MS,
+  );
+
+  // The spec pairs with the contract's origin. A committed clientgen.json reads
+  // the committed schema/openapi.json only: no cache key covers a .gen/schema an
+  // earlier build left in a project whose build does not write the contract.
+  test(
+    'a committed clientgen.json reads the committed spec, never a .gen spec',
+    () => {
+      const committed = MINIMAL_SPEC.replaceAll('/items/{id}', '/committed/{id}').replace('getItem', 'getCommitted');
+      const leftover = MINIMAL_SPEC.replaceAll('/items/{id}', '/leftover/{id}').replace('getItem', 'getLeftover');
+      const root = setupProject({
+        'clientgen.json': TS_CONFIG,
+        'schema/openapi.json': committed,
+        '.gen/schema/openapi.json': leftover,
+      });
+
+      generateProjectClients(root);
+      expect(readFileSync(join(root, 'clients/ts/src/committed-client.ts'), 'utf8')).toContain("'/committed/{id}'");
+      expect(existsSync(join(root, 'clients/ts/src/leftover-client.ts'))).toBe(false);
+
+      rmSync(join(root, 'schema/openapi.json'));
+      expect(() => generateProjectClients(root)).toThrow('must commit its OpenAPI spec as schema/openapi.json');
     },
     FORMATTER_TEST_TIMEOUT_MS,
   );

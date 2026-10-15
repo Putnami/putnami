@@ -378,6 +378,93 @@ func TestResetCededSchemaDropsARemovedProducersArtifact(t *testing.T) {
 	}
 }
 
+// An app that no longer configures a client generator leaves no earlier
+// contract behind: the clientgen tasks read .gen/clientgen/config.json before
+// the committed clientgen.json, so a stale one would select targets the
+// current sources do not produce. The reset removes the whole tree and nothing
+// else under .gen.
+func TestResetClientContractDropsAnEarlierRunsContract(t *testing.T) {
+	genDir := filepath.Join(t.TempDir(), ".gen")
+	for rel, body := range map[string]string{
+		"clientgen/config.json":      `{"targets":["go"]}`,
+		"clientgen/go/client.gen.go": "package client\n",
+		"schema/openapi.json":        `{"openapi":"3.1.0"}`,
+		"generate-result.json":       `{}`,
+	} {
+		path := filepath.Join(genDir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := resetClientContract(genDir); err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(genDir, "clientgen")); !os.IsNotExist(err) {
+		t.Errorf("an earlier run's .gen/clientgen survived the reset: %v", err)
+	}
+	for _, rel := range []string{"schema/openapi.json", "generate-result.json"} {
+		if _, err := os.Stat(filepath.Join(genDir, filepath.FromSlash(rel))); err != nil {
+			t.Errorf("the reset removed %s, which it does not own: %v", rel, err)
+		}
+	}
+	// A project that never wrote a contract resets without an error.
+	if err := resetClientContract(genDir); err != nil {
+		t.Errorf("reset of an absent tree: %v", err)
+	}
+}
+
+// runDescribe removes an earlier run's .gen/clientgen before the describe
+// binary starts, so a binary that writes no contract leaves none behind. The
+// stand-in binary records whether the tree exists when it runs.
+func TestRunDescribeStartsTheBinaryWithoutAnEarlierClientContract(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script stand-in not portable to Windows")
+	}
+	workspace := t.TempDir()
+	projectDir := filepath.Join(workspace, "svc")
+	for rel, body := range map[string]string{
+		"go.mod":                     "module example.com/svc\n\nrequire go.putnami.dev/app v0.1.0\n",
+		"main.go":                    "package main\n\nimport _ \"go.putnami.dev/app\"\n\nfunc main() {}\n",
+		".gen/clientgen/config.json": `{"targets":["go"],"go":{"output":"clients/go"}}`,
+		".gen/clientgen/go/old.go":   "package client\n",
+	} {
+		path := filepath.Join(projectDir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	observed := filepath.Join(t.TempDir(), "observed")
+	binPath := writeShellBinary(t, `#!/bin/sh
+if [ -e "$PUTNAMI_DESCRIBE_OUT/clientgen" ]; then echo present > '`+observed+`'; else echo absent > '`+observed+`'; fi
+`)
+	compile := compileDescribeHost
+	compileDescribeHost = func(*pctx.Context, string) (string, func(), error) { return binPath, func() {}, nil }
+	t.Cleanup(func() { compileDescribeHost = compile })
+
+	ctx := &pctx.Context{WorkspaceRoot: workspace, CacheRoot: t.TempDir(), Project: pctx.Project{Path: "svc", FullPath: projectDir}, Params: pctx.Params{}}
+	if _, err := runDescribe(ctx, jsonl.New()); err != nil {
+		t.Fatalf("runDescribe: %v", err)
+	}
+	seen, err := os.ReadFile(observed)
+	if err != nil {
+		t.Fatalf("the describe binary did not run: %v", err)
+	}
+	if got := strings.TrimSpace(string(seen)); got != "absent" {
+		t.Errorf("the describe binary started with .gen/clientgen %s, want it removed first", got)
+	}
+	if _, err := os.Stat(filepath.Join(projectDir, ".gen", "clientgen")); !os.IsNotExist(err) {
+		t.Errorf("a describe whose binary writes no contract left .gen/clientgen behind: %v", err)
+	}
+}
+
 // A project whose generators produce no contract hands nothing over, and that is
 // not an error: the mirror simply does not exist.
 func TestResetCededSchemaWithoutAMirrorIsANoOp(t *testing.T) {

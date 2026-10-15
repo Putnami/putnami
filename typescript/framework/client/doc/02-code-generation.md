@@ -264,7 +264,7 @@ Factory function that creates a `ClientGeneratorPlugin` instance.
 - `@myorg/users-api` → `@myorg/users-api-client`
 - `users-api` → `users-api-client`
 
-The plugin always writes the resolved generation contract to `.gen/clientgen/config.json` — the single source of truth every per-language emitter reads. See [`openapi-ir-mapping.md`](./openapi-ir-mapping.md#genclientgenconfigjson) for the schema and defaults.
+The plugin always writes the resolved generation contract to `.gen/clientgen/config.json` — the single source of truth every per-language emitter reads. A project with no app to build commits the contract as `clientgen.json` at its root instead, and the emitters read it when no build wrote `.gen/clientgen/config.json`. See [`openapi-ir-mapping.md`](./openapi-ir-mapping.md#genclientgenconfigjson) for the schema and defaults.
 
 ### `generateTypeScriptClient(specIR, options): GeneratedFile[]`
 

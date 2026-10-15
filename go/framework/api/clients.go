@@ -27,6 +27,12 @@ const describerNameClients = "clients"
 // runner reads to learn the targets, output dirs, and module/package naming.
 const ClientGenConfigPath = "clientgen/config.json"
 
+// CommittedClientGenConfigPath is the project-relative path of a generation
+// contract the project commits instead of building, such as a provider slice
+// with no app. A reader that finds no .gen/clientgen/config.json reads it.
+// It lives outside .gen because build-describe empties .gen/clientgen.
+const CommittedClientGenConfigPath = "clientgen.json"
+
 // ClientStageDir is the OutputDir-relative directory the describer stages
 // generated client code into (e.g. .gen/clientgen/go/client.gen.go). The build
 // runner mirrors it into the configured output directory in the project tree —

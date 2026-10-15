@@ -50,6 +50,17 @@ func OptionalEmpty() OutputOption {
 	return func(o *proto.DeclaredOutput) { o.OptionalEmpty = true }
 }
 
+// Emptied asks the engine to empty an OptionalEmpty project or workspace
+// directory before the task executes, and on a restore of an entry that
+// records it empty, as it empties a required directory. Use it when only this
+// task writes the path, so no committed file lives there: what the directory
+// holds is then a function of the task's key, and a later task that reads it
+// can fold that key instead of hashing the bytes. Build rejects it on any
+// other shape (protocols/extension ADR 0009).
+func Emptied() OutputOption {
+	return func(o *proto.DeclaredOutput) { o.Emptied = true }
+}
+
 // FailOnDrift asks the engine to compare the bytes this task produces (or a
 // cache hit restores) with the bytes present at the path immediately before,
 // and to FAIL the task with the diagnostic `generated-output-drift` when they

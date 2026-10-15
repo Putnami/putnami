@@ -354,6 +354,7 @@ wiring — though a declared output may take its path from such a port (see
 | `path` | one of | Literal root-relative path |
 | `pathFrom` | one of | Name of a port in the task's `outputs` map whose runtime value is the path |
 | `optionalEmpty` | no | The output may legitimately be absent, or empty, after a successful run |
+| `emptied` | no | The engine empties this `optionalEmpty` **directory** output before the task executes and on a restore of an entry that records it empty. Requires a durable scope, a literal `path`, and the `project` or `workspace` root |
 | `excludes` | no | Root-relative subpaths this **directory** output cedes: neither captured nor restored with it, and ownable by another task |
 | `preserves` | no | Output-relative subpaths of this **directory** output the workspace owns (a `putnami.json`, a `go.mod`): never captured, never replaced or deleted by a restore, never judged for drift. Allowed on a `pathFrom` output |
 | `drift` | no | `warn` or `fail`: the engine compares the bytes the task produces (or a cache hit restores) with the bytes present at the path immediately before, and reports a difference as `generated-output-drift` |
@@ -385,10 +386,20 @@ disagree". Without the flag, a missing declared output is a defect.
 
 Before a task executes, the engine empties each directory output with a
 literal `path` that the task owns, except an `optionalEmpty` one under the
-`project` or `workspace` root. A restore of an entry that recorded an
-`optionalEmpty` `command-output` directory empty also empties it. A task keeps
-no state there that must outlive a run. See
+`project` or `workspace` root that does not set `emptied`. A restore of an
+entry that recorded an emptied `optionalEmpty` output empty also empties it.
+A task keeps no state there that must outlive a run. See
 [task-owned entries](../../../tooling/cli/doc/10-caching.md#task-owned-entries-declared-outputs).
+
+An `optionalEmpty` output under the `project` or `workspace` root can hold a
+file no task writes, such as a committed configuration, so the engine leaves it
+as it stands unless the output sets `emptied`. Set `emptied` when only the task
+writes the path. The output then holds what the task's last execution or
+restore wrote and nothing else, so a later task that reads it can fold the
+task's key instead of hashing its bytes
+([ADR 0009](adr/0009-an-optional-project-output-may-ask-to-be-emptied.md)). An
+`optionalEmpty` `command-output` directory and a required directory are emptied
+without the flag, and declaring it there is an error.
 
 #### Ceding a Subpath (`excludes`)
 

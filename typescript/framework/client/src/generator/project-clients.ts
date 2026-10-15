@@ -14,6 +14,14 @@ import { generateTypeScriptClient } from './ts/ts-generator';
 /** Project-relative path of the client-generation contract a build emits. */
 const CONFIG_REL = '.gen/clientgen/config.json';
 
+/**
+ * Project-relative path of a client-generation contract the project commits
+ * instead of building, such as a provider slice with no app. It is read when no
+ * build wrote {@link CONFIG_REL}, and lives outside `.gen` because the Go
+ * `build-describe` empties `.gen/clientgen`.
+ */
+const COMMITTED_CONFIG_REL = 'clientgen.json';
+
 /** Result of {@link generateProjectClients}. */
 export interface ProjectClientResult {
   /** True when a TypeScript client was emitted (ts target enabled + the spec exposed services). */
@@ -66,9 +74,13 @@ interface GeneratedClientManifest {
 const MANIFEST_FILE = 'client.putnami.json';
 
 /**
- * Emit the TypeScript client for a provider from the OpenAPI spec and contract a
- * build already produced under `projectRoot`, writing it into
- * `projectRoot/<ts.output>` (default `clients/ts`).
+ * Emit the TypeScript client for a provider from the OpenAPI spec and the
+ * generation contract of the project at `projectRoot`, writing it into
+ * `projectRoot/<ts.output>` (default `clients/ts`). The contract is the one a
+ * build wrote at `.gen/clientgen/config.json`, or the committed
+ * `clientgen.json` when no build wrote one. The spec comes from the same
+ * origin: a built contract reads the `.gen` spec first, and a committed one
+ * reads the committed `schema/openapi.json` only.
  *
  * This is the standalone, app-less counterpart of {@link ClientGeneratorPlugin}'s
  * in-app `postGenerate()`: the workspace `clientgen` command runs it — in its own
@@ -84,8 +96,10 @@ const MANIFEST_FILE = 'client.putnami.json';
  * or the provider's Biome configuration cannot be applied before writing.
  */
 export function generateProjectClients(projectRoot: string, selected: ProjectClientSource = {}): ProjectClientResult {
-  const configPath = joinPath(projectRoot, CONFIG_REL);
-  if (!fileExists(configPath)) {
+  const configPath = [CONFIG_REL, COMMITTED_CONFIG_REL]
+    .map((rel) => joinPath(projectRoot, rel))
+    .find((path) => fileExists(path));
+  if (configPath === undefined) {
     return { generated: false, outputDir: '', files: [] };
   }
   const config: ClientGenConfig = JSON.parse(readFileSync(configPath, 'utf8'));
@@ -94,7 +108,10 @@ export function generateProjectClients(projectRoot: string, selected: ProjectCli
     return { generated: false, outputDir: outputRel, files: [] };
   }
 
-  const projectSpec = readProjectSpec(projectRoot, config, selected.sourcePath);
+  const built = configPath === joinPath(projectRoot, CONFIG_REL);
+  const projectSpec = built
+    ? readBuiltProjectSpec(projectRoot, config, selected.sourcePath)
+    : readCommittedProjectSpec(projectRoot, config);
   const specIR = projectSpec.ir;
   const outputDir = resolveOutputDirectory(projectRoot, outputRel);
   const formatOutputDir = resolveOutputDirectory(selected.formatProjectRoot ?? projectRoot, outputRel);
@@ -302,31 +319,48 @@ function resolveOwnedPath(outputDir: string, relativePath: string): string {
 }
 
 /**
- * Resolve the OpenAPI spec a build produced for `projectRoot`, preferring the
- * fresh `.gen` JSON or gzipped artifact before the committed snapshot. This covers a
- * TypeScript provider (committed `schema/openapi.json` by default) and a Go
- * provider (`.gen/schema/openapi.json` from the describer's OutputDir).
+ * Resolve the OpenAPI spec that pairs with a contract a build wrote, preferring
+ * the artifact the build lifecycle selected, then the fresh `.gen` JSON or
+ * gzipped artifact, before the committed snapshot. This covers a TypeScript
+ * provider (committed `schema/openapi.json` by default) and a Go provider
+ * (`.gen/schema/openapi.json` from the describer's OutputDir).
  */
-function readProjectSpec(projectRoot: string, config: ClientGenConfig, selectedPath?: string): ProjectSpec {
+function readBuiltProjectSpec(projectRoot: string, config: ClientGenConfig, selectedPath?: string): ProjectSpec {
   for (const p of uniquePaths([selectedPath, joinPath(projectRoot, '.gen', 'schema', 'openapi.json')])) {
     if (fileExists(p)) {
-      const source = readFileSync(p, 'utf8');
-      return { ir: readOpenApiSource(source, { mode: config.thirdParty ? 'thirdParty' : 'firstParty' }), source };
+      return readSpecSource(readFileSync(p, 'utf8'), config);
     }
   }
   const gz = joinPath(projectRoot, '.gen', 'schema', 'openapi.json.gz');
   if (fileExists(gz)) {
-    const source = gunzipSync(readFileSync(gz)).toString('utf8');
-    return { ir: readOpenApiSource(source, { mode: config.thirdParty ? 'thirdParty' : 'firstParty' }), source };
+    return readSpecSource(gunzipSync(readFileSync(gz)).toString('utf8'), config);
   }
   const committed = joinPath(projectRoot, 'schema', 'openapi.json');
   if (fileExists(committed)) {
-    const source = readFileSync(committed, 'utf8');
-    return { ir: readOpenApiSource(source, { mode: config.thirdParty ? 'thirdParty' : 'firstParty' }), source };
+    return readSpecSource(readFileSync(committed, 'utf8'), config);
   }
   throw new Error(
     `clientgen: no OpenAPI spec under ${projectRoot} (looked for schema/openapi.json, .gen/schema/openapi.json[.gz]); run \`putnami build\` first.`,
   );
+}
+
+/**
+ * Read the spec that pairs with the committed `clientgen.json`: the committed
+ * `schema/openapi.json` only. No build wrote the contract then, so a
+ * `.gen/schema` file is whatever an earlier build left, and no cache key covers it.
+ */
+function readCommittedProjectSpec(projectRoot: string, config: ClientGenConfig): ProjectSpec {
+  const committed = joinPath(projectRoot, 'schema', 'openapi.json');
+  if (!fileExists(committed)) {
+    throw new Error(
+      `clientgen: ${projectRoot} commits its generation contract as ${COMMITTED_CONFIG_REL}, so it must commit its OpenAPI spec as schema/openapi.json.`,
+    );
+  }
+  return readSpecSource(readFileSync(committed, 'utf8'), config);
+}
+
+function readSpecSource(source: string, config: ClientGenConfig): ProjectSpec {
+  return { ir: readOpenApiSource(source, { mode: config.thirdParty ? 'thirdParty' : 'firstParty' }), source };
 }
 
 function uniquePaths(paths: Array<string | undefined>): string[] {

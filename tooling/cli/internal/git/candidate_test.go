@@ -1,6 +1,8 @@
 package git
 
 import (
+	"errors"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -39,5 +41,45 @@ func TestReadIndexModes(t *testing.T) {
 
 	if _, err := ReadIndexModes(outsideRepository(t)); err == nil {
 		t.Fatal("ReadIndexModes outside a repository succeeded")
+	}
+}
+
+// TrackedUnder answers from the index: a tracked file deleted from the
+// worktree is listed, an untracked file is not, a sibling whose name shares
+// the prefix is not, a path spelled in another case lists what the index
+// tracks under it, and a path that does not exist lists nothing. Outside a
+// repository the answer is an *UnmanagedError.
+func TestTrackedUnderListsWhatTheIndexTracksBelowAPath(t *testing.T) {
+	repo := initGitRepo(t)
+	ws := filepath.Join(repo, "sub", "ws")
+	for _, rel := range []string{"out/a.txt", "out/nested/b.txt", "outer.txt", "out[x]/c.txt"} {
+		write(t, filepath.Join(ws, filepath.FromSlash(rel)), rel+"\n")
+	}
+	runGit(t, repo, "add", ".")
+	runGit(t, repo, "commit", "-q", "-m", "track")
+	write(t, filepath.Join(ws, "out", "untracked.txt"), "new\n")
+	if err := os.Remove(filepath.Join(ws, "out", "a.txt")); err != nil {
+		t.Fatal(err)
+	}
+
+	for rel, want := range map[string][]string{
+		"out":     {"out/a.txt", "out/nested/b.txt"},
+		"OUT":     {"out/a.txt", "out/nested/b.txt"},
+		"out[x]":  {"out[x]/c.txt"},
+		"missing": nil,
+	} {
+		got, err := TrackedUnder(ws, rel)
+		if err != nil {
+			t.Fatalf("TrackedUnder(%q): %v", rel, err)
+		}
+		if strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Errorf("TrackedUnder(%q) = %v, want %v", rel, got, want)
+		}
+	}
+
+	_, err := TrackedUnder(t.TempDir(), "out")
+	var unmanaged *UnmanagedError
+	if !errors.As(err, &unmanaged) {
+		t.Fatalf("TrackedUnder outside a repository = %v, want an *UnmanagedError", err)
 	}
 }

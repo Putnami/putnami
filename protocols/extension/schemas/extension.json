@@ -1275,6 +1275,24 @@
         },
         {
           "if": {
+            "required": ["emptied"],
+            "properties": {
+              "emptied": { "const": true }
+            }
+          },
+          "then": {
+            "required": ["path", "optionalEmpty"],
+            "properties": {
+              "kind": { "const": "directory" },
+              "scope": { "const": "durable" },
+              "root": { "enum": ["project", "workspace"] },
+              "optionalEmpty": { "const": true }
+            },
+            "not": { "required": ["pathFrom"] }
+          }
+        },
+        {
+          "if": {
             "required": ["drift"]
           },
           "then": {
@@ -1340,6 +1358,10 @@
         "optionalEmpty": {
           "type": "boolean",
           "description": "The output may legitimately be absent, or an empty directory, after a SUCCESSFUL run (a coverage file when coverage is off). Capture records nothing and restore materializes nothing, and neither is an error."
+        },
+        "emptied": {
+          "type": "boolean",
+          "description": "The engine empties this optionalEmpty directory output before its task executes, and on a restore of an entry that records it empty, keeping the ceded and preserved subpaths. Set it when only this task writes the path: no committed file and no other task's bytes live there. The engine already does this for a required directory output and for an optional one under the command-output root, so the flag requires kind directory, a durable scope, a literal path, the project or workspace root, and optionalEmpty true."
         },
         "excludes": {
           "type": "array",

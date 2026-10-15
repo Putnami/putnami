@@ -11,9 +11,39 @@ REST/JSON, Connect/protobuf, SSE and WebSocket transports it exposes.
 Declare the provider API and enable its native client generator. In TypeScript,
 add `clientGenerator()` to the application; in Go, add
 `api.Clients(...).From(apiPlugin)`. The provider build writes
-`.gen/clientgen/config.json` and its marked OpenAPI and Proto artifacts.
-First-party mode is the default and rejects any contract semantic that the
-shared client IR cannot represent.
+`.gen/clientgen/config.json` and its marked OpenAPI and Proto artifacts. A
+provider with no app to build, such as a `cloud/clients` slice, commits its
+generation contract as `clientgen.json` at its root and its contract as
+`schema/openapi.json`. Every reader takes `.gen/clientgen/config.json` first
+and `clientgen.json` when no build wrote one, and pairs the OpenAPI document
+with that origin: the built contract reads `.gen/schema/openapi.json` (or its
+`.gz`) and then `schema/openapi.json`, and `clientgen.json` reads
+`schema/openapi.json` only, never a `.gen/schema` an earlier build left (CLI
+ADR 0068). First-party mode is the default
+and rejects any contract semantic that the shared client IR cannot represent.
+
+**Migrate a contract committed under `.gen`.** Committing a file under
+`.gen/clientgen` or `.gen/schema` is no longer supported, a breaking change
+that ships in a minor release. The Go `build-describe` owns both directories
+whole, so it fails while Git tracks a file there: the engine never empties an
+emptied output that holds a tracked file (CLI ADR 0068). The TypeScript
+`build-generate` owns `.gen` whole and deletes such a file. Migrate each
+provider in three steps:
+
+1. Run `git mv <project>/.gen/clientgen/config.json <project>/clientgen.json`.
+2. Run `mkdir -p <project>/schema && git mv <project>/.gen/schema/openapi.json <project>/schema/openapi.json`.
+   When `schema/openapi.json` already exists, run
+   `git rm --cached <project>/.gen/schema/openapi.json` instead.
+3. Ignore `.gen` in `.gitignore`, and drop any rule that re-includes a file
+   under it, such as a `!config.json` carve-out. A workspace that does not
+   ignore it holds
+   each build's output there as a Git candidate, which the workspace check
+   reports and which the clientgen keys read.
+
+A plain `mv` leaves the old path in the Git index, and describe then fails
+naming the `git rm --cached` to run. The workspace check reports each Git
+candidate still under either tree as `clientgen.committed-generated-contract`,
+with the command to run.
 
 Generate every configured target:
 
@@ -109,14 +139,17 @@ the tracked files and the untracked files no ignore rule excludes. Its member
 projects are the ones the job context names, which the CLI resolves from
 `putnami.workspace.json` and the scope manifests its includes name; the guard
 never reads the project index. For each provider it reads the committed
-`schema/openapi.json`, the committed `client.putnami.json` manifests under it —
-which name its targets, since no build has written a generation contract on a
+`schema/openapi.json`, its committed `clientgen.json` when it has one, the
+committed `client.putnami.json` manifests under it — which name its targets
+when it commits no generation contract, since no build has written one on a
 cold clone — and the inventories each project commits. A file Git ignores, such
 as a provider's built `.gen/clientgen/config.json` or `.gen/schema/openapi.json`
-or an ignored source, is absent, as it is from a clone; a project that commits
-those `.gen` files has them read. That is what makes a cold clone and a tree the
-session just built reach one verdict, and what removed the nested provider
-build and the mirror render that cost ~10 s of every `putnami validate`.
+or an ignored source, is absent, as it is from a clone; a file a project
+commits under `.gen/clientgen` or `.gen/schema` is read, and reported as
+`clientgen.committed-generated-contract`. That is what makes a cold clone and
+a tree the session just built reach one verdict, and what removed the nested
+provider build and the mirror render that cost ~10 s of every
+`putnami validate`.
 
 **The same manifest is the workspace graph's contract edge.** A project whose
 root commits a `client.putnami.json` is a generated client target, and the
@@ -289,21 +322,37 @@ directory as a generated output. The strict `client.putnami.json` manifest
 then hashes every emitted file and carries the public binding symbols and full
 operation/transport inventory used by workspace verification.
 
-When `.gen/clientgen/config.json` is missing, a target reports no directory
-only if the provider commits no client in that language. A provider that
+When neither `.gen/clientgen/config.json` nor `clientgen.json` exists, a
+target reports no directory only if the provider commits no client in that
+language. A provider that
 commits one fails generation instead and keeps its committed client. Both
 project tasks read the project `gen` resource, so the planner never runs them
 while another step of the same project rewrites `.gen`.
 
 Both project tasks are cacheable, so their cache keys name every input that
-decides an emitted byte: the clientgen configuration, the built contract, the
-provider `package.json` and — for the TypeScript target — the workspace root
+decides an emitted byte: the committed generation contract `clientgen.json`,
+the committed contract `schema/openapi.json`, the provider `package.json` and —
+for the TypeScript target — the workspace root
 `package.json`, which decides whether the client depends on `@putnami/client`
 through `catalog:`, a pinned version or `workspace:*`, and the Biome
 configuration, its `extends` chain and the EditorConfig beside it, because the
 emitter canonicalizes every file it writes with Biome. A configuration this
 resolution cannot name as a workspace path (a package specifier, a path outside
 the workspace) fails generation instead of being silently left out of the key.
+
+Neither key hashes a file a build writes under `.gen`. The provider build
+writes `.gen/clientgen` and `.gen/schema` during the run, so a key that hashed
+them would differ between the value the run computes before any task starts
+and the value the task computes when it starts, and the task would miss the
+entry the run looked up. Those bytes are fixed by the key of the build that writes them,
+which these keys fold, because the `clientgen` command depends on `build`. The
+TypeScript `build-generate` owns `.gen` whole, and the Go `build-describe`
+declares `.gen/schema` and `.gen/clientgen` `emptied`, so each tree holds what
+that build's execution or restore wrote and nothing else (CLI ADR 0068). Each
+key also reads `.gen/clientgen/config.json` as a Git candidate
+(`git:.gen/clientgen/config.json`), so a project that has not migrated moves its
+key when it edits the contract it commits there, while the one a build writes is
+ignored, no candidate, and never moves the key during the run.
 
 ### What is cached and what is not
 
@@ -325,7 +374,8 @@ it; the cut can, because the check reads through it:
   `.putnami/workspace-index.json`;
 - discovery reads a provider's `.gen/clientgen/config.json` and
   `.gen/schema/openapi.json` only when the project commits them; otherwise the
-  committed sidecar and manifests decide, as they do on a cold clone.
+  committed `clientgen.json`, sidecar and manifests decide, as they do on a
+  cold clone.
 
 A file Git ignores therefore changes neither the key nor the verdict, and every
 candidate the verdict depends on moves the key. Outside a Git work tree the

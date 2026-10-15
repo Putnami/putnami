@@ -2,6 +2,7 @@
 
 - **Status**: accepted, amended by
   [ADR 0065](0065-an-optional-command-output-directory-is-emptied-on-execution-and-on-an-empty-restore.md)
+  and [ADR 0068](0068-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md)
 - **Scope**: `@putnami/cli` (`internal/jobs`, `internal/store`)
 
 ## Context

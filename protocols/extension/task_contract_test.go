@@ -1238,3 +1238,47 @@ func TestValidateOutputDrift(t *testing.T) {
 		t.Fatal("the drift vocabulary is exactly warn and fail; the empty string is the absent field")
 	}
 }
+
+// An emptied output is an optional directory with a literal path under the
+// project or workspace root. Each other shape is refused at its own field: one
+// the engine cannot empty before the run (a file, a pathFrom output, an
+// invocation-scoped output) and one it empties already (a required directory,
+// an optional command-output directory). An unset or false flag states
+// nothing.
+func TestValidateOutputEmptied(t *testing.T) {
+	task := TaskDefinition{Outputs: map[string]TaskOutputPort{"clientOutput": {}}}
+	cases := []struct {
+		name   string
+		output DeclaredOutput
+		codes  int
+	}{
+		{name: "an unset flag states nothing", output: DeclaredOutput{Kind: OutputKindFile, Path: "a.txt"}},
+		{name: "optional project directory", output: DeclaredOutput{Kind: OutputKindDirectory, Root: OutputRootProject, Path: ".gen/schema", OptionalEmpty: true, Emptied: true}},
+		{name: "optional directory under the default root", output: DeclaredOutput{Kind: OutputKindDirectory, Path: ".gen/clientgen", OptionalEmpty: true, Emptied: true}},
+		{name: "optional workspace directory", output: DeclaredOutput{Kind: OutputKindDirectory, Root: OutputRootWorkspace, Path: "dist/contracts", OptionalEmpty: true, Emptied: true}},
+		{name: "with ceded and preserved subpaths", output: DeclaredOutput{Kind: OutputKindDirectory, Path: ".gen/schema", OptionalEmpty: true, Emptied: true, Excludes: []string{".gen/schema/ceded"}, Preserves: []string{"kept"}}},
+		{name: "a file", output: DeclaredOutput{Kind: OutputKindFile, Path: "dist/app.js", OptionalEmpty: true, Emptied: true}, codes: 1},
+		{name: "a pathFrom directory", output: DeclaredOutput{Kind: OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true, Emptied: true}, codes: 1},
+		{name: "an invocation-scoped directory", output: DeclaredOutput{Kind: OutputKindDirectory, Scope: OutputScopeInvocation, Path: "scratch", OptionalEmpty: true, Emptied: true}, codes: 1},
+		{name: "an optional command-output directory", output: DeclaredOutput{Kind: OutputKindDirectory, Root: OutputRootCommandOutput, Path: "bin", OptionalEmpty: true, Emptied: true}, codes: 1},
+		{name: "a required directory", output: DeclaredOutput{Kind: OutputKindDirectory, Path: ".gen", Emptied: true}, codes: 1},
+		{name: "a required command-output file", output: DeclaredOutput{Kind: OutputKindFile, Root: OutputRootCommandOutput, Path: "bin/tool", Emptied: true}, codes: 3},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := 0
+			for _, d := range validateDeclaredOutput("tasks.t.declares.outputs.o", tc.output, task) {
+				if d.Code != "invalid-output-emptied" {
+					continue
+				}
+				if d.Field != "tasks.t.declares.outputs.o.emptied" {
+					t.Errorf("diagnostic at %q, want the emptied field", d.Field)
+				}
+				got++
+			}
+			if got != tc.codes {
+				t.Fatalf("invalid-output-emptied diagnostics = %d, want %d", got, tc.codes)
+			}
+		})
+	}
+}

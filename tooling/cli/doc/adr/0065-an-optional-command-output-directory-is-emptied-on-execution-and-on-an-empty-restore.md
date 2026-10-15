@@ -1,6 +1,7 @@
 # ADR 0065 — An optional command-output directory is emptied on execution and on an empty restore
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0068](0068-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md)
 - **Scope**: `@putnami/cli` (`internal/jobs`, `internal/store`)
 - **Amends**: [ADR 0064](0064-an-executing-task-starts-from-an-empty-owned-directory.md),
   points 4, 7 and 8 and its `optionalEmpty` consequence

@@ -130,6 +130,10 @@
       "text": "A Go source task key ignores the .go files under a .gen tree, which another task writes during the run and no Go source task compiles. A file under .gen still moves the key when a go:embed directive names it."
     },
     {
+      "id": "clientgen-key-reads-no-run-written-tree",
+      "text": "The clientgen-go and clientgen-ts keys ignore the .gen/schema and .gen/clientgen files the Go build-describe or the TypeScript build-generate writes during the run, and fold those producers' keys instead; build-describe empties both trees before it executes and on an empty restore. An edit to clientgen.json, schema/openapi.json or a .gen/clientgen/config.json Git tracks moves the keys. When describe writes both trees, each clientgen job starts with the key the run computed before any job started."
+    },
+    {
       "id": "result-only-remote-restore",
       "text": "With a provider that echoes restore-result-only, a remote hit whose files no job of the run reads, in minimal mode or in toplevel mode outside the selected projects, moves no blob: it reports its cached status, writes nothing, and records a local result-only entry. A task a planned job waits for, by dependency or serialization, keeps its files. A run that reads the files never serves a result-only entry: it restores the full entry or executes. A provider without the capability receives no new field."
     },
@@ -143,7 +147,11 @@
     },
     {
       "id": "executed-directory-output-starts-empty",
-      "text": "Before a task executes, the engine empties each literal-path directory output that is required or under the command-output root, keeping ceded and preserved subpaths and the build stamp. A hit whose entry records such an output empty empties it too, or executes the task when it cannot. Other hits and adopted results empty nothing; a retry empties again; a failure to empty fails the task. Other outputs are not emptied. A key marker keeps entries stored without emptying from being served."
+      "text": "Before a task executes, the engine empties each literal-path directory output that is required, under the command-output root, or declares emptied, keeping ceded and preserved subpaths and the build stamp. A hit whose entry records such an output empty empties it too, or executes the task when it cannot. Other hits and adopted results empty nothing; a retry empties again; a failure to empty fails the task. Other outputs are not emptied. A key marker keeps entries stored without emptying from being served."
+    },
+    {
+      "id": "emptied-output-keeps-tracked-files",
+      "text": "An output that declares emptied and holds a file the Git index tracks outside its kept subpaths is never emptied: its execution fails before the subprocess starts, naming the output, its path, the file and the Git command that takes it out (git rm --cached when the file is gone from the worktree), and a hit whose restore would empty it is not served. Outside a Git work tree it is emptied as before; a work tree with no git program to read its index fails the task, naming the missing program."
     },
     {
       "id": "session-written-input-keys",

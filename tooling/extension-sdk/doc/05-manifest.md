@@ -73,13 +73,15 @@ Four constructors cover the shapes a declared output can take, so `kind` can nev
 | `FileFromPort(port, opts...)` | a file whose path the task reports at runtime |
 | `DirectoryFromPort(port, opts...)` | a subtree whose path the task reports at runtime |
 
-Options: `InProject()` (default), `InWorkspace()`, `InCommandOutput()`, `OptionalEmpty()`, `FailOnDrift()`, `WarnOnDrift()`, `Describe(text)`.
+Options: `InProject()` (default), `InWorkspace()`, `InCommandOutput()`, `OptionalEmpty()`, `Emptied()`, `FailOnDrift()`, `WarnOnDrift()`, `Describe(text)`.
 
 `InCommandOutput()` resolves against `.putnami/out/<project>/<command>`, which every step of one command **shares** — which is why two steps of the same command must name different files.
 
 `OptionalEmpty()` marks an output that may legitimately be absent, or an empty directory, after a *successful* run (a coverage file when coverage is off). Without it, a missing declared output means the declaration and the task disagree.
 
-Before a task executes, the engine empties each `Directory(...)` output it owns, except an `OptionalEmpty()` one in the project or the workspace. Keep no state there that must outlive a run, such as an incremental build cache. A restore of an entry that recorded an `OptionalEmpty().InCommandOutput()` directory empty also empties it. See [Task-owned entries](../../cli/doc/10-caching.md#task-owned-entries-declared-outputs).
+Before a task executes, the engine empties each `Directory(...)` output it owns, except an `OptionalEmpty()` one in the project or the workspace that does not also declare `Emptied()`. Keep no state there that must outlive a run, such as an incremental build cache. A restore of an entry that recorded an `OptionalEmpty().InCommandOutput()` directory, or an `OptionalEmpty()` directory with `Emptied()`, empty also empties it. See [Task-owned entries](../../cli/doc/10-caching.md#task-owned-entries-declared-outputs).
+
+`Emptied()` is for an `OptionalEmpty()` project or workspace directory that only this task writes, so no committed file lives there. Its bytes are then a function of the task's key, and a later task that reads them can fold that key instead of hashing them. `Build` rejects it on a file, a `...FromPort` output, an invocation-scoped output, a command-output directory and a required directory (`invalid-output-emptied`). See [protocols/extension ADR 0009](../../../protocols/extension/doc/adr/0009-an-optional-project-output-may-ask-to-be-emptied.md).
 
 A directory output can also **cede** a subpath to the task that produces it, which is how a subtree written after the enclosing tree was captured survives a cache hit. There is no option for it yet: set `Excludes` on the value `Directory(...)` returns, and `Build` validates it like every other rule (`excludes` must be literal paths strictly inside `path`, on a directory output with a literal path, without duplicates). See [protocols/extension ADR 0003](../../../protocols/extension/doc/adr/0003-a-declared-directory-output-may-cede-one-subpath.md).
 
