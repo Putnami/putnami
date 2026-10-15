@@ -24,11 +24,6 @@
       "coverage-threshold": 80,
       "filePatterns": [
         "doc/**",
-        "internal/cli/testdata/**",
-        "internal/commands/testdata/**",
-        "internal/mcp/testdata/**",
-        "testdata/recorded/**",
-        "internal/lockfile/testdata/prior-releases/**",
         "scripts/**",
         "../../**/putnami.json",
         "../*/putnami.json",

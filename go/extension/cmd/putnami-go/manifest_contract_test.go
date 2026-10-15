@@ -18,6 +18,7 @@ import (
 	"go.putnami.dev/go/extension/internal/toolchain"
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/extension"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/docslinks"
 	"go.putnami.dev/sdk/extension/infraagg"
 	"go.putnami.dev/sdk/extension/releaseset"
@@ -2453,6 +2454,34 @@ func TestBuildTasksDoNotKeyOnTestFiles(t *testing.T) {
 	if containsString(derived.Files, goTests) {
 		t.Errorf("test-exec derived cache key files = %v excludes test sources; the stored verdict would "+
 			"outlive the tests it was produced from", derived.Files)
+	}
+}
+
+// A test reads its fixtures from testdata/ with os.ReadFile, which no Go
+// source names, so neither the test sources nor go-embed:test carry them. A
+// key blind to them replays a stored pass over an edited fixture the test now
+// fails on. The Go tool reserves testdata for test inputs at any depth, so
+// test-exec declares them itself rather than leaving each project to.
+//
+// The paths are matched through the grammar the cache hasher applies, on the
+// DERIVED key the executor hashes.
+func TestTestExecKeysOnEveryTestdataFile(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "testdata-is-a-test-input", "test-exec-keys-on-every-testdata-file")
+	m := loadExtensionManifest(t)
+
+	derived := proto.DeriveTaskCacheKey(m.Tasks["test-exec"].Inputs)
+	for _, rel := range []string{
+		"testdata/want.md",
+		"internal/render/testdata/want.md",
+		"internal/render/testdata/golden/nested/case.json",
+	} {
+		if !wsproto.SelectsPath(rel, derived.Files) {
+			t.Errorf("test-exec derived cache key files = %v do not select %s; an edit to it would replay a stale verdict",
+				derived.Files, rel)
+		}
+	}
+	if wsproto.SelectsPath("internal/testdatafile.md", derived.Files) {
+		t.Errorf("test-exec derived cache key files = %v select a file outside any testdata directory", derived.Files)
 	}
 }
 

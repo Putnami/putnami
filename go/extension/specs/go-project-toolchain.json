@@ -48,6 +48,10 @@
       "text": "Every repository file the Go extension's tests read outside the project (go.work, every go.work member's go.mod, every first-party extension manifest, the content policy and authored agent content of each manifest that ships content, and the npm packager's gate twin) is a declared test input, so editing one re-runs the suite instead of replaying an old verdict."
     },
     {
+      "id": "testdata-is-a-test-input",
+      "text": "Every file under a testdata directory of a Go project, at any depth, is a test-exec input, so a fixture edit re-runs the tests instead of replaying an old verdict. The Go tool reserves testdata for test inputs, so a project declares no pattern of its own for them."
+    },
+    {
       "id": "modfile-restoration",
       "text": "A build that mutates go.mod or go.sum restores the tracked content it found, including deleting a file the run created and recreating one the run removed."
     },

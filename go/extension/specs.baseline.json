@@ -41,6 +41,7 @@
     "go/go-project-toolchain#single-schema-committer",
     "go/go-project-toolchain#test-failure-attribution",
     "go/go-project-toolchain#test-host-identity-scrub",
+    "go/go-project-toolchain#testdata-is-a-test-input",
     "go/go-project-toolchain#tidy-drift-visibility"
   ]
 }
