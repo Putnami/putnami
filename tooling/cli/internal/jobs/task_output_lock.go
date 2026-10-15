@@ -216,6 +216,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -382,7 +383,7 @@ func taskOutputLockNames(job *ScheduledJob) []string {
 	if job == nil || job.Project == nil || job.JobDef == nil {
 		return nil
 	}
-	project := projectRelPath(job)
+	project := cachekey.ProjectRelPath(job)
 	names := []string{"command-output:" + path.Join(project, jobCommandName(job))}
 	declaration := taskDeclarationOf(job)
 	if declaration == nil {
@@ -446,7 +447,7 @@ func taskReadLockNames(job *ScheduledJob) []string {
 
 // projectOutputLockName is the key of job's project tree.
 func projectOutputLockName(job *ScheduledJob) string {
-	return "project:" + projectRelPath(job)
+	return "project:" + cachekey.ProjectRelPath(job)
 }
 
 // keyID is the lock file stem of the key name in this workspace.

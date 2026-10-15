@@ -18,6 +18,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/ownerperm"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -859,7 +860,7 @@ func TestInvocation_AllHitFrontierPrunesSetupAndFinalizer(t *testing.T) {
 	// relations must be resolved before the key the test publishes at can match
 	// the one the scheduler looks up.
 	resolveInvocationRelations(fixture.planned)
-	keys, err := PrecomputeKeys(fixture.ws, fixture.planned, nil, nil, cache, CacheBypass{})
+	keys, err := cachekey.PrecomputeKeys(fixture.ws, fixture.planned, nil, nil, cache, cachekey.CacheBypass{})
 	if err != nil {
 		t.Fatalf("PrecomputeKeys: %v", err)
 	}
@@ -958,7 +959,7 @@ func TestInvocation_PruneIfPreservesImperativeSideEffects(t *testing.T) {
 
 			cache := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
 			resolveInvocationRelations(fixture.planned)
-			keys, err := PrecomputeKeys(fixture.ws, fixture.planned, params, nil, cache, CacheBypass{})
+			keys, err := cachekey.PrecomputeKeys(fixture.ws, fixture.planned, params, nil, cache, cachekey.CacheBypass{})
 			if err != nil {
 				t.Fatalf("PrecomputeKeys: %v", err)
 			}
@@ -1041,7 +1042,7 @@ func TestInvocation_PrunedRelationStillServesTheConsumersCachedResult(t *testing
 
 	cache := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
 	resolveInvocationRelations(fixture.planned)
-	keys, err := PrecomputeKeys(fixture.ws, fixture.planned, nil, nil, cache, CacheBypass{})
+	keys, err := cachekey.PrecomputeKeys(fixture.ws, fixture.planned, nil, nil, cache, cachekey.CacheBypass{})
 	if err != nil {
 		t.Fatalf("PrecomputeKeys: %v", err)
 	}
@@ -1124,7 +1125,7 @@ func TestInvocation_ConsumerKeyFollowsTheProducingAction(t *testing.T) {
 		// A fresh manager each time: the memoized file-hash cache would otherwise
 		// hide a content change the key is supposed to see.
 		cache := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
-		keys, err := PrecomputeKeys(fixture.ws, fixture.planned, nil, nil, cache, CacheBypass{})
+		keys, err := cachekey.PrecomputeKeys(fixture.ws, fixture.planned, nil, nil, cache, cachekey.CacheBypass{})
 		if err != nil {
 			t.Fatalf("PrecomputeKeys: %v", err)
 		}
@@ -1269,7 +1270,7 @@ func TestInvocation_ConsumerKeyFollowsTheProducersClosure(t *testing.T) {
 		// A fresh manager each time: the memoized file-hash cache would otherwise
 		// hide the content change the key is supposed to see.
 		cache := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
-		keys, err := PrecomputeKeys(ws, planned, nil, nil, cache, CacheBypass{})
+		keys, err := cachekey.PrecomputeKeys(ws, planned, nil, nil, cache, cachekey.CacheBypass{})
 		if err != nil {
 			t.Fatalf("PrecomputeKeys: %v", err)
 		}
@@ -1314,53 +1315,6 @@ func TestInvocation_ConsumerKeyFollowsTheProducersClosure(t *testing.T) {
 		`{"protocolVersion":2,"databases":[{"name":"own","engine":"postgres"}]}`)
 	if seeded := consumerKey(); seeded == changed {
 		t.Error("the seed project's own requirements are part of its closure and must move the key")
-	}
-}
-
-// TestClosureInputsDigest_IsIndependentOfTheCheckoutDirectory pins that a
-// closure key input travels: two checkouts of the same content produce the same
-// digest, so a remote entry stays shareable between a developer and CI. (The
-// other cross-project key mechanism, ExtraFiles, hashes ABSOLUTE paths, which is
-// exactly why this digest does not use it.)
-func TestClosureInputsDigest_IsIndependentOfTheCheckoutDirectory(t *testing.T) {
-	t.Parallel()
-	build := func(root string) (*workspace.Workspace, *ScheduledJob) {
-		writeProjectFile(t, root, "lib", "infra/requirements.json", `{"protocolVersion":2}`)
-		writeProjectFile(t, root, "app", "go.mod", "module example.com/app\n")
-		lib := &workspace.Project{ID: "/lib", Name: "lib", Path: "lib"}
-		app := &workspace.Project{ID: "/app", Name: "app", Path: "app", Dependencies: []string{"lib"}}
-		ws := workspace.NewWorkspace(root, nil, []*workspace.Project{lib, app})
-		ws.Graph = workspace.BuildGraph(ws.Projects)
-		job := &ScheduledJob{
-			Project: app,
-			JobDef: &extension.JobDefinition{
-				Name: "test~setup",
-				TaskCachePolicy: &extension.TaskCachePolicy{
-					Key: &extensionproto.TaskCacheKey{ClosureFiles: []string{"infra/requirements.json"}},
-				},
-			},
-		}
-		return ws, job
-	}
-
-	leftWS, leftJob := build(t.TempDir())
-	rightWS, rightJob := build(t.TempDir())
-	left, leftErr := closureInputsDigest(leftWS, leftJob, store.NewCacheManager(store.NewLocalStore(t.TempDir())))
-	right, rightErr := closureInputsDigest(rightWS, rightJob, store.NewCacheManager(store.NewLocalStore(t.TempDir())))
-	if leftErr != nil || rightErr != nil {
-		t.Fatalf("closure inputs: %v, %v", leftErr, rightErr)
-	}
-	if left == "" {
-		t.Fatal("a declared closure input produced no digest")
-	}
-	if left != right {
-		t.Errorf("closure digest varies with the checkout directory: %q vs %q", left, right)
-	}
-
-	// A task that declares no closure input pays nothing and folds nothing.
-	bare := &ScheduledJob{Project: leftJob.Project, JobDef: &extension.JobDefinition{Name: "test~run"}}
-	if got, err := closureInputsDigest(leftWS, bare, store.NewCacheManager(store.NewLocalStore(t.TempDir()))); err != nil || got != "" {
-		t.Errorf("undeclared closure digest = %q, want empty", got)
 	}
 }
 
@@ -1757,7 +1711,7 @@ func TestSensitiveNeedles_CoversAJSONArtifactsLeaves(t *testing.T) {
 
 // captureInvocationWarnings redirects the default logger for one test and returns what it
 // was written. slog is the channel the surrounding scheduler degrades on
-// (remote.go, task_capture.go), so it is where a partially covered artifact has
+// (remotecache/remote.go, task_capture.go), so it is where a partially covered artifact has
 // to become visible.
 func captureInvocationWarnings(t *testing.T) func() string {
 	t.Helper()

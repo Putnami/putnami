@@ -932,7 +932,7 @@ func TestReadyBatchKeyGroupsSiblingBuildProducers(t *testing.T) {
 	}
 
 	// A different build kind (types) must NOT co-batch with transpile: distinct
-	// task args + cacheTaskName keep the kinds in separate groups.
+	// task args + cachekey.CacheTaskName keep the kinds in separate groups.
 	typesJob := *jobs[1]
 	typesDef := *jobs[1].JobDef
 	typesDef.Name = "build~types"

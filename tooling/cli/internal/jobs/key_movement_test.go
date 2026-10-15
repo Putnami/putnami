@@ -13,6 +13,8 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -42,7 +44,7 @@ func layerPath(f *captureFixture) string {
 // keyOf computes job's key through cm, from no published dependency key.
 func keyOf(t *testing.T, f *captureFixture, job *ScheduledJob, cm *store.CacheManager) string {
 	t.Helper()
-	hash, err := computeJobCacheHash(f.ws, job, nil, nil, cm, nil)
+	hash, err := cachekey.ComputeJobCacheHash(f.ws, job, nil, nil, cm, nil)
 	if err != nil || hash == "" {
 		t.Fatalf("compute the key of %s: %q (err=%v)", job.Key(), hash, err)
 	}
@@ -119,12 +121,12 @@ func TestPlanKeyMovementFollowsWritersAndFoldedKeys(t *testing.T) {
 		planned := []*ScheduledJob{producer, check, summary, lint}
 		f := newCaptureFixture(t, planned...)
 
-		movement := planKeyMovement(keyInputs{ws: f.ws}, planned)
+		movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: f.ws}, planned)
 		want := map[string]bool{check.Key(): true, summary.Key(): true}
-		if !reflect.DeepEqual(movement.moving, want) {
-			t.Fatalf("moving = %v, want %v", movement.moving, want)
+		if !reflect.DeepEqual(movement.Moving, want) {
+			t.Fatalf("moving = %v, want %v", movement.Moving, want)
 		}
-		if got := movement.writers[check.Key()]; !reflect.DeepEqual(got, []string{producer.Key()}) {
+		if got := movement.Writers[check.Key()]; !reflect.DeepEqual(got, []string{producer.Key()}) {
 			t.Fatalf("writers of the check = %v, want the producer alone", got)
 		}
 	})
@@ -140,11 +142,11 @@ func TestPlanKeyMovementFollowsWritersAndFoldedKeys(t *testing.T) {
 		planned := []*ScheduledJob{fixer, compile, docs}
 		f := newCaptureFixture(t, planned...)
 
-		movement := planKeyMovement(keyInputs{ws: f.ws}, planned)
-		if !movement.moving[compile.Key()] {
+		movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: f.ws}, planned)
+		if !movement.Moving[compile.Key()] {
 			t.Fatal("a job that reads the sources a rewriter rewrites keeps its precomputed key")
 		}
-		if movement.moving[docs.Key()] {
+		if movement.Moving[docs.Key()] {
 			t.Fatal("a job that reads none of the rewriter's sources was moved by it")
 		}
 	})
@@ -160,48 +162,10 @@ func TestPlanKeyMovementFollowsWritersAndFoldedKeys(t *testing.T) {
 		planned := []*ScheduledJob{client, lint}
 		f := newCaptureFixture(t, planned...)
 
-		if movement := planKeyMovement(keyInputs{ws: f.ws}, planned); !movement.moving[lint.Key()] {
+		if movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: f.ws}, planned); !movement.Moving[lint.Key()] {
 			t.Fatal("a job that reads the project was not moved by an output whose path is unknown before its task runs")
 		}
 	})
-}
-
-// A movable consumer key can be confirmed when the producer starts only if
-// every job that can move it finishes before then or runs after the consumer.
-func TestSettlesBeforeOrdersEveryWriterAroundTheProducer(t *testing.T) {
-	job := func(name string, dependsOn ...string) *ScheduledJob {
-		planned := declaredJob(name, name, &extension.TaskDeclaration{})
-		planned.DependsOn = dependsOn
-		return planned
-	}
-	before := job("test~layers")
-	producer := job("test~env", before.Key())
-	consumer := job("test~run", producer.Key())
-	after := job("package~layers", consumer.Key())
-	concurrent := job("build~layers")
-	byKey := jobsByKey([]*ScheduledJob{before, producer, consumer, after, concurrent})
-
-	cases := []struct {
-		name    string
-		writers []string
-		want    bool
-	}{
-		{name: "a writer the producer waits for", writers: []string{before.Key()}, want: true},
-		{name: "a writer that waits for the consumer", writers: []string{after.Key()}, want: true},
-		{name: "a writer the schedule does not order", writers: []string{before.Key(), concurrent.Key()}, want: false},
-	}
-	for _, tc := range cases {
-		movement := keyMovement{writers: map[string][]string{consumer.Key(): tc.writers}}
-		if got := settlesBefore(producer, consumer, movement, byKey); got != tc.want {
-			t.Errorf("%s: settlesBefore = %v, want %v", tc.name, got, tc.want)
-		}
-	}
-
-	folded := job("test~run", producer.Key(), concurrent.Key())
-	byKey[folded.Key()] = folded
-	if settlesBefore(producer, folded, keyMovement{}, byKey) {
-		t.Error("a consumer that folds the key of a job the producer does not wait for was confirmed")
-	}
 }
 
 // providerKeysAsked returns every key the provider was asked about in op.
@@ -240,9 +204,9 @@ func TestAPrecomputedKeyAnEarlierWriteMovesIsNeverLookedUpNorUploaded(t *testing
 	producer, check := layersProducer(), layersCheck()
 	planned := []*ScheduledJob{producer, check}
 	f := newCaptureFixture(t, planned...)
-	remote, notice := LoadRemoteCache(context.Background(), f.ws.Root,
-		[]*extension.ExtensionDescription{fakeProviderExtension(t, nil)}, nil, store.CacheTrustAny)
-	if remote == nil || !remote.isProviderBacked() {
+	remote, notice := remotecache.LoadRemoteCache(context.Background(), f.ws.Root,
+		[]*extension.ExtensionDescription{fakeProviderExtension(t, nil)}, nil, store.CacheTrustAny, fakeProviderLaunch)
+	if remote == nil || !remote.IsProviderBacked() {
 		t.Fatalf("expected a provider-backed remote cache, got %+v (notice %q)", remote, notice)
 	}
 	t.Cleanup(remote.Close)
@@ -251,11 +215,11 @@ func TestAPrecomputedKeyAnEarlierWriteMovesIsNeverLookedUpNorUploaded(t *testing
 	writeFileAt(t, layerPath(f), "old layer\n")
 	stale := keyOf(t, f, check, store.NewCacheManager(nil))
 
-	remote.Negotiate(t.Context(), f.ws, planned, nil, nil, f.cache, CacheBypass{})
-	if recorded, ok := remote.keys[check.Key()]; ok {
+	remote.Negotiate(t.Context(), f.ws, planned, nil, nil, f.cache, cachekey.CacheBypass{})
+	if recorded, ok := remote.Keys[check.Key()]; ok {
 		t.Fatalf("the negotiation recorded %q as the check's key, though the producer may rewrite its input", recorded)
 	}
-	if remote.keys[producer.Key()] == "" {
+	if remote.Keys[producer.Key()] == "" {
 		t.Fatal("the negotiation dropped the key of a job no planned write can move")
 	}
 
@@ -350,7 +314,7 @@ func (f *invocationFixture) planLayersWriter(t *testing.T, content string, after
 func (f *invocationFixture) publishConsumerEntry(t *testing.T, cm *store.CacheManager) {
 	t.Helper()
 	resolveInvocationRelations(f.planned)
-	keys, err := PrecomputeKeys(f.ws, f.planned, nil, nil, cm, CacheBypass{})
+	keys, err := cachekey.PrecomputeKeys(f.ws, f.planned, nil, nil, cm, cachekey.CacheBypass{})
 	if err != nil {
 		t.Fatalf("PrecomputeKeys: %v", err)
 	}

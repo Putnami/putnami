@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -58,9 +60,44 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"process readings; only the tests start fixture programs",
 	},
 	{
-		dir:     "internal/jobs/cachekey",
+		dir:     "internal/jobs/cachekey/framing",
 		allowed: nil,
 		why:     "cache key framing: it writes labeled fields to a hash and imports the standard library only",
+	},
+	{
+		dir: "internal/jobs/cachekey",
+		allowed: []string{
+			"go.putnami.dev/cli/model/jobs",
+			"go.putnami.dev/protocol/cache",
+			"go.putnami.dev/protocol/distribution",
+			"go.putnami.dev/protocol/extension",
+			"go.putnami.dev/protocol/features",
+			"go.putnami.dev/protocol/runtime",
+			"go.putnami.dev/protocol/workspace",
+			"go.putnami.dev/sdk/extension/dirlink",
+			"go.putnami.dev/sdk/extension/releaseset",
+			"go.putnami.dev/tooling/cli/internal/artifactstore",
+			"go.putnami.dev/tooling/cli/internal/extension",
+			"go.putnami.dev/tooling/cli/internal/git",
+			"go.putnami.dev/tooling/cli/internal/jobs/cachekey/framing",
+			"go.putnami.dev/tooling/cli/internal/jobs/machineprobe",
+			"go.putnami.dev/tooling/cli/internal/jobs/toolchain",
+			"go.putnami.dev/tooling/cli/internal/store",
+			"go.putnami.dev/tooling/cli/internal/workspace",
+		},
+		testOnly: []string{
+			"go.putnami.dev/cli/model/extension",
+			"go.putnami.dev/cli/model/workspace",
+			"go.putnami.dev/protocol/cli",
+			"go.putnami.dev/protocol/job",
+			"go.putnami.dev/sdk/extension/profiles",
+		},
+		why: "task cache keys: a key hashes the task's declared files and params, its project and " +
+			"workspace membership, its extension's installed tree or runtime sources, its runtime " +
+			"toolchains, the host platform and the release baseline the git history names; it reads " +
+			"them through the workspace, extension and store models, and never imports the scheduler " +
+			"or the runner. It also converts a task's result to and from its cache entry, whose events " +
+			"name protocol features",
 	},
 	{
 		dir: "internal/jobs/toolchain",
@@ -70,23 +107,47 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/protocol/extension",
 			"go.putnami.dev/sdk/extension/envkeys",
 			"go.putnami.dev/tooling/cli/internal/extension",
-			"go.putnami.dev/tooling/cli/internal/jobs/cachekey",
+			"go.putnami.dev/tooling/cli/internal/jobs/cachekey/framing",
 			"go.putnami.dev/tooling/cli/internal/jobs/machineprobe",
 			"go.putnami.dev/tooling/cli/internal/jobs/procdeadline",
 			"go.putnami.dev/tooling/cli/internal/lockfile",
 			"go.putnami.dev/tooling/cli/internal/runcredential",
 			"go.putnami.dev/tooling/cli/internal/store",
-			"go.putnami.dev/tooling/cli/internal/workspace",
 		},
 		testOnly: []string{
+			"go.putnami.dev/cli/model/workspace",
 			"go.putnami.dev/protocol/features/spectest",
 			"go.putnami.dev/sdk/extension/pkgmeta",
 			"go.putnami.dev/tooling/cli/internal/fixtureproc",
 			"go.putnami.dev/tooling/cli/internal/hometest",
 		},
-		why: "runtime toolchains: they resolve an extension's declared toolchains against the workspace " +
-			"lock, which needs the extension and workspace models, the lock, the artifact store root, " +
-			"and the run credential's custody mark and hosted check before a probe starts repository code",
+		why: "runtime toolchains: they resolve an extension's declared toolchains against the lock of " +
+			"the workspace root the caller names, which needs the extension model, the lock, the " +
+			"artifact store root, and the run credential's custody mark and hosted check before a " +
+			"probe starts repository code",
+	},
+	{
+		dir: "internal/jobs/remotecache",
+		allowed: []string{
+			"go.putnami.dev/cli/model/jobs",
+			"go.putnami.dev/protocol/cache",
+			"go.putnami.dev/protocol/extension",
+			"go.putnami.dev/protocol/features",
+			"go.putnami.dev/tooling/cli/internal/cacheprovider",
+			"go.putnami.dev/tooling/cli/internal/extension",
+			"go.putnami.dev/tooling/cli/internal/flock",
+			"go.putnami.dev/tooling/cli/internal/git",
+			"go.putnami.dev/tooling/cli/internal/jobs/cachekey",
+			"go.putnami.dev/tooling/cli/internal/runcredential",
+			"go.putnami.dev/tooling/cli/internal/store",
+			"go.putnami.dev/tooling/cli/internal/workspace",
+		},
+		testOnly: []string{
+			"go.putnami.dev/protocol/job",
+		},
+		why: "remote cache client: it negotiates, restores and shares task cache entries with a cache " +
+			"provider session, under the run credential and trust policy; the caller hands it the " +
+			"provider's launch, so it never imports the scheduler or the runner",
 	},
 }
 
@@ -200,4 +261,293 @@ func jobsSplitImportAllowed(path string, allowed []string) bool {
 		}
 	}
 	return false
+}
+
+// jobsSchedulerDir holds the scheduler and the runner. Their production files
+// reach the remote cache client only through the cachekey.RemoteCache
+// interface the engine hands them, so they do not import the client.
+const jobsSchedulerDir = "internal/jobs"
+
+// TestJobsSplitSchedulerDoesNotImportTheRemoteCacheClient fails when a
+// production file of internal/jobs imports internal/jobs/remotecache. The
+// engine loads the client; a scheduler import of it, for any name, would make
+// the scheduler depend on the client again and rerun its tests on the
+// client's changes. Its tests may import it to wire a client in.
+func TestJobsSplitSchedulerDoesNotImportTheRemoteCacheClient(t *testing.T) {
+	t.Parallel()
+	root := moduleRoot(t)
+	entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(jobsSchedulerDir)))
+	if err != nil {
+		t.Fatalf("%s: %v", jobsSchedulerDir, err)
+	}
+	parsed := 0
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		rel := jobsSchedulerDir + "/" + name
+		file, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, filepath.FromSlash(rel)), nil, parser.ImportsOnly)
+		if err != nil {
+			t.Fatalf("parse %s: %v", rel, err)
+		}
+		parsed++
+		if _, imported := jobsImportName(file, remoteCacheImportPath); imported {
+			t.Errorf("%s imports %s. The scheduler and the runner reach the remote cache client "+
+				"only through the cachekey.RemoteCache interface the engine hands them. Move the "+
+				"name the file needs to cachekey, or read it through that interface.",
+				rel, remoteCacheImportPath)
+		}
+	}
+	if parsed == 0 {
+		t.Fatalf("%s holds no production Go file — the scheduler moved; move this check with it", jobsSchedulerDir)
+	}
+}
+
+// jobsSplitTestSeams are, by import path, the exported package variables the
+// split left writable by every package in the module. Each one is a seam a
+// test replaces or a table a key reads. Only a test file may write one: a
+// production write would change task cache keys, or the provider a run
+// starts, for every caller in the process.
+var jobsSplitTestSeams = map[string]map[string]string{
+	jobsSplitModulePath + "/internal/jobs/remotecache": {
+		"SpawnProviderSession": "tests swap it to run the fake provider in-process; production spawns the provider",
+	},
+	jobsSplitModulePath + "/internal/jobs/cachekey": {
+		"WorkspaceSourceState":    "a cache key input; tests replace it to key a job the way a root in the other source state would",
+		"EmptiedOutputIDs":        "a cache key input; tests replace it to key a job the way an engine that emptied nothing did",
+		"ProjectWalkExcludedDirs": "a table that shapes cache keys and project walks; nothing may add, remove or replace an entry",
+	},
+}
+
+// jobsSplitSeamWrite is one write to a seam outside its declaring package.
+type jobsSplitSeamWrite struct {
+	line   int
+	pkg    string
+	symbol string
+}
+
+func TestJobsSplitSeamsAreWrittenOnlyByTests(t *testing.T) {
+	t.Parallel()
+	root := moduleRoot(t)
+	for importPath, seams := range jobsSplitTestSeams {
+		dir := filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(importPath, jobsSplitModulePath+"/")))
+		declared := jobsSplitPackageVars(t, dir)
+		for symbol := range seams {
+			if !declared[symbol] {
+				t.Errorf("%s declares no package variable %s — it moved or stopped being a variable; "+
+					"update jobsSplitTestSeams", importPath, symbol)
+			}
+		}
+	}
+
+	var violations []string
+	scanned := 0
+	err := filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if info.IsDir() {
+			switch info.Name() {
+			case ".git", ".putnami", "node_modules", "testdata", "vendor":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(info.Name(), ".go") || strings.HasSuffix(info.Name(), "_test.go") {
+			return nil
+		}
+		rel, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			return relErr
+		}
+		scanned++
+		fset := token.NewFileSet()
+		file, parseErr := parser.ParseFile(fset, path, nil, 0)
+		if parseErr != nil {
+			return parseErr
+		}
+		for _, write := range jobsSplitSeamWrites(fset, file) {
+			violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(write.line)+"  "+
+				write.pkg[strings.LastIndex(write.pkg, "/")+1:]+"."+write.symbol+" — "+
+				jobsSplitTestSeams[write.pkg][write.symbol])
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk %s: %v", root, err)
+	}
+	if scanned == 0 {
+		t.Fatalf("scanned no Go files under %s — the walk root is wrong", root)
+	}
+	sort.Strings(violations)
+	if len(violations) > 0 {
+		t.Errorf("%d production write(s) to a test seam:\n    %s\n"+
+			"  Only a test may replace these variables. Pass the value to the caller instead, or "+
+			"make the seam a per-instance option.", len(violations), strings.Join(violations, "\n    "))
+	}
+}
+
+// TestJobsSplitSeamWritesDetectsEveryWriteShape keeps the walk above from
+// passing vacuously: it feeds the detector each way Go writes a package
+// variable, and the reads the scheduler makes today.
+func TestJobsSplitSeamWritesDetectsEveryWriteShape(t *testing.T) {
+	t.Parallel()
+	const src = `package probe
+
+import (
+	ck "go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
+)
+
+func writes() {
+	remotecache.SpawnProviderSession = nil
+	ck.WorkspaceSourceState, _ = nil, 0
+	ck.ProjectWalkExcludedDirs["dist"] = false
+	delete(ck.ProjectWalkExcludedDirs, "vendor")
+	clear(ck.ProjectWalkExcludedDirs)
+	seam := &ck.EmptiedOutputIDs
+	_ = seam
+}
+
+func reads(ck map[string]bool) {
+	_ = remotecache.SpawnProviderSession
+	_ = ck["dist"]
+	ck["vendor"] = true
+}
+`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "probe.go", src, 0)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	var got []string
+	for _, write := range jobsSplitSeamWrites(fset, file) {
+		got = append(got, strconv.Itoa(write.line)+" "+write.symbol)
+	}
+	want := []string{
+		"9 SpawnProviderSession",
+		"10 WorkspaceSourceState",
+		"11 ProjectWalkExcludedDirs",
+		"12 ProjectWalkExcludedDirs",
+		"13 ProjectWalkExcludedDirs",
+		"14 EmptiedOutputIDs",
+	}
+	if strings.Join(got, ", ") != strings.Join(want, ", ") {
+		t.Errorf("jobsSplitSeamWrites = %v, want %v", got, want)
+	}
+}
+
+// jobsSplitSeamWrites returns every write in file to a seam of
+// jobsSplitTestSeams, named through the seam's import: an assignment, an
+// increment, a map entry write, a delete or clear call, or a taken address.
+// The declaring package names its seams unqualified, so its writes are not
+// reported.
+func jobsSplitSeamWrites(fset *token.FileSet, file *ast.File) []jobsSplitSeamWrite {
+	locals := map[string]string{}
+	for importPath := range jobsSplitTestSeams {
+		if local, imported := jobsImportName(file, importPath); imported {
+			locals[local] = importPath
+		}
+	}
+	if len(locals) == 0 {
+		return nil
+	}
+	var writes []jobsSplitSeamWrite
+	record := func(target ast.Expr) {
+		for {
+			if paren, ok := target.(*ast.ParenExpr); ok {
+				target = paren.X
+				continue
+			}
+			if index, ok := target.(*ast.IndexExpr); ok {
+				target = index.X
+				continue
+			}
+			break
+		}
+		selector, ok := target.(*ast.SelectorExpr)
+		if !ok {
+			return
+		}
+		pkg, ok := selector.X.(*ast.Ident)
+		// pkg.Obj != nil means a local declaration shadows the import name.
+		if !ok || pkg.Obj != nil {
+			return
+		}
+		importPath, ok := locals[pkg.Name]
+		if !ok {
+			return
+		}
+		if _, seam := jobsSplitTestSeams[importPath][selector.Sel.Name]; !seam {
+			return
+		}
+		writes = append(writes, jobsSplitSeamWrite{
+			line:   fset.Position(selector.Sel.Pos()).Line,
+			pkg:    importPath,
+			symbol: selector.Sel.Name,
+		})
+	}
+	ast.Inspect(file, func(node ast.Node) bool {
+		switch n := node.(type) {
+		case *ast.AssignStmt:
+			for _, lhs := range n.Lhs {
+				record(lhs)
+			}
+		case *ast.IncDecStmt:
+			record(n.X)
+		case *ast.RangeStmt:
+			if n.Tok == token.ASSIGN {
+				if n.Key != nil {
+					record(n.Key)
+				}
+				if n.Value != nil {
+					record(n.Value)
+				}
+			}
+		case *ast.UnaryExpr:
+			if n.Op == token.AND {
+				record(n.X)
+			}
+		case *ast.CallExpr:
+			if fn, ok := n.Fun.(*ast.Ident); ok && (fn.Name == "delete" || fn.Name == "clear") && len(n.Args) > 0 {
+				record(n.Args[0])
+			}
+		}
+		return true
+	})
+	return writes
+}
+
+// jobsSplitPackageVars returns the package-level variable names the
+// production files in dir declare.
+func jobsSplitPackageVars(t *testing.T, dir string) map[string]bool {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("%s: %v", dir, err)
+	}
+	vars := map[string]bool{}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(token.NewFileSet(), filepath.Join(dir, name), nil, parser.SkipObjectResolution)
+		if err != nil {
+			t.Fatalf("parse %s: %v", filepath.Join(dir, name), err)
+		}
+		for _, decl := range file.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok || gen.Tok != token.VAR {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				for _, ident := range spec.(*ast.ValueSpec).Names {
+					vars[ident.Name] = true
+				}
+			}
+		}
+	}
+	return vars
 }

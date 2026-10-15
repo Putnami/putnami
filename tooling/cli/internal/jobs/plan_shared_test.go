@@ -8,6 +8,7 @@ import (
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -51,7 +52,7 @@ func sharedProbeExtension() *extension.ExtensionDescription {
 			"sources": {From: "project", Files: []string{"**/*.go"}},
 			"mode":    {From: "params"},
 		},
-		Writes: []extension.ResourceRef{{ID: genResourceID}},
+		Writes: []extension.ResourceRef{{ID: cachekey.GenResourceID}},
 		Cache:  &extension.TaskCachePolicy{Enabled: &enabled, Deterministic: true},
 		Declares: &extension.TaskDeclaration{
 			Outputs: map[string]extension.DeclaredOutput{
@@ -403,7 +404,7 @@ func TestSharedExecutions_DoNotMoveThePlan(t *testing.T) {
 		if job.SharedExecution() != "" {
 			shared++
 		}
-		hash, err := computeJobCacheHash(ws, job, nil, nil, cache, map[string]string{})
+		hash, err := cachekey.ComputeJobCacheHash(ws, job, nil, nil, cache, map[string]string{})
 		if err != nil {
 			t.Fatalf("cache hash for %s: %v", job.Key(), err)
 		}
@@ -418,7 +419,7 @@ func TestSharedExecutions_DoNotMoveThePlan(t *testing.T) {
 		job.SharedExecutionID = ""
 	}
 	for _, job := range planned {
-		hash, err := computeJobCacheHash(ws, job, nil, nil, cache, map[string]string{})
+		hash, err := cachekey.ComputeJobCacheHash(ws, job, nil, nil, cache, map[string]string{})
 		if err != nil {
 			t.Fatalf("cache hash for %s: %v", job.Key(), err)
 		}

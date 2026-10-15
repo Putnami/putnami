@@ -257,7 +257,7 @@ func (c *needleCollector) degrade(reason string) {
 // by the private absolute path: that path is a needle precisely because it must
 // not be published, and a guard that printed it to make a point would be the
 // leak it exists to prevent. slog.Warn is the channel the rest of the scheduler
-// degrades on (remote.go, task_capture.go), so this needs no new surface.
+// degrades on (remotecache/remote.go, task_capture.go), so this needs no new surface.
 func (c *needleCollector) report(scratch *store.InvocationScratch, rel string) {
 	if len(c.degraded) == 0 {
 		return

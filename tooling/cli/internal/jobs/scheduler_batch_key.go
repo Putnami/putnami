@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -86,7 +87,7 @@ func (s *Scheduler) readyBatch(job *ScheduledJob) (string, int) {
 	for _, field := range []string{
 		job.Extension.Name,
 		job.Extension.Version,
-		cacheTaskName(job),
+		cachekey.CacheTaskName(job),
 		job.JobDef.Traits.SideEffects,
 		job.JobDef.Batchable.Tool,
 		strconv.Itoa(maxProjects),
@@ -120,7 +121,7 @@ func (s *Scheduler) batchConfigDigest(job *ScheduledJob) (string, bool) {
 	vars := extension.BuildTemplateVars(
 		s.ws.Root,
 		projRoot,
-		jobExtensionRoot(s.ws, job),
+		cachekey.JobExtensionRoot(s.ws, job),
 		filepath.Join(s.ws.Root, ".putnami", "out", job.Project.Path, jobCommandName(job)),
 	)
 	for _, candidate := range policy.ConfigFiles {

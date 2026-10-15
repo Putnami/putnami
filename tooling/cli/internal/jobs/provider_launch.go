@@ -13,6 +13,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	registryproto "go.putnami.dev/protocol/registry"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 )
 
@@ -183,7 +184,7 @@ func (m *providerRuntimeMemo) current(slot providerRuntimeSlot, ext *extension.E
 		return providerRuntimeRecord{}, false
 	}
 	if slot.prepared {
-		digest, err := extensionRuntimeDigest(ext)
+		digest, err := cachekey.ExtensionRuntimeDigest(ext)
 		if err != nil || digest != record.digest {
 			return providerRuntimeRecord{}, false
 		}

@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/doctor"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -70,7 +71,7 @@ type CleanupReport struct {
 type preparation struct {
 	ws       *workspace.Workspace
 	withheld []*jobs.ScheduledJob
-	versions jobs.RunVersions
+	versions cachekey.RunVersions
 }
 
 // upDeps are the effects Up acts through, replaceable in tests.

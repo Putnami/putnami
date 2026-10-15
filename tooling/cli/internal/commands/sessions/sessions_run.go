@@ -15,7 +15,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	providerext "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/runnerprovider"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -137,7 +137,7 @@ func resolveRunnerProvider(ctx context.Context, wsRoot string, cfg *wsproto.Conf
 		return runnerprovider.Resume{}, err
 	}
 	return runnerprovider.Resume{
-		WorkspaceRoot: wsRoot, Workspace: jobs.RunMarkerWorkspaceID(ws), ProviderName: provider.ExtensionName,
+		WorkspaceRoot: wsRoot, Workspace: remotecache.RunMarkerWorkspaceID(ws), ProviderName: provider.ExtensionName,
 		Launch: launch, Retention: workspace_state.RetentionFromWorkspace(cfg),
 	}, nil
 }

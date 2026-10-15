@@ -11,8 +11,9 @@ import (
 
 	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/protocol/cache/objectcachetest"
-	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -99,7 +100,7 @@ type objectCacheFixture struct {
 	ws      *workspace.Workspace
 	planned []*ScheduledJob
 	cache   *store.CacheManager
-	remote  *RemoteCache
+	remote  *remotecache.RemoteCache
 	out     string
 }
 
@@ -172,15 +173,15 @@ func newObjectCacheFixture(t *testing.T, providerEnv map[string]string, cacheabl
 // loadRemote resolves a provider-backed remote cache for the fixture's
 // workspace. Each call is a fresh provider SESSION, so it also produces a fresh
 // exchange directory and socket path.
-func (f *objectCacheFixture) loadRemote(t *testing.T, providerEnv map[string]string) *RemoteCache {
+func (f *objectCacheFixture) loadRemote(t *testing.T, providerEnv map[string]string) *remotecache.RemoteCache {
 	t.Helper()
 	provider := map[string]string{"FAKE_OBJECT_CACHE": "1"}
 	for k, v := range providerEnv {
 		provider[k] = v
 	}
-	remote, notice := LoadRemoteCache(context.Background(), f.ws.Root,
-		[]*extension.ExtensionDescription{fakeProviderExtension(t, provider)}, nil, store.CacheTrustAny)
-	if remote == nil || !remote.isProviderBacked() {
+	remote, notice := remotecache.LoadRemoteCache(context.Background(), f.ws.Root,
+		[]*extension.ExtensionDescription{fakeProviderExtension(t, provider)}, nil, store.CacheTrustAny, fakeProviderLaunch)
+	if remote == nil || !remote.IsProviderBacked() {
 		t.Fatalf("expected a provider-backed remote cache, got %+v (notice %q)", remote, notice)
 	}
 	t.Cleanup(remote.Close)
@@ -238,7 +239,7 @@ func TestObjectCacheTrustPolicyReachesAJobProcess(t *testing.T) {
 	f := newObjectCacheFixture(t, map[string]string{"FAKE_OBJECT_CHANNEL": string(cache.ChannelHint)}, false, true)
 	// The run's resolved policy is what the job must see; LoadRemoteCache took
 	// it from the CLI flag, so restate it here as an authoritative run would.
-	f.remote.trust = store.CacheTrustCI
+	f.remote.Trust = store.CacheTrustCI
 
 	result := f.run(t, SchedulerConfig{MaxParallel: 1})
 	if !result.Success {
@@ -370,14 +371,14 @@ func TestObjectCacheEnvStaysOutOfCacheKeys(t *testing.T) {
 // still execute here and still need the object cache.
 func TestNegotiateSpawnsTheProviderForALocallyExecutingJob(t *testing.T) {
 	f := newObjectCacheFixture(t, nil, false, false)
-	keys, err := PrecomputeKeys(f.ws, f.planned, nil, nil, f.cache, CacheBypass{})
+	keys, err := cachekey.PrecomputeKeys(f.ws, f.planned, nil, nil, f.cache, cachekey.CacheBypass{})
 	if err != nil {
 		t.Fatalf("precompute keys: %v", err)
 	}
 	if len(keys) != 0 {
 		t.Fatalf("the fixture's job is cacheable (%d keys); this test needs a run with nothing to warm", len(keys))
 	}
-	f.remote.Negotiate(context.Background(), f.ws, f.planned, nil, nil, f.cache, CacheBypass{})
+	f.remote.Negotiate(context.Background(), f.ws, f.planned, nil, nil, f.cache, cachekey.CacheBypass{})
 	if got := f.remote.ObjectCacheSocket(); got == "" {
 		t.Fatal("a run with a locally executing job did not start the provider")
 	}
@@ -393,7 +394,7 @@ func TestNegotiateDoesNotSpawnTheProviderForAFullyWarmRun(t *testing.T) {
 	}
 
 	warmRemote := f.loadRemote(t, nil)
-	warmRemote.Negotiate(context.Background(), f.ws, f.planned, nil, nil, f.cache, CacheBypass{})
+	warmRemote.Negotiate(context.Background(), f.ws, f.planned, nil, nil, f.cache, cachekey.CacheBypass{})
 	if got := warmRemote.ObjectCacheSocket(); got != "" {
 		t.Fatalf("a fully warm rebuild spun up the provider: socket %q", got)
 	}
@@ -404,7 +405,7 @@ func TestNegotiateDoesNotSpawnTheProviderForAFullyWarmRun(t *testing.T) {
 func TestNegotiateAsksForTheObjectCacheCapability(t *testing.T) {
 	capabilitiesOut := filepath.Join(t.TempDir(), "capabilities.txt")
 	f := newObjectCacheFixture(t, map[string]string{"FAKE_CAPABILITIES_OUT": capabilitiesOut}, false, false)
-	f.remote.Negotiate(context.Background(), f.ws, f.planned, nil, nil, f.cache, CacheBypass{})
+	f.remote.Negotiate(context.Background(), f.ws, f.planned, nil, nil, f.cache, cachekey.CacheBypass{})
 
 	data, err := os.ReadFile(capabilitiesOut)
 	if err != nil {
@@ -412,41 +413,5 @@ func TestNegotiateAsksForTheObjectCacheCapability(t *testing.T) {
 	}
 	if !strings.Contains(string(data), cache.CapabilityObjectCache) {
 		t.Fatalf("advertised capabilities = %q, want %q", data, cache.CapabilityObjectCache)
-	}
-}
-
-// TestObjectCacheJobEnvFailsClosed covers, at the accessor, every case where
-// the two variables must not be exported at all.
-func TestObjectCacheJobEnvFailsClosed(t *testing.T) {
-	var nilCache *RemoteCache
-	if got := nilCache.objectCacheJobEnv(); got != nil {
-		t.Fatalf("nil cache env = %v, want none", got)
-	}
-	if got := nilCache.ObjectCacheSocket(); got != "" {
-		t.Fatalf("nil cache socket = %q, want empty", got)
-	}
-
-	// A provider-backed cache that has not negotiated a socket exports nothing.
-	local := newProviderRemoteCache(t.TempDir(), cacheprovider.LaunchSpec{Command: "/bin/true"}, cache.ModeFull, store.CacheTrustAny)
-	if got := local.objectCacheJobEnv(); got != nil {
-		t.Fatalf("un-negotiated env = %v, want none", got)
-	}
-
-	// A socket with a disabled trust policy stays unexported: the object cache
-	// follows the same fail-closed rule the task cache does.
-	local.provider.ready = true
-	local.provider.objectCacheSocket = "/tmp/objects.sock"
-	local.trust = store.CacheTrustNone
-	if got := local.objectCacheJobEnv(); got != nil {
-		t.Fatalf("trust none env = %v, want none", got)
-	}
-	local.trust = store.CacheTrustCI
-	want := []string{
-		cache.ObjectCacheSocketEnv + "=/tmp/objects.sock",
-		cache.CacheTrustEnv + "=ci",
-	}
-	got := local.objectCacheJobEnv()
-	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
-		t.Fatalf("env = %v, want %v", got, want)
 	}
 }

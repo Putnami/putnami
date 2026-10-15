@@ -12,6 +12,7 @@ import (
 	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -211,7 +212,7 @@ func catalogSelectionIn(
 // toolWorkspaceProjects projects the loaded workspace onto the tool wire, in
 // canonical project-id order.
 //
-// It is the same projection jobs.workspaceProjectsContext makes for a job
+// It is the same projection cachekey.WorkspaceProjectsContext makes for a job
 // subprocess, plus the authored project config — which a job never needs,
 // because a job acts on its own project, and a workspace-answering tool always
 // does, because it reports ON other projects.
@@ -248,7 +249,7 @@ func toolWorkspaceProjects(ws *workspace.Workspace) []proto.ToolProjectRef {
 			Publish:      project.Publish,
 			Extensions:   project.Extensions,
 			RunsWith:     project.RunsWith,
-			Dependencies: jobs.DirectDependencyIDs(ws, project),
+			Dependencies: cachekey.DirectDependencyIDs(ws, project),
 			Config:       encodedProjectConfig(project),
 		})
 	}

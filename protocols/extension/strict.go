@@ -763,10 +763,10 @@ func sameParamName(a, b string) bool {
 	return canonicalParamName(a) == canonicalParamName(b)
 }
 
-// canonicalParamName copies the CLI's canonicalParamName and kebabToCamel
-// (tooling/cli/internal/jobs/context.go), the rule it applies when it projects
-// parameter aliases. This package cannot import the CLI, so the rule is
-// copied; keep the two in step.
+// canonicalParamName copies the CLI's canonicalParamName and KebabToCamel
+// (tooling/cli/internal/jobs/cachekey/context.go), the rule it applies when
+// it projects parameter aliases. This package cannot import the CLI, so the
+// rule is copied; keep the two in step.
 func canonicalParamName(name string) string {
 	if !strings.Contains(name, "-") {
 		return name

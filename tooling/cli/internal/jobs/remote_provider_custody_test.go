@@ -13,6 +13,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -54,22 +55,22 @@ func nativeProviderExtension(t *testing.T) *extension.ExtensionDescription {
 // in-process fake provider, which serves a run marker, and the number of
 // provider processes started so far. bearer, when set, is handed to the
 // provider.
-func custodyProviderCache(t *testing.T, bearer string, ext *extension.ExtensionDescription) (*RemoteCache, *atomic.Int32) {
+func custodyProviderCache(t *testing.T, bearer string, ext *extension.ExtensionDescription) (*remotecache.RemoteCache, *atomic.Int32) {
 	t.Helper()
 	enableProviderRemoteCache(t)
 	useInProcessFakeProvider(t)
-	inProcess := spawnProviderSession
+	inProcess := remotecache.SpawnProviderSession
 	spawns := new(atomic.Int32)
-	spawnProviderSession = func(ctx context.Context, spec cacheprovider.LaunchSpec, opts ...cacheprovider.Option) (*cacheprovider.Session, error) {
+	remotecache.SpawnProviderSession = func(ctx context.Context, spec cacheprovider.LaunchSpec, opts ...cacheprovider.Option) (*cacheprovider.Session, error) {
 		spawns.Add(1)
 		return inProcess(ctx, spec, opts...)
 	}
-	t.Cleanup(func() { spawnProviderSession = inProcess })
-	var options []RemoteCacheOption
+	t.Cleanup(func() { remotecache.SpawnProviderSession = inProcess })
+	var options []remotecache.RemoteCacheOption
 	if bearer != "" {
-		options = append(options, WithCacheRunCredential(bearer))
+		options = append(options, remotecache.WithCacheRunCredential(bearer))
 	}
-	remote, notice := LoadRemoteCache(context.Background(), t.TempDir(), []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny, options...)
+	remote, notice := remotecache.LoadRemoteCache(context.Background(), t.TempDir(), []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny, preparedProviderLaunch, options...)
 	if remote == nil || notice != "" {
 		t.Fatalf("expected a provider-backed remote cache, got %+v, notice %q", remote, notice)
 	}

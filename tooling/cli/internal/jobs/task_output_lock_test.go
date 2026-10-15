@@ -19,6 +19,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/flock"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -757,7 +758,7 @@ func TestHeldOutputLocksEnvIsNeverACacheKeyInput(t *testing.T) {
 				Name: "build", CommandName: "build", ExtensionName: "@test/ext", Cache: true,
 			},
 		}, "")
-		got, err := computeJobCacheHash(ws, job, nil, nil, cache, nil)
+		got, err := cachekey.ComputeJobCacheHash(ws, job, nil, nil, cache, nil)
 		if err != nil {
 			t.Fatalf("compute task cache key: %v", err)
 		}

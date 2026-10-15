@@ -13,12 +13,16 @@ import (
 // an alias both need resolves strictly. The error is the one strict resolution
 // returns.
 func RequirePlannedRuntimeToolchains(ws *workspace.Workspace, planned []*ScheduledJob) error {
+	root := ""
+	if ws != nil {
+		root = ws.Root
+	}
 	for _, provisioning := range []bool{false, true} {
 		for _, job := range planned {
 			if job == nil || toolchain.IsToolchainProvisioningCommand(job.CommandName()) != provisioning {
 				continue
 			}
-			if err := toolchain.EnsureJobRuntimeToolchains(ws, job); err != nil {
+			if err := toolchain.EnsureJobRuntimeToolchains(root, job); err != nil {
 				return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
 					"resolve extension runtime toolchains: %v", err)
 			}

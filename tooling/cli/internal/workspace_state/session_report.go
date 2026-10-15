@@ -12,9 +12,10 @@ import (
 	"time"
 
 	"go.putnami.dev/cli/model/extension"
+	"go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
 	runtimeproto "go.putnami.dev/protocol/runtime"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
 const (
@@ -117,7 +118,7 @@ func (s *Session) FinalizeV2WithCoverage(
 	planned []*jobs.ScheduledJob,
 	results map[string]*jobs.JobResult,
 	run *jobs.SessionResult,
-	version *jobs.JobContextVersion,
+	version *cachekey.JobContextVersion,
 ) error {
 	if err := s.FinalizeV2(meta, wsRoot, baseline); err != nil {
 		return err

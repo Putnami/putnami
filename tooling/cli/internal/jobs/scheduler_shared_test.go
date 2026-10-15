@@ -11,6 +11,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -243,7 +244,7 @@ func TestGenericProducerKeyErrorCannotHideConsumerGoInputFailure(t *testing.T) {
 				Kind: "command", Command: hookPath,
 			}}
 			cache := sharedRuntimeCache(t)
-			if _, err := computeJobCacheHash(ws, consumer, nil, nil, cache, nil); err == nil || errors.Is(err, store.ErrGoEmbedInput) || !strings.Contains(err.Error(), "resolve Git input repository") {
+			if _, err := cachekey.ComputeJobCacheHash(ws, consumer, nil, nil, cache, nil); err == nil || errors.Is(err, store.ErrGoEmbedInput) || !strings.Contains(err.Error(), "resolve Git input repository") {
 				t.Fatalf("fixture must fail generically in producer before consumer Go hashing: %v", err)
 			}
 			result := runSharedScheduler(context.Background(), ws, planned[:1], SchedulerConfig{MaxParallel: 1, NoCache: tc.bypass}, cache)

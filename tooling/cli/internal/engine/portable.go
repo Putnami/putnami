@@ -27,6 +27,8 @@ import (
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runnerprovider"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
@@ -198,7 +200,7 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 			iox.Fprintf(os.Stderr, "putnami: portable execution refused: %v\n", err)
 			return SessionResult{ExitCode: ExitError, Plan: planned}, true
 		}
-		inputs, err := jobs.PortableInputs(ws, planned, req.CommandParams)
+		inputs, err := cachekey.PortableInputs(ws, planned, req.CommandParams)
 		if err == nil {
 			err = runnerprovider.VerifyAdmission(req.WorkspaceRoot, req.Portable.Request.Source.Bound, inputs)
 		}
@@ -217,7 +219,7 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 		iox.Fprintf(os.Stderr, "putnami: --where remote: %v\n", err)
 		return SessionResult{ExitCode: ExitUsage, Plan: planned}, true
 	}
-	inputs, err := jobs.PortableInputs(ws, planned, req.CommandParams)
+	inputs, err := cachekey.PortableInputs(ws, planned, req.CommandParams)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: --where remote: %v\n", err)
 		return SessionResult{ExitCode: ExitError, Plan: planned}, true
@@ -249,7 +251,7 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 		return SessionResult{ExitCode: ExitError, Plan: planned}, true
 	}
 	outcome, err := runnerprovider.Execute(ctx, runnerprovider.Offload{
-		WorkspaceRoot: req.WorkspaceRoot, Workspace: jobs.RunMarkerWorkspaceID(ws),
+		WorkspaceRoot: req.WorkspaceRoot, Workspace: remotecache.RunMarkerWorkspaceID(ws),
 		ProviderName: req.runnerProvider.ExtensionName, Launch: launch, Request: request,
 		Retention: workspace_state.RetentionFromWorkspace(req.Config),
 		Stdout:    req.stdout(), Stderr: os.Stderr,
@@ -515,7 +517,7 @@ func pinnedEnvironment(wsRoot string, extensions []*extension.ExtensionDescripti
 	return environment
 }
 
-func lineVersions(versions jobs.RunVersions) []runner.LineVersion {
+func lineVersions(versions cachekey.RunVersions) []runner.LineVersion {
 	out := make([]runner.LineVersion, 0, len(versions))
 	for line, version := range versions {
 		if version == nil {
@@ -530,10 +532,10 @@ func lineVersions(versions jobs.RunVersions) []runner.LineVersion {
 
 // portableRunVersions is the executing side's version table: exactly the
 // lines the submitter stamped, so the snapshot needs no Git history.
-func portableRunVersions(versions []runner.LineVersion) jobs.RunVersions {
-	out := make(jobs.RunVersions, len(versions))
+func portableRunVersions(versions []runner.LineVersion) cachekey.RunVersions {
+	out := make(cachekey.RunVersions, len(versions))
 	for _, version := range versions {
-		out[version.Line] = &jobs.JobContextVersion{Base: version.Base, Full: version.Full, SHA: version.SHA, Branch: version.Branch,
+		out[version.Line] = &cachekey.JobContextVersion{Base: version.Base, Full: version.Full, SHA: version.SHA, Branch: version.Branch,
 			Tag: version.Tag, Suffix: version.Suffix, Tagged: version.Tagged, IsDirty: version.Dirty, Line: version.Line}
 	}
 	return out

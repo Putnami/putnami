@@ -6,6 +6,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -85,7 +86,7 @@ func TestCacheKeyIsTheSameUnderEverySelectionThatPlansTheTask(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: plan: %v", name, err)
 		}
-		keys, err := PrecomputeKeys(ws, planned, nil, nil, cache, CacheBypass{})
+		keys, err := cachekey.PrecomputeKeys(ws, planned, nil, nil, cache, cachekey.CacheBypass{})
 		if err != nil {
 			t.Fatalf("%s: precompute keys: %v", name, err)
 		}

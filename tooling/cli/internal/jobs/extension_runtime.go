@@ -1,22 +1,16 @@
 package jobs
 
 import (
-	"bufio"
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash"
 	"io"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -38,8 +32,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
-
-const extensionRuntimeDigestVersion = "putnami-extension-runtime-v1"
 
 type extensionRuntimeError struct {
 	code string
@@ -462,7 +454,7 @@ func synchronizeDeclaredExtensionRuntimeWithEnv(
 	if ext.LocalSource && ext.Runtime.Prepare != nil {
 		var err error
 		resolving := time.Now()
-		digest, err = extensionRuntimeDigest(ext)
+		digest, err = cachekey.ExtensionRuntimeDigest(ext)
 		spans.since(PreparationResolution, resolving)
 		if err != nil {
 			return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
@@ -496,26 +488,11 @@ func ExtensionImplementationIdentity(ext *extension.ExtensionDescription) string
 	if !ext.LocalSource {
 		return ext.Version
 	}
-	digest, err := extensionRuntimeDigest(ext)
+	digest, err := cachekey.ExtensionRuntimeDigest(ext)
 	if err != nil {
 		return ""
 	}
 	return digest
-}
-
-func isLocalDevExtensionSource(ws *workspace.Workspace, job *ScheduledJob) bool {
-	if ws == nil || ws.Root == "" || job == nil || job.Extension == nil || !job.Extension.LocalSource {
-		return false
-	}
-	if job.Extension.RelPath == "" {
-		return true
-	}
-	root := jobExtensionRoot(ws, job)
-	rel, err := filepath.Rel(ws.Root, root)
-	if err != nil {
-		return false
-	}
-	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 func resolvedExtensionRuntime(job *ScheduledJob) (string, error) {
@@ -561,7 +538,7 @@ func prepareOrLoadExtensionRuntimeWithDigestAndEnv(
 	def := ext.Runtime
 	root := filepath.Clean(ext.Path)
 	if root == "." || root == "" {
-		root = filepath.Clean(jobExtensionRoot(nil, &ScheduledJob{Extension: ext}))
+		root = filepath.Clean(cachekey.JobExtensionRoot(nil, &ScheduledJob{Extension: ext}))
 	}
 	// Both branches below start the extension's code: its prepare command and
 	// its runtime-info handshake. An extension installed from the artifact
@@ -590,7 +567,7 @@ func prepareOrLoadExtensionRuntimeWithDigestAndEnv(
 	if digest == "" {
 		var err error
 		resolving := time.Now()
-		digest, err = extensionRuntimeDigest(ext)
+		digest, err = cachekey.ExtensionRuntimeDigest(ext)
 		spans.since(PreparationResolution, resolving)
 		if err != nil {
 			return "", runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
@@ -624,7 +601,7 @@ func prepareOrLoadExtensionRuntimeWithDigestAndEnv(
 		spans.since(PreparationMutation, staging)
 
 		resolving := time.Now()
-		inputs, collectErr := collectRuntimeInputs(root, def.Prepare.Inputs)
+		inputs, collectErr := cachekey.CollectRuntimeInputs(root, def.Prepare.Inputs)
 		spans.since(PreparationResolution, resolving)
 		if collectErr != nil {
 			return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
@@ -670,7 +647,7 @@ func prepareOrLoadExtensionRuntimeWithDigestAndEnv(
 		// Re-hashing the inputs is VERIFICATION, not resolution: the identity is
 		// already decided, and this run only proves the source did not move under
 		// the preparation that claims to implement it.
-		after, digestErr := extensionRuntimeDigest(ext)
+		after, digestErr := cachekey.ExtensionRuntimeDigest(ext)
 		spans.since(PreparationVerification, verifying)
 		if digestErr != nil {
 			return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
@@ -745,149 +722,6 @@ func isTextFileBusy(err error) bool {
 	return errors.Is(err, syscall.ETXTBSY)
 }
 
-func extensionRuntimeDigest(ext *extension.ExtensionDescription) (string, error) {
-	if ext == nil || ext.Runtime == nil || ext.Runtime.Prepare == nil {
-		return "", errors.New("runtime preparation is not declared")
-	}
-	// The root is walked, so it must be the directory itself: a directory
-	// link at ext.Path, a junction on Windows included, is followed first.
-	root, err := dirlink.Resolve(ext.Path)
-	if err != nil {
-		return "", fmt.Errorf("resolve extension root: %w", err)
-	}
-	inputs, err := collectRuntimeInputs(root, ext.Runtime.Prepare.Inputs)
-	if err != nil {
-		return "", err
-	}
-	h := sha256.New()
-	cachekey.HashField(h, "schema", []byte(extensionRuntimeDigestVersion))
-	cachekey.HashField(h, "extension", []byte(ext.Name))
-	cachekey.HashField(h, "version", []byte(ext.Version))
-	cachekey.HashField(h, "platform", []byte(runtime.GOOS+"/"+runtime.GOARCH))
-	cachekey.HashField(h, "runtime-abi", []byte(fmt.Sprintf("%d", runtimeproto.RuntimeABIVersion)))
-	cachekey.HashField(h, "toolchains", []byte(toolchain.RuntimeToolchainIdentityForRefs(ext, ext.Runtime.Prepare.Toolchains)))
-	declaration, err := json.Marshal(ext.Runtime)
-	if err != nil {
-		return "", fmt.Errorf("marshal runtime declaration: %w", err)
-	}
-	cachekey.HashField(h, "declaration", declaration)
-	for _, input := range ext.Runtime.Prepare.Inputs {
-		cachekey.HashField(h, "input-pattern", []byte(input))
-	}
-	for _, rel := range inputs {
-		full := filepath.Join(root, filepath.FromSlash(rel))
-		info, err := os.Lstat(full)
-		if err != nil {
-			return "", fmt.Errorf("stat runtime input %s: %w", rel, err)
-		}
-		cachekey.HashField(h, "input/"+rel+"/mode", []byte(fmt.Sprintf("%o", info.Mode()&(os.ModeType|0o111))))
-		file, err := os.Open(full)
-		if err != nil {
-			return "", fmt.Errorf("open runtime input %s: %w", rel, err)
-		}
-		if err := cachekey.HashStream(h, "input/"+rel, info.Size(), file); err != nil {
-			_ = file.Close()
-			return "", fmt.Errorf("hash runtime input %s: %w", rel, err)
-		}
-		if err := file.Close(); err != nil {
-			return "", fmt.Errorf("close runtime input %s: %w", rel, err)
-		}
-	}
-	replacements, err := runtimeReplacementClosure(root)
-	if err != nil {
-		return "", err
-	}
-	for _, replacement := range replacements {
-		if err := hashRuntimeReplacementTree(h, "module-replacement/"+replacement.label, replacement.root); err != nil {
-			return "", err
-		}
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-// collectRuntimeInputs returns the slash-form paths, relative to root, of the
-// regular files under root that patterns select, sorted. A directory link at
-// root, a junction on Windows included, is followed first, so the walk reads
-// the directory the digest hashes and staging copies, never the link itself.
-func collectRuntimeInputs(root string, patterns []string) ([]string, error) {
-	resolved, err := dirlink.Resolve(root)
-	if err != nil {
-		return nil, fmt.Errorf("resolve runtime input root: %w", err)
-	}
-	root = filepath.Clean(resolved)
-	matches := make(map[string]bool)
-	err = filepath.WalkDir(root, func(full string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		rel, err := filepath.Rel(root, full)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
-		if rel == "." {
-			return nil
-		}
-		matched := false
-		for _, pattern := range patterns {
-			if matchRuntimeInput(pattern, rel) {
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			return nil
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("runtime input %q is a symlink", rel)
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		if !info.Mode().IsRegular() {
-			return fmt.Errorf("runtime input %q is not a regular file", rel)
-		}
-		matches[rel] = true
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	out := make([]string, 0, len(matches))
-	for rel := range matches {
-		out = append(out, rel)
-	}
-	sort.Strings(out)
-	return out, nil
-}
-
-func matchRuntimeInput(pattern, rel string) bool {
-	patternParts := strings.Split(path.Clean(pattern), "/")
-	relParts := strings.Split(path.Clean(rel), "/")
-	var match func(int, int) bool
-	match = func(pi, ri int) bool {
-		if pi == len(patternParts) {
-			return ri == len(relParts)
-		}
-		if patternParts[pi] == "**" {
-			if match(pi+1, ri) {
-				return true
-			}
-			return ri < len(relParts) && match(pi, ri+1)
-		}
-		if ri == len(relParts) {
-			return false
-		}
-		ok, err := path.Match(patternParts[pi], relParts[ri])
-		return err == nil && ok && match(pi+1, ri+1)
-	}
-	return match(0, 0)
-}
-
 func copyRuntimeInputs(root, dest string, inputs []string) error {
 	for _, rel := range inputs {
 		source := filepath.Join(root, filepath.FromSlash(rel))
@@ -916,18 +750,18 @@ func copyRuntimeInputs(root, dest string, inputs []string) error {
 
 // copyRuntimeTree stages a replaced module's enumerated tree. Regular files are
 // copied; a contained symlink is recreated verbatim, so the staged view keeps
-// the shape hashRuntimeReplacementTree fingerprinted. collectRuntimeTree already
+// the shape hashRuntimeReplacementTree fingerprinted. cachekey.CollectRuntimeTree already
 // refused every link that leaves the replacement root, so a recreated link can
 // only resolve inside the staged copy.
-func copyRuntimeTree(root, dest string, entries []runtimeTreeEntry) error {
+func copyRuntimeTree(root, dest string, entries []cachekey.RuntimeTreeEntry) error {
 	for _, entry := range entries {
-		source := filepath.Join(root, filepath.FromSlash(entry.rel))
-		target := filepath.Join(dest, filepath.FromSlash(entry.rel))
+		source := filepath.Join(root, filepath.FromSlash(entry.Rel))
+		target := filepath.Join(dest, filepath.FromSlash(entry.Rel))
 		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 			return err
 		}
-		if entry.symlink {
-			if err := stageRuntimeSymlink(source, entry.target, target); err != nil {
+		if entry.Symlink {
+			if err := stageRuntimeSymlink(source, entry.Target, target); err != nil {
 				return err
 			}
 			continue
@@ -939,7 +773,7 @@ func copyRuntimeTree(root, dest string, entries []runtimeTreeEntry) error {
 		if !info.Mode().IsRegular() {
 			// The entry changed type after the enumeration classified it. Refuse
 			// rather than copy through a link the digest never validated.
-			return fmt.Errorf("module replacement input %q is not a regular non-symlink file", entry.rel)
+			return fmt.Errorf("module replacement input %q is not a regular non-symlink file", entry.Rel)
 		}
 		mode := os.FileMode(0o444)
 		if info.Mode()&0o111 != 0 {
@@ -1038,75 +872,13 @@ func copyRuntimeInputFile(source, target string, mode os.FileMode) error {
 	return nil
 }
 
-// runtimeReplacement is one module a local replace directive reaches. root is
-// the physical directory its tree is read from. stage is where the declaring
-// module's go.mod expects it: a relative directive joins the declaring
-// module's stage path lexically, as the go command does, so a replacement
-// behind a directory link is staged at the path the go.mod names rather than
-// where the link points. An absolute directive keeps the physical root, since
-// the build reads that path outside the staged view.
-type runtimeReplacement struct {
-	label string
-	root  string
-	stage string
-}
-
-func runtimeReplacementClosure(extensionRoot string) ([]runtimeReplacement, error) {
-	type pendingModule struct {
-		label string
-		root  string
-		stage string
-	}
-	queue := []pendingModule{{label: "extension", root: extensionRoot, stage: filepath.Clean(extensionRoot)}}
-	seen := map[string]bool{filepath.Clean(extensionRoot): true}
-	var replacements []runtimeReplacement
-	for len(queue) > 0 {
-		module := queue[0]
-		queue = queue[1:]
-		goMod := filepath.Join(module.root, "go.mod")
-		if _, err := os.Stat(goMod); errors.Is(err, os.ErrNotExist) {
-			continue
-		} else if err != nil {
-			return nil, err
-		}
-		paths, err := localDirectivePaths(goMod, "replace")
-		if err != nil {
-			return nil, err
-		}
-		for _, declared := range paths {
-			replacementRoot := declared
-			if !filepath.IsAbs(replacementRoot) {
-				replacementRoot = filepath.Join(module.root, replacementRoot)
-			}
-			replacementRoot, err = dirlink.Resolve(replacementRoot)
-			if err != nil {
-				return nil, fmt.Errorf("resolve local replacement %q from %s: %w", declared, goMod, err)
-			}
-			replacementRoot = filepath.Clean(replacementRoot)
-			if seen[replacementRoot] {
-				continue
-			}
-			seen[replacementRoot] = true
-			label := module.label + "/" + filepath.ToSlash(declared)
-			stage := replacementRoot
-			if !filepath.IsAbs(declared) {
-				stage = filepath.Join(module.stage, declared)
-			}
-			replacements = append(replacements, runtimeReplacement{label: label, root: replacementRoot, stage: stage})
-			queue = append(queue, pendingModule{label: label, root: replacementRoot, stage: stage})
-		}
-	}
-	sort.Slice(replacements, func(i, j int) bool { return replacements[i].label < replacements[j].label })
-	return replacements, nil
-}
-
 func stageRuntimeSourceView(extensionRoot, viewRoot string, inputs []string) (string, error) {
 	physicalExtensionRoot, err := dirlink.Resolve(extensionRoot)
 	if err != nil {
 		return "", fmt.Errorf("resolve extension source root: %w", err)
 	}
 	extensionRoot = physicalExtensionRoot
-	replacements, err := runtimeReplacementClosure(extensionRoot)
+	replacements, err := cachekey.RuntimeReplacementClosure(extensionRoot)
 	if err != nil {
 		return "", err
 	}
@@ -1114,11 +886,11 @@ func stageRuntimeSourceView(extensionRoot, viewRoot string, inputs []string) (st
 	// Two directories staged at one path would merge into one tree.
 	staged := map[string]string{common: common}
 	for _, replacement := range replacements {
-		if other, ok := staged[replacement.stage]; ok {
-			return "", fmt.Errorf("runtime sources %q and %q both stage at %q", other, replacement.root, replacement.stage)
+		if other, ok := staged[replacement.Stage]; ok {
+			return "", fmt.Errorf("runtime sources %q and %q both stage at %q", other, replacement.Root, replacement.Stage)
 		}
-		staged[replacement.stage] = replacement.root
-		common = commonPathAncestor(common, replacement.stage)
+		staged[replacement.Stage] = replacement.Root
+		common = commonPathAncestor(common, replacement.Stage)
 	}
 	stagePath := func(root string) (string, error) {
 		rel, err := filepath.Rel(common, root)
@@ -1135,15 +907,15 @@ func stageRuntimeSourceView(extensionRoot, viewRoot string, inputs []string) (st
 		return "", err
 	}
 	for _, replacement := range replacements {
-		stagedReplacement, err := stagePath(replacement.stage)
+		stagedReplacement, err := stagePath(replacement.Stage)
 		if err != nil {
 			return "", err
 		}
-		entries, err := collectRuntimeTree(replacement.root)
+		entries, err := cachekey.CollectRuntimeTree(replacement.Root)
 		if err != nil {
 			return "", err
 		}
-		if err := copyRuntimeTree(replacement.root, stagedReplacement, entries); err != nil {
+		if err := copyRuntimeTree(replacement.Root, stagedReplacement, entries); err != nil {
 			return "", err
 		}
 	}
@@ -1164,134 +936,6 @@ func commonPathAncestor(a, b string) string {
 		}
 		a = parent
 	}
-}
-
-// runtimeTreeEntry is one member of a replaced module's tree. Staging and
-// hashing consume the same enumeration, so a prepared runtime's digest always
-// describes the tree its build actually reads.
-type runtimeTreeEntry struct {
-	rel string
-	// symlink marks an entry staged as a link rather than copied bytes.
-	symlink bool
-	// target is the raw link target of a symlink entry, empty otherwise.
-	target string
-}
-
-func collectRuntimeTree(root string) ([]runtimeTreeEntry, error) {
-	root = filepath.Clean(root)
-	var out []runtimeTreeEntry
-	err := filepath.WalkDir(root, func(full string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		rel, err := filepath.Rel(root, full)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
-		if rel == "." {
-			return nil
-		}
-		if runtimeReplacementIgnoredDir(rel) {
-			if entry.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			target, err := os.Readlink(full)
-			if err != nil {
-				return err
-			}
-			if !runtimeReplacementLinkContained(rel, target) {
-				return fmt.Errorf(
-					"module replacement input %q is a symlink to %q outside the replacement root",
-					rel, target)
-			}
-			out = append(out, runtimeTreeEntry{rel: rel, symlink: true, target: target})
-			return nil
-		}
-		if runtime.GOOS == "windows" && info.Mode()&os.ModeIrregular != 0 {
-			return runtimeTreeReparsePointError(full, rel, info)
-		}
-		if info.Mode().IsRegular() {
-			out = append(out, runtimeTreeEntry{rel: rel})
-		}
-		return nil
-	})
-	sort.Slice(out, func(i, j int) bool { return out[i].rel < out[j].rel })
-	return out, err
-}
-
-// runtimeTreeReparsePointError refuses a replaced module's entry that Go
-// reports as irregular on Windows. A directory junction stores an absolute
-// target, which a staged copy at another path cannot reproduce; any other
-// reparse point has no content the walk can hash or stage.
-func runtimeTreeReparsePointError(full, rel string, info os.FileInfo) error {
-	if dirlink.IsLink(full, info) {
-		target, _ := os.Readlink(full)
-		return fmt.Errorf(
-			"module replacement input %q is a directory junction to %q: a staged copy cannot reproduce its absolute target, "+
-				"so replace it with the directory itself or with a relative symbolic link inside the module",
-			rel, target)
-	}
-	return fmt.Errorf(
-		"module replacement input %q is a reparse point that cannot be staged (mode %v): replace it with a regular file",
-		rel, info.Mode())
-}
-
-// runtimeReplacementLinkContained reports whether a symlink of the replaced
-// module stays inside that module. Containment is decided lexically, without
-// resolving intermediate links: the staged view is a copy at another path, so
-// only a relative target that stays under the replacement root still points at
-// staged bytes once it is recreated there. An absolute target, or one that
-// climbs out, would let the content-addressed build read bytes from outside the
-// tree this digest covers, which is exactly what the previous blanket refusal
-// protected against.
-func runtimeReplacementLinkContained(rel, target string) bool {
-	slashed := filepath.ToSlash(target)
-	// filepath.IsAbs alone misses a rooted "/x" on Windows, path.IsAbs alone
-	// misses a volume-qualified "C:\x"; either match means the target is not relative.
-	if target == "" || filepath.IsAbs(target) || path.IsAbs(slashed) {
-		return false
-	}
-	// path.Join cleans its result, so a target that climbs above the module
-	// root keeps a leading "..".
-	resolved := path.Join(path.Dir(rel), slashed)
-	return resolved != ".." && !strings.HasPrefix(resolved, "../")
-}
-
-// runtimeReplacementStagedProjectExclusions are the project-walk exclusions a
-// replaced module keeps: vendor/ is build input whenever a module vendors its
-// dependencies, and dist/ is ordinary source here — the planner skips those
-// names while LOOKING for projects, not while building one.
-var runtimeReplacementStagedProjectExclusions = map[string]bool{"vendor": true, "dist": true}
-
-// A local replacement module is source, regardless of directory names such as
-// coverage, dist, generated, or tools. Only orchestrator/VCS state, the
-// scheduler-owned .gen output tree, and the install output the planner already
-// refuses to walk are excluded unconditionally. Build and generate refresh files
-// throughout .gen, and any install rewrites its own output tree; hashing or
-// staging either makes the prepared-runtime digest follow the previous task
-// invocation, or the last install, instead of the replacement module's source.
-// That output is also where an install plants the ordinary bin links a staged
-// copy cannot resolve. The install-directory names come from the planner's
-// shared exclusion table rather than being spelled here, because core does not
-// name package managers. The match is by base name and applies to any entry:
-// an install may plant those names as symlinks rather than directories.
-func runtimeReplacementIgnoredDir(rel string) bool {
-	base := path.Base(rel)
-	if base == ".git" || base == ".putnami" || base == ".gen" {
-		return true
-	}
-	return projectWalkExcludedDirs[base] && !runtimeReplacementStagedProjectExclusions[base]
 }
 
 // runtimeExecutablePath is the file under root that holds the runtime a
@@ -1562,129 +1206,6 @@ func runtimeHandshakeTimeout(
 			"machine is less loaded, and if it repeats run `%s __putnami runtime-info` by hand: stderr=%q: %s",
 		ext.Name, timing.Ran.Round(time.Millisecond), runtimeHandshakeDeadline, starting.Round(time.Millisecond),
 		timing.Uncounted(), cpu, executable, stderr, describeRuntimeExecutable(executable))
-}
-
-// hashRuntimeReplacementTree fingerprints exactly the entries stageRuntimeSourceView
-// stages: both read the tree through collectRuntimeTree, so the digest can never
-// accept a tree the staging walk refuses, nor cover bytes the build never sees.
-func hashRuntimeReplacementTree(h hash.Hash, label, root string) error {
-	entries, err := collectRuntimeTree(root)
-	if err != nil {
-		return fmt.Errorf("walk runtime replacement %s: %w", label, err)
-	}
-	for _, entry := range entries {
-		rel := entry.rel
-		full := filepath.Join(root, filepath.FromSlash(rel))
-		info, err := os.Lstat(full)
-		if err != nil {
-			return err
-		}
-		cachekey.HashField(h, label+"/"+rel+"/mode", []byte(fmt.Sprintf("%o", info.Mode()&(os.ModeType|0o111))))
-		if entry.symlink {
-			target, err := os.Readlink(full)
-			if err != nil {
-				return err
-			}
-			cachekey.HashField(h, label+"/"+rel, []byte(target))
-			continue
-		}
-		if !info.Mode().IsRegular() {
-			// The entry changed type under the walk. Refuse rather than fold a
-			// mode-only field into a digest whose staging would refuse the tree.
-			return fmt.Errorf("module replacement input %q is not a regular file", rel)
-		}
-		file, err := os.Open(full)
-		if err != nil {
-			return err
-		}
-		if err := cachekey.HashStream(h, label+"/"+rel, info.Size(), file); err != nil {
-			_ = file.Close()
-			return fmt.Errorf("hash runtime replacement %s/%s: %w", label, rel, err)
-		}
-		if err := file.Close(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// localDirectivePaths extracts local filesystem operands from simple Go
-// replace directives without invoking the toolchain. Comments and both
-// block/single-line forms are supported.
-func localDirectivePaths(filename, directive string) ([]string, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var paths []string
-	inBlock := false
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(strings.SplitN(scanner.Text(), "//", 2)[0])
-		if line == "" {
-			continue
-		}
-		if inBlock {
-			if line == ")" {
-				inBlock = false
-				continue
-			}
-			if local := directiveLocalOperand(line, directive); local != "" {
-				paths = append(paths, local)
-			}
-			continue
-		}
-		prefix := directive + " "
-		if line == directive+" (" {
-			inBlock = true
-			continue
-		}
-		if strings.HasPrefix(line, prefix) {
-			if local := directiveLocalOperand(strings.TrimSpace(strings.TrimPrefix(line, prefix)), directive); local != "" {
-				paths = append(paths, local)
-			}
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-	sort.Strings(paths)
-	return dedupeStrings(paths), nil
-}
-
-func directiveLocalOperand(line, directive string) string {
-	fields := strings.Fields(line)
-	if directive == "use" {
-		if len(fields) > 0 && isLocalPath(fields[0]) {
-			return fields[0]
-		}
-		return ""
-	}
-	for i, field := range fields {
-		if field == "=>" && i+1 < len(fields) && isLocalPath(fields[i+1]) {
-			return fields[i+1]
-		}
-	}
-	return ""
-}
-
-func isLocalPath(value string) bool {
-	return filepath.IsAbs(value) || value == "." || strings.HasPrefix(value, "./") || strings.HasPrefix(value, "../")
-}
-
-func dedupeStrings(values []string) []string {
-	if len(values) < 2 {
-		return values
-	}
-	out := values[:1]
-	for _, value := range values[1:] {
-		if value != out[len(out)-1] {
-			out = append(out, value)
-		}
-	}
-	return out
 }
 
 func setEnv(env []string, key, value string) []string {

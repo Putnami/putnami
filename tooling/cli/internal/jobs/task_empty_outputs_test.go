@@ -15,6 +15,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -289,10 +290,10 @@ func recordEmptyings(t *testing.T) func() []string {
 // package variables.
 func engineWithoutEmptying(t *testing.T) (restore func()) {
 	t.Helper()
-	savedEmpty, savedIDs := emptyTaskOutput, emptiedOutputIDs
+	savedEmpty, savedIDs := emptyTaskOutput, cachekey.EmptiedOutputIDs
 	emptyTaskOutput = func(string, string, ...string) error { return nil }
-	emptiedOutputIDs = func(*ScheduledJob) []string { return nil }
-	restore = func() { emptyTaskOutput, emptiedOutputIDs = savedEmpty, savedIDs }
+	cachekey.EmptiedOutputIDs = func(*ScheduledJob) []string { return nil }
+	restore = func() { emptyTaskOutput, cachekey.EmptiedOutputIDs = savedEmpty, savedIDs }
 	t.Cleanup(restore)
 	return restore
 }
@@ -1003,42 +1004,6 @@ func emptyingShapesJob() *ScheduledJob {
 	})
 }
 
-// The emptied set is every durable directory output whose path the
-// declaration states and that is required or lives under the command-output
-// root, in id order. An optionalEmpty directory under the project or the
-// workspace root, a file, a pathFrom output, an invocation-scoped output, a
-// path that escapes or names its root, and an unknown root are left out. The
-// key carries the ids of exactly that set.
-func TestEmptiedOutputsAreRequiredOrCommandOutputDirectoriesWithAStatedPath(t *testing.T) {
-	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-path-from-output-is-left-as-it-stands")
-	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-project-or-workspace-output-is-left-as-it-stands")
-	spectest.Proves(t, emptyingFeature, emptyingRequirement, "an-optional-command-output-directory-is-emptied")
-	job := emptyingShapesJob()
-
-	want := []string{"archives", "default", "gen", "lib", "shared"}
-	if got := emptiedOutputIDs(job); !reflect.DeepEqual(got, want) {
-		t.Fatalf("emptiedOutputIDs = %v, want %v", got, want)
-	}
-	rels := map[string]string{}
-	for _, declared := range emptiedOutputDeclarations(job) {
-		rels[declared.id] = declared.rel
-	}
-	if want := map[string]string{
-		"archives": "archives", "default": "generated", "gen": ".gen", "lib": "lib", "shared": "dist/shared",
-	}; !reflect.DeepEqual(rels, want) {
-		t.Fatalf("emptied paths = %v, want %v", rels, want)
-	}
-
-	undeclared := &ScheduledJob{
-		Project:   &workspace.Project{ID: "/p", Name: "p", Path: "p"},
-		Extension: &extension.ExtensionDescription{Name: "@test/ext"},
-		JobDef:    &extension.JobDefinition{Name: "lint"},
-	}
-	if got := emptiedOutputIDs(undeclared); got != nil {
-		t.Fatalf("a task with no declaration empties %v", got)
-	}
-}
-
 // The build stamp is kept in the one output that holds it: a project-rooted
 // directory the stamp sits strictly inside, under any spelling of its name.
 func TestVersionStampWithin(t *testing.T) {
@@ -1224,10 +1189,10 @@ func TestEmptiedOutputsMoveOnlyTheKeysOfTasksThatOwnOne(t *testing.T) {
 			keys := func() (execution, selection string) {
 				t.Helper()
 				var err error
-				if execution, err = computeJobCacheHashWith(f.ws, job, nil, nil, f.cache, nil, false); err != nil {
+				if execution, err = cachekey.ComputeJobCacheHashWith(f.ws, job, nil, nil, f.cache, nil, false); err != nil {
 					t.Fatalf("compute execution key: %v", err)
 				}
-				if selection, err = computeJobCacheHashWith(f.ws, job, nil, nil, f.cache, nil, true); err != nil {
+				if selection, err = cachekey.ComputeJobCacheHashWith(f.ws, job, nil, nil, f.cache, nil, true); err != nil {
 					t.Fatalf("compute selection key: %v", err)
 				}
 				return execution, selection

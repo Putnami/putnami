@@ -19,6 +19,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -43,7 +44,7 @@ type PlannerResult struct {
 	Complete bool
 	Projects []*workspace.Project
 	Jobs     []*jobs.ScheduledJob
-	Versions jobs.RunVersions
+	Versions cachekey.RunVersions
 }
 
 // Planner is supplied by the CLI adapter, which is the sole owner of
@@ -180,15 +181,15 @@ func planDirectProjects(ws *workspace.Workspace, paths []string) []*workspace.Pr
 	return projects
 }
 
-func buildPlanCache(ws *workspace.Workspace, planned []*jobs.ScheduledJob, versions jobs.RunVersions, noCache bool) ciproto.ChangePlanCache {
+func buildPlanCache(ws *workspace.Workspace, planned []*jobs.ScheduledJob, versions cachekey.RunVersions, noCache bool) ciproto.ChangePlanCache {
 	if noCache {
 		return ciproto.ChangePlanCache{Status: "disabled"}
 	}
-	if !jobs.CacheKeysRecomputableAtRevision(ws, planned, false) {
+	if !cachekey.CacheKeysRecomputableAtRevision(ws, planned, false) {
 		return ciproto.ChangePlanCache{Status: "unavailable", Reason: "ambient-input"}
 	}
 	cache := store.NewCacheManager(store.NewLocalStore(store.ResolveStoreRoot(ws.Root)))
-	keys, err := jobs.PrecomputeKeys(ws, planned, nil, versions, cache, jobs.CacheBypass{})
+	keys, err := cachekey.PrecomputeKeys(ws, planned, nil, versions, cache, cachekey.CacheBypass{})
 	if err != nil {
 		return ciproto.ChangePlanCache{Status: "unavailable", Reason: "key-computation-failed"}
 	}
@@ -201,7 +202,7 @@ func buildPlanCache(ws *workspace.Workspace, planned []*jobs.ScheduledJob, versi
 	entries := make([]ciproto.ChangePlanCacheEntry, 0, len(keys))
 	for taskKey, key := range keys {
 		job := byKey[taskKey]
-		present, err := jobs.CacheEntryPresent(cache, job, key)
+		present, err := cachekey.CacheEntryPresent(cache, job, key)
 		if err != nil {
 			return ciproto.ChangePlanCache{Status: "unavailable", Reason: "presence-lookup-failed"}
 		}

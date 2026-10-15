@@ -42,15 +42,19 @@ import (
 // so when a later slice moves one of these packages the scan follows it across
 // the module boundary instead of quietly scanning nothing. Imports are read from
 // the AST, so a doc comment or a test fixture naming an origin path does not
-// count; this file names all three literally, one line below.
+// count; this file names all four literally, one line below.
 
 // internalWorkspaceImportPath and internalExtensionImportPath are the two other
 // origin packages the model was lifted out of. The third, internal/jobs, is
 // already spelled by engine_boundary_test.go as jobsImportPath and is reused
-// here rather than written twice.
+// here rather than written twice. internalCacheKeyImportPath is the part of
+// internal/jobs split out of it with the job-context version block, so a
+// consumer that reaches it reaches the same execution half; so is the remote
+// cache client, spelled there as remoteCacheImportPath.
 const (
 	internalWorkspaceImportPath = "go.putnami.dev/tooling/cli/internal/workspace"
 	internalExtensionImportPath = "go.putnami.dev/tooling/cli/internal/extension"
+	internalCacheKeyImportPath  = "go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
 // modelOrigin is one internal package the pure model was lifted out of.
@@ -69,6 +73,8 @@ var modelOrigins = []modelOrigin{
 	{jobsImportPath, "jobs", "the planner, scheduler, executor, cache and job-context writer"},
 	{internalWorkspaceImportPath, "workspace", "workspace discovery, loading, probing, syncing and snapshotting"},
 	{internalExtensionImportPath, "extension", "extension discovery, install, integrity, registry and lockfile I/O"},
+	{internalCacheKeyImportPath, "cachekey", "the task cache key and the job-context inputs it hashes"},
+	{remoteCacheImportPath, "remotecache", "the remote cache client a run restores from and shares with"},
 }
 
 // modelOnlyPackages are the consumers A5 flipped onto
@@ -127,10 +133,10 @@ var modelDecouplingExceptions = []modelDecouplingException{
 	},
 	{
 		file:   "internal/workspace_state/session_report.go",
-		origin: jobsImportPath,
-		symbol: "jobs.JobContextVersion",
+		origin: internalCacheKeyImportPath,
+		symbol: "cachekey.JobContextVersion",
 		why: "the version block of the job CONTEXT FILE the executor writes and every task reads " +
-			"(internal/jobs/context.go). The session report records the version stamp a run actually " +
+			"(internal/jobs/cachekey/context.go). The session report records the version stamp a run actually " +
 			"shipped with, which is that writer's shape rather than the canonical result model's.",
 	},
 }

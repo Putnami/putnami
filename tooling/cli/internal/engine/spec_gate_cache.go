@@ -11,6 +11,7 @@ import (
 	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/specgate"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -48,7 +49,7 @@ type cachedObservationRecovery struct {
 	disabled string
 
 	once      sync.Once
-	versions  jobs.RunVersions
+	versions  cachekey.RunVersions
 	entriesMu sync.Mutex
 	entries   map[string]*store.TaskEntry
 }
@@ -110,8 +111,8 @@ func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.
 	if err != nil {
 		return source.unconsultedAll(candidates, fmt.Sprintf("their test plan could not be derived: %v", err))
 	}
-	keys, err := jobs.PrecomputeKeys(source.ws, planned, source.req.CommandParams,
-		source.runVersions(), source.cache, jobs.CacheBypass{})
+	keys, err := cachekey.PrecomputeKeys(source.ws, planned, source.req.CommandParams,
+		source.runVersions(), source.cache, cachekey.CacheBypass{})
 	if err != nil {
 		return source.unconsultedAll(candidates, fmt.Sprintf("their cache keys could not be derived: %v", err))
 	}
@@ -243,7 +244,7 @@ func reportInEntry(wsRoot string, job *jobs.ScheduledJob, entry *store.TaskEntry
 
 // runVersions shares the versions already resolved by planning and execution.
 // A recovery source assembled outside the engine resolves lazily on first use.
-func (source *cachedObservationRecovery) runVersions() jobs.RunVersions {
+func (source *cachedObservationRecovery) runVersions() cachekey.RunVersions {
 	source.once.Do(func() { source.versions = source.req.runVersions(source.ws) })
 	return source.versions
 }

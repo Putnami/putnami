@@ -56,6 +56,8 @@ import (
 	"go.putnami.dev/tooling/cli/internal/hooks"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/sessionreporter"
 	"go.putnami.dev/tooling/cli/internal/specgate"
@@ -361,7 +363,7 @@ type Request struct {
 	// before its first hook (HostedRemoteCache.Start), or nil. Every stage of
 	// the run that reads the remote cache reads it through this one; execute
 	// sets it to the cache the session runs with (hostedRunRemoteCache).
-	hostedRemote *jobs.RemoteCache
+	hostedRemote *remotecache.RemoteCache
 	// Hooks are the workspace lifecycle hooks to run around the lifecycle. Nil
 	// runs none: only the terminal adapter passes them today, for the same
 	// reason Observer is injected.
@@ -394,7 +396,7 @@ type Request struct {
 	VersionSnapshot *git.VersionInfo
 	// versions is resolved during serial planning and then read by execution
 	// and evidence recovery. Each run, including a watch iteration, owns it.
-	versions jobs.RunVersions
+	versions cachekey.RunVersions
 	// versionsErr is why versions could not read a line from git, or nil. The
 	// run proceeds either way (jobs.BuildRunVersions); --debug prints it, so a
 	// 0.0.0 stamp can be told apart from a line that is really untagged.

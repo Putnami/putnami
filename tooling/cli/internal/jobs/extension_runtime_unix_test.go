@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"syscall"
 	"testing"
+
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
 // On Unix an irregular entry of a replaced module, here a FIFO, stays out of
@@ -18,7 +20,7 @@ func TestRuntimeReplacementIrregularEntryStaysOutOfDigestAndStagingOnUnix(t *tes
 	extensionRoot, sdkRoot := writeRuntimeReplacementFixture(t, root)
 	ext := runtimeTestExtension(extensionRoot)
 	ext.Runtime.Prepare.Inputs = append(ext.Runtime.Prepare.Inputs, "go.mod")
-	without, err := extensionRuntimeDigest(ext)
+	without, err := cachekey.ExtensionRuntimeDigest(ext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +28,7 @@ func TestRuntimeReplacementIrregularEntryStaysOutOfDigestAndStagingOnUnix(t *tes
 	if err := syscall.Mkfifo(filepath.Join(sdkRoot, "pipe"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	with, err := extensionRuntimeDigest(ext)
+	with, err := cachekey.ExtensionRuntimeDigest(ext)
 	if err != nil {
 		t.Fatalf("digest refused an irregular entry on Unix: %v", err)
 	}

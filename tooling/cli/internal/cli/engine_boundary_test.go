@@ -56,29 +56,61 @@ import (
 // jobsImportPath is the package whose execution surface is engine-only.
 const jobsImportPath = "go.putnami.dev/tooling/cli/internal/jobs"
 
+// remoteCacheImportPath is the remote cache client the engine loads and hands
+// to the scheduler. It left internal/jobs, so its loader and its type are
+// restricted under their own import path.
+const remoteCacheImportPath = "go.putnami.dev/tooling/cli/internal/jobs/remotecache"
+
+// schedulerTestDir holds the scheduler's own tests. They name the remote cache
+// client to wire one into an in-package scheduler, as they did unqualified
+// before the client left internal/jobs; its production files may not, because
+// the scheduler reaches the client only through the cachekey.RemoteCache
+// interface.
+const schedulerTestDir = "internal/jobs"
+
 // enginePackageDir is the one package allowed to name the restricted symbols,
 // as a module-relative directory. Files in it — production and test alike — may
 // name them; every other package in the module may not.
 const enginePackageDir = "internal/engine"
 
-// restrictedJobSymbols are the jobs exports that constitute "running a plan".
-// Naming any of them outside internal/engine is a second run loop being born.
-var restrictedJobSymbols = map[string]string{
-	"Plan":            "planning is an engine stage (engine/plan.go); a private plan skips contract validation and the missing-extension/starved-command guards",
-	"RunPlan":         "the ONE execution entry (engine/execute.go); a second caller is a run without the session file, run markers, profiler or remote cache",
-	"RunRequest":      "RunPlan's argument; naming it outside the engine means assembling a run elsewhere",
-	"Scheduler":       "ADR 0001 §3: no adapter constructs or configures a jobs.Scheduler",
-	"SchedulerConfig": "scheduler tuning is derived from the engine Request's global flags, in one place",
-	"SchedulerResult": "the raw scheduler result; adapters read the canonical engine.SessionResult instead",
-	"RemoteCache":     "remote-cache lifetime is engine-owned (setup timing, Close after the run marker is published)",
-	"LoadRemoteCache": "same: a second loader means a run whose cache stats and trust policy nobody reconciled",
+// restrictedJobSymbols are, by import path, the exports that constitute
+// "running a plan". Naming any of them outside internal/engine is a second run
+// loop being born.
+var restrictedJobSymbols = map[string]map[string]string{
+	jobsImportPath: {
+		"Plan":            "planning is an engine stage (engine/plan.go); a private plan skips contract validation and the missing-extension/starved-command guards",
+		"RunPlan":         "the ONE execution entry (engine/execute.go); a second caller is a run without the session file, run markers, profiler or remote cache",
+		"RunRequest":      "RunPlan's argument; naming it outside the engine means assembling a run elsewhere",
+		"Scheduler":       "ADR 0001 §3: no adapter constructs or configures a jobs.Scheduler",
+		"SchedulerConfig": "scheduler tuning is derived from the engine Request's global flags, in one place",
+		"SchedulerResult": "the raw scheduler result; adapters read the canonical engine.SessionResult instead",
+	},
+	remoteCacheImportPath: {
+		"RemoteCache":     "remote-cache lifetime is engine-owned (setup timing, Close after the run marker is published)",
+		"LoadRemoteCache": "same: a second loader means a run whose cache stats and trust policy nobody reconciled",
+	},
 }
 
 // jobSymbolReference is one selector expression naming a restricted symbol.
 type jobSymbolReference struct {
 	file   string
 	line   int
+	pkg    string // the import path the symbol is restricted under
 	symbol string
+}
+
+// qualified spells the reference the way the source does by default, as
+// "jobs.RunPlan" or "remotecache.LoadRemoteCache".
+func (r jobSymbolReference) qualified() string {
+	return r.pkg[strings.LastIndex(r.pkg, "/")+1:] + "." + r.symbol
+}
+
+// boundaryExempt reports whether ref may name its symbol outside the engine:
+// only a scheduler test naming the remote cache client may.
+func boundaryExempt(ref jobSymbolReference) bool {
+	return ref.pkg == remoteCacheImportPath &&
+		strings.HasSuffix(ref.file, "_test.go") &&
+		filepath.ToSlash(filepath.Dir(ref.file)) == schedulerTestDir
 }
 
 func TestEngineBoundary_OnlyTheEngineRunsJobs(t *testing.T) {
@@ -91,11 +123,14 @@ func TestEngineBoundary_OnlyTheEngineRunsJobs(t *testing.T) {
 	engineRefs := map[string]bool{}
 	for _, ref := range refs {
 		if strings.HasPrefix(ref.file, enginePackageDir+"/") {
-			engineRefs[ref.symbol] = true
+			engineRefs[ref.qualified()] = true
+			continue
+		}
+		if boundaryExempt(ref) {
 			continue
 		}
 		violations = append(violations, ref.file+":"+strconv.Itoa(ref.line)+
-			"  jobs."+ref.symbol+" — "+restrictedJobSymbols[ref.symbol])
+			"  "+ref.qualified()+" — "+restrictedJobSymbols[ref.pkg][ref.symbol])
 	}
 	sort.Strings(violations)
 	if len(violations) > 0 {
@@ -106,20 +141,42 @@ func TestEngineBoundary_OnlyTheEngineRunsJobs(t *testing.T) {
 			len(violations), enginePackageDir, strings.Join(violations, "\n    "))
 	}
 
-	// Self-check: if the scan found nothing in the engine either, the walk or the
-	// import path is wrong and the assertion above passed vacuously. Both entry
-	// points are called from internal/engine today, by construction.
-	for _, symbol := range []string{"Plan", "RunPlan"} {
+	// Self-check: if the scan found nothing in the engine either, the walk or an
+	// import path is wrong and the assertion above passed vacuously. The engine
+	// calls these entry points today, by construction.
+	for _, symbol := range []string{"jobs.Plan", "jobs.RunPlan", "remotecache.LoadRemoteCache"} {
 		if !engineRefs[symbol] {
-			t.Fatalf("scan found no reference to jobs.%s in %s — the boundary scan is broken, not the tree "+
-				"(check %s and the walk root %s)", symbol, enginePackageDir, jobsImportPath, root)
+			t.Fatalf("scan found no reference to %s in %s — the boundary scan is broken, not the tree "+
+				"(check %s, %s and the walk root %s)", symbol, enginePackageDir, jobsImportPath, remoteCacheImportPath, root)
+		}
+	}
+}
+
+// TestEngineBoundary_OnlySchedulerTestsNameTheRemoteCacheClient pins the one
+// exemption: a scheduler test may name the remote cache client, a scheduler
+// production file or any other package may not, and the jobs symbols get no
+// exemption at all.
+func TestEngineBoundary_OnlySchedulerTestsNameTheRemoteCacheClient(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		ref  jobSymbolReference
+		want bool
+	}{
+		{jobSymbolReference{file: "internal/jobs/remote_task_test.go", pkg: remoteCacheImportPath, symbol: "LoadRemoteCache"}, true},
+		{jobSymbolReference{file: "internal/jobs/scheduler.go", pkg: remoteCacheImportPath, symbol: "RemoteCache"}, false},
+		{jobSymbolReference{file: "internal/jobs/toolchain/toolchain_test.go", pkg: remoteCacheImportPath, symbol: "RemoteCache"}, false},
+		{jobSymbolReference{file: "internal/commands/sessions/sessions_run_test.go", pkg: remoteCacheImportPath, symbol: "LoadRemoteCache"}, false},
+		{jobSymbolReference{file: "internal/jobs/run_plan_test.go", pkg: jobsImportPath, symbol: "RunPlan"}, false},
+	} {
+		if got := boundaryExempt(c.ref); got != c.want {
+			t.Errorf("boundaryExempt(%s in %s) = %v, want %v", c.ref.qualified(), c.ref.file, got, c.want)
 		}
 	}
 }
 
 // restrictedJobReferences returns every selector expression in the module that
-// names a restricted symbol through an import of internal/jobs, as module
-// relative "dir/file.go" paths.
+// names a restricted symbol through an import of internal/jobs or
+// internal/jobs/remotecache, as module relative "dir/file.go" paths.
 //
 // It reads the AST, so occurrences in comments and string literals do not count:
 // structural_baseline_test.go and several doc comments spell these names on
@@ -154,8 +211,13 @@ func restrictedJobReferences(t *testing.T, root string) []jobSymbolReference {
 		if parseErr != nil {
 			return parseErr
 		}
-		local, imported := jobsImportName(file)
-		if !imported {
+		locals := map[string]string{}
+		for importPath := range restrictedJobSymbols {
+			if local, imported := jobsImportName(file, importPath); imported {
+				locals[local] = importPath
+			}
+		}
+		if len(locals) == 0 {
 			return nil
 		}
 		ast.Inspect(file, func(node ast.Node) bool {
@@ -167,15 +229,20 @@ func restrictedJobReferences(t *testing.T, root string) []jobSymbolReference {
 			// pkg.Obj != nil means the identifier resolved to a local
 			// declaration in this file (a variable or parameter that shadows the
 			// import name), so it is not the package qualifier.
-			if !ok || pkg.Name != local || pkg.Obj != nil {
+			if !ok || pkg.Obj != nil {
 				return true
 			}
-			if _, restricted := restrictedJobSymbols[selector.Sel.Name]; !restricted {
+			importPath, ok := locals[pkg.Name]
+			if !ok {
+				return true
+			}
+			if _, restricted := restrictedJobSymbols[importPath][selector.Sel.Name]; !restricted {
 				return true
 			}
 			refs = append(refs, jobSymbolReference{
 				file:   rel,
 				line:   fset.Position(selector.Sel.Pos()).Line,
+				pkg:    importPath,
 				symbol: selector.Sel.Name,
 			})
 			return true
@@ -191,19 +258,19 @@ func restrictedJobReferences(t *testing.T, root string) []jobSymbolReference {
 	return refs
 }
 
-// jobsImportName returns the identifier internal/jobs is bound to in file (its
-// alias, or "jobs"), and whether the file imports it at all. A blank or dot
-// import is reported as not imported: neither can produce a "jobs.X" selector,
-// and a dot import of internal/jobs would not compile against the unexported
-// constructor anyway.
-func jobsImportName(file *ast.File) (string, bool) {
+// jobsImportName returns the identifier importPath is bound to in file (its
+// alias, or the last element of the path), and whether the file imports it at
+// all. A blank or dot import is reported as not imported: neither can produce
+// a "jobs.X" selector, and a dot import of internal/jobs would not compile
+// against the unexported constructor anyway.
+func jobsImportName(file *ast.File, importPath string) (string, bool) {
 	for _, spec := range file.Imports {
 		path, err := strconv.Unquote(spec.Path.Value)
-		if err != nil || path != jobsImportPath {
+		if err != nil || path != importPath {
 			continue
 		}
 		if spec.Name == nil {
-			return "jobs", true
+			return importPath[strings.LastIndex(importPath, "/")+1:], true
 		}
 		if spec.Name.Name == "_" || spec.Name.Name == "." {
 			return "", false

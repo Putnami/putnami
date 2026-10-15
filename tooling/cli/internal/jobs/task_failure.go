@@ -5,6 +5,7 @@ import (
 	"time"
 
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -29,9 +30,9 @@ import (
 //   - THE STATUS IS "failed". A canceled task says nothing about its inputs
 //     (the session was cut short), and a skipped one already has its own
 //     caching rule.
-//   - THE JOB'S OWN LOGIC RAN (resultEmittedMeta). A wrapper bail-out — an
+//   - THE JOB'S OWN LOGIC RAN (cachekey.ResultEmittedMeta). A wrapper bail-out — an
 //     unavailable Go toolchain, an empty project — fails for a reason that is a
-//     property of THIS HOST, not of the task's inputs. isCacheableResult
+//     property of THIS HOST, not of the task's inputs. cachekey.IsCacheableResult
 //     applies the same guard to a cached skip.
 //   - THE FAILURE IS NOT A TIMEOUT. A deadline is a function of host load, not
 //     of the cache key, so pinning one would turn a busy laptop into a
@@ -78,11 +79,11 @@ func (s *Scheduler) replayFailedEntry(job *ScheduledJob, hash string) *JobResult
 		return nil
 	}
 
-	result := jobResultFromEntryResult(record.Result)
+	result := cachekey.JobResultFromEntryResult(record.Result)
 	// Every caller at this key shares one memoized record, so give each result
 	// its own top-level payload map rather than an alias of the record's.
 	// Events are already cloned on the way out of the entry.
-	result.Data = cloneEventData(result.Data)
+	result.Data = cachekey.CloneEventData(result.Data)
 	if result.Status != string(TaskStatusFailed) {
 		// Defense in depth: the store already refuses a record that does not
 		// state a failure. A non-failure here must never be replayed as one.
@@ -186,7 +187,7 @@ func (s *Scheduler) recordExecutedOutcome(job *ScheduledJob, result *JobResult, 
 	record, err := s.cache.RecordTaskFailure(hash, store.TaskFailure{
 		ExitCode:      result.ExitCode,
 		FirstFailedAt: time.Now(),
-		Result:        failureEntryResultFromJobResult(result),
+		Result:        cachekey.FailureEntryResultFromJobResult(result),
 	})
 	if err != nil {
 		slog.Debug("failure not recorded for replay",
@@ -232,7 +233,7 @@ func recordableFailure(job *ScheduledJob, result *JobResult) bool {
 	if result.Error != nil && result.Error.Code == extensionproto.OutputDriftDiagnosticCode {
 		return false
 	}
-	if !resultEmittedMeta(result) {
+	if !cachekey.ResultEmittedMeta(result) {
 		return false
 	}
 	return CanUseCache(job)

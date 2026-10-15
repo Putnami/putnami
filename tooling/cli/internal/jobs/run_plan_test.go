@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -75,7 +76,7 @@ func TestRunRequest_WiresTheRemoteCacheAndSessionSeams(t *testing.T) {
 	t.Parallel()
 	ws := testWorkspace(t.TempDir())
 	cache := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
-	remote := &RemoteCache{}
+	remote := &remotecache.RemoteCache{}
 	handler := func(SessionRecord) {}
 
 	wired := RunRequest{Workspace: ws, Cache: cache, Remote: remote, SessionEvents: handler, Renderer: &mockRenderer{}}.scheduler()

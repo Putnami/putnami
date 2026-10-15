@@ -27,13 +27,12 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/envkeys"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey/framing"
 	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
 	"go.putnami.dev/tooling/cli/internal/jobs/procdeadline"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
-	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 const unavailableRuntimeToolchainIdentity = "unavailable"
@@ -217,7 +216,7 @@ func ResolveRuntimeToolchainsForPreparation(ctx context.Context, workspaceRoot s
 // refuses a required toolchain the run already resolved unavailable once a lock
 // exists: only a provisioning resolution produces that state, and it must not
 // reach a command the missing pin is meant to stop.
-func EnsureJobRuntimeToolchains(ws *workspace.Workspace, job *jobs.ScheduledJob) error {
+func EnsureJobRuntimeToolchains(workspaceRoot string, job *jobs.ScheduledJob) error {
 	if job == nil || job.Extension == nil || job.JobDef == nil || len(job.JobDef.Toolchains) == 0 {
 		return nil
 	}
@@ -238,15 +237,15 @@ func EnsureJobRuntimeToolchains(ws *workspace.Workspace, job *jobs.ScheduledJob)
 	if len(missing) == 0 && len(unavailable) == 0 {
 		return nil
 	}
-	if ws == nil {
-		return errors.New("resolve job runtime toolchains: workspace is required")
+	if workspaceRoot == "" {
+		return errors.New("resolve job runtime toolchains: workspace root is required")
 	}
 	if len(unavailable) > 0 {
-		if err := refuseProvisioningRuntimeToolchains(ws.Root, job.Extension, unavailable); err != nil {
+		if err := refuseProvisioningRuntimeToolchains(workspaceRoot, job.Extension, unavailable); err != nil {
 			return err
 		}
 	}
-	return resolveRuntimeToolchainRefs(context.Background(), ws.Root, job.Extension, missing, os.Environ(), provisioningMode(provisioning))
+	return resolveRuntimeToolchainRefs(context.Background(), workspaceRoot, job.Extension, missing, os.Environ(), provisioningMode(provisioning))
 }
 
 // requiredRuntimeToolchain reports whether ext declares ref as a required
@@ -1199,15 +1198,15 @@ func RuntimeToolchainIdentityForRefs(ext *model.ExtensionDescription, refs []str
 func runtimeToolchainIdentity(requirement extensionproto.RuntimeToolchain, version, integrity string, available bool) string {
 	h := sha256.New()
 	declaration, _ := json.Marshal(requirement)
-	cachekey.HashField(h, "declaration", declaration)
-	cachekey.HashField(h, "version", []byte(version))
-	cachekey.HashField(h, "platform", []byte(machineprobe.HostPlatform()))
-	cachekey.HashField(h, "integrity", []byte(integrity))
+	framing.HashField(h, "declaration", declaration)
+	framing.HashField(h, "version", []byte(version))
+	framing.HashField(h, "platform", []byte(machineprobe.HostPlatform()))
+	framing.HashField(h, "integrity", []byte(integrity))
 	availability := unavailableRuntimeToolchainIdentity
 	if available {
 		availability = "available"
 	}
-	cachekey.HashField(h, "availability", []byte(availability))
+	framing.HashField(h, "availability", []byte(availability))
 	return hex.EncodeToString(h.Sum(nil))
 }
 

@@ -6,13 +6,9 @@ import (
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
-
-var projectWalkExcludedDirs = map[string]bool{
-	".git": true, ".putnami": true, ".venv": true,
-	"dist": true, "node_modules": true, "vendor": true,
-}
 
 // planCache owns invocation-stable planner facts and memoizes the filesystem
 // probes repeated while matching every (project, command) pair. Activation
@@ -117,7 +113,7 @@ func matchDoubleStarGlob(root, pattern string) bool {
 		}
 		if d.IsDir() {
 			// Skip common non-project directories for performance
-			if projectWalkExcludedDirs[d.Name()] {
+			if cachekey.ProjectWalkExcludedDirs[d.Name()] {
 				return filepath.SkipDir
 			}
 			return nil
@@ -157,73 +153,7 @@ func mergeCommandParams(
 		publishChannels = proj.Publish
 	}
 
-	return mergeParamLayers(configDefaults, jobDef, nil, proj, ext.Name, cmdName, publishChannels, commandParams)
-}
-
-// mergeParamLayers merges the layered param sources shared by plan-time `if`
-// evaluation (mergeCommandParams) and the job context file (BuildJobContext)
-// into a single bag, lowest to highest priority:
-//
-//  1. Manifest flag defaults
-//  2. Workspace config defaults (configDefaults)
-//  3. Job definition defaults (jobDefaults, nil to skip)
-//  4. Project-level options (options.{cmd}, options.{ext}, options.{ext}:{cmd})
-//  5. Publish channels forced to true (publishChannels, nil to skip)
-//  6. CLI flags (commandParams)
-func mergeParamLayers(
-	configDefaults map[string]any,
-	jobDef *extension.JobDefinition,
-	jobDefaults map[string]string,
-	proj *workspace.Project,
-	extName, cmdName string,
-	publishChannels []string,
-	commandParams map[string]any,
-) map[string]any {
-	params := make(map[string]any)
-
-	// Manifest flag defaults (lowest priority — overridden by everything else)
-	flagDefaults := make(extension.ParamMap)
-	if jobDef.Flags != nil {
-		for name, def := range jobDef.Flags {
-			if def.Default != nil {
-				flagDefaults[name] = def.Default
-			}
-		}
-	}
-	applyProjectedParamLayer(params, flagDefaults)
-
-	// Workspace config defaults (options.*, options.{cmd}, options.{ext}, options.{ext}:{cmd})
-	applyProjectedParamLayer(params, configDefaults)
-
-	resolvedJobDefaults := make(extension.ParamMap, len(jobDefaults))
-	for k, v := range jobDefaults {
-		resolvedJobDefaults[k] = v
-	}
-	applyProjectedParamLayer(params, resolvedJobDefaults)
-
-	// Project-level options (options.{cmd}, options.{ext}, options.{ext}:{cmd})
-	if proj.Config != nil && proj.Config.Options != nil {
-		if projCmdOpts, ok := proj.Config.Options[cmdName]; ok {
-			applyProjectedParamLayer(params, projCmdOpts)
-		}
-		if projExtOpts, ok := proj.Config.Options[extName]; ok {
-			applyProjectedParamLayer(params, projExtOpts)
-		}
-		if projExtCmdOpts, ok := proj.Config.Options[extName+":"+cmdName]; ok {
-			applyProjectedParamLayer(params, projExtCmdOpts)
-		}
-	}
-
-	publishDefaults := make(extension.ParamMap, len(publishChannels))
-	for _, ch := range publishChannels {
-		publishDefaults[ch] = true
-	}
-	applyProjectedParamLayer(params, publishDefaults)
-
-	// CLI flags (highest priority)
-	applyProjectedParamLayer(params, commandParams)
-
-	return params
+	return cachekey.MergeParamLayers(configDefaults, jobDef, nil, proj, ext.Name, cmdName, publishChannels, commandParams)
 }
 
 func toSet(items []string) map[string]bool {

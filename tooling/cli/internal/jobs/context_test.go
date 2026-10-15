@@ -12,6 +12,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -297,7 +298,7 @@ func TestBuildJobContext_DependencyClosureCarriesSourceName(t *testing.T) {
 		Dependencies: []string{"@acme/core"},
 	}
 	// NewWorkspace, not a struct literal: it is what builds the id index and the
-	// graph that projectDependencyClosure walks.
+	// graph that cachekey.ProjectDependencyClosure walks.
 	ws := workspace.NewWorkspace("/workspace", &wsproto.Config{}, []*workspace.Project{web, core})
 	ws.Name = "ws"
 
@@ -332,7 +333,7 @@ func TestBuildJobContext_DependencyClosureCarriesSourceName(t *testing.T) {
 	}
 	// omitempty keeps a ref with nothing to declare byte-identical to what an
 	// older orchestrator produced.
-	plain, err := json.Marshal(JobContextProjectRef{Name: "a", Path: "a", FullPath: "/workspace/a"})
+	plain, err := json.Marshal(cachekey.JobContextProjectRef{Name: "a", Path: "a", FullPath: "/workspace/a"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,9 +367,9 @@ func TestBuildJobContext_ProjectReferencesCarryTheResolvedVersion(t *testing.T) 
 	ws := workspace.NewWorkspace("/workspace",
 		&wsproto.Config{}, []*workspace.Project{web, core})
 	ws.Name = "ws"
-	versions := RunVersions{
-		"libs": &JobContextVersion{Base: "2.1.0", Full: "2.1.0", Line: "libs"},
-		"apps": &JobContextVersion{Base: "9.9.9", Full: "9.9.9", Line: "apps"},
+	versions := cachekey.RunVersions{
+		"libs": &cachekey.JobContextVersion{Base: "2.1.0", Full: "2.1.0", Line: "libs"},
+		"apps": &cachekey.JobContextVersion{Base: "9.9.9", Full: "9.9.9", Line: "apps"},
 	}
 
 	ctx := BuildJobContext(ws, &ScheduledJob{
@@ -412,7 +413,7 @@ func TestBuildJobContext_ProjectReferencesCarryTheResolvedVersion(t *testing.T) 
 	// orchestrator that predates the member produced.
 	for _, ref := range []any{
 		JobContextSelectedProject{Name: "a", Path: "a", FullPath: "/workspace/a"},
-		JobContextProjectRef{Name: "a", Path: "a", FullPath: "/workspace/a"},
+		cachekey.JobContextProjectRef{Name: "a", Path: "a", FullPath: "/workspace/a"},
 	} {
 		plain, err := json.Marshal(ref)
 		if err != nil {
@@ -791,7 +792,7 @@ func TestBuildJobContext_VersionInfo(t *testing.T) {
 		JobDef:    &extension.JobDefinition{Name: "build", ExtensionName: "ext"},
 	}
 
-	vi := &JobContextVersion{
+	vi := &cachekey.JobContextVersion{
 		Base:    "0.1.0",
 		Full:    "0.1.0-abc1234",
 		SHA:     "abc1234",
@@ -835,7 +836,7 @@ func TestBuildJobContext_VersionComesFromTheProjectsLine(t *testing.T) {
 		Extension: &extension.ExtensionDescription{Name: "ext", Path: "/ext"},
 		JobDef:    &extension.JobDefinition{Name: "build", ExtensionName: "ext"},
 	}
-	versions := RunVersions{"packages": &JobContextVersion{
+	versions := cachekey.RunVersions{"packages": &cachekey.JobContextVersion{
 		Base:   "0.1.0",
 		Full:   "0.1.0-abc1234",
 		SHA:    "abc1234",
@@ -850,28 +851,6 @@ func TestBuildJobContext_VersionComesFromTheProjectsLine(t *testing.T) {
 	}
 	if ctx.Version.Full != "0.1.0-abc1234" {
 		t.Errorf("Version.Full = %q, want 0.1.0-abc1234", ctx.Version.Full)
-	}
-}
-
-func TestKebabToCamel(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"config-path", "configPath"},
-		{"put-registry-url", "putRegistryUrl"},
-		{"also-branch-tag", "alsoBranchTag"},
-		{"dry-run", "dryRun"},
-		{"simple", "simple"},
-		{"a-b-c-d", "aBCD"},
-		{"", ""},
-	}
-	for _, tt := range tests {
-		got := kebabToCamel(tt.input)
-		if got != tt.want {
-			t.Errorf("kebabToCamel(%q) = %q, want %q", tt.input, got, tt.want)
-		}
 	}
 }
 
@@ -1244,7 +1223,7 @@ func TestBuildJobContext_ProjectReferencesCarryDirectDependencies(t *testing.T) 
 	// orchestrator that predates the member produced.
 	for _, ref := range []any{
 		JobContextSelectedProject{Name: "a", Path: "a", FullPath: "/workspace/a"},
-		JobContextProjectRef{Name: "a", Path: "a", FullPath: "/workspace/a"},
+		cachekey.JobContextProjectRef{Name: "a", Path: "a", FullPath: "/workspace/a"},
 	} {
 		plain, err := json.Marshal(ref)
 		if err != nil {
@@ -1283,13 +1262,13 @@ func TestRegistriesParamIsNotACacheKeyInput(t *testing.T) {
 	if !present || string(entry["oci"]) != `{"publish":"oci.example.test/team"}` {
 		t.Fatalf("context registries = %#v, want the project's effective entries", ctx.Params["registries"])
 	}
-	if _, leaked := resolvedJobParams(job, nil, nil)["registries"]; leaked {
+	if _, leaked := cachekey.ResolvedJobParams(job, nil, nil)["registries"]; leaked {
 		t.Fatal("registries reached the resolved parameter bag the cache key hashes")
 	}
 
 	hash := func() string {
 		t.Helper()
-		value, err := computeJobCacheHash(ws, job, nil, nil, cache, nil)
+		value, err := cachekey.ComputeJobCacheHash(ws, job, nil, nil, cache, nil)
 		if err != nil {
 			t.Fatalf("compute task cache key: %v", err)
 		}
@@ -1311,7 +1290,7 @@ func TestBuildJobContextGivesTheLineVersionOnlyToATaskWhoseKeyCarriesIt(t *testi
 	ws := makeExecutorTestWorkspace(t)
 	project := &workspace.Project{ID: "/proj", Name: "proj", Path: "proj"}
 	ws.Projects = []*workspace.Project{project}
-	resolved := &JobContextVersion{
+	resolved := &cachekey.JobContextVersion{
 		Base: "0.4.0", Full: "0.4.0-20261004094924-a389c95", Suffix: "20261004094924-a389c95",
 		SHA: "a389c95f00dfeed0123456789abcdef012345678", Branch: "main",
 	}
@@ -1326,9 +1305,9 @@ func TestBuildJobContextGivesTheLineVersionOnlyToATaskWhoseKeyCarriesIt(t *testi
 	for _, tc := range []struct {
 		name string
 		job  *ScheduledJob
-		want JobContextVersion
+		want cachekey.JobContextVersion
 	}{
-		{"a cached task", cached, JobContextVersion{Base: "0.0.0"}},
+		{"a cached task", cached, cachekey.JobContextVersion{Base: "0.0.0"}},
 		{"a version-aware task", versionAware, *resolved},
 		{"an uncached task", uncached, *resolved},
 	} {

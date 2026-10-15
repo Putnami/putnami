@@ -24,6 +24,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -226,7 +227,7 @@ func buildJobInvocation(
 	extensionRuntime string,
 ) *jobInvocation {
 	projRoot := filepath.Join(ws.Root, job.Project.Path)
-	extensionRoot := jobExtensionRoot(ws, job)
+	extensionRoot := cachekey.JobExtensionRoot(ws, job)
 	tmplVars := extension.BuildTemplateVars(
 		ws.Root,
 		projRoot,
@@ -361,7 +362,7 @@ func buildJobInvocation(
 //
 // extraEnv carries ONLY facts about how the CLI is spawning the process:
 // RunJobInteractive's PUTNAMI_INTERACTIVE=1 and the scheduler's object-cache
-// socket + trust policy (remote_provider.go). Neither describes the work, so
+// socket + trust policy (remotecache/remote_provider.go). Neither describes the work, so
 // neither belongs in a cache key. The one entry that DID describe the work is
 // gone: a cleanup deleted the synthesized DATABASE_TEST_BINDINGS the
 // test-infra planner injected here. Its whole purpose
@@ -376,10 +377,10 @@ func prepareJobInvocation(
 	job *ScheduledJob,
 	commandParams map[string]any,
 	configDefaults map[string]any,
-	versions RunVersions,
+	versions cachekey.RunVersions,
 	extraEnv []string,
 ) (context.Context, context.CancelFunc, *jobInvocation, error) {
-	if err := toolchain.EnsureJobRuntimeToolchains(ws, job); err != nil {
+	if err := toolchain.EnsureJobRuntimeToolchains(ws.Root, job); err != nil {
 		return nil, nil, nil, err
 	}
 	runtimePath, runtimeErr := resolvedExtensionRuntime(job)
@@ -483,7 +484,7 @@ func RunJob(
 	job *ScheduledJob,
 	commandParams map[string]any,
 	configDefaults map[string]any,
-	versions RunVersions,
+	versions cachekey.RunVersions,
 	onEvent EventHandler,
 ) (*JobResult, error) {
 	return runJob(ctx, ws, job, commandParams, configDefaults, versions, nil, onEvent)
@@ -504,7 +505,7 @@ func RunJobWithProcessEnv(
 	job *ScheduledJob,
 	commandParams map[string]any,
 	configDefaults map[string]any,
-	versions RunVersions,
+	versions cachekey.RunVersions,
 	processEnv []string,
 	onEvent EventHandler,
 ) (*JobResult, error) {
@@ -545,7 +546,7 @@ func runJob(
 	job *ScheduledJob,
 	commandParams map[string]any,
 	configDefaults map[string]any,
-	versions RunVersions,
+	versions cachekey.RunVersions,
 	extraEnv []string,
 	onEvent EventHandler,
 ) (*JobResult, error) {

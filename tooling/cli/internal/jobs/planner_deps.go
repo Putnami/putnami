@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -437,7 +438,7 @@ func resolveSessionPrerequisiteForOwner(
 		ownerDef = owner.JobDef
 	}
 	ownerParams := mergeCommandParams(ws, owner.Project, owner.Extension, ownerCommand, ownerDef, commandParams)
-	applyBoundParams(ownerParams, owner.JobDef.BoundParams)
+	cachekey.ApplyBoundParams(ownerParams, owner.JobDef.BoundParams)
 	if definition.Command == "" || definition.Command == ownerCommand {
 		return sessionPrerequisiteResolution{}, fmt.Errorf("%s session prerequisite %d has invalid command %q", owner.Key(), index, definition.Command)
 	}
@@ -506,7 +507,7 @@ func resolveSessionPrerequisiteForOwner(
 			continue
 		}
 		projectParams := mergeCommandParams(ws, project, owner.Extension, ownerCommand, ownerDef, commandParams)
-		applyBoundParams(projectParams, owner.JobDef.BoundParams)
+		cachekey.ApplyBoundParams(projectParams, owner.JobDef.BoundParams)
 		eligible := extension.EvaluateExpression(definition.ProjectIf, &extension.WhenContext{Params: projectParams})
 		resolved.projectIf[project.ID] = eligible
 		if !eligible {
@@ -547,7 +548,7 @@ func resolveSessionPrerequisiteForOwner(
 		resolved.relation.projects = append(resolved.relation.projects, project)
 		if len(overrides) > 0 {
 			resolved.relation.paramsByProject[project.ID] = overrides
-			resolved.canonicalParamsByProject[project.ID], _ = projectParamAliases(overrides)
+			resolved.canonicalParamsByProject[project.ID], _ = cachekey.ProjectParamAliases(overrides)
 		}
 	}
 	return resolved, nil
@@ -603,8 +604,8 @@ func activeSessionPrerequisites(
 				if compatible {
 					continue
 				}
-				leftParams, _ := projectParamAliases(roots[0].JobDef.BoundParams)
-				rightParams, _ := projectParamAliases(root.JobDef.BoundParams)
+				leftParams, _ := cachekey.ProjectParamAliases(roots[0].JobDef.BoundParams)
+				rightParams, _ := cachekey.ProjectParamAliases(root.JobDef.BoundParams)
 				paramSet := make(map[string]struct{}, len(leftParams)+len(rightParams))
 				for name := range leftParams {
 					paramSet[name] = struct{}{}
@@ -730,9 +731,9 @@ func emitCommandForSelection(
 		return false, err
 	}
 	var workspaceCandidates []*ScheduledJob
-	workspaceParams, _ := projectParamAliases(commandParams)
+	workspaceParams, _ := cachekey.ProjectParamAliases(commandParams)
 	if len(workspaceOverrides) > 0 {
-		applyProjectedParamLayer(workspaceParams, workspaceOverrides)
+		cachekey.ApplyProjectedParamLayer(workspaceParams, workspaceOverrides)
 	}
 	for _, jobDef := range workspaceJobs {
 		ext := extension.FindExtensionByName(extensions, jobDef.ExtensionName)
@@ -763,9 +764,9 @@ func emitCommandForSelection(
 			return false, err
 		}
 		overrides := paramsByProject[project.ID]
-		effectiveParams, _ := projectParamAliases(commandParams)
+		effectiveParams, _ := cachekey.ProjectParamAliases(commandParams)
 		if len(overrides) > 0 {
-			applyProjectedParamLayer(effectiveParams, overrides)
+			cachekey.ApplyProjectedParamLayer(effectiveParams, overrides)
 		}
 		var candidates []*ScheduledJob
 		for _, jobDef := range jobDefs {
@@ -813,8 +814,8 @@ func mergeSessionPrerequisiteCandidates(
 		for name, value := range candidate.JobDef.BoundParams {
 			definition.BoundParams[name] = value
 		}
-		literalParams, literalSources := projectParamAliases(definition.BoundParams)
-		overrideParams, overrideSources := projectParamAliases(overrides)
+		literalParams, literalSources := cachekey.ProjectParamAliases(definition.BoundParams)
+		overrideParams, overrideSources := cachekey.ProjectParamAliases(overrides)
 		canonicalNames := make([]string, 0, len(overrideParams))
 		for name := range overrideParams {
 			canonicalNames = append(canonicalNames, name)
@@ -873,8 +874,8 @@ func mergeExistingSessionPrerequisiteCandidates(
 		if planned == nil {
 			return false, incompatible
 		}
-		plannedParams, _ := projectParamAliases(planned.JobDef.BoundParams)
-		candidateParams, _ := projectParamAliases(candidate.JobDef.BoundParams)
+		plannedParams, _ := cachekey.ProjectParamAliases(planned.JobDef.BoundParams)
+		candidateParams, _ := cachekey.ProjectParamAliases(candidate.JobDef.BoundParams)
 		if !reflect.DeepEqual(plannedParams, candidateParams) {
 			return false, incompatible
 		}
@@ -1231,7 +1232,7 @@ func resolveExternalDeps(jobs []*ScheduledJob, ws *workspace.Workspace) error {
 // project metadata digest, which every one of its cache keys asks for. The
 // provider's sources are read by no action of the client, so they must not
 // reach its keys — and DependsOn is a cache-key edge, because
-// computeJobCacheHashWith folds every DependsOn key into the dependent's key.
+// cachekey.ComputeJobCacheHashWith folds every DependsOn key into the dependent's key.
 // SerializeAfter is the ordering-only family: it sequences execution, never
 // contributes to a key, and a failed predecessor does not cancel the
 // successor. That is exactly the relation here — the client reads a file that
@@ -1326,7 +1327,7 @@ func orderContractClients(jobs []*ScheduledJob, ws *workspace.Workspace) {
 			case extension.OutputRootWorkspace:
 				return true
 			case extension.OutputRootProject:
-				if nested(projectRelPath(providerJob), projectRelPath(client)) {
+				if nested(cachekey.ProjectRelPath(providerJob), cachekey.ProjectRelPath(client)) {
 					return true
 				}
 			}

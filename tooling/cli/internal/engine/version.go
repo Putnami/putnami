@@ -9,6 +9,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -17,7 +18,7 @@ import (
 // exported for the extension-command path, which stamps a single interactive
 // job without going through the run lifecycle and therefore has no captured
 // snapshot to layer. It fails where Engine.Run fails (captureVersionSnapshot).
-func BuildVersionInfo(ws *workspace.Workspace) (jobs.RunVersions, error) {
+func BuildVersionInfo(ws *workspace.Workspace) (cachekey.RunVersions, error) {
 	snapshot, err := captureVersionSnapshot(ws.Root)
 	if err != nil {
 		return nil, err
@@ -155,7 +156,7 @@ func newRunCacheManager(req *Request, ws *workspace.Workspace) *store.CacheManag
 // workspace's Git history traversal. Engine.Run clears this memo on each run.
 // A nil snapshot still resolves any lines git can answer with their own tree
 // fields, as for callers outside the engine lifecycle.
-func (req *Request) runVersions(ws *workspace.Workspace) jobs.RunVersions {
+func (req *Request) runVersions(ws *workspace.Workspace) cachekey.RunVersions {
 	if req.versions == nil {
 		if req.Portable.frozen() {
 			// The executing side stamps exactly the lines the submitter resolved:

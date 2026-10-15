@@ -34,6 +34,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	protocoljob "go.putnami.dev/protocol/job"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -347,7 +348,7 @@ func (s *Scheduler) actionDigest(job *ScheduledJob, mu *sync.Mutex, hashes map[s
 		}
 	}
 	mu.Unlock()
-	digest, err := computeJobCacheHash(s.ws, job, s.commandParams, s.cfg.VersionInfo, s.cache, hashCopy)
+	digest, err := cachekey.ComputeJobCacheHash(s.ws, job, s.commandParams, s.cfg.VersionInfo, s.cache, hashCopy)
 	if err != nil {
 		return ""
 	}

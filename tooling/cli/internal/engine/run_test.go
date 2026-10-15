@@ -29,6 +29,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	internalgit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/profiler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
@@ -1104,12 +1105,12 @@ func newRunMarkerTestServer(t *testing.T, state *runMarkerServerState, lookup fu
 
 // enableRunMarkerServer configures the workspace's remote cache to point at the
 // test server. It writes the per-workspace .putnami/cache.json the engine reads
-// (jobs.RemoteCacheConfigPath) instead of setting PUTNAMI_CACHE_URL, which is
+// (remotecache.RemoteCacheConfigPath) instead of setting PUTNAMI_CACHE_URL, which is
 // the same configuration through the file half of the resolution — and, being
 // workspace-scoped rather than process-global, it is compatible with t.Parallel.
 func enableRunMarkerServer(t *testing.T, wsRoot string, srv *httptest.Server) {
 	t.Helper()
-	path := jobs.RemoteCacheConfigPath(wsRoot)
+	path := remotecache.RemoteCacheConfigPath(wsRoot)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}

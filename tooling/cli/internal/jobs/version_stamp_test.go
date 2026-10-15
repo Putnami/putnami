@@ -26,6 +26,8 @@ import (
 	"time"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -37,15 +39,15 @@ import (
 // stampCommitA and stampCommitB are two revisions of the same tree: identical
 // content, different identity. Everything in this file is the question "which
 // of these two may a given key or file legitimately depend on".
-func stampCommitA() RunVersions {
-	return rootLineVersions(&JobContextVersion{
+func stampCommitA() cachekey.RunVersions {
+	return rootLineVersions(&cachekey.JobContextVersion{
 		Base: "1.0.0", Full: "1.0.0-a1b2c3d4", Suffix: "a1b2c3d4",
 		SHA: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678", Branch: "main",
 	})
 }
 
-func stampCommitB() RunVersions {
-	return rootLineVersions(&JobContextVersion{
+func stampCommitB() cachekey.RunVersions {
+	return rootLineVersions(&cachekey.JobContextVersion{
 		Base: "1.0.0", Full: "1.0.0-f6e5d4c3", Suffix: "f6e5d4c3",
 		SHA: "f6e5d4c3b2a1908172635445362718091a2b3c4d", Branch: "main",
 	})
@@ -60,7 +62,7 @@ func genStampJob() *ScheduledJob {
 		Outputs: map[string]extension.DeclaredOutput{
 			"gen": dirDeclaration(extension.OutputRootProject, ".gen", false),
 		},
-	}, extension.ResourceRef{ID: genResourceID})
+	}, extension.ResourceRef{ID: cachekey.GenResourceID})
 	job.JobDef.FilePatterns = []string{"src.txt"}
 	// A declared base version, so the stamp's `version` is the deployable
 	// "<base>-<suffix>" identity a release consumer reads rather than the 0.0.0
@@ -81,7 +83,7 @@ func readVersionStamp(t *testing.T, projectRoot string) VersionInfo {
 }
 
 // assertStampReports fails unless the stamp on disk names the given revision.
-func assertStampReports(t *testing.T, leg, projectRoot string, want RunVersions) {
+func assertStampReports(t *testing.T, leg, projectRoot string, want cachekey.RunVersions) {
 	t.Helper()
 	stamp := readVersionStamp(t, projectRoot)
 	expected := want[""]
@@ -152,7 +154,7 @@ func primeGenerationEntry(
 	t *testing.T,
 	f *captureFixture,
 	job *ScheduledJob,
-	at RunVersions,
+	at cachekey.RunVersions,
 	buildTime string,
 ) string {
 	t.Helper()
@@ -165,7 +167,7 @@ func primeGenerationEntry(
 	writeFileAt(t, filepath.Join(projectRoot, ".gen", "openapi.json"), `{"openapi":"3.1.0"}`)
 	assertStampReports(t, "producer", projectRoot, at)
 
-	hash, err := computeJobCacheHash(f.ws, job, nil, at, f.cache, nil)
+	hash, err := cachekey.ComputeJobCacheHash(f.ws, job, nil, at, f.cache, nil)
 	if err != nil {
 		t.Fatalf("compute generation key: %v", err)
 	}
@@ -215,7 +217,7 @@ func TestPrecomputeKeys_UnchangedLeafSurvivesASiblingLeafChange(t *testing.T) {
 			JobDef: &extension.JobDefinition{
 				Name: "build~generate", ExtensionName: "@test/ext", Cache: true,
 				FilePatterns: []string{"src.txt"},
-				Writes:       []extension.ResourceRef{{ID: genResourceID}},
+				Writes:       []extension.ResourceRef{{ID: cachekey.GenResourceID}},
 			},
 			Step:      &extension.PipelineStep{Task: "generate"},
 			DependsOn: upstream,
@@ -245,11 +247,11 @@ func TestPrecomputeKeys_UnchangedLeafSurvivesASiblingLeafChange(t *testing.T) {
 
 	// A fresh CacheManager per invocation: lookupFileHash memoizes per process,
 	// and the second gate run really is a second CLI invocation.
-	keysAt := func(version RunVersions, buildTime string) map[string]string {
+	keysAt := func(version cachekey.RunVersions, buildTime string) map[string]string {
 		t.Helper()
 		cm := store.NewCacheManager(store.NewLocalStore(filepath.Join(ws.Root, ".putnami", "store")))
 		preserveMatchingVersionFiles(ws, planned, version, buildTime)
-		keys, err := PrecomputeKeys(ws, planned, nil, version, cm, CacheBypass{})
+		keys, err := cachekey.PrecomputeKeys(ws, planned, nil, version, cm, cachekey.CacheBypass{})
 		if err != nil {
 			t.Fatalf("precompute keys: %v", err)
 		}
@@ -310,7 +312,7 @@ func TestSchedulerGenerationLocalHitStampsTheCurrentRevision(t *testing.T) {
 	hash := primeGenerationEntry(t, f, job, produced, "2026-07-30T10:00:00Z")
 
 	// A second checkout of the same content at the newer commit.
-	currentHash, err := computeJobCacheHash(f.ws, job, nil, current, f.cache, nil)
+	currentHash, err := cachekey.ComputeJobCacheHash(f.ws, job, nil, current, f.cache, nil)
 	if err != nil {
 		t.Fatalf("compute generation key at the current commit: %v", err)
 	}
@@ -459,16 +461,16 @@ func TestRemoteGenerationHitStampsTheCurrentRevision(t *testing.T) {
 // genStampRemoteFixture is matrixFixture for this file's generation job: a
 // workspace whose scheduler talks to `server` through a provider-backed remote
 // cache, configured to build at `version`.
-func genStampRemoteFixture(t *testing.T, server *fakeCacheServer, version RunVersions) (*captureFixture, *RemoteCache) {
+func genStampRemoteFixture(t *testing.T, server *fakeCacheServer, version cachekey.RunVersions) (*captureFixture, *remotecache.RemoteCache) {
 	t.Helper()
 	enableProviderRemoteCache(t)
 	useSharedFakeProvider(t, server)
 
 	f := newCaptureFixture(t, genStampJob())
 	f.sched.cfg.VersionInfo = version
-	remote, notice := LoadRemoteCache(context.Background(), f.ws.Root,
-		[]*extension.ExtensionDescription{fakeProviderExtension(t, nil)}, nil, store.CacheTrustAny)
-	if remote == nil || !remote.isProviderBacked() {
+	remote, notice := remotecache.LoadRemoteCache(context.Background(), f.ws.Root,
+		[]*extension.ExtensionDescription{fakeProviderExtension(t, nil)}, nil, store.CacheTrustAny, fakeProviderLaunch)
+	if remote == nil || !remote.IsProviderBacked() {
 		t.Fatalf("expected a provider-backed remote cache, got %+v (notice %q)", remote, notice)
 	}
 	t.Cleanup(remote.Close)

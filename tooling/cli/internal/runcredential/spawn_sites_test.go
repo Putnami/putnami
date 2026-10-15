@@ -111,7 +111,7 @@ var spawnSites = map[string]spawnSite{
 		why: "the workspace probe of an extension not installed from the artifact store"},
 
 	// Credential holders, started through StartHolder.
-	"cacheprovider/session.go:Spawn": {spawns: 1, verdict: holder, by: "jobs/remote_provider.go:(*RemoteCache).ensureProvider",
+	"cacheprovider/session.go:Spawn": {spawns: 1, verdict: holder, by: "jobs/remotecache/remote_provider.go:(*RemoteCache).ensureProvider",
 		native: true, why: "the remote cache provider"},
 	"credentialprovider/session.go:Spawn": {spawns: 1, verdict: holder, by: "credentialprovider/resolve.go:New",
 		native: true, why: "the credential provider"},

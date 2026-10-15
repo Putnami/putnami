@@ -910,7 +910,7 @@ const unreadableSentinel = "__unreadable__"
 // it never invalidated anything.
 //
 // A sentinel rather than an error: hashFiles' error return is swallowed by
-// closureInputsDigest (jobs/executor.go), which drops the whole member from the
+// closureInputsDigest (jobs/cachekey/executor.go), which drops the whole member from the
 // closure digest on error and so reproduces exactly this silent-drop one level
 // coarser. The sentinel keeps the invariant checkable inside this function and
 // matches hashFileBytes, which already encodes the same policy. It deliberately

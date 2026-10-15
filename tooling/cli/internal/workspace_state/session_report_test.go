@@ -12,6 +12,7 @@ import (
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -40,7 +41,7 @@ func TestSessionFinalizeV2WithCoverageUsesCompletedValidationRegardlessOfVerdict
 	validation := sessionForReport(t, store, "20260806-100000-000001")
 	if err := validation.FinalizeV2WithCoverage(reportSessionFile(protocolcli.RunOutcomeSuccess), "", "", params,
 		[]*jobs.ScheduledJob{job}, results, &jobs.SessionResult{},
-		&jobs.JobContextVersion{Suffix: "abc1234", Branch: "main"}); err != nil {
+		&cachekey.JobContextVersion{Suffix: "abc1234", Branch: "main"}); err != nil {
 		t.Fatalf("FinalizeV2WithCoverage: %v", err)
 	}
 	data, err := os.ReadFile(filepath.Join(validation.Dir(), reportFileName))
@@ -83,7 +84,7 @@ func TestSessionFinalizeV2WithCoverageUsesCompletedValidationRegardlessOfVerdict
 	failedRun := &jobs.SessionResult{Status: jobs.TaskCounts{Failed: 1}}
 	if err := failed.FinalizeV2WithCoverage(reportSessionFile(protocolcli.RunOutcomeFailure), "", "", params,
 		[]*jobs.ScheduledJob{job}, results, failedRun,
-		&jobs.JobContextVersion{Suffix: "failedrev", Branch: "main"}); err != nil {
+		&cachekey.JobContextVersion{Suffix: "failedrev", Branch: "main"}); err != nil {
 		t.Fatal(err)
 	}
 	got := store.LatestValidationCoverage([]string{"test"}, []string{"/app"})
@@ -99,7 +100,7 @@ func TestSessionFinalizeV2WithCoverageUsesCompletedValidationRegardlessOfVerdict
 	}
 	if err := aborted.FinalizeV2WithCoverage(reportSessionFile(protocolcli.RunOutcomeAborted), "", "", params,
 		[]*jobs.ScheduledJob{job}, results, abortedRun,
-		&jobs.JobContextVersion{Suffix: "abortedrev", Branch: "main"}); err != nil {
+		&cachekey.JobContextVersion{Suffix: "abortedrev", Branch: "main"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(aborted.Dir(), reportFileName)); !os.IsNotExist(err) {

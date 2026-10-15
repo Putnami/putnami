@@ -8,6 +8,7 @@ import (
 	protocoljob "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -60,7 +61,7 @@ func TestBuildJobContext_ConformsToProtocol(t *testing.T) {
 	ctx := BuildJobContext(ws, job,
 		map[string]any{"fast": true, "coverage-threshold": "80"},
 		map[string]any{"target": "es2020"},
-		rootLineVersions(&JobContextVersion{SHA: "abc1234", Suffix: "abc1234"}))
+		rootLineVersions(&cachekey.JobContextVersion{SHA: "abc1234", Suffix: "abc1234"}))
 
 	data, err := json.Marshal(ctx)
 	if err != nil {

@@ -14,6 +14,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/watch"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -72,7 +73,7 @@ type memberRuntime struct {
 	watch    bool
 
 	ws             *workspace.Workspace
-	versions       jobs.RunVersions
+	versions       cachekey.RunVersions
 	output         jobs.Renderer
 	observeProcess func(pgid int)
 	// releaseProcess is told every group a serve step spawned once the step

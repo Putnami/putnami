@@ -6,6 +6,7 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -80,7 +81,7 @@ func planCLIValidationCadence(t *testing.T, commandParams extension.ParamMap) []
 	}
 	// The suite reads every first-party extension manifest, the Go one included.
 	const manifestPattern = "../../**/putnami.extension.json"
-	if !containsStr(paramStrings(projectConfig.Options["test"], "filePatterns"), manifestPattern) {
+	if !containsStr(cachekey.ParamStrings(projectConfig.Options["test"], "filePatterns"), manifestPattern) {
 		t.Fatalf("CLI test cache key does not include %q", manifestPattern)
 	}
 

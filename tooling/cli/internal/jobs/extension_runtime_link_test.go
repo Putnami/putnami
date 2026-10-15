@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/sdk/extension/dirlink"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
 // A local extension root reached through a directory link, a symbolic link on
@@ -25,11 +26,11 @@ func TestRuntimeRootBehindADirectoryLinkIsReadAsItsDirectory(t *testing.T) {
 	linked := runtimeTestExtension(link)
 	linked.Runtime.Prepare.Inputs = direct.Runtime.Prepare.Inputs
 
-	want, err := collectRuntimeInputs(extensionRoot, direct.Runtime.Prepare.Inputs)
+	want, err := cachekey.CollectRuntimeInputs(extensionRoot, direct.Runtime.Prepare.Inputs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := collectRuntimeInputs(link, linked.Runtime.Prepare.Inputs)
+	got, err := cachekey.CollectRuntimeInputs(link, linked.Runtime.Prepare.Inputs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,11 +38,11 @@ func TestRuntimeRootBehindADirectoryLinkIsReadAsItsDirectory(t *testing.T) {
 		t.Fatalf("inputs through the link = %v, want %v (with cmd/main.go)", got, want)
 	}
 
-	wantDigest, err := extensionRuntimeDigest(direct)
+	wantDigest, err := cachekey.ExtensionRuntimeDigest(direct)
 	if err != nil {
 		t.Fatal(err)
 	}
-	gotDigest, err := extensionRuntimeDigest(linked)
+	gotDigest, err := cachekey.ExtensionRuntimeDigest(linked)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,35 +61,6 @@ func TestRuntimeRootBehindADirectoryLinkIsReadAsItsDirectory(t *testing.T) {
 	}
 }
 
-// A replaced module whose directory is a directory link is hashed as the
-// directory it names, so an edit behind the link changes the digest.
-func TestRuntimeReplacementBehindADirectoryLinkIsDigested(t *testing.T) {
-	root := t.TempDir()
-	extensionRoot, sdkRoot := writeRuntimeReplacementFixture(t, root)
-	physicalSDK := filepath.Join(root, "sdk-source")
-	if err := os.Rename(sdkRoot, physicalSDK); err != nil {
-		t.Fatal(err)
-	}
-	if err := dirlink.Create(physicalSDK, sdkRoot); err != nil {
-		t.Fatal(err)
-	}
-	ext := runtimeTestExtension(extensionRoot)
-	ext.Runtime.Prepare.Inputs = append(ext.Runtime.Prepare.Inputs, "go.mod")
-
-	before, err := extensionRuntimeDigest(ext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mustWriteRuntimeFile(t, filepath.Join(physicalSDK, "sdk.go"), "package sdk\n\nconst Edited = true\n", 0o644)
-	after, err := extensionRuntimeDigest(ext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if after == before {
-		t.Fatal("an edit behind the replaced module's directory link did not change the runtime digest")
-	}
-}
-
 // A replaced module whose directory is a directory link to another tree is
 // staged where the extension's go.mod names it, next to the staged extension,
 // not at the link target's position.
@@ -104,7 +76,7 @@ func TestRuntimeReplacementBehindADirectoryLinkIsStagedAtItsGoModPath(t *testing
 	}
 	ext := runtimeTestExtension(extensionRoot)
 	ext.Runtime.Prepare.Inputs = append(ext.Runtime.Prepare.Inputs, "go.mod")
-	inputs, err := collectRuntimeInputs(extensionRoot, ext.Runtime.Prepare.Inputs)
+	inputs, err := cachekey.CollectRuntimeInputs(extensionRoot, ext.Runtime.Prepare.Inputs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +121,7 @@ replace example.dev/lib => ../lib
 	}
 	ext := runtimeTestExtension(extensionRoot)
 	ext.Runtime.Prepare.Inputs = append(ext.Runtime.Prepare.Inputs, "go.mod")
-	inputs, err := collectRuntimeInputs(extensionRoot, ext.Runtime.Prepare.Inputs)
+	inputs, err := cachekey.CollectRuntimeInputs(extensionRoot, ext.Runtime.Prepare.Inputs)
 	if err != nil {
 		t.Fatal(err)
 	}

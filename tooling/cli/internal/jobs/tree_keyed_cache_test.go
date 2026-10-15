@@ -18,6 +18,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -179,7 +180,7 @@ func treeKeyedExtensions(t *testing.T) []*extension.ExtensionDescription {
 // gives each line at the checkout's head.
 type treeKeyedLane struct {
 	ws       *workspace.Workspace
-	versions RunVersions
+	versions cachekey.RunVersions
 }
 
 // openTreeKeyedLane starts a run in the checkout at root: it reads the three
@@ -228,7 +229,7 @@ func (l *treeKeyedLane) keys(
 	}
 	preserveMatchingVersionFiles(l.ws, planned, l.versions, buildTime)
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(l.ws.Root, ".putnami", "store")))
-	keys, err := PrecomputeKeys(l.ws, planned, params, l.versions, cache, CacheBypass{})
+	keys, err := cachekey.PrecomputeKeys(l.ws, planned, params, l.versions, cache, cachekey.CacheBypass{})
 	if err != nil {
 		t.Fatalf("precompute keys: %v", err)
 	}
@@ -257,7 +258,7 @@ func keysOnReleaseBaseline(job *ScheduledJob) bool {
 func treeKeyedBaseline(t *testing.T, lane *treeKeyedLane, job *ScheduledJob) string {
 	t.Helper()
 	dir := filepath.Join(lane.ws.Root, job.Project.Path)
-	baseline, err := putnamigit.ReadReleaseBaseline(dir, lineTagPattern(lane.ws, job.Project.Line))
+	baseline, err := putnamigit.ReadReleaseBaseline(dir, cachekey.LineTagPattern(lane.ws, job.Project.Line))
 	if err != nil {
 		t.Fatalf("read the release baseline of %s: %v", dir, err)
 	}
@@ -384,7 +385,7 @@ func TestTwoLanesOnOneTreeShareTheirCacheKeys(t *testing.T) {
 			if !keyed {
 				continue
 			}
-			if !taskIsVersionAware(job) {
+			if !cachekey.TaskIsVersionAware(job) {
 				if atSquash[key] != hash {
 					t.Errorf("%s: the two lanes keyed one tree differently (%s != %s)", key, hash, atSquash[key])
 				}
@@ -435,7 +436,7 @@ func TestTwoLanesOnOneTreeShareTheirCacheKeys(t *testing.T) {
 		// file, whichever project declares it: lint-docs checks links into it.
 		readsTheCut := map[string]bool{}
 		for _, job := range planned {
-			readsTheCut[job.Key()] = keysOnCandidateCut(job)
+			readsTheCut[job.Key()] = cachekey.KeysOnCandidateCut(job)
 		}
 		cutReaders := 0
 		for _, key := range sortedKeyNames(clean) {
@@ -498,7 +499,7 @@ func TestStampFieldsThatReachACacheKey(t *testing.T) {
 	projectRoot := filepath.Join(ws.Root, "proj")
 	stampPath := filepath.Join(projectRoot, filepath.FromSlash(versionStampRelPath))
 	job := cacheableJob("lint", "/proj", "proj", "proj")
-	versions := rootLineVersions(&JobContextVersion{
+	versions := rootLineVersions(&cachekey.JobContextVersion{
 		Base: "0.3.1", Full: "0.3.1-20261003152506-4da6833", Suffix: "20261003152506-4da6833",
 		SHA: "4da6833c0ffee0123456789abcdef0123456789a", Branch: "feature/tree-keys",
 	})

@@ -9,6 +9,7 @@ import (
 
 	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -55,7 +56,7 @@ type SchedulerConfig struct {
 	// forces singleton execution at the engine boundary and records each task's
 	// project-tree writes; it never changes cache identity or entry formats.
 	CacheVerification bool
-	VersionInfo       RunVersions
+	VersionInfo       cachekey.RunVersions
 	FinalizeResults   func(results map[string]*JobResult)
 	// SessionID is the id of the session this run records, or "" for a run that
 	// records none (every lifecycle run). The scheduler exports it into each
@@ -115,13 +116,13 @@ type Scheduler struct {
 	// bypass is cfg.NoCache and cfg.NoCacheProjects resolved over this exact
 	// plan, once, at construction: every cache decision of the run reads it
 	// instead of re-deriving the closure per job.
-	bypass   CacheBypass
+	bypass   cachekey.CacheBypass
 	renderer Renderer
 	cache    *store.CacheManager
 	// cacheStats is present for every cache-enabled run, including local-only
 	// runs. A configured remote cache shares this exact accumulator so the final
 	// snapshot cannot split one session across two independently-timed views.
-	cacheStats *CacheStats
+	cacheStats *cachekey.CacheStats
 	// onCacheLeaseWait observes a genuine miss after this scheduler lost the
 	// per-key lease and immediately before it waits for the owner. Tests install
 	// it before Run; production leaves it nil.
@@ -145,7 +146,7 @@ type Scheduler struct {
 
 	// remote, when set, negotiates and shares cache results with a remote build
 	// cache. It is best-effort and degrades to local-only caching on any error.
-	remote *RemoteCache
+	remote cachekey.RemoteCache
 
 	// storeBudget is the in-run half of the store byte budget, or nil
 	// when caching is off. The coordinator is its only caller: AfterBatch at each
@@ -320,7 +321,7 @@ func newScheduler(
 		commandParams:            commandParams,
 		taskParams:               commandParams,
 		cfg:                      cfg,
-		bypass:                   NewCacheBypass(planned, cfg.NoCache, cfg.NoCacheProjects),
+		bypass:                   cachekey.NewCacheBypass(planned, cfg.NoCache, cfg.NoCacheProjects),
 		renderer:                 renderer,
 		cache:                    cache,
 		hookSlots:                make(map[string]*hookSlot),
@@ -329,14 +330,14 @@ func newScheduler(
 		capabilitySourceBindings: newCapabilitySourceBindingMemo(),
 	}
 	if cache != nil && !cfg.NoCache {
-		s.cacheStats = &CacheStats{}
+		s.cacheStats = &cachekey.CacheStats{}
 	}
 	if cache != nil {
 		// The stamp's marker reads the answer every execution key of the run
 		// reads, so an output stamped with no source claim is never stored
 		// under a key computed as inside a repository.
 		s.capabilitySourceBindings.isUnmanaged = func(repoRoot string) bool {
-			return workspaceSourceState(cache, repoRoot) == store.SourceStateUnmanaged
+			return cachekey.WorkspaceSourceState(cache, repoRoot) == store.SourceStateUnmanaged
 		}
 	}
 	if ws != nil {
@@ -377,8 +378,9 @@ type RunRequest struct {
 	// Cache is the local cache manager, or nil when caching is off.
 	Cache *store.CacheManager
 	// Remote enables the remote build cache. A nil Remote (or a nil Cache)
-	// leaves the run local-only.
-	Remote *RemoteCache
+	// leaves the run local-only. A nil *remotecache.RemoteCache is not a nil
+	// Remote: pass a nil interface for a local-only run.
+	Remote cachekey.RemoteCache
 	// StoreBudget holds the store's byte budget while the run is in flight: the
 	// coordinator checks it each time a dispatch group completes, and a due
 	// collection pass runs in the background. The coordinator never waits for
@@ -456,7 +458,7 @@ func (s *Scheduler) setSessionEventHandler(handler SessionEventHandler) {
 
 // setRemoteCache enables the remote build cache for this run. A nil remote (or
 // nil local cache) leaves the scheduler local-only.
-func (s *Scheduler) setRemoteCache(remote *RemoteCache) {
+func (s *Scheduler) setRemoteCache(remote cachekey.RemoteCache) {
 	if s.cache == nil {
 		return
 	}
@@ -467,13 +469,13 @@ func (s *Scheduler) setRemoteCache(remote *RemoteCache) {
 	// Preserve setup time recorded while the engine resolved the provider before
 	// constructing the scheduler. Tests may hand-build a remote without stats;
 	// in that case give it the local accumulator rather than leaving a nil trap.
-	if remote.stats != nil {
-		s.cacheStats = remote.stats
+	if stats := remote.CacheStats(); stats != nil {
+		s.cacheStats = stats
 	} else {
 		if s.cacheStats == nil {
-			s.cacheStats = &CacheStats{}
+			s.cacheStats = &cachekey.CacheStats{}
 		}
-		remote.stats = s.cacheStats
+		remote.SetCacheStats(s.cacheStats)
 	}
 }
 
@@ -486,7 +488,7 @@ func (s *Scheduler) setRemoteCache(remote *RemoteCache) {
 // database — and the ordering constraint was the whole reason this function
 // exists. That is gone with the test-infra planner: a
 // consumer of an invocation-scoped resource folds in the PRODUCING ACTION's
-// digest (executor.go), which is derived from the producer's declared inputs
+// digest (cachekey/executor.go), which is derived from the producer's declared inputs
 // and needs no process-global side effect to be visible to the key.
 func (s *Scheduler) prepareRun() {
 	s.versionBuildTime = time.Now().UTC().Format(time.RFC3339)
@@ -504,7 +506,7 @@ func (s *Scheduler) prepareRun() {
 	spawned := generateVersionFilesAtWithSourceBindings(
 		s.ws, versionedPlan, s.cfg.VersionInfo, s.versionBuildTime, true, s.capabilitySourceBindings,
 	)
-	s.cacheStats.recordLocalBindings(started, time.Now(), spawned)
+	s.cacheStats.RecordLocalBindings(started, time.Now(), spawned)
 }
 
 // prepareScheduling resolves learned execution tuning and performs every setup
@@ -799,7 +801,7 @@ finish:
 	// still be evicting (the process must never exit in the middle of it), let
 	// the budget record the growth no pass measured, and keep what it did for
 	// the session record, before finalizeRun snapshots the cache stats.
-	s.cacheStats.recordStoreBudget(s.storeBudget.Close())
+	s.cacheStats.RecordStoreBudget(s.storeBudget.Close())
 
 	return s.finalizeRun(parentCtx, decision, start, results, &mu)
 }

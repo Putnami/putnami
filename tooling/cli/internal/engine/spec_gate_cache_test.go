@@ -11,6 +11,7 @@ import (
 	features "go.putnami.dev/protocol/features"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -148,7 +149,7 @@ func newRecoveryPlanFixture(t *testing.T, withTestEnv bool) *recoveryPlanFixture
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
-	keys, err := jobs.PrecomputeKeys(ws, planned, nil, source.runVersions(), cache, jobs.CacheBypass{})
+	keys, err := cachekey.PrecomputeKeys(ws, planned, nil, source.runVersions(), cache, cachekey.CacheBypass{})
 	if err != nil {
 		t.Fatalf("PrecomputeKeys: %v", err)
 	}

@@ -17,8 +17,10 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	registryproto "go.putnami.dev/protocol/registry"
 	runtimeproto "go.putnami.dev/protocol/runtime"
+	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -46,6 +48,23 @@ func runtimeInfoFor(t *testing.T, ext *extension.ExtensionDescription) string {
 		t.Fatal(err)
 	}
 	return string(data)
+}
+
+// preparedProviderLaunch is the cache-provider launcher the engine passes:
+// the runner's provider launch, as the cache provider's launch type.
+func preparedProviderLaunch(ctx context.Context, workspaceRoot string, ext *extension.ExtensionDescription, command string) (cacheprovider.LaunchSpec, error) {
+	launch, err := PrepareProviderLaunch(ctx, workspaceRoot, ext, command)
+	return cacheprovider.LaunchSpec(launch), err
+}
+
+// recordProviderLaunch is preparedProviderLaunch that also keeps the launch
+// it returned in got.
+func recordProviderLaunch(got *cacheprovider.LaunchSpec) remotecache.Launcher {
+	return func(ctx context.Context, workspaceRoot string, ext *extension.ExtensionDescription, command string) (cacheprovider.LaunchSpec, error) {
+		launch, err := preparedProviderLaunch(ctx, workspaceRoot, ext, command)
+		*got = launch
+		return launch, err
+	}
 }
 
 // runtimeProviderExtension is an installed cache-provider extension whose
@@ -76,15 +95,15 @@ func TestLoadRemoteCacheLaunchesThePreparedProviderRuntime(t *testing.T) {
 		t.Fatalf("the Windows runtime fixture is %s, want the .exe name", want)
 	}
 
-	remote, notice := LoadRemoteCache(context.Background(), t.TempDir(), []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny)
-	if remote == nil || !remote.isProviderBacked() {
+	var launch cacheprovider.LaunchSpec
+	remote, notice := remotecache.LoadRemoteCache(context.Background(), t.TempDir(), []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny, recordProviderLaunch(&launch))
+	if remote == nil || !remote.IsProviderBacked() {
 		t.Fatalf("remote cache is not provider-backed (nil %v), notice %q", remote == nil, notice)
 	}
 	defer remote.Close()
 	if notice != "" {
 		t.Fatalf("a provider whose runtime prepares must load without a notice, got %q", notice)
 	}
-	launch := remote.provider.launch
 	if launch.Command != want {
 		t.Fatalf("provider command = %q, want the prepared runtime %q", launch.Command, want)
 	}
@@ -109,23 +128,26 @@ func TestProviderRemoteCacheStartsThePreparedRuntime(t *testing.T) {
 	// The handshake inherits this process's environment; the provider gets
 	// its own from the manifest.
 	t.Setenv("GORACE", "atexit_sleep_ms=0")
-	ext := runtimeProviderExtension(t, map[string]string{"GORACE": "atexit_sleep_ms=0"})
+	ext := runtimeProviderExtension(t, map[string]string{"GORACE": "atexit_sleep_ms=0", "FAKE_MARKER_SHA": "cafef00d"})
 	want := fixtureproc.Binary(t, filepath.Join(ext.Path, filepath.FromSlash(providerRuntimeExecutable)))
 	t.Setenv(fakeRuntimeInfoEnv, runtimeInfoFor(t, ext))
 	// The handshake has a deadline, so the copy is warmed first.
 	fixtureproc.Warm(t, want, "__putnami", "runtime-info")
 
 	wsRoot := t.TempDir()
-	remote, notice := LoadRemoteCache(context.Background(), wsRoot, []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny)
-	if remote == nil || !remote.isProviderBacked() {
+	var launch cacheprovider.LaunchSpec
+	remote, notice := remotecache.LoadRemoteCache(context.Background(), wsRoot, []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny, recordProviderLaunch(&launch))
+	if remote == nil || !remote.IsProviderBacked() {
 		t.Fatalf("remote cache is not provider-backed (nil %v), notice %q", remote == nil, notice)
 	}
 	defer remote.Close()
-	if got := remote.provider.launch.Command; got != want {
+	if got := launch.Command; got != want {
 		t.Fatalf("provider command = %q, want the prepared runtime %q", got, want)
 	}
-	if sess, ready := remote.ensureProvider(context.Background(), nil, nil); sess == nil || !ready {
-		t.Fatalf("the prepared runtime did not start as a ready provider: session started %v, ready %v", sess != nil, ready)
+	// A run marker comes back only from a provider that started, answered
+	// initialize as ready, and served the lookup.
+	if sha, ok := remote.LookupRunMarker(context.Background(), "ws-id", "main", []string{"build"}, ""); !ok || sha != "cafef00d" {
+		t.Fatalf("the prepared runtime did not start as a ready provider: run marker %q, %v", sha, ok)
 	}
 }
 
@@ -136,7 +158,7 @@ func TestLoadRemoteCacheBuildsLocallyWhenTheProviderRuntimeIsMissing(t *testing.
 	enableProviderRemoteCache(t)
 	ext := runtimeProviderExtension(t, nil)
 
-	remote, notice := LoadRemoteCache(context.Background(), t.TempDir(), []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny)
+	remote, notice := remotecache.LoadRemoteCache(context.Background(), t.TempDir(), []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny, preparedProviderLaunch)
 	if remote != nil {
 		remote.Close()
 		t.Fatal("a provider whose runtime is missing must build locally, got a remote cache")
@@ -152,8 +174,8 @@ func TestLoadRemoteCacheBuildsLocallyWhenTheProviderRuntimeIsMissing(t *testing.
 // it, failing the test unless the provider resolved without a notice.
 func loadRuntimeProvider(t *testing.T, ext *extension.ExtensionDescription) {
 	t.Helper()
-	remote, notice := LoadRemoteCache(context.Background(), t.TempDir(), []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny)
-	if remote == nil || !remote.isProviderBacked() {
+	remote, notice := remotecache.LoadRemoteCache(context.Background(), t.TempDir(), []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny, preparedProviderLaunch)
+	if remote == nil || !remote.IsProviderBacked() {
 		t.Fatalf("remote cache is not provider-backed (nil %v), notice %q", remote == nil, notice)
 	}
 	remote.Close()
@@ -175,7 +197,7 @@ func TestProviderRuntimeIsVerifiedOncePerRuntimeIdentity(t *testing.T) {
 	runs := func() int { return len(fixtureproc.Runs(t, handshakes)) }
 
 	failing := fixtureproc.Write(t, path, fixtureproc.Program{Record: handshakes, Stderr: "not a runtime", Exit: 3})
-	remote, notice := LoadRemoteCache(context.Background(), t.TempDir(), []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny)
+	remote, notice := remotecache.LoadRemoteCache(context.Background(), t.TempDir(), []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny, preparedProviderLaunch)
 	if remote != nil {
 		remote.Close()
 		t.Fatal("a runtime that fails its handshake must leave the build local")

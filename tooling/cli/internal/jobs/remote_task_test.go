@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -16,6 +17,8 @@ import (
 	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -208,8 +211,8 @@ func (f *fakeCacheServer) lookup(key string) (fakeCacheEntry, bool) {
 // bytes through it.
 func useSharedFakeProvider(t *testing.T, server *fakeCacheServer) {
 	t.Helper()
-	orig := spawnProviderSession
-	spawnProviderSession = func(_ context.Context, _ cacheprovider.LaunchSpec, opts ...cacheprovider.Option) (*cacheprovider.Session, error) {
+	orig := remotecache.SpawnProviderSession
+	remotecache.SpawnProviderSession = func(_ context.Context, _ cacheprovider.LaunchSpec, opts ...cacheprovider.Option) (*cacheprovider.Session, error) {
 		reqR, reqW := io.Pipe()
 		respR, respW := io.Pipe()
 		go func() {
@@ -219,7 +222,7 @@ func useSharedFakeProvider(t *testing.T, server *fakeCacheServer) {
 		}()
 		return cacheprovider.Connect(reqW, respR, opts...), nil
 	}
-	t.Cleanup(func() { spawnProviderSession = orig })
+	t.Cleanup(func() { remotecache.SpawnProviderSession = orig })
 }
 
 func serveSharedFakeProvider(stdin io.Reader, stdout io.Writer, server *fakeCacheServer) {
@@ -254,10 +257,10 @@ func serveSharedFakeProvider(stdin io.Reader, stdout io.Writer, server *fakeCach
 			var capabilities []string
 			if p != nil {
 				exchangeDir = p.BlobExchangeDir
-				if containsString(p.Capabilities, cache.CapabilityProviderProtocolV2) {
+				if slices.Contains(p.Capabilities, cache.CapabilityProviderProtocolV2) {
 					negotiated = cache.ProviderProtocolVersion
 				}
-				if server.echoesResultOnly() && containsString(p.Capabilities, cache.CapabilityRestoreResultOnly) {
+				if server.echoesResultOnly() && slices.Contains(p.Capabilities, cache.CapabilityRestoreResultOnly) {
 					capabilities = append(capabilities, cache.CapabilityRestoreResultOnly)
 				}
 			}
@@ -329,7 +332,7 @@ func serveSharedFakeProvider(stdin io.Reader, stdout io.Writer, server *fakeCach
 // alone a shared remote cache.
 func matrixKey(t *testing.T, f *captureFixture, job *ScheduledJob) string {
 	t.Helper()
-	keys, err := PrecomputeKeys(f.ws, []*ScheduledJob{job}, nil, nil, f.cache, CacheBypass{})
+	keys, err := cachekey.PrecomputeKeys(f.ws, []*ScheduledJob{job}, nil, nil, f.cache, cachekey.CacheBypass{})
 	if err != nil {
 		t.Fatalf("precompute keys: %v", err)
 	}
@@ -452,16 +455,16 @@ func mutateDeclaredOutputs(t *testing.T, f *captureFixture) {
 
 // matrixFixture builds a workspace whose scheduler talks to server through a
 // provider-backed RemoteCache.
-func matrixFixture(t *testing.T, server *fakeCacheServer) (*captureFixture, *RemoteCache) {
+func matrixFixture(t *testing.T, server *fakeCacheServer) (*captureFixture, *remotecache.RemoteCache) {
 	t.Helper()
 	enableProviderRemoteCache(t)
 	useSharedFakeProvider(t, server)
 
 	job := matrixJob()
 	f := newCaptureFixture(t, job)
-	remote, notice := LoadRemoteCache(context.Background(), f.ws.Root,
-		[]*extension.ExtensionDescription{fakeProviderExtension(t, nil)}, nil, store.CacheTrustAny)
-	if remote == nil || !remote.isProviderBacked() {
+	remote, notice := remotecache.LoadRemoteCache(context.Background(), f.ws.Root,
+		[]*extension.ExtensionDescription{fakeProviderExtension(t, nil)}, nil, store.CacheTrustAny, fakeProviderLaunch)
+	if remote == nil || !remote.IsProviderBacked() {
 		t.Fatalf("expected a provider-backed remote cache, got %+v (notice %q)", remote, notice)
 	}
 	t.Cleanup(remote.Close)
@@ -862,7 +865,7 @@ func TestNegotiateAsksForTheTaskOwnedAddress(t *testing.T) {
 	f, remote := matrixFixture(t, server)
 	job := matrixJob()
 
-	keys, err := PrecomputeKeys(f.ws, []*ScheduledJob{job}, nil, nil, f.cache, CacheBypass{})
+	keys, err := cachekey.PrecomputeKeys(f.ws, []*ScheduledJob{job}, nil, nil, f.cache, cachekey.CacheBypass{})
 	if err != nil {
 		t.Fatalf("precompute keys: %v", err)
 	}
@@ -871,7 +874,7 @@ func TestNegotiateAsksForTheTaskOwnedAddress(t *testing.T) {
 		t.Fatal("no cache key precomputed for the declared job")
 	}
 
-	remote.Negotiate(t.Context(), f.ws, []*ScheduledJob{job}, nil, nil, f.cache, CacheBypass{})
+	remote.Negotiate(t.Context(), f.ws, []*ScheduledJob{job}, nil, nil, f.cache, cachekey.CacheBypass{})
 	want := []string{store.RemoteTaskEntryKey(hash)}
 	if got := server.prefetched(); len(got) != 1 || got[0] != want[0] {
 		t.Fatalf("negotiated keys = %v, want %v (the raw key %s must never be asked for)", got, want, hash)
@@ -892,11 +895,11 @@ func TestNegotiateAsksForTheTaskOwnedAddress(t *testing.T) {
 		t.Fatal("warm workspace published no entry")
 	}
 	before := len(server.prefetched())
-	warmRemote.Negotiate(t.Context(), warm.ws, []*ScheduledJob{job}, nil, nil, warm.cache, CacheBypass{})
+	warmRemote.Negotiate(t.Context(), warm.ws, []*ScheduledJob{job}, nil, nil, warm.cache, cachekey.CacheBypass{})
 	if got := server.prefetched(); len(got) != before {
 		t.Fatalf("a locally-published entry was negotiated anyway: %v", got)
 	}
-	if !warmRemote.localHits[hash] {
+	if !warmRemote.LocalHits[hash] {
 		t.Fatal("a published task-owned entry was not recognized as a local hit")
 	}
 }
@@ -936,13 +939,13 @@ func TestDeclaredSourceRewriterRejectsMutatingStatusEntry(t *testing.T) {
 			job := declaredJob("lint~fix", "fix", tc.declaration, tc.writes...)
 			job.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{NoOutput: true}
 
-			if !isCacheEnabled(job, CacheBypass{}) {
+			if !cachekey.IsCacheEnabled(job, cachekey.CacheBypass{}) {
 				t.Fatal("a declared source rewriter did not reach clean-only caching")
 			}
-			if !declaredSourceRewriter(job) {
+			if !cachekey.DeclaredSourceRewriter(job) {
 				t.Fatal("neither v3 source-mutation signal selected the restore guard")
 			}
-			if sourceMutationTask(job) {
+			if remotecache.SourceMutationTask(job) {
 				t.Fatal("a v3 task still infers the v2 source-mutation marker")
 			}
 
@@ -973,10 +976,10 @@ func TestDeclaredSourceRewriterRejectsMutatingStatusEntry(t *testing.T) {
 	// cannot reach a raw restore or publish path without an output contract.
 	v2 := declaredJob("lint~fix", "fix", nil, sources)
 	v2.JobDef.TaskCachePolicy = &extension.TaskCachePolicy{NoOutput: true}
-	if isCacheEnabled(v2, CacheBypass{}) {
+	if cachekey.IsCacheEnabled(v2, cachekey.CacheBypass{}) {
 		t.Fatal("the v2 sibling reached a cache path without a declaration")
 	}
-	if got, want := cacheTaskName(v2), "lint~fix"; got != want {
+	if got, want := cachekey.CacheTaskName(v2), "lint~fix"; got != want {
 		t.Fatalf("cache task name = %q, want %q", got, want)
 	}
 }
@@ -997,12 +1000,12 @@ func TestPrepareTaskUpload_AppliesTheSameGatesAsTheLegacyPath(t *testing.T) {
 	}
 
 	r := newUploadTestCache()
-	in, ok := r.prepareTaskUpload(captureHashA, job, f.cache)
+	in, ok := r.PrepareTaskUpload(captureHashA, job, f.cache)
 	if !ok {
 		t.Fatal("an all-empty (status-only) task-owned entry must be eligible for upload")
 	}
-	if len(in.payload.Files) != 0 {
-		t.Fatalf("payload = %+v, want no files", in.payload)
+	if len(in.Payload.Files) != 0 {
+		t.Fatalf("payload = %+v, want no files", in.Payload)
 	}
 	if len(in.Manifest.Files) != 1 || in.Manifest.Files[0].Path != store.RemoteEntryDescriptorPath {
 		t.Fatalf("wire manifest = %+v, want exactly the descriptor", in.Manifest)
@@ -1013,7 +1016,7 @@ func TestPrepareTaskUpload_AppliesTheSameGatesAsTheLegacyPath(t *testing.T) {
 			"coverage": fileDeclaration(extension.OutputRootProject, "coverage.json", true),
 		},
 	})
-	if _, ok := r.prepareTaskUpload(captureHashA, publish, f.cache); ok {
+	if _, ok := r.PrepareTaskUpload(captureHashA, publish, f.cache); ok {
 		t.Fatal("a side-effecting task must never be shared with the provider")
 	}
 }
@@ -1032,19 +1035,19 @@ func TestPrepareTaskUpload_SharesACheapEntryWithItsBytes(t *testing.T) {
 	}
 
 	r := newUploadTestCache()
-	in, ok := r.prepareTaskUpload(captureHashA, job, f.cache)
+	in, ok := r.PrepareTaskUpload(captureHashA, job, f.cache)
 	if !ok {
 		t.Fatal("a cheap bytes-carrying task-owned entry must be eligible for upload")
 	}
 	if in.Key != store.RemoteTaskEntryKey(captureHashA) {
 		t.Fatalf("upload key = %q, want the format-qualified key", in.Key)
 	}
-	if len(in.payload.Files) == 0 || manifestBytes(in.payload) == 0 {
-		t.Fatalf("payload = %+v, want the task's output bytes", in.payload)
+	if len(in.Payload.Files) == 0 || remotecache.ManifestBytes(in.Payload) == 0 {
+		t.Fatalf("payload = %+v, want the task's output bytes", in.Payload)
 	}
-	if len(in.Manifest.Files) != len(in.payload.Files)+1 {
+	if len(in.Manifest.Files) != len(in.Payload.Files)+1 {
 		t.Fatalf("wire manifest has %d files, want the %d payload files plus the descriptor",
-			len(in.Manifest.Files), len(in.payload.Files))
+			len(in.Manifest.Files), len(in.Payload.Files))
 	}
 	if in.Result == nil || in.Result.DurationMs != 5 {
 		t.Fatalf("upload result = %+v, want the recorded 5 ms duration", in.Result)
@@ -1052,7 +1055,7 @@ func TestPrepareTaskUpload_SharesACheapEntryWithItsBytes(t *testing.T) {
 
 	publish := matrixJob()
 	publish.JobDef.Name = "publish~emit"
-	if _, ok := r.prepareTaskUpload(captureHashA, publish, f.cache); ok {
+	if _, ok := r.PrepareTaskUpload(captureHashA, publish, f.cache); ok {
 		t.Fatal("a side-effecting task must never be shared with the provider")
 	}
 }

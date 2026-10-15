@@ -304,7 +304,7 @@ The op set is intentionally thin. The split is:
 
 ## Live scheduler path
 
-`jobs.LoadRemoteCache` first checks whether remote cache is explicitly active
+`remotecache.LoadRemoteCache` first checks whether remote cache is explicitly active
 (`.putnami/cache.json` or `PUTNAMI_CACHE_URL`). If it is inactive, the run stays
 local-only and silent, even when `@putnami/cloud` is installed. If it is active,
 core detects a compatible provider command and prepares the extension runtime

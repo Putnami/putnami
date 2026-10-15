@@ -38,6 +38,7 @@ import (
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
 // redactedMarker replaces a leaked value on the live event stream. The task is
@@ -140,10 +141,10 @@ func matchesDeclaredArtifactPath(job *ScheduledJob, output extension.DeclaredOut
 	expected := []string{outputPath}
 	switch output.EffectiveRoot() {
 	case extension.OutputRootCommandOutput:
-		commandPath := path.Join(projectRelPath(job), job.CommandName(), outputPath)
+		commandPath := path.Join(cachekey.ProjectRelPath(job), job.CommandName(), outputPath)
 		expected = append(expected, commandPath, path.Join(".putnami", "out", commandPath))
 	case extension.OutputRootProject:
-		expected = append(expected, path.Join(projectRelPath(job), outputPath))
+		expected = append(expected, path.Join(cachekey.ProjectRelPath(job), outputPath))
 	case extension.OutputRootWorkspace:
 		// outputPath already names the workspace-relative display form.
 	default:

@@ -84,8 +84,15 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  25,
-		funcs:  178,
-		why: "RAISED 177→178 (cli/job-planning-execution, spec-gate-records-an-empty-evaluation): " +
+		funcs:  180,
+		why: "RAISED 178→180 (the internal/jobs split): the remote cache client leaves internal/jobs " +
+			"and the scheduler reads it through the cachekey.RemoteCache interface, so the engine is " +
+			"where the client meets the runner. run_credential.go holds launchCacheProvider, the " +
+			"launcher the engine hands the remote cache loader so the client starts its provider the " +
+			"way the CLI starts every provider without importing the runner, and schedulerRemote, " +
+			"which hands a local-only run's scheduler a nil interface instead of a nil pointer inside " +
+			"one. They add no stage, flag or store; files stay at 25. " +
+			"RAISED 177→178 (cli/job-planning-execution, spec-gate-records-an-empty-evaluation): " +
 			"spec_gate.go adds validateProducerPlan.ApplicableProjects, the one seam that answers which " +
 			"selected projects a criteria-projection producer applies to. It plans through the existing " +
 			"planner and adds no run stage, scheduler or store. " +
@@ -367,7 +374,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "planner",
 		prefix: "internal/jobs/plan",
 		files:  10,
-		funcs:  92,
+		funcs:  86,
 		why: "internal/jobs/plan*.go: the single planner entrypoint (jobs.Plan), its dependency, " +
 			"activation, matching and resource passes, plus the plan contract and its validation. " +
 			"Planning is pure — selection in, typed plan out — and that purity is what lets the " +
@@ -424,7 +431,12 @@ var complexityCeilings = []complexityCeiling{
 			"from — into the ordering-only family the plan already has (SerializeAfter). It reads " +
 			"the same `^` step references resolveExternalDeps resolves and the same planned index, " +
 			"adds no stage, no flag and no cache-key edge, and its one refusal (an edge the plan's " +
-			"existing ordering already runs the other way) is what keeps the DAG a DAG",
+			"existing ordering already runs the other way) is what keeps the DAG a DAG. " +
+			"LOWERED, from 10/92 to 10/86: the task cache key left the planner. Four functions of " +
+			"plan_contract.go and one each of planner_helpers.go and planner_resources.go moved to " +
+			"internal/jobs/cachekey, which computes keys and imports neither the planner nor the " +
+			"scheduler; the files they moved to keep planner names but sit in that package, outside " +
+			"this unit",
 	},
 	{
 		unit:   "scheduler",
