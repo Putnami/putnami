@@ -2,8 +2,10 @@ package extension
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -206,5 +208,126 @@ func TestDoWithRetry_ContextCancelledStops(t *testing.T) {
 	_, err := DoWithRetry(ctx, srv.Client(), req)
 	if err == nil {
 		t.Fatal("expected error from canceled context")
+	}
+}
+
+type recordingTransport struct{ hosts []string }
+
+func (t *recordingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	t.hosts = append(t.hosts, req.URL.Host)
+	return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Request: req}, nil
+}
+
+func TestRegistryTransportSendsAMappedHostToItsOrigin(t *testing.T) {
+	t.Setenv("PUTNAMI_REGISTRY_ORIGINS", "put.example.dev=https://put-internal.example.net")
+	base := &recordingTransport{}
+	client := &http.Client{Transport: registryTransport(base)}
+
+	for _, target := range []string{
+		"https://put.example.dev/putnami/go/download?channel=1.0.0",
+		"https://other.example.dev/putnami/go/download?channel=1.0.0",
+	} {
+		resp, err := client.Get(target)
+		if err != nil {
+			t.Fatalf("GET %s: %v", target, err)
+		}
+		_ = resp.Body.Close()
+		if publicHost := strings.SplitN(target, "/", 4)[2]; resp.Request.URL.Host != publicHost {
+			t.Fatalf("response request host = %s, want %s", resp.Request.URL.Host, publicHost)
+		}
+	}
+	want := []string{"put-internal.example.net", "other.example.dev"}
+	if strings.Join(base.hosts, ",") != strings.Join(want, ",") {
+		t.Fatalf("hosts reached = %v, want %v", base.hosts, want)
+	}
+}
+
+func TestRegistryHTTPClientRefusesAMalformedOriginsValueWithoutRetrying(t *testing.T) {
+	t.Setenv("PUTNAMI_REGISTRY_ORIGINS", "put.example.dev=http://plain.example.net")
+	t.Setenv(HTTPRetryBackoffEnv, "0")
+	base := &recordingTransport{}
+	client := &http.Client{Transport: registryTransport(base)}
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://put.example.dev/putnami/go/download", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := DoWithRetry(context.Background(), client, req); !errors.Is(err, errRegistryOrigins) {
+		t.Fatalf("DoWithRetry error = %v, want a registry origins error", err)
+	}
+	if len(base.hosts) != 0 {
+		t.Fatalf("a malformed value reached the network: %v", base.hosts)
+	}
+}
+
+// TestDoHeadWithRetry_SendsHead pins that a headers-only request reaches the
+// server as HEAD, whatever method the caller built it with.
+func TestDoHeadWithRetry_SendsHead(t *testing.T) {
+	var methods []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		methods = append(methods, r.Method)
+	}))
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+	resp, err := DoHeadWithRetry(context.Background(), srv.Client(), req)
+	if err != nil {
+		t.Fatalf("DoHeadWithRetry: %v", err)
+	}
+	resp.Body.Close()
+	if len(methods) != 1 || methods[0] != http.MethodHead {
+		t.Errorf("methods = %v, want [HEAD]", methods)
+	}
+}
+
+// TestDoHeadWithRetry_FallsBackToGetOn405 keeps a registry that refuses HEAD
+// working: the same request is sent again as a GET.
+func TestDoHeadWithRetry_FallsBackToGetOn405(t *testing.T) {
+	var methods []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		methods = append(methods, r.Method)
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("X-Resolved-Version", "1.2.3")
+	}))
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+	resp, err := DoHeadWithRetry(context.Background(), srv.Client(), req)
+	if err != nil {
+		t.Fatalf("DoHeadWithRetry: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || resp.Header.Get("X-Resolved-Version") != "1.2.3" {
+		t.Errorf("response = %d %q, want 200 from the GET", resp.StatusCode, resp.Header.Get("X-Resolved-Version"))
+	}
+	if len(methods) != 2 || methods[0] != http.MethodHead || methods[1] != http.MethodGet {
+		t.Errorf("methods = %v, want [HEAD GET]", methods)
+	}
+}
+
+// TestDoHeadWithRetry_NoFallbackOn404 keeps a 404 to HEAD an answer: only 405
+// sends the request again as a GET.
+func TestDoHeadWithRetry_NoFallbackOn404(t *testing.T) {
+	var methods []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		methods = append(methods, r.Method)
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+	resp, err := DoHeadWithRetry(context.Background(), srv.Client(), req)
+	if err != nil {
+		t.Fatalf("DoHeadWithRetry: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("StatusCode = %d, want 404", resp.StatusCode)
+	}
+	if len(methods) != 1 || methods[0] != http.MethodHead {
+		t.Errorf("methods = %v, want [HEAD]", methods)
 	}
 }

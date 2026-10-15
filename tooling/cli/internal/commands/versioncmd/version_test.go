@@ -603,6 +603,29 @@ func TestFetchLatestRelease_ReadsIntegrityHeaders(t *testing.T) {
 	}
 }
 
+// TestFetchRelease_SendsHead pins that the channel lookup reads only headers:
+// it sends HEAD, so the registry sends no binary. downloadBinary fetches the
+// binary itself when the CLI installs it.
+func TestFetchRelease_SendsHead(t *testing.T) {
+	var methods []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		methods = append(methods, r.Method)
+		w.Header().Set("X-Resolved-Version", "1.2.3")
+	}))
+	defer srv.Close()
+
+	version, _, _, err := fetchRelease(context.Background(), srv.Client(), srv.URL, "canary")
+	if err != nil {
+		t.Fatalf("fetchRelease: %v", err)
+	}
+	if version != "1.2.3" {
+		t.Errorf("version = %q, want 1.2.3", version)
+	}
+	if len(methods) != 1 || methods[0] != http.MethodHead {
+		t.Errorf("methods = %v, want [HEAD]", methods)
+	}
+}
+
 func TestVersionUpdate_FailsClosedWithoutIntegrity(t *testing.T) {
 	// Ensure no global env from another test leaks in.
 	t.Setenv("PUTNAMI_UNSAFE_UPDATE", "")

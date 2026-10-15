@@ -19,6 +19,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/privatebroker"
 	"go.putnami.dev/sdk/extension/registrycred"
+	"go.putnami.dev/sdk/extension/registryorigin"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/useragent"
 )
@@ -350,12 +351,38 @@ const HTTPRetryBackoffEnv = "PUTNAMI_HTTP_RETRY_BACKOFF"
 // artifact downloads. Timeout is read from PUTNAMI_HTTP_TIMEOUT (env);
 // invalid or missing values fall back to DefaultHTTPTimeout so the
 // existing behavior is preserved for users that don't touch the knob.
+// A registry host that PUTNAMI_REGISTRY_ORIGINS maps is reached at its mapped
+// origin (registryorigin), as image pushes and Put publications are.
 func NewRegistryHTTPClient() *http.Client {
 	return &http.Client{
 		Timeout:       resolveHTTPTimeout(os.Getenv(HTTPTimeoutEnv)),
-		Transport:     useragent.NewTransport(nil),
+		Transport:     registryTransport(useragent.NewTransport(nil)),
 		CheckRedirect: registryRedirectPolicy,
 	}
+}
+
+// errRegistryOrigins marks a PUTNAMI_REGISTRY_ORIGINS value that does not
+// parse. It is configuration, so DoWithRetry does not retry it.
+var errRegistryOrigins = errors.New("registry origins")
+
+// registryTransport routes base through the origins PUTNAMI_REGISTRY_ORIGINS
+// maps. A malformed value fails every request instead of silently keeping the
+// public route.
+func registryTransport(base http.RoundTripper) http.RoundTripper {
+	origins, err := registryorigin.FromEnv()
+	if err != nil {
+		return refusingTransport{err: fmt.Errorf("%w: %w", errRegistryOrigins, err)}
+	}
+	return registryorigin.Transport(base, origins)
+}
+
+type refusingTransport struct{ err error }
+
+func (t refusingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req != nil && req.Body != nil {
+		_ = req.Body.Close()
+	}
+	return nil, t.err
 }
 
 // registryRedirectPolicy keeps following ordinary download redirects while
@@ -411,7 +438,7 @@ func resolveRetryBackoff(raw string) time.Duration {
 }
 
 // DoWithRetry runs req via client, retrying on transient failures with
-// exponential backoff. Only safe for idempotent GETs — the wrapper
+// exponential backoff. Only safe for idempotent GETs and HEADs — the wrapper
 // rebuilds the request per attempt so a body cannot be consumed once.
 //
 // Transient = network error, 408 Request Timeout, 429 Too Many Requests,
@@ -457,12 +484,30 @@ func DoWithRetry(ctx context.Context, client *http.Client, req *http.Request) (*
 	return nil, lastErr
 }
 
+// DoHeadWithRetry sends req as a HEAD through DoWithRetry, for a caller that
+// reads only the response headers: the server sends no body. A server that
+// refuses HEAD with 405 Method Not Allowed receives the same request as a GET,
+// whose body the caller closes unread.
+func DoHeadWithRetry(ctx context.Context, client *http.Client, req *http.Request) (*http.Response, error) {
+	head := req.Clone(ctx)
+	head.Method = http.MethodHead
+	resp, err := DoWithRetry(ctx, client, head)
+	if err != nil || resp.StatusCode != http.StatusMethodNotAllowed {
+		return resp, err
+	}
+	drainAndClose(resp)
+	get := req.Clone(ctx)
+	get.Method = http.MethodGet
+	return DoWithRetry(ctx, client, get)
+}
+
 func isTransientErr(err error) bool {
 	// net.OpError, *url.Error, EOF, context.DeadlineExceeded surface here
 	// — they all represent failed connection / partial response cases
 	// that a retry might recover. context.Canceled is NOT transient:
-	// the caller asked us to stop.
-	return err != nil && !errors.Is(err, context.Canceled)
+	// the caller asked us to stop. Neither is a malformed
+	// PUTNAMI_REGISTRY_ORIGINS: a retry reads the same value.
+	return err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, errRegistryOrigins)
 }
 
 func isTransientStatus(code int) bool {
