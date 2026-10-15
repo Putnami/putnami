@@ -98,6 +98,36 @@ func TestMergeVocabulary_AVocabularyNeverChangesTheSideEffectsOfAWellKnownVerb(t
 	}
 }
 
+// TestResolve_DeclaredTraitsKeepAWellKnownVerbsSideEffects pins the one
+// resolution every gate reads: a command whose declared traits name no side
+// effects keeps its well-known verb's, and a vocabulary does not reach a job
+// whose manifest declared traits.
+func TestResolve_DeclaredTraitsKeepAWellKnownVerbsSideEffects(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "declared-traits-keep-a-well-known-verbs-side-effects")
+	channels := proto.CommandTraits{InjectPublishChannels: true}
+	heavy := proto.CommandTraits{Heavy: true}
+	jobs := Resolve(&Manifest{Name: "@acme/release", Commands: map[string]CommandDefinition{
+		"publish": {Traits: &channels},
+		"deploy":  {Traits: &heavy},
+		"release": {Traits: &channels},
+	}}, "/ext")
+	dev := vocabularyExtension("@acme/dev", VerbDefinition{Name: "release", Description: "Release.",
+		Traits: &proto.CommandTraits{SideEffects: proto.SideEffectsRegistry}})
+	ApplyVocabularyTraits([]*ExtensionDescription{jobs, dev})
+
+	cases := map[string]CommandTraits{
+		"publish": {InjectPublishChannels: true, SideEffects: proto.SideEffectsRegistry},
+		"deploy":  {Heavy: true, SideEffects: proto.SideEffectsCloud},
+		"release": channels, // no well-known side effects, and the declaration wins over the vocabulary
+	}
+	for name, want := range cases {
+		if got := jobs.Jobs[name].Traits; got != want {
+			t.Errorf("%s traits = %+v, want %+v", name, got, want)
+		}
+	}
+}
+
 func TestMergeVocabulary_AnAliasNeverShadowsAVerbCommandGroupOrReservedName(t *testing.T) {
 	t.Parallel()
 	vocabulary := vocabularyExtension("@acme/dev", VerbDefinition{
@@ -147,9 +177,10 @@ func TestApplyVocabularyTraits_DefaultsOnlyUndeclaredTraits(t *testing.T) {
 	ApplyVocabularyTraits([]*ExtensionDescription{jobs, dev})
 
 	cases := map[string]CommandTraits{
-		"bundle":  cloud,                                // the vocabulary's default
-		"check":   {},                                   // no verb, no default
-		"publish": {Heavy: true},                        // declared traits win
+		"bundle": cloud, // the vocabulary's default
+		"check":  {},    // no verb, no default
+		// declared traits win, and keep the verb's side effects
+		"publish": {Heavy: true, SideEffects: proto.SideEffectsRegistry},
 		"serve":   proto.WellKnownVerbs["serve"].Traits, // a verb without traits keeps the fallback
 	}
 	for name, want := range cases {

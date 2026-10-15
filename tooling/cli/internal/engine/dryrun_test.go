@@ -106,6 +106,27 @@ func TestDropUndryableSideEffectJobs_ExcludesUndeclaredSideEffects(t *testing.T)
 	}
 }
 
+// TestDropUndryableSideEffectJobs_ExcludesAPublishWhoseTraitsNameNoSideEffects
+// pins the filter on a job resolved from a manifest: a publish whose declared
+// traits name no side effects keeps the verb's registry side effect, so
+// `publish --dry-run` excludes it instead of running it for real.
+func TestDropUndryableSideEffectJobs_ExcludesAPublishWhoseTraitsNameNoSideEffects(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "preview-no-effects", "only-declared-dry-run-simulations-survive")
+	ext := extension.Resolve(&extension.Manifest{Name: "@acme/release", Commands: map[string]extension.CommandDefinition{
+		"publish": {Traits: &extension.CommandTraits{InjectPublishChannels: true}},
+	}}, "/ext")
+	publisher := &jobs.ScheduledJob{
+		Project:   &workspace.Project{ID: "/p", Name: "p", Path: "p"},
+		Extension: ext,
+		JobDef:    ext.Jobs["publish"],
+	}
+
+	if kept := dropUndryableSideEffectJobs(executingDryRunRequest(), []*jobs.ScheduledJob{publisher}); len(kept) != 0 {
+		t.Fatalf("kept = %v, want the publish excluded from an executing dry-run", kept)
+	}
+}
+
 func TestDropUndryableSideEffectJobs_KeepsPipelineStepsWithCommandDryRunFlag(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "preview-no-effects", "only-declared-dry-run-simulations-survive")

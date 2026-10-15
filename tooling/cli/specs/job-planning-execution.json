@@ -31,7 +31,7 @@
     },
     {
       "id": "vocabulary-default-traits",
-      "text": "After discovery loads every extension, a job whose manifest declares no traits takes the default traits of its verb in the merged vocabulary. A verb without traits keeps the well-known defaults, declared traits win, and a vocabulary never changes the side effects of a well-known verb. A manifest that declares a vocabulary requires CLI contract 9 wherever it loads from, and the packagers validate and stamp it, so an older CLI refuses it instead of planning those jobs with other traits."
+      "text": "After discovery loads every extension, a job whose manifest declares no traits takes the default traits of its verb in the merged vocabulary. A verb without traits keeps the well-known defaults, declared traits win, a vocabulary never changes the side effects of a well-known verb, and declared traits that name no side effects keep the verb's. A manifest that declares a vocabulary requires CLI contract 9 wherever it loads from, and the packagers validate and stamp it, so an older CLI refuses it instead of planning those jobs with other traits."
     },
     {
       "id": "selection-before-plan",

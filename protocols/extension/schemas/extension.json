@@ -762,7 +762,7 @@
         },
         "traits": {
           "$ref": "#/$defs/commandTraits",
-          "description": "Orchestration traits; replaces the well-known verb's defaults wholesale when declared."
+          "description": "Orchestration traits; replaces the well-known verb's defaults when declared, except that an empty sideEffects keeps the verb's."
         }
       }
     },

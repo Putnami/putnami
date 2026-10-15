@@ -928,8 +928,9 @@ func (s *Server) rejectSideEffectingCommands(commands []string) error {
 // its resolved SideEffects trait. Resolution is the protocol's own
 // (extension.Resolve applies proto.EffectiveTraits at load), so a
 // manifest-declared `sideEffects` on a custom verb counts exactly as publish's
-// default does, and a manifest that overrides a well-known verb's traits owns
-// the answer for it — the same resolved traits the planner schedules by.
+// default does, and a manifest that declares a well-known verb's traits without
+// side effects keeps the verb's — the same resolved traits the planner
+// schedules by.
 //
 // A command several extensions declare keeps the side-effecting classification
 // if ANY of them carries one: run_jobs would schedule all of them.
