@@ -17,6 +17,11 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
+// batchLifecycleHangBound only detects a hang. A test here runs up to four
+// schedulers under one bound, and a loaded machine spends tens of seconds on
+// them, so a tighter bound fails a correct run.
+const batchLifecycleHangBound = 3 * time.Minute
+
 // What "one runner through the ordinary per-task
 // lifecycle" has to mean, measured rather than asserted in prose.
 //
@@ -218,7 +223,7 @@ func TestBatchMembersStoreAndHitDeclaredEntries(t *testing.T) {
 	localStore := store.NewLocalStore(storeRoot)
 	newCache := func() *store.CacheManager { return store.NewCacheManager(localStore) }
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), batchLifecycleHangBound)
 	defer cancel()
 
 	cold := runBatchScheduler(ctx, ws, planned, SchedulerConfig{MaxParallel: 2}, newCache())
@@ -285,7 +290,7 @@ func TestSoloAndBatchDispatchShareOneCacheEntry(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), batchLifecycleHangBound)
 			defer cancel()
 			logPath := filepath.Join(t.TempDir(), "invocations")
 			ws, planned := declaredBatchFixture(t, logPath)
@@ -382,7 +387,7 @@ func TestFailedBatchMemberRetriesSoloAndIsNotReBatched(t *testing.T) {
 	localStore := store.NewLocalStore(filepath.Join(t.TempDir(), "store"))
 	newCache := func() *store.CacheManager { return store.NewCacheManager(localStore) }
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), batchLifecycleHangBound)
 	defer cancel()
 
 	result := runBatchScheduler(ctx, ws, planned,
@@ -435,7 +440,7 @@ func TestBatchWithoutRetryBudgetNeverReExecutesAMember(t *testing.T) {
 	logPath := filepath.Join(t.TempDir(), "invocations")
 	ws, planned := retryBatchFixture(t, logPath)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), batchLifecycleHangBound)
 	defer cancel()
 
 	result := runBatchScheduler(ctx, ws, planned,
@@ -497,7 +502,7 @@ func TestSoloAndBatchDispatchProduceEqualCanonicalResults(t *testing.T) {
 	if _, err := os.Stat("/bin/sh"); err != nil {
 		t.Skip("/bin/sh unavailable")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), batchLifecycleHangBound)
 	defer cancel()
 
 	run := func(solo bool) map[string]TaskResult {
@@ -555,7 +560,7 @@ func TestSoloAndBatchDiagnosticEventsAgreeOnAnAbsentCode(t *testing.T) {
 	if _, err := os.Stat("/bin/sh"); err != nil {
 		t.Skip("/bin/sh unavailable")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), batchLifecycleHangBound)
 	defer cancel()
 
 	run := func(solo bool) []any {
@@ -701,7 +706,7 @@ func TestCanceledBatchMemberLeavesSiblingVerdictAndEntryIntact(t *testing.T) {
 
 	localStore := store.NewLocalStore(filepath.Join(t.TempDir(), "store"))
 	newCache := func() *store.CacheManager { return store.NewCacheManager(localStore) }
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), batchLifecycleHangBound)
 	defer cancel()
 
 	result := runBatchScheduler(ctx, ws, planned,
@@ -794,7 +799,7 @@ func TestFailedBatchMemberIsolatedIdenticallyToSoloDispatch(t *testing.T) {
 	if _, err := os.Stat("/bin/sh"); err != nil {
 		t.Skip("/bin/sh unavailable")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), batchLifecycleHangBound)
 	defer cancel()
 
 	run := func(solo bool) (map[string]string, int) {
@@ -939,7 +944,7 @@ func TestBatchAndSoloFixWritesAreEquivalent(t *testing.T) {
 	if _, err := os.Stat("/bin/sh"); err != nil {
 		t.Skip("/bin/sh unavailable")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), batchLifecycleHangBound)
 	defer cancel()
 
 	run := func(solo bool) (map[string]string, map[string]bool) {
