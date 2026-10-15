@@ -1,9 +1,11 @@
-package git
+package treefingerprint
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -12,11 +14,11 @@ import (
 
 var lowercaseSHA256 = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
-func fingerprint(t *testing.T, dir string) TreeFingerprint {
+func fingerprint(t *testing.T, dir string) Tree {
 	t.Helper()
-	tree, err := FingerprintTree(dir)
+	tree, err := Compute(dir)
 	if err != nil {
-		t.Fatalf("FingerprintTree(%s): %v", dir, err)
+		t.Fatalf("Compute(%s): %v", dir, err)
 	}
 	if !lowercaseSHA256.MatchString(tree.Fingerprint) {
 		t.Fatalf("fingerprint %q is not a lowercase hex sha256", tree.Fingerprint)
@@ -34,12 +36,39 @@ func write(t *testing.T, path, content string) {
 	}
 }
 
+// initGitRepo creates a repository on branch main whose one commit holds
+// README.md.
+func initGitRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	runGit(t, dir, "init")
+	runGit(t, dir, "config", "user.email", "test@test.com")
+	runGit(t, dir, "config", "user.name", "Test")
+	runGit(t, dir, "config", "commit.gpgsign", "false")
+	runGit(t, dir, "checkout", "-b", "main")
+	write(t, filepath.Join(dir, "README.md"), "# Test")
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "initial")
+	return dir
+}
+
+func runGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return string(out)
+}
+
 // TestFingerprintTreeIsDeterministicAndCwdIndependent pins the property every
 // other use rests on: the digest describes the TREE, not the reader. Two agents
 // run this from wherever they happen to be, so a cwd-dependent digest would be
 // useless.
 func TestFingerprintTreeIsDeterministicAndCwdIndependent(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "gated-tree-identity",
+	spectest.Proves(t, "tooling/extension-authoring", "tree-fingerprint",
 		"one-digest-covers-head-the-tracked-diff-and-untracked-content")
 	repo := initGitRepo(t)
 	nested := filepath.Join(repo, "nested")
@@ -64,7 +93,7 @@ func TestFingerprintTreeIsDeterministicAndCwdIndependent(t *testing.T) {
 // `git status` output is byte-for-byte identical across the two states and a
 // path-only check cannot tell them apart.
 func TestFingerprintTreeSeesContentBehindAnUnchangedStatus(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "gated-tree-identity",
+	spectest.Proves(t, "tooling/extension-authoring", "tree-fingerprint",
 		"one-digest-covers-head-the-tracked-diff-and-untracked-content")
 	repo := initGitRepo(t)
 	tracked := filepath.Join(repo, "README.md")
@@ -94,7 +123,7 @@ func TestFingerprintTreeSeesContentBehindAnUnchangedStatus(t *testing.T) {
 }
 
 func TestFingerprintTreeCoversUntrackedContentAndIgnoresIgnoredFiles(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "gated-tree-identity",
+	spectest.Proves(t, "tooling/extension-authoring", "tree-fingerprint",
 		"one-digest-covers-head-the-tracked-diff-and-untracked-content")
 	repo := initGitRepo(t)
 	base := fingerprint(t, repo)
@@ -136,7 +165,7 @@ func TestFingerprintTreeCoversUntrackedContentAndIgnoresIgnoredFiles(t *testing.
 // meaningful against the commit it was taken from, so a moved HEAD must read as
 // a different tree instead of canceling out against an identical diff.
 func TestFingerprintTreeFoldsInHead(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "gated-tree-identity",
+	spectest.Proves(t, "tooling/extension-authoring", "tree-fingerprint",
 		"one-digest-covers-head-the-tracked-diff-and-untracked-content")
 	repo := initGitRepo(t)
 	before := fingerprint(t, repo)
@@ -159,7 +188,7 @@ func TestFingerprintTreeFoldsInHead(t *testing.T) {
 // TestFingerprintTreeDistinguishesTheExecutableBit covers the one change that
 // alters what a tree DOES while leaving every byte it contains identical.
 func TestFingerprintTreeDistinguishesTheExecutableBit(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "gated-tree-identity",
+	spectest.Proves(t, "tooling/extension-authoring", "tree-fingerprint",
 		"one-digest-covers-head-the-tracked-diff-and-untracked-content")
 	repo := initGitRepo(t)
 	script := filepath.Join(repo, "script.sh")
@@ -190,7 +219,7 @@ func TestFingerprintTreeDistinguishesTheExecutableBit(t *testing.T) {
 // — it aborted with "Unable to hash". The path enters the digest; the nested
 // repository's contents do not, because git reports nothing about them either.
 func TestFingerprintTreeReadsAnUntrackedNestedRepository(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "gated-tree-identity",
+	spectest.Proves(t, "tooling/extension-authoring", "tree-fingerprint",
 		"one-digest-covers-head-the-tracked-diff-and-untracked-content")
 	repo := initGitRepo(t)
 	base := fingerprint(t, repo)
@@ -204,9 +233,9 @@ func TestFingerprintTreeReadsAnUntrackedNestedRepository(t *testing.T) {
 		t.Fatalf("the scenario is wrong, git did not collapse the nested repository: %q", listing)
 	}
 
-	nestedTree, err := FingerprintTree(repo)
+	nestedTree, err := Compute(repo)
 	if err != nil {
-		t.Fatalf("FingerprintTree over a nested repository: %v", err)
+		t.Fatalf("Compute over a nested repository: %v", err)
 	}
 	if nestedTree.Fingerprint == base.Fingerprint {
 		t.Errorf("an untracked nested repository did not move the digest")
@@ -214,11 +243,11 @@ func TestFingerprintTreeReadsAnUntrackedNestedRepository(t *testing.T) {
 }
 
 func TestFingerprintTreeRefusesWhatItCannotIdentify(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "gated-tree-identity",
-		"a-producer-that-cannot-determine-the-tree-records-nothing")
+	spectest.Proves(t, "tooling/extension-authoring", "tree-fingerprint",
+		"a-tree-that-cannot-be-identified-has-no-fingerprint")
 	t.Run("outside a git worktree", func(t *testing.T) {
-		if _, err := FingerprintTree(t.TempDir()); err == nil {
-			t.Fatal("FingerprintTree succeeded outside a git worktree")
+		if _, err := Compute(t.TempDir()); err == nil {
+			t.Fatal("Compute succeeded outside a git worktree")
 		} else if !strings.Contains(err.Error(), "not inside a git worktree") {
 			t.Errorf("error = %v, want it to name the missing worktree", err)
 		}
@@ -226,8 +255,8 @@ func TestFingerprintTreeRefusesWhatItCannotIdentify(t *testing.T) {
 	t.Run("a repository with no commit", func(t *testing.T) {
 		empty := t.TempDir()
 		runGit(t, empty, "init", "-b", "main")
-		if _, err := FingerprintTree(empty); err == nil {
-			t.Fatal("FingerprintTree succeeded on a repository with no commit")
+		if _, err := Compute(empty); err == nil {
+			t.Fatal("Compute succeeded on a repository with no commit")
 		} else if !strings.Contains(err.Error(), "has no commit") {
 			t.Errorf("error = %v, want it to name the missing commit", err)
 		}
@@ -254,7 +283,7 @@ func addSubmodule(t *testing.T, parent, child, name string) {
 // compares. It is the same "same status, different bytes" defect this mechanism
 // exists to catch, one level down.
 func TestFingerprintTreeSeesContentInsideADirtySubmodule(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "gated-tree-identity",
+	spectest.Proves(t, "tooling/extension-authoring", "tree-fingerprint",
 		"one-digest-covers-head-the-tracked-diff-and-untracked-content")
 	child := initGitRepo(t)
 	write(t, filepath.Join(child, "source.txt"), "v1")
@@ -309,7 +338,7 @@ func TestFingerprintTreeSeesContentInsideADirtySubmodule(t *testing.T) {
 // `--full-index` for a text diff, so `core.abbrev` alone made two machines
 // disagree about the same tree. Each knob below moved the version-1 digest.
 func TestFingerprintTreeIgnoresDiffRenderingConfiguration(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "gated-tree-identity",
+	spectest.Proves(t, "tooling/extension-authoring", "tree-fingerprint",
 		"one-digest-covers-head-the-tracked-diff-and-untracked-content")
 	repo := initGitRepo(t)
 	tracked := filepath.Join(repo, "tracked.txt")
@@ -347,7 +376,7 @@ func TestFingerprintTreeIgnoresDiffRenderingConfiguration(t *testing.T) {
 // emptying. Both leave nothing to read at the path, and a digest that could not
 // tell them apart would accept one for the other.
 func TestFingerprintTreeRecordsADeletedTrackedFile(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "gated-tree-identity",
+	spectest.Proves(t, "tooling/extension-authoring", "tree-fingerprint",
 		"one-digest-covers-head-the-tracked-diff-and-untracked-content")
 	repo := initGitRepo(t)
 	tracked := filepath.Join(repo, "tracked.txt")
@@ -386,7 +415,7 @@ func TestFingerprintTreeRecordsADeletedTrackedFile(t *testing.T) {
 // per level, until the depth guard fired — so the checkout test has to come
 // before the recursion, not after it as a fallback.
 func TestFingerprintTreeSurvivesAnUninitializedSubmodule(t *testing.T) {
-	spectest.Proves(t, "cli/diagnostics-results", "gated-tree-identity",
+	spectest.Proves(t, "tooling/extension-authoring", "tree-fingerprint",
 		"one-digest-covers-head-the-tracked-diff-and-untracked-content")
 	child := initGitRepo(t)
 	parent := initGitRepo(t)
@@ -395,14 +424,135 @@ func TestFingerprintTreeSurvivesAnUninitializedSubmodule(t *testing.T) {
 	clone := filepath.Join(t.TempDir(), "clone")
 	runGit(t, t.TempDir(), "-c", "protocol.file.allow=always", "clone", "--no-recurse-submodules", parent, clone)
 
-	tree, err := FingerprintTree(clone)
+	tree, err := Compute(clone)
 	if err != nil {
-		t.Fatalf("FingerprintTree on a clone with an uninitialized submodule: %v", err)
+		t.Fatalf("Compute on a clone with an uninitialized submodule: %v", err)
 	}
 	if !lowercaseSHA256.MatchString(tree.Fingerprint) {
 		t.Errorf("fingerprint %q is not a lowercase hex sha256", tree.Fingerprint)
 	}
 	if tree.Dirty {
 		t.Errorf("a clone with an uninitialized submodule reported dirty")
+	}
+}
+
+// A host that stats the executable bit keeps the disk's kind. On a host that
+// does not, a regular file's kind follows git's worktree mode, and links and
+// directories keep their kind.
+func TestTrackedKind(t *testing.T) {
+	for _, tc := range []struct {
+		diskKind, worktreeMode string
+		statsExecBit           bool
+		want                   string
+	}{
+		{treeEntryFile, executableMode, true, treeEntryFile},
+		{treeEntryExec, "100644", true, treeEntryExec},
+		{treeEntryFile, executableMode, false, treeEntryExec},
+		{treeEntryExec, "100644", false, treeEntryFile},
+		{treeEntryFile, "100644", false, treeEntryFile},
+		{treeEntryLink, "120000", false, treeEntryLink},
+		{treeEntryDirectory, executableMode, false, treeEntryDirectory},
+	} {
+		if got := trackedKind(tc.diskKind, tc.worktreeMode, tc.statsExecBit); got != tc.want {
+			t.Errorf("trackedKind(%q, %q, %v) = %q, want %q", tc.diskKind, tc.worktreeMode, tc.statsExecBit, got, tc.want)
+		}
+	}
+}
+
+// indexExecutableRepo commits tool.sh and plain.txt at 0644 with
+// core.fileMode=false, the setting Git for Windows gives every clone, then marks
+// tool.sh executable in the index only and edits both files, so git lists both
+// as changed while the disk still carries no executable bit.
+func indexExecutableRepo(t *testing.T) string {
+	t.Helper()
+	repo := initGitRepo(t)
+	runGit(t, repo, "config", "core.fileMode", "false")
+	tool, plain := filepath.Join(repo, "tool.sh"), filepath.Join(repo, "plain.txt")
+	write(t, tool, "#!/bin/sh\n")
+	write(t, plain, "plain\n")
+	runGit(t, repo, "add", "tool.sh", "plain.txt")
+	runGit(t, repo, "commit", "-m", "add files")
+	runGit(t, repo, "update-index", "--chmod=+x", "tool.sh")
+	write(t, tool, "#!/bin/sh\nexit 0\n")
+	write(t, plain, "plain, edited\n")
+	for _, p := range []string{tool, plain} {
+		if err := os.Chmod(p, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return repo
+}
+
+// Without a host executable bit, the fingerprint classifies a tracked file from
+// the worktree mode `git status --porcelain=v2` reports, which mirrors the index
+// under core.fileMode=false. With one, the disk decides, as it always does on
+// Linux and macOS.
+func TestTrackedChangesTakesTheExecutableBitFromGitWithoutAHostExecBit(t *testing.T) {
+	repo := indexExecutableRepo(t)
+	kinds := func(statsExecBit bool) map[string]string {
+		entries, err := trackedChanges(repo, 0, statsExecBit)
+		if err != nil {
+			t.Fatalf("trackedChanges: %v", err)
+		}
+		got := map[string]string{}
+		for _, entry := range entries {
+			got[entry.path] = entry.kind
+		}
+		return got
+	}
+
+	if got := kinds(false); got["tool.sh"] != treeEntryExec || got["plain.txt"] != treeEntryFile {
+		t.Errorf("without a host executable bit: kinds = %v, want tool.sh exec and plain.txt file", got)
+	}
+	if got := kinds(true); got["tool.sh"] != treeEntryFile || got["plain.txt"] != treeEntryFile {
+		t.Errorf("with a host executable bit: kinds = %v, want both file, as the disk says", got)
+	}
+}
+
+// git's environment loses every variable that selects another repository or
+// injects configuration, and keeps transport credentials, tracing and the
+// remaining settings.
+func TestRepositoryEnvironmentKeepsTransportAndRemovesForeignRepository(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "tree-fingerprint",
+		"the-environment-cannot-redirect-the-repository")
+	selectors := []string{"GIT_DIR=/tmp/foreign.git", "GIT_WORK_TREE=/tmp/foreign", "GIT_CONFIG_COUNT=1",
+		"GIT_CONFIG_KEY_0=core.worktree", "GIT_CONFIG_VALUE_0=/tmp/foreign", "GIT_CONFIG_GLOBAL=/tmp/gitconfig",
+		"GIT_CONFIG_NOSYSTEM=1", "GIT_INDEX_FILE=/tmp/foreign.index", "GIT_COMMON_DIR=/tmp/foreign.git",
+		"GIT_OBJECT_DIRECTORY=/tmp/objects", "GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/alternates", "GIT_PREFIX=sub/",
+		"GIT_CEILING_DIRECTORIES=/tmp", "GIT_DISCOVERY_ACROSS_FILESYSTEM=1", "GIT_NAMESPACE=other"}
+	kept := []string{"GIT_SSH_COMMAND=ssh -i /tmp/key", "GIT_ASKPASS=/tmp/askpass", "GIT_LITERAL_PATHSPECS=1", "PATH=/bin"}
+	got := repositoryEnvironment(append(slices.Clone(selectors), kept...))
+	for _, selector := range selectors {
+		if slices.Contains(got, selector) {
+			t.Errorf("selector survived: %q", selector)
+		}
+	}
+	if !slices.Equal(got, kept) {
+		t.Errorf("repositoryEnvironment kept %q, want %q", got, kept)
+	}
+}
+
+// A fingerprint taken where git exports GIT_DIR, as it does to a hook, or
+// where the environment injects configuration, still describes the worktree
+// holding dir.
+func TestComputeIgnoresRepositorySelectorsInTheEnvironment(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "tree-fingerprint",
+		"the-environment-cannot-redirect-the-repository")
+	repo := initGitRepo(t)
+	write(t, filepath.Join(repo, "untracked.txt"), "untracked")
+	want := fingerprint(t, repo)
+
+	foreign := initGitRepo(t)
+	write(t, filepath.Join(foreign, "README.md"), "foreign edit")
+	excludes := filepath.Join(t.TempDir(), "excludes")
+	write(t, excludes, "untracked.txt\n")
+	t.Setenv("GIT_DIR", filepath.Join(foreign, ".git"))
+	t.Setenv("GIT_WORK_TREE", foreign)
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "core.excludesFile")
+	t.Setenv("GIT_CONFIG_VALUE_0", excludes)
+
+	if got := fingerprint(t, repo); got != want {
+		t.Errorf("the environment redirected the fingerprint: %+v, want %+v", got, want)
 	}
 }

@@ -16,29 +16,6 @@ func TestHostStatsExecBit(t *testing.T) {
 	}
 }
 
-// A host that stats the executable bit keeps the disk's kind. On a host that
-// does not, a regular file's kind follows git's worktree mode, and links and
-// directories keep their kind.
-func TestTrackedKind(t *testing.T) {
-	for _, tc := range []struct {
-		diskKind, worktreeMode string
-		statsExecBit           bool
-		want                   string
-	}{
-		{treeEntryFile, executableMode, true, treeEntryFile},
-		{treeEntryExec, "100644", true, treeEntryExec},
-		{treeEntryFile, executableMode, false, treeEntryExec},
-		{treeEntryExec, "100644", false, treeEntryFile},
-		{treeEntryFile, "100644", false, treeEntryFile},
-		{treeEntryLink, "120000", false, treeEntryLink},
-		{treeEntryDirectory, executableMode, false, treeEntryDirectory},
-	} {
-		if got := trackedKind(tc.diskKind, tc.worktreeMode, tc.statsExecBit); got != tc.want {
-			t.Errorf("trackedKind(%q, %q, %v) = %q, want %q", tc.diskKind, tc.worktreeMode, tc.statsExecBit, got, tc.want)
-		}
-	}
-}
-
 // indexExecutableRepo commits tool.sh and plain.txt at 0644 with
 // core.fileMode=false, the setting Git for Windows gives every clone, then marks
 // tool.sh executable in the index only and edits both files, so git lists both
@@ -63,35 +40,9 @@ func indexExecutableRepo(t *testing.T) string {
 	return repo
 }
 
-// Without a host executable bit, the fingerprint classifies a tracked file from
-// the worktree mode `git status --porcelain=v2` reports, which mirrors the index
-// under core.fileMode=false. With one, the disk decides, as it always does on
-// Linux and macOS.
-func TestTrackedChangesTakesTheExecutableBitFromGitWithoutAHostExecBit(t *testing.T) {
-	repo := indexExecutableRepo(t)
-	kinds := func(statsExecBit bool) map[string]string {
-		entries, err := trackedChanges(repo, 0, statsExecBit)
-		if err != nil {
-			t.Fatalf("trackedChanges: %v", err)
-		}
-		got := map[string]string{}
-		for _, entry := range entries {
-			got[entry.path] = entry.kind
-		}
-		return got
-	}
-
-	if got := kinds(false); got["tool.sh"] != treeEntryExec || got["plain.txt"] != treeEntryFile {
-		t.Errorf("without a host executable bit: kinds = %v, want tool.sh exec and plain.txt file", got)
-	}
-	if got := kinds(true); got["tool.sh"] != treeEntryFile || got["plain.txt"] != treeEntryFile {
-		t.Errorf("with a host executable bit: kinds = %v, want both file, as the disk says", got)
-	}
-}
-
-// The same rule for the source binding: the index mode the snapshot enumerates
-// decides for a tracked file without a host executable bit, and an untracked
-// file is regular there.
+// Without a host executable bit, the index mode the snapshot enumerates
+// decides for a tracked file, and an untracked file is regular there. With
+// one, the disk decides, as it always does on Linux and macOS.
 func TestSourceBindingRecordTakesTheExecutableBitFromTheIndexWithoutAHostExecBit(t *testing.T) {
 	repo := indexExecutableRepo(t)
 	untracked := filepath.Join(repo, "new.sh")
