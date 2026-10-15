@@ -166,6 +166,7 @@ func (o *sessionObserver) RunPlanned(ctx context.Context, plan engine.RunPlan) {
 	startPreviousTelemetryDrain(ctx, o.client.CanDrainPrevious())
 	o.client.TrackSessionStart(telemetry.SessionStart{
 		Commands:    plan.Commands,
+		Declarers:   plan.Declarers,
 		Projects:    plan.Projects,
 		Jobs:        plan.Jobs,
 		Flags:       telemetryFlagPresence(o.args),

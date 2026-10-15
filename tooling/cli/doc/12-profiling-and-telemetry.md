@@ -342,12 +342,22 @@ explicit `telemetry on` setting wins the precedence order.
 
 | Event | Closed, collected fields |
 |-------|--------------------------|
-| `session:start` | Public job-command names; project and job counts; presence-only booleans for `impacted`, `coverage`, `output`, `no-cache`, `projects`, and `watch`; `interactive` |
+| `session:start` | Names of the requested commands that Putnami's own extensions declare; project and job counts; presence-only booleans for `impacted`, `coverage`, `output`, `no-cache`, `projects`, and `watch`; `interactive` |
 | `session:end` | Success; duration in milliseconds; `interactive`; a failure-only `errorCategory` of `usage`, `auth`, `api`, or `failure` |
 
 The OTLP representation adds the event name, CLI version, OS, architecture, and
 a monthly-rotating random device ID. Every attribute is checked against a
 compiled-in closed vocabulary before it is written or exported.
+
+The command vocabulary (`cliusage.Commands` in `protocols/telemetry`) lists the
+public job commands of the CLI catalog and every public command that an
+extension of the `@putnami` scope declares. The CLI records a requested command
+only when it is in that vocabulary and a loaded `@putnami` extension declares
+it public. A command that only another extension declares is omitted, even
+when its name matches one in the vocabulary, so no name a user or a third
+party chose leaves the machine. The receiver drops a record that names a
+command outside the vocabulary, so a receiver that knows a new command must be
+deployed before a CLI that sends it.
 
 Runner memory capacity, cgroup gauges/events, PSI, execution MaxRSS, workload
 widths, and scratch-substrate declarations are **not** part of this anonymous

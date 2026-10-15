@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -484,7 +485,12 @@ func TestEnableStampsCurrentDeviceIDMonth(t *testing.T) {
 func TestSessionEventVocabularyGuard(t *testing.T) {
 	c := &Client{config: &Config{Enabled: boolPtr(true)}}
 	c.TrackSessionStart(SessionStart{
-		Commands:    []string{"build", "test", "unregistered-command", "build"},
+		Commands: []string{"build", "test", "unregistered-command", "build"},
+		Declarers: map[string][]string{
+			"build":                {"@putnami/go"},
+			"test":                 {"@acme/rust", "@putnami/go"},
+			"unregistered-command": {"@putnami/go"},
+		},
 		Projects:    2,
 		Jobs:        3,
 		Flags:       FlagPresence{Impacted: true, Coverage: true, Output: true, NoCache: true, Projects: true, Watch: true},
@@ -556,6 +562,36 @@ func TestSessionStartWithoutRecordableCommandConformsOnTheWire(t *testing.T) {
 	}
 	if diags := cliusage.ValidateLogs(*request); diag.HasErrors(diags) {
 		t.Fatalf("session:start without a recordable command fails the receiver vocabulary: %v", diags)
+	}
+}
+
+// A session-start records a command only when it is in the shared vocabulary
+// and an extension of the @putnami scope declares it public, in request order.
+func TestSessionStartRecordsOnlyFirstPartyCommands(t *testing.T) {
+	t.Parallel()
+	c := &Client{config: &Config{Enabled: boolPtr(true)}}
+	c.TrackSessionStart(SessionStart{
+		Commands: []string{
+			"validate-workspace", "clientgen", "build", "deploy", "private-command", "cloud-deploy",
+		},
+		Declarers: map[string][]string{
+			"validate-workspace": {"@putnami/sdd"},
+			"clientgen":          {"@acme/clientgen"},
+			"build":              {"@acme/rust", "@putnami/go"},
+			"private-command":    {"@putnami/go"},
+			"cloud-deploy":       {"@putnami-fork/cloud"},
+		},
+	})
+
+	if len(c.events) != 1 {
+		t.Fatalf("recorded events = %d, want 1", len(c.events))
+	}
+	if err := validateEventVocabulary(c.events[0]); err != nil {
+		t.Fatalf("session:start escaped the vocabulary: %v", err)
+	}
+	got, _ := c.events[0].Data[cliusage.AttrCommands].([]string)
+	if want := []string{"validate-workspace", "build"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("recorded commands = %v, want %v", got, want)
 	}
 }
 

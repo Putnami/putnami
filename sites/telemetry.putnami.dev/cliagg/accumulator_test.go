@@ -336,6 +336,14 @@ func TestDimensionReservationsStayWithinGlobalCaps(t *testing.T) {
 	}
 }
 
+// The command cap admits the whole closed vocabulary: a day on which every
+// command runs never overflows the command dimension.
+func TestCommandCapAdmitsTheWholeVocabulary(t *testing.T) {
+	if got, capacity := len(cliusage.Commands), counterDimensionCaps[DimCommand]; got > capacity {
+		t.Fatalf("command vocabulary has %d names, the per-day command cap admits %d", got, capacity)
+	}
+}
+
 func TestPerDayReservationsDoNotCrossContaminate(t *testing.T) {
 	acc := testAccumulator()
 	commands := strings.Join(cliusage.Commands, ",")
