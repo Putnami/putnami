@@ -41,11 +41,17 @@ func detectServeRunModes(commands []string) (serve, run bool) {
 func executionRenderer(
 	req *Request,
 	sessStore *workspace_state.SessionStore,
+	extensions []*extension.ExtensionDescription,
 	sink EventSink,
 	isServeMode, isRunMode bool,
 ) jobs.Renderer {
 	if sink != nil {
 		return sink
+	}
+	// The live view orders its command columns by the merged vocabulary.
+	var verbOrder []string
+	for _, verb := range extension.MergeVocabulary(extensions, nil).Verbs {
+		verbOrder = append(verbOrder, verb.Name)
 	}
 	noColor := req.Global.Color != nil && !*req.Global.Color
 	return output.NewRenderer(output.Config{
@@ -59,6 +65,7 @@ func executionRenderer(
 		// only in that it is one-shot (no forced watch — see below).
 		ServeMode:      isServeMode || isRunMode,
 		CoverageReplay: sessStore.LatestValidationCoverage(req.Commands, nil),
+		VerbOrder:      verbOrder,
 	})
 }
 
@@ -214,7 +221,7 @@ func (e *Engine) executeSession(
 	// the iteration builds its own cache manager, scheduler config and session.
 	if req.Global.Watch {
 		return e.runWatch(ctx, req, ws, selectedProjects, planExtensions,
-			executionRenderer(req, sessStore, sink, isServeMode, isRunMode), isServeMode)
+			executionRenderer(req, sessStore, extensions, sink, isServeMode, isRunMode), isServeMode)
 	}
 
 	// The cache manager arrives from Engine.run, which builds it before
@@ -313,7 +320,7 @@ func (e *Engine) executeSession(
 	// shares that recorder with its bounded live selector; other renderers are
 	// wrapped without changing their display behavior.
 	renderer := executionSessionRenderer(
-		executionRenderer(req, sessStore, sink, isServeMode, isRunMode),
+		executionRenderer(req, sessStore, extensions, sink, isServeMode, isRunMode),
 		session, req.Global.Verbose || req.Global.Debug,
 	)
 

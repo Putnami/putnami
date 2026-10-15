@@ -2,6 +2,7 @@ package output
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -31,32 +32,33 @@ func commandName(job *jobs.ScheduledJob) string {
 	return stripStepSuffix(job.JobDef.Name)
 }
 
-// commandRank gives a canonical ordering for well-known commands so columns
-// appear in a stable, intuitive sequence. Unknown commands sort after known
-// ones, alphabetically (handled by the caller).
-func commandRank(name string) int {
-	switch name {
-	case "generate":
-		return 0
-	case "lint":
-		return 1
-	case "format":
-		return 2
-	case "test":
-		return 3
-	case "build":
-		return 4
-	case "package":
-		return 5
-	case "publish":
-		return 6
-	case "deploy":
-		return 7
-	case "serve":
-		return 8
-	default:
-		return 100
+// fallbackCommandOrder orders the verbs that no loaded vocabulary orders.
+var fallbackCommandOrder = []string{
+	"generate", "lint", "format", "test", "build", "package", "publish", "deploy", "serve",
+}
+
+// unknownCommandRank is the rank of a command that neither the loaded
+// vocabularies nor the fallback order name.
+const unknownCommandRank = 100
+
+// commandRank ranks name in the column order of the live view: the verbs of
+// the loaded vocabularies first, in vocabulary order, then the fallback verbs
+// the vocabularies do not name, in fallback order. A command neither names
+// ranks after them all; the caller sorts those alphabetically.
+func commandRank(vocabulary []string, name string) int {
+	if i := slices.Index(vocabulary, name); i >= 0 {
+		return i
 	}
+	rank := len(vocabulary)
+	for _, verb := range fallbackCommandOrder {
+		if verb == name {
+			return rank
+		}
+		if !slices.Contains(vocabulary, verb) {
+			rank++
+		}
+	}
+	return max(unknownCommandRank, rank)
 }
 
 // summaryColumnHideRank orders summary cells by how readily they should be

@@ -120,7 +120,7 @@ func (r *LiveRenderer) sortCommandOrders() {
 	for _, row := range r.rows {
 		order := row.commandOrder
 		sort.SliceStable(order, func(i, j int) bool {
-			ri, rj := commandRank(order[i]), commandRank(order[j])
+			ri, rj := commandRank(r.verbOrder, order[i]), commandRank(r.verbOrder, order[j])
 			if ri != rj {
 				return ri < rj
 			}
@@ -185,7 +185,7 @@ func (r *LiveRenderer) computeLayout(cmdSeen map[string]bool) {
 		cmds = append(cmds, cmd)
 	}
 	sort.SliceStable(cmds, func(i, j int) bool {
-		ri, rj := commandRank(cmds[i]), commandRank(cmds[j])
+		ri, rj := commandRank(r.verbOrder, cmds[i]), commandRank(r.verbOrder, cmds[j])
 		if ri != rj {
 			return ri < rj
 		}

@@ -6,6 +6,7 @@ import (
 	"io"
 	"maps"
 	"os"
+	"slices"
 
 	"go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -29,6 +30,10 @@ type Config struct {
 	// CoverageReplay is keyed by stable project ID. The live renderer consults
 	// it only when the current run produced no coverage for that project.
 	CoverageReplay map[string]CoverageReplay
+	// VerbOrder is the verbs of the loaded vocabularies, in vocabulary order.
+	// The live renderer orders its command columns by it; the verbs it does
+	// not name follow in the renderer's fallback order.
+	VerbOrder []string
 
 	// Out and Err are the streams the selected renderer writes to. Nil means
 	// os.Stdout / os.Stderr, which is every terminal-shaped caller.
@@ -163,6 +168,7 @@ func autoDetectRenderer(cfg Config) jobs.Renderer {
 		r := NewLiveRenderer(out, errOut)
 		r.coverageReplay = maps.Clone(cfg.CoverageReplay)
 		r.serveMode = cfg.ServeMode
+		r.verbOrder = slices.Clone(cfg.VerbOrder)
 		return r
 	}
 

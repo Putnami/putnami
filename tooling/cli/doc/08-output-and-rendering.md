@@ -161,7 +161,11 @@ One row per project, in stable plan order:
   blocked on upstream dependencies is excluded, and overlapping jobs for the
   same project are counted once. `--:--` until work starts.
 
-**Summary cells** — one fixed-width cell per command, aligned across rows:
+**Summary cells** — one fixed-width cell per command, aligned across rows. The
+cells follow the verb order of the loaded vocabularies. The verbs no vocabulary
+names follow in the order `generate`, `lint`, `format`, `test`, `build`,
+`package`, `publish`, `deploy`, `serve`, and any other command comes last,
+alphabetically:
 
 ```
   lint ✓ ok · test ✓ 42/45 · cov 84.0% · build ✓ 3 files

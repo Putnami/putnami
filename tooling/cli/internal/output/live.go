@@ -63,6 +63,10 @@ type LiveRenderer struct {
 	// serveMode tails log lines to scrollback above the live table.
 	serveMode bool
 
+	// verbOrder is the verbs of the loaded vocabularies, in vocabulary order.
+	// The command columns follow it (commandRank).
+	verbOrder []string
+
 	// Project rows in stable display order.
 	rows         []*projectRow
 	rowByID      map[string]*projectRow
