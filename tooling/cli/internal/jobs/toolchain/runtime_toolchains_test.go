@@ -299,6 +299,41 @@ func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 	})
 }
 
+// TestRuntimeToolchainProbeAnswersOnStandardOutput pins where the version is
+// read. A warning on the standard error beside a version on the standard
+// output does not disqualify the version, as a uv that warns about its
+// environment did. A program that writes its version to the standard error
+// only is still read there.
+func TestRuntimeToolchainProbeAnswersOnStandardOutput(t *testing.T) {
+	warning := "warning: this machine configures uv through a setting it no longer reads\n"
+	for _, tc := range []struct {
+		name    string
+		program fixtureproc.Program
+		want    string
+		wantErr string
+	}{
+		{name: "warning beside the version", program: fixtureproc.Program{Stdout: "0.11.32\n", Stderr: warning}, want: "0.11.32"},
+		{name: "version on the standard error only", program: fixtureproc.Program{Stderr: "1.2.3\n"}, want: "1.2.3"},
+		{name: "a warning alone is no version", program: fixtureproc.Program{Stderr: warning}, wantErr: "probe output too long (72 bytes, limit 64)"},
+		{name: "a long standard error does not hide the version", program: fixtureproc.Program{Stdout: "0.11.32\n", Stderr: strings.Repeat("w", 2*toolVersionProbeOutputLimit)}, want: "0.11.32"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := fixtureproc.Write(t, filepath.Join(t.TempDir(), "uv"), tc.program)
+			got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"},
+				procdeadline.HostProcessDeadline(toolVersionProbeTimeout))
+			if tc.wantErr != "" {
+				if err == nil || err.Error() != tc.wantErr {
+					t.Fatalf("probe = %q, %v; want error %q", got, err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil || got != tc.want {
+				t.Fatalf("probe = %q, %v; want %q", got, err, tc.want)
+			}
+		})
+	}
+}
+
 // TestRuntimeToolchainProbeDeadlineCountsFromTheFirstInstruction pins that a
 // probe the host holds before its first instruction, or that waits for a CPU,
 // is not charged for that time: held past a deadline that has already

@@ -49,8 +49,9 @@ type RuntimeToolchainCandidate struct {
 	Environment string `json:"environment,omitempty"`
 }
 
-// RuntimeToolchainProbe must match the trimmed combined output exactly after
-// replacing {version} with the lock version. Exact matching prevents adjacent
+// RuntimeToolchainProbe must match the trimmed answer exactly after replacing
+// {version} with the lock version. The answer is the standard output, or the
+// standard error when the probe writes nothing to its standard output. Exact matching prevents adjacent
 // versions such as 1.2.30 and 1.2.3 from sharing an identity.
 type RuntimeToolchainProbe struct {
 	Args        []string          `json:"args,omitempty"`

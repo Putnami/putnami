@@ -867,19 +867,23 @@ func runtimeToolchainProbeTimeout(ctx context.Context) time.Duration {
 }
 
 // probeRuntimeToolchain runs the declared probe under deadline and returns its
-// trimmed one-line output. The error states why the output cannot identify a
-// version: a timeout (ErrToolchainProbeTimeout), a failed start, a failed
-// exit, output that stays open after the probe exits, or output that is
-// empty, too long, or spans several lines.
+// trimmed one-line answer: the standard output, or the standard error when the
+// probe writes nothing to its standard output. A warning a program writes to
+// its standard error beside a version on its standard output is not part of
+// the answer. The error states why the answer cannot identify a version: a
+// timeout (ErrToolchainProbeTimeout), a failed start, a failed exit, output
+// that stays open after the probe exits, or an answer that is empty, too long,
+// or spans several lines.
 func probeRuntimeToolchain(ctx context.Context, path string, args, env []string, deadline procdeadline.ProcessDeadline) (string, error) {
 	probeCtx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
-	out := &boundedBuffer{limit: toolVersionProbeOutputLimit}
+	stdout := &boundedBuffer{limit: toolVersionProbeOutputLimit}
+	stderr := &boundedBuffer{limit: toolVersionProbeOutputLimit}
 	//nolint:gosec // G702: path is an executable candidate from the validated extension manifest; probing it is the resolver's purpose.
 	cmd := exec.CommandContext(probeCtx, path, args...)
 	cmd.Env = env
-	cmd.Stdout = out
-	cmd.Stderr = out
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 	cmd.WaitDelay = toolVersionProbeWaitDelay
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("probe failed to start: %w", err)
@@ -896,6 +900,10 @@ func probeRuntimeToolchain(ctx context.Context, path string, args, env []string,
 			return "", fmt.Errorf("probe failed: %w", exitErr)
 		}
 		return "", fmt.Errorf("probe failed: %w", err)
+	}
+	out := stdout
+	if strings.TrimSpace(string(stdout.buf)) == "" && !stdout.truncated {
+		out = stderr
 	}
 	if out.truncated {
 		return "", fmt.Errorf("probe output too long (over %d bytes)", toolVersionProbeOutputLimit)
