@@ -301,6 +301,18 @@ func TestFailureCacheRefusesVerdictsItsKeyCannotExplain(t *testing.T) {
 			cacheEnabled: true, hash: captureHashA,
 		},
 		{
+			name:         "a timeout the extension marks on its result event",
+			result:       resultFromWire(t, `{"status":"FAILED","error":{"timedOut":true}}`),
+			cacheEnabled: true, hash: captureHashA,
+		},
+		{
+			name: "a timeout the extension marks on a batch member",
+			result: jobResultFromBatchWire("", failureFixtureJob(),
+				batchWireResult{ProjectID: "/" + captureTestProject, Status: "FAILED", TimedOut: true},
+				&JobResult{}, nil),
+			cacheEnabled: true, hash: captureHashA,
+		},
+		{
 			name: "a sensitive-leak verdict rests on values the key does not describe",
 			result: &JobResult{
 				Status: "failed",
@@ -364,6 +376,42 @@ func TestFailureCacheRecordsAFailureItsKeyExplains(t *testing.T) {
 	}
 	if record.Attempts != 1 || record.ExitCode != 3 {
 		t.Errorf("record = %+v, want attempts 1 and exit code 3", record)
+	}
+}
+
+// resultFromWire reads a failed job's result the way the runner reads an
+// extension's stdout: it parses a result event line carrying data and extracts
+// its JobResult, behind the meta event a recordable failure needs.
+func resultFromWire(t *testing.T, data string) *JobResult {
+	t.Helper()
+	event, ok := parseRawEvent(`{"v":2,"type":"result","data":` + data + `}`)
+	if !ok {
+		t.Fatalf("parse a result event carrying %s", data)
+	}
+	result := extractResult(event.Data)
+	result.Events = []RawJobEvent{metaEvent()}
+	return result
+}
+
+// TestFailureCacheRecordsAnExtensionFailureWithoutTheTimeoutMark is the
+// control for the two extension-reported timeout rows above: the same result
+// shapes without the mark are recorded, so only the mark refuses them.
+func TestFailureCacheRecordsAnExtensionFailureWithoutTheTimeoutMark(t *testing.T) {
+	t.Parallel()
+	event := resultFromWire(t, `{"status":"FAILED","error":{"message":"assertion failed"}}`)
+	member := jobResultFromBatchWire("", failureFixtureJob(),
+		batchWireResult{ProjectID: "/" + captureTestProject, Status: "FAILED"}, &JobResult{}, nil)
+
+	for name, result := range map[string]*JobResult{"result event": event, "batch member": member} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if result.TimedOut {
+				t.Fatalf("an unmarked %s reads as timed out", name)
+			}
+			if record := recordThrough(t, newCaptureFixture(t), result, true, captureHashA); record == nil {
+				t.Fatalf("an unmarked %s failure was not recorded", name)
+			}
+		})
 	}
 }
 
@@ -556,6 +604,125 @@ func TestBatchMembersInheritTheAggregateDeadline(t *testing.T) {
 		if recordableFailure(work[0].job, result) {
 			t.Errorf("batch member %s would record a timeout as its key's verdict", key)
 		}
+	}
+}
+
+// resultProbeFixture plans ONE cacheable task whose script logs its invocation
+// to logPath, emits meta and a result event with resultData, and exits 1, the
+// way an extension reports a failed job.
+func resultProbeFixture(t *testing.T, logPath, resultData string) (*workspace.Workspace, []*ScheduledJob) {
+	t.Helper()
+	ws, planned := flakeFixture(t, logPath, filepath.Join(t.TempDir(), "unused-verdict"))
+	probe := filepath.Join(ws.Root, "result-probe.sh")
+	writeExecutable(t, probe,
+		"#!/bin/sh\n"+
+			"printf 'probe\\n' >> "+shellQuote(logPath)+"\n"+
+			"printf '%s\\n' '{\"v\":2,\"type\":\"meta\",\"data\":{\"protocol\":2}}'\n"+
+			"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":"+resultData+"}'\n"+
+			"exit 1\n")
+	planned[0].JobDef.Command = probe
+	return ws, planned
+}
+
+// TestFailureReplay_AnExtensionReportedTimeoutRunsAgain is the timeout carve-out
+// end to end through the real subprocess, parse and store: a failed result
+// event whose error.timedOut is set is never recorded, so the next run at the
+// same key executes again. The control, the same failure without the mark, is
+// replayed.
+func TestFailureReplay_AnExtensionReportedTimeoutRunsAgain(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "failure-replay-cache",
+		"only-a-failure-the-key-explains-is-recorded")
+	requireShell(t)
+
+	cases := []struct {
+		name       string
+		resultData string
+		wantRuns   int
+	}{
+		{name: "timed out", resultData: `{"status":"FAILED","error":{"timedOut":true}}`, wantRuns: 2},
+		{name: "control", resultData: `{"status":"FAILED","error":{"message":"assertion failed"}}`, wantRuns: 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			logPath := filepath.Join(t.TempDir(), "invocations")
+			ws, planned := resultProbeFixture(t, logPath, tc.resultData)
+			storeRoot := filepath.Join(t.TempDir(), "store")
+			newCache := func() *store.CacheManager {
+				return store.NewCacheManager(store.NewLocalStore(storeRoot))
+			}
+
+			first := runSharedScheduler(context.Background(), ws, planned, SchedulerConfig{MaxParallel: 1}, newCache())
+			cold := resultOf(t, first, planned, 0)
+			if cold.Status != "failed" || cold.CacheKey == "" {
+				t.Fatalf("cold result = %+v, want a failure with a cache key", cold)
+			}
+			second := runSharedScheduler(context.Background(), ws, planned, SchedulerConfig{MaxParallel: 1}, newCache())
+			if got := resultOf(t, second, planned, 0).Status; got != "failed" {
+				t.Fatalf("second status = %q, want failed", got)
+			}
+			if got := subprocessRuns(t, logPath); got != tc.wantRuns {
+				t.Fatalf("the task ran %d times over two runs, want %d", got, tc.wantRuns)
+			}
+			recorded := newCache().LookupTaskFailure(cold.CacheKey) != nil
+			if recorded != (tc.wantRuns == 1) {
+				t.Fatalf("failure recorded = %v, want %v", recorded, tc.wantRuns == 1)
+			}
+		})
+	}
+}
+
+// TestFailureReplay_ABatchMemberReportedTimeoutRunsAgain is the same carve-out
+// on the batch wire: the member marked timedOut executes again, and its batch
+// mate with an ordinary failure is replayed.
+func TestFailureReplay_ABatchMemberReportedTimeoutRunsAgain(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "failure-replay-cache",
+		"only-a-failure-the-key-explains-is-recorded")
+	requireShell(t)
+
+	logPath := filepath.Join(t.TempDir(), "invocations")
+	ws, planned := makeBatchSchedulerFixture(t, "")
+	command := filepath.Join(ws.Root, "timeout-batch.sh")
+	writeExecutable(t, command,
+		"#!/bin/sh\n"+
+			"printf 'run\\n' >> "+shellQuote(logPath)+"\n"+
+			"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"OK\",\"data\":{\"batchResults\":["+
+			"{\"projectId\":\"/a\",\"status\":\"FAILED\",\"timedOut\":true},"+
+			"{\"projectId\":\"/b\",\"status\":\"FAILED\"}]}}}'\n")
+	for _, job := range planned {
+		job.JobDef.Command = command
+	}
+	storeRoot := filepath.Join(t.TempDir(), "store")
+	newCache := func() *store.CacheManager {
+		return store.NewCacheManager(store.NewLocalStore(storeRoot))
+	}
+	config := SchedulerConfig{MaxParallel: 2, ContinueOnError: true}
+
+	first := runSharedScheduler(context.Background(), ws, planned, config, newCache())
+	for i := range planned {
+		if got := resultOf(t, first, planned, i).Status; got != "failed" {
+			t.Fatalf("cold %s status = %q, want failed", planned[i].Key(), got)
+		}
+	}
+	if got := invocationCount(t, logPath); got != 1 {
+		t.Fatalf("cold run spawned %d batches, want one", got)
+	}
+	timedOutKey := resultOf(t, first, planned, 0).CacheKey
+	if newCache().LookupTaskFailure(timedOutKey) != nil {
+		t.Fatal("the member marked timedOut was recorded for replay")
+	}
+
+	second := runSharedScheduler(context.Background(), ws, planned, config, newCache())
+	if got := invocationCount(t, logPath); got != 2 {
+		t.Fatalf("second run spawned %d batches in total, want the timed-out member to run again", got)
+	}
+	if replayed := resultOf(t, second, planned, 0).ReplayedFailure; replayed != nil {
+		t.Fatalf("the member marked timedOut was replayed: %+v", replayed)
+	}
+	if resultOf(t, second, planned, 1).ReplayedFailure == nil {
+		t.Fatal("the control member with an ordinary failure was not replayed")
 	}
 }
 

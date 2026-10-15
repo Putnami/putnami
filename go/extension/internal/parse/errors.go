@@ -400,6 +400,49 @@ func TestFailureText(output string) string {
 	return text
 }
 
+// A test binary past its -timeout panics with `panic: test timed out after
+// 10m0s`. One still running a minute later is killed by cmd/go, which prints
+// `*** Test killed: ran too long (10m1s).` or, when it first sends a signal,
+// `*** Test killed with quit: ran too long (10m1s).`.
+const (
+	testTimeoutPanic = "panic: test timed out after "
+	testKilledPrefix = "*** Test killed"
+	testKilledReason = ": ran too long ("
+)
+
+// TestTimedOut reports whether `go test` output shows a test binary that
+// exceeded its -timeout. It reads `-json` events and plain lines alike, with
+// no line-length limit, so a long log line before the panic cannot hide it.
+func TestTimedOut(output string) bool {
+	scanner := LineScanner(strings.NewReader(output))
+	for scanner.Scan() {
+		line := scanner.Text()
+		var evt TestEvent
+		if json.Unmarshal([]byte(line), &evt) == nil && evt.Action != "" {
+			line = evt.Output
+		}
+		if timeoutLine(line) {
+			return true
+		}
+	}
+	return false
+}
+
+// timeoutLine reports whether one output line carries a timeout marker. The
+// marker may follow output a test left without a newline, so it is matched
+// anywhere in the line, except in a line indented like t.Log output: a test
+// that logs the text has not timed out.
+func timeoutLine(line string) bool {
+	if strings.HasPrefix(line, "    ") || strings.HasPrefix(line, "\t") {
+		return false
+	}
+	if strings.Contains(line, testTimeoutPanic) {
+		return true
+	}
+	_, killed, found := strings.Cut(line, testKilledPrefix)
+	return found && strings.Contains(killed, testKilledReason)
+}
+
 // maxFailureOutputBytes is the report's public per-message budget. Applying it
 // at the causal selector prevents a later plain-tail cut from discarding the
 // panic, race or FAIL block this package deliberately chose.

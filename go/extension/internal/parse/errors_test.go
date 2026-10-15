@@ -1111,3 +1111,114 @@ func TestCoverageDiagnostics_SkipsEmptyFiles(t *testing.T) {
 		t.Errorf("expected 0 diagnostics for files with no statements, got %d", len(events))
 	}
 }
+
+// TestTestTimedOut pins the timeout detection on the line a test binary prints
+// when it exceeds -timeout, in `-json` and plain output alike.
+func TestTestTimedOut(t *testing.T) {
+	event := func(action, test, output string) string {
+		data, err := json.Marshal(TestEvent{Action: action, Package: "pkg", Test: test, Output: output})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	timedOutJSON := strings.Join([]string{
+		event("run", "TestSlow", ""),
+		event("output", "TestSlow", "=== RUN   TestSlow\n"),
+		event("output", "TestSlow", "panic: test timed out after 10m0s\n"),
+		event("output", "TestSlow", "\trunning tests:\n"),
+		event("output", "TestSlow", "\t\tTestSlow (10m0s)\n"),
+		event("fail", "TestSlow", ""),
+		event("output", "", "FAIL\tpkg\t600.012s\n"),
+		event("fail", "", ""),
+	}, "\n")
+
+	cases := []struct {
+		name   string
+		output string
+		want   bool
+	}{
+		{name: "a -json stream", output: timedOutJSON, want: true},
+		{
+			name:   "plain output",
+			output: "=== RUN   TestSlow\npanic: test timed out after 1s\n\trunning tests:\n\t\tTestSlow (1s)\nFAIL\tpkg\t1.010s\n",
+			want:   true,
+		},
+		{
+			name:   "after a line longer than the default scanner limit",
+			output: event("output", "TestSlow", strings.Repeat("x", 70*1024)+"\n") + "\n" + timedOutJSON,
+			want:   true,
+		},
+		{
+			name: "an assertion failure",
+			output: strings.Join([]string{
+				event("output", "TestOne", "    one_test.go:9: boom\n"),
+				event("fail", "TestOne", ""),
+				event("fail", "", ""),
+			}, "\n"),
+		},
+		{
+			name:   "after output a test left without a newline",
+			output: event("output", "TestSlow", "progress 40%panic: test timed out after 1s\n"),
+			want:   true,
+		},
+		{
+			name:   "plain, after output a test left without a newline",
+			output: "=== RUN   TestSlow\nprogress 40%panic: test timed out after 1s\n\trunning tests:\n",
+			want:   true,
+		},
+		{
+			name:   "cmd/go killed the binary",
+			output: event("output", "", "*** Test killed: ran too long (1m1s).\n"),
+			want:   true,
+		},
+		{
+			name:   "cmd/go killed the binary with a signal",
+			output: event("output", "", "*** Test killed with quit: ran too long (1m1s).\n"),
+			want:   true,
+		},
+		{
+			name:   "plain, cmd/go killed the binary",
+			output: "=== RUN   TestSlow\n*** Test killed: ran too long (1m1s).\nFAIL\tpkg\t61.004s\n",
+			want:   true,
+		},
+		{
+			name:   "plain, cmd/go killed the binary with a signal",
+			output: "=== RUN   TestSlow\n*** Test killed with quit: ran too long (1m1s).\nFAIL\tpkg\t61.004s\n",
+			want:   true,
+		},
+		{
+			name:   "cmd/go killed the binary after output left without a newline",
+			output: event("output", "TestSlow", "waiting*** Test killed: ran too long (1m1s).\n"),
+			want:   true,
+		},
+		{
+			name: "a test that logs the timeout text",
+			output: strings.Join([]string{
+				event("output", "TestOne", "    one_test.go:9: panic: test timed out after 1s\n"),
+				event("fail", "TestOne", ""),
+			}, "\n"),
+		},
+		{
+			name: "a subtest that logs the kill text",
+			output: strings.Join([]string{
+				event("output", "TestOne/sub", "        one_test.go:9: *** Test killed: ran too long (1m1s).\n"),
+				event("fail", "TestOne/sub", ""),
+			}, "\n"),
+		},
+		{
+			name:   "a test log continuation line",
+			output: "    one_test.go:9: first line\n        panic: test timed out after 1s\n",
+		},
+		{name: "a kill line without its reason", output: "*** Test killed\n"},
+		{name: "another panic", output: "panic: runtime error: index out of range [1] with length 1\n"},
+		{name: "no output"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := TestTimedOut(tc.output); got != tc.want {
+				t.Errorf("TestTimedOut = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

@@ -189,6 +189,10 @@ type JobError struct {
 	// Code is the producer's machine-readable failure identifier, when it has
 	// one. This protocol does not define a code vocabulary.
 	Code string `json:"code,omitempty"`
+	// TimedOut reports that the failure is a deadline the producer's own tool
+	// enforced, such as a test binary's timeout, and not a verdict its inputs
+	// produced. A consumer that caches failures by input never records one.
+	TimedOut bool `json:"timedOut,omitempty"`
 }
 
 // MetaData is the payload of a meta event.

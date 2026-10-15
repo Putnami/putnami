@@ -1,0 +1,3 @@
+{"v":2,"type":"meta","data":{"extension":"@putnami/go","job":"test"}}
+{"v":2,"type":"diagnostic","severity":"error","message":"panic: test timed out after 10m0s","code":"GO_TEST_FAILURE"}
+{"v":2,"type":"result","data":{"status":"FAILED","error":{"timedOut":true}}}

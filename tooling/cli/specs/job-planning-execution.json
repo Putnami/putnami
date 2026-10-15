@@ -99,7 +99,7 @@
     },
     {
       "id": "failure-replay-cache",
-      "text": "A failed task is recorded locally at the cache key that would have served its success; a later run with unchanged inputs replays that verdict instead of running, with the same status, exit code, diagnostics and logs plus its age and attempt count. Canceled, skipped, bailed-out, timed-out and leak results are never recorded, and one run counts one observation per key. A success at that key deletes the record under any selection or bypass, --retry-failed re-executes, and no record reaches a remote cache."
+      "text": "A failed task is recorded locally at the cache key its success would use; a later run with unchanged inputs replays it without running, with the same status, exit code, diagnostics and logs plus age and attempt count. Canceled, skipped, bailed-out and leak results are never recorded, nor is a timeout the CLI or an extension reports; one run counts one observation per key. A success at that key deletes the record under any selection or bypass, --retry-failed re-executes, and no record reaches a remote cache."
     },
     {
       "id": "extension-implementation-cache-key",

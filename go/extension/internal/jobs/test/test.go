@@ -356,6 +356,11 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 				diagnostic.Category,
 			)
 		}
+		// A test binary past its -timeout failed on host load, not on its
+		// inputs: the mark keeps the CLI from replaying the failure.
+		if parse.TestTimedOut(outputStr) {
+			emit.MarkTimedOut()
+		}
 		return "FAILED", resultData, nil
 	}
 

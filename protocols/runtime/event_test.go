@@ -272,6 +272,36 @@ func TestEmitter_ResultWithError(t *testing.T) {
 	}
 }
 
+// TestEmitter_ResultTimedOut pins the timedOut member on the wire: present
+// only when set, so every stream that does not set it keeps its bytes.
+func TestEmitter_ResultTimedOut(t *testing.T) {
+	var buf bytes.Buffer
+	em := NewEmitter(&buf)
+	em.Result(ResultFailed, nil, &JobError{TimedOut: true})
+	em.Result(ResultFailed, nil, &JobError{Message: "build failed"})
+
+	events, err := DecodeAll(&buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("got %d events", len(events))
+	}
+	if got := string(events[0].Data); !strings.Contains(got, `"error":{"timedOut":true}`) {
+		t.Errorf("timed-out result data = %s, want error.timedOut true", got)
+	}
+	if got := string(events[1].Data); strings.Contains(got, "timedOut") {
+		t.Errorf("result data = %s, want no timedOut member when it is false", got)
+	}
+	var rd ResultData
+	if err := json.Unmarshal(events[0].Data, &rd); err != nil {
+		t.Fatal(err)
+	}
+	if rd.Error == nil || !rd.Error.TimedOut {
+		t.Errorf("Error = %+v, want TimedOut", rd.Error)
+	}
+}
+
 func TestValidateEvent_ValidLog(t *testing.T) {
 	e := &Event{V: 1, Type: EventLog, Level: "info", Message: "hello"}
 	diags := ValidateEvent(e)

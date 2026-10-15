@@ -106,6 +106,10 @@ type batchWireResult struct {
 	// lint/test/Python emit none, so their reconstructed rows are unchanged. The
 	// field name and json tags MUST mirror the extension's buildBatchMetric.
 	Metrics []batchWireMetric `json:"metrics,omitempty"`
+	// TimedOut reports, like error.timedOut on a result event, that the
+	// member's failure is a deadline the extension's own tool enforced. It
+	// sets JobResult.TimedOut.
+	TimedOut bool `json:"timedOut,omitempty"`
 }
 
 type batchWireMetric struct {
@@ -351,6 +355,7 @@ func jobResultFromBatchWire(
 		FirstEventObserved: aggregate.FirstEventObserved,
 		ExitCode:           aggregate.ExitCode,
 		Canonical:          &task,
+		TimedOut:           wire.TimedOut,
 	}
 	if !valid {
 		result.Error = &JobError{Message: fmt.Sprintf(

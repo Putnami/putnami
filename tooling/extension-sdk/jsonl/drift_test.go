@@ -170,3 +170,72 @@ func TestDrift_NonNumericMetricDropped(t *testing.T) {
 		t.Fatalf("non-numeric metric emitted %q event, want debug log", evt.Type)
 	}
 }
+
+// TestEmitter_MarkTimedOut pins the timed-out result on the wire: a FAILED
+// result after MarkTimedOut carries error.timedOut and parses as a valid
+// runtime protocol event; OK, SKIP and an unmarked FAILED keep their bytes.
+// Its TypeScript twin is the "carries a tool-enforced timeout" case in
+// typescript/framework/runtime/test/jobs/events.test.ts.
+func TestEmitter_MarkTimedOut(t *testing.T) {
+	results := func(mark bool) []string {
+		out := captureStdout(t, func() {
+			e := NewForVersion(runtime.ProtocolVersion)
+			if mark {
+				e.MarkTimedOut()
+			}
+			e.Result("FAILED", map[string]any{"testSummary": map[string]any{"failed": 1}})
+			e.Result("OK", nil)
+			e.Result("SKIP", nil)
+		})
+		return strings.Split(strings.TrimSpace(out), "\n")
+	}
+
+	marked := results(true)
+	if len(marked) != 3 {
+		t.Fatalf("emitted %d lines, want 3:\n%s", len(marked), strings.Join(marked, "\n"))
+	}
+	evt, err := runtime.ParseEvent([]byte(marked[0]))
+	if err != nil {
+		t.Fatalf("timed-out result does not parse: %v\n%s", err, marked[0])
+	}
+	if diags := runtime.ValidateEvent(evt); diag.HasErrors(diags) {
+		t.Fatalf("timed-out result violates the runtime protocol: %v\n%s", diags, marked[0])
+	}
+	var data runtime.ResultData
+	if err := json.Unmarshal(evt.Data, &data); err != nil {
+		t.Fatal(err)
+	}
+	if data.Status != runtime.ResultFailed || data.Error == nil || *data.Error != (runtime.JobError{TimedOut: true}) {
+		t.Errorf("timed-out result = %+v (error %+v), want FAILED with only error.timedOut", data, data.Error)
+	}
+	if data.Data["testSummary"] == nil {
+		t.Errorf("timed-out result lost its data: %s", marked[0])
+	}
+	for _, line := range marked[1:] {
+		if strings.Contains(line, `"error"`) {
+			t.Errorf("an OK or SKIP result carries an error after MarkTimedOut: %s", line)
+		}
+	}
+
+	// Without the mark, every result keeps the bytes it had before the member
+	// existed: the time stamp is the only difference between the two streams.
+	for i, line := range results(false) {
+		if strings.Contains(line, `"error"`) {
+			t.Errorf("unmarked result %d carries an error: %s", i, line)
+		}
+		if i > 0 && stripTime(t, line) != stripTime(t, marked[i]) {
+			t.Errorf("result %d differs with and without the mark:\n%s\n%s", i, line, marked[i])
+		}
+	}
+}
+
+// stripTime returns line with its time member replaced by a fixed value.
+func stripTime(t *testing.T, line string) string {
+	t.Helper()
+	var event map[string]any
+	if err := json.Unmarshal([]byte(line), &event); err != nil {
+		t.Fatalf("line does not parse: %v\n%s", err, line)
+	}
+	stamp, _ := event["time"].(string)
+	return strings.Replace(line, stamp, "T", 1)
+}

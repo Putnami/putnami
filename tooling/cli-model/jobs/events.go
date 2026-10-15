@@ -373,6 +373,10 @@ func (e RawJobEvent) RecordPayload() map[string]any {
 }
 
 // ExtractResult builds a JobResult from the data payload of a "result" event.
+//
+// error.timedOut sets TimedOut. Error is set only when the error carries a
+// message or a code, so a runner still supplies its own message for a failure
+// the event does not explain.
 func ExtractResult(data map[string]any) *JobResult {
 	result := &JobResult{}
 
@@ -385,13 +389,12 @@ func ExtractResult(data map[string]any) *JobResult {
 	}
 
 	if e, ok := data["error"].(map[string]any); ok {
-		result.Error = &JobError{}
-		if msg, ok := e["message"].(string); ok {
-			result.Error.Message = msg
+		msg, _ := e["message"].(string)
+		code, _ := e["code"].(string)
+		if msg != "" || code != "" {
+			result.Error = &JobError{Message: msg, Code: code}
 		}
-		if code, ok := e["code"].(string); ok {
-			result.Error.Code = code
-		}
+		result.TimedOut, _ = e["timedOut"].(bool)
 	}
 
 	return result

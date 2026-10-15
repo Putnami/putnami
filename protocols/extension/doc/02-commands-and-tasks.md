@@ -698,7 +698,11 @@ diagnostics (`category`, `severity`, `description`, optional `file`, `line`, and
 a transpile that returns nil data) still replay its counters —
 `transpiled-files`, `type-declarations`, `generate-hash`,
 `compiled-executables` — into the reconstructed terminal row so it matches a
-singleton run. Putnami splits these back into ordinary per-project results. Cache
+singleton run. Set `timedOut: true` on a `FAILED` item whose failure is a
+deadline the tool enforced, such as a test binary that exceeded its timeout:
+it is the batch form of `error.timedOut` on a result event, and the CLI does
+not record that project's failure for replay. Omit it otherwise.
+Putnami splits these back into ordinary per-project results. Cache
 keys, entries, terminal session rows, hit/miss outcomes, and DAG dependencies
 remain per project. Tasks without `batchable` continue through the singleton
 execution path.

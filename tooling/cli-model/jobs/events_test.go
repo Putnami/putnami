@@ -271,3 +271,55 @@ func TestRecordPayloadKeepsWhatDataNames(t *testing.T) {
 		t.Fatalf("payload of an empty event = %v, want none", got)
 	}
 }
+
+// TestExtractResultReadsTheExtensionsTimeoutMark pins how a result event's
+// error becomes a JobResult: error.timedOut sets TimedOut, and an error with
+// neither message nor code leaves Error nil, so the runner still supplies the
+// message a CLI deadline or a non-zero exit gives the failure.
+func TestExtractResultReadsTheExtensionsTimeoutMark(t *testing.T) {
+	cases := []struct {
+		name         string
+		event        string
+		wantTimedOut bool
+		wantError    *JobError
+	}{
+		{
+			name:         "a timeout mark alone",
+			event:        `{"v":2,"type":"result","data":{"status":"FAILED","error":{"timedOut":true}}}`,
+			wantTimedOut: true,
+		},
+		{
+			name:         "a timeout mark with a message",
+			event:        `{"v":2,"type":"result","data":{"status":"FAILED","error":{"message":"deadline","code":"E_TIME","timedOut":true}}}`,
+			wantTimedOut: true,
+			wantError:    &JobError{Message: "deadline", Code: "E_TIME"},
+		},
+		{
+			name:      "a failure without the mark",
+			event:     `{"v":2,"type":"result","data":{"status":"FAILED","error":{"message":"assertion failed"}}}`,
+			wantError: &JobError{Message: "assertion failed"},
+		},
+		{
+			name:  "a mark that is not true",
+			event: `{"v":2,"type":"result","data":{"status":"FAILED","error":{"timedOut":"yes"}}}`,
+		},
+		{
+			name:  "an empty error",
+			event: `{"v":2,"type":"result","data":{"status":"FAILED","error":{}}}`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, result := ReadJSONLEventsObserved(strings.NewReader(tc.event+"\n"), nil, nil, nil)
+			if result == nil || result.Status != "failed" {
+				t.Fatalf("result = %#v, want a failed verdict", result)
+			}
+			if result.TimedOut != tc.wantTimedOut {
+				t.Errorf("TimedOut = %v, want %v", result.TimedOut, tc.wantTimedOut)
+			}
+			if !reflect.DeepEqual(result.Error, tc.wantError) {
+				t.Errorf("Error = %#v, want %#v", result.Error, tc.wantError)
+			}
+		})
+	}
+}
