@@ -880,8 +880,8 @@ func TestAnExplicitChannelDependentPicksFirst(t *testing.T) {
 	earlier.channel("@acme/c", "canary", "1.3.0")
 	earlier.mustRun(cfg, "@acme/z@canary")
 	requests := earlier.takeRequests()
-	if got := requestsFor(requests, "@acme/m"); !slices.Equal(got, []string{"resolve:canary", "lock:1.0.0"}) {
-		t.Errorf("@acme/m requests = %v, want the channel, which serves the pin", got)
+	if got := requestsFor(requests, "@acme/m"); !slices.Equal(got, []string{"resolve:canary", "canary"}) {
+		t.Errorf("@acme/m requests = %v, want the channel", got)
 	}
 	if got := requestsFor(requests, "@acme/c"); !slices.Equal(got, []string{"lock:1.2.0"}) {
 		t.Errorf("@acme/c requests = %v, want the request @acme/a reached it with", got)
@@ -1132,8 +1132,12 @@ func TestAnUpdateNeverMovesAPinToAnOlderBuild(t *testing.T) {
 		"Would keep @putnami/cloud@"+lockedCanary+": channel latest serves the older build "+olderBuild) {
 		t.Errorf("dry run lacks the kept pin:\n%s", preview)
 	}
+	r.takeRequests()
 	if out := r.mustRun(cfg, "--latest"); !strings.Contains(out, kept) {
 		t.Errorf("install --latest output lacks %q:\n%s", kept, out)
+	}
+	if got := requestsFor(r.takeRequests(), "@putnami/cloud"); !slices.Equal(got, []string{"resolve:latest", "lock:" + lockedCanary}) {
+		t.Errorf("install --latest requests = %v, want the channel's answer, then the pin, and never the older build", got)
 	}
 	if !bytes.Equal(r.lockBytes(), before) {
 		t.Fatalf("install --latest moved the lock:\n%s", r.lockBytes())
@@ -1152,8 +1156,22 @@ func TestAnUpdateNeverMovesAPinToAnOlderBuild(t *testing.T) {
 		t.Errorf("a newer build lacks ↑:\n%s", out)
 	}
 	wantPins(t, r.locked(), map[string]string{"@putnami/cloud": newerBuild})
+	r.takeRequests()
 	if out := r.update(cfg, ArtifactUpdateOptions{}, ""); !strings.Contains(out, "✓ @putnami/cloud@"+newerBuild+" (up to date)") || strings.Contains(out, "↑") {
 		t.Errorf("the same build is not up to date:\n%s", out)
+	}
+	if got := requestsFor(r.takeRequests(), "@putnami/cloud"); !slices.Equal(got, []string{"resolve:latest", "latest"}) {
+		t.Errorf("the same build requests = %v, want the channel's answer, then its download", got)
+	}
+	wantPins(t, r.locked(), map[string]string{"@putnami/cloud": newerBuild})
+
+	r.channel("@putnami/cloud", "canary", lockedCanary)
+	out := r.mustRun(cfg, "@putnami/cloud@canary")
+	if want := "✓ @putnami/cloud@" + newerBuild + " (kept: channel canary serves the older build " + lockedCanary + ")"; !strings.Contains(out, want) {
+		t.Errorf("install @putnami/cloud@canary output lacks %q:\n%s", want, out)
+	}
+	if got := requestsFor(r.takeRequests(), "@putnami/cloud"); !slices.Equal(got, []string{"resolve:canary", "lock:" + newerBuild}) {
+		t.Errorf("install @putnami/cloud@canary requests = %v, want the channel's answer, then the pin, and never the older build", got)
 	}
 	wantPins(t, r.locked(), map[string]string{"@putnami/cloud": newerBuild})
 }
@@ -1281,6 +1299,107 @@ func TestAFailedPinReinstallRestoresTheStableLink(t *testing.T) {
 	}
 	if !bytes.Equal(r.lockBytes(), before) {
 		t.Fatalf("the failed update moved the lock:\n%s", r.lockBytes())
+	}
+}
+
+// A lookup that fails while the command runs does not fail the update: the
+// update downloads the channel's build and compares its version, so an older
+// build keeps the pin and a newer one moves it.
+func TestAFailedLookupComparesAfterTheDownload(t *testing.T) {
+	spectest.Proves(t, dependenciesFeature, "a-channel-never-moves-a-pin-backwards", "a-failed-lookup-compares-after-the-download")
+	r := newGraphRegistry(t)
+	for _, version := range []string{olderBuild, lockedCanary, newerBuild} {
+		r.publish("@putnami/cloud", version, "")
+	}
+	cfg, _ := r.declare(map[string]string{"@putnami/cloud": ""})
+	r.mustRun(cfg, "@putnami/cloud@"+lockedCanary)
+	ops := r.ops()
+	ops.resolve = func(context.Context, string, string) (*artifactInstallOutcome, error) {
+		return nil, errors.New("HTTP 501 to HEAD")
+	}
+	update := func() string {
+		t.Helper()
+		out, err := sharedtest.CaptureStdout(t, func() error {
+			return updateArtifacts(context.Background(), r.ws, cfg, nil, ops, ArtifactUpdateOptions{}, "")
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+
+	r.channel("@putnami/cloud", "latest", olderBuild)
+	r.takeRequests()
+	if want := "✓ @putnami/cloud@" + lockedCanary + " (kept: channel latest serves the older build " + olderBuild + ")"; !strings.Contains(update(), want) {
+		t.Errorf("update lacks %q", want)
+	}
+	if got := requestsFor(r.takeRequests(), "@putnami/cloud"); !slices.Equal(got, []string{"latest", "lock:" + lockedCanary}) {
+		t.Errorf("update requests = %v, want the download, then the pin again", got)
+	}
+	wantPins(t, r.locked(), map[string]string{"@putnami/cloud": lockedCanary})
+
+	r.channel("@putnami/cloud", "latest", newerBuild)
+	if want := "↑ @putnami/cloud: " + lockedCanary + " → " + newerBuild; !strings.Contains(update(), want) {
+		t.Errorf("update lacks %q", want)
+	}
+	wantPins(t, r.locked(), map[string]string{"@putnami/cloud": newerBuild})
+}
+
+// A channel that moves to an older build between the lookup and the download
+// keeps the pin: the downloaded build's own version is compared again.
+func TestAChannelThatMovesAfterTheLookupKeepsThePin(t *testing.T) {
+	spectest.Proves(t, dependenciesFeature, "a-channel-never-moves-a-pin-backwards", "a-channel-that-moves-after-the-lookup-keeps-the-pin")
+	r := newGraphRegistry(t)
+	for _, version := range []string{olderBuild, lockedCanary, newerBuild} {
+		r.publish("@putnami/cloud", version, "")
+	}
+	cfg, _ := r.declare(map[string]string{"@putnami/cloud": ""})
+	r.mustRun(cfg, "@putnami/cloud@"+lockedCanary)
+	r.channel("@putnami/cloud", "latest", newerBuild)
+	r.delay = func(string) { r.channel("@putnami/cloud", "latest", olderBuild) }
+	r.takeRequests()
+	before := r.lockBytes()
+
+	out := r.update(cfg, ArtifactUpdateOptions{}, "")
+	if want := "✓ @putnami/cloud@" + lockedCanary + " (kept: channel latest serves the older build " + olderBuild + ")"; !strings.Contains(out, want) || strings.Contains(out, "↑") {
+		t.Errorf("output lacks %q, or shows ↑:\n%s", want, out)
+	}
+	if got := requestsFor(r.takeRequests(), "@putnami/cloud"); !slices.Equal(got, []string{"resolve:latest", "latest", "lock:" + lockedCanary}) {
+		t.Errorf("requests = %v, want the lookup, the download, then the pin again", got)
+	}
+	if !bytes.Equal(r.lockBytes(), before) {
+		t.Fatalf("the update moved the lock:\n%s", r.lockBytes())
+	}
+	if got := r.linkedVersion("@putnami/cloud"); got != lockedCanary {
+		t.Errorf("the update links %s, want the pinned %s", got, lockedCanary)
+	}
+}
+
+// A channel answer equal to the pin downloads the build, so an update
+// refreshes a lock entry whose digest or manifest hash is wrong at the pinned
+// version.
+func TestAnEqualAnswerRefreshesTheLockEntry(t *testing.T) {
+	spectest.Proves(t, dependenciesFeature, "a-channel-never-moves-a-pin-backwards", "an-equal-answer-refreshes-the-lock-entry")
+	r := newGraphRegistry(t)
+	r.publish("@acme/tool", "1.2.0", "")
+	cfg, _ := r.declare(map[string]string{"@acme/tool": ""})
+	r.mustRun(cfg)
+	lf := mustLock(t, r.ws)
+	stale, _ := lf.GetExtension("@acme/tool")
+	stale.Integrity, stale.ManifestHash = "sha256-wrong", "manifest-wrong"
+	lf.SetExtension("@acme/tool", stale)
+	if err := lockfile.WriteLockFile(r.ws, lf); err != nil {
+		t.Fatal(err)
+	}
+	r.takeRequests()
+
+	r.update(cfg, ArtifactUpdateOptions{}, "")
+	if got := requestsFor(r.takeRequests(), "@acme/tool"); !slices.Equal(got, []string{"resolve:latest", "latest"}) {
+		t.Errorf("requests = %v, want the lookup, then the download", got)
+	}
+	entry, _ := mustLock(t, r.ws).GetExtension("@acme/tool")
+	if entry.Version != "1.2.0" || entry.Integrity != "sha256-@acme/tool@1.2.0" || entry.ManifestHash != "manifest-@acme/tool@1.2.0" {
+		t.Errorf("lock entry = %+v, want 1.2.0 with the registry's digest and manifest hash", entry)
 	}
 }
 

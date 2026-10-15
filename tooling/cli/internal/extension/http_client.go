@@ -442,8 +442,9 @@ func resolveRetryBackoff(raw string) time.Duration {
 // rebuilds the request per attempt so a body cannot be consumed once.
 //
 // Transient = network error, 408 Request Timeout, 429 Too Many Requests,
-// or any 5xx response. Non-transient responses (200, 404, etc.) and the
-// context being canceled return immediately.
+// or any 5xx response but 501 Not Implemented, which a retry never changes.
+// Non-transient responses (200, 404, 501, etc.) and the context being
+// canceled return immediately.
 //
 // On retry, the response from a prior attempt is fully drained and
 // closed so the connection can be reused.
@@ -486,13 +487,13 @@ func DoWithRetry(ctx context.Context, client *http.Client, req *http.Request) (*
 
 // DoHeadWithRetry sends req as a HEAD through DoWithRetry, for a caller that
 // reads only the response headers: the server sends no body. A server that
-// refuses HEAD with 405 Method Not Allowed receives the same request as a GET,
-// whose body the caller closes unread.
+// refuses HEAD with 405 Method Not Allowed or 501 Not Implemented receives
+// the same request as a GET, whose body the caller closes unread.
 func DoHeadWithRetry(ctx context.Context, client *http.Client, req *http.Request) (*http.Response, error) {
 	head := req.Clone(ctx)
 	head.Method = http.MethodHead
 	resp, err := DoWithRetry(ctx, client, head)
-	if err != nil || resp.StatusCode != http.StatusMethodNotAllowed {
+	if err != nil || (resp.StatusCode != http.StatusMethodNotAllowed && resp.StatusCode != http.StatusNotImplemented) {
 		return resp, err
 	}
 	drainAndClose(resp)
@@ -514,6 +515,8 @@ func isTransientStatus(code int) bool {
 	switch code {
 	case http.StatusRequestTimeout, http.StatusTooManyRequests:
 		return true
+	case http.StatusNotImplemented:
+		return false
 	}
 	return code >= 500 && code <= 599
 }

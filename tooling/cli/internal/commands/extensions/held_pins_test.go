@@ -1,6 +1,13 @@
 package extensions
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"testing"
+
+	"go.putnami.dev/sdk/extension/dirlink"
+)
 
 func TestHoldPin(t *testing.T) {
 	tests := []struct {
@@ -43,5 +50,49 @@ func TestMoveMark(t *testing.T) {
 		if got := moveMark(tc.old, tc.next); got != tc.want {
 			t.Errorf("moveMark(%q, %q) = %s, want %s", tc.old, tc.next, got, tc.want)
 		}
+	}
+}
+
+// A stable link that did not exist before the install is removed again, and
+// one that cannot be pointed back is removed with the reason.
+func TestLinkSnapshotRestoreRemovesTheLink(t *testing.T) {
+	dir := t.TempDir()
+	link := filepath.Join(dir, "ext")
+	build := filepath.Join(dir, "ext@1.0.0")
+	if err := os.Mkdir(build, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ops := artifactOps{stableLink: func(string) string { return link }}
+
+	none := snapshotLink(ops, "ext")
+	if err := dirlink.Create(build, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := none.restore(); err != nil {
+		t.Fatalf("restore without a prior link = %v, want nil", err)
+	}
+	if _, err := os.Lstat(link); !os.IsNotExist(err) {
+		t.Errorf("a link that did not exist before is still there: %v", err)
+	}
+
+	if runtime.GOOS == "windows" {
+		// dirlink.Replace replaces an empty directory on Windows.
+		return
+	}
+	if err := dirlink.Create(build, link); err != nil {
+		t.Fatal(err)
+	}
+	linked := snapshotLink(ops, "ext")
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(link, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := linked.restore(); err == nil {
+		t.Error("restore over a directory = nil, want the reason the link could not be pointed back")
+	}
+	if _, err := os.Lstat(link); !os.IsNotExist(err) {
+		t.Errorf("a link that could not be pointed back is still there: %v", err)
 	}
 }

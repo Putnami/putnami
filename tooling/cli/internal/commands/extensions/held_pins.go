@@ -68,13 +68,13 @@ func isUnnamedAnswer(version string) bool {
 
 // installHoldingPin installs item. An item that holds its pin and resolves
 // again on a channel first asks the registry which build the channel serves,
-// without downloading it. A held answer, or the pinned build itself, installs
-// from the lock entry, so the older build is never fetched. A newer answer
-// installs, and a channel that moved to a held build between the two
-// requests installs the pin again. An answer that names no build installs,
-// then compares the build's own version, and restores the stable link when
-// the pin cannot be installed again. A held item records the answer in
-// item.held and reads as a lock-pinned install.
+// without downloading it. A held answer installs from the lock entry, so the
+// older build is never fetched. A newer answer, one equal to the pin, which
+// refreshes the lock entry from the registry, one that names no build, and a
+// lookup that fails while ctx is live all download the channel's build and
+// compare that build's own version: a held build installs the pin again, and
+// the stable link is restored when the pin cannot be installed. A held item
+// records the answer in item.held and reads as a lock-pinned install.
 func installHoldingPin(ctx context.Context, ops artifactOps, item *artifactInstallWork) {
 	if item.lockEntry != nil || !item.holdsPin || !channelHoldsPin(item.constraint, item.prior.Version) {
 		item.result, item.err = ops.install(ctx, item.name, item.constraint, item.lockEntry)
@@ -82,12 +82,12 @@ func installHoldingPin(ctx context.Context, ops artifactOps, item *artifactInsta
 	}
 	if ops.resolve != nil {
 		answer, err := ops.resolve(ctx, item.name, item.constraint)
-		if err != nil {
+		switch {
+		case err != nil && ctx.Err() != nil:
 			item.err = err
 			return
-		}
-		if !isUnnamedAnswer(answer.Version) {
-			if held := holdPin(item.constraint, item.prior.Version, answer.Version); held != nil || answer.Version == item.prior.Version {
+		case err == nil && !isUnnamedAnswer(answer.Version):
+			if held := holdPin(item.constraint, item.prior.Version, answer.Version); held != nil {
 				installPin(ctx, ops, item, held, nil)
 				return
 			}

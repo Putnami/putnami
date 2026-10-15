@@ -3707,7 +3707,10 @@
               "an-exact-version-moves-a-pin-backwards",
               "the-up-arrow-marks-only-a-newer-build",
               "an-unnamed-answer-compares-after-the-download",
-              "a-failed-pin-reinstall-restores-the-stable-link"
+              "a-failed-pin-reinstall-restores-the-stable-link",
+              "a-failed-lookup-compares-after-the-download",
+              "a-channel-that-moves-after-the-lookup-keeps-the-pin",
+              "an-equal-answer-refreshes-the-lock-entry"
             ]
           }
         },

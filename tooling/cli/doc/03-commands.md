@@ -605,11 +605,13 @@ build it serves:
 ```
 
 Versions compare by semantic-version precedence, so a build
-`0.0.0-<UTC timestamp>-<sha>` orders by its timestamp. A pin equal to the
-channel's build is up to date. A registry that does not name the build it
-serves makes the update download the build and compare its own version; when
-the pin cannot be installed again, the update fails that extension and points
-it back at the pinned build. A `0.0.0` pin is not a release: any channel
+`0.0.0-<UTC timestamp>-<sha>` orders by its timestamp. A newer build, or one
+equal to the pin, is downloaded; an equal one is up to date, and its lock
+entry takes the digest and manifest hash the registry serves. When the
+registry does not name the build it serves, or the lookup fails, the update
+downloads the build and compares its own version; when the pin then cannot
+be installed again, the update fails that extension and points it back at the
+pinned build. A `0.0.0` pin is not a release: any channel
 build replaces it, and the line marks that move `→`. `templates update`, the
 extension and template phases of `upgrade`, `install --latest` and
 `install <name>@<channel>` follow the same rule.
