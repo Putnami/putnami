@@ -574,14 +574,15 @@ func TestSpecContextReportsAnUnresolvedDecisionRecordWithoutEchoingIt(t *testing
   "feature": "billing/invoice-export",
   "outcomes": ["Customers export an issued invoice"],
   "requirements": [],
-  "decisions": ["app/doc/adr/0009-deleted.md"]
+  "decisions": ["app/doc/adr/0010-kept.md", "app/doc/adr/0009-deleted.md"]
 }`)
+	writeFixtureFile(t, filepath.Join(root, "app", "doc", "adr", "0010-kept.md"), "# kept")
 	report, err := BuildSpecContextResult(ws, "billing/invoice-export")
 	if err != nil {
 		t.Fatalf("specs inspect: %v", err)
 	}
-	if len(report.Decisions) != 1 || report.Decisions[0].Exists {
-		t.Fatalf("decisions = %+v, want the link reported as absent", report.Decisions)
+	if len(report.Decisions) != 2 || report.Decisions[0].Exists || !report.Decisions[1].Exists {
+		t.Fatalf("decisions = %+v, want the deleted link absent and the kept link present", report.Decisions)
 	}
 	finding, found := findDiagnostic(report.Diagnostics, SpecCodeUnresolvedDecision)
 	if !found {
@@ -590,8 +591,8 @@ func TestSpecContextReportsAnUnresolvedDecisionRecordWithoutEchoingIt(t *testing
 	if finding.Severity != diag.Warning {
 		t.Fatalf("an absent record must not fail the run: %+v", finding)
 	}
-	if finding.Field != "app/specs/invoice.json#decisions[0]" {
-		t.Fatalf("field = %q, want the exact link position", finding.Field)
+	if finding.Field != "app/specs/invoice.json#decisions[1]" {
+		t.Fatalf("field = %q, want the link's position in the file", finding.Field)
 	}
 	if strings.Contains(finding.Message, "0009-deleted") {
 		t.Fatalf("message echoed the linked path: %q", finding.Message)

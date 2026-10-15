@@ -271,8 +271,9 @@ func TestSpecDiagnosticsNameFilePositions(t *testing.T) {
 		{ID: "zeta-export", Text: "A second sentence for the same identity."},
 	}
 	spec.Decisions = []string{"protocols/features/doc/adr/0001-second-protocol.txt", "doc/adr/0001-workspace-decision.md"}
+	findings := ValidateSpec(spec)
 	byField := make(map[string]diag.Diagnostic)
-	for _, finding := range ValidateSpec(spec) {
+	for _, finding := range findings {
 		byField[finding.Field] = finding
 	}
 
@@ -290,8 +291,15 @@ func TestSpecDiagnosticsNameFilePositions(t *testing.T) {
 	if _, ok := byField["decisions[0]"]; !ok {
 		t.Errorf("invalid decision link not reported at its file position: %v", byField)
 	}
-	if len(byField) != 3 {
-		t.Errorf("want exactly three findings, got %v", byField)
+	if len(findings) != 3 || len(byField) != 3 {
+		t.Errorf("want exactly three findings on three fields, got %v", findings)
+	}
+
+	spec = basicSpec("billing/invoicing")
+	spec.NonGoals = []string{"A stated limit", strings.Repeat("x", 513)}
+	findings = ValidateSpec(spec)
+	if len(findings) != 1 || findings[0].Field != "nonGoals[1]" || !strings.Contains(findings[0].Message, "512 bytes") {
+		t.Errorf("oversized non-goal not reported at its position with its bound: %v", findings)
 	}
 }
 
