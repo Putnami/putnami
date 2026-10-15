@@ -55,9 +55,8 @@ func captureVersionSnapshot(wsRoot string) (*git.VersionInfo, error) {
 // requireRepository returns the one-line refusal when the run includes a
 // command that ships a commit and Git does not manage the workspace root. A
 // command ships a commit when its jobs declare a side effect outside the
-// workspace (internalextension.CommandSideEffects): publish and deploy by
-// default, and any command whose manifest declares sideEffects. The declared
-// trait decides, not the command name.
+// workspace (internalextension.CommandSideEffects): publish and deploy
+// always, plus any command whose manifest declares sideEffects.
 //
 // It reads the extensions only when the tree-state capture found no commit,
 // and asks git only when the run also includes such a command, so a run inside

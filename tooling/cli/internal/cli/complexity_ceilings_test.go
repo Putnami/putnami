@@ -151,8 +151,7 @@ var complexityCeilings = []complexityCeiling{
 			"reportRepositoryRefusal reports a selected command whose extension is not installed " +
 			"with the missing-extension guard's own message instead of the refusal, because that " +
 			"install is the first remedy; discoverDeclaredExtensions resolves the extensions for " +
-			"that question before any hook, as startHostedRemoteCache does, and only for a " +
-			"workspace that declares a registry extension. Run gains no branch; files stay at 23. " +
+			"that question before any hook, as startHostedRemoteCache does. Run gains no branch; files stay at 23. " +
 			"RAISED 145→146 (one source-state answer per run): newRunCacheManager builds the run's " +
 			"one cache manager out of run, carrying the cache-verification store override with it, " +
 			"and records the workspace root as managed when this run's own tree-state capture " +
