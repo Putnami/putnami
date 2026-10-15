@@ -12,6 +12,7 @@
     "tooling/specification-driven-development#opt-in-activation",
     "tooling/specification-driven-development#predictable-spec-scaffolding",
     "tooling/specification-driven-development#refuse-rather-than-widen",
-    "tooling/specification-driven-development#settled-decisions-are-enforced"
+    "tooling/specification-driven-development#settled-decisions-are-enforced",
+    "tooling/specification-driven-development#spec-findings-name-file-positions"
   ]
 }

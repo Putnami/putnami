@@ -264,6 +264,20 @@
               "sync-rejects-project-selection"
             ]
           }
+        },
+        {
+          "id": "spec-findings-name-file-positions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-spec-finding-names-the-entry-position-in-the-file",
+              "an-unresolved-decision-names-its-file-position"
+            ]
+          }
         }
       ]
     }
