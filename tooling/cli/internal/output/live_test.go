@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs"
@@ -221,8 +222,10 @@ func TestCommandRankOrder(t *testing.T) {
 	if commandRank("unknown") <= commandRank("deploy") {
 		t.Error("unknown commands should rank after known ones")
 	}
+	// Without a vocabulary the fallback order is short, so an unknown command
+	// ranks at the floor.
 	if commandRank("unknown") != unknownCommandRank {
-		t.Errorf("unknown command rank = %d, want %d", commandRank("unknown"), unknownCommandRank)
+		t.Errorf("unknown command rank = %d, want the floor %d", commandRank("unknown"), unknownCommandRank)
 	}
 }
 
@@ -239,8 +242,10 @@ func TestCommandRankFollowsTheVocabulary(t *testing.T) {
 	if !slices.Equal(names, want) {
 		t.Errorf("order = %v, want %v", names, want)
 	}
+	// A short vocabulary leaves an unknown command at the floor; a longer one
+	// pushes it past the last verb.
 	if got := commandRank(vocabulary, "unknown"); got != unknownCommandRank {
-		t.Errorf("unknown command rank = %d, want %d", got, unknownCommandRank)
+		t.Errorf("unknown command rank = %d, want the floor %d", got, unknownCommandRank)
 	}
 
 	long := make([]string, unknownCommandRank+1)
@@ -255,6 +260,7 @@ func TestCommandRankFollowsTheVocabulary(t *testing.T) {
 // TestLiveColumnsFollowTheVocabulary: the renderer orders each row's commands
 // and the summary columns by the vocabulary it was given.
 func TestLiveColumnsFollowTheVocabulary(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "extension-verb-vocabulary", "the-live-view-orders-columns-by-the-loaded-vocabulary")
 	initial := ColorsEnabled()
 	SetColorsEnabled(false)
 	t.Cleanup(func() { SetColorsEnabled(initial) })

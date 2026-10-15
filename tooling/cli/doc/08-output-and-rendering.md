@@ -162,7 +162,9 @@ One row per project, in stable plan order:
   same project are counted once. `--:--` until work starts.
 
 **Summary cells** — one fixed-width cell per command, aligned across rows. The
-cells follow the verb order of the loaded vocabularies. The verbs no vocabulary
+cells follow the verb order of the loaded vocabularies, merged as
+[Declaring a verb vocabulary](../../../protocols/extension/doc/06-verbs.md#declaring-a-verb-vocabulary)
+describes (extension-name order, first declaration wins). The verbs no vocabulary
 names follow in the order `generate`, `lint`, `format`, `test`, `build`,
 `package`, `publish`, `deploy`, `serve`, and any other command comes last,
 alphabetically:

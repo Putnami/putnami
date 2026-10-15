@@ -24,12 +24,8 @@ func TestMergeVocabulary_MergesInExtensionNameOrderAndTheFirstDeclarationWins(t 
 	)
 	got := MergeVocabulary([]*ExtensionDescription{zeta, nil, alpha}, nil)
 
-	var names []string
-	for _, verb := range got.Verbs {
-		names = append(names, verb.Name)
-	}
-	if want := []string{"test", "build", "check"}; !reflect.DeepEqual(names, want) {
-		t.Fatalf("verbs = %v, want %v", names, want)
+	if want := []string{"test", "build", "check"}; !reflect.DeepEqual(got.VerbNames(), want) {
+		t.Fatalf("verbs = %v, want %v", got.VerbNames(), want)
 	}
 	if build, _ := got.Verb("build"); build.Description != "Alpha build." {
 		t.Fatalf("build = %q, want the first declaration, by extension name", build.Description)
@@ -118,7 +114,7 @@ func TestMergeVocabulary_AnAliasNeverShadowsAVerbCommandGroupOrReservedName(t *t
 func TestMergeVocabulary_NoVocabulary(t *testing.T) {
 	t.Parallel()
 	got := MergeVocabulary([]*ExtensionDescription{{Name: "@acme/go", Commands: map[string]string{"build": ""}}}, nil)
-	if len(got.Verbs) != 0 || got.AliasMap() != nil {
+	if len(got.Verbs) != 0 || got.AliasMap() != nil || got.VerbNames() != nil {
 		t.Fatalf("vocabulary = %+v, want none", got)
 	}
 	if _, ok := got.Verb("build"); ok {
