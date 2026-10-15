@@ -418,25 +418,35 @@ func impactedFailureEndsRun(req *Request, wsRoot string, err error) bool {
 	return false
 }
 
-func applyBareProjectSelection(req *Request, ws *workspace.Workspace, extensions []*extension.ExtensionDescription) (autoProjectSelectionNote, int) {
-	// A --baseline that names no other selection is the --impacted run it asks
-	// for. The ref is only ever read by impact analysis, so the default
-	// selection used to drop it without a word and compare against its own
-	// baseline instead. Tag filters keep narrowing the impacted set. Beside
-	// named projects or --all the baseline still changes no selection: those
-	// name their projects, and there is nothing to compare.
-	if !req.Global.Impacted && !req.Global.All &&
-		strings.TrimSpace(req.Global.Projects) == "" &&
-		strings.TrimSpace(req.Global.Baseline) != "" {
-		// Refused here rather than by --impacted's own check, so the one-line
-		// refusal names the flag the caller typed.
-		if unmanaged := git.Unmanaged(ws.Root); unmanaged != nil {
-			iox.Fprintf(os.Stderr, "putnami: --baseline needs git history: %v\n", unmanaged)
-			return autoProjectSelectionNote{}, ExitError
-		}
-		req.Global.Impacted = true
-		req.Global.Projects = impactedProjectsSentinel
+// applyStandaloneBaseline turns a --baseline that names no other selection
+// into the --impacted run it asks for. The ref is only ever read by impact
+// analysis, so the default selection used to drop it without a word and
+// compare against its own baseline instead. Tag filters keep narrowing the
+// impacted set. Beside named projects or --all the baseline still changes no
+// selection: those name their projects, and there is nothing to compare.
+//
+// Engine.Run applies it before the release-set mode is derived, because that
+// mode and the strict deploy both read --impacted: a channel publish given a
+// baseline alone is an impacted publish, and its deploy must not fall back to
+// every project on a ref git cannot resolve.
+func applyStandaloneBaseline(req *Request, ws *workspace.Workspace) int {
+	if req.Portable.frozen() || req.Global.Impacted || req.Global.All ||
+		strings.TrimSpace(req.Global.Projects) != "" ||
+		strings.TrimSpace(req.Global.Baseline) == "" {
+		return ExitSuccess
 	}
+	// Refused here rather than by --impacted's own check, so the one-line
+	// refusal names the flag the caller typed.
+	if unmanaged := git.Unmanaged(ws.Root); unmanaged != nil {
+		iox.Fprintf(os.Stderr, "putnami: --baseline needs git history: %v\n", unmanaged)
+		return ExitError
+	}
+	req.Global.Impacted = true
+	req.Global.Projects = impactedProjectsSentinel
+	return ExitSuccess
+}
+
+func applyBareProjectSelection(req *Request, ws *workspace.Workspace, extensions []*extension.ExtensionDescription) (autoProjectSelectionNote, int) {
 	if !isBareProjectSelection(req) {
 		return autoProjectSelectionNote{}, ExitSuccess
 	}

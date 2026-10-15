@@ -359,6 +359,27 @@ func TestRun_MixedGateAndChannelPublishUnderImpactedKeepsTheGitImpactedSet(t *te
 	assertPlanned(t, keys, "/lib:test~test", "/app:publish~artifact")
 }
 
+// A channel publish given a baseline alone is the impacted publish it asks
+// for: the release-set mode reads --impacted, so the baseline must become one
+// before that mode is derived, or the channel is refused as needing --impacted.
+func TestRun_ChannelPublishWithABaselineAloneIsImpacted(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "explicit-baseline", "a-baseline-alone-selects-the-projects-impacted-against-it")
+	root, req := releaseSetSessionFixture(t)
+	touchFixtureProject(t, root, "lib")
+	req.Global.Impacted, req.Global.Projects, req.Global.Baseline = false, "", "origin/main"
+
+	result, err := New().Run(context.Background(), req, discardEvents{})
+	if err != nil || result.ExitCode != ExitSuccess {
+		t.Fatalf("baseline-only channel session = exit %d, err %v", result.ExitCode, err)
+	}
+	keys := planKeys(t, result.Plan)
+	assertNotPlanned(t, keys, "/other:test~test", "/other:publish~artifact")
+	assertPlanned(t, keys, "/lib:test~test", "/app:publish~artifact")
+	if selection := plannedSelection(t, result.Plan); selection.Mode != protocoljob.SelectionModeImpacted || selection.Baseline != "origin/main" {
+		t.Fatalf("selection = %+v, want impacted against origin/main", selection)
+	}
+}
+
 // Both halves are reported, and each keeps its own provenance: the mode and the
 // baseline describe how the verification set was chosen, and the release-set
 // member names what the channel head decided.

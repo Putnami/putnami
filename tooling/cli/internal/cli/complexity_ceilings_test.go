@@ -84,8 +84,14 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  25,
-		funcs:  180,
-		why: "RAISED 178→180 (the internal/jobs split): the remote cache client leaves internal/jobs " +
+		funcs:  181,
+		why: "RAISED 180→181 (cli/workspace-discovery-selection, explicit-baseline): " +
+			"applyStandaloneBaseline turns a --baseline that names no target, --all or --impacted " +
+			"into the --impacted run it asks for. Engine.Run calls it before the release-set mode is " +
+			"derived, because that mode and the strict deploy read --impacted; selectProjects runs " +
+			"after it, so it cannot hold the step. It replaces the bare selection's own no-repository " +
+			"--baseline refusal and adds no stage, flag or store; files stay at 25. " +
+			"RAISED 178→180 (the internal/jobs split): the remote cache client leaves internal/jobs " +
 			"and the scheduler reads it through the cachekey.RemoteCache interface, so the engine is " +
 			"where the client meets the runner. run_credential.go holds launchCacheProvider, the " +
 			"launcher the engine hands the remote cache loader so the client starts its provider the " +

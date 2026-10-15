@@ -529,7 +529,7 @@ _putnami() {
         '--tag[Filter by tags]:tags:'
         '--exclude-tag[Exclude by tags]:tags:'
         '--exclude[Exclude by name]:names:'
-        '--baseline[Custom git baseline for --impacted; implies --impacted when no target is named]:branch:'
+        '--baseline[Custom git baseline for --impacted; a job command with no target or --all implies --impacted]:branch:'
         '--impacted-strict[Fail when baseline can'\''t be resolved]'
         '--where[Execution placement: local | remote (local when no runner provider is installed)]:placement:(local remote)'
         '--providers[Credentials to ask the credential provider for: install, publish (comma list)]:list:(install publish)'

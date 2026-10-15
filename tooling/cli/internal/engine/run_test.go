@@ -423,9 +423,10 @@ func TestSelectProjects_BaselineAloneSelectsImpactedAgainstIt(t *testing.T) {
 		t.Helper()
 		req := &Request{Commands: []string{"build"}, Config: &workspacepb.Config{}}
 		mutate(&req.Global)
-		var selected []*workspace.Project
-		var code int
-		captureStderr(t, func() { selected, code = selectProjects(req, ws) })
+		if code := applyStandaloneBaseline(req, ws); code != ExitSuccess {
+			t.Fatalf("applyStandaloneBaseline exit code = %d, want %d", code, ExitSuccess)
+		}
+		selected, code := selectProjects(req, ws)
 		if code != ExitSuccess {
 			t.Fatalf("selectProjects exit code = %d, want %d", code, ExitSuccess)
 		}
@@ -455,6 +456,12 @@ func TestSelectProjects_BaselineAloneSelectsImpactedAgainstIt(t *testing.T) {
 	ids, _ = selectIDs(t, func(g *GlobalFlags) { g.Baseline, g.FilterTag = "origin/main", "service" })
 	if strings.Join(ids, ",") != "/packages/app" {
 		t.Fatalf("--baseline origin/main --tag service = %v, want app alone", ids)
+	}
+	// The tag narrows the impacted set rather than replacing it: app carries the
+	// tag, and HEAD impacts nothing.
+	ids, _ = selectIDs(t, func(g *GlobalFlags) { g.Baseline, g.FilterTag = "HEAD", "service" })
+	if len(ids) != 0 {
+		t.Fatalf("--baseline HEAD --tag service = %v, want nothing impacted against HEAD", ids)
 	}
 
 	// A named target keeps its own selection: the baseline compares nothing.

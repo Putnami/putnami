@@ -719,6 +719,9 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// COORDINATOR decide which projects the run PUBLISHES, and only that: the
 	// commands sharing the session keep the selection the caller asked for.
 	// Both selections are resolved here, before the coordinator's override.
+	if code := applyStandaloneBaseline(req, ws); code != ExitSuccess {
+		return SessionResult{ExitCode: code}, nil
+	}
 	releaseSetOptions, verification, verificationEvidence, code := resolveReleaseSetSelections(req, ws, extensions...)
 	if code != ExitSuccess {
 		return SessionResult{ExitCode: code}, nil

@@ -88,7 +88,7 @@ Exclude by tags
 Exclude by name
 .TP
 .B --baseline " <branch>"
-Custom git baseline for --impacted; implies --impacted when no target is named
+Custom git baseline for --impacted; a job command with no target or --all implies --impacted
 .TP
 .B --impacted-strict
 Fail when baseline can't be resolved
