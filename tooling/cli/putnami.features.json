@@ -3695,6 +3695,28 @@
           }
         },
         {
+          "id": "a-channel-never-moves-a-pin-backwards",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-locked-canary-newer-than-the-channel-stays",
+              "a-dependency-keeps-a-newer-pin",
+              "a-version-that-does-not-compare-keeps-the-pin",
+              "an-exact-version-moves-a-pin-backwards",
+              "the-up-arrow-marks-only-a-newer-build",
+              "an-unnamed-answer-compares-after-the-download",
+              "a-failed-pin-reinstall-restores-the-stable-link",
+              "a-failed-lookup-compares-after-the-download",
+              "a-channel-that-moves-after-the-lookup-keeps-the-pin",
+              "an-equal-answer-refreshes-the-lock-entry",
+              "a-held-pin-with-a-wrong-entry-names-the-exact-install",
+              "the-exact-install-hint-refreshes-a-dependency"
+            ]
+          }
+        },
+        {
           "id": "remove-keeps-the-graph-whole",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

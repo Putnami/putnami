@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -352,6 +353,48 @@ func TestUpdateArtifacts_MovesTemplateWorkspacePin(t *testing.T) {
 
 	if got, want := readFile(t, path), strings.Replace(config, "@a/pinned:1.0.0", "@a/pinned:2.0.0", 1); got != want {
 		t.Errorf("%s =\n%s\nwant\n%s", wsproto.WorkspaceConfigFilename, got, want)
+	}
+}
+
+// A template update keeps a lock pin newer than the build its channel
+// serves: it asks the channel which build it serves, installs the pin from the
+// lock, never downloads the older build, and leaves the lock as it is.
+func TestUpdateArtifacts_KeepsANewerTemplatePin(t *testing.T) {
+	ws := t.TempDir()
+	writeWorkspaceFile(t, ws, `{"templates": ["@a/tpl"]}`)
+	lf := lockfile.NewLockFile()
+	lf.SetTemplate("@a/tpl", lockfile.LockEntry{Version: "1.1.0"})
+	if err := lockfile.WriteLockFile(ws, lf); err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(ws, lockfile.LockFilename)
+	before := readFile(t, lockPath)
+	var requests []string
+	ops := templateOps(ws)
+	ops.install = func(_ context.Context, _, constraint string, lockEntry *lockfile.LockEntry) (*artifactInstallOutcome, error) {
+		if lockEntry != nil {
+			requests = append(requests, "lock:"+lockEntry.Version)
+			return &artifactInstallOutcome{Version: lockEntry.Version}, nil
+		}
+		requests = append(requests, constraint)
+		return &artifactInstallOutcome{Version: "1.0.0"}, nil
+	}
+	ops.resolve = func(_ context.Context, _, constraint string) (*artifactInstallOutcome, error) {
+		requests = append(requests, "resolve:"+constraint)
+		return &artifactInstallOutcome{Version: "1.0.0"}, nil
+	}
+	ops.resolvePlatformIntegrity = nil
+
+	stdout, _ := runPinUpdate(t, ws, wsproto.Load(ws), ops, ArtifactUpdateOptions{}, "")
+
+	if want := "✓ @a/tpl@1.1.0 (kept: channel latest serves the older build 1.0.0)"; !strings.Contains(stdout, want) {
+		t.Errorf("output lacks %q:\n%s", want, stdout)
+	}
+	if want := []string{"resolve:latest", "lock:1.1.0"}; !slices.Equal(requests, want) {
+		t.Errorf("requests = %v, want %v, which never downloads the older build", requests, want)
+	}
+	if got := readFile(t, lockPath); got != before {
+		t.Errorf("the update moved the lock:\n%s", got)
 	}
 }
 

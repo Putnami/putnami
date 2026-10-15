@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/template"
@@ -117,12 +116,10 @@ func TemplatesRemove(wsRoot string, cfg *wsproto.Config, args []string) error {
 	return removeArtifact(wsRoot, args, templateOps(wsRoot))
 }
 
-// parseTemplateArg parses "name" or "name@version" from args.
+// parseTemplateArg parses "name", "name@version", "@scope/name" or
+// "@scope/name@version" from args.
 func parseTemplateArg(arg string) (string, string) {
-	if idx := strings.IndexByte(arg, '@'); idx >= 0 {
-		return arg[:idx], arg[idx+1:]
-	}
-	return arg, ""
+	return splitArtifactArg(arg)
 }
 
 func templatesListJSONL(tplMap map[string]string, lockFile *lockfile.LockFile, discovered []*template.TemplateDescription) error {

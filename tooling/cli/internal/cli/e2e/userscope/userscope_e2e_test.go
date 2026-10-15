@@ -662,6 +662,59 @@ func TestAppRun_ExtensionsInstallUser_LatestMovesThePin(t *testing.T) {
 	assertSameTree(t, "the caller directory", before, snapshotTree(t, callerDir))
 }
 
+// TestAppRun_ExtensionsInstallUser_LatestKeepsANewerPin pins that --latest
+// never moves a user-scope pin to an older build: when latest serves 1.0.0
+// below the pinned 1.1.0, the install keeps 1.1.0, names the channel and the
+// build it serves, never downloads 1.0.0, and the command runs 1.1.0.
+func TestAppRun_ExtensionsInstallUser_LatestKeepsANewerPin(t *testing.T) {
+	userRoot, _ := userScopeTestEnv(t)
+	archives := map[string][]byte{
+		"1.0.0": userScopeArchiveAt(t, "user-scope-1.0.0", "1.0.0"),
+		"1.1.0": userScopeArchiveAt(t, "user-scope-1.1.0", "1.1.0"),
+	}
+	var latest atomic.Value
+	latest.Store("1.1.0")
+	var olderDownloads atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		version := latest.Load().(string)
+		if _, ok := archives[r.URL.Query().Get("channel")]; ok {
+			version = r.URL.Query().Get("channel")
+		}
+		if r.Method == http.MethodGet && version == "1.0.0" {
+			olderDownloads.Add(1)
+		}
+		archive := archives[version]
+		sum := sha256.Sum256(archive)
+		w.Header().Set("X-Resolved-Version", version)
+		w.Header().Set("X-Integrity", "sha256:"+hex.EncodeToString(sum[:]))
+		_, _ = w.Write(archive)
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv(extension.PutRegistryURLEnv, srv.URL)
+
+	if code, output := runApp(t, "extensions", "install", "--user", userScopeExtensionName); code != cli.ExitSuccess {
+		t.Fatalf("install exit = %d:\n%s", code, output)
+	}
+	latest.Store("1.0.0")
+	code, output := runApp(t, "extensions", "install", "--user", "--latest", userScopeExtensionName)
+	if want := "(kept: channel latest serves the older build 1.0.0)"; code != cli.ExitSuccess || !strings.Contains(output, want) {
+		t.Fatalf("install --latest exit = %d, want success with %q:\n%s", code, want, output)
+	}
+	if n := olderDownloads.Load(); n != 0 {
+		t.Errorf("install --latest downloaded the older build %d time(s)", n)
+	}
+	if entry, ok := readUserScopeLock(t, userRoot).GetExtension(userScopeExtensionName); !ok || entry.Version != "1.1.0" {
+		t.Fatalf("user-scope lock entry = %+v (present %v), want version 1.1.0", entry, ok)
+	}
+	code, output = runApp(t, "audit", "run")
+	if code != cli.ExitSuccess {
+		t.Fatalf("audit run exit = %d:\n%s", code, output)
+	}
+	if got := parseUserScopeRun(t, output).marker; got != "user-scope-1.1.0" {
+		t.Fatalf("after install --latest the command ran %q, want the kept pin user-scope-1.1.0", got)
+	}
+}
+
 // TestAppRun_ExtensionsInstallUser_ARefusalKeepsThePriorPin pins that a
 // refused install leaves the build that worked before it. 2.0.0 names an
 // extension dependency, which the user scope refuses: the stable link still

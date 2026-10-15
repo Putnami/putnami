@@ -203,6 +203,9 @@ func (g *installGraph) prepare(reached []*graphNode) {
 		node.known = g.edgesInto(node.name)
 		item := artifactInstallWork{name: node.name, constraint: node.request, requiredBy: node.requiredBy[0]}
 		item.prior, item.hadPrior = g.ops.lockGet(g.lockFile, node.name)
+		// A pin that misses a known constraint moves wherever its request
+		// resolves.
+		item.holdsPin = item.hadPrior && satisfiesRanges(item.prior.Version, node.known)
 		switch {
 		case !item.hadPrior && !g.persist:
 			item.err = g.notPinned(node)
@@ -640,6 +643,16 @@ func updateDependencies(ctx context.Context, cfg *wsproto.Config, lockFile *lock
 	moved := 0
 	for _, node := range graph.order {
 		item := node.item
+		if item.held != nil {
+			// Its lock entry stays as it is.
+			if quiet {
+				emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: item.name, Version: item.prior.Version, Source: item.result.Source,
+					FromCache: item.result.FromCache, Status: "kept", RequiredBy: item.requiredBy, Channel: item.held.channel, ChannelVersion: item.held.served})
+			} else {
+				iox.Fprintf(os.Stdout, "  ✓ %s@%s%s\n", item.name, item.prior.Version, requiredBySuffix(item.requiredBy, "kept: "+item.held.note()))
+			}
+			continue
+		}
 		entry := lockEntryFor(item.prior, item.hadPrior, item.result)
 		carryPlatformIntegrities(ctx, ops, item.name, item.prior, item.hadPrior, &entry, quiet)
 		ops.lockSet(lockFile, item.name, entry)
@@ -650,7 +663,7 @@ func updateDependencies(ctx context.Context, cfg *wsproto.Config, lockFile *lock
 				emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: item.name, Version: item.result.Version, OldVersion: oldVersion,
 					Source: item.result.Source, Status: "updated", RequiredBy: item.requiredBy})
 			} else {
-				iox.Fprintf(os.Stdout, "  ↑ %s: %s → %s%s\n", item.name, oldVersion, item.result.Version, requiredBySuffix(item.requiredBy))
+				iox.Fprintf(os.Stdout, "  %s %s: %s → %s%s\n", moveMark(oldVersion, item.result.Version), item.name, oldVersion, item.result.Version, requiredBySuffix(item.requiredBy))
 			}
 			continue
 		}

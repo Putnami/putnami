@@ -67,7 +67,7 @@ func TestIsTransientStatus(t *testing.T) {
 			t.Errorf("%d should be transient", code)
 		}
 	}
-	notTransient := []int{200, 301, 400, 401, 403, 404}
+	notTransient := []int{200, 301, 400, 401, 403, 404, 501}
 	for _, code := range notTransient {
 		if isTransientStatus(code) {
 			t.Errorf("%d should not be transient", code)
@@ -308,8 +308,37 @@ func TestDoHeadWithRetry_FallsBackToGetOn405(t *testing.T) {
 	}
 }
 
+// TestDoHeadWithRetry_FallsBackToGetOn501 keeps a server that does not
+// implement HEAD working: the 501 is not retried, and the same request is
+// sent again as a GET.
+func TestDoHeadWithRetry_FallsBackToGetOn501(t *testing.T) {
+	var methods []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		methods = append(methods, r.Method)
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusNotImplemented)
+			return
+		}
+		w.Header().Set("X-Resolved-Version", "1.2.3")
+	}))
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+	resp, err := DoHeadWithRetry(context.Background(), srv.Client(), req)
+	if err != nil {
+		t.Fatalf("DoHeadWithRetry: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || resp.Header.Get("X-Resolved-Version") != "1.2.3" {
+		t.Errorf("response = %d %q, want 200 from the GET", resp.StatusCode, resp.Header.Get("X-Resolved-Version"))
+	}
+	if len(methods) != 2 || methods[0] != http.MethodHead || methods[1] != http.MethodGet {
+		t.Errorf("methods = %v, want [HEAD GET]", methods)
+	}
+}
+
 // TestDoHeadWithRetry_NoFallbackOn404 keeps a 404 to HEAD an answer: only 405
-// sends the request again as a GET.
+// and 501 send the request again as a GET.
 func TestDoHeadWithRetry_NoFallbackOn404(t *testing.T) {
 	var methods []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

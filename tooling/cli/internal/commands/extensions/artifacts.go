@@ -15,6 +15,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/template"
@@ -240,6 +241,10 @@ type InstallAction struct {
 	// OldVersion is the version a dependency's lock entry pinned before the
 	// install moved it.
 	OldVersion string
+	// Channel and ChannelVersion name the channel whose answer did not replace
+	// the pin, and the build it serves (holdPin). Version is then the pin.
+	Channel        string
+	ChannelVersion string
 }
 
 type InstallActionKind string
@@ -297,6 +302,14 @@ type artifactOps struct {
 	install func(ctx context.Context, name, constraint string, lockEntry *lockfile.LockEntry) (*artifactInstallOutcome, error)
 	resolve func(ctx context.Context, name, constraint string) (*artifactInstallOutcome, error)
 	remove  func(name string) error
+	// stableLink returns the path of the stable link install points at the
+	// build of name, so an install of a build the pin keeps out can be undone
+	// (installHoldingPin). Nil when the kind keeps no stable link.
+	stableLink func(name string) string
+	// installCommand is the command that installs one artifact of this scope
+	// at an exact version, named in a hint. Empty means
+	// "putnami <plural> install" (installCmd).
+	installCommand string
 
 	// localPlatform is the "os/arch" lock key this process installs for. Its
 	// digest may only ever come from locally downloaded, hashed and verified
@@ -330,6 +343,15 @@ type artifactOps struct {
 	// nothing new to record, and writing would risk shrinking a shared lock to
 	// whatever the materialization happened to touch.
 	materialize bool
+}
+
+// installCmd returns the command that installs one artifact of these ops at an
+// exact version.
+func (ops artifactOps) installCmd() string {
+	if ops.installCommand != "" {
+		return ops.installCommand
+	}
+	return "putnami " + ops.plural + " install"
 }
 
 // persistsLock reports whether an install through these ops should write the
@@ -422,6 +444,9 @@ func extensionOpsFor(wsRoot string, installer *extension.Installer) artifactOps 
 		remove: func(name string) error {
 			return installer.Remove(name, "")
 		},
+		stableLink: func(name string) string {
+			return layout.StableDir(installer.WorkspaceRoot, layout.Extensions, name)
+		},
 		localPlatform: installer.Platform(),
 		resolvePlatformIntegrity: func(ctx context.Context, name, version, goos, goarch string) (string, error) {
 			return installer.ResolveIntegrityForPlatform(ctx, name, version, goos, goarch)
@@ -490,6 +515,9 @@ func templateOps(wsRoot string) artifactOps {
 		remove: func(name string) error {
 			return installer.Remove(name, "")
 		},
+		stableLink: func(name string) string {
+			return layout.StableDir(installer.WorkspaceRoot, layout.Templates, name)
+		},
 		localPlatform: installer.Platform(),
 		resolvePlatformIntegrity: func(ctx context.Context, name, version, goos, goarch string) (string, error) {
 			return installer.ResolveIntegrityForPlatform(ctx, name, version, goos, goarch)
@@ -554,6 +582,11 @@ type artifactInstallWork struct {
 	err        error
 	// requiredBy is the dependent of a dependency, "" for a root.
 	requiredBy string
+	// holdsPin keeps the prior pin when a channel answer is older than it, or
+	// does not compare with it (installHoldingPin).
+	holdsPin bool
+	// held is the channel answer that did not replace the pin.
+	held *heldPin
 }
 
 // installArtifactsWithOptions restores independent artifacts concurrently, but
@@ -691,6 +724,7 @@ func prepareArtifactInstallWork(lockFile *lockfile.LockFile, artMap map[string]s
 		}
 
 		item.prior, item.hadPrior = ops.lockGet(lockFile, name)
+		item.holdsPin = item.hadPrior
 		explicitVersion := name == specificName && specificVersion != ""
 		if !latest && !explicitVersion && item.hadPrior {
 			locked := item.prior
@@ -717,7 +751,7 @@ func runArtifactInstallWorkers(ctx context.Context, work []artifactInstallWork, 
 				if item.local || item.err != nil {
 					continue
 				}
-				item.result, item.err = ops.install(ctx, item.name, item.constraint, item.lockEntry)
+				installHoldingPin(ctx, ops, item)
 			}
 		}()
 	}
@@ -792,6 +826,9 @@ func installActionFor(ops artifactOps, item *artifactInstallWork, status Install
 	if item.err != nil {
 		action.Error = item.err.Error()
 	}
+	if item.held != nil {
+		action.Channel, action.ChannelVersion = item.held.channel, item.held.served
+	}
 	if item.requiredBy != "" {
 		action.RequiredBy = item.requiredBy
 		if item.result != nil && item.hadPrior && item.prior.Version != "" && item.prior.Version != item.result.Version {
@@ -812,16 +849,18 @@ func publishInstallActions(actions []InstallAction, work []artifactInstallWork, 
 		}
 		if jsonlOut {
 			emitArtifactActionJSONL(artifactActionEntry{
-				Kind:       string(action.Kind),
-				Action:     string(action.Action),
-				Name:       action.Name,
-				Version:    action.Version,
-				OldVersion: action.OldVersion,
-				Source:     action.Source,
-				FromCache:  action.FromCache,
-				Status:     legacyInstallStatus(action.Status),
-				Error:      action.Error,
-				RequiredBy: action.RequiredBy,
+				Kind:           string(action.Kind),
+				Action:         string(action.Action),
+				Name:           action.Name,
+				Version:        action.Version,
+				OldVersion:     action.OldVersion,
+				Source:         action.Source,
+				FromCache:      action.FromCache,
+				Status:         legacyInstallStatus(action.Status),
+				Error:          action.Error,
+				RequiredBy:     action.RequiredBy,
+				Channel:        action.Channel,
+				ChannelVersion: action.ChannelVersion,
 			})
 			continue
 		}
@@ -833,8 +872,10 @@ func publishInstallActions(actions []InstallAction, work []artifactInstallWork, 
 			iox.Fprintf(os.Stderr, "  ✗ %s: %s\n", action.Name, action.Error)
 		case action.Status == InstallStatusLocal:
 			iox.Fprintf(opts.Out, "%s", work[i].localLine)
+		case work[i].held != nil:
+			iox.Fprintf(opts.Out, "  ✓ %s@%s%s\n", action.Name, action.Version, requiredBySuffix(action.RequiredBy, "kept: "+work[i].held.note()))
 		case action.OldVersion != "":
-			iox.Fprintf(opts.Out, "  ↑ %s: %s → %s%s\n", action.Name, action.OldVersion, action.Version, requiredBySuffix(action.RequiredBy))
+			iox.Fprintf(opts.Out, "  %s %s: %s → %s%s\n", moveMark(action.OldVersion, action.Version), action.Name, action.OldVersion, action.Version, requiredBySuffix(action.RequiredBy))
 		case action.Status == InstallStatusCached || action.Status == InstallStatusRestored:
 			iox.Fprintf(opts.Out, "  ✓ %s@%s%s\n", action.Name, action.Version, requiredBySuffix(action.RequiredBy, "cached"))
 		default:
@@ -922,20 +963,34 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 			}
 		}
 
-		// Force re-download by not passing the lock entry
-		result, err := ops.install(ctx, name, constraint, nil)
-		if err != nil {
+		// Resolve again by not passing the lock entry.
+		item := artifactInstallWork{name: name, constraint: constraint}
+		item.prior, item.hadPrior = ops.lockGet(lockFile, name)
+		item.holdsPin = item.hadPrior
+		installHoldingPin(ctx, ops, &item)
+		if item.err != nil {
 			if jsonlOut {
-				emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Status: "failed", Error: err.Error()})
+				emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Status: "failed", Error: item.err.Error()})
 			} else {
-				iox.Fprintf(os.Stderr, "  ✗ %s: %v\n", name, err)
+				iox.Fprintf(os.Stderr, "  ✗ %s: %v\n", name, item.err)
 			}
 			return
 		}
+		result := item.result
 		roots = append(roots, artifactInstallWork{name: name, result: result})
 
-		prior, hadPrior := ops.lockGet(lockFile, name)
+		prior, hadPrior := item.prior, item.hadPrior
 		oldVersion := prior.Version
+		if item.held != nil {
+			// The lock entry and the workspace pin stay as they are.
+			if jsonlOut {
+				emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: oldVersion, Source: result.Source, FromCache: result.FromCache,
+					Status: "kept", Channel: item.held.channel, ChannelVersion: item.held.served})
+			} else {
+				iox.Fprintf(os.Stdout, "  ✓ %s@%s (kept: %s)\n", name, oldVersion, item.held.note())
+			}
+			return
+		}
 
 		entry := lockEntryFor(prior, hadPrior, result)
 		// A version bump starts a fresh per-platform map, which would otherwise
@@ -959,7 +1014,7 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 			if jsonlOut {
 				emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: result.Version, OldVersion: oldVersion, Source: result.Source, Status: "updated", ReplacesPin: replacesPin, GlobalPin: globalPin})
 			} else {
-				iox.Fprintf(os.Stdout, "  ↑ %s: %s → %s\n", name, oldVersion, result.Version)
+				iox.Fprintf(os.Stdout, "  %s %s: %s → %s\n", moveMark(oldVersion, result.Version), name, oldVersion, result.Version)
 			}
 			updated++
 		} else if jsonlOut {
@@ -990,7 +1045,7 @@ func updateArtifacts(ctx context.Context, wsRoot string, cfg *wsproto.Config, ar
 
 	if !jsonlOut {
 		for _, name := range sortedPinNames(moved) {
-			iox.Fprintf(os.Stdout, "  ↑ %s pin %s: %s → %s\n", wsproto.WorkspaceConfigFilename, name, replaced[name], moved[name])
+			iox.Fprintf(os.Stdout, "  %s %s pin %s: %s → %s\n", moveMark(replaced[name], moved[name]), wsproto.WorkspaceConfigFilename, name, replaced[name], moved[name])
 		}
 		if len(moved) > 0 {
 			iox.Fprintf(os.Stdout, "\n  %d updated, %d pins moved in %s\n", updated, len(moved), wsproto.WorkspaceConfigFilename)
@@ -1060,6 +1115,8 @@ func previewArtifactUpdates(ctx context.Context, wsRoot string, cfg *wsproto.Con
 		return nil
 	}
 
+	// A lock that cannot be read holds no pin; the update itself refuses it.
+	lockFile, _ := lockfile.ReadLockFile(wsRoot)
 	var resolved int
 	moved := map[string]string{}
 	for name, constraint := range artMap {
@@ -1106,6 +1163,30 @@ func previewArtifactUpdates(ctx context.Context, wsRoot string, cfg *wsproto.Con
 				iox.Fprintf(os.Stderr, "  ✗ %s: %v\n", name, err)
 			}
 			continue
+		}
+		if prior, ok := lockedEntry(lockFile, ops, name); ok {
+			if isUnnamedAnswer(result.Version) && channelHoldsPin(constraint, prior.Version) {
+				// The answer names no build: only the download tells whether
+				// it replaces the pin.
+				if jsonlOut {
+					emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: constraint, Status: "resolved"})
+				} else {
+					iox.Fprintf(os.Stdout, "  Would resolve %s@%s: the channel names no build, so the update downloads it and keeps %s unless the build is newer\n",
+						name, constraint, prior.Version)
+				}
+				resolved++
+				continue
+			}
+			if held := holdPin(constraint, prior.Version, result.Version); held != nil {
+				if jsonlOut {
+					emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: prior.Version, Status: "kept",
+						Channel: held.channel, ChannelVersion: held.served})
+				} else {
+					iox.Fprintf(os.Stdout, "  Would keep %s@%s: %s\n", name, prior.Version, held.note())
+				}
+				resolved++
+				continue
+			}
 		}
 		replacesPin := ""
 		if movesWorkspacePin(pins, name, declared, result.Version) {
@@ -1194,8 +1275,8 @@ func printArtifactListJSONL(entries []artifactListEntry) error {
 }
 
 // artifactActionEntry is one event of an install/update --output=jsonl stream.
-// Status is one of: installed, cached, updated, "up-to-date", local, resolved,
-// failed. Action is "install" or "update".
+// Status is one of: installed, cached, updated, "up-to-date", kept, local,
+// resolved, failed. Action is "install" or "update".
 type artifactActionEntry struct {
 	Kind       string `json:"kind"`   // "extension" | "template"
 	Action     string `json:"action"` // "install" | "update"
@@ -1215,6 +1296,11 @@ type artifactActionEntry struct {
 	GlobalPin string `json:"globalPin,omitempty"`
 	// RequiredBy is the dependent a dependency resolved for (ADR 0066).
 	RequiredBy string `json:"requiredBy,omitempty"`
+	// Channel and ChannelVersion name the channel whose answer did not
+	// replace the pin, and the build it serves (holdPin). Version is then the
+	// pin, and an update reports status kept.
+	Channel        string `json:"channel,omitempty"`
+	ChannelVersion string `json:"channelVersion,omitempty"`
 }
 
 // emitArtifactActionJSONL writes one artifactActionEntry as a JSON line.
