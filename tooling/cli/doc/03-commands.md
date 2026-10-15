@@ -1359,9 +1359,10 @@ Agent IDEs (Claude Code, Cursor, VS Code) auto-discover the server through a
 ```
 
 A source workspace, whose `putnami.lock.json` records `cli.source: "workspace"`,
-refuses the global `putnami`. When its root holds an executable `putnamiw`, the
-entry's `command` is `./putnamiw` instead, so the server runs the CLI built from
-the tree.
+refuses the global `putnami`. When its root holds a `putnamiw` file, the entry's
+`command` is `./putnamiw` instead, so the server runs the CLI built from the
+tree. Only committed content decides, never the file mode, so every platform
+writes the same entry.
 
 `putnami init`, `putnami install` and `putnami upgrade` add the `putnami` entry
 to this file when it is missing, so a new agent session finds the server with no

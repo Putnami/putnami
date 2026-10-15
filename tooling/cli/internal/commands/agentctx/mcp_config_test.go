@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -74,8 +73,11 @@ func writePutnamiw(t *testing.T, dir string, mode os.FileMode) {
 }
 
 // A source workspace refuses the global putnami (ADR 0028), so its server
-// starts through its own executable ./putnamiw. Every other workspace keeps
-// the bare putnami that resolves from PATH.
+// starts through its own ./putnamiw. Every other workspace keeps the bare
+// putnami that resolves from PATH. Only committed content decides: a putnamiw
+// without an executable bit still counts, so every platform agrees on the
+// committed entry. Each case runs the implicit registration on a workspace
+// with no .mcp.json.
 func TestMCPServerCommandFollowsTheWorkspaceSource(t *testing.T) {
 	spectest.Proves(t, "cli/context-mcp-discovery", "implicit-mcp-registration", "a-source-workspace-registers-its-putnamiw")
 	source := lockfile.LockEntry{Source: lockfile.SourceWorkspace}
@@ -92,14 +94,17 @@ func TestMCPServerCommandFollowsTheWorkspaceSource(t *testing.T) {
 		{"a source workspace without putnamiw", func(t *testing.T, dir string) {
 			writeCLILock(t, dir, source)
 		}, "putnami"},
+		{"a source workspace whose putnamiw is a directory", func(t *testing.T, dir string) {
+			writeCLILock(t, dir, source)
+			if err := os.Mkdir(filepath.Join(dir, "putnamiw"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}, "putnami"},
 		{"a source workspace with a putnamiw that is not executable", func(t *testing.T, dir string) {
 			writeCLILock(t, dir, source)
 			writePutnamiw(t, dir, 0o644)
-		}, "putnami"},
+		}, "./putnamiw"},
 		{"a source workspace with an executable putnamiw", func(t *testing.T, dir string) {
-			if runtime.GOOS == "windows" {
-				t.Skip("Windows records no executable bit")
-			}
 			writeCLILock(t, dir, source)
 			writePutnamiw(t, dir, 0o755)
 		}, "./putnamiw"},
@@ -111,8 +116,12 @@ func TestMCPServerCommandFollowsTheWorkspaceSource(t *testing.T) {
 			if err != nil || got != tc.want {
 				t.Fatalf("mcpServerCommand = %q (%v), want %q", got, err, tc.want)
 			}
-			if _, err := ensureMCPConfig(dir, mcpRepairDivergedEntry); err != nil {
-				t.Fatalf("ensureMCPConfig: %v", err)
+			var warn bytes.Buffer
+			if !RegisterMCPServer(dir, &warn) {
+				t.Fatal("RegisterMCPServer reported no change for a missing file")
+			}
+			if warn.Len() != 0 {
+				t.Fatalf("a fresh registration is not a problem to warn about, got %q", warn.String())
 			}
 			assertPutnamiEntry(t, readMCPServers(t, dir), tc.want)
 		})
@@ -120,17 +129,81 @@ func TestMCPServerCommandFollowsTheWorkspaceSource(t *testing.T) {
 }
 
 // A lock that cannot be read cannot rule a source workspace out, so no entry
-// is written from a guess.
-func TestEnsureMCPConfigRefusesAnUnreadableLock(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, lockfile.LockFilename), []byte(`{not json`), 0o644); err != nil {
-		t.Fatal(err)
+// is written from a guess, and the warning names the lock as the file to fix.
+// A lock that declares no CLI is readable and keeps putnami.
+func TestMCPRegistrationOverTheLockFailurePaths(t *testing.T) {
+	writeLock := func(t *testing.T, dir, content string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, lockfile.LockFilename), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if _, err := ensureMCPConfig(dir, mcpRepairDivergedEntry); err == nil || !strings.Contains(err.Error(), lockfile.LockFilename) {
-		t.Fatalf("ensureMCPConfig error = %v, want it to name %s", err, lockfile.LockFilename)
+	assertNoMCPConfig := func(t *testing.T, dir string) {
+		t.Helper()
+		if _, err := os.Stat(filepath.Join(dir, mcpConfigPath)); !os.IsNotExist(err) {
+			t.Fatalf("an unreadable lock still wrote %s: stat err %v", mcpConfigPath, err)
+		}
 	}
-	if _, err := os.Stat(filepath.Join(dir, mcpConfigPath)); !os.IsNotExist(err) {
-		t.Fatalf("an unreadable lock still wrote %s: stat err %v", mcpConfigPath, err)
+	for _, tc := range []struct {
+		name string
+		run  func(t *testing.T, dir string)
+	}{
+		{"the implicit path warns over an unreadable lock", func(t *testing.T, dir string) {
+			writeLock(t, dir, `{not json`)
+			var warn bytes.Buffer
+			if RegisterMCPServer(dir, &warn) {
+				t.Fatal("RegisterMCPServer reported a change over an unreadable lock")
+			}
+			if want := "Fix " + lockfile.LockFilename + ", then run `putnami mcp install`."; !strings.Contains(warn.String(), want) {
+				t.Fatalf("warning = %q, want it to contain %q", warn.String(), want)
+			}
+			assertNoMCPConfig(t, dir)
+		}},
+		{"mcp install fails over an unreadable lock", func(t *testing.T, dir string) {
+			writeLock(t, dir, `{not json`)
+			if err := MCPInstall(dir); err == nil || !strings.Contains(err.Error(), "read "+lockfile.LockFilename+": ") {
+				t.Fatalf("MCPInstall error = %v, want it to name %s", err, lockfile.LockFilename)
+			}
+			assertNoMCPConfig(t, dir)
+		}},
+		{"an error that names the lock is not prefixed again", func(t *testing.T, dir string) {
+			writeLock(t, dir, `{"version":99}`)
+			err := MCPInstall(dir)
+			if err == nil || strings.Count(err.Error(), lockfile.LockFilename) != 1 {
+				t.Fatalf("MCPInstall error = %v, want %s named once", err, lockfile.LockFilename)
+			}
+			assertNoMCPConfig(t, dir)
+		}},
+		{"a lock with no cli entry keeps putnami", func(t *testing.T, dir string) {
+			if err := lockfile.WriteLockFile(dir, lockfile.NewLockFile()); err != nil {
+				t.Fatal(err)
+			}
+			writePutnamiw(t, dir, 0o755)
+			if err := MCPInstall(dir); err != nil {
+				t.Fatalf("MCPInstall: %v", err)
+			}
+			assertPutnamiEntry(t, readMCPServers(t, dir), "putnami")
+		}},
+		{"an unreadable lock next to a canonical entry fails and keeps the file", func(t *testing.T, dir string) {
+			if err := MCPInstall(dir); err != nil {
+				t.Fatalf("seed: %v", err)
+			}
+			before, err := os.ReadFile(filepath.Join(dir, mcpConfigPath))
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeLock(t, dir, `{not json`)
+			if err := MCPInstall(dir); err == nil {
+				t.Fatal("MCPInstall reported the entry registered over an unreadable lock")
+			}
+			if after, err := os.ReadFile(filepath.Join(dir, mcpConfigPath)); err != nil || string(after) != string(before) {
+				t.Fatalf("an unreadable lock changed %s:\n%s\n(%v)", mcpConfigPath, after, err)
+			}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.run(t, t.TempDir())
+		})
 	}
 }
 
@@ -138,9 +211,6 @@ func TestEnsureMCPConfigRefusesAnUnreadableLock(t *testing.T) {
 // repairs the stale putnami entry an older release wrote, and the implicit
 // registration keeps it byte for byte, as it keeps any diverged entry.
 func TestSourceWorkspaceRepairsOrKeepsAStalePutnamiEntry(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Windows records no executable bit")
-	}
 	stale := `{"mcpServers":{"other":{"command":"x"},"putnami":{"args":["mcp"],"command":"putnami","env":{"PUTNAMI_AGENT_WORKSPACE":"${CLAUDE_PROJECT_DIR:-.}"}}}}` + "\n"
 	sourceWorkspace := func(t *testing.T) string {
 		dir := t.TempDir()

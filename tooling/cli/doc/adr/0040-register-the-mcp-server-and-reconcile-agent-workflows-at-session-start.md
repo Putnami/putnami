@@ -31,10 +31,11 @@ cannot parse, leaving it untouched.
 
 The entry runs `putnami mcp`. A source workspace refuses the global binary
 ([ADR 0028](0028-self-hosted-cli-source-workspace.md)), so when its lock
-records `cli.source: "workspace"` and its root holds an executable `putnamiw`,
-the entry runs `./putnamiw mcp` instead. Each workspace compares against its
-own canonical entry, so `putnami mcp install` repairs a source workspace's
-stale `putnami` entry.
+records `cli.source: "workspace"` and its root holds a `putnamiw` file, the
+entry runs `./putnamiw mcp` instead. The choice reads only committed content,
+never the file mode, so every platform writes the same entry. Each workspace
+compares against its own canonical entry, so `putnami mcp install` repairs a
+source workspace's stale `putnami` entry.
 
 `putnami init`, an explicit `putnami install`, and `putnami upgrade` (except
 its dry run) add the entry with the same merge when no `putnami` entry exists.

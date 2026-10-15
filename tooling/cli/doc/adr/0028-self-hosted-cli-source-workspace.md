@@ -179,8 +179,8 @@ start it through `./putnamiw`. The build-only mode serves it.
   The workspace therefore loads `@putnami/cloud` from `/cloud/extension` and
   pins no published build of it.
 - Agent hosts must start the MCP server as `./putnamiw mcp`. `.codex/config.toml`
-  does, and so does `.mcp.json`: in a source workspace whose root holds an
-  executable `putnamiw`, `putnami mcp install` writes `"command": "./putnamiw"`
+  does, and so does `.mcp.json`: in a source workspace whose root holds a
+  `putnamiw` file, `putnami mcp install` writes `"command": "./putnamiw"`
   ([ADR 0040](0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md)).
 - Consumer workspaces keep published pins under section 1. A workspace without
   `tooling/cli` computes no key and writes nothing to the from-source store.

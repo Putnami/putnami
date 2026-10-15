@@ -120,7 +120,7 @@ on request, and is the one command that rewrites a diverged one.
 
 The entry runs `putnami mcp`. A workspace that builds its own CLI from source
 (`cli.source: "workspace"` in `putnami.lock.json`) refuses the global binary, so
-when its root holds an executable `putnamiw`, the entry runs `./putnamiw mcp`.
+when its root holds a `putnamiw` file, the entry runs `./putnamiw mcp`.
 
 The server speaks JSON-RPC 2.0 on stdin/stdout, exits with the session, and
 exposes the workspace as typed tools instead of shell exploration:
