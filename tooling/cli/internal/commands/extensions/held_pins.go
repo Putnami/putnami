@@ -105,7 +105,8 @@ func installHoldingPin(ctx context.Context, ops artifactOps, item *artifactInsta
 
 // installPin installs the build item pins from its lock entry and records
 // held. When that install fails, link, the stable link before an install of
-// another build, is restored.
+// another build, is restored, and the error of a held pin ends with the
+// exact-version install that refreshes its lock entry.
 func installPin(ctx context.Context, ops artifactOps, item *artifactInstallWork, held *heldPin, link *linkSnapshot) {
 	locked := item.prior
 	result, err := ops.install(ctx, item.name, item.constraint, &locked)
@@ -114,7 +115,11 @@ func installPin(ctx context.Context, ops artifactOps, item *artifactInstallWork,
 			err = fmt.Errorf("%w; the stable link could not be restored: %w", err, restoreErr)
 		}
 		if held != nil {
-			err = fmt.Errorf("%s, and installing the pinned %s failed: %w", held.note(), locked.Version, err)
+			// An update resolves the channel again and holds the pin, so it
+			// cannot refresh this entry; an exact version installs with no lock
+			// entry and is never held.
+			err = fmt.Errorf("%s, and installing the pinned %s failed: %w; run `putnami %s install %s@%s` to refresh its lock entry",
+				held.note(), locked.Version, err, ops.plural, item.name, locked.Version)
 		}
 		item.result, item.err = nil, err
 		return

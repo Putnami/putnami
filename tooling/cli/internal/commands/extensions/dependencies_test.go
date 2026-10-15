@@ -165,6 +165,11 @@ func (r *graphRegistry) install(_ context.Context, name, constraint string, lock
 	if err != nil {
 		return nil, err
 	}
+	// A lock entry whose digest is not the release's fails, as the real
+	// installer's archive check does, before the stable link moves.
+	if digest := "sha256-" + name + "@" + version; lockEntry != nil && lockEntry.Integrity != "" && lockEntry.Integrity != digest {
+		return nil, fmt.Errorf("integrity mismatch for %s@%s: lock %s, got %s; run `putnami extensions update` to refresh the lock", name, version, lockEntry.Integrity, digest)
+	}
 	release := r.releases[name][version]
 	dir := filepath.Join(r.store, "extensions", layout.EncodeName(name)+"@"+version)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -1400,6 +1405,56 @@ func TestAnEqualAnswerRefreshesTheLockEntry(t *testing.T) {
 	entry, _ := mustLock(t, r.ws).GetExtension("@acme/tool")
 	if entry.Version != "1.2.0" || entry.Integrity != "sha256-@acme/tool@1.2.0" || entry.ManifestHash != "manifest-@acme/tool@1.2.0" {
 		t.Errorf("lock entry = %+v, want 1.2.0 with the registry's digest and manifest hash", entry)
+	}
+}
+
+// A held pin whose lock entry fails to install ends its error with the
+// exact-version install, which refreshes the entry and keeps the pin, never
+// with the update that holds the pin again.
+func TestAHeldPinWithAWrongEntryNamesTheExactInstall(t *testing.T) {
+	spectest.Proves(t, dependenciesFeature, "a-channel-never-moves-a-pin-backwards", "a-held-pin-with-a-wrong-entry-names-the-exact-install")
+	r := newGraphRegistry(t)
+	r.publish("@putnami/cloud", olderBuild, "")
+	r.publish("@putnami/cloud", lockedCanary, "")
+	cfg, _ := r.declare(map[string]string{"@putnami/cloud": ""})
+	r.mustRun(cfg, "@putnami/cloud@"+lockedCanary)
+	lf := mustLock(t, r.ws)
+	stale, _ := lf.GetExtension("@putnami/cloud")
+	stale.Integrity = "sha256-wrong"
+	lf.SetExtension("@putnami/cloud", stale)
+	if err := lockfile.WriteLockFile(r.ws, lf); err != nil {
+		t.Fatal(err)
+	}
+	r.channel("@putnami/cloud", "latest", olderBuild)
+	r.takeRequests()
+
+	var runErr error
+	stderr := sharedtest.CaptureStderr(t, func() {
+		_, runErr = sharedtest.CaptureStdout(t, func() error {
+			return updateArtifacts(context.Background(), r.ws, cfg, nil, r.ops(), ArtifactUpdateOptions{}, "")
+		})
+	})
+	if runErr != nil {
+		t.Fatalf("update = %v, want the failed root reported, not returned", runErr)
+	}
+	var line string
+	for _, l := range strings.Split(stderr, "\n") {
+		if strings.Contains(l, "✗ @putnami/cloud") {
+			line = strings.TrimSpace(l)
+		}
+	}
+	remedy := "; run `putnami extensions install @putnami/cloud@" + lockedCanary + "` to refresh its lock entry"
+	if !strings.Contains(line, "✗ @putnami/cloud: channel latest serves the older build "+olderBuild+", and installing the pinned "+lockedCanary+" failed: integrity mismatch") ||
+		!strings.HasSuffix(line, remedy) {
+		t.Errorf("stderr = %q, want the integrity mismatch ending with %q", line, remedy)
+	}
+	if got := requestsFor(r.takeRequests(), "@putnami/cloud"); !slices.Equal(got, []string{"resolve:latest", "lock:" + lockedCanary}) {
+		t.Errorf("update requests = %v, want the lookup, then the pin", got)
+	}
+
+	r.mustRun(cfg, "@putnami/cloud@"+lockedCanary)
+	if entry, _ := mustLock(t, r.ws).GetExtension("@putnami/cloud"); entry.Version != lockedCanary || entry.Integrity != "sha256-@putnami/cloud@"+lockedCanary {
+		t.Errorf("after the named install the lock entry = %+v, want the pin with the registry's digest", entry)
 	}
 }
 
