@@ -32,24 +32,31 @@ The four names stand for two different rules:
   behind the changed `generate` and never `validate~features` or
   `validate~specs`, so `test` runs and the spec gate gets no criteria
   projection for that project. No declaration states this relation. Every
-  first-party `validate` and `validate-workspace` task declares file inputs,
-  so a rule such as "a task that declares no file input is never narrowed"
-  keeps none of them.
+  first-party `validate` task declares file inputs. Two first-party
+  `validate-workspace` tasks, `breaking-marker-validate` and
+  `agent-attribution-validate`, declare only the `env` input
+  `PUTNAMI_PROPOSAL_MESSAGE`. A rule such as "a task that declares no file
+  input is never narrowed" would keep those two, and neither
+  `validate~features` nor `validate~specs`.
 
 ## Decision
 
 1. **A job whose command traits declare side effects is never narrowed by a
    task scope.** The rule reads the job's resolved traits
-   (`JobDefinition.Traits.SideEffects` is not empty), so it follows the
-   manifest's declaration whatever the command's name. The predecessors of a
-   kept job are kept, as before.
+   (`JobDefinition.Traits.SideEffects` is not empty), so a command of any
+   name that declares side effects keeps its jobs. The rule also counts the
+   default side effect of the command's well-known verb, read from the
+   protocol's `WellKnownVerbs` table, when a declaration drops it: `publish`
+   (`registry`) and `deploy` (`cloud`) keep their jobs whatever their
+   manifest declares. A change that removes a development verb from
+   `WellKnownVerbs` must move this floor with it, or that verb's jobs start
+   to narrow. The predecessors of a kept job are kept, as before.
 2. **`validate` and `validate-workspace` stay never narrowed by name.** They
    are the last name-keyed arm of the narrowing. Proposal 1 states what
    replaces it.
-3. **Every first-party command keeps what it kept.** No first-party manifest
-   declares traits on `publish`, which therefore takes the `registry` default
-   of its well-known verb; `deploy` takes `cloud`; no other first-party
-   command declares side effects. A test loads every first-party manifest and
+3. **Every first-party command keeps what it kept.** Every first-party
+   `publish` resolves to `registry`, by default or by declaration; `deploy`
+   takes `cloud`; no other first-party command declares side effects. A test loads every first-party manifest and
    pins, command by command, that the new rule keeps exactly the jobs the
    four names kept.
 
@@ -83,14 +90,21 @@ plan holds, so each needs the owner's decision.
 ## Consequences
 
 - A command with any name that declares side effects keeps its jobs on a
-  task-scoped project. A declaration adds side effects but never removes a
-  well-known verb's, so `publish` and `deploy` keep their jobs whatever their
-  manifest declares. `--impacted` plans,
-  and the `impact-plan` output built from them, follow the declaration.
-- A portable request carries its task scopes, and the executing side
-  re-plans with the same rule to prove the graph equal. A submitter and an
-  executor on the two sides of this change disagree only on a manifest whose
-  traits contradict its command's name, and that request is refused rather
-  than run on a different graph.
+  task-scoped project. `--impacted` plans, and the `impact-plan` output
+  built from them, follow the declaration.
+- The well-known verb floor of decision 1 is local to the narrowing. Every
+  other reader of a command's side effects follows the declared traits as
+  resolved, where a declared `traits` object replaces the verb's defaults
+  wholesale: the dry-run exclusion, the remote-shape refusal, the capability
+  and publication gates, the task cache key and the batch key. A `publish`
+  whose manifest declares traits without `sideEffects` is kept by a task
+  scope, but none of those readers counts the `registry` default for it.
+- A version 1 (frozen) portable request carries its task scopes and its
+  expected plan, and the executing side re-plans with its own rule to prove
+  the graph equal. A submitter and an executor on the two sides of this
+  change disagree on a command not named `publish` or `deploy` that declares
+  side effects, such as `ship`, and that request is refused rather than run
+  on a different graph. A version 2 (commit-addressed) request carries no
+  expected plan: the executor plans it with its own rule.
 - The core still names `validate` and `validate-workspace` in the narrowing
   until proposal 1 is decided.

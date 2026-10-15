@@ -75,9 +75,10 @@ func narrowToTaskScopes(ws *workspace.Workspace, planned []*jobs.ScheduledJob, s
 			continue
 		}
 		scope, scoped := scopes[job.Project.ID]
-		// A manifest's traits add side effects but never remove a well-known
-		// verb's, so `publish` and `deploy` keep their jobs whatever their
-		// manifest declares.
+		// This rule also counts the well-known verb's default side effect when
+		// a declaration drops it, so `publish` and `deploy` keep their jobs
+		// whatever their manifest declares. Every other reader of a command's
+		// side effects follows the declared traits as resolved.
 		command := modeljobs.JobCommandName(job)
 		sideEffects := job.JobDef.Traits.SideEffects != extensionproto.SideEffectsNone ||
 			extensionproto.EffectiveTraits(command, nil).SideEffects != extensionproto.SideEffectsNone
