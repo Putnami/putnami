@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -310,9 +311,9 @@ func TestNarrowToTaskScopes_KeepsValidateOnATaskScopedProject(t *testing.T) {
 
 // A task scope keeps a job by what its command declares, never by the command's
 // name alone. A command named `ship` that declares registry side effects
-// survives a scope that does not name it, a `publish` whose manifest declares
-// traits without side effects keeps its registry default, and a command that
-// declares none is narrowed. The manifest
+// survives a scope that does not name it, a `publish` and a `deploy` whose
+// manifest declares traits without side effects keep their well-known verb's
+// default, and a command that declares none is narrowed. The manifest
 // goes through the loader and the planner a run uses, so the traits are the
 // ones a run resolves.
 func TestNarrowToTaskScopes_FollowsTheDeclaredSideEffectsNotTheCommandName(t *testing.T) {
@@ -325,11 +326,13 @@ func TestNarrowToTaskScopes_FollowsTheDeclaredSideEffectsNotTheCommandName(t *te
 			`"build":{"run":[{"id":"compile","task":"compile"}]},` +
 			`"ship":{"traits":{"sideEffects":"registry"},"run":[{"id":"upload","task":"upload"}]},` +
 			`"publish":{"traits":{},"run":[{"id":"notes","task":"notes"}]},` +
+			`"deploy":{"traits":{},"run":[{"id":"roll","task":"roll"}]},` +
 			`"docs":{"traits":{},"run":[{"id":"render","task":"render"}]}},` +
 			`"tasks":{` +
 			`"compile":{"kind":"command","command":"fixture","cache":false,"inputs":{"sources":{"from":"project","files":["**/*.src"]}}},` +
 			`"upload":{"kind":"command","command":"fixture","cache":false},` +
 			`"notes":{"kind":"command","command":"fixture","cache":false},` +
+			`"roll":{"kind":"command","command":"fixture","cache":false},` +
 			`"render":{"kind":"command","command":"fixture","cache":false}}}`,
 	} {
 		path := filepath.Join(root, rel)
@@ -347,26 +350,26 @@ func TestNarrowToTaskScopes_FollowsTheDeclaredSideEffectsNotTheCommandName(t *te
 	lib := &workspace.Project{ID: "/lib", Name: "lib", Path: "lib", Extensions: []string{"@fixture/release"}, Config: &wsproto.ProjectConfig{}}
 	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "scope"}, []*workspace.Project{lib})
 	ws.Graph = workspace.BuildGraph(ws.Projects)
-	planned, err := jobs.Plan(ws, []string{"build", "ship", "publish", "docs"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := jobs.Plan(ws, []string{"build", "ship", "publish", "deploy", "docs"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan: %v", err)
 	}
-	if got, want := sortedJobKeys(planned), []string{"/lib:build~compile", "/lib:docs~render", "/lib:publish~notes", "/lib:ship~upload"}; !slices.Equal(got, want) {
+	if got, want := sortedJobKeys(planned), []string{"/lib:build~compile", "/lib:deploy~roll", "/lib:docs~render", "/lib:publish~notes", "/lib:ship~upload"}; !slices.Equal(got, want) {
 		t.Fatalf("planned = %v, want %v", got, want)
 	}
 
 	narrowed := narrowToTaskScopes(ws, planned, map[string][]string{"/lib": {"build~compile"}})
 
-	if got, want := sortedJobKeys(narrowed), []string{"/lib:build~compile", "/lib:publish~notes", "/lib:ship~upload"}; !slices.Equal(got, want) {
-		t.Errorf("narrowed = %v, want %v: ship declares registry side effects, publish keeps its default, docs declares none", got, want)
+	if got, want := sortedJobKeys(narrowed), []string{"/lib:build~compile", "/lib:deploy~roll", "/lib:publish~notes", "/lib:ship~upload"}; !slices.Equal(got, want) {
+		t.Errorf("narrowed = %v, want %v: ship declares registry side effects, publish and deploy keep their defaults, docs declares none", got, want)
 	}
 }
 
-// Every first-party command keeps, under a task scope, exactly what it kept
-// when the narrowing read four command names: the jobs of `publish`, `deploy`,
-// `validate` and `validate-workspace`, and no other. `publish` declares no
-// traits in a first-party manifest and takes its well-known verb's registry
-// default, and no other first-party command declares side effects.
+// Every first-party command keeps, under a task scope, the jobs of `publish`,
+// `deploy`, `validate` and `validate-workspace`, and no other. Every
+// first-party `publish` resolves to `registry`, by default or by declaration,
+// and no other first-party command declares side effects. The manifests are
+// discovered, so a new first-party extension is covered without an edit here.
 func TestNarrowToTaskScopes_KeepsWhatEveryFirstPartyCommandKept(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-task-scope-keeps-every-job-that-declares-side-effects")
@@ -375,15 +378,37 @@ func TestNarrowToTaskScopes_KeepsWhatEveryFirstPartyCommandKept(t *testing.T) {
 	project := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
 	ws := workspace.NewWorkspace("/ws", nil, []*workspace.Project{project})
 	scopes := map[string][]string{"/app": {"none~none"}}
+	var dirs []string
+	err := filepath.WalkDir(repoRoot, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		// Hidden trees (.git, .gen, .putnami), installs, builds and fixtures hold no first-party manifest.
+		if entry.IsDir() {
+			switch name := entry.Name(); {
+			case path != repoRoot && strings.HasPrefix(name, "."), name == "node_modules", name == "testdata", name == "dist":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.Name() == "putnami.extension.json" {
+			dir, err := filepath.Rel(repoRoot, filepath.Dir(path))
+			if err != nil {
+				return err
+			}
+			dirs = append(dirs, filepath.ToSlash(dir))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("discover the first-party manifests: %v", err)
+	}
+	// The repository holds sixteen first-party extensions; fewer means the walk missed some.
+	if len(dirs) < 16 {
+		t.Fatalf("discovered %d first-party manifests %v, want at least 16", len(dirs), dirs)
+	}
 	kept := make(map[string]int)
-	for _, dir := range []string{
-		"cloud/extension", "go/extension", "python/extension",
-		"tooling/clientgen-extension", "tooling/contributor", "tooling/github-collaboration",
-		"tooling/local-collaboration", "tooling/memory-store", "tooling/samples/shell-extension",
-		"tooling/scaffold", "tooling/sdd-extension", "typescript/extension",
-		"typescript/framework/analytics", "typescript/framework/application",
-		"typescript/framework/events", "typescript/framework/web",
-	} {
+	for _, dir := range dirs {
 		ext := extension.LoadExtensionFromDir(filepath.Join(repoRoot, dir), dir)
 		if ext == nil {
 			t.Fatalf("first-party extension %s did not load", dir)
