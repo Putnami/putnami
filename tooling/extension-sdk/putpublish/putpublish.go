@@ -26,12 +26,17 @@ import (
 	distribution "go.putnami.dev/protocol/distribution"
 	infra "go.putnami.dev/protocol/infra"
 	put "go.putnami.dev/protocol/put"
+	"go.putnami.dev/sdk/extension/internal/retry"
 	"go.putnami.dev/sdk/extension/registryorigin"
 )
 
 // MaxResponseBytes bounds a registry answer: a stored manifest payload and the
 // envelope around it.
 const MaxResponseBytes = put.MaxManifestBytes + 64<<10
+
+// retryPolicy is how a blob upload, a manifest publish and a manifest read
+// retry a transient failure.
+var retryPolicy = retry.Default()
 
 // Blob is one blob a member's manifest references. Publish reads it only
 // when it uploads it, so a member holds one blob in memory at a time.
@@ -80,8 +85,9 @@ type Published struct {
 	// Platforms maps "<os>/<arch>" to the blob digest of that platform, for an
 	// archive member. It is nil for any other kind.
 	Platforms map[string]string
-	// Reused reports that the registry already held the version with the same
-	// manifest.
+	// Reused reports that the accepted publish attempt found the version
+	// already stored with the same manifest, which includes a version an
+	// earlier attempt of the same publish stored before its answer was lost.
 	Reused bool
 }
 
@@ -232,7 +238,9 @@ func firstMessage(diags []diag.Diagnostic) string {
 // UploadBlob reads blob and uploads it to the blob endpoint of coordinate.
 // A registryURL that ValidateRegistryURL refuses is refused before any read.
 // Bytes whose digest or size is not the blob's are refused before they are
-// sent, and a receipt that names other bytes is refused.
+// sent, and a receipt that names other bytes is refused. A transient failure
+// (package retry) sends the same bytes again, up to retry.Attempts times in
+// all.
 func UploadBlob(ctx context.Context, client *http.Client, registryURL, token, coordinate string, blob Blob) error {
 	registryURL, err := ValidateRegistryURL(registryURL)
 	if err != nil {
@@ -252,16 +260,16 @@ func UploadBlob(ctx context.Context, client *http.Client, registryURL, token, co
 	if int64(len(data)) != blob.Size || put.Digest(data) != blob.Digest {
 		return fmt.Errorf("the blob bytes are not blob %s of %d bytes", blob.Digest, blob.Size)
 	}
-	body, status, err := send(ctx, client, http.MethodPost, registryURL+put.BlobUploadPath(namespace, pkg), blob.MediaType, token, data)
+	answer, outcome, attempts, err := sendRetrying(ctx, client, http.MethodPost, registryURL+put.BlobUploadPath(namespace, pkg), blob.MediaType, token, data)
 	if err != nil {
-		return fmt.Errorf("blob upload: %w", err)
+		return fmt.Errorf("blob upload: %w%s", err, retry.After(attempts))
 	}
-	if status != http.StatusCreated {
-		return fmt.Errorf("blob upload returned %d", status)
+	if answer.status != http.StatusCreated {
+		return fmt.Errorf("blob upload returned %d%s", answer.status, retry.Note(outcome, attempts))
 	}
 	// The answer is untrusted and can reflect the Authorization value in any
 	// field, so its diagnostics stay out of the error.
-	receipt, diags := put.ParseBlobReceipt(body)
+	receipt, diags := put.ParseBlobReceipt(answer.body)
 	if receipt == nil || diag.HasErrors(diags) {
 		return errors.New("invalid blob upload response")
 	}
@@ -274,8 +282,10 @@ func UploadBlob(ctx context.Context, client *http.Client, registryURL, token, co
 // PublishManifest publishes member's manifest without a channel and returns
 // the manifest the registry stores. A 409 means the version is already
 // published: the stored manifest is read back, and the version is a reuse only
-// when its media type and payload bytes equal member's. A registryURL that
-// ValidateRegistryURL refuses is refused before any request.
+// when its media type and payload bytes equal member's. A transient failure
+// (package retry) sends the publish again, up to retry.Attempts times in all,
+// and a 409 after a lost answer is accepted by the same rule. A registryURL
+// that ValidateRegistryURL refuses is refused before any request.
 func PublishManifest(ctx context.Context, client *http.Client, registryURL, token string, member Member) (stored *put.Manifest, reused bool, err error) {
 	registryURL, err = ValidateRegistryURL(registryURL)
 	if err != nil {
@@ -295,13 +305,13 @@ func PublishManifest(ctx context.Context, client *http.Client, registryURL, toke
 	if err != nil {
 		return nil, false, errors.New("the publish request cannot be encoded")
 	}
-	body, status, err := send(ctx, client, http.MethodPost, registryURL+put.PublishPath(namespace, pkg), put.PublishContentType, token, encoded)
+	answer, outcome, attempts, err := sendRetrying(ctx, client, http.MethodPost, registryURL+put.PublishPath(namespace, pkg), put.PublishContentType, token, encoded)
 	if err != nil {
-		return nil, false, fmt.Errorf("publish: %w", err)
+		return nil, false, fmt.Errorf("publish: %w%s", err, retry.After(attempts))
 	}
-	switch status {
+	switch answer.status {
 	case http.StatusCreated:
-		response, diags := put.ParsePublishResponse(body)
+		response, diags := put.ParsePublishResponse(answer.body)
 		if response == nil || diag.HasErrors(diags) {
 			return nil, false, errors.New("invalid publish response")
 		}
@@ -319,11 +329,13 @@ func PublishManifest(ctx context.Context, client *http.Client, registryURL, toke
 		}
 		return manifest, true, nil
 	}
-	return nil, false, fmt.Errorf("publish returned %d", status)
+	return nil, false, fmt.Errorf("publish returned %d%s", answer.status, retry.Note(outcome, attempts))
 }
 
 // ReadManifest reads the stored manifest of coordinate at version. A
-// registryURL that ValidateRegistryURL refuses is refused before any request.
+// transient failure (package retry) sends the read again, up to
+// retry.Attempts times in all. A registryURL that ValidateRegistryURL refuses
+// is refused before any request.
 func ReadManifest(ctx context.Context, client *http.Client, registryURL, token, coordinate, version string) (*put.Manifest, error) {
 	registryURL, err := ValidateRegistryURL(registryURL)
 	if err != nil {
@@ -336,14 +348,14 @@ func ReadManifest(ctx context.Context, client *http.Client, registryURL, token, 
 	if err := put.ValidVersion(version); err != nil {
 		return nil, err
 	}
-	body, status, err := send(ctx, client, http.MethodGet, registryURL+put.ManifestPath(namespace, pkg, version), "", token, nil)
+	answer, outcome, attempts, err := sendRetrying(ctx, client, http.MethodGet, registryURL+put.ManifestPath(namespace, pkg, version), "", token, nil)
 	if err != nil {
-		return nil, fmt.Errorf("manifest read: %w", err)
+		return nil, fmt.Errorf("manifest read: %w%s", err, retry.After(attempts))
 	}
-	if status != http.StatusOK {
-		return nil, fmt.Errorf("manifest read returned %d", status)
+	if answer.status != http.StatusOK {
+		return nil, fmt.Errorf("manifest read returned %d%s", answer.status, retry.Note(outcome, attempts))
 	}
-	manifest, diags := put.ParseManifest(body)
+	manifest, diags := put.ParseManifest(answer.body)
 	if manifest == nil || diag.HasErrors(diags) {
 		return nil, errors.New("invalid manifest read response")
 	}
@@ -375,20 +387,42 @@ func Publish(ctx context.Context, client *http.Client, registryURL, token string
 	return Published{Digest: put.Digest(stored.Payload), Platforms: platforms, Reused: reused}, nil
 }
 
-// send sends one request with the bearer and returns the bounded answer body
-// and its status.
-func send(ctx context.Context, client *http.Client, method, target, contentType, token string, body []byte) ([]byte, int, error) {
+// reply is a registry answer: its status, its header, and its bounded body.
+type reply struct {
+	status int
+	header http.Header
+	body   []byte
+}
+
+// sendRetrying sends the request with send under retryPolicy. It returns the
+// last answer, the outcome retry.Note describes, the attempt count, and the
+// last error.
+func sendRetrying(ctx context.Context, client *http.Client, method, target, contentType, token string, body []byte) (reply, retry.Answer, int, error) {
+	var last reply
+	outcome, attempts, err := retryPolicy.Do(ctx, func() (retry.Answer, error) {
+		answer, err := send(ctx, client, method, target, contentType, token, body)
+		last = answer
+		return retry.Answer{Status: answer.status, Header: answer.header}, err
+	})
+	return last, outcome, attempts, err
+}
+
+// send sends one request with the bearer and returns the answer. A transport
+// failure or an unreadable answer is marked with retry.Again when package
+// retry counts it as transient.
+func send(ctx context.Context, client *http.Client, method, target, contentType, token string, body []byte) (reply, error) {
 	client, err := withoutRedirects(client)
 	if err != nil {
-		return nil, 0, err
+		return reply{}, err
 	}
 	var reader io.Reader
 	if body != nil {
 		reader = bytes.NewReader(body)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, target, reader)
+	watched, exchange := retry.Watch(ctx)
+	req, err := http.NewRequestWithContext(watched, method, target, reader)
 	if err != nil {
-		return nil, 0, errors.New("the request cannot be created")
+		return reply{}, errors.New("the request cannot be created")
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
@@ -399,17 +433,17 @@ func send(ctx context.Context, client *http.Client, method, target, contentType,
 	}
 	resp, err := client.Do(req) //nolint:gosec // G704: target starts with a registry URL that ValidateRegistryURL accepted in the exported call that sends it
 	if err != nil {
-		return nil, 0, transportError(err)
+		return reply{}, exchange.Failed(err, transportError(err))
 	}
 	defer func() { _ = resp.Body.Close() }()
 	data, err := io.ReadAll(io.LimitReader(resp.Body, MaxResponseBytes+1))
 	if err != nil {
-		return nil, 0, errors.New("the registry answer cannot be read")
+		return reply{}, exchange.Failed(err, errors.New("the registry answer cannot be read"))
 	}
 	if len(data) > MaxResponseBytes {
-		return nil, 0, fmt.Errorf("the registry answer exceeds %d bytes", MaxResponseBytes)
+		return reply{}, fmt.Errorf("the registry answer exceeds %d bytes", MaxResponseBytes)
 	}
-	return data, resp.StatusCode, nil
+	return reply{status: resp.StatusCode, header: resp.Header, body: data}, nil
 }
 
 // transportError keeps the kind of a failed exchange and drops its text, which
@@ -420,6 +454,8 @@ func transportError(err error) error {
 		return context.Canceled
 	case errors.Is(err, context.DeadlineExceeded):
 		return context.DeadlineExceeded
+	case retry.CertificateRefused(err):
+		return errors.New("the registry certificate was refused")
 	}
 	return errors.New("the registry did not answer")
 }

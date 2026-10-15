@@ -26,6 +26,7 @@ import (
 	"golang.org/x/mod/module"
 
 	gomod "go.putnami.dev/protocol/gomod"
+	"go.putnami.dev/sdk/extension/internal/retry"
 )
 
 // MaxResponseBytes bounds a blob-upload or version-PUT response body.
@@ -34,6 +35,10 @@ const MaxResponseBytes = 1 << 20
 // MaxZipBytes is the largest module zip the Go toolchain accepts. A served zip
 // is hashed up to one byte past it, so a longer body never matches a digest.
 const MaxZipBytes = 500 << 20
+
+// retryPolicy is how a blob upload, a version PUT that may find the version
+// stored, and a verification read retry a transient failure.
+var retryPolicy = retry.Default()
 
 // Reporter receives the diagnostics and log lines of an upload. A
 // *jsonl.Emitter satisfies it. A nil Reporter discards them.
@@ -137,7 +142,9 @@ func authorize(req *http.Request, token string) {
 
 // UploadZip uploads zip to the blob endpoint of modulePath and returns the
 // blob digest, which equals the digest of zip. A registry that answers another
-// digest is refused.
+// digest is refused. The blob endpoint is content-addressed, so a transient
+// failure (package retry) sends the same zip again, up to retry.Attempts
+// times in all.
 func UploadZip(ctx context.Context, client *http.Client, reporter Reporter, registryURL, token, modulePath string, zip []byte) (string, error) {
 	reporter = reporterOrDiscard(reporter)
 	client, err := withoutRedirects(client)
@@ -154,24 +161,22 @@ func UploadZip(ctx context.Context, client *http.Client, reporter Reporter, regi
 	req.Header.Set("Content-Type", gomod.BlobContentType)
 	authorize(req, token)
 
-	resp, err := client.Do(req) //nolint:gosec // registryURL is validated publish configuration
-	if err != nil {
-		reporter.Diagnostic("error", "Blob upload failed: "+err.Error(), "", 0)
-		return "", err
+	sent := sendRetrying(ctx, retryPolicy, client, req, zip)
+	if sent.err != nil {
+		if sent.unreadable {
+			reporter.Diagnostic("error", "Invalid blob upload response"+retry.After(sent.attempts)+": "+sent.err.Error(), "", 0)
+		} else {
+			reporter.Diagnostic("error", "Blob upload failed"+retry.After(sent.attempts)+": "+sent.err.Error(), "", 0)
+		}
+		return "", sent.failure("blob upload failed")
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := readBoundedResponse(resp.Body)
-	if err != nil {
-		reporter.Diagnostic("error", "Invalid blob upload response: "+err.Error(), "", 0)
-		return "", err
-	}
-	if resp.StatusCode != http.StatusCreated {
-		reporter.Diagnostic("error", fmt.Sprintf("Blob upload returned %d", resp.StatusCode), "", 0)
-		return "", fmt.Errorf("blob upload returned %d", resp.StatusCode)
+	if status := sent.answer.Status; status != http.StatusCreated {
+		note := retry.Note(sent.answer, sent.attempts)
+		reporter.Diagnostic("error", fmt.Sprintf("Blob upload returned %d%s", status, note), "", 0)
+		return "", fmt.Errorf("blob upload returned %d%s", status, note)
 	}
 
-	result, diagnostics := gomod.ParseAndValidateBlobUploadResponse(body)
+	result, diagnostics := gomod.ParseAndValidateBlobUploadResponse(sent.body)
 	if result == nil || len(diagnostics) > 0 {
 		// The response is untrusted and can reflect the Authorization value in
 		// its digest field, so its protocol diagnostics stay out of the error
@@ -192,7 +197,10 @@ func UploadZip(ctx context.Context, client *http.Client, reporter Reporter, regi
 // PublishVersion sends the version PUT for modulePath@version, with no dist
 // tag, and reports whether the registry already held that version. A 409 is a
 // reuse only when allowExisting is set, and only VerifyZip and VerifyMod prove
-// the existing version holds the same bytes.
+// the existing version holds the same bytes. With allowExisting set, a
+// transient failure (package retry) sends the PUT again, up to retry.Attempts
+// times in all, and a version a lost attempt stored answers 409. Without it,
+// the PUT is sent once.
 func PublishVersion(ctx context.Context, client *http.Client, reporter Reporter, registryURL, token, modulePath, version string, goMod []byte, zipDigest string, allowExisting bool) (reused bool, err error) {
 	reporter = reporterOrDiscard(reporter)
 	client, err = withoutRedirects(client)
@@ -212,22 +220,26 @@ func PublishVersion(ctx context.Context, client *http.Client, reporter Reporter,
 	req.Header.Set("Content-Type", gomod.VersionContentType)
 	authorize(req, token)
 
-	resp, err := client.Do(req) //nolint:gosec // registryURL is validated publish configuration
-	if err != nil {
-		reporter.Diagnostic("error", "Publish request failed: "+err.Error(), "", 0)
-		return false, err
+	policy := retryPolicy
+	if !allowExisting {
+		policy.Attempts = 1
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if _, err := readBoundedResponse(resp.Body); err != nil {
-		reporter.Diagnostic("error", "Invalid publish response: "+err.Error(), "", 0)
-		return false, err
+	sent := sendRetrying(ctx, policy, client, req, payload)
+	if sent.err != nil {
+		if sent.unreadable {
+			reporter.Diagnostic("error", "Invalid publish response"+retry.After(sent.attempts)+": "+sent.err.Error(), "", 0)
+		} else {
+			reporter.Diagnostic("error", "Publish request failed"+retry.After(sent.attempts)+": "+sent.err.Error(), "", 0)
+		}
+		return false, sent.failure("publish failed")
 	}
-	if resp.StatusCode != http.StatusCreated && (!allowExisting || resp.StatusCode != http.StatusConflict) {
-		reporter.Diagnostic("error", fmt.Sprintf("Publish returned %d", resp.StatusCode), "", 0)
-		return false, fmt.Errorf("publish returned %d", resp.StatusCode)
+	status := sent.answer.Status
+	if status != http.StatusCreated && (!allowExisting || status != http.StatusConflict) {
+		note := retry.Note(sent.answer, sent.attempts)
+		reporter.Diagnostic("error", fmt.Sprintf("Publish returned %d%s", status, note), "", 0)
+		return false, fmt.Errorf("publish returned %d%s", status, note)
 	}
-	if resp.StatusCode == http.StatusConflict {
+	if status == http.StatusConflict {
 		reporter.Log("info", fmt.Sprintf("Module %s@%s already exists; verifying immutable registry bytes", modulePath, version))
 		return true, nil
 	}
@@ -235,15 +247,68 @@ func PublishVersion(ctx context.Context, client *http.Client, reporter Reporter,
 	return false, nil
 }
 
+// errResponseTooLarge is a registry answer above MaxResponseBytes.
+var errResponseTooLarge = fmt.Errorf("registry response exceeds %d bytes", MaxResponseBytes)
+
 func readBoundedResponse(body io.Reader) ([]byte, error) {
 	data, err := io.ReadAll(io.LimitReader(body, MaxResponseBytes+1))
 	if err != nil {
 		return nil, err
 	}
 	if len(data) > MaxResponseBytes {
-		return nil, fmt.Errorf("registry response exceeds %d bytes", MaxResponseBytes)
+		return nil, errResponseTooLarge
 	}
 	return data, nil
+}
+
+// outcome is what sendRetrying observed.
+type outcome struct {
+	// answer is the last answer, for retry.Note.
+	answer retry.Answer
+	// body is the bounded body of the last answer.
+	body []byte
+	// attempts is the number of attempts made.
+	attempts int
+	// unreadable reports that the last answer could not be read.
+	unreadable bool
+	// err is the last error.
+	err error
+}
+
+// failure is the error of a request that ended with err: err itself after
+// one attempt, and what, the attempt count and err after more.
+func (o outcome) failure(what string) error {
+	if o.attempts > 1 {
+		return fmt.Errorf("%s%s: %w", what, retry.After(o.attempts), o.err)
+	}
+	return o.err
+}
+
+// sendRetrying sends req, carrying body, under policy, and reads the bounded
+// answer of each attempt. An answer above MaxResponseBytes is final.
+func sendRetrying(ctx context.Context, policy retry.Policy, client *http.Client, req *http.Request, body []byte) outcome {
+	var result outcome
+	result.answer, result.attempts, result.err = policy.Do(ctx, func() (retry.Answer, error) {
+		watched, exchange := retry.Watch(ctx)
+		attempt := req.Clone(watched)
+		attempt.Body = io.NopCloser(bytes.NewReader(body))
+		resp, err := client.Do(attempt) //nolint:gosec // registryURL is validated publish configuration
+		if err != nil {
+			result.unreadable = false
+			return retry.Answer{}, exchange.Failed(err, err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		result.body, err = readBoundedResponse(resp.Body)
+		result.unreadable = err != nil
+		switch {
+		case errors.Is(err, errResponseTooLarge):
+			return retry.Answer{}, err
+		case err != nil:
+			return retry.Answer{}, exchange.Failed(err, err)
+		}
+		return retry.Answer{Status: resp.StatusCode, Header: resp.Header}, nil
+	})
+	return result
 }
 
 // proxyURL returns the standard Go proxy URL of modulePath@version's file with
@@ -260,28 +325,63 @@ func proxyURL(registryURL, modulePath, version, extension string) (string, error
 	return registryURL + "/" + escapedPath + "/@v/" + escapedVersion + extension, nil
 }
 
-// download GETs a standard Go proxy projection and returns the open response
-// when it answers 200.
-func download(ctx context.Context, client *http.Client, target, token, name string) (*http.Response, error) {
+// download GETs a standard Go proxy projection and hands the body of a 200
+// answer to consume. A transient failure (package retry), a failure to read
+// that body included, sends the GET again, up to retry.Attempts times in
+// all. Any other error consume returns is final.
+func download(ctx context.Context, client *http.Client, target, token, name string, consume func(io.Reader) error) error {
 	client, err := withoutRedirects(client)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	authorize(req, token)
-	resp, err := client.Do(req) //nolint:gosec // the URL is built from validated publish configuration
+	answer, attempts, err := retryPolicy.Do(ctx, func() (retry.Answer, error) {
+		watched, exchange := retry.Watch(ctx)
+		resp, err := client.Do(req.Clone(watched)) //nolint:gosec // the URL is built from validated publish configuration
+		if err != nil {
+			return retry.Answer{}, exchange.Failed(err, err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		answer := retry.Answer{Status: resp.StatusCode, Header: resp.Header}
+		if resp.StatusCode != http.StatusOK {
+			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, MaxResponseBytes))
+			return answer, nil
+		}
+		body := &readRecorder{reader: resp.Body}
+		if err := consume(body); err != nil {
+			if body.err != nil {
+				return answer, exchange.Failed(body.err, err)
+			}
+			return answer, err
+		}
+		return answer, nil
+	})
 	if err != nil {
-		return nil, err
+		return outcome{attempts: attempts, err: err}.failure(name + " download failed")
 	}
-	if resp.StatusCode != http.StatusOK {
-		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, MaxResponseBytes))
-		_ = resp.Body.Close()
-		return nil, fmt.Errorf("%s download returned %d", name, resp.StatusCode)
+	if answer.Status != http.StatusOK {
+		return fmt.Errorf("%s download returned %d%s", name, answer.Status, retry.Note(answer, attempts))
 	}
-	return resp, nil
+	return nil
+}
+
+// readRecorder reads from reader and keeps the first error other than io.EOF
+// that reader returned.
+type readRecorder struct {
+	reader io.Reader
+	err    error
+}
+
+func (r *readRecorder) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	if err != nil && !errors.Is(err, io.EOF) && r.err == nil {
+		r.err = err
+	}
+	return n, err
 }
 
 // VerifyZip downloads the module zip the registry serves to consumers and
@@ -292,20 +392,17 @@ func VerifyZip(ctx context.Context, client *http.Client, registryURL, token, mod
 	if err != nil {
 		return err
 	}
-	resp, err := download(ctx, client, target, token, "module zip")
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	hash := sha256.New()
-	if _, err := io.Copy(hash, io.LimitReader(resp.Body, MaxZipBytes+1)); err != nil {
-		return fmt.Errorf("hash downloaded module zip: %w", err)
-	}
-	gotDigest := fmt.Sprintf("sha256:%x", hash.Sum(nil))
-	if gotDigest != wantDigest {
-		return fmt.Errorf("downloaded module zip digest %q does not match uploaded digest %q", gotDigest, wantDigest)
-	}
-	return nil
+	return download(ctx, client, target, token, "module zip", func(body io.Reader) error {
+		hash := sha256.New()
+		if _, err := io.Copy(hash, io.LimitReader(body, MaxZipBytes+1)); err != nil {
+			return fmt.Errorf("hash downloaded module zip: %w", err)
+		}
+		gotDigest := fmt.Sprintf("sha256:%x", hash.Sum(nil))
+		if gotDigest != wantDigest {
+			return fmt.Errorf("downloaded module zip digest %q does not match uploaded digest %q", gotDigest, wantDigest)
+		}
+		return nil
+	})
 }
 
 // VerifyMod downloads the go.mod the registry serves to consumers and refuses
@@ -316,19 +413,16 @@ func VerifyMod(ctx context.Context, client *http.Client, registryURL, token, mod
 	if err != nil {
 		return err
 	}
-	resp, err := download(ctx, client, target, token, "go.mod")
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	got, err := io.ReadAll(io.LimitReader(resp.Body, int64(len(want))+1))
-	if err != nil {
-		return fmt.Errorf("read downloaded go.mod: %w", err)
-	}
-	if !bytes.Equal(got, want) {
-		return fmt.Errorf("downloaded go.mod does not match submitted bytes")
-	}
-	return nil
+	return download(ctx, client, target, token, "go.mod", func(body io.Reader) error {
+		got, err := io.ReadAll(io.LimitReader(body, int64(len(want))+1))
+		if err != nil {
+			return fmt.Errorf("read downloaded go.mod: %w", err)
+		}
+		if !bytes.Equal(got, want) {
+			return fmt.Errorf("downloaded go.mod does not match submitted bytes")
+		}
+		return nil
+	})
 }
 
 // Publish uploads mod's zip, sends its version PUT, and reads the served zip

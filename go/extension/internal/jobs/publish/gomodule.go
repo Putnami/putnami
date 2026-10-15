@@ -8,6 +8,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
+	"time"
 
 	"go.putnami.dev/go/extension/internal/releaseplan"
 	"go.putnami.dev/go/extension/internal/toolchain"
@@ -75,6 +78,7 @@ func resolveGoPublishRoute(declaredOrigin string, managed bool) (goPublishRoute,
 // module is packed into the outbox and nothing else happens
 // (packGoModuleIntoOutbox). An explicit token ignores the outbox.
 func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
+	started := time.Now()
 	if ctx.Project.Name == "" {
 		emit.Summary("Skipped: no project context")
 		return "SKIP", nil, nil
@@ -216,9 +220,11 @@ func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 	if err != nil {
 		return "FAILED", nil, err
 	}
+	registryCtx, cancel := goRegistryContext(started)
+	defer cancel()
 
 	emit.PhaseStart("upload-module")
-	zipDigest, err := uploadZipBlob(client, emit, route.endpoint, registryToken, modulePath, moduleMeta.ZipPath)
+	zipDigest, err := uploadZipBlob(registryCtx, client, emit, route.endpoint, registryToken, modulePath, moduleMeta.ZipPath)
 	if err != nil {
 		emit.PhaseEnd("upload-module", "failed")
 		return "FAILED", nil, fmt.Errorf("upload module zip: %w", err)
@@ -231,17 +237,17 @@ func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 		return "FAILED", nil, fmt.Errorf("read go.mod: %w", err)
 	}
 
-	reused, err := publishVersion(client, emit, route.endpoint, registryToken, modulePath, version, string(goModContent), zipDigest, planned != nil)
+	reused, err := publishVersion(registryCtx, client, emit, route.endpoint, registryToken, modulePath, version, string(goModContent), zipDigest, planned != nil)
 	if err != nil {
 		emit.PhaseEnd("upload-module", "failed")
 		return "FAILED", nil, fmt.Errorf("publish version: %w", err)
 	}
-	if err := verifyPublishedZip(client, route.endpoint, registryToken, modulePath, version, zipDigest); err != nil {
+	if err := verifyPublishedZip(registryCtx, client, route.endpoint, registryToken, modulePath, version, zipDigest); err != nil {
 		emit.Diagnostic("error", "Published module zip verification failed: "+err.Error(), "", 0)
 		emit.PhaseEnd("upload-module", "failed")
 		return "FAILED", nil, fmt.Errorf("verify published module zip: %w", err)
 	}
-	if err := verifyPublishedMod(client, route.endpoint, registryToken, modulePath, version, goModContent); err != nil {
+	if err := verifyPublishedMod(registryCtx, client, route.endpoint, registryToken, modulePath, version, goModContent); err != nil {
 		emit.Diagnostic("error", "Published go.mod verification failed: "+err.Error(), "", 0)
 		emit.PhaseEnd("upload-module", "failed")
 		return "FAILED", nil, fmt.Errorf("verify published go.mod: %w", err)
@@ -289,6 +295,25 @@ func goModule(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 		result["digestReused"] = true
 	}
 	return "OK", result, nil
+}
+
+// goRegistryDeadlineMarginCapMs limits the part of the scheduler deadline a
+// module publication keeps to report a registry failure itself.
+const goRegistryDeadlineMarginCapMs int64 = 30_000
+
+// goRegistryContext bounds the registry requests of a module publication that
+// started at started below the scheduler deadline the CLI handed this task
+// (extproto.TaskDeadlineMsEnv), by a fifth of it and at most
+// goRegistryDeadlineMarginCapMs. A retry that runs out of time then ends with
+// the registry's last status before the scheduler kills the task. Without a
+// deadline, only the client timeout bounds each request.
+func goRegistryContext(started time.Time) (context.Context, context.CancelFunc) {
+	deadlineMs, err := strconv.ParseInt(strings.TrimSpace(os.Getenv(extproto.TaskDeadlineMsEnv)), 10, 64)
+	if err != nil || deadlineMs <= 0 {
+		return context.WithCancel(context.Background())
+	}
+	margin := min(max(deadlineMs/5, 1), goRegistryDeadlineMarginCapMs)
+	return context.WithDeadline(context.Background(), started.Add(time.Duration(max(deadlineMs-margin, 1))*time.Millisecond))
 }
 
 // validateGoRegistryURL rejects credential-bearing URLs before any diagnostic,
@@ -405,7 +430,7 @@ func goOutboxProject(ctx *pctx.Context, planned *releaseplan.GoProject, modulePa
 
 // uploadZipBlob uploads the module zip to the gomod-write blob endpoint and
 // returns the blob digest.
-func uploadZipBlob(client *http.Client, emit *jsonl.Emitter, registryURL, token, modulePath, zipPath string) (string, error) {
+func uploadZipBlob(ctx context.Context, client *http.Client, emit *jsonl.Emitter, registryURL, token, modulePath, zipPath string) (string, error) {
 	if zipPath == "" {
 		emit.Diagnostic("error", "Missing zip artifact path (run 'package' with latest Go extension)", "", 0)
 		return "", fmt.Errorf("missing zip path")
@@ -415,21 +440,21 @@ func uploadZipBlob(client *http.Client, emit *jsonl.Emitter, registryURL, token,
 		emit.Diagnostic("error", "Failed to read zip: "+err.Error(), "", 0)
 		return "", err
 	}
-	return gomodpublish.UploadZip(context.Background(), client, emit, registryURL, token, modulePath, zipData)
+	return gomodpublish.UploadZip(ctx, client, emit, registryURL, token, modulePath, zipData)
 }
 
 // publishVersion publishes the module version via the gomod-write version PUT
 // and reports whether the registry already held that exact version. No dist
 // tag is sent: the release-set coordinator advances every channel it names,
 // once, after every selected member has a verified digest.
-func publishVersion(client *http.Client, emit *jsonl.Emitter, registryURL, token, modulePath, version, goMod, zipDigest string, allowExisting bool) (reused bool, err error) {
-	return gomodpublish.PublishVersion(context.Background(), client, emit, registryURL, token, modulePath, version, []byte(goMod), zipDigest, allowExisting)
+func publishVersion(ctx context.Context, client *http.Client, emit *jsonl.Emitter, registryURL, token, modulePath, version, goMod, zipDigest string, allowExisting bool) (reused bool, err error) {
+	return gomodpublish.PublishVersion(ctx, client, emit, registryURL, token, modulePath, version, []byte(goMod), zipDigest, allowExisting)
 }
 
 // verifyPublishedZip downloads the immutable standard Go proxy artifact and
 // hashes the exact bytes served to consumers.
-func verifyPublishedZip(client *http.Client, registryURL, token, modulePath, version, wantDigest string) error {
-	return gomodpublish.VerifyZip(context.Background(), client, registryURL, token, modulePath, version, wantDigest)
+func verifyPublishedZip(ctx context.Context, client *http.Client, registryURL, token, modulePath, version, wantDigest string) error {
+	return gomodpublish.VerifyZip(ctx, client, registryURL, token, modulePath, version, wantDigest)
 }
 
 // getGoModuleZip sends a GET of the standard Go proxy zip of modulePath at
@@ -456,8 +481,8 @@ func getGoModuleZip(client *http.Client, registryURL, token, modulePath, version
 
 // verifyPublishedMod compares the standard Go proxy .mod projection byte for
 // byte with the file submitted in the version PUT.
-func verifyPublishedMod(client *http.Client, registryURL, token, modulePath, version string, want []byte) error {
-	return gomodpublish.VerifyMod(context.Background(), client, registryURL, token, modulePath, version, want)
+func verifyPublishedMod(ctx context.Context, client *http.Client, registryURL, token, modulePath, version string, want []byte) error {
+	return gomodpublish.VerifyMod(ctx, client, registryURL, token, modulePath, version, want)
 }
 
 // hostFromURL returns the URL host (including any explicit port), used to key the

@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"go.putnami.dev/sdk/extension/internal/retry"
 )
 
 // ErrorExcerptLimit bounds, in characters, how much of a registry error body
@@ -32,6 +34,10 @@ const ErrorExcerptLimit = 300
 // ErrorExcerptLimit, so a credential cut by the read bound always lies past
 // the excerpt and never shows partially.
 const errorReadLimit = 4096
+
+// retryPolicy is how Publish retries its probes and its PUT after a transient
+// failure.
+var retryPolicy = retry.Default()
 
 // Attachment is the tarball attachment of a publish document.
 type Attachment struct {
@@ -129,81 +135,124 @@ func withoutRedirects(client *http.Client) (*http.Client, error) {
 	return &bounded, nil
 }
 
-// Put sends payload to registry with token as its bearer. Any status outside
-// 2xx is an error carrying a bounded, redacted excerpt of the response body.
+// Put sends payload to registry with token as its bearer, once. Any status
+// outside 2xx is an error carrying a bounded, redacted excerpt of the
+// response body.
 func Put(ctx context.Context, client *http.Client, registry, token string, payload Payload) error {
+	_, err := put(ctx, client, registry, token, payload)
+	return err
+}
+
+// put sends one PUT of payload and returns its answer. A transient failure
+// (package retry) is marked with retry.Again.
+func put(ctx context.Context, client *http.Client, registry, token string, payload Payload) (retry.Answer, error) {
 	client, err := withoutRedirects(client)
 	if err != nil {
-		return err
+		return retry.Answer{}, err
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("encode managed npm payload: %w", err)
+		return retry.Answer{}, fmt.Errorf("encode managed npm payload: %w", err)
 	}
 	endpoint := strings.TrimRight(registry, "/") + "/" + url.PathEscape(payload.Name)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, bytes.NewReader(body))
+	watched, exchange := retry.Watch(ctx)
+	req, err := http.NewRequestWithContext(watched, http.MethodPut, endpoint, bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("build managed npm request: %w", err)
+		return retry.Answer{}, fmt.Errorf("build managed npm request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req) //nolint:gosec // registry is an explicit, validated managed publish target
 	if err != nil {
-		return fmt.Errorf("send managed npm request: %w", err)
+		return retry.Answer{}, exchange.Failed(err, fmt.Errorf("send managed npm request: %w", err))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	answer := retry.Answer{Status: resp.StatusCode, Header: resp.Header}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("registry returned %s%s", resp.Status, ErrorExcerpt(resp.Body, token))
+		return answer, transientAnswer(answer, fmt.Errorf("registry returned %s%s", resp.Status, ErrorExcerpt(resp.Body, token)))
 	}
-	return nil
+	return answer, nil
+}
+
+// transientAnswer marks err, the error of answer, with retry.Again when the
+// answer's status is transient.
+func transientAnswer(answer retry.Answer, err error) error {
+	if retry.Transient(answer.Status) {
+		return retry.Again(err)
+	}
+	return err
 }
 
 // Probe downloads the tarball registry serves for packageName@version with
-// token as its bearer. It reports false when the registry answers 404, true
-// when the bytes have exactly wantSize bytes and wantDigest, and an error
+// token as its bearer, once. It reports false when the registry answers 404,
+// true when the bytes have exactly wantSize bytes and wantDigest, and an error
 // otherwise: a registry that serves other bytes holds an immutable version
 // this artifact cannot replace.
 func Probe(ctx context.Context, client *http.Client, registry, token, packageName, version, wantDigest string, wantSize int64) (bool, error) {
+	found, _, err := probe(ctx, client, registry, token, packageName, version, wantDigest, wantSize)
+	return found, err
+}
+
+// probeRetrying is Probe under retryPolicy.
+func probeRetrying(ctx context.Context, client *http.Client, registry, token, packageName, version, wantDigest string, wantSize int64) (bool, error) {
+	var found bool
+	answer, attempts, err := retryPolicy.Do(ctx, func() (retry.Answer, error) {
+		var answer retry.Answer
+		var err error
+		found, answer, err = probe(ctx, client, registry, token, packageName, version, wantDigest, wantSize)
+		return answer, err
+	})
+	if err != nil {
+		return false, fmt.Errorf("%w%s", err, retry.Note(answer, attempts))
+	}
+	return found, nil
+}
+
+// probe sends one Probe GET and returns its answer. A transient failure
+// (package retry) is marked with retry.Again.
+func probe(ctx context.Context, client *http.Client, registry, token, packageName, version, wantDigest string, wantSize int64) (bool, retry.Answer, error) {
 	client, err := withoutRedirects(client)
 	if err != nil {
-		return false, err
+		return false, retry.Answer{}, err
 	}
 	tarballURL, err := TarballURL(registry, packageName, version)
 	if err != nil {
-		return false, err
+		return false, retry.Answer{}, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tarballURL, nil)
+	watched, exchange := retry.Watch(ctx)
+	req, err := http.NewRequestWithContext(watched, http.MethodGet, tarballURL, nil)
 	if err != nil {
-		return false, fmt.Errorf("build managed npm verification request: %w", err)
+		return false, retry.Answer{}, fmt.Errorf("build managed npm verification request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := client.Do(req) //nolint:gosec // tarball URL is constructed from the validated registry origin and staged coordinate
 	if err != nil {
-		return false, fmt.Errorf("download managed npm artifact: %w", err)
+		return false, retry.Answer{}, exchange.Failed(err, fmt.Errorf("download managed npm artifact: %w", err))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	answer := retry.Answer{Status: resp.StatusCode, Header: resp.Header}
 	if resp.StatusCode == http.StatusNotFound {
-		return false, nil
+		return false, answer, nil
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return false, fmt.Errorf("registry tarball returned %s%s", resp.Status, ErrorExcerpt(resp.Body, token))
+		return false, answer, transientAnswer(answer, fmt.Errorf("registry tarball returned %s%s", resp.Status, ErrorExcerpt(resp.Body, token)))
 	}
 	if wantSize < 0 {
-		return false, fmt.Errorf("managed npm artifact size is invalid")
+		return false, answer, fmt.Errorf("managed npm artifact size is invalid")
 	}
 	hash := sha256.New()
 	read, err := io.Copy(hash, io.LimitReader(resp.Body, wantSize+1))
 	if err != nil {
-		return false, fmt.Errorf("hash registry npm artifact: %w", err)
+		return false, answer, exchange.Failed(err, fmt.Errorf("hash registry npm artifact: %w", err))
 	}
 	if read != wantSize {
-		return false, fmt.Errorf("published npm artifact size mismatch: staged %d, registry %d", wantSize, read)
+		return false, answer, fmt.Errorf("published npm artifact size mismatch: staged %d, registry %d", wantSize, read)
 	}
 	gotDigest := fmt.Sprintf("sha256:%x", hash.Sum(nil))
 	if gotDigest != wantDigest {
-		return false, fmt.Errorf("published npm artifact digest mismatch: staged %s, registry %s", wantDigest, gotDigest)
+		return false, answer, fmt.Errorf("published npm artifact digest mismatch: staged %s, registry %s", wantDigest, gotDigest)
 	}
-	return true, nil
+	return true, answer, nil
 }
 
 // CheckIdentity refuses an artifact whose manifest does not name exactly its
@@ -226,7 +275,14 @@ func CheckIdentity(artifact Artifact) error {
 // the same tarball, then reads the tarball back. It reports whether the
 // version already existed at the artifact's digest. An artifact CheckIdentity
 // refuses is an error before any request, and a version the registry holds
-// with other bytes is an error, before and after the upload.
+// with other bytes is an error, before and after the upload. A transient
+// failure (package retry) sends a probe again, up to retry.Attempts times in
+// all. After a transient PUT failure, Publish probes first: a registry that
+// serves the artifact's digest and size holds the version, and a 404 sends
+// the PUT again, up to retry.Attempts attempts in all, a failed probe
+// counting as one. A PUT sent again that gets an answer neither 2xx nor
+// transient is followed by one more probe, and a registry that serves the
+// artifact's digest and size then holds the version.
 func Publish(ctx context.Context, client *http.Client, registry, token string, artifact Artifact) (reused bool, err error) {
 	if err := CheckIdentity(artifact); err != nil {
 		return false, err
@@ -236,17 +292,40 @@ func Publish(ctx context.Context, client *http.Client, registry, token string, a
 		return false, err
 	}
 	digest, size := Digest(artifact.Tarball), int64(len(artifact.Tarball))
-	found, err := Probe(ctx, client, registry, token, artifact.Name, artifact.Version, digest, size)
+	found, err := probeRetrying(ctx, client, registry, token, artifact.Name, artifact.Version, digest, size)
 	if err != nil {
 		return false, fmt.Errorf("check published npm artifact: %w", err)
 	}
 	if found {
 		return true, nil
 	}
-	if err := Put(ctx, client, registry, token, payload); err != nil {
-		return false, fmt.Errorf("managed npm publish failed: %w", err)
+	stored := false
+	sends := 0
+	answer, attempts, err := retryPolicy.Do(ctx, func() (retry.Answer, error) {
+		sends++
+		if sends > 1 {
+			landed, answer, err := probe(ctx, client, registry, token, artifact.Name, artifact.Version, digest, size)
+			if err != nil || landed {
+				stored = landed
+				return answer, err
+			}
+		}
+		answer, err := put(ctx, client, registry, token, payload)
+		if err != nil && sends > 1 && answer.Status != 0 && !retry.Transient(answer.Status) {
+			if landed, probed, probeErr := probe(ctx, client, registry, token, artifact.Name, artifact.Version, digest, size); probeErr == nil && landed {
+				stored = true
+				return probed, nil
+			}
+		}
+		return answer, err
+	})
+	if err != nil {
+		return false, fmt.Errorf("managed npm publish failed: %w%s", err, retry.Note(answer, attempts))
 	}
-	found, err = Probe(ctx, client, registry, token, artifact.Name, artifact.Version, digest, size)
+	if stored {
+		return false, nil
+	}
+	found, err = probeRetrying(ctx, client, registry, token, artifact.Name, artifact.Version, digest, size)
 	if err != nil {
 		return false, fmt.Errorf("verify published npm artifact: %w", err)
 	}

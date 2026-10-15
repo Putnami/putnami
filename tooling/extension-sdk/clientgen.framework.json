@@ -56,7 +56,7 @@
           "path": "tooling/extension-sdk/putpublish/putpublish.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "7b2423e487c586830cc21d05bf3571789a87650a454ab395e5b32de8147dda70"
+          "fingerprint": "221e36d1ad383a69c3f92be633432346c8aa54cd0eefcf30d7da6d8f00536d02"
         }
       ],
       "owner": "putnami-extension-sdk",

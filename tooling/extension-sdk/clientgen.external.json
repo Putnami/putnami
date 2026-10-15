@@ -51,13 +51,13 @@
           "path": "tooling/extension-sdk/npmpublish/npmpublish.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "aaf66cdd3207836262ef01091ef1afaf4f1ca811a38c7f60f32b9741ba5b04ae"
+          "fingerprint": "14f54f74b90b540c33f2381b938b7653ffa2ac4d8cc5c5e9ce26ae39280e3b3a"
         },
         {
           "path": "tooling/extension-sdk/npmpublish/npmpublish.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "c2d762c61f66e63e57e12aa9ca226ff373ebacd980ccae3a8ca3cf61119f8c5a"
+          "fingerprint": "8d70403aba3c02dd188ebe42868ad3784f9eeacbc4f40555f282898d0f46a0c3"
         }
       ],
       "owner": "putnami-extension-sdk",

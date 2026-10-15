@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"go.putnami.dev/go/extension/internal/releaseplan"
 	distribution "go.putnami.dev/protocol/distribution"
@@ -675,7 +676,7 @@ func TestUploadZipBlobRejectsRegistryDigestMismatch(t *testing.T) {
 		_, _ = fmt.Fprintf(w, `{"digest":"sha256:%s"}`, strings.Repeat("f", 64))
 	}))
 	defer server.Close()
-	if _, err := uploadZipBlob(server.Client(), jsonl.New(), server.URL, "token", "go.putnami.dev/mod", zipPath); err == nil || !strings.Contains(err.Error(), "does not match uploaded zip digest") {
+	if _, err := uploadZipBlob(context.Background(), server.Client(), jsonl.New(), server.URL, "token", "go.putnami.dev/mod", zipPath); err == nil || !strings.Contains(err.Error(), "does not match uploaded zip digest") {
 		t.Fatalf("upload mismatch error = %v", err)
 	}
 }
@@ -694,7 +695,7 @@ func TestUploadZipBlobDoesNotReflectBearerFromHostileDigest(t *testing.T) {
 
 	var uploadErr error
 	output := capturePublishOutput(t, func() {
-		_, uploadErr = uploadZipBlob(server.Client(), jsonl.New(), server.URL, bearer, "go.putnami.dev/mod", zipPath)
+		_, uploadErr = uploadZipBlob(context.Background(), server.Client(), jsonl.New(), server.URL, bearer, "go.putnami.dev/mod", zipPath)
 	})
 	if uploadErr == nil || !strings.Contains(uploadErr.Error(), "does not match uploaded zip digest") {
 		t.Fatalf("hostile digest upload error = %v", uploadErr)
@@ -716,7 +717,7 @@ func TestManagedGoRegistryResponsesAreBoundedAndSanitized(t *testing.T) {
 		}))
 		defer server.Close()
 		output := capturePublishOutput(t, func() {
-			_, err := uploadZipBlob(server.Client(), jsonl.New(), server.URL, "token", "go.putnami.dev/mod", zipPath)
+			_, err := uploadZipBlob(context.Background(), server.Client(), jsonl.New(), server.URL, "token", "go.putnami.dev/mod", zipPath)
 			if err == nil || !strings.Contains(err.Error(), "blob upload returned 401") {
 				t.Fatalf("blob upload error = %v", err)
 			}
@@ -732,7 +733,7 @@ func TestManagedGoRegistryResponsesAreBoundedAndSanitized(t *testing.T) {
 			_, _ = w.Write(bytes.Repeat([]byte("x"), maxGoRegistryResponseBytes+1))
 		}))
 		defer server.Close()
-		if _, err := uploadZipBlob(server.Client(), jsonl.New(), server.URL, "token", "go.putnami.dev/mod", zipPath); err == nil || !strings.Contains(err.Error(), "response exceeds") {
+		if _, err := uploadZipBlob(context.Background(), server.Client(), jsonl.New(), server.URL, "token", "go.putnami.dev/mod", zipPath); err == nil || !strings.Contains(err.Error(), "response exceeds") {
 			t.Fatalf("oversized blob response error = %v", err)
 		}
 	})
@@ -744,7 +745,7 @@ func TestManagedGoRegistryResponsesAreBoundedAndSanitized(t *testing.T) {
 		}))
 		defer server.Close()
 		output := capturePublishOutput(t, func() {
-			_, err := publishVersion(server.Client(), jsonl.New(), server.URL, "token", "go.putnami.dev/mod", "v1.2.3", "module go.putnami.dev/mod\n", digestForTest('a'), true)
+			_, err := publishVersion(context.Background(), server.Client(), jsonl.New(), server.URL, "token", "go.putnami.dev/mod", "v1.2.3", "module go.putnami.dev/mod\n", digestForTest('a'), true)
 			if err == nil || !strings.Contains(err.Error(), "publish returned 403") {
 				t.Fatalf("publish error = %v", err)
 			}
@@ -766,7 +767,7 @@ func TestVerifyPublishedZipRejectsDownloadedDigestMismatch(t *testing.T) {
 	}))
 	defer server.Close()
 	want := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte("uploaded bytes")))
-	err := verifyPublishedZip(server.Client(), server.URL, "", "go.putnami.dev/mod", "v1.2.3", want)
+	err := verifyPublishedZip(context.Background(), server.Client(), server.URL, "", "go.putnami.dev/mod", "v1.2.3", want)
 	if err == nil || !strings.Contains(err.Error(), "does not match uploaded digest") {
 		t.Fatalf("download mismatch error = %v", err)
 	}
@@ -778,7 +779,7 @@ func TestVerifyPublishedModRejectsDownloadedBytesMismatch(t *testing.T) {
 		_, _ = w.Write([]byte("module go.putnami.dev/other\n"))
 	}))
 	defer server.Close()
-	err := verifyPublishedMod(server.Client(), server.URL, "", "go.putnami.dev/mod", "v1.2.3", []byte("module go.putnami.dev/mod\n"))
+	err := verifyPublishedMod(context.Background(), server.Client(), server.URL, "", "go.putnami.dev/mod", "v1.2.3", []byte("module go.putnami.dev/mod\n"))
 	if err == nil || !strings.Contains(err.Error(), "does not match submitted bytes") {
 		t.Fatalf("go.mod mismatch error = %v", err)
 	}
@@ -1357,4 +1358,35 @@ func TestMain(m *testing.M) {
 		}
 	}
 	os.Exit(m.Run())
+}
+
+// The registry requests of a module publication end before the scheduler
+// deadline, by a fifth of it and at most goRegistryDeadlineMarginCapMs.
+func TestGoRegistryContextEndsBeforeTheTaskDeadline(t *testing.T) {
+	started := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		deadline string
+		want     time.Duration
+	}{
+		{"60000", 48 * time.Second},
+		{"600000", 570 * time.Second},
+		{" 10000 ", 8 * time.Second},
+	} {
+		t.Setenv(extproto.TaskDeadlineMsEnv, tc.deadline)
+		ctx, cancel := goRegistryContext(started)
+		got, ok := ctx.Deadline()
+		cancel()
+		if !ok || got.Sub(started) != tc.want {
+			t.Errorf("deadline %q gives %v (%t), want %v after the start", tc.deadline, got.Sub(started), ok, tc.want)
+		}
+	}
+	for _, deadline := range []string{"", "0", "-5", "soon"} {
+		t.Setenv(extproto.TaskDeadlineMsEnv, deadline)
+		ctx, cancel := goRegistryContext(started)
+		_, ok := ctx.Deadline()
+		cancel()
+		if ok {
+			t.Errorf("deadline %q bounds the registry requests", deadline)
+		}
+	}
 }
