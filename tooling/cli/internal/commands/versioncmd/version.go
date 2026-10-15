@@ -359,7 +359,9 @@ func fetchRelease(ctx context.Context, client *http.Client, baseURL string, chan
 		return "", "", "", err
 	}
 
-	resp, err := extension.DoWithRetry(ctx, client, req)
+	// Only the headers are read here: HEAD keeps the registry from sending the
+	// binary, which downloadBinary fetches separately when it installs.
+	resp, err := extension.DoHeadWithRetry(ctx, client, req)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -383,7 +385,7 @@ func fetchRelease(ctx context.Context, client *http.Client, baseURL string, chan
 	integrity = pinnedarchive.ReadAdvertisedIntegrity(resp.Header)
 
 	// The download endpoint streams the binary directly — return the URL
-	// so downloadBinary can re-fetch it.
+	// so downloadBinary can fetch it.
 	return resolvedVersion, dlURL, integrity, nil
 }
 

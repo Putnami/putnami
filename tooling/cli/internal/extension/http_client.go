@@ -438,7 +438,7 @@ func resolveRetryBackoff(raw string) time.Duration {
 }
 
 // DoWithRetry runs req via client, retrying on transient failures with
-// exponential backoff. Only safe for idempotent GETs — the wrapper
+// exponential backoff. Only safe for idempotent GETs and HEADs — the wrapper
 // rebuilds the request per attempt so a body cannot be consumed once.
 //
 // Transient = network error, 408 Request Timeout, 429 Too Many Requests,
@@ -482,6 +482,23 @@ func DoWithRetry(ctx context.Context, client *http.Client, req *http.Request) (*
 		delay *= 2
 	}
 	return nil, lastErr
+}
+
+// DoHeadWithRetry sends req as a HEAD through DoWithRetry, for a caller that
+// reads only the response headers: the server sends no body. A server that
+// refuses HEAD with 405 Method Not Allowed receives the same request as a GET,
+// whose body the caller closes unread.
+func DoHeadWithRetry(ctx context.Context, client *http.Client, req *http.Request) (*http.Response, error) {
+	head := req.Clone(ctx)
+	head.Method = http.MethodHead
+	resp, err := DoWithRetry(ctx, client, head)
+	if err != nil || resp.StatusCode != http.StatusMethodNotAllowed {
+		return resp, err
+	}
+	drainAndClose(resp)
+	get := req.Clone(ctx)
+	get.Method = http.MethodGet
+	return DoWithRetry(ctx, client, get)
 }
 
 func isTransientErr(err error) bool {
