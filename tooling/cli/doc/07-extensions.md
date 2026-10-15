@@ -909,6 +909,8 @@ This is useful for CI/e2e environments where you want to always test against the
 
 When `putnami extensions update` or `putnami upgrade` moves an extension that `putnami.workspace.json` pins to one exact release, it writes the new release to that pin as well as to the lock. Ranges, channels, `latest`, unpinned entries and local paths are left as they are.
 
+A channel never moves a pin to an older build. When `extensions update`, `upgrade`, `install --latest` or `install <name>@<channel>` resolves a locked extension on a channel that serves an older build than the lock pins, or a build whose version does not compare with the pin, it keeps the pin, leaves the lock entry and the workspace pin as they are, and names the channel and the build it serves: `✓ @putnami/cloud@0.0.0-20261013204708-711d2a7 (kept: channel latest serves the older build 0.0.0-20260929233842-35e20e821)`. Versions compare by semantic-version precedence, so a build `0.0.0-<UTC timestamp>-<sha>` orders by its timestamp. To move a pin back, name the exact version: `putnami extensions install <name>@<version>`.
+
 ### Extension Dependencies
 
 An extension lists the extensions it needs in `extensionDependencies`. The
@@ -949,11 +951,14 @@ so on down the graph. See
   first dependent in that order picks the request. A constraint found at a
   later level is only checked. A cycle installs each extension once.
 - **Update and remove.** `putnami extensions update` and `putnami upgrade`
-  resolve every dependency again and write its lock entry. `update --dry-run`
-  previews the declared extensions only, and says so. `putnami extensions
-  remove <name>` refuses while another declared extension still requires
-  `<name>`, and names the path. Otherwise it also removes each dependency no
-  declared extension requires any more.
+  resolve every dependency again and write its lock entry. A dependency the
+  lock pins newer than its channel's build keeps its pin:
+  `✓ @acme/dev@1.2.0 (kept: channel latest serves the older build 1.1.0,
+  required by @acme/app)`. `update --dry-run` previews the declared
+  extensions only, and says so. `putnami extensions remove <name>` refuses
+  while another declared extension still requires `<name>`, and names the
+  path. Otherwise it also removes each dependency no declared extension
+  requires any more.
 - **List.** `putnami extensions list` shows each dependency with the
   extensions that require it, and the reserved provider commands it lost: a
   dependency the workspace does not declare serves no credential, cache,

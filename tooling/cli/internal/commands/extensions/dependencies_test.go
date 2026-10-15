@@ -1049,6 +1049,168 @@ func TestDryRunPreviewsDeclaredExtensionsOnly(t *testing.T) {
 	}
 }
 
+// The builds of a canary line: a canary pinned on 2026-10-13, the older build
+// latest serves, and a newer one.
+const (
+	olderBuild   = "0.0.0-20260929233842-35e20e821"
+	lockedCanary = "0.0.0-20261013204708-711d2a7"
+	newerBuild   = "0.0.0-20261014154651-d465c1b"
+)
+
+// update runs an update with args and returns its stdout.
+func (r *graphRegistry) update(cfg *wsproto.Config, opts ArtifactUpdateOptions, outputFormat string, args ...string) string {
+	r.t.Helper()
+	out, err := sharedtest.CaptureStdout(r.t, func() error {
+		return updateArtifacts(context.Background(), r.ws, cfg, args, r.ops(), opts, outputFormat)
+	})
+	if err != nil {
+		r.t.Fatalf("update %v: %v", args, err)
+	}
+	return out
+}
+
+// linkedVersion returns the version the stable link of name points at.
+func (r *graphRegistry) linkedVersion(name string) string {
+	r.t.Helper()
+	target, err := os.Readlink(layout.StableDir(r.ws, layout.Extensions, name))
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	_, version, _ := strings.Cut(filepath.Base(target), "@")
+	return version
+}
+
+// A channel that serves a build older than the locked one moves nothing: an
+// update, with or without the name, an upgrade over an exact workspace pin,
+// its dry run and install --latest keep the pin, write nothing, and name the
+// channel and the build it serves. A newer build moves the pin with ↑, and
+// the same build is up to date.
+func TestAnUpdateNeverMovesAPinToAnOlderBuild(t *testing.T) {
+	spectest.Proves(t, dependenciesFeature, "a-channel-never-moves-a-pin-backwards", "a-locked-canary-newer-than-the-channel-stays")
+	spectest.Proves(t, dependenciesFeature, "a-channel-never-moves-a-pin-backwards", "the-up-arrow-marks-only-a-newer-build")
+	r := newGraphRegistry(t)
+	for _, version := range []string{olderBuild, lockedCanary, newerBuild} {
+		r.publish("@putnami/cloud", version, "")
+	}
+	r.channel("@putnami/cloud", "latest", olderBuild)
+	cfg, _ := r.declare(map[string]string{"@putnami/cloud": ""})
+	r.mustRun(cfg, "@putnami/cloud@"+lockedCanary)
+	r.takeRequests()
+	before := r.lockBytes()
+	kept := "✓ @putnami/cloud@" + lockedCanary + " (kept: channel latest serves the older build " + olderBuild + ")"
+
+	for _, args := range [][]string{nil, {"@putnami/cloud"}} {
+		out := r.update(cfg, ArtifactUpdateOptions{}, "", args...)
+		if !strings.Contains(out, kept) || strings.Contains(out, "↑") {
+			t.Errorf("update %v output lacks %q, or shows ↑:\n%s", args, kept, out)
+		}
+		if got := requestsFor(r.takeRequests(), "@putnami/cloud"); !slices.Equal(got, []string{"latest", "lock:" + lockedCanary}) {
+			t.Errorf("update %v requests = %v, want the channel, then the pin again", args, got)
+		}
+		if !bytes.Equal(r.lockBytes(), before) {
+			t.Fatalf("update %v moved the lock:\n%s", args, r.lockBytes())
+		}
+		if got := r.linkedVersion("@putnami/cloud"); got != lockedCanary {
+			t.Errorf("update %v links %s, want the pinned %s", args, got, lockedCanary)
+		}
+	}
+
+	jsonl := r.update(cfg, ArtifactUpdateOptions{}, "jsonl")
+	for _, want := range []string{`"version":"` + lockedCanary + `"`, `"status":"kept"`, `"channel":"latest","channelVersion":"` + olderBuild + `"`} {
+		if !strings.Contains(jsonl, want) {
+			t.Errorf("jsonl lacks %s:\n%s", want, jsonl)
+		}
+	}
+	if preview := r.update(cfg, ArtifactUpdateOptions{DryRun: true}, ""); !strings.Contains(preview,
+		"Would keep @putnami/cloud@"+lockedCanary+": channel latest serves the older build "+olderBuild) {
+		t.Errorf("dry run lacks the kept pin:\n%s", preview)
+	}
+	if out := r.mustRun(cfg, "--latest"); !strings.Contains(out, kept) {
+		t.Errorf("install --latest output lacks %q:\n%s", kept, out)
+	}
+	if !bytes.Equal(r.lockBytes(), before) {
+		t.Fatalf("install --latest moved the lock:\n%s", r.lockBytes())
+	}
+
+	pinned, workspaceFile := r.declare(map[string]string{"@putnami/cloud": lockedCanary})
+	if out := r.update(pinned, ArtifactUpdateOptions{ConstraintOverride: "latest"}, ""); !strings.Contains(out, kept) {
+		t.Errorf("upgrade output lacks %q:\n%s", kept, out)
+	}
+	if got, _ := os.ReadFile(filepath.Join(r.ws, wsproto.WorkspaceConfigFilename)); !bytes.Equal(got, workspaceFile) || !bytes.Equal(r.lockBytes(), before) {
+		t.Fatalf("upgrade moved the workspace pin or the lock:\n%s\n%s", got, r.lockBytes())
+	}
+
+	r.channel("@putnami/cloud", "latest", newerBuild)
+	if out := r.update(cfg, ArtifactUpdateOptions{}, ""); !strings.Contains(out, "↑ @putnami/cloud: "+lockedCanary+" → "+newerBuild) {
+		t.Errorf("a newer build lacks ↑:\n%s", out)
+	}
+	wantPins(t, r.locked(), map[string]string{"@putnami/cloud": newerBuild})
+	if out := r.update(cfg, ArtifactUpdateOptions{}, ""); !strings.Contains(out, "✓ @putnami/cloud@"+newerBuild+" (up to date)") || strings.Contains(out, "↑") {
+		t.Errorf("the same build is not up to date:\n%s", out)
+	}
+	wantPins(t, r.locked(), map[string]string{"@putnami/cloud": newerBuild})
+}
+
+// A dependency the lock pins newer than its channel's build keeps its pin
+// through an update, and the line names the channel and its dependent.
+func TestAnUpdateKeepsANewerDependencyPin(t *testing.T) {
+	spectest.Proves(t, dependenciesFeature, "a-channel-never-moves-a-pin-backwards", "a-dependency-keeps-a-newer-pin")
+	r := newGraphRegistry(t)
+	r.publish("@acme/app", "1.0.0", `{"@putnami/cloud": ""}`)
+	r.publish("@putnami/cloud", olderBuild, "")
+	r.publish("@putnami/cloud", lockedCanary, "")
+	r.channel("@putnami/cloud", "latest", lockedCanary)
+	cfg, _ := r.declare(map[string]string{"@acme/app": ""})
+	r.mustRun(cfg)
+	r.channel("@putnami/cloud", "latest", olderBuild)
+	before := r.lockBytes()
+
+	out := r.update(cfg, ArtifactUpdateOptions{}, "")
+	want := "✓ @putnami/cloud@" + lockedCanary + " (kept: channel latest serves the older build " + olderBuild + ", required by @acme/app)"
+	if !strings.Contains(out, want) || strings.Contains(out, "↑") {
+		t.Errorf("output lacks %q, or shows ↑:\n%s", want, out)
+	}
+	if !bytes.Equal(r.lockBytes(), before) {
+		t.Fatalf("the update moved the lock:\n%s", r.lockBytes())
+	}
+}
+
+// A channel build whose version does not compare with the pin keeps the pin,
+// and the line says so.
+func TestAVersionThatDoesNotCompareKeepsThePin(t *testing.T) {
+	spectest.Proves(t, dependenciesFeature, "a-channel-never-moves-a-pin-backwards", "a-version-that-does-not-compare-keeps-the-pin")
+	r := newGraphRegistry(t)
+	r.publish("@acme/tool", "1.0.0", "")
+	r.publish("@acme/tool", "nightly", "")
+	r.channel("@acme/tool", "latest", "1.0.0")
+	cfg, _ := r.declare(map[string]string{"@acme/tool": ""})
+	r.mustRun(cfg)
+	r.channel("@acme/tool", "latest", "nightly")
+
+	out := r.update(cfg, ArtifactUpdateOptions{}, "")
+	if want := "✓ @acme/tool@1.0.0 (kept: channel latest serves nightly, which does not compare with the pin)"; !strings.Contains(out, want) {
+		t.Errorf("output lacks %q:\n%s", want, out)
+	}
+	wantPins(t, r.locked(), map[string]string{"@acme/tool": "1.0.0"})
+}
+
+// An exact version, such as upgrade --version, moves a pin to an older build,
+// and the line marks the move ↓.
+func TestAnExactVersionMovesAPinBackwards(t *testing.T) {
+	spectest.Proves(t, dependenciesFeature, "a-channel-never-moves-a-pin-backwards", "an-exact-version-moves-a-pin-backwards")
+	r := newGraphRegistry(t)
+	r.publish("@putnami/cloud", olderBuild, "")
+	r.publish("@putnami/cloud", lockedCanary, "")
+	cfg, _ := r.declare(map[string]string{"@putnami/cloud": ""})
+	r.mustRun(cfg, "@putnami/cloud@"+lockedCanary)
+
+	out := r.update(cfg, ArtifactUpdateOptions{ConstraintOverride: olderBuild}, "")
+	if want := "↓ @putnami/cloud: " + lockedCanary + " → " + olderBuild; !strings.Contains(out, want) {
+		t.Errorf("output lacks %q:\n%s", want, out)
+	}
+	wantPins(t, r.locked(), map[string]string{"@putnami/cloud": olderBuild})
+}
+
 func runRemove(t *testing.T, r *graphRegistry, cfg *wsproto.Config, name string) (string, error) {
 	t.Helper()
 	return sharedtest.CaptureStdout(t, func() error { return removeExtension(r.ws, cfg, []string{name}, r.ops()) })

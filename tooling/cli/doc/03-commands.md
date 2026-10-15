@@ -589,6 +589,29 @@ putnami extensions remove <name>    # Remove an extension
 putnami extensions prepare          # Prepare the provider runtimes of a source workspace
 ```
 
+`extensions update`, with or without a name, resolves each extension and each
+of its dependencies again on its constraint and writes the new version to the
+lock. A line marks a move `↑` only when the version is newer. On a channel
+(`latest`, an empty constraint, `*` or a channel name such as `canary`), the
+update never moves a pin to an older build. When the channel serves a build
+older than the lock pins, or one whose version does not compare with the pin,
+it keeps the pin, leaves the lock entry and any exact workspace pin as they
+are, and names the channel and the build it serves:
+
+```
+  ✓ @putnami/cloud@0.0.0-20261013204708-711d2a7 (kept: channel latest serves the older build 0.0.0-20260929233842-35e20e821)
+```
+
+Versions compare by semantic-version precedence, so a build
+`0.0.0-<UTC timestamp>-<sha>` orders by its timestamp. A pin equal to the
+channel's build is up to date. `templates update`, `upgrade`,
+`install --latest` and `install <name>@<channel>` follow the same rule, and
+`update --dry-run` prints `Would keep` for such a pin. With `--output=jsonl`,
+the event of a kept pin has `status` `kept`, the pin as `version`, and the
+channel's answer as `channel` and `channelVersion`. To move a pin to an older
+build, name the exact version: `putnami extensions install <name>@<version>`,
+or `putnami upgrade --version <version>`, which marks the move `↓`.
+
 `extensions list` shows one row per `extensions` key and one per other loaded extension, with its version constraint, installed version, and source. A `config` row is an entry of `extensions` in `putnami.workspace.json`, named by its key, which can be a path; its installed version is the one the lock records, not what this machine has. A `workspace` row is a loaded extension whose name is not such a key, for example one a workspace project or a `node_modules` package provides; its installed version is its manifest version. A path-declared extension therefore has two rows: a `config` row under its path and a `workspace` row under its name. Use `--output=jsonl` for machine-readable output.
 
 #### The user scope: `--user`

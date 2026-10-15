@@ -52,6 +52,11 @@ func TestVersionCompare(t *testing.T) {
 		{"1.0.0", "1.0.0-alpha", 1},  // release > prerelease
 		{"1.0.0-alpha", "1.0.0-beta", -1},
 		{"1.0.0-alpha.1", "1.0.0-alpha.2", -1},
+		// A build prerelease, <UTC timestamp>-<sha>, orders by its timestamp
+		// whatever its sha.
+		{"0.0.0-20261013204708-711d2a7", "0.0.0-20260929233842-35e20e821", 1},
+		{"0.0.0-20261013204708-711d2a7", "0.0.0-20261014154651-d465c1b", -1},
+		{"0.0.0-20261014154651-d465c1b", "0.0.0-20261014154651-d465c1b", 0},
 	}
 
 	for _, tt := range tests {

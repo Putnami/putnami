@@ -65,6 +65,10 @@
       "text": "putnami extensions update and putnami upgrade re-resolve every dependency by the resolution rules, write its lock entry and never write it into the workspace file's pins. update --dry-run previews the declared extensions only, and says so. putnami extensions list shows each dependency with the extension that requires it."
     },
     {
+      "id": "a-channel-never-moves-a-pin-backwards",
+      "text": "When putnami extensions update, putnami templates update, putnami upgrade, install --latest or install name@channel resolves a locked artifact again on a channel (latest, an empty constraint, * or a channel name), it never moves the pin to an older build or to one whose version does not compare with it: it keeps the pin, leaves its lock entry as it is and names the channel and the build it serves. Only an exact version or a range moves a pin backwards, and ↑ marks only a newer version."
+    },
+    {
       "id": "remove-keeps-the-graph-whole",
       "text": "putnami extensions remove refuses when the name is still reachable from the workspace declarations without it, and names the members on that path, so the root of a cycle can be removed. Otherwise it removes the lock entry of the name and of each dependency those declarations no longer reach."
     },
