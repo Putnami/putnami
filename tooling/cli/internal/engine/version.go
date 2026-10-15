@@ -66,12 +66,16 @@ func captureVersionSnapshot(wsRoot string) (*git.VersionInfo, error) {
 // side of a frozen portable request is exempt: the submitter resolved its
 // versions, and the snapshot it runs in carries no repository. A version 2
 // request runs on a checkout, which is asked like any other root.
-func requireRepository(req *Request) error {
+//
+// It also returns the extensions it discovered, nil when it read none, so a
+// refusal is reported without discovering them again (reportRepositoryRefusal).
+func requireRepository(req *Request) (*internalextension.DiscoveryResult, error) {
 	if req.VersionSnapshot != nil || req.Portable.frozen() || req.Global.Plan || req.previewsOnly() {
-		return nil
+		return nil, nil
 	}
+	discovered := discoverDeclaredExtensions(req)
 	var extensions []*internalextension.ExtensionDescription
-	if discovered := discoverDeclaredExtensions(req); discovered != nil {
+	if discovered != nil {
 		extensions = discovered.Extensions
 	}
 	for _, command := range req.Commands {
@@ -79,15 +83,16 @@ func requireRepository(req *Request) error {
 			continue
 		}
 		if unmanaged := git.Unmanaged(req.WorkspaceRoot); unmanaged != nil {
-			return fmt.Errorf("%s needs git history: %w", command, unmanaged)
+			return discovered, fmt.Errorf("%s needs git history: %w", command, unmanaged)
 		}
-		return nil
+		return discovered, nil
 	}
-	return nil
+	return discovered, nil
 }
 
 // reportRepositoryRefusal prints why a run requireRepository refused stops, and
-// returns the error the run ends with.
+// returns the error the run ends with. discovered is what requireRepository
+// discovered, nil when the extensions cannot be read.
 //
 // A selected command that no loaded extension declares, while an extension the
 // workspace declares is not installed, cannot run in any directory: installing
@@ -98,17 +103,14 @@ func requireRepository(req *Request) error {
 // job or remote call. A command a loaded extension declares but no selected
 // project activates gets the refusal: telling it apart needs the plan, which
 // this run never builds.
-func reportRepositoryRefusal(req *Request, refusal error) error {
-	// Only a registry extension can be missing, so the extensions of a
-	// workspace that declares none are not read again.
-	if len(missingRegistryExtensions(req.Config, nil)) > 0 {
-		if discovered := discoverDeclaredExtensions(req); discovered != nil {
-			missing := missingRegistryExtensions(req.Config, discovered.Extensions, discovered.MissingDependencies()...)
-			if len(missing) > 0 && len(selectedCommandsWithoutJobs(req.Commands, nil, discovered.Extensions)) > 0 {
-				reportMissingExtensions(missing, discovered.Skipped, "")
-				reportUnservedSDDCommands(req.Commands, discovered.Extensions)
-				return nil
-			}
+func reportRepositoryRefusal(req *Request, discovered *internalextension.DiscoveryResult, refusal error) error {
+	// Only a workspace that declares a registry extension can miss one.
+	if discovered != nil && len(missingRegistryExtensions(req.Config, nil)) > 0 {
+		missing := missingRegistryExtensions(req.Config, discovered.Extensions, discovered.MissingDependencies()...)
+		if len(missing) > 0 && len(selectedCommandsWithoutJobs(req.Commands, nil, discovered.Extensions)) > 0 {
+			reportMissingExtensions(missing, discovered.Skipped, "")
+			reportUnservedSDDCommands(req.Commands, discovered.Extensions)
+			return nil
 		}
 	}
 	iox.Fprintf(os.Stderr, "putnami: %v\n", refusal)

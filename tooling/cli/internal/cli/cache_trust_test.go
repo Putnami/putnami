@@ -94,8 +94,9 @@ func TestResolveCacheTrustReleasePathsForceAuthoritative(t *testing.T) {
 // TestResolveCacheTrustReleaseFollowsTheDeclaredSideEffects pins that the
 // release floor reads the registry side effect a loaded job declares, not the
 // command name: a verb of the extension's own that declares it is raised like
-// publish, a publish whose declared traits name none is not, and a cloud side
-// effect alone, deploy's default, does not raise the trust. The flag fixes the
+// publish, a publish whose declared traits name none keeps its registry
+// default and is raised, and a cloud side effect alone, deploy's default, does
+// not raise the trust. The flag fixes the
 // requested trust, so neither CI nor PUTNAMI_CACHE_TRUST is read.
 func TestResolveCacheTrustReleaseFollowsTheDeclaredSideEffects(t *testing.T) {
 	t.Parallel()
@@ -115,7 +116,7 @@ func TestResolveCacheTrustReleaseFollowsTheDeclaredSideEffects(t *testing.T) {
 	}{
 		{"a verb declaring registry side effects raises any to ci", loaded, []string{"release"}, store.CacheTrustCI},
 		{"it raises a run among ordinary commands", loaded, []string{"build", "release"}, store.CacheTrustCI},
-		{"publish declared without side effects keeps any", loaded, []string{"publish"}, store.CacheTrustAny},
+		{"publish declared without side effects keeps its registry floor", loaded, []string{"publish"}, store.CacheTrustCI},
 		{"publish no extension declares raises any to ci", nil, []string{"publish"}, store.CacheTrustCI},
 		{"a verb declaring cloud side effects keeps any", loaded, []string{"converge"}, store.CacheTrustAny},
 		{"deploy keeps any", nil, []string{"deploy"}, store.CacheTrustAny},

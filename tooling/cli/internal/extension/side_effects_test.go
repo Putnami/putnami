@@ -6,10 +6,9 @@ import (
 )
 
 // TestCommandSideEffects pins that a command's side effects are the traits its
-// loaded jobs declare, not its name: a verb of an extension's own is classified
-// by its declaration, a well-known verb whose declared traits name none has
-// none, and only a command no loaded extension declares falls back to the
-// well-known verb's defaults.
+// loaded jobs declare plus the well-known verb's default: a verb of an
+// extension's own is classified by its declaration, and declared traits add
+// side effects to a well-known verb but never remove its default.
 func TestCommandSideEffects(t *testing.T) {
 	t.Parallel()
 	job := func(effects string) *JobDefinition {
@@ -24,6 +23,7 @@ func TestCommandSideEffects(t *testing.T) {
 	mirror := &ExtensionDescription{Name: "@test/mirror", Jobs: map[string]*JobDefinition{
 		"ship":    job(SideEffectsRegistry),
 		"release": job(SideEffectsCloud),
+		"deploy":  job(SideEffectsRegistry),
 	}}
 	loaded := []*ExtensionDescription{nil, release, mirror}
 	for _, tc := range []struct {
@@ -35,7 +35,8 @@ func TestCommandSideEffects(t *testing.T) {
 		{name: "a verb of its own declaring registry", extensions: []*ExtensionDescription{release}, command: "release", want: []string{SideEffectsRegistry}},
 		{name: "a verb of its own declaring cloud", extensions: loaded, command: "converge", want: []string{SideEffectsCloud}},
 		{name: "a step of that verb", extensions: []*ExtensionDescription{release}, command: "release~upload", want: []string{SideEffectsRegistry}},
-		{name: "publish declared with no side effect", extensions: loaded, command: "publish"},
+		{name: "publish declared with no side effect keeps registry", extensions: loaded, command: "publish", want: []string{SideEffectsRegistry}},
+		{name: "deploy declared with registry adds it to cloud", extensions: loaded, command: "deploy", want: []string{SideEffectsCloud, SideEffectsRegistry}},
 		{name: "every extension that declares the command counts", extensions: loaded, command: "release", want: []string{SideEffectsCloud, SideEffectsRegistry}},
 		{name: "one side effect among declarations of none", extensions: loaded, command: "ship", want: []string{SideEffectsRegistry}},
 		{name: "publish no extension declares", extensions: []*ExtensionDescription{mirror}, command: "publish", want: []string{SideEffectsRegistry}},
