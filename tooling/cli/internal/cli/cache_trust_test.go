@@ -96,8 +96,8 @@ func TestResolveCacheTrustReleasePathsForceAuthoritative(t *testing.T) {
 // command name: a verb of the extension's own that declares it is raised like
 // publish, a publish whose declared traits name none keeps its registry
 // default and is raised, and a cloud side effect alone, deploy's default, does
-// not raise the trust. The flag fixes the
-// requested trust, so neither CI nor PUTNAMI_CACHE_TRUST is read.
+// not raise the trust. The flag fixes the requested trust, so neither CI nor
+// PUTNAMI_CACHE_TRUST is read.
 func TestResolveCacheTrustReleaseFollowsTheDeclaredSideEffects(t *testing.T) {
 	t.Parallel()
 	loaded := []*extension.ExtensionDescription{{

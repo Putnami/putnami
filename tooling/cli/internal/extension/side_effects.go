@@ -13,7 +13,7 @@ import (
 // nothing outside the workspace.
 //
 // It reads command traits only. The effects a task declares (declares.effects)
-// are read by jobs.HasExternalEffects.
+// are read by scheduler.HasExternalEffects.
 //
 // Declared traits add side effects and never remove one: a manifest that
 // declares sideEffects on a verb of its own counts exactly as the default of

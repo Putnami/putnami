@@ -25,6 +25,10 @@ func TestCommandSideEffects(t *testing.T) {
 		"release": job(SideEffectsCloud),
 		"deploy":  job(SideEffectsRegistry),
 	}}
+	again := &ExtensionDescription{Name: "@test/again", Jobs: map[string]*JobDefinition{
+		"publish": job(SideEffectsRegistry),
+		"ship":    job(SideEffectsRegistry),
+	}}
 	loaded := []*ExtensionDescription{nil, release, mirror}
 	for _, tc := range []struct {
 		name       string
@@ -39,6 +43,8 @@ func TestCommandSideEffects(t *testing.T) {
 		{name: "deploy declared with registry adds it to cloud", extensions: loaded, command: "deploy", want: []string{SideEffectsCloud, SideEffectsRegistry}},
 		{name: "every extension that declares the command counts", extensions: loaded, command: "release", want: []string{SideEffectsCloud, SideEffectsRegistry}},
 		{name: "one side effect among declarations of none", extensions: loaded, command: "ship", want: []string{SideEffectsRegistry}},
+		{name: "publish declaring its own default counts it once", extensions: []*ExtensionDescription{again}, command: "publish", want: []string{SideEffectsRegistry}},
+		{name: "two extensions declaring one side effect count it once", extensions: []*ExtensionDescription{mirror, again}, command: "ship", want: []string{SideEffectsRegistry}},
 		{name: "publish no extension declares", extensions: []*ExtensionDescription{mirror}, command: "publish", want: []string{SideEffectsRegistry}},
 		{name: "deploy with no extension loaded", command: "deploy", want: []string{SideEffectsCloud}},
 		{name: "build with no extension loaded", command: "build"},
