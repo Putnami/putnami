@@ -307,3 +307,27 @@ func TestDoHeadWithRetry_FallsBackToGetOn405(t *testing.T) {
 		t.Errorf("methods = %v, want [HEAD GET]", methods)
 	}
 }
+
+// TestDoHeadWithRetry_NoFallbackOn404 keeps a 404 to HEAD an answer: only 405
+// sends the request again as a GET.
+func TestDoHeadWithRetry_NoFallbackOn404(t *testing.T) {
+	var methods []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		methods = append(methods, r.Method)
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+	resp, err := DoHeadWithRetry(context.Background(), srv.Client(), req)
+	if err != nil {
+		t.Fatalf("DoHeadWithRetry: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("StatusCode = %d, want 404", resp.StatusCode)
+	}
+	if len(methods) != 1 || methods[0] != http.MethodHead {
+		t.Errorf("methods = %v, want [HEAD]", methods)
+	}
+}

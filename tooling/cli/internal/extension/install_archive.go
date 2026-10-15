@@ -86,7 +86,8 @@ func (inst *Installer) ResolveArtifact(ctx context.Context, name, constraint str
 // so the only thing streaming the archive would add is a consistency check of
 // the registry against itself — while making every version bump pay a full
 // (tens of MB, up to MaxArchiveSize) download per extra platform. So only the
-// advertised header is read and the response body is closed unread.
+// advertised header is read: the lookup sends HEAD, and a registry that refuses
+// HEAD gets a GET whose body is closed unread.
 //
 // The LOCAL platform's digest keeps its strictly stronger guarantee and never
 // comes from here: InstallArtifact hashes the bytes it actually downloaded and

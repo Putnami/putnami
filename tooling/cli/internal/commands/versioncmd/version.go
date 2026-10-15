@@ -385,7 +385,7 @@ func fetchRelease(ctx context.Context, client *http.Client, baseURL string, chan
 	integrity = pinnedarchive.ReadAdvertisedIntegrity(resp.Header)
 
 	// The download endpoint streams the binary directly — return the URL
-	// so downloadBinary can re-fetch it.
+	// so downloadBinary can fetch it.
 	return resolvedVersion, dlURL, integrity, nil
 }
 
