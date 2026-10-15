@@ -164,7 +164,7 @@ func workspaceProviderBindings(
 				Dir:               ws.Root,
 				Context:           ctx,
 				Resolve:           runtimeResolverFor(ctx, ws, ext, preparation),
-				FromArtifactStore: extension.InArtifactStore(ws.Root, ext),
+				PreparedBeforeRun: !extension.StartsRepositoryCode(ws.Root, ext),
 			},
 		})
 	}

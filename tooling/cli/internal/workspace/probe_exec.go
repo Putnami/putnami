@@ -65,12 +65,13 @@ type ExecProbeProvider struct {
 	Timeout time.Duration
 	// Context scopes the run. Nil means context.Background().
 	Context context.Context
-	// FromArtifactStore says the provider's extension is installed from the
-	// artifact store (extension.InArtifactStore): its probe runs registry
-	// code. Any other provider, a local extension first of all, runs
-	// repository code, and Probe records that before the spawn
-	// (runcredential.MarkRepositoryCodeStarted).
-	FromArtifactStore bool
+	// PreparedBeforeRun says the provider's probe starts no repository code
+	// (extension.StartsRepositoryCode): its extension is installed from the
+	// artifact store, which is registry code, or this run starts its runtime
+	// from the source build (extension.FromSourceBuild). Any other provider, a
+	// local extension first of all, runs repository code, and Probe records
+	// that before the spawn (runcredential.MarkRepositoryCodeStarted).
+	PreparedBeforeRun bool
 }
 
 // Name is the provider's extension name.
@@ -103,7 +104,7 @@ func (p *ExecProbeProvider) Probe(request wsproto.ProbeRequest) (wsproto.ProbeRe
 	if len(args) == 0 {
 		args = wsproto.ProbeControlArgs()
 	}
-	if !p.FromArtifactStore {
+	if !p.PreparedBeforeRun {
 		runcredential.MarkRepositoryCodeStarted("workspace probe of " + p.Extension)
 	}
 	cmd := exec.CommandContext(ctx, executable, args...) //nolint:gosec // executable is a resolved extension runtime

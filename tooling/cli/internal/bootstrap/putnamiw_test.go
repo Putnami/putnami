@@ -526,7 +526,8 @@ func TestPutnamiwBunCache_FollowsTheBunOfTheMachine(t *testing.T) {
 // tree, with sources both inside and outside tooling/cli, and a stub `go` that
 // logs its invocations. It returns the repo, the shared PUTNAMI_HOME, and the
 // env slice. GO_BUILD_FAIL names a file whose existence makes the stub's `build`
-// fail; it does not exist until a test creates it.
+// fail; it does not exist until a test creates it. The CLI the stub builds fails
+// when SENTINEL_FAIL exists, or when SENTINEL_NEEDS names no executable file.
 func gitSourceRepo(t *testing.T) (repo, home string, env []string) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
@@ -544,6 +545,7 @@ func gitSourceRepo(t *testing.T) (repo, home string, env []string) {
 	stubBin := filepath.Join(root, "bin")
 	goLog := filepath.Join(root, "go.log")
 	buildFail := filepath.Join(root, "go-build-fail")
+	sentinelFail := filepath.Join(root, "sentinel-fail")
 	writeExec(t, filepath.Join(stubBin, "go"), `#!/usr/bin/env bash
 printf '%s\n' "$*" >> "$GO_LOG"
 case "$1" in
@@ -554,7 +556,11 @@ case "$1" in
          if [ -f "$GO_BUILD_FAIL" ]; then echo "stub go: build refused" >&2; exit 1; fi
          [ -n "$out" ] && { cat > "$out" <<'SENTINEL'
 #!/usr/bin/env bash
+if [ -f "$SENTINEL_FAIL" ]; then echo "sentinel: $* refused" >&2; exit 7; fi
+if [ -n "${SENTINEL_NEEDS:-}" ] && [ ! -x "$SENTINEL_NEEDS" ]; then echo "sentinel: $SENTINEL_NEEDS is missing" >&2; exit 8; fi
 echo RAN_BUILT
+echo "ARGS=$*"
+echo "CWD=$PWD"
 echo "SELF=$0"
 echo "FROM_SOURCE=${PUTNAMI_FROM_SOURCE:-<unset>}"
 echo "FROM_SOURCE_KEY=${PUTNAMI_FROM_SOURCE_KEY:-<unset>}"
@@ -573,6 +579,7 @@ exit 0
 		"PUTNAMI_HOME="+home,
 		"GO_LOG="+goLog,
 		"GO_BUILD_FAIL="+buildFail,
+		"SENTINEL_FAIL="+sentinelFail,
 	)
 	return repo, home, env
 }
@@ -1198,12 +1205,7 @@ exec "`+filepath.Join(stubBin, "go")+`" "$@"
 // or, when the lock pins another release, the one go.dev publishes beside the
 // archive. Any other archive stops the run, and nothing is installed or built.
 func TestPutnamiwSourceKey_DownloadedGoMustMatchItsSHA256(t *testing.T) {
-	platform := runtime.GOOS + "/" + runtime.GOARCH
-	switch platform {
-	case "darwin/amd64", "darwin/arm64", "linux/amd64", "linux/arm64":
-	default:
-		t.Skipf("the wrapper downloads no Go for %s", platform)
-	}
+	requireGoDownloadPlatform(t)
 	const archive = "FAKE-GO-ARCHIVE"
 	sum := sha256.Sum256([]byte(archive))
 	digest := hex.EncodeToString(sum[:])
@@ -1227,45 +1229,8 @@ func TestPutnamiwSourceKey_DownloadedGoMustMatchItsSHA256(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(repo, "go.work"), []byte("go 1.30.0\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			type goPin struct {
-				Version     string            `json:"version"`
-				Integrities map[string]string `json:"integrities"`
-				Source      string            `json:"source"`
-			}
-			type lockFile struct {
-				Version    int              `json:"version"`
-				Toolchains map[string]goPin `json:"toolchains"`
-			}
-			lock, err := json.MarshalIndent(lockFile{
-				Version: 3,
-				Toolchains: map[string]goPin{"go": {
-					Version:     c.lockVersion,
-					Integrities: map[string]string{platform: c.lockDigest},
-					Source:      "https://go.dev/dl/",
-				}},
-			}, "", "  ")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(repo, "putnami.lock.json"), lock, 0o644); err != nil {
-				t.Fatal(err)
-			}
-			downloadBin := t.TempDir()
-			writeExec(t, filepath.Join(downloadBin, "curl"), `#!/usr/bin/env bash
-out=""; url=""
-while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2;; -*) shift;; *) url="$1"; shift;; esac; done
-case "$url" in
-  *.sha256) [ -n "`+c.published+`" ] || exit 22; echo "`+c.published+`"; exit 0;;
-esac
-printf '`+archive+`' > "$out"
-`)
-			writeExec(t, filepath.Join(downloadBin, "tar"), `#!/usr/bin/env bash
-dir=""
-while [ $# -gt 0 ]; do case "$1" in -C) dir="$2"; shift 2;; *) shift;; esac; done
-mkdir -p "$dir/go/bin"
-printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "`+filepath.Join(stubBin, "go")+`" > "$dir/go/bin/go"
-chmod +x "$dir/go/bin/go"
-`)
+			writeGoLock(t, repo, c.lockVersion, c.lockDigest)
+			downloadBin, _ := fakeGoDownload(t, archive, c.published, filepath.Join(stubBin, "go"))
 			env = append(env, "PATH="+downloadBin+string(os.PathListSeparator)+envValue(env, "PATH"))
 
 			out, code := runIn(t, repo, env, "ping")
@@ -1290,6 +1255,73 @@ chmod +x "$dir/go/bin/go"
 	}
 	spectest.Proves(t, "cli/engine-provenance", "build-toolchain-stays-in-the-build",
 		"a-downloaded-go-is-installed-only-at-its-locked-or-published-sha256")
+}
+
+// requireGoDownloadPlatform skips the test on a platform for which the wrapper
+// downloads no Go.
+func requireGoDownloadPlatform(t *testing.T) {
+	t.Helper()
+	switch platform := runtime.GOOS + "/" + runtime.GOARCH; platform {
+	case "darwin/amd64", "darwin/arm64", "linux/amd64", "linux/arm64":
+	default:
+		t.Skipf("the wrapper downloads no Go for %s", platform)
+	}
+}
+
+// writeGoLock writes a workspace lock in the layout the CLI writes, pinning Go
+// version with digest as the SHA-256 of its archive for the host platform.
+func writeGoLock(t *testing.T, repo, version, digest string) {
+	t.Helper()
+	type goPin struct {
+		Version     string            `json:"version"`
+		Integrities map[string]string `json:"integrities"`
+		Source      string            `json:"source"`
+	}
+	type lockFile struct {
+		Version    int              `json:"version"`
+		Toolchains map[string]goPin `json:"toolchains"`
+	}
+	lock, err := json.MarshalIndent(lockFile{
+		Version: 3,
+		Toolchains: map[string]goPin{"go": {
+			Version:     version,
+			Integrities: map[string]string{runtime.GOOS + "/" + runtime.GOARCH: digest},
+			Source:      "https://go.dev/dl/",
+		}},
+	}, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "putnami.lock.json"), lock, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// fakeGoDownload writes a curl that answers a .sha256 URL with published, or
+// fails when published is empty, and any other URL with archive, and a tar that
+// extracts any archive to a go/bin/go that runs stubGo. The curl appends each
+// URL it is given to curlLog. It returns the directory to put first on PATH.
+func fakeGoDownload(t *testing.T, archive, published, stubGo string) (bin, curlLog string) {
+	t.Helper()
+	bin = t.TempDir()
+	curlLog = filepath.Join(t.TempDir(), "curl.log")
+	writeExec(t, filepath.Join(bin, "curl"), `#!/usr/bin/env bash
+out=""; url=""
+while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2;; -*) shift;; *) url="$1"; shift;; esac; done
+printf '%s\n' "$url" >> "`+curlLog+`"
+case "$url" in
+  *.sha256) [ -n "`+published+`" ] || exit 22; echo "`+published+`"; exit 0;;
+esac
+printf '`+archive+`' > "$out"
+`)
+	writeExec(t, filepath.Join(bin, "tar"), `#!/usr/bin/env bash
+dir=""
+while [ $# -gt 0 ]; do case "$1" in -C) dir="$2"; shift 2;; *) shift;; esac; done
+mkdir -p "$dir/go/bin"
+printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "`+stubGo+`" > "$dir/go/bin/go"
+chmod +x "$dir/go/bin/go"
+`)
+	return bin, curlLog
 }
 
 // sha256_of, which checks a downloaded Go archive, hashes with openssl on a
@@ -1433,11 +1465,11 @@ func TestPutnamiwSourceKey_KeylessRunUnsetsAnInheritedPin(t *testing.T) {
 
 // ─── build-only mode ─────────────────────────────────────────────────────────
 //
-// `./putnamiw --print-engine` builds or reuses the keyed store blob, runs
-// nothing, and prints one JSON line naming it. A launcher then starts that blob
-// itself, in another process, with the environment it chooses. Nothing under
-// .putnami/bin moves, so the build has no side effect a later process could
-// read as its own.
+// `./putnamiw --print-engine` builds or reuses the keyed store blob, runs only
+// `putnami extensions prepare` with it, and prints one JSON line naming it. A
+// launcher then starts that blob itself, in another process, with the
+// environment it chooses. Nothing under .putnami/bin moves, so the build has no
+// side effect a later process could read as its own.
 
 // printedEngine is the one JSON line --print-engine writes on stdout.
 type printedEngine struct {
@@ -1504,23 +1536,43 @@ func assertNoWorkspaceBin(t *testing.T, repo string) {
 	}
 }
 
-// The mode builds the blob once, prints its absolute path, key and root, starts
-// nothing, and leaves .putnami/bin absent. A second call at the same tree state
+// The mode builds the blob once, prints its absolute path, key and root, and
+// leaves .putnami/bin absent. The one command it starts with the blob is
+// `extensions prepare`, in the workspace root, admitted by the key that names
+// the blob, with its output on stderr. A second call at the same tree state
 // reuses the blob without compiling and prints the same line.
-func TestPutnamiwPrintEngine_PrintsTheBlobAndRunsNothing(t *testing.T) {
+func TestPutnamiwPrintEngine_PrintsTheBlobAndRunsOnlyExtensionsPrepare(t *testing.T) {
 	repo, home, env := gitSourceRepo(t)
 
 	stdout, stderr, code := runSplit(t, repo, env, "--print-engine")
 	if code != 0 {
 		t.Fatalf("--print-engine failed (%d):\n%s", code, stderr)
 	}
-	if strings.Contains(stdout+stderr, "RAN_BUILT") {
-		t.Errorf("--print-engine started the CLI:\nstdout=%s\nstderr=%s", stdout, stderr)
+	if strings.Contains(stdout, "RAN_BUILT") {
+		t.Errorf("--print-engine wrote the output of the CLI on stdout:\n%s", stdout)
 	}
 	if !strings.Contains(stderr, "Building putnami CLI") {
 		t.Errorf("progress must go to stderr, got:\n%s", stderr)
 	}
 	engine := decodeEngine(t, stdout)
+	if got := strings.Count(stderr, "RAN_BUILT"); got != 1 {
+		t.Fatalf("--print-engine started the CLI %d times, want once:\n%s", got, stderr)
+	}
+	if got := sentinelField(t, stderr, "ARGS"); got != "extensions prepare" {
+		t.Errorf("--print-engine ran `putnami %s`, want only `putnami extensions prepare`", got)
+	}
+	if got := sentinelField(t, stderr, "CWD"); !samePath(t, got, repo) {
+		t.Errorf("extensions prepare ran in %q, want the workspace %q", got, repo)
+	}
+	if got := sentinelField(t, stderr, "SELF"); !samePath(t, got, engine.Path) {
+		t.Errorf("extensions prepare ran %q, want the printed blob %q", got, engine.Path)
+	}
+	if got := sentinelField(t, stderr, "FROM_SOURCE"); !samePath(t, got, repo) {
+		t.Errorf("extensions prepare names the source %q, want the workspace %q", got, repo)
+	}
+	if got := sentinelField(t, stderr, "FROM_SOURCE_KEY"); got != engine.Key {
+		t.Errorf("extensions prepare names the key %q, want the printed key %q", got, engine.Key)
+	}
 
 	blobs := sourceBlobs(t, home)
 	if len(blobs) != 1 {
@@ -1570,7 +1622,7 @@ func TestPutnamiwPrintEngine_PrintsTheBlobAndRunsNothing(t *testing.T) {
 		t.Errorf("the normal run rebuilt (`go build` count %d, want 1)", got)
 	}
 	spectest.Proves(t, "cli/engine-provenance", "build-only-engine",
-		"print-engine-names-the-keyed-blob-and-runs-nothing")
+		"print-engine-names-the-keyed-blob-and-runs-only-extensions-prepare")
 }
 
 // An existing workspace link and marker stay byte-identical when --print-engine
@@ -1632,7 +1684,8 @@ func TestPutnamiwPrintEngine_LeavesTheWorkspaceLinkAlone(t *testing.T) {
 }
 
 // A failed build exits non-zero with nothing on stdout, even when an older blob
-// is cached, and every refusal does the same before building anything.
+// is cached, and so does a failed `extensions prepare`. Every refusal does the
+// same before building anything.
 func TestPutnamiwPrintEngine_FailsWithNothingOnStdout(t *testing.T) {
 	t.Run("failed build", func(t *testing.T) {
 		repo, _, env := gitSourceRepo(t)
@@ -1654,6 +1707,26 @@ func TestPutnamiwPrintEngine_FailsWithNothingOnStdout(t *testing.T) {
 			if !strings.Contains(stderr, want) {
 				t.Errorf("stderr must carry %q:\n%s", want, stderr)
 			}
+		}
+		assertNoWorkspaceBin(t, repo)
+	})
+
+	t.Run("failed extensions prepare", func(t *testing.T) {
+		repo, home, env := gitSourceRepo(t)
+		if err := os.WriteFile(envValue(env, "SENTINEL_FAIL"), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		stdout, stderr, code := runSplit(t, repo, env, "--print-engine")
+		if code == 0 || stdout != "" {
+			t.Fatalf("a failed extensions prepare must exit non-zero with empty stdout: code=%d stdout=%q", code, stdout)
+		}
+		for _, want := range []string{"sentinel: extensions prepare refused", "putnami extensions prepare failed"} {
+			if !strings.Contains(stderr, want) {
+				t.Errorf("stderr must carry %q:\n%s", want, stderr)
+			}
+		}
+		if got := sourceBlobs(t, home); len(got) != 1 {
+			t.Errorf("blobs = %v, want the one blob the build published", got)
 		}
 		assertNoWorkspaceBin(t, repo)
 	})
@@ -1717,4 +1790,119 @@ func TestPutnamiwPrintEngine_FailsWithNothingOnStdout(t *testing.T) {
 			assertNoWorkspaceBin(t, repo)
 		})
 	}
+}
+
+// `extensions prepare` resolves a prepare toolchain to exactly the Go release
+// the lock pins and installs none. So before it runs that command,
+// --print-engine installs that release under the Putnami home, on a run that
+// builds the blob and on one that reuses it, unless $GOROOT/bin/go or the go on
+// PATH runs as that release, probed as the CLI probes it: GOROOT unset and
+// GOTOOLCHAIN=local. A Go it cannot verify stops the mode before the command
+// starts, with nothing on stdout.
+func TestPutnamiwPrintEngine_InstallsTheLockedGoBeforeExtensionsPrepare(t *testing.T) {
+	requireGoDownloadPlatform(t)
+	const archive = "FAKE-GO-ARCHIVE"
+	sum := sha256.Sum256([]byte(archive))
+	digest := hex.EncodeToString(sum[:])
+	setup := func(t *testing.T, version, lockDigest string) (repo, managed, curlLog string, env []string) {
+		repo, home, env := gitSourceRepo(t)
+		stubGo := filepath.Join(strings.Split(envValue(env, "PATH"), string(os.PathListSeparator))[0], "go")
+		writeGoLock(t, repo, version, lockDigest)
+		downloadBin, curlLog := fakeGoDownload(t, archive, "", stubGo)
+		managed = filepath.Join(home, "toolchains", "go", "go-"+version)
+		env = append(env,
+			"PATH="+downloadBin+string(os.PathListSeparator)+envValue(env, "PATH"),
+			"SENTINEL_NEEDS="+filepath.Join(managed, "go", "bin", "go"))
+		return repo, managed, curlLog, env
+	}
+	downloads := func(t *testing.T, curlLog string) int {
+		t.Helper()
+		data, err := os.ReadFile(curlLog)
+		if os.IsNotExist(err) {
+			return 0
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		return strings.Count(string(data), "\n")
+	}
+
+	t.Run("the go on PATH runs as another release", func(t *testing.T) {
+		repo, managed, curlLog, env := setup(t, "1.30.0", digest)
+		for i, run := range []string{"a run that builds", "a run that reuses the blob"} {
+			stdout, stderr, code := runSplit(t, repo, env, "--print-engine")
+			if code != 0 {
+				t.Fatalf("%s: --print-engine failed (%d):\n%s", run, code, stderr)
+			}
+			decodeEngine(t, stdout)
+			if got := sentinelField(t, stderr, "ARGS"); got != "extensions prepare" {
+				t.Errorf("%s: ran `putnami %s`, want `putnami extensions prepare`", run, got)
+			}
+			if got := downloads(t, curlLog); got != i+1 {
+				t.Errorf("%s: %d downloads, want %d", run, got, i+1)
+			}
+			if err := os.RemoveAll(managed); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got := goBuildCount(t, env); got != 1 {
+			t.Errorf("`go build` count %d, want 1: the second run reuses the blob", got)
+		}
+	})
+
+	t.Run("the go on PATH runs as the locked release", func(t *testing.T) {
+		repo, managed, curlLog, env := setup(t, "1.26.1", digest)
+		env = append(env, "SENTINEL_NEEDS=")
+		stdout, stderr, code := runSplit(t, repo, env, "--print-engine")
+		if code != 0 {
+			t.Fatalf("--print-engine failed (%d):\n%s", code, stderr)
+		}
+		decodeEngine(t, stdout)
+		if got := downloads(t, curlLog); got != 0 {
+			t.Errorf("%d downloads, want none: the go on PATH runs as the locked release", got)
+		}
+		if _, err := os.Stat(managed); !os.IsNotExist(err) {
+			t.Errorf("a Go was installed at %s: %v", managed, err)
+		}
+	})
+
+	t.Run("GOROOT holds the locked release", func(t *testing.T) {
+		repo, managed, curlLog, env := setup(t, "1.30.0", digest)
+		goroot := t.TempDir()
+		writeExec(t, filepath.Join(goroot, "bin", "go"), `#!/usr/bin/env bash
+if [ "$1 $2" = "env GOVERSION" ] && [ -z "${GOROOT:-}" ] && [ "${GOTOOLCHAIN:-}" = local ]; then echo go1.30.0; fi
+exit 0
+`)
+		env = append(env, "GOROOT="+goroot, "SENTINEL_NEEDS=")
+		stdout, stderr, code := runSplit(t, repo, env, "--print-engine")
+		if code != 0 {
+			t.Fatalf("--print-engine failed (%d):\n%s", code, stderr)
+		}
+		decodeEngine(t, stdout)
+		if got := downloads(t, curlLog); got != 0 {
+			t.Errorf("%d downloads, want none: $GOROOT/bin/go runs as the locked release", got)
+		}
+		if _, err := os.Stat(managed); !os.IsNotExist(err) {
+			t.Errorf("a Go was installed at %s: %v", managed, err)
+		}
+	})
+
+	t.Run("the locked release fails its SHA-256", func(t *testing.T) {
+		repo, managed, _, env := setup(t, "1.30.0", strings.Repeat("0", 64))
+		stdout, stderr, code := runSplit(t, repo, env, "--print-engine")
+		if code == 0 || stdout != "" {
+			t.Fatalf("want a non-zero exit with empty stdout: code=%d stdout=%q", code, stdout)
+		}
+		if !strings.Contains(stderr, "Refusing Go 1.30.0") {
+			t.Errorf("stderr must refuse the archive:\n%s", stderr)
+		}
+		if strings.Contains(stderr, "RAN_BUILT") {
+			t.Errorf("extensions prepare ran after a refused Go:\n%s", stderr)
+		}
+		if _, err := os.Stat(managed); !os.IsNotExist(err) {
+			t.Errorf("an unverified Go was installed at %s: %v", managed, err)
+		}
+	})
+	spectest.Proves(t, "cli/engine-provenance", "print-engine-installs-the-locked-go",
+		"print-engine-installs-the-locked-go-before-extensions-prepare")
 }

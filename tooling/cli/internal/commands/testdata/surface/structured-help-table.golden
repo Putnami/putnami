@@ -125,6 +125,11 @@ flag: --user |  | List the extensions pinned in the user scope (~/.putnami/user)
 example: putnami extensions list
 example: putnami extensions list --output=jsonl
 example: putnami extensions list --user
+═══ extensions prepare ═══
+description: Prepare into the artifact store the runtime of each path extension that serves a provider in a workspace that builds its own CLI. A hosted run of the same tree starts these runtimes and prepares none itself. ./putnamiw --print-engine runs this command after it builds the CLI
+usage: putnami extensions prepare [--output <format>]
+example: putnami extensions prepare
+example: putnami extensions prepare --output=jsonl
 ═══ extensions remove ═══
 description: Remove an installed extension
 usage: putnami extensions remove <name> [--user]

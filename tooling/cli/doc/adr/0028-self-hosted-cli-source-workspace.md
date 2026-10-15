@@ -1,7 +1,7 @@
 # ADR 0028 — The `putnami` repository is the source of its own CLI
 
 - **Status**: accepted
-- **Scope**: root `putnami.lock.json`, root `putnamiw`, `@putnami/cli` (`internal/lockfile`, `internal/launch`)
+- **Scope**: root `putnami.lock.json`, root `putnamiw`, `@putnami/cli` (`internal/lockfile`, `internal/launch`, `internal/commands/extensions`)
 
 ## Context
 
@@ -115,6 +115,35 @@ artifact GC. `.putnami/bin/putnami` is an absolute symlink to it.
 - Progress goes to stderr, so a cold build cannot corrupt an MCP handshake or a
   `--output=json` pipeline.
 
+### 5. `./putnamiw --print-engine` builds the engine for a launcher
+
+A launcher that starts the CLI itself, such as a hosted runner that hands the
+engine a credential
+([ADR 0055](0055-run-credentials-stay-out-of-repository-processes.md)), cannot
+start it through `./putnamiw`. The build-only mode serves it.
+
+- `./putnamiw --print-engine` builds or reuses the store blob of §4 exactly as
+  a normal run does, writes nothing under `.putnami/bin`, and prints one JSON
+  line on stdout: the blob path, the source key and the workspace root.
+- Before it prints, it starts the blob once, as `putnami extensions prepare`,
+  in the workspace root, admitted by the same key, with its output on stderr.
+  That command prepares the provider runtimes of the workspace's own path
+  extensions, which a hosted run of the tree starts before repository code
+  (ADR 0055 §5). It resolves their prepare toolchains to exactly the releases
+  the lock pins and installs none, so the mode first installs the Go release
+  the lock pins under the Putnami home, unless the home holds it already, or
+  `$GOROOT/bin/go` or the `go` on `PATH` runs as that release.
+- Every failure or refusal, a failed `extensions prepare` included, exits
+  non-zero with nothing on stdout. The mode refuses a workspace without
+  `tooling/cli`, a checkout with no content key, a command after the flag, and
+  `--download`.
+- The launcher starts the printed path with `PUTNAMI_FROM_SOURCE` set to the
+  root, `PUTNAMI_FROM_SOURCE_KEY` set to the key, and the same `PUTNAMI_HOME`,
+  so §3 admits it as the workspace's own engine. It also keeps the `HOME` and
+  `PUTNAMI_ARTIFACT_DIR` of the build: the artifact store that holds the
+  prepared runtimes is `PUTNAMI_ARTIFACT_DIR`, else `~/.putnami/artifacts`,
+  whatever `PUTNAMI_HOME` is.
+
 ## Rejected alternatives
 
 - **Removing the `cli` entry.** The launcher reads absence as "no pin to
@@ -139,11 +168,16 @@ artifact GC. `.putnami/bin/putnami` is an absolute symlink to it.
 
 - A `tooling/cli` change is tested by the CLI it changes, with no lock change.
 - `./putnamiw` is the only supported entrypoint here. A runner that invokes a
-  checkout's `./putnamiw` when one exists works; one that invokes a CLI directly
-  is refused with an actionable message.
-- This workspace cannot run hosted: it builds its own CLI, which only
-  `./putnamiw` starts, and a hosted runner starts the CLI directly
-  ([ADR 0055](0055-run-credentials-stay-out-of-repository-processes.md)).
+  checkout's `./putnamiw` when one exists works. A runner that starts the
+  binary `./putnamiw --print-engine` prints works (§5). One that invokes any
+  other CLI directly is refused with an actionable message.
+- This workspace runs hosted through `./putnamiw --print-engine`: the runner
+  starts the printed binary with `--credential-fd`. That binary takes its
+  providers, `@putnami/cloud` included, from the runtimes the build prepared
+  from the tree
+  ([ADR 0055](0055-run-credentials-stay-out-of-repository-processes.md) §5).
+  The workspace therefore loads `@putnami/cloud` from `/cloud/extension` and
+  pins no published build of it.
 - Agent hosts must start the MCP server as `./putnamiw mcp`. `.codex/config.toml`
   does. `.mcp.json` keeps `"command": "putnami"`, because the `@putnami/cloud`
   installer requires that exact value and `putnami install` fails otherwise, so

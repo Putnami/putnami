@@ -61,6 +61,7 @@ _putnami_subcommands_for() {
             reply=(
                 'install'
                 'list'
+                'prepare'
                 'remove'
                 'update'
             )
@@ -174,6 +175,7 @@ _putnami_path_known() {
         'extensions') return 0 ;;
         'extensions install') return 0 ;;
         'extensions list') return 0 ;;
+        'extensions prepare') return 0 ;;
         'extensions remove') return 0 ;;
         'extensions update') return 0 ;;
         'help') return 0 ;;

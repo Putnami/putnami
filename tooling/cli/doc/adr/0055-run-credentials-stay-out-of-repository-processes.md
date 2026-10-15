@@ -5,8 +5,9 @@
   too ([ADR 0057](0057-publication-authority-stays-in-the-engine.md)).
 - **Scope**: `@putnami/cli` (`internal/runcredential`, `internal/launch`,
   `internal/credentialprovider`, `internal/cacheprovider`, `internal/jobs`,
-  `internal/commands/lifecycle`, `internal/extension`, `internal/engine`,
-  `internal/sessionreporter`), `go.putnami.dev/sdk/extension`
+  `internal/commands/lifecycle`, `internal/commands/extensions`,
+  `internal/extension`, `internal/engine`, `internal/sessionreporter`), root
+  `putnamiw`, `go.putnami.dev/sdk/extension`
   (`procguard`, `registrycred`), `go.putnami.dev/protocol/{registry,cache,extension,runner,cli}`,
   `@putnami/typescript` and `@putnami/go` extensions (`workspace-fetch`)
 
@@ -27,7 +28,9 @@ places is a credential the repository holds.
 
 On a hosted run, no repository-controlled process can read a credential. A
 hosted run is a run whose engine received `--credential-fd <n>`. Without the
-flag, nothing changes.
+flag, nothing changes. In a source workspace, the tree under test builds the
+engine and the provider runtimes of its own extensions before the run, and
+those hold the credential (§5).
 
 ### 1. The credential arrives on a descriptor and stays in memory
 
@@ -76,13 +79,15 @@ flag, nothing changes.
   files lie inside a `node_modules` directory at any depth with a reason of
   its own. `putnami extensions install <path>` accepts only a path extension
   of the workspace.
-- A path extension is repository code and serves no provider. Discovery removes
-  its `credential-provider`, `cache-provider`, `runner-provider`,
-  `session-reporter`, `log-reporter` and `cloud-release-set` commands, so every
-  provider comes from the store. It records each removal apart from the
-  extensions it could not load: the extension loaded, and a run that finds no
-  provider names the removal in its error. Its runtime, workspace probe,
-  toolchain probes, jobs and hooks start only after custody ends (§4).
+- A path extension is repository code and serves no provider, unless the
+  source build of a source workspace prepared its runtime (§5). Discovery
+  removes the `credential-provider`, `cache-provider`, `runner-provider`,
+  `session-reporter`, `log-reporter` and `cloud-release-set` commands of every
+  other path extension, so every other provider comes from the store. It
+  records each removal apart from the extensions it could not load: the
+  extension loaded, and a run that finds no provider names the removal in its
+  error. Its runtime, workspace probe, toolchain probes, jobs and hooks start
+  only after custody ends (§4).
 - A hosted run reads no registry the workspace declares
   (`registries.put.registry`). The runner's `PUTNAMI_REGISTRY_PUT_URL`, then
   `PUTNAMI_REGISTRY_URL`, or the default registry decides where the pinned CLI
@@ -204,11 +209,11 @@ ends when repository code starts.
   nested CLI that loads the workspace's extensions, such as
   `putnami cloud release-set`. It marks a runtime before it prepares it, and
   an extension outside the store before it probes a toolchain that the
-  extension's manifest declares. From
-  then on,
-  every handoff fails with an error naming the process that asked and the one
-  that ran repository code: the job credential descriptor, a cache provider's
-  `authenticate`, `initialize.runCredential`, and a reporter's
+  extension's manifest declares. A runtime the source build prepared, and the
+  workspace probe it serves, are not repository processes of the run (§5).
+  From then on, every handoff fails with an error naming the process that asked
+  and the one that ran repository code: the job credential descriptor, a cache
+  provider's `authenticate`, `initialize.runCredential`, and a reporter's
   `authenticate`. A holder keeps what it has.
 - A test lists every place under `internal/` that starts a process, directly,
   through a variable that holds a helper, or through an SDK helper
@@ -226,16 +231,17 @@ ends when repository code starts.
   starts the reporters it resumes the same way, but it is a separate
   invocation, and this decision defines no hosted replay.
   Every executable that receives the credential is bytes the store held before
-  any repository process of the invocation ran, and no path extension's runtime
-  starts before the last handoff.
+  any repository process of the invocation ran. No path extension's runtime
+  starts before the last handoff, except one the source build prepared (§5).
 - A cache provider or credential-provider must be one native executable that
   loads nothing from the store after it starts. On a hosted run the CLI starts
   either only as its extension's native runtime (`{extensionRuntime}`) and
   refuses, naming the provider, a command that is not the runtime or a runtime
   that is a script (`#!`), a link, or not an executable in the host's format
   (ELF, Mach-O, PE). The run fails before its first hook. A hosted run with a
-  remote cache therefore needs an `@putnami/cloud` release whose
-  `cache-provider` task runs `{extensionRuntime}`.
+  remote cache therefore needs an `@putnami/cloud` whose `cache-provider` task
+  runs `{extensionRuntime}`: a release, or the workspace's own source in a
+  source workspace (§5).
 - A session reporter or a log reporter holds the credential under the same
   native-runtime rule, but a reporter that cannot hold it does not fail the
   run: reporting never changes a verdict
@@ -258,7 +264,8 @@ ends when repository code starts.
   earlier process outlives. An earlier invocation can leave `.git/config`
   entries git runs, state under `.putnami`, a rewritten store, home or user
   scope, and detached daemons. `putnami build --credential-fd <n>` installs in
-  the same invocation. The runner holds this rule; the CLI cannot check it.
+  the same invocation. The one earlier step is the source build of a source
+  workspace (§5). The runner holds this rule; the CLI cannot check it.
 - `putnami upgrade` refuses `--credential-fd` before any phase: it rewrites the
   lock a hosted run executes as committed, and restarts after the
   `deps-upgrade` hooks.
@@ -271,16 +278,88 @@ ends when repository code starts.
 - A hosted run therefore supports finite job commands, such as `build`, and
   built-in commands, such as `install`.
 
+### 5. A source workspace starts its own providers from the source build
+
+A source workspace is one whose lock records the workspace as the source of its
+CLI (`cli.source: "workspace"`,
+[ADR 0028](0028-self-hosted-cli-source-workspace.md)). It runs hosted through
+its source build: the runner runs `./putnamiw --print-engine` without the
+credential, then starts the printed binary with `--credential-fd`. That build
+is the one repository step that the fresh-sandbox rule (§4) admits before the
+hosted run. It shares the artifact store and the Putnami home with that run:
+the runner starts both with the same `HOME`, `PUTNAMI_ARTIFACT_DIR` and
+`PUTNAMI_HOME`. The engine that receives the credential is repository code by
+construction: the tree under test built it.
+
+- `./putnamiw --print-engine` runs `putnami extensions prepare` with the binary
+  it built, in the workspace root, before it prints the binary. When that
+  command fails, the build-only mode fails and prints nothing on stdout. The
+  command resolves each prepare toolchain to exactly the release the lock pins
+  and installs none, so the mode first installs the Go release the lock pins
+  under the Putnami home, unless the home holds it already, or
+  `$GOROOT/bin/go` or the `go` on `PATH` runs as that release.
+- `putnami extensions prepare` prepares into the artifact store the runtime of
+  each path extension of the workspace that declares a provider command (§2)
+  and whose `runtime.prepare` builds its runtime. It runs the prepare command
+  and the toolchain probes as a run without the flag does. In any other
+  workspace it prepares nothing.
+- A hosted run keeps those extensions whole: discovery removes none of their
+  provider commands. The run computes each runtime's input digest from the
+  tested files, and takes the identity of its prepare toolchains from the
+  workspace lock instead of a probe. It loads the runtime the store holds under
+  that digest. It runs no prepare command and no toolchain probe for it, and
+  records no repository code. Before the provider, it starts only that runtime:
+  its `runtime-info` handshake and, when the extension declares one, its
+  workspace probe.
+- The run then starts the provider before repository code and hands it the
+  credential, as it does for a store extension (§4). A runtime the store lacks
+  is not prepared: an input changed after the source build, the build did not
+  run, or the run reads another artifact store. Loading that runtime then
+  fails with an error that names `./putnamiw --print-engine`, so the provider
+  is unavailable. When nothing else in the command runs that runtime, a remote
+  cache degrades to a local build and a release set fails the publish. A job,
+  hook or workspace probe that runs it fails the command with the same error.
+  The `workspace-install`, `build`, `test`, `validate`, `package` and `publish`
+  tasks of `/cloud/extension` run its runtime, so in this repository a store
+  miss fails each of those commands.
+- A provider command of such an extension resolves no runtime toolchain: the
+  engine marks the run before it probes one (§4), so that provider would get a
+  custody error. `putnami extensions prepare` fails for an extension whose
+  provider command resolves one.
+- An optional prepare toolchain that the lock pins counts as available in the
+  digest. A runtime prepared where no candidate matched that pin has another
+  digest, so `putnami extensions prepare` fails and names both digests.
+- The other commands, jobs and hooks of such an extension, and every other path
+  extension, still start after the last handoff (§2, §4).
+
+This adds no trust beyond the engine's. The provider runtimes and the engine
+come from the same tree, built by the same step without a credential, so a
+repository that could forge a provider runtime could already forge the engine.
+What §4 forbids is a binary that a repository process of the hosted run could
+rewrite before it starts: the run starts no repository process before the last
+handoff. So a runner gives the credential to a source workspace only for a tree
+it trusts as much as the engine that tree builds: not, for example, a pull
+request from a fork.
+
 ## Consequences
 
 - A repository process on a hosted run finds no credential in its environment,
   the user's home, the workspace, or the memory of the engine and its providers.
+  In a source workspace, the tree under test built that engine and the
+  providers §5 starts.
 - A hosted runner starts the CLI binary directly. `./putnamiw` is a
-  repository-controlled script that would hold the descriptor first, so a
-  workspace that builds its own CLI cannot run hosted; it must pin the CLI from
-  a registry. A workspace's path extensions run hosted, after custody ends, and
-  serve no provider: a workspace whose cache provider or credential-provider is
-  a local source must pin that extension from a registry to run hosted with it.
+  repository-controlled script that would hold the descriptor first, so it
+  never receives it. A workspace that builds its own CLI runs hosted through
+  `./putnamiw --print-engine`, run first without the credential: the runner
+  starts the binary it prints with `--credential-fd`
+  ([ADR 0028](0028-self-hosted-cli-source-workspace.md)).
+- Outside a source workspace, a workspace's path extensions run hosted after
+  custody ends and serve no provider: a workspace whose cache provider or
+  credential-provider is a local source must pin that extension from a registry
+  to run hosted with it. A source workspace serves the providers of its own
+  path extensions from the runtimes its source build prepared (§5), so this
+  repository loads `@putnami/cloud` from `/cloud/extension` and pins no build
+  of it.
 - A hosted install runs the fetch command twice: once for the store
   extensions, once for the path extensions after the cache provider starts.
 - A pinned CLI below the custody level is never `exec`ed by a hosted relaunch:

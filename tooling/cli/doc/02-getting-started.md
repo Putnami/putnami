@@ -50,7 +50,7 @@ The repository includes a `putnamiw` wrapper script (similar to Gradle's `gradle
 | (none)          | Build from Go source if binary is missing or stale. Reuses cached binary otherwise.     |
 | `--bootstrap`   | Force rebuild from source, even if the binary is up to date.                            |
 | `--download`    | Download a pre-built binary from `putnami.dev` instead of compiling. No Go required.    |
-| `--print-engine` | Build or reuse the from-source CLI, run nothing, and print where it is. Workspaces with `tooling/cli` only. |
+| `--print-engine` | Build or reuse the from-source CLI, prepare the provider runtimes of the workspace's own extensions, and print where the CLI is. Workspaces with `tooling/cli` only. |
 
 The binary is cached at `.putnami/bin/putnami`. On subsequent runs, `putnamiw` skips the build/download if the binary is already present and up to date.
 
@@ -74,7 +74,7 @@ It prints one JSON line on stdout and nothing else:
 | `key`  | The content key of the sources it was built from.                              |
 | `root` | Absolute path of the workspace root.                                           |
 
-The mode uses the same key, cache, and build as a normal run. It reuses the cached binary when the sources have not changed, and `--bootstrap` forces a rebuild. It starts nothing and writes nothing under `.putnami/bin`. Progress and errors go to stderr. On any failure it exits non-zero and prints nothing on stdout. It refuses a workspace without `tooling/cli`, a checkout with no content key (no git work tree, or no `sha256sum` or `shasum`), a command after the flag, and `--download`.
+The mode uses the same key, cache, and build as a normal run. It reuses the cached binary when the sources have not changed, and `--bootstrap` forces a rebuild. It writes nothing under `.putnami/bin`. The one command it starts is [`putnami extensions prepare`](03-commands.md#extensions-prepare), with the binary it built, in the workspace root: it prepares the runtimes that a hosted run of the tree starts as providers. That command needs exactly the Go release the workspace lock pins, so the mode first installs that release under `$PUTNAMI_HOME/toolchains/go`, unless it is there already, or `$GOROOT/bin/go` or the `go` on `PATH` runs as that release. Progress and errors go to stderr. On any failure, a failed `extensions prepare` included, it exits non-zero and prints nothing on stdout. It refuses a workspace without `tooling/cli`, a checkout with no content key (no git work tree, or no `sha256sum` or `shasum`), a command after the flag, and `--download`.
 
 To start the printed binary as the workspace's own engine in a workspace whose lock records `cli.source: "workspace"`, run `path` itself, with its working directory inside `root`, and set:
 
@@ -83,6 +83,7 @@ To start the printed binary as the workspace's own engine in a workspace whose l
 | `PUTNAMI_FROM_SOURCE`     | `root`                                                        |
 | `PUTNAMI_FROM_SOURCE_KEY` | `key`                                                         |
 | `PUTNAMI_HOME`            | The `PUTNAMI_HOME` the wrapper used, so that `path` is under it. Without it, the CLI looks in `~/.putnami`. |
+| `HOME`, `PUTNAMI_ARTIFACT_DIR` | The values the wrapper had. The prepared runtimes are in the artifact store, `PUTNAMI_ARTIFACT_DIR`, else `~/.putnami/artifacts`, whatever `PUTNAMI_HOME` is. |
 
 The CLI admits itself only when it is the file at `$PUTNAMI_HOME/artifacts/cli-source/$PUTNAMI_FROM_SOURCE_KEY/putnami`, so start `path`, not a copy of it. `PUTNAMI_NO_RELAUNCH` has no effect in such a workspace. In a workspace whose lock pins a published CLI version, also set `PUTNAMI_NO_RELAUNCH=1`, or the binary relaunches into the pinned release.
 

@@ -146,9 +146,10 @@ func reportingResolver(ctx context.Context, capability sessionreporter.Capabilit
 				return sessionreporter.LaunchSpec{}, err
 			}
 			// The reporter runs the extension's code. An extension installed
-			// from the artifact store is registry code; any other one is
-			// repository code.
-			if !extension.InArtifactStore(ws.Root, ext) {
+			// from the artifact store is registry code, and a runtime the
+			// source build prepared is the engine's own build; any other one
+			// is repository code.
+			if extension.StartsRepositoryCode(ws.Root, ext) {
 				runcredential.MarkRepositoryCodeStarted("session reporter " + ext.Name)
 			}
 			return sessionreporter.LaunchSpec{

@@ -131,6 +131,7 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 | `putnami extensions list` | List extensions |
 | `putnami extensions update` | Update extensions |
 | `putnami extensions remove` | Remove an extension |
+| `putnami extensions prepare` | Prepare the provider runtimes of a source workspace |
 | `putnami templates install` | Install templates from config |
 | `putnami templates list` | List installed templates |
 | `putnami templates update` | Update templates |
@@ -665,6 +666,21 @@ putnami extensions remove <name> [--user]
 
 - `putnami extensions remove @putnami/go`
 - `putnami extensions remove @acme/audit --user`
+
+### `putnami extensions prepare`
+
+Prepare into the artifact store the runtime of each path extension that serves a provider in a workspace that builds its own CLI. A hosted run of the same tree starts these runtimes and prepares none itself. ./putnamiw --print-engine runs this command after it builds the CLI
+
+**Usage**
+
+```
+putnami extensions prepare [--output <format>]
+```
+
+**Examples**
+
+- `putnami extensions prepare`
+- `putnami extensions prepare --output=jsonl`
 
 ### `putnami templates install`
 

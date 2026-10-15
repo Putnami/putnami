@@ -143,6 +143,12 @@ func commandRuntimeToolchainRefs(ext *model.ExtensionDescription, activeCommands
 	return sortedRuntimeToolchainRefs(refs)
 }
 
+// CommandRuntimeToolchainRefs returns the sorted toolchain aliases that a run
+// of the active commands of ext probes (commandRuntimeToolchainRefs).
+func CommandRuntimeToolchainRefs(ext *model.ExtensionDescription, activeCommands map[string]bool) []string {
+	return commandRuntimeToolchainRefs(ext, activeCommands)
+}
+
 // commandRuntimeToolchainRefSets returns the sorted toolchain aliases the
 // active commands of one extension can require, split by how they resolve.
 // provisioning holds the aliases only ToolchainProvisioningCommand reaches;
@@ -1201,6 +1207,49 @@ func RuntimeToolchainIdentityForRefs(ext *model.ExtensionDescription, refs []str
 		parts = append(parts, ref+"="+resolution.Identity)
 	}
 	return strings.Join(parts, ";")
+}
+
+// LockedRuntimeToolchainIdentityForRefs returns the identity that
+// RuntimeToolchainIdentityForRefs gives once refs of ext resolved strictly,
+// computed from the workspace lock of workspaceRoot alone. It starts no probe,
+// so it runs no program the manifest of ext chooses. It fails where a strict
+// resolution fails on the lock: no lock, or a required alias with no exact pin
+// or no integrity for this host. An optional alias the lock does not pin takes
+// the unavailable identity a resolution records. An optional alias the lock
+// pins is taken as available, so it does not match a runtime prepared where
+// no candidate matched that pin.
+func LockedRuntimeToolchainIdentityForRefs(workspaceRoot string, ext *model.ExtensionDescription, refs []string) (string, error) {
+	if ext == nil || len(refs) == 0 {
+		return "", nil
+	}
+	if ext.Runtime == nil {
+		return "", errors.New("runtime toolchains: extension runtime is not declared")
+	}
+	locked, err := lockfile.ReadLockFile(workspaceRoot)
+	if err != nil {
+		return "", fmt.Errorf("read workspace lock for runtime toolchains: %w", err)
+	}
+	if locked == nil {
+		return "", fmt.Errorf("extension %q runtime toolchains: the workspace has no lock", ext.Name)
+	}
+	ordered := append([]string(nil), refs...)
+	sort.Strings(ordered)
+	parts := make([]string, 0, len(ordered))
+	for _, ref := range ordered {
+		requirement, declared := ext.Runtime.Toolchains[ref]
+		if !declared {
+			return "", fmt.Errorf("extension %q runtime toolchain %q: declaration is missing", ext.Name, ref)
+		}
+		entry, pinned := locked.GetToolchain(requirement.Lock)
+		integrity := entry.IntegrityFor(runtime.GOOS, runtime.GOARCH)
+		available := pinned && strings.TrimSpace(entry.Version) != "" && strings.TrimSpace(integrity) != ""
+		if !available && !requirement.Optional {
+			return "", fmt.Errorf("extension %q runtime toolchain %q: workspace lock has no exact %q pin with an integrity for %s",
+				ext.Name, ref, requirement.Lock, machineprobe.HostPlatform())
+		}
+		parts = append(parts, ref+"="+runtimeToolchainIdentity(requirement, entry.Version, integrity, available))
+	}
+	return strings.Join(parts, ";"), nil
 }
 
 func runtimeToolchainIdentity(requirement extensionproto.RuntimeToolchain, version, integrity string, available bool) string {

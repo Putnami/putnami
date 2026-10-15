@@ -586,6 +586,7 @@ putnami extensions install          # Install/update all extensions and run inst
 putnami extensions list             # List extensions with their constraint, installed version and source
 putnami extensions update           # Update extension versions (lock and exact pins)
 putnami extensions remove <name>    # Remove an extension
+putnami extensions prepare          # Prepare the provider runtimes of a source workspace
 ```
 
 `extensions list` shows one row per `extensions` key and one per other loaded extension, with its version constraint, installed version, and source. A `config` row is an entry of `extensions` in `putnami.workspace.json`, named by its key, which can be a path; its installed version is the one the lock records, not what this machine has. A `workspace` row is a loaded extension whose name is not such a key, for example one a workspace project or a `node_modules` package provides; its installed version is its manifest version. A path-declared extension therefore has two rows: a `config` row under its path and a `workspace` row under its name. Use `--output=jsonl` for machine-readable output.
@@ -645,6 +646,30 @@ Either flag makes the run a **materialization**, which is deliberately side-effe
 A materialization also **fails closed**: if the lock records no integrity for the requested platform and the registry advertises none, the command errors instead of falling back to an unverified install. `PUTNAMI_UNSAFE_INSTALL=1` does not apply here.
 
 The produced tree is reproducible: file modes are canonicalized and every timestamp is stamped to a fixed value, so the same lock and platform yield byte-identical output across machines and runs — which is what lets the result be hashed into an image content key.
+
+#### `extensions prepare`
+
+`putnami extensions prepare` prepares the provider runtimes of a workspace that
+builds its own CLI: one whose lock records `cli.source: "workspace"`. A path
+extension of that workspace qualifies when it declares a provider command, such
+as `cache-provider`, and its `runtime.prepare` builds its runtime. For each
+one, the command admits the runtime to the artifact store. It runs the prepare
+command only when the store holds no runtime for the current inputs. It prints
+one line per runtime, or one JSON line each with `--output=jsonl`. In any other
+workspace it prepares nothing.
+
+The command resolves each prepare toolchain to exactly the release the lock
+pins, and installs none. It fails when that release is missing, when a provider
+command of the extension resolves a runtime toolchain, when the runtime it
+prepared has another digest than the one a hosted run looks for, and when it
+runs with `--credential-fd`.
+
+`./putnamiw --print-engine` runs it with the CLI it built. Before that, it
+installs the Go release the lock pins under the Putnami home, unless the home
+holds it already, or `$GOROOT/bin/go` or the `go` on `PATH` runs as that
+release. A hosted run of the same tree (`--credential-fd`) then starts those
+runtimes as providers before any repository code, and prepares none itself. See
+[Run credential](#run-credential---credential-fd).
 
 ### `templates`
 
@@ -1609,14 +1634,26 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
   install <path>` accepts only a path extension of the workspace. The CLI reads no registry that the workspace
   declares: `PUTNAMI_REGISTRY_PUT_URL`, `PUTNAMI_REGISTRY_URL` or the default
   registry decides.
-- **A path extension serves no provider.** With the flag, the CLI removes the
-  `credential-provider`, `cache-provider`, `runner-provider`,
-  `session-reporter`, `log-reporter` and `cloud-release-set` commands of a
-  path extension. The extension still loads. When a run needs a provider and
-  no store extension serves it, the error names each path extension and
-  command that the CLI removed. Every provider comes from a store extension. The path extension's
-  other commands, jobs and hooks run after the credential's last handoff, as
-  the next items describe.
+- **A path extension serves no provider, except in a source workspace.** With
+  the flag, the CLI removes the `credential-provider`, `cache-provider`,
+  `runner-provider`, `session-reporter`, `log-reporter` and
+  `cloud-release-set` commands of a path extension. The extension still loads.
+  When a run needs a provider and no store extension serves it, the error
+  names each path extension and command that the CLI removed. Every provider
+  comes from a store extension, except in a source workspace (next item). The
+  path extension's other commands, jobs and hooks run after the credential's
+  last handoff, as the next items describe.
+- **A source workspace serves its own providers.** In a workspace whose lock
+  records `cli.source: "workspace"`, the CLI keeps the provider commands of a
+  path extension whose `runtime.prepare` builds its runtime. It starts the
+  runtime that [`putnami extensions prepare`](#extensions-prepare) admitted to
+  the artifact store before the run, and runs no prepare command and no
+  toolchain probe for it. `./putnamiw --print-engine` runs that command; start
+  the run with the `HOME` and `PUTNAMI_ARTIFACT_DIR` that command had. When an
+  input of the runtime changed since, the store has no runtime for it, and
+  loading it fails with a message that names `./putnamiw --print-engine`. The
+  provider is then unavailable. A run in which a job, hook or workspace probe
+  of that extension also runs the runtime fails with that message.
 - **The committed files stay as they are.** With the flag, `putnami install`
   writes no `putnami.lock.json`, `bun.lock`, `.npmrc`, `go.work`, `go.mod`,
   manifest or assistant content (`AGENTS.md`, `.mcp.json`, agent workflows).
