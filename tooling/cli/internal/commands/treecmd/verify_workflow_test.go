@@ -464,8 +464,10 @@ func TestWorkflowReplaysUnobservedReclassification(t *testing.T) {
 	}{
 		{"every unobservable row reclassified", "", func(*verifyFixture, fxObj, fxObj) {}},
 		// Every attester answered: the collector warns with the same code and
-		// leaves the rows missing, which the replay also accepts.
+		// leaves the rows missing, which the replay also accepts. Report mode
+		// keeps the group from failing the gate that produced it.
 		{"exhausted scope left missing", "", func(_ *verifyFixture, _, group fxObj) {
+			group["mode"] = "report"
 			fxObjAt(group, "requirements", 1)["state"] = "missing"
 			fxObjAt(group, "requirements", 2)["state"] = "missing"
 		}},
@@ -525,7 +527,7 @@ func TestWorkflowReplaysUnobservedReclassification(t *testing.T) {
 					counts[state] = 0
 				}
 				counts[state] = counts[state].(int) + 1
-				blocked = blocked || (state != "verified" && state != "unobserved")
+				blocked = blocked || (group["mode"] == "enforce" && state != "verified" && state != "unobserved")
 			}
 			group["counts"], group["blocked"] = counts, blocked
 			f.write(".context/putnami.features.json", manifest)
