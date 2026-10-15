@@ -20,7 +20,7 @@ import (
 // literal declared output of another task reads bytes that task can write in
 // between, so the two values differ. When the reader's key folds the writer's
 // key, those bytes are already fixed by the folded key and reading them only
-// moves the key (issue #270). This guard reads every extension manifest of the
+// moves the key. This guard reads every extension manifest of the
 // repository and fails on each key pattern that names such an output and
 // selects a file inside it, unless the allowlist says why the key must read
 // those bytes. A pattern names an output
