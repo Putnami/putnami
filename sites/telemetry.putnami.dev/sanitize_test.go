@@ -124,6 +124,7 @@ func TestSanitizeValidStartPassesThrough(t *testing.T) {
 // An extension command of the vocabulary passes like a catalog command: the
 // record survives with its command list unchanged.
 func TestSanitizeKeepsExtensionCommands(t *testing.T) {
+	spectest.Proves(t, "telemetry-putnami-dev/cli-usage-receiver", "fields-are-allowlisted", "an-extension-command-of-the-vocabulary-is-kept")
 	const commands = "clientgen,cloud-deploy,validate-workspace"
 	rec := validStartRecord()
 	rec.Attributes[5] = telemetry.Attr(cliusage.AttrCommands, telemetry.StringVal(commands))

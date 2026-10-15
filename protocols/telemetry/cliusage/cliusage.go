@@ -80,12 +80,13 @@ var (
 	cliVersionPattern = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z][0-9A-Za-z.-]{0,63})?(?:\+[0-9A-Za-z][0-9A-Za-z.-]{0,63})?$`)
 )
 
-// Commands is the ordered receiver-known command vocabulary: the public job
-// commands of the CLI catalog in catalog order, then every public command that
-// an extension of the @putnami scope declares, sorted. A conformance test in
-// the CLI pins the list to those two sources, so adding a command requires an
-// explicit wire-contract update. A released CLI sends any name listed here, so
-// a name is never removed: the receiver would drop that CLI's records.
+// Commands is the ordered receiver-known command vocabulary: the eleven job
+// commands the CLI catalog listed when the vocabulary first shipped, in catalog
+// order, then every public command that an extension of the @putnami scope
+// declares, sorted. A conformance test in the CLI fails while such a command is
+// missing, so adding one requires an explicit wire-contract update. A released
+// CLI sends any name listed here, so a name is never removed: the receiver would
+// drop that CLI's records, and a protocol test fails.
 var Commands = []string{
 	"build",
 	"test",

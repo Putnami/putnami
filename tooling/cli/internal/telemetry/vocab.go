@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -49,11 +50,18 @@ type SessionStart struct {
 }
 
 // recordedCommands returns the commands of session that a session-start
-// event records, in request order.
+// event records, in request order, each once and at most cliusage.MaxCommands
+// of them: the receiver drops a record that repeats a command or names more.
 func recordedCommands(session SessionStart) []string {
-	commands := make([]string, 0, len(session.Commands))
+	commands := make([]string, 0, min(len(session.Commands), cliusage.MaxCommands))
 	for _, command := range session.Commands {
-		if _, allowed := allowedCommands[command]; allowed && declaredByFirstParty(session.Declarers[command]) {
+		if len(commands) == cliusage.MaxCommands {
+			break
+		}
+		if _, allowed := allowedCommands[command]; !allowed || slices.Contains(commands, command) {
+			continue
+		}
+		if declaredByFirstParty(session.Declarers[command]) {
 			commands = append(commands, command)
 		}
 	}

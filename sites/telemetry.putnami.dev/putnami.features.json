@@ -68,6 +68,7 @@
             "checks": [
               "an-unknown-field-is-dropped-before-storage",
               "a-record-outside-the-closed-vocabulary-is-dropped",
+              "an-extension-command-of-the-vocabulary-is-kept",
               "every-free-text-surface-is-removed",
               "the-compiled-allowlist-reduction-is-pinned"
             ]
