@@ -446,9 +446,10 @@ func TestRunKeepsTheTestsOfAConsumerReachedThroughItsSpecGate(t *testing.T) {
 }
 
 // A task scope keeps a job by what its command declares, never by the command's
-// name. A command named `ship` that declares registry side effects survives a
-// scope that does not name it, and a command named `publish` whose manifest
-// declares traits without side effects is narrowed like any other. The manifest
+// name alone. A command named `ship` that declares registry side effects
+// survives a scope that does not name it, a `publish` whose manifest declares
+// traits without side effects keeps its registry default, and a command that
+// declares none is narrowed. The manifest
 // goes through the loader and the planner a run uses, so the traits are the
 // ones a run resolves.
 func TestNarrowToTaskScopes_FollowsTheDeclaredSideEffectsNotTheCommandName(t *testing.T) {
@@ -460,11 +461,13 @@ func TestNarrowToTaskScopes_FollowsTheDeclaredSideEffectsNotTheCommandName(t *te
 		"release/putnami.extension.json": `{"name":"@fixture/release","version":"1.0.0","cliContract":4,"commands":{` +
 			`"build":{"run":[{"id":"compile","task":"compile"}]},` +
 			`"ship":{"traits":{"sideEffects":"registry"},"run":[{"id":"upload","task":"upload"}]},` +
-			`"publish":{"traits":{},"run":[{"id":"notes","task":"notes"}]}},` +
+			`"publish":{"traits":{},"run":[{"id":"notes","task":"notes"}]},` +
+			`"docs":{"traits":{},"run":[{"id":"render","task":"render"}]}},` +
 			`"tasks":{` +
 			`"compile":{"kind":"command","command":"fixture","cache":false,"inputs":{"sources":{"from":"project","files":["**/*.src"]}}},` +
 			`"upload":{"kind":"command","command":"fixture","cache":false},` +
-			`"notes":{"kind":"command","command":"fixture","cache":false}}}`,
+			`"notes":{"kind":"command","command":"fixture","cache":false},` +
+			`"render":{"kind":"command","command":"fixture","cache":false}}}`,
 	} {
 		path := filepath.Join(root, rel)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -481,18 +484,18 @@ func TestNarrowToTaskScopes_FollowsTheDeclaredSideEffectsNotTheCommandName(t *te
 	lib := &workspace.Project{ID: "/lib", Name: "lib", Path: "lib", Extensions: []string{"@fixture/release"}, Config: &wsproto.ProjectConfig{}}
 	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "scope"}, []*workspace.Project{lib})
 	ws.Graph = workspace.BuildGraph(ws.Projects)
-	planned, err := jobs.Plan(ws, []string{"build", "ship", "publish"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := jobs.Plan(ws, []string{"build", "ship", "publish", "docs"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan: %v", err)
 	}
-	if got, want := sortedJobKeys(planned), []string{"/lib:build~compile", "/lib:publish~notes", "/lib:ship~upload"}; !slices.Equal(got, want) {
+	if got, want := sortedJobKeys(planned), []string{"/lib:build~compile", "/lib:docs~render", "/lib:publish~notes", "/lib:ship~upload"}; !slices.Equal(got, want) {
 		t.Fatalf("planned = %v, want %v", got, want)
 	}
 
 	narrowed := narrowToTaskScopes(ws, planned, map[string][]string{"/lib": {"build~compile"}})
 
-	if got, want := sortedJobKeys(narrowed), []string{"/lib:build~compile", "/lib:ship~upload"}; !slices.Equal(got, want) {
-		t.Errorf("narrowed = %v, want %v: ship declares registry side effects and publish declares none", got, want)
+	if got, want := sortedJobKeys(narrowed), []string{"/lib:build~compile", "/lib:publish~notes", "/lib:ship~upload"}; !slices.Equal(got, want) {
+		t.Errorf("narrowed = %v, want %v: ship declares registry side effects, publish keeps its default, docs declares none", got, want)
 	}
 }
 
