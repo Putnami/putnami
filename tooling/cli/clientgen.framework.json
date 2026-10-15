@@ -52,7 +52,7 @@
           "path": "tooling/cli/internal/extension/http_client.go",
           "transport": "http",
           "symbol": "http.Client",
-          "fingerprint": "5f0549a58869f1e0b65ad16568e38a4987875400be88dd70a9d46a6e6c0c9111"
+          "fingerprint": "650349550250142bd88c87be65f10db82a79a65110d681fd4f7037cc1a0d7ada"
         }
       ],
       "owner": "@putnami/cli",

@@ -2,8 +2,10 @@ package extension
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -206,5 +208,54 @@ func TestDoWithRetry_ContextCancelledStops(t *testing.T) {
 	_, err := DoWithRetry(ctx, srv.Client(), req)
 	if err == nil {
 		t.Fatal("expected error from canceled context")
+	}
+}
+
+type recordingTransport struct{ hosts []string }
+
+func (t *recordingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	t.hosts = append(t.hosts, req.URL.Host)
+	return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Request: req}, nil
+}
+
+func TestRegistryTransportSendsAMappedHostToItsOrigin(t *testing.T) {
+	t.Setenv("PUTNAMI_REGISTRY_ORIGINS", "put.example.dev=https://put-internal.example.net")
+	base := &recordingTransport{}
+	client := &http.Client{Transport: registryTransport(base)}
+
+	for _, target := range []string{
+		"https://put.example.dev/putnami/go/download?channel=1.0.0",
+		"https://other.example.dev/putnami/go/download?channel=1.0.0",
+	} {
+		resp, err := client.Get(target)
+		if err != nil {
+			t.Fatalf("GET %s: %v", target, err)
+		}
+		_ = resp.Body.Close()
+		if publicHost := strings.SplitN(target, "/", 4)[2]; resp.Request.URL.Host != publicHost {
+			t.Fatalf("response request host = %s, want %s", resp.Request.URL.Host, publicHost)
+		}
+	}
+	want := []string{"put-internal.example.net", "other.example.dev"}
+	if strings.Join(base.hosts, ",") != strings.Join(want, ",") {
+		t.Fatalf("hosts reached = %v, want %v", base.hosts, want)
+	}
+}
+
+func TestRegistryHTTPClientRefusesAMalformedOriginsValueWithoutRetrying(t *testing.T) {
+	t.Setenv("PUTNAMI_REGISTRY_ORIGINS", "put.example.dev=http://plain.example.net")
+	t.Setenv(HTTPRetryBackoffEnv, "0")
+	base := &recordingTransport{}
+	client := &http.Client{Transport: registryTransport(base)}
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://put.example.dev/putnami/go/download", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := DoWithRetry(context.Background(), client, req); !errors.Is(err, errRegistryOrigins) {
+		t.Fatalf("DoWithRetry error = %v, want a registry origins error", err)
+	}
+	if len(base.hosts) != 0 {
+		t.Fatalf("a malformed value reached the network: %v", base.hosts)
 	}
 }
