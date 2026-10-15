@@ -393,6 +393,77 @@ func TestSelectProjects_BareFeatureBranchUsesTrunkImpacted(t *testing.T) {
 	}
 }
 
+func TestSelectProjects_BaselineAloneSelectsImpactedAgainstIt(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/workspace-discovery-selection", "explicit-baseline", "a-baseline-alone-selects-the-projects-impacted-against-it")
+	wsRoot := t.TempDir()
+	initCLISelectionGitRepo(t, wsRoot)
+	runCLISelectionGit(t, wsRoot, "update-ref", "refs/remotes/origin/main", "HEAD")
+	runCLISelectionGit(t, wsRoot, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+	runCLISelectionGit(t, wsRoot, "checkout", "-b", "feature")
+
+	projects := []*workspace.Project{
+		{ID: "/packages/app", Name: "app", Path: "packages/app", Dependencies: []string{"lib"}, Tags: []string{"service"}},
+		{ID: "/packages/lib", Name: "lib", Path: "packages/lib"},
+	}
+	ws := workspace.NewWorkspace(wsRoot, &workspacepb.Config{}, projects)
+	// lib changes on the branch against the trunk; the working tree adds no
+	// change on top of HEAD, so HEAD as a baseline impacts nothing.
+	libFile := filepath.Join(wsRoot, "packages", "lib", "lib.go")
+	if err := os.MkdirAll(filepath.Dir(libFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(libFile, []byte("package lib\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runCLISelectionGit(t, wsRoot, "add", ".")
+	runCLISelectionGit(t, wsRoot, "commit", "-m", "lib")
+
+	selectIDs := func(t *testing.T, mutate func(*GlobalFlags)) ([]string, *Request) {
+		t.Helper()
+		req := &Request{Commands: []string{"build"}, Config: &workspacepb.Config{}}
+		mutate(&req.Global)
+		var selected []*workspace.Project
+		var code int
+		captureStderr(t, func() { selected, code = selectProjects(req, ws) })
+		if code != ExitSuccess {
+			t.Fatalf("selectProjects exit code = %d, want %d", code, ExitSuccess)
+		}
+		ids := make([]string, len(selected))
+		for i, p := range selected {
+			ids[i] = p.ID
+		}
+		return ids, req
+	}
+
+	ids, req := selectIDs(t, func(g *GlobalFlags) { g.Baseline = "HEAD" })
+	if len(ids) != 0 || !req.Global.Impacted || req.Global.Baseline != "HEAD" {
+		t.Fatalf("--baseline HEAD = %v (impacted %v, baseline %q), want nothing impacted against HEAD", ids, req.Global.Impacted, req.Global.Baseline)
+	}
+	if req.Global.AutoSelected {
+		t.Fatal("an explicit baseline must not be recorded as the default selection")
+	}
+	if req.selection == nil || req.selection.Mode != "impacted" || !req.selection.EmptyImpact {
+		t.Fatalf("wire selection = %+v, want an empty impacted selection", req.selection)
+	}
+
+	ids, _ = selectIDs(t, func(g *GlobalFlags) { g.Baseline = "origin/main" })
+	if strings.Join(ids, ",") != "/packages/app,/packages/lib" {
+		t.Fatalf("--baseline origin/main = %v, want lib and its dependent app", ids)
+	}
+
+	ids, _ = selectIDs(t, func(g *GlobalFlags) { g.Baseline, g.FilterTag = "origin/main", "service" })
+	if strings.Join(ids, ",") != "/packages/app" {
+		t.Fatalf("--baseline origin/main --tag service = %v, want app alone", ids)
+	}
+
+	// A named target keeps its own selection: the baseline compares nothing.
+	ids, req = selectIDs(t, func(g *GlobalFlags) { g.Baseline, g.Projects = "HEAD", "lib" })
+	if strings.Join(ids, ",") != "/packages/lib" || req.Global.Impacted {
+		t.Fatalf("--baseline HEAD lib = %v (impacted %v), want lib alone", ids, req.Global.Impacted)
+	}
+}
+
 func TestSelectProjects_BareMainIgnoresLastSHAForDifferentCommand(t *testing.T) {
 	t.Parallel()
 	wsRoot := t.TempDir()

@@ -204,6 +204,19 @@
           }
         },
         {
+          "id": "explicit-baseline",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-baseline-alone-selects-the-projects-impacted-against-it"
+            ]
+          }
+        },
+        {
           "id": "version-lines-are-scopes",
           "stage": "coded",
           "evidenceKinds": [

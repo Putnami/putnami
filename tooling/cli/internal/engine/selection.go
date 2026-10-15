@@ -419,6 +419,24 @@ func impactedFailureEndsRun(req *Request, wsRoot string, err error) bool {
 }
 
 func applyBareProjectSelection(req *Request, ws *workspace.Workspace, extensions []*extension.ExtensionDescription) (autoProjectSelectionNote, int) {
+	// A --baseline that names no other selection is the --impacted run it asks
+	// for. The ref is only ever read by impact analysis, so the default
+	// selection used to drop it without a word and compare against its own
+	// baseline instead. Tag filters keep narrowing the impacted set. Beside
+	// named projects or --all the baseline still changes no selection: those
+	// name their projects, and there is nothing to compare.
+	if !req.Global.Impacted && !req.Global.All &&
+		strings.TrimSpace(req.Global.Projects) == "" &&
+		strings.TrimSpace(req.Global.Baseline) != "" {
+		// Refused here rather than by --impacted's own check, so the one-line
+		// refusal names the flag the caller typed.
+		if unmanaged := git.Unmanaged(ws.Root); unmanaged != nil {
+			iox.Fprintf(os.Stderr, "putnami: --baseline needs git history: %v\n", unmanaged)
+			return autoProjectSelectionNote{}, ExitError
+		}
+		req.Global.Impacted = true
+		req.Global.Projects = impactedProjectsSentinel
+	}
 	if !isBareProjectSelection(req) {
 		return autoProjectSelectionNote{}, ExitSuccess
 	}
@@ -476,14 +494,6 @@ func applyBareProjectSelection(req *Request, ws *workspace.Workspace, extensions
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: resolve default project selection: %v\n", err)
 		return autoProjectSelectionNote{}, ExitError
-	}
-	// A bare run covers every project where Git does not manage the root, but a
-	// baseline the caller named is a comparison, and there is nothing to compare.
-	if selection.Reason == workspace.AutoSelectionReasonNoRepository && strings.TrimSpace(req.Global.Baseline) != "" {
-		if unmanaged := git.Unmanaged(ws.Root); unmanaged != nil {
-			iox.Fprintf(os.Stderr, "putnami: --baseline needs git history: %v\n", unmanaged)
-			return autoProjectSelectionNote{}, ExitError
-		}
 	}
 
 	note := autoProjectSelectionNote{
