@@ -1,8 +1,7 @@
 # ADR 0067 — @putnami/dev declares the development verbs
 
-- **Status**: accepted, amended by
-  [#288](https://github.com/Putnami/putnami/issues/288): a command's own
-  traits that name no side effects keep the `WellKnownVerbs` ones
+- **Status**: accepted, amended in decision 4: a command's own traits that
+  name no side effects keep the `WellKnownVerbs` ones
 - **Scope**: `@putnami/cli` (`internal/cli`, `internal/commands/completion`,
   `internal/extension`), `@putnami/cli-model` (`extension`),
   `go.putnami.dev/protocol/extension` and `go.putnami.dev/protocol/cli`
