@@ -28,8 +28,8 @@ type VerbDefinition struct {
 	// would.
 	Aliases []string `json:"aliases,omitempty"`
 	// Traits are the default traits of every job of the verb whose manifest
-	// declares none. A declared object replaces the defaults wholesale, as a
-	// command's traits do.
+	// declares none. A declared object replaces the defaults wholesale; it may
+	// not change the side effects WellKnownVerbs gives the verb.
 	Traits *CommandTraits `json:"traits,omitempty"`
 	// Related are the commands `putnami help <verb>` suggests, in order.
 	Related []string `json:"related,omitempty"`

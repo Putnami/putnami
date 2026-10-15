@@ -226,7 +226,8 @@ The CLI reads the vocabularies of the loaded extensions:
 - **Default traits.** A job whose command declares no `traits` takes its
   verb's `traits`. When the verb declares none, the job keeps the defaults of
   the [verb registry](#the-verb-registry). A command's own `traits` replace
-  both, and keep the registry's side effects when they name none. A vocabulary never changes the side effects the registry
+  both, but a declaration without `sideEffects` keeps the verb registry's
+  side effects. A vocabulary never changes the side effects the registry
   gives a verb: `publish` keeps `registry` and `deploy` keeps `cloud`. When a
   loaded vocabulary's traits would change them, the CLI sets those traits
   aside with a warning, and the verb keeps the registry's defaults.
