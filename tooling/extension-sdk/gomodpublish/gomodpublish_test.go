@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -192,8 +194,9 @@ func recordWaits(t *testing.T) *[]time.Duration {
 }
 
 // faultyRegistry answers the first count blob uploads, or every one when count
-// is negative, with status and a body that echoes the bearer, and hands every
-// other request to registry. It returns the bytes of every blob upload.
+// is negative, with status and a body that echoes the bearer, or closes the
+// connection without an answer when status is 0, and hands every other
+// request to registry. It returns the bytes of every blob upload.
 func faultyRegistry(t *testing.T, registry *fakeRegistry, count, status int, header ...string) (*httptest.Server, *[][]byte) {
 	t.Helper()
 	var mu sync.Mutex
@@ -213,6 +216,10 @@ func faultyRegistry(t *testing.T, registry *fakeRegistry, count, status int, hea
 			registry.serve(w, r)
 			return
 		}
+		if status == 0 {
+			dropConnection(w)
+			return
+		}
 		for index := 0; index+1 < len(header); index += 2 {
 			w.Header().Set(header[index], header[index+1])
 		}
@@ -221,6 +228,50 @@ func faultyRegistry(t *testing.T, registry *fakeRegistry, count, status int, hea
 	}))
 	t.Cleanup(server.Close)
 	return server, sent
+}
+
+// dropConnection closes the connection without a response.
+func dropConnection(w http.ResponseWriter) {
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		panic("the test server cannot hijack a connection")
+	}
+	conn, _, err := hijacker.Hijack()
+	if err == nil {
+		_ = conn.Close()
+	}
+}
+
+// silentListener accepts connections and never writes to them, until t ends.
+// It returns its address.
+func silentListener(t *testing.T) string {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var accepted []net.Conn
+	t.Cleanup(func() {
+		_ = listener.Close()
+		mu.Lock()
+		defer mu.Unlock()
+		for _, conn := range accepted {
+			_ = conn.Close()
+		}
+	})
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			accepted = append(accepted, conn)
+			mu.Unlock()
+		}
+	}()
+	return listener.Addr().String()
 }
 
 func TestUploadZipRetriesATransientFailure(t *testing.T) {
@@ -243,6 +294,131 @@ func TestUploadZipRetriesATransientFailure(t *testing.T) {
 	}
 	if len(*sent) != 2 || fmt.Sprint(*waits) != "[5s]" {
 		t.Fatalf("%d uploads waited %v, want 2 uploads that waited the Retry-After 5s", len(*sent), *waits)
+	}
+
+	waits = recordWaits(t)
+	server, sent = faultyRegistry(t, registry, 1, 0)
+	if _, err := UploadZip(context.Background(), testClient(t), nil, server.URL, testToken, testModule, []byte("zip bytes")); err != nil {
+		t.Fatalf("UploadZip = %v, want the second attempt after a dropped connection stored", err)
+	}
+	if len(*sent) != 2 || fmt.Sprint(*waits) != "[1s]" {
+		t.Fatalf("%d uploads waited %v, want 2 uploads after a dropped connection", len(*sent), *waits)
+	}
+}
+
+func TestUploadZipRetriesATLSHandshakeTimeout(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-blob-upload-retries-a-transient-failure")
+	waits := recordWaits(t)
+	client := &http.Client{Transport: &http.Transport{TLSHandshakeTimeout: 50 * time.Millisecond}}
+	_, err := UploadZip(context.Background(), client, nil, "https://"+silentListener(t), testToken, testModule, []byte("zip bytes"))
+	if err == nil || !strings.HasPrefix(err.Error(), "blob upload failed after 4 attempts: ") || !strings.Contains(err.Error(), "TLS handshake timeout") {
+		t.Fatalf("UploadZip = %v, want a TLS handshake timeout after 4 attempts", err)
+	}
+	if fmt.Sprint(*waits) != "[1s 2s 4s]" {
+		t.Fatalf("waits = %v, want [1s 2s 4s]", *waits)
+	}
+}
+
+func TestUploadZipDoesNotRetryAClientTimeout(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-blob-upload-retries-a-transient-failure")
+	waits := recordWaits(t)
+	release := make(chan struct{})
+	var sent atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		sent.Add(1)
+		<-release
+	}))
+	t.Cleanup(server.Close)
+	t.Cleanup(func() { close(release) })
+	client := testClient(t)
+	client.Timeout = 100 * time.Millisecond
+	if _, err := UploadZip(context.Background(), client, nil, server.URL, testToken, testModule, []byte("zip bytes")); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("UploadZip = %v, want the client timeout", err)
+	}
+	if sent.Load() != 1 || len(*waits) != 0 {
+		t.Fatalf("%d uploads waited %v, want one upload and no wait", sent.Load(), *waits)
+	}
+}
+
+// A version PUT whose answer is lost after the registry stored the version is
+// sent again when a stored version is allowed, and its 409 is a reuse.
+func TestPublishVersionRetriesOnlyWhenAStoredVersionIsAllowed(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-publish-retries-a-transient-failure")
+	mod := []byte("module go.putnami.dev/mod\n")
+	for _, allowExisting := range []bool{true, false} {
+		t.Run(fmt.Sprint(allowExisting), func(t *testing.T) {
+			waits := recordWaits(t)
+			registry := newFakeRegistry(t)
+			var puts atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPut || puts.Add(1) > 1 {
+					registry.serve(w, r)
+					return
+				}
+				registry.serve(httptest.NewRecorder(), r)
+				w.WriteHeader(http.StatusBadGateway)
+			}))
+			t.Cleanup(server.Close)
+			reused, err := PublishVersion(context.Background(), testClient(t), nil, server.URL, testToken, testModule, testVersion, mod, otherDigest, allowExisting)
+			if allowExisting {
+				if err != nil || !reused || puts.Load() != 2 || fmt.Sprint(*waits) != "[1s]" {
+					t.Fatalf("PublishVersion = %t, %v after %d PUTs and waits %v, want a reuse after 2 PUTs", reused, err, puts.Load(), *waits)
+				}
+				return
+			}
+			if err == nil || err.Error() != "publish returned 502" || puts.Load() != 1 || len(*waits) != 0 {
+				t.Fatalf("PublishVersion = %v after %d PUTs and waits %v, want 502 after one PUT", err, puts.Load(), *waits)
+			}
+		})
+	}
+}
+
+func TestVerifyRetriesATransientDownloadFailure(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-publish-retries-a-transient-failure")
+	zip := []byte("zip bytes")
+	mod := []byte("module go.putnami.dev/mod\n")
+	for name, verify := range map[string]func(ctx context.Context, client *http.Client, registryURL string) error{
+		"zip": func(ctx context.Context, client *http.Client, registryURL string) error {
+			return VerifyZip(ctx, client, registryURL, testToken, testModule, testVersion, Digest(zip))
+		},
+		"mod": func(ctx context.Context, client *http.Client, registryURL string) error {
+			return VerifyMod(ctx, client, registryURL, testToken, testModule, testVersion, mod)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			waits := recordWaits(t)
+			var gets atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if gets.Add(1) == 1 {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					return
+				}
+				if strings.HasSuffix(r.URL.Path, ".zip") {
+					_, _ = w.Write(zip)
+					return
+				}
+				_, _ = w.Write(mod)
+			}))
+			t.Cleanup(server.Close)
+			if err := verify(context.Background(), testClient(t), server.URL); err != nil {
+				t.Fatalf("verify = %v, want the second download verified", err)
+			}
+			if gets.Load() != 2 || fmt.Sprint(*waits) != "[1s]" {
+				t.Fatalf("%d downloads waited %v, want 2 downloads and one wait of 1s", gets.Load(), *waits)
+			}
+
+			waits = recordWaits(t)
+			failing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusBadGateway)
+			}))
+			t.Cleanup(failing.Close)
+			if err := verify(context.Background(), testClient(t), failing.URL); err == nil || !strings.Contains(err.Error(), "download returned 502 after 4 attempts") {
+				t.Fatalf("verify = %v, want 502 after 4 attempts", err)
+			}
+			if len(*waits) != 3 {
+				t.Fatalf("waits = %v, want 3", *waits)
+			}
+		})
 	}
 }
 

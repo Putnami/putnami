@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
 )
@@ -42,11 +43,15 @@ type fakeRegistry struct {
 	server   *httptest.Server
 	tarballs map[string][]byte
 	puts     int
+	// answer, when set, sees every request with the count of requests of its
+	// method so far, and replaces the answer when it returns true.
+	answer func(w http.ResponseWriter, req *http.Request, count int) bool
+	counts map[string]int
 }
 
 func newFakeRegistry(t *testing.T) *fakeRegistry {
 	t.Helper()
-	registry := &fakeRegistry{tarballs: map[string][]byte{}}
+	registry := &fakeRegistry{tarballs: map[string][]byte{}, counts: map[string]int{}}
 	registry.server = httptest.NewServer(http.HandlerFunc(registry.serve))
 	t.Cleanup(registry.server.Close)
 	return registry
@@ -59,6 +64,15 @@ func (r *fakeRegistry) serve(w http.ResponseWriter, req *http.Request) {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.counts[req.Method]++
+	if r.answer != nil && r.answer(w, req, r.counts[req.Method]) {
+		return
+	}
+	r.store(w, req)
+}
+
+// store answers req as a registry that keeps every version it receives.
+func (r *fakeRegistry) store(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodPut:
 		var payload Payload
@@ -125,6 +139,116 @@ func TestNPMUploadIsIdempotentByDigest(t *testing.T) {
 	}
 	if registry.puts != 1 {
 		t.Fatalf("a digest mismatch sent a PUT: %d PUTs", registry.puts)
+	}
+}
+
+// recordWaits makes retryPolicy record each wait instead of sleeping, with no
+// jitter, until t ends.
+func recordWaits(t *testing.T) *[]time.Duration {
+	t.Helper()
+	saved := retryPolicy
+	t.Cleanup(func() { retryPolicy = saved })
+	waits := &[]time.Duration{}
+	retryPolicy.Jitter = func(time.Duration) time.Duration { return 0 }
+	retryPolicy.Wait = func(ctx context.Context, d time.Duration) error {
+		*waits = append(*waits, d)
+		return ctx.Err()
+	}
+	return waits
+}
+
+func TestPublishRetriesATransientProbe(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-publish-retries-a-transient-failure")
+	for name, failing := range map[string]int{"the first probe": 1, "the verification probe": 2} {
+		t.Run(name, func(t *testing.T) {
+			waits := recordWaits(t)
+			registry := newFakeRegistry(t)
+			registry.answer = func(w http.ResponseWriter, req *http.Request, count int) bool {
+				if req.Method != http.MethodGet || count != failing {
+					return false
+				}
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return true
+			}
+			reused, err := Publish(context.Background(), testClient(t), registry.server.URL, testToken, testArtifact("tarball bytes"))
+			if err != nil || reused {
+				t.Fatalf("Publish = %t, %v, want a fresh upload", reused, err)
+			}
+			if registry.puts != 1 || registry.counts[http.MethodGet] != 3 || fmt.Sprint(*waits) != "[1s]" {
+				t.Fatalf("%d PUTs and %d probes waited %v, want 1 PUT, 3 probes and one wait", registry.puts, registry.counts[http.MethodGet], *waits)
+			}
+		})
+	}
+	waits := recordWaits(t)
+	registry := newFakeRegistry(t)
+	registry.answer = func(w http.ResponseWriter, _ *http.Request, _ int) bool {
+		w.WriteHeader(http.StatusBadGateway)
+		return true
+	}
+	_, err := Publish(context.Background(), testClient(t), registry.server.URL, testToken, testArtifact("tarball bytes"))
+	if err == nil || !strings.HasPrefix(err.Error(), "check published npm artifact: registry tarball returned 502") || !strings.HasSuffix(err.Error(), " after 4 attempts") {
+		t.Fatalf("Publish = %v, want the probe's 502 after 4 attempts", err)
+	}
+	if registry.counts[http.MethodPut] != 0 || len(*waits) != 3 {
+		t.Fatalf("%d PUTs waited %v, want no PUT and 3 waits", registry.counts[http.MethodPut], *waits)
+	}
+}
+
+// After a transient PUT failure, Publish probes first: a registry that serves
+// the artifact holds the version, and a 404 sends the PUT again.
+func TestPublishRetriesATransientPut(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-publish-retries-a-transient-failure")
+	for name, tc := range map[string]struct {
+		stored bool
+		puts   int
+	}{
+		"a lost answer after the registry stored the version": {true, 1},
+		"a failure before the registry stored the version":    {false, 2},
+	} {
+		t.Run(name, func(t *testing.T) {
+			waits := recordWaits(t)
+			registry := newFakeRegistry(t)
+			registry.answer = func(w http.ResponseWriter, req *http.Request, count int) bool {
+				if req.Method != http.MethodPut || count > 1 {
+					return false
+				}
+				if tc.stored {
+					registry.store(httptest.NewRecorder(), req)
+				}
+				w.WriteHeader(http.StatusBadGateway)
+				return true
+			}
+			reused, err := Publish(context.Background(), testClient(t), registry.server.URL, testToken, testArtifact("tarball bytes"))
+			if err != nil || reused {
+				t.Fatalf("Publish = %t, %v, want a fresh upload", reused, err)
+			}
+			if registry.counts[http.MethodPut] != tc.puts || fmt.Sprint(*waits) != "[1s]" {
+				t.Fatalf("%d PUTs waited %v, want %d PUTs and one wait", registry.counts[http.MethodPut], *waits, tc.puts)
+			}
+		})
+	}
+	for status, attempts := range map[int]int{http.StatusBadGateway: 4, http.StatusBadRequest: 1} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			waits := recordWaits(t)
+			registry := newFakeRegistry(t)
+			registry.answer = func(w http.ResponseWriter, req *http.Request, _ int) bool {
+				if req.Method != http.MethodPut {
+					return false
+				}
+				w.WriteHeader(status)
+				return true
+			}
+			_, err := Publish(context.Background(), testClient(t), registry.server.URL, testToken, testArtifact("tarball bytes"))
+			if err == nil || !strings.HasPrefix(err.Error(), fmt.Sprintf("managed npm publish failed: registry returned %d", status)) {
+				t.Fatalf("Publish = %v, want the PUT's %d", err, status)
+			}
+			if attempts > 1 && !strings.HasSuffix(err.Error(), " after 4 attempts") {
+				t.Fatalf("Publish = %v, want the attempt count", err)
+			}
+			if registry.counts[http.MethodPut] != attempts || len(*waits) != attempts-1 {
+				t.Fatalf("%d PUTs waited %v, want %d PUTs", registry.counts[http.MethodPut], *waits, attempts)
+			}
+		})
 	}
 }
 

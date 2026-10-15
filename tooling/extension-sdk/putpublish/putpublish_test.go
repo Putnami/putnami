@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -555,14 +557,18 @@ func TestValidateRegistryURL(t *testing.T) {
 	}
 }
 
+// testNow is the time an HTTP-date Retry-After is read against.
+var testNow = time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
+
 // recordWaits makes retryPolicy record each wait instead of sleeping, with no
-// jitter, until t ends.
+// jitter and testNow as the current time, until t ends.
 func recordWaits(t *testing.T) *[]time.Duration {
 	t.Helper()
 	saved := retryPolicy
 	t.Cleanup(func() { retryPolicy = saved })
 	waits := &[]time.Duration{}
 	retryPolicy.Jitter = func(time.Duration) time.Duration { return 0 }
+	retryPolicy.Now = func() time.Time { return testNow }
 	retryPolicy.Wait = func(ctx context.Context, d time.Duration) error {
 		*waits = append(*waits, d)
 		return ctx.Err()
@@ -603,6 +609,38 @@ func answerStatus(status int, header ...string) func(w http.ResponseWriter) {
 	}
 }
 
+// silentListener accepts connections and never writes to them, until t ends.
+// It returns its address.
+func silentListener(t *testing.T) string {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var accepted []net.Conn
+	t.Cleanup(func() {
+		_ = listener.Close()
+		mu.Lock()
+		defer mu.Unlock()
+		for _, conn := range accepted {
+			_ = conn.Close()
+		}
+	})
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			accepted = append(accepted, conn)
+			mu.Unlock()
+		}
+	}()
+	return listener.Addr().String()
+}
+
 // resetBeforeAnswer closes the connection without a response.
 func resetBeforeAnswer(w http.ResponseWriter) {
 	hijacker, ok := w.(http.Hijacker)
@@ -619,13 +657,13 @@ func TestUploadBlobRetriesATransientFailure(t *testing.T) {
 	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-blob-upload-retries-a-transient-failure")
 	blob := members()[distribution.KindDoc].Blobs[0]
 	for name, fault := range map[string]func(w http.ResponseWriter){
-		"429":                          answerStatus(http.StatusTooManyRequests),
-		"500":                          answerStatus(http.StatusInternalServerError),
-		"502":                          answerStatus(http.StatusBadGateway),
-		"503":                          answerStatus(http.StatusServiceUnavailable),
-		"504":                          answerStatus(http.StatusGatewayTimeout),
-		"a connection reset":           resetBeforeAnswer,
-		"a Retry-After that is a date": answerStatus(http.StatusServiceUnavailable, "Retry-After", "Wed, 21 Oct 2026 07:28:00 GMT"),
+		"408":                answerStatus(http.StatusRequestTimeout),
+		"429":                answerStatus(http.StatusTooManyRequests),
+		"500":                answerStatus(http.StatusInternalServerError),
+		"502":                answerStatus(http.StatusBadGateway),
+		"503":                answerStatus(http.StatusServiceUnavailable),
+		"504":                answerStatus(http.StatusGatewayTimeout),
+		"a connection reset": resetBeforeAnswer,
 	} {
 		t.Run(name, func(t *testing.T) {
 			waits := recordWaits(t)
@@ -647,7 +685,10 @@ func TestUploadBlobRetriesATransientFailure(t *testing.T) {
 func TestUploadBlobHonorsRetryAfter(t *testing.T) {
 	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-blob-upload-retries-a-transient-failure")
 	blob := members()[distribution.KindDoc].Blobs[0]
-	for retryAfter, want := range map[string]string{"7": "[7s]", "0": "[1s]", "3600": "[30s]"} {
+	for retryAfter, want := range map[string]string{
+		"7": "[7s]", "0": "[1s]", "30": "[30s]",
+		testNow.Add(5 * time.Second).Format(http.TimeFormat): "[5s]",
+	} {
 		t.Run(retryAfter, func(t *testing.T) {
 			waits := recordWaits(t)
 			registry := newFakeRegistry(t)
@@ -659,6 +700,67 @@ func TestUploadBlobHonorsRetryAfter(t *testing.T) {
 				t.Fatalf("%d uploads waited %v, want 2 uploads that waited %s", len(*sent), *waits, want)
 			}
 		})
+	}
+}
+
+func TestUploadBlobStopsWhenRetryAfterAsksForMoreThanTheCap(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-blob-upload-retries-a-transient-failure")
+	blob := members()[distribution.KindDoc].Blobs[0]
+	for retryAfter, asked := range map[string]string{
+		"3600":                 "1h0m0s",
+		"99999999999999999999": "99999999999999999999s",
+		testNow.Add(time.Hour).Format(http.TimeFormat): "1h0m0s",
+	} {
+		t.Run(retryAfter, func(t *testing.T) {
+			waits := recordWaits(t)
+			registry := newFakeRegistry(t)
+			sent := failBlobUploads(registry, 1, answerStatus(http.StatusServiceUnavailable, "Retry-After", retryAfter))
+			err := UploadBlob(context.Background(), testClient(t), registry.server.URL, testToken, "acme/doc-contents", blob)
+			if want := "blob upload returned 503; the registry asked to wait " + asked + ", more than 30s"; err == nil || err.Error() != want {
+				t.Fatalf("UploadBlob = %v, want %q", err, want)
+			}
+			if len(*sent) != 1 || len(*waits) != 0 {
+				t.Fatalf("%d uploads waited %v, want one upload and no wait", len(*sent), *waits)
+			}
+		})
+	}
+}
+
+func TestUploadBlobRetriesATLSHandshakeTimeout(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-blob-upload-retries-a-transient-failure")
+	blob := members()[distribution.KindDoc].Blobs[0]
+	waits := recordWaits(t)
+	client := &http.Client{Transport: &http.Transport{TLSHandshakeTimeout: 50 * time.Millisecond}}
+	err := UploadBlob(context.Background(), client, "https://"+silentListener(t), testToken, "acme/doc-contents", blob)
+	if want := "blob upload: the registry did not answer after 4 attempts"; err == nil || err.Error() != want {
+		t.Fatalf("UploadBlob = %v, want %q", err, want)
+	}
+	if fmt.Sprint(*waits) != "[1s 2s 4s]" {
+		t.Fatalf("waits = %v, want [1s 2s 4s]", *waits)
+	}
+}
+
+func TestUploadBlobDoesNotRetryAClientTimeout(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-blob-upload-retries-a-transient-failure")
+	blob := members()[distribution.KindDoc].Blobs[0]
+	waits := recordWaits(t)
+	registry := newFakeRegistry(t)
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	var sent atomic.Int32
+	registry.answer = func(http.ResponseWriter, *http.Request) bool {
+		sent.Add(1)
+		<-release
+		return true
+	}
+	client := testClient(t)
+	client.Timeout = 100 * time.Millisecond
+	err := UploadBlob(context.Background(), client, registry.server.URL, testToken, "acme/doc-contents", blob)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("UploadBlob = %v, want the client timeout", err)
+	}
+	if sent.Load() != 1 || len(*waits) != 0 {
+		t.Fatalf("%d uploads waited %v, want one upload and no wait", sent.Load(), *waits)
 	}
 }
 
@@ -690,7 +792,7 @@ func TestUploadBlobFailsAfterTheAttemptBound(t *testing.T) {
 func TestUploadBlobFailsAtOnceOnAnotherStatus(t *testing.T) {
 	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-blob-upload-retries-a-transient-failure")
 	blob := members()[distribution.KindDoc].Blobs[0]
-	for _, status := range []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusConflict, http.StatusRequestTimeout, http.StatusNotImplemented} {
+	for _, status := range []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusConflict, http.StatusNotImplemented} {
 		t.Run(fmt.Sprint(status), func(t *testing.T) {
 			waits := recordWaits(t)
 			registry := newFakeRegistry(t)
@@ -749,6 +851,7 @@ func TestUploadBlobStopsWhenTheContextEnds(t *testing.T) {
 // A publish whose answer is lost after the registry stored the version is
 // sent again, answers 409, and is accepted as the same manifest.
 func TestPublishManifestRetriesATransientFailure(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-publish-retries-a-transient-failure")
 	member := members()[distribution.KindDoc]
 	for name, stored := range map[string]bool{"the registry stored nothing": false, "the registry stored the version": true} {
 		t.Run(name, func(t *testing.T) {
@@ -791,4 +894,30 @@ func TestPublishManifestRetriesATransientFailure(t *testing.T) {
 		err.Error() != "publish returned 503 after 4 attempts" || len(*waits) != 3 {
 		t.Fatalf("Publish = %v after %v, want 503 after 4 attempts", err, *waits)
 	}
+	t.Run("the read-back after a 409", func(t *testing.T) {
+		waits := recordWaits(t)
+		registry := newFakeRegistry(t)
+		if _, err := Publish(context.Background(), testClient(t), registry.server.URL, testToken, member); err != nil {
+			t.Fatal(err)
+		}
+		reads := 0
+		registry.answer = func(w http.ResponseWriter, r *http.Request) bool {
+			if r.Method != http.MethodGet {
+				return false
+			}
+			reads++
+			if reads > 1 {
+				return false
+			}
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return true
+		}
+		published, err := Publish(context.Background(), testClient(t), registry.server.URL, testToken, member)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if reads != 2 || !published.Reused || fmt.Sprint(*waits) != "[1s]" {
+			t.Fatalf("%d reads answered %+v after %v, want 2 reads and a reuse", reads, published, *waits)
+		}
+	})
 }
