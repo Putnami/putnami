@@ -235,6 +235,9 @@ func TestCommandVocabularyKeepsEveryReleasedName(t *testing.T) {
 			t.Errorf("released command %q left the vocabulary: the receiver drops the records of CLIs that send it", command)
 		}
 	}
+	if len(Commands) != len(releasedCommands) {
+		t.Errorf("Commands has %d names and the frozen copy %d: add each new name to releasedCommands too", len(Commands), len(releasedCommands))
+	}
 }
 
 // Every name is one comma-free, lowercase token: the wire joins the list with
