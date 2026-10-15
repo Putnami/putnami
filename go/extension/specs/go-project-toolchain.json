@@ -49,7 +49,7 @@
     },
     {
       "id": "testdata-is-a-test-input",
-      "text": "Every file under a testdata directory of a Go project, at any depth, is a test-exec input, so a fixture edit re-runs the tests instead of replaying an old verdict. The Go tool reserves testdata for test inputs, so a project declares no pattern of its own for them."
+      "text": "Every file under a testdata directory of a Go project, at any depth, is a test-exec input, so a fixture edit re-runs the tests instead of replaying an old verdict. The Go tool reserves testdata for test inputs, so a project declares no pattern of its own for them. The cache walker's directory skips still apply: a file below a node_modules, .git, .putnami, out, dist or vendor directory is not an input."
     },
     {
       "id": "modfile-restoration",

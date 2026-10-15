@@ -19,7 +19,9 @@ and runtime inputs; the table focuses on Go sources, modules, and lint config.
 
 Files under a `testdata` directory, at any depth, key the `test` job. A test
 reads them at run time, so a fixture edit re-runs the tests. A project does not
-declare them in `filePatterns`.
+declare them in `filePatterns`. The cache skips a `node_modules`, `.git`,
+`.putnami`, `out`, `dist` or `vendor` directory, inside `testdata` too, so keep
+fixtures out of directories with those names.
 
 ## Go build cache
 
