@@ -98,6 +98,7 @@ use (
 	./tooling/cli-documents
 	./tooling/cli-model
 	./tooling/clientgen-extension
+	./tooling/contributor
 	./tooling/extension-sdk
 	./tooling/github-collaboration
 	./tooling/local-collaboration

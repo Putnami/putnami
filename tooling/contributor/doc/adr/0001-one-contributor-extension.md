@@ -18,7 +18,11 @@ provider-neutral call
 
 ## Decision
 
-### 1. One content-only extension
+### 1. One content-only extension (superseded in part by ADR 0004)
+
+[ADR 0004](0004-the-contributor-extension-ships-a-compiled-executable.md)
+gives the extension a compiled runtime and moves its packaging to
+`@putnami/go`. The agent content below is unchanged.
 
 `tooling/contributor` is the extension `@putnami/contributor`. It runs nothing:
 its manifest declares only `agentContent` in the authored form (`source: src`,

@@ -33,8 +33,8 @@ import (
 // on the tooling SDK — the exact inversion the repository layering forbids, and
 // one that would cost each framework module a set of cross-domain permissions
 // nothing else needs. `/sites/putnami.dev` is a deployed TypeScript application
-// and has no Go module at all. `/tooling/contributor` is a content-only
-// extension with no Go module either.
+// and has no Go module at all. `/tooling/contributor`'s Go module holds only
+// the extension's runtime.
 //
 // This extension is where `putnami architecture validate` runs and it already
 // depends on both the protocol and the SDK, so hosting costs no new edge. The
@@ -519,11 +519,11 @@ func authoredPublicDocsDomain() *arch.Builder {
 		)
 }
 
-// The agent-workflows domain owns content and a rule, not a mechanism: the
-// agent content of the @putnami/contributor extension. The builder that turns
-// that source into an archive belongs to the packager, so this domain carries
-// no code and no protocol dependency of its own; what it exports is the source
-// a packager reads.
+// The agent-workflows domain owns the @putnami/contributor extension: its
+// agent content and the runtime that answers the host. The builder that turns
+// the content source into an archive belongs to the packager; what this domain
+// exports is the source a packager reads. Its runtime is an extension binary,
+// so it imports the SDK runtime and the wire contracts like every other one.
 func authoredAgentWorkflowsDomain() *arch.Builder {
 	return arch.NewDomain("agent-workflows", "tooling").
 		Projects(
@@ -546,7 +546,40 @@ func authoredAgentWorkflowsDomain() *arch.Builder {
 			},
 			Modes:         []archproto.AccessMode{archproto.ModeReference},
 			Compatibility: arch.Compatible(archproto.CompatibilityAdditive, 1),
-		})
+		}).
+		Import(
+			arch.Reference("agent-workflows.extension-runtime.v1", 1, arch.From("extension-sdk", "extension-sdk.extension-runtime.v1"),
+				arch.As("agent-workflows.extension-runtime"),
+				arch.Status(archproto.StatusActive),
+				arch.Facts("extension_runtime_api"),
+				arch.Justification("The contributor extension's runtime is an extension binary: it answers the host's runtime handshake through the SDK runtime instead of writing the descriptor itself, so its answer cannot drift from the one every other Putnami extension gives."),
+				arch.Bind("/tooling/contributor", "/tooling/extension-sdk"),
+			),
+			arch.Reference("agent-workflows.protocol-contracts.v1", 1, arch.From("protocols", "protocols.wire-contracts.v1"),
+				arch.As("agent-workflows.protocol-contracts"),
+				arch.Status(archproto.StatusActive),
+				arch.Facts("wire_contract_definitions"),
+				arch.Justification("The contributor extension's runtime speaks to the CLI through the shared strict wire contracts: the runtime descriptor, the CLI contract and the extension manifest it ships. Its module builds outside the Go workspace, so it resolves every contract module the SDK requires from this repository."),
+				arch.Bind("/tooling/contributor", "/protocols/architecture"),
+				arch.Bind("/tooling/contributor", "/protocols/capabilities"),
+				arch.Bind("/tooling/contributor", "/protocols/cli"),
+				arch.Bind("/tooling/contributor", "/protocols/database"),
+				arch.Bind("/tooling/contributor", "/protocols/diagnostic"),
+				arch.Bind("/tooling/contributor", "/protocols/distribution"),
+				arch.Bind("/tooling/contributor", "/protocols/events"),
+				arch.Bind("/tooling/contributor", "/protocols/extension"),
+				arch.Bind("/tooling/contributor", "/protocols/features"),
+				arch.Bind("/tooling/contributor", "/protocols/gomod"),
+				arch.Bind("/tooling/contributor", "/protocols/infra"),
+				arch.Bind("/tooling/contributor", "/protocols/job"),
+				arch.Bind("/tooling/contributor", "/protocols/oci"),
+				arch.Bind("/tooling/contributor", "/protocols/put"),
+				arch.Bind("/tooling/contributor", "/protocols/registry"),
+				arch.Bind("/tooling/contributor", "/protocols/runtime"),
+				arch.Bind("/tooling/contributor", "/protocols/storage"),
+				arch.Bind("/tooling/contributor", "/protocols/workspace"),
+			),
+		)
 }
 
 // TestCommittedGoFrameworkDomainManifestIsTheAuthoredOne holds the go-framework

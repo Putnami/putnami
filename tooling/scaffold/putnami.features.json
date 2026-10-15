@@ -109,7 +109,6 @@
             "checks": [
               "a-content-only-extension-is-written-once-per-platform-key-with-identical-bytes",
               "an-extension-that-runs-something-is-left-to-its-language-extension",
-              "the-contributor-extension-packages-through-the-package-job",
               "the-archive-keys-are-the-sdk-distribution-matrix",
               "a-declared-policy-violation-fails-the-job",
               "the-file-key-encodes-the-extension-name-the-registry-uses"

@@ -1,12 +1,22 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "name": "@putnami/contributor",
-  "tags": ["tooling"],
-  "extensions": ["@putnami/scaffold"],
+  "tags": ["tooling", "go", "extension"],
+  "extensions": ["/go/extension"],
   "disable": {
     "jobs": ["serve"]
   },
   "options": {
+    "@putnami/go": {
+      "entrypoint": "./cmd/putnami-contributor",
+      "version-var": "main.runtimeVersion"
+    },
+    "test": {
+      "filePatterns": ["putnami.extension.json", "bin/prepare"]
+    },
+    "package": {
+      "archives": true
+    },
     "publish": {
       "archives": true
     },

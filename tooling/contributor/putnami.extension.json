@@ -2,6 +2,67 @@
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/contributor",
   "cliContract": 5,
+  "runtime": {
+    "executable": "compiled/putnami-contributor",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "PUTNAMI_CONTRIBUTOR_GO": {
+            "from": "executable"
+          },
+          "PUTNAMI_CONTRIBUTOR_GO_VERSION": {
+            "from": "literal",
+            "value": "go{version}"
+          }
+        }
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    }
+  },
   "agentContent": {
     "path": "content",
     "source": "src",

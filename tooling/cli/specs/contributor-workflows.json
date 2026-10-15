@@ -21,7 +21,7 @@
   "requirements": [
     {
       "id": "one-contributor-extension",
-      "text": "One content-only @putnami/contributor extension ships build, spec, design, prototype, review, adr and check, the explicit content-bump utility, four worker profiles and shared references for both hosts. Build owns one planning/implementation/review/repair/check loop and continues until the requested outcome, concrete blocker or mandate boundary. A workspace opts in with extension:@putnami/contributor."
+      "text": "One @putnami/contributor extension ships build, spec, design, prototype, review, adr and check, the explicit content-bump utility, four worker profiles and shared references for both hosts. Build owns one planning/implementation/review/repair/check loop and continues until the requested outcome, concrete blocker or mandate boundary. A workspace opts in with extension:@putnami/contributor."
     },
     {
       "id": "explicit-only-invocation",

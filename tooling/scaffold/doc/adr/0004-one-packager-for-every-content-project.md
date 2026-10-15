@@ -1,15 +1,18 @@
 # ADR 0004 — One packager for every content project
 
 - **Status**: accepted
-- **Scope**: `@putnami/scaffold` (`tooling/scaffold`), `@putnami/contributor`
+- **Scope**: `@putnami/scaffold` (`tooling/scaffold`), and `@putnami/contributor`
+  until contributor ADR 0004
 
 ## Context
 
 A template and a content-only extension are the same kind of thing: a directory
 of content no toolchain compiles, packaged into a versioned archive, uploaded by
 the archive uploader, and materialized into another workspace. A content-only
-extension declares `agentContent` and runs nothing; `@putnami/contributor` is
-one. Both write `<command-output>/archives`, and every declared output has
+extension declares `agentContent` and runs nothing; `@putnami/contributor` was
+one until its runtime moved it to `@putnami/go` under §2
+([contributor ADR 0004](../../../contributor/doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md)).
+Both write `<command-output>/archives`, and every declared output has
 exactly one owner.
 
 ## Decision

@@ -211,7 +211,7 @@ and what a published workflow archive contains.
 
 | Project | Name | Authority it carries |
 |---|---|---|
-| `/tooling/contributor` | `@putnami/contributor` | The contributor skills and workers, their host adapters, and the content policy their extension ships under. The repository-root `.agents`, `.claude`, and `.codex` trees are generated from this source; the audit skill and host policy files stay outside this authority. |
+| `/tooling/contributor` | `@putnami/contributor` | The contributor skills and workers, their host adapters, the content policy their extension ships under, and the extension's runtime. The repository-root `.agents`, `.claude`, and `.codex` trees are generated from this source; the audit skill and host policy files stay outside this authority. |
 
 ### `observability` — 1 project
 
@@ -400,20 +400,20 @@ authority and needs a domain.
 
 ## ARC permissions and DARC flows are not the same thing
 
-The 21 imports in this repository split into two kinds. Reading one as the other
+The 23 imports in this repository split into two kinds. Reading one as the other
 is the mistake this section exists to prevent.
 
 | | ARC project permission | DARC runtime flow |
 |---|---|---|
 | What it authorizes | One package or module dependency edge | One movement of data between domains at run time or build time |
 | Where it shows up | `bindings` on a `reference` import | `transport`, `consistency`, `localModel`, `deletion` on a non-reference import |
-| Count today | 13 imports, 526 bindings | 8 imports, 0 bindings |
+| Count today | 15 imports, 601 bindings | 8 imports, 0 bindings |
 | What it says about data | Nothing | Everything: freshness, failure, ordering, deletion |
 
 **A binding is a compile-time fact.** `/go/framework/http` may import
 `go.putnami.dev/protocol/http-routes`. That is all it says. No fact is copied, no
-staleness bound applies, and nothing is enforced at run time. All 526 bindings in
-this repository are of this kind, and 13 of the 21 imports carry them.
+staleness bound applies, and nothing is enforced at run time. All 601 bindings in
+this repository are of this kind, and 15 of the 23 imports carry them.
 
 **A DARC flow is a data-movement fact.** It states what is copied, how fresh it
 must be, what happens when it is missing or stale, and how the producer's
