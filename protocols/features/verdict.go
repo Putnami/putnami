@@ -198,6 +198,34 @@ func GroupBlocks(mode VerificationMode, verdicts []SpecRequirementVerdict, diagn
 	return false
 }
 
+// Unobservable reports whether a verdict's only defect is a declared check that
+// no observation reported: the requirement is missing, and each of its checks is
+// either satisfied or missing with ReasonCheckNotObserved, at least one of them
+// missing. A check reported skipped, failed, stale, duplicated or in a shape the
+// criterion cannot read rests on an observation that DID arrive, so it never
+// qualifies.
+//
+// It is the one eligibility rule for RequirementUnobserved. The collector
+// reclassifies exactly these verdicts when an attester could not be consulted,
+// and a verifier replaying a record accepts the state exactly where the pure
+// evaluator yields such a verdict.
+func Unobservable(verdict SpecRequirementVerdict) bool {
+	if verdict.State != RequirementMissing {
+		return false
+	}
+	unobserved := false
+	for _, check := range verdict.Checks {
+		switch {
+		case check.State == CheckSatisfied:
+		case check.State == CheckMissing && check.Reason == ReasonCheckNotObserved:
+			unobserved = true
+		default:
+			return false
+		}
+	}
+	return unobserved
+}
+
 // ParseSpecVerificationRecord strictly parses one persisted record.
 func ParseSpecVerificationRecord(data []byte) (*SpecVerificationRecord, []diag.Diagnostic) {
 	if err := requireExactProtocolVersion(data, SpecVerificationRecordProtocolVersion); err != nil {

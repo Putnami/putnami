@@ -259,3 +259,33 @@ func TestEmptySpecVerificationRecordRoundTripsReadable(t *testing.T) {
 		t.Fatalf("record failed its own validator: %v", diagnostics)
 	}
 }
+
+// Unobservable admits a missing requirement only when every unresolved check
+// was never reported; any check that rests on an arrived observation keeps the
+// requirement out of the non-blocking state.
+func TestUnobservableAdmitsOnlyChecksNothingReported(t *testing.T) {
+	notObserved := SpecCheckVerdict{Check: "a", State: CheckMissing, Reason: ReasonCheckNotObserved}
+	satisfied := SpecCheckVerdict{Check: "b", State: CheckSatisfied, Reason: ReasonCheckPassed}
+	cases := []struct {
+		name    string
+		verdict SpecRequirementVerdict
+		want    bool
+	}{
+		{"never reported", SpecRequirementVerdict{State: RequirementMissing, Checks: []SpecCheckVerdict{notObserved}}, true},
+		{"never reported beside a pass", SpecRequirementVerdict{State: RequirementMissing, Checks: []SpecCheckVerdict{notObserved, satisfied}}, true},
+		{"skipped", SpecRequirementVerdict{State: RequirementMissing, Checks: []SpecCheckVerdict{notObserved,
+			{Check: "c", State: CheckMissing, Reason: ReasonCheckSkipped}}}, false},
+		{"unclassified", SpecRequirementVerdict{State: RequirementMissing, Checks: []SpecCheckVerdict{notObserved,
+			{Check: "c", State: CheckUnclassified, Reason: ReasonDuplicateObservation}}}, false},
+		{"no check", SpecRequirementVerdict{State: RequirementMissing}, false},
+		{"contradicted", SpecRequirementVerdict{State: RequirementContradicted, Checks: []SpecCheckVerdict{notObserved,
+			{Check: "c", State: CheckViolated, Reason: ReasonCheckFailed}}}, false},
+		{"verified", SpecRequirementVerdict{State: RequirementVerified, Checks: []SpecCheckVerdict{satisfied}}, false},
+		{"already unobserved", SpecRequirementVerdict{State: RequirementUnobserved, Checks: []SpecCheckVerdict{notObserved}}, false},
+	}
+	for _, tc := range cases {
+		if got := Unobservable(tc.verdict); got != tc.want {
+			t.Errorf("%s: Unobservable = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}

@@ -41,7 +41,9 @@ const (
 	// record cannot mistake absence for an excuse. Only a collector that knows
 	// which producers were in scope — and therefore that a source was never
 	// consulted rather than consulted and silent — may reclassify a missing
-	// requirement into this state, and GroupBlocks does not block on it.
+	// requirement into this state, and GroupBlocks does not block on it. A
+	// reader replaying a record accepts the state only where Unobservable holds
+	// for the evaluator's own verdict.
 	RequirementUnobserved RequirementVerificationState = "unobserved"
 	// RequirementVerified says every expected check passed, or the current
 	// objective was met, with no contradiction.

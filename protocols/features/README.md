@@ -220,7 +220,10 @@ cannot mistake absence for an excuse. Only a collector that knows which
 producers were in scope may reclassify a `missing` requirement into
 `unobserved`, and only when every one of its unresolved checks was
 `check-not-observed` — a check reported skipped, contradicted, stale, or
-uninterpretable rests on an observation that did arrive and stays blocking. `CheckEvaluation.EvidenceOutcome` maps a classification onto
+uninterpretable rests on an observation that did arrive and stays blocking.
+`Unobservable` is that rule; a verifier replaying a record accepts
+`unobserved` only where it holds for the evaluator's own verdict.
+`CheckEvaluation.EvidenceOutcome` maps a classification onto
 the durable `supports` / `contradicts` vocabulary so a caller can adapt
 observations into ordinary in-memory evidence records; the repository evidence
 resolver stays the only reducer over committed evidence, and nothing here
