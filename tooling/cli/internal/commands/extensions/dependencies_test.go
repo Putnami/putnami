@@ -57,8 +57,9 @@ type graphRegistry struct {
 	delay func(name string)
 
 	mu sync.Mutex
-	// requests records "name request" per install, in call order; request is
-	// "lock:<version>" for an install from a lock entry.
+	// requests records "name request" per install and resolve, in call order;
+	// request is "lock:<version>" for an install from a lock entry and
+	// "resolve:<constraint>" for a resolve-only lookup.
 	requests []string
 }
 
@@ -224,13 +225,19 @@ func (r *graphRegistry) ops() artifactOps {
 			r.mu.Lock()
 			r.requests = append(r.requests, name+" resolve:"+constraint)
 			r.mu.Unlock()
-			version, _, err := r.resolve(name, constraint, nil)
+			version, unnamed, err := r.resolve(name, constraint, nil)
 			if err != nil {
 				return nil, err
 			}
+			if unnamed {
+				// A resolve-only lookup reads the version from the answer
+				// alone, and an answer without one falls back to 0.0.0.
+				version = "0.0.0"
+			}
 			return &artifactInstallOutcome{Version: version}, nil
 		},
-		remove: func(name string) error { return os.RemoveAll(layout.StableDir(ws, layout.Extensions, name)) },
+		remove:     func(name string) error { return os.RemoveAll(layout.StableDir(ws, layout.Extensions, name)) },
+		stableLink: func(name string) string { return layout.StableDir(ws, layout.Extensions, name) },
 		installLocal: func(name string, out io.Writer) (bool, error) {
 			local, err := resolveLocalExtensionRef(ws, name)
 			if err != nil || local == nil {
@@ -640,7 +647,7 @@ func TestACommandLineChannelReResolvesTheSubgraph(t *testing.T) {
 
 	out := r.mustRun(cfg, "@acme/app@canary")
 	requests := r.takeRequests()
-	if got := requestsFor(requests, "@acme/dev"); !slices.Equal(got, []string{"canary"}) {
+	if got := requestsFor(requests, "@acme/dev"); !slices.Equal(got, []string{"resolve:canary", "canary"}) {
 		t.Errorf("@acme/dev requests = %v, want the channel over the lock", got)
 	}
 	if got := requestsFor(requests, "@acme/lib"); !slices.Equal(got, []string{"lock:1.0.0"}) {
@@ -652,7 +659,7 @@ func TestACommandLineChannelReResolvesTheSubgraph(t *testing.T) {
 	wantPins(t, r.locked(), map[string]string{"@acme/app": "1.0.0", "@acme/dev": "1.9.0", "@acme/lib": "1.0.0", "@acme/other": "1.0.0"})
 
 	r.mustRun(cfg, "--latest")
-	if got := requestsFor(r.takeRequests(), "@acme/lib"); !slices.Equal(got, []string{"latest"}) {
+	if got := requestsFor(r.takeRequests(), "@acme/lib"); !slices.Equal(got, []string{"resolve:latest", "latest"}) {
 		t.Errorf("--latest requested @acme/lib with %v, want latest", got)
 	}
 	if r.locked()["@acme/lib"] != "1.5.0" {
@@ -851,7 +858,7 @@ func TestAnExplicitChannelDependentPicksFirst(t *testing.T) {
 	r.channel("@acme/c", "canary", "1.3.0")
 
 	out := r.mustRun(cfg, "@acme/z@canary")
-	if got := requestsFor(r.takeRequests(), "@acme/c"); !slices.Equal(got, []string{"canary"}) {
+	if got := requestsFor(r.takeRequests(), "@acme/c"); !slices.Equal(got, []string{"resolve:canary", "canary"}) {
 		t.Errorf("@acme/c requests = %v, want the channel of @acme/z first", got)
 	}
 	if !strings.Contains(out, "↑ @acme/c: 1.2.0 → 1.3.0 (required by @acme/z)") {
@@ -873,8 +880,8 @@ func TestAnExplicitChannelDependentPicksFirst(t *testing.T) {
 	earlier.channel("@acme/c", "canary", "1.3.0")
 	earlier.mustRun(cfg, "@acme/z@canary")
 	requests := earlier.takeRequests()
-	if got := requestsFor(requests, "@acme/m"); !slices.Equal(got, []string{"canary"}) {
-		t.Errorf("@acme/m requests = %v, want the channel", got)
+	if got := requestsFor(requests, "@acme/m"); !slices.Equal(got, []string{"resolve:canary", "lock:1.0.0"}) {
+		t.Errorf("@acme/m requests = %v, want the channel, which serves the pin", got)
 	}
 	if got := requestsFor(requests, "@acme/c"); !slices.Equal(got, []string{"lock:1.2.0"}) {
 		t.Errorf("@acme/c requests = %v, want the request @acme/a reached it with", got)
@@ -1104,8 +1111,8 @@ func TestAnUpdateNeverMovesAPinToAnOlderBuild(t *testing.T) {
 		if !strings.Contains(out, kept) || strings.Contains(out, "↑") {
 			t.Errorf("update %v output lacks %q, or shows ↑:\n%s", args, kept, out)
 		}
-		if got := requestsFor(r.takeRequests(), "@putnami/cloud"); !slices.Equal(got, []string{"latest", "lock:" + lockedCanary}) {
-			t.Errorf("update %v requests = %v, want the channel, then the pin again", args, got)
+		if got := requestsFor(r.takeRequests(), "@putnami/cloud"); !slices.Equal(got, []string{"resolve:latest", "lock:" + lockedCanary}) {
+			t.Errorf("update %v requests = %v, want the channel's answer, then the pin, and never the older build", args, got)
 		}
 		if !bytes.Equal(r.lockBytes(), before) {
 			t.Fatalf("update %v moved the lock:\n%s", args, r.lockBytes())
@@ -1192,6 +1199,89 @@ func TestAVersionThatDoesNotCompareKeepsThePin(t *testing.T) {
 		t.Errorf("output lacks %q:\n%s", want, out)
 	}
 	wantPins(t, r.locked(), map[string]string{"@acme/tool": "1.0.0"})
+}
+
+// A channel answer that names no build installs, then compares the build's
+// own version: an older one installs the pin again from the lock. Its dry run
+// does not claim to keep the pin, because only the download tells.
+func TestAnUnnamedAnswerComparesAfterTheDownload(t *testing.T) {
+	spectest.Proves(t, dependenciesFeature, "a-channel-never-moves-a-pin-backwards", "an-unnamed-answer-compares-after-the-download")
+	r := newGraphRegistry(t)
+	r.publish("@putnami/cloud", olderBuild, "")
+	r.publish("@putnami/cloud", lockedCanary, "")
+	cfg, _ := r.declare(map[string]string{"@putnami/cloud": ""})
+	r.mustRun(cfg, "@putnami/cloud@"+lockedCanary)
+	r.channel("@putnami/cloud", "latest", "?"+olderBuild)
+	r.takeRequests()
+	before := r.lockBytes()
+
+	preview := r.update(cfg, ArtifactUpdateOptions{DryRun: true}, "")
+	if want := "Would resolve @putnami/cloud@latest: the channel names no build, so the update downloads it and keeps " + lockedCanary + " unless the build is newer"; !strings.Contains(preview, want) || strings.Contains(preview, "Would keep") {
+		t.Errorf("dry run lacks %q, or claims to keep the pin:\n%s", want, preview)
+	}
+	if got := requestsFor(r.takeRequests(), "@putnami/cloud"); !slices.Equal(got, []string{"resolve:latest"}) {
+		t.Errorf("dry run requests = %v, want the resolve-only lookup", got)
+	}
+
+	out := r.update(cfg, ArtifactUpdateOptions{}, "")
+	if want := "✓ @putnami/cloud@" + lockedCanary + " (kept: channel latest serves the older build " + olderBuild + ")"; !strings.Contains(out, want) {
+		t.Errorf("update output lacks %q:\n%s", want, out)
+	}
+	if got := requestsFor(r.takeRequests(), "@putnami/cloud"); !slices.Equal(got, []string{"resolve:latest", "latest", "lock:" + lockedCanary}) {
+		t.Errorf("update requests = %v, want the lookup, the download, then the pin again", got)
+	}
+	if !bytes.Equal(r.lockBytes(), before) {
+		t.Fatalf("the update moved the lock:\n%s", r.lockBytes())
+	}
+	if got := r.linkedVersion("@putnami/cloud"); got != lockedCanary {
+		t.Errorf("the update links %s, want the pinned %s", got, lockedCanary)
+	}
+}
+
+// When a channel answer that names no build is older than the pin and the pin
+// cannot be installed again, the update fails that root: the stable link
+// points at the pinned build again, the lock stays as it was, and no
+// dependency only the older build declares is pinned.
+func TestAFailedPinReinstallRestoresTheStableLink(t *testing.T) {
+	spectest.Proves(t, dependenciesFeature, "a-channel-never-moves-a-pin-backwards", "a-failed-pin-reinstall-restores-the-stable-link")
+	r := newGraphRegistry(t)
+	r.publish("@putnami/cloud", olderBuild, `{"@acme/extra": ""}`)
+	r.publish("@putnami/cloud", lockedCanary, "")
+	r.publish("@acme/extra", "1.0.0", "")
+	cfg, _ := r.declare(map[string]string{"@putnami/cloud": ""})
+	r.mustRun(cfg, "@putnami/cloud@"+lockedCanary)
+	link := layout.StableDir(r.ws, layout.Extensions, "@putnami/cloud")
+	pinnedTarget, err := os.Readlink(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.channel("@putnami/cloud", "latest", "?"+olderBuild)
+	delete(r.releases["@putnami/cloud"], lockedCanary)
+	r.takeRequests()
+	before := r.lockBytes()
+
+	var runErr error
+	stderr := sharedtest.CaptureStderr(t, func() {
+		_, runErr = sharedtest.CaptureStdout(t, func() error {
+			return updateArtifacts(context.Background(), r.ws, cfg, nil, r.ops(), ArtifactUpdateOptions{}, "")
+		})
+	})
+	// A failed root reports ✗ and does not fail the update.
+	if runErr != nil {
+		t.Fatalf("update = %v, want the failed root reported, not returned", runErr)
+	}
+	if want := "✗ @putnami/cloud: channel latest serves the older build " + olderBuild + ", and installing the pinned " + lockedCanary + " failed"; !strings.Contains(stderr, want) {
+		t.Errorf("stderr lacks %q:\n%s", want, stderr)
+	}
+	if got := requestsFor(r.takeRequests(), "@putnami/cloud"); !slices.Equal(got, []string{"resolve:latest", "latest", "lock:" + lockedCanary}) {
+		t.Errorf("update requests = %v, want the lookup, the download, then the pin again", got)
+	}
+	if got, err := os.Readlink(link); err != nil || got != pinnedTarget {
+		t.Errorf("stable link = %q (%v), want the pinned build %q again", got, err, pinnedTarget)
+	}
+	if !bytes.Equal(r.lockBytes(), before) {
+		t.Fatalf("the failed update moved the lock:\n%s", r.lockBytes())
+	}
 }
 
 // An exact version, such as upgrade --version, moves a pin to an older build,

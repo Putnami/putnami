@@ -37,6 +37,7 @@ func TestMoveMark(t *testing.T) {
 		{lockedCanary, olderBuild, "↓"},
 		{"1.0.0", "v1.0.0", "→"},
 		{"1.0.0", "nightly", "→"},
+		{"0.0.0", olderBuild, "→"},
 	}
 	for _, tc := range tests {
 		if got := moveMark(tc.old, tc.next); got != tc.want {

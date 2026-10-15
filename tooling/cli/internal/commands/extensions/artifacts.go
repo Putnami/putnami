@@ -15,6 +15,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/template"
@@ -301,6 +302,10 @@ type artifactOps struct {
 	install func(ctx context.Context, name, constraint string, lockEntry *lockfile.LockEntry) (*artifactInstallOutcome, error)
 	resolve func(ctx context.Context, name, constraint string) (*artifactInstallOutcome, error)
 	remove  func(name string) error
+	// stableLink returns the path of the stable link install points at the
+	// build of name, so an install of a build the pin keeps out can be undone
+	// (installHoldingPin). Nil when the kind keeps no stable link.
+	stableLink func(name string) string
 
 	// localPlatform is the "os/arch" lock key this process installs for. Its
 	// digest may only ever come from locally downloaded, hashed and verified
@@ -426,6 +431,9 @@ func extensionOpsFor(wsRoot string, installer *extension.Installer) artifactOps 
 		remove: func(name string) error {
 			return installer.Remove(name, "")
 		},
+		stableLink: func(name string) string {
+			return layout.StableDir(installer.WorkspaceRoot, layout.Extensions, name)
+		},
 		localPlatform: installer.Platform(),
 		resolvePlatformIntegrity: func(ctx context.Context, name, version, goos, goarch string) (string, error) {
 			return installer.ResolveIntegrityForPlatform(ctx, name, version, goos, goarch)
@@ -493,6 +501,9 @@ func templateOps(wsRoot string) artifactOps {
 		},
 		remove: func(name string) error {
 			return installer.Remove(name, "")
+		},
+		stableLink: func(name string) string {
+			return layout.StableDir(installer.WorkspaceRoot, layout.Templates, name)
 		},
 		localPlatform: installer.Platform(),
 		resolvePlatformIntegrity: func(ctx context.Context, name, version, goos, goarch string) (string, error) {
@@ -1141,6 +1152,18 @@ func previewArtifactUpdates(ctx context.Context, wsRoot string, cfg *wsproto.Con
 			continue
 		}
 		if prior, ok := lockedEntry(lockFile, ops, name); ok {
+			if isUnnamedAnswer(result.Version) && channelHoldsPin(constraint, prior.Version) {
+				// The answer names no build: only the download tells whether
+				// it replaces the pin.
+				if jsonlOut {
+					emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: constraint, Status: "resolved"})
+				} else {
+					iox.Fprintf(os.Stdout, "  Would resolve %s@%s: the channel names no build, so the update downloads it and keeps %s unless the build is newer\n",
+						name, constraint, prior.Version)
+				}
+				resolved++
+				continue
+			}
 			if held := holdPin(constraint, prior.Version, result.Version); held != nil {
 				if jsonlOut {
 					emitArtifactActionJSONL(artifactActionEntry{Kind: ops.label, Action: "update", Name: name, Version: prior.Version, Status: "kept",

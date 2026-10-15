@@ -905,11 +905,11 @@ putnami install --latest
 putnami extensions install --latest
 ```
 
-This is useful for CI/e2e environments where you want to always test against the latest compatible versions rather than pinned ones. The lock file is updated after installation with the newly resolved versions.
+This is useful for CI/e2e environments where you want to always test against the latest compatible versions rather than pinned ones. The lock file is updated after installation with the newly resolved versions, except a pin newer than its channel's build, which stays: see "A channel never moves a pin to an older build" below.
 
 When `putnami extensions update` or `putnami upgrade` moves an extension that `putnami.workspace.json` pins to one exact release, it writes the new release to that pin as well as to the lock. Ranges, channels, `latest`, unpinned entries and local paths are left as they are.
 
-A channel never moves a pin to an older build. When `extensions update`, `upgrade`, `install --latest` or `install <name>@<channel>` resolves a locked extension on a channel that serves an older build than the lock pins, or a build whose version does not compare with the pin, it keeps the pin, leaves the lock entry and the workspace pin as they are, and names the channel and the build it serves: `✓ @putnami/cloud@0.0.0-20261013204708-711d2a7 (kept: channel latest serves the older build 0.0.0-20260929233842-35e20e821)`. Versions compare by semantic-version precedence, so a build `0.0.0-<UTC timestamp>-<sha>` orders by its timestamp. To move a pin back, name the exact version: `putnami extensions install <name>@<version>`.
+A channel never moves a pin to an older build. When `extensions update`, the extension phase of `upgrade`, `install --latest` or `install <name>@<channel>` resolves a locked extension on a channel, it first asks the registry which build the channel serves, without downloading it. When that build is older than the lock pins, or its version does not compare with the pin, the command downloads nothing new: it keeps the pin, leaves the lock entry and the workspace pin as they are, and names the channel and the build it serves: `✓ @putnami/cloud@0.0.0-20261013204708-711d2a7 (kept: channel latest serves the older build 0.0.0-20260929233842-35e20e821)`. Versions compare by semantic-version precedence, so a build `0.0.0-<UTC timestamp>-<sha>` orders by its timestamp. A registry that does not name the build it serves makes the command download the build and compare its own version; when the pin cannot be installed again, the extension fails and its stable link points at the pinned build again. A `0.0.0` pin is not a release: any channel build replaces it, marked `→`. To move a pin back, name the exact version: `putnami extensions install <name>@<version>`.
 
 ### Extension Dependencies
 
@@ -954,7 +954,8 @@ so on down the graph. See
   resolve every dependency again and write its lock entry. A dependency the
   lock pins newer than its channel's build keeps its pin:
   `✓ @acme/dev@1.2.0 (kept: channel latest serves the older build 1.1.0,
-  required by @acme/app)`. `update --dry-run` previews the declared
+  required by @acme/app)`. A dependency requested with a range moves to what
+  the range resolves. `update --dry-run` previews the declared
   extensions only, and says so. `putnami extensions remove <name>` refuses
   while another declared extension still requires `<name>`, and names the
   path. Otherwise it also removes each dependency no declared extension
@@ -1013,6 +1014,8 @@ not downloaded again.
   `PUTNAMI_UNSAFE_INSTALL=1` is set, exactly as for a workspace.
 - A re-run keeps the recorded pin and downloads nothing. `--latest` moves the
   pin to the newest release, and an explicit version moves it to that version.
+  `--latest` keeps a pin newer than the build `latest` serves, and downloads
+  nothing new for it.
 - It runs no extension install hook, and it reads and writes nothing in the
   current directory, inside a workspace or not.
 - It takes one registry extension (`@scope/name[@version]`). A local path,
@@ -1298,7 +1301,7 @@ putnami templates remove <name>        # Remove an installed template
 
 The combined `putnami install` command also installs templates when the workspace config declares them.
 
-`templates update` writes a moved release to a template entry that pins one exact release (`"@scope/tpl:1.2.3"`) as well as to the lock. When a template is declared more than once across `putnami.workspace.json` and the global putnami config, only the entry the config reader keeps is rewritten. If that rewrite would leave another entry in effect, the update stops before writing the lock and names the template.
+`templates update` writes a moved release to a template entry that pins one exact release (`"@scope/tpl:1.2.3"`) as well as to the lock. When a template is declared more than once across `putnami.workspace.json` and the global putnami config, only the entry the config reader keeps is rewritten. If that rewrite would leave another entry in effect, the update stops before writing the lock and names the template. A template pin newer than the build its channel serves stays, as for an extension: see "A channel never moves a pin to an older build".
 
 #### Workspace Configuration
 
