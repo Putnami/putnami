@@ -254,19 +254,19 @@ func parseExtensionArg(arg string) (string, string) {
 	if isLocalExtensionRef(arg) {
 		return arg, ""
 	}
+	return splitArtifactArg(arg)
+}
 
-	// Handle @scope/name@version
+// splitArtifactArg splits "name@version" or "@scope/name@version" at the @
+// after the name, so the @ of a scope never starts the version. An arg with
+// no version returns "" as the version.
+func splitArtifactArg(arg string) (string, string) {
+	start := 0
 	if strings.HasPrefix(arg, "@") {
-		// @scope/name@version → split at second @
-		rest := arg[1:]
-		if idx := strings.IndexByte(rest, '@'); idx >= 0 {
-			return "@" + rest[:idx], rest[idx+1:]
-		}
-		return arg, ""
+		start = 1
 	}
-	// Handle name@version
-	if idx := strings.IndexByte(arg, '@'); idx >= 0 {
-		return arg[:idx], arg[idx+1:]
+	if idx := strings.IndexByte(arg[start:], '@'); idx >= 0 {
+		return arg[:start+idx], arg[start+idx+1:]
 	}
 	return arg, ""
 }

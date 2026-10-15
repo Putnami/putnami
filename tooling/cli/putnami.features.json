@@ -3711,7 +3711,8 @@
               "a-failed-lookup-compares-after-the-download",
               "a-channel-that-moves-after-the-lookup-keeps-the-pin",
               "an-equal-answer-refreshes-the-lock-entry",
-              "a-held-pin-with-a-wrong-entry-names-the-exact-install"
+              "a-held-pin-with-a-wrong-entry-names-the-exact-install",
+              "the-exact-install-hint-refreshes-a-dependency"
             ]
           }
         },

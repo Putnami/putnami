@@ -25,6 +25,9 @@ func TestParseTemplateArg(t *testing.T) {
 		{"basic@^2.0.0", "basic", "^2.0.0"},
 		{"", "", ""},
 		{"a@b@c", "a", "b@c"},
+		{"tpl@1.2.0", "tpl", "1.2.0"},
+		{"@scope/tpl", "@scope/tpl", ""},
+		{"@scope/tpl@1.2.0", "@scope/tpl", "1.2.0"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {

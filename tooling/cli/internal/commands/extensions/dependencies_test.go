@@ -1458,6 +1458,54 @@ func TestAHeldPinWithAWrongEntryNamesTheExactInstall(t *testing.T) {
 	}
 }
 
+// The exact-version install a held dependency's failure names works for a
+// dependency the workspace does not declare: it refreshes the dependency's
+// lock entry at the pin and writes nothing to putnami.workspace.json.
+func TestTheExactInstallHintRefreshesADependency(t *testing.T) {
+	spectest.Proves(t, dependenciesFeature, "a-channel-never-moves-a-pin-backwards", "the-exact-install-hint-refreshes-a-dependency")
+	r := newGraphRegistry(t)
+	r.publish("@acme/app", "1.0.0", `{"@putnami/cloud": ""}`)
+	r.publish("@putnami/cloud", olderBuild, "")
+	r.publish("@putnami/cloud", lockedCanary, "")
+	r.channel("@putnami/cloud", "latest", lockedCanary)
+	cfg, workspaceFile := r.declare(map[string]string{"@acme/app": ""})
+	r.mustRun(cfg)
+	lf := mustLock(t, r.ws)
+	stale, _ := lf.GetExtension("@putnami/cloud")
+	stale.Integrity = "sha256-wrong"
+	lf.SetExtension("@putnami/cloud", stale)
+	if err := lockfile.WriteLockFile(r.ws, lf); err != nil {
+		t.Fatal(err)
+	}
+	r.channel("@putnami/cloud", "latest", olderBuild)
+
+	var runErr error
+	stderr := sharedtest.CaptureStderr(t, func() {
+		_, runErr = sharedtest.CaptureStdout(t, func() error {
+			return updateArtifacts(context.Background(), r.ws, cfg, nil, r.ops(), ArtifactUpdateOptions{}, "")
+		})
+	})
+	var line string
+	for _, l := range strings.Split(stderr, "\n") {
+		if strings.Contains(l, "✗ @putnami/cloud") {
+			line = strings.TrimSpace(l)
+		}
+	}
+	remedy := "; run `putnami extensions install @putnami/cloud@" + lockedCanary + "` to refresh its lock entry"
+	if runErr == nil || !strings.HasSuffix(line, remedy) {
+		t.Fatalf("update = %v with stderr %q, want the dependency's failure ending with %q", runErr, line, remedy)
+	}
+
+	r.mustRun(cfg, "@putnami/cloud@"+lockedCanary)
+	if entry, _ := mustLock(t, r.ws).GetExtension("@putnami/cloud"); entry.Version != lockedCanary || entry.Integrity != "sha256-@putnami/cloud@"+lockedCanary {
+		t.Errorf("after the named install the lock entry = %+v, want the pin with the registry's digest", entry)
+	}
+	wantPins(t, r.locked(), map[string]string{"@acme/app": "1.0.0", "@putnami/cloud": lockedCanary})
+	if got, _ := os.ReadFile(filepath.Join(r.ws, wsproto.WorkspaceConfigFilename)); !bytes.Equal(got, workspaceFile) {
+		t.Errorf("the named install wrote %s:\n%s", wsproto.WorkspaceConfigFilename, got)
+	}
+}
+
 // An exact version, such as upgrade --version, moves a pin to an older build,
 // and the line marks the move ↓.
 func TestAnExactVersionMovesAPinBackwards(t *testing.T) {
