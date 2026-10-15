@@ -170,11 +170,11 @@ func TestCommitPublicationHoldsAPublishingPlanToTheBarrier(t *testing.T) {
 func TestCommitRequestReadsItsCheckoutLikeALocalRun(t *testing.T) {
 	t.Parallel()
 	commit := &Request{Commands: []string{"publish"}, WorkspaceRoot: t.TempDir(), Portable: commitExecution(runner.RequestedSelection{Mode: runner.SelectionModeAll}, "", nil)}
-	if err := requireRepository(commit); err == nil {
+	if _, err := requireRepository(commit); err == nil {
 		t.Fatal("a version 2 publish outside a repository was not refused")
 	}
 	frozen := &Request{Commands: []string{"publish"}, WorkspaceRoot: t.TempDir(), Portable: &PortableExecution{}}
-	if err := requireRepository(frozen); err != nil {
+	if _, err := requireRepository(frozen); err != nil {
 		t.Fatalf("a frozen publish in its snapshot was refused: %v", err)
 	}
 	if !readsAncestry(&Request{Commands: []string{"build"}, Portable: commitExecution(runner.RequestedSelection{Mode: runner.SelectionModeAll}, "", &runner.PublicationBlock{Barrier: []string{"build"}})}) {

@@ -59,7 +59,8 @@ loaded [verb vocabulary](#declaring-a-verb-vocabulary), declares them.
 ```
 
 A declared `traits` object **replaces the verb's defaults wholesale**;
-fields are not merged. Per-step heaviness uses `heavy` on the pipeline
+fields are not merged. The Git requirement, the MCP `run_jobs` refusal and
+the cache trust floor also keep a well-known verb's default `sideEffects`. Per-step heaviness uses `heavy` on the pipeline
 step:
 
 ```json
@@ -71,7 +72,7 @@ step:
 | `heavy` | Worker tuning leaves the command's jobs CPU/memory headroom. |
 | `requiresRunnable` | The command is skipped for `library` projects. |
 | `injectPublishChannels` | The project's `publish: [...]` channels are auto-activated as boolean params. |
-| `sideEffects` | `registry` or `cloud`; documents what the command mutates outside the workspace. |
+| `sideEffects` | `registry` or `cloud`: what the command mutates outside the workspace. Any side effect refuses a root Git does not manage and makes MCP `run_jobs` refuse the command; `registry` raises remote cache trust to at least `ci`. For these three checks, declared traits add to a well-known verb's side effects and never remove them. |
 
 ### Gated capability transport is not server authorization
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -52,7 +53,7 @@ func TestResolveCacheTrustPrecedenceAndDefaults(t *testing.T) {
 			t.Setenv("CI", tt.ci)
 			g := &GlobalFlags{CacheTrust: tt.flag}
 			cfg := &wsproto.Config{Options: tt.options}
-			if err := resolveCacheTrust(g, cfg, tt.commands, ""); err != nil {
+			if err := resolveCacheTrust(g, cfg, nil, tt.commands, ""); err != nil {
 				t.Fatalf("resolveCacheTrust: %v", err)
 			}
 			if got := store.CacheTrust(g.CacheTrust); got != tt.want {
@@ -80,7 +81,51 @@ func TestResolveCacheTrustReleasePathsForceAuthoritative(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := &GlobalFlags{CacheTrust: tt.flag}
-			if err := resolveCacheTrust(g, &wsproto.Config{}, tt.commands, tt.subcommand); err != nil {
+			if err := resolveCacheTrust(g, &wsproto.Config{}, nil, tt.commands, tt.subcommand); err != nil {
+				t.Fatalf("resolveCacheTrust: %v", err)
+			}
+			if got := store.CacheTrust(g.CacheTrust); got != tt.want {
+				t.Fatalf("CacheTrust = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestResolveCacheTrustReleaseFollowsTheDeclaredSideEffects pins that the
+// release floor reads the registry side effect a loaded job declares, not the
+// command name: a verb of the extension's own that declares it is raised like
+// publish, a publish whose declared traits name none keeps its registry
+// default and is raised, and a cloud side effect alone, deploy's default, does
+// not raise the trust. The flag fixes the
+// requested trust, so neither CI nor PUTNAMI_CACHE_TRUST is read.
+func TestResolveCacheTrustReleaseFollowsTheDeclaredSideEffects(t *testing.T) {
+	t.Parallel()
+	loaded := []*extension.ExtensionDescription{{
+		Name: "@test/release",
+		Jobs: map[string]*extension.JobDefinition{
+			"release":  {Traits: extension.CommandTraits{SideEffects: extension.SideEffectsRegistry}},
+			"converge": {Traits: extension.CommandTraits{SideEffects: extension.SideEffectsCloud}},
+			"publish":  {Traits: extension.CommandTraits{InjectPublishChannels: true}},
+		},
+	}}
+	tests := []struct {
+		name       string
+		extensions []*extension.ExtensionDescription
+		commands   []string
+		want       store.CacheTrust
+	}{
+		{"a verb declaring registry side effects raises any to ci", loaded, []string{"release"}, store.CacheTrustCI},
+		{"it raises a run among ordinary commands", loaded, []string{"build", "release"}, store.CacheTrustCI},
+		{"publish declared without side effects keeps its registry floor", loaded, []string{"publish"}, store.CacheTrustCI},
+		{"publish no extension declares raises any to ci", nil, []string{"publish"}, store.CacheTrustCI},
+		{"a verb declaring cloud side effects keeps any", loaded, []string{"converge"}, store.CacheTrustAny},
+		{"deploy keeps any", nil, []string{"deploy"}, store.CacheTrustAny},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			g := &GlobalFlags{CacheTrust: string(store.CacheTrustAny)}
+			if err := resolveCacheTrust(g, &wsproto.Config{}, tt.extensions, tt.commands, ""); err != nil {
 				t.Fatalf("resolveCacheTrust: %v", err)
 			}
 			if got := store.CacheTrust(g.CacheTrust); got != tt.want {
@@ -95,14 +140,14 @@ func TestResolveCacheTrustRejectsInvalidSources(t *testing.T) {
 	t.Run("flag", func(t *testing.T) {
 		t.Setenv("PUTNAMI_CACHE_TRUST", "ci")
 		g := &GlobalFlags{CacheTrust: "unsafe"}
-		err := resolveCacheTrust(g, &wsproto.Config{}, []string{"build"}, "")
+		err := resolveCacheTrust(g, &wsproto.Config{}, nil, []string{"build"}, "")
 		if err == nil || !strings.Contains(err.Error(), "--cache-trust") {
 			t.Fatalf("error = %v, want flag-specific validation", err)
 		}
 	})
 	t.Run("environment", func(t *testing.T) {
 		t.Setenv("PUTNAMI_CACHE_TRUST", "unsafe")
-		err := resolveCacheTrust(&GlobalFlags{}, &wsproto.Config{}, []string{"build"}, "")
+		err := resolveCacheTrust(&GlobalFlags{}, &wsproto.Config{}, nil, []string{"build"}, "")
 		if err == nil || !strings.Contains(err.Error(), "PUTNAMI_CACHE_TRUST") {
 			t.Fatalf("error = %v, want env-specific validation", err)
 		}
@@ -112,7 +157,7 @@ func TestResolveCacheTrustRejectsInvalidSources(t *testing.T) {
 		cfg := &wsproto.Config{Options: map[string]map[string]any{
 			"build": {cacheTrustOption: "unsafe"},
 		}}
-		err := resolveCacheTrust(&GlobalFlags{}, cfg, []string{"build"}, "")
+		err := resolveCacheTrust(&GlobalFlags{}, cfg, nil, []string{"build"}, "")
 		if err == nil || !strings.Contains(err.Error(), "options.build.cache-trust") {
 			t.Fatalf("error = %v, want config-specific validation", err)
 		}

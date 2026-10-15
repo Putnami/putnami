@@ -107,7 +107,7 @@ func (a *App) runExtensionStructuredCommand(
 		iox.Fprintf(stderr, "putnami: %v\n", err)
 		return ExitUsage
 	}
-	if err := resolveCacheTrust(&parsed.Global, cfg, []string{resolved.CommandName}, ""); err != nil {
+	if err := resolveCacheTrust(&parsed.Global, cfg, extensions, []string{resolved.CommandName}, ""); err != nil {
 		iox.Fprintf(stderr, "putnami: %v\n", err)
 		return ExitUsage
 	}

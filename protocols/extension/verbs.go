@@ -9,7 +9,9 @@ import "strings"
 // a well-known verb, which carries defaults).
 //
 // A manifest-declared traits object replaces the verb's defaults
-// wholesale — fields are not merged.
+// wholesale — fields are not merged. The Git requirement, the MCP run_jobs
+// refusal and the cache trust floor also keep a well-known verb's default
+// side effects.
 //
 // Traits describe the COMMAND, never the workload the command runs
 // against. Contract 3 deleted the one trait that broke that

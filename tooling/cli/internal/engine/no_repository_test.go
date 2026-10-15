@@ -287,11 +287,11 @@ func TestRequireRepository(t *testing.T) {
 		return &Request{WorkspaceRoot: root, Commands: commands}
 	}
 	for _, commands := range [][]string{{"build"}, {"test", "lint"}, {"serve"}, nil} {
-		if err := requireRepository(request(commands...)); err != nil {
+		if _, err := requireRepository(request(commands...)); err != nil {
 			t.Errorf("requireRepository(%v) = %v, want nil", commands, err)
 		}
 	}
-	if err := requireRepository(request("publish")); !errors.Is(err, git.ErrNotRepository) {
+	if _, err := requireRepository(request("publish")); !errors.Is(err, git.ErrNotRepository) {
 		t.Fatalf("requireRepository(publish) = %v, want ErrNotRepository", err)
 	}
 
@@ -301,33 +301,33 @@ func TestRequireRepository(t *testing.T) {
 	dryRun := request("deploy")
 	dryRun.Global.DryRun = true
 	for name, preview := range map[string]*Request{"--plan": plan, "--dry-run": dryRun} {
-		if err := requireRepository(preview); err != nil {
+		if _, err := requireRepository(preview); err != nil {
 			t.Errorf("requireRepository(deploy %s) = %v, want nil", name, err)
 		}
 	}
 	// A dry run the extension interprets executes its jobs, so it is refused.
 	rehearsal := request("publish")
 	rehearsal.Global.DryRun, rehearsal.ExecutesUnderDryRun = true, true
-	if err := requireRepository(rehearsal); !errors.Is(err, git.ErrNotRepository) {
+	if _, err := requireRepository(rehearsal); !errors.Is(err, git.ErrNotRepository) {
 		t.Errorf("requireRepository(executing dry run) = %v, want ErrNotRepository", err)
 	}
 
 	// A captured tree state proves a repository answered.
 	captured := request("publish")
 	captured.VersionSnapshot = &git.VersionInfo{SHA: "abc1234"}
-	if err := requireRepository(captured); err != nil {
+	if _, err := requireRepository(captured); err != nil {
 		t.Errorf("requireRepository with a captured tree state = %v, want nil", err)
 	}
 	// A portable request carries the versions its submitter resolved, and the
 	// snapshot it runs in holds no repository.
 	portable := request("publish")
 	portable.Portable = &PortableExecution{}
-	if err := requireRepository(portable); err != nil {
+	if _, err := requireRepository(portable); err != nil {
 		t.Errorf("requireRepository for a portable request = %v, want nil", err)
 	}
 
 	t.Setenv("PATH", t.TempDir())
-	err := requireRepository(request("deploy"))
+	_, err := requireRepository(request("deploy"))
 	if !errors.Is(err, git.ErrNoProgram) {
 		t.Fatalf("requireRepository without a git program = %v, want ErrNoProgram", err)
 	}
@@ -335,8 +335,67 @@ func TestRequireRepository(t *testing.T) {
 	if err.Error() != want {
 		t.Fatalf("message = %q, want %q", err.Error(), want)
 	}
-	if err := requireRepository(request("build")); err != nil {
+	if _, err := requireRepository(request("build")); err != nil {
 		t.Errorf("requireRepository(build) without a git program = %v, want nil", err)
+	}
+}
+
+// The refusal follows the side effects a command's jobs declare, not its name,
+// and declared traits never remove a well-known verb's default. A verb of the
+// extension's own that declares registry side effects is refused like publish;
+// a publish whose declared traits name none keeps its registry default and is
+// refused; deploy, which no loaded extension declares, keeps its default and is
+// refused.
+func TestRequireRepository_DeclaredSideEffectsAddToTheWellKnownDefaults(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-without-git", "git-history-is-refused-in-one-line",
+		"a-declared-side-effect-outside-a-repository-names-git")
+	root := rootWithoutRepository(t)
+	step := func(id string) []extensionproto.PipelineStep {
+		return []extensionproto.PipelineStep{{ID: id, Task: "noop"}}
+	}
+	manifest, err := json.Marshal(extensionproto.Manifest{
+		Name: "@test/release", Version: "1.0.0", CLIContract: 4,
+		Commands: map[string]extensionproto.CommandDefinition{
+			"build": {Run: step("build")},
+			"release": {Run: step("release"), Traits: &extensionproto.CommandTraits{
+				SideEffects: extensionproto.SideEffectsRegistry,
+			}},
+			"publish": {Run: step("publish"), Traits: &extensionproto.CommandTraits{InjectPublishChannels: true}},
+		},
+		Tasks: map[string]extensionproto.TaskDefinition{
+			"noop": {Kind: "command", Command: "true", Cwd: "{projectRoot}"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, data := range map[string][]byte{
+		"putnami.workspace.json":           []byte(`{"name":"release","includes":["app","extension"],"extensions":["/extension"]}`),
+		"app/putnami.json":                 []byte(`{"name":"app","extensions":["/extension"]}`),
+		"extension/putnami.json":           []byte(`{"name":"@test/release"}`),
+		"extension/putnami.extension.json": manifest,
+	} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, path)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, path), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	workspace.InvalidateLoadCache(root)
+	request := func(commands ...string) *Request {
+		return &Request{WorkspaceRoot: root, Config: workspacepb.Load(root), Commands: commands}
+	}
+
+	for _, commands := range [][]string{{"release"}, {"build", "release"}, {"deploy"}, {"publish"}, {"build", "publish"}} {
+		_, err := requireRepository(request(commands...))
+		what := commands[len(commands)-1]
+		if !errors.Is(err, git.ErrNotRepository) || !strings.HasPrefix(err.Error(), what+" needs git history: ") {
+			t.Errorf("requireRepository(%v) = %v, want the refusal naming %s", commands, err, what)
+		}
+	}
+	if _, err := requireRepository(request("build")); err != nil {
+		t.Errorf("requireRepository(build) = %v, want nil: no job of the run declares a side effect", err)
 	}
 }
 
