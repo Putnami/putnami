@@ -274,6 +274,7 @@ const releaseSetFixtureManifest = `{
     "validate": {"run": [{"id": "rules", "task": "noop"}]},
     "package": {"run": [{"id": "artifact", "task": "noop"}]},
     "publish": {"dependsOn": ["package"], "run": [{"id": "artifact", "task": "noop"}]},
+    "deploy": {"run": [{"id": "rollout", "task": "noop"}]},
     "cloud-release-set": {"visibility": "internal", "run": [{"id": "provider", "task": "noop"}]}
   },
   "tasks": {
@@ -377,6 +378,26 @@ func TestRun_ChannelPublishWithABaselineAloneIsImpacted(t *testing.T) {
 	assertPlanned(t, keys, "/lib:test~test", "/app:publish~artifact")
 	if selection := plannedSelection(t, result.Plan); selection.Mode != protocoljob.SelectionModeImpacted || selection.Baseline != "origin/main" {
 		t.Fatalf("selection = %+v, want impacted against origin/main", selection)
+	}
+}
+
+// A channel deploy given a baseline alone resolves it strictly, as an impacted
+// channel deploy does: a ref git cannot resolve must not widen the deploy to
+// every project the channel never released.
+func TestRun_ChannelDeployWithAnUnresolvedBaselineAloneRefuses(t *testing.T) {
+	root, req := releaseSetSessionFixture(t)
+	touchFixtureProject(t, root, "lib")
+	req.Commands = []string{"deploy"}
+	req.Global.Impacted, req.Global.Projects, req.Global.Baseline = false, "", "refs/heads/no-such-ref"
+
+	var result SessionResult
+	var err error
+	stderr := captureStderr(t, func() { result, err = New().Run(context.Background(), req, discardEvents{}) })
+	if result.ExitCode == ExitSuccess {
+		t.Fatalf("baseline-only channel deploy = exit %d, err %v, want a refusal", result.ExitCode, err)
+	}
+	if !strings.Contains(stderr, "--impacted failed") {
+		t.Fatalf("stderr = %q, want the strict impacted refusal", stderr)
 	}
 }
 
