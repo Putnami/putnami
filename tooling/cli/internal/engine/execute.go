@@ -48,11 +48,6 @@ func executionRenderer(
 	if sink != nil {
 		return sink
 	}
-	// The live view orders its command columns by the merged vocabulary.
-	var verbOrder []string
-	for _, verb := range extension.MergeVocabulary(extensions, nil).Verbs {
-		verbOrder = append(verbOrder, verb.Name)
-	}
 	noColor := req.Global.Color != nil && !*req.Global.Color
 	return output.NewRenderer(output.Config{
 		Output:  req.Global.Output,
@@ -65,7 +60,8 @@ func executionRenderer(
 		// only in that it is one-shot (no forced watch — see below).
 		ServeMode:      isServeMode || isRunMode,
 		CoverageReplay: sessStore.LatestValidationCoverage(req.Commands, nil),
-		VerbOrder:      verbOrder,
+		// The live view orders its command columns by the merged vocabulary.
+		VerbOrder: extension.MergeVocabulary(extensions, nil).VerbNames(),
 	})
 }
 

@@ -37,8 +37,9 @@ var fallbackCommandOrder = []string{
 	"generate", "lint", "format", "test", "build", "package", "publish", "deploy", "serve",
 }
 
-// unknownCommandRank is the rank of a command that neither the loaded
-// vocabularies nor the fallback order name.
+// unknownCommandRank is the lowest rank of a command that neither the loaded
+// vocabularies nor the fallback order name; a longer vocabulary pushes it
+// further.
 const unknownCommandRank = 100
 
 // commandRank ranks name in the column order of the live view: the verbs of
