@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
 	gomod "go.putnami.dev/protocol/gomod"
@@ -172,6 +173,122 @@ func TestUploadZipRefusesRegistryDigestMismatch(t *testing.T) {
 	defer server.Close()
 	if _, err := UploadZip(context.Background(), server.Client(), nil, server.URL, testToken, testModule, []byte("uploaded")); err == nil || !strings.Contains(err.Error(), "does not match uploaded zip digest") {
 		t.Fatalf("upload mismatch error = %v", err)
+	}
+}
+
+// recordWaits makes retryPolicy record each wait instead of sleeping, with no
+// jitter, until t ends.
+func recordWaits(t *testing.T) *[]time.Duration {
+	t.Helper()
+	saved := retryPolicy
+	t.Cleanup(func() { retryPolicy = saved })
+	waits := &[]time.Duration{}
+	retryPolicy.Jitter = func(time.Duration) time.Duration { return 0 }
+	retryPolicy.Wait = func(ctx context.Context, d time.Duration) error {
+		*waits = append(*waits, d)
+		return ctx.Err()
+	}
+	return waits
+}
+
+// faultyRegistry answers the first count blob uploads, or every one when count
+// is negative, with status and a body that echoes the bearer, and hands every
+// other request to registry. It returns the bytes of every blob upload.
+func faultyRegistry(t *testing.T, registry *fakeRegistry, count, status int, header ...string) (*httptest.Server, *[][]byte) {
+	t.Helper()
+	var mu sync.Mutex
+	sent := &[][]byte{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != gomod.BlobUploadPath(testModule) {
+			registry.serve(w, r)
+			return
+		}
+		data, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		*sent = append(*sent, data)
+		fail := count < 0 || len(*sent) <= count
+		mu.Unlock()
+		if !fail {
+			r.Body = io.NopCloser(bytes.NewReader(data))
+			registry.serve(w, r)
+			return
+		}
+		for index := 0; index+1 < len(header); index += 2 {
+			w.Header().Set(header[index], header[index+1])
+		}
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, "Bearer "+testToken)
+	}))
+	t.Cleanup(server.Close)
+	return server, sent
+}
+
+func TestUploadZipRetriesATransientFailure(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-blob-upload-retries-a-transient-failure")
+	waits := recordWaits(t)
+	registry := newFakeRegistry(t)
+	server, sent := faultyRegistry(t, registry, 1, http.StatusBadGateway)
+	digest, err := UploadZip(context.Background(), testClient(t), nil, server.URL, testToken, testModule, []byte("zip bytes"))
+	if err != nil || digest != Digest([]byte("zip bytes")) {
+		t.Fatalf("UploadZip = %q, %v; want the zip digest from the second attempt", digest, err)
+	}
+	if len(*sent) != 2 || !bytes.Equal((*sent)[0], (*sent)[1]) || registry.uploads != 1 || fmt.Sprint(*waits) != "[1s]" {
+		t.Fatalf("%d uploads (%d stored) waited %v, want the zip twice and one wait of 1s", len(*sent), registry.uploads, *waits)
+	}
+
+	waits = recordWaits(t)
+	server, sent = faultyRegistry(t, registry, 1, http.StatusServiceUnavailable, "Retry-After", "5")
+	if _, err := UploadZip(context.Background(), testClient(t), nil, server.URL, testToken, testModule, []byte("zip bytes")); err != nil {
+		t.Fatal(err)
+	}
+	if len(*sent) != 2 || fmt.Sprint(*waits) != "[5s]" {
+		t.Fatalf("%d uploads waited %v, want 2 uploads that waited the Retry-After 5s", len(*sent), *waits)
+	}
+}
+
+func TestUploadZipFailsAfterTheAttemptBoundOrAtOnce(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-blob-upload-retries-a-transient-failure")
+	for status, tc := range map[int]struct {
+		attempts int
+		want     string
+	}{
+		http.StatusBadGateway:   {4, "blob upload returned 502 after 4 attempts"},
+		http.StatusBadRequest:   {1, "blob upload returned 400"},
+		http.StatusUnauthorized: {1, "blob upload returned 401"},
+	} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			waits := recordWaits(t)
+			server, sent := faultyRegistry(t, newFakeRegistry(t), -1, status)
+			report := &recordedReport{}
+			_, err := UploadZip(context.Background(), testClient(t), report, server.URL, testToken, testModule, []byte("zip bytes"))
+			if err == nil || err.Error() != tc.want {
+				t.Fatalf("UploadZip = %v, want %q", err, tc.want)
+			}
+			if len(*sent) != tc.attempts || len(*waits) != tc.attempts-1 {
+				t.Fatalf("%d uploads waited %v, want %d uploads", len(*sent), *waits, tc.attempts)
+			}
+			if strings.Contains(report.String(), testToken) {
+				t.Fatalf("report exposed the response body: %s", report)
+			}
+		})
+	}
+}
+
+func TestUploadZipStopsWhenTheContextEnds(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "a-blob-upload-retries-a-transient-failure")
+	recordWaits(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	retryPolicy.Wait = func(ctx context.Context, _ time.Duration) error {
+		cancel()
+		return ctx.Err()
+	}
+	server, sent := faultyRegistry(t, newFakeRegistry(t), -1, http.StatusServiceUnavailable)
+	if _, err := UploadZip(ctx, testClient(t), nil, server.URL, testToken, testModule, []byte("zip bytes")); !errors.Is(err, context.Canceled) {
+		t.Fatalf("UploadZip = %v, want context.Canceled", err)
+	}
+	if len(*sent) != 1 {
+		t.Fatalf("%d uploads were sent, want 1", len(*sent))
 	}
 }
 

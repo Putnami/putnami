@@ -102,7 +102,7 @@
     },
     {
       "id": "publication-outbox",
-      "text": "A publication job packs its managed artifacts into the PUTNAMI_PUBLICATION_OUTBOX directory, writes outbox.json last, and uploads nothing. The descriptor is strict and bounded, and every path stays inside the outbox. The engine reads each artifact once, refuses a size or digest the descriptor does not state, and uploads the bytes it verified. A version published at the same digest is reused. Each uploader takes the bearer as an argument and sends it only to its registry; no error carries it."
+      "text": "A publication job packs its managed artifacts into PUTNAMI_PUBLICATION_OUTBOX, writes outbox.json last, and uploads nothing. The descriptor is strict and bounded; every path stays in the outbox. The engine reads each artifact once, refuses a size or digest the descriptor does not state, and uploads the verified bytes, retrying a transient blob failure up to 3 times. A version at the same digest is reused. Each uploader takes the bearer as an argument and sends it only to its registry; no error carries it."
     }
   ],
   "decisions": [

@@ -45,7 +45,10 @@ The upload is **content-addressed and two-phase on purpose**: the registry
 returns the digest it computed for the bytes it actually stored, and the publish
 body echoes that digest back. A publisher therefore cannot bind a version to
 bytes the registry never received, and a truncated upload fails at the blob step
-rather than producing a version that resolves to a corrupt zip.
+rather than producing a version that resolves to a corrupt zip. Because the
+blob is content-addressed, sending the same zip again is safe: `gomodpublish`
+retries a blob upload after a transient failure as `putpublish` does
+([put-write retries](../put/README.md#retries)).
 
 A digest is `sha256:` followed by exactly 64 lowercase hex characters. Uppercase
 hex, a short digest, and a missing algorithm prefix are all rejected — see

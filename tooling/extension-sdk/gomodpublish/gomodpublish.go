@@ -26,6 +26,7 @@ import (
 	"golang.org/x/mod/module"
 
 	gomod "go.putnami.dev/protocol/gomod"
+	"go.putnami.dev/sdk/extension/internal/retry"
 )
 
 // MaxResponseBytes bounds a blob-upload or version-PUT response body.
@@ -34,6 +35,9 @@ const MaxResponseBytes = 1 << 20
 // MaxZipBytes is the largest module zip the Go toolchain accepts. A served zip
 // is hashed up to one byte past it, so a longer body never matches a digest.
 const MaxZipBytes = 500 << 20
+
+// retryPolicy is how a blob upload retries a transient failure.
+var retryPolicy = retry.Default()
 
 // Reporter receives the diagnostics and log lines of an upload. A
 // *jsonl.Emitter satisfies it. A nil Reporter discards them.
@@ -137,7 +141,9 @@ func authorize(req *http.Request, token string) {
 
 // UploadZip uploads zip to the blob endpoint of modulePath and returns the
 // blob digest, which equals the digest of zip. A registry that answers another
-// digest is refused.
+// digest is refused. The blob endpoint is content-addressed, so a failure
+// before any response, or a 429, 500, 502, 503 or 504 answer, sends the same
+// zip again, up to retry.Attempts times in all.
 func UploadZip(ctx context.Context, client *http.Client, reporter Reporter, registryURL, token, modulePath string, zip []byte) (string, error) {
 	reporter = reporterOrDiscard(reporter)
 	client, err := withoutRedirects(client)
@@ -154,21 +160,35 @@ func UploadZip(ctx context.Context, client *http.Client, reporter Reporter, regi
 	req.Header.Set("Content-Type", gomod.BlobContentType)
 	authorize(req, token)
 
-	resp, err := client.Do(req) //nolint:gosec // registryURL is validated publish configuration
+	var body []byte
+	unreadable := false
+	answer, attempts, err := retryPolicy.Do(ctx, func() (retry.Answer, error) {
+		attemptReq := req.Clone(ctx)
+		attemptReq.Body = io.NopCloser(bytes.NewReader(zip))
+		resp, err := client.Do(attemptReq) //nolint:gosec // registryURL is validated publish configuration
+		if err != nil {
+			return retry.Answer{}, retry.NoResponse(ctx, err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		answer := retry.Answer{Status: resp.StatusCode, Header: resp.Header}
+		body, err = readBoundedResponse(resp.Body)
+		unreadable = err != nil
+		return answer, err
+	})
 	if err != nil {
-		reporter.Diagnostic("error", "Blob upload failed: "+err.Error(), "", 0)
+		if unreadable {
+			reporter.Diagnostic("error", "Invalid blob upload response: "+err.Error(), "", 0)
+			return "", err
+		}
+		reporter.Diagnostic("error", "Blob upload failed"+retry.After(attempts)+": "+err.Error(), "", 0)
+		if attempts > 1 {
+			return "", fmt.Errorf("blob upload failed%s: %w", retry.After(attempts), err)
+		}
 		return "", err
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := readBoundedResponse(resp.Body)
-	if err != nil {
-		reporter.Diagnostic("error", "Invalid blob upload response: "+err.Error(), "", 0)
-		return "", err
-	}
-	if resp.StatusCode != http.StatusCreated {
-		reporter.Diagnostic("error", fmt.Sprintf("Blob upload returned %d", resp.StatusCode), "", 0)
-		return "", fmt.Errorf("blob upload returned %d", resp.StatusCode)
+	if answer.Status != http.StatusCreated {
+		reporter.Diagnostic("error", fmt.Sprintf("Blob upload returned %d%s", answer.Status, retry.After(attempts)), "", 0)
+		return "", fmt.Errorf("blob upload returned %d%s", answer.Status, retry.After(attempts))
 	}
 
 	result, diagnostics := gomod.ParseAndValidateBlobUploadResponse(body)

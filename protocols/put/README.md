@@ -113,6 +113,19 @@ manifest back with its bearer and accepts the version only when the media type
 and the payload bytes equal its own (`ValidateManifestFor`): an immutable
 version that holds anything else is another publisher's version.
 
+### Retries
+
+A blob upload is safe to send again: the registry hashes the bytes it receives
+and, when it already holds them, answers 201 with the stored blob. A publish is
+safe to send again too: a publish the registry stored but whose answer was lost
+answers 409, and the conflict rule above accepts it. The publisher therefore
+retries both after a transient failure, which is a failure before any response
+or a 429, 500, 502, 503 or 504 answer. Any other status fails at once.
+`putpublish` makes at most 4 attempts. Between two attempts it waits 1, 2, then
+4 seconds plus up to half again at random, or the `Retry-After` seconds of the
+answer when they are longer, up to 30 seconds. It stops when its context ends,
+and its last error names the attempt count and the last status.
+
 ## Producers and consumers
 
 **Client (in this repository)** — `tooling/extension-sdk/putpublish` sends
