@@ -115,10 +115,10 @@ func installPin(ctx context.Context, ops artifactOps, item *artifactInstallWork,
 			err = fmt.Errorf("%w; the stable link could not be restored: %w", err, restoreErr)
 		}
 		if held != nil {
-			// An update resolves the channel again and holds the pin, so it
+			// A channel request resolves the channel again and holds the pin, so it
 			// cannot refresh this entry; an exact version installs with no lock
 			// entry and is never held.
-			err = fmt.Errorf("%s, and installing the pinned %s failed: %w; `update` keeps this pin, so run `%s %s@%s` to refresh its lock entry",
+			err = fmt.Errorf("%s, and installing the pinned %s failed: %w; a channel request keeps this pin, so run `%s %s@%s` to refresh its lock entry",
 				held.note(), locked.Version, err, ops.installCmd(), item.name, locked.Version)
 		}
 		item.result, item.err = nil, err

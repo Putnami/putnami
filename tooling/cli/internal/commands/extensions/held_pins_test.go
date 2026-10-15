@@ -33,7 +33,7 @@ func TestAHeldPinHintNamesTheInstallOfItsScope(t *testing.T) {
 	item := artifactInstallWork{name: "@acme/tool", constraint: "latest", prior: lockfile.LockEntry{Version: "1.1.0"}, hadPrior: true, holdsPin: true}
 
 	installHoldingPin(context.Background(), ops, &item)
-	want := "; `update` keeps this pin, so run `putnami extensions install --user @acme/tool@1.1.0` to refresh its lock entry"
+	want := "; a channel request keeps this pin, so run `putnami extensions install --user @acme/tool@1.1.0` to refresh its lock entry"
 	if item.err == nil || !strings.HasSuffix(item.err.Error(), want) {
 		t.Errorf("user-scope error = %v, want it to end with %q", item.err, want)
 	}
