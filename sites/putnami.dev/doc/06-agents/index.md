@@ -118,6 +118,10 @@ file are preserved, a `putnami` entry you changed is kept, and a file that does
 not parse is left untouched with a warning. `mcp install` writes the same entry
 on request, and is the one command that rewrites a diverged one.
 
+The entry runs `putnami mcp`. A workspace that builds its own CLI from source
+(`cli.source: "workspace"` in `putnami.lock.json`) refuses the global binary, so
+when its root holds an executable `putnamiw`, the entry runs `./putnamiw mcp`.
+
 The server speaks JSON-RPC 2.0 on stdin/stdout, exits with the session, and
 exposes the workspace as typed tools instead of shell exploration:
 

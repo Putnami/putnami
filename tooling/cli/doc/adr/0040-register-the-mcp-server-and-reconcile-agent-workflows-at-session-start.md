@@ -29,6 +29,13 @@ top-level keys, rewrites a diverged `putnami` entry (the user asked for this
 exact write, so it repairs a hand-edited registration), and fails on a file it
 cannot parse, leaving it untouched.
 
+The entry runs `putnami mcp`. A source workspace refuses the global binary
+([ADR 0028](0028-self-hosted-cli-source-workspace.md)), so when its lock
+records `cli.source: "workspace"` and its root holds an executable `putnamiw`,
+the entry runs `./putnamiw mcp` instead. Each workspace compares against its
+own canonical entry, so `putnami mcp install` repairs a source workspace's
+stale `putnami` entry.
+
 `putnami init`, an explicit `putnami install`, and `putnami upgrade` (except
 its dry run) add the entry with the same merge when no `putnami` entry exists.
 They differ from the explicit command where the user did not ask for this
@@ -100,6 +107,8 @@ or the build fails.
   after the host's one-time project approval.
 - A repository that commits a `.mcp.json` without a `putnami` entry sees the
   file change after its next explicit `putnami install`.
+- A source workspace that commits a `putnami` entry keeps it through `install`
+  and `upgrade`; `putnami mcp install` rewrites it to `./putnamiw`.
 - A worktree that moved to another lock gets the matching workflows at its
   next agent session. When the pinned release is not installed, the session
   starts with the old files and a warning naming `putnami install`.

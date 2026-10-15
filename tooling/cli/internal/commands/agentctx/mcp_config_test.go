@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
 
 // readMCPServers parses .mcp.json in dir and returns the mcpServers object.
@@ -30,14 +32,14 @@ func readMCPServers(t *testing.T, dir string) map[string]any {
 	return servers
 }
 
-func assertPutnamiEntry(t *testing.T, servers map[string]any) {
+func assertPutnamiEntry(t *testing.T, servers map[string]any, command string) {
 	t.Helper()
 	entry, ok := servers["putnami"].(map[string]any)
 	if !ok {
 		t.Fatalf("putnami entry missing: %v", servers)
 	}
-	if entry["command"] != "putnami" {
-		t.Errorf("command = %v, want putnami", entry["command"])
+	if entry["command"] != command {
+		t.Errorf("command = %v, want %s", entry["command"], command)
 	}
 	args, _ := entry["args"].([]any)
 	if len(args) != 1 || args[0] != "mcp" {
@@ -49,6 +51,142 @@ func assertPutnamiEntry(t *testing.T, servers map[string]any) {
 	}
 }
 
+// writeCLILock writes a putnami.lock.json in dir whose CLI entry is cli.
+func writeCLILock(t *testing.T, dir string, cli lockfile.LockEntry) {
+	t.Helper()
+	lf := lockfile.NewLockFile()
+	lf.SetCLI(cli)
+	if err := lockfile.WriteLockFile(dir, lf); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// writePutnamiw writes a putnamiw wrapper at the root of dir with mode.
+func writePutnamiw(t *testing.T, dir string, mode os.FileMode) {
+	t.Helper()
+	path := filepath.Join(dir, "putnamiw")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n"), mode); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, mode); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A source workspace refuses the global putnami (ADR 0028), so its server
+// starts through its own executable ./putnamiw. Every other workspace keeps
+// the bare putnami that resolves from PATH.
+func TestMCPServerCommandFollowsTheWorkspaceSource(t *testing.T) {
+	spectest.Proves(t, "cli/context-mcp-discovery", "implicit-mcp-registration", "a-source-workspace-registers-its-putnamiw")
+	source := lockfile.LockEntry{Source: lockfile.SourceWorkspace}
+	for _, tc := range []struct {
+		name  string
+		setup func(t *testing.T, dir string)
+		want  string
+	}{
+		{"no lock", func(*testing.T, string) {}, "putnami"},
+		{"a published pin with a putnamiw", func(t *testing.T, dir string) {
+			writeCLILock(t, dir, lockfile.LockEntry{Version: "1.2.3", Source: "https://registry.example/putnami"})
+			writePutnamiw(t, dir, 0o755)
+		}, "putnami"},
+		{"a source workspace without putnamiw", func(t *testing.T, dir string) {
+			writeCLILock(t, dir, source)
+		}, "putnami"},
+		{"a source workspace with a putnamiw that is not executable", func(t *testing.T, dir string) {
+			writeCLILock(t, dir, source)
+			writePutnamiw(t, dir, 0o644)
+		}, "putnami"},
+		{"a source workspace with an executable putnamiw", func(t *testing.T, dir string) {
+			if runtime.GOOS == "windows" {
+				t.Skip("Windows records no executable bit")
+			}
+			writeCLILock(t, dir, source)
+			writePutnamiw(t, dir, 0o755)
+		}, "./putnamiw"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			tc.setup(t, dir)
+			got, err := mcpServerCommand(dir)
+			if err != nil || got != tc.want {
+				t.Fatalf("mcpServerCommand = %q (%v), want %q", got, err, tc.want)
+			}
+			if _, err := ensureMCPConfig(dir, mcpRepairDivergedEntry); err != nil {
+				t.Fatalf("ensureMCPConfig: %v", err)
+			}
+			assertPutnamiEntry(t, readMCPServers(t, dir), tc.want)
+		})
+	}
+}
+
+// A lock that cannot be read cannot rule a source workspace out, so no entry
+// is written from a guess.
+func TestEnsureMCPConfigRefusesAnUnreadableLock(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, lockfile.LockFilename), []byte(`{not json`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ensureMCPConfig(dir, mcpRepairDivergedEntry); err == nil || !strings.Contains(err.Error(), lockfile.LockFilename) {
+		t.Fatalf("ensureMCPConfig error = %v, want it to name %s", err, lockfile.LockFilename)
+	}
+	if _, err := os.Stat(filepath.Join(dir, mcpConfigPath)); !os.IsNotExist(err) {
+		t.Fatalf("an unreadable lock still wrote %s: stat err %v", mcpConfigPath, err)
+	}
+}
+
+// A source workspace's canonical entry is ./putnamiw, so the explicit install
+// repairs the stale putnami entry an older release wrote, and the implicit
+// registration keeps it byte for byte, as it keeps any diverged entry.
+func TestSourceWorkspaceRepairsOrKeepsAStalePutnamiEntry(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows records no executable bit")
+	}
+	stale := `{"mcpServers":{"other":{"command":"x"},"putnami":{"args":["mcp"],"command":"putnami","env":{"PUTNAMI_AGENT_WORKSPACE":"${CLAUDE_PROJECT_DIR:-.}"}}}}` + "\n"
+	sourceWorkspace := func(t *testing.T) string {
+		dir := t.TempDir()
+		writeCLILock(t, dir, lockfile.LockEntry{Source: lockfile.SourceWorkspace})
+		writePutnamiw(t, dir, 0o755)
+		if err := os.WriteFile(filepath.Join(dir, mcpConfigPath), []byte(stale), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return dir
+	}
+
+	t.Run("mcp install repairs it", func(t *testing.T) {
+		dir := sourceWorkspace(t)
+		if err := MCPInstall(dir); err != nil {
+			t.Fatalf("MCPInstall: %v", err)
+		}
+		servers := readMCPServers(t, dir)
+		assertPutnamiEntry(t, servers, "./putnamiw")
+		if encoded, err := canonicalJSON(servers["other"]); err != nil || encoded != `{"command":"x"}` {
+			t.Fatalf("unrelated server changed: %s (%v)", encoded, err)
+		}
+		status, err := ensureMCPConfig(dir, mcpRepairDivergedEntry)
+		if err != nil || status != mcpConfigUnchanged {
+			t.Fatalf("second install status = %v (%v), want unchanged", status, err)
+		}
+	})
+
+	t.Run("the implicit registration keeps it", func(t *testing.T) {
+		dir := sourceWorkspace(t)
+		var warn bytes.Buffer
+		if RegisterMCPServer(dir, &warn) {
+			t.Fatal("RegisterMCPServer reported a change over a diverged entry")
+		}
+		if got, err := os.ReadFile(filepath.Join(dir, mcpConfigPath)); err != nil || string(got) != stale {
+			t.Fatalf("the implicit path rewrote a diverged entry:\n%s\n(%v)", got, err)
+		}
+		if warn.Len() != 0 {
+			t.Fatalf("a kept entry is not a problem to warn about, got %q", warn.String())
+		}
+		status, err := ensureMCPConfig(dir, mcpKeepDivergedEntry)
+		if err != nil || status != mcpConfigKept {
+			t.Fatalf("status = %v (%v), want kept", status, err)
+		}
+	})
+}
+
 func TestEnsureMCPConfigCreatesFile(t *testing.T) {
 	dir := t.TempDir()
 	status, err := ensureMCPConfig(dir, mcpRepairDivergedEntry)
@@ -58,7 +196,7 @@ func TestEnsureMCPConfigCreatesFile(t *testing.T) {
 	if status != mcpConfigCreated {
 		t.Errorf("status = %v, want created", status)
 	}
-	assertPutnamiEntry(t, readMCPServers(t, dir))
+	assertPutnamiEntry(t, readMCPServers(t, dir), "putnami")
 }
 
 func TestEnsureMCPConfigMergesIntoExistingFile(t *testing.T) {
@@ -77,7 +215,7 @@ func TestEnsureMCPConfigMergesIntoExistingFile(t *testing.T) {
 	}
 
 	servers := readMCPServers(t, dir)
-	assertPutnamiEntry(t, servers)
+	assertPutnamiEntry(t, servers, "putnami")
 	other, ok := servers["other"].(map[string]any)
 	if !ok || other["command"] != "other-bin" {
 		t.Errorf("existing server was not preserved: %v", servers)
@@ -110,7 +248,7 @@ func TestEnsureMCPConfigRewritesADivergedEntryAndKeepsTheRest(t *testing.T) {
 		t.Errorf("status = %v, want updated", status)
 	}
 	servers := readMCPServers(t, dir)
-	assertPutnamiEntry(t, servers)
+	assertPutnamiEntry(t, servers, "putnami")
 	if _, ok := servers["other"]; !ok {
 		t.Error("other server was dropped by the rewrite")
 	}
@@ -215,7 +353,7 @@ func TestMCPInstallIsTheExplicitRegistrationPath(t *testing.T) {
 		t.Fatalf("MCPInstall: %v", err)
 	}
 	servers := readMCPServers(t, dir)
-	assertPutnamiEntry(t, servers)
+	assertPutnamiEntry(t, servers, "putnami")
 	if encoded, err := canonicalJSON(servers["other"]); err != nil || encoded != `{"command":"other-server"}` {
 		t.Fatalf("unrelated server changed: %s (%v)", encoded, err)
 	}
@@ -244,7 +382,7 @@ func TestRegisterMCPServerAddsAMissingEntry(t *testing.T) {
 	if !RegisterMCPServer(dir, nil) {
 		t.Fatal("RegisterMCPServer reported no change for a missing file")
 	}
-	assertPutnamiEntry(t, readMCPServers(t, dir))
+	assertPutnamiEntry(t, readMCPServers(t, dir), "putnami")
 
 	merged := t.TempDir()
 	existing := `{"mcpServers":{"other":{"command":"other-bin","args":["serve"]}},"customKey":42}`
@@ -255,7 +393,7 @@ func TestRegisterMCPServerAddsAMissingEntry(t *testing.T) {
 		t.Fatal("RegisterMCPServer reported no change for a file without the entry")
 	}
 	servers := readMCPServers(t, merged)
-	assertPutnamiEntry(t, servers)
+	assertPutnamiEntry(t, servers, "putnami")
 	if encoded, err := canonicalJSON(servers["other"]); err != nil || encoded != `{"args":["serve"],"command":"other-bin"}` {
 		t.Fatalf("unrelated server changed: %s (%v)", encoded, err)
 	}

@@ -138,7 +138,7 @@ it, then rerun.
 
 ## Reach the MCP server
 
-An agent IDE discovers the server through a `.mcp.json` file at the workspace root. `putnami init`, `putnami install` and `putnami upgrade` add the `putnami` entry when it is missing. They merge: other servers and unknown keys are preserved, a `putnami` entry you changed is kept as you wrote it, and a file that does not parse is left untouched with a warning.
+An agent IDE discovers the server through a `.mcp.json` file at the workspace root. `putnami init`, `putnami install` and `putnami upgrade` add the `putnami` entry when it is missing. They merge: other servers and unknown keys are preserved, a `putnami` entry you changed is kept as you wrote it, and a file that does not parse is left untouched with a warning. The entry runs `putnami mcp`, or `./putnamiw mcp` in a workspace that builds its own CLI from source and has an executable `putnamiw` at its root.
 
 To write or repair the entry explicitly, run:
 

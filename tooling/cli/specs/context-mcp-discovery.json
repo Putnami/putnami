@@ -22,7 +22,7 @@
     },
     {
       "id": "implicit-mcp-registration",
-      "text": "init, and an explicit install or upgrade, add a missing putnami entry to .mcp.json through the merge putnami mcp install uses, keeping other servers and unknown keys. Unlike that command, they keep a diverged putnami entry byte for byte, and leave an unparseable file untouched with a warning instead of failing. The first-use install that runs before an unrelated command writes no .mcp.json."
+      "text": "init, and an explicit install or upgrade, add a missing putnami entry to .mcp.json through the merge putnami mcp install uses, keeping other servers and unknown keys. Unlike that command, they keep a diverged putnami entry byte for byte, and leave an unparseable file untouched with a warning instead of failing. The first-use install that runs before an unrelated command writes no .mcp.json. The entry runs ./putnamiw mcp in a source workspace whose root holds an executable putnamiw, putnami mcp elsewhere."
     },
     {
       "id": "workspace-map",
