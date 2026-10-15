@@ -343,6 +343,19 @@ describe('OAuthService', () => {
       ]);
     });
 
+    for (const body of ['{}', '{"error":400}', '"invalid_grant"', 'null', '["invalid_grant"]']) {
+      it(`logs a 400 refresh answer whose body ${body} names no error code at error`, async () => {
+        const records = await failedTokenRecords(
+          () => Promise.resolve(new Response(body, { status: 400 })),
+          (service) => service.refreshToken('r'),
+        );
+        expect(records.map((e) => [e.level, e.message])).toEqual([['error', 'OAuth token request failed']]);
+        expect(records[0]?.data).toEqual([
+          { status: 400, grantType: 'refresh_token', tokenUri: TOKEN_URI, error: undefined },
+        ]);
+      });
+    }
+
     it('logs a network error on a refresh grant at error', async () => {
       const records = await failedTokenRecords(
         () => Promise.reject(new TypeError('fetch failed')),

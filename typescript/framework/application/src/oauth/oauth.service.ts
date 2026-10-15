@@ -643,8 +643,6 @@ export class OAuthService {
     const grantType = body['grant_type'];
     const error = await readOAuthErrorCode(res);
     const fields = { status: res.status, grantType, tokenUri, error };
-    // An expired or revoked refresh token is an expected outcome: the caller
-    // sends the user to sign in again.
     if (grantType === 'refresh_token' && res.status === 400 && error === 'invalid_grant') {
       useLogger().warn('OAuth refresh token rejected', fields);
     } else {
