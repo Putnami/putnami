@@ -45,6 +45,11 @@ type JobContextProjectRef struct {
 	// putnami.json list, else the provider's view, else its scope's. Set on
 	// workspaceProjects only, as Config is.
 	Extensions []string `json:"extensions,omitempty"`
+	// Type is the resolved classification: the authored putnami.json type, else
+	// the provider probe's. Set on workspaceProjects only, as Config is, so a
+	// workspace task tells a workload from a library without reading Config,
+	// which holds only the authored half.
+	Type string `json:"type,omitempty"`
 }
 
 // JobContextVersion describes the computed version metadata in the context file.
@@ -244,6 +249,7 @@ func WorkspaceProjectsContext(ws *workspace.Workspace, versions RunVersions) []J
 			FullPath:   filepath.Join(ws.Root, project.Path),
 			Config:     encodedProjectConfig(project),
 			Extensions: slices.Clone(project.Extensions),
+			Type:       project.Type,
 			// The resolved DIRECT edges. Publishing them here is what makes the
 			// member a graph rather than a listing: a consumer reading an entry
 			// with no edge list inside this member knows the project declares

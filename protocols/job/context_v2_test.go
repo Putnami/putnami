@@ -141,6 +141,7 @@ func TestV2InvalidFixtureCoverage(t *testing.T) {
 		"selectedProjects[1].version",
 		"selectedProjects[1].dependencies",
 		"selectedProjects[0].extensions",
+		"selectedProjects[0].type",
 		"workspaceProjects",
 		"workspaceProjects[1].path",
 		"userScope",
@@ -591,6 +592,32 @@ func TestV2WorkspaceProjectsCarryTheResolvedExtensions(t *testing.T) {
 	}
 	if strings.Contains(string(encoded), "extensions") {
 		t.Errorf("encoded reference = %s, want extensions omitted when empty", encoded)
+	}
+}
+
+// TestV2WorkspaceProjectsCarryTheResolvedType asserts the member a workspace
+// task reads to tell a deployable workload from a library, and that a
+// reference without it encodes as it did before the member.
+func TestV2WorkspaceProjectsCarryTheResolvedType(t *testing.T) {
+	t.Parallel()
+	ctx, diags := ParseAndValidate(readFixture(t, "fixtures", "v2", "valid", "project-references.json"))
+	if diag.HasErrors(diags) {
+		t.Fatalf("valid fixture rejected: %v", diags)
+	}
+	if len(ctx.WorkspaceProjects) != 3 {
+		t.Fatalf("workspaceProjects = %d, want the fixture's three", len(ctx.WorkspaceProjects))
+	}
+	for i, want := range []string{"application", "", "library"} {
+		if got := ctx.WorkspaceProjects[i].Type; got != want {
+			t.Errorf("workspaceProjects[%d].type = %q, want %q", i, got, want)
+		}
+	}
+	encoded, err := json.Marshal(ProjectRef{Name: "a", Path: "a", FullPath: "/ws/a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), `"type"`) {
+		t.Errorf("encoded reference = %s, want type omitted when empty", encoded)
 	}
 }
 
