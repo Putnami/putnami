@@ -254,10 +254,12 @@ func TestUndeclaredFlagWarnings_QuietForKnownShapes(t *testing.T) {
 	}
 }
 
-// The core reads --channel, --baseline-channel, --visibility and --release from
-// a job-running command itself: no manifest declares them, because the
-// coordinator that consumes them is the CLI. Without this exemption every
-// release-set publish would warn about the exact flag it requires.
+// The core reads --channel, --baseline-channel, --reuse-channel,
+// --reuse-source-revision, --visibility and --release from a job-running
+// command itself: no manifest declares them,
+// because the coordinator that consumes them is the CLI. Without this
+// exemption every release-set publish would warn about the exact flag it
+// requires.
 func TestUndeclaredFlagWarningsExemptCoreJobFlags(t *testing.T) {
 	t.Parallel()
 	cases := [][]string{
@@ -265,6 +267,10 @@ func TestUndeclaredFlagWarningsExemptCoreJobFlags(t *testing.T) {
 		{"--channel=canary,next"},
 		{"--baseline-channel", "canary"},
 		{"--baseline-channel=canary"},
+		{"--reuse-channel", "pr-7"},
+		{"--reuse-channel=pr-7"},
+		{"--reuse-source-revision", strings.Repeat("a", 40)},
+		{"--reuse-source-revision=" + strings.Repeat("a", 40)},
 		{"--visibility", "public"},
 		{"--scope", "typescript"},
 		{"--release", "rs_" + strings.Repeat("a", 64)},

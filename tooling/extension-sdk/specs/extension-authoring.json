@@ -18,7 +18,7 @@
   "requirements": [
     {
       "id": "release-plan-compatibility",
-      "text": "The job-context release-set plan accepts additive unknown fields at the supported protocol version, rejects unsupported versions naming received and supported versions, and preserves single-document framing, size limits and validation of known fields."
+      "text": "The job-context release-set plan accepts additive unknown fields at the supported protocol version, rejects unsupported versions naming received and supported versions, and preserves single-document framing, size limits and validation of known fields. A reused member carries the reuse head's artifact record, built at the plan's reuse source revision, rebound to the plan's revision and the run's one source tree, and a plan that reuses nothing emits no reuse field."
     },
     {
       "id": "event-stream-conformance",

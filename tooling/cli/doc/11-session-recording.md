@@ -318,6 +318,39 @@ that is the half a selection flag decides (ADR 0017 §2):
 when its plan selected no member. Subtract it from `projects` to read what the
 session verified without publishing.
 
+A publication that named `--reuse-channel` and whose plan takes at least one
+member from that channel's head records `reuse`: the channel, the id of the
+head the run resolved, the commit `--reuse-source-revision` named, which every
+reused record had to come from, and every reused member with the version the
+plan takes, sorted by ecosystem then coordinate. It states the plan, not the release
+outcome: a dry run, or a release that fails, records the same block and
+releases nothing. It is unrelated to `run.reuse`, which counts the tasks a
+cache served. A reused member is neither built nor uploaded by the session, so
+its project is not in `releaseSetProjects`; below, the session verified
+`/libs/widget` and its plan takes the package from `pr-7` (ADR 0066):
+
+```json
+{
+  "commands": ["lint", "test", "build", "validate", "publish"],
+  "selection": {
+    "mode": "impacted",
+    "scoped": true,
+    "projects": ["/libs/widget"],
+    "reuse": {
+      "channel": "pr-7",
+      "head": "rs_4f9c…",
+      "sourceRevision": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+      "members": [
+        { "ecosystem": "npm", "coordinate": "@putnami/widget", "version": "1.4.0-20261014120000-abc1234" }
+      ]
+    }
+  }
+}
+```
+
+`reuse` is absent when the run reused nothing, including when it named a reuse
+channel whose head offered no member.
+
 ### The gated tree
 
 `tree` names **which worktree the session ran against**, by content. `git` names

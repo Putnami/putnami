@@ -221,6 +221,12 @@ type Selection struct {
 	// BaselineSource is the resolution tier that produced Baseline, so a
 	// consumer can distrust a stale fallback ref the same way the run can.
 	BaselineSource string `json:"baselineSource,omitempty"`
+	// Reuse names the members the release-set plan takes from another
+	// channel's head instead of building them. It states the plan, not the
+	// release outcome: a dry run or a failed release records it too. Absent
+	// when the plan reused nothing, which is every session that names no reuse
+	// channel.
+	Reuse *SelectionReuse `json:"reuse,omitempty"`
 	// ProjectIDs are the selected projects' canonical ids, sorted.
 	ProjectIDs []string `json:"projects"`
 	// ReleaseSetProjects are the canonical ids, sorted, of the projects whose
@@ -239,6 +245,27 @@ type Selection struct {
 	// and a consumer must render it as "nothing to check" rather than as a
 	// failure to find work.
 	EmptyImpact bool `json:"emptyImpact,omitempty"`
+}
+
+// SelectionReuse is what the release-set plan takes from its reuse channel:
+// the channel, the id of the head the publication resolved for it, the commit
+// every reused record had to come from (`--reuse-source-revision`, the full
+// 40-hex revision of the reviewed final head), and every member the plan takes
+// with that head's artifact, sorted by ecosystem then coordinate. Members is
+// never empty: a plan that reused nothing reports no block.
+type SelectionReuse struct {
+	Channel        string                  `json:"channel"`
+	Head           string                  `json:"head"`
+	SourceRevision string                  `json:"sourceRevision"`
+	Members        []SelectionReusedMember `json:"members"`
+}
+
+// SelectionReusedMember is one reused member and the version the plan takes
+// for it, which is the version the reuse head recorded.
+type SelectionReusedMember struct {
+	Ecosystem  string `json:"ecosystem"`
+	Coordinate string `json:"coordinate"`
+	Version    string `json:"version"`
 }
 
 // PathFor returns the staging directory a declared-output root resolves to, or

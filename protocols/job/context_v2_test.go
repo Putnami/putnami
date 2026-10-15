@@ -154,6 +154,10 @@ func TestV2InvalidFixtureCoverage(t *testing.T) {
 		"selection.projects",
 		"selection.projects[0]",
 		"selection.releaseSetProjects",
+		"selection.reuse.channel",
+		"selection.reuse.sourceRevision",
+		"selection.reuse.members",
+		"selection.reuse.members[0].version",
 		"selection.emptyImpact",
 	} {
 		if !fields[field] {

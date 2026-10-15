@@ -73,6 +73,22 @@ it was. The baseline channel's head rides in `Heads` beside the advanced ones,
 because the publication resolved all of them in one exchange
 (`protocols/distribution` ADR 0006).
 
+`Plan.ReuseChannel` names one more channel the plan READS and never releases,
+and only when the plan took at least one member from its head: `Plan.Reused`
+lists those members, `Plan.ReusedMembers()` returns them, and
+`Plan.ReuseHead()` is that head, which rides in `Heads` too. A reused member is
+unselected, so no package or publish step runs for it. It carries the reuse
+head's record of the member, rebound to `Plan.SourceRevision`, the commit the
+plan publishes, and to the run's source tree: every selected and reused member
+of such a plan records the same `SourceTree`, possibly none
+(`protocols/distribution` ADR 0007). `Plan.ReuseSourceRevision` is the commit
+whose build the reuse channel offered, the pull request's reviewed final head:
+`ValidatePlan` refuses a reused member whose record on the reuse head names
+another revision, so a record an earlier push left on that head is never
+released as reused. A plan that reuses nothing carries none of these fields. An SDK older
+than this field refuses a plan that reuses a member: the reuse head is a head
+it did not request.
+
 This rule applies to the versioned job-context plan. The provider's `releaseSet`
 project metadata remains a closed declaration, and authored `infra/runtime.json`
 remains strict so unsupported policy fields produce diagnostics.

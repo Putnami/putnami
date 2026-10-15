@@ -152,6 +152,8 @@ var v2StructDefs = map[string]any{
 	"sessionAgent":             SessionAgent{},
 	"sessionPlacement":         SessionPlacement{},
 	"sessionProvenance":        SessionProvenance{},
+	"sessionSelectionReuse":    SessionSelectionReuse{},
+	"sessionReusedMember":      SessionSelectionReusedMember{},
 	"sessionEnvironment":       SessionEnvironment{},
 	"preparationPhaseRecord":   PreparationPhaseRecord{},
 	"sessionPreparation":       SessionPreparation{},

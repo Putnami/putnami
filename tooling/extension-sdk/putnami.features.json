@@ -22,7 +22,9 @@
             "checks": [
               "supported-plans-accept-additive-fields",
               "future-plans-name-received-and-supported-versions",
-              "plan-framing-and-size-limits-remain-enforced"
+              "plan-framing-and-size-limits-remain-enforced",
+              "reused-members-carry-the-reuse-heads-record",
+              "a-plan-without-reuse-keeps-its-bytes"
             ]
           }
         },

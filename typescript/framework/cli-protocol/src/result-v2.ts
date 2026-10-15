@@ -756,6 +756,36 @@ export interface SessionSelection {
    * this member is what lets a consumer attribute each half.
    */
   releaseSetProjects?: string[];
+  /**
+   * The members this session's release-set plan takes from the reuse
+   * channel's head instead of building them. It states the plan, not the
+   * release outcome: a dry run or a failed release records it too. Absent when
+   * the plan reused nothing. Unrelated to `run.reuse`, which counts the tasks
+   * a cache served.
+   */
+  reuse?: SessionSelectionReuse;
+}
+
+/**
+ * What the release-set plan takes from the channel `--reuse-channel` named:
+ * the channel, the id of the head the publication resolved for it, the commit
+ * `--reuse-source-revision` named, which every reused record had to come from
+ * (a full 40-hex lowercase revision), and every member the plan takes with
+ * that head's artifact, at least one, sorted by ecosystem then coordinate
+ * without duplicates.
+ */
+export interface SessionSelectionReuse {
+  channel: string;
+  head: string;
+  sourceRevision: string;
+  members: SessionSelectionReusedMember[];
+}
+
+/** One reused member and the version the plan takes for it. */
+export interface SessionSelectionReusedMember {
+  ecosystem: string;
+  coordinate: string;
+  version: string;
 }
 
 /**
@@ -2014,11 +2044,71 @@ const sessionPlacement: Check = (v, path, value) => {
   }
 };
 
+const sessionReusedMemberFields: Field[] = [
+  req('ecosystem', nonEmptyString),
+  req('coordinate', nonEmptyString),
+  req('version', nonEmptyString),
+];
+const sessionReusedMember: Check = (v, path, value) => object(v, path, value, sessionReusedMemberFields);
+
+const sessionSelectionReuseFields: Field[] = [
+  req('channel', nonEmptyString),
+  req('head', nonEmptyString),
+  req('sourceRevision', releaseSourceRevision),
+  req('members', arrayOf(sessionReusedMember)),
+];
+/**
+ * Compares two strings by code point, which is Go's byte order on their UTF-8
+ * encoding. UTF-16 code-unit order differs from it past the Basic Multilingual
+ * Plane, so it would accept a member order the Go twin refuses.
+ */
+const byCodePoint = (a: string, b: string): number => {
+  const left = [...a];
+  const right = [...b];
+  for (let i = 0; i < left.length && i < right.length; i++) {
+    const x = left[i].codePointAt(0) ?? 0;
+    const y = right[i].codePointAt(0) ?? 0;
+    if (x !== y) {
+      return x < y ? -1 : 1;
+    }
+  }
+  return left.length - right.length;
+};
+
+/**
+ * Applies the job contract's rule for the same block beside the member set:
+ * members names at least one member, because a plan that reused nothing
+ * reports no block, in (ecosystem, coordinate) order without duplicates. A
+ * violation names the members array once.
+ */
+const sessionSelectionReuse: Check = (v, path, value) => {
+  const members = childArray(object(v, path, value, sessionSelectionReuseFields), 'members');
+  if (members === undefined) {
+    return;
+  }
+  if (members.length === 0) {
+    v.add(VIOLATION_CODE.invalidValue, join(path, 'members'));
+    return;
+  }
+  let previous: [string, string] = ['', ''];
+  for (const [i, entry] of members.entries()) {
+    const member = isObject(entry) ? entry : undefined;
+    const current: [string, string] = [childString(member, 'ecosystem') ?? '', childString(member, 'coordinate') ?? ''];
+    const ecosystem = byCodePoint(previous[0], current[0]);
+    if (i > 0 && (ecosystem > 0 || (ecosystem === 0 && byCodePoint(previous[1], current[1]) >= 0))) {
+      v.add(VIOLATION_CODE.invalidValue, join(path, 'members'));
+      return;
+    }
+    previous = current;
+  }
+};
+
 const sessionSelectionFields: Field[] = [
   req('mode', enumOf(...SESSION_SELECTION_MODES)),
   req('scoped', boolean),
   opt('projects', arrayOf(nonEmptyString)),
   opt('releaseSetProjects', arrayOf(nonEmptyString)),
+  opt('reuse', sessionSelectionReuse),
 ];
 const sessionSelection: Check = (v, path, value) => object(v, path, value, sessionSelectionFields);
 
@@ -2431,6 +2521,22 @@ function percentage(v: Validator, path: string, value: unknown): void {
     return;
   }
   if (!Number.isFinite(value) || value < 0 || value > 100) {
+    v.add(VIOLATION_CODE.invalidValue, path);
+  }
+}
+
+/**
+ * Accepts a full commit revision as a release-set member records one: exactly
+ * 40 lowercase hex characters. Narrower than {@link gitObjectId}, because the
+ * distribution protocol holds every member revision to that shape and a reuse
+ * block names the revision its reused records carry.
+ */
+function releaseSourceRevision(v: Validator, path: string, value: unknown): void {
+  if (typeof value !== 'string') {
+    v.add(VIOLATION_CODE.invalidType, path);
+    return;
+  }
+  if (!/^[0-9a-f]{40}$/.test(value)) {
     v.add(VIOLATION_CODE.invalidValue, path);
   }
 }
@@ -2889,6 +2995,8 @@ export const V2_FIELD_NAMES: Record<string, { members: string[]; required: strin
       ['sessionAgent', sessionAgentFields],
       ['sessionPlacement', sessionPlacementFields],
       ['sessionProvenance', sessionProvenanceFields],
+      ['sessionSelectionReuse', sessionSelectionReuseFields],
+      ['sessionReusedMember', sessionReusedMemberFields],
       ['sessionEnvironment', sessionEnvironmentFields],
       ['preparationPhaseRecord', preparationPhaseRecordFields],
       ['sessionPreparation', sessionPreparationFields],

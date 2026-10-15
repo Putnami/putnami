@@ -176,13 +176,36 @@ defaults are) is the language extension's, the graph is core's.
   two are never confused. It is absent when the session coordinates no release
   set, and when the plan selected no member.
 
+  `reuse` names what the release-set plan takes from the channel
+  `--reuse-channel` named instead of building it: `channel`, the `head` set id
+  the publication resolved for it, `sourceRevision`, the commit
+  `--reuse-source-revision` named, which every reused record had to come from,
+  and `members`, each with its `ecosystem`, `coordinate` and the `version` the
+  plan takes. It states the plan, which a dry run or a failed release does not
+  release. Every member is required and non-blank, `sourceRevision` is a full
+  40-hex lowercase commit, and the list is non-empty and sorted by ecosystem
+  then coordinate with no duplicate (`job.invalid_value`, `job.missing_field`).
+  It is absent when the publication reused nothing.
+
+  ```json
+  "reuse": {
+    "channel": "pr-7",
+    "head": "rs_9a03…",
+    "sourceRevision": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+    "members": [
+      {"ecosystem": "npm", "coordinate": "@acme/widget", "version": "1.2.0-20261014120000-abc1234"}
+    ]
+  }
+  ```
+
   The shape is the CLI's own `ResolvedSelection`
   (`tooling/cli/internal/commands/shared/selection.go`) member for member and
   **byte for byte**, so one resolver answers both the interactive command
-  surfaces and the planned jobs. `releaseSetProjects` is the one exception, and
-  it is one because a read-only selection surface coordinates no publication: it
-  is produced by the orchestrator alone, which is why the CLI type omits it and
-  every document that type can produce still marshals identically. The type is
+  surfaces and the planned jobs. `releaseSetProjects` and `reuse` are the two
+  exceptions, and they are because a read-only selection surface coordinates no
+  publication: they are produced by the orchestrator alone, which is why the
+  CLI type omits them and every document that type can produce still marshals
+  identically. The type is
   not imported — it carries resolved workspace projects and would drag the
   CLI's workspace loader into this protocol — so the equality is pinned by a
   drift test on the CLI side, the same arrangement the staging roots use against

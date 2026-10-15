@@ -658,6 +658,8 @@ func validateSelection(selection *Selection, present bool) []diag.Diagnostic {
 		}
 	}
 
+	diags = append(diags, validateSelectionReuse(selection)...)
+
 	if selection.EmptyImpact {
 		if selection.Mode != SelectionModeImpacted {
 			diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, "selection.emptyImpact",
@@ -672,6 +674,77 @@ func validateSelection(selection *Selection, present bool) []diag.Diagnostic {
 	}
 
 	return diags
+}
+
+// validateSelectionReuse checks the reuse block: every member names what a
+// reader needs to find the artifact again, and the list is sorted and free of
+// duplicates by (ecosystem, coordinate), the member identity, so the same plan
+// produces the same bytes. An empty list is refused, because the block exists
+// only when something was reused.
+func validateSelectionReuse(selection *Selection) []diag.Diagnostic {
+	reuse := selection.Reuse
+	if reuse == nil {
+		return nil
+	}
+	var diags []diag.Diagnostic
+	if strings.TrimSpace(reuse.Channel) == "" {
+		diags = append(diags, diag.Errorf(ErrorCodeMissingField, "selection.reuse.channel",
+			"selection.reuse.channel is required"))
+	}
+	if strings.TrimSpace(reuse.Head) == "" {
+		diags = append(diags, diag.Errorf(ErrorCodeMissingField, "selection.reuse.head",
+			"selection.reuse.head is required"))
+	}
+	switch {
+	case reuse.SourceRevision == "":
+		diags = append(diags, diag.Errorf(ErrorCodeMissingField, "selection.reuse.sourceRevision",
+			"selection.reuse.sourceRevision is required"))
+	case !isReleaseSourceRevision(reuse.SourceRevision):
+		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, "selection.reuse.sourceRevision",
+			"selection.reuse.sourceRevision %q is not a full 40-hex lowercase commit revision", reuse.SourceRevision))
+	}
+	if len(reuse.Members) == 0 {
+		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, "selection.reuse.members",
+			"selection.reuse.members must name at least one member; a session that reused nothing reports no reuse block"))
+	}
+	for i, member := range reuse.Members {
+		for _, field := range []struct{ name, value string }{
+			{"ecosystem", member.Ecosystem}, {"coordinate", member.Coordinate}, {"version", member.Version},
+		} {
+			if strings.TrimSpace(field.value) == "" {
+				diags = append(diags, diag.Errorf(ErrorCodeMissingField,
+					fmt.Sprintf("selection.reuse.members[%d].%s", i, field.name),
+					"selection.reuse.members[%d].%s is required", i, field.name))
+			}
+		}
+		if i == 0 {
+			continue
+		}
+		previous := reuse.Members[i-1]
+		if previous.Ecosystem > member.Ecosystem ||
+			(previous.Ecosystem == member.Ecosystem && previous.Coordinate >= member.Coordinate) {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, "selection.reuse.members",
+				"selection.reuse.members must be sorted by ecosystem then coordinate and free of duplicates; %s/%s precedes %s/%s",
+				previous.Ecosystem, previous.Coordinate, member.Ecosystem, member.Coordinate))
+			break
+		}
+	}
+	return diags
+}
+
+// isReleaseSourceRevision reports whether value is a full commit revision as a
+// release-set member records one: 40 lowercase hex characters
+// (protocols/distribution sourceRevision).
+func isReleaseSourceRevision(value string) bool {
+	if len(value) != 40 {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		if b := value[i]; (b < '0' || b > '9') && (b < 'a' || b > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 // validateStaging checks the task-owned staging tree.
