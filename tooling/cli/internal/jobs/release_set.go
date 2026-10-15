@@ -2202,7 +2202,7 @@ func reuseSelectedMembers(
 			continue
 		}
 		suffix := ""
-		if info := VersionInfoForProject(options.Versions, candidates[key].project); info != nil {
+		if info := cachekey.VersionInfoForProject(options.Versions, candidates[key].project); info != nil {
 			suffix = info.Suffix
 		}
 		if !releaseVersionsShareBase(versions[key], suffix, record.Version) {

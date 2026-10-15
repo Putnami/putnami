@@ -3262,10 +3262,10 @@ func TestReleaseSetReuseBuildsWhatTheReuseHeadCannotVouchFor(t *testing.T) {
 		mainSuffix        = "20261014120000-abc1234"
 		pullRequestSuffix = "20261013110000-def5678"
 	)
-	stamped := RunVersions{"": &JobContextVersion{Base: "1.1.0", Full: "1.1.0-" + mainSuffix, Suffix: mainSuffix}}
+	stamped := cachekey.RunVersions{"": &cachekey.JobContextVersion{Base: "1.1.0", Full: "1.1.0-" + mainSuffix, Suffix: mainSuffix}}
 	cases := []struct {
 		name     string
-		versions RunVersions
+		versions cachekey.RunVersions
 		// record edits pr-7's downstream record; returning false omits it.
 		record func(*distribution.ReleaseSetMember) bool
 		// canary is canary's downstream version, "" for the fixture's.
@@ -3475,7 +3475,7 @@ func TestReleaseSetReuseDemotesAMemberWhoseDependencyIsBuilt(t *testing.T) {
 		}
 		options := releaseSetRequest()
 		options.ReuseChannel, options.ReuseSourceRevision = "pr-7", reuseTestRevision
-		options.Versions = RunVersions{"": &JobContextVersion{Base: "1.1.0", Full: "1.1.0-" + mainSuffix, Suffix: mainSuffix}}
+		options.Versions = cachekey.RunVersions{"": &cachekey.JobContextVersion{Base: "1.1.0", Full: "1.1.0-" + mainSuffix, Suffix: mainSuffix}}
 
 		plan := buildTestPlan(t, options, ws, heads)
 		if plan.Reused != nil || len(plan.SelectedMembers()) != 3 {
@@ -3546,7 +3546,7 @@ func TestReleaseSetPlanThatReusesNothingKeepsItsBytes(t *testing.T) {
 // answered before any other.
 func TestReleaseSetTaggedPublicationIgnoresTheReuseChannel(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "release-set-reuse-channel", "a-tagged-publication-ignores-the-reuse-channel")
-	tagged := RunVersions{"": &JobContextVersion{Base: "1.0.0", Full: "1.0.0", Tagged: true, Tag: "v1.0.0"}}
+	tagged := cachekey.RunVersions{"": &cachekey.JobContextVersion{Base: "1.0.0", Full: "1.0.0", Tagged: true, Tag: "v1.0.0"}}
 	for _, channel := range []string{"canary", ""} {
 		options, err := BuildReleaseSetOptions(ReleaseSetRequest{
 			Commands: []string{"publish"}, WorkspaceRoot: t.TempDir(), Channel: channel,
