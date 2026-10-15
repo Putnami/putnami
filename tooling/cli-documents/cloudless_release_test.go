@@ -189,6 +189,32 @@ func TestCloudlessReleaseFixture_PublicManifestsHaveNoCloudDependency(t *testing
 	}
 }
 
+// TestCloudlessReleaseFixture_WritesNoExecutableFile pins that the fixture
+// executes no file it wrote: its tasks run fixture.sh through /bin/sh, and no
+// fixture file carries an execute bit.
+func TestCloudlessReleaseFixture_WritesNoExecutableFile(t *testing.T) {
+	t.Parallel()
+	requireShell(t)
+	root := writeCloudlessReleaseFixture(t)
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if info.Mode().Perm()&0o111 != 0 {
+			rel, _ := filepath.Rel(root, path)
+			t.Errorf("fixture file %s has mode %v; a fixture task runs its script through /bin/sh", filepath.ToSlash(rel), info.Mode().Perm())
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk the cloudless fixture: %v", err)
+	}
+}
+
 func findShippedManifests(t *testing.T, root, filename string) []string {
 	t.Helper()
 	var manifests []string
@@ -248,7 +274,7 @@ func writeCloudlessReleaseFixture(t *testing.T) string {
 		{"extensions/typescript", "@putnami/typescript", "typescript", "package.json", "**/*.test.ts"},
 	} {
 		writeCloudlessFile(t, root, fixture.path+"/putnami.json", fmt.Sprintf(`{"name":%q}`+"\n", fixture.name), 0o644)
-		writeCloudlessFile(t, root, fixture.path+"/fixture.sh", cloudlessFixtureScript, 0o755)
+		writeCloudlessFile(t, root, fixture.path+"/fixture.sh", cloudlessFixtureScript, 0o644)
 		manifest := fmt.Sprintf(`{
   "name": %q,
   "version": "0.0.0-release-fixture",
@@ -284,11 +310,11 @@ func writeCloudlessReleaseFixture(t *testing.T) string {
     }
   },
   "tasks": {
-    "install": {"kind":"command","command":"{extensionRoot}/fixture.sh","args":[%q,"install"],"cache":false,"timeoutMs":10000},
-    "build": {"kind":"command","command":"{extensionRoot}/fixture.sh","args":[%q,"build"],"cache":{"enabled":true,"noOutput":true},"timeoutMs":10000,"declares":{}},
-    "lint": {"kind":"command","command":"{extensionRoot}/fixture.sh","args":[%q,"lint"],"cache":false,"timeoutMs":10000},
-    "test": {"kind":"command","command":"{extensionRoot}/fixture.sh","args":[%q,"test"],"cache":false,"timeoutMs":10000},
-    "serve": {"kind":"command","command":"{extensionRoot}/fixture.sh","args":[%q,"serve"],"cache":false,"timeoutMs":-1,"declares":{"effects":["process"]}}
+    "install": {"kind":"command","command":"/bin/sh","args":["{extensionRoot}/fixture.sh",%q,"install"],"cache":false,"timeoutMs":10000},
+    "build": {"kind":"command","command":"/bin/sh","args":["{extensionRoot}/fixture.sh",%q,"build"],"cache":{"enabled":true,"noOutput":true},"timeoutMs":10000,"declares":{}},
+    "lint": {"kind":"command","command":"/bin/sh","args":["{extensionRoot}/fixture.sh",%q,"lint"],"cache":false,"timeoutMs":10000},
+    "test": {"kind":"command","command":"/bin/sh","args":["{extensionRoot}/fixture.sh",%q,"test"],"cache":false,"timeoutMs":10000},
+    "serve": {"kind":"command","command":"/bin/sh","args":["{extensionRoot}/fixture.sh",%q,"serve"],"cache":false,"timeoutMs":-1,"declares":{"effects":["process"]}}
   }
 }
 `, fixture.name, fixture.activation, fixture.activation, fixture.testActivation, fixture.activation,
@@ -296,7 +322,7 @@ func writeCloudlessReleaseFixture(t *testing.T) string {
 		writeCloudlessFile(t, root, fixture.path+"/putnami.extension.json", manifest, 0o644)
 	}
 	writeCloudlessFile(t, root, "extensions/sdd/putnami.json", `{"name":"@putnami/sdd"}`+"\n", 0o644)
-	writeCloudlessFile(t, root, "extensions/sdd/fixture.sh", cloudlessFixtureScript, 0o755)
+	writeCloudlessFile(t, root, "extensions/sdd/fixture.sh", cloudlessFixtureScript, 0o644)
 	writeCloudlessFile(t, root, "extensions/sdd/putnami.extension.json", `{
   "name": "@putnami/sdd",
   "version": "0.0.0-release-fixture",
@@ -315,8 +341,8 @@ func writeCloudlessReleaseFixture(t *testing.T) string {
     }
   },
   "tasks": {
-    "validate": {"kind":"command","command":"{extensionRoot}/fixture.sh","args":["sdd","validate"],"cache":false,"timeoutMs":10000},
-    "validate-workspace": {"kind":"command","command":"{extensionRoot}/fixture.sh","args":["sdd","validate-workspace"],"cache":false,"timeoutMs":10000}
+    "validate": {"kind":"command","command":"/bin/sh","args":["{extensionRoot}/fixture.sh","sdd","validate"],"cache":false,"timeoutMs":10000},
+    "validate-workspace": {"kind":"command","command":"/bin/sh","args":["{extensionRoot}/fixture.sh","sdd","validate-workspace"],"cache":false,"timeoutMs":10000}
   }
 }
 `, 0o644)
@@ -324,6 +350,9 @@ func writeCloudlessReleaseFixture(t *testing.T) string {
 	return root
 }
 
+// cloudlessFixtureScript is the script of every fixture task. A task passes it
+// to /bin/sh, and the fixture writes it without an execute bit: the fixture
+// executes no file it wrote, and a task's timeoutMs times the script alone.
 const cloudlessFixtureScript = `#!/bin/sh
 set -eu
 
