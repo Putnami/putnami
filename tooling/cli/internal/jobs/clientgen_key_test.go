@@ -8,6 +8,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -59,7 +60,7 @@ func TestClientgenKeyIgnoresTheDescribeOwnedTrees(t *testing.T) {
 			key := func() string {
 				t.Helper()
 				cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(root, ".putnami", "store")))
-				value, err := computeJobCacheHash(ws, job, nil, nil, cache, nil)
+				value, err := cachekey.ComputeJobCacheHash(ws, job, nil, nil, cache, nil)
 				if err != nil {
 					t.Fatalf("compute %s key: %v", task.name, err)
 				}
@@ -99,7 +100,7 @@ func TestClientgenKeyIgnoresTheDescribeOwnedTrees(t *testing.T) {
 		Step:      &extension.PipelineStep{Task: "build-describe"},
 		JobDef:    &extension.JobDefinition{Name: "build~describe", Cache: true},
 	}
-	emptied := emptiedOutputIDs(describe)
+	emptied := cachekey.EmptiedOutputIDs(describe)
 	for _, id := range []string{"clientgen", "schema"} {
 		if !slices.Contains(emptied, id) {
 			t.Errorf("build-describe empties %v, want it to empty %q: a clientgen key that leaves the tree out would omit bytes no folded key fixes", emptied, id)

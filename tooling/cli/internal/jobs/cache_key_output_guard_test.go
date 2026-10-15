@@ -9,6 +9,7 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -26,7 +27,7 @@ import (
 // directory output, or the directory that holds a file output.
 //
 // The guard reads a key the way the key code reads it:
-//   - keyFilePatterns assembles the project-rooted patterns: the task's
+//   - cachekey.KeyFilePatterns assembles the project-rooted patterns: the task's
 //     `from: project` and `from: closure` input files when it declares inputs,
 //     otherwise its cache.key files and closureFiles. A closure pattern is read
 //     in every member of the closure, so it is project-rooted too.
@@ -292,8 +293,8 @@ func taskCacheReachable(ext *extension.ExtensionDescription, name string, defini
 
 // taskKeyFilePatterns returns the project-rooted patterns the task's key reads.
 // It derives the step's cache policy the way pipeline expansion does — declared
-// inputs win over cache.key — and lets keyFilePatterns assemble the list, so the
-// guard follows the key code when either changes.
+// inputs win over cache.key — and lets cachekey.KeyFilePatterns assemble the
+// list, so the guard follows the key code when either changes.
 func taskKeyFilePatterns(ext *extension.ExtensionDescription, name string, definition extension.TaskDefinition) []string {
 	policy := definition.Cache
 	var filePatterns []string
@@ -313,7 +314,7 @@ func taskKeyFilePatterns(ext *extension.ExtensionDescription, name string, defin
 			FilePatterns: filePatterns, TaskCachePolicy: policy,
 		},
 	}
-	files, _ := keyFilePatterns(nil, job, nil)
+	files, _ := cachekey.KeyFilePatterns(nil, job, nil)
 	return files
 }
 
