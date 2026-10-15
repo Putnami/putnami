@@ -515,6 +515,19 @@
           }
         },
         {
+          "id": "testdata-is-a-test-input",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "test-exec-keys-on-every-testdata-file"
+            ]
+          }
+        },
+        {
           "id": "shared-build-cache",
           "stage": "coded",
           "evidenceKinds": [

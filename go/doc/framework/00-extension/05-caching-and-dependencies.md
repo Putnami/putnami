@@ -7,7 +7,7 @@ Go jobs are cache-aware and keep Go module metadata aligned with workspace depen
 | Job | Selected file inputs |
 |-----|--------|
 | `build` | `**/*.go`, `!**/*_test.go`, `go-embed:build` (source links, referents, and embedded assets), `go.mod`, `go.sum`, `go.work`, `go.work.sum` |
-| `test` | `**/*.go`, `go-embed:test` (including test-source links, referents, and embedded assets), `go.mod`, `go.sum`, `go.work`, `go.work.sum` |
+| `test` | `**/*.go`, `go-embed:test` (including test-source links, referents, and embedded assets), `**/testdata/**`, `go.mod`, `go.sum`, `go.work`, `go.work.sum` |
 | `lint` | `**/*.go`, `go-embed:test` (source links, referents, and embedded assets), `go.mod`, `go.work`, `go.work.sum`; `golangci-lint` also reads `.golangci.yml` and `.golangci.yaml` |
 | `serve` | depends on build, never cached |
 
@@ -16,6 +16,12 @@ buildable sources. An asset-only edit changes the job key even when no `.go`
 file changes. A missing or unsafe embedded input fails before an old cached
 result can be restored. Tasks also declare other configuration, parameters,
 and runtime inputs; the table focuses on Go sources, modules, and lint config.
+
+Files under a `testdata` directory, at any depth, key the `test` job. A test
+reads them at run time, so a fixture edit re-runs the tests. A project does not
+declare them in `filePatterns`. The cache skips a `node_modules`, `.git`,
+`.putnami`, `out`, `dist` or `vendor` directory, inside `testdata` too, so keep
+fixtures out of directories with those names.
 
 ## Go build cache
 

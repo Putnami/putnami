@@ -576,7 +576,7 @@
       },
       "timeoutMs": 600000,
       "inputs": {
-        "tests": { "from": "project", "files": ["**/*_test.go"] },
+        "tests": { "from": "project", "files": ["**/*_test.go", "**/testdata/**"] },
         "sources": { "from": "project", "files": ["**/*.go", "go-embed:test", "!**/.gen/**"] },
         "modules": { "from": "project", "files": ["go.mod", "go.sum", "go.work"] },
         "workspaceModules": { "from": "workspace", "files": ["go.work", "go.work.sum"] },

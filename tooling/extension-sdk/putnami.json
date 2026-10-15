@@ -16,9 +16,6 @@
     ]
   },
   "options": {
-    "test": {
-      "filePatterns": ["registrycred/testdata/recorded/**", "recorded/testdata/**", "memberprobe/testdata/recorded/**", "uvtoolchain/testdata/**"]
-    },
     "publish": {
       "archives": false
     },
