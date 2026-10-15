@@ -130,8 +130,11 @@ or tool owns the executable.
 }
 ```
 
-The probe output must equal the `{version}` template after substitution. A
-nearby version never qualifies. Candidate symlinks are resolved before
+The probe output must equal the `{version}` template after substitution. The
+output is the standard output, or the standard error when the probe writes
+nothing to its standard output, so a warning on the standard error never
+disqualifies a version on the standard output. A nearby version never
+qualifies. Candidate symlinks are resolved before
 ancestor-derived environment values are computed, and the selected executable
 directory is the only declared addition to `PATH`. The lock version, platform
 integrity, declaration and availability form the portable toolchain identity in
