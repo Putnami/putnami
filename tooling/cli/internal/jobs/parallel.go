@@ -167,27 +167,6 @@ func memoryWorkerCap(mode string, totalMemoryBytes uint64, heavyPermille int) in
 	return maxInt(1, totalMiB/perWorkerMiB)
 }
 
-func totalMemoryBytes() uint64 {
-	return totalMemoryBytesAt(runnerEnvironmentRoot, readFile)
-}
-
-// stableMemoryCapacityBytes returns the smaller of physical RAM and this
-// process's cgroup memory limit. Both are allocation configuration, not live
-// pressure, so identical machines/plans do not change ceilings because a
-// co-tenant happened to consume memory at sampling time.
-func stableMemoryCapacityBytes(root string, physical uint64) uint64 {
-	sample := environmentSample{}
-	if physical > 0 {
-		sample.memoryCapacity = memoryCapacityReading{physicalBytes: physical, hasPhysical: true}
-	}
-	readCgroupMemoryFrom(root, &sample, readFile)
-	effective, _, ok := sample.memoryCapacity.effectiveBytes()
-	if !ok {
-		return 0
-	}
-	return effective
-}
-
 func clampWorkers(workers, plannedCount int) int {
 	if plannedCount <= 0 {
 		return 1

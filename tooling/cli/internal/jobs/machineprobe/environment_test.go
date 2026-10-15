@@ -1,4 +1,4 @@
-package jobs
+package machineprobe
 
 import (
 	"os"
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/workspace"
+	"go.putnami.dev/cli/model/jobs"
 )
 
 // Runner-environment capture.
@@ -61,9 +61,9 @@ func quotaLimitedRunner(t *testing.T) (root string, closing map[string]string) {
 // sessionOver takes the opening sample, applies the closing file contents, and
 // takes the closing sample — the exact sequence beginRun/finalizeRun perform,
 // with the samples' clocks pinned so the window is assertable.
-func sessionOver(t *testing.T, root string, closing map[string]string, window time.Duration) RunnerEnvironment {
+func sessionOver(t *testing.T, root string, closing map[string]string, window time.Duration) jobs.RunnerEnvironment {
 	t.Helper()
-	begin := captureEnvironmentSample(root)
+	begin := CaptureEnvironmentSample(root)
 	for path, content := range closing {
 		full := filepath.Join(root, path)
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
@@ -73,10 +73,10 @@ func sessionOver(t *testing.T, root string, closing map[string]string, window ti
 			t.Fatalf("write %s: %v", full, err)
 		}
 	}
-	end := captureEnvironmentSample(root)
+	end := CaptureEnvironmentSample(root)
 	begin.at = time.Unix(0, 0)
 	end.at = begin.at.Add(window)
-	return resolveRunnerEnvironment(root, begin, end)
+	return ResolveRunnerEnvironment(root, begin, end)
 }
 
 // TestRunnerEnvironment_WindowsEveryCumulativeCounter is criterion 4: the
@@ -112,7 +112,7 @@ func TestRunnerEnvironment_WindowsEveryCumulativeCounter(t *testing.T) {
 	if cgroup.Throttle == nil {
 		t.Fatal("no throttle block for a cpu.stat carrying the bandwidth counters")
 	}
-	want := CgroupThrottle{Periods: 35, ThrottledPeriods: 4, ThrottledUs: 128000}
+	want := jobs.CgroupThrottle{Periods: 35, ThrottledPeriods: 4, ThrottledUs: 128000}
 	if *cgroup.Throttle != want {
 		t.Errorf("throttle = %+v, want %+v", *cgroup.Throttle, want)
 	}
@@ -267,7 +267,7 @@ func TestRunnerEnvironment_CgroupNamespaceRoot(t *testing.T) {
 	if environment.Cgroup.Throttle == nil {
 		t.Fatal("throttle block dropped, losing the measured 'never throttled'")
 	}
-	want := CgroupThrottle{Periods: 4}
+	want := jobs.CgroupThrottle{Periods: 4}
 	if *environment.Cgroup.Throttle != want {
 		t.Errorf("throttle = %+v, want %+v", *environment.Cgroup.Throttle, want)
 	}
@@ -558,7 +558,7 @@ func TestReadCgroupCPU_ExactPathFallbacks(t *testing.T) {
 				}
 				return tc.files[filepath.ToSlash(relative)]
 			}
-			var sample environmentSample
+			var sample EnvironmentSample
 			readCgroupCPUFrom(root, &sample, read)
 			if sample.hasCgroup != tc.hasCgroup || sample.periodUs != tc.periodUs || sample.quotaUs != tc.quotaUs {
 				t.Errorf("quota = %d/%d (has=%v), want %d/%d (has=%v)",
@@ -571,7 +571,7 @@ func TestReadCgroupCPU_ExactPathFallbacks(t *testing.T) {
 			if sample.hasThrottle {
 				t.Errorf("fixture without bandwidth counters invented throttle data: %+v", sample)
 			}
-			if grant := sample.cpuBandwidthCores(); grant != tc.grantCores {
+			if grant := sample.CPUBandwidthCores(); grant != tc.grantCores {
 				t.Errorf("allocator grant = %d cores, want %d", grant, tc.grantCores)
 			}
 		})
@@ -584,7 +584,7 @@ func TestReadCgroupCPU_ExactPathFallbacks(t *testing.T) {
 // every steal ratio is read against.
 func TestProcStatTotalExcludesGuestColumns(t *testing.T) {
 	t.Parallel()
-	var sample environmentSample
+	var sample EnvironmentSample
 	root := fixtureRunner(t, map[string]string{
 		"proc/stat": "cpu  1 2 3 4 5 6 7 8 1000 2000\n",
 	})
@@ -605,7 +605,7 @@ func TestProcStatTotalExcludesGuestColumns(t *testing.T) {
 // contributes nothing rather than a total with a silently missing member.
 func TestProcStatShortLineIsNotRead(t *testing.T) {
 	t.Parallel()
-	var sample environmentSample
+	var sample EnvironmentSample
 	root := fixtureRunner(t, map[string]string{"proc/stat": "cpu  1 2 3 4\n"})
 	readHostCPUTime(root, &sample)
 	if sample.hasHostCPU {
@@ -673,7 +673,7 @@ func TestParseCgroupV1CPUQuota(t *testing.T) {
 // the CPU-pressure signal.
 func TestReadCPUPressureTakesOnlyTheSomeTotal(t *testing.T) {
 	t.Parallel()
-	var sample environmentSample
+	var sample EnvironmentSample
 	root := fixtureRunner(t, map[string]string{
 		"proc/pressure/cpu": "some avg10=1.00 avg60=2.00 avg300=3.00 total=98765\nfull avg10=0.00 total=11111\n",
 	})
@@ -688,7 +688,7 @@ func TestReadCPUPressureTakesOnlyTheSomeTotal(t *testing.T) {
 // rather than divide by a guess.
 func TestAllocatedMillicoresOnNoEnvironment(t *testing.T) {
 	t.Parallel()
-	var environment *RunnerEnvironment
+	var environment *jobs.RunnerEnvironment
 	if millicores, fromQuota := environment.AllocatedMillicores(); millicores != 0 || fromQuota {
 		t.Errorf("nil environment reported %d millicores (quota=%v)", millicores, fromQuota)
 	}
@@ -701,58 +701,56 @@ func TestCPUBandwidthCores(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name   string
-		sample environmentSample
+		sample EnvironmentSample
 		want   int
 	}{
-		{"no cgroup", environmentSample{}, 0},
-		{"cpu.max is max", environmentSample{hasCgroup: true, periodUs: 100_000, quotaUs: 0}, 0},
-		{"two cpus", environmentSample{hasCgroup: true, periodUs: 100_000, quotaUs: 200_000}, 2},
-		{"two and a half cpus", environmentSample{hasCgroup: true, periodUs: 100_000, quotaUs: 250_000}, 2},
-		{"half a cpu floors at one", environmentSample{hasCgroup: true, periodUs: 100_000, quotaUs: 50_000}, 1},
-		{"zero period is unusable", environmentSample{hasCgroup: true, periodUs: 0, quotaUs: 200_000}, 0},
+		{"no cgroup", EnvironmentSample{}, 0},
+		{"cpu.max is max", EnvironmentSample{hasCgroup: true, periodUs: 100_000, quotaUs: 0}, 0},
+		{"two cpus", EnvironmentSample{hasCgroup: true, periodUs: 100_000, quotaUs: 200_000}, 2},
+		{"two and a half cpus", EnvironmentSample{hasCgroup: true, periodUs: 100_000, quotaUs: 250_000}, 2},
+		{"half a cpu floors at one", EnvironmentSample{hasCgroup: true, periodUs: 100_000, quotaUs: 50_000}, 1},
+		{"zero period is unusable", EnvironmentSample{hasCgroup: true, periodUs: 0, quotaUs: 200_000}, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.sample.cpuBandwidthCores(); got != tc.want {
-				t.Errorf("cpuBandwidthCores() = %d, want %d", got, tc.want)
+			if got := tc.sample.CPUBandwidthCores(); got != tc.want {
+				t.Errorf("CPUBandwidthCores() = %d, want %d", got, tc.want)
 			}
 		})
 	}
 }
 
-func TestPrepareScheduling_ClampsAllocatorToCapturedCgroupQuota(t *testing.T) {
+// TestEffectiveMemoryBytes: the scheduler admits jobs against this number, so
+// it must be the smaller of the physical memory and the cgroup limit, name the
+// one that bounds it, and resolve nothing when the sample read neither.
+func TestEffectiveMemoryBytes(t *testing.T) {
 	t.Parallel()
-	scheduler := &Scheduler{ws: &workspace.Workspace{Root: t.TempDir()}}
-	scheduler.environmentBegin = environmentSample{
-		hasCgroup: true,
-		periodUs:  100_000,
-		quotaUs:   250_000,
-		memoryCapacity: memoryCapacityReading{
-			physicalBytes: 8 << 30,
-			hasPhysical:   true,
-			cgroupBytes:   2 << 30,
-			hasCgroup:     true,
-			cgroupSource:  CgroupMemoryV2,
-		},
-	}
-	memoryCapacity, _, ok := scheduler.environmentBegin.memoryCapacity.effectiveBytes()
-	if !ok {
-		t.Fatal("opening memory capacity did not resolve")
-	}
-	decision := resolveParallelDecisionWithHardware(SchedulerConfig{}, nil, 12, memoryCapacity)
-	scheduler.prepareScheduling(decision)
-
-	if got := scheduler.cpuAlloc.totalCPU; got != 2 {
-		t.Fatalf("allocator capacity = %d, want captured quota floor 2 (not logical CPUs or GOMAXPROCS)", got)
-	}
-	if got := scheduler.resources.cpuCapacity; got != 2 {
-		t.Fatalf("admission capacity = %d, want the same captured quota floor 2", got)
-	}
-	if decision.MemoryTotalMiB != 2048 || decision.MemoryUsableMiB != 1536 {
-		t.Fatalf("memory decision = total %d / usable %d MiB, want 2048 / 1536",
-			decision.MemoryTotalMiB, decision.MemoryUsableMiB)
-	}
-	if got := scheduler.resources.memoryCapacity; got != 1536*1024*1024 {
-		t.Fatalf("memory admission = %d, want the unchanged 75%% of opening 2 GiB", got)
+	for _, tc := range []struct {
+		name       string
+		reading    memoryCapacityReading
+		wantBytes  uint64
+		wantSource string
+		wantOK     bool
+	}{
+		{"nothing read", memoryCapacityReading{}, 0, "", false},
+		{"physical only", memoryCapacityReading{physicalBytes: 8 << 30, hasPhysical: true},
+			8 << 30, jobs.MemoryCapacityPhysical, true},
+		{"cgroup only", memoryCapacityReading{cgroupBytes: 2 << 30, hasCgroup: true, cgroupSource: jobs.CgroupMemoryV2},
+			2 << 30, jobs.MemoryCapacityCgroupLimit, true},
+		{"cgroup below physical", memoryCapacityReading{
+			physicalBytes: 8 << 30, hasPhysical: true, cgroupBytes: 2 << 30, hasCgroup: true, cgroupSource: jobs.CgroupMemoryV2,
+		}, 2 << 30, jobs.MemoryCapacityCgroupLimit, true},
+		{"physical below cgroup", memoryCapacityReading{
+			physicalBytes: 2 << 30, hasPhysical: true, cgroupBytes: 8 << 30, hasCgroup: true, cgroupSource: jobs.CgroupMemoryV2,
+		}, 2 << 30, jobs.MemoryCapacityPhysical, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sample := EnvironmentSample{memoryCapacity: tc.reading}
+			bytes, source, ok := sample.EffectiveMemoryBytes()
+			if bytes != tc.wantBytes || source != tc.wantSource || ok != tc.wantOK {
+				t.Errorf("EffectiveMemoryBytes() = %d, %q, %v; want %d, %q, %v",
+					bytes, source, ok, tc.wantBytes, tc.wantSource, tc.wantOK)
+			}
+		})
 	}
 }
 
@@ -761,8 +759,8 @@ func TestPrepareScheduling_ClampsAllocatorToCapturedCgroupQuota(t *testing.T) {
 // must not panic and must produce the host facts, whatever the kernel exposes.
 func TestCaptureEnvironmentOnTheRealRoot(t *testing.T) {
 	t.Parallel()
-	begin := captureEnvironmentSample(runnerEnvironmentRoot)
-	environment := resolveRunnerEnvironment(runnerEnvironmentRoot, begin, captureEnvironmentSample(runnerEnvironmentRoot))
+	begin := CaptureEnvironmentSample(RunnerEnvironmentRoot)
+	environment := ResolveRunnerEnvironment(RunnerEnvironmentRoot, begin, CaptureEnvironmentSample(RunnerEnvironmentRoot))
 	if environment.OS != runtime.GOOS || environment.Arch != runtime.GOARCH {
 		t.Errorf("host facts = %s/%s, want the running platform", environment.OS, environment.Arch)
 	}

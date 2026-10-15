@@ -16,6 +16,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -50,7 +51,7 @@ func TestIndependentRuntimeSyncsRunConcurrently(t *testing.T) {
 		t.Skip("shell runtime fixture")
 	}
 	const runtimes = 4
-	workers := preparationWorkers(runtimes, runtime.NumCPU(), totalMemoryBytes())
+	workers := preparationWorkers(runtimes, runtime.NumCPU(), machineprobe.TotalMemoryBytes())
 	if workers < 2 {
 		t.Skipf("host grants %d preparation worker(s); concurrency is not observable", workers)
 	}

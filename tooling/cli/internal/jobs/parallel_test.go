@@ -378,37 +378,10 @@ func TestResolveParallelDecision_UncappedReportsNoCap(t *testing.T) {
 	}
 }
 
-func TestStableMemoryCapacityUsesPhysicalOrCgroupLimitWithHeadroom(t *testing.T) {
-	const eightGiB = uint64(8 * 1024 * 1024 * 1024)
-	root := fixtureRunner(t, map[string]string{
-		"proc/self/cgroup":                "0::/runner\n",
-		"sys/fs/cgroup/runner/memory.max": "2147483648\n",
-	})
-	capacity := stableMemoryCapacityBytes(root, eightGiB)
-	if capacity != 2*1024*1024*1024 {
-		t.Fatalf("stable capacity = %d, want 2 GiB cgroup limit", capacity)
-	}
-	if usable := usableMemoryBytes(capacity); usable != 1536*1024*1024 {
+func TestUsableMemoryKeepsAFixedQuarterHeadroom(t *testing.T) {
+	t.Parallel()
+	if usable := usableMemoryBytes(2 * 1024 * 1024 * 1024); usable != 1536*1024*1024 {
 		t.Fatalf("usable memory = %d, want fixed 25%% headroom", usable)
-	}
-
-	unlimited := fixtureRunner(t, map[string]string{
-		"proc/self/cgroup":         "0::/\n",
-		"sys/fs/cgroup/memory.max": "max\n",
-	})
-	if got := stableMemoryCapacityBytes(unlimited, eightGiB); got != eightGiB {
-		t.Fatalf("unlimited cgroup capacity = %d, want physical RAM %d", got, eightGiB)
-	}
-}
-
-func TestStableMemoryCapacitySupportsCgroupV1(t *testing.T) {
-	const physical = uint64(8 * 1024 * 1024 * 1024)
-	root := fixtureRunner(t, map[string]string{
-		"proc/self/cgroup": "5:memory:/docker/abc\n",
-		"sys/fs/cgroup/memory/docker/abc/memory.limit_in_bytes": "3221225472\n",
-	})
-	if got := stableMemoryCapacityBytes(root, physical); got != 3*1024*1024*1024 {
-		t.Fatalf("v1 stable capacity = %d, want 3 GiB", got)
 	}
 }
 

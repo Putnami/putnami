@@ -9,6 +9,7 @@ import (
 
 	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -198,8 +199,9 @@ type Scheduler struct {
 	// counters — cgroup throttling, PSI, steal — taken before any job is
 	// dispatched. Every counter it holds is cumulative since boot, so it is
 	// useless alone: finalizeRun takes the closing reading and publishes only
-	// the delta, which is this session's own window. See environment.go.
-	environmentBegin environmentSample
+	// the delta, which is this session's own window. See
+	// machineprobe/environment.go.
+	environmentBegin machineprobe.EnvironmentSample
 
 	// versionBuildTime is shared by every real execution in this scheduler run.
 	// versionFiles tracks projects already refreshed after their first cache
@@ -520,7 +522,7 @@ func (s *Scheduler) prepareScheduling(decision ParallelDecision) {
 	// number, used to decide rather than only to describe. Unbounded hosts report
 	// 0 and keep LogicalCPU.
 	machineCPU := decision.LogicalCPU
-	if quota := s.environmentBegin.cpuBandwidthCores(); quota > 0 {
+	if quota := s.environmentBegin.CPUBandwidthCores(); quota > 0 {
 		machineCPU = min(machineCPU, quota)
 	}
 	s.cpuAlloc = newCPUAllocator(machineCPU, cpuBudgetPolicy(s.cfg.CPUBudgetPolicy))
@@ -815,13 +817,13 @@ func (s *Scheduler) beginRun() ParallelDecision {
 
 	// The runner's opening counters, read BEFORE any job is dispatched so the
 	// window the closing sample closes is the run's and nothing else's.
-	s.environmentBegin = captureEnvironmentSample(runnerEnvironmentRoot)
+	s.environmentBegin = machineprobe.CaptureEnvironmentSample(machineprobe.RunnerEnvironmentRoot)
 
-	memoryCapacity, _, _ := s.environmentBegin.memoryCapacity.effectiveBytes()
+	memoryCapacity, _, _ := s.environmentBegin.EffectiveMemoryBytes()
 	decision := resolveParallelDecisionWithHardware(
 		s.cfg, s.planned, runtime.NumCPU(), memoryCapacity,
 	)
-	if quota := s.environmentBegin.cpuBandwidthCores(); quota > 0 {
+	if quota := s.environmentBegin.CPUBandwidthCores(); quota > 0 {
 		decision.CPUCapacity = min(decision.CPUCapacity, quota)
 	}
 	s.workerCount = decision.Workers
@@ -1061,7 +1063,7 @@ func (s *Scheduler) finalizeRun(
 	// The runner environment closes its window HERE, after the last subprocess
 	// has been waited for, so the throttle, pressure and steal deltas cover the
 	// whole of the work they are meant to explain.
-	environment := resolveRunnerEnvironment(runnerEnvironmentRoot, s.environmentBegin, captureEnvironmentSample(runnerEnvironmentRoot))
+	environment := machineprobe.ResolveRunnerEnvironment(machineprobe.RunnerEnvironmentRoot, s.environmentBegin, machineprobe.CaptureEnvironmentSample(machineprobe.RunnerEnvironmentRoot))
 	session.Environment = &environment
 	// Preparation is carried through UNCHANGED. It was measured before this
 	// scheduler existed and describes in-process work, so it is neither reduced

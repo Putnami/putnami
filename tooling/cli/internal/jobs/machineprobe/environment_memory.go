@@ -1,4 +1,4 @@
-package jobs
+package machineprobe
 
 import (
 	"os/exec"
@@ -6,6 +6,8 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"go.putnami.dev/cli/model/jobs"
 )
 
 const (
@@ -29,9 +31,9 @@ func (r memoryCapacityReading) effectiveBytes() (uint64, string, bool) {
 		return 0, "", false
 	}
 	if r.hasPhysical && (!r.hasCgroup || r.physicalBytes <= r.cgroupBytes) {
-		return r.physicalBytes, MemoryCapacityPhysical, true
+		return r.physicalBytes, jobs.MemoryCapacityPhysical, true
 	}
-	return r.cgroupBytes, MemoryCapacityCgroupLimit, true
+	return r.cgroupBytes, jobs.MemoryCapacityCgroupLimit, true
 }
 
 type memorySample struct {
@@ -40,9 +42,9 @@ type memorySample struct {
 	identity string
 	current  int64
 
-	composition *CgroupMemoryComposition
-	peak        *CgroupMemoryLifetimePeak
-	events      *CgroupMemoryEvents
+	composition *jobs.CgroupMemoryComposition
+	peak        *jobs.CgroupMemoryLifetimePeak
+	events      *jobs.CgroupMemoryEvents
 }
 
 type memoryPressureSample struct {
@@ -53,7 +55,7 @@ type memoryPressureSample struct {
 	full     int64
 }
 
-func readMemoryEnvironment(root string, sample *environmentSample) {
+func readMemoryEnvironment(root string, sample *EnvironmentSample) {
 	if physical := totalMemoryBytesAt(root, readFile); physical > 0 {
 		sample.memoryCapacity.physicalBytes = physical
 		sample.memoryCapacity.hasPhysical = true
@@ -66,7 +68,7 @@ func readMemoryEnvironment(root string, sample *environmentSample) {
 
 // readCgroupMemoryFrom performs bounded direct reads only. It resolves at most
 // one v2 or v1 directory and never walks or lists the cgroup tree.
-func readCgroupMemoryFrom(root string, sample *environmentSample, read func(string) string) {
+func readCgroupMemoryFrom(root string, sample *EnvironmentSample, read func(string) string) {
 	cgroup := read(filepath.Join(root, "proc/self/cgroup"))
 	if readCgroupV2Memory(root, cgroup, sample, read) {
 		return
@@ -77,7 +79,7 @@ func readCgroupMemoryFrom(root string, sample *environmentSample, read func(stri
 func readCgroupV2Memory(
 	root string,
 	cgroup string,
-	sample *environmentSample,
+	sample *EnvironmentSample,
 	read func(string) string,
 ) bool {
 	mount := filepath.Join(root, "sys/fs/cgroup")
@@ -100,34 +102,34 @@ func readCgroupV2Memory(
 		if current, ok := parseSafeMemoryValue(currentContent); ok {
 			sample.memory = memorySample{
 				present:  true,
-				source:   CgroupMemoryV2,
+				source:   jobs.CgroupMemoryV2,
 				identity: filepath.Clean(dir),
 				current:  current,
 			}
 			if peak, peakOK := parseSafeMemoryValue(read(filepath.Join(dir, "memory.peak"))); peakOK {
-				sample.memory.peak = &CgroupMemoryLifetimePeak{Bytes: peak}
+				sample.memory.peak = &jobs.CgroupMemoryLifetimePeak{Bytes: peak}
 			}
 			if stat, statOK := parseCompleteCounters(
 				read(filepath.Join(dir, "memory.stat")), []string{"anon", "file", "shmem"},
 			); statOK && stat["shmem"] <= stat["file"] {
-				sample.memory.composition = &CgroupMemoryComposition{
+				sample.memory.composition = &jobs.CgroupMemoryComposition{
 					AnonBytes: stat["anon"], FileBytes: stat["file"], ShmemBytes: stat["shmem"],
 				}
 			}
 			if events, eventsOK := parseCompleteCounters(
 				read(filepath.Join(dir, "memory.events")), []string{"low", "high", "max", "oom", "oom_kill"},
 			); eventsOK {
-				sample.memory.events = &CgroupMemoryEvents{
+				sample.memory.events = &jobs.CgroupMemoryEvents{
 					Low: events["low"], High: events["high"], Max: events["max"],
 					OOM: events["oom"], OOMKill: events["oom_kill"],
 				}
 			}
 		}
 
-		if limit, finite := parseFiniteMemoryLimit(limitContent, CgroupMemoryV2); finite {
+		if limit, finite := parseFiniteMemoryLimit(limitContent, jobs.CgroupMemoryV2); finite {
 			sample.memoryCapacity.cgroupBytes = limit
 			sample.memoryCapacity.hasCgroup = true
-			sample.memoryCapacity.cgroupSource = CgroupMemoryV2
+			sample.memoryCapacity.cgroupSource = jobs.CgroupMemoryV2
 		} else if value := strings.TrimSpace(limitContent); filepath.Clean(dir) != filepath.Clean(mount) &&
 			(value == "" || value == "max") {
 			// memory.max is hierarchical. Preserve the leaf gauges and identity,
@@ -135,17 +137,17 @@ func readCgroupV2Memory(
 			// leaf delegates its effective ceiling to an ancestor. A malformed
 			// leaf limit deliberately does not enter this branch.
 			if limit, rootFinite := parseFiniteMemoryLimit(
-				read(filepath.Join(mount, "memory.max")), CgroupMemoryV2,
+				read(filepath.Join(mount, "memory.max")), jobs.CgroupMemoryV2,
 			); rootFinite {
 				sample.memoryCapacity.cgroupBytes = limit
 				sample.memoryCapacity.hasCgroup = true
-				sample.memoryCapacity.cgroupSource = CgroupMemoryV2
+				sample.memoryCapacity.cgroupSource = jobs.CgroupMemoryV2
 			}
 		}
 
 		if some, full, ok := parseMemoryPressure(read(filepath.Join(dir, "memory.pressure"))); sample.memory.present && ok {
 			sample.memoryPressure = memoryPressureSample{
-				present: true, scope: MemoryPressureCgroup,
+				present: true, scope: jobs.MemoryPressureCgroup,
 				identity: filepath.Clean(dir), some: some, full: full,
 			}
 		}
@@ -157,7 +159,7 @@ func readCgroupV2Memory(
 func readCgroupV1Memory(
 	root string,
 	cgroup string,
-	sample *environmentSample,
+	sample *EnvironmentSample,
 	read func(string) string,
 ) {
 	membership, ok := cgroupV1Memberships(cgroup)["memory"]
@@ -175,68 +177,68 @@ func readCgroupV1Memory(
 		if current, currentOK := parseSafeMemoryValue(currentContent); currentOK {
 			sample.memory = memorySample{
 				present:  true,
-				source:   CgroupMemoryV1,
+				source:   jobs.CgroupMemoryV1,
 				identity: filepath.Clean(dir),
 				current:  current,
 			}
 			if peak, peakOK := parseSafeMemoryValue(
 				read(filepath.Join(dir, "memory.max_usage_in_bytes")),
 			); peakOK {
-				sample.memory.peak = &CgroupMemoryLifetimePeak{Bytes: peak}
+				sample.memory.peak = &jobs.CgroupMemoryLifetimePeak{Bytes: peak}
 			}
 		}
-		if limit, finite := parseFiniteMemoryLimit(limitContent, CgroupMemoryV1); finite {
+		if limit, finite := parseFiniteMemoryLimit(limitContent, jobs.CgroupMemoryV1); finite {
 			sample.memoryCapacity.cgroupBytes = limit
 			sample.memoryCapacity.hasCgroup = true
-			sample.memoryCapacity.cgroupSource = CgroupMemoryV1
+			sample.memoryCapacity.cgroupSource = jobs.CgroupMemoryV1
 		}
 		return
 	}
 }
 
-func readHostMemoryPressureFrom(root string, sample *environmentSample, read func(string) string) {
+func readHostMemoryPressureFrom(root string, sample *EnvironmentSample, read func(string) string) {
 	if some, full, ok := parseMemoryPressure(read(filepath.Join(root, "proc/pressure/memory"))); ok {
 		sample.memoryPressure = memoryPressureSample{
-			present: true, scope: MemoryPressureHost, identity: "host", some: some, full: full,
+			present: true, scope: jobs.MemoryPressureHost, identity: "host", some: some, full: full,
 		}
 	}
 }
 
-func resolveMemoryCapacity(reading memoryCapacityReading) *MemoryCapacity {
+func resolveMemoryCapacity(reading memoryCapacityReading) *jobs.MemoryCapacity {
 	effective, source, ok := reading.effectiveBytes()
 	if !ok || effective == 0 || effective > maxSafeJSONInteger {
 		return nil
 	}
-	capacity := &MemoryCapacity{EffectiveBytes: int64(effective), EffectiveSource: source}
+	capacity := &jobs.MemoryCapacity{EffectiveBytes: int64(effective), EffectiveSource: source}
 	if reading.hasPhysical && reading.physicalBytes <= maxSafeJSONInteger {
 		capacity.PhysicalBytes = int64(reading.physicalBytes)
 	}
 	if reading.hasCgroup && reading.cgroupBytes <= maxSafeJSONInteger {
-		capacity.CgroupLimit = &CgroupMemoryLimit{
+		capacity.CgroupLimit = &jobs.CgroupMemoryLimit{
 			Bytes: int64(reading.cgroupBytes), Source: reading.cgroupSource,
 		}
 	}
 	return capacity
 }
 
-func resolveCgroupMemory(begin, end memorySample) *CgroupMemory {
+func resolveCgroupMemory(begin, end memorySample) *jobs.CgroupMemory {
 	if !begin.present || !end.present || begin.source != end.source || begin.identity != end.identity {
 		return nil
 	}
-	memory := &CgroupMemory{
+	memory := &jobs.CgroupMemory{
 		Source: end.source,
-		Closing: CgroupMemoryClosing{
+		Closing: jobs.CgroupMemoryClosing{
 			CurrentBytes: end.current, Composition: end.composition, LifetimePeak: end.peak,
 		},
 	}
-	if end.source == CgroupMemoryV2 && begin.events != nil && end.events != nil {
+	if end.source == jobs.CgroupMemoryV2 && begin.events != nil && end.events != nil {
 		low, lowOK := windowDelta(begin.events.Low, end.events.Low)
 		high, highOK := windowDelta(begin.events.High, end.events.High)
 		maximum, maxOK := windowDelta(begin.events.Max, end.events.Max)
 		oom, oomOK := windowDelta(begin.events.OOM, end.events.OOM)
 		oomKill, killOK := windowDelta(begin.events.OOMKill, end.events.OOMKill)
 		if lowOK && highOK && maxOK && oomOK && killOK {
-			memory.Events = &CgroupMemoryEvents{
+			memory.Events = &jobs.CgroupMemoryEvents{
 				Low: low, High: high, Max: maximum, OOM: oom, OOMKill: oomKill,
 			}
 		}
@@ -246,12 +248,12 @@ func resolveCgroupMemory(begin, end memorySample) *CgroupMemory {
 
 func resolveMemoryPressure(
 	begin, end memoryPressureSample,
-	memory *CgroupMemory,
-) *MemoryPressure {
+	memory *jobs.CgroupMemory,
+) *jobs.MemoryPressure {
 	if !begin.present || !end.present || begin.scope != end.scope || begin.identity != end.identity {
 		return nil
 	}
-	if end.scope == MemoryPressureCgroup && (memory == nil || memory.Source != CgroupMemoryV2) {
+	if end.scope == jobs.MemoryPressureCgroup && (memory == nil || memory.Source != jobs.CgroupMemoryV2) {
 		return nil
 	}
 	some, someOK := windowDelta(begin.some, end.some)
@@ -259,7 +261,7 @@ func resolveMemoryPressure(
 	if !someOK || !fullOK || full > some {
 		return nil
 	}
-	return &MemoryPressure{Scope: end.scope, SomeStalledUs: some, FullStalledUs: full}
+	return &jobs.MemoryPressure{Scope: end.scope, SomeStalledUs: some, FullStalledUs: full}
 }
 
 func parseSafeMemoryValue(content string) (int64, bool) {
@@ -283,7 +285,7 @@ func parseFiniteMemoryLimit(content, source string) (uint64, bool) {
 	if err != nil || limit == 0 {
 		return 0, false
 	}
-	if source == CgroupMemoryV1 && limit >= cgroupV1UnlimitedSentinel {
+	if source == jobs.CgroupMemoryV1 && limit >= cgroupV1UnlimitedSentinel {
 		return 0, false
 	}
 	return limit, true
@@ -359,6 +361,12 @@ func parseMemoryPressure(content string) (some, full int64, ok bool) {
 	return some, full, seenSome && seenFull && full <= some
 }
 
+// TotalMemoryBytes is the physical memory of the machine running the CLI, or 0
+// when it cannot be read.
+func TotalMemoryBytes() uint64 {
+	return totalMemoryBytesAt(RunnerEnvironmentRoot, readFile)
+}
+
 func totalMemoryBytesAt(root string, read func(string) string) uint64 {
 	for _, line := range strings.Split(read(filepath.Join(root, "proc/meminfo")), "\n") {
 		if !strings.HasPrefix(line, "MemTotal:") {
@@ -374,7 +382,7 @@ func totalMemoryBytesAt(root string, read func(string) string) uint64 {
 		}
 		return kib * 1024
 	}
-	if root == runnerEnvironmentRoot && runtime.GOOS == "darwin" {
+	if root == RunnerEnvironmentRoot && runtime.GOOS == "darwin" {
 		out, err := exec.Command("sysctl", "-n", "hw.memsize").Output()
 		if err != nil {
 			return 0
@@ -386,7 +394,7 @@ func totalMemoryBytesAt(root string, read func(string) string) uint64 {
 	}
 	// The platform reader, like sysctl above, is consulted only for the real
 	// filesystem: a fixture tree describes a machine of its own.
-	if root == runnerEnvironmentRoot {
+	if root == RunnerEnvironmentRoot {
 		return platformPhysicalMemoryBytes()
 	}
 	return 0

@@ -31,6 +31,7 @@ import (
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -212,7 +213,7 @@ func synchronizeExtensionRuntimesWithEnv(
 	}
 
 	started := time.Now()
-	workers := preparationWorkers(len(nodes), runtime.NumCPU(), totalMemoryBytes())
+	workers := preparationWorkers(len(nodes), runtime.NumCPU(), machineprobe.TotalMemoryBytes())
 	spans := make([]*preparationSpans, len(nodes))
 	errs := make([]error, len(nodes))
 	for i := range spans {

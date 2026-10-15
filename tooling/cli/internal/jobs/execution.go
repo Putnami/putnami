@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
 )
 
 // The PHYSICAL execution, and what a LOGICAL task record may claim from it.
@@ -130,7 +132,7 @@ func captureExecution(ps *os.ProcessState, wall time.Duration, concurrency int) 
 	if ps == nil {
 		return nil
 	}
-	maxRSSBytes, inBlocks, outBlocks := processRusage(ps)
+	maxRSSBytes, inBlocks, outBlocks := machineprobe.ProcessRusage(ps)
 	return &Execution{
 		ID:          nextExecutionID(),
 		Wall:        max(wall, 0),

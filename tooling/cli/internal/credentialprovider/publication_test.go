@@ -234,6 +234,12 @@ func refusalCodeOf(err error) string {
 	return refusalCode(err)
 }
 
+// lostAnswerTimeout bounds each release exchange in the lost-answer tests. The
+// same bound times out the lost answer and waits for the answered repeat, so it
+// must cover the provider's real answer on a loaded machine: a 300ms bound
+// failed the answered repeat under load.
+const lostAnswerTimeout = 5 * time.Second
+
 // A release whose answer is lost is sent once more on the same session; the
 // provider applies the plan digest once and answers the repeat with its first
 // answer. When the repeat is lost too, the outcome is unknown: the error names
@@ -244,7 +250,7 @@ func TestReleaseAfterAnUncertainSubmitIsResolvedByPlanDigest(t *testing.T) {
 	ctx := context.Background()
 
 	provider := providertest.New(providertest.Config{Unanswered: map[registry.CredentialOp]int{registry.CredentialOpRelease: 1}})
-	_, publication := publicationBroker(t, provider, WithReleaseTimeout(300*time.Millisecond))
+	_, publication := publicationBroker(t, provider, WithReleaseTimeout(lostAnswerTimeout))
 	open := testOpenParams(t, "0.3.0", []string{"canary"}, nil)
 	if err := publication.Open(ctx, open); err != nil {
 		t.Fatal(err)
@@ -261,7 +267,7 @@ func TestReleaseAfterAnUncertainSubmitIsResolvedByPlanDigest(t *testing.T) {
 	}
 
 	lost := providertest.New(providertest.Config{Unanswered: map[registry.CredentialOp]int{registry.CredentialOpRelease: 2}})
-	_, publication = publicationBroker(t, lost, WithReleaseTimeout(300*time.Millisecond))
+	_, publication = publicationBroker(t, lost, WithReleaseTimeout(lostAnswerTimeout))
 	open = testOpenParams(t, "0.3.0", []string{"canary"}, nil)
 	if err := publication.Open(ctx, open); err != nil {
 		t.Fatal(err)
