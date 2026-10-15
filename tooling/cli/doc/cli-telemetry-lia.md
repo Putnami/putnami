@@ -1,6 +1,6 @@
 # CLI telemetry Legitimate Interests Assessment
 
-**Version:** 1.0
+**Version:** 1.1
 
 **Applies to:** Putnami CLI anonymous usage telemetry.
 
@@ -22,7 +22,7 @@ Each field maps to a concrete product question:
 
 | Field | Decision it informs |
 |-------|---------------------|
-| Closed command names | Which CLI workflows warrant maintenance and documentation investment |
+| Closed command names | Which workflows of the CLI and of Putnami's own extensions warrant maintenance and documentation investment |
 | Project and job counts | Which workspace sizes and plans need performance work |
 | Flag presence | Which supported execution modes are actively used, without retaining flag values |
 | Success and failure category | Whether a broad class of invocation, authentication, API, or execution failures regresses |
@@ -32,13 +32,18 @@ Each field maps to a concrete product question:
 | Monthly random ID | Aggregate deduplication within a short rotation window, without a persistent identifier |
 
 The design excludes code, file paths, workspace/project names, configuration,
-environment values, error messages, user identity, and IP addresses. Those data
-are not necessary for the stated purpose.
+command names that a user or another extension chose, environment values,
+error messages, user identity, and IP addresses. Those data are not necessary
+for the stated purpose.
 
 ## Balancing test
 
 The field set is limited by a compiled allowlist, and the random identifier
-rotates every UTC month. The device ID and local buffer are deleted by `putnami
+rotates every UTC month. The command vocabulary holds only names that Putnami
+chose: the public job commands of the CLI catalog and the public commands that
+extensions of the `@putnami` scope declare. The CLI sends a command only when a
+loaded `@putnami` extension declares it, so a command that only another
+extension declares is never sent, even when its name matches. The device ID and local buffer are deleted by `putnami
 telemetry off`; `DO_NOT_TRACK=1`, `PUTNAMI_TELEMETRY=off`, and CI provide further
 opt-outs or safeguards. A visible interactive notice is persisted before a
 previous buffer can be sent, and non-TTY runs are silent until that notice exists

@@ -104,12 +104,17 @@ type Observer interface {
 }
 
 // RunPlan is what the engine knows about a run at observation time. It
-// deliberately carries counts only: flag presence, TTY interactivity, and every
-// other CLI-shaped detail belongs to the adapter that owns the observer.
+// deliberately carries only the requested commands, the extensions that declare
+// them, and counts: flag presence, TTY interactivity, and every other
+// CLI-shaped detail belongs to the adapter that owns the observer.
 type RunPlan struct {
 	Commands []string
-	Projects int
-	Jobs     int
+	// Declarers maps each command of Commands to the sorted names of the loaded
+	// extensions that declare it public. A command that no loaded extension
+	// declares public has no entry.
+	Declarers map[string][]string
+	Projects  int
+	Jobs      int
 }
 
 // notifyRunPlanned is the only place the engine touches an observer. A nil
@@ -895,7 +900,12 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// Observe the run after the plan is complete: the plan-dependent counts do
 	// not exist before this point, which is why earlier exits are unobserved.
 	notifyRunPlanned(ctx, req.Observer, func() RunPlan {
-		return RunPlan{Commands: req.Commands, Projects: len(selectedProjects), Jobs: len(planned)}
+		return RunPlan{
+			Commands:  req.Commands,
+			Declarers: extension.PublicDeclarers(req.Commands, discovered.Extensions),
+			Projects:  len(selectedProjects),
+			Jobs:      len(planned),
+		}
 	})
 
 	if result, nothingToRun := servePreparationWithoutFiniteSteps(req, planned, selectedProjects, ws, withheld); nothingToRun {

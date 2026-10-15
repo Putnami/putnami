@@ -1,6 +1,7 @@
 package cliusage
 
 import (
+	"regexp"
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -197,6 +198,48 @@ func TestValidateLogsRejectsForeignService(t *testing.T) {
 		}},
 	}}}
 	assertHasCode(t, ValidateLogs(req), ErrorCodeInvalidService)
+}
+
+func TestValidateRecordAcceptsExtensionCommands(t *testing.T) {
+	t.Parallel()
+	attrs := startAttrs()
+	attrs[AttrCommands] = telemetry.StringVal("clientgen,validate-workspace,cloud-deploy")
+	if diags := ValidateRecord(recordFromAttrs(attrs)); diag.HasErrors(diags) {
+		t.Fatalf("session:start naming extension commands rejected: %v", diags)
+	}
+}
+
+// releasedCommands are names a released CLI sends. The receiver accepts each of
+// them, or it drops every record of that CLI that names one.
+var releasedCommands = []string{
+	"build", "test", "lint", "serve", "run", "format",
+	"package", "publish", "deploy", "generate", "validate",
+}
+
+func TestCommandVocabularyKeepsEveryReleasedName(t *testing.T) {
+	t.Parallel()
+	for _, command := range releasedCommands {
+		if !IsCommand(command) {
+			t.Errorf("released command %q left the vocabulary: the receiver drops the records of CLIs that send it", command)
+		}
+	}
+}
+
+// Every name is one comma-free, lowercase token: the wire joins the list with
+// commas, and the receiver publishes each name as an aggregate key.
+func TestCommandVocabularyNamesAreUniqueTokens(t *testing.T) {
+	t.Parallel()
+	token := regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
+	seen := make(map[string]bool, len(Commands))
+	for _, command := range Commands {
+		if !token.MatchString(command) {
+			t.Errorf("command %q is not a lowercase token of at most 64 bytes", command)
+		}
+		if seen[command] {
+			t.Errorf("command %q is listed twice", command)
+		}
+		seen[command] = true
+	}
 }
 
 func TestRequiredAttributesAreAllowed(t *testing.T) {

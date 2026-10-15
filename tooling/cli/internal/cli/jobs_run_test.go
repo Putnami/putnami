@@ -151,7 +151,12 @@ func TestSessionObserver_RecordsSessionStart(t *testing.T) {
 	drained := make(chan struct{})
 	drainTelemetry = func(context.Context) { close(drained) }
 
-	observer.RunPlanned(context.Background(), engine.RunPlan{Commands: []string{"build"}, Projects: 2, Jobs: 3})
+	observer.RunPlanned(context.Background(), engine.RunPlan{
+		Commands:  []string{"build", "clientgen"},
+		Declarers: map[string][]string{"build": {"@putnami/go"}, "clientgen": {"@acme/clientgen"}},
+		Projects:  2,
+		Jobs:      3,
+	})
 	select {
 	case <-drained:
 	case <-time.After(2 * time.Second):
@@ -164,6 +169,24 @@ func TestSessionObserver_RecordsSessionStart(t *testing.T) {
 	names := bufferedEventNames(t, bufferPath)
 	if len(names) != 1 || names[0] != "session:start" {
 		t.Fatalf("buffered events = %v, want exactly one session:start", names)
+	}
+	// The observer forwards the plan's declarers: the command a first-party
+	// extension declares is recorded, the one only another extension declares
+	// is not.
+	data, err := os.ReadFile(bufferPath)
+	if err != nil {
+		t.Fatalf("read telemetry buffer: %v", err)
+	}
+	var event struct {
+		Data struct {
+			Commands []string `json:"commands"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(string(data))), &event); err != nil {
+		t.Fatalf("decode session:start: %v", err)
+	}
+	if strings.Join(event.Data.Commands, ",") != "build" {
+		t.Fatalf("recorded commands = %v, want [build]", event.Data.Commands)
 	}
 }
 
