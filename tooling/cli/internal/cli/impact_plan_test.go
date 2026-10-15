@@ -75,27 +75,27 @@ func TestImpactPlanCommandsResolveEachAliasToOneCommand(t *testing.T) {
 	t.Parallel()
 	cfg := &wsproto.Config{Aliases: map[string]string{"check": "lint", "gate": "lint,test", "verify": "check"}}
 
-	got, err := impactPlanCommands("t, l ,b", cfg)
+	got, err := impactPlanCommands("t, l ,b", commandAliases{user: cfg.Aliases})
 	if err != nil || !reflect.DeepEqual(got, []string{"test", "lint", "build"}) {
 		t.Fatalf("impactPlanCommands = %v, %v; want [test lint build]", got, err)
 	}
-	got, err = impactPlanCommands("verify,test,b", cfg)
+	got, err = impactPlanCommands("verify,test,b", commandAliases{user: cfg.Aliases})
 	if err != nil || !reflect.DeepEqual(got, []string{"lint", "test", "build"}) {
 		t.Fatalf("impactPlanCommands = %v, %v; want [lint test build] in the order named", got, err)
 	}
-	got, err = impactPlanCommands("validate,lint", nil)
+	got, err = impactPlanCommands("validate,lint", commandAliases{})
 	if err != nil || !reflect.DeepEqual(got, []string{"validate", "lint"}) {
 		t.Fatalf("impactPlanCommands without a workspace config = %v, %v", got, err)
 	}
-	_, err = impactPlanCommands("l,check", cfg)
+	_, err = impactPlanCommands("l,check", commandAliases{user: cfg.Aliases})
 	if protocolcli.ExitCodeForError(err) != protocolcli.ExitUsage || !strings.Contains(err.Error(), `impact-plan names lint twice in "l,check"`) {
 		t.Fatalf("two names of one command: %v, want a usage error naming lint", err)
 	}
-	_, err = impactPlanCommands("gate", cfg)
+	_, err = impactPlanCommands("gate", commandAliases{user: cfg.Aliases})
 	if protocolcli.ExitCodeForError(err) != protocolcli.ExitUsage || !strings.Contains(err.Error(), `"lint,test" in "gate" is not one command`) {
 		t.Fatalf("a multi-command alias: %v, want a usage error naming it", err)
 	}
-	_, err = impactPlanCommands("loop", &wsproto.Config{Aliases: map[string]string{"loop": "loop2", "loop2": "loop"}})
+	_, err = impactPlanCommands("loop", commandAliases{user: map[string]string{"loop": "loop2", "loop2": "loop"}})
 	if protocolcli.ExitCodeForError(err) != protocolcli.ExitUsage || !strings.Contains(err.Error(), "cycle") {
 		t.Fatalf("a cyclic alias: %v, want a usage error", err)
 	}

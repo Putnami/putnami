@@ -32,7 +32,7 @@ The smallest valid extension manifest has a single command with at least one pip
 | `name` | no | Extension identifier (e.g., `@putnami/typescript`) |
 | `version` | no | Extension version (semver) |
 | `cliContract` | no | CLI ↔ extension contract version, stamped by the package job after strict validation (earned, not claimed — see [validation](04-validation.md)) |
-| `commands` | one of `commands`, `tools`, `agentContent` | Public commands exposed to users |
+| `commands` | one of `commands`, `tools`, `agentContent`, `verbs` | Public commands exposed to users |
 | `tasks` | no | Atomic executable units referenced by commands |
 | `extensionDependencies` | no | Other extensions this extension needs, each with a version constraint. The CLI installs, pins and loads each registry dependency (`@scope/name`); a manifest that names one requires CLI contract 8 — see below |
 | `workspaceDevDependencies` | no | NPM devDependencies required at workspace root |
@@ -42,12 +42,14 @@ The smallest valid extension manifest has a single command with at least one pip
 | `hooks` | no | Lifecycle hooks (e.g., `preBuild`, `onInstall`) |
 | `contracts` | no | Input/output schemas for task validation |
 | `optionNamespaces` | no | Bare `options.<name>` blocks of a project config this extension reads — see below |
-| `tools` | one of `commands`, `tools`, `agentContent` | Namespaced MCP tools the extension contributes |
-| `agentContent` | one of `commands`, `tools`, `agentContent` | Agent instructions the extension ships under its own version — see below |
+| `tools` | one of `commands`, `tools`, `agentContent`, `verbs` | Namespaced MCP tools the extension contributes |
+| `agentContent` | one of `commands`, `tools`, `agentContent`, `verbs` | Agent instructions the extension ships under its own version — see below |
+| `verbs` | one of `commands`, `tools`, `agentContent`, `verbs` | The verb vocabulary: verbs other extensions run, with their descriptions, aliases, default traits and related commands. Requires CLI contract 9 — see [verbs](06-verbs.md#declaring-a-verb-vocabulary) |
 
-A manifest must contribute something: at least one command, MCP tool, or
-agent-content contribution. A content-only extension — no runtime, no command,
-no tool — is a complete manifest.
+A manifest must contribute something: at least one command, MCP tool,
+agent-content contribution, or verb vocabulary. A content-only extension — no
+runtime, no command, no tool — is a complete manifest, and so is a
+vocabulary-only one.
 
 ## Agent Content
 

@@ -149,15 +149,16 @@ the lowest contract whose vocabulary covers the manifest
 `protocols/cli.GoEmbedInputsContract` (6) for `go-embed:build` or
 `go-embed:test` task inputs/cache-key files, or
 `protocols/cli.ReleaseBaselineInputContract` (7) for a task that declares the
-`releaseBaseline` runtime input, or `protocols/cli.ExtensionDependenciesContract`
-(8) for `extensionDependencies` that name a registry extension (`@scope/name`).
+`releaseBaseline` runtime input, `protocols/cli.ExtensionDependenciesContract`
+(8) for `extensionDependencies` that name a registry extension (`@scope/name`),
+or `protocols/cli.VerbVocabularyContract` (9) for a `verbs` vocabulary.
 `protocols/cli.GitInputModeContract` names the same rung 7 for a task whose
 input port or cache-key files select a `git:` pattern. The gate applies to every non-empty command, command-group, MCP
-tool, or agent-content surface. A non-conforming manifest — for example one
+tool, or agent-content surface, and to a verb vocabulary. A non-conforming manifest — for example one
 that shadows a reserved global flag — fails packaging and never reaches a
 registry. A manifest without the field is contract `0` (pre-registry).
 
-Contracts 5, 6, 7 and 8 are **additive**. They add vocabulary a manifest opts into
+Contracts 5, 6, 7, 8 and 9 are **additive**. They add vocabulary a manifest opts into
 and change nothing a manifest without that vocabulary means. An extension without
 agent content, Go embed inputs, a `releaseBaseline` input or a `git:` input keeps
 its contract-4 stamp; one with agent content but no Go embed inputs requires
@@ -172,8 +173,12 @@ the CLI loads it from the artifact store or a declared path, because the CLI
 installs and loads those dependencies and an older reader would drop them
 (`CheckDependencyContract`). `LoadManifest` enforces `RequiredLoadContract`,
 which leaves the dependency rung out, so a manifest loaded from
-`node_modules` loads unstamped. The reader loads every stamp from the one the
-manifest's vocabulary requires up to `protocols/cli.LatestContract` (8):
+`node_modules` loads unstamped. A manifest that declares `verbs` requires
+contract 9 wherever it loads from, `node_modules` included: its default traits
+change how the jobs of other extensions are planned, and an older reader would
+plan them with other traits. `RequiredLoadContract` includes that rung. The
+reader loads every stamp from the one the manifest's vocabulary requires up to
+`protocols/cli.LatestContract` (9):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|
@@ -182,12 +187,22 @@ manifest's vocabulary requires up to `protocols/cli.LatestContract` (8):
 | above the latest | **Reject**: "extension requires a newer putnami (contract N > M)". A future contract is never half-interpreted. |
 
 A manifest that declares **no contract surface** (no commands, command groups,
-tools, or agent content) is outside the ladder and loads unstamped: the packager
-never stamps one, so requiring a stamp would reject exactly the manifests it
-refuses to stamp. `DeclaresContractSurface` is the shared predicate. Agent
-content counts as a surface even though it runs nothing: it is exactly what an
-older reader would drop without a word, so an unstamped content manifest must
-not load as hook-only.
+tools, agent content, or verb vocabulary) is outside the ladder and loads
+unstamped: the packager never stamps one, so requiring a stamp would reject
+exactly the manifests it refuses to stamp. `DeclaresContractSurface` is the
+shared predicate. Agent content and a verb vocabulary count as surfaces even
+though they run nothing: each is exactly what an older reader would drop
+without a word, so an unstamped content or vocabulary manifest must not load
+as hook-only.
+
+The Go archive and npm packagers count a verb vocabulary as surface too. They
+validate a manifest that declares one strictly and stamp it 9, a
+vocabulary-only manifest included, and a defective vocabulary fails packaging
+unstamped, even beside a registry extension dependency. The SDK's
+`agentartifact.PackageExtension`, which the scaffold `package` command runs,
+stamps 9 on a content-only extension that declares a vocabulary beside its
+agent content. It still requires agent content, so it does not package a
+vocabulary-only extension.
 
 For the Go archive packager, registry `extensionDependencies` are contract
 surface too. A manifest that declares only hooks and such dependencies takes

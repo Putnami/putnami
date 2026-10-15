@@ -82,7 +82,8 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: ExtensionDependenciesContract for extensionDependencies that
+// the manifest: VerbVocabularyContract for a verb vocabulary,
+// ExtensionDependenciesContract for extensionDependencies that
 // name a registry extension, ReleaseBaselineInputContract for a task that
 // declares the releaseBaseline runtime input, GitInputModeContract (the same
 // rung) for a task that declares a `git:` file pattern, GoEmbedInputsContract
@@ -125,6 +126,11 @@ func RequiredLoadContract(m *Manifest) int {
 		if declaresGoEmbedSelector(task) {
 			required = max(required, protocolcli.GoEmbedInputsContract)
 		}
+	}
+	// A vocabulary's default traits change plans wherever the manifest loads
+	// from, so its rung is part of the load floor.
+	if m.DeclaresVerbs() {
+		required = max(required, protocolcli.VerbVocabularyContract)
 	}
 	return required
 }

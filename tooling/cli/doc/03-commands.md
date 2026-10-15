@@ -1805,6 +1805,16 @@ Single-letter shortcuts for the conventional job commands. They are catalog
 data, so the current set is printed by `putnami help --markdown` (the "Aliases"
 block) rather than listed here.
 
+### Vocabulary Aliases
+
+An extension's
+[verb vocabulary](../../../protocols/extension/doc/06-verbs.md#declaring-a-verb-vocabulary)
+can declare aliases for its verbs. A vocabulary alias never takes the name of
+a verb, an extension command or command group, or a command of the core
+catalog. A workspace alias of the same name hides it, with a warning. A
+workspace alias named like a built-in alias never applies, so it hides
+nothing.
+
 ### User-Defined Aliases
 
 Define custom aliases in `putnami.workspace.json`:
@@ -1819,4 +1829,4 @@ Define custom aliases in `putnami.workspace.json`:
 }
 ```
 
-Alias resolution chains are supported (up to 10 levels to prevent infinite loops). Built-in aliases take precedence, then user aliases.
+Alias resolution chains are supported (up to 10 levels to prevent infinite loops). Vocabulary aliases apply first, except one a user alias hides; then built-in aliases; then user aliases. `putnami impact-plan` resolves aliases in the same order.

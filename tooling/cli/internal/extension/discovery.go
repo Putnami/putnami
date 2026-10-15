@@ -271,6 +271,10 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 		}
 	}
 
+	// A loaded vocabulary gives its verbs' default traits to the jobs whose
+	// manifest declared none, across extensions.
+	applyVocabularyTraits(extensions)
+
 	return &DiscoveryResult{Extensions: extensions, Skipped: skipped, RemovedCapabilities: removed, Dependencies: dependencies}, nil
 }
 
@@ -648,6 +652,16 @@ func warnOnce(key, msg string, args ...any) {
 		return
 	}
 	slog.Warn(msg, args...)
+}
+
+// applyVocabularyTraits runs the vocabulary pass over the loaded extensions
+// and warns, once per process, about each declaration the merge set aside: a
+// verb two vocabularies declare, or default traits that would change a
+// well-known verb's side effects.
+func applyVocabularyTraits(extensions []*ExtensionDescription) {
+	for _, warning := range ApplyVocabularyTraits(extensions) {
+		warnOnce("vocabulary\x00"+warning, "verb vocabulary declaration set aside", "reason", warning)
+	}
 }
 
 func tryLoadExtension(absPath, refName string, installed bool) (*ExtensionDescription, *SkippedExtension) {

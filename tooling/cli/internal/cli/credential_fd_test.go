@@ -117,7 +117,7 @@ func TestRunCredentialIsCapturedBeforeAnythingStarts(t *testing.T) {
 			t.Errorf("App.Run calls %s.%s before enterProcess", later[0], later[1])
 		}
 	}
-	for _, later := range []string{"claimPackageRoot", "takeProvidersEnv", "ParseArgs"} {
+	for _, later := range []string{"claimPackageRoot", "takeProvidersEnv", "parseArgs"} {
 		if offset, ok := calls[later]; !ok || offset < entry {
 			t.Errorf("App.Run calls %s before enterProcess (or never)", later)
 		}

@@ -95,6 +95,7 @@ Every extension is defined by a `putnami.extension.json` file. The manifest decl
 | `templates` | no | Project templates (see [Templates](/docs/tooling-&-workspace/templates)) |
 | `contracts` | no | Input/output schemas for task validation |
 | `extensionDependencies` | no | Other extensions this one needs, each with a version constraint. Installing this extension installs and pins each registry dependency (`@scope/name`), and the manifest then requires CLI contract 8 |
+| `verbs` | no | A verb vocabulary: the verbs this extension gives meaning to, each with a description, aliases, default traits and related commands. Help, completion and alias resolution read it, and a job whose command declares no traits takes its verb's. The manifest then requires CLI contract 9 wherever it loads from |
 | `workspaceDevDependencies` | no | NPM devDependencies required at workspace root |
 | `autoServe` | no | Whether `serve` auto-discovers projects with this extension |
 | `runtime` | no | The extension's own executable and how to prepare it (see [Lifecycle primitives](#lifecycle-primitives)) |

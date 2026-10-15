@@ -41,8 +41,8 @@ instead — see [Typed producer requirements](#typed-producer-requirements).
 | `config-extract` | Extract the project's config schema manifest. | — |
 | `config-merge` | Merge config defaults from workspace dependencies. | — |
 
-Custom verbs remain allowed; they carry zero traits unless the manifest
-declares them.
+Custom verbs remain allowed; they carry zero traits unless the manifest, or a
+loaded [verb vocabulary](#declaring-a-verb-vocabulary), declares them.
 
 ## Declaring traits
 
@@ -160,6 +160,97 @@ credential format, nor guess a shorter TTL. The issuer must support
 terminal/cancel revocation through token introspection or `jti`. Never put a
 broad human token in CI. Server authorization remains authoritative even if a
 repository forges plausible gate jobs or edges.
+
+## Declaring a verb vocabulary
+
+An extension can give meaning to verbs that other extensions run. Its
+`verbs` section lists those verbs in the order help shows them:
+
+```json
+{
+  "name": "@acme/dev",
+  "verbs": [
+    {
+      "name": "build",
+      "description": "Compile sources into runnable or distributable outputs.",
+      "aliases": ["b"],
+      "related": ["test", "package"]
+    },
+    {
+      "name": "publish",
+      "description": "Push packaged artifacts to registries.",
+      "traits": { "injectPublishChannels": true, "sideEffects": "registry" }
+    }
+  ]
+}
+```
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `name` | yes | The command name: lowercase letters, digits and hyphens, starting with a letter. |
+| `description` | yes | The one-line description that help and completion show. |
+| `aliases` | no | Short names that resolve to the verb. |
+| `traits` | no | The default traits of every job of the verb whose command declares none. |
+| `related` | no | The commands `putnami help <verb>` suggests, in order. |
+
+A vocabulary runs nothing and adds no job. The jobs of a verb stay the
+commands each extension declares under that name. So a vocabulary changes a
+plan only through the default traits of its verbs.
+
+The CLI reads the vocabularies of the loaded extensions:
+
+- **Merge.** The vocabularies merge in extension-name order, each in its
+  declared order. The first declaration of a verb wins whole: its
+  description, aliases, traits and related commands. A second vocabulary
+  that declares the same verb draws a warning that names both extensions.
+- **Help.** Help lists the merged verbs first, then the core's job commands
+  the vocabulary does not name. Inside a workspace, help lists a verb only
+  when a loaded extension declares a command of that name, as it does for
+  every job command. `putnami help <verb>` suggests the verb's `related`
+  commands instead of the core's.
+- **Aliases.** A command name resolves through the vocabulary's aliases
+  first, then the core's built-in aliases, then the workspace's. A workspace
+  alias of the same name hides a vocabulary alias, with a warning. A
+  workspace alias named like a built-in alias never applies, so it hides
+  nothing. The CLI drops an alias that an earlier verb claimed, or that
+  names a verb, a command or command group of a loaded extension, or a
+  command of the core catalog, such as `help` or `deploy`. `putnami impact-plan` resolves the same
+  aliases. A provider process, the CLI an extension starts, resolves no
+  vocabulary alias, as it resolves no workspace alias.
+- **Completion.** Completion offers the merged verbs with their
+  descriptions, and their aliases.
+- **Default traits.** A job whose command declares no `traits` takes its
+  verb's `traits`. When the verb declares none, the job keeps the defaults of
+  the [verb registry](#the-verb-registry). A command's own `traits` replace
+  both wholesale. A vocabulary never changes the side effects the registry
+  gives a verb: `publish` keeps `registry` and `deploy` keeps `cloud`. When a
+  loaded vocabulary's traits would change them, the CLI sets those traits
+  aside with a warning, and the verb keeps the registry's defaults.
+
+Without a loaded vocabulary, help, aliases, completion and traits come from
+the core alone, as before.
+
+Strict validation checks the section when it is present:
+
+| Rule | Code |
+| --- | --- |
+| The section lists at least one verb. | `empty-verbs` |
+| Each verb has a name and a description. | `required-field` |
+| A name is lowercase letters, digits and hyphens, starting with a letter. | `invalid-verb-name` |
+| A name appears once. | `duplicate-verb` |
+| An alias is letters, digits and hyphens, starting with a letter. | `invalid-verb-alias` |
+| An alias appears once, and names no verb, command or command group of the manifest. | `duplicate-verb-alias` |
+| `traits.sideEffects` is `registry` or `cloud`. | `invalid-enum` |
+| `traits.sideEffects` keeps the side effects the verb registry gives the verb. | `invalid-verb-traits` |
+| A related command is a path of lowercase words, other than the verb itself, and appears once. | `invalid-verb-related` |
+
+A manifest that declares only a vocabulary is complete: it needs no command,
+MCP tool or agent content. Declaring `verbs` requires CLI contract 9
+(`VerbVocabularyContract`) wherever the manifest loads from, because its
+default traits change how other extensions' jobs are planned. A CLI below 9
+refuses the manifest with "requires a newer putnami". The Go archive and npm
+packagers validate the vocabulary and stamp the manifest 9, a vocabulary-only
+manifest included (see [validation](04-validation.md)).
 
 ## Typed producer requirements
 

@@ -196,6 +196,13 @@ A manifest loaded from `node_modules` keeps loading unstamped, because the CLI
 does not follow its dependencies. The Go archive packager stamps 8, even on a
 manifest that declares only hooks and dependencies; the npm packager leaves
 the list out of its stamp.
+Contract `9` (`VerbVocabularyContract`) is additive for the `verbs` section:
+the verbs an extension declares, with their descriptions, aliases, default
+traits and related commands. From 9 on, help, completion and alias resolution
+read the loaded vocabularies first, and a job whose command declares no traits
+takes its verb's default traits. A reader below 9 would plan those jobs with
+other traits, so it refuses the stamp. The floor binds a manifest wherever it
+loads from. Only a manifest that declares the section is stamped 9.
 Contract `6` is additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs. A reader limited to contract 5 refuses that
 manifest before interpreting its inputs; unrelated manifests retain their

@@ -45,6 +45,14 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	9: ADDITIVE — the verb vocabulary (`verbs`): the verbs an extension
+//	   declares, in order, with their description, aliases, default traits
+//	   and related commands. From 9 on, help, completion and alias resolution
+//	   read it, and a job whose manifest declares no traits takes the default
+//	   traits of its verb from it. An older reader would plan those jobs with
+//	   other traits, so it must refuse the stamp. Only a manifest that
+//	   declares the section is stamped 9, and the floor binds it from every
+//	   origin.
 //	8: ADDITIVE — extensionDependencies that name a registry extension
 //	   (@scope/name). From 8 on, the CLI installs, pins and loads every
 //	   extension such a manifest depends on. An older reader loads the
@@ -131,7 +139,13 @@ const GitInputModeContract = ReleaseBaselineInputContract
 // refuse its stamp instead of loading the extension without its dependencies.
 const ExtensionDependenciesContract = 8
 
+// VerbVocabularyContract is required by a manifest that declares a verb
+// vocabulary. Its default traits change the plan of every job of that verb
+// whose manifest declares none, so an older reader refuses the stamp instead of
+// planning those jobs with other traits.
+const VerbVocabularyContract = 9
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = ExtensionDependenciesContract
+const LatestContract = VerbVocabularyContract

@@ -383,7 +383,7 @@ func TestResolveAlias(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveAlias(tt.input, tt.aliases)
+			got, err := resolveAlias(tt.input, commandAliases{user: tt.aliases})
 			if tt.wantCycle {
 				if err == nil {
 					t.Fatalf("resolveAlias(%q) = %q, want a cycle error", tt.input, got)

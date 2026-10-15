@@ -57,9 +57,10 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 	// instructions and runs nothing. An empty contribution still fails, because
 	// ValidateAgentContent rejects a section that names neither a source nor a
 	// digest-bound tree, so an empty section can never stand in for a
-	// contribution.
-	if len(m.Commands) == 0 && len(m.Tools) == 0 && !m.DeclaresAgentContent() {
-		diags = append(diags, diag.Errorf("required-field", "commands", "at least one command, MCP tool or agent-content contribution is required"))
+	// contribution. A vocabulary-only extension is complete for the same
+	// reason, and ValidateVerbs rejects an empty vocabulary.
+	if len(m.Commands) == 0 && len(m.Tools) == 0 && !m.DeclaresAgentContent() && !m.DeclaresVerbs() {
+		diags = append(diags, diag.Errorf("required-field", "commands", "at least one command, MCP tool, agent-content contribution or verb vocabulary is required"))
 	}
 	diags = append(diags, ValidateNoReservedFlagShadows(m)...)
 
@@ -344,6 +345,10 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 	// The agent-content section (agent_content.go). Inert for a manifest that
 	// declares none.
 	diags = append(diags, ValidateAgentContent(m)...)
+
+	// The verb vocabulary (verb_vocabulary.go). Inert for a manifest that
+	// declares none.
+	diags = append(diags, ValidateVerbs(m)...)
 
 	// Validate MCP tool declarations in sorted order for deterministic
 	// diagnostics. A malformed tool must fail package-time validation instead

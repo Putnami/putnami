@@ -1,7 +1,9 @@
 package completion
 
 import (
+	"maps"
 	"path/filepath"
+	"slices"
 	"sort"
 
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -68,6 +70,11 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config) completionConte
 	}
 
 	// Add dynamic commands from extensions
+	var vocabulary extension.Vocabulary
+	var workspaceAliases map[string]string
+	if cfg != nil {
+		workspaceAliases = cfg.Aliases
+	}
 	if wsRoot != "" {
 		projectPaths := []string{}
 		ws, _ := workspace.Load(wsRoot)
@@ -116,6 +123,19 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config) completionConte
 		}
 
 		extensions, _ := extension.DiscoverExtensions(wsRoot, cfg, projectPaths)
+		// The loaded vocabulary describes its verbs ahead of the catalog and of
+		// the commands that serve them. The CLI's own alias tables reserve the
+		// same names: a vocabulary alias never takes a catalog command, and a
+		// workspace alias of the same name that applies hides it.
+		vocabulary = extension.MergeVocabulary(extensions, func(name string) bool {
+			return commandmeta.ReservesVocabularyAlias(name, workspaceAliases)
+		})
+		for _, verb := range vocabulary.Verbs {
+			addCompletionCommand(&ctx, verb.Name, "")
+			if verb.Description != "" {
+				ctx.commandDesc[verb.Name] = verb.Description
+			}
+		}
 		for _, ext := range extensions {
 			for name, description := range ext.Commands {
 				if ext.CommandVisibility[name] == "internal" {
@@ -148,7 +168,7 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config) completionConte
 	}
 
 	finalizeCompletionContext(&ctx)
-	addCommandAliasCompletions(&ctx)
+	addCommandAliasCompletions(&ctx, vocabulary.Aliases, workspaceAliases)
 
 	sort.Strings(ctx.commands)
 	sort.Strings(ctx.projects)
@@ -222,8 +242,28 @@ func addCompletionCommand(ctx *completionContext, name, description string) {
 	}
 }
 
-func addCommandAliasCompletions(ctx *completionContext) {
-	for _, alias := range commandmeta.BuiltinAliasList() {
+// addCommandAliasCompletions offers every alias: those of the loaded
+// vocabulary, the built-in ones whose name the vocabulary leaves free, then
+// the workspace's that apply and name no catalog command, in name order.
+func addCommandAliasCompletions(ctx *completionContext, vocabulary []extension.VerbAlias, workspace map[string]string) {
+	builtin := commandmeta.BuiltinAliasList()
+	aliases := make([]commandmeta.Alias, 0, len(vocabulary)+len(builtin)+len(workspace))
+	claimed := make(map[string]bool, len(vocabulary))
+	for _, alias := range vocabulary {
+		claimed[alias.Name] = true
+		aliases = append(aliases, commandmeta.Alias{Name: alias.Name, Command: alias.Verb})
+	}
+	for _, alias := range builtin {
+		if !claimed[alias.Name] {
+			aliases = append(aliases, alias)
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(workspace)) {
+		if _, catalog := commandmeta.Lookup(name); !catalog && commandmeta.WorkspaceAliasApplies(name, workspace) {
+			aliases = append(aliases, commandmeta.Alias{Name: name, Command: workspace[name]})
+		}
+	}
+	for _, alias := range aliases {
 		addCompletionCommand(ctx, alias.Name, "Alias for "+alias.Command)
 		if flags := ctx.structuredFlags[alias.Command]; len(flags) > 0 {
 			ctx.structuredFlags[alias.Name] = mergeStructuredCompletionFlags(ctx.structuredFlags[alias.Name], flags)

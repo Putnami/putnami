@@ -95,7 +95,10 @@ func cmdImpactPlan(env *CommandEnv) error {
 	if env.Global.Baseline != "" || env.Global.Impacted || env.Global.Projects != "" || env.Global.All {
 		return usageErrorf("impact-plan owns impact selection; use --base instead of --baseline, --impacted, --projects, or --all")
 	}
-	commands, err := impactPlanCommands(parsed.positionals[0], env.Cfg)
+	// The aliases of the loaded vocabulary resolve here as they do for
+	// `putnami <command>`.
+	scope, _ := discoverHelpScope(env.WsRoot, env.Cfg)
+	commands, err := impactPlanCommands(parsed.positionals[0], scope.commandAliases(workspaceAliases(env.Cfg)))
 	if err != nil {
 		return err
 	}
@@ -113,15 +116,11 @@ func cmdImpactPlan(env *CommandEnv) error {
 }
 
 // impactPlanCommands parses the command list of impact-plan the way the CLI
-// parses `putnami <command[,command...]>`: comma-separated, with built-in and
-// workspace aliases resolved, in order. A command named twice, and an alias
-// that expands to several commands, are usage errors: the plan names each
-// command once, by its own name.
-func impactPlanCommands(list string, cfg *wsproto.Config) ([]string, error) {
-	var aliases map[string]string
-	if cfg != nil {
-		aliases = cfg.Aliases
-	}
+// parses `putnami <command[,command...]>`: comma-separated, with the
+// vocabulary, built-in and workspace aliases resolved, in order. A command
+// named twice, and an alias that expands to several commands, are usage
+// errors: the plan names each command once, by its own name.
+func impactPlanCommands(list string, aliases commandAliases) ([]string, error) {
 	commands, err := resolveCommands(list, aliases)
 	if err != nil {
 		return nil, err
@@ -1000,14 +999,18 @@ func cmdHelp(env *CommandEnv) error {
 		if len(env.Args) > 0 && !strings.HasPrefix(env.Args[0], "-") {
 			nestedSub = env.Args[0]
 		}
-		command := resolveAliasOrSelf(env.Sub, env.Cfg.Aliases)
+		command := resolveAliasOrSelf(env.Sub, commandAliases{user: env.Cfg.Aliases})
 		if err := refuseHelpOfRemovedCoreRoot(env, command); err != nil {
 			return err
 		}
+		// The aliases of a loaded vocabulary come first, so the command is
+		// resolved again once the help scope knows them.
+		scope, extensions := discoverHelpScope(env.WsRoot, env.Cfg)
+		command = resolveAliasOrSelf(env.Sub, scope.commandAliases(env.Cfg.Aliases))
 		if isStructuredCommand(command) || nestedSub != "" {
-			printSubcommandHelp(command, nestedSub, newHelpScope(env.WsRoot, env.Cfg))
+			printSubcommandHelp(command, nestedSub, scope)
 		} else {
-			printJobCommandHelp(command, env.WsRoot, env.Cfg, nil)
+			printCommandHelp(command, jobCommandFlags(command, extensions), scope)
 		}
 	} else {
 		printHelp(newHelpScope(env.WsRoot, env.Cfg))

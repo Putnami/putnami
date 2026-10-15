@@ -78,6 +78,11 @@ type Manifest struct {
 	// AgentContentContract, and a workspace receives the content only when it
 	// opts in.
 	AgentContent *AgentContentContribution `json:"agentContent,omitempty"`
+	// Verbs is the verb vocabulary this extension declares, in display order:
+	// each verb's description, aliases, default traits and related commands
+	// (see verb_vocabulary.go). Nil means the extension declares none.
+	// Declaring it requires cliContract VerbVocabularyContract.
+	Verbs []VerbDefinition `json:"verbs,omitempty"`
 	// Ecosystems lists the ecosystem profiles this extension owns.
 	Ecosystems []EcosystemProfile `json:"ecosystems,omitempty"`
 	// Uses lists ecosystem ids another extension owns and this extension publishes to.

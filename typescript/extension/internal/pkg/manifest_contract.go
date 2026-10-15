@@ -43,7 +43,8 @@ const (
 // registry.
 //
 // The gate applies only to manifests that declare a contract surface
-// (non-empty commands, commandGroups, or tools, or an agentContent section).
+// (non-empty commands, commandGroups, or tools, or an agentContent or verbs
+// section).
 // Hook-only manifests (e.g. framework packages shipping a preBuild hook with
 // `"commands": {}`) expose neither flags nor agent-facing tools for the
 // contract to govern and intentionally fail full strict validation, so they
@@ -284,19 +285,21 @@ func verifyStagedManifestLoads(manifestPath string) error {
 }
 
 // manifestDeclaresContractSurface reports whether the raw manifest exposes a
-// command, tool or agent-content surface the contract must govern. Only
-// genuinely absent or empty-object commands, commandGroups, and tools are
-// treated as hook-only and bypass the gate. A present value of the wrong JSON
-// type (e.g. "tools": []) is NOT hook-only — it is a malformed contract surface
-// that must be gated, so strict parsing rejects it instead of publishing an
-// unloadable manifest unstamped. Any non-null agentContent is gated, an empty
-// one included, because the loader counts it as a surface and strict
-// validation refuses an empty contribution.
+// command, tool, agent-content or verb-vocabulary surface the contract must
+// govern. Only genuinely absent or empty-object commands, commandGroups, and
+// tools are treated as hook-only and bypass the gate. A present value of the
+// wrong JSON type (e.g. "tools": []) is NOT hook-only — it is a malformed
+// contract surface that must be gated, so strict parsing rejects it instead of
+// publishing an unloadable manifest unstamped. Any non-null agentContent or
+// verbs is gated, an empty one included, because the loader counts it as a
+// surface (proto.DeclaresContractSurface) and strict validation refuses an
+// empty one.
 func manifestDeclaresContractSurface(raw map[string]any) bool {
 	return surfaceNeedsGate(raw["commands"]) ||
 		surfaceNeedsGate(raw["commandGroups"]) ||
 		surfaceNeedsGate(raw["tools"]) ||
-		raw["agentContent"] != nil
+		raw["agentContent"] != nil ||
+		raw["verbs"] != nil
 }
 
 // namesRegistryDependency reports whether the raw manifest's
