@@ -306,6 +306,10 @@ type artifactOps struct {
 	// build of name, so an install of a build the pin keeps out can be undone
 	// (installHoldingPin). Nil when the kind keeps no stable link.
 	stableLink func(name string) string
+	// installCommand is the command that installs one artifact of this scope
+	// at an exact version, named in a hint. Empty means
+	// "putnami <plural> install" (installCmd).
+	installCommand string
 
 	// localPlatform is the "os/arch" lock key this process installs for. Its
 	// digest may only ever come from locally downloaded, hashed and verified
@@ -339,6 +343,15 @@ type artifactOps struct {
 	// nothing new to record, and writing would risk shrinking a shared lock to
 	// whatever the materialization happened to touch.
 	materialize bool
+}
+
+// installCmd returns the command that installs one artifact of these ops at an
+// exact version.
+func (ops artifactOps) installCmd() string {
+	if ops.installCommand != "" {
+		return ops.installCommand
+	}
+	return "putnami " + ops.plural + " install"
 }
 
 // persistsLock reports whether an install through these ops should write the

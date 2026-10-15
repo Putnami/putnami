@@ -118,8 +118,8 @@ func installPin(ctx context.Context, ops artifactOps, item *artifactInstallWork,
 			// An update resolves the channel again and holds the pin, so it
 			// cannot refresh this entry; an exact version installs with no lock
 			// entry and is never held.
-			err = fmt.Errorf("%s, and installing the pinned %s failed: %w; run `putnami %s install %s@%s` to refresh its lock entry",
-				held.note(), locked.Version, err, ops.plural, item.name, locked.Version)
+			err = fmt.Errorf("%s, and installing the pinned %s failed: %w; `update` keeps this pin, so run `%s %s@%s` to refresh its lock entry",
+				held.note(), locked.Version, err, ops.installCmd(), item.name, locked.Version)
 		}
 		item.result, item.err = nil, err
 		return

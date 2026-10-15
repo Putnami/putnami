@@ -1443,7 +1443,7 @@ func TestAHeldPinWithAWrongEntryNamesTheExactInstall(t *testing.T) {
 			line = strings.TrimSpace(l)
 		}
 	}
-	remedy := "; run `putnami extensions install @putnami/cloud@" + lockedCanary + "` to refresh its lock entry"
+	remedy := "; `update` keeps this pin, so run `putnami extensions install @putnami/cloud@" + lockedCanary + "` to refresh its lock entry"
 	if !strings.Contains(line, "✗ @putnami/cloud: channel latest serves the older build "+olderBuild+", and installing the pinned "+lockedCanary+" failed: integrity mismatch") ||
 		!strings.HasSuffix(line, remedy) {
 		t.Errorf("stderr = %q, want the integrity mismatch ending with %q", line, remedy)
@@ -1491,7 +1491,7 @@ func TestTheExactInstallHintRefreshesADependency(t *testing.T) {
 			line = strings.TrimSpace(l)
 		}
 	}
-	remedy := "; run `putnami extensions install @putnami/cloud@" + lockedCanary + "` to refresh its lock entry"
+	remedy := "; `update` keeps this pin, so run `putnami extensions install @putnami/cloud@" + lockedCanary + "` to refresh its lock entry"
 	if runErr == nil || !strings.HasSuffix(line, remedy) {
 		t.Fatalf("update = %v with stderr %q, want the dependency's failure ending with %q", runErr, line, remedy)
 	}

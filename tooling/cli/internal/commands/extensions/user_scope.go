@@ -71,15 +71,22 @@ func ExtensionsInstallUser(ctx context.Context, userRoot string, args []string, 
 	extension.ClaimUserScopeRepair(userRoot)
 
 	installer := extension.NewUserScopeInstaller(userRoot)
+	return installArtifactsWithOptions(ctx, userRoot, &wsproto.Config{}, rest, userScopeOps(userRoot, installer), InstallOptions{
+		OutputFormat: outputFormat,
+		Out:          out,
+	})
+}
+
+// userScopeOps returns the extension ops of the user scope at userRoot.
+func userScopeOps(userRoot string, installer *extension.Installer) artifactOps {
 	ops := extensionOpsFor(userRoot, installer)
 	// A local path belongs to a workspace; the user scope has none to resolve it
 	// against, and resolving it from the current directory would read it.
 	ops.installLocal = nil
 	ops.install = refuseUserScopeDependents(ops.install, installer)
-	return installArtifactsWithOptions(ctx, userRoot, &wsproto.Config{}, rest, ops, InstallOptions{
-		OutputFormat: outputFormat,
-		Out:          out,
-	})
+	// A hint names the user-scope install, never the workspace one.
+	ops.installCommand = "putnami extensions install --user"
+	return ops
 }
 
 // ExtensionsRemoveUser drops one extension from the user scope: its lock entry,

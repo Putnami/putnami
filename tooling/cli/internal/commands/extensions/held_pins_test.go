@@ -1,13 +1,46 @@
 package extensions
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/sdk/extension/dirlink"
+	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
+
+// A held pin whose lock install fails names the exact install of its own
+// scope: the user scope's hint names install --user, never the workspace
+// command, and templates name templates install.
+func TestAHeldPinHintNamesTheInstallOfItsScope(t *testing.T) {
+	userRoot := t.TempDir()
+	ops := userScopeOps(userRoot, extension.NewUserScopeInstaller(userRoot))
+	ops.resolve = func(context.Context, string, string) (*artifactInstallOutcome, error) {
+		return &artifactInstallOutcome{Version: "1.0.0"}, nil
+	}
+	ops.install = func(_ context.Context, name, _ string, lockEntry *lockfile.LockEntry) (*artifactInstallOutcome, error) {
+		if lockEntry == nil {
+			t.Error("the held pin downloaded the older build")
+			return &artifactInstallOutcome{Version: "1.0.0"}, nil
+		}
+		return nil, fmt.Errorf("integrity mismatch for %s@%s", name, lockEntry.Version)
+	}
+	item := artifactInstallWork{name: "@acme/tool", constraint: "latest", prior: lockfile.LockEntry{Version: "1.1.0"}, hadPrior: true, holdsPin: true}
+
+	installHoldingPin(context.Background(), ops, &item)
+	want := "; `update` keeps this pin, so run `putnami extensions install --user @acme/tool@1.1.0` to refresh its lock entry"
+	if item.err == nil || !strings.HasSuffix(item.err.Error(), want) {
+		t.Errorf("user-scope error = %v, want it to end with %q", item.err, want)
+	}
+	if got := templateOps(t.TempDir()).installCmd(); got != "putnami templates install" {
+		t.Errorf("template install command = %q, want putnami templates install", got)
+	}
+}
 
 func TestHoldPin(t *testing.T) {
 	tests := []struct {
