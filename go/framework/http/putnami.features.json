@@ -179,6 +179,20 @@
               "a-binary-message-is-written-under-the-message-bound"
             ]
           }
+        },
+        {
+          "id": "caller-withdrawal",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-canceled-request-answers-499-below-error",
+              "a-stalled-request-ends-on-its-deadline-at-error",
+              "a-long-lived-request-runs-without-a-request-deadline",
+              "work-rolled-back-by-the-deadline-answers-500"
+            ]
+          }
         }
       ]
     }

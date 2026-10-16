@@ -81,6 +81,7 @@ func TestServerConfigDefaultTagsMatchResolvedDefaults(t *testing.T) {
 	resolved := map[string]time.Duration{
 		"ShutdownTimeout":      defaultShutdownTimeout,
 		"IdleTimeout":          defaultIdleTimeout,
+		"WriteTimeout":         defaultWriteTimeout,
 		"WebSocketIdleTimeout": defaultWebSocketIdleTimeout,
 		"StreamWriteTimeout":   defaultStreamWriteTimeout,
 	}

@@ -1,7 +1,9 @@
 package errors
 
 import (
+	"context"
 	"encoding/json"
+	stderrors "errors"
 	"net/http"
 	"sync"
 )
@@ -23,6 +25,11 @@ const (
 	CodeServiceUnavailable   Code = "http.service_unavailable"
 	CodeGatewayTimeout       Code = "http.gateway_timeout"
 )
+
+// StatusClientClosedRequest is the status a server answers when its caller
+// withdrew before the answer was ready. The code is not in RFC 9110; 499 is
+// the value nginx and Google APIs use, and net/http has no name for it.
+const StatusClientClosedRequest = 499
 
 var statusMu sync.RWMutex
 
@@ -48,6 +55,7 @@ var codeToStatus = map[Code]int{
 	CodeNotImplemented: http.StatusNotImplemented,
 	CodeInternal:       http.StatusInternalServerError,
 	CodeUnavailable:    http.StatusServiceUnavailable,
+	CodeCancelled:      StatusClientClosedRequest,
 	CodeTimeout:        http.StatusGatewayTimeout,
 	CodeValidation:     http.StatusBadRequest,
 	CodeInvalidArg:     http.StatusBadRequest,
@@ -79,16 +87,26 @@ var statusToCode = map[int]Code{
 }
 
 // HTTPStatus returns the HTTP status code for an error.
-// Returns 500 for unknown codes or non-Error errors.
+// Returns 500 for unknown codes, and for non-Error errors other than
+// context.Canceled, which answers StatusClientClosedRequest.
 func HTTPStatus(err error) int {
-	e := GetError(err)
-	if e == nil {
-		return http.StatusInternalServerError
-	}
-	if status, ok := HTTPStatusForCode(e.code); ok {
+	if status, ok := HTTPStatusForCode(httpCode(err)); ok {
 		return status
 	}
 	return http.StatusInternalServerError
+}
+
+// httpCode returns the code that decides err's HTTP answer: the code of the
+// first *Error in the chain, CodeCancelled for a context.Canceled outside any
+// *Error, and CodeInternal otherwise.
+func httpCode(err error) Code {
+	if e := GetError(err); e != nil {
+		return e.code
+	}
+	if stderrors.Is(err, context.Canceled) {
+		return CodeCancelled
+	}
+	return CodeInternal
 }
 
 // HTTPStatusForCode returns the HTTP status registered for a structured error code.
@@ -133,13 +151,12 @@ func HTTPErrorResponse(err error) (int, HTTPErrorBody) {
 	status := HTTPStatus(err)
 
 	body := HTTPErrorBody{
-		Code:    string(CodeInternal),
-		Error:   http.StatusText(status),
+		Code:    string(httpCode(err)),
+		Error:   statusText(status),
 		Message: genericErrorMessage,
 	}
 
 	if e != nil {
-		body.Code = string(e.code)
 		// Only client-safe categories expose the message and any "details" attr.
 		// Gating details inside the category check prevents internal/infra/bug
 		// errors from leaking a "details" payload to the client.
@@ -154,6 +171,14 @@ func HTTPErrorResponse(err error) (int, HTTPErrorBody) {
 	}
 
 	return status, body
+}
+
+// statusText extends http.StatusText with StatusClientClosedRequest.
+func statusText(status int) string {
+	if status == StatusClientClosedRequest {
+		return "Client Closed Request"
+	}
+	return http.StatusText(status)
 }
 
 // --- HTTP convenience constructors ---

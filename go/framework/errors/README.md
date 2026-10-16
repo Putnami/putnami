@@ -150,6 +150,7 @@ errors.WriteHTTPError(w, err)
 | `validation`, `invalid_argument` | 400 |
 | `http.unprocessable_entity` | 422 |
 | `rate_limit`, `http.too_many_requests` | 429 |
+| `canceled`, or a `context.Canceled` outside any `*Error` | 499 (`StatusClientClosedRequest`) |
 | `internal` | 500 |
 | `unavailable` | 503 |
 | `timeout` | 504 |

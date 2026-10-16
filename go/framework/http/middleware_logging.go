@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"go.putnami.dev/errors"
 	"go.putnami.dev/logger"
 )
 
@@ -132,8 +133,11 @@ func Logging(opts LoggerOptions) Middleware {
 		}
 
 		outcome := "success"
-		if status >= 500 {
+		switch {
+		case status >= 500:
 			outcome = "failure"
+		case status == errors.StatusClientClosedRequest:
+			outcome = "canceled"
 		}
 
 		// Re-read the request context at emit time so the terminal record

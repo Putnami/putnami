@@ -43,6 +43,9 @@ type ServerConfig struct {
 	// ReadTimeout is the maximum duration for reading the entire request. Default: 30s.
 	ReadTimeout time.Duration `json:"readTimeout" default:"30s"`
 	// WriteTimeout is the maximum duration for writing the response. Default: 30s.
+	// Each request context ends with context.DeadlineExceeded at nine tenths of
+	// it, so a stalled handler can still answer 5xx; WebSocket, Server-Sent
+	// Events, gRPC and Connect streams run without that deadline.
 	WriteTimeout time.Duration `json:"writeTimeout" default:"30s"`
 	// IdleTimeout is how long a keep-alive connection, HTTP/1.1 or HTTP/2 (h2c
 	// included), stays open while it waits for its next request. Keep it above
@@ -442,7 +445,14 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 		maxBody = DefaultMaxBodySize
 	}
 
+	requestDeadline := p.config.requestDeadline()
+
 	return func(w http.ResponseWriter, r *http.Request) {
+		if requestDeadline > 0 && !longLivedRequest(r) {
+			reqCtx, cancel := context.WithTimeout(r.Context(), requestDeadline)
+			defer cancel()
+			r = r.WithContext(reqCtx)
+		}
 		ctx := NewContext(w, r)
 
 		// Match route
@@ -570,7 +580,14 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 			}
 			defer closeStream()
 		}
-		finalize(requestOutcome(r.Context(), resp))
+		outcome := requestOutcome(r.Context(), resp)
+		finalize(outcome)
+		if scope != nil && resp != nil && resp.Status < http.StatusInternalServerError &&
+			stderrors.Is(outcome, context.DeadlineExceeded) {
+			// The request deadline rolled the work back while the caller is
+			// still waiting: a success answer would report discarded work.
+			commitErr = outcome
+		}
 		if commitErr != nil {
 			// The handler succeeded but committing its work failed: never report
 			// success. Replace the response with a sanitized 500.
@@ -657,10 +674,7 @@ func (p *ServerPlugin) buildServer(handler http.Handler) (string, *http.Server) 
 	if readTimeout == 0 {
 		readTimeout = 30 * time.Second
 	}
-	writeTimeout := p.config.WriteTimeout
-	if writeTimeout == 0 {
-		writeTimeout = 30 * time.Second
-	}
+	writeTimeout := p.config.writeTimeout()
 	// Always enable h2c (HTTP/2 cleartext) alongside HTTP/1.1.
 	// This is required for container platforms (Cloud Run, Fargate) that
 	// forward HTTP/2 without TLS to the container. HTTP/1.1 clients are

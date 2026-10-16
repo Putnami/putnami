@@ -385,7 +385,7 @@ func TestConnectStatusForHTTPNamesOneCodePerStatus(t *testing.T) {
 	cases := map[int]string{
 		400: "invalid_argument", 401: "unauthenticated", 403: "permission_denied", 404: "not_found",
 		409: "already_exists", 408: "deadline_exceeded", 429: "resource_exhausted", 501: "unimplemented",
-		503: "unavailable", 504: "deadline_exceeded", 418: "invalid_argument", 502: "internal", 200: "unknown",
+		499: "canceled", 503: "unavailable", 504: "deadline_exceeded", 418: "invalid_argument", 502: "internal", 200: "unknown",
 	}
 	for status, want := range cases {
 		if got := connectStatusForHTTP(status).Name; got != want {

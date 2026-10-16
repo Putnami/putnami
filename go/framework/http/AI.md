@@ -87,6 +87,18 @@ server.Use(MyMiddleware)
 
 **Built-in:** `Recovery()`, `RequestID()`, `Logging()`, `RateLimit()`, `Compression()`.
 
+`Logging()` writes one record per request: ERROR at 5xx, INFO below. A `499`
+answer has the outcome `canceled`; any other status under 500 has `success`.
+
+## Request Deadline
+
+Each request context ends with `context.DeadlineExceeded` at nine tenths of
+`ServerConfig.WriteTimeout`, so a stalled handler still answers 5xx before the
+server cuts the response. `context.Canceled` then means the caller left:
+`http.ErrorResponse(ctx.Context().Err())` answers `499` (`errors.StatusClientClosedRequest`)
+with the code `canceled`. WebSocket upgrades, Server-Sent Events, and gRPC or
+Connect streams run without that deadline.
+
 ## Handler Injection
 
 `http.Inject` wraps a function with DI-resolved parameters. Singleton deps are
