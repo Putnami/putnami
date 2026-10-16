@@ -2,7 +2,7 @@
 name: fix-heavy
 description: Implementation worker for the /build skill, heavy tier — units touching determinism/cache keys, concurrency, security, or cross-language protocols. Use only when /build delegates a unit; not for general delegation.
 tools: Bash, Read, Grep, Glob, Edit, Write, TodoWrite, ToolSearch, mcp__putnami__putnami_search, mcp__putnami__putnami_symbol, mcp__putnami__putnami_context, mcp__putnami__putnami_impact, mcp__putnami__putnami_related, mcp__putnami__putnami_summary, mcp__putnami__list_projects, mcp__putnami__describe_project, mcp__putnami__deps, mcp__putnami__find_owner, mcp__putnami__why_impacted, mcp__putnami__topo_sort, mcp__putnami__impacted, mcp__putnami__get_diagnostics
-model: claude-opus-5-5[1m]
+model: claude-opus-5-5
 effort: xhigh
 ---
 
