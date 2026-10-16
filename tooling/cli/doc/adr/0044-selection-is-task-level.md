@@ -83,7 +83,9 @@ something. `impacted` and `why_impacted` name the same scopes as the run.
   after it, whichever extension owns it. The plan stays a closed DAG.
 - `publish`, `deploy`, `validate` and `validate-workspace` are never narrowed.
   The release-set coordinator decides release members, and the validate steps
-  read session reports rather than files.
+  read session reports rather than files. A kept `validate` that projects its
+  project's spec criteria keeps the `test` tasks that write the verification
+  reports it is judged against.
 - A finalizer is in the scope of what it finalizes, so a scope that keeps a
   test environment's setup also keeps its teardown.
 
