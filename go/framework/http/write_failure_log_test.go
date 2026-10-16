@@ -2,9 +2,11 @@ package http
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	stderrors "errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -25,13 +27,20 @@ func (endlessBody) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// failingBodyWriter is a ResponseWriter whose body writes fail.
+// failingBodyWriter is a ResponseWriter whose body writes fail with err.
+// onFailure runs as each write fails.
 type failingBodyWriter struct {
 	*httptest.ResponseRecorder
-	err error
+	err       error
+	onFailure func()
 }
 
-func (w failingBodyWriter) Write([]byte) (int, error) { return 0, w.err }
+func (w failingBodyWriter) Write([]byte) (int, error) {
+	if w.onFailure != nil {
+		w.onFailure()
+	}
+	return 0, w.err
+}
 
 // writeResponseRecords returns the "write response" records the server logged,
 // decoded.
@@ -65,8 +74,17 @@ func assertNoErrorRecord(t *testing.T, rec *logtest.Recorder) {
 
 func TestClientResettingDownloadMidBodyLogsNoError(t *testing.T) {
 	spectest.Proves(t, "go/http-services", "caller-withdrawal", "a-write-to-a-caller-that-left-logs-below-error")
-	for protocol, major := range map[string]int{"HTTP/1.1": 1, "HTTP/2": 2} {
-		t.Run(protocol, func(t *testing.T) {
+	for name, tc := range map[string]struct {
+		major int
+		// dropConnection closes the client's connection instead of the
+		// response body, which resets only the HTTP/2 stream.
+		dropConnection bool
+	}{
+		"HTTP/1.1":                 {major: 1},
+		"HTTP/2 stream reset":      {major: 2},
+		"HTTP/2 connection closed": {major: 2, dropConnection: true},
+	} {
+		t.Run(name, func(t *testing.T) {
 			rec := logtest.NewRecorder(t)
 			server := NewServerPlugin(ServerConfig{})
 			server.log = rec.Named("http")
@@ -75,7 +93,7 @@ func TestClientResettingDownloadMidBodyLogsNoError(t *testing.T) {
 			})
 
 			ts := httptest.NewUnstartedServer(server.Handler())
-			if major == 2 {
+			if tc.major == 2 {
 				ts.EnableHTTP2 = true
 				ts.StartTLS()
 			} else {
@@ -83,17 +101,36 @@ func TestClientResettingDownloadMidBodyLogsNoError(t *testing.T) {
 			}
 			defer ts.Close()
 
-			resp, err := ts.Client().Get(ts.URL + "/download")
+			client := ts.Client()
+			conns := make(chan net.Conn, 1)
+			if tc.dropConnection {
+				transport := client.Transport.(*http.Transport).Clone()
+				config := transport.TLSClientConfig.Clone()
+				config.NextProtos = []string{"h2"}
+				transport.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+					conn, err := (&tls.Dialer{Config: config}).DialContext(ctx, network, addr)
+					if err == nil {
+						conns <- conn
+					}
+					return conn, err
+				}
+				client = &http.Client{Transport: transport}
+			}
+
+			resp, err := client.Get(ts.URL + "/download")
 			if err != nil {
 				t.Fatal(err)
 			}
 			_, readErr := io.CopyN(io.Discard, resp.Body, 64<<10)
-			resp.Body.Close() // the client resets the download mid-body
+			if tc.dropConnection {
+				(<-conns).Close()
+			}
+			resp.Body.Close() // the client leaves mid-body
 			if readErr != nil {
 				t.Fatal(readErr)
 			}
-			if resp.ProtoMajor != major {
-				t.Fatalf("protocol = %s, want %s", resp.Proto, protocol)
+			if resp.ProtoMajor != tc.major {
+				t.Fatalf("protocol = %s, want HTTP/%d", resp.Proto, tc.major)
 			}
 
 			deadline := time.Now().Add(10 * time.Second)
@@ -103,6 +140,7 @@ func TestClientResettingDownloadMidBodyLogsNoError(t *testing.T) {
 				}
 				time.Sleep(10 * time.Millisecond)
 			}
+			ts.Close() // waits for the handler, so every record it writes is in
 			for _, record := range writeResponseRecords(t, rec) {
 				if record["severity"] != "INFO" {
 					t.Errorf("severity = %v, want INFO", record["severity"])
@@ -116,15 +154,28 @@ func TestClientResettingDownloadMidBodyLogsNoError(t *testing.T) {
 func TestFailedWriteClassifiedByRequestContext(t *testing.T) {
 	spectest.Proves(t, "go/http-services", "caller-withdrawal", "a-failed-write-with-a-live-request-stays-at-error")
 	writeErr := stderrors.New("write: no space left on device")
+	// leave ends the request context: before the request, as the write fails,
+	// or shortly after it failed, as HTTP/2 does when the connection closes.
+	type leave int
+	const (
+		stays leave = iota
+		before
+		duringWrite
+		afterWrite
+	)
 	for name, tc := range map[string]struct {
 		path     string
-		leave    bool
+		major    int
+		leave    leave
 		severity string
 	}{
-		"live request":           {path: "/orders", severity: "ERROR"},
-		"caller left":            {path: "/orders", leave: true, severity: "INFO"},
-		"not found, live":        {path: "/missing", severity: "ERROR"},
-		"not found, caller left": {path: "/missing", leave: true, severity: "INFO"},
+		"live request":                     {path: "/orders", major: 1, severity: "ERROR"},
+		"live HTTP/2 request":              {path: "/orders", major: 2, severity: "ERROR"},
+		"caller leaves during the write":   {path: "/orders", major: 1, leave: duringWrite, severity: "INFO"},
+		"HTTP/2 caller left before":        {path: "/orders", major: 2, leave: before, severity: "INFO"},
+		"HTTP/2 stream ends after failure": {path: "/orders", major: 2, leave: afterWrite, severity: "INFO"},
+		"not found, live":                  {path: "/missing", major: 1, severity: "ERROR"},
+		"not found, caller left":           {path: "/missing", major: 1, leave: before, severity: "INFO"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			rec := logtest.NewRecorder(t)
@@ -134,13 +185,20 @@ func TestFailedWriteClassifiedByRequestContext(t *testing.T) {
 				return Text("ok")
 			})
 
-			reqCtx, leave := context.WithCancel(context.Background())
-			defer leave()
-			if tc.leave {
-				leave()
-			}
+			reqCtx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			w := failingBodyWriter{ResponseRecorder: httptest.NewRecorder(), err: writeErr}
-			server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, tc.path, nil).WithContext(reqCtx))
+			switch tc.leave {
+			case before:
+				cancel()
+			case duringWrite:
+				w.onFailure = cancel
+			case afterWrite:
+				w.onFailure = func() { time.AfterFunc(5*time.Millisecond, cancel) }
+			}
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil).WithContext(reqCtx)
+			req.ProtoMajor = tc.major
+			server.Handler().ServeHTTP(w, req)
 
 			records := writeResponseRecords(t, rec)
 			if len(records) != 1 {

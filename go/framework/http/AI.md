@@ -100,8 +100,9 @@ with the code `canceled`. WebSocket upgrades, Server-Sent Events, and gRPC or
 Connect streams run without that deadline.
 
 A response write that fails after the caller left (the request context ended
-with `context.Canceled`) logs `write response` at INFO. A write that fails while
-the request context is live logs at ERROR.
+with `context.Canceled`) logs the failure at INFO. A write that fails while the
+request context is live logs at ERROR. Over HTTP/2, a failed write waits up to
+100 ms for the stream context to end before it is classified.
 
 ## Handler Injection
 
