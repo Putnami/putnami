@@ -28,6 +28,7 @@ func TestConformance_SchemaConditionalsValidateFixtures(t *testing.T) {
 		"declared-output-drift-path-from-workspace.json",
 		"declared-output-preserve-invalid.json",
 		"declared-output-emptied-invalid.json",
+		"declared-output-within-invalid.json",
 	} {
 		t.Run("reject "+fixture, func(t *testing.T) {
 			outputs := fixtureDeclaredOutputs(t, filepath.Join("fixtures/invalid", fixture))
@@ -43,7 +44,7 @@ func TestConformance_SchemaConditionalsValidateFixtures(t *testing.T) {
 
 	for _, fixture := range []string{
 		lifecycleFixturePath, "fixtures/valid/declared-output-drift.json", "fixtures/valid/declared-output-preserves.json",
-		"fixtures/valid/declared-output-emptied.json",
+		"fixtures/valid/declared-output-emptied.json", "fixtures/valid/declared-output-within.json",
 	} {
 		for _, output := range fixtureDeclaredOutputs(t, fixture) {
 			if violations := conditionalSchemaViolations(declaredOutput, output); violations != 0 {
@@ -313,6 +314,9 @@ var v3ValidFixtures = map[string]bool{
 	// executes and on a restore of an empty record, under the project and the
 	// workspace root (protocol ADR 0009).
 	"declared-output-emptied.json": true,
+	// A file whose name the environment chooses, reported through a port and
+	// bounded to the subtree it lands in (protocol ADR 0010).
+	"declared-output-within.json": true,
 }
 
 // v3InvalidFixtureCodes maps each v3 conformance counter-example to the exact
@@ -379,6 +383,9 @@ var v3InvalidFixtureCodes = map[string][]string{
 		"invalid-output-emptied", "invalid-output-emptied", "invalid-output-emptied", "invalid-output-emptied",
 		"invalid-output-emptied",
 	},
+	// WITHIN — only a pathFrom output is bounded, and the bound is a subtree of
+	// the root.
+	"declared-output-within-invalid.json": {"invalid-output-path", "invalid-output-within"},
 }
 
 // lifecycleInvalidFixtureCodes is the manifest-level counterpart of
@@ -507,6 +514,9 @@ func TestConformance_TaskContracts_CoversEveryFeature(t *testing.T) {
 				if output.Emptied {
 					covered["emptied"] = true
 				}
+				if output.Within != "" {
+					covered["within"] = true
+				}
 				if len(output.Excludes) != 0 {
 					covered["excludes"] = true
 				}
@@ -518,7 +528,7 @@ func TestConformance_TaskContracts_CoversEveryFeature(t *testing.T) {
 	}
 
 	features := []string{
-		"mutatesSources", "pathFrom", "path", "optionalEmpty", "emptied", "sensitive", "excludes",
+		"mutatesSources", "pathFrom", "path", "optionalEmpty", "emptied", "within", "sensitive", "excludes",
 		"kind:" + OutputKindFile, "kind:" + OutputKindDirectory, "kind:" + OutputKindRuntimeFile,
 		"root:" + OutputRootProject, "root:" + OutputRootWorkspace, "root:" + OutputRootCommandOutput,
 		"root:" + OutputRootInvocation,

@@ -1252,6 +1252,14 @@
         },
         {
           "if": {
+            "required": ["within"]
+          },
+          "then": {
+            "required": ["pathFrom"]
+          }
+        },
+        {
+          "if": {
             "required": ["excludes"]
           },
           "then": {
@@ -1354,6 +1362,10 @@
         "pathFrom": {
           "type": "string",
           "description": "Name of a port in the task's 'outputs' map whose reported value supplies the root-relative path, for an output whose location is chosen at runtime (a configured generated-client directory)."
+        },
+        "within": {
+          "type": "string",
+          "description": "Root-relative subtree a pathFrom output's reported path must equal or lie under; a path outside it leaves the run uncached. Before the task runs, the planner takes the output's write to be this subtree instead of the whole root. A literal cleaned path, never the root itself. Requires pathFrom: a literal path is its own bound."
         },
         "optionalEmpty": {
           "type": "boolean",

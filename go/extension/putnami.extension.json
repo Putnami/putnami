@@ -1478,8 +1478,9 @@
             "kind": "file",
             "root": "project",
             "pathFrom": "mergedConfig",
+            "within": ".gen/conf",
             "optionalEmpty": true,
-            "description": "The merged config file at the environment-suffixed path the mergedConfig port reports. build-generate cedes .gen/conf so this claim is legal and so generate's restore leaves the file alone; a cache hit on this task restores it. Absent when the task skipped and reported no path."
+            "description": "The merged config file at the environment-suffixed path the mergedConfig port reports, always under .gen/conf, so a key that reads nothing there does not move when this task is planned. build-generate cedes .gen/conf so this claim is legal and so generate's restore leaves the file alone; a cache hit on this task restores it. Absent when the task skipped and reported no path."
           }
         }
       }

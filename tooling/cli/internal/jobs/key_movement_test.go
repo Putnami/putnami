@@ -166,6 +166,30 @@ func TestPlanKeyMovementFollowsWritersAndFoldedKeys(t *testing.T) {
 			t.Fatal("a job that reads the project was not moved by an output whose path is unknown before its task runs")
 		}
 	})
+
+	t.Run("a bounded port-reported path", func(t *testing.T) {
+		spectest.Proves(t, "cli/job-planning-execution", "session-written-input-keys",
+			"a-bounded-port-output-moves-only-the-keys-that-read-its-bound")
+		merge := declaredJob("build~merge", "merge", &extension.TaskDeclaration{
+			Outputs: map[string]extension.DeclaredOutput{
+				"merged": {Kind: extension.OutputKindFile, PathFrom: "mergedConfig", Within: ".gen/conf", OptionalEmpty: true},
+			},
+		})
+		lint := declaredJob("lint~lint", "lint", &extension.TaskDeclaration{})
+		lint.JobDef.FilePatterns = []string{"src/**"}
+		serve := declaredJob("build~serve", "serve", &extension.TaskDeclaration{})
+		serve.JobDef.FilePatterns = []string{".gen/conf/**"}
+		planned := []*ScheduledJob{merge, lint, serve}
+		f := newCaptureFixture(t, planned...)
+
+		movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: f.ws}, planned)
+		if movement.Moving[lint.Key()] {
+			t.Fatal("a job that reads nothing under the bound was moved by an output bounded to .gen/conf")
+		}
+		if !movement.Moving[serve.Key()] {
+			t.Fatal("a job that reads the bound was not moved by an output whose path lies under it")
+		}
+	})
 }
 
 // A write moves a key only when it can reach a file the key selects: a tree

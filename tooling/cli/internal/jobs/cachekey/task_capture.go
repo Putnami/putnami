@@ -260,7 +260,8 @@ func outputRelativeExcludes(rel string, excludes []string) []string {
 
 // declaredOutputPath resolves one declaration to its root-relative path.
 // Returns ok=false only for an optional pathFrom output whose port reported
-// nothing usable.
+// nothing usable. A reported path outside the output's within bound is an
+// error.
 func declaredOutputPath(output extension.DeclaredOutput, data map[string]any) (string, bool, error) {
 	if output.PathFrom == "" {
 		normalized, err := extension.NormalizeOutputPath(output.Path)
@@ -280,6 +281,9 @@ func declaredOutputPath(output extension.DeclaredOutput, data map[string]any) (s
 	normalized, err := extension.NormalizeOutputPath(raw)
 	if err != nil {
 		return "", false, fmt.Errorf("output port %q reported invalid path %q: %w", output.PathFrom, raw, err)
+	}
+	if bound := output.WithinBound(); !extension.LiesWithin(bound, normalized) {
+		return "", false, fmt.Errorf("output port %q reported path %q outside its within bound %q", output.PathFrom, normalized, bound)
 	}
 	return normalized, true, nil
 }

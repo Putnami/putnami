@@ -827,6 +827,30 @@ func TestDeclaredCapturePortPathOutput(t *testing.T) {
 			t.Fatalf("entry recorded %+v, want no outputs for an unresolved optional port", entry.Outputs)
 		}
 	})
+
+	// A bounded port that reports a path outside its bound wrote where the
+	// planner did not look, so the run caches nothing; one inside it caches.
+	t.Run("port reports a path outside its bound", func(t *testing.T) {
+		bounded := func() *ScheduledJob {
+			return declaredJob("build~merge", "merge", &extension.TaskDeclaration{
+				Outputs: map[string]extension.DeclaredOutput{
+					"merged": {Kind: extension.OutputKindFile, PathFrom: "mergedConfig", Within: ".gen/conf", OptionalEmpty: true},
+				},
+			})
+		}
+		job := bounded()
+		f := newCaptureFixture(t, job)
+		project := filepath.Join(f.ws.Root, captureTestProject)
+		writeFileAt(t, filepath.Join(project, ".gen", "conf", ".env.local.yaml"), "a: 1\n")
+		writeFileAt(t, filepath.Join(project, "conf", ".env.local.yaml"), "a: 1\n")
+
+		if f.sched.storeDeclaredCapture(job, capturedResult(map[string]any{"mergedConfig": "conf/.env.local.yaml"}), captureHashA) {
+			t.Fatal("published an entry for a path outside the output's within bound")
+		}
+		if !f.sched.storeDeclaredCapture(bounded(), capturedResult(map[string]any{"mergedConfig": ".gen/conf/.env.local.yaml"}), captureHashB) {
+			t.Fatal("refused a path inside the output's within bound")
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------

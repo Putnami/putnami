@@ -1,0 +1,36 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/declared-output-within",
+  "version": "1.0.0",
+  "cliContract": 4,
+  "commands": {
+    "build": {
+      "description": "Merge the configuration into a file whose name the environment chooses",
+      "run": [{ "id": "merge", "task": "build-config-merge" }]
+    }
+  },
+  "tasks": {
+    "build-config-merge": {
+      "kind": "command",
+      "command": "echo",
+      "args": ["config-merge"],
+      "cwd": "{projectRoot}",
+      "cache": { "enabled": true, "deterministic": true },
+      "outputs": {
+        "mergedConfig": { "description": "Project-relative path of the merged file this run wrote." }
+      },
+      "declares": {
+        "outputs": {
+          "merged": {
+            "kind": "file",
+            "root": "project",
+            "pathFrom": "mergedConfig",
+            "within": ".gen/conf",
+            "optionalEmpty": true,
+            "description": "The merged file at the path the port reports, which lies under .gen/conf (protocol ADR 0010)."
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "build": {
+      "run": [{ "id": "merge", "task": "build-config-merge" }]
+    }
+  },
+  "tasks": {
+    "build-config-merge": {
+      "kind": "command",
+      "command": "echo",
+      "outputs": {
+        "mergedConfig": { "description": "Project-relative path of the merged file this run wrote." }
+      },
+      "declares": {
+        "outputs": {
+          "literal": {
+            "kind": "file",
+            "path": ".gen/conf/.env.local.yaml",
+            "within": ".gen/conf",
+            "description": "A literal path is its own bound."
+          },
+          "escape": {
+            "kind": "file",
+            "pathFrom": "mergedConfig",
+            "within": "../conf",
+            "optionalEmpty": true,
+            "description": "A bound never escapes the root."
+          }
+        }
+      }
+    }
+  }
+}

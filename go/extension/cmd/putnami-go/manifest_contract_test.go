@@ -1328,6 +1328,11 @@ func TestGenerateIsTheSingleProducerOfGen(t *testing.T) {
 	if _, ok := m.Tasks["config-merge-exec"].Outputs[configmerge.MergedConfigPort]; !ok {
 		t.Errorf("config-merge-exec does not declare the %q data port its merged output resolves from", configmerge.MergedConfigPort)
 	}
+	// The port reports a file under the ceded .gen/conf, and the bound says so,
+	// so the planner moves only the keys that read that directory.
+	if buildMerged.Within != ".gen/conf" || !proto.LiesWithin(buildMerged.WithinBound(), testMerged.Path) {
+		t.Errorf("config-merge-exec merged output within = %q, want .gen/conf, the directory the port's path lies in", buildMerged.Within)
+	}
 	if testMerged.Path != ".gen/conf/.env.test.yaml" || testMerged.PathFrom != "" {
 		t.Errorf("config-merge-test-exec merged output = %+v, want the literal .gen/conf/.env.test.yaml "+
 			"(APP_ENV is pinned to test; a second pathFrom on the same port would overlap at plan time)", testMerged)

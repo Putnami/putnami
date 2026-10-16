@@ -297,6 +297,14 @@ type DeclaredOutput struct {
 	// the root-relative path. Overlap involving an unresolved PathFrom output
 	// is decided when the value is known (see OutputsOverlap).
 	PathFrom string `json:"pathFrom,omitempty"`
+	// Within bounds a PathFrom output to one subtree of its root: the reported
+	// path must equal Within or lie under it, or capture records no entry for
+	// the run (ADR 0010).
+	// Before the task runs, the planner takes the output's write to be Within
+	// instead of the whole root, so a key that reads nothing under it does not
+	// move. It is a canonical concrete path (NormalizeOutputPath), and only a
+	// PathFrom output may carry it: a literal Path is its own bound.
+	Within string `json:"within,omitempty"`
 	// OptionalEmpty marks an output that may legitimately be absent — or an
 	// empty directory — after a SUCCESSFUL run: a coverage file when coverage
 	// is off, a client directory when the project generates no client. Capture
@@ -725,10 +733,49 @@ func validateDeclaredOutput(field string, output DeclaredOutput, task TaskDefini
 		}
 	}
 
+	diags = append(diags, validateOutputWithin(field, output)...)
 	diags = append(diags, validateOutputExcludes(field, output)...)
 	diags = append(diags, validateOutputPreserves(field, output)...)
 	diags = append(diags, validateOutputEmptied(field, output)...)
 	return append(diags, validateOutputDrift(field, output)...)
+}
+
+// validateOutputWithin checks that a bound names a subtree of the root and
+// rides on an output whose path the task reports.
+func validateOutputWithin(field string, output DeclaredOutput) []diag.Diagnostic {
+	if output.Within == "" {
+		return nil
+	}
+	var diags []diag.Diagnostic
+	if output.PathFrom == "" {
+		diags = append(diags, diag.Errorf("invalid-output-within", field+".within",
+			"only a pathFrom output is bounded by within: a literal path is its own bound"))
+	}
+	if _, err := NormalizeOutputPath(output.Within); err != nil {
+		diags = append(diags, diag.Errorf("invalid-output-path", field+".within",
+			"invalid declared output within %q: %v", output.Within, err))
+	}
+	return diags
+}
+
+// WithinBound returns the canonical subtree a PathFrom output's reported path
+// must lie in, or "" when the output declares no usable bound.
+func (o DeclaredOutput) WithinBound() string {
+	if o.PathFrom == "" || o.Within == "" {
+		return ""
+	}
+	normalized, err := NormalizeOutputPath(o.Within)
+	if err != nil {
+		return ""
+	}
+	return normalized
+}
+
+// LiesWithin reports whether a canonical root-relative path equals bound or
+// lies under it, under the case-insensitive comparison ownership uses. An empty
+// bound holds every path.
+func LiesWithin(bound, rel string) bool {
+	return bound == "" || strings.EqualFold(bound, rel) || pathContainsFold(bound, rel)
 }
 
 // validateOutputEmptied checks that an output asking to be emptied is one the

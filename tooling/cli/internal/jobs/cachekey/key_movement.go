@@ -116,7 +116,8 @@ func directivesReached(read fileSelection, writes []plannedWrites) bool {
 // declares. A literal path is joined to its root. A path a port reports is
 // read from the result's data; an output whose port reported nothing usable —
 // in a task's result, or in the empty result of a task that has not run yet —
-// contributes its whole root, because the task may write anywhere beneath it.
+// contributes its within bound, or its whole root when it declares none,
+// because the task may write anywhere beneath it.
 // An output under a root this CLI cannot resolve contributes the workspace
 // root. Invocation-scoped outputs live in the invocation's private tree, which
 // no key reads.
@@ -133,8 +134,10 @@ func DeclaredOutputPaths(roots WorkspaceRoots, job *jobmodel.ScheduledJob, resul
 }
 
 // declaredOutputWrites returns DeclaredOutputPaths as planned writes, sorted by
-// path: a file output writes its path, and any other output, or one whose path
-// is not resolved, may write anywhere at or under its path.
+// path: a file output writes its path, and any other output may write anywhere
+// at or under its path. A pathFrom output whose port reported no path may write
+// anywhere under its within bound, or under its root when it declares none; one
+// whose port reported a path it cannot use may write anywhere under its root.
 func declaredOutputWrites(roots WorkspaceRoots, job *jobmodel.ScheduledJob, result *jobmodel.JobResult) []plannedWrite {
 	declaration := jobmodel.TaskDeclarationOf(job)
 	if declaration == nil {
@@ -150,14 +153,18 @@ func declaredOutputWrites(roots WorkspaceRoots, job *jobmodel.ScheduledJob, resu
 			base = roots.Root
 		}
 		rel, resolved, err := declaredOutputPath(output, result.Data)
-		if err != nil || !resolved {
+		_, reported := declaredPortPathValue(result.Data, output.PathFrom)
+		switch bound := output.WithinBound(); {
+		case err == nil && resolved:
+			writes = append(writes, plannedWrite{
+				Path: filepath.Join(base, filepath.FromSlash(rel)),
+				Tree: output.Kind != extension.OutputKindFile,
+			})
+		case bound != "" && !reported:
+			writes = append(writes, plannedWrite{Path: filepath.Join(base, filepath.FromSlash(bound)), Tree: true})
+		default:
 			writes = append(writes, plannedWrite{Path: base, Tree: true})
-			continue
 		}
-		writes = append(writes, plannedWrite{
-			Path: filepath.Join(base, filepath.FromSlash(rel)),
-			Tree: output.Kind != extension.OutputKindFile,
-		})
 	}
 	sort.Slice(writes, func(i, j int) bool { return writes[i].Path < writes[j].Path })
 	return writes

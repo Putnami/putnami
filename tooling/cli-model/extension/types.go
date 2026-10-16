@@ -149,6 +149,10 @@ var DecidableExcludes = proto.DecidableExcludes
 // dropped, so the bytes stay captured.
 var DecidablePreserves = proto.DecidablePreserves
 
+// LiesWithin reports whether a canonical root-relative path equals a pathFrom
+// output's within bound or lies under it (protocol ADR 0010).
+var LiesWithin = proto.LiesWithin
+
 // --- Resolved types (CLI-specific, used by the planner) ---
 
 // ExtensionDescription is the resolved, in-memory representation of an extension.

@@ -1282,3 +1282,53 @@ func TestValidateOutputEmptied(t *testing.T) {
 		})
 	}
 }
+
+// A bound rides only on a pathFrom output and names a subtree of the root. A
+// reported path at or under it lies within it; a sibling that shares its prefix
+// does not.
+func TestValidateOutputWithin(t *testing.T) {
+	task := TaskDefinition{Outputs: map[string]TaskOutputPort{"mergedConfig": {}}}
+	cases := []struct {
+		name   string
+		output DeclaredOutput
+		codes  []string
+	}{
+		{name: "a bounded port", output: DeclaredOutput{Kind: OutputKindFile, PathFrom: "mergedConfig", Within: ".gen/conf"}},
+		{name: "a literal path", output: DeclaredOutput{Kind: OutputKindFile, Path: ".gen/conf/a.yaml", Within: ".gen/conf"}, codes: []string{"invalid-output-within"}},
+		{name: "a bound above the root", output: DeclaredOutput{Kind: OutputKindFile, PathFrom: "mergedConfig", Within: "../conf"}, codes: []string{"invalid-output-path"}},
+		{name: "the root itself", output: DeclaredOutput{Kind: OutputKindFile, PathFrom: "mergedConfig", Within: "."}, codes: []string{"invalid-output-path"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var got []string
+			for _, d := range validateDeclaredOutput("tasks.t.declares.outputs.o", tc.output, task) {
+				if d.Field != "tasks.t.declares.outputs.o.within" {
+					continue
+				}
+				got = append(got, d.Code)
+			}
+			if !reflect.DeepEqual(got, tc.codes) {
+				t.Fatalf("within diagnostics = %v, want %v", got, tc.codes)
+			}
+		})
+	}
+
+	bound := DeclaredOutput{PathFrom: "mergedConfig", Within: "./.gen/conf/"}.WithinBound()
+	if bound != ".gen/conf" {
+		t.Fatalf("WithinBound = %q, want .gen/conf", bound)
+	}
+	for rel, want := range map[string]bool{
+		".gen/conf":                 true,
+		".gen/conf/.env.local.yaml": true,
+		".GEN/conf/a.yaml":          true,
+		".gen/config/a.yaml":        false,
+		".gen":                      false,
+	} {
+		if got := LiesWithin(bound, rel); got != want {
+			t.Errorf("LiesWithin(%q, %q) = %v, want %v", bound, rel, got, want)
+		}
+	}
+	if (DeclaredOutput{Path: "a", Within: ".gen/conf"}).WithinBound() != "" {
+		t.Error("a literal path reported a bound")
+	}
+}

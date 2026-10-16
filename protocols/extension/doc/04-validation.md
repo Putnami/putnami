@@ -102,6 +102,7 @@ manifest that predates the task contract keeps its exact verdict.
 | Exactly one of `path` and `pathFrom` is set | `required-field`, `invalid-value` |
 | `path` is relative, cleaned, concrete (no glob, no template variable), and never the root itself | `invalid-output-path` |
 | `pathFrom` names a port the task declares in its `outputs` map | `unresolved-output-port` |
+| `within` is set only with `pathFrom`, and is relative, cleaned, concrete, and never the root itself | `invalid-output-within`, `invalid-output-path` |
 | `effects` come from the closed vocabulary, without duplicates | `invalid-enum`, `duplicate-effect` |
 | A task cannot both declare outputs and claim `cache.noOutput` | `effect-conflict` |
 | A task declaring an external effect (`registry`, `cloud`, `process`) must disable caching — a hit would skip the effect | `effect-conflict` |
