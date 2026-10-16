@@ -821,12 +821,13 @@ func PathsRegion(paths []string) InputRegion {
 	region := InputRegion{roots: make([]string, 0, len(paths))}
 	var linked []string
 	for _, p := range paths {
-		if absolute, err := filepath.Abs(p); err == nil {
-			p = absolute
-		}
 		root := regionPath(p)
 		region.roots = append(region.roots, root)
-		if target := regionPath(linkTarget(filepath.Clean(p))); target != root {
+		absolute, err := filepath.Abs(p)
+		if err != nil {
+			continue
+		}
+		if target := regionPath(linkTarget(absolute)); target != root {
 			linked = append(linked, target)
 		}
 	}
@@ -1008,8 +1009,9 @@ const maxLinkHops = 255
 // linkTarget returns the path the absolute, clean path p leads to once every
 // symbolic link on it is followed, the way the operating system resolves it:
 // an existing segment that is a link, a dangling one included, is replaced by
-// its target, and the segments from the first one that does not exist are kept
-// as written. It returns p when a segment cannot be read or the links loop.
+// its target, and the segments from the first one that does not exist or
+// cannot be read are kept as written. It returns p when a link cannot be read
+// or the links loop.
 func linkTarget(p string) string {
 	isSeparator := func(r rune) bool { return r < 0x80 && os.IsPathSeparator(uint8(r)) }
 	volume := filepath.VolumeName(p)
@@ -1027,11 +1029,8 @@ func linkTarget(p string) string {
 		}
 		next := filepath.Join(current, segment)
 		info, err := os.Lstat(next)
-		if errors.Is(err, os.ErrNotExist) {
-			return filepath.Join(append([]string{next}, pending...)...)
-		}
 		if err != nil {
-			return p
+			return filepath.Join(append([]string{next}, pending...)...)
 		}
 		if info.Mode()&os.ModeSymlink == 0 {
 			current = next

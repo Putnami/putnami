@@ -17,11 +17,24 @@ import (
 type plannedWrite struct {
 	Path string
 	Tree bool
+	// region is Region once withRegion computed it.
+	region *store.InputRegion
 }
 
 // Region is the region of every path the write can create, change or delete.
 func (w plannedWrite) Region() store.InputRegion {
+	if w.region != nil {
+		return *w.region
+	}
 	return store.PathsRegion([]string{w.Path})
+}
+
+// withRegion returns w with its region computed once, for a planner that
+// compares it with many selections.
+func (w plannedWrite) withRegion() plannedWrite {
+	region := w.Region()
+	w.region = &region
+	return w
 }
 
 // fileSelection is the set of files a key's file digest selects under one
@@ -43,23 +56,23 @@ type fileSelection struct {
 	region   store.InputRegion
 	bounded  bool
 	patterns []string
-	// includes are the ordinary include patterns, includeRegions the region
-	// of each, and excludes every exclusion, which the digest applies to
-	// ordinary includes only.
-	includes       []string
-	includeRegions []store.InputRegion
-	excludes       []string
+	// includes are the ordinary include patterns, and excludes every
+	// exclusion, which the digest applies to ordinary includes only.
+	includes []string
+	excludes []string
 	// embeds are the Go embed selectors.
 	embeds  []string
 	scanner *selectionScanner
 }
 
 // selectionScanner builds fileSelections and scans the Go embed directives of
-// one directory, the links of one selection and the spelling of one path once.
-// The zero value is ready to use, from one goroutine.
+// one directory, the links of one selection, the region of one include and the
+// spelling of one path once. The zero value is ready to use, from one
+// goroutine.
 type selectionScanner struct {
 	embeds  map[embedScanKey]store.GoEmbedBound
 	links   map[string]bool
+	regions map[string]store.InputRegion
 	spelled map[string]bool
 }
 
@@ -90,7 +103,6 @@ func (s *selectionScanner) Select(dir string, patterns []string) fileSelection {
 			selection.embeds = append(selection.embeds, pattern)
 		} else {
 			selection.includes = append(selection.includes, pattern)
-			selection.includeRegions = append(selection.includeRegions, store.FileInputRegion(dir, []string{pattern}))
 		}
 	}
 	selection.excludes = excludes
@@ -127,8 +139,8 @@ func (s fileSelection) Reaches(w plannedWrite) bool {
 	if !inside {
 		return true
 	}
-	for i, include := range s.includes {
-		if s.includeReaches(include, s.includeRegions[i], rel, w, written) {
+	for _, include := range s.includes {
+		if s.includeReaches(include, rel, w, written) {
 			return true
 		}
 	}
@@ -159,13 +171,14 @@ func (s fileSelection) ReachesDirectivesIn(region store.InputRegion) bool {
 }
 
 // includeReaches reports whether w, whose region is written, can touch a file
-// one ordinary include, bounded by region, selects. Every path under w that an
+// one ordinary include selects. Every path under w that an
 // exclusion covers is out of reach, and a file write is selected only when the
 // include matches it and no exclusion does, as the store's ordinary file
 // collection decides. The collection spells a path's leading literal segments
 // as the include does, so a write that spells them in another case, or that
 // meets the include only through a link, is not decided by pattern.
-func (s fileSelection) includeReaches(include string, region store.InputRegion, rel string, w plannedWrite, written store.InputRegion) bool {
+func (s fileSelection) includeReaches(include, rel string, w plannedWrite, written store.InputRegion) bool {
+	region := s.scanner.includeRegion(s.dir, include)
 	if !region.Overlaps(written) {
 		return false
 	}
@@ -271,6 +284,20 @@ func (s *selectionScanner) selectsThroughLink(dir string, patterns []string) boo
 	}
 	s.links[key] = linked
 	return linked
+}
+
+// includeRegion memoizes store.FileInputRegion for one ordinary include of dir.
+func (s *selectionScanner) includeRegion(dir, include string) store.InputRegion {
+	key := dir + "\x00" + include
+	if region, ok := s.regions[key]; ok {
+		return region
+	}
+	region := store.FileInputRegion(dir, []string{include})
+	if s.regions == nil {
+		s.regions = make(map[string]store.InputRegion)
+	}
+	s.regions[key] = region
+	return region
 }
 
 // embed returns the bound of one Go embed selector of dir.

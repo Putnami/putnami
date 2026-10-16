@@ -57,6 +57,9 @@ type plannedWrites struct {
 
 func (k KeyInputs) writes(job *jobmodel.ScheduledJob, scanner *selectionScanner) plannedWrites {
 	writes := plannedWrites{outputs: declaredOutputWrites(WorkspaceRoots{Root: k.Workspace.Root}, job, &jobmodel.JobResult{})}
+	for i, output := range writes.outputs {
+		writes.outputs[i] = output.withRegion()
+	}
 	if RewritesSourceTree(job) {
 		for _, read := range k.reads(job, scanner) {
 			writes.rewritten = append(writes.rewritten, read.Region())
