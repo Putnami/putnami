@@ -112,7 +112,7 @@ server.GET("/files/{path...}", func(ctx *http.Context) *http.Response {
 
 HEAD requests automatically fall back to the matching GET handler if no explicit HEAD route is registered.
 
-A HEAD request answers with the status and headers the handler returns, and no body. The server does not encode or read the body: a streamed body is closed unread, and bytes a handler writes to `ctx.Writer` are discarded.
+A HEAD request answers with the status and headers the handler returns, and no body. The server writes no body byte: a streamed body is closed unread, and a body held in memory only sets `Content-Length`. Bytes a handler writes to `ctx.Writer` itself follow `net/http`.
 
 ## Request Context
 

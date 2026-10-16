@@ -1,46 +1,53 @@
 package http
 
-import "net/http"
-
-// headWriter is the handler's writer for a HEAD request: it passes headers and
-// the status through and discards every body byte, so a handler that writes a
-// body to ctx.Writer answers the same head with no body on the wire.
-type headWriter struct {
-	http.ResponseWriter
-}
-
-func (w headWriter) Write(p []byte) (int, error) {
-	return len(p), nil
-}
-
-// Flush sends the head when the wrapped writer can flush.
-func (w headWriter) Flush() {
-	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
-		flusher.Flush()
-	}
-}
-
-// Unwrap returns the wrapped writer, so http.ResponseController reaches it.
-func (w headWriter) Unwrap() http.ResponseWriter {
-	return w.ResponseWriter
-}
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+)
 
 // writeResponse writes resp to w. A HEAD request gets resp's status and
-// headers and no body: the server neither encodes nor reads the body, and
-// closing a streamed body stays with the caller.
+// headers and no body: the server writes no body byte and reads no streamed
+// body, and closing a streamed body stays with the caller. When the body is
+// held in memory and resp sets no Content-Length, the HEAD answer carries the
+// length a GET answer's body has.
 func writeResponse(w http.ResponseWriter, r *http.Request, resp *Response) error {
 	if r.Method != http.MethodHead {
 		return resp.WriteTo(w)
 	}
-	for key, values := range resp.Headers {
-		for _, v := range values {
-			w.Header().Add(key, v)
+	if resp.stream == nil && resp.Headers.Get("Content-Length") == "" && w.Header().Get("Content-Length") == "" {
+		length, err := resp.bodyLength()
+		if err != nil {
+			return err
+		}
+		if length > 0 {
+			w.Header().Set("Content-Length", strconv.FormatInt(length, 10))
 		}
 	}
-	status := resp.Status
-	if status == 0 {
-		status = http.StatusOK
-	}
-	w.WriteHeader(status)
+	resp.writeHead(w)
 	return nil
+}
+
+// bodyLength returns the number of body bytes WriteTo writes for a body held
+// in memory.
+func (r *Response) bodyLength() (int64, error) {
+	if r.raw != nil {
+		return int64(len(r.raw)), nil
+	}
+	if r.body == nil {
+		return 0, nil
+	}
+	var counter byteCounter
+	if err := json.NewEncoder(&counter).Encode(r.body); err != nil {
+		return 0, err
+	}
+	return int64(counter), nil
+}
+
+// byteCounter is an io.Writer that counts the bytes written to it.
+type byteCounter int64
+
+func (c *byteCounter) Write(p []byte) (int, error) {
+	*c += byteCounter(len(p))
+	return len(p), nil
 }

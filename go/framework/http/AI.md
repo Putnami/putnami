@@ -41,7 +41,7 @@ A health plugin (`http.NewHealthPlugin()`) or a platform plugin added with `a.Us
 
 Methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, or `server.Route("OPTIONS", path, handler)`.
 
-A HEAD request with no HEAD route runs the GET route. Every HEAD request answers the returned status and headers with no body: the server never encodes or reads the body, closes a streamed body unread, and discards bytes written to `ctx.Writer`.
+A HEAD request with no HEAD route runs the GET route. Every HEAD request answers the returned status and headers with no body: the server writes no body byte, closes a streamed body unread, and sends the `Content-Length` of a body held in memory. Bytes a handler writes to `ctx.Writer` itself follow `net/http`.
 
 ## Handler Context
 

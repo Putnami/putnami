@@ -454,9 +454,6 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 			r = r.WithContext(reqCtx)
 		}
 		ctx := NewContext(w, r)
-		if r.Method == http.MethodHead {
-			ctx.Writer = headWriter{ResponseWriter: w}
-		}
 
 		// Match route
 		matchedMethod := r.Method

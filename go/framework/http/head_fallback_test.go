@@ -3,9 +3,11 @@ package http
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"sync/atomic"
 	"testing"
 
@@ -33,39 +35,40 @@ func (s *countingSource) Close() error {
 }
 
 // A HEAD request to a GET-only route answers the GET route's status and
-// headers with no body over HTTP/1.1 and HTTP/2, writes no body, and logs no
-// ERROR, with the Logging middleware's recording writer in the chain.
+// headers with no body over HTTP/1.1 and HTTP/2, reads no streamed body, and
+// logs no ERROR, with the Logging middleware's recording writer in the chain.
+// A body held in memory gives the HEAD answer the GET body's Content-Length.
 func TestHeadFallbackAnswersTheGetHeadWithoutABody(t *testing.T) {
 	spectest.Proves(t, "go/http-services", "method-fallbacks", "a-head-fallback-answers-the-get-status-and-headers-without-a-body")
 	large := bytes.Repeat([]byte("x"), 64<<10)
 	for _, major := range []int{1, 2} {
 		for name, route := range map[string]struct {
-			status  int
-			handler func(source *countingSource) Handler
+			status int
+			// inMemory marks a body the server holds, whose length the HEAD
+			// answer carries.
+			inMemory bool
+			handler  func(ctx *Context, source *countingSource) *Response
 		}{
-			"bytes": {status: http.StatusOK, handler: func(*countingSource) Handler {
-				return func(*Context) *Response { return Bytes(http.StatusOK, "application/octet-stream", large) }
+			"large bytes": {status: http.StatusOK, inMemory: true, handler: func(*Context, *countingSource) *Response {
+				return Bytes(http.StatusOK, "application/octet-stream", large)
 			}},
-			"json": {status: http.StatusCreated, handler: func(*countingSource) Handler {
-				return func(*Context) *Response {
-					return JSONStatus(http.StatusCreated, map[string]string{"data": string(large)})
-				}
+			"small text": {status: http.StatusOK, inMemory: true, handler: func(*Context, *countingSource) *Response {
+				return Text("ok")
 			}},
-			"stream": {status: http.StatusOK, handler: func(source *countingSource) Handler {
-				return func(*Context) *Response { return Stream(http.StatusOK, "application/octet-stream", source) }
+			"large json": {status: http.StatusCreated, inMemory: true, handler: func(*Context, *countingSource) *Response {
+				return JSONStatus(http.StatusCreated, map[string]string{"data": string(large)})
 			}},
-			"direct write": {status: http.StatusAccepted, handler: func(*countingSource) Handler {
-				return func(ctx *Context) *Response {
-					ctx.SetHeader("Content-Type", "application/octet-stream")
-					ctx.Writer.WriteHeader(http.StatusAccepted)
-					if _, err := ctx.Writer.Write(large); err != nil {
-						t.Errorf("direct body write: %v", err)
-					}
-					return nil
-				}
+			"stream": {status: http.StatusOK, handler: func(_ *Context, source *countingSource) *Response {
+				return Stream(http.StatusOK, "application/octet-stream", source)
+			}},
+			"direct write": {status: http.StatusAccepted, handler: func(ctx *Context, _ *countingSource) *Response {
+				ctx.SetHeader("Content-Type", "application/octet-stream")
+				ctx.Writer.WriteHeader(http.StatusAccepted)
+				_, _ = ctx.Writer.Write(large)
+				return nil
 			}},
 		} {
-			t.Run(name+" over HTTP/"+string(rune('0'+major)), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%s over HTTP/%d", name, major), func(t *testing.T) {
 				rec := logtest.NewRecorder(t)
 				server := NewServerPlugin(ServerConfig{})
 				server.log = rec.Named("http")
@@ -73,7 +76,7 @@ func TestHeadFallbackAnswersTheGetHeadWithoutABody(t *testing.T) {
 				var source *countingSource
 				server.GET("/download", func(ctx *Context) *Response {
 					source = &countingSource{reader: bytes.NewReader(large)}
-					return route.handler(source)(ctx)
+					return route.handler(ctx, source)
 				})
 
 				ts := httptest.NewUnstartedServer(server.Handler())
@@ -89,8 +92,11 @@ func TestHeadFallbackAnswersTheGetHeadWithoutABody(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				_, _ = io.Copy(io.Discard, get.Body)
+				getBody, err := io.ReadAll(get.Body)
 				_ = get.Body.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
 
 				req, err := http.NewRequest(http.MethodHead, ts.URL+"/download", nil)
 				if err != nil {
@@ -116,10 +122,18 @@ func TestHeadFallbackAnswersTheGetHeadWithoutABody(t *testing.T) {
 				if got, want := head.Header.Get("X-Request-ID") != "", get.Header.Get("X-Request-ID") != ""; got != want {
 					t.Errorf("HEAD X-Request-ID present = %v, want %v", got, want)
 				}
+				if route.inMemory {
+					if got, want := head.Header.Get("Content-Length"), strconv.Itoa(len(getBody)); got != want {
+						t.Errorf("HEAD Content-Length = %q, want the GET body length %s", got, want)
+					}
+					if gotGet := get.Header.Get("Content-Length"); gotGet != "" && gotGet != head.Header.Get("Content-Length") {
+						t.Errorf("HEAD Content-Length = %q, want the GET value %q", head.Header.Get("Content-Length"), gotGet)
+					}
+				}
 				if len(body) != 0 {
 					t.Errorf("HEAD body = %d bytes, want none", len(body))
 				}
-				if source != nil && name == "stream" {
+				if name == "stream" {
 					if read := source.read.Load(); read != 0 {
 						t.Errorf("HEAD read %d bytes from the stream source, want none", read)
 					}
