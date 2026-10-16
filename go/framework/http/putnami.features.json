@@ -205,6 +205,20 @@
               "a-failed-write-with-a-live-request-stays-at-error"
             ]
           }
+        },
+        {
+          "id": "request-log-status",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-directly-written-5xx-logs-at-error",
+              "a-directly-written-status-below-500-logs-at-info",
+              "a-directly-written-499-logs-as-canceled",
+              "a-5xx-returned-after-a-written-status-logs-at-error"
+            ]
+          }
         }
       ]
     }

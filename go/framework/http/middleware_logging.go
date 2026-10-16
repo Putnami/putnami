@@ -1,11 +1,15 @@
 package http
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"log/slog"
+	"net"
+	"net/http"
 	"strings"
 	"time"
 
@@ -91,6 +95,9 @@ type LoggerOptions struct {
 }
 
 // Logging middleware logs each request with method, path, status, and duration.
+// The status is the one written to the wire: a status the handler writes to
+// ctx.Writer wins over the response it returns, and the record's level and
+// outcome follow that status.
 //
 //	server.Use(http.Logging(http.LoggerOptions{
 //	    Exclude: []string{"/_/health"},
@@ -118,12 +125,20 @@ func Logging(opts LoggerOptions) Middleware {
 		bag := logger.NewFieldBag()
 		ctx.SetContext(logger.ContextWithFieldBag(ctx.Context(), bag))
 
+		writer, written := newStatusWriter(ctx.Writer)
+		ctx.Writer = writer
+
 		start := time.Now()
 		resp := next()
 		durationMs := time.Since(start).Milliseconds()
 
-		status := 200
-		if resp != nil && resp.Status != 0 {
+		// The logged status is the one on the wire: a status the handler wrote
+		// to ctx.Writer is final, and otherwise the server writes resp.
+		status := http.StatusOK
+		switch {
+		case written.status != 0:
+			status = written.status
+		case resp != nil && resp.Status != 0:
 			status = resp.Status
 		}
 
@@ -132,9 +147,11 @@ func Logging(opts LoggerOptions) Middleware {
 			routePath = ctx.Path
 		}
 
+		// A handler that returns a 5xx after it wrote a lower status failed
+		// mid-answer: the record keeps the written status and logs the failure.
 		outcome := "success"
 		switch {
-		case status >= 500:
+		case status >= 500, resp != nil && resp.Status >= 500:
 			outcome = "failure"
 		case status == errors.StatusClientClosedRequest:
 			outcome = "canceled"
@@ -163,7 +180,7 @@ func Logging(opts LoggerOptions) Middleware {
 		// leaks into the message (matches the frozen conformance fixture).
 		msg := fmt.Sprintf("[%s] %s", ctx.Method, routePath)
 		switch {
-		case status >= 500:
+		case outcome == "failure":
 			// RequestError may be nil when nothing recorded an error (e.g. a
 			// handler returned a bare 500); ErrorCtx then emits no error field.
 			log.ErrorCtx(reqCtx, msg, logger.RequestError(reqCtx), httpGroup)
@@ -173,4 +190,91 @@ func Logging(opts LoggerOptions) Middleware {
 
 		return resp
 	}
+}
+
+// statusWriter records the final status a handler writes to the wrapped
+// writer: the first WriteHeader outside the informational 1xx range, or 200
+// when the handler writes, copies or flushes a body first. Status 0 means nothing was
+// written.
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(code int) {
+	informational := code >= 100 && code <= 199 && code != http.StatusSwitchingProtocols
+	if w.status == 0 && !informational {
+		w.status = code
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *statusWriter) Write(b []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	return w.ResponseWriter.Write(b)
+}
+
+// ReadFrom keeps the wrapped writer's io.ReaderFrom, so a copy to the
+// response still reaches sendfile.
+func (w *statusWriter) ReadFrom(r io.Reader) (int64, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	if readerFrom, ok := w.ResponseWriter.(io.ReaderFrom); ok {
+		return readerFrom.ReadFrom(r)
+	}
+	return io.Copy(struct{ io.Writer }{w.ResponseWriter}, r)
+}
+
+// Unwrap returns the wrapped writer, so http.ResponseController reaches it.
+func (w *statusWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
+type statusFlusher struct {
+	recorder *statusWriter
+	flusher  http.Flusher
+}
+
+func (w statusFlusher) Flush() {
+	if w.recorder.status == 0 {
+		w.recorder.status = http.StatusOK
+	}
+	w.flusher.Flush()
+}
+
+type statusHijacker struct{ hijacker http.Hijacker }
+
+func (w statusHijacker) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return w.hijacker.Hijack()
+}
+
+// newStatusWriter wraps w in a statusWriter that implements http.Flusher and
+// http.Hijacker exactly when w does. It returns the writer to hand down and
+// the recorder to read the status from.
+func newStatusWriter(w http.ResponseWriter) (http.ResponseWriter, *statusWriter) {
+	sw := &statusWriter{ResponseWriter: w}
+	flusher, canFlush := w.(http.Flusher)
+	hijacker, canHijack := w.(http.Hijacker)
+	switch {
+	case canFlush && canHijack:
+		return struct {
+			*statusWriter
+			statusFlusher
+			statusHijacker
+		}{sw, statusFlusher{sw, flusher}, statusHijacker{hijacker}}, sw
+	case canFlush:
+		return struct {
+			*statusWriter
+			statusFlusher
+		}{sw, statusFlusher{sw, flusher}}, sw
+	case canHijack:
+		return struct {
+			*statusWriter
+			statusHijacker
+		}{sw, statusHijacker{hijacker}}, sw
+	}
+	return sw, sw
 }
