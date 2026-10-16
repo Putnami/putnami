@@ -47,7 +47,7 @@ both, and the v1 corpus is unchanged.
 | Version | Members | Corpus |
 | --- | --- | --- |
 | 1 | everything above | `fixtures/{valid,invalid}` |
-| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `project.tags`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `ProjectRef.config` and `ProjectRef.extensions` | `fixtures/v2/{valid,invalid}` |
+| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `project.tags`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `ProjectRef.config`, `ProjectRef.extensions` and `ProjectRef.type` | `fixtures/v2/{valid,invalid}` |
 
 **Putnami's orchestrator produces v2 only.** The CLI requires an extension
 contract whose SDK reads v2, so a subprocess that reaches this context is
@@ -240,7 +240,7 @@ consumer would ignore exactly the members a v2 consumer would trust.
 ## Project references
 
 `selectedProjects[]`, `project.dependencyClosure[]` and `workspaceProjects[]`
-share one shape. Beyond `id`, `name`, `path` and `fullPath`, five optional
+share one shape. Beyond `id`, `name`, `path` and `fullPath`, seven optional
 members carry facts the orchestrator already owns, so a task never re-derives
 them:
 
@@ -313,7 +313,18 @@ them:
   workspace task needs to know which extension's option blocks apply to a
   sibling: a block keyed by `@putnami/go` applies to Go projects only.
 
-All six are omitempty, so a producer that has nothing to say emits none.
+- **`type`** (v2 only) — the project's **resolved** classification, the value
+  `project.type` carries for the job's own project: the authored `putnami.json`
+  type, else the one the owning provider's workspace probe reported. It is
+  populated inside `workspaceProjects`, where a task that acts on deployable
+  workloads must tell them from libraries. `config` holds only the authored
+  half, and a provider classifies most projects (every Go module), so a task
+  reading `config` alone takes a library for an unclassified workload. Empty
+  means the workspace classified nothing, which a task reads as
+  `"application"`, the orchestrator's default. A v1 document carrying it is
+  rejected (`job.unexpected_field`).
+
+All seven are omitempty, so a producer that has nothing to say emits none.
 
 ## Environment variable mirror
 

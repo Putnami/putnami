@@ -347,6 +347,18 @@ type ProjectRef struct {
 	// block keyed by an extension applies only to that extension's projects.
 	// v2 only, for the reason Config is.
 	Extensions []string `json:"extensions,omitempty"`
+	// Type is the project's RESOLVED classification, the same value
+	// Project.Type carries for the job's own project: the authored putnami.json
+	// type, else the one the owning provider's workspace probe reported.
+	//
+	// The orchestrator populates it on WorkspaceProjects, where a task that acts
+	// on the workspace's deployable workloads must tell them from libraries.
+	// Config carries only the authored half, and a provider classifies most
+	// projects (every Go module), so a consumer reading Config alone takes a
+	// library for an unclassified workload. Empty means the workspace classified
+	// nothing, which a consumer reads as "application", the orchestrator's own
+	// default. v2 only, for the reason Config is.
+	Type string `json:"type,omitempty"`
 }
 
 // GetBinString returns the bin field as a string if it's a simple string value.

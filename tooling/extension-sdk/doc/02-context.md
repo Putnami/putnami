@@ -243,6 +243,7 @@ for _, ref := range ctx.WorkspaceProjects {
 	fmt.Println(ref.Path)         // workspace-relative
 	fmt.Println(ref.Dependencies) // resolved DIRECT dependency ids
 	fmt.Println(string(ref.Config)) // raw authored putnami.json, when supplied
+	fmt.Println(ref.Type)         // resolved classification: "application", "library", ...
 }
 ```
 
@@ -275,6 +276,13 @@ It stays raw because `protocols/workspace` owns that document's shape. Decode
 only the workspace-protocol fields your extension needs; absence means an older
 or non-Putnami producer supplied no authored config, so fail closed rather than
 scanning manifests to reconstruct it.
+
+`Type` is the project's resolved classification: the authored `putnami.json`
+type, else the one the owning provider's workspace probe reported. Read it, not
+`Config`, to tell a deployable workload from a library: a provider classifies
+most projects (every Go module), so their `putnami.json` authors no type. Empty
+means the workspace classified nothing; read it as `"application"`, the
+orchestrator's default.
 
 ### Project Bin Field
 
@@ -324,7 +332,7 @@ Reads and parses a Putnami context JSON file.
 | `Project` | `Project` | Project metadata |
 | `Selection` | `*Selection` | The invocation's resolved project selection (nil if the orchestrator resolved none) |
 | `SelectedProjects` | `[]ProjectRef` | The projects the run acts on; present for jobs that need cross-project context |
-| `WorkspaceProjects` | `[]ProjectRef` | The complete workspace membership with resolved direct dependency edges and raw authored project config |
+| `WorkspaceProjects` | `[]ProjectRef` | The complete workspace membership with resolved direct dependency edges, resolved types and raw authored project config |
 | `Extension` | `Extension` | Extension identity |
 | `Job` | `Job` | Current job identity |
 | `Params` | `Params` | Job parameters |

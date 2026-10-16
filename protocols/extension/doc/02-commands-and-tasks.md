@@ -243,6 +243,12 @@ names that directory; see the job context protocol
 (`protocols/job/README.md`). Inside a workspace, `workspace` changes nothing:
 the workspace's own pin of the extension runs.
 
+An interactive subcommand runs once for the whole workspace. Its job context
+lists every workspace project in `workspaceProjects`, each with its resolved
+`type` (the authored `putnami.json` type, else the provider's), so a subcommand
+that acts on deployable workloads reads it instead of classifying projects
+itself; see the job context protocol (`protocols/job/README.md`).
+
 The CLI reads `workspace`, `interactive` and `default` on the group and the
 top-level subcommand it dispatches. A nested subcommand is validated with the
 same rules and carries no dispatch meaning.

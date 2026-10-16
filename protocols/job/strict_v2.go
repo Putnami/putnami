@@ -131,6 +131,8 @@ func validateVersioned(ctx *Context) []diag.Diagnostic {
 		// undeclared dependency, while a v2 consumer sees them and fails the run.
 		// `config` can carry a reviewed featureAuthority answer; ignoring it makes
 		// a v1 consumer report a completeness gap a v2 consumer suppresses.
+		// `type` splits a workload from a library: a v1 consumer reads every
+		// reference as unclassified and acts on a library a v2 consumer skips.
 		for i, project := range ctx.SelectedProjects {
 			for _, member := range []struct {
 				name  string
@@ -138,6 +140,7 @@ func validateVersioned(ctx *Context) []diag.Diagnostic {
 			}{
 				{"sourceName", project.SourceName},
 				{"version", project.Version},
+				{"type", project.Type},
 			} {
 				if member.value == "" {
 					continue
