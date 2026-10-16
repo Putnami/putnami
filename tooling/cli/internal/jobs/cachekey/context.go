@@ -45,6 +45,11 @@ type JobContextProjectRef struct {
 	// putnami.json list, else the provider's view, else its scope's. Set on
 	// workspaceProjects only, as Config is.
 	Extensions []string `json:"extensions,omitempty"`
+	// Type is the resolved classification: the authored putnami.json type, else
+	// the provider probe's, else "application". Set on workspaceProjects only,
+	// as Config is, and always set there, so a workspace task tells a workload
+	// from a library without reading Config, which holds only the authored half.
+	Type string `json:"type,omitempty"`
 }
 
 // JobContextVersion describes the computed version metadata in the context file.
@@ -244,6 +249,7 @@ func WorkspaceProjectsContext(ws *workspace.Workspace, versions RunVersions) []J
 			FullPath:   filepath.Join(ws.Root, project.Path),
 			Config:     encodedProjectConfig(project),
 			Extensions: slices.Clone(project.Extensions),
+			Type:       workspaceMemberType(project),
 			// The resolved DIRECT edges. Publishing them here is what makes the
 			// member a graph rather than a listing: a consumer reading an entry
 			// with no edge list inside this member knows the project declares
@@ -256,6 +262,21 @@ func WorkspaceProjectsContext(ws *workspace.Workspace, versions RunVersions) []J
 		return nil
 	}
 	return out
+}
+
+// defaultProjectType is the classification of a project that neither its
+// putnami.json nor its provider classified.
+const defaultProjectType = "application"
+
+// workspaceMemberType returns the classification a workspaceProjects entry
+// carries: the resolved type, else the workspace default. The member is never
+// empty, so a consumer reads an entry without it as one from a producer that
+// predates the member.
+func workspaceMemberType(project *workspace.Project) string {
+	if project.Type == "" {
+		return defaultProjectType
+	}
+	return project.Type
 }
 
 // encodedProjectConfig re-encodes the authored putnami.json the loader parsed.
