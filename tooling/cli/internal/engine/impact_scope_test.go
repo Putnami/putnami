@@ -323,10 +323,11 @@ func declaresFile(path string) *extension.TaskDeclaration {
 }
 
 // A task-scoped project whose kept `validate` projects its spec criteria keeps
-// the `test` tasks that write the verification reports those criteria are
-// judged against, and their predecessors: the spec gate then reads the same
-// reports a full plan gives it. A project whose kept plan projects no criteria
-// still drops the tests its scope does not name.
+// its `test` command, whose verification reports those criteria are judged
+// against: the step that writes them, its predecessors, and the finalizer that
+// tears down its environment. The spec gate then reads the same reports a full
+// plan gives it. A project whose kept plan projects no criteria still drops
+// the tests its scope does not name.
 func TestNarrowToTaskScopes_KeepsTheTestsAKeptSpecGateJudges(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "changed-files-select-owners-and-transitive-dependents")
 	sdd := &workspace.Project{ID: "/tooling/sdd-extension", Name: "@putnami/sdd", Path: "tooling/sdd-extension"}
@@ -341,6 +342,7 @@ func TestNarrowToTaskScopes_KeepsTheTestsAKeptSpecGateJudges(t *testing.T) {
 			declaredJob(project, "go/extension", "build", "compile", nil),
 			declaredJob(project, "go/extension", "test", "generate", nil),
 			declaredJob(project, "go/extension", "test", "test", report, id+":build~compile", id+":test~generate"),
+			declaredJob(project, "go/extension", "test", "test-env-teardown", nil),
 			declaredJob(project, "go/extension", "lint", "check", nil),
 			declaredJob(project, "tooling/sdd-extension", "validate", "features", nil),
 		}
@@ -358,7 +360,7 @@ func TestNarrowToTaskScopes_KeepsTheTestsAKeptSpecGateJudges(t *testing.T) {
 		got = append(got, job.Key())
 	}
 	want := []string{
-		"/libs/http:build~compile", "/libs/http:test~generate", "/libs/http:test~test",
+		"/libs/http:build~compile", "/libs/http:test~generate", "/libs/http:test~test", "/libs/http:test~test-env-teardown",
 		"/libs/http:validate~features", "/libs/http:validate~specs",
 		"/libs/core:validate~features",
 	}

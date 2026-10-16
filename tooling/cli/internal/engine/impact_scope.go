@@ -26,7 +26,7 @@ import (
 // the spec gate for exactly the projects this selection newly makes
 // task-scoped, silently: `test~test` re-runs green and no criteria projection
 // is written for the finalizer to join. A kept `validate~specs` keeps in turn
-// the `test` tasks whose reports it judges (narrowToTaskScopes).
+// the `test` command whose reports it judges (narrowToTaskScopes).
 //
 // Both entries are a command-level answer to the same general gap: a task that
 // declares no file input has said nothing about what it reads, and the index
@@ -52,10 +52,10 @@ const extensionScopeSeparator = "#"
 //     job with no pipeline step;
 //   - its command is never narrowed (neverNarrowedCommands): a release
 //     command, or a `validate` whose steps read session state and not files;
-//   - it writes its project's verification report, and a kept job of the same
-//     project projects the spec criteria judged against that report: the spec
-//     gate reads the reports a full plan gives it, and an unchanged test is a
-//     cache hit;
+//   - it is a `test` job, and a kept job of the same project projects the
+//     spec criteria judged against that command's verification reports: the
+//     spec gate reads the reports a full plan gives it, and an unchanged test
+//     is a cache hit;
 //   - a kept job depends on it or is serialized after it, transitively: the
 //     kept plan stays a closed graph, the rule serve_withhold.go applies to
 //     the jobs it hands a supervisor. A scoped `test` keeps the `build` it
@@ -86,14 +86,17 @@ func narrowToTaskScopes(ws *workspace.Workspace, planned []*jobs.ScheduledJob, s
 		if !scoped || neverNarrowedCommands[modeljobs.JobCommandName(job)] || jobInScope(ws, job, scope) {
 			kept[job.Key()] = true
 			frontier = append(frontier, job)
-			judged[job.Project.ID] = judged[job.Project.ID] || jobs.ProducesSpecCriteriaProjection(job)
+			if scoped && jobs.ProducesSpecCriteriaProjection(job) {
+				judged[job.Project.ID] = true
+			}
 		}
 	}
-	// A kept criteria projection is judged against its project's verification
-	// reports, so the tasks that write them stay too.
+	// A kept criteria projection is judged against the verification reports of
+	// its project's `test` command, so that command stays whole: the steps that
+	// write the reports, and the finalizers that tear down what they ran on.
 	for _, job := range planned {
-		if job != nil && job.Project != nil && judged[job.Project.ID] && !kept[job.Key()] &&
-			jobs.ProducesVerificationReport(job) {
+		if job != nil && job.Project != nil && job.JobDef != nil && judged[job.Project.ID] &&
+			!kept[job.Key()] && modeljobs.JobCommandName(job) == "test" {
 			kept[job.Key()] = true
 			frontier = append(frontier, job)
 		}
