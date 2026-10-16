@@ -844,10 +844,10 @@ func TestDeclaredCapturePortPathOutput(t *testing.T) {
 		writeFileAt(t, filepath.Join(project, ".gen", "conf", ".env.local.yaml"), "a: 1\n")
 		writeFileAt(t, filepath.Join(project, "conf", ".env.local.yaml"), "a: 1\n")
 
-		if f.sched.storeDeclaredCapture(job, capturedResult(map[string]any{"mergedConfig": "conf/.env.local.yaml"}), captureHashA) {
+		if f.sched.storeDeclaredCapture(job, portResult("mergedConfig", "conf/.env.local.yaml"), captureHashA) {
 			t.Fatal("published an entry for a path outside the output's within bound")
 		}
-		if !f.sched.storeDeclaredCapture(bounded(), capturedResult(map[string]any{"mergedConfig": ".gen/conf/.env.local.yaml"}), captureHashB) {
+		if !f.sched.storeDeclaredCapture(bounded(), portResult("mergedConfig", ".gen/conf/.env.local.yaml"), captureHashB) {
 			t.Fatal("refused a path inside the output's within bound")
 		}
 	})

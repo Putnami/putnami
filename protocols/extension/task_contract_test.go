@@ -1284,8 +1284,8 @@ func TestValidateOutputEmptied(t *testing.T) {
 }
 
 // A bound rides only on a pathFrom output and names a subtree of the root. A
-// reported path at or under it lies within it; a sibling that shares its prefix
-// does not.
+// reported path at or under it, spelled as the bound is, lies within it; a
+// sibling that shares its prefix does not.
 func TestValidateOutputWithin(t *testing.T) {
 	task := TaskDefinition{Outputs: map[string]TaskOutputPort{"mergedConfig": {}}}
 	cases := []struct {
@@ -1320,7 +1320,7 @@ func TestValidateOutputWithin(t *testing.T) {
 	for rel, want := range map[string]bool{
 		".gen/conf":                 true,
 		".gen/conf/.env.local.yaml": true,
-		".GEN/conf/a.yaml":          true,
+		".GEN/conf/a.yaml":          false,
 		".gen/config/a.yaml":        false,
 		".gen":                      false,
 	} {

@@ -576,3 +576,32 @@ func TestInvocation_ConsumerKeyAWriteMayMoveAfterTheProducerStartsIsNeverPruned(
 		t.Fatalf("finalizer ran %d times, want exactly once", got)
 	}
 }
+
+// The paths a bounded port output may have written, which a run drops the
+// memoized digests under, are the reported file, the bound when the port
+// reported nothing, and the whole project when it reported a path outside the
+// bound.
+func TestDeclaredOutputPathsOfABoundedPortOutput(t *testing.T) {
+	job := declaredJob("build~merge", "merge", &extension.TaskDeclaration{
+		Outputs: map[string]extension.DeclaredOutput{
+			"merged": {Kind: extension.OutputKindFile, PathFrom: "mergedConfig", Within: ".gen/conf", OptionalEmpty: true},
+		},
+	})
+	f := newCaptureFixture(t, job)
+	project := filepath.Join(f.ws.Root, captureTestProject)
+	cases := []struct {
+		name   string
+		result *JobResult
+		want   string
+	}{
+		{"a path inside the bound", portResult("mergedConfig", ".gen/conf/.env.local.yaml"), filepath.Join(project, ".gen", "conf", ".env.local.yaml")},
+		{"no path", capturedResult(nil), filepath.Join(project, ".gen", "conf")},
+		{"a path outside the bound", portResult("mergedConfig", "conf/.env.local.yaml"), project},
+	}
+	for _, tc := range cases {
+		got := cachekey.DeclaredOutputPaths(f.sched.outputRoots(), job, tc.result)
+		if len(got) != 1 || got[0] != tc.want {
+			t.Errorf("%s: DeclaredOutputPaths = %v, want [%s]", tc.name, got, tc.want)
+		}
+	}
+}

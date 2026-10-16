@@ -5,6 +5,7 @@
   "declared-output-drift.json#build-generate": "tc1:c72278882d5a45ebbe6cb8366128b02631db81ffe6aba2cef1452f91383d5d40",
   "declared-output-emptied.json#build-describe": "tc1:78fc905748ce8a0fc65a7c0c1df07d6206bbb9c2b513401df40d4c928ce951db",
   "declared-output-preserves.json#build-clients": "tc1:7e3589be89d30032b033ad5d0eaf59c2cce4b3e3e250c5b4b5072a5fdfb55fbc",
+  "declared-output-within.json#build-config-merge": "tc1:f0ba3365c5487a8bba1ad9f1b4138a1a1e4ae6893fb8b98e8410e23d50f3ffe7",
   "ecosystem-owner.json#publish-npm-exec": "tc1:a67b6ceecc8091a3ea9821e00e84a959ca6340084717c24ea63fa1cc245e55ac",
   "ecosystem-uses.json#publish-go-exec": "tc1:a67b6ceecc8091a3ea9821e00e84a959ca6340084717c24ea63fa1cc245e55ac",
   "full.json#build-exec": "tc1:c19c61056aa1543bd6bb10f54e59aa756d037873e255a923b0071053172d0973",

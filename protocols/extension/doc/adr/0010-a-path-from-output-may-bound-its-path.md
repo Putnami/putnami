@@ -24,8 +24,9 @@ Only the task's author knows where the reported path can land.
 ## Decision
 
 1. **A `pathFrom` output may carry `within`**, a root-relative subtree. The
-   reported path must equal it or lie under it, compared without case like
-   every ownership comparison.
+   reported path must equal it or lie under it, compared with case: the
+   planner takes the bound as spelled, and on a case-sensitive filesystem
+   another spelling is another path.
 2. **A path outside the bound leaves the run uncached.** The capture refuses
    the output and warns, as it does for a required output the task did not
    produce, so no cache entry records a write the planner did not count.

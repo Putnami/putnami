@@ -772,10 +772,11 @@ func (o DeclaredOutput) WithinBound() string {
 }
 
 // LiesWithin reports whether a canonical root-relative path equals bound or
-// lies under it, under the case-insensitive comparison ownership uses. An empty
-// bound holds every path.
+// lies under it. An empty bound holds every path. The comparison keeps case:
+// the planner takes the bound as spelled, and on a case-sensitive filesystem
+// another spelling is another path.
 func LiesWithin(bound, rel string) bool {
-	return bound == "" || strings.EqualFold(bound, rel) || pathContainsFold(bound, rel)
+	return bound == "" || bound == rel || pathContains(bound, rel)
 }
 
 // validateOutputEmptied checks that an output asking to be emptied is one the

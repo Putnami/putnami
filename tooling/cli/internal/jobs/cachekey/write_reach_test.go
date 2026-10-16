@@ -129,3 +129,60 @@ func TestFileSelectionKeepsTheRegionItCannotNarrow(t *testing.T) {
 		}
 	}
 }
+
+// A write the digest may read under another name than the one it declares is
+// decided by region: a file the selection reads through a link, a literal
+// pattern segment in another case, a path whose existing segments are spelled
+// otherwise on disk, and a pattern the store cleans before it globs.
+func TestFileSelectionDecidesByRegionWhatItCannotSpell(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "proj")
+	at := func(rel string) string { return filepath.Join(dir, filepath.FromSlash(rel)) }
+	writeSelectionFile(t, at(".gen/version.json"), "{}\n")
+	writeSelectionFile(t, at("Config/app.json"), "{}\n")
+
+	t.Run("a selected link", func(t *testing.T) {
+		var scanner selectionScanner
+		patterns := []string{"**/*.json", "!**/.gen/**"}
+		write := plannedWrite{Path: at(".gen/version.json")}
+		if scanner.Select(dir, patterns).Reaches(write) {
+			t.Fatal("an excluded file reached a selection that reads no link")
+		}
+		if err := os.MkdirAll(at("src"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(filepath.Join("..", ".gen", "version.json"), at("src/version.json")); err != nil {
+			t.Skipf("symlinks unavailable: %v", err)
+		}
+		var fresh selectionScanner
+		if !fresh.Select(dir, patterns).Reaches(write) {
+			t.Fatal("a write to the target of a selected link did not reach the selection")
+		}
+	})
+
+	t.Run("a literal segment in another case", func(t *testing.T) {
+		var scanner selectionScanner
+		if !scanner.Select(dir, []string{"Config/*.yaml"}).Reaches(plannedWrite{Path: at("config/app.json")}) {
+			t.Fatal("a write that spells the pattern's literal segment in another case was decided by pattern")
+		}
+		if scanner.Select(dir, []string{"Config/*.yaml"}).Reaches(plannedWrite{Path: at("Config/app.json")}) {
+			t.Fatal("a write spelled as the pattern is, that the pattern does not match, reached the selection")
+		}
+	})
+
+	t.Run("a path spelled otherwise on disk", func(t *testing.T) {
+		var scanner selectionScanner
+		write := plannedWrite{Path: at("config/new.json")}
+		_, err := os.Lstat(at("config"))
+		caseInsensitive := err == nil
+		if got := scanner.Select(dir, []string{"**/*.json", "!config/**"}).Reaches(write); got != caseInsensitive {
+			t.Fatalf("Reaches = %v, want %v: the write lands in Config on a case-insensitive filesystem only", got, caseInsensitive)
+		}
+	})
+
+	t.Run("a pattern not in clean form", func(t *testing.T) {
+		var scanner selectionScanner
+		if !scanner.Select(dir, []string{"Config/./*.yaml"}).Reaches(plannedWrite{Path: at("Config/app.json")}) {
+			t.Fatal("a pattern the store cleans was decided by matching it as written")
+		}
+	})
+}

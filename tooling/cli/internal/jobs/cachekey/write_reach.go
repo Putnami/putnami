@@ -1,6 +1,10 @@
 package cachekey
 
 import (
+	"errors"
+	"io/fs"
+	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -29,11 +33,15 @@ func (w plannedWrite) Region() store.InputRegion {
 //
 // The narrowing holds while the embed directives stay as they are scanned. A
 // caller that plans a write ReachesDirectives reports true for decides with
-// Widened instead.
+// Widened instead. It also holds only for a write the digest reads under the
+// spelling it declares, and for files the digest does not read through a link:
+// a write that cannot be decided so reaches whatever the region says it
+// reaches.
 type fileSelection struct {
-	dir     string
-	region  store.InputRegion
-	bounded bool
+	dir      string
+	region   store.InputRegion
+	bounded  bool
+	patterns []string
 	// includes are the ordinary include patterns, and excludes every
 	// exclusion, which the digest applies to ordinary includes only.
 	includes []string
@@ -44,9 +52,12 @@ type fileSelection struct {
 }
 
 // selectionScanner builds fileSelections and scans the Go embed directives of
-// one directory once. The zero value is ready to use, from one goroutine.
+// one directory, the links of one selection and the spelling of one path once.
+// The zero value is ready to use, from one goroutine.
 type selectionScanner struct {
-	embeds map[embedScanKey]store.GoEmbedBound
+	embeds  map[embedScanKey]store.GoEmbedBound
+	links   map[string]bool
+	spelled map[string]bool
 }
 
 type embedScanKey struct {
@@ -55,13 +66,19 @@ type embedScanKey struct {
 }
 
 // Select returns the selection of patterns under dir. A pattern set with no
-// pattern or a Git candidate pattern is bounded by its region alone.
+// pattern, a Git candidate pattern, or a pattern that is not in clean slash
+// form is bounded by its region alone.
 func (s *selectionScanner) Select(dir string, patterns []string) fileSelection {
-	selection := fileSelection{dir: dir, region: store.FileInputRegion(dir, patterns), scanner: s}
+	selection := fileSelection{dir: dir, region: store.FileInputRegion(dir, patterns), patterns: patterns, scanner: s}
 	if len(patterns) == 0 {
 		return selection
 	}
 	includes, excludes := wsproto.SplitFilePatterns(patterns)
+	for _, pattern := range append(append([]string(nil), includes...), excludes...) {
+		if path.Clean(pattern) != pattern || strings.HasPrefix(pattern, "/") || strings.Contains(pattern, "\\") {
+			return selection
+		}
+	}
 	for _, pattern := range includes {
 		if _, git := wsproto.GitFilePattern(pattern); git {
 			return selection
@@ -117,7 +134,7 @@ func (s fileSelection) Reaches(w plannedWrite) bool {
 			return true
 		}
 	}
-	return false
+	return !s.scanner.spelledOnDisk(s.dir, rel) || s.scanner.selectsThroughLink(s.dir, s.patterns)
 }
 
 // ReachesDirectives reports whether w can change the Go sources an embed
@@ -128,7 +145,7 @@ func (s fileSelection) ReachesDirectives(w plannedWrite) bool {
 		return false
 	}
 	rel, inside := s.relative(w.Path)
-	return !inside || store.ReachesGoSource(rel, w.Tree)
+	return !inside || store.ReachesGoSource(rel, w.Tree) || !s.scanner.spelledOnDisk(s.dir, rel)
 }
 
 // ReachesDirectivesIn is ReachesDirectives for a write bounded by region alone.
@@ -139,10 +156,15 @@ func (s fileSelection) ReachesDirectivesIn(region store.InputRegion) bool {
 // includeReaches reports whether w can touch a file one ordinary include
 // selects. Every path under w that an exclusion covers is out of reach, and a
 // file write is selected only when the include matches it and no exclusion
-// does, as the store's ordinary file collection decides.
+// does, as the store's ordinary file collection decides. The collection
+// spells a path's leading literal segments as the include does, so a write
+// that spells them in another case is not decided by pattern.
 func (s fileSelection) includeReaches(include, rel string, w plannedWrite) bool {
 	if !store.FileInputRegion(s.dir, []string{include}).Overlaps(w.Region()) {
 		return false
+	}
+	if !literalPrefixAgrees(include, rel) {
+		return true
 	}
 	if wsproto.ExcludesTree(rel, s.excludes) {
 		return false
@@ -170,6 +192,79 @@ func (s fileSelection) relative(p string) (string, bool) {
 		return "", false
 	}
 	return filepath.ToSlash(rel), true
+}
+
+// literalPrefixAgrees reports whether rel spells the leading literal segments
+// of pattern as the pattern does wherever the two compare equal without case.
+func literalPrefixAgrees(pattern, rel string) bool {
+	segments := strings.Split(rel, "/")
+	for i, part := range strings.Split(pattern, "/") {
+		if i >= len(segments) || strings.ContainsAny(part, "*?[\\") {
+			return true
+		}
+		if part != segments[i] {
+			return !strings.EqualFold(part, segments[i])
+		}
+	}
+	return true
+}
+
+// spelledOnDisk reports whether every segment of rel that exists under dir
+// exists under that exact name, so the digest reads the path as rel spells it.
+// A segment that does not exist yet is created as rel spells it.
+func (s *selectionScanner) spelledOnDisk(dir, rel string) bool {
+	key := filepath.Join(dir, filepath.FromSlash(rel))
+	if spelled, ok := s.spelled[key]; ok {
+		return spelled
+	}
+	spelled := segmentsSpelledOnDisk(dir, rel)
+	if s.spelled == nil {
+		s.spelled = make(map[string]bool)
+	}
+	s.spelled[key] = spelled
+	return spelled
+}
+
+func segmentsSpelledOnDisk(dir, rel string) bool {
+	parent := dir
+	for _, name := range strings.Split(rel, "/") {
+		child := filepath.Join(parent, name)
+		if _, err := os.Lstat(child); errors.Is(err, fs.ErrNotExist) {
+			return true
+		} else if err != nil {
+			return false
+		}
+		entries, err := os.ReadDir(parent)
+		if err != nil {
+			return false
+		}
+		found := false
+		for _, entry := range entries {
+			if entry.Name() == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+		parent = child
+	}
+	return true
+}
+
+// selectsThroughLink memoizes store.SelectsThroughLink for one selection.
+func (s *selectionScanner) selectsThroughLink(dir string, patterns []string) bool {
+	key := dir + "\x00" + strings.Join(patterns, "\x00")
+	if linked, ok := s.links[key]; ok {
+		return linked
+	}
+	linked := store.SelectsThroughLink(dir, patterns)
+	if s.links == nil {
+		s.links = make(map[string]bool)
+	}
+	s.links[key] = linked
+	return linked
 }
 
 // embed returns the bound of one Go embed selector of dir.
