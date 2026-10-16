@@ -26,6 +26,7 @@ func TestTypeScriptLintCheckOnlyCacheKeyIgnoresGeneratedFiles(t *testing.T) {
 	}
 	typescript := extension.Resolve(manifest, filepath.Dir(manifestPath))
 	typescript.Name = "@putnami/typescript"
+	pinInstalledTree(t, typescript)
 
 	lintCommand := typescript.Jobs["lint"]
 	if lintCommand == nil {

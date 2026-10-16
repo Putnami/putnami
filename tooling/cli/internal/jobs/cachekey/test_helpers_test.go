@@ -6,7 +6,24 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+
+	"go.putnami.dev/tooling/cli/internal/extension"
 )
+
+// pinInstalledTree points ext, loaded from this repository as an installed
+// extension, at a copy of its manifest. The key of an installed extension's
+// task digests every file under ext.Path, and a build of the same run writes
+// into the repository's extension directory, so the installed tree is one only
+// the test writes.
+func pinInstalledTree(t *testing.T, ext *extension.ExtensionDescription) {
+	t.Helper()
+	manifest, err := os.ReadFile(filepath.Join(ext.Path, extension.ManifestFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ext.Path = t.TempDir()
+	writeTestFile(t, filepath.Join(ext.Path, extension.ManifestFilename), string(manifest))
+}
 
 // writeExecutable writes a fixture program a test then starts directly.
 //

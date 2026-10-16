@@ -22,8 +22,8 @@ var clientgenTasks = []struct{ name, job string }{
 }
 
 // loadShippedExtension loads an extension manifest of this repository the way
-// a run loads an installed one, with one fixed runtime digest, so a key never
-// reads the extension's sources, which a concurrent build may rewrite.
+// a run loads an installed one, so a key never reads the extension's sources,
+// which a concurrent build may rewrite.
 func loadShippedExtension(t *testing.T, rel, name string) *extension.ExtensionDescription {
 	t.Helper()
 	ext := extension.LoadExtensionFromDir(filepath.Join(findJobsRepoRoot(t), filepath.FromSlash(rel)), name)
@@ -32,8 +32,23 @@ func loadShippedExtension(t *testing.T, rel, name string) *extension.ExtensionDe
 	}
 	ext.LocalSource = false
 	ext.RelPath = rel
-	ext.RuntimeDigest = "prepared " + name
+	pinInstalledTree(t, ext)
 	return ext
+}
+
+// pinInstalledTree points ext, loaded from this repository as an installed
+// extension, at a copy of its manifest. The key of an installed extension's
+// task digests every file under ext.Path, and a build of the same run writes
+// into the repository's extension directory, so the installed tree is one only
+// the test writes.
+func pinInstalledTree(t *testing.T, ext *extension.ExtensionDescription) {
+	t.Helper()
+	manifest, err := os.ReadFile(filepath.Join(ext.Path, extension.ManifestFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ext.Path = t.TempDir()
+	writeTestFile(t, filepath.Join(ext.Path, extension.ManifestFilename), string(manifest))
 }
 
 // clientgenKeyFixture is a Git work tree that ignores .gen, as this
@@ -389,7 +404,7 @@ func TestClientgenStartKeyEqualsThePrecomputedKeyWhenDescribeWrites(t *testing.T
 			t.Fatalf("the run precomputed no key for %s; it keyed %v", key, sortedKeyNames(precomputed))
 		}
 		if started[key] != precomputed[key] {
-			t.Errorf("%s starts with key %s, but the run looked up %s: a file describe wrote under .gen reached the key", key, started[key], precomputed[key])
+			t.Errorf("%s starts with key %s, but the run looked up %s: a file written between the two computations reached the key", key, started[key], precomputed[key])
 		}
 	}
 }

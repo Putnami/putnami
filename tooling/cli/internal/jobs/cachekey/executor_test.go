@@ -267,6 +267,7 @@ func TestGoWorkspaceModuleFilesMoveRealTaskCacheKey(t *testing.T) {
 	}
 	// The test exercises manifest inputs, not mutable-runtime identity.
 	goExtension.LocalSource = false
+	pinInstalledTree(t, goExtension)
 	task, ok := goExtension.Tasks["test-exec"]
 	if !ok {
 		t.Fatal("real Go manifest has no test-exec task")
