@@ -85,6 +85,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "a-head-fallback-answers-the-get-status-and-headers-without-a-body",
               "head-falls-back-to-the-get-handler",
               "options-fallback-answers-a-known-path",
               "options-preflight-passes-through-the-middleware-chain"

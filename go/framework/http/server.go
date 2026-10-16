@@ -454,6 +454,9 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 			r = r.WithContext(reqCtx)
 		}
 		ctx := NewContext(w, r)
+		if r.Method == http.MethodHead {
+			ctx.Writer = headWriter{ResponseWriter: w}
+		}
 
 		// Match route
 		matchedMethod := r.Method
@@ -477,7 +480,7 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 				}
 			}
 			if match == nil {
-				if err := NotFound().WriteTo(w); err != nil {
+				if err := writeResponse(w, r, NotFound()); err != nil {
 					p.logWriteFailure(r, "write response", err)
 				}
 				return
@@ -506,7 +509,7 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 			if err != nil {
 				p.log.Error("create DI scope", err)
 				resp := InternalError("Internal Server Error")
-				if writeErr := resp.WriteTo(w); writeErr != nil {
+				if writeErr := writeResponse(w, r, resp); writeErr != nil {
 					p.logWriteFailure(r, "write error response", writeErr)
 				}
 				return
@@ -594,7 +597,7 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 			resp = scopeFailureResponse(scopeCtx, commitErr)
 		}
 		if resp != nil {
-			if err := resp.WriteTo(w); err != nil {
+			if err := writeResponse(w, r, resp); err != nil {
 				p.logWriteFailure(r, "write response", err)
 			}
 		}
