@@ -96,7 +96,7 @@ security.Middleware(security.Options{
 })
 ```
 
-Returns `401` when `ctx.User` is unset, `403` when a rule fails.
+Returns `401` when `ctx.User` is unset, `403` when a rule fails. Both answers carry the canonical error envelope `{code, error, message}`, with the code `unauthorized` or `forbidden`.
 
 ### Optional authentication
 

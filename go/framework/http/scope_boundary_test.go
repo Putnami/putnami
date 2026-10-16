@@ -49,23 +49,33 @@ func (f *probeFinalizer) FinalizeScope(_ context.Context, outcome error) error {
 	return f.probe.finalizeErr
 }
 
-// newBoundaryServer wires a ServerPlugin with a DI container that registers the
-// Scoped probeFinalizer, plus a single GET /probe route whose injected handler
-// materializes it. The returned plugin is finalized via TestServer by the caller.
-func newBoundaryServer(t *testing.T, probe *boundaryProbe, handler any) *ServerPlugin {
+// startedContainer returns a started container context that registers
+// providers, closed when the test ends.
+func startedContainer(t *testing.T, providers ...inject.Registration) *inject.ContainerContext {
 	t.Helper()
-	cc := inject.NewContainerContext("http-boundary")
-	if err := cc.Register(inject.Provide(
-		inject.TokenOf[*probeFinalizer](),
-		func(_ inject.Resolver) (any, error) { return &probeFinalizer{probe: probe}, nil },
-		inject.WithScope(inject.Scoped),
-	)); err != nil {
-		t.Fatal(err)
+	cc := inject.NewContainerContext("http-test")
+	for _, provider := range providers {
+		if err := cc.Register(provider); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := cc.Start(); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = cc.Close() })
+	return cc
+}
+
+// newBoundaryServer wires a ServerPlugin with a DI container that registers the
+// Scoped probeFinalizer, plus a single GET /probe route whose injected handler
+// materializes it. The returned plugin is finalized via TestServer by the caller.
+func newBoundaryServer(t *testing.T, probe *boundaryProbe, handler any) *ServerPlugin {
+	t.Helper()
+	cc := startedContainer(t, inject.Provide(
+		inject.TokenOf[*probeFinalizer](),
+		func(_ inject.Resolver) (any, error) { return &probeFinalizer{probe: probe}, nil },
+		inject.WithScope(inject.Scoped),
+	))
 
 	p := NewServerPlugin(ServerConfig{Port: 0})
 	p.setContainerContext(cc)

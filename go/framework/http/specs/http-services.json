@@ -76,6 +76,10 @@
     {
       "id": "request-log-status",
       "text": "A handler that writes to the response writer, such as a gateway-mounted Connect handler, is logged with the status it wrote, not the response it returns. A 5xx logs at ERROR with the outcome failure, a 499 at INFO with the outcome canceled, any other status at INFO with the outcome success. A body written without a status logs 200. A 5xx returned after a lower written status logs that status at ERROR with the outcome failure."
+    },
+    {
+      "id": "error-envelope",
+      "text": "A route that does not exist answers 404 in the canonical error envelope {code, error, message} with the code not_found. A panic that Recovery catches answers 500 with the code internal and the message Internal Server Error, and so does a request scope that cannot be created, resolved or committed. NotFound, Unauthorized, Forbidden and InternalError write that envelope with the codes not_found, unauthorized, forbidden and internal."
     }
   ],
   "decisions": [

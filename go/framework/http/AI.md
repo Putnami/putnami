@@ -68,11 +68,18 @@ http.JSONStatus(201, data)     // custom status + JSON
 http.Text("hello")             // 200 + text/plain
 http.NoContent()               // 204
 http.Redirect("/login", 302)   // redirect
-http.NotFound()                // 404
-http.Unauthorized()            // 401
-http.Forbidden()               // 403
-http.InternalError(err.Error()) // 500 — takes a string message
+http.NotFound()                // 404, code not_found
+http.Unauthorized()            // 401, code unauthorized
+http.Forbidden()               // 403, code forbidden
+http.InternalError("export failed") // 500, code internal — the message reaches the client verbatim
 ```
+
+The four error helpers write the canonical envelope `{code, error, message}`,
+the same one `http.ErrorResponse` writes. The router's 404, the 500 after a
+panic that `Recovery` catches, and the 500 for a request scope that cannot be
+created, resolved or committed use it too. Answer an error value with
+`http.ErrorResponse(err)`, which hides an internal cause, not with
+`http.InternalError(err.Error())`.
 
 ## Middleware
 

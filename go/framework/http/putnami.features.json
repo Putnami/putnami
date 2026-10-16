@@ -220,6 +220,20 @@
               "a-5xx-returned-after-a-written-status-logs-at-error"
             ]
           }
+        },
+        {
+          "id": "error-envelope",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unknown-route-answers-404-not-found",
+              "a-panic-answers-500-internal-with-the-fixed-message",
+              "a-scope-failure-answers-500-internal",
+              "the-error-helpers-write-the-canonical-envelope"
+            ]
+          }
         }
       ]
     }

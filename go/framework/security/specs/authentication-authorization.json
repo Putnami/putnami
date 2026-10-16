@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "authorization-decision",
-      "text": "Missing identity returns 401 unless the rule declares Optional, an authenticated identity that fails any required role, scope, client, or guard decision returns 403, and only an explicit excluded path bypasses the rule."
+      "text": "Missing identity returns 401 with the code unauthorized unless the rule declares Optional, an authenticated identity that fails any required role, scope, client, or guard decision returns 403 with the code forbidden, both in the canonical error envelope {code, error, message}, and only an explicit excluded path bypasses the rule."
     },
     {
       "id": "credential-validation",
