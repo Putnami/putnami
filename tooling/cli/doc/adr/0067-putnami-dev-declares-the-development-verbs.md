@@ -1,6 +1,7 @@
 # ADR 0067 — @putnami/dev declares the development verbs
 
-- **Status**: accepted
+- **Status**: accepted, amended in decision 4: a command's own traits that
+  name no side effects keep the `WellKnownVerbs` ones
 - **Scope**: `@putnami/cli` (`internal/cli`, `internal/commands/completion`,
   `internal/extension`), `@putnami/cli-model` (`extension`),
   `go.putnami.dev/protocol/extension` and `go.putnami.dev/protocol/cli`
@@ -70,7 +71,8 @@ per verb and project to every plan, and change every recorded session.
 4. **A vocabulary gives default traits.** Once discovery has loaded every
    extension, a job whose command declares no traits takes its verb's
    traits. A verb that declares none leaves the `WellKnownVerbs` defaults in
-   place. A command's own traits still replace both wholesale. The pass runs
+   place. A command's own traits still replace both, but keep the
+   `WellKnownVerbs` side effects when they name none. The pass runs
    for the workspace and for the user scope. While `WellKnownVerbs` gives a
    verb side effects, a vocabulary keeps them: strict validation refuses
    default traits that change them (`invalid-verb-traits`), and discovery

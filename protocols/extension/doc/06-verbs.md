@@ -58,9 +58,13 @@ loaded [verb vocabulary](#declaring-a-verb-vocabulary), declares them.
 }
 ```
 
-A declared `traits` object **replaces the verb's defaults wholesale**;
-fields are not merged. Per-step heaviness uses `heavy` on the pipeline
-step:
+A declared `traits` object **replaces the verb's defaults**; fields are not
+merged, with one exception: a declaration that names no `sideEffects` keeps
+the verb's. A `publish` that declares only `injectPublishChannels` still has
+`registry` side effects, and a `deploy` that declares only `heavy` still has
+`cloud` ones, so every gate that reads the trait treats them as side-effecting.
+A declared `sideEffects` still replaces the verb's. Per-step heaviness uses
+`heavy` on the pipeline step:
 
 ```json
 { "id": "golangci-lint", "task": "golangci-lint", "heavy": true }
@@ -222,7 +226,8 @@ The CLI reads the vocabularies of the loaded extensions:
 - **Default traits.** A job whose command declares no `traits` takes its
   verb's `traits`. When the verb declares none, the job keeps the defaults of
   the [verb registry](#the-verb-registry). A command's own `traits` replace
-  both wholesale. A vocabulary never changes the side effects the registry
+  both, but a declaration without `sideEffects` keeps the verb registry's
+  side effects. A vocabulary never changes the side effects the registry
   gives a verb: `publish` keeps `registry` and `deploy` keeps `cloud`. When a
   loaded vocabulary's traits would change them, the CLI sets those traits
   aside with a warning, and the verb keeps the registry's defaults.

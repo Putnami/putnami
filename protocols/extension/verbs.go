@@ -8,8 +8,10 @@ import "strings"
 // correct scheduling and gating behavior by declaring them (or by using
 // a well-known verb, which carries defaults).
 //
-// A manifest-declared traits object replaces the verb's defaults
-// wholesale — fields are not merged.
+// A manifest-declared traits object replaces the verb's defaults, except
+// that a declaration naming no side effects keeps the verb's: `publish`
+// always mutates a registry and `deploy` a cloud, so no declaration can make
+// either look harmless to the gates that read SideEffects.
 //
 // Traits describe the COMMAND, never the workload the command runs
 // against. Contract 3 deleted the one trait that broke that
@@ -137,14 +139,18 @@ func BaseCommandName(name string) string {
 }
 
 // EffectiveTraits resolves the traits for a command: a manifest-declared
-// traits object wins wholesale; otherwise the well-known verb's default
-// traits apply; unknown verbs default to the zero traits.
+// traits object wins, except that its empty SideEffects keeps the well-known
+// verb's; otherwise the well-known verb's default traits apply; unknown verbs
+// default to the zero traits. SideEffects holds one value, so a declared side
+// effect still replaces the verb's.
 func EffectiveTraits(commandName string, declared *CommandTraits) CommandTraits {
-	if declared != nil {
-		return *declared
+	defaults := WellKnownVerbs[BaseCommandName(commandName)].Traits
+	if declared == nil {
+		return defaults
 	}
-	if spec, ok := WellKnownVerbs[BaseCommandName(commandName)]; ok {
-		return spec.Traits
+	traits := *declared
+	if traits.SideEffects == SideEffectsNone {
+		traits.SideEffects = defaults.SideEffects
 	}
-	return CommandTraits{}
+	return traits
 }

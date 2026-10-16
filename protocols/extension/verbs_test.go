@@ -93,11 +93,22 @@ func TestEffectiveTraits(t *testing.T) {
 	if got := EffectiveTraits("serve~dev", nil); !got.RequiresRunnable {
 		t.Error("serve~dev should inherit the serve verb's requiresRunnable trait")
 	}
-	// Manifest traits replace defaults wholesale.
+	// Manifest traits replace the defaults, but naming no side effects keeps
+	// the verb's: a declaration cannot make publish or deploy look harmless.
 	declared := &CommandTraits{RequiresRunnable: true}
-	got := EffectiveTraits("publish", declared)
-	if got.InjectPublishChannels || got.SideEffects != "" || !got.RequiresRunnable {
-		t.Errorf("declared traits must replace defaults wholesale, got %+v", got)
+	if got, want := EffectiveTraits("publish", declared), (CommandTraits{RequiresRunnable: true, SideEffects: SideEffectsRegistry}); got != want {
+		t.Errorf("EffectiveTraits(publish, %+v) = %+v, want %+v", *declared, got, want)
+	}
+	if got := EffectiveTraits("deploy~apply", &CommandTraits{Heavy: true}); got.SideEffects != SideEffectsCloud {
+		t.Errorf("deploy~apply declared without side effects = %+v, want the cloud side effect kept", got)
+	}
+	// A declared side effect still replaces the verb's: the trait holds one value.
+	if got := EffectiveTraits("publish", &CommandTraits{SideEffects: SideEffectsCloud}); got.SideEffects != SideEffectsCloud {
+		t.Errorf("publish declared with cloud side effects = %+v, want cloud", got)
+	}
+	// A verb without default side effects takes the declaration as is.
+	if got, want := EffectiveTraits("build", declared), *declared; got != want {
+		t.Errorf("EffectiveTraits(build, %+v) = %+v, want %+v", *declared, got, want)
 	}
 	// Unknown verbs default to zero traits.
 	if got := EffectiveTraits("frobnicate", nil); got != (CommandTraits{}) {
