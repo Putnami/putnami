@@ -1101,6 +1101,19 @@
               "a-write-to-a-link-target-moves-a-key-that-reads-through-the-link"
             ]
           }
+        },
+        {
+          "id": "job-context-names-member-types",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-workspace-member-names-its-resolved-type"
+            ]
+          }
         }
       ]
     },
