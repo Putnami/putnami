@@ -27,7 +27,7 @@
     },
     {
       "id": "method-fallbacks",
-      "text": "A HEAD request falls back to the GET handler, and an OPTIONS request to a known path with no OPTIONS route is answered through the composed middleware chain so a configured CORS middleware sees the preflight."
+      "text": "A HEAD request falls back to the GET handler, and a HEAD request answers the status and headers of the response its handler returns with no body: the server writes none of that body, reads no streamed body, and logs no failed write for it. An OPTIONS request to a known path with no OPTIONS route is answered through the composed middleware chain so a configured CORS middleware sees the preflight."
     },
     {
       "id": "middleware-order",

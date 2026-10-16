@@ -187,21 +187,23 @@ func (r *Response) BodyBytes() ([]byte, error) {
 	return nil, nil
 }
 
-// WriteTo writes the response to an http.ResponseWriter.
-func (r *Response) WriteTo(w http.ResponseWriter) (retErr error) {
-	// Copy headers
+// writeHead copies the response headers to w and writes the status.
+func (r *Response) writeHead(w http.ResponseWriter) {
 	for key, values := range r.Headers {
 		for _, v := range values {
 			w.Header().Add(key, v)
 		}
 	}
-
-	// Write status
 	status := r.Status
 	if status == 0 {
 		status = http.StatusOK
 	}
 	w.WriteHeader(status)
+}
+
+// WriteTo writes the response to an http.ResponseWriter.
+func (r *Response) WriteTo(w http.ResponseWriter) (retErr error) {
+	r.writeHead(w)
 
 	// Write body
 	if r.stream != nil {
@@ -213,6 +215,11 @@ func (r *Response) WriteTo(w http.ResponseWriter) (retErr error) {
 		_, retErr = io.Copy(w, r.stream)
 		return retErr
 	}
+	return r.writeBody(w)
+}
+
+// writeBody writes a body held in memory to w.
+func (r *Response) writeBody(w io.Writer) error {
 	if r.raw != nil {
 		_, err := w.Write(r.raw)
 		return err
