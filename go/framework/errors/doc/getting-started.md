@@ -260,7 +260,7 @@ return errors.Forbidden("insufficient permissions")
 
 ### HTTPStatus
 
-`HTTPStatus` resolves an error to its HTTP status code. Unknown codes and plain errors default to 500:
+`HTTPStatus` resolves an error to its HTTP status code. Unknown codes and plain errors default to 500. A `context.Canceled` outside any `*Error` answers 499 (`StatusClientClosedRequest`): the caller left.
 
 ```go
 status := errors.HTTPStatus(err) // e.g., 404

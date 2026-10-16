@@ -502,6 +502,8 @@ func connectStatusForHTTP(status int) connectwire.Status {
 		return connectwire.Status{Name: "not_found", Number: 5, Status: 404}
 	case http.StatusConflict:
 		return connectwire.Status{Name: "already_exists", Number: 6, Status: 409}
+	case perrors.StatusClientClosedRequest:
+		return connectwire.Status{Name: "canceled", Number: 1, Status: perrors.StatusClientClosedRequest}
 	case http.StatusRequestTimeout:
 		return connectwire.Status{Name: "deadline_exceeded", Number: 4, Status: 504}
 	case http.StatusTooManyRequests:

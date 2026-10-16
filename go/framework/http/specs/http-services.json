@@ -64,6 +64,10 @@
     {
       "id": "idle-connections",
       "text": "An idle keep-alive connection, HTTP/1.1 or HTTP/2 including h2c, stays open for the server's IdleTimeout and never for its ReadTimeout. An unset IdleTimeout resolves to 620 seconds, above the 600-second idle timeout that Google Cloud application load balancers hold on their backend connections, so a proxy in front of the server closes an idle connection first. An explicit IdleTimeout still closes an idle connection when it expires."
+    },
+    {
+      "id": "caller-withdrawal",
+      "text": "Each request context ends with context.DeadlineExceeded at nine tenths of the write timeout: a stalled handler answers 5xx at ERROR, and a success returned after the deadline rolled its work back answers 500. A handler that answers its canceled context answers 499 with the code canceled, logged at INFO with the outcome canceled. WebSocket upgrades, Server-Sent Events, and gRPC or Connect streams run without the deadline."
     }
   ],
   "decisions": [
