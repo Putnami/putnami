@@ -478,7 +478,7 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 			}
 			if match == nil {
 				if err := NotFound().WriteTo(w); err != nil {
-					p.log.Error("write response", err)
+					p.logWriteFailure(r, "write response", err)
 				}
 				return
 			}
@@ -507,7 +507,7 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 				p.log.Error("create DI scope", err)
 				resp := InternalError("Internal Server Error")
 				if writeErr := resp.WriteTo(w); writeErr != nil {
-					p.log.Error("write error response", writeErr)
+					p.logWriteFailure(r, "write error response", writeErr)
 				}
 				return
 			}
@@ -595,10 +595,23 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 		}
 		if resp != nil {
 			if err := resp.WriteTo(w); err != nil {
-				p.log.Error("write response", err)
+				p.logWriteFailure(r, "write response", err)
 			}
 		}
 	}
+}
+
+// logWriteFailure logs a response write that failed. A request whose context
+// ended with context.Canceled has lost its caller, since the request deadline
+// ends a stalled request with context.DeadlineExceeded instead: the write
+// failed because the caller left, and the record is INFO. Any other failure is
+// a server fault, logged at ERROR.
+func (p *ServerPlugin) logWriteFailure(r *http.Request, msg string, err error) {
+	if stderrors.Is(r.Context().Err(), context.Canceled) {
+		p.log.Info(msg, logger.ErrorAttr(err))
+		return
+	}
+	p.log.Error(msg, err)
 }
 
 type maxBytesBody struct {
