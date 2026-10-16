@@ -69,23 +69,6 @@ func TestErrorEnvelope_PanicAnswersInternal(t *testing.T) {
 	envelopeOf(t, resp, http.StatusInternalServerError, "internal", "Internal Server Error")
 }
 
-// startedContainer returns a started container context that registers
-// providers, closed when the test ends.
-func startedContainer(t *testing.T, providers ...inject.Registration) *inject.ContainerContext {
-	t.Helper()
-	cc := inject.NewContainerContext("http-error-envelope")
-	for _, provider := range providers {
-		if err := cc.Register(provider); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := cc.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = cc.Close() })
-	return cc
-}
-
 func TestErrorEnvelope_ScopeCreationFailureAnswersInternal(t *testing.T) {
 	spectest.Proves(t, "go/http-services", "error-envelope", "a-scope-failure-answers-500-internal")
 	cc := startedContainer(t)

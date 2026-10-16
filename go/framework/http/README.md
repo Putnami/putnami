@@ -89,7 +89,7 @@ http.NoContent()                   // 204
 http.NotFound()                    // 404, code not_found
 http.Unauthorized()                // 401, code unauthorized
 http.Forbidden()                   // 403, code forbidden
-http.InternalError(err.Error())    // 500, code internal
+http.InternalError("export failed") // 500, code internal; use http.ErrorResponse(err) for an error value
 
 // Add headers
 resp.WithHeader("X-Custom", "value")

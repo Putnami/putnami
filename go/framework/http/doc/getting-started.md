@@ -214,11 +214,13 @@ The package provides factory functions for common response types:
 
 `NotFound`, `Unauthorized`, `Forbidden` and `InternalError` write the canonical
 error envelope that `ErrorResponse` writes, `{"code", "error", "message"}`, with
-the codes `not_found`, `unauthorized`, `forbidden` and `internal`. The answers
-the server writes on its own use the same envelope: a route that does not exist
-answers `NotFound()`, and a panic that `Recovery` catches, or a request scope
+the codes `not_found`, `unauthorized`, `forbidden` and `internal`. The server
+uses the same envelope for these answers: a route that does not exist answers
+`NotFound()`, and a panic that `Recovery` catches, or a request scope
 that cannot be created, resolved or committed, answers 500 with the code
-`internal` and the message `Internal Server Error`.
+`internal` and the message `Internal Server Error`. `InternalError` sends its
+message to the client verbatim: pass a fixed message, and answer an error value
+with `ErrorResponse(err)`, which hides an internal cause.
 
 ### Modifying Responses
 

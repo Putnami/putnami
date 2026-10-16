@@ -79,7 +79,7 @@
     },
     {
       "id": "error-envelope",
-      "text": "Every error answer the server writes on its own carries the canonical envelope {code, error, message}: a route that does not exist answers 404 with the code not_found, a panic that Recovery catches answers 500 with the code internal and the message Internal Server Error, and a request scope that cannot be created, resolved or committed answers the same 500. NotFound, Unauthorized, Forbidden and InternalError write that envelope with the codes not_found, unauthorized, forbidden and internal."
+      "text": "A route that does not exist answers 404 in the canonical error envelope {code, error, message} with the code not_found. A panic that Recovery catches answers 500 with the code internal and the message Internal Server Error, and so does a request scope that cannot be created, resolved or committed. NotFound, Unauthorized, Forbidden and InternalError write that envelope with the codes not_found, unauthorized, forbidden and internal."
     }
   ],
   "decisions": [
