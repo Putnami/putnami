@@ -168,7 +168,7 @@ func TestPlanKeyMovementFollowsWritersAndFoldedKeys(t *testing.T) {
 	})
 
 	t.Run("a bounded port-reported path", func(t *testing.T) {
-		spectest.Proves(t, "cli/job-planning-execution", "session-written-input-keys",
+		spectest.Proves(t, "cli/job-planning-execution", "planned-write-reach",
 			"a-bounded-port-output-moves-only-the-keys-that-read-its-bound")
 		merge := declaredJob("build~merge", "merge", &extension.TaskDeclaration{
 			Outputs: map[string]extension.DeclaredOutput{
@@ -198,7 +198,7 @@ func TestPlanKeyMovementFollowsWritersAndFoldedKeys(t *testing.T) {
 // write that can change those directives makes every write in the key's
 // region count again.
 func TestPlanKeyMovementCountsOnlyWritesThatReachASelectedFile(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "session-written-input-keys",
+	spectest.Proves(t, "cli/job-planning-execution", "planned-write-reach",
 		"a-write-that-reaches-no-selected-file-leaves-a-key-unmoved")
 	sources := []string{"**/*.go", "!**/*_test.go", "go-embed:build", "!**/.gen/**"}
 	compile := func() *ScheduledJob {

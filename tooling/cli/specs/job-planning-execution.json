@@ -155,7 +155,11 @@
     },
     {
       "id": "session-written-input-keys",
-      "text": "A task is looked up, stored and shared at the key of the bytes it reads when it starts: a declared output an earlier task of the session wrote, by executing, whatever its verdict, or by restoring its entry, moves that key. A key computed before any task runs is never used for a task whose inputs another planned task may write: a write may reach an input unless the input's exclusions cover the written tree, its patterns do not match the written file, or, for a Go embed selector, the write lies beside every Go source and every path its embed directives name while no planned write can change those sources. An output whose path its task reports writes, before the task runs, anywhere under its declared within bound, or under its whole root when it declares none. A resource pruned on such a consumer key is confirmed from the consumer's key when its producer starts, and provisioned when a write that can move that key may finish later."
+      "text": "A task is looked up, stored and shared at the key of the bytes it reads when it starts: a declared output an earlier task of the session wrote, by executing, whatever its verdict, or by restoring its entry, moves that key. A key computed before any task runs is never used for a task whose inputs another planned task may write. A resource pruned on such a consumer key is confirmed from the consumer's key when its producer starts, and provisioned when a write that can move that key may finish later."
+    },
+    {
+      "id": "planned-write-reach",
+      "text": "Before any task runs, a planned write moves a key only when it can reach a file the key selects: not when the key's exclusions cover the written tree, its patterns do not match the written file, or, for a Go embed selector, the write lies beside every Go source and embedded path while no planned write changes those sources. A path a task reports is written anywhere under its declared within bound, or its whole root without one. A write the key may read under another name reaches it."
     }
   ],
   "decisions": [

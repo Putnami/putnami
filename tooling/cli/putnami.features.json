@@ -1077,7 +1077,19 @@
             "checks": [
               "an-earlier-task-output-moves-the-key-of-its-reader",
               "a-precomputed-key-a-write-may-move-is-never-looked-up-or-shared",
-              "pruning-on-a-movable-consumer-key-is-confirmed-when-the-producer-starts",
+              "pruning-on-a-movable-consumer-key-is-confirmed-when-the-producer-starts"
+            ]
+          }
+        },
+        {
+          "id": "planned-write-reach",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
               "a-write-that-reaches-no-selected-file-leaves-a-key-unmoved",
               "a-bounded-port-output-moves-only-the-keys-that-read-its-bound"
             ]
