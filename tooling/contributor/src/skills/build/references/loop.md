@@ -70,7 +70,7 @@ the decision in the proposal when you keep the spread.
 | Tier | When | Worker profile (policy default) | Effort |
 |---|---|---|---|
 | light | Prescribed mechanical change, no behavioral invariant at risk | `workers.light` (`fix-light`) | medium |
-| standard | Settled multi-file design following existing patterns | `workers.standard` (`fix-standard`), or inline when the coordinator already runs at that quality | high |
+| standard | Settled multi-file design following existing patterns | `workers.standard` (`fix-standard`) | high |
 | heavy | Open design, security, concurrency, caching or cross-contract invariants | `workers.heavy` (`fix-heavy`) | xhigh |
 
 An explicit tier wins, then a task tier label (policy `tasks.tiers`), then the
