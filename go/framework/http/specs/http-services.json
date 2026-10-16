@@ -72,6 +72,10 @@
     {
       "id": "failed-writes",
       "text": "A response write that fails after the request context ended with context.Canceled, such as a client that resets a download mid-body or closes its connection, logs the failure at INFO. A write that fails while the request context is live logs at ERROR. Over HTTP/2, a failed write waits up to 100 ms for the stream context to end before it is classified."
+    },
+    {
+      "id": "request-log-status",
+      "text": "The request log records the status written to the wire. A handler that writes its answer to the response writer, such as a gateway-mounted Connect handler, is logged with the status it wrote, and the record's level and outcome follow that status: a 5xx logs at ERROR with the outcome failure, a 499 logs at INFO with the outcome canceled, and any other status logs at INFO with the outcome success. A body written without a status logs 200."
     }
   ],
   "decisions": [
