@@ -1082,6 +1082,20 @@
               "pruning-on-a-movable-consumer-key-is-confirmed-when-the-producer-starts"
             ]
           }
+        },
+        {
+          "id": "planned-write-reach",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-write-that-reaches-no-selected-file-leaves-a-key-unmoved",
+              "a-bounded-port-output-moves-only-the-keys-that-read-its-bound"
+            ]
+          }
         }
       ]
     },

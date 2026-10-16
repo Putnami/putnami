@@ -353,6 +353,7 @@ wiring — though a declared output may take its path from such a port (see
 | `sensitive` | no | The output's path and bytes never reach events, results, sessions, telemetry, or cache traffic. Requires `scope: "invocation"` and a literal `path` |
 | `path` | one of | Literal root-relative path |
 | `pathFrom` | one of | Name of a port in the task's `outputs` map whose runtime value is the path |
+| `within` | no | Root-relative subtree a `pathFrom` output's reported path must equal or lie under. A path outside it leaves the run uncached, and the planner takes the output's write to be this subtree instead of the whole root. Requires `pathFrom` |
 | `optionalEmpty` | no | The output may legitimately be absent, or empty, after a successful run |
 | `emptied` | no | The engine empties this `optionalEmpty` **directory** output before the task executes and on a restore of an entry that records it empty. Requires a durable scope, a literal `path`, and the `project` or `workspace` root |
 | `excludes` | no | Root-relative subpaths this **directory** output cedes: neither captured nor restored with it, and ownable by another task |
@@ -363,6 +364,14 @@ wiring — though a declared output may take its path from such a port (see
 Exactly one of `path` and `pathFrom` is set. `pathFrom` exists for outputs whose
 location is chosen per project — a configured generated-client directory —
 so they stay declarable instead of hard-coded in the runner.
+
+A `pathFrom` output's path is unknown until the task runs, so before the run
+the planner counts it as a write to its whole root: every key that reads a file
+of the project moves. When the path always lands in one subtree, set `within`
+to that subtree. The planner then moves only the keys that read a file under
+it, and the engine caches no entry for a run whose port reports a path
+outside it
+([ADR 0010](adr/0010-a-path-from-output-may-bound-its-path.md)).
 
 A `path` is canonical and concrete: slash-separated, cleaned, relative to its
 root, never the root itself, and never a glob or a template variable. The root

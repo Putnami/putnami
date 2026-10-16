@@ -280,3 +280,48 @@ func TestResolveRejectsUnsafeSourceFileSymlinks(t *testing.T) {
 		t.Fatalf("test source link escaped project: %v", err)
 	}
 }
+
+// Every file an embed pattern embeds lies at or under its static prefix, so the
+// prefix bounds what a directive can read before any file exists.
+func TestStaticPrefixBoundsEveryEmbeddedFile(t *testing.T) {
+	for declared, want := range map[string]string{
+		".gen/version.json":    ".gen/version.json",
+		"all:assets/config":    "assets/config",
+		"static/*.html":        "static",
+		"templates/[a-z]*/x":   "templates",
+		"*":                    "",
+		"assets/report one.js": "assets/report one.js",
+	} {
+		got, err := StaticPrefix(declared)
+		if err != nil || got != want {
+			t.Errorf("StaticPrefix(%q) = %q, %v; want %q", declared, got, err, want)
+		}
+	}
+	for _, invalid := range []string{"", "../x", "/abs", "a//b"} {
+		if _, err := StaticPrefix(invalid); err == nil {
+			t.Errorf("StaticPrefix(%q) accepted an invalid pattern", invalid)
+		}
+	}
+}
+
+func TestDirectivesAndLinksNamesLinkTargets(t *testing.T) {
+	root := t.TempDir()
+	put(t, root, "p/embed.go", "package p\nimport _ \"embed\"\n//go:embed .gen/version.json\nvar x []byte\n")
+	put(t, root, "shared/linked.go.txt", "package p\n")
+	if err := os.Symlink(filepath.Join("..", "shared", "linked.go.txt"), filepath.Join(root, "p", "linked.go")); err != nil {
+		t.Fatal(err)
+	}
+	directives, links, err := DirectivesAndLinks(root, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := directives["p/embed.go"]; !slices.Equal(got, []string{".gen/version.json"}) {
+		t.Fatalf("directives = %v", directives)
+	}
+	if !slices.Equal(links, []string{filepath.Join(root, "shared", "linked.go.txt")}) {
+		t.Fatalf("links = %v", links)
+	}
+	if !IgnoresSource(".gen/x.go") || !IgnoresSource("vendor/a/b.go") || IgnoresSource("p/embed.go") {
+		t.Fatal("IgnoresSource disagrees with the source scan")
+	}
+}

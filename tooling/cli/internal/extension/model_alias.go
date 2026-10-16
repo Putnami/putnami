@@ -143,6 +143,10 @@ var DecidableExcludes = model.DecidableExcludes
 // leaves to the workspace (protocol ADR 0005): normalized and sorted.
 var DecidablePreserves = model.DecidablePreserves
 
+// LiesWithin reports whether a canonical root-relative path equals a pathFrom
+// output's within bound or lies under it (protocol ADR 0010).
+var LiesWithin = model.LiesWithin
+
 // --- Resolved types (the planner's in-memory extension) ---
 
 // ExtensionDescription is the resolved, in-memory representation of an extension.

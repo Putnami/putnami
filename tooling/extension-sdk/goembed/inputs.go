@@ -306,6 +306,13 @@ func ToolingIgnoresPath(rel string) bool {
 	return false
 }
 
+// IgnoresSource reports whether the source scan Directives runs skips rel, a
+// project-relative path: under a directory the Go tool ignores, under vendor,
+// or a file the Go tool ignores.
+func IgnoresSource(rel string) bool {
+	return ignoresSource(rel)
+}
+
 func ignoresSource(rel string) bool {
 	if ToolingIgnoresPath(rel) {
 		return true
@@ -397,6 +404,32 @@ func readSource(root, filename string) ([]byte, string, error) {
 func Directives(root string, includeTests bool) (map[string][]string, error) {
 	found, _, _, err := directivesAndSourceLinks(root, includeTests)
 	return found, err
+}
+
+// DirectivesAndLinks returns what Directives returns and the absolute path of
+// the target of every source-file link the scan read: the bytes the directives
+// of a linked source come from.
+func DirectivesAndLinks(root string, includeTests bool) (map[string][]string, []string, error) {
+	found, links, _, err := directivesAndSourceLinks(root, includeTests)
+	return found, links, err
+}
+
+// StaticPrefix returns the leading segments of an embed pattern that hold no
+// glob metacharacter, without its "all:" prefix: every file the pattern
+// embeds lies at or under that path, relative to the directive's package.
+func StaticPrefix(declared string) (string, error) {
+	pattern, _, err := validPattern(declared)
+	if err != nil {
+		return "", err
+	}
+	var static []string
+	for _, part := range strings.Split(pattern, "/") {
+		if strings.ContainsAny(part, `*?[\`) {
+			break
+		}
+		static = append(static, part)
+	}
+	return strings.Join(static, "/"), nil
 }
 
 func directivesAndSourceLinks(root string, includeTests bool) (map[string][]string, []string, []string, error) {

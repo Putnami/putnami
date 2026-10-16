@@ -93,3 +93,42 @@ func TestMatchFilePattern_DoubleStarMatchesZeroSegments(t *testing.T) {
 		}
 	}
 }
+
+// An exclusion covers a tree only when it removes every path that can lie
+// there: each covered tree below is checked against paths written beneath it,
+// and each uncovered one names a path the exclusions leave selected.
+func TestExcludesTree(t *testing.T) {
+	excludes := []string{"**/.gen/**", "!ignored", "**/*_test.go", "build/out/**", "../shared/**"}
+	for _, testCase := range []struct {
+		rel     string
+		covered bool
+		// beneath is a path at or under rel the exclusions leave selected
+		// when the tree is not covered, or one they remove when it is.
+		beneath string
+	}{
+		{".gen", true, ".gen/conf/.env.local.yaml"},
+		{".gen/conf", true, ".gen/conf/.env.local.yaml"},
+		{"pkg/.gen/schema", true, "pkg/.gen/schema/openapi.json"},
+		{"build/out", true, "build/out/a/b.txt"},
+		{"build/out/sub", true, "build/out/sub/x"},
+		{"../shared/lib", true, "../shared/lib/a.go"},
+		{"build", false, "build/main.go"},
+		{"generated", false, "generated/client.go"},
+		{"pkg", false, "pkg/a.go"},
+		{"x_test.go", false, "x_test.go/inner.go"},
+		{".", false, "a.go"},
+	} {
+		if got := ExcludesTree(testCase.rel, excludes); got != testCase.covered {
+			t.Errorf("ExcludesTree(%q) = %v, want %v", testCase.rel, got, testCase.covered)
+		}
+		if got := MatchesAnyFilePattern(testCase.beneath, excludes); got != testCase.covered {
+			t.Errorf("the exclusions match %q: %v, want %v", testCase.beneath, got, testCase.covered)
+		}
+	}
+	if !ExcludesTree("anything/at/all", []string{"**"}) {
+		t.Error(`"**" excludes every tree`)
+	}
+	if ExcludesTree("a", nil) {
+		t.Error("no exclusion covers a tree")
+	}
+}
