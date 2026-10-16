@@ -40,6 +40,7 @@ func newGoSourceKeyFixture(t *testing.T, taskName, jobName string, crossProjectE
 	// The test exercises manifest inputs, not mutable-runtime identity.
 	goExtension.LocalSource = false
 	goExtension.RelPath = "go/extension"
+	pinInstalledTree(t, goExtension)
 	task, ok := goExtension.Tasks[taskName]
 	if !ok {
 		t.Fatalf("real Go manifest has no %s task", taskName)

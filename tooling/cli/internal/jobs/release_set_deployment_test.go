@@ -245,6 +245,7 @@ func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing
 	}
 	// The implementation digest of a local extension is not under test here.
 	goExtension.LocalSource = false
+	pinInstalledTree(t, goExtension)
 
 	root := t.TempDir()
 	writeProjectFile(t, root, "lib", "go.mod", "module example.com/lib\n")
