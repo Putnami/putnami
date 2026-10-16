@@ -117,35 +117,37 @@ func NoContent() *Response {
 	return NewResponse(http.StatusNoContent)
 }
 
-// NotFound creates a 404 Not Found JSON response.
+// NotFound creates a 404 response in the canonical error envelope, with the
+// code not_found.
 func NotFound() *Response {
-	return JSONStatus(http.StatusNotFound, map[string]string{
-		"error":   "Not Found",
-		"message": "The requested resource was not found",
-	})
+	return errorEnvelope(http.StatusNotFound, perrors.CodeNotFound, "The requested resource was not found")
 }
 
-// Unauthorized creates a 401 Unauthorized JSON response.
+// Unauthorized creates a 401 response in the canonical error envelope, with
+// the code unauthorized.
 func Unauthorized() *Response {
-	return JSONStatus(http.StatusUnauthorized, map[string]string{
-		"error":   "Unauthorized",
-		"message": "Authentication required",
-	})
+	return errorEnvelope(http.StatusUnauthorized, perrors.CodeUnauthorized, "Authentication required")
 }
 
-// Forbidden creates a 403 Forbidden JSON response.
+// Forbidden creates a 403 response in the canonical error envelope, with the
+// code forbidden.
 func Forbidden() *Response {
-	return JSONStatus(http.StatusForbidden, map[string]string{
-		"error":   "Forbidden",
-		"message": "Insufficient permissions",
-	})
+	return errorEnvelope(http.StatusForbidden, perrors.CodeForbidden, "Insufficient permissions")
 }
 
-// InternalError creates a 500 Internal Server Error JSON response.
+// InternalError creates a 500 response in the canonical error envelope, with
+// the code internal. The client receives message verbatim.
 func InternalError(message string) *Response {
-	return JSONStatus(http.StatusInternalServerError, map[string]string{
-		"error":   "Internal Server Error",
-		"message": message,
+	return errorEnvelope(http.StatusInternalServerError, perrors.CodeInternal, message)
+}
+
+// errorEnvelope creates a JSON response whose body is the canonical error
+// envelope that ErrorResponse writes: {code, error, message}.
+func errorEnvelope(status int, code perrors.Code, message string) *Response {
+	return JSONStatus(status, perrors.HTTPErrorBody{
+		Code:    string(code),
+		Error:   http.StatusText(status),
+		Message: message,
 	})
 }
 

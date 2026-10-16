@@ -86,10 +86,10 @@ http.JSONStatus(201, data)         // Custom status + JSON
 http.Text("hello")                 // 200 + text/plain
 http.Redirect("/login", 302)       // Redirect
 http.NoContent()                   // 204
-http.NotFound()                    // 404
-http.Unauthorized()                // 401
-http.Forbidden()                   // 403
-http.InternalError(err)            // 500
+http.NotFound()                    // 404, code not_found
+http.Unauthorized()                // 401, code unauthorized
+http.Forbidden()                   // 403, code forbidden
+http.InternalError(err.Error())    // 500, code internal
 
 // Add headers
 resp.WithHeader("X-Custom", "value")

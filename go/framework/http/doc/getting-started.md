@@ -212,6 +212,14 @@ The package provides factory functions for common response types:
 | `Forbidden()` | 403 | `application/json` |
 | `InternalError(message)` | 500 | `application/json` |
 
+`NotFound`, `Unauthorized`, `Forbidden` and `InternalError` write the canonical
+error envelope that `ErrorResponse` writes, `{"code", "error", "message"}`, with
+the codes `not_found`, `unauthorized`, `forbidden` and `internal`. The answers
+the server writes on its own use the same envelope: a route that does not exist
+answers `NotFound()`, and a panic that `Recovery` catches, or a request scope
+that cannot be created, resolved or committed, answers 500 with the code
+`internal` and the message `Internal Server Error`.
+
 ### Modifying Responses
 
 Responses are immutable-style. Use `WithStatus` and `WithHeader` to derive a new response:
@@ -294,7 +302,7 @@ resp := wrapped(ctx)
 
 #### Recovery
 
-Catches panics and returns a 500 response with the panic message. Always register this first:
+Catches panics and returns a 500 response with the code `internal` and the fixed message `Internal Server Error`; the panic itself goes to the log only. Always register this first:
 
 ```go
 server.Use(http.Recovery())

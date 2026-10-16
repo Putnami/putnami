@@ -203,11 +203,11 @@ fhttp.Redirect("/new-location", 302)
 // No content
 fhttp.NoContent()                    // 204
 
-// Error responses
-fhttp.NotFound()                     // 404 JSON
-fhttp.Unauthorized()                 // 401 JSON
-fhttp.Forbidden()                    // 403 JSON
-fhttp.InternalError("something failed") // 500 JSON
+// Error responses, in the canonical envelope {code, error, message}
+fhttp.NotFound()                     // 404, code not_found
+fhttp.Unauthorized()                 // 401, code unauthorized
+fhttp.Forbidden()                    // 403, code forbidden
+fhttp.InternalError("something failed") // 500, code internal
 ```
 
 ### Response modification

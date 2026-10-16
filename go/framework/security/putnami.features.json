@@ -20,6 +20,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "a-denial-answers-the-canonical-envelope",
               "client-denial-returns-403",
               "guard-denial-returns-403",
               "missing-identity-returns-401",
