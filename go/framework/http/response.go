@@ -215,6 +215,11 @@ func (r *Response) WriteTo(w http.ResponseWriter) (retErr error) {
 		_, retErr = io.Copy(w, r.stream)
 		return retErr
 	}
+	return r.writeBody(w)
+}
+
+// writeBody writes a body held in memory to w.
+func (r *Response) writeBody(w io.Writer) error {
 	if r.raw != nil {
 		_, err := w.Write(r.raw)
 		return err

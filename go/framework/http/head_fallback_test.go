@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -54,6 +55,9 @@ func TestHeadFallbackAnswersTheGetHeadWithoutABody(t *testing.T) {
 			}},
 			"small text": {status: http.StatusOK, inMemory: true, handler: func(*Context, *countingSource) *Response {
 				return Text("ok")
+			}},
+			"empty body": {status: http.StatusOK, inMemory: true, handler: func(*Context, *countingSource) *Response {
+				return NewResponse(http.StatusOK)
 			}},
 			"large json": {status: http.StatusCreated, inMemory: true, handler: func(*Context, *countingSource) *Response {
 				return JSONStatus(http.StatusCreated, map[string]string{"data": string(large)})
@@ -161,8 +165,9 @@ func TestHeadFallbackAnswersTheGetHeadWithoutABody(t *testing.T) {
 	}
 }
 
-// An explicit HEAD route and a HEAD request to an unknown path also answer
-// their status and headers with no body, and log no ERROR.
+// An explicit HEAD route, a HEAD request to an unknown path and a status that
+// carries no body also answer their status and headers with no body, and log
+// no ERROR. Only a status that allows a body gets a Content-Length.
 func TestHeadRequestWritesNoBody(t *testing.T) {
 	spectest.Proves(t, "go/http-services", "method-fallbacks", "a-head-fallback-answers-the-get-status-and-headers-without-a-body")
 	rec := logtest.NewRecorder(t)
@@ -171,13 +176,27 @@ func TestHeadRequestWritesNoBody(t *testing.T) {
 	server.Route(http.MethodHead, "/explicit", func(*Context) *Response {
 		return Bytes(http.StatusOK, "application/octet-stream", bytes.Repeat([]byte("x"), 64<<10))
 	})
+	server.GET("/empty", func(*Context) *Response {
+		return NoContent()
+	})
 
 	ts := httptest.NewUnstartedServer(server.Handler())
 	ts.EnableHTTP2 = true
 	ts.StartTLS()
 	defer ts.Close()
 
-	for path, status := range map[string]int{"/explicit": http.StatusOK, "/missing": http.StatusNotFound} {
+	notFound, err := NotFound().BodyBytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]struct {
+		status int
+		length string
+	}{
+		"/explicit": {status: http.StatusOK, length: strconv.Itoa(64 << 10)},
+		"/missing":  {status: http.StatusNotFound, length: strconv.Itoa(len(notFound) + 1)}, // WriteTo ends JSON with a newline
+		"/empty":    {status: http.StatusNoContent},
+	} {
 		req, err := http.NewRequest(http.MethodHead, ts.URL+path, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -188,8 +207,11 @@ func TestHeadRequestWritesNoBody(t *testing.T) {
 		}
 		body, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
-		if resp.ProtoMajor != 2 || resp.StatusCode != status || len(body) != 0 {
-			t.Errorf("HEAD %s = %s %d with %d body bytes, want HTTP/2 %d with none", path, resp.Proto, resp.StatusCode, len(body), status)
+		if resp.ProtoMajor != 2 || resp.StatusCode != want.status || len(body) != 0 {
+			t.Errorf("HEAD %s = %s %d with %d body bytes, want HTTP/2 %d with none", path, resp.Proto, resp.StatusCode, len(body), want.status)
+		}
+		if got := resp.Header.Get("Content-Length"); got != want.length {
+			t.Errorf("HEAD %s Content-Length = %q, want %q", path, got, want.length)
 		}
 	}
 	ts.Close() // waits for the handlers, so every record they write is in
@@ -197,4 +219,25 @@ func TestHeadRequestWritesNoBody(t *testing.T) {
 		t.Errorf("want no write response record, got %d.%s", len(records), rec.Dump())
 	}
 	assertNoErrorRecord(t, rec)
+}
+
+// A HEAD request whose JSON body cannot be encoded still answers the returned
+// status and headers, as GET does before its body write fails.
+func TestHeadRequestWithAnUnencodableBodyKeepsTheReturnedHead(t *testing.T) {
+	spectest.Proves(t, "go/http-services", "method-fallbacks", "a-head-fallback-answers-the-get-status-and-headers-without-a-body")
+	server := NewServerPlugin(ServerConfig{})
+	server.log = logtest.NewRecorder(t).Named("http")
+	server.GET("/broken", func(*Context) *Response {
+		return JSONStatus(http.StatusCreated, map[string]float64{"v": math.NaN()})
+	})
+
+	w := httptest.NewRecorder()
+	server.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodHead, "/broken", nil))
+
+	if w.Code != http.StatusCreated || w.Header().Get("Content-Type") != "application/json" {
+		t.Errorf("HEAD = %d %q, want 201 application/json", w.Code, w.Header().Get("Content-Type"))
+	}
+	if got := w.Header().Get("Content-Length"); got != "" || w.Body.Len() != 0 {
+		t.Errorf("HEAD Content-Length = %q with %d body bytes, want neither", got, w.Body.Len())
+	}
 }
