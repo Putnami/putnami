@@ -538,7 +538,8 @@
               "two-vocabularies-declaring-one-verb-warn",
               "a-workspace-alias-wins-over-a-vocabulary-alias",
               "a-provider-process-resolves-no-vocabulary-alias",
-              "impact-plan-resolves-the-vocabulary-aliases"
+              "impact-plan-resolves-the-vocabulary-aliases",
+              "the-live-view-orders-columns-by-the-loaded-vocabulary"
             ]
           }
         },

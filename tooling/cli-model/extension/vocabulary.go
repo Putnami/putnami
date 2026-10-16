@@ -115,6 +115,16 @@ func (v Vocabulary) Verb(name string) (VerbDefinition, bool) {
 	return VerbDefinition{}, false
 }
 
+// VerbNames returns the names of the merged verbs, in merge order, or nil when
+// the vocabulary has none.
+func (v Vocabulary) VerbNames() []string {
+	var names []string
+	for _, verb := range v.Verbs {
+		names = append(names, verb.Name)
+	}
+	return names
+}
+
 // AliasMap returns the aliases as a map from alias to verb, or nil when the
 // vocabulary has none.
 func (v Vocabulary) AliasMap() map[string]string {
