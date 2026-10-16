@@ -341,35 +341,17 @@ func reclassifyUnobserved(verdicts []features.SpecRequirementVerdict, unconsulte
 }
 
 // unobservedRequirements returns the indexes of the requirements whose ONLY
-// defect is a declared check nothing reported. It is the shared predicate: the
-// same rows are excused when a source was unreachable and named as an
+// defect is a declared check nothing reported (features.Unobservable). The same
+// rows are excused when a source was unreachable and named as an
 // exhausted-scope gap when every source answered.
 func unobservedRequirements(verdicts []features.SpecRequirementVerdict) []int {
 	var indexes []int
 	for i := range verdicts {
-		if verdicts[i].State != features.RequirementMissing {
-			continue
+		if features.Unobservable(verdicts[i]) {
+			indexes = append(indexes, i)
 		}
-		if !onlyUnobservedChecks(verdicts[i].Checks) {
-			continue
-		}
-		indexes = append(indexes, i)
 	}
 	return indexes
-}
-
-func onlyUnobservedChecks(checks []features.SpecCheckVerdict) bool {
-	unobserved := false
-	for _, check := range checks {
-		switch {
-		case check.State == features.CheckSatisfied:
-		case check.State == features.CheckMissing && check.Reason == features.ReasonCheckNotObserved:
-			unobserved = true
-		default:
-			return false
-		}
-	}
-	return unobserved
 }
 
 // unobservedDiagnostic is the DX deliverable: the message that replaces a bare

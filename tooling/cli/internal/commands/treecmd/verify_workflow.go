@@ -306,6 +306,18 @@ func (r *verifyRun) workflowVerdicts(record *features.SpecVerificationRecord, se
 		for _, evaluation := range evaluated {
 			evaluatedByID[evaluation.Requirement] = evaluation
 		}
+		// The collector reclassifies, in one decision per group, every
+		// requirement features.Unobservable admits once an attester could not be
+		// consulted, and warns. Which attester was unreachable is cache state the
+		// record does not carry, so the replay checks what it can: the state on
+		// exactly the rows the pure evaluator finds unobservable, and, as a
+		// consistency check only, the warning the collector emits with them.
+		reclassified := slices.ContainsFunc(group.Requirements, func(verdict features.SpecRequirementVerdict) bool {
+			return verdict.State == features.RequirementUnobserved
+		})
+		require(!reclassified || slices.ContainsFunc(group.Diagnostics, func(finding diag.Diagnostic) bool {
+			return finding.Severity == diag.Warning && finding.Code == features.WarningCodeUnobservedRequirement
+		}), "workflow proof reclassifies unobserved requirements without the native warning for "+featureID)
 		for _, verdict := range group.Requirements {
 			expected, known := requirements[verdict.Requirement]
 			require(known, "workflow proof has unknown requirement "+featureID+"#"+verdict.Requirement)
@@ -320,7 +332,11 @@ func (r *verifyRun) workflowVerdicts(record *features.SpecVerificationRecord, se
 			sort.Strings(sortedExpected)
 			require(slices.Equal(actual, sortedExpected), "workflow proof check inventory differs for "+key)
 			evaluation := evaluatedByID[verdict.Requirement]
-			require(verdict.State == evaluation.State, "workflow proof does not match native producer observations for "+key)
+			state := evaluation.State
+			if reclassified && features.Unobservable(workflowEvaluatedVerdict(evaluation)) {
+				state = features.RequirementUnobserved
+			}
+			require(verdict.State == state, "workflow proof does not match native producer observations for "+key)
 			if evaluation.Evaluation != nil {
 				for _, computed := range evaluation.Evaluation.Checks {
 					match := false
@@ -336,6 +352,18 @@ func (r *verifyRun) workflowVerdicts(record *features.SpecVerificationRecord, se
 		}
 	}
 	return result
+}
+
+// workflowEvaluatedVerdict projects the pure evaluator's result onto the record
+// verdict shape features.Unobservable reads.
+func workflowEvaluatedVerdict(evaluation features.SpecRequirementEvaluation) features.SpecRequirementVerdict {
+	verdict := features.SpecRequirementVerdict{Requirement: evaluation.Requirement, State: evaluation.State}
+	if evaluation.Evaluation != nil {
+		for _, check := range evaluation.Evaluation.Checks {
+			verdict.Checks = append(verdict.Checks, features.SpecCheckVerdict{Check: check.Check, State: check.State, Reason: check.Reason})
+		}
+	}
+	return verdict
 }
 
 func (r *verifyRun) workflowRequirements(value any, source map[string]workflowSource) (map[string]workflowRequirement, int) {

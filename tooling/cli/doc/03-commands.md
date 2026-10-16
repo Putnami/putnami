@@ -1073,9 +1073,15 @@ and `unresolvedFindings`.
 `spec-verification.json` beside the exact v2 session file, with a matching
 session ID and current tree fingerprint. Its native per-requirement and
 per-check verdicts must match the complete authored spec and manifest
-inventories. Missing, duplicate, failed, skipped, stale, or unknown checks
-cannot pass a current unit. Unmapped and unexecutable requirements remain
-visible as incomplete. Native collection errors block proof; advisory native
+inventories. The verifier recomputes each verdict from the producer reports.
+A requirement recorded `unobserved`, because the gate could not consult a
+project outside its selection that might attest it, matches when the
+recomputed verdict is `missing` only because no observation reported a check,
+when its group reclassifies every such requirement, and when the group carries
+the native `features.unobserved_requirement` warning. Missing, duplicate,
+failed, skipped, stale, or unknown checks cannot pass a current unit, and
+neither can an `unobserved` requirement.
+Unmapped and unexecutable requirements remain visible as incomplete. Native collection errors block proof; advisory native
 warnings remain visible with the affected incomplete unit, so a later
 unobserved requirement cannot silently disappear or block an otherwise ready
 independent current unit. A standalone `--workflow` call can report pending

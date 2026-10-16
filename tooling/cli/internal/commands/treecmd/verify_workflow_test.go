@@ -451,6 +451,96 @@ func TestWorkflowLaterScopeAndUnitReceipts(t *testing.T) {
 	f.workflow(w, false, "workflow unit has no requirements")
 }
 
+// A gate whose selection did not plan an attester records the requirement
+// unobserved (specgate.reclassifyUnobserved). The replay accepts that state
+// exactly where the collector produces it, so an excluded unobserved
+// requirement leaves the current unit ready, and anything else is refused.
+func TestWorkflowReplaysUnobservedReclassification(t *testing.T) {
+	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "native-requirement-check-coverage")
+	t.Parallel()
+	cases := []struct {
+		name, reason string
+		change       func(f *verifyFixture, w, group fxObj)
+	}{
+		{"every unobservable row reclassified", "", func(*verifyFixture, fxObj, fxObj) {}},
+		// Every attester answered: the collector warns with the same code and
+		// leaves the rows missing, which the replay also accepts. Report mode
+		// keeps the group from failing the gate that produced it.
+		{"exhausted scope left missing", "", func(_ *verifyFixture, _, group fxObj) {
+			group["mode"] = "report"
+			fxObjAt(group, "requirements", 1)["state"] = "missing"
+			fxObjAt(group, "requirements", 2)["state"] = "missing"
+		}},
+		{"no native warning", "without the native warning", func(_ *verifyFixture, _, group fxObj) {
+			group["diagnostics"] = fxArr{}
+		}},
+		{"one unobservable row left missing", "does not match native producer observations", func(_ *verifyFixture, _, group fxObj) {
+			fxObjAt(group, "requirements", 1)["state"] = "missing"
+		}},
+		{"verified row reclassified", "does not match native producer observations", func(_ *verifyFixture, _, group fxObj) {
+			fxObjAt(group, "requirements", 0)["state"] = "unobserved"
+		}},
+		{"current unobserved requirement", "current unit lacks passing native checks", func(_ *verifyFixture, w, _ fxObj) {
+			row := fxObjAt(w, "requirements", 2)
+			row["disposition"], row["unit"] = "current", "first"
+			delete(row, "reason")
+			delete(row, "authority")
+			fxAppend(fxObjAt(w, "units", 0), "requirements", workflowFeature+"#large-data")
+		}},
+		{"skipped check reclassified", "does not match native producer observations", func(f *verifyFixture, _, group fxObj) {
+			report := f.readJSON(".context/verification-report.json")
+			report["observations"] = append(fxArrAt(report, "observations"), fxObj{
+				"feature": workflowFeature, "requirement": "large-data", "check": "large-data-check", "status": "skipped",
+				"provenance": fxObj{"path": "app_test.go", "symbol": "TestLargeData"}})
+			f.write(".context/verification-report.json", report)
+			fxObjAt(group, "reports", 0)["digest"] = "sha256:" + f.reference(".context/verification-report.json")["sha256"].(string)
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f, w := newWorkflowFixture(t)
+			manifest := f.readJSON(".context/putnami.features.json")
+			spec := f.readJSON(".context/specs/workflow.json")
+			record := f.readJSON(".context/sessions/synthetic-gate/spec-verification.json")
+			group := fxObjAt(record, "groups", 0)
+			for _, id := range []string{"bulk-data", "large-data"} {
+				fxAppend(fxObjAt(manifest, "features", 0), "requirements", fxObj{
+					"id": id, "stage": "coded", "evidenceKinds": fxArr{"attestation"},
+					"verification": fxObj{"kind": "acceptance", "checks": fxArr{id + "-check"}}})
+				fxAppend(spec, "requirements", fxObj{"id": id, "text": "An attester outside the selection proves it."})
+				fxAppend(group, "requirements", fxObj{"requirement": id, "state": "unobserved",
+					"checks": fxArr{fxObj{"check": id + "-check", "state": "missing", "reason": "check-not-observed"}}})
+				fxAppend(w, "requirements", fxObj{"feature": workflowFeature, "id": id, "disposition": "excluded",
+					"reason":    f.note(id+"-reason", "Its attester is outside this selection."),
+					"authority": f.note(id+"-authority", "Scope authority approved the exclusion.")})
+			}
+			group["diagnostics"] = fxArr{fxObj{"severity": "warning", "code": "features.unobserved_requirement",
+				"message": "2 requirement(s) have checks that NO observation source reported.", "field": ".context/specs/workflow.json"}}
+			tc.change(f, w, group)
+			counts := fxObj{"specRequirements": 3, "executable": 3, "verified": 0, "unmapped": 0,
+				"unexecutable": 0, "missing": 0, "stale": 0, "contradicted": 0}
+			blocked := false
+			for _, item := range fxArrAt(group, "requirements") {
+				state := item.(fxObj)["state"].(string)
+				if counts[state] == nil {
+					counts[state] = 0
+				}
+				counts[state] = counts[state].(int) + 1
+				blocked = blocked || (group["mode"] == "enforce" && state != "verified" && state != "unobserved")
+			}
+			group["counts"], group["blocked"] = counts, blocked
+			f.write(".context/putnami.features.json", manifest)
+			f.write(".context/specs/workflow.json", spec)
+			f.write(".context/sessions/synthetic-gate/spec-verification.json", record)
+			source := fxObjAt(w, "sources", 0)
+			source["manifest"], source["spec"] = f.reference(".context/putnami.features.json"), f.reference(".context/specs/workflow.json")
+			fxObjAt(w, "proof")["specVerification"] = f.reference(".context/sessions/synthetic-gate/spec-verification.json")
+			f.workflow(w, true, tc.reason)
+		})
+	}
+}
+
 func TestWorkflowArtifactAndHandoffBindings(t *testing.T) {
 	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "relevant-artifact-invalidation")
 	t.Parallel()
