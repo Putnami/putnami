@@ -473,10 +473,12 @@ the bytes it reads, whether or not it depends on that task:
 - a generate asset reaches the paths it names.
 
 A write outside every declaration is not seen until the next run, so a file a
-task produces for a later task belongs in its declared outputs. Paths are
-compared as written, without resolving symbolic links: an input read through a
-link is reached by the link's path, so an output declared at the link's target
-does not drop its digest. A task that rewrites its sources drops every digest
+task produces for a later task belongs in its declared outputs. A symbolic link
+on the directory a pattern reaches, or on a declared output's path, is
+followed, a dangling link included: an output declared at a link's target drops
+the digest of an input read through the link, and an output declared through a
+link drops the digest of an input that reads its target. A link below that
+directory is not followed. A task that rewrites its sources drops every digest
 (see [Source-writing fix tasks](#source-writing-fix-tasks)).
 
 The remote negotiation and the pruning of an invocation-scoped resource key the

@@ -601,7 +601,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "cache",
 		prefix: "internal/store/",
 		files:  34,
-		funcs:  309,
+		funcs:  311,
 		why: "internal/store: the content-addressed local cache — entries, task entries, CAS, " +
 			"leases, GC, generations and the remote bridge. Cache-key completeness and atomicity " +
 			"under concurrency are the two invariants this repository has been burned by most " +
@@ -820,7 +820,12 @@ var complexityCeilings = []complexityCeiling{
 			"RAISED, from 34/308 to 34/309, with no new file. SelectsThroughLink lists a " +
 			"selection with the key's own collection and reports a file read through a link, " +
 			"so the planner never narrows a write by pattern when the digest reads a link's " +
-			"target. It reads, writes, addresses or evicts no entry",
+			"target. It reads, writes, addresses or evicts no entry. " +
+			"RAISED, from 34/309 to 34/311, with no new file. linkTarget follows the symbolic " +
+			"links on a region root, a dangling one included, so a read through a link and a " +
+			"write to its target overlap; OverlapsAsSpelled tells the planner when two regions " +
+			"meet only through such a link, so it decides that write by region and not by " +
+			"pattern. Neither reads, writes, addresses or evicts an entry",
 	},
 	{
 		unit:   "output",

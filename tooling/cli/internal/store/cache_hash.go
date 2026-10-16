@@ -763,11 +763,19 @@ func HasMatchingFiles(dir string, patterns []string) (bool, error) {
 // case-sensitive one the comparison only reports an overlap too many. A bound
 // that cannot be decided from the patterns alone is unbounded, so between
 // paths as written an overlap can be reported too often but is never missed.
-// Symbolic links are not resolved: a pattern that reaches a directory through
-// a link is bounded by the link's path, so a write declared at the link's
-// target does not overlap it.
+//
+// A root that reaches another path through a symbolic link on it also bounds
+// the region at the path the link leads to (linkTarget), so a read through a
+// link and a write to its target overlap, and so do a write through a link and
+// a read of its target. The link is followed as the region is built: a link a
+// task adds, retargets or removes later is seen by the regions built after it.
+// A link below a root, which only a listing of the files finds, is not
+// followed.
 type InputRegion struct {
+	// roots holds the comparison form of each root as written, then of each
+	// root's link target that differs from it; spelled counts the former.
 	roots     []string
+	spelled   int
 	unbounded bool
 }
 
@@ -777,8 +785,8 @@ type InputRegion struct {
 const globMetacharacters = `*?[\`
 
 // FileInputRegion is the region of the files collectFiles selects under dir
-// with patterns, decided from the patterns alone, so it also covers a file a
-// write may add there later:
+// with patterns, decided from the patterns and the links on their roots, so it
+// also covers a file a write may add there later:
 //   - no pattern selects the whole tree under dir;
 //   - an exclusion only removes files, so it narrows nothing;
 //   - a Go embed selector resolves sources, embedded assets and source-link
@@ -792,32 +800,45 @@ const globMetacharacters = `*?[\`
 //     prefix names a segment other than ".." or ".".
 func FileInputRegion(dir string, patterns []string) InputRegion {
 	if len(patterns) == 0 {
-		return InputRegion{roots: []string{regionPath(dir)}}
+		return PathsRegion([]string{dir})
 	}
 	includes, _ := wsproto.SplitFilePatterns(patterns)
-	region := InputRegion{roots: make([]string, 0, len(includes))}
+	roots := make([]string, 0, len(includes))
 	for _, pattern := range includes {
 		root, bounded := patternRoot(dir, pattern)
 		if !bounded {
 			return InputRegion{unbounded: true}
 		}
-		region.roots = append(region.roots, regionPath(root))
+		roots = append(roots, root)
 	}
-	return region
+	return PathsRegion(roots)
 }
 
 // PathsRegion is the region of the named paths and everything beneath them: the
-// files an extra-file declaration hashes, or the outputs a task writes.
+// files an extra-file declaration hashes, or the outputs a task writes. A path
+// that leads elsewhere through a link also bounds it at its link target.
 func PathsRegion(paths []string) InputRegion {
 	region := InputRegion{roots: make([]string, 0, len(paths))}
+	var linked []string
 	for _, p := range paths {
-		region.roots = append(region.roots, regionPath(p))
+		root := regionPath(p)
+		region.roots = append(region.roots, root)
+		absolute, err := filepath.Abs(p)
+		if err != nil {
+			continue
+		}
+		if target := regionPath(linkTarget(absolute)); target != root {
+			linked = append(linked, target)
+		}
 	}
+	region.spelled = len(region.roots)
+	region.roots = append(region.roots, linked...)
 	return region
 }
 
 // Overlaps reports whether a file can lie in both regions: one is unbounded and
-// the other holds a path, or a root of one is at or under a root of the other.
+// the other holds a path, or a root or link target of one is at or under a
+// root or link target of the other.
 func (r InputRegion) Overlaps(other InputRegion) bool {
 	if r.unbounded || other.unbounded {
 		return (r.unbounded || len(r.roots) > 0) && (other.unbounded || len(other.roots) > 0)
@@ -830,6 +851,16 @@ func (r InputRegion) Overlaps(other InputRegion) bool {
 		}
 	}
 	return false
+}
+
+// OverlapsAsSpelled is Overlaps between the roots as written, before any link
+// on them is followed. Where Overlaps holds and OverlapsAsSpelled does not, a
+// file lies in both regions only under two names, one of them through a link.
+func (r InputRegion) OverlapsAsSpelled(other InputRegion) bool {
+	if r.unbounded || other.unbounded {
+		return r.Overlaps(other)
+	}
+	return InputRegion{roots: r.roots[:r.spelled]}.Overlaps(InputRegion{roots: other.roots[:other.spelled]})
 }
 
 // RegionIndex names, among many owned regions, the owners whose region
@@ -970,6 +1001,54 @@ func staticPrefix(p string) string {
 		}
 	}
 	return p
+}
+
+// maxLinkHops bounds how many symbolic links linkTarget follows on one path.
+const maxLinkHops = 255
+
+// linkTarget returns the path the absolute, clean path p leads to once every
+// symbolic link on it is followed, the way the operating system resolves it:
+// an existing segment that is a link, a dangling one included, is replaced by
+// its target, and the segments from the first one that does not exist or
+// cannot be read are kept as written. It returns p when a link cannot be read
+// or the links loop.
+func linkTarget(p string) string {
+	isSeparator := func(r rune) bool { return r < 0x80 && os.IsPathSeparator(uint8(r)) }
+	volume := filepath.VolumeName(p)
+	current := volume + string(filepath.Separator)
+	pending := strings.FieldsFunc(p[len(volume):], isSeparator)
+	for hops := 0; len(pending) > 0; {
+		segment := pending[0]
+		pending = pending[1:]
+		if segment == "." {
+			continue
+		}
+		if segment == ".." {
+			current = filepath.Dir(current)
+			continue
+		}
+		next := filepath.Join(current, segment)
+		info, err := os.Lstat(next)
+		if err != nil {
+			return filepath.Join(append([]string{next}, pending...)...)
+		}
+		if info.Mode()&os.ModeSymlink == 0 {
+			current = next
+			continue
+		}
+		hops++
+		link, err := os.Readlink(next)
+		if err != nil || hops > maxLinkHops {
+			return p
+		}
+		if filepath.IsAbs(link) {
+			volume = filepath.VolumeName(link)
+			current = volume + string(filepath.Separator)
+			link = link[len(volume):]
+		}
+		pending = append(strings.FieldsFunc(link, isSeparator), pending...)
+	}
+	return current
 }
 
 // regionPath is the comparison form of a path: absolute, cleaned, in slash

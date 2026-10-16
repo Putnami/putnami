@@ -17,11 +17,24 @@ import (
 type plannedWrite struct {
 	Path string
 	Tree bool
+	// region is Region once withRegion computed it.
+	region *store.InputRegion
 }
 
 // Region is the region of every path the write can create, change or delete.
 func (w plannedWrite) Region() store.InputRegion {
+	if w.region != nil {
+		return *w.region
+	}
 	return store.PathsRegion([]string{w.Path})
+}
+
+// withRegion returns w with its region computed once, for a planner that
+// compares it with many selections.
+func (w plannedWrite) withRegion() plannedWrite {
+	region := w.Region()
+	w.region = &region
+	return w
 }
 
 // fileSelection is the set of files a key's file digest selects under one
@@ -36,7 +49,8 @@ func (w plannedWrite) Region() store.InputRegion {
 // Widened instead. It also holds only for a write the digest reads under the
 // spelling it declares, and for files the digest does not read through a link:
 // a write that cannot be decided so reaches whatever the region says it
-// reaches.
+// reaches. A write that meets the region only through a link on a root of
+// either is such a write.
 type fileSelection struct {
 	dir      string
 	region   store.InputRegion
@@ -52,11 +66,13 @@ type fileSelection struct {
 }
 
 // selectionScanner builds fileSelections and scans the Go embed directives of
-// one directory, the links of one selection and the spelling of one path once.
-// The zero value is ready to use, from one goroutine.
+// one directory, the links of one selection, the region of one include and the
+// spelling of one path once. The zero value is ready to use, from one
+// goroutine.
 type selectionScanner struct {
 	embeds  map[embedScanKey]store.GoEmbedBound
 	links   map[string]bool
+	regions map[string]store.InputRegion
 	spelled map[string]bool
 }
 
@@ -116,7 +132,7 @@ func (s fileSelection) Reaches(w plannedWrite) bool {
 	if !s.region.Overlaps(written) {
 		return false
 	}
-	if !s.bounded {
+	if !s.bounded || !s.region.OverlapsAsSpelled(written) {
 		return true
 	}
 	rel, inside := s.relative(w.Path)
@@ -124,7 +140,7 @@ func (s fileSelection) Reaches(w plannedWrite) bool {
 		return true
 	}
 	for _, include := range s.includes {
-		if s.includeReaches(include, rel, w) {
+		if s.includeReaches(include, rel, w, written) {
 			return true
 		}
 	}
@@ -141,11 +157,12 @@ func (s fileSelection) Reaches(w plannedWrite) bool {
 // selector of the selection reads its directives from, or which sources it
 // reads: the bound Reaches takes for that selector.
 func (s fileSelection) ReachesDirectives(w plannedWrite) bool {
-	if !s.bounded || len(s.embeds) == 0 || !s.region.Overlaps(w.Region()) {
+	written := w.Region()
+	if !s.bounded || len(s.embeds) == 0 || !s.region.Overlaps(written) {
 		return false
 	}
 	rel, inside := s.relative(w.Path)
-	return !inside || store.ReachesGoSource(rel, w.Tree) || !s.scanner.spelledOnDisk(s.dir, rel)
+	return !inside || !s.region.OverlapsAsSpelled(written) || store.ReachesGoSource(rel, w.Tree) || !s.scanner.spelledOnDisk(s.dir, rel)
 }
 
 // ReachesDirectivesIn is ReachesDirectives for a write bounded by region alone.
@@ -153,17 +170,19 @@ func (s fileSelection) ReachesDirectivesIn(region store.InputRegion) bool {
 	return s.bounded && len(s.embeds) > 0 && s.region.Overlaps(region)
 }
 
-// includeReaches reports whether w can touch a file one ordinary include
-// selects. Every path under w that an exclusion covers is out of reach, and a
-// file write is selected only when the include matches it and no exclusion
-// does, as the store's ordinary file collection decides. The collection
-// spells a path's leading literal segments as the include does, so a write
-// that spells them in another case is not decided by pattern.
-func (s fileSelection) includeReaches(include, rel string, w plannedWrite) bool {
-	if !store.FileInputRegion(s.dir, []string{include}).Overlaps(w.Region()) {
+// includeReaches reports whether w, whose region is written, can touch a file
+// one ordinary include selects. Every path under w that an
+// exclusion covers is out of reach, and a file write is selected only when the
+// include matches it and no exclusion does, as the store's ordinary file
+// collection decides. The collection spells a path's leading literal segments
+// as the include does, so a write that spells them in another case, or that
+// meets the include only through a link, is not decided by pattern.
+func (s fileSelection) includeReaches(include, rel string, w plannedWrite, written store.InputRegion) bool {
+	region := s.scanner.includeRegion(s.dir, include)
+	if !region.Overlaps(written) {
 		return false
 	}
-	if !literalPrefixAgrees(include, rel) {
+	if !region.OverlapsAsSpelled(written) || !literalPrefixAgrees(include, rel) {
 		return true
 	}
 	if wsproto.ExcludesTree(rel, s.excludes) {
@@ -265,6 +284,20 @@ func (s *selectionScanner) selectsThroughLink(dir string, patterns []string) boo
 	}
 	s.links[key] = linked
 	return linked
+}
+
+// includeRegion memoizes store.FileInputRegion for one ordinary include of dir.
+func (s *selectionScanner) includeRegion(dir, include string) store.InputRegion {
+	key := dir + "\x00" + include
+	if region, ok := s.regions[key]; ok {
+		return region
+	}
+	region := store.FileInputRegion(dir, []string{include})
+	if s.regions == nil {
+		s.regions = make(map[string]store.InputRegion)
+	}
+	s.regions[key] = region
+	return region
 }
 
 // embed returns the bound of one Go embed selector of dir.
