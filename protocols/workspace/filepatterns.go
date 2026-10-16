@@ -102,6 +102,39 @@ func matchFilePatternSegments(patterns, segments []string) bool {
 	return ok && matchFilePatternSegments(patterns[1:], segments[1:])
 }
 
+// ExcludesTree reports whether the exclusions remove every path at or under
+// the forward-slash relative path rel, so that no include can select a file
+// written there. It decides from the patterns alone: an exclusion "P/**"
+// covers the tree when P matches rel or one of its ancestors, because "**"
+// matches any rest, none included. Any other exclusion form is not taken to
+// cover a tree, so the answer can be false for a tree that is in fact
+// excluded, never true for one that is not.
+func ExcludesTree(rel string, excludes []string) bool {
+	rel = strings.TrimPrefix(filepath.ToSlash(rel), "./")
+	if rel == "" || rel == "." {
+		return false
+	}
+	segments := strings.Split(rel, "/")
+	for _, exclude := range excludes {
+		exclude, _ = GitFilePattern(exclude)
+		exclude = strings.TrimPrefix(filepath.ToSlash(exclude), "./")
+		if exclude == "**" {
+			return true
+		}
+		prefix, ok := strings.CutSuffix(exclude, "/**")
+		if !ok {
+			continue
+		}
+		parts := strings.Split(prefix, "/")
+		for k := 0; k <= len(segments); k++ {
+			if matchFilePatternSegments(parts, segments[:k]) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // SelectsPath reports whether a declared pattern set selects one named path,
 // without touching the filesystem. An empty include list selects nothing: a
 // caller that reads "no patterns" as "every file under the project root" — the

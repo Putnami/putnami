@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -309,6 +310,53 @@ func appendGoEmbedInputs(dir string, files []fileEntry, selectors []string) ([]f
 		}
 	}
 	return files, nil
+}
+
+// GoEmbedBound is what a Go embed selector of one directory reads beyond its
+// Go sources: the static prefix of every embed directive, scanned from the
+// sources as they stand. A selector this store does not know, whose
+// directives cannot be read, or whose sources include a link, is not Bounded.
+type GoEmbedBound struct {
+	Bounded bool
+	Assets  InputRegion
+}
+
+// ScanGoEmbedBound scans the embed directives selector reads under dir.
+func ScanGoEmbedBound(dir, selector string) GoEmbedBound {
+	if !goembed.IsSelector(selector) {
+		return GoEmbedBound{}
+	}
+	directives, links, err := goembed.DirectivesAndLinks(dir, selector == goembed.TestSelector)
+	if err != nil || len(links) > 0 {
+		return GoEmbedBound{}
+	}
+	var roots []string
+	for source, patterns := range directives {
+		pkg := filepath.Join(dir, filepath.FromSlash(path.Dir(source)))
+		for _, pattern := range patterns {
+			prefix, err := goembed.StaticPrefix(pattern)
+			if err != nil {
+				return GoEmbedBound{}
+			}
+			roots = append(roots, filepath.Join(pkg, filepath.FromSlash(prefix)))
+		}
+	}
+	return GoEmbedBound{Bounded: true, Assets: PathsRegion(roots)}
+}
+
+// ReachesGoSource reports whether a write at rel, a slash path relative to a
+// Go embed selector's directory, can change a Go source the selector reads,
+// or which sources it reads: a .go file, or for a tree anything, outside every
+// path the source scan skips. A go.mod anywhere counts too: one opens or
+// closes a nested module, and one above an embedded file rejects it.
+func ReachesGoSource(rel string, tree bool) bool {
+	if !tree && path.Base(rel) == "go.mod" {
+		return true
+	}
+	if goembed.IgnoresSource(rel) {
+		return false
+	}
+	return tree || path.Ext(rel) == ".go"
 }
 
 func sortedUniqueFileEntries(files []fileEntry) []fileEntry {

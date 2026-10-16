@@ -168,6 +168,79 @@ func TestPlanKeyMovementFollowsWritersAndFoldedKeys(t *testing.T) {
 	})
 }
 
+// A write moves a key only when it can reach a file the key selects: a tree
+// the key's exclusions cover, a file its patterns do not match, and a path
+// beside every file its Go embed directives name leave it unmoved, while a
+// write that can change those directives makes every write in the key's
+// region count again.
+func TestPlanKeyMovementCountsOnlyWritesThatReachASelectedFile(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "session-written-input-keys",
+		"a-write-that-reaches-no-selected-file-leaves-a-key-unmoved")
+	sources := []string{"**/*.go", "!**/*_test.go", "go-embed:build", "!**/.gen/**"}
+	compile := func() *ScheduledJob {
+		job := declaredJob("build~compile", "compile", &extension.TaskDeclaration{})
+		job.JobDef.FilePatterns = sources
+		return job
+	}
+	writer := func(name string, output extension.DeclaredOutput) *ScheduledJob {
+		return declaredJob(name, name, &extension.TaskDeclaration{
+			Outputs: map[string]extension.DeclaredOutput{"out": output},
+		})
+	}
+	key := func(name string) string { return "/" + captureTestProject + ":" + name }
+	writeSources := func(t *testing.T, f *captureFixture) {
+		project := filepath.Join(f.ws.Root, captureTestProject)
+		writeFileAt(t, filepath.Join(project, "go.mod"), "module example.com/proj\n")
+		writeFileAt(t, filepath.Join(project, "version.go"),
+			"package proj\nimport _ \"embed\"\n//go:embed .gen/version.json\nvar version []byte\n")
+		writeFileAt(t, filepath.Join(project, ".gen", "version.json"), "{}")
+	}
+
+	t.Run("an excluded tree and an unselected file", func(t *testing.T) {
+		generate := writer("build~generate", dirDeclaration(extension.OutputRootProject, ".gen/schema", false))
+		infra := writer("build~infra", fileDeclaration(extension.OutputRootProject, "infra/runtime.json", true))
+		check := declaredJob("build~check", "check", &extension.TaskDeclaration{})
+		check.JobDef.FilePatterns = []string{".gen/schema/**"}
+		planned := []*ScheduledJob{generate, infra, compile(), check}
+		f := newCaptureFixture(t, planned...)
+		writeSources(t, f)
+
+		movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: f.ws}, planned)
+		if movement.Moving[key("build~compile")] {
+			t.Fatalf("compile moved by writes none of its files can lie under: writers %v", movement.Writers[key("build~compile")])
+		}
+		if got := movement.Writers[key("build~check")]; !reflect.DeepEqual(got, []string{key("build~generate")}) {
+			t.Fatalf("writers of a reader of the generated tree = %v, want the generator alone", got)
+		}
+	})
+
+	t.Run("an embedded file", func(t *testing.T) {
+		stamp := writer("build~stamp", fileDeclaration(extension.OutputRootProject, ".gen/version.json", false))
+		conf := writer("build~conf", dirDeclaration(extension.OutputRootProject, ".gen/conf", true))
+		planned := []*ScheduledJob{stamp, conf, compile()}
+		f := newCaptureFixture(t, planned...)
+		writeSources(t, f)
+
+		movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: f.ws}, planned)
+		if got := movement.Writers[key("build~compile")]; !reflect.DeepEqual(got, []string{key("build~stamp")}) {
+			t.Fatalf("writers of compile = %v, want the writer of the file it embeds alone", got)
+		}
+	})
+
+	t.Run("a write that can change a directive", func(t *testing.T) {
+		conf := writer("build~conf", dirDeclaration(extension.OutputRootProject, ".gen/conf", true))
+		client := writer("build~client", dirDeclaration(extension.OutputRootProject, "client", true))
+		planned := []*ScheduledJob{conf, client, compile()}
+		f := newCaptureFixture(t, planned...)
+		writeSources(t, f)
+
+		movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: f.ws}, planned)
+		if got := movement.Writers[key("build~compile")]; !reflect.DeepEqual(got, []string{key("build~client"), key("build~conf")}) {
+			t.Fatalf("writers of compile = %v, want both: a source the client writes may embed the conf tree", got)
+		}
+	})
+}
+
 // providerKeysAsked returns every key the provider was asked about in op.
 func providerKeysAsked(server *fakeCacheServer, op cache.ProviderOp) []string {
 	var keys []string

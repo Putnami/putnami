@@ -601,7 +601,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "cache",
 		prefix: "internal/store/",
 		files:  34,
-		funcs:  306,
+		funcs:  308,
 		why: "internal/store: the content-addressed local cache — entries, task entries, CAS, " +
 			"leases, GC, generations and the remote bridge. Cache-key completeness and atomicity " +
 			"under concurrency are the two invariants this repository has been burned by most " +
@@ -809,7 +809,14 @@ var complexityCeilings = []complexityCeiling{
 			"FileInputRegion, so a key that reads one file no longer lists the whole repository. " +
 			"The bounded listing selects the same files, so every key hashes the same bytes " +
 			"(cache_git_test.go pins it), and an unbounded pattern such as `**` lists the whole " +
-			"cut as before. It reads, writes, addresses or evicts no entry",
+			"cut as before. It reads, writes, addresses or evicts no entry. " +
+			"RAISED, from 34/306 to 34/308, with no new file. ScanGoEmbedBound and " +
+			"ReachesGoSource bound what a Go embed selector reads by the static prefixes of its " +
+			"embed directives and the sources the scan reads them from, with the same goembed " +
+			"scan the key's collection uses, so the planner tells a write beside every embedded " +
+			"file from one that can move the key. They live here because the store is the one " +
+			"core package that knows Go embed selectors. Neither reads, writes, addresses or " +
+			"evicts an entry",
 	},
 	{
 		unit:   "output",

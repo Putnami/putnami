@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -16,47 +17,99 @@ type KeyInputs struct {
 	CommandParams map[string]any
 }
 
-// regions returns the region of every file a job's cache key reads: its
+// reads returns the selection of every file a job's cache key reads: its
 // project and workspace patterns, its closure patterns in every member of the
 // closure, its generate assets, and the same inputs of the producing action the
 // key of an invocation-scoped resource's consumer folds. It reads the
 // declarations ComputeJobCacheHashWith keys, through the same helpers, the way
 // portableKeyFiles does.
-func (k KeyInputs) regions(job *jobmodel.ScheduledJob) []store.InputRegion {
+func (k KeyInputs) reads(job *jobmodel.ScheduledJob, scanner *selectionScanner) []fileSelection {
 	if k.Workspace == nil || job == nil || job.JobDef == nil || job.Project == nil {
 		return nil
 	}
 	files, workspaceFiles := KeyFilePatterns(k.Workspace, job, k.CommandParams)
-	regions := []store.InputRegion{store.FileInputRegion(filepath.Join(k.Workspace.Root, job.Project.Path), files)}
+	reads := []fileSelection{scanner.Select(filepath.Join(k.Workspace.Root, job.Project.Path), files)}
 	if len(workspaceFiles) > 0 {
-		regions = append(regions, store.FileInputRegion(k.Workspace.Root, workspaceFiles))
+		reads = append(reads, scanner.Select(k.Workspace.Root, workspaceFiles))
 	}
 	if patterns := closureKeyPatterns(job); len(patterns) > 0 {
 		for _, root := range ProjectClosureRoots(k.Workspace, job.Project) {
-			regions = append(regions, store.FileInputRegion(root, patterns))
+			reads = append(reads, scanner.Select(root, patterns))
 		}
 	}
 	if assets := GenerateAssetFiles(k.Workspace, job); len(assets) > 0 {
-		regions = append(regions, store.PathsRegion(assets))
+		reads = append(reads, regionSelection(store.PathsRegion(assets)))
 	}
 	if job.InvocationProducer != nil {
-		regions = append(regions, k.regions(job.InvocationProducer)...)
+		reads = append(reads, k.reads(job.InvocationProducer, scanner)...)
 	}
-	return regions
+	return reads
 }
 
-// writes returns where a planned job may write a file another job's key reads:
-// its declared outputs, resolved before it runs, and for a source rewriter
-// every input its own key reads, since it rewrites the sources it reads.
-func (k KeyInputs) writes(job *jobmodel.ScheduledJob) []store.InputRegion {
-	var regions []store.InputRegion
-	if paths := DeclaredOutputPaths(WorkspaceRoots{Root: k.Workspace.Root}, job, &jobmodel.JobResult{}); len(paths) > 0 {
-		regions = append(regions, store.PathsRegion(paths))
-	}
+// plannedWrites is where a planned job may write a file another job's key
+// reads: its declared outputs, resolved before it runs, and for a source
+// rewriter the region of every input its own key reads, since it rewrites the
+// sources it reads.
+type plannedWrites struct {
+	outputs   []plannedWrite
+	rewritten []store.InputRegion
+}
+
+func (k KeyInputs) writes(job *jobmodel.ScheduledJob, scanner *selectionScanner) plannedWrites {
+	writes := plannedWrites{outputs: declaredOutputWrites(WorkspaceRoots{Root: k.Workspace.Root}, job, &jobmodel.JobResult{})}
 	if RewritesSourceTree(job) {
-		regions = append(regions, k.regions(job)...)
+		for _, read := range k.reads(job, scanner) {
+			writes.rewritten = append(writes.rewritten, read.Region())
+		}
 	}
-	return regions
+	return writes
+}
+
+// reachedBy reports whether writes can change a file one of reads selects.
+func reachedBy(reads []fileSelection, writes plannedWrites) bool {
+	for _, read := range reads {
+		for _, output := range writes.outputs {
+			if read.Reaches(output) {
+				return true
+			}
+		}
+		for _, region := range writes.rewritten {
+			if read.Region().Overlaps(region) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// widenedFor returns reads with every selection whose embed directives one of
+// writes can change bounded by its region alone: its narrower bound holds only
+// while the directives stay as they were scanned.
+func widenedFor(reads []fileSelection, writes []plannedWrites) []fileSelection {
+	widened := make([]fileSelection, len(reads))
+	for i, read := range reads {
+		widened[i] = read
+		if directivesReached(read, writes) {
+			widened[i] = read.Widened()
+		}
+	}
+	return widened
+}
+
+func directivesReached(read fileSelection, writes []plannedWrites) bool {
+	for _, write := range writes {
+		for _, output := range write.outputs {
+			if read.ReachesDirectives(output) {
+				return true
+			}
+		}
+		for _, region := range write.rewritten {
+			if read.ReachesDirectivesIn(region) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // DeclaredOutputPaths returns the absolute path of every durable output job
@@ -68,11 +121,26 @@ func (k KeyInputs) writes(job *jobmodel.ScheduledJob) []store.InputRegion {
 // root. Invocation-scoped outputs live in the invocation's private tree, which
 // no key reads.
 func DeclaredOutputPaths(roots WorkspaceRoots, job *jobmodel.ScheduledJob, result *jobmodel.JobResult) []string {
+	writes := declaredOutputWrites(roots, job, result)
+	if writes == nil {
+		return nil
+	}
+	paths := make([]string, 0, len(writes))
+	for _, write := range writes {
+		paths = append(paths, write.Path)
+	}
+	return paths
+}
+
+// declaredOutputWrites returns DeclaredOutputPaths as planned writes, sorted by
+// path: a file output writes its path, and any other output, or one whose path
+// is not resolved, may write anywhere at or under its path.
+func declaredOutputWrites(roots WorkspaceRoots, job *jobmodel.ScheduledJob, result *jobmodel.JobResult) []plannedWrite {
 	declaration := jobmodel.TaskDeclarationOf(job)
 	if declaration == nil {
 		return nil
 	}
-	paths := make([]string, 0, len(declaration.Outputs))
+	writes := make([]plannedWrite, 0, len(declaration.Outputs))
 	for _, output := range declaration.Outputs {
 		if output.IsInvocationScoped() {
 			continue
@@ -83,13 +151,16 @@ func DeclaredOutputPaths(roots WorkspaceRoots, job *jobmodel.ScheduledJob, resul
 		}
 		rel, resolved, err := declaredOutputPath(output, result.Data)
 		if err != nil || !resolved {
-			paths = append(paths, base)
+			writes = append(writes, plannedWrite{Path: base, Tree: true})
 			continue
 		}
-		paths = append(paths, filepath.Join(base, filepath.FromSlash(rel)))
+		writes = append(writes, plannedWrite{
+			Path: filepath.Join(base, filepath.FromSlash(rel)),
+			Tree: output.Kind != extension.OutputKindFile,
+		})
 	}
-	sort.Strings(paths)
-	return paths
+	sort.Slice(writes, func(i, j int) bool { return writes[i].Path < writes[j].Path })
+	return writes
 }
 
 // RestoredOutputPaths returns the absolute path of every output a task-owned
@@ -115,16 +186,18 @@ func RestoredOutputPaths(roots WorkspaceRoots, job *jobmodel.ScheduledJob, entry
 // any task runs differ from the key it computes when it starts?".
 type KeyMovement struct {
 	// Writers maps a job key to the other planned jobs that may write a file
-	// its key reads, sorted.
+	// its key reads, or change which files it reads, sorted.
 	Writers map[string][]string
 	// Moving holds every job that has such a writer, and every job whose key
 	// folds the key of a moving job (CacheKeyDependencies).
 	Moving map[string]bool
 }
 
-// PlanKeyMovement decides KeyMovement for planned, from the declarations alone.
-// A writer counts whatever its place in the schedule, so a job is reported
-// moving whenever it cannot be shown not to be.
+// PlanKeyMovement decides KeyMovement for planned, from the declarations and
+// the Go embed directives of the tree as it stands. A writer counts whatever
+// its place in the schedule, and when one of its writes can reach a file the
+// key selects (fileSelection), so a job is reported moving whenever it
+// cannot be shown not to be.
 func PlanKeyMovement(inputs KeyInputs, planned []*jobmodel.ScheduledJob) KeyMovement {
 	movement := KeyMovement{Writers: make(map[string][]string), Moving: make(map[string]bool)}
 	if inputs.Workspace == nil {
@@ -133,13 +206,21 @@ func PlanKeyMovement(inputs KeyInputs, planned []*jobmodel.ScheduledJob) KeyMove
 	keyed := func(job *jobmodel.ScheduledJob) bool {
 		return job != nil && job.JobDef != nil && job.Project != nil
 	}
+	var scanner selectionScanner
 	var index store.RegionIndex
+	writes := make(map[string]plannedWrites, len(planned))
 	for _, job := range planned {
 		if !keyed(job) {
 			continue
 		}
-		for _, region := range inputs.writes(job) {
-			index.Add(job.Key(), region)
+		key := job.Key()
+		jobWrites := inputs.writes(job, &scanner)
+		writes[key] = jobWrites
+		for _, output := range jobWrites.outputs {
+			index.Add(key, output.Region())
+		}
+		for _, region := range jobWrites.rewritten {
+			index.Add(key, region)
 		}
 	}
 
@@ -153,8 +234,22 @@ func PlanKeyMovement(inputs KeyInputs, planned []*jobmodel.ScheduledJob) KeyMove
 		for _, dependency := range CacheKeyDependencies(job) {
 			dependents[dependency] = append(dependents[dependency], key)
 		}
-		for _, writer := range index.Overlapping(inputs.regions(job)...) {
+		reads := inputs.reads(job, &scanner)
+		regions := make([]store.InputRegion, 0, len(reads))
+		for _, read := range reads {
+			regions = append(regions, read.Region())
+		}
+		var candidates []string
+		var candidateWrites []plannedWrites
+		for _, writer := range index.Overlapping(regions...) {
 			if writer != key {
+				candidates = append(candidates, writer)
+				candidateWrites = append(candidateWrites, writes[writer])
+			}
+		}
+		reads = widenedFor(reads, candidateWrites)
+		for i, writer := range candidates {
+			if reachedBy(reads, candidateWrites[i]) {
 				movement.Writers[key] = append(movement.Writers[key], writer)
 			}
 		}
