@@ -936,6 +936,7 @@ func TestFinalSummaryReplaysMeasuredZeroWithProvenance(t *testing.T) {
 	r, errOut := newTestRendererWithCoverage(t, 120, map[string]CoverageReplay{
 		"app": {
 			Entry: workspace_state.SessionCoverageEntry{
+				Command: "test",
 				Summary: runtimeproto.CoverageSummary{
 					Percentage:  0,
 					Granularity: runtimeproto.CoverageLines,
@@ -963,6 +964,7 @@ func TestFinalSummaryCurrentCoverageOverridesReplay(t *testing.T) {
 	r, errOut := newTestRendererWithCoverage(t, 120, map[string]CoverageReplay{
 		"app": {
 			Entry: workspace_state.SessionCoverageEntry{
+				Command: "test",
 				Summary: runtimeproto.CoverageSummary{Percentage: 12, Granularity: runtimeproto.CoverageStatements},
 			},
 			Source: workspace_state.SessionReportSource{Revision: "oldrev"},
@@ -991,6 +993,7 @@ func TestFinalSummaryMixedGoLiveAndTypeScriptReplayUsesBothPercentages(t *testin
 	r, errOut := newTestRendererWithCoverage(t, 140, map[string]CoverageReplay{
 		"ts-app": {
 			Entry: workspace_state.SessionCoverageEntry{
+				Command: "test",
 				Summary: runtimeproto.CoverageSummary{
 					Percentage:  40,
 					Granularity: runtimeproto.CoverageLines,
@@ -1020,6 +1023,33 @@ func TestFinalSummaryMixedGoLiveAndTypeScriptReplayUsesBothPercentages(t *testin
 	out := errOut.String()
 	if !strings.Contains(out, "coverage 60.0% (live + replayed: validation @ tsrev)") {
 		t.Fatalf("mixed-granularity aggregate omitted a language or provenance:\n%s", out)
+	}
+}
+
+// A replayed measurement goes to the command that recorded it, whatever that
+// command is called, and never to another command of the same project.
+func TestStartReplaysCoverageOnTheCommandThatRecordedIt(t *testing.T) {
+	testJob := makeLiveTestJob("app", "test")
+	checkJob := makeLiveTestJob("app", "check")
+	r, _ := newTestRendererWithCoverage(t, 120, map[string]CoverageReplay{
+		"app": {
+			Entry: workspace_state.SessionCoverageEntry{
+				Command: "check",
+				Summary: runtimeproto.CoverageSummary{Percentage: 70, Granularity: runtimeproto.CoverageLines},
+			},
+			Source: workspace_state.SessionReportSource{Revision: "checkrev"},
+		},
+	}, testJob, checkJob)
+
+	row := r.rowByID["app"]
+	if row == nil {
+		t.Fatal("no row for the project")
+	}
+	if replay := row.commands["check"].replayedCoverage; replay == nil || replay.Entry.Summary.Percentage != 70 {
+		t.Fatalf("check replay = %+v, want the measurement recorded under check", replay)
+	}
+	if replay := row.commands["test"].replayedCoverage; replay != nil {
+		t.Fatalf("test took a replay recorded under check: %+v", replay)
 	}
 }
 

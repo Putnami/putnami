@@ -91,11 +91,15 @@
     },
     {
       "id": "spec-gate-records-an-empty-evaluation",
-      "text": "A session whose spec gate ran records a verdict with no group and no diagnostic when no selected project states a requirement: every selected project a criteria-projection producer applies to ran one that succeeded and none emitted a projection; a project no producer applies to states none. When a producer applies but did not run, as in test without validate, or it failed, was canceled or was skipped, the session writes no record or one that carries only its collection findings."
+      "text": "A session whose spec gate ran records a verdict with no group and no diagnostic when no selected project states a requirement: every selected project a criteria-projection producer applies to ran one that succeeded and none emitted a projection; a project no producer applies to states none. When a producer applies but did not run, or it failed, was canceled or was skipped, the session writes no record or one that carries only its collection findings."
     },
     {
       "id": "spec-gate-evidence-scope",
-      "text": "A selected project's requirements resolve from observations its transitive dependencies and its DIRECT dependents already published: an attester the run did not plan is answered from that project's own test cache entry, provenance still contained in the reporting project. Transitive dependents stay out of scope. A consulted source that did not support a check still blocks under enforce, as does an exhausted scope; a check no reachable source could report is recorded unobserved and warned, never blocked."
+      "text": "A selected project's requirements resolve from observations its transitive dependencies and its DIRECT dependents already published: an attester the run did not plan is answered from its report producer's cache entry, provenance still contained in the reporting project. Transitive dependents stay out of scope. A consulted source that did not support a check still blocks under enforce, as does an exhausted scope; a check no reachable source could report is recorded unobserved and warned, never blocked."
+    },
+    {
+      "id": "declared-verification-producers",
+      "text": "The verification report and the spec criteria projection come from the tasks that declare them as command-output files, whatever the command. The spec gate attaches to a session naming test or a command whose task declares the report, reads those tasks' observations, and plans the declaring commands to learn applicability and recover cached reports; a warm hit restores both artifact records. Coverage rows come from any job whose result carries a summary and replay under its command."
     },
     {
       "id": "scoped-cache-bypass",
@@ -158,6 +162,7 @@
     "tooling/cli/doc/adr/0017-one-release-set-plan-against-the-channel-head.md",
     "tooling/cli/doc/adr/0023-private-selected-publication-handoff.md",
     "tooling/cli/doc/adr/0026-spec-gate-evidence-scope.md",
+    "tooling/cli/doc/adr/0069-the-verification-report-and-spec-criteria-producers-are-the-tasks-that-declare-them.md",
     "tooling/cli/doc/adr/0030-a-failed-task-is-cached-until-its-inputs-change.md",
     "tooling/cli/doc/adr/0031-scratch-generations-expire-between-consumers.md",
     "tooling/cli/doc/adr/0034-a-declared-output-polices-its-own-drift.md",

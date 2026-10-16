@@ -822,6 +822,25 @@
           }
         },
         {
+          "id": "declared-verification-producers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "producer-commands-are-the-commands-whose-tasks-declare-the-files",
+              "a-session-naming-a-declared-report-command-carries-the-gate",
+              "projection-applicability-plans-the-declaring-commands",
+              "cache-recovery-plans-the-declared-report-commands",
+              "a-warm-hit-restores-the-declared-artifact-under-any-command",
+              "coverage-is-recorded-and-replayed-under-the-command-that-measured-it",
+              "a-third-party-producer-command-gates-the-run"
+            ]
+          }
+        },
+        {
           "id": "scoped-cache-bypass",
           "stage": "coded",
           "evidenceKinds": [

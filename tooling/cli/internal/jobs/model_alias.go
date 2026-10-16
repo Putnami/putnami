@@ -34,6 +34,14 @@ var ProducesVerificationReport = model.ProducesVerificationReport
 // project's criteria-projection producer.
 var ProducesSpecCriteriaProjection = model.ProducesSpecCriteriaProjection
 
+// VerificationReportCommands returns the commands whose jobs include a
+// verification-report producer.
+var VerificationReportCommands = model.VerificationReportCommands
+
+// SpecCriteriaProjectionCommands returns the commands whose jobs include a
+// criteria-projection producer.
+var SpecCriteriaProjectionCommands = model.SpecCriteriaProjectionCommands
+
 // --- Typed identity ---
 
 // TaskIdentityOfKey is the fallback for a result the plan does not name.

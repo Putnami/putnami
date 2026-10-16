@@ -93,7 +93,8 @@ func (r *LiveRenderer) Start(planned []*jobs.ScheduledJob) {
 		if row == nil {
 			continue
 		}
-		cmd := row.commands["test"]
+		// The replay belongs to the command that recorded the measurement.
+		cmd := row.commands[replay.Entry.Command]
 		if cmd == nil {
 			continue
 		}

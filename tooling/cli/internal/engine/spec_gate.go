@@ -16,8 +16,9 @@ import (
 	"go.putnami.dev/tooling/cli/internal/specgate"
 )
 
-// The spec gate is SESSION-ATTACHED: after any real
-// engine session containing `test`, the post-session result finalizer joins
+// The spec gate is SESSION-ATTACHED: after any real engine session that names
+// `test` or a command whose task declares the verification report, the
+// post-session result finalizer joins
 // the extension-emitted criteria projections with the observation reports
 // already present in the session's job results and lets `enforce` fail the
 // run through the canonical reducer. There is deliberately no verify DAG job:
@@ -41,8 +42,9 @@ type specGateOutcome struct {
 }
 
 // specGateFinalizer returns the post-session spec-verification finalizer, or
-// nil when this run must not carry it: a session without the test command
-// (nothing new was observed, so there is nothing to judge), a run with no
+// nil when this run must not carry it: a session that names neither `test`
+// nor one of reportCommands, the commands whose tasks declare the verification
+// report (nothing new was observed, so there is nothing to judge), a run with no
 // loaded workspace, or a policy that resolves off everywhere — off means "do
 // not collect or evaluate automatically", so the collector is not attached at
 // all rather than attached and muted.
@@ -55,16 +57,24 @@ type specGateOutcome struct {
 //
 // recovery is the unplanned-attester source: the seam that lets a
 // requirement attested by a dependency the selection did not plan resolve from
-// that dependency's own test cache entry. It may be nil, which disables
+// that dependency's own report producer cache entry. It may be nil, which disables
 // recovery and leaves every such check unresolvable — and therefore warned.
 //
 // producers names the selected projects a criteria-projection producer applies
 // to. It may be nil, and then a session that projected nothing records
 // nothing.
+//
+// `test` attaches the gate by name, whether or not a `test` task declares the
+// report. A `test` pipeline that declares none then has no report producer, so
+// its projects read as consulted and silent and block under enforce. Attaching
+// only on reportCommands would skip the gate in that workspace and let enforce
+// pass on no evidence.
 func specGateFinalizer(req *Request, ws *workspace.Workspace, planned []*jobs.ScheduledJob,
-	recovery specgate.ObservationRecovery, producers specgate.ProjectionProducers,
+	reportCommands []string, recovery specgate.ObservationRecovery, producers specgate.ProjectionProducers,
 	outcome *specGateOutcome) func(map[string]*jobs.JobResult) {
-	if ws == nil || outcome == nil || !slices.Contains(req.Commands, "test") {
+	if ws == nil || outcome == nil || !slices.ContainsFunc(req.Commands, func(command string) bool {
+		return command == "test" || slices.Contains(reportCommands, command)
+	}) {
 		return nil
 	}
 	if !specgate.GateActive(ws) {
@@ -135,13 +145,15 @@ func reportSpecGateWarnings(record *features.SpecVerificationRecord) {
 	}
 }
 
-// validateProducerPlan answers specgate.ProjectionProducers with a `validate`
-// plan over the session's selected projects, so the planner's own activation
-// rule decides which projects a criteria-projection producer applies to.
+// projectionProducerPlan answers specgate.ProjectionProducers with a plan of
+// the commands whose tasks declare the criteria projection (first-party:
+// `validate`) over the session's selected projects, so the planner's own
+// activation rule decides which projects a criteria-projection producer
+// applies to.
 // extensions is the whole discovered set, never a set the session narrowed:
 // a producer the session excluded still applies to its project. skipped is
 // what discovery failed to load.
-type validateProducerPlan struct {
+type projectionProducerPlan struct {
 	req        *Request
 	ws         *workspace.Workspace
 	projects   []*workspace.Project
@@ -149,13 +161,15 @@ type validateProducerPlan struct {
 	skipped    []extension.SkippedExtension
 }
 
-// ApplicableProjects plans `validate` over the selected projects with the
-// run's command params and without its disable lists, and returns the selected
-// projects whose plan holds a criteria-projection producer. A selected project
-// that disables `validate` itself hides whether a producer applies to it, and
-// so does an extension that failed to load or a configured registry extension
-// that is not loaded, disabled or not: each answer is an error.
-func (plan *validateProducerPlan) ApplicableProjects() (map[string]bool, error) {
+// ApplicableProjects plans the projection producers' commands over the
+// selected projects with the run's command params and without its disable
+// lists, and returns the selected projects whose plan holds a
+// criteria-projection producer. A selected project that disables one of those
+// commands itself hides whether a producer applies to it, and so does an
+// extension that failed to load or a configured registry extension that is
+// not loaded, disabled or not: each answer is an error. With no producer
+// command, no producer applies to any project.
+func (plan *projectionProducerPlan) ApplicableProjects() (map[string]bool, error) {
 	if len(plan.skipped) > 0 {
 		return nil, fmt.Errorf("extension %s failed to load", plan.skipped[0].Name)
 	}
@@ -166,22 +180,31 @@ func (plan *validateProducerPlan) ApplicableProjects() (map[string]bool, error) 
 			return nil, fmt.Errorf("extension %s is not loaded", missing[0])
 		}
 	}
+	commands := jobs.SpecCriteriaProjectionCommands(plan.extensions)
+	if len(commands) == 0 {
+		return map[string]bool{}, nil
+	}
 	selected := make(map[string]bool, len(plan.projects))
 	for _, project := range plan.projects {
 		if project == nil {
 			continue
 		}
-		// A project's own disable list hides a producer when it names `validate`,
-		// alone or under one extension.
-		if project.Config != nil && project.Config.Disable != nil &&
-			slices.ContainsFunc(project.Config.Disable.Jobs, func(job string) bool {
-				return job == "validate" || strings.HasSuffix(job, ":validate")
+		if project.Config == nil || project.Config.Disable == nil {
+			selected[project.ID] = true
+			continue
+		}
+		// A project's own disable list hides a producer when it names a producer
+		// command, alone or under one extension.
+		for _, command := range commands {
+			if slices.ContainsFunc(project.Config.Disable.Jobs, func(job string) bool {
+				return job == command || strings.HasSuffix(job, ":"+command)
 			}) {
-			return nil, fmt.Errorf("project %s disables validate", project.ID)
+				return nil, fmt.Errorf("project %s disables %s", project.ID, command)
+			}
 		}
 		selected[project.ID] = true
 	}
-	planned, err := jobs.Plan(plan.ws, []string{"validate"}, plan.projects, plan.extensions,
+	planned, err := jobs.Plan(plan.ws, commands, plan.projects, plan.extensions,
 		plan.req.CommandParams, nil, nil)
 	if err != nil {
 		return nil, err

@@ -1,6 +1,10 @@
 # ADR 0026 — The spec gate's evidence scope
 
-- **Status**: accepted
+- **Status**: accepted. The producer rule of §2 and the `test` plan of §7 are
+  superseded by
+  [ADR 0069](0069-the-verification-report-and-spec-criteria-producers-are-the-tasks-that-declare-them.md)
+  (proposed): a producer is the task that declares the file, whatever its
+  command.
 - **Scope**: `@putnami/cli` spec gate (`internal/specgate`, the observation
   recovery in `internal/engine`) and the verification record of
   `protocols/features`

@@ -9,6 +9,7 @@ import (
 	"go.putnami.dev/cli/model/extension"
 	extensionproto "go.putnami.dev/protocol/extension"
 	features "go.putnami.dev/protocol/features"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -131,6 +132,13 @@ type recoveryPlanFixture struct {
 // file that activates the uncacheable test-environment steps.
 func newRecoveryPlanFixture(t *testing.T, withTestEnv bool) *recoveryPlanFixture {
 	t.Helper()
+	return newRecoveryPlanFixtureFor(t, withTestEnv, "test")
+}
+
+// newRecoveryPlanFixtureFor is newRecoveryPlanFixture with the report
+// producer's pipeline declared under command instead of `test`.
+func newRecoveryPlanFixtureFor(t *testing.T, withTestEnv bool, command string) *recoveryPlanFixture {
+	t.Helper()
 	root := t.TempDir()
 	writeSpecGateFile(t, filepath.Join(root, "billing", "go.mod"), "module example.com/billing\n")
 	writeSpecGateFile(t, filepath.Join(root, "billing", "invoice_test.go"), "package billing\n")
@@ -142,10 +150,16 @@ func newRecoveryPlanFixture(t *testing.T, withTestEnv bool) *recoveryPlanFixture
 	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "gate"}, []*workspace.Project{project})
 	ws.Graph = workspace.BuildGraph(ws.Projects)
 
+	ext := recoveryTestExtension()
+	if command != "test" {
+		pipeline := ext.Jobs["test"]
+		pipeline.Name = command
+		ext.Jobs = map[string]*extension.JobDefinition{command: pipeline}
+	}
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(root, ".putnami", "store")))
-	source := newCachedObservationRecovery(&Request{Commands: []string{"test"}}, ws,
-		[]*extension.ExtensionDescription{recoveryTestExtension()}, cache)
-	planned, err := jobs.Plan(ws, []string{"test"}, ws.Projects, source.extensions, nil, nil, nil)
+	source := newCachedObservationRecovery(&Request{Commands: []string{command}}, ws,
+		[]*extension.ExtensionDescription{ext}, cache)
+	planned, err := jobs.Plan(ws, []string{command}, ws.Projects, source.extensions, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -357,5 +371,38 @@ func TestRecoverReportsIgnoresAPrerequisiteWithoutAnEntry(t *testing.T) {
 	recovery := fixture.source.RecoverReports(fixture.ws.Projects)
 	if len(recovery.Reports) != 0 || len(recovery.Unconsulted) != 0 {
 		t.Errorf("recovery = %+v, want the candidate consulted and silent", recovery)
+	}
+}
+
+// TestRecoverReportsPlansTheDeclaredReportCommand pins recovery under a report
+// producer that is not `test`: the lookup plans the command whose task declares
+// the report, keys it as a run of that command does, and returns the cached
+// report from that command's entry. Its prerequisite steps still answer for
+// nothing.
+func TestRecoverReportsPlansTheDeclaredReportCommand(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "declared-verification-producers",
+		"cache-recovery-plans-the-declared-report-commands")
+	t.Parallel()
+	const reportTask = "/billing:check~test"
+	fixture := newRecoveryPlanFixtureFor(t, true, "check")
+	if fixture.keys[reportTask] == "" || fixture.keys["/billing:check~generate"] == "" {
+		t.Fatalf("the check plan must key its report and generate tasks, got %v", fixture.keys)
+	}
+	fixture.publish(t, "/billing:check~generate", nil, "")
+	entry := fixture.publish(t, reportTask, []store.DeclaredEntryOutput{recoveryReportOutput}, recoveryReportBytes)
+
+	recovery := fixture.source.RecoverReports(fixture.ws.Projects)
+	if len(recovery.Unconsulted) != 0 {
+		t.Errorf("a candidate with a cached check report was reported unconsulted: %+v", recovery.Unconsulted)
+	}
+	if len(recovery.Reports) != 1 {
+		t.Fatalf("reports = %+v, want exactly the candidate's cached check report", recovery.Reports)
+	}
+	report := recovery.Reports[0]
+	if report.Project != recoveryProjectID || report.Task != reportTask {
+		t.Errorf("report attributed to %s/%s, want %s/%s", report.Project, report.Task, recoveryProjectID, reportTask)
+	}
+	if want := filepath.Join(entry.FilesDir, recoveryReportOutput.ID); report.Path != want {
+		t.Errorf("report path = %s, want the entry's own copy at %s", report.Path, want)
 	}
 }

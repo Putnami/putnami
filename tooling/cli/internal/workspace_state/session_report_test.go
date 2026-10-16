@@ -9,6 +9,7 @@ import (
 	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs"
@@ -178,7 +179,7 @@ func TestSessionStoreLatestValidationCoverageScansPastOrdinaryRunsPerProject(t *
 		t.Errorf("/b replay = %+v, want older per-project report", got["/b"])
 	}
 	if got := store.LatestValidationCoverage([]string{"build"}, []string{"/a"}); len(got) != 0 {
-		t.Fatalf("non-test command loaded coverage replay: %+v", got)
+		t.Fatalf("a command that recorded no coverage loaded a replay: %+v", got)
 	}
 }
 
@@ -286,5 +287,56 @@ func coverageEntry(projectID, projectName string, percentage float64, granularit
 			Covered:     covered,
 			Total:       total,
 		},
+	}
+}
+
+// TestSessionCoverageIsRecordedAndReplayedUnderItsCommand pins that a coverage
+// row comes from the job whose result carries a coverage summary, whatever its
+// command: a `check` job's summary is recorded under `check`, the strict reader
+// accepts the report, and the replay serves it only to a session naming
+// `check`. A job without a summary records no row.
+func TestSessionCoverageIsRecordedAndReplayedUnderItsCommand(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "declared-verification-producers",
+		"coverage-is-recorded-and-replayed-under-the-command-that-measured-it")
+	t.Parallel()
+	store := NewSessionStore(t.TempDir())
+	project := &workspace.Project{ID: "/app", Name: "app"}
+	provider := &extension.ExtensionDescription{Name: "@acme/check"}
+	build := &jobs.ScheduledJob{Project: project, Extension: provider,
+		JobDef: &extension.JobDefinition{Name: "build"}}
+	check := &jobs.ScheduledJob{Project: project, Extension: provider,
+		JobDef: &extension.JobDefinition{Name: "check~run", CommandName: "check"}}
+	results := map[string]*jobs.JobResult{
+		build.Key(): {Status: string(jobs.TaskStatusSuccess)},
+		check.Key(): {
+			Status: string(jobs.TaskStatusSuccess),
+			Data: extension.ParamMap{"coverageSummary": extension.ParamMap{
+				"percentage":  80.0,
+				"granularity": runtimeproto.CoverageLines,
+				"covered":     8,
+				"total":       10,
+			}},
+		},
+	}
+	meta := reportSessionFile(protocolcli.RunOutcomeSuccess)
+	meta.Commands = []string{"build", "check"}
+	session := sessionForReport(t, store, "20260806-100000-000001")
+	if err := session.FinalizeV2WithCoverage(meta, "", "", extension.ParamMap{"enforce-coverage": true},
+		[]*jobs.ScheduledJob{build, check}, results, &jobs.SessionResult{},
+		&cachekey.JobContextVersion{Suffix: "checkrev", Branch: "main"}); err != nil {
+		t.Fatalf("FinalizeV2WithCoverage: %v", err)
+	}
+
+	got := store.LatestValidationCoverage([]string{"check"}, nil)
+	replay, ok := got["/app"]
+	if len(got) != 1 || !ok {
+		t.Fatalf("coverage replay = %+v, want the check measurement for /app", got)
+	}
+	if replay.Entry.Command != "check" || replay.Entry.TaskKey != check.Key() ||
+		replay.Entry.Summary.Percentage != 80 || replay.Source.Revision != "checkrev" {
+		t.Fatalf("replay = %+v, want the check job's 80%% at checkrev", replay)
+	}
+	if got := store.LatestValidationCoverage([]string{"test"}, nil); len(got) != 0 {
+		t.Fatalf("a test session replayed coverage measured under check: %+v", got)
 	}
 }

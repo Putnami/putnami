@@ -286,6 +286,55 @@ func TestSpecGateMatrix_EndToEnd(t *testing.T) {
 		}
 	})
 
+	t.Run("producers under other command names gate the run", func(t *testing.T) {
+		spectest.Proves(t, "cli/job-planning-execution", "declared-verification-producers",
+			"a-third-party-producer-command-gates-the-run")
+		wsRoot := newWorkspace(t)
+		// The same tasks, declared under commands named neither validate nor
+		// test: the declarations alone make them the producers.
+		manifestPath := filepath.Join(wsRoot, "gate-extension", "putnami.extension.json")
+		manifest, err := os.ReadFile(manifestPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		renamed := strings.Replace(strings.Replace(string(manifest),
+			`"validate": {`, `"criteria": {`, 1), `"test": {`, `"check": {`, 1)
+		if !strings.Contains(renamed, `"criteria": {`) || !strings.Contains(renamed, `"check": {`) {
+			t.Fatalf("the fixture manifest no longer names validate and test:\n%s", manifest)
+		}
+		clitest.WriteFile(t, manifestPath, renamed)
+		setGatePolicy(t, wsRoot, "alpha", "enforce")
+		setGateReport(t, wsRoot, "alpha", "passed")
+		setGateReport(t, wsRoot, "beta", "passed")
+
+		code, output := clitest.RunGateArgs(t, wsRoot, "criteria,check", "--all")
+		if code != cli.ExitSuccess {
+			t.Fatalf("exit = %d, want success for a verified enforce project\n%s", code, output)
+		}
+		record, _ := latestGateRecord(t, wsRoot)
+		if gateState(t, record, "gate/alpha").Requirements[0].State != features.RequirementVerified {
+			t.Fatal("alpha did not verify from the check command's report")
+		}
+
+		// A contradicted check blocks, and the warm rerun restores the same
+		// evidence from the cache and blocks again.
+		setGateReport(t, wsRoot, "alpha", "failed")
+		for _, run := range []string{"cold", "warm"} {
+			code, output = clitest.RunGateArgs(t, wsRoot, "criteria,check", "--all")
+			if code != cli.ExitError || !strings.Contains(output, "specs~verify") {
+				t.Fatalf("%s run: exit = %d, want %d with the synthetic sanction\n%s", run, code, cli.ExitError, output)
+			}
+			if run == "warm" && !strings.Contains(output, "cached") {
+				t.Fatalf("warm run reports no cache reuse:\n%s", output)
+			}
+			record, _ = latestGateRecord(t, wsRoot)
+			if alpha := gateState(t, record, "gate/alpha"); !alpha.Blocked ||
+				alpha.Requirements[0].State != features.RequirementContradicted {
+				t.Fatalf("%s run: alpha group = %+v, want the contradicted check blocked", run, alpha)
+			}
+		}
+	})
+
 	t.Run("off attaches nothing", func(t *testing.T) {
 		wsRoot := newWorkspace(t)
 		clitest.WriteFile(t, filepath.Join(wsRoot, "putnami.workspace.json"), `{

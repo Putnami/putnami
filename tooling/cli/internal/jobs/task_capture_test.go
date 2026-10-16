@@ -474,8 +474,11 @@ func TestCededSubpathIsNeverAdoptedByTheCedingTask(t *testing.T) {
 // action-events, and old cache entries predate that field entirely. The
 // task-owned descriptor still proves that these two reserved files were
 // produced. Restoring their artifact records keeps the spec gate identical on
-// cold and warm runs without throwing away the cache hit.
+// cold and warm runs without throwing away the cache hit. The declaring task
+// decides, whatever its command is called.
 func TestDeclaredRestoreRecoversReservedArtifactsWithoutCachedEvents(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "declared-verification-producers",
+		"a-warm-hit-restores-the-declared-artifact-under-any-command")
 	tests := []struct {
 		name       string
 		job        string
@@ -493,6 +496,20 @@ func TestDeclaredRestoreRecoversReservedArtifactsWithoutCachedEvents(t *testing.
 		{
 			name:       "spec criteria projection",
 			job:        "validate~specs",
+			outputID:   "criteria",
+			path:       features.SpecCriteriaProjectionFilename,
+			artifactID: features.SpecCriteriaProjectionArtifactID,
+		},
+		{
+			name:       "feature verification report under another command",
+			job:        "check~run",
+			outputID:   "featureVerification",
+			path:       features.VerificationReportFilename,
+			artifactID: features.VerificationReportArtifactID,
+		},
+		{
+			name:       "spec criteria projection under another command",
+			job:        "criteria~specs",
 			outputID:   "criteria",
 			path:       features.SpecCriteriaProjectionFilename,
 			artifactID: features.SpecCriteriaProjectionArtifactID,

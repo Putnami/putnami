@@ -280,8 +280,10 @@ detection stays workspace-wide.
 
 `verify` is the audit surface of the executable-spec gate (decision 9, fixed).
 Core's post-session finalizer — attached to every real engine
-session containing `test` — joins the criteria projection `specs-validate`
-emits with the observation reports the test jobs declared, decides each
+session that names `test` or another command whose task declares the
+observation report — joins the criteria projection
+`specs-validate` emits with the observation reports those tasks declared,
+decides each
 textual requirement (`verified`, `unmapped`, `unexecutable`, `missing`,
 `stale`, or `contradicted`) through the protocol's one pure evaluator, and
 persists the verdict record beside the session. `specs verify` **reproduces**
@@ -300,7 +302,8 @@ records that verdict when every selected project that `specs-validate` applies
 to ran it successfully. The gate reads a project that `specs-validate` does
 not apply to, because it holds no `putnami.features.json` or `specs/*.json` or
 does not attach this extension, as stating no requirement. A session without
-a record evaluated nothing: it ran no `test`, its policy is `off` everywhere,
+a record evaluated nothing: it ran neither `test` nor another
+report-producing command, its policy is `off` everywhere,
 or a selected project's `specs-validate` did not run or did not succeed, as in
 a `test` run without `validate`. Under an effective `off` policy the group
 reports `automaticEvaluation: false` and succeeds; structural spec errors keep

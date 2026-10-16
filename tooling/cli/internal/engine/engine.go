@@ -918,10 +918,12 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	req.specGate = &specGateOutcome{}
 	// The gate's cache-recovery source reuses THIS run's cache manager, so the
 	// memoized file-hash pass built for the execution keys is the one a recovery
-	// lookup keys against; a second manager would walk the tree again.
-	if gate := specGateFinalizer(req, ws, planned,
+	// lookup keys against; a second manager would walk the tree again. The gate
+	// attaches when the session names `test` or a command whose task declares
+	// the verification report in any discovered extension.
+	if gate := specGateFinalizer(req, ws, planned, jobs.VerificationReportCommands(discovered.Extensions),
 		newCachedObservationRecovery(req, ws, planningExtensions, cacheManager),
-		&validateProducerPlan{req: req, ws: ws, projects: selectedProjects, extensions: discovered.Extensions, skipped: discovered.Skipped},
+		&projectionProducerPlan{req: req, ws: ws, projects: selectedProjects, extensions: discovered.Extensions, skipped: discovered.Skipped},
 		req.specGate); gate != nil {
 		finalizers = append(finalizers, gate)
 	}

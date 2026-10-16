@@ -77,11 +77,12 @@ func newCachedObservationRecovery(req *Request, ws *workspace.Workspace,
 	return source
 }
 
-// RecoverReports keys one `test` plan over the candidate set and reports where
-// each candidate's captured verification report lives, or why it could not be
-// consulted. Only the test tasks that can write the report are asked (see
-// jobs.ProducesVerificationReport); the other steps of the command cannot
-// answer for it.
+// RecoverReports keys one plan of the report producers' commands (the
+// commands whose tasks declare the verification report; first-party: `test`)
+// over the candidate set and reports where each candidate's captured
+// verification report lives, or why it could not be consulted. Only the tasks
+// that can write the report are asked (see jobs.ProducesVerificationReport);
+// the other steps of those commands cannot answer for it.
 func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.Project) specgate.Recovery {
 	recovery := specgate.Recovery{}
 	if source == nil || len(candidates) == 0 {
@@ -102,11 +103,18 @@ func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.
 	// property every warm hit already depends on) — and the batch pays one
 	// topological pass and one activation-probe cache instead of N of each, on a
 	// path that only runs when the gate is already in trouble.
+	//
+	// Without a report producer command no candidate has a task that can write
+	// the report, so each one is consulted and silent.
+	commands := jobs.VerificationReportCommands(source.extensions)
+	if len(commands) == 0 {
+		return recovery
+	}
 	var disabledJobs, disabledExtensions []string
 	if source.req.Config != nil && source.req.Config.Disable != nil {
 		disabledJobs, disabledExtensions = source.req.Config.Disable.Jobs, source.req.Config.Disable.Extensions
 	}
-	planned, err := jobs.Plan(source.ws, []string{"test"}, candidates, source.extensions,
+	planned, err := jobs.Plan(source.ws, commands, candidates, source.extensions,
 		source.req.CommandParams, disabledJobs, disabledExtensions)
 	if err != nil {
 		return source.unconsultedAll(candidates, fmt.Sprintf("their test plan could not be derived: %v", err))
@@ -169,7 +177,7 @@ func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.
 }
 
 // candidateOutcome is what the lookup learned about one candidate project's
-// report tasks: the test tasks that can write the verification report.
+// report tasks: the tasks that can write the verification report.
 type candidateOutcome struct {
 	report      *specgate.RecoveredReport
 	reportTasks int
@@ -183,8 +191,8 @@ type candidateOutcome struct {
 //
 // Silence is an answer in two shapes, and both count as consulted:
 //
-//   - the project has no test task that can write the verification report, so
-//     it can never attest anything;
+//   - the project has no task that can write the verification report, so it
+//     can never attest anything;
 //   - its report task's entry exists and records the verification report
 //     EMPTY, which is the explicit statement "this task ran for these inputs
 //     and observed nothing". Reading that as "unreachable" would excuse every
@@ -213,7 +221,7 @@ func (source *cachedObservationRecovery) unconsultedAll(candidates []*workspace.
 	return recovery
 }
 
-// reportInEntry resolves one cached test task's entry to the captured
+// reportInEntry resolves one cached report task's entry to the captured
 // verification report inside it, or nil when the entry carries none.
 //
 // The DESCRIPTOR decides, exactly as restoreReservedDeclaredArtifactEvents does
