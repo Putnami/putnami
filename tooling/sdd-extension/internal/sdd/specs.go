@@ -640,10 +640,13 @@ func resolveSpecDecisions(ws *workspace.Workspace, discovered featureengine.Disc
 	}
 	canonical := featureproto.CanonicalSpec(discovered.Spec)
 	resolved := featureengine.ResolveDecisionRecords(ws, canonical.Decisions)
-	for index, link := range canonical.Decisions {
-		exists := resolved[link]
-		links = append(links, SpecDecisionLink{Path: link, Exists: exists})
-		if exists || !containedDecisionLink(link) {
+	for _, link := range canonical.Decisions {
+		links = append(links, SpecDecisionLink{Path: link, Exists: resolved[link]})
+	}
+	// A warning names the link by its position in the file, the index the
+	// protocol's own spec diagnostics use, not by its canonical order.
+	for index, link := range discovered.Spec.Decisions {
+		if resolved[link] || !containedDecisionLink(link) {
 			// A link the protocol already refused is reported by the protocol,
 			// which deliberately keeps the offending path out of the message so an
 			// absolute or private path cannot leak through a diagnostic. Repeating

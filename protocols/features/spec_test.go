@@ -263,6 +263,46 @@ func TestSpecLocalValidationBoundaries(t *testing.T) {
 	}
 }
 
+func TestSpecDiagnosticsNameFilePositions(t *testing.T) {
+	spec := basicSpec("billing/invoicing")
+	spec.Requirements = []SpecRequirement{
+		{ID: "zeta-export", Text: "An export states its format in the response content type."},
+		{ID: "alpha-export", Text: strings.Repeat("x", 513)},
+		{ID: "zeta-export", Text: "A second sentence for the same identity."},
+	}
+	spec.Decisions = []string{"protocols/features/doc/adr/0001-second-protocol.txt", "doc/adr/0001-workspace-decision.md"}
+	findings := ValidateSpec(spec)
+	byField := make(map[string]diag.Diagnostic)
+	for _, finding := range findings {
+		byField[finding.Field] = finding
+	}
+
+	text, ok := byField["requirements[1].text"]
+	if !ok {
+		t.Fatalf("oversized text not reported at its file position: %v", byField)
+	}
+	if !strings.Contains(text.Message, `"alpha-export"`) || !strings.Contains(text.Message, "512 bytes") {
+		t.Errorf("text message names neither the requirement nor the bound: %q", text.Message)
+	}
+	duplicate, ok := byField["requirements[2].id"]
+	if !ok || !strings.HasSuffix(duplicate.Message, "first declaration is requirements[0]") {
+		t.Errorf("duplicate requirement not reported against its first file position: %v", byField)
+	}
+	if _, ok := byField["decisions[0]"]; !ok {
+		t.Errorf("invalid decision link not reported at its file position: %v", byField)
+	}
+	if len(findings) != 3 || len(byField) != 3 {
+		t.Errorf("want exactly three findings on three fields, got %v", findings)
+	}
+
+	spec = basicSpec("billing/invoicing")
+	spec.NonGoals = []string{"A stated limit", strings.Repeat("x", 513)}
+	findings = ValidateSpec(spec)
+	if len(findings) != 1 || findings[0].Field != "nonGoals[1]" || !strings.Contains(findings[0].Message, "512 bytes") {
+		t.Errorf("oversized non-goal not reported at its position with its bound: %v", findings)
+	}
+}
+
 func TestSpecDecisionLinksAreContainedAndRedactionSafe(t *testing.T) {
 	spec := basicSpec("billing/invoicing")
 	spec.Decisions = []string{"../../Users/alice/private/doc/adr/0001-token.md"}

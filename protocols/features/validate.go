@@ -15,6 +15,9 @@ import (
 
 const (
 	decisionLinkMaxLength = 512
+	// specTextMaxLength bounds one spec outcome, non-goal, or requirement text
+	// in bytes.
+	specTextMaxLength = 512
 	// checkIDMaxLength bounds one declared or observed check identity.
 	checkIDMaxLength = 128
 	// semanticCodeMaxLength bounds metric, unit, and environment codes.
@@ -654,8 +657,11 @@ func ValidateSpec(input *Spec) []diag.Diagnostic {
 	diagnostics = append(diagnostics, validateSpecStatements("outcomes", spec.Outcomes)...)
 	diagnostics = append(diagnostics, validateSpecStatements("nonGoals", spec.NonGoals)...)
 
+	// Requirements and decision links are walked in file order, not in the
+	// canonical ID order, so a field index names the entry an author can find
+	// at that position in the file.
 	seenRequirements := make(map[string]string)
-	for i, requirement := range spec.Requirements {
+	for i, requirement := range input.Requirements {
 		field := fmt.Sprintf("requirements[%d]", i)
 		if !segmentIDPattern.MatchString(requirement.ID) {
 			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidRequirement, field+".id", "requirement ID %q must be one lower-case ASCII ID segment", requirement.ID))
@@ -665,13 +671,13 @@ func ValidateSpec(input *Spec) []diag.Diagnostic {
 		} else {
 			seenRequirements[requirement.ID] = field
 		}
-		if !boundedText(requirement.Text, 512) {
-			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidRequirement, field+".text", "requirement text must be non-empty bounded text without control characters"))
+		if !boundedText(requirement.Text, specTextMaxLength) {
+			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidRequirement, field+".text", "requirement %q text must be non-blank, at most %d bytes, without control characters", requirement.ID, specTextMaxLength))
 		}
 	}
 
 	seenDecisions := make(map[string]string)
-	for i, decision := range spec.Decisions {
+	for i, decision := range input.Decisions {
 		field := fmt.Sprintf("decisions[%d]", i)
 		diagnostics = append(diagnostics, validateDecisionLink(field, decision)...)
 		if first, exists := seenDecisions[decision]; exists {
@@ -687,8 +693,8 @@ func ValidateSpec(input *Spec) []diag.Diagnostic {
 func validateSpecStatements(field string, statements []string) []diag.Diagnostic {
 	var diagnostics []diag.Diagnostic
 	for i, statement := range statements {
-		if !boundedText(statement, 512) {
-			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, fmt.Sprintf("%s[%d]", field, i), "%s statements must be non-empty bounded text without control characters", field))
+		if !boundedText(statement, specTextMaxLength) {
+			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, fmt.Sprintf("%s[%d]", field, i), "%s statements must be non-blank, at most %d bytes, without control characters", field, specTextMaxLength))
 		}
 	}
 	return diagnostics

@@ -84,6 +84,46 @@ func TestSpecsValidateFailsOnlyOnBrokenContract(t *testing.T) {
 	}
 }
 
+// TestSpecsValidateNamesAnEntryByItsFilePosition pins that a finding names the
+// requirement an author finds at that index of the file, not its index in the
+// ID-sorted canonical order.
+func TestSpecsValidateNamesAnEntryByItsFilePosition(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "spec-findings-name-file-positions",
+		"a-spec-finding-names-the-entry-position-in-the-file")
+	ws := specWorkspace(t)
+	writeFixtureFile(t, filepath.Join(ws.Root, "app", "specs", "invoice.json"), `{
+  "protocolVersion": 1,
+  "feature": "billing/invoice-export",
+  "outcomes": ["Customers export an issued invoice"],
+  "requirements": [
+    {"id": "zeta-export", "text": "An export states its format in the response content type."},
+    {"id": "alpha-export", "text": "`+strings.Repeat("x", 513)+`"}
+  ]
+}`)
+
+	_, err := BuildSpecValidationResult(ws, Selection{})
+	if !errors.Is(err, protocolcli.ErrInvalidConfig) {
+		t.Fatalf("specs validate error = %v, want ErrInvalidConfig", err)
+	}
+	report, ok := ResultData(err).(SpecValidationReport)
+	if !ok {
+		t.Fatalf("failure data = %T, want SpecValidationReport", ResultData(err))
+	}
+	for _, finding := range report.Diagnostics {
+		if finding.Code != featureproto.ErrorCodeInvalidRequirement {
+			continue
+		}
+		if finding.Field != "app/specs/invoice.json#requirements[1].text" {
+			t.Fatalf("field = %q, want the oversized requirement's position in the file", finding.Field)
+		}
+		if !strings.Contains(finding.Message, `"alpha-export"`) || !strings.Contains(finding.Message, "512 bytes") {
+			t.Fatalf("message = %q, want the requirement ID and the bound", finding.Message)
+		}
+		return
+	}
+	t.Fatalf("no requirement finding in %+v", report.Diagnostics)
+}
+
 // TestSpecsValidateReportsCompletenessWithoutFailing pins that the three
 // authoring gaps are reported as warnings and never change the exit code.
 func TestSpecsValidateReportsCompletenessWithoutFailing(t *testing.T) {
@@ -567,6 +607,8 @@ func TestSpecInspectAnswersAnAuthoredFeatureWithNoSpec(t *testing.T) {
 }
 
 func TestSpecContextReportsAnUnresolvedDecisionRecordWithoutEchoingIt(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "spec-findings-name-file-positions",
+		"an-unresolved-decision-names-its-file-position")
 	ws := specWorkspace(t)
 	root := ws.Root
 	writeFixtureFile(t, filepath.Join(root, "app", "specs", "invoice.json"), `{
@@ -574,14 +616,15 @@ func TestSpecContextReportsAnUnresolvedDecisionRecordWithoutEchoingIt(t *testing
   "feature": "billing/invoice-export",
   "outcomes": ["Customers export an issued invoice"],
   "requirements": [],
-  "decisions": ["app/doc/adr/0009-deleted.md"]
+  "decisions": ["app/doc/adr/0010-kept.md", "app/doc/adr/0009-deleted.md"]
 }`)
+	writeFixtureFile(t, filepath.Join(root, "app", "doc", "adr", "0010-kept.md"), "# kept")
 	report, err := BuildSpecContextResult(ws, "billing/invoice-export")
 	if err != nil {
 		t.Fatalf("specs inspect: %v", err)
 	}
-	if len(report.Decisions) != 1 || report.Decisions[0].Exists {
-		t.Fatalf("decisions = %+v, want the link reported as absent", report.Decisions)
+	if len(report.Decisions) != 2 || report.Decisions[0].Exists || !report.Decisions[1].Exists {
+		t.Fatalf("decisions = %+v, want the deleted link absent and the kept link present", report.Decisions)
 	}
 	finding, found := findDiagnostic(report.Diagnostics, SpecCodeUnresolvedDecision)
 	if !found {
@@ -590,8 +633,8 @@ func TestSpecContextReportsAnUnresolvedDecisionRecordWithoutEchoingIt(t *testing
 	if finding.Severity != diag.Warning {
 		t.Fatalf("an absent record must not fail the run: %+v", finding)
 	}
-	if finding.Field != "app/specs/invoice.json#decisions[0]" {
-		t.Fatalf("field = %q, want the exact link position", finding.Field)
+	if finding.Field != "app/specs/invoice.json#decisions[1]" {
+		t.Fatalf("field = %q, want the link's position in the file", finding.Field)
 	}
 	if strings.Contains(finding.Message, "0009-deleted") {
 		t.Fatalf("message echoed the linked path: %q", finding.Message)

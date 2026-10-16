@@ -83,6 +83,10 @@
     {
       "id": "authoring-never-grants-a-permission",
       "text": "The two architecture authoring subcommands write only the mechanical half of a declaration: architecture init scaffolds a domain carrying the id, owner and projects the caller stated and refuses a domain another manifest already declares, and architecture sync removes a project entry the workspace no longer contains and a binding the graph no longer observes while refusing to grant an edge no declared import covers; the reconciliation is whole-workspace, so it rejects project selection."
+    },
+    {
+      "id": "spec-findings-name-file-positions",
+      "text": "A spec finding names a requirement or decision link by its position in the file, never by its position in the canonical ID order, so specs validate and specs inspect point at the entry an author finds at that index. A requirement text finding also names the requirement ID and the 512-byte bound."
     }
   ],
   "decisions": [
