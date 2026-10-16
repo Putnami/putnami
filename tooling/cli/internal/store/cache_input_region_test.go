@@ -117,6 +117,51 @@ func TestInputRegionFoldsCase(t *testing.T) {
 	}
 }
 
+// A root reached through a symbolic link also bounds the region at the link's
+// target, dangling or not: a read through the link overlaps a write to the
+// target, and a write through the link overlaps a read of the target, though
+// only as linked and never as spelled. A link loop leaves the root as written.
+func TestInputRegionFollowsALinkOnARoot(t *testing.T) {
+	dir := t.TempDir()
+	at := func(rel string) string { return filepath.Join(dir, filepath.FromSlash(rel)) }
+	if err := os.MkdirAll(at("src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("..", ".gen"), at("src/gen")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	throughLink := FileInputRegion(dir, []string{"src/gen/*.json"})
+	target := PathsRegion([]string{at(".gen/a.json")})
+	for _, state := range []string{"dangling", "resolved"} {
+		if state == "resolved" {
+			writeRegionFile(t, at(".gen/a.json"), "{}")
+			throughLink = FileInputRegion(dir, []string{"src/gen/*.json"})
+			target = PathsRegion([]string{at(".gen/a.json")})
+		}
+		if !throughLink.Overlaps(target) {
+			t.Errorf("%s link: a write to the target does not overlap a read through the link", state)
+		}
+		if throughLink.OverlapsAsSpelled(target) {
+			t.Errorf("%s link: a write to the target overlaps a read through the link as spelled", state)
+		}
+		var index RegionIndex
+		index.Add("writer", target)
+		if got := index.Overlapping(throughLink); !reflect.DeepEqual(got, []string{"writer"}) {
+			t.Errorf("%s link: the index names %v for a read through the link, want the writer of its target", state, got)
+		}
+	}
+	if !FileInputRegion(dir, []string{".gen/*.json"}).Overlaps(PathsRegion([]string{at("src/gen/a.json")})) {
+		t.Error("a write through the link does not overlap a read of its target")
+	}
+
+	if err := os.Symlink("loop", at("loop")); err != nil {
+		t.Fatal(err)
+	}
+	if loop := at("loop/a.json"); linkTarget(loop) != loop {
+		t.Errorf("a link loop resolves to %s, want the path as written", linkTarget(loop))
+	}
+}
+
 // The index names exactly the owners whose region overlaps: an owner at, above
 // or below a root, and an unbounded owner, and none beside it.
 func TestRegionIndexNamesOverlappingOwners(t *testing.T) {

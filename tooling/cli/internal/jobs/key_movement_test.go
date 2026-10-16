@@ -605,3 +605,78 @@ func TestDeclaredOutputPathsOfABoundedPortOutput(t *testing.T) {
 		}
 	}
 }
+
+// linkReadFixture plans a job that writes the project file at write and a job
+// that reads patterns, in a project whose src/gen is a symbolic link to its
+// .gen. When target is false, .gen does not exist, so the link dangles.
+func linkReadFixture(t *testing.T, write string, target bool, patterns ...string) (*captureFixture, *ScheduledJob, *ScheduledJob) {
+	t.Helper()
+	writer := declaredJob("build~write", "write", &extension.TaskDeclaration{
+		Outputs: map[string]extension.DeclaredOutput{"out": fileDeclaration(extension.OutputRootProject, write, false)},
+	})
+	reader := declaredJob("build~read", "read", &extension.TaskDeclaration{})
+	reader.JobDef.FilePatterns = patterns
+	f := newCaptureFixture(t, writer, reader)
+	project := filepath.Join(f.ws.Root, captureTestProject)
+	if target {
+		writeFileAt(t, filepath.Join(project, ".gen", "a.json"), "{}\n")
+	}
+	if err := os.MkdirAll(filepath.Join(project, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("..", ".gen"), filepath.Join(project, "src", "gen")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	return f, writer, reader
+}
+
+// A key that reads a directory through a symbolic link reads the link's
+// target, so a planned write to the target moves it, whether the target holds
+// the file yet or not. A write declared through the link moves a key that
+// reads the target the same way.
+func TestAWriteToALinkTargetMovesAKeyThatReadsThroughTheLink(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "planned-write-reach",
+		"a-write-to-a-link-target-moves-a-key-that-reads-through-the-link")
+	cases := []struct {
+		name     string
+		write    string
+		target   bool
+		patterns []string
+	}{
+		{"a target that does not exist yet", ".gen/a.json", false, []string{"src/gen/*.json"}},
+		{"a target that holds the file", ".gen/a.json", true, []string{"src/gen/*.json"}},
+		{"a write declared through the link", "src/gen/a.json", true, []string{".gen/*.json"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f, writer, reader := linkReadFixture(t, tc.write, tc.target, tc.patterns...)
+			movement := cachekey.PlanKeyMovement(cachekey.KeyInputs{Workspace: f.ws}, []*ScheduledJob{writer, reader})
+			if got := movement.Writers[reader.Key()]; !reflect.DeepEqual(got, []string{writer.Key()}) {
+				t.Fatalf("writers of a key that reads %v = %v, want the job that writes %s", tc.patterns, got, tc.write)
+			}
+		})
+	}
+}
+
+// Once a task wrote a link's target, a key that reads the target through the
+// link reads the written bytes, not the memoized digest of the bytes before.
+func TestAWrittenLinkTargetMovesTheKeyOfAJobThatReadsThroughTheLink(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "session-written-input-keys",
+		"a-written-link-target-moves-the-key-of-a-reader-through-the-link")
+	f, writer, reader := linkReadFixture(t, ".gen/a.json", true, "src/gen/*.json")
+	target := filepath.Join(f.ws.Root, captureTestProject, ".gen", "a.json")
+	stale := keyOf(t, f, reader, f.cache)
+	writeFileAt(t, target, "{\"written\":true}\n")
+	if memoized := keyOf(t, f, reader, f.cache); memoized != stale {
+		t.Fatal("the memo did not hold the key of the old bytes, so this test cannot prove anything")
+	}
+
+	var mu sync.Mutex
+	f.sched.finalizeExecutedJob(t.Context(), writer, &JobResult{Status: "success"},
+		false, "", "", &mu, map[string]string{})
+
+	got, want := keyOf(t, f, reader, f.cache), keyOf(t, f, reader, store.NewCacheManager(nil))
+	if got != want || got == stale {
+		t.Fatalf("after the writer ran, the reader keys %q, want %q: the key of the bytes it reads through the link", got, want)
+	}
+}
