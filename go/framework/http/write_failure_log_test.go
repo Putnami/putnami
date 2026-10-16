@@ -73,7 +73,7 @@ func assertNoErrorRecord(t *testing.T, rec *logtest.Recorder) {
 }
 
 func TestClientResettingDownloadMidBodyLogsNoError(t *testing.T) {
-	spectest.Proves(t, "go/http-services", "caller-withdrawal", "a-write-to-a-caller-that-left-logs-below-error")
+	spectest.Proves(t, "go/http-services", "failed-writes", "a-write-to-a-caller-that-left-logs-below-error")
 	for name, tc := range map[string]struct {
 		major int
 		// dropConnection closes the client's connection instead of the
@@ -152,7 +152,7 @@ func TestClientResettingDownloadMidBodyLogsNoError(t *testing.T) {
 }
 
 func TestFailedWriteClassifiedByRequestContext(t *testing.T) {
-	spectest.Proves(t, "go/http-services", "caller-withdrawal", "a-failed-write-with-a-live-request-stays-at-error")
+	spectest.Proves(t, "go/http-services", "failed-writes", "a-failed-write-with-a-live-request-stays-at-error")
 	writeErr := stderrors.New("write: no space left on device")
 	// leave ends the request context: before the request, as the write fails,
 	// or shortly after it failed, as HTTP/2 does when the connection closes.
