@@ -80,7 +80,9 @@ something. `impacted` and `why_impacted` name the same scopes as the run.
   re-propagates.
 - `narrowToTaskScopes` keeps a job when its project is not task-scoped, when
   the scope names its task, or when a kept job depends on or is serialized
-  after it, whichever extension owns it. The plan stays a closed DAG.
+  after it, whichever extension owns it. The plan stays a closed DAG. It also
+  keeps a project's `test` jobs when a kept `validate` job of that project
+  projects the spec criteria judged against their verification reports.
 - `publish`, `deploy`, `validate` and `validate-workspace` are never narrowed.
   The release-set coordinator decides release members, and the validate steps
   read session reports rather than files.

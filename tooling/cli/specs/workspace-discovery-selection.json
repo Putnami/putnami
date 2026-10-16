@@ -28,7 +28,7 @@
     },
     {
       "id": "impacted-closure",
-      "text": "Impacted selection maps changed files to their direct owners and includes the full transitive dependent closure, reaching an in-workspace extension's consumers for that extension's tasks only, so a plan keeps a task-scoped project's jobs of those extensions and their predecessors. A run that executes the selection records its complete trace, the diff base and the uncommitted changed files as a session event."
+      "text": "Impacted selection maps changed files to their direct owners and includes the full transitive dependent closure, reaching an in-workspace extension's consumers for that extension's tasks only, so a plan keeps a task-scoped project's jobs of those extensions and their predecessors, and a project's kept spec gate keeps that project's tests, whose verification reports it judges. A run that executes the selection records its complete trace, the diff base and the uncommitted changed files as a session event."
     },
     {
       "id": "safe-baseline",

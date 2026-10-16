@@ -13,6 +13,7 @@ import (
 	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -299,5 +300,141 @@ func TestNarrowToTaskScopes_KeepsValidateOnATaskScopedProject(t *testing.T) {
 	}
 	if slices.Contains(names, "test~test") {
 		t.Errorf("narrowed plan = %v, want test~test dropped: the scope does not name it", names)
+	}
+}
+
+// declaredJob is a pipeline step whose manifest task carries a v3 declaration,
+// the shape the spec gate's producer predicates read.
+func declaredJob(project *workspace.Project, extRelPath, command, step string,
+	declaration *extension.TaskDeclaration, predecessors ...string) *jobs.ScheduledJob {
+	job := scopedJob(project, extRelPath, command+"~"+step, predecessors...)
+	task := command + "-" + step
+	job.JobDef.CommandName, job.JobDef.StepID = command, step
+	job.Step = &extension.PipelineStep{ID: step, Task: task}
+	job.Extension.Tasks = map[string]extension.TaskDefinition{task: {Kind: "command", Declares: declaration}}
+	return job
+}
+
+// declaresFile is a v3 declaration of one command-output file.
+func declaresFile(path string) *extension.TaskDeclaration {
+	return &extension.TaskDeclaration{Outputs: map[string]extension.DeclaredOutput{
+		"file": {Kind: extension.OutputKindFile, Root: extension.OutputRootCommandOutput, Path: path},
+	}}
+}
+
+// A task-scoped project whose kept `validate` projects its spec criteria keeps
+// its `test` command, whose verification reports those criteria are judged
+// against: the step that writes them, its predecessors, and the finalizer that
+// tears down its environment. The spec gate then reads the same reports a full
+// plan gives it. A project whose kept plan projects no criteria still drops
+// the tests its scope does not name.
+func TestNarrowToTaskScopes_KeepsTheTestsAKeptSpecGateJudges(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "changed-files-select-owners-and-transitive-dependents")
+	sdd := &workspace.Project{ID: "/tooling/sdd-extension", Name: "@putnami/sdd", Path: "tooling/sdd-extension"}
+	http := &workspace.Project{ID: "/libs/http", Name: "http", Path: "libs/http"}
+	core := &workspace.Project{ID: "/libs/core", Name: "core", Path: "libs/core"}
+	ws := workspace.NewWorkspace("/ws", nil, []*workspace.Project{sdd, http, core})
+	report := declaresFile(features.VerificationReportFilename)
+	projection := declaresFile(features.SpecCriteriaProjectionFilename)
+	plan := func(project *workspace.Project, withSpecs bool) []*jobs.ScheduledJob {
+		id := project.ID
+		planned := []*jobs.ScheduledJob{
+			declaredJob(project, "go/extension", "build", "compile", nil),
+			declaredJob(project, "go/extension", "test", "generate", nil),
+			declaredJob(project, "go/extension", "test", "test", report, id+":build~compile", id+":test~generate"),
+			declaredJob(project, "go/extension", "test", "test-env-teardown", nil),
+			declaredJob(project, "go/extension", "lint", "check", nil),
+			declaredJob(project, "tooling/sdd-extension", "validate", "features", nil),
+		}
+		if withSpecs {
+			planned = append(planned, declaredJob(project, "tooling/sdd-extension", "validate", "specs", projection))
+		}
+		return planned
+	}
+	planned := append(plan(http, true), plan(core, false)...)
+	sddTasks := []string{"/tooling/sdd-extension#validate~features", "/tooling/sdd-extension#validate~specs"}
+	scopes := map[string][]string{"/libs/http": sddTasks, "/libs/core": sddTasks}
+
+	var got []string
+	for _, job := range narrowToTaskScopes(ws, planned, scopes) {
+		got = append(got, job.Key())
+	}
+	want := []string{
+		"/libs/http:build~compile", "/libs/http:test~generate", "/libs/http:test~test", "/libs/http:test~test-env-teardown",
+		"/libs/http:validate~features", "/libs/http:validate~specs",
+		"/libs/core:validate~features",
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("narrowed = %v, want %v", got, want)
+	}
+}
+
+// The end-to-end shape of the spec gate rule: a change to the extension that
+// provides the spec gate reaches its consumers for that extension's tasks only,
+// and each consumer still runs the test that writes the verification report its
+// kept `validate~specs` is judged against.
+func TestRunKeepsTheTestsOfAConsumerReachedThroughItsSpecGate(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "changed-files-select-owners-and-transitive-dependents")
+	root := t.TempDir()
+	write := func(rel, content string) {
+		t.Helper()
+		path := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	task := taskCommand(t, fixtureproc.Program{})
+	manifest := func(name, command, output string) string {
+		return `{"name":"` + name + `","version":"1.0.0","cliContract":4,` +
+			`"commands":{"` + command + `":{"run":[{"id":"` + command + `","task":"mark"}]}},` +
+			`"tasks":{"mark":{"kind":"command","command":` + task + `,"cache":false,` +
+			`"inputs":{"sources":{"from":"project","files":["**/*.src"]}},` +
+			`"declares":{"outputs":{"file":{"kind":"file","root":"command-output","path":"` + output + `","optionalEmpty":true}}}}}}`
+	}
+	write(".gitignore", ".putnami/\n")
+	write("putnami.workspace.json", `{"name":"spec-gate-scope","includes":["app","lib","sdd","tester"]}`)
+	write("lib/putnami.json", `{"name":"lib","extensions":["/sdd","/tester"]}`)
+	write("app/putnami.json", `{"name":"app","dependencies":["lib"],"extensions":["/sdd","/tester"]}`)
+	write("sdd/putnami.json", `{"name":"@fixture/sdd"}`)
+	write("sdd/putnami.extension.json", manifest("@fixture/sdd", "validate", features.SpecCriteriaProjectionFilename))
+	write("sdd/implementation.txt", "v1\n")
+	write("tester/putnami.json", `{"name":"@fixture/tester"}`)
+	write("tester/putnami.extension.json", manifest("@fixture/tester", "test", features.VerificationReportFilename))
+	initCLISelectionGitRepo(t, root)
+	runCLISelectionGit(t, root, "update-ref", "refs/remotes/origin/main", "HEAD")
+	runCLISelectionGit(t, root, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+	runCLISelectionGit(t, root, "checkout", "-b", "feature")
+	write("sdd/implementation.txt", "v2\n")
+	workspace.InvalidateLoadCache(root)
+
+	var live bytes.Buffer
+	renderer := output.NewRenderer(output.Config{Output: "jsonl", Command: "test", Out: &live, Err: &live})
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	result, err := New().Run(ctx, Request{
+		WorkspaceRoot: root, Config: wsproto.Load(root), Commands: []string{"test", "validate"},
+		Global: GlobalFlags{Output: "jsonl", Impacted: true, Projects: impactedProjectsSentinel, NoCache: true, MaxParallel: 1},
+	}, renderer)
+	if err != nil || result.ExitCode != ExitSuccess {
+		t.Fatalf("impacted engine run: exit=%d err=%v\n%s", result.ExitCode, err, live.String())
+	}
+
+	var started []string
+	for _, line := range strings.Split(strings.TrimSpace(live.String()), "\n") {
+		var record protocolcli.SessionStreamRecord
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			t.Fatalf("decode live record %q: %v", line, err)
+		}
+		if record.Record == protocolcli.RecordTaskStart && record.Identity != nil {
+			started = append(started, record.Identity.Key)
+		}
+	}
+	slices.Sort(started)
+	want := []string{"/app:test~test", "/app:validate~validate", "/lib:test~test", "/lib:validate~validate"}
+	if !slices.Equal(started, want) {
+		t.Errorf("tasks started = %v, want %v: each consumer's spec gate and the test it judges", started, want)
 	}
 }
