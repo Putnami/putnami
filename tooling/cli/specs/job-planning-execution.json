@@ -148,6 +148,10 @@
     {
       "id": "session-written-input-keys",
       "text": "A task is looked up, stored and shared at the key of the bytes it reads when it starts: a declared output an earlier task of the session wrote, by executing, whatever its verdict, or by restoring its entry, moves that key. A key computed before any task runs is never used for a task whose inputs another planned task may write. A resource pruned on such a consumer key is confirmed from the consumer's key when its producer starts, and provisioned when a write that can move that key may finish later."
+    },
+    {
+      "id": "job-context-names-member-types",
+      "text": "Every job context the core writes lists the complete workspace membership in workspaceProjects, and each entry names the project's resolved type: the type its putnami.json authors, else the type its provider reported, else application. An entry without a type comes from a CLI that predates the member. selectedProjects and dependencyClosure carry no type."
     }
   ],
   "decisions": [

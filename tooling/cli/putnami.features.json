@@ -1036,6 +1036,19 @@
               "pruning-on-a-movable-consumer-key-is-confirmed-when-the-producer-starts"
             ]
           }
+        },
+        {
+          "id": "job-context-names-member-types",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-workspace-member-names-its-resolved-type"
+            ]
+          }
         }
       ]
     },

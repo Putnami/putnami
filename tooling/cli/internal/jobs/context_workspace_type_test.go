@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	protocoljob "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -37,6 +38,7 @@ func typedMembership(libraryType string) *workspace.Workspace {
 // selection and the dependency closure carry none.
 func TestBuildJobContext_WorkspaceProjectsCarryTheResolvedType(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "job-context-names-member-types", "each-workspace-member-names-its-resolved-type")
 	ws := typedMembership("library")
 	app := ws.ProjectByID("/go/app")
 	ctx := BuildJobContext(ws, &ScheduledJob{
