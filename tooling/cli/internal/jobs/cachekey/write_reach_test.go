@@ -135,12 +135,18 @@ func TestFileSelectionKeepsTheRegionItCannotNarrow(t *testing.T) {
 // pattern segment in another case, a path whose existing segments are spelled
 // otherwise on disk, and a pattern the store cleans before it globs.
 func TestFileSelectionDecidesByRegionWhatItCannotSpell(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "proj")
+	var dir string
 	at := func(rel string) string { return filepath.Join(dir, filepath.FromSlash(rel)) }
-	writeSelectionFile(t, at(".gen/version.json"), "{}\n")
-	writeSelectionFile(t, at("Config/app.json"), "{}\n")
+	// Each case starts from its own tree, so a link one case adds never
+	// decides another.
+	fixture := func(t *testing.T) {
+		dir = filepath.Join(t.TempDir(), "proj")
+		writeSelectionFile(t, at(".gen/version.json"), "{}\n")
+		writeSelectionFile(t, at("Config/app.json"), "{}\n")
+	}
 
 	t.Run("a selected link", func(t *testing.T) {
+		fixture(t)
 		var scanner selectionScanner
 		patterns := []string{"**/*.json", "!**/.gen/**"}
 		write := plannedWrite{Path: at(".gen/version.json")}
@@ -160,6 +166,7 @@ func TestFileSelectionDecidesByRegionWhatItCannotSpell(t *testing.T) {
 	})
 
 	t.Run("a literal segment in another case", func(t *testing.T) {
+		fixture(t)
 		var scanner selectionScanner
 		if !scanner.Select(dir, []string{"Config/*.yaml"}).Reaches(plannedWrite{Path: at("config/app.json")}) {
 			t.Fatal("a write that spells the pattern's literal segment in another case was decided by pattern")
@@ -170,6 +177,7 @@ func TestFileSelectionDecidesByRegionWhatItCannotSpell(t *testing.T) {
 	})
 
 	t.Run("a path spelled otherwise on disk", func(t *testing.T) {
+		fixture(t)
 		var scanner selectionScanner
 		write := plannedWrite{Path: at("config/new.json")}
 		_, err := os.Lstat(at("config"))
@@ -180,6 +188,7 @@ func TestFileSelectionDecidesByRegionWhatItCannotSpell(t *testing.T) {
 	})
 
 	t.Run("a pattern not in clean form", func(t *testing.T) {
+		fixture(t)
 		var scanner selectionScanner
 		if !scanner.Select(dir, []string{"Config/./*.yaml"}).Reaches(plannedWrite{Path: at("Config/app.json")}) {
 			t.Fatal("a pattern the store cleans was decided by matching it as written")
