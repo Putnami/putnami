@@ -193,6 +193,18 @@
               "work-rolled-back-by-the-deadline-answers-500"
             ]
           }
+        },
+        {
+          "id": "failed-writes",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-write-to-a-caller-that-left-logs-below-error",
+              "a-failed-write-with-a-live-request-stays-at-error"
+            ]
+          }
         }
       ]
     }

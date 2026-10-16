@@ -99,6 +99,11 @@ server cuts the response. `context.Canceled` then means the caller left:
 with the code `canceled`. WebSocket upgrades, Server-Sent Events, and gRPC or
 Connect streams run without that deadline.
 
+A response write that fails after the caller left (the request context ended
+with `context.Canceled`) logs the failure at INFO. A write that fails while the
+request context is live logs at ERROR. Over HTTP/2, a failed write waits up to
+100 ms for the stream context to end before it is classified.
+
 ## Handler Injection
 
 `http.Inject` wraps a function with DI-resolved parameters. Singleton deps are
