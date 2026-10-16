@@ -89,9 +89,12 @@ server.Use(MyMiddleware)
 
 `Logging()` writes one record per request: ERROR at 5xx, INFO below. A `499`
 answer has the outcome `canceled`; any other status under 500 has `success`.
-The record carries the status written to the wire: a handler that writes to
-`ctx.Writer` and returns `nil`, such as a gateway-mounted Connect handler, is
-logged with the status it wrote. A body written without a status logs `200`.
+A handler that writes to `ctx.Writer`, such as a gateway-mounted Connect
+handler, is logged with the status it wrote, not the response it returns. A
+body written without a status logs `200`. A handler that returns a 5xx after it
+wrote a lower status logs the written status at ERROR with the outcome
+`failure`. A failure carried in gRPC trailers or a Connect end-stream message
+rides on a written `200` and logs as `success`.
 
 ## Request Deadline
 

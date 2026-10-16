@@ -2,9 +2,11 @@ package http
 
 import (
 	"bufio"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	perrors "go.putnami.dev/errors"
@@ -33,7 +35,7 @@ func TestRequestLogRecordsTheStatusWrittenToTheWire(t *testing.T) {
 		},
 		{
 			name:     "success",
-			check:    "a-directly-written-success-logs-at-info",
+			check:    "a-directly-written-status-below-500-logs-at-info",
 			write:    func(w http.ResponseWriter) { w.WriteHeader(http.StatusOK) },
 			status:   http.StatusOK,
 			severity: "INFO",
@@ -41,7 +43,7 @@ func TestRequestLogRecordsTheStatusWrittenToTheWire(t *testing.T) {
 		},
 		{
 			name:     "client error",
-			check:    "a-directly-written-success-logs-at-info",
+			check:    "a-directly-written-status-below-500-logs-at-info",
 			write:    func(w http.ResponseWriter) { w.WriteHeader(http.StatusNotFound) },
 			status:   http.StatusNotFound,
 			severity: "INFO",
@@ -49,7 +51,7 @@ func TestRequestLogRecordsTheStatusWrittenToTheWire(t *testing.T) {
 		},
 		{
 			name:     "body without a status",
-			check:    "a-directly-written-success-logs-at-info",
+			check:    "a-directly-written-status-below-500-logs-at-info",
 			write:    func(w http.ResponseWriter) { _, _ = w.Write([]byte("ok")) },
 			status:   http.StatusOK,
 			severity: "INFO",
@@ -135,9 +137,38 @@ func TestRequestLogPrefersTheWrittenStatusOverTheReturnedResponse(t *testing.T) 
 	}
 }
 
+// A handler that panics after it wrote a 200 head answers 200 on the wire, and
+// the record keeps that status but logs the failure Recovery recorded.
+func TestRequestLogKeepsAFailureReturnedAfterTheWrittenStatus(t *testing.T) {
+	spectest.Proves(t, "go/http-services", "request-log-status", "a-5xx-returned-after-a-written-status-logs-at-error")
+	rec := logtest.NewRecorder(t)
+	handler := Chain(Logging(LoggerOptions{Logger: rec.Named("http")}), Recovery())(func(ctx *Context) *Response {
+		ctx.Writer.WriteHeader(http.StatusOK)
+		_, _ = ctx.Writer.Write([]byte("partial"))
+		panic("kaboom")
+	})
+	ctx := NewContext(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/exports", nil))
+	ctx.Route = "/exports"
+	handler(ctx)
+
+	record := terminalRecord(t, rec, "/exports")
+	if record["severity"] != "ERROR" {
+		t.Errorf("severity = %v, want ERROR", record["severity"])
+	}
+	group, _ := record["http"].(map[string]any)
+	if group["status"] != float64(http.StatusOK) || group["outcome"] != "failure" {
+		t.Errorf("logged status/outcome = %v/%v, want 200/failure", group["status"], group["outcome"])
+	}
+	errField, _ := record["error"].(map[string]any)
+	if message, _ := errField["message"].(string); !strings.Contains(message, "kaboom") {
+		t.Errorf("error = %v, want the recovered panic", record["error"])
+	}
+}
+
 type hijackableRecorder struct {
 	*httptest.ResponseRecorder
 	hijacked bool
+	readFrom bool
 }
 
 func (h *hijackableRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
@@ -145,9 +176,15 @@ func (h *hijackableRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return nil, nil, nil
 }
 
+func (h *hijackableRecorder) ReadFrom(r io.Reader) (int64, error) {
+	h.readFrom = true
+	return io.Copy(h.ResponseRecorder, r)
+}
+
 // The writer the Logging middleware hands down keeps the optional interfaces of
-// the writer it wraps, so streams flush and upgrades hijack through it.
-func TestLoggingWriterKeepsFlusherHijackerAndUnwrap(t *testing.T) {
+// the writer it wraps, so streams flush, upgrades hijack and copies reach
+// sendfile through it.
+func TestLoggingWriterKeepsTheWrappedWritersInterfaces(t *testing.T) {
 	inner := &hijackableRecorder{ResponseRecorder: httptest.NewRecorder()}
 	var seen http.ResponseWriter
 	handler := Chain(Logging(LoggerOptions{Logger: logtest.NewRecorder(t).Named("http")}))(func(ctx *Context) *Response {
@@ -174,6 +211,9 @@ func TestLoggingWriterKeepsFlusherHijackerAndUnwrap(t *testing.T) {
 	if unwrapper, ok := seen.(interface{ Unwrap() http.ResponseWriter }); !ok || unwrapper.Unwrap() != inner {
 		t.Error("Unwrap does not return the wrapped writer")
 	}
+	if _, err := io.Copy(seen, struct{ io.Reader }{strings.NewReader("body")}); err != nil || !inner.readFrom {
+		t.Errorf("a copy to the logged writer did not reach the wrapped io.ReaderFrom: %v", err)
+	}
 
 	var plain http.ResponseWriter
 	handler = Chain(Logging(LoggerOptions{Logger: logtest.NewRecorder(t).Named("http")}))(func(ctx *Context) *Response {
@@ -183,5 +223,8 @@ func TestLoggingWriterKeepsFlusherHijackerAndUnwrap(t *testing.T) {
 	handler(NewContext(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil)))
 	if _, ok := plain.(http.Hijacker); ok {
 		t.Error("the logged writer claims http.Hijacker over a writer that cannot hijack")
+	}
+	if _, err := io.Copy(plain, struct{ io.Reader }{strings.NewReader("body")}); err != nil {
+		t.Errorf("copy through a writer without io.ReaderFrom: %v", err)
 	}
 }

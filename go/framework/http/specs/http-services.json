@@ -75,7 +75,7 @@
     },
     {
       "id": "request-log-status",
-      "text": "The request log records the status written to the wire. A handler that writes its answer to the response writer, such as a gateway-mounted Connect handler, is logged with the status it wrote, and the record's level and outcome follow that status: a 5xx logs at ERROR with the outcome failure, a 499 logs at INFO with the outcome canceled, and any other status logs at INFO with the outcome success. A body written without a status logs 200."
+      "text": "A handler that writes its answer to the response writer, such as a gateway-mounted Connect handler, is logged with the status it wrote, not the response it returns, and the record's level and outcome follow that status: a 5xx logs at ERROR with the outcome failure, a 499 logs at INFO with the outcome canceled, and any other status logs at INFO with the outcome success. A body written without a status logs 200. A handler that returns a 5xx after it wrote a lower status logs the written status at ERROR with the outcome failure."
     }
   ],
   "decisions": [

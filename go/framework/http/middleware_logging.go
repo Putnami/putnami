@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -146,9 +147,11 @@ func Logging(opts LoggerOptions) Middleware {
 			routePath = ctx.Path
 		}
 
+		// A handler that returns a 5xx after it wrote a lower status failed
+		// mid-answer: the record keeps the written status and logs the failure.
 		outcome := "success"
 		switch {
-		case status >= 500:
+		case status >= 500, resp != nil && resp.Status >= 500:
 			outcome = "failure"
 		case status == errors.StatusClientClosedRequest:
 			outcome = "canceled"
@@ -177,7 +180,7 @@ func Logging(opts LoggerOptions) Middleware {
 		// leaks into the message (matches the frozen conformance fixture).
 		msg := fmt.Sprintf("[%s] %s", ctx.Method, routePath)
 		switch {
-		case status >= 500:
+		case outcome == "failure":
 			// RequestError may be nil when nothing recorded an error (e.g. a
 			// handler returned a bare 500); ErrorCtx then emits no error field.
 			log.ErrorCtx(reqCtx, msg, logger.RequestError(reqCtx), httpGroup)
@@ -191,7 +194,7 @@ func Logging(opts LoggerOptions) Middleware {
 
 // statusWriter records the final status a handler writes to the wrapped
 // writer: the first WriteHeader outside the informational 1xx range, or 200
-// when the handler writes or flushes a body first. Status 0 means nothing was
+// when the handler writes, copies or flushes a body first. Status 0 means nothing was
 // written.
 type statusWriter struct {
 	http.ResponseWriter
@@ -211,6 +214,18 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 		w.status = http.StatusOK
 	}
 	return w.ResponseWriter.Write(b)
+}
+
+// ReadFrom keeps the wrapped writer's io.ReaderFrom, so a copy to the
+// response still reaches sendfile.
+func (w *statusWriter) ReadFrom(r io.Reader) (int64, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	if readerFrom, ok := w.ResponseWriter.(io.ReaderFrom); ok {
+		return readerFrom.ReadFrom(r)
+	}
+	return io.Copy(struct{ io.Writer }{w.ResponseWriter}, r)
 }
 
 // Unwrap returns the wrapped writer, so http.ResponseController reaches it.
