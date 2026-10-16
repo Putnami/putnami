@@ -80,7 +80,8 @@ func newAttestedFixture(t *testing.T) *attestedFixture {
 
 	validate := &jobs.ScheduledJob{Project: billing,
 		Extension: &extension.ExtensionDescription{Name: "@putnami/sdd"},
-		JobDef:    &extension.JobDefinition{Name: "validate~specs", CommandName: "validate"}}
+		JobDef: &extension.JobDefinition{Name: "validate~specs", CommandName: "validate",
+			Traits: extension.CommandTraits{Kind: extension.CommandKindCriteria}}}
 	billingTest := testStep(billing, "test", true)
 
 	fixture := &attestedFixture{ws: ws, root: root,
@@ -113,8 +114,9 @@ func testStep(project *workspace.Project, step string, reports bool) *jobs.Sched
 	return &jobs.ScheduledJob{Project: project,
 		Extension: &extension.ExtensionDescription{Name: "@putnami/go",
 			Tasks: map[string]extension.TaskDefinition{task: {Kind: "command", Declares: declaration}}},
-		Step:   &extension.PipelineStep{ID: step, Task: task},
-		JobDef: &extension.JobDefinition{Name: "test~" + step, CommandName: "test", StepID: step}}
+		Step: &extension.PipelineStep{ID: step, Task: task},
+		JobDef: &extension.JobDefinition{Name: "test~" + step, CommandName: "test", StepID: step,
+			Traits: extension.CommandTraits{Kind: extension.CommandKindVerification}}}
 }
 
 // rebuildGraph re-derives the dependency graph after a test rewires the edges.

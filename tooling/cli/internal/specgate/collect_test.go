@@ -103,11 +103,14 @@ func (f *gateFixture) setPolicy(scope string, mode string) {
 	f.project().Config.Options = options
 }
 
+// fixtureJob is a project's whole job of a verification command, which writes
+// the verification report without a pipeline step that declares it.
 func fixtureJob(project *workspace.Project, name, command string) *jobs.ScheduledJob {
 	return &jobs.ScheduledJob{
 		Project:   project,
 		Extension: &extension.ExtensionDescription{Name: "@putnami/test-fixture"},
-		JobDef:    &extension.JobDefinition{Name: name, CommandName: command},
+		JobDef: &extension.JobDefinition{Name: name, CommandName: command,
+			Traits: extension.CommandTraits{Kind: extension.CommandKindVerification}},
 	}
 }
 
@@ -122,8 +125,9 @@ func producerJob(project *workspace.Project) *jobs.ScheduledJob {
 					Path: features.SpecCriteriaProjectionFilename, OptionalEmpty: true},
 			}}},
 		}},
-		JobDef: &extension.JobDefinition{Name: "validate~specs", CommandName: "validate"},
-		Step:   &extension.PipelineStep{Task: "specs-validate"},
+		JobDef: &extension.JobDefinition{Name: "validate~specs", CommandName: "validate",
+			Traits: extension.CommandTraits{Kind: extension.CommandKindCriteria}},
+		Step: &extension.PipelineStep{Task: "specs-validate"},
 	}
 }
 

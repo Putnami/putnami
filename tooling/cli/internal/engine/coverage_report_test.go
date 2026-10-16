@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"go.putnami.dev/cli/model/jobs"
+	extensionproto "go.putnami.dev/protocol/extension"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -21,6 +22,7 @@ func TestExecuteWritesCoverageReportOnlyAfterSuccessfulValidation(t *testing.T) 
 	f.req.Commands = []string{"test"}
 	f.req.CommandParams = extension.ParamMap{"enforce-coverage": true}
 	f.planned[0].JobDef.Name = "test"
+	f.planned[0].JobDef.Traits.Kind = extensionproto.CommandKindVerification
 	injectCoverage := func(results map[string]*jobs.JobResult) {
 		results[f.planned[0].Key()].Data = extension.ParamMap{
 			"coverageSummary": extension.ParamMap{

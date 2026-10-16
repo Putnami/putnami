@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
@@ -474,11 +475,17 @@ func TestCededSubpathIsNeverAdoptedByTheCedingTask(t *testing.T) {
 // action-events, and old cache entries predate that field entirely. The
 // task-owned descriptor still proves that these two reserved files were
 // produced. Restoring their artifact records keeps the spec gate identical on
-// cold and warm runs without throwing away the cache hit.
+// cold and warm runs without throwing away the cache hit. The declaring task
+// and its command's kind decide, whatever the command is called: a test or
+// validate command without the kind restores no artifact record.
 func TestDeclaredRestoreRecoversReservedArtifactsWithoutCachedEvents(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "declared-verification-producers",
+		"a-warm-hit-restores-the-declared-artifact-by-kind")
+	verification, criteria := extensionproto.CommandKindVerification, extensionproto.CommandKindCriteria
 	tests := []struct {
 		name       string
 		job        string
+		kind       string
 		outputID   string
 		path       string
 		artifactID string
@@ -486,6 +493,7 @@ func TestDeclaredRestoreRecoversReservedArtifactsWithoutCachedEvents(t *testing.
 		{
 			name:       "feature verification report",
 			job:        "test~run",
+			kind:       verification,
 			outputID:   "featureVerification",
 			path:       features.VerificationReportFilename,
 			artifactID: features.VerificationReportArtifactID,
@@ -493,9 +501,38 @@ func TestDeclaredRestoreRecoversReservedArtifactsWithoutCachedEvents(t *testing.
 		{
 			name:       "spec criteria projection",
 			job:        "validate~specs",
+			kind:       criteria,
 			outputID:   "criteria",
 			path:       features.SpecCriteriaProjectionFilename,
 			artifactID: features.SpecCriteriaProjectionArtifactID,
+		},
+		{
+			name:       "feature verification report under another command",
+			job:        "check~run",
+			kind:       verification,
+			outputID:   "featureVerification",
+			path:       features.VerificationReportFilename,
+			artifactID: features.VerificationReportArtifactID,
+		},
+		{
+			name:       "spec criteria projection under another command",
+			job:        "criteria~specs",
+			kind:       criteria,
+			outputID:   "criteria",
+			path:       features.SpecCriteriaProjectionFilename,
+			artifactID: features.SpecCriteriaProjectionArtifactID,
+		},
+		{
+			name:     "feature verification report under a test command without the kind",
+			job:      "test~run",
+			outputID: "featureVerification",
+			path:     features.VerificationReportFilename,
+		},
+		{
+			name:     "spec criteria projection under a validate command without the kind",
+			job:      "validate~specs",
+			outputID: "criteria",
+			path:     features.SpecCriteriaProjectionFilename,
 		},
 	}
 
@@ -506,6 +543,7 @@ func TestDeclaredRestoreRecoversReservedArtifactsWithoutCachedEvents(t *testing.
 					test.outputID: fileDeclaration(extension.OutputRootCommandOutput, test.path, true),
 				},
 			})
+			job.JobDef.Traits.Kind = test.kind
 			f := newCaptureFixture(t, job)
 			artifactPath := filepath.Join(f.commandDir(job.CommandName()), test.path)
 			writeFileAt(t, artifactPath, "{}\n")
@@ -521,6 +559,12 @@ func TestDeclaredRestoreRecoversReservedArtifactsWithoutCachedEvents(t *testing.
 
 			result := f.hitOrFail(t, job, captureHashA)
 			artifacts := TaskResultOf(job, result).Artifacts
+			if test.artifactID == "" {
+				if len(artifacts) != 0 {
+					t.Fatalf("restored artifacts = %+v, want none without the command kind", artifacts)
+				}
+				return
+			}
 			if len(artifacts) != 1 || artifacts[0].ID != test.artifactID || artifacts[0].Path != test.path {
 				t.Fatalf("restored artifacts = %+v, want %s at %s", artifacts, test.artifactID, test.path)
 			}

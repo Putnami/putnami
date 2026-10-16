@@ -57,19 +57,23 @@ version-1 `job:end` / `job:event` logs. New sessions write only version 2.
 
 `report.json` is currently an optional, independently versioned compact slice.
 A completed, non-aborted `--enforce-coverage` run writes every valid canonical
-runtime `coverageSummary` fact it collected per project, including a measured
-percentage from a test that failed its threshold or a session where another
-task failed. An ordinary or aborted run writes no report. The shape is
-language-neutral (Go statements and TypeScript lines retain their declared
-granularity) and contains no raw result payloads or invocation-scoped data.
+runtime `coverageSummary` fact it collected per project and verification
+command: a command whose resolved traits declare the verification kind,
+whatever it is called. That includes a measured percentage from a test that
+failed its threshold or a session where another task failed. An ordinary or
+aborted run writes no report. The shape is language-neutral (Go statements and
+TypeScript lines retain their declared granularity) and contains no raw result
+payloads or invocation-scoped data.
 
-The interactive `test` summary scans completed reports newest-first for each
-selected project. Coverage collected by the current run always wins. When no
-current measurement exists, the summary replays the last validation fact and
-labels it `stale` with its revision (or source session) so it cannot be read as
-current-run coverage. Failed completed sessions remain eligible sources;
-aborted or incomplete sessions never do. Report reads and writes are
-display-only: they never change task parameters, cache keys, or pass/fail.
+The interactive summary scans completed reports newest-first for each
+selected project, among the facts recorded under a verification command the
+run names (`test` for the language extensions). Coverage collected by the
+current run always wins. When no current measurement exists, the summary
+replays the last validation fact and labels it `stale` with its revision (or
+source session) so it cannot be read as current-run coverage. Failed completed
+sessions remain eligible sources; aborted or incomplete sessions never do.
+Report reads and writes are display-only: they never change task parameters,
+cache keys, or pass/fail.
 
 ### `plan.json` — Execution Plan Snapshot
 

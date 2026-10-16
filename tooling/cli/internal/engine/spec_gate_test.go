@@ -8,6 +8,7 @@ import (
 
 	"go.putnami.dev/cli/model/extension"
 	"go.putnami.dev/cli/model/jobs"
+	extensionproto "go.putnami.dev/protocol/extension"
 	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -16,8 +17,8 @@ import (
 )
 
 // specGateFixture builds the on-disk shape a completed session leaves behind:
-// one spec-owning project whose validate step declared a criteria projection
-// and whose test step declared an observation report.
+// one spec-owning project whose criteria command emitted a criteria
+// projection and whose verification command emitted an observation report.
 type specGateFixture struct {
 	ws      *workspace.Workspace
 	planned []*jobs.ScheduledJob
@@ -55,10 +56,12 @@ func newSpecGateFixture(t *testing.T, observationStatus string) *specGateFixture
 
 	validate := &jobs.ScheduledJob{Project: project,
 		Extension: &extension.ExtensionDescription{Name: "@putnami/sdd"},
-		JobDef:    &extension.JobDefinition{Name: "validate~specs", CommandName: "validate"}}
+		JobDef: &extension.JobDefinition{Name: "validate~specs", CommandName: "validate",
+			Traits: extension.CommandTraits{Kind: extensionproto.CommandKindCriteria}}}
 	test := &jobs.ScheduledJob{Project: project,
 		Extension: &extension.ExtensionDescription{Name: "@putnami/go"},
-		JobDef:    &extension.JobDefinition{Name: "test", CommandName: "test"}}
+		JobDef: &extension.JobDefinition{Name: "test", CommandName: "test",
+			Traits: extension.CommandTraits{Kind: extensionproto.CommandKindVerification}}}
 	return &specGateFixture{
 		ws:      ws,
 		planned: []*jobs.ScheduledJob{validate, test},
@@ -93,43 +96,44 @@ func writeSpecGateFile(t *testing.T, path, content string) {
 }
 
 // TestSpecGateFinalizer_AttachmentConditions pins when the gate exists at
-// all: only sessions containing test carry it, off-everywhere attaches no
-// collector, and a run without a workspace has nothing to attach to.
+// all: only sessions naming a verification command (here `test`) carry it,
+// off-everywhere attaches no collector, and a run without a workspace has
+// nothing to attach to.
 func TestSpecGateFinalizer_AttachmentConditions(t *testing.T) {
 	t.Parallel()
 	fixture := newSpecGateFixture(t, "passed")
 
-	if specGateFinalizer(&Request{Commands: []string{"build", "lint"}}, fixture.ws, fixture.planned, nil, nil, &specGateOutcome{}) != nil {
+	if specGateFinalizer(&Request{Commands: []string{"build", "lint"}}, fixture.ws, fixture.planned, []string{"test"}, nil, nil, &specGateOutcome{}) != nil {
 		t.Error("a session without test carried the spec gate")
 	}
-	if specGateFinalizer(&Request{Commands: []string{"test"}}, nil, nil, nil, nil, &specGateOutcome{}) != nil {
+	if specGateFinalizer(&Request{Commands: []string{"test"}}, nil, nil, []string{"test"}, nil, nil, &specGateOutcome{}) != nil {
 		t.Error("a run with no loaded workspace carried the spec gate")
 	}
-	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, nil, &specGateOutcome{}) == nil {
+	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, []string{"test"}, nil, nil, &specGateOutcome{}) == nil {
 		t.Error("a test session under the default report mode carried no spec gate")
 	}
 	// One project going off does NOT disarm the workspace: the built-in default
 	// stays report for everyone else, so the collector still attaches.
 	fixture.setProjectMode("off")
-	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, nil, &specGateOutcome{}) == nil {
+	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, []string{"test"}, nil, nil, &specGateOutcome{}) == nil {
 		t.Error("a single project's off disarmed the whole workspace's gate")
 	}
 	// Off EVERYWHERE — the committed workspace policy plus no overriding
 	// project — attaches no collector at all.
 	fixture.ws.Config.Options = map[string]map[string]any{"sdd": {"verification": map[string]any{"specs": "off"}}}
-	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, nil, &specGateOutcome{}) != nil {
+	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, []string{"test"}, nil, nil, &specGateOutcome{}) != nil {
 		t.Error("off everywhere still attached the collector")
 	}
 	// A project override back on re-attaches even under a workspace off.
 	fixture.setProjectMode("enforce")
-	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, nil, &specGateOutcome{}) == nil {
+	if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, []string{"test"}, nil, nil, &specGateOutcome{}) == nil {
 		t.Error("a committed enforce override under a workspace off attached nothing")
 	}
 	// A watch iteration replans through Engine.Run and rebuilds the finalizer
 	// list, so an iteration request attaches the gate exactly as a terminal
 	// run does — watch parity costs no special case.
 	iteration := &Request{Commands: []string{"test"}, watchIteration: true}
-	if specGateFinalizer(iteration, fixture.ws, fixture.planned, nil, nil, &specGateOutcome{}) == nil {
+	if specGateFinalizer(iteration, fixture.ws, fixture.planned, []string{"test"}, nil, nil, &specGateOutcome{}) == nil {
 		t.Error("a watch iteration carried no spec gate")
 	}
 }
@@ -153,7 +157,7 @@ func TestSpecGateFinalizer_EnforceSanctionsThroughTheReducer(t *testing.T) {
 			fixture := newSpecGateFixture(t, tc.status)
 			fixture.setProjectMode("enforce")
 			outcome := &specGateOutcome{}
-			finalize := specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, nil, outcome)
+			finalize := specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, []string{"test"}, nil, nil, outcome)
 			if finalize == nil {
 				t.Fatal("enforce session carried no finalizer")
 			}
@@ -188,7 +192,7 @@ func TestSpecGateFinalizer_ReportNeverChangesACleanExit(t *testing.T) {
 	t.Parallel()
 	fixture := newSpecGateFixture(t, "failed")
 	outcome := &specGateOutcome{}
-	finalize := specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, nil, outcome)
+	finalize := specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, []string{"test"}, nil, nil, outcome)
 	if finalize == nil {
 		t.Fatal("default report session carried no finalizer")
 	}
@@ -214,7 +218,7 @@ func TestSpecGateFinalizer_IncompleteSessionsGainNoSecondaryFailures(t *testing.
 			fixture.setProjectMode("enforce")
 			fixture.results[fixture.planned[1].Key()].Status = status
 			outcome := &specGateOutcome{}
-			finalize := specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, nil, nil, outcome)
+			finalize := specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, []string{"test"}, nil, nil, outcome)
 			finalize(fixture.results)
 
 			if _, sanctioned := fixture.results["/billing:specs~verify"]; sanctioned {
@@ -256,7 +260,7 @@ func TestSpecGateFinalizer_TruncatedSessionsWarnAboutNothing(t *testing.T) {
 		t.Helper()
 		return captureStderr(t, func() {
 			finalize := specGateFinalizer(&Request{Commands: []string{"test"}},
-				fixture.ws, fixture.planned, exhaustedRecovery{}, nil, &specGateOutcome{})
+				fixture.ws, fixture.planned, []string{"test"}, exhaustedRecovery{}, nil, &specGateOutcome{})
 			finalize(fixture.results)
 		})
 	}
@@ -301,9 +305,9 @@ func keysOf(results map[string]*jobs.JobResult) []string {
 	return keys
 }
 
-// projectionProducerExtension is an SDD-shaped extension: a `validate`
-// pipeline step whose task declares the reserved criteria projection, active
-// in a project that holds specs/*.json.
+// projectionProducerExtension is an SDD-shaped extension: a pipeline step of
+// the criteria command `validate` whose task declares the reserved criteria
+// projection, active in a project that holds specs/*.json.
 func projectionProducerExtension() *extension.ExtensionDescription {
 	enabled := true
 	return &extension.ExtensionDescription{
@@ -317,6 +321,7 @@ func projectionProducerExtension() *extension.ExtensionDescription {
 				Command:         "sdd",
 				ActivationFiles: []string{"specs/*.json"},
 				PipelineSteps:   []extension.PipelineStep{{ID: "specs", Task: "specs-validate"}},
+				Traits:          extension.CommandTraits{Kind: extensionproto.CommandKindCriteria},
 			},
 		},
 		Tasks: map[string]extension.TaskDefinition{
@@ -332,11 +337,11 @@ func projectionProducerExtension() *extension.ExtensionDescription {
 	}
 }
 
-// TestValidateProducerPlanAnswersFromTheWholeExtensionSet pins the engine half
+// TestProjectionProducerPlanAnswersFromTheWholeExtensionSet pins the engine half
 // of the empty-evaluation rule: a producer applies by the planner's activation
 // rule alone, the session's disable lists never hide one, and a project that
 // disables validate itself leaves the answer unknown.
-func TestValidateProducerPlanAnswersFromTheWholeExtensionSet(t *testing.T) {
+func TestProjectionProducerPlanAnswersFromTheWholeExtensionSet(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeSpecGateFile(t, filepath.Join(root, "billing", "specs", "invoicing.json"), "{}")
@@ -352,7 +357,7 @@ func TestValidateProducerPlanAnswersFromTheWholeExtensionSet(t *testing.T) {
 	req := &Request{Commands: []string{"test"}, Config: &wsproto.Config{Disable: &wsproto.DisableConfig{
 		Jobs: []string{"validate"}, Extensions: []string{"@acme/sdd"},
 	}}}
-	plan := &validateProducerPlan{req: req, ws: ws, projects: []*workspace.Project{billing, ledger},
+	plan := &projectionProducerPlan{req: req, ws: ws, projects: []*workspace.Project{billing, ledger},
 		extensions: []*extension.ExtensionDescription{projectionProducerExtension()}}
 
 	applicable, err := plan.ApplicableProjects()
@@ -382,5 +387,161 @@ func TestValidateProducerPlanAnswersFromTheWholeExtensionSet(t *testing.T) {
 	billing.Config.Disable = &wsproto.ProjectDisableConfig{Jobs: []string{"@acme/sdd:validate"}}
 	if _, err := plan.ApplicableProjects(); err == nil {
 		t.Fatal("a selected project that disables validate answered applicability")
+	}
+}
+
+// reportCommandExtension is a third-party extension whose `check` command
+// declares the verification kind and whose pipeline step declares the reserved
+// verification report: a report producer under a command that is not `test`.
+func reportCommandExtension() *extension.ExtensionDescription {
+	return &extension.ExtensionDescription{
+		Name:    "@acme/check",
+		Version: "1.0.0",
+		Jobs: map[string]*extension.JobDefinition{
+			"check": {
+				ExtensionName: "@acme/check",
+				Name:          "check",
+				Kind:          "command",
+				Command:       "check",
+				PipelineSteps: []extension.PipelineStep{{ID: "run", Task: "check-run"}},
+				Traits:        extension.CommandTraits{Kind: extensionproto.CommandKindVerification},
+			},
+		},
+		Tasks: map[string]extension.TaskDefinition{
+			"check-run": {
+				Kind: "command", Command: "check",
+				Declares: &extension.TaskDeclaration{Outputs: map[string]extension.DeclaredOutput{
+					"report": {Kind: extension.OutputKindFile, Root: extension.OutputRootCommandOutput,
+						Path: features.VerificationReportFilename, OptionalEmpty: true},
+				}},
+			},
+		},
+	}
+}
+
+// TestSpecGateFinalizer_AVerificationKindCommandCarriesTheGate pins the kind
+// rule at the gate: a session naming a command whose resolved traits declare
+// the verification kind carries the gate whatever the command is called, reads
+// its declaring task's observations, and sanctions an unresolved requirement
+// under enforce. A session naming a `test` command whose manifest declared
+// traits without that kind carries none.
+func TestSpecGateFinalizer_AVerificationKindCommandCarriesTheGate(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "declared-verification-producers",
+		"a-verification-kind-command-carries-the-gate")
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		status  string
+		blocked bool
+		state   features.RequirementVerificationState
+	}{
+		"verified passes":     {"passed", false, features.RequirementVerified},
+		"failed check blocks": {"failed", true, features.RequirementContradicted},
+	} {
+		t.Run(name, func(t *testing.T) {
+			fixture := newSpecGateFixture(t, tc.status)
+			fixture.setProjectMode("enforce")
+			ext := reportCommandExtension()
+			kindless := &extension.ExtensionDescription{Name: "@acme/legacy", Jobs: map[string]*extension.JobDefinition{
+				"test": {Name: "test", Kind: "command", TraitsDeclared: true, Traits: extension.CommandTraits{Heavy: true}},
+			}}
+			verification := jobs.CommandsOfKind([]*extension.ExtensionDescription{kindless, ext},
+				extension.CommandKindVerification)
+			if len(verification) != 1 || verification[0] != "check" {
+				t.Fatalf("verification commands = %v, want [check]", verification)
+			}
+			// The report now sits in the check command's output tree, written by
+			// a step whose task declares it.
+			outRoot := filepath.Join(fixture.ws.Root, ".putnami", "out", "billing")
+			if err := os.Rename(filepath.Join(outRoot, "test"), filepath.Join(outRoot, "check")); err != nil {
+				t.Fatalf("move report: %v", err)
+			}
+			check := &jobs.ScheduledJob{Project: fixture.ws.Projects[0], Extension: ext,
+				JobDef: &extension.JobDefinition{Name: "check~run", CommandName: "check",
+					Traits: ext.Jobs["check"].Traits},
+				Step: &ext.Jobs["check"].PipelineSteps[0]}
+			delete(fixture.results, fixture.planned[1].Key())
+			fixture.planned[1] = check
+			fixture.results[check.Key()] = specGateResult("success", features.VerificationReportArtifactID,
+				features.VerificationReportFilename)
+
+			if specGateFinalizer(&Request{Commands: []string{"validate", "build"}}, fixture.ws, fixture.planned,
+				verification, nil, nil, &specGateOutcome{}) != nil {
+				t.Error("a session naming no verification command carried the gate")
+			}
+			if specGateFinalizer(&Request{Commands: []string{"test"}}, fixture.ws, fixture.planned, verification,
+				nil, nil, &specGateOutcome{}) != nil {
+				t.Error("a session naming a test command without the verification kind carried the gate")
+			}
+			outcome := &specGateOutcome{}
+			finalize := specGateFinalizer(&Request{Commands: []string{"validate", "check"}}, fixture.ws, fixture.planned,
+				verification, nil, nil, outcome)
+			if finalize == nil {
+				t.Fatal("a session naming the verification command carried no gate")
+			}
+			finalize(fixture.results)
+
+			if _, sanctioned := fixture.results["/billing:specs~verify"]; sanctioned != tc.blocked {
+				t.Fatalf("sanctioned = %v, want %v (results %v)", sanctioned, tc.blocked, keysOf(fixture.results))
+			}
+			if outcome.record == nil || len(outcome.record.Groups) != 1 ||
+				outcome.record.Groups[0].Requirements[0].State != tc.state {
+				t.Fatalf("record = %+v, want one group whose requirement is %s from the check report",
+					outcome.record, tc.state)
+			}
+		})
+	}
+}
+
+// TestProjectionProducerPlanFollowsTheDeclaringCommand pins applicability under
+// a projection producer that is not `validate`: the plan covers the criteria
+// command whose task declares the projection, a project's disable list hides a
+// producer only when it names that command, and a workspace with no producer
+// command answers that no producer applies. A `validate` command without the
+// criteria kind is no producer command, even when its task declares the
+// projection.
+func TestProjectionProducerPlanFollowsTheDeclaringCommand(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "declared-verification-producers",
+		"projection-applicability-plans-the-declaring-commands")
+	t.Parallel()
+	root := t.TempDir()
+	writeSpecGateFile(t, filepath.Join(root, "billing", "specs", "invoicing.json"), "{}")
+	writeSpecGateFile(t, filepath.Join(root, "ledger", "ledger.go"), "package ledger\n")
+	billing := &workspace.Project{ID: "/billing", Name: "billing", Path: "billing",
+		Extensions: []string{"@acme/sdd"}, Config: &wsproto.ProjectConfig{}}
+	ledger := &workspace.Project{ID: "/ledger", Name: "ledger", Path: "ledger",
+		Extensions: []string{"@acme/sdd"}, Config: &wsproto.ProjectConfig{}}
+	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "gate"}, []*workspace.Project{billing, ledger})
+
+	sdd := projectionProducerExtension()
+	criteria := sdd.Jobs["validate"]
+	criteria.Name = "criteria"
+	sdd.Jobs = map[string]*extension.JobDefinition{"criteria": criteria}
+	plan := &projectionProducerPlan{req: &Request{Commands: []string{"criteria"}}, ws: ws,
+		projects:   []*workspace.Project{billing, ledger},
+		extensions: []*extension.ExtensionDescription{sdd}}
+
+	billing.Config.Disable = &wsproto.ProjectDisableConfig{Jobs: []string{"validate"}}
+	applicable, err := plan.ApplicableProjects()
+	if err != nil {
+		t.Fatalf("ApplicableProjects with validate disabled and the producer under criteria: %v", err)
+	}
+	if !applicable["/billing"] || len(applicable) != 1 {
+		t.Fatalf("applicable = %v, want only the selected project that holds a spec", applicable)
+	}
+
+	billing.Config.Disable = &wsproto.ProjectDisableConfig{Jobs: []string{"@acme/sdd:criteria"}}
+	if _, err := plan.ApplicableProjects(); err == nil || !strings.Contains(err.Error(), "disables criteria") {
+		t.Fatalf("a selected project that disables the producer command answered applicability (err %v)", err)
+	}
+
+	kindless := projectionProducerExtension()
+	kindless.Jobs["validate"].Traits = extension.CommandTraits{}
+	for _, extensions := range [][]*extension.ExtensionDescription{{reportCommandExtension()}, {kindless}} {
+		plan.extensions = extensions
+		billing.Config.Disable = &wsproto.ProjectDisableConfig{Jobs: []string{"validate"}}
+		applicable, err = plan.ApplicableProjects()
+		if err != nil || len(applicable) != 0 {
+			t.Fatalf("with no projection producer: applicable = %v, err = %v; want none and no error", applicable, err)
+		}
 	}
 }

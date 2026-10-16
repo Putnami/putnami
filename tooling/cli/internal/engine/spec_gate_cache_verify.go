@@ -11,12 +11,14 @@ import (
 
 	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // VerifyCachedVerificationReport corroborates a restored native observation
-// against the current test plan and the task-owned cache entry it derives. It
-// only reads evidence; it never executes a test or materializes an output.
+// against the current plan of the loaded verification commands and the
+// task-owned cache entry it derives. It only reads evidence; it never executes
+// a test or materializes an output.
 // Command parameters not recorded by a session cannot be guessed here: an
 // entry keyed with nondefault parameters fails closed.
 func VerifyCachedVerificationReport(root string, report features.VerificationReportRef) ([]byte, error) {
@@ -36,7 +38,9 @@ func VerifyCachedVerificationReport(root string, report features.VerificationRep
 	if err != nil {
 		return nil, fmt.Errorf("capture native report version: %w", err)
 	}
-	req := &Request{WorkspaceRoot: ws.Root, Config: ws.Config, Commands: []string{"test"}, VersionSnapshot: snapshot}
+	req := &Request{WorkspaceRoot: ws.Root, Config: ws.Config,
+		Commands:        scheduler.CommandsOfKind(discovered.Extensions, extension.CommandKindVerification),
+		VersionSnapshot: snapshot}
 	cache := newRunCacheManager(req, ws)
 	source := newCachedObservationRecovery(req, ws, discovered.Extensions, cache)
 	return source.verifyCachedReport(report)

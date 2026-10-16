@@ -161,9 +161,10 @@ func reporterFixture(t *testing.T, task fixtureproc.Program) (string, Request) {
 	}
 	cacheEnabled := false
 	manifest := extensionproto.Manifest{
-		Name: "@test/reporter", Version: "1.0.0", CLIContract: 4,
+		Name: "@test/reporter", Version: "1.0.0", CLIContract: 11,
 		Commands: map[string]extensionproto.CommandDefinition{
-			"test":             {Run: []extensionproto.PipelineStep{{ID: "test", Task: "test-exec"}}},
+			"test": {Traits: &extensionproto.CommandTraits{Kind: extensionproto.CommandKindVerification},
+				Run: []extensionproto.PipelineStep{{ID: "test", Task: "test-exec"}}},
 			"session-reporter": {Visibility: "internal", Run: []extensionproto.PipelineStep{{ID: "reporter", Task: "reporter-exec"}}},
 		},
 		Tasks: map[string]extensionproto.TaskDefinition{

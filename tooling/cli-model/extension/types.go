@@ -107,6 +107,13 @@ const (
 	OutputDriftDiagnosticCode = proto.OutputDriftDiagnosticCode
 )
 
+// The command kinds the spec gate, the task-scope narrowing and the session
+// report read from a job's resolved traits.
+const (
+	CommandKindVerification = proto.CommandKindVerification
+	CommandKindCriteria     = proto.CommandKindCriteria
+)
+
 // The closed task-effect vocabulary, so the planner names the same effects a
 // manifest declares.
 const (

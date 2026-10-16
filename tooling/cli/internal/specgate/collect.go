@@ -38,11 +38,12 @@ const maxArtifactBytes = 16 << 20
 // with no group when every selected project a projection producer applies to
 // ran one that succeeded: the gate ran, and no selected project states a
 // requirement. It returns (nil, nil) when a producer applies to a selected
-// project the session did not run it for, as in a `test` run without
-// `validate`, or when a producer failed or never finished: the gate had
-// nothing to evaluate, which is not the same fact as evaluating and finding
-// nothing. A projection that was declared but could not be read still
-// produces a record, because that is a finding that must fail closed.
+// project the session did not run it for, as in a session that runs a
+// verification command without the criteria command that projects, or when a
+// producer failed or never finished: the gate had nothing to evaluate, which
+// is not the same fact as evaluating and finding nothing. A projection that
+// was declared but could not be read still produces a record, because that is
+// a finding that must fail closed.
 //
 // recovery is the unplanned-attester seam (recover.go). It is consulted
 // LAZILY — only for a group the in-session join left unresolved — so a green
@@ -225,10 +226,12 @@ func evaluateVerdicts(criteria features.SpecCriteriaGroup, specRequirements []fe
 	return verdicts, unexpected
 }
 
-// collectObservations reads every observation report the session's test jobs
-// declared. Observations survive only with trusted provenance: the declaration
-// they name must be a regular, contained file of the REPORTING task's own
-// project, so a report can never claim another project's source as its proof.
+// collectObservations reads every observation report the session's report
+// producers emitted (jobs.ProducesVerificationReport): the jobs of its
+// verification commands that can write the report. Observations survive only
+// with trusted provenance: the declaration they name must be a regular,
+// contained file of the REPORTING task's own project, so a report can never
+// claim another project's source as its proof.
 func collectObservations(wsRoot string, ordered []*jobs.ScheduledJob, results map[string]*jobs.JobResult) (
 	[]features.VerificationObservation, map[string][]features.VerificationReportRef, []diag.Diagnostic) {
 	var observations []features.VerificationObservation
@@ -237,7 +240,7 @@ func collectObservations(wsRoot string, ordered []*jobs.ScheduledJob, results ma
 	readPaths := make(map[string]bool)
 
 	for _, job := range ordered {
-		if job.CommandName() != "test" {
+		if !jobs.ProducesVerificationReport(job) {
 			continue
 		}
 		result := results[job.Key()]
@@ -418,8 +421,9 @@ func artifactField(wsRoot, path string) string {
 // and this package does not import the planner.
 type ProjectionProducers interface {
 	// ApplicableProjects returns the IDs of the session's selected projects
-	// for which a `validate` plan holds a criteria-projection producer,
-	// whether or not the session planned that command.
+	// for which a plan of the criteria commands that declare the projection
+	// holds a criteria-projection producer, whether or not the session planned
+	// them.
 	ApplicableProjects() (map[string]bool, error)
 }
 

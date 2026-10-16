@@ -39,6 +39,13 @@ func scopedJob(project *workspace.Project, extRelPath, name string, predecessors
 	}
 }
 
+// ofKind gives a planned job the command kind its command's resolved traits
+// declare.
+func ofKind(kind string, job *scheduler.ScheduledJob) *scheduler.ScheduledJob {
+	job.JobDef.Traits.Kind = kind
+	return job
+}
+
 // A task-scoped project keeps the jobs of the extensions in its scope and
 // whatever those depend on, however many hops away and whichever extension
 // owns the predecessor; a full project keeps everything; a command that
@@ -280,18 +287,25 @@ func projectIDs(projects []*workspace.Project) []string {
 	return ids
 }
 
-// A task-scoped project keeps its `validate` jobs. Their steps read the
-// verification reports the session recorded rather than files, so no changed
-// file ever names them and narrowing would retire the spec gate for exactly
-// the projects task-level selection newly creates.
-func TestNarrowToTaskScopes_KeepsValidateOnATaskScopedProject(t *testing.T) {
+// A task-scoped project keeps the jobs of every command of the criteria kind,
+// whatever the command is called. Their steps read the verification reports
+// the session recorded rather than files, so no changed file ever names them
+// and narrowing would retire the spec gate for exactly the projects task-level
+// selection newly creates. The name alone keeps nothing: a `validate` command
+// without the kind is narrowed like any other.
+func TestNarrowToTaskScopes_NeverNarrowsACriteriaKindCommand(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-criteria-kind-command-is-never-narrowed")
+	criteria := extensionproto.CommandKindCriteria
 	project := &workspace.Project{ID: "/libs/http", Name: "http", Path: "libs/http"}
 	ws := workspace.NewWorkspace("/ws", nil, []*workspace.Project{project})
 	planned := []*scheduler.ScheduledJob{
 		namespacedJob(project, "go/extension", "build", "compile"),
-		namespacedJob(project, "go/extension", "test", "test"),
-		namespacedJob(project, "tooling/sdd-extension", "validate", "features"),
-		namespacedJob(project, "tooling/sdd-extension", "validate", "specs"),
+		ofKind(extensionproto.CommandKindVerification, namespacedJob(project, "go/extension", "test", "test")),
+		ofKind(criteria, namespacedJob(project, "tooling/sdd-extension", "validate", "features")),
+		ofKind(criteria, namespacedJob(project, "tooling/sdd-extension", "validate", "specs")),
+		ofKind(criteria, namespacedJob(project, "acme/extension", "audit", "rules")),
+		namespacedJob(project, "legacy/extension", "validate", "lint"),
 	}
 	scopes := map[string][]string{"/libs/http": {"build~compile"}}
 
@@ -301,13 +315,8 @@ func TestNarrowToTaskScopes_KeepsValidateOnATaskScopedProject(t *testing.T) {
 	for _, job := range kept {
 		names = append(names, jobTaskScope(job))
 	}
-	for _, want := range []string{"build~compile", "validate~features", "validate~specs"} {
-		if !slices.Contains(names, want) {
-			t.Errorf("narrowed plan = %v, want %s kept", names, want)
-		}
-	}
-	if slices.Contains(names, "test~test") {
-		t.Errorf("narrowed plan = %v, want test~test dropped: the scope does not name it", names)
+	if want := []string{"build~compile", "validate~features", "validate~specs", "audit~rules"}; !slices.Equal(names, want) {
+		t.Errorf("narrowed plan = %v, want %v: the scope names build~compile, and the criteria commands are never narrowed", names, want)
 	}
 }
 
@@ -330,12 +339,12 @@ func declaresFile(path string) *extension.TaskDeclaration {
 	}}
 }
 
-// A task-scoped project whose kept `validate` projects its spec criteria keeps
-// its `test` command, whose verification reports those criteria are judged
+// A task-scoped project whose kept criteria command projects its spec criteria
+// keeps its verification command, whose reports those criteria are judged
 // against: the step that writes them, its predecessors, and the finalizer that
 // tears down its environment. The spec gate then reads the same reports a full
 // plan gives it. A project whose kept plan projects no criteria still drops
-// the tests its scope does not name.
+// the tests its scope does not name, and so does a command of another kind.
 func TestNarrowToTaskScopes_KeepsTheTestsAKeptSpecGateJudges(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "changed-files-select-owners-and-transitive-dependents")
 	sdd := &workspace.Project{ID: "/tooling/sdd-extension", Name: "@putnami/sdd", Path: "tooling/sdd-extension"}
@@ -344,18 +353,19 @@ func TestNarrowToTaskScopes_KeepsTheTestsAKeptSpecGateJudges(t *testing.T) {
 	ws := workspace.NewWorkspace("/ws", nil, []*workspace.Project{sdd, http, core})
 	report := declaresFile(features.VerificationReportFilename)
 	projection := declaresFile(features.SpecCriteriaProjectionFilename)
+	verification, criteria := extensionproto.CommandKindVerification, extensionproto.CommandKindCriteria
 	plan := func(project *workspace.Project, withSpecs bool) []*scheduler.ScheduledJob {
 		id := project.ID
 		planned := []*scheduler.ScheduledJob{
 			declaredJob(project, "go/extension", "build", "compile", nil),
-			declaredJob(project, "go/extension", "test", "generate", nil),
-			declaredJob(project, "go/extension", "test", "test", report, id+":build~compile", id+":test~generate"),
-			declaredJob(project, "go/extension", "test", "test-env-teardown", nil),
-			declaredJob(project, "go/extension", "lint", "check", nil),
-			declaredJob(project, "tooling/sdd-extension", "validate", "features", nil),
+			ofKind(verification, declaredJob(project, "go/extension", "test", "generate", nil)),
+			ofKind(verification, declaredJob(project, "go/extension", "test", "test", report, id+":build~compile", id+":test~generate")),
+			ofKind(verification, declaredJob(project, "go/extension", "test", "test-env-teardown", nil)),
+			ofKind(extensionproto.CommandKindDiagnostics, declaredJob(project, "go/extension", "lint", "check", nil)),
+			ofKind(criteria, declaredJob(project, "tooling/sdd-extension", "validate", "features", nil)),
 		}
 		if withSpecs {
-			planned = append(planned, declaredJob(project, "tooling/sdd-extension", "validate", "specs", projection))
+			planned = append(planned, ofKind(criteria, declaredJob(project, "tooling/sdd-extension", "validate", "specs", projection)))
 		}
 		return planned
 	}
@@ -380,7 +390,9 @@ func TestNarrowToTaskScopes_KeepsTheTestsAKeptSpecGateJudges(t *testing.T) {
 // The end-to-end shape of the spec gate rule: a change to the extension that
 // provides the spec gate reaches its consumers for that extension's tasks only,
 // and each consumer still runs the test that writes the verification report its
-// kept `validate~specs` is judged against.
+// kept `validate~validate` is judged against. Each manifest declares its
+// command's kind, as a first-party manifest or the @putnami/dev vocabulary
+// does.
 func TestRunKeepsTheTestsOfAConsumerReachedThroughItsSpecGate(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "changed-files-select-owners-and-transitive-dependents")
 	root := t.TempDir()
@@ -395,9 +407,9 @@ func TestRunKeepsTheTestsOfAConsumerReachedThroughItsSpecGate(t *testing.T) {
 		}
 	}
 	task := taskCommand(t, fixtureproc.Program{})
-	manifest := func(name, command, output string) string {
-		return `{"name":"` + name + `","version":"1.0.0","cliContract":4,` +
-			`"commands":{"` + command + `":{"run":[{"id":"` + command + `","task":"mark"}]}},` +
+	manifest := func(name, command, kind, output string) string {
+		return `{"name":"` + name + `","version":"1.0.0","cliContract":11,` +
+			`"commands":{"` + command + `":{"traits":{"kind":"` + kind + `"},"run":[{"id":"` + command + `","task":"mark"}]}},` +
 			`"tasks":{"mark":{"kind":"command","command":` + task + `,"cache":false,` +
 			`"inputs":{"sources":{"from":"project","files":["**/*.src"]}},` +
 			`"declares":{"outputs":{"file":{"kind":"file","root":"command-output","path":"` + output + `","optionalEmpty":true}}}}}}`
@@ -407,10 +419,10 @@ func TestRunKeepsTheTestsOfAConsumerReachedThroughItsSpecGate(t *testing.T) {
 	write("lib/putnami.json", `{"name":"lib","extensions":["/sdd","/tester"]}`)
 	write("app/putnami.json", `{"name":"app","dependencies":["lib"],"extensions":["/sdd","/tester"]}`)
 	write("sdd/putnami.json", `{"name":"@fixture/sdd"}`)
-	write("sdd/putnami.extension.json", manifest("@fixture/sdd", "validate", features.SpecCriteriaProjectionFilename))
+	write("sdd/putnami.extension.json", manifest("@fixture/sdd", "validate", extensionproto.CommandKindCriteria, features.SpecCriteriaProjectionFilename))
 	write("sdd/implementation.txt", "v1\n")
 	write("tester/putnami.json", `{"name":"@fixture/tester"}`)
-	write("tester/putnami.extension.json", manifest("@fixture/tester", "test", features.VerificationReportFilename))
+	write("tester/putnami.extension.json", manifest("@fixture/tester", "test", extensionproto.CommandKindVerification, features.VerificationReportFilename))
 	initCLISelectionGitRepo(t, root)
 	runCLISelectionGit(t, root, "update-ref", "refs/remotes/origin/main", "HEAD")
 	runCLISelectionGit(t, root, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
@@ -506,11 +518,16 @@ func TestNarrowToTaskScopes_FollowsTheDeclaredSideEffectsNotTheCommandName(t *te
 // Every first-party command keeps, under a task scope, the jobs of `publish`,
 // `deploy`, `validate` and `validate-workspace`, and no other. Every
 // first-party `publish` resolves to `registry`, by default or by declaration,
-// and no other first-party command declares side effects. The manifests are
-// discovered, so a new first-party extension is covered without an edit here.
+// and no other first-party command declares side effects. Every first-party
+// `validate` and `validate-workspace` resolves to the criteria kind, by its
+// own declaration or by the @putnami/dev vocabulary, and no other first-party
+// command does. The manifests are discovered, so a new first-party extension
+// is covered without an edit here, and the vocabulary pass runs over them all
+// as discovery runs it over a workspace's extensions.
 func TestNarrowToTaskScopes_KeepsWhatEveryFirstPartyCommandKept(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-task-scope-keeps-every-job-that-declares-side-effects")
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-criteria-kind-command-is-never-narrowed")
 	keptByName := map[string]bool{"publish": true, "deploy": true, "validate": true, "validate-workspace": true}
 	repoRoot := filepath.Join(engineModuleRoot(t), "..", "..")
 	project := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
@@ -545,12 +562,20 @@ func TestNarrowToTaskScopes_KeepsWhatEveryFirstPartyCommandKept(t *testing.T) {
 	if len(dirs) < 16 {
 		t.Fatalf("discovered %d first-party manifests %v, want at least 16", len(dirs), dirs)
 	}
-	kept := make(map[string]int)
+	loaded := make([]*extension.ExtensionDescription, 0, len(dirs))
 	for _, dir := range dirs {
 		ext := extension.LoadExtensionFromDir(filepath.Join(repoRoot, dir), dir)
 		if ext == nil {
 			t.Fatalf("first-party extension %s did not load", dir)
 		}
+		loaded = append(loaded, ext)
+	}
+	if warnings := extension.ApplyVocabularyTraits(loaded); len(warnings) > 0 {
+		t.Fatalf("the first-party vocabularies merge with warnings: %v", warnings)
+	}
+	kept := make(map[string]int)
+	for i, ext := range loaded {
+		dir := dirs[i]
 		for _, def := range ext.Jobs {
 			job := &scheduler.ScheduledJob{Project: project, Extension: ext, JobDef: def}
 			command := modeljobs.JobCommandName(job)

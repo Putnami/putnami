@@ -36,7 +36,6 @@ const traitsDeclaringDir = "protocols/extension"
 // onto its field add the readers. The list only shrinks: a field listed here
 // that gains a read site fails the guard until its entry is deleted.
 var traitsAwaitingAReader = map[string]bool{
-	"Kind":               true,
 	"Workload":           true,
 	"RewritesSources":    true,
 	"ConsumesReleaseSet": true,
