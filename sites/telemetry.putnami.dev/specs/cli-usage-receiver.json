@@ -28,7 +28,7 @@
     },
     {
       "id": "fields-are-allowlisted",
-      "text": "A record is reduced to the compiled field allowlist and closed vocabularies before anything is stored; unknown command names and unknown fields are dropped rather than persisted."
+      "text": "A record is reduced to the compiled field allowlist and closed vocabularies before anything is stored; a command the vocabulary names, including one a @putnami extension declares, is kept, and unknown command names and unknown fields are dropped rather than persisted."
     },
     {
       "id": "acceptance-is-not-an-oracle",
