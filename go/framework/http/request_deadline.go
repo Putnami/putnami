@@ -20,14 +20,19 @@ func (c ServerConfig) writeTimeout() time.Duration {
 }
 
 // requestDeadline is how long a request runs before its context ends with
-// context.DeadlineExceeded: nine tenths of the write timeout. Over HTTP/2, a
-// write timeout that fires first resets the stream and cancels the request
-// context, so a stalled handler would read context.Canceled, the error a caller
-// that left produces. The margin also leaves the handler time to write its 5xx
-// answer. A disabled write timeout sets no deadline.
+// context.DeadlineExceeded: nine tenths of the write timeout. A disabled write
+// timeout sets no deadline.
 func (c ServerConfig) requestDeadline() time.Duration {
-	timeout := c.writeTimeout()
-	return timeout - timeout/10
+	return deadlineWithin(c.writeTimeout())
+}
+
+// deadlineWithin is the request deadline under a write timeout: nine tenths of
+// it. Over HTTP/2, a write timeout that fires first resets the stream and
+// cancels the request context, so a stalled handler would read
+// context.Canceled, the error a caller that left produces. The margin also
+// leaves the handler time to write its 5xx answer.
+func deadlineWithin(writeTimeout time.Duration) time.Duration {
+	return writeTimeout - writeTimeout/10
 }
 
 // longLivedRequest reports a request whose response outlives the write timeout

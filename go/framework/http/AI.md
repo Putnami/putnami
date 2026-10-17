@@ -114,6 +114,11 @@ server cuts the response. `context.Canceled` then means the caller left:
 with the code `canceled`. WebSocket upgrades, Server-Sent Events, and gRPC or
 Connect streams run without that deadline.
 
+A route that answers after the write timeout on purpose, such as one bounded
+pass of a scheduled job, declares its own bound with `WithWriteTimeout(d)`. Its
+response must be written within `d`, and its request context ends at nine
+tenths of `d`. Every other route keeps the server's bound.
+
 A response write that fails after the caller left (the request context ended
 with `context.Canceled`) logs the failure at INFO. A write that fails while the
 request context is live logs at ERROR. Over HTTP/2, a failed write waits up to

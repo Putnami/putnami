@@ -70,6 +70,10 @@
       "text": "Each request context ends with context.DeadlineExceeded at nine tenths of the write timeout: a stalled handler answers 5xx at ERROR, and a success returned after the deadline rolled its work back answers 500. A handler that answers its canceled context answers 499 with the code canceled, logged at INFO with the outcome canceled. WebSocket upgrades, Server-Sent Events, and gRPC or Connect streams run without the deadline."
     },
     {
+      "id": "route-write-timeout",
+      "text": "A route registered WithWriteTimeout(d) is written within d instead of the server write timeout, and its request context ends with context.DeadlineExceeded at nine tenths of d, so its success returned past the server bound answers 2xx. Every other route keeps the server bound, a mounted subtree takes its mount's bound, and long-lived requests still run without a deadline. A bound of zero or less panics at registration."
+    },
+    {
       "id": "failed-writes",
       "text": "A response write that fails after the request context ended with context.Canceled, such as a client that resets a download mid-body or closes its connection, logs the failure at INFO. A write that fails while the request context is live logs at ERROR. Over HTTP/2, a failed write waits up to 100 ms for the stream context to end before it is classified."
     },

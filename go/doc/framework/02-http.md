@@ -111,6 +111,17 @@ server.Route("GET", "/api/data", handler,
 )
 ```
 
+### Route that answers after the write timeout
+
+Each request context ends at nine tenths of `WriteTimeout`. A route that runs
+longer on purpose, such as one bounded pass of a scheduled job, declares its
+own bound. Its response must be written within that bound, and its request
+context ends at nine tenths of it. Every other route keeps the server's.
+
+```go
+server.Route("POST", "/jobs/sweep", sweep, fhttp.WithWriteTimeout(55*time.Second))
+```
+
 ### Route patterns
 
 The router uses a trie-based matcher supporting three pattern types:
