@@ -56,9 +56,10 @@ authenticated HEAD path is probed in the tests.
   exact-match edge rule cannot inspect it. Requests are accepted with the OTLP
   content type, a foreign one, or none at all. No content-type predicate is
   available to tighten this contract.
-- **Rejection.** Undeclared paths and methods already return `404` from the
-  workload itself (wrong OTLP signals, wrong methods, the framework health path,
-  the host root), so the edge reject is indistinguishable from today's answer.
+- **Rejection.** Undeclared paths already return `404` from the workload itself
+  (wrong OTLP signals, the framework health path, the host root), so the edge
+  reject is indistinguishable from today's answer. A wrong method on a declared
+  path returns `405` from the workload and `404` from the edge.
 - **Status contract.** `202` accepted (byte-identical whether the payload had
   content problems or the collector is down), `400` malformed, `413` oversize,
   `429` rate-limited. The receiver never redirects, which matters because the
@@ -66,11 +67,14 @@ authenticated HEAD path is probed in the tests.
 
 ## What enforcement actually changes
 
-Only four requests answer anything but `404` today and would start being
+Only seven requests answer anything but `404` today and would start being
 rejected at the edge. None is reachable by a production client:
 
 | Request | Today | Why it is safe to reject |
 |---|---|---|
+| `GET /v1/logs` | `405` + `Allow` | wrong method; the CLI sender only posts |
+| `DELETE /v1/logs` | `405` + `Allow` | wrong method; the CLI sender only posts |
+| `POST /v1/cli-usage/aggregate` | `405` + `Allow` | wrong method; internal readers only read |
 | `OPTIONS /v1/logs` | `204` + `Allow` | synthesized preflight; no CORS policy, no browser client |
 | `OPTIONS /v1/cli-usage/aggregate` | `401` | synthesized preflight, already refused |
 | `POST /v1/logs/` | `202` | trailing-slash variant; the CLI sender builds `endpoint + "/v1/logs"` |

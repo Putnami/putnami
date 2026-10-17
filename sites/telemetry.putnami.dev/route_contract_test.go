@@ -248,9 +248,12 @@ var undeclaredProbes = []struct {
 }{
 	{method: http.MethodPost, path: telemetry.PathMetrics, workloadStatus: http.StatusNotFound},
 	{method: http.MethodPost, path: telemetry.PathTraces, workloadStatus: http.StatusNotFound},
-	{method: http.MethodGet, path: telemetry.PathLogs, workloadStatus: http.StatusNotFound},
-	{method: http.MethodDelete, path: telemetry.PathLogs, workloadStatus: http.StatusNotFound},
-	{method: http.MethodPost, path: aggregatePath, bearer: true, workloadStatus: http.StatusNotFound},
+	{method: http.MethodGet, path: telemetry.PathLogs, workloadStatus: http.StatusMethodNotAllowed,
+		note: "a method a declared path does not route answers 405 with an Allow header"},
+	{method: http.MethodDelete, path: telemetry.PathLogs, workloadStatus: http.StatusMethodNotAllowed,
+		note: "a method a declared path does not route answers 405 with an Allow header"},
+	{method: http.MethodPost, path: aggregatePath, bearer: true, workloadStatus: http.StatusMethodNotAllowed,
+		note: "a method a declared path does not route answers 405 with an Allow header"},
 	{method: http.MethodGet, path: "/_/health", workloadStatus: http.StatusNotFound,
 		note: "the workload composes no health plugin, so no health route exists to declare"},
 	{method: http.MethodGet, path: "/", workloadStatus: http.StatusNotFound},
@@ -492,9 +495,9 @@ func TestUndeclaredRequestsNeverReachTheWorkload(t *testing.T) {
 
 // TestUndeclaredRequestsMeasureWhatEnforcementChanges records the unenforced
 // behavior of every undeclared probe, which is exactly what the rollout gives
-// up. Most already answer 404, so enforcement changes nothing; the synthesized
-// preflights and the two trailing-slash forms are the whole difference, and none
-// of them is reachable by a production client. Nothing here may leak CORS
+// up. Most already answer 404, so enforcement changes nothing; the wrong methods
+// on a declared path, the synthesized preflights and the two trailing-slash forms
+// are the whole difference, and none of them is reachable by a production client. Nothing here may leak CORS
 // headers, since a browser flow is the one client that would regress.
 func TestUndeclaredRequestsMeasureWhatEnforcementChanges(t *testing.T) {
 	issuer := newFakeIssuer(t)
