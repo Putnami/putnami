@@ -164,7 +164,7 @@ export default error().render(function PostsError() {
 });
 ```
 
-The server logs a loader error the same way on a full page load and on a client navigation. It records the error as the request error, so the request log line of the `logger()` plugin carries it when the response status is 500 or more. It also logs the error at ERROR with its stack, unless the error is an `HttpException`. A thrown `Response`, a redirect included, is a status the loader chose: the server does not log it as an error.
+When a loader throws, the server records the error as the request error, so the request log line of the `logger()` plugin carries it when the response status is 500 or more. The server also logs the error at ERROR with its stack, unless the error is an `HttpException`. On a full page load, a thrown `Response`, a redirect included, is a status the loader chose: the server does not log it as an error.
 
 ### Loading States
 

@@ -55,12 +55,12 @@ export const pageRenderer =
     const staticOpts = resolvedBasename ? { basename: resolvedBasename } : undefined;
     const reactStaticHandler = createStaticHandler(routes(), staticOpts);
     const reactStaticContext = await reactStaticHandler.query(req);
+    reportLoaderErrors(reactStaticContext, reqContext, logger);
 
     const validationResult = handleStaticContext(reactStaticContext);
     if (validationResult) {
       return validationResult;
     }
-    reportLoaderErrors(reactStaticContext as StaticHandlerContext, reqContext, logger);
 
     const router = createStaticRouter(reactStaticHandler.dataRoutes, reactStaticContext as StaticHandlerContext);
 
@@ -181,6 +181,7 @@ export const pageRenderer =
       // whole try would clear it too early — the timer must outlive this return
       // to cover async streaming.)
       if (timeoutId !== undefined) clearTimeout(timeoutId);
+      recordRequestError(reqContext, error);
       logger.error(error);
       return handleRenderError(error);
     }
@@ -371,14 +372,18 @@ export function handleRenderError(error: unknown) {
 }
 
 /**
- * Handles the errors loaders and actions threw the way the dispatcher handles a
- * route handler's error: records the first one as the request error, and logs
- * each one at ERROR with its stack unless it is an `HttpException`. A thrown
- * `Response` or `HttpResponse` is a redirect or a status the loader chose, not an
- * error.
+ * Handles the errors React Router kept from loaders and actions, one per error
+ * boundary, the way the dispatcher handles a route handler's error: records the
+ * first one as the request error, and logs each one at ERROR with its stack
+ * unless it is an `HttpException`. A thrown `Response` or `HttpResponse` is a
+ * redirect or a status the loader chose, not an error.
  */
-function reportLoaderErrors(context: StaticHandlerContext, reqContext: HttpRequestContext, logger: Logger): void {
-  if (!context.errors) return;
+function reportLoaderErrors(
+  context: StaticHandlerContext | Response,
+  reqContext: HttpRequestContext,
+  logger: Logger,
+): void {
+  if (!('errors' in context) || !context.errors) return;
   let recorded = false;
   for (const error of Object.values(context.errors)) {
     if (isRouteErrorResponse(error) || error instanceof Response || error instanceof HttpResponse) continue;

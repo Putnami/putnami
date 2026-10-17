@@ -296,7 +296,7 @@ describe('page.renderer', () => {
       },
     );
 
-    it('records an HttpException a loader throws without logging it, like the dispatcher', async () => {
+    it('records an HttpException a loader throws as the request error without logging it', async () => {
       const exception = new HttpException(404, 'Post not found');
       const logger = new MemoryLogger();
       const ctx = createMockContext({ req: new Request('http://localhost/posts'), logger });
@@ -377,6 +377,29 @@ describe('page.renderer', () => {
       const html = await response.get().text();
       expect(html).toContain('<h1>Something went wrong</h1>');
       expect(html).toContain('Error: boom');
+    });
+
+    it('records a render failure as the request error', async () => {
+      const failure = new Error('render failed');
+      const ctx = createMockContext({ logger: new MemoryLogger() });
+      const handler = pageRenderer(
+        () => [
+          {
+            path: '/',
+            element: React.createElement(() => {
+              throw failure;
+            }),
+          } as never,
+        ],
+        () => RootHtml,
+        () => 'hydrate.js',
+        SSR_TIMEOUT_MS,
+      );
+
+      const response = await runInContext(ctx, async () => await handler());
+
+      expect(response.status).toBe(500);
+      expect((ctx as Record<string, unknown>).__requestError).toBe(failure);
     });
 
     it('clears the abort timeout when rendering throws before streaming', async () => {
