@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/api"
@@ -121,7 +122,10 @@ func TestRegisterOn_RenderFailureHidesTheCause(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read body: %v", err)
 	}
-	assertRouteEnvelope(t, body, "internal", "Internal Server Error", "An internal error occurred")
+	assertRouteEnvelope(t, body, "internal", "Internal Server Error", "Internal Server Error")
+	if strings.Contains(string(body), "External") {
+		t.Errorf("500 body leaks the render failure: %s", body)
+	}
 }
 
 // assertRouteEnvelope fails the test unless body is the canonical error

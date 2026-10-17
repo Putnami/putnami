@@ -471,17 +471,21 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 			// middleware can answer the preflight (analogous to HEAD→GET).
 			// Without this, routing is method-keyed and the preflight 404s
 			// before any middleware runs, silently breaking CORS.
-			if match == nil && r.Method == "OPTIONS" {
-				if allowed := p.routes.allowedMethods(r.URL.Path); len(allowed) > 0 {
-					match = &routeMatch[Handler]{
-						Handlers: []Handler{p.preflightHandler(allowed)},
-						Pattern:  r.URL.Path,
-					}
+			var allowed []string
+			if match == nil {
+				allowed = p.routes.allowedMethods(r.URL.Path)
+			}
+			if match == nil && r.Method == "OPTIONS" && len(allowed) > 0 {
+				match = &routeMatch[Handler]{
+					Handlers: []Handler{p.preflightHandler(allowed)},
+					Pattern:  r.URL.Path,
 				}
 			}
 			if match == nil {
+				// A path that only an OPTIONS route matches, such as a CORS
+				// catch-all, is not a resource: it answers 404.
 				refusal := NotFound()
-				if allowed := p.routes.allowedMethods(r.URL.Path); len(allowed) > 0 {
+				if slices.ContainsFunc(allowed, func(method string) bool { return method != http.MethodOptions }) {
 					refusal = methodNotAllowed(allowed)
 				}
 				if err := writeResponse(w, r, refusal); err != nil {

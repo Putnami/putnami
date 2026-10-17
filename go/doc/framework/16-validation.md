@@ -136,7 +136,7 @@ result.HasErrors() // true if any validation errors
 func createUser(ctx *fhttp.Context) *fhttp.Response {
     var input map[string]any
     if err := ctx.Body(&input); err != nil {
-        return fhttp.JSONStatus(400, map[string]string{"error": "invalid JSON"})
+        return fhttp.ErrorResponse(errors.BadRequest("Invalid request body"))
     }
 
     result := schema.Validate(

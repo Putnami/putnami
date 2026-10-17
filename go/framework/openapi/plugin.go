@@ -304,7 +304,7 @@ func (p *Plugin) handler() phttp.Handler {
 			if logger.RequestError(reqCtx) == nil {
 				logger.FromContextOrDefault(reqCtx).Named("openapi").ErrorCtx(reqCtx, "OpenAPI document rendering failed", err)
 			}
-			return phttp.ErrorResponse(err)
+			return phttp.InternalError("Internal Server Error")
 		}
 		if specJSON == nil {
 			return phttp.JSONStatus(http.StatusServiceUnavailable, errors.HTTPErrorBody{

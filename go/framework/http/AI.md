@@ -7,6 +7,7 @@ HTTP server, trie-based router, middleware chain, endpoint builder, and response
 ```go
 import (
     "go.putnami.dev/app"
+    "go.putnami.dev/errors"
     "go.putnami.dev/http"
 )
 
@@ -53,7 +54,7 @@ func handler(ctx *http.Context) *http.Response {
 
     var body CreateInput
     if err := ctx.Body(&body); err != nil {
-        return http.JSONStatus(400, map[string]string{"error": err.Error()})
+        return http.ErrorResponse(errors.BadRequest("Invalid request body"))
     }
 
     return http.JSON(result)
@@ -141,7 +142,7 @@ server.GET("/users", http.Inject(func(svc *UserService, ctx *http.Context) *http
 server.POST("/users", http.Inject(func(svc *UserService, ctx *http.Context) *http.Response {
     var body CreateInput
     if err := ctx.Body(&body); err != nil {
-        return http.JSONStatus(400, map[string]string{"error": err.Error()})
+        return http.ErrorResponse(errors.BadRequest("Invalid request body"))
     }
     return http.JSONStatus(201, svc.Create(body))
 }))
@@ -234,6 +235,7 @@ to: `http.EndpointContext`, the typed extractors `http.ParamsAs` /
 ```go
 import (
     "go.putnami.dev/api"
+    "go.putnami.dev/errors"
     "go.putnami.dev/http"
 )
 
@@ -246,7 +248,7 @@ apiPlugin.Register(api.Endpoint("POST", "/users").
     Handle(http.Inject(func(svc *UserService, ctx *http.EndpointContext) *http.Response {
         body, err := http.BodyAs[CreateUserBody](ctx)
         if err != nil {
-            return http.JSONStatus(400, map[string]string{"error": err.Error()})
+            return http.ErrorResponse(errors.BadRequest("Invalid request body"))
         }
         return http.JSONStatus(201, svc.Create(body))
     })))

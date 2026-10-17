@@ -55,6 +55,20 @@ func TestRefusalEnvelope_UnroutedMethodAnswersMethodNotAllowed(t *testing.T) {
 	envelopeOf(t, resp, http.StatusNotFound, "not_found", "The requested resource was not found")
 }
 
+func TestRefusalEnvelope_OptionsOnlyPathAnswersNotFound(t *testing.T) {
+	spectest.Proves(t, "go/http-services", "refusal-envelope", "an-unrouted-method-answers-405-with-allow")
+	p := NewServerPlugin(ServerConfig{Port: 0})
+	p.Handle(http.MethodOptions, "/{path...}", func(*Context) *Response { return NoContent() })
+	ts := p.TestServer()
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/typo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	envelopeOf(t, resp, http.StatusNotFound, "not_found", "The requested resource was not found")
+}
+
 func TestRefusalEnvelope_PreflightAllowNamesHead(t *testing.T) {
 	spectest.Proves(t, "go/http-services", "refusal-envelope", "an-unrouted-method-answers-405-with-allow")
 	p := NewServerPlugin(ServerConfig{Port: 0})

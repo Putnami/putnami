@@ -152,7 +152,7 @@ server.POST("/users", func(ctx *http.Context) *http.Response {
         Email string `json:"email"`
     }
     if err := ctx.Body(&input); err != nil {
-        return http.JSONStatus(400, map[string]string{"error": err.Error()})
+        return http.ErrorResponse(errors.BadRequest("Invalid request body"))
     }
     return http.JSONStatus(201, input)
 })
@@ -413,7 +413,7 @@ apiPlugin.Register(api.Endpoint("POST", "/users").
     Handle(func(ctx *http.EndpointContext) *http.Response {
         body, err := http.BodyAs[CreateUserBody](ctx)
         if err != nil {
-            return http.JSONStatus(400, map[string]string{"error": err.Error()})
+            return http.ErrorResponse(errors.BadRequest("Invalid request body"))
         }
         // create user...
         return http.JSONStatus(201, user)
