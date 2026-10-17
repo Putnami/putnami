@@ -1400,8 +1400,8 @@ for them, exactly as it does for `serve` (which `run_jobs` also refuses to
 execute, because the engine promotes it to watch mode and one blocking tool call
 wedges the whole stdio session).
 
-Agent IDEs (Claude Code, Cursor, VS Code) auto-discover the server through a
-`.mcp.json` file at the workspace root:
+Claude Code discovers the server through a `.mcp.json` file at the workspace
+root:
 
 ```json
 {
@@ -1410,6 +1410,9 @@ Agent IDEs (Claude Code, Cursor, VS Code) auto-discover the server through a
   }
 }
 ```
+
+Codex reads `.codex/config.toml`, Cursor reads `.cursor/mcp.json`, and VS Code
+reads `.vscode/mcp.json`. None of them sees this entry.
 
 A source workspace, whose `putnami.lock.json` records `cli.source: "workspace"`,
 refuses the global `putnami`. When its root holds a `putnamiw` file, the entry's

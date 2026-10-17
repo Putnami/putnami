@@ -116,7 +116,9 @@ putnami mcp           # run the server over stdio (your client spawns this)
 to `.mcp.json` when it is missing. Other servers and unknown keys in an existing
 file are preserved, a `putnami` entry you changed is kept, and a file that does
 not parse is left untouched with a warning. `mcp install` writes the same entry
-on request, and is the one command that rewrites a diverged one.
+on request, and is the one command that rewrites a diverged one. Claude Code
+reads `.mcp.json`; Codex, Cursor and VS Code read their own configuration
+files, which Putnami commands do not write.
 
 The entry runs `putnami mcp`. A workspace that builds its own CLI from source
 (`cli.source: "workspace"` in `putnami.lock.json`) refuses the global binary, so
