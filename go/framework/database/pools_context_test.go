@@ -195,3 +195,50 @@ func TestPools_HealthCheck_BoundedByTheProbeContext(t *testing.T) {
 		t.Fatalf("HealthCheck = %v, want an error wrapping context.DeadlineExceeded", err)
 	}
 }
+
+// TestPools_ForContext_EndedContextStartsNoOpen proves a caller whose context
+// has already ended gets its context error without starting a connect.
+func TestPools_ForContext_EndedContextStartsNoOpen(t *testing.T) {
+	pools, f := newContextTestPools(t)
+	defer close(f.release)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := pools.ForContext(ctx, "platform_iam"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("ForContext = %v, want an error wrapping context.Canceled", err)
+	}
+	select {
+	case <-f.entered:
+		t.Fatal("a caller with an ended context started a physical open")
+	case <-time.After(20 * time.Millisecond):
+	}
+}
+
+// TestPools_Close_DuringAnOpenClosesItsPool proves an open that finishes after
+// Close does not cache its pool: its waiters get a db.connection error, the
+// physical pool it opened is released, and the next call opens anew.
+func TestPools_Close_DuringAnOpenClosesItsPool(t *testing.T) {
+	pools, f := newContextTestPools(t)
+
+	done := make(chan poolResult, 1)
+	go func() {
+		pool, err := pools.ForContext(context.Background(), "platform_iam")
+		done <- poolResult{pool, err}
+	}()
+	awaitOpen(t, f)
+	pools.Close()
+	close(f.release)
+
+	r := awaitResult(t, done, "the caller waiting across Close")
+	if r.pool != nil || !perrors.Is(r.err, CodeConnection) {
+		t.Fatalf("waiter = (%v, %v), want a db.connection error and no pool", r.pool, r.err)
+	}
+	if got := pools.PhysicalCount(); got != 0 {
+		t.Errorf("PhysicalCount() after the orphaned open = %d, want 0", got)
+	}
+
+	if _, err := pools.For("platform_iam"); err != nil {
+		t.Fatalf("For after Close: %v", err)
+	}
+	awaitOpen(t, f)
+}

@@ -127,8 +127,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-cancelled-caller-returns-with-its-context-error",
-              "the-shared-open-outlives-a-cancelled-caller"
+              "a-canceled-caller-returns-with-its-context-error",
+              "the-shared-open-outlives-a-canceled-caller"
             ]
           }
         },
