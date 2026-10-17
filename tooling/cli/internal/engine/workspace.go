@@ -3,6 +3,7 @@ package engine
 import (
 	"os"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -83,4 +84,20 @@ func loadWorkspaceAndExtensions(req *Request) (*workspace.Workspace, *extension.
 		}
 	}
 	return ws, discovered, ExitSuccess
+}
+
+// loadRunWorkspace is loadWorkspaceAndExtensions for a run, which also refuses
+// a hosted run whose CI configuration needs a provider that only a path
+// extension declares (requireHostedProviders), before any job. It prints the
+// refusal and returns its exit code and error.
+func loadRunWorkspace(req *Request) (*workspace.Workspace, *extension.DiscoveryResult, int, error) {
+	ws, discovered, code := loadWorkspaceAndExtensions(req)
+	if code != ExitSuccess {
+		return nil, nil, code, nil
+	}
+	if err := requireHostedProviders(req, discovered); err != nil {
+		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
+		return nil, nil, protocolcli.ExitCodeForError(err), err
+	}
+	return ws, discovered, ExitSuccess, nil
 }

@@ -643,9 +643,9 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 // run is the lifecycle proper, between the before and after hooks.
 func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (SessionResult, error) {
 	// Phase 1: load the workspace and resolve extensions — once per run.
-	ws, discovered, code := loadWorkspaceAndExtensions(req)
+	ws, discovered, code, err := loadRunWorkspace(req)
 	if code != ExitSuccess {
-		return SessionResult{ExitCode: code}, nil
+		return SessionResult{ExitCode: code}, err
 	}
 	// The dependency fetch of a hosted install sees only the extensions
 	// installed from the artifact store: no path extension starts beside the

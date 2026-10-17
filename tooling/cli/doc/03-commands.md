@@ -1699,7 +1699,11 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
   `runner-provider`, `session-reporter`, `log-reporter` and
   `cloud-release-set` commands of a path extension. The extension still loads.
   When a run needs a provider and no store extension serves it, the error
-  names each path extension and command that the CLI removed. Every provider
+  names each path extension and command that the CLI removed. A run whose
+  CI configuration needs such a provider fails before any job, with exit 2:
+  `cloud-release-set` when `putnami.ci.json` declares a rule that publishes,
+  and `cache-provider` when the run reads a configured remote cache. The pull
+  request then fails, not the publish on `main`. Every provider
   comes from a store extension, except in a source workspace (next item). The
   path extension's other commands, jobs and hooks run after the credential's
   last handoff, as the next items describe.

@@ -3,9 +3,16 @@ package engine
 import (
 	"context"
 	"os"
+	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
+	cache "go.putnami.dev/protocol/cache"
+	ciproto "go.putnami.dev/protocol/ci"
+	protocolcli "go.putnami.dev/protocol/cli"
+	distribution "go.putnami.dev/protocol/distribution"
 	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
@@ -179,4 +186,50 @@ func hostedRunRemoteCache(ctx context.Context, req *Request, ws *workspace.Works
 		return nil, err
 	}
 	return remote, nil
+}
+
+// requireHostedProviders fails a hosted run whose CI configuration needs a
+// provider capability that only the workspace's path extensions declare, since
+// a hosted run removes it from them
+// (extension.DiscoveryResult.OnlyFromPathExtensions). The configuration needs
+// the release-set provider when the workspace's CI document declares a rule
+// that publishes to at least one channel, and the cache provider when req
+// reads the remote cache (readsHostedRemoteCache) and the workspace configures
+// one (remotecache.Configured). A missing or invalid CI document declares no
+// rule: the run that publishes reports an invalid one. The error is an invalid
+// configuration that names the capability, what needs it, each path extension
+// that declares it, and the fix. A run without a run credential is never
+// refused.
+func requireHostedProviders(req *Request, discovered *extension.DiscoveryResult) error {
+	if !runcredential.Hosted() {
+		return nil
+	}
+	type need struct{ command, neededBy string }
+	var needs []need
+	if data, err := os.ReadFile(filepath.Join(req.WorkspaceRoot, ciproto.Filename)); err == nil {
+		if document, err := ciproto.Parse(data); err == nil && slices.ContainsFunc(document.Rules, func(rule ciproto.Rule) bool {
+			return !rule.Publish.Disabled && len(rule.Publish.Channels) > 0
+		}) {
+			needs = append(needs, need{distribution.ProviderCommandName, ciproto.Filename + " declares a rule that publishes"})
+		}
+	}
+	if readsHostedRemoteCache(req) && remotecache.Configured(req.WorkspaceRoot) {
+		needs = append(needs, need{cache.ProviderCommandName, "the workspace configures a remote cache"})
+	}
+	for _, need := range needs {
+		removed := discovered.OnlyFromPathExtensions(need.command)
+		if len(removed) == 0 {
+			continue
+		}
+		names := make([]string, len(removed))
+		causes := make([]string, len(removed))
+		for i, capability := range removed {
+			names[i] = capability.Extension
+			causes[i] = capability.Reason().Error()
+		}
+		return protocolcli.InvalidConfigf("%s, which needs the %s capability, and no extension of this hosted run serves it: %s; "+
+			"pin %s from the registry in the workspace lock and install it",
+			need.neededBy, need.command, strings.Join(causes, "; "), strings.Join(names, ", "))
+	}
+	return nil
 }

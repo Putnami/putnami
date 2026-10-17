@@ -307,6 +307,33 @@ func (d *DiscoveryResult) ProviderCause(command string) string {
 	return strings.Join(causes, "; ")
 }
 
+// OnlyFromPathExtensions returns each capability command that discovery
+// removed from one of the workspace's path extensions (RemovedCapability with
+// no RequiredBy), sorted by extension name, when no extension of d.Extensions
+// declares command. It returns nil when an extension that stays serves
+// command, when no path extension lost it, and for a nil d.
+func (d *DiscoveryResult) OnlyFromPathExtensions(command string) []RemovedCapability {
+	if d == nil {
+		return nil
+	}
+	var removed []RemovedCapability
+	for _, capability := range d.RemovedCapabilities {
+		if capability.Command == command && capability.RequiredBy == "" {
+			removed = append(removed, capability)
+		}
+	}
+	if len(removed) == 0 {
+		return nil
+	}
+	for _, ext := range d.Extensions {
+		if slices.Contains(ProviderCommands(ext), command) {
+			return nil
+		}
+	}
+	slices.SortFunc(removed, func(a, b RemovedCapability) int { return strings.Compare(a.Extension, b.Extension) })
+	return removed
+}
+
 // keepHostedExtensions returns the extensions a hosted run may run, a skip
 // record for each extension it drops, and each provider capability it removes
 // from an extension it keeps. It keeps whole an extension installed from the

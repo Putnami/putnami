@@ -86,8 +86,11 @@ those hold the credential (§5).
   other path extension, so every other provider comes from the store. It
   records each removal apart from the extensions it could not load: the
   extension loaded, and a run that finds no provider names the removal in its
-  error. Its runtime, workspace probe, toolchain probes, jobs and hooks start
-  only after custody ends (§4).
+  error. A run whose CI configuration needs a removed provider that no store
+  extension serves fails before any job: `cloud-release-set` for a rule that
+  publishes, `cache-provider` for a remote cache the run reads. Otherwise only
+  the publish on `main` would fail. Its runtime, workspace probe, toolchain
+  probes, jobs and hooks start only after custody ends (§4).
 - A hosted run reads no registry the workspace declares
   (`registries.put.registry`). The runner's `PUTNAMI_REGISTRY_PUT_URL`, then
   `PUTNAMI_REGISTRY_URL`, or the default registry decides where the pinned CLI

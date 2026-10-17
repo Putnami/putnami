@@ -84,8 +84,15 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  25,
-		funcs:  181,
-		why: "RAISED 180→181 (cli/workspace-discovery-selection, explicit-baseline): " +
+		funcs:  183,
+		why: "RAISED 181→183 (cli/credential-custody, needed-provider-only-on-a-path-extension): " +
+			"a hosted run whose CI configuration needs a provider that only a path extension declares " +
+			"fails before any job, so its pull request fails instead of the publish on main. " +
+			"run_credential.go holds requireHostedProviders, which reads what the CI document and the " +
+			"remote cache need, and workspace.go holds loadRunWorkspace, which applies it after the " +
+			"run's one discovery so Engine.run stays within its statement limit. The removal itself " +
+			"stays in internal/extension; they add no stage, flag or store; files stay at 25. " +
+			"RAISED 180→181 (cli/workspace-discovery-selection, explicit-baseline): " +
 			"applyStandaloneBaseline turns a --baseline that names no target, --all or --impacted " +
 			"into the --impacted run it asks for. Engine.Run calls it before the release-set mode is " +
 			"derived, because that mode and the strict deploy read --impacted; selectProjects runs " +
