@@ -65,9 +65,9 @@ them:
 - Event terminal: INFO on success, ERROR on failure. A handler that asks for
   a later redelivery is not a failure: its terminal record is WARNING
   `message redelivery requested` with outcome `skipped`. Retry scheduling is
-  WARNING; dead-letter and drops are ERROR. A push delivery that fails logs
-  no event terminal record: the request record that carried it is the one
-  ERROR record, with the handler error and the delivery's `event` group.
+  WARNING; dead-letter and drops are ERROR. A push delivery that fails inside
+  a logged request logs no event terminal record: the request record is the
+  one ERROR record, with the handler error and the delivery's fields.
 
 ### Terminal-record policy
 

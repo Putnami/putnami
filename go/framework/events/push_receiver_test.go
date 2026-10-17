@@ -312,10 +312,15 @@ func TestHandlePushRedeliverAnswers429AndLogsNoError(t *testing.T) {
 
 func TestHandlePushFailureLogsOneErrorWithItsCause(t *testing.T) {
 	spectest.Proves(t, "go/event-delivery", "redelivery-request", "push-failure-logs-one-error-with-its-cause")
-	var got string
 	cause := stderrors.New("orders database unreachable")
 	p := Events(PluginConfig{Delivery: DeliveryPush})
-	p.Register(recordingHandler("order.created", &got, cause))
+	p.Register(&HandlerDefinition{
+		Topic: "order.created",
+		Handler: func(ctx context.Context, _ *Envelope) error {
+			logger.Set(ctx, "order.id", "o-1")
+			return cause
+		},
+	})
 
 	resp, sink := servePushLogged(t, p, pushBody(t, Envelope{ID: "m-failed", Topic: "order.created", Payload: map[string]any{"id": "o-1"}}))
 	if resp.Status != http.StatusInternalServerError {
@@ -339,8 +344,31 @@ func TestHandlePushFailureLogsOneErrorWithItsCause(t *testing.T) {
 	if group["topic"] != "order.created" || group["messageId"] != "m-failed" || group["outcome"] != outcomeFailure {
 		t.Errorf("event group = %v, want the failed delivery's identity and outcome", group)
 	}
+	if order, _ := record.Context["order"].(map[string]any); order["id"] != "o-1" {
+		t.Errorf("ERROR record context = %v, want the fields the delivery accumulated", record.Context)
+	}
 	if found := recordsOf(sink, "events.handler", "message handling failed"); len(found) != 0 {
 		t.Errorf("the delivery logged its failure again: %d records", len(found))
+	}
+}
+
+// Without the http Logging middleware no request record exists, so the
+// delivery keeps its own ERROR record with the cause.
+func TestHandlePushFailureWithoutRequestLoggingKeepsTheDeliveryRecord(t *testing.T) {
+	var got string
+	cause := stderrors.New("orders database unreachable")
+	p := Events(PluginConfig{Delivery: DeliveryPush})
+	p.Register(recordingHandler("order.created", &got, cause))
+	sink := logger.NewMemorySink()
+	p.logs = eventLoggersFrom(logger.New("", logger.LevelDebug, sink))
+
+	resp := p.handlePush(pushContext(pushBody(t, Envelope{Topic: "order.created", Payload: map[string]any{"id": "o-1"}})))
+	if resp.Status != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500 (retry)", resp.Status)
+	}
+	record := oneRecordOf(t, sink, "events.handler", "message handling failed")
+	if record.Level != logger.LevelError || record.Error == nil || record.Error.Message != cause.Error() {
+		t.Errorf("delivery record = %v %+v, want ERROR with the handler's cause", record.Level, record.Error)
 	}
 }
 

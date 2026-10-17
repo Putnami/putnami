@@ -96,31 +96,35 @@ func retryEventAttr(env Envelope, delay time.Duration, opts HandlerOptions) slog
 // record), a seeded trace id, and the base event group every record of the
 // delivery shares. The trace id is the envelope's trace id falling back to the
 // message id, matching the TypeScript dispatch pipeline so a message stays
-// correlatable across runtimes even with no active span.
-func newDeliveryContext(ctx context.Context, env Envelope) context.Context {
+// correlatable across runtimes even with no active span. It returns the bag too,
+// so the delivery can hand its fields to a failureReporter.
+func newDeliveryContext(ctx context.Context, env Envelope) (context.Context, *logger.FieldBag) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	if traceID := cmp.Or(env.TraceID, env.ID); traceID != "" {
 		ctx = logger.ContextWithTraceID(ctx, traceID)
 	}
-	ctx = logger.ContextWithFieldBag(ctx, logger.NewFieldBag())
+	bag := logger.NewFieldBag()
+	ctx = logger.ContextWithFieldBag(ctx, bag)
 	logger.Set(ctx, "event", eventGroup(env))
-	return ctx
+	return ctx, bag
 }
 
-// failureReporter takes over the terminal record of a failed delivery: it
-// receives the delivery's event group and the handler error, and the delivery
-// logs no record of its own. The push receiver uses it to report the failure on
-// the request that carried the message.
-type failureReporter func(event map[string]any, err error)
+// failureReporter offers the terminal record of a failed delivery to an
+// enclosing boundary: it receives the fields the delivery accumulated, its event
+// group included, and the handler error. It returns true when a record of that
+// boundary will carry them; the delivery then logs no record of its own. The
+// push receiver uses it to report the failure on the request that carried the
+// message.
+type failureReporter func(fields map[string]any, err error) bool
 
 // dispatchDelivery runs one delivery of env through invoke inside the canonical
 // per-delivery boundary and emits exactly ONE terminal record for it: INFO
 // "message handled" on success, WARN "message redelivery requested" when the
 // handler returns a Redeliver error, and ERROR "message handling failed" with
-// the structured error on failure. A non-nil reportFailure receives the failure
-// instead of the ERROR record. Every transport dispatches through it (directly
+// the structured error on failure. A non-nil reportFailure that accepts the
+// failure replaces the ERROR record. Every transport dispatches through it (directly
 // or through invokeTransportHandler) so the terminal record is identical
 // everywhere.
 //
@@ -136,7 +140,7 @@ func dispatchDelivery(
 	invoke func(ctx context.Context, env *Envelope) error,
 	reportFailure failureReporter,
 ) (context.Context, time.Duration, error) {
-	deliveryCtx := newDeliveryContext(ctx, *env)
+	deliveryCtx, bag := newDeliveryContext(ctx, *env)
 
 	start := time.Now()
 	err := invoke(deliveryCtx, env)
@@ -164,12 +168,8 @@ func dispatchDelivery(
 		logs.handler.InfoCtx(deliveryCtx, "message handled")
 	case redelivery:
 		logs.handler.WarnCtx(deliveryCtx, "message redelivery requested", logger.ErrorAttr(err))
-	case reportFailure != nil:
-		event := eventGroup(*env)
-		for k, v := range terminal {
-			event[k] = v
-		}
-		reportFailure(event, err)
+	case reportFailure != nil && reportFailure(bag.Snapshot(), err):
+		// A record of the enclosing boundary carries the failure.
 	default:
 		logs.handler.ErrorCtx(deliveryCtx, "message handling failed", err)
 	}

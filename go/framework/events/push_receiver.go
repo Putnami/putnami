@@ -196,9 +196,9 @@ func (p *Plugin) allowPusher(user *phttp.Claims, _ *phttp.Context) bool {
 //	429  retry (deferred: a handler returned Redeliver)
 //	5xx  retry (transient: a handler failed)
 //
-// A handler failure is recorded on the request, so the request's ERROR record
-// carries the cause and the delivery's event group, and the delivery logs no
-// record of its own. Push delivery is at-least-once, so handlers must be
+// When the http Logging middleware wraps the route, a handler failure is
+// recorded on the request, so the request's ERROR record carries the cause and
+// the delivery's fields, and the delivery logs no record of its own. Push delivery is at-least-once, so handlers must be
 // idempotent. Authentication runs in the middleware chain (securedPushHandler)
 // before this handler.
 func (p *Plugin) handlePush(ctx *phttp.Context) *phttp.Response {
@@ -210,10 +210,19 @@ func (p *Plugin) handlePush(ctx *phttp.Context) *phttp.Response {
 	if err != nil {
 		return phttp.JSONStatus(400, map[string]string{"error": "invalid envelope"})
 	}
+	// A failure moves to the request record when the request carries a field
+	// bag (the http Logging middleware wraps the route); otherwise the delivery
+	// keeps its own ERROR record.
 	requestCtx := ctx.Context()
-	reportFailure := func(event map[string]any, err error) {
-		logger.Set(requestCtx, "event", event)
+	reportFailure := func(fields map[string]any, err error) bool {
 		logger.SetRequestError(requestCtx, err)
+		if logger.RequestError(requestCtx) == nil {
+			return false
+		}
+		for key, value := range fields {
+			logger.Set(requestCtx, key, value)
+		}
+		return true
 	}
 	for _, def := range p.selectPushTargets(env) {
 		// Each target is its own delivery boundary; a non-2xx answer below is

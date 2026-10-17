@@ -182,7 +182,7 @@ handler := events.Handle(topic, func(ctx context.Context, msg *events.Message[Or
 })
 ```
 
-The delivery logs WARN `message redelivery requested` with outcome `skipped`, not ERROR `message handling failed`. A broker transport retries the message within `WithMaxRetries`, as it retries a failure. Under push delivery the receiver answers `429`, which the provider redelivers, and the request record logs at INFO. `msg.Nack` and every other error remain failures and log ERROR.
+The delivery logs WARN `message redelivery requested` with outcome `skipped`, not ERROR `message handling failed`. A transport that retries failures delivers the message again the same way, within `WithMaxRetries` where it applies; Redis Pub/Sub cannot redeliver, so the message is lost there. Under push delivery the receiver answers `429`, which the provider redelivers, and the request record logs at INFO. `msg.Nack` and every other error remain failures and log ERROR.
 
 ### Attribute Filtering
 

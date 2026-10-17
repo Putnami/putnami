@@ -154,8 +154,9 @@ const (
 // again later, in any ack mode. It is a deferral, not a failure: the delivery
 // logs WARN "message redelivery requested" instead of ERROR "message handling
 // failed", and the push receiver answers 429, which the provider redelivers.
-// A broker transport retries the message as it retries a failure, within the
-// handler's MaxRetries. reason says why the handler defers the message.
+// A transport that retries failures delivers the message again the same way;
+// Redis Pub/Sub cannot, so the message is lost there. reason says why the
+// handler defers the message.
 func Redeliver(reason string) error {
 	if reason == "" {
 		reason = "message redelivery requested"
