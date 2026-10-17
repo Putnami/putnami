@@ -117,14 +117,18 @@ func (p *Provider) createTask(_ context.Context, call collab.Call) (any, *collab
 			taskState = collab.TaskStateOpen
 		}
 		state.Next.Task++
+		id := "T-" + strconv.Itoa(state.Next.Task)
+		now := p.timestamp()
 		created = collab.Task{
-			Ref:       collab.Ref{Source: state.Source(), ID: "T-" + strconv.Itoa(state.Next.Task)},
+			Ref:       collab.Ref{Source: state.Source(), ID: id},
+			Key:       id,
 			Revision:  "r1",
 			Title:     input.Title,
 			Body:      input.Body,
 			State:     taskState,
 			Labels:    input.Labels,
-			UpdatedAt: p.timestamp(),
+			CreatedAt: now,
+			UpdatedAt: now,
 		}
 		state.Tasks = append(state.Tasks, created)
 		state.Keys[key] = store.Key{Kind: "task", ID: created.Ref.ID, Digest: digest}

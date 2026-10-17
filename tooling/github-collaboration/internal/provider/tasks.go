@@ -55,12 +55,14 @@ func (s *taskSession) task(issue *ghIssue) collab.Task {
 	state, providerState := s.states.stateOf(issue)
 	task := collab.Task{
 		Ref:           s.repo.ref(issue.Number),
+		Key:           "#" + strconv.Itoa(issue.Number),
 		Revision:      issueRevision(issue),
 		URL:           displayURL(issue.HTMLURL),
 		Title:         oneLine(issue.Title, collab.MaxTitleLength, "#"+strconv.Itoa(issue.Number)),
 		Body:          boundedBody(body),
 		State:         state,
 		ProviderState: oneLine(providerState, collab.MaxLabelLength, string(state)),
+		CreatedAt:     timestamp(issue.CreatedAt),
 		UpdatedAt:     timestamp(issue.UpdatedAt),
 	}
 	task.Labels = boundedLabels(s.states.visibleLabels(issue.labelNames()))
