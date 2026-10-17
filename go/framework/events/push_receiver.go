@@ -3,6 +3,7 @@ package events
 import (
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"go.putnami.dev/app"
 	"go.putnami.dev/errors"
 	phttp "go.putnami.dev/http"
+	"go.putnami.dev/logger"
 	protoevents "go.putnami.dev/protocol/events"
 	"go.putnami.dev/security"
 )
@@ -191,10 +193,14 @@ func (p *Plugin) allowPusher(user *phttp.Claims, _ *phttp.Context) bool {
 //
 //	2xx  ack   (delivered; or no matching handler, so the message is dropped)
 //	4xx  DLQ   (permanent: malformed push body or envelope)
+//	429  retry (deferred: a handler returned Redeliver)
 //	5xx  retry (transient: a handler failed)
 //
-// Push delivery is at-least-once, so handlers must be idempotent. Authentication
-// runs in the middleware chain (securedPushHandler) before this handler.
+// A handler failure is recorded on the request, so the request's ERROR record
+// carries the cause and the delivery's event group, and the delivery logs no
+// record of its own. Push delivery is at-least-once, so handlers must be
+// idempotent. Authentication runs in the middleware chain (securedPushHandler)
+// before this handler.
 func (p *Plugin) handlePush(ctx *phttp.Context) *phttp.Response {
 	var wrapper protoevents.PushEnvelope
 	if err := ctx.Body(&wrapper); err != nil {
@@ -204,10 +210,23 @@ func (p *Plugin) handlePush(ctx *phttp.Context) *phttp.Response {
 	if err != nil {
 		return phttp.JSONStatus(400, map[string]string{"error": "invalid envelope"})
 	}
+	requestCtx := ctx.Context()
+	reportFailure := func(event map[string]any, err error) {
+		logger.Set(requestCtx, "event", event)
+		logger.SetRequestError(requestCtx, err)
+	}
 	for _, def := range p.selectPushTargets(env) {
-		// Each target is its own delivery boundary with its own terminal record;
-		// the 5xx below is what turns the failure into a provider retry.
-		if _, err := invokeTransportHandler(ctx.Request.Context(), p.logs, def, env); err != nil {
+		// Each target is its own delivery boundary; a non-2xx answer below is
+		// what turns a deferral or a failure into a provider redelivery.
+		_, err := invokeTransportHandler(ctx.Request.Context(), p.logs, def, env, reportFailure)
+		switch {
+		case IsRedeliver(err):
+			return phttp.JSONStatus(http.StatusTooManyRequests, errors.HTTPErrorBody{
+				Code:    string(CodeEventsRedeliver),
+				Error:   http.StatusText(http.StatusTooManyRequests),
+				Message: "message redelivery requested",
+			})
+		case err != nil:
 			return phttp.InternalError("handler failed")
 		}
 	}

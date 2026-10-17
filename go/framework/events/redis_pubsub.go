@@ -126,7 +126,7 @@ func (t *RedisPubSubTransport) subscribe(ctx context.Context, sub *redisPubSubSu
 		// ("message handling failed", ERROR, structured error). This live-only
 		// transport has no retry or DLQ, so there is nothing else to report and no
 		// second record to emit.
-		_, _ = invokeTransportHandler(messageCtx, t.logs, sub.def, env) //nolint:errcheck // the terminal record is the report; pub/sub cannot nack
+		_, _ = invokeTransportHandler(messageCtx, t.logs, sub.def, env, nil) //nolint:errcheck // the terminal record is the report; pub/sub cannot nack
 	})
 }
 

@@ -5,14 +5,17 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	stderrors "errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/app"
 	phttp "go.putnami.dev/http"
+	"go.putnami.dev/logger"
 	protoevents "go.putnami.dev/protocol/events"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/infra"
@@ -240,6 +243,104 @@ func TestHandlePushNoMatchingHandlerAcks(t *testing.T) {
 	}
 	if got != "" {
 		t.Error("a handler for a different topic must not be invoked")
+	}
+}
+
+// servePushLogged serves one push through the http Logging middleware, with the
+// request logger and the plugin's event loggers writing to one memory sink, and
+// returns the response and the records of that push.
+func servePushLogged(t *testing.T, p *Plugin, body []byte) (*phttp.Response, *logger.MemorySink) {
+	t.Helper()
+	sink := logger.NewMemorySink()
+	root := logger.New("", logger.LevelDebug, sink)
+	p.logs = eventLoggersFrom(root)
+	handler := phttp.Chain(phttp.Logging(phttp.LoggerOptions{Logger: root.Named("http")}))(p.handlePush)
+	return handler(pushContext(body)), sink
+}
+
+// errorRecords returns every ERROR record of sink.
+func errorRecords(sink *logger.MemorySink) []logger.LogEntry {
+	var out []logger.LogEntry
+	for _, entry := range sink.Entries {
+		if entry.Level == logger.LevelError {
+			out = append(out, entry)
+		}
+	}
+	return out
+}
+
+func TestHandlePushRedeliverAnswers429AndLogsNoError(t *testing.T) {
+	spectest.Proves(t, "go/event-delivery", "redelivery-request", "push-redelivery-answers-429-without-an-error-record")
+	var got string
+	p := Events(PluginConfig{Delivery: DeliveryPush})
+	p.Register(recordingHandler("order.created", &got, Redeliver("another attempt holds the work")))
+
+	resp, sink := servePushLogged(t, p, pushBody(t, Envelope{ID: "m-held", Topic: "order.created", Payload: map[string]any{"id": "o-1"}}))
+	if resp.Status != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want 429 (redeliver)", resp.Status)
+	}
+	if outcome := protoevents.PushOutcomeForStatus(resp.Status); outcome != protoevents.PushRetry {
+		t.Errorf("push outcome = %q, want retry", outcome)
+	}
+	raw, err := resp.BodyBytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body map[string]string
+	if err := json.Unmarshal(raw, &body); err != nil || body["code"] != string(CodeEventsRedeliver) || body["error"] == "" || body["message"] == "" {
+		t.Errorf("body = %s, want the canonical error envelope with code %s", raw, CodeEventsRedeliver)
+	}
+	if errs := errorRecords(sink); len(errs) != 0 {
+		t.Fatalf("a redelivery request logged %d ERROR records:%s", len(errs), allRecords(sink))
+	}
+
+	delivery := oneRecordOf(t, sink, "events.handler", "message redelivery requested")
+	if delivery.Level != logger.LevelWarn {
+		t.Errorf("delivery level = %v, want WARN", delivery.Level)
+	}
+	if info := errorAttrOf(t, delivery); !strings.Contains(info.Message, "another attempt holds the work") {
+		t.Errorf("delivery error.message = %q, want the handler's reason", info.Message)
+	}
+	if group := eventGroupOf(t, delivery); group["outcome"] != outcomeSkipped || group["messageId"] != "m-held" {
+		t.Errorf("delivery event group = %v, want outcome skipped for m-held", group)
+	}
+	request := oneRecordOf(t, sink, "http", "[POST] /_putnami/events/s")
+	if request.Level != logger.LevelInfo {
+		t.Errorf("request level = %v, want INFO", request.Level)
+	}
+}
+
+func TestHandlePushFailureLogsOneErrorWithItsCause(t *testing.T) {
+	spectest.Proves(t, "go/event-delivery", "redelivery-request", "push-failure-logs-one-error-with-its-cause")
+	var got string
+	cause := stderrors.New("orders database unreachable")
+	p := Events(PluginConfig{Delivery: DeliveryPush})
+	p.Register(recordingHandler("order.created", &got, cause))
+
+	resp, sink := servePushLogged(t, p, pushBody(t, Envelope{ID: "m-failed", Topic: "order.created", Payload: map[string]any{"id": "o-1"}}))
+	if resp.Status != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500 (retry)", resp.Status)
+	}
+	errs := errorRecords(sink)
+	if len(errs) != 1 {
+		t.Fatalf("a failed push logged %d ERROR records, want 1:%s", len(errs), allRecords(sink))
+	}
+	record := errs[0]
+	if record.Logger != "http" {
+		t.Errorf("ERROR record logger = %q, want the request record (http)", record.Logger)
+	}
+	if record.Error == nil || record.Error.Message != cause.Error() {
+		t.Fatalf("ERROR record error = %+v, want the handler's cause %q", record.Error, cause)
+	}
+	group, ok := record.Context["event"].(map[string]any)
+	if !ok {
+		t.Fatalf("ERROR record carries no event group: %v", record.Context)
+	}
+	if group["topic"] != "order.created" || group["messageId"] != "m-failed" || group["outcome"] != outcomeFailure {
+		t.Errorf("event group = %v, want the failed delivery's identity and outcome", group)
+	}
+	if found := recordsOf(sink, "events.handler", "message handling failed"); len(found) != 0 {
+		t.Errorf("the delivery logged its failure again: %d records", len(found))
 	}
 }
 

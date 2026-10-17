@@ -10,10 +10,12 @@ import (
 )
 
 // Outcome vocabulary of the logging contract (protocols/logging/conformance).
-// Event deliveries only ever report success or failure.
+// An event delivery reports success, failure, or skipped when its handler asks
+// for a redelivery (see Redeliver).
 const (
 	outcomeSuccess = "success"
 	outcomeFailure = "failure"
+	outcomeSkipped = "skipped"
 )
 
 // Drop reasons reported as event.reason on a "message dropped" record. They are
@@ -107,11 +109,20 @@ func newDeliveryContext(ctx context.Context, env Envelope) context.Context {
 	return ctx
 }
 
+// failureReporter takes over the terminal record of a failed delivery: it
+// receives the delivery's event group and the handler error, and the delivery
+// logs no record of its own. The push receiver uses it to report the failure on
+// the request that carried the message.
+type failureReporter func(event map[string]any, err error)
+
 // dispatchDelivery runs one delivery of env through invoke inside the canonical
 // per-delivery boundary and emits exactly ONE terminal record for it: INFO
-// "message handled" on success, ERROR "message handling failed" with the
-// structured error on failure. Every transport dispatches through it (directly or
-// through invokeTransportHandler) so the terminal record is identical everywhere.
+// "message handled" on success, WARN "message redelivery requested" when the
+// handler returns a Redeliver error, and ERROR "message handling failed" with
+// the structured error on failure. A non-nil reportFailure receives the failure
+// instead of the ERROR record. Every transport dispatches through it (directly
+// or through invokeTransportHandler) so the terminal record is identical
+// everywhere.
 //
 // It returns the boundary context — so a transport's retry / dead-letter / drop
 // records correlate with the terminal record through the same trace id and event
@@ -123,6 +134,7 @@ func dispatchDelivery(
 	logs eventLoggers,
 	env *Envelope,
 	invoke func(ctx context.Context, env *Envelope) error,
+	reportFailure failureReporter,
 ) (context.Context, time.Duration, error) {
 	deliveryCtx := newDeliveryContext(ctx, *env)
 
@@ -130,22 +142,36 @@ func dispatchDelivery(
 	err := invoke(deliveryCtx, env)
 	duration := time.Since(start)
 
+	redelivery := IsRedeliver(err)
 	outcome := outcomeSuccess
-	if err != nil {
+	switch {
+	case redelivery:
+		outcome = outcomeSkipped
+	case err != nil:
 		outcome = outcomeFailure
+	}
+	terminal := map[string]any{
+		"outcome":    outcome,
+		"durationMs": duration.Milliseconds(),
 	}
 	// Merge the terminal fields into the bag's event group instead of emitting a
 	// closed attr: the terminal record must also carry what the delivery
 	// accumulated (e.g. events the handler published), exactly like the
 	// TypeScript dispatch pipeline's logger.with('event', …).
-	logger.Set(deliveryCtx, "event", map[string]any{
-		"outcome":    outcome,
-		"durationMs": duration.Milliseconds(),
-	})
-	if err != nil {
+	logger.Set(deliveryCtx, "event", terminal)
+	switch {
+	case err == nil:
+		logs.handler.InfoCtx(deliveryCtx, "message handled")
+	case redelivery:
+		logs.handler.WarnCtx(deliveryCtx, "message redelivery requested", logger.ErrorAttr(err))
+	case reportFailure != nil:
+		event := eventGroup(*env)
+		for k, v := range terminal {
+			event[k] = v
+		}
+		reportFailure(event, err)
+	default:
 		logs.handler.ErrorCtx(deliveryCtx, "message handling failed", err)
-		return deliveryCtx, duration, err
 	}
-	logs.handler.InfoCtx(deliveryCtx, "message handled")
-	return deliveryCtx, duration, nil
+	return deliveryCtx, duration, err
 }

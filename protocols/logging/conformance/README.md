@@ -49,7 +49,7 @@ them:
 | Boundary | Messages |
 |----------|----------|
 | http | `[<METHOD>] <routePath>` (same message for success and failure — severity and `error` carry the failure) |
-| event | `message handled`, `message handling failed`, `message retry scheduled`, `message dead-lettered`, `message dropped` |
+| event | `message handled`, `message handling failed`, `message redelivery requested`, `message retry scheduled`, `message dead-lettered`, `message dropped` |
 | database | `query executed`, `query failed`, `slow query`, `transaction committed`, `transaction rolled back` |
 | migration | `migration applied`, `migration failed` |
 
@@ -62,8 +62,12 @@ them:
   never produces error-level noise.
 - HTTP terminal: INFO below 500, ERROR at ≥ 500 (with the real handler error
   in `error`).
-- Event terminal: INFO on success, ERROR on failure. Retry scheduling is
-  WARNING; dead-letter and drops are ERROR.
+- Event terminal: INFO on success, ERROR on failure. A handler that asks for
+  a later redelivery is not a failure: its terminal record is WARNING
+  `message redelivery requested` with outcome `skipped`. Retry scheduling is
+  WARNING; dead-letter and drops are ERROR. A push delivery that fails logs
+  no event terminal record: the request record that carried it is the one
+  ERROR record, with the handler error and the delivery's `event` group.
 
 ### Terminal-record policy
 

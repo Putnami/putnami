@@ -75,6 +75,8 @@ broker.Subscribe(events.Handle(OrderTopic, processPayment,
 ))
 ```
 
+A handler that wants its message back later, without a failure, returns `events.Redeliver("reason")` in any ack mode. The delivery logs WARN `message redelivery requested`, never ERROR; a broker retries the message within `MaxRetries`, and the push receiver answers `429`, which the provider redelivers. `msg.Nack` and any other error stay failures and log ERROR.
+
 `MemoryBrokerConfig.Observer` can bridge publish, handle, retry, DLQ, and drop callbacks to telemetry/logging.
 
 ## Publish Options
@@ -186,7 +188,7 @@ a.Use(ev) // push delivery: registers POST /_putnami/events/{subscription} on se
 
 The plugin mounts the receiver after it resolves the `events` config, so a deployment that sets `events.delivery: push` mounts it too, with the resolved issuer, key set, and audience. A push application that holds no server, or several, fails configure with an error that names `RegisterOn`. Call `ev.RegisterOn(server)` before the application configures to choose the server: when the delivery set in code is push it registers the route at once from the push configuration set in code; otherwise it records the server and the plugin mounts the receiver on it at configure. Pull and stream delivery need no server.
 
-The receiver verifies the pusher's OIDC token fail-closed (JWKS signature, issuer, audience) and a **service-account-email allowlist**, then dispatches the decoded envelope. The HTTP status encodes the ack: `2xx` ack, `4xx` dead-letter, `5xx` retry — so handlers must be idempotent. Caller-supplied `auth.*` attributes are stripped before dispatch; the pusher identity never becomes a carried end-user identity. `delivery` travels into the infra requirement so the deployer provisions a push subscription. Pull/stream modes are unchanged.
+The receiver verifies the pusher's OIDC token fail-closed (JWKS signature, issuer, audience) and a **service-account-email allowlist**, then dispatches the decoded envelope. The HTTP status encodes the ack: `2xx` ack, `429` redeliver, other `4xx` dead-letter, `5xx` retry — so handlers must be idempotent. A failed handler answers `500`, and the request record is the one ERROR record, with the handler error and the delivery's `event` group. Caller-supplied `auth.*` attributes are stripped before dispatch; the pusher identity never becomes a carried end-user identity. `delivery` travels into the infra requirement so the deployer provisions a push subscription. Pull/stream modes are unchanged.
 
 During first-deploy bootstrap, resolved config may set `events.push.enabled:
 false`. The plugin still mounts the receiver, but it returns a retryable `503`

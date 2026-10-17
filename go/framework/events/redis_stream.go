@@ -254,7 +254,7 @@ func (t *RedisStreamTransport) handleRecord(ctx context.Context, sub *redisStrea
 	// The boundary context carries the delivery's trace id and event group, so the
 	// retry/dead-letter records below correlate with the terminal record. It only
 	// adds values to ctx: cancellation and deadlines are unchanged.
-	deliveryCtx, err := invokeTransportHandler(ctx, t.logs, sub.def, env)
+	deliveryCtx, err := invokeTransportHandler(ctx, t.logs, sub.def, env, nil)
 	if err != nil {
 		return t.handleFailure(deliveryCtx, err, env, sub, streamKey, record.id)
 	}
