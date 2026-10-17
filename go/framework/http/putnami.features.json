@@ -196,6 +196,19 @@
           }
         },
         {
+          "id": "route-write-timeout",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-route-with-its-own-write-timeout-answers-past-the-server-bound",
+              "a-route-write-timeout-moves-its-request-deadline",
+              "a-non-positive-route-write-timeout-panics"
+            ]
+          }
+        },
+        {
           "id": "failed-writes",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

@@ -45,7 +45,8 @@ type ServerConfig struct {
 	// WriteTimeout is the maximum duration for writing the response. Default: 30s.
 	// Each request context ends with context.DeadlineExceeded at nine tenths of
 	// it, so a stalled handler can still answer 5xx; WebSocket, Server-Sent
-	// Events, gRPC and Connect streams run without that deadline.
+	// Events, gRPC and Connect streams run without that deadline. A route
+	// registered WithWriteTimeout answers under its own bound instead.
 	WriteTimeout time.Duration `json:"writeTimeout" default:"30s"`
 	// IdleTimeout is how long a keep-alive connection, HTTP/1.1 or HTTP/2 (h2c
 	// included), stays open while it waits for its next request. Keep it above
@@ -84,22 +85,23 @@ type ServerConfig struct {
 // ServerPlugin implements the HTTP server as a framework plugin.
 // It manages route registration, middleware composition, and server lifecycle.
 type ServerPlugin struct {
-	config          ServerConfig
-	routes          *RouteController
-	routeBodyLimits map[string]int64
-	httpRouteFacts  []httpRouteFact
-	projectName     string
-	middlewares     []Middleware
-	composedChain   func(Handler) Handler
-	log             *logger.Logger
-	server          *http.Server
-	readyEndpoints  []runtimeproto.ReadyEndpoint
-	cc              *inject.ContainerContext
-	pending         []*InjectedHandler
-	routesWrapped   bool
-	drain           chan struct{}
-	drainOnce       sync.Once
-	mu              sync.RWMutex
+	config             ServerConfig
+	routes             *RouteController
+	routeBodyLimits    map[string]int64
+	routeWriteTimeouts map[string]time.Duration
+	httpRouteFacts     []httpRouteFact
+	projectName        string
+	middlewares        []Middleware
+	composedChain      func(Handler) Handler
+	log                *logger.Logger
+	server             *http.Server
+	readyEndpoints     []runtimeproto.ReadyEndpoint
+	cc                 *inject.ContainerContext
+	pending            []*InjectedHandler
+	routesWrapped      bool
+	drain              chan struct{}
+	drainOnce          sync.Once
+	mu                 sync.RWMutex
 }
 
 // drainSignal returns the channel that closes when this server begins a
@@ -130,10 +132,11 @@ func (p *ServerPlugin) beginDrain() {
 // NewServerPlugin creates a new HTTP server plugin.
 func NewServerPlugin(config ServerConfig) *ServerPlugin {
 	return &ServerPlugin{
-		config:          config,
-		routes:          newRouteController(),
-		routeBodyLimits: make(map[string]int64),
-		log:             logger.Default().Named("http"),
+		config:             config,
+		routes:             newRouteController(),
+		routeBodyLimits:    make(map[string]int64),
+		routeWriteTimeouts: make(map[string]time.Duration),
+		log:                logger.Default().Named("http"),
 	}
 }
 
@@ -177,9 +180,7 @@ func (p *ServerPlugin) Route(method, path string, handler any, opts ...RouteOpti
 	}
 	h = applyRouteOptions(h, cfg)
 	p.routes.Add(method, path, h)
-	if cfg.maxBodySize > 0 {
-		p.routeBodyLimits[routeBodyLimitKey(method, path)] = cfg.maxBodySize
-	}
+	p.recordRouteBounds(method, path, cfg)
 	p.httpRouteFacts = append(p.httpRouteFacts, httpRouteFact{method: method, path: path, source: routeSourceManual})
 	return p
 }
@@ -201,9 +202,7 @@ func (p *ServerPlugin) RouteMount(method, prefix string, handler any, opts ...Ro
 	// the public inventory records one prefix mount.
 	pattern := prefix + "{mountPath...}"
 	p.routes.Add(method, pattern, h)
-	if cfg.maxBodySize > 0 {
-		p.routeBodyLimits[routeBodyLimitKey(method, pattern)] = cfg.maxBodySize
-	}
+	p.recordRouteBounds(method, pattern, cfg)
 	p.httpRouteFacts = append(p.httpRouteFacts, httpRouteFact{
 		method: method, path: prefix, source: routeSourceStaticMount, match: httproutes.MatchPrefix,
 	})
@@ -252,7 +251,18 @@ func (p *ServerPlugin) HandleWithBodyLimit(method, path string, handler Handler,
 		panic(fmt.Sprintf("http: route %s %s needs a strictly positive body limit, got %d", method, path, maxBytes))
 	}
 	p.Handle(method, path, handler)
-	p.routeBodyLimits[routeBodyLimitKey(method, path)] = maxBytes
+	p.routeBodyLimits[routeKey(method, path)] = maxBytes
+}
+
+// recordRouteBounds keeps the route's own body limit and write timeout, which
+// buildHandler reads once the request matches the route's pattern.
+func (p *ServerPlugin) recordRouteBounds(method, pattern string, cfg routeConfig) {
+	if cfg.maxBodySize > 0 {
+		p.routeBodyLimits[routeKey(method, pattern)] = cfg.maxBodySize
+	}
+	if cfg.writeTimeout > 0 {
+		p.routeWriteTimeouts[routeKey(method, pattern)] = cfg.writeTimeout
+	}
 }
 
 // AddPendingInjectedHandler registers an InjectedHandler for DI finalization. If the
@@ -448,13 +458,6 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 	requestDeadline := p.config.requestDeadline()
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		if requestDeadline > 0 && !longLivedRequest(r) {
-			reqCtx, cancel := context.WithTimeout(r.Context(), requestDeadline)
-			defer cancel()
-			r = r.WithContext(reqCtx)
-		}
-		ctx := NewContext(w, r)
-
 		// Match route
 		matchedMethod := r.Method
 		match := p.routes.lookup(r.Method, r.URL.Path)
@@ -484,10 +487,27 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 			}
 		}
 
+		if !longLivedRequest(r) {
+			deadline := requestDeadline
+			if timeout := p.routeWriteTimeouts[routeKey(matchedMethod, match.Pattern)]; timeout > 0 {
+				// The route answers under its own bound: move the write deadline
+				// the server armed from WriteTimeout. A writer that does not
+				// expose its deadline, such as a recorder, keeps the bound its
+				// host set.
+				_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(timeout)) //nolint:errcheck
+				deadline = deadlineWithin(timeout)
+			}
+			if deadline > 0 {
+				reqCtx, cancel := context.WithTimeout(r.Context(), deadline)
+				defer cancel()
+				r = r.WithContext(reqCtx)
+			}
+		}
+		ctx := NewContext(w, r)
 		ctx.Route = match.Pattern
 		ctx.Params = match.Params
 		bodyLimit := maxBody
-		if routeLimit := p.routeBodyLimits[routeBodyLimitKey(matchedMethod, match.Pattern)]; routeLimit > 0 {
+		if routeLimit := p.routeBodyLimits[routeKey(matchedMethod, match.Pattern)]; routeLimit > 0 {
 			bodyLimit = routeLimit
 		}
 		body := &maxBytesBody{ReadCloser: http.MaxBytesReader(w, r.Body, bodyLimit)}
@@ -646,7 +666,7 @@ func payloadTooLargeResponse() *Response {
 	return ErrorResponse(errors.New(errors.CodePayloadTooLarge, "Request body exceeds the declared bound"))
 }
 
-func routeBodyLimitKey(method, path string) string {
+func routeKey(method, path string) string {
 	return strings.ToUpper(method) + "\x00" + path
 }
 
@@ -845,9 +865,10 @@ func (rc *RouteController) allowedMethods(path string) []string {
 type RouteOption func(*routeConfig)
 
 type routeConfig struct {
-	accept      []string
-	statusCode  int
-	maxBodySize int64
+	accept       []string
+	statusCode   int
+	maxBodySize  int64
+	writeTimeout time.Duration
 }
 
 // WithAccept sets acceptable content types for this route.
@@ -875,6 +896,23 @@ func WithMaxBodySize(maxBytes int64) RouteOption {
 	}
 	return func(c *routeConfig) {
 		c.maxBodySize = maxBytes
+	}
+}
+
+// WithWriteTimeout sets the write timeout for one manually registered route
+// without changing ServerConfig.WriteTimeout for every other endpoint. The
+// route's response must be written within timeout of the route matching the
+// request, and its request context ends with context.DeadlineExceeded at nine
+// tenths of timeout. Use it for a route that answers after the server's write
+// timeout on purpose, such as one bounded pass of a scheduled job. WebSocket,
+// Server-Sent Events, gRPC and Connect requests keep running without a request
+// deadline.
+func WithWriteTimeout(timeout time.Duration) RouteOption {
+	if timeout <= 0 {
+		panic(fmt.Sprintf("http: route write timeout must be strictly positive, got %v", timeout))
+	}
+	return func(c *routeConfig) {
+		c.writeTimeout = timeout
 	}
 }
 
