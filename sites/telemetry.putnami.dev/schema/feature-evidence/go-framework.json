@@ -15,7 +15,7 @@
       "source": {
         "root": "project",
         "ownerProject": "telemetry.putnami.dev",
-        "binding": "source-v1:sha256:676b822637a545f085f11a7a9eab5e02cde4d88e46f4281ff1ec2fe7539a1875"
+        "binding": "source-v1:sha256:d6f6cb4ea394d7028164c7bdaa9d2335d058abd1b4529689f441e443a61631b2"
       },
       "subject": {
         "kind": "capability",
@@ -45,7 +45,7 @@
       "source": {
         "root": "project",
         "ownerProject": "telemetry.putnami.dev",
-        "binding": "source-v1:sha256:676b822637a545f085f11a7a9eab5e02cde4d88e46f4281ff1ec2fe7539a1875"
+        "binding": "source-v1:sha256:d6f6cb4ea394d7028164c7bdaa9d2335d058abd1b4529689f441e443a61631b2"
       },
       "subject": {
         "kind": "capability",
