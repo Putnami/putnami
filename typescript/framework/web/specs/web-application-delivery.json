@@ -29,7 +29,7 @@
     },
     {
       "id": "ssr-response",
-      "text": "SSR executes the static handler and loaders before rendering, preserves redirects and router status, waits for lazy head contributions, then emits one HTML document whose React body is streamed and whose timer is released on success or error."
+      "text": "SSR executes the static handler and loaders before rendering, preserves redirects and router status, logs an unexpected loader error and records it as the request error, waits for lazy head contributions, then emits one HTML document whose React body is streamed and whose timer is released on success or error."
     },
     {
       "id": "document-isolation",

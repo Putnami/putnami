@@ -255,7 +255,8 @@
               "a-middleware-stack-runs-in-order-and-can-short-circuit",
               "a-plain-object-result-is-serialized-to-json",
               "an-http-exception-becomes-a-json-response-and-an-unknown-error-rethrows",
-              "an-http-response-passes-through-unchanged"
+              "an-http-response-passes-through-unchanged",
+              "an-unexpected-loader-error-is-logged-and-recorded-as-the-request-error"
             ]
           }
         }
