@@ -24,10 +24,12 @@
         "source": "github:acme/app",
         "id": "42"
       },
+      "key": "#42",
       "revision": "etag-42",
       "url": "https://github.com/acme/app/issues/42",
       "title": "Fix the login redirect",
       "state": "open",
+      "createdAt": "2026-09-20T09:30:00Z",
       "updatedAt": "2026-09-23T10:00:00+02:00"
     }
   ],

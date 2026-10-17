@@ -56,10 +56,13 @@ atomically.
 | `link` | mutating | no | yes | — | `ref`, and `parent` or `unlink: true` | `task` |
 | `claim` | mutating | no | yes | atomic | `ref`, `holder`, `release` | `task` (with `holder`), `held` |
 
-A task is `ref`, `revision`, `url`, `title`, `body`, `state`, `providerState`,
-`labels`, `assignees`, `parent`, `holder`, `updatedAt`. `state` is one of
-`open`, `in_progress`, `blocked`, `done`, `canceled`; `providerState` is the
-backend's own label, for display. An assignee is information, never an
+A task is `ref`, `key`, `revision`, `url`, `title`, `body`, `state`,
+`providerState`, `labels`, `assignees`, `parent`, `holder`, `createdAt`,
+`updatedAt`. `state` is one of `open`, `in_progress`, `blocked`, `done`,
+`canceled`; `providerState` is the backend's own label, for display. `key` is
+the identifier people read and write, such as `#123` or `ENG-42`: it is for
+display and for matching a mention in text, and `ref`, not `key`, names the
+task in a request. An assignee is information, never an
 exclusive lease: exclusivity is `claim`'s, offered only where the backend
 enforces it.
 

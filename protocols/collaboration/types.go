@@ -59,6 +59,11 @@ var ValidTaskStates = []TaskState{TaskStateBlocked, TaskStateCanceled, TaskState
 type Task struct {
 	// Ref is the task's source-qualified opaque reference.
 	Ref Ref `json:"ref"`
+	// Key is the identifier people read and write for the task, such as
+	// "#123" or "ENG-42", when the provider has one. It is for display and
+	// for matching a mention in text; Ref, not Key, names the task in a
+	// request.
+	Key string `json:"key,omitempty"`
 	// Revision changes whenever the task changes; it is the token an
 	// expectedRevision precondition compares. Parent is the one member a
 	// provider may leave outside it: such a provider says so in the
@@ -87,6 +92,8 @@ type Task struct {
 	// Holder is the current exclusive claimant, reported only by a provider
 	// that offers the claim operation.
 	Holder string `json:"holder,omitempty"`
+	// CreatedAt is when the task was created, in RFC 3339, when known.
+	CreatedAt string `json:"createdAt,omitempty"`
 	// UpdatedAt is when the task last changed, in RFC 3339, when known.
 	UpdatedAt string `json:"updatedAt,omitempty"`
 }

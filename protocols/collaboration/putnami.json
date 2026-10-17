@@ -4,10 +4,14 @@
   "visibility": "public",
   "tags": ["go", "protocol"],
   "extensions": ["/go/extension"],
+  "publish": ["go"],
   "disable": {
     "jobs": ["serve"]
   },
   "options": {
+    "publish": {
+      "archives": false
+    },
     "test": {
       "filePatterns": ["fixtures/**", "schemas/**"]
     }

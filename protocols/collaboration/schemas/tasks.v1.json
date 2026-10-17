@@ -14,6 +14,7 @@
       "required": ["ref", "revision", "title", "state"],
       "properties": {
         "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "key": { "$ref": "collaboration.json#/$defs/token", "description": "The identifier people read and write, such as '#123' or 'ENG-42'. For display and for matching a mention in text; ref names the task in a request." },
         "revision": { "$ref": "collaboration.json#/$defs/token" },
         "url": { "$ref": "collaboration.json#/$defs/url" },
         "title": { "type": "string", "minLength": 1, "maxLength": 256 },
@@ -33,6 +34,7 @@
           "description": "The containing task. The one member a provider may leave outside revision; such a provider says so in its link operation's description."
         },
         "holder": { "$ref": "collaboration.json#/$defs/token", "description": "The exclusive claimant, from a provider offering claim." },
+        "createdAt": { "$ref": "collaboration.json#/$defs/timestamp" },
         "updatedAt": { "$ref": "collaboration.json#/$defs/timestamp" }
       }
     },

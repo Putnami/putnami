@@ -38,9 +38,9 @@ var maximalCommit = strings.Repeat("a", 64)
 func maximalTask() Task {
 	parent := maximalRef(1)
 	task := Task{
-		Ref: maximalRef(0), Revision: fill(MaxTokenLength), URL: maximalURL(0), Title: fill(MaxTitleLength),
+		Ref: maximalRef(0), Key: fill(MaxTokenLength), Revision: fill(MaxTokenLength), URL: maximalURL(0), Title: fill(MaxTitleLength),
 		Body: fill(MaxBodyBytes), State: TaskStateOpen, ProviderState: fill(MaxLabelLength), Parent: &parent,
-		Holder: fill(MaxTokenLength), UpdatedAt: maximalTimestamp,
+		Holder: fill(MaxTokenLength), CreatedAt: maximalTimestamp, UpdatedAt: maximalTimestamp,
 	}
 	for i := range MaxLabels {
 		task.Labels = append(task.Labels, numbered(i, MaxLabelLength))

@@ -425,3 +425,13 @@ func TestAReferenceSourceIgnoresCase(t *testing.T) {
 	}
 	h.fails("tasks", "get", `{"ref":{"source":"github:acme/other","id":"`+task.Ref.ID+`"}}`, collab.OutcomeNotFound)
 }
+
+func TestATaskCarriesItsIssueNumberAndCreationTime(t *testing.T) {
+	h := newHarness(t)
+	task := h.createTask("Numbered", "numbered")
+	var got collab.TaskResult
+	h.ok("tasks", "get", `{"ref":`+refJSON(task.Ref)+`}`, &got)
+	if got.Task.Key != "#"+task.Ref.ID || got.Task.CreatedAt == "" {
+		t.Fatalf("a task reads its issue number as its key and its creation time: %+v", got.Task)
+	}
+}

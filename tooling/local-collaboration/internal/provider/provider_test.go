@@ -98,7 +98,8 @@ func TestTasks_CreateReadFindAndPage(t *testing.T) {
 	var first collab.TaskCreateResult
 	h.ok("tasks", "create", `{"title":"Write the provider guide","labels":["docs"],"idempotencyKey":"k1"}`, &first)
 	if !first.Created || first.Task.Ref.ID != "T-1" || first.Task.Revision != "r1" || first.Task.State != collab.TaskStateOpen ||
-		!strings.HasPrefix(first.Task.Ref.Source, "local:") || first.Task.UpdatedAt != "2026-09-24T08:00:00Z" {
+		!strings.HasPrefix(first.Task.Ref.Source, "local:") || first.Task.Key != "T-1" ||
+		first.Task.CreatedAt != "2026-09-24T08:00:00Z" || first.Task.UpdatedAt != "2026-09-24T08:00:00Z" {
 		t.Fatalf("created %+v", first)
 	}
 	for i := 2; i <= 5; i++ {

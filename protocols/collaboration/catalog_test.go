@@ -216,6 +216,10 @@ func TestValidationBoundsAndTimestamps(t *testing.T) {
 	if got := distinctCodes(ValidateResult(&MemoryRecordResult{Record: record})); !slices.Equal(got, []string{ErrorCodeInvalidTimestamp}) {
 		t.Errorf("a malformed timestamp: codes %v", got)
 	}
+	created := Task{Ref: Ref{Source: "local:x", ID: "T"}, Revision: "r", Title: "t", State: TaskStateOpen, CreatedAt: "2026-09-24"}
+	if got := distinctCodes(ValidateResult(&TaskResult{Task: created})); !slices.Equal(got, []string{ErrorCodeInvalidTimestamp}) {
+		t.Errorf("a malformed createdAt: codes %v", got)
+	}
 	items := make([]Task, MaxListMembers+1)
 	for i := range items {
 		items[i] = Task{Ref: Ref{Source: "local:x", ID: "T"}, Revision: "r", Title: "t", State: TaskStateOpen}

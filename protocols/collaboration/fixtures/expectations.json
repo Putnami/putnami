@@ -60,6 +60,7 @@
     "result.proposals.status.repeated-assignee.json": ["collaboration.invalid_value"],
     "result.proposals.upsert.url-with-credentials.json": ["collaboration.invalid_url"],
     "result.tasks.find.bad-state.json": ["collaboration.invalid_state"],
+    "result.tasks.find.key-with-space.json": ["collaboration.invalid_value"],
     "result.tasks.find.null-items.json": ["collaboration.required"]
   }
 }

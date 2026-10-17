@@ -363,6 +363,11 @@
       "status": "preview"
     },
     {
+      "id": "go.putnami.dev/protocol/collaboration",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
       "id": "go.putnami.dev/protocol/config",
       "kind": "protocol",
       "status": "preview"
