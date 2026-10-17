@@ -8,6 +8,7 @@
     "go/persistence-transactions#transaction-finalization",
     "go/persistence-transactions#unit-of-work",
     "go/shared-datasource-pooling#acquire-time-search-path",
+    "go/shared-datasource-pooling#caller-bounded-first-open",
     "go/shared-datasource-pooling#datasource-bound-acquire",
     "go/shared-datasource-pooling#one-pool-per-physical-database",
     "go/shared-datasource-pooling#shared-pool-lifetime",

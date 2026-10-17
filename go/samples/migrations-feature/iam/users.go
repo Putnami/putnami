@@ -31,9 +31,9 @@ type User struct {
 // It takes the *database.Pools registry rather than the *database.Pool: the
 // registry opens the pool on first use, so describing the application at build
 // time needs no database, while the unnamed pool is opened when the handler is
-// wired.
+// wired. The request's context bounds the wait for the pool's first open.
 func ListUsers(pools *database.Pools, ctx *http.Context) *http.Response {
-	pool, err := pools.Default()
+	pool, err := pools.DefaultContext(ctx.Context())
 	if err != nil {
 		logger.FromContextOrDefault(ctx.Context()).ErrorCtx(ctx.Context(), "open the users datasource", err)
 		return http.InternalError("Internal Server Error")
