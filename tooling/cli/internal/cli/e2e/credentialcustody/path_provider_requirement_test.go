@@ -109,7 +109,10 @@ func TestAHostedRunFailsWhenTheCIConfigurationNeedsAPathExtensionProvider(t *tes
 			if built {
 				t.Errorf("hosted build ran the build of app, want it to fail before any job\n%s", output)
 			}
-			for _, want := range []string{tc.missing, "@fixture/path-provider", "pin"} {
+			if strings.Contains(output, "building locally") {
+				t.Errorf("hosted build announced a local build it never runs:\n%s", output)
+			}
+			for _, want := range []string{tc.missing, "@fixture/path-provider", "by name instead of by path"} {
 				if !strings.Contains(output, want) {
 					t.Errorf("hosted build output lacks %q:\n%s", want, output)
 				}

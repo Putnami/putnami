@@ -507,7 +507,9 @@ func TestRequireHostedProviders(t *testing.T) {
 		}
 	}
 	rules(publishing, `[{"branches":"main","publish":["canary"]}]`)
-	optedOut, invalid, cached := t.TempDir(), t.TempDir(), t.TempDir()
+	optedOut, invalid, cached, both := t.TempDir(), t.TempDir(), t.TempDir(), t.TempDir()
+	rules(both, `[{"branches":"main","publish":["canary"]}]`)
+	configureRemoteCache(t, both)
 	rules(optedOut, `[{"branches":"main","publish":false}]`)
 	rules(invalid, `"main"`)
 	configureRemoteCache(t, cached)
@@ -530,12 +532,15 @@ func TestRequireHostedProviders(t *testing.T) {
 	}{
 		"a rule that publishes":    {"prc_engine_custody", Request{WorkspaceRoot: publishing, Global: anyTrust}, pathOnly, distribution.ProviderCommandName},
 		"a remote cache":           {"prc_engine_custody", Request{WorkspaceRoot: cached, Global: anyTrust}, pathOnly, cache.ProviderCommandName},
+		"both":                     {"prc_engine_custody", Request{WorkspaceRoot: both, Global: anyTrust}, pathOnly, distribution.ProviderCommandName + "|" + cache.ProviderCommandName},
 		"without a run credential": {"", Request{WorkspaceRoot: publishing, Global: anyTrust}, pathOnly, ""},
 		"a store provider":         {"prc_engine_custody", Request{WorkspaceRoot: publishing, Global: anyTrust}, served, ""},
 		"a rule that opts out":     {"prc_engine_custody", Request{WorkspaceRoot: optedOut, Global: anyTrust}, pathOnly, ""},
 		"an invalid CI document":   {"prc_engine_custody", Request{WorkspaceRoot: invalid, Global: anyTrust}, pathOnly, ""},
 		"a remote cache under --no-cache": {"prc_engine_custody", Request{WorkspaceRoot: cached,
 			Global: GlobalFlags{CacheTrust: string(store.CacheTrustAny), NoCache: true}}, pathOnly, ""},
+		"a workspace lifecycle run": {"prc_engine_custody", Request{WorkspaceRoot: publishing, Global: anyTrust,
+			WorkspaceLifecycle: true}, pathOnly, ""},
 	} {
 		restore := runcredential.SetForTest(c.bearer)
 		err := requireHostedProviders(&c.req, c.discovered)
@@ -550,7 +555,8 @@ func TestRequireHostedProviders(t *testing.T) {
 			t.Errorf("%s: requireHostedProviders = %v, want an invalid configuration", name, err)
 			continue
 		}
-		for _, want := range []string{c.missing, "@acme/cloud", "pin @acme/cloud from the registry"} {
+		wants := append(strings.Split(c.missing, "|"), "@acme/cloud", "declare @acme/cloud by name instead of by path")
+		for _, want := range wants {
 			if !strings.Contains(err.Error(), want) {
 				t.Errorf("%s: requireHostedProviders = %q, want it to name %q", name, err, want)
 			}

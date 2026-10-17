@@ -603,7 +603,7 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	hostedRemote, err := hosted.Start(ctx, req)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
-		return SessionResult{ExitCode: ExitError}, err
+		return SessionResult{ExitCode: protocolcli.ExitCodeForError(err)}, err
 	}
 	req.hostedRemote = hostedRemote
 	// Its reporters start before the first hook too, so that each can hold

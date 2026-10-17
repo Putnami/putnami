@@ -106,7 +106,6 @@ func loadProviderRemoteCache(ctx context.Context, wsRoot string, exts []*extensi
 	if err != nil {
 		return nil, fmt.Sprintf("putnami: remote cache config unavailable (%v); building locally", err), nil
 	}
-	cfg.ApplyEnv()
 	if !cfg.Active() {
 		return nil, "", nil
 	}

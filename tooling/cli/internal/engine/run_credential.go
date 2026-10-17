@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -119,7 +120,9 @@ func readsHostedRemoteCache(req *Request) bool {
 //
 // It returns nil without a run credential, under --no-cache, under the trust
 // policy "none" (a watch iteration), and when no remote cache is configured,
-// and prints the notice of a configured cache that cannot serve the run. A
+// and prints the notice of a configured cache that cannot serve the run. It
+// refuses, before any hook, a run whose CI configuration needs a provider that
+// only a path extension declares (requireHostedProviders). A
 // workspace that does not load starts nothing here: the run reports it after
 // the hooks. A provider that fails to start leaves the run building locally,
 // as a lazy start does. The error is the refusal to start the provider:
@@ -145,6 +148,9 @@ func startHostedRemoteCache(ctx context.Context, req *Request) (*remotecache.Rem
 	discovered, err := extension.DiscoverExtensionsDetailed(req.WorkspaceRoot, req.Config, projectPaths)
 	if err != nil {
 		return nil, nil
+	}
+	if err := requireHostedProviders(req, discovered); err != nil {
+		return nil, err
 	}
 	setupStart := time.Now()
 	remote, notice := remotecache.LoadRemoteCache(ctx, req.WorkspaceRoot, discovered.Extensions, discovered,
@@ -195,13 +201,14 @@ func hostedRunRemoteCache(ctx context.Context, req *Request, ws *workspace.Works
 // the release-set provider when the workspace's CI document declares a rule
 // that publishes to at least one channel, and the cache provider when req
 // reads the remote cache (readsHostedRemoteCache) and the workspace configures
-// one (remotecache.Configured). A missing or invalid CI document declares no
-// rule: the run that publishes reports an invalid one. The error is an invalid
-// configuration that names the capability, what needs it, each path extension
-// that declares it, and the fix. A run without a run credential is never
-// refused.
+// one (remotecache.Configured). A CI document that cannot be read or parsed
+// declares no rule: only a run that publishes reads it as a failure. The error
+// is an invalid configuration that names, for each capability, what needs it
+// and each path extension that declares it, then the fix. A run without a run
+// credential and a workspace lifecycle run (Request.WorkspaceLifecycle) are
+// never refused.
 func requireHostedProviders(req *Request, discovered *extension.DiscoveryResult) error {
-	if !runcredential.Hosted() {
+	if !runcredential.Hosted() || req.WorkspaceLifecycle {
 		return nil
 	}
 	type need struct{ command, neededBy string }
@@ -216,20 +223,26 @@ func requireHostedProviders(req *Request, discovered *extension.DiscoveryResult)
 	if readsHostedRemoteCache(req) && remotecache.Configured(req.WorkspaceRoot) {
 		needs = append(needs, need{cache.ProviderCommandName, "the workspace configures a remote cache"})
 	}
+	var unmet, names []string
 	for _, need := range needs {
 		removed := discovered.OnlyFromPathExtensions(need.command)
 		if len(removed) == 0 {
 			continue
 		}
-		names := make([]string, len(removed))
 		causes := make([]string, len(removed))
 		for i, capability := range removed {
-			names[i] = capability.Extension
 			causes[i] = capability.Reason().Error()
+			if !slices.Contains(names, capability.Extension) {
+				names = append(names, capability.Extension)
+			}
 		}
-		return protocolcli.InvalidConfigf("%s, which needs the %s capability, and no extension of this hosted run serves it: %s; "+
-			"pin %s from the registry in the workspace lock and install it",
-			need.neededBy, need.command, strings.Join(causes, "; "), strings.Join(names, ", "))
+		unmet = append(unmet, fmt.Sprintf("%s, which needs the %s capability, and no extension of this hosted run serves it: %s",
+			need.neededBy, need.command, strings.Join(causes, "; ")))
 	}
-	return nil
+	if len(unmet) == 0 {
+		return nil
+	}
+	return protocolcli.InvalidConfigf("%s; in the extensions of putnami.workspace.json, declare %s by name instead of by path, "+
+		"pin it from the registry in the workspace lock and install it",
+		strings.Join(unmet, "; "), strings.Join(names, ", "))
 }

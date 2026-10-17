@@ -91,11 +91,7 @@ func (c *remoteCacheConfig) Active() bool {
 // A config that cannot be read configures none.
 func Configured(wsRoot string) bool {
 	cfg, err := loadRemoteCacheConfig(wsRoot)
-	if err != nil {
-		return false
-	}
-	cfg.ApplyEnv()
-	return cfg.Active()
+	return err == nil && cfg.Active()
 }
 
 // uploadInput is the per-job data needed to share a freshly built result with the

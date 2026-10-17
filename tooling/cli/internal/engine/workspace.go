@@ -88,7 +88,9 @@ func loadWorkspaceAndExtensions(req *Request) (*workspace.Workspace, *extension.
 
 // loadRunWorkspace is loadWorkspaceAndExtensions for a run, which also refuses
 // a hosted run whose CI configuration needs a provider that only a path
-// extension declares (requireHostedProviders), before any job. It prints the
+// extension declares (requireHostedProviders), before any job. A run that
+// reads the remote cache was already refused before its hooks
+// (startHostedRemoteCache); this refuses one that does not. It prints the
 // refusal and returns its exit code and error.
 func loadRunWorkspace(req *Request) (*workspace.Workspace, *extension.DiscoveryResult, int, error) {
 	ws, discovered, code := loadWorkspaceAndExtensions(req)
