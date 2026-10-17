@@ -1118,3 +1118,21 @@ func TestProbeDeclaresGoAndOCIMembers(t *testing.T) {
 		}
 	}
 }
+
+// An empty attribution states that every source of the module was read and
+// none imports a workspace module. An authored image project has no source to
+// read and an incomplete scan has no answer, so neither reports a map.
+func TestProbe_ReportsNoAttributionWithoutAFullSourceScan(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "images", "base", "putnami.json"),
+		`{"name":"base","type":"image","options":{"publish":{"docker":true}}}`)
+	writeProbeFile(t, filepath.Join(root, "apps", "broken", "go.mod"), "module example.com/broken\n\ngo 1.25\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "broken", "main.go"), "package main\n\nimport \"example.com/util\n")
+
+	result := probeAll(t, root, "images/base", "apps/broken", "libs/core")
+	for _, path := range []string{"images/base", "apps/broken"} {
+		if sources := projectAt(t, result, path).DependencySources; sources != nil {
+			t.Errorf("%s dependencySources = %#v, want none: its sources were not all read", path, sources)
+		}
+	}
+}
