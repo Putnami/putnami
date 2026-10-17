@@ -3127,6 +3127,17 @@
           }
         },
         {
+          "id": "needed-provider-only-on-a-path-extension",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-hosted-run-fails-when-the-ci-needs-a-path-extension-provider"
+            ]
+          }
+        },
+        {
           "id": "cold-install-leaves-locks-unchanged",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

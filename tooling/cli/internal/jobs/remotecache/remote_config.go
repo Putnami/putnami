@@ -86,6 +86,14 @@ func (c *remoteCacheConfig) Active() bool {
 	return c.Enabled == nil || *c.Enabled
 }
 
+// Configured reports whether wsRoot configures an active remote cache: its
+// config file with the PUTNAMI_CACHE_* overrides applied (ApplyEnv) is Active.
+// A config that cannot be read configures none.
+func Configured(wsRoot string) bool {
+	cfg, err := loadRemoteCacheConfig(wsRoot)
+	return err == nil && cfg.Active()
+}
+
 // uploadInput is the per-job data needed to share a freshly built result with the
 // cache provider: the precomputed cache key, the cached outcome to record, and
 // the built manifest (the file set with per-file CAS digests).

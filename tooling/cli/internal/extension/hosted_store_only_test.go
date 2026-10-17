@@ -447,6 +447,37 @@ func TestProviderCause(t *testing.T) {
 	}
 }
 
+// OnlyFromPathExtensions returns the path extensions a capability was removed
+// from, sorted, while no extension that stays declares it.
+func TestOnlyFromPathExtensions(t *testing.T) {
+	var none *DiscoveryResult
+	if removed := none.OnlyFromPathExtensions("cache-provider"); removed != nil {
+		t.Errorf("a nil result returns %v, want nil", removed)
+	}
+	result := &DiscoveryResult{
+		Extensions: []*ExtensionDescription{{Name: "@acme/store", Commands: map[string]string{"runner-provider": "Run jobs."}}},
+		RemovedCapabilities: []RemovedCapability{
+			{Extension: "@acme/b", Path: "/ws/b", Command: "cache-provider"},
+			{Extension: "@acme/a", Path: "/ws/a", Command: "cache-provider"},
+			{Extension: "@acme/dep", Path: "/ws/dep", Command: "cloud-release-set", RequiredBy: "@acme/a"},
+			{Extension: "@acme/c", Path: "/ws/c", Command: "runner-provider"},
+		},
+	}
+	removed := result.OnlyFromPathExtensions("cache-provider")
+	if len(removed) != 2 || removed[0].Extension != "@acme/a" || removed[1].Extension != "@acme/b" {
+		t.Errorf("cache-provider returns %v, want @acme/a then @acme/b", removed)
+	}
+	if removed := result.OnlyFromPathExtensions("cloud-release-set"); removed != nil {
+		t.Errorf("cloud-release-set, removed only from a dependency, returns %v, want nil", removed)
+	}
+	if removed := result.OnlyFromPathExtensions("runner-provider"); removed != nil {
+		t.Errorf("runner-provider, which @acme/store serves, returns %v, want nil", removed)
+	}
+	if removed := result.OnlyFromPathExtensions("session-reporter"); removed != nil {
+		t.Errorf("session-reporter, removed from no extension, returns %v, want nil", removed)
+	}
+}
+
 // The `extensions` entry or argument that a hosted install loads as a local
 // extension names one of the workspace's own path extensions; any other local
 // path loads nothing.

@@ -15,7 +15,9 @@ import (
 	"testing"
 
 	cache "go.putnami.dev/protocol/cache"
+	ciproto "go.putnami.dev/protocol/ci"
 	protocolcli "go.putnami.dev/protocol/cli"
+	distribution "go.putnami.dev/protocol/distribution"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -487,5 +489,77 @@ func TestSchedulerRemoteIsANilInterfaceForALocalRun(t *testing.T) {
 	client := &remotecache.RemoteCache{}
 	if remote := schedulerRemote(client); remote != client {
 		t.Fatalf("schedulerRemote(client) = %#v, want the same client", remote)
+	}
+}
+
+// requireHostedProviders refuses a hosted run whose CI configuration needs a
+// capability that only a path extension declares: the release-set provider for
+// a rule that publishes, the cache provider for a remote cache the run reads.
+// It refuses nothing without a run credential, for a capability an extension
+// that stays serves, or for a configuration that needs neither.
+func TestRequireHostedProviders(t *testing.T) {
+	t.Setenv(remotecache.CacheURLEnv, "")
+	publishing, rules := t.TempDir(), func(wsRoot, rules string) {
+		t.Helper()
+		document := `{"version":3,"commands":["build"],"rules":` + rules + `}`
+		if err := os.WriteFile(filepath.Join(wsRoot, ciproto.Filename), []byte(document), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rules(publishing, `[{"branches":"main","publish":["canary"]}]`)
+	optedOut, invalid, cached, both := t.TempDir(), t.TempDir(), t.TempDir(), t.TempDir()
+	rules(both, `[{"branches":"main","publish":["canary"]}]`)
+	configureRemoteCache(t, both)
+	rules(optedOut, `[{"branches":"main","publish":false}]`)
+	rules(invalid, `"main"`)
+	configureRemoteCache(t, cached)
+	pathOnly := &extension.DiscoveryResult{RemovedCapabilities: []extension.RemovedCapability{
+		{Extension: "@acme/cloud", Path: "/ws/cloud", Command: distribution.ProviderCommandName},
+		{Extension: "@acme/cloud", Path: "/ws/cloud", Command: cache.ProviderCommandName},
+	}}
+	served := &extension.DiscoveryResult{
+		Extensions: []*extension.ExtensionDescription{{Name: "@acme/store", Commands: map[string]string{
+			distribution.ProviderCommandName: "Serve release sets.", cache.ProviderCommandName: "Serve the cache.",
+		}}},
+		RemovedCapabilities: pathOnly.RemovedCapabilities,
+	}
+	anyTrust := GlobalFlags{CacheTrust: string(store.CacheTrustAny)}
+	for name, c := range map[string]struct {
+		bearer     string
+		req        Request
+		discovered *extension.DiscoveryResult
+		missing    string
+	}{
+		"a rule that publishes":    {"prc_engine_custody", Request{WorkspaceRoot: publishing, Global: anyTrust}, pathOnly, distribution.ProviderCommandName},
+		"a remote cache":           {"prc_engine_custody", Request{WorkspaceRoot: cached, Global: anyTrust}, pathOnly, cache.ProviderCommandName},
+		"both":                     {"prc_engine_custody", Request{WorkspaceRoot: both, Global: anyTrust}, pathOnly, distribution.ProviderCommandName + "|" + cache.ProviderCommandName},
+		"without a run credential": {"", Request{WorkspaceRoot: publishing, Global: anyTrust}, pathOnly, ""},
+		"a store provider":         {"prc_engine_custody", Request{WorkspaceRoot: publishing, Global: anyTrust}, served, ""},
+		"a rule that opts out":     {"prc_engine_custody", Request{WorkspaceRoot: optedOut, Global: anyTrust}, pathOnly, ""},
+		"an invalid CI document":   {"prc_engine_custody", Request{WorkspaceRoot: invalid, Global: anyTrust}, pathOnly, ""},
+		"a remote cache under --no-cache": {"prc_engine_custody", Request{WorkspaceRoot: cached,
+			Global: GlobalFlags{CacheTrust: string(store.CacheTrustAny), NoCache: true}}, pathOnly, ""},
+		"a workspace lifecycle run": {"prc_engine_custody", Request{WorkspaceRoot: publishing, Global: anyTrust,
+			WorkspaceLifecycle: true}, pathOnly, ""},
+	} {
+		restore := runcredential.SetForTest(c.bearer)
+		err := requireHostedProviders(&c.req, c.discovered)
+		restore()
+		if c.missing == "" {
+			if err != nil {
+				t.Errorf("%s: requireHostedProviders = %v, want nil", name, err)
+			}
+			continue
+		}
+		if !errors.Is(err, protocolcli.ErrInvalidConfig) {
+			t.Errorf("%s: requireHostedProviders = %v, want an invalid configuration", name, err)
+			continue
+		}
+		wants := append(strings.Split(c.missing, "|"), "@acme/cloud", "declare @acme/cloud by name instead of by path")
+		for _, want := range wants {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("%s: requireHostedProviders = %q, want it to name %q", name, err, want)
+			}
+		}
 	}
 }

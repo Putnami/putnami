@@ -260,8 +260,15 @@ func WithCacheRunCredential(bearer string) RemoteCacheOption {
 	return func(p *providerRemote) { p.runCredential = bearer }
 }
 
+// loadRemoteCacheConfig reads the remote-cache config of wsRoot with the
+// PUTNAMI_CACHE_* overrides applied (ApplyEnv).
 func loadRemoteCacheConfig(wsRoot string) (*remoteCacheConfig, error) {
-	return loadRemoteCacheConfigFile(RemoteCacheConfigPath(wsRoot))
+	cfg, err := loadRemoteCacheConfigFile(RemoteCacheConfigPath(wsRoot))
+	if err != nil {
+		return nil, err
+	}
+	cfg.ApplyEnv()
+	return cfg, nil
 }
 
 // Negotiate precomputes every cacheable key and hands the build's non-local,
