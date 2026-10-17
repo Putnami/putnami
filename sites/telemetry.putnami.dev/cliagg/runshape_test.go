@@ -91,6 +91,29 @@ func TestRunShapeIsFoldedIntoRanges(t *testing.T) {
 	}
 }
 
+func TestRunWithoutRecordableCommandCreatesNoCommandBucket(t *testing.T) {
+	acc := testAccumulator()
+	rec := sessionStart(nanosAt(dayA), "d1", "", true)
+	rec.Attributes = append(rec.Attributes,
+		telemetry.Attr(cliusage.AttrProjects, telemetry.IntVal(1)),
+		telemetry.Attr(cliusage.AttrJobs, telemetry.IntVal(3)),
+	)
+	acc.Add([]telemetry.ResourceLogs{cliResource(rec)})
+
+	got := make(map[string]int64)
+	for key, count := range counterMap(acc.Drain().Counters) {
+		got[key[1]+"/"+key[2]] += count
+	}
+	if got[DimProjects+"/1"] != 1 || got[DimJobs+"/2-5"] != 1 {
+		t.Fatalf("run-shape counters = %v, want one project range and one job range", got)
+	}
+	for key := range got {
+		if strings.HasPrefix(key, DimCommand+"/") {
+			t.Fatalf("an empty command list created command bucket %q", key)
+		}
+	}
+}
+
 func TestRangeKeyBoundaries(t *testing.T) {
 	cases := []struct {
 		ranges []sizeRange

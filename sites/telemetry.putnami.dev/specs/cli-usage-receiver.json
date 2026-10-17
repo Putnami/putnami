@@ -28,7 +28,7 @@
     },
     {
       "id": "fields-are-allowlisted",
-      "text": "A record is reduced to the compiled field allowlist and closed vocabularies before anything is stored; unknown command names and unknown fields are dropped rather than persisted."
+      "text": "A record is reduced to the compiled field allowlist and closed vocabularies before anything is stored; unknown command names and unknown fields are dropped rather than persisted, and a session start whose command list is empty keeps its other fields."
     },
     {
       "id": "acceptance-is-not-an-oracle",

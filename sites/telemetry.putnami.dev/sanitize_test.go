@@ -121,6 +121,32 @@ func TestSanitizeValidStartPassesThrough(t *testing.T) {
 	_ = soleRecord(t, clean)
 }
 
+// TestSanitizeKeepsStartWithoutRecordableCommand proves a session:start whose
+// command list is empty keeps its record and every other field.
+func TestSanitizeKeepsStartWithoutRecordableCommand(t *testing.T) {
+	spectest.Proves(t, "telemetry-putnami-dev/cli-usage-receiver", "fields-are-allowlisted", "a-start-without-a-known-command-keeps-its-other-fields")
+	rec := validStartRecord()
+	for i, kv := range rec.Attributes {
+		if kv.Key == cliusage.AttrCommands {
+			rec.Attributes[i] = telemetry.Attr(cliusage.AttrCommands, telemetry.StringVal(""))
+		}
+	}
+
+	clean := sanitizeLogs(logsReq(cliResource(), rec))
+	if got := cliusage.ValidateLogs(clean); diag.HasErrors(got) {
+		t.Fatalf("session:start without a recordable command rejected: %v", got)
+	}
+	kept := make(map[string]telemetry.AnyValue)
+	for _, kv := range soleRecord(t, clean).Attributes {
+		kept[kv.Key] = kv.Value
+	}
+	for _, kv := range rec.Attributes {
+		if !reflect.DeepEqual(kept[kv.Key], kv.Value) {
+			t.Fatalf("attribute %q = %+v, want %+v", kv.Key, kept[kv.Key], kv.Value)
+		}
+	}
+}
+
 // TestSanitizeStampsOriginUnspoofable proves a caller cannot set origin, whether
 // supplied at the resource level or as a record attribute.
 func TestSanitizeStampsOriginUnspoofable(t *testing.T) {

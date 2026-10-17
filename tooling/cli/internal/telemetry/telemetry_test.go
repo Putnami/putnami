@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	diag "go.putnami.dev/protocol/diagnostic"
+	otlp "go.putnami.dev/protocol/telemetry"
 	"go.putnami.dev/protocol/telemetry/cliusage"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 )
@@ -482,7 +484,7 @@ func TestEnableStampsCurrentDeviceIDMonth(t *testing.T) {
 func TestSessionEventVocabularyGuard(t *testing.T) {
 	c := &Client{config: &Config{Enabled: boolPtr(true)}}
 	c.TrackSessionStart(SessionStart{
-		Commands:    []string{"build", "test", "unregistered-command"},
+		Commands:    []string{"build", "test", "unregistered-command", "build"},
 		Projects:    2,
 		Jobs:        3,
 		Flags:       FlagPresence{Impacted: true, Coverage: true, Output: true, NoCache: true, Projects: true, Watch: true},
@@ -518,6 +520,42 @@ func TestSessionEventVocabularyGuard(t *testing.T) {
 		if !success && !hasCategory {
 			t.Fatalf("failed session:end lacks error category: %#v", event.Data)
 		}
+	}
+}
+
+func TestSessionStartWithoutRecordableCommandConformsOnTheWire(t *testing.T) {
+	c := &Client{config: &Config{Enabled: boolPtr(true)}}
+	c.TrackSessionStart(SessionStart{
+		Commands:    []string{"rust-build"},
+		Projects:    2,
+		Jobs:        3,
+		Interactive: true,
+	})
+	if got := len(c.events); got != 1 {
+		t.Fatalf("recorded events = %d, want 1", got)
+	}
+	if commands, _ := c.events[0].Data[cliusage.AttrCommands].([]string); len(commands) != 0 {
+		t.Fatalf("commands = %v, want none", commands)
+	}
+
+	line, err := json.Marshal(c.events[0])
+	if err != nil {
+		t.Fatalf("marshal buffered event: %v", err)
+	}
+	events := decodeBufferedEvents(line)
+	if len(events) != 1 {
+		t.Fatalf("buffered events = %d, want 1", len(events))
+	}
+	body, err := otlp.MarshalCanonical(encodeLogs(events, "", "", "v1.2.3", "linux", "amd64"))
+	if err != nil {
+		t.Fatalf("marshal OTLP logs: %v", err)
+	}
+	request, diags := otlp.ParseAndValidateLogs(body)
+	if diag.HasErrors(diags) {
+		t.Fatalf("OTLP logs are structurally invalid: %v", diags)
+	}
+	if diags := cliusage.ValidateLogs(*request); diag.HasErrors(diags) {
+		t.Fatalf("session:start without a recordable command fails the receiver vocabulary: %v", diags)
 	}
 }
 

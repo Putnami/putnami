@@ -52,11 +52,14 @@ func TestValidateRecordAcceptsConformingEvents(t *testing.T) {
 	failure := endAttrs()
 	failure[AttrSuccess] = telemetry.BoolVal(false)
 	failure[AttrErrorCategory] = telemetry.StringVal(ErrorCategoryFailure)
+	noRecordableCommand := startAttrs()
+	noRecordableCommand[AttrCommands] = telemetry.StringVal("")
 
 	for name, attrs := range map[string]map[string]telemetry.AnyValue{
-		"session:start":       startAttrs(),
-		"session:end success": endAttrs(),
-		"session:end failure": failure,
+		"session:start":             startAttrs(),
+		"session:start no commands": noRecordableCommand,
+		"session:end success":       endAttrs(),
+		"session:end failure":       failure,
 	} {
 		t.Run(name, func(t *testing.T) {
 			if diags := ValidateRecord(recordFromAttrs(attrs)); diag.HasErrors(diags) {
@@ -133,6 +136,11 @@ func TestValidateRecordRejectsViolations(t *testing.T) {
 			name: "syntactically valid unknown command",
 			want: ErrorCodeInvalidValue,
 			mut:  func(a map[string]telemetry.AnyValue) { a[AttrCommands] = telemetry.StringVal("attacker-command") },
+		},
+		{
+			name: "empty command between commas",
+			want: ErrorCodeInvalidValue,
+			mut:  func(a map[string]telemetry.AnyValue) { a[AttrCommands] = telemetry.StringVal("build,,test") },
 		},
 		{
 			name: "too many commands",
