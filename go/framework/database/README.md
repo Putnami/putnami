@@ -281,8 +281,9 @@ when `AutoApply` is set; the pools are closed on shutdown.
 
 A workload that owns several datasources declares them with `PluginConfig.Datasources`
 and resolves each datasource-bound pool by name from the injected `*database.Pools`
-registry (`pools.For("platform_iam")`) — each logical pool carries its own
-`search_path`, opened lazily on first use. Datasources that resolve to the same
+registry (`pools.For("platform_iam")`, or `pools.ForContext(ctx, "platform_iam")`
+in a request, which stops waiting for the first open when `ctx` ends) — each
+logical pool carries its own `search_path`, opened lazily on first use. Datasources that resolve to the same
 physical connection (several schemas of one database) share one physical
 connection pool and must declare the same tuning; the framework sets each
 datasource's `search_path` when it hands a connection out, so unqualified

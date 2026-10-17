@@ -20,6 +20,10 @@
       "text": "The physical pool carries no search_path startup parameter; before a connection is handed out, the hook compares the acquiring datasource's request with the connection's marker, issues nothing when equal, one session-level set_config when it differs, RESET for an empty request over a set marker, destroys the connection when the set fails, and fails an acquire that carries no request."
     },
     {
+      "id": "caller-bounded-first-open",
+      "text": "Pools.ForContext and Pools.DefaultContext return when the caller's context ends before the first open of the datasource completes, with a db.connection error that wraps ctx.Err(). The open keeps running under the datasource's ConnectTimeout, so callers still waiting on it and the registry's cache receive the pool. For and Default wait under ConnectTimeout alone."
+    },
+    {
       "id": "datasource-bound-acquire",
       "text": "Every acquire through a logical pool, its PGXPool view, Pool.Acquire, and the database/sql connector marks the context with that datasource's search_path; the raw shared pgxpool is never handed to callers."
     },

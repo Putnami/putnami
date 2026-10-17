@@ -67,7 +67,7 @@ type Pools struct {
 	// or "" when the workload declares only named datasources.
 	defaultKey string
 
-	// mu guards cache, loading, physical and connecting. It is held only for
+	// mu guards cache, loading, physical, connecting and epoch. It is held only for
 	// fast bookkeeping, never across a pool open (a real connect, bounded by
 	// ConnectTimeout): the physical open in acquirePhysical runs with mu
 	// released, so opening one datasource never blocks resolving,
@@ -86,11 +86,15 @@ type Pools struct {
 	// connecting dedups concurrent first opens of the same physical identity by
 	// two datasources: identity -> in-flight connect.
 	connecting map[string]*physicalLoad
+	// epoch counts the calls to Close, so an open that started before a
+	// Close does not cache its pool after it.
+	epoch uint64
 }
 
-// poolLoad is one in-flight pool open. The goroutine that registers it runs the
-// open; concurrent callers for the same datasource wait on done and observe the
-// same result. A failed open is not cached, so a later call retries.
+// poolLoad is one in-flight pool open. The caller that registers it starts one
+// goroutine that runs the open; every caller for the same datasource waits on
+// done, or on its own context, and observes the same result. A failed open is
+// not cached, so a later call retries.
 type poolLoad struct {
 	done chan struct{}
 	pool *Pool
@@ -137,34 +141,54 @@ func newPools(specs map[string]datasourceSpec, defaultKey string, newPhysical fu
 // and caching it for the registry's lifetime. It fails with a clear
 // db.datasource error when the name was not declared (listing the datasources
 // the workload does declare), and propagates the binding/connection error when
-// the datasource is declared but its pool cannot be resolved or opened.
+// the datasource is declared but its pool cannot be resolved or opened. It
+// waits for a first open up to the datasource's ConnectTimeout; ForContext
+// bounds that wait by the caller's context.
 func (ps *Pools) For(name string) (*Pool, error) {
+	return ps.ForContext(context.Background(), name)
+}
+
+// ForContext is For bounded by ctx. When ctx ends before the pool is open, it
+// returns a db.connection error that wraps ctx.Err(). The first open keeps
+// running under the datasource's ConnectTimeout whatever happens to ctx, so
+// the other callers waiting on it and the cache still receive the pool.
+func (ps *Pools) ForContext(ctx context.Context, name string) (*Pool, error) {
 	key := strings.TrimSpace(name)
 	if key == "" {
 		return nil, perrors.Newf(CodeDatasource, "a datasource name is required to resolve a pool")
 	}
-	return ps.open(key)
+	return ps.open(ctx, key)
 }
 
 // Default returns the pool for the workload's default (primary) datasource —
 // the same instance the unnamed *Pool token resolves to. It fails when the
-// workload declares only named datasources, pointing the caller at For.
+// workload declares only named datasources, pointing the caller at For. It
+// waits for a first open up to the datasource's ConnectTimeout;
+// DefaultContext bounds that wait by the caller's context.
 func (ps *Pools) Default() (*Pool, error) {
+	return ps.DefaultContext(context.Background())
+}
+
+// DefaultContext is Default bounded by ctx, with the same contract as
+// ForContext.
+func (ps *Pools) DefaultContext(ctx context.Context) (*Pool, error) {
 	if ps.defaultKey == "" {
 		return nil, perrors.Newf(CodeDatasource,
 			"no default datasource: this workload declares only named datasources (%s); resolve one with Pools.For",
 			ps.declaredNames())
 	}
-	return ps.open(ps.defaultKey)
+	return ps.open(ctx, ps.defaultKey)
 }
 
 // open returns the pool bound to key, opening it at most once across concurrent
-// callers and caching the result. The physical open (binding resolution plus
-// connect) runs in openPool with ps.mu released, so a slow open of one
-// datasource never blocks resolving, health-checking, or closing another. A
-// failed open is not cached: every in-flight caller observes the same error and
+// callers and caching the result. The open (binding resolution plus connect)
+// runs with ps.mu released, so a slow open of one datasource never blocks
+// resolving, health-checking, or closing another. When ctx can end, the open
+// runs in its own goroutine, so a caller whose ctx ends stops waiting without
+// stopping the open; a ctx that has already ended starts no open. A failed
+// open is not cached: every caller still waiting observes the same error and
 // the next call retries.
-func (ps *Pools) open(key string) (*Pool, error) {
+func (ps *Pools) open(ctx context.Context, key string) (*Pool, error) {
 	ps.mu.Lock()
 	if pool, ok := ps.cache[key]; ok {
 		ps.mu.Unlock()
@@ -176,28 +200,61 @@ func (ps *Pools) open(key string) (*Pool, error) {
 		return nil, perrors.Newf(CodeDatasource,
 			"unknown datasource %q; this workload declares: %s", key, ps.declaredNames())
 	}
-	if load, ok := ps.loading[key]; ok {
-		// A first open is already in flight for this datasource; share its
-		// outcome instead of opening a second connection.
+	load, inFlight := ps.loading[key]
+	if !inFlight {
+		if err := ctx.Err(); err != nil {
+			ps.mu.Unlock()
+			return nil, perrors.Wrapf(err, CodeConnection, "wait for pool of datasource", perrors.String("datasource", key))
+		}
+		load = &poolLoad{done: make(chan struct{})}
+		ps.loading[key] = load
+		epoch := ps.epoch
 		ps.mu.Unlock()
-		<-load.done
-		return load.pool, load.err
+		if ctx.Done() == nil {
+			ps.load(key, spec, load, epoch)
+		} else {
+			go ps.load(key, spec, load, epoch)
+		}
+	} else {
+		ps.mu.Unlock()
 	}
-	load := &poolLoad{done: make(chan struct{})}
-	ps.loading[key] = load
-	ps.mu.Unlock()
 
+	select {
+	case <-load.done:
+		return load.pool, load.err
+	case <-ctx.Done():
+		select {
+		case <-load.done:
+			return load.pool, load.err
+		default:
+		}
+		return nil, perrors.Wrapf(ctx.Err(), CodeConnection, "wait for pool of datasource", perrors.String("datasource", key))
+	}
+}
+
+// load runs one first open of key, caches a pool it opens, and publishes the
+// outcome to every caller waiting on load.done. epoch is the registry's Close
+// count when the open started: a pool that finishes opening after a Close is
+// closed instead of cached, and its waiters receive a db.connection error.
+func (ps *Pools) load(key string, spec datasourceSpec, load *poolLoad, epoch uint64) {
 	pool, err := ps.openPool(key, spec)
 
 	ps.mu.Lock()
 	delete(ps.loading, key)
+	var orphan *Pool
+	if err == nil && ps.epoch != epoch {
+		orphan, pool = pool, nil
+		err = perrors.Newf(CodeConnection, "the pool registry closed while datasource %q was opening", key)
+	}
 	if err == nil {
 		ps.cache[key] = pool
 	}
 	load.pool, load.err = pool, err
 	close(load.done)
 	ps.mu.Unlock()
-	return pool, err
+	if orphan != nil {
+		orphan.Close()
+	}
 }
 
 // openPool resolves key's binding into its effective PoolConfig, then binds a
@@ -331,10 +388,11 @@ func (ps *Pools) Names() []string {
 // opening it on first probe just as the single-pool plugin always has. With no
 // default datasource (a named-only workload) it pings every pool already opened
 // via For, so the probe reflects the datasources actually in use without
-// force-opening idle ones.
+// force-opening idle ones. ctx bounds the wait for a first open as well as
+// the ping.
 func (ps *Pools) HealthCheck(ctx context.Context) error {
 	if ps.defaultKey != "" {
-		pool, err := ps.Default()
+		pool, err := ps.DefaultContext(ctx)
 		if err != nil {
 			return err
 		}
@@ -356,13 +414,15 @@ func (ps *Pools) HealthCheck(ctx context.Context) error {
 
 // Close closes every logical pool opened through the registry and drops the
 // logical and physical caches, so a second call (e.g. plugin Stop after the
-// container's close hook) is a no-op and a later For re-opens. Each logical
+// container's close hook) is a no-op and a later For re-opens. A pool still
+// opening when Close runs is closed when its open finishes, never cached. Each logical
 // close releases its handle on its physical pool, and the physical pool closes
 // with the last handle. It snapshots the open pools under the lock and closes
 // them outside it, so closing never stalls behind an in-flight open of another
 // datasource.
 func (ps *Pools) Close() {
 	ps.mu.Lock()
+	ps.epoch++
 	opened := ps.cache
 	ps.cache = make(map[string]*Pool)
 	ps.physical = make(map[string]*physicalPool)

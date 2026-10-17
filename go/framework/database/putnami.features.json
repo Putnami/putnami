@@ -119,6 +119,20 @@
           }
         },
         {
+          "id": "caller-bounded-first-open",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-canceled-caller-returns-with-its-context-error",
+              "the-shared-open-outlives-a-canceled-caller"
+            ]
+          }
+        },
+        {
           "id": "datasource-bound-acquire",
           "stage": "coded",
           "evidenceKinds": [

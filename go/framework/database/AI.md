@@ -149,6 +149,11 @@ func NewBillingStore(pools *database.Pools) (*BillingStore, error) {
   `Pools.Default()`), so single-datasource code, the migration runner, and the
   health probe are unchanged. Migrations run off the default pool, fanning out
   across datasources via per-transaction `search_path`.
+- In a request, resolve with `pools.ForContext(ctx, name)` or
+  `pools.DefaultContext(ctx)`: the call returns when `ctx` ends, with a
+  `db.connection` error that wraps `ctx.Err()`. The first open keeps running
+  under the datasource's `ConnectTimeout`, so other callers still get the pool.
+  `For` and `Default` wait up to `ConnectTimeout`.
 - `pools.For` fails closed on an undeclared name, listing what the workload does
   declare. A workload may declare only `Datasources` (no primary) — then there is
   no unnamed `*Pool`; resolve everything through `Pools.For`.
