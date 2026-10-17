@@ -33,6 +33,9 @@ type authoredFeature struct {
 	feature featureproto.Feature
 	path    string
 	field   string
+	// requirementPositions maps a requirement ID to its first index in the
+	// file, so a requirement finding names the entry an author finds there.
+	requirementPositions map[string]int
 }
 
 // Aggregate performs strict bounded discovery, exact contribution resolution,
@@ -94,18 +97,24 @@ func Aggregate(request Request) Result {
 	selected := selectedFeatureSet(discovered)
 	var authored []authoredFeature
 	for _, source := range discovered.manifests {
-		manifest := featureproto.CanonicalManifest(source.Manifest)
-		for index, feature := range manifest.Features {
-			if selected != nil && !selected[feature.ID] {
+		for index, declared := range source.Manifest.Features {
+			if selected != nil && !selected[declared.ID] {
 				// The identity tier read this declaration so duplicates and
 				// relation targets stay exact; assessing it would put a feature the
 				// caller did not select into the answer.
 				continue
 			}
+			positions := make(map[string]int, len(declared.Requirements))
+			for position, requirement := range declared.Requirements {
+				if _, seen := positions[requirement.ID]; !seen {
+					positions[requirement.ID] = position
+				}
+			}
 			authored = append(authored, authoredFeature{
-				feature: feature,
-				path:    source.Path,
-				field:   fmt.Sprintf("%s#features[%d]", source.Path, index),
+				feature:              featureproto.CanonicalManifest(&featureproto.Manifest{Features: []featureproto.Feature{declared}}).Features[0],
+				path:                 source.Path,
+				field:                fmt.Sprintf("%s#features[%d]", source.Path, index),
+				requirementPositions: positions,
 			})
 		}
 	}
@@ -113,7 +122,7 @@ func Aggregate(request Request) Result {
 
 	assessments := make([]FeatureAssessment, 0, len(authored))
 	for _, declaration := range authored {
-		assessment, findings := assessFeature(declaration.feature, declaration.path, declaration.field, byRequirement, enrichedByIdentity, bindings)
+		assessment, findings := assessFeature(declaration, byRequirement, enrichedByIdentity, bindings)
 		diagnostics = append(diagnostics, findings...)
 		assessments = append(assessments, assessment)
 	}
@@ -263,8 +272,7 @@ func scopeDiagnostics(discovered discoveredRepository, input []diag.Diagnostic) 
 func flattenEvidence(sources []featureproto.EvidenceSource) []evidenceOccurrence {
 	var result []evidenceOccurrence
 	for _, source := range sources {
-		document := featureproto.CanonicalEvidenceDocument(source.Document)
-		for index, record := range document.Evidence {
+		for index, record := range source.Document.Evidence {
 			result = append(result, evidenceOccurrence{
 				path:   source.Path,
 				field:  fmt.Sprintf("%s#evidence[%d]", source.Path, index),
@@ -302,9 +310,8 @@ func validateSnapshotMetadataBounds(manifests []featureproto.ManifestSource, evi
 	}
 	for _, source := range manifests {
 		check(source.Path, source.Path, maxProtocolPathBytes)
-		manifest := featureproto.CanonicalManifest(source.Manifest)
-		check(source.Path+"#namespace", manifest.Namespace, maxSemanticMetadataBytes)
-		for featureIndex, feature := range manifest.Features {
+		check(source.Path+"#namespace", source.Manifest.Namespace, maxSemanticMetadataBytes)
+		for featureIndex, feature := range source.Manifest.Features {
 			field := fmt.Sprintf("%s#features[%d]", source.Path, featureIndex)
 			check(field+".id", feature.ID, maxSemanticMetadataBytes)
 			for relationIndex, relation := range feature.Relations {
@@ -317,8 +324,7 @@ func validateSnapshotMetadataBounds(manifests []featureproto.ManifestSource, evi
 	}
 	for _, source := range evidence {
 		check(source.Path, source.Path, maxProtocolPathBytes)
-		document := featureproto.CanonicalEvidenceDocument(source.Document)
-		for evidenceIndex, record := range document.Evidence {
+		for evidenceIndex, record := range source.Document.Evidence {
 			field := fmt.Sprintf("%s#evidence[%d]", source.Path, evidenceIndex)
 			check(field+".id", record.ID, maxSemanticMetadataBytes)
 			check(field+".feature", record.Feature, maxSemanticMetadataBytes)
@@ -362,13 +368,12 @@ func validateEvidenceContributionReferences(occurrences []evidenceOccurrence, ca
 }
 
 func assessFeature(
-	feature featureproto.Feature,
-	source string,
-	featureField string,
+	declaration authoredFeature,
 	byRequirement map[string][]evidenceOccurrence,
 	contributions map[string]ContributionAssessment,
 	bindings *bindingResolver,
 ) (FeatureAssessment, []diag.Diagnostic) {
+	feature, source, featureField := declaration.feature, declaration.path, declaration.field
 	targetRank, _ := featureproto.StageRank(feature.Target)
 	assessment := FeatureAssessment{
 		ID:        feature.ID,
@@ -383,7 +388,7 @@ func assessFeature(
 	}
 	var diagnostics []diag.Diagnostic
 	activeHumanByStage := make(map[featureproto.MaturityStage]bool)
-	for requirementIndex, requirement := range feature.Requirements {
+	for _, requirement := range feature.Requirements {
 		rank, _ := featureproto.StageRank(requirement.Stage)
 		requirementAssessment := RequirementAssessment{
 			ID:            requirement.ID,
@@ -410,7 +415,7 @@ func assessFeature(
 				activeContradiction = true
 			}
 		}
-		field := fmt.Sprintf("%s.requirements[%d]", featureField, requirementIndex)
+		field := fmt.Sprintf("%s.requirements[%d]", featureField, declaration.requirementPositions[requirement.ID])
 		switch {
 		case activeContradiction:
 			requirementAssessment.State = VerificationContradicted

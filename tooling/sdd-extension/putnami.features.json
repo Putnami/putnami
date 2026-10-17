@@ -278,6 +278,20 @@
               "an-unresolved-decision-names-its-file-position"
             ]
           }
+        },
+        {
+          "id": "feature-findings-name-file-positions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-feature-finding-names-the-entry-position-in-the-file",
+              "a-feature-text-finding-states-its-bound"
+            ]
+          }
         }
       ]
     }

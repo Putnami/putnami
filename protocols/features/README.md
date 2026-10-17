@@ -634,7 +634,10 @@ non-goals keeps its order, because reordering it would rewrite the statement
 rather than normalize it.
 
 Use `ValidateManifest`/`ValidateEvidenceDocument`/`ValidateSpec`/
-`ValidateVerificationReport` for local shape validation. Use path-aware
+`ValidateVerificationReport` for local shape validation. Every validator walks
+lists in file order, so a diagnostic field such as
+`features[2].requirements[0].stage` names the entry at that position in the
+file, never its position in the canonical order. Use path-aware
 `ValidateRepository` for workspace-wide feature/evidence IDs, cross-document
 relations, cycles, and feature/requirement/stage references, and
 `ValidateSpecRepository` for spec discovery locations, feature resolution, and

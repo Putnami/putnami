@@ -8,6 +8,7 @@
     "tooling/specification-driven-development#codeowners-follow-declared-owners",
     "tooling/specification-driven-development#declared-inputs-cover-the-read-set",
     "tooling/specification-driven-development#every-document-has-working-links",
+    "tooling/specification-driven-development#feature-findings-name-file-positions",
     "tooling/specification-driven-development#one-engine-two-surfaces",
     "tooling/specification-driven-development#opt-in-activation",
     "tooling/specification-driven-development#predictable-spec-scaffolding",

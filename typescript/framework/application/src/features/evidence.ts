@@ -255,7 +255,9 @@ export function validateFeatureEvidenceDocument(document: FeatureEvidenceDocumen
     return diagnostics;
   }
   const seen = new Map<string, string>();
-  for (const [index, record] of canonicalFeatureEvidenceDocument(document).evidence.entries()) {
+  // The loop walks records in file order, so a field index names the record an
+  // author finds at that position in the file.
+  for (const [index, record] of document.evidence.entries()) {
     const field = `evidence[${index}]`;
     if (!FEATURE_ID.test(record.id))
       diagnostics.push(finding('features.invalid_id', `${field}.id`, 'evidence ID is not canonical'));
