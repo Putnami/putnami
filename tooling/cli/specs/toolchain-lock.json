@@ -70,7 +70,7 @@
     },
     {
       "id": "deps-tidy-resolves-as-the-workspace-does",
-      "text": "putnami deps add, deps remove and deps prune run go mod tidy on a copy of the module's go.mod that also states each go.work replace directive for a module version the module does not replace itself, so tidy resolves a module go.work replaces as the workspace build does, such as the framework release go.work pins in place of a generated client's placeholder requirement. go.mod and go.sum take the tidied copy without those directives. A failed go step leaves every putnami.json, go.mod, go.sum and go.work.sum the command edits as it was."
+      "text": "putnami deps add, deps remove and deps prune run go mod tidy on a copy of go.mod that also states each go.work replace directive for a module version the module does not replace itself, such as the release go.work pins for a generated client's placeholder. go.mod and go.sum take the tidied copy without those directives. A failed go step leaves every putnami.json, go.mod, go.sum and go.work.sum the command edits as it was."
     },
     {
       "id": "go-pin-reuses-the-machine-record",
