@@ -100,8 +100,12 @@ receiver's HTTP response status encodes the acknowledgement outcome:
 | Status | Outcome | Provider behavior |
 |--------|---------|-------------------|
 | `2xx` | `ack` | message acknowledged and dropped |
-| `4xx` | `dlq` | permanent failure: dead-letter, no retry |
+| `429` | `retry` | the receiver defers the message: redeliver with backoff |
+| other `4xx` | `dlq` | permanent failure: dead-letter, no retry |
 | other (`5xx`, timeout) | `retry` | transient failure: redeliver with backoff |
+
+A receiver answers `429` when its handler asks for a later redelivery, which is
+not a failure. A `5xx` answer reports a failure.
 
 Go helper:
 

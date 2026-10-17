@@ -19,6 +19,10 @@
       "text": "Competing handlers select one matching consumer while broadcast handlers select every matching consumer; retries and provider redelivery mean handlers must tolerate duplicates."
     },
     {
+      "id": "redelivery-request",
+      "text": "A handler that returns Redeliver gets its message delivered again later and logs no ERROR record: the delivery logs WARN, a broker retries it, and the push receiver answers 429, logged at INFO. A push whose handler fails answers 500 and logs one ERROR record with the handler's error: the request record, with the delivery's fields, when the request is logged."
+    },
+    {
       "id": "retry-boundary",
       "text": "A handler invocation is deadline-bound, retries use bounded exponential backoff with stable event identity, and a retry for one Redis consumer group is not amplified into another group."
     },

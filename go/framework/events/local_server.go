@@ -645,7 +645,7 @@ func (t *LocalServerTransport) pump(ctx context.Context, sub *localSubscription)
 		// server owns the delivery deadline.
 		deliveryCtx, _, err := dispatchDelivery(ctx, t.logs, &env, func(deliveryCtx context.Context, msg *Envelope) error {
 			return sub.def.Handler(deliveryCtx, msg)
-		})
+		}, nil)
 		if err != nil {
 			status, reason = "nack", err.Error()
 		}

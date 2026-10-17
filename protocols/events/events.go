@@ -342,11 +342,12 @@ type PushAckOutcome string
 const (
 	// PushAck acknowledges the message (HTTP 2xx); the provider drops it.
 	PushAck PushAckOutcome = "ack"
-	// PushDLQ permanently fails the message (HTTP 4xx); the provider routes it
-	// to the dead-letter destination without further retries.
+	// PushDLQ permanently fails the message (HTTP 4xx other than 429); the
+	// provider routes it to the dead-letter destination without further retries.
 	PushDLQ PushAckOutcome = "dlq"
-	// PushRetry transiently fails the message (HTTP 5xx, timeout, or any other
-	// status); the provider redelivers with backoff.
+	// PushRetry asks the provider to redeliver the message with backoff: a
+	// deferral the receiver chose (HTTP 429), a transient failure (HTTP 5xx), a
+	// timeout, or any other status.
 	PushRetry PushAckOutcome = "retry"
 )
 
@@ -354,6 +355,7 @@ const (
 // to its delivery acknowledgement outcome:
 //
 //	2xx        -> ack   (delivered; the provider drops the message)
+//	429        -> retry (deferred; the receiver asks for a later redelivery)
 //	4xx        -> dlq   (permanent failure; the provider dead-letters it)
 //	otherwise  -> retry (transient; the provider redelivers with backoff)
 //
@@ -362,6 +364,8 @@ func PushOutcomeForStatus(status int) PushAckOutcome {
 	switch {
 	case status >= 200 && status < 300:
 		return PushAck
+	case status == 429:
+		return PushRetry
 	case status >= 400 && status < 500:
 		return PushDLQ
 	default:

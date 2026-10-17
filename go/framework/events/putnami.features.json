@@ -87,6 +87,19 @@
           }
         },
         {
+          "id": "redelivery-request",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-broker-redelivers-a-deferred-message-without-an-error-record",
+              "push-failure-logs-one-error-with-its-cause",
+              "push-redelivery-answers-429-without-an-error-record"
+            ]
+          }
+        },
+        {
           "id": "retry-boundary",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

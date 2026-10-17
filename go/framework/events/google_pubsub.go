@@ -218,7 +218,7 @@ func (t *GooglePubSubTransport) handleMessage(ctx context.Context, sub *googlePu
 	// The delivery's terminal record reports the outcome; the nack hands the retry
 	// decision back to Pub/Sub, which owns redelivery and dead-lettering here, so
 	// this transport emits no retry/dead-letter record of its own.
-	if _, err := invokeTransportHandler(ctx, t.logs, sub.def, env); err != nil {
+	if _, err := invokeTransportHandler(ctx, t.logs, sub.def, env, nil); err != nil {
 		raw.Nack()
 		return
 	}

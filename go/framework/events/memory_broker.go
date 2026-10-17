@@ -327,7 +327,7 @@ func (b *MemoryBroker) executeHandler(ctx context.Context, env Envelope, sub *su
 		handlerCtx, cancel := context.WithTimeout(deliveryCtx, handlerTimeout(sub.def.Options))
 		defer cancel()
 		return sub.def.Handler(handlerCtx, msg)
-	})
+	}, nil)
 	b.observeHandled(deliveryCtx, env, duration, err)
 	if err != nil {
 		b.handleFailure(deliveryCtx, err, env, sub)

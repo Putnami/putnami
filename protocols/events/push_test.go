@@ -62,6 +62,7 @@ func TestPushOutcomeForStatus(t *testing.T) {
 		400: PushDLQ,
 		404: PushDLQ,
 		422: PushDLQ,
+		429: PushRetry,
 		499: PushDLQ,
 		500: PushRetry,
 		503: PushRetry,

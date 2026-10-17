@@ -3,11 +3,13 @@ package events
 import (
 	"context"
 	stderrors "errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"go.putnami.dev/errors"
 	"go.putnami.dev/logger"
 	"go.putnami.dev/protocol/features/spectest"
 )
@@ -613,4 +615,87 @@ func TestPublishAccumulatesOntoCallerBoundary(t *testing.T) {
 	if first["messageId"] != "m-1" || first["topic"] != topic.Name {
 		t.Errorf("first publish record group = %v", first)
 	}
+}
+
+// A handler that returns Redeliver on a broker transport logs WARN "message
+// redelivery requested" with outcome skipped, never an ERROR record, and the
+// broker delivers the message again.
+func TestEventRedeliverRecordIsAWarningAndRetries(t *testing.T) {
+	spectest.Proves(t, "go/event-delivery", "redelivery-request", "a-broker-redelivers-a-deferred-message-without-an-error-record")
+	topic := NewTopic[string]("logging.terminal.redeliver")
+	broker, sink := brokerWithSink()
+
+	signal := newFailingHandlerSignal(2)
+	var mu sync.Mutex
+	calls := 0
+	if err := broker.Subscribe(Handle(topic, func(context.Context, *Message[string]) error {
+		mu.Lock()
+		calls++
+		first := calls == 1
+		mu.Unlock()
+		defer signal.record()
+		if first {
+			return Redeliver("work held by another attempt")
+		}
+		return nil
+	}, WithMaxRetries(2), WithDLQ(false),
+		WithBaseBackoff(time.Millisecond), WithMaxBackoff(2*time.Millisecond))); err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	if err := broker.Start(context.Background()); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if err := Publish(context.Background(), broker, topic, "payload", WithMessageID("m-redeliver")); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	signal.wait(t)
+	stopBroker(t, broker)
+
+	for _, entry := range sink.Entries {
+		if entry.Level == logger.LevelError {
+			t.Fatalf("a redelivery request logged an ERROR record:%s", allRecords(sink))
+		}
+	}
+	entry := oneRecordOf(t, sink, "events.handler", "message redelivery requested")
+	if entry.Level != logger.LevelWarn {
+		t.Errorf("level = %v, want WARN", entry.Level)
+	}
+	if info := errorAttrOf(t, entry); !strings.Contains(info.Message, "work held by another attempt") {
+		t.Errorf("error.message = %q, want the handler's reason", info.Message)
+	}
+	if group := eventGroupOf(t, entry); group["outcome"] != outcomeSkipped || group["attempt"] != 1 {
+		t.Errorf("event group = %v, want outcome skipped on attempt 1", group)
+	}
+	oneRecordOf(t, sink, "events.broker", "message retry scheduled")
+	handled := oneRecordOf(t, sink, "events.handler", "message handled")
+	if group := eventGroupOf(t, handled); group["attempt"] != 2 {
+		t.Errorf("handled attempt = %v, want 2", group["attempt"])
+	}
+}
+
+func TestIsRedeliver(t *testing.T) {
+	cases := map[string]struct {
+		err  error
+		want bool
+	}{
+		"nil":                  {nil, false},
+		"redeliver":            {Redeliver("busy"), true},
+		"empty reason":         {Redeliver(""), true},
+		"wrapped by fmt":       {fmt.Errorf("handler: %w", Redeliver("busy")), true},
+		"plain error":          {stderrors.New("boom"), false},
+		"nack":                 {newAckStateNack(), false},
+		"framework error code": {errors.New(CodeEventsInvalidPayload, "bad"), false},
+	}
+	for name, tc := range cases {
+		if got := IsRedeliver(tc.err); got != tc.want {
+			t.Errorf("%s: IsRedeliver = %v, want %v", name, got, tc.want)
+		}
+	}
+	if msg := Redeliver("").Error(); !strings.Contains(msg, "redelivery requested") {
+		t.Errorf("empty reason message = %q, want a default reason", msg)
+	}
+}
+
+func newAckStateNack() error {
+	return newAckState(ManualAck).nack("busy")
 }

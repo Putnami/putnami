@@ -145,7 +145,30 @@ const (
 	CodeEventsNack errors.Code = "events.nack"
 	// CodeEventsMissingAck identifies a manual handler that returned without Ack/Nack.
 	CodeEventsMissingAck errors.Code = "events.missing_ack"
+	// CodeEventsRedeliver identifies a handler's request to deliver the message
+	// again later.
+	CodeEventsRedeliver errors.Code = "events.redeliver"
 )
+
+// Redeliver returns the error a handler returns to have the message delivered
+// again later, in any ack mode. It is a deferral, not a failure: the delivery
+// logs WARN "message redelivery requested" instead of ERROR "message handling
+// failed", and the push receiver answers 429, which the provider redelivers.
+// A transport that retries failures delivers the message again the same way;
+// Redis Pub/Sub cannot, so the message is lost there. reason says why the
+// handler defers the message.
+func Redeliver(reason string) error {
+	if reason == "" {
+		reason = "message redelivery requested"
+	}
+	return errors.New(CodeEventsRedeliver, reason)
+}
+
+// IsRedeliver reports whether err is a redelivery request from Redeliver: the
+// first framework error in its chain carries CodeEventsRedeliver.
+func IsRedeliver(err error) bool {
+	return err != nil && errors.GetCode(err) == CodeEventsRedeliver
+}
 
 func decodePayload[T any](payload any) (T, error) {
 	if typed, ok := payload.(T); ok {
