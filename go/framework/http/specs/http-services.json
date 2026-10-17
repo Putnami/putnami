@@ -84,6 +84,10 @@
     {
       "id": "error-envelope",
       "text": "A route that does not exist answers 404 in the canonical error envelope {code, error, message} with the code not_found. A panic that Recovery catches answers 500 with the code internal and the message Internal Server Error, and so does a request scope that cannot be created, resolved or committed. NotFound, Unauthorized, Forbidden and InternalError write that envelope with the codes not_found, unauthorized, forbidden and internal."
+    },
+    {
+      "id": "refusal-envelope",
+      "text": "A known path called with a method it does not route answers 405 with the code http.method_not_allowed and an Allow header naming its methods, HEAD when it routes GET, and OPTIONS; a preflight names the same. The rate limiter's 429 carries the code http.too_many_requests, and a stream route or WebSocket upgrade it refuses answers 400 with the code http.bad_request, each in the canonical error envelope."
     }
   ],
   "decisions": [

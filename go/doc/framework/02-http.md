@@ -221,6 +221,11 @@ fhttp.Forbidden()                    // 403, code forbidden
 fhttp.InternalError("something failed") // 500, code internal
 ```
 
+The server writes the same envelope for its own refusals: 404 `not_found` for
+an unknown path, 405 `http.method_not_allowed` with an `Allow` header for a
+method a known path does not route, 429 `http.too_many_requests` from the rate
+limiter, and 400 `http.bad_request` for a refused stream or WebSocket upgrade.
+
 ### Response modification
 
 ```go

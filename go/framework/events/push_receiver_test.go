@@ -143,6 +143,7 @@ func TestDecodePushEnvelopeErrors(t *testing.T) {
 }
 
 func TestHandlePushMissingSubscriptionDLQs(t *testing.T) {
+	spectest.Proves(t, "go/event-delivery", "push-refusal-envelope", "an-undecodable-push-answers-400-bad-request")
 	p := Events(PluginConfig{Delivery: DeliveryPush})
 	// A valid encoded envelope but no subscription on the wrapper must be
 	// rejected (400/DLQ), not dispatched.
@@ -158,6 +159,7 @@ func TestHandlePushMissingSubscriptionDLQs(t *testing.T) {
 	if resp.Status != 400 {
 		t.Fatalf("status = %d, want 400 (DLQ) for missing subscription", resp.Status)
 	}
+	assertBadRequestEnvelope(t, resp, "invalid envelope")
 }
 
 func TestPushCompetingDistributionRoundRobins(t *testing.T) {
@@ -224,10 +226,30 @@ func TestHandlePushHandlerErrorRetries(t *testing.T) {
 }
 
 func TestHandlePushBadBodyDLQs(t *testing.T) {
+	spectest.Proves(t, "go/event-delivery", "push-refusal-envelope", "an-undecodable-push-answers-400-bad-request")
 	p := Events(PluginConfig{Delivery: DeliveryPush})
 	resp := p.handlePush(pushContext([]byte("not json")))
 	if resp.Status != 400 {
 		t.Fatalf("status = %d, want 400 (DLQ)", resp.Status)
+	}
+	assertBadRequestEnvelope(t, resp, "invalid push body")
+}
+
+// assertBadRequestEnvelope fails the test unless resp carries the canonical
+// error envelope with the code http.bad_request and message.
+func assertBadRequestEnvelope(t *testing.T, resp *phttp.Response, message string) {
+	t.Helper()
+	raw, err := resp.BodyBytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body map[string]string
+	if err := json.Unmarshal(raw, &body); err != nil {
+		t.Fatalf("decoding body %s: %v", raw, err)
+	}
+	want := map[string]string{"code": "http.bad_request", "error": "Bad Request", "message": message}
+	if len(body) != len(want) || body["code"] != want["code"] || body["error"] != want["error"] || body["message"] != want["message"] {
+		t.Errorf("body = %s, want %v", raw, want)
 	}
 }
 

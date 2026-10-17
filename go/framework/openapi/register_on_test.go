@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"testing"
 
+	"go.putnami.dev/api"
 	phttp "go.putnami.dev/http"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestRegisterOn_Handler covers:
@@ -15,6 +17,7 @@ import (
 //   - the 503 "spec not yet generated" branch (handler called before Configure)
 //   - the 200 success path with Cache-Control header (handler called after Configure)
 func TestRegisterOn_Handler(t *testing.T) {
+	spectest.Proves(t, "go/api-contracts", "spec-disclosure", "the-openapi-route-refusals-carry-a-code-and-hide-the-cause")
 	plugin := NewPlugin(PluginOptions{
 		Title:        "Register Test",
 		Version:      "0.1.0",
@@ -47,13 +50,7 @@ func TestRegisterOn_Handler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read 503 body: %v", err)
 	}
-	var errPayload map[string]string
-	if err := json.Unmarshal(body503, &errPayload); err != nil {
-		t.Fatalf("unmarshal 503 body %q: %v", body503, err)
-	}
-	if errPayload["error"] == "" {
-		t.Errorf("503 body missing error field; got %v", errPayload)
-	}
+	assertRouteEnvelope(t, body503, "http.service_unavailable", "Service Unavailable", "OpenAPI spec not yet generated")
 
 	// --- Generate the spec via Configure ---
 	if err := plugin.Configure(context.Background(), nil); err != nil {
@@ -88,5 +85,55 @@ func TestRegisterOn_Handler(t *testing.T) {
 	}
 	if specPayload["openapi"] != "3.0.3" {
 		t.Errorf("spec openapi field = %v, want 3.0.3", specPayload["openapi"])
+	}
+}
+
+// A document that fails to render answers 500 with the code internal and a
+// fixed message; the cause stays on the server.
+func TestRegisterOn_RenderFailureHidesTheCause(t *testing.T) {
+	spectest.Proves(t, "go/api-contracts", "spec-disclosure", "the-openapi-route-refusals-carry-a-code-and-hide-the-cause")
+	plugin := NewPlugin(PluginOptions{Title: "Render Failure", Version: "0.1.0"})
+	server := phttp.NewServerPlugin(phttp.ServerConfig{})
+	plugin.RegisterOn(server)
+	ts := server.TestServer()
+	defer ts.Close()
+
+	if err := plugin.Configure(context.Background(), nil); err != nil {
+		t.Fatalf("Configure: %v", err)
+	}
+	// External needs a first-party client contract, which this document lacks,
+	// so the next render fails.
+	plugin.AddRoute(DiscoveredRoute{
+		Method:        "GET",
+		Path:          "/v2/{name}/manifests/{reference}",
+		ClientOptions: &api.ClientOperationOptions{External: ociDistribution},
+	})
+
+	resp, err := http.Get(ts.URL + plugin.opts.Route)
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	assertRouteEnvelope(t, body, "internal", "Internal Server Error", "An internal error occurred")
+}
+
+// assertRouteEnvelope fails the test unless body is the canonical error
+// envelope with code, error and message, and nothing else.
+func assertRouteEnvelope(t *testing.T, body []byte, code, errorText, message string) {
+	t.Helper()
+	var payload map[string]string
+	if err := json.Unmarshal(body, &payload); err != nil {
+		t.Fatalf("unmarshal body %q: %v", body, err)
+	}
+	want := map[string]string{"code": code, "error": errorText, "message": message}
+	if len(payload) != len(want) || payload["code"] != code || payload["error"] != errorText || payload["message"] != message {
+		t.Errorf("body = %s, want %v", body, want)
 	}
 }

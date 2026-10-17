@@ -247,6 +247,19 @@
               "the-error-helpers-write-the-canonical-envelope"
             ]
           }
+        },
+        {
+          "id": "refusal-envelope",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unrouted-method-answers-405-with-allow",
+              "the-rate-limiter-answers-429-too-many-requests",
+              "a-refused-stream-or-upgrade-answers-400-bad-request"
+            ]
+          }
         }
       ]
     }

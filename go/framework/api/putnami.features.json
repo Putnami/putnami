@@ -140,7 +140,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-openapi-document-is-no-store-unless-a-cacheable-directive-is-declared"
+              "the-openapi-document-is-no-store-unless-a-cacheable-directive-is-declared",
+              "the-openapi-route-refusals-carry-a-code-and-hide-the-cause"
             ]
           }
         },

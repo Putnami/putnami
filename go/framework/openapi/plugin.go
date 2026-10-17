@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -17,6 +18,7 @@ import (
 	"go.putnami.dev/app"
 	"go.putnami.dev/errors"
 	phttp "go.putnami.dev/http"
+	"go.putnami.dev/logger"
 	clientcontract "go.putnami.dev/protocol/clientcontract"
 	"go.putnami.dev/protocol/contracts"
 )
@@ -294,14 +296,21 @@ func (p *Plugin) RegisterOn(server *phttp.ServerPlugin) {
 }
 
 func (p *Plugin) handler() phttp.Handler {
-	return func(_ *phttp.Context) *phttp.Response {
+	return func(ctx *phttp.Context) *phttp.Response {
 		specJSON, err := p.runtimeSpecJSON()
 		if err != nil {
-			return phttp.InternalError(err.Error())
+			reqCtx := ctx.Context()
+			logger.SetRequestError(reqCtx, err)
+			if logger.RequestError(reqCtx) == nil {
+				logger.FromContextOrDefault(reqCtx).Named("openapi").ErrorCtx(reqCtx, "OpenAPI document rendering failed", err)
+			}
+			return phttp.ErrorResponse(err)
 		}
 		if specJSON == nil {
-			return phttp.JSONStatus(503, map[string]string{
-				"error": "OpenAPI spec not yet generated",
+			return phttp.JSONStatus(http.StatusServiceUnavailable, errors.HTTPErrorBody{
+				Code:    string(errors.CodeServiceUnavailable),
+				Error:   http.StatusText(http.StatusServiceUnavailable),
+				Message: "OpenAPI spec not yet generated",
 			})
 		}
 

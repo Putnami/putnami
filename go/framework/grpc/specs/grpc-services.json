@@ -46,7 +46,7 @@
     },
     {
       "id": "bridge-validation",
-      "text": "A bridged call re-enters the endpoint's own validation pipeline, so it accepts and rejects exactly what the equivalent REST call would, and a numeric path parameter keeps its original decimal text rather than passing through float64."
+      "text": "A bridged call re-enters the endpoint's own validation pipeline, so it accepts and rejects exactly what the equivalent REST call would, and a numeric path parameter keeps its original decimal text rather than passing through float64. A body the bridge cannot read or decode is refused with the framework code http.bad_request at status 400, and one it cannot re-encode with the code internal at status 500."
     }
   ],
   "decisions": [

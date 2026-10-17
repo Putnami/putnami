@@ -141,6 +141,12 @@ func InternalError(message string) *Response {
 	return errorEnvelope(http.StatusInternalServerError, perrors.CodeInternal, message)
 }
 
+// badRequest creates a 400 response in the canonical error envelope, with the
+// code http.bad_request. The client receives message verbatim.
+func badRequest(message string) *Response {
+	return errorEnvelope(http.StatusBadRequest, perrors.CodeBadRequest, message)
+}
+
 // errorEnvelope creates a JSON response whose body is the canonical error
 // envelope that ErrorResponse writes: {code, error, message}.
 func errorEnvelope(status int, code perrors.Code, message string) *Response {

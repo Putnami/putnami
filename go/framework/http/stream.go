@@ -219,10 +219,7 @@ func (p *ServerPlugin) streamRouteHandler(stream StreamHandler) Handler {
 			// declares, or none. Anything else is a client that expects another
 			// vocabulary, and a socket it can only fail on.
 			if !offersExactlyTheDeclaredSubprotocol(ctx.Request, stream.Subprotocol) {
-				return JSONStatus(http.StatusBadRequest, map[string]string{
-					"error":   "Bad Request",
-					"message": "requested websocket subprotocol is not the one this endpoint speaks",
-				})
+				return badRequest("requested websocket subprotocol is not the one this endpoint speaks")
 			}
 			subprotocol = stream.Subprotocol
 		case upgrade:
@@ -232,10 +229,7 @@ func (p *ServerPlugin) streamRouteHandler(stream StreamHandler) Handler {
 			if subprotocol == "" && len(requestSubprotocols(ctx.Request)) > 0 {
 				// Accepting a socket whose offered vocabulary this route cannot
 				// speak would hand the caller a connection it can only fail on.
-				return JSONStatus(http.StatusBadRequest, map[string]string{
-					"error":   "Bad Request",
-					"message": "requested websocket subprotocol is not supported by this endpoint",
-				})
+				return badRequest("requested websocket subprotocol is not supported by this endpoint")
 			}
 		}
 		// A negotiated protocol admits in band, so its own Serve runs the chain
@@ -253,10 +247,7 @@ func (p *ServerPlugin) streamRouteHandler(stream StreamHandler) Handler {
 		if !admitOnUpgrade && stream.Mode == StreamModeServer && acceptsEventStream(ctx.Request) {
 			return p.serveSSE(ctx, stream)
 		}
-		return JSONStatus(http.StatusBadRequest, map[string]string{
-			"error":   "Bad Request",
-			"message": `stream endpoint requires "Upgrade: websocket" or "Accept: text/event-stream"`,
-		})
+		return badRequest(`stream endpoint requires "Upgrade: websocket" or "Accept: text/event-stream"`)
 	}
 }
 

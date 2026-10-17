@@ -62,6 +62,7 @@ Any validation failure answers `400` with the failing fields:
 
 ```json
 {
+  "code": "http.bad_request",
   "error": "Bad Request",
   "message": "Validation failed",
   "details": [{ "field": "query.limit", "message": "must be at most 100", "constraint": "max" }]

@@ -28,7 +28,7 @@
     },
     {
       "id": "validation-pipeline",
-      "text": "A bound endpoint validates path parameters, then query parameters, then the request body, then resolves injected dependencies; any validation failure answers 400 with the failing field details, and a dependency-resolution failure answers a generic 500 without leaking the underlying error."
+      "text": "A bound endpoint validates path parameters, then query parameters, then the request body, then resolves injected dependencies; any validation failure answers 400 with the code http.bad_request and the failing field details, as does a body that is not JSON, and a dependency-resolution failure answers a generic 500 without leaking the underlying error."
     },
     {
       "id": "json-body-fidelity",
@@ -56,7 +56,7 @@
     },
     {
       "id": "spec-disclosure",
-      "text": "The served OpenAPI route is unauthenticated and describes the API's security model, so it is sent with Cache-Control no-store unless the workload explicitly opts into a cacheable directive."
+      "text": "The served OpenAPI route is unauthenticated and describes the API's security model, so it is sent with Cache-Control no-store unless the workload explicitly opts into a cacheable directive. Before the document exists the route answers 503 with the code http.service_unavailable; a document that fails to render answers 500 with the code internal and a fixed message, and its cause is logged, never sent."
     },
     {
       "id": "build-time-artifacts",

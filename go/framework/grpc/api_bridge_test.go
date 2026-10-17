@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"net/http"
 	"net/http/httptest"
 	"sort"
 	"strings"
@@ -256,6 +258,7 @@ func TestApiBridge_ForwardsQueryParams(t *testing.T) {
 
 func TestApiBridge_RejectsInvalidJSON(t *testing.T) {
 	spectest.Proves(t, "go/grpc-services", "bridge-validation", "bridge-rejects-invalid-json")
+	spectest.Proves(t, "go/grpc-services", "bridge-validation", "bridge-refusals-carry-a-code")
 	server := newFakeServer()
 	apiPlugin := api.New(server)
 
@@ -277,7 +280,71 @@ func TestApiBridge_RejectsInvalidJSON(t *testing.T) {
 	resp := handler(phttp.NewContext(httptest.NewRecorder(), req))
 
 	if resp == nil || resp.Status != 400 {
-		t.Errorf("expected 400 for malformed JSON, got %+v", resp)
+		t.Fatalf("expected 400 for malformed JSON, got %+v", resp)
+	}
+	raw, err := resp.BodyBytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document struct {
+		Message string `json:"message"`
+		Details []struct {
+			Debug struct {
+				Code       string `json:"code"`
+				HTTPStatus int    `json:"httpStatus"`
+			} `json:"debug"`
+		} `json:"details"`
+	}
+	if err := json.Unmarshal(raw, &document); err != nil {
+		t.Fatalf("decoding Connect error %s: %v", raw, err)
+	}
+	if document.Message != "Invalid JSON body for Connect RPC" || len(document.Details) != 1 ||
+		document.Details[0].Debug.Code != "http.bad_request" || document.Details[0].Debug.HTTPStatus != 400 {
+		t.Errorf("Connect error = %s, want the framework code http.bad_request at status 400", raw)
+	}
+}
+
+func TestApiBridge_UnreadableBodyAnswersBadRequest(t *testing.T) {
+	spectest.Proves(t, "go/grpc-services", "bridge-validation", "bridge-refusals-carry-a-code")
+	def := api.Endpoint("POST", "/users").
+		Body(api.Type[bridgeCreateBody]()).
+		HandleRaw(func(_ *phttp.Context) *phttp.Response { return phttp.JSON(nil) })
+	handler := (&ApiBridge{}).bridgeHandler(def, "/users")
+	req := httptest.NewRequest("POST", "/api.v1.ApiService/CreateUsers", failingReader{})
+	resp := handler(phttp.NewContext(httptest.NewRecorder(), req))
+	if resp == nil || resp.Status != 400 {
+		t.Fatalf("expected 400 for an unreadable body, got %+v", resp)
+	}
+	assertBridgeEnvelope(t, resp, "http.bad_request", "Failed to read Connect RPC body")
+}
+
+func TestApiBridge_UnencodableBodyAnswersInternal(t *testing.T) {
+	spectest.Proves(t, "go/grpc-services", "bridge-validation", "bridge-refusals-carry-a-code")
+	_, resp := encodeBridgeBody(map[string]any{"value": make(chan int)})
+	if resp == nil || resp.Status != 500 {
+		t.Fatalf("expected 500 for a body that cannot be re-encoded, got %+v", resp)
+	}
+	assertBridgeEnvelope(t, resp, "internal", "Failed to re-encode bridged request body")
+}
+
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) { return 0, errors.New("connection reset") }
+
+// assertBridgeEnvelope fails the test unless resp carries the canonical error
+// envelope with code and message.
+func assertBridgeEnvelope(t *testing.T, resp *phttp.Response, code, message string) {
+	t.Helper()
+	raw, err := resp.BodyBytes()
+	if err != nil {
+		t.Fatalf("reading body: %v", err)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(raw, &body); err != nil {
+		t.Fatalf("decoding body %s: %v", raw, err)
+	}
+	if body["code"] != code || body["error"] != http.StatusText(resp.Status) || body["message"] != message || len(body) != 3 {
+		t.Errorf("body = %s, want code %q, message %q", raw, code, message)
 	}
 }
 

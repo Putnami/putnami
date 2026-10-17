@@ -87,6 +87,17 @@
           }
         },
         {
+          "id": "push-refusal-envelope",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-undecodable-push-answers-400-bad-request"
+            ]
+          }
+        },
+        {
           "id": "redelivery-request",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
