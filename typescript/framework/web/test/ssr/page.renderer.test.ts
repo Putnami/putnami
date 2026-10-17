@@ -1,7 +1,14 @@
 import React from 'react';
 import { describe, expect, it } from 'bun:test';
-import { CSP_NONCE_CONTEXT_KEY, SecurityHeadersMiddleware, type HttpRequestContext } from '@putnami/application';
+import {
+  CSP_NONCE_CONTEXT_KEY,
+  LoggerMiddleware,
+  SecurityHeadersMiddleware,
+  type HttpRequestContext,
+} from '@putnami/application';
+import { HttpException } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
+import { MemoryLogger } from '@putnami/runtime/testing';
 import { restoreEnv } from '@putnami/utils';
 import { buildHttpContext } from '../../../application/src/http/http-context.builder';
 import type { StaticHandlerContext } from 'react-router';
@@ -246,6 +253,104 @@ describe('page.renderer', () => {
       expect(html).toContain('"status":404');
     });
 
+    specTest(
+      'logs an unexpected loader error with its stack, and the request log line carries it',
+      {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'ssr-response',
+        check: 'an-unexpected-loader-error-is-logged-and-recorded-as-the-request-error',
+      },
+      async () => {
+        const failure = new Error('upstream answered 403');
+        const logger = new MemoryLogger();
+        const ctx = createMockContext({ req: new Request('http://localhost/orders'), logger });
+        const handler = pageRenderer(
+          () => [
+            {
+              path: '/orders',
+              loader: () => {
+                throw failure;
+              },
+              element: React.createElement('div', null, 'Orders'),
+            } as never,
+          ],
+          () => RootHtml,
+          () => 'hydrate.js',
+          SSR_TIMEOUT_MS,
+        );
+
+        const response = await runInContext(ctx, () => LoggerMiddleware()(ctx, async () => await handler()));
+        await response?.get().text();
+
+        expect(response?.status).toBe(500);
+        const errors = logger.entries.filter((entry) => entry.level === 'error');
+        // One entry from the renderer, one request log line from LoggerMiddleware.
+        expect(errors).toHaveLength(2);
+        const [logged, requestLine] = errors;
+        expect(logged?.error?.message).toBe('upstream answered 403');
+        expect(logged?.error?.stack).toContain('upstream answered 403');
+        expect(requestLine?.message).toBe('[GET] /orders');
+        expect(requestLine?.error?.message).toBe('upstream answered 403');
+        const http = requestLine?.context?.['http'] as Record<string, unknown> | undefined;
+        expect(http?.['status']).toBe(500);
+      },
+    );
+
+    it('records an HttpException a loader throws as the request error without logging it', async () => {
+      const exception = new HttpException(404, 'Post not found');
+      const logger = new MemoryLogger();
+      const ctx = createMockContext({ req: new Request('http://localhost/posts'), logger });
+      const handler = pageRenderer(
+        () => [
+          {
+            path: '/posts',
+            loader: () => {
+              throw exception;
+            },
+            element: React.createElement('div', null, 'Posts'),
+          } as never,
+        ],
+        () => RootHtml,
+        () => 'hydrate.js',
+        SSR_TIMEOUT_MS,
+      );
+
+      const response = await runInContext(ctx, async () => await handler());
+      await response.get().text();
+
+      expect((ctx as Record<string, unknown>).__requestError).toBe(exception);
+      expect(logger.entries.filter((entry) => entry.level === 'error')).toHaveLength(0);
+    });
+
+    it('does not log a Response a loader throws as an error', async () => {
+      const logger = new MemoryLogger();
+      const statusResponse = await renderRoute(
+        {
+          path: '/missing',
+          loader: () => {
+            throw new Response('missing', { status: 404 });
+          },
+          element: React.createElement('div', null, 'Missing'),
+        },
+        { req: new Request('http://localhost/missing'), logger },
+      );
+      await statusResponse.get().text();
+      const redirectResponse = await renderRoute(
+        {
+          path: '/from',
+          loader: () => {
+            throw Response.redirect('http://localhost/to', 302);
+          },
+          element: React.createElement('div', null, 'Redirect'),
+        },
+        { req: new Request('http://localhost/from'), logger },
+      );
+
+      expect(statusResponse.status).toBe(404);
+      expect(redirectResponse.status).toBe(302);
+      expect(logger.entries.filter((entry) => entry.level === 'error')).toHaveLength(0);
+    });
+
     it('falls back to the request context status code when the router stays at 200', async () => {
       const response = await renderRoute(
         {
@@ -272,6 +377,29 @@ describe('page.renderer', () => {
       const html = await response.get().text();
       expect(html).toContain('<h1>Something went wrong</h1>');
       expect(html).toContain('Error: boom');
+    });
+
+    it('records a render failure as the request error', async () => {
+      const failure = new Error('render failed');
+      const ctx = createMockContext({ logger: new MemoryLogger() });
+      const handler = pageRenderer(
+        () => [
+          {
+            path: '/',
+            element: React.createElement(() => {
+              throw failure;
+            }),
+          } as never,
+        ],
+        () => RootHtml,
+        () => 'hydrate.js',
+        SSR_TIMEOUT_MS,
+      );
+
+      const response = await runInContext(ctx, async () => await handler());
+
+      expect(response.status).toBe(500);
+      expect((ctx as Record<string, unknown>).__requestError).toBe(failure);
     });
 
     it('clears the abort timeout when rendering throws before streaming', async () => {

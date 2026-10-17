@@ -105,8 +105,7 @@ export class HttpDispatcher {
   };
 
   private async handleError(e: unknown, context: HttpRequestContext): Promise<HttpResponse> {
-    // Store on context so middleware (e.g. LoggerMiddleware) can log the error
-    (context as HttpRequestContextInternal).__requestError = e;
+    recordRequestError(context, e);
 
     // Give the user's error handler first chance
     if (this.errorHandler) {
@@ -152,6 +151,14 @@ export class HttpDispatcher {
       : { error: 'Internal Server Error' };
     return HttpResponse.json(body, { status: 500 });
   }
+}
+
+/**
+ * Records `error` as the error of the request `context` serves. When the response
+ * status is 500 or more, the request log line of `LoggerMiddleware` carries it.
+ */
+export function recordRequestError(context: HttpRequestContext, error: unknown): void {
+  (context as HttpRequestContextInternal).__requestError = error;
 }
 
 /** The first-party client-contract error envelope — identical in shape to `go/framework/errors/http.go`'s `HTTPErrorBody`. */

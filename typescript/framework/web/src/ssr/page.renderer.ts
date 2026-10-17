@@ -2,18 +2,19 @@ import {
   type Claims,
   type HttpRequestContext,
   HttpResponse,
+  recordRequestError,
   resolveRoles,
   resolveScopes,
   CSP_NONCE_CONTEXT_KEY,
   CSRF_TOKEN_CONTEXT_KEY,
   type RouteHandler,
 } from '@putnami/application';
-import { shouldExposeErrorStack, useConfig, useContext, useLogger } from '@putnami/runtime';
+import { HttpException, type Logger, shouldExposeErrorStack, useConfig, useContext, useLogger } from '@putnami/runtime';
 import type { ClientSecurityContext } from '../shared/security.types';
 import React, { type ReactElement, type ReactNode } from 'react';
 import { type ReactDOMServerReadableStream, renderToReadableStream } from 'react-dom/server';
 import type { RouteObject, StaticHandlerContext } from 'react-router';
-import { createStaticHandler, createStaticRouter, StaticRouterProvider } from 'react-router';
+import { createStaticHandler, createStaticRouter, isRouteErrorResponse, StaticRouterProvider } from 'react-router';
 import { DocumentMetaContext } from '../client/document/document-context';
 import { escapeHtml } from '../client/document/tag.utils';
 import { SsrDocumentHelper } from '../client/document/document-ssr.helper';
@@ -54,6 +55,7 @@ export const pageRenderer =
     const staticOpts = resolvedBasename ? { basename: resolvedBasename } : undefined;
     const reactStaticHandler = createStaticHandler(routes(), staticOpts);
     const reactStaticContext = await reactStaticHandler.query(req);
+    reportLoaderErrors(reactStaticContext, reqContext, logger);
 
     const validationResult = handleStaticContext(reactStaticContext);
     if (validationResult) {
@@ -179,6 +181,7 @@ export const pageRenderer =
       // whole try would clear it too early — the timer must outlive this return
       // to cover async streaming.)
       if (timeoutId !== undefined) clearTimeout(timeoutId);
+      recordRequestError(reqContext, error);
       logger.error(error);
       return handleRenderError(error);
     }
@@ -366,6 +369,30 @@ export function handleRenderError(error: unknown) {
     status: 500,
     headers: { 'content-type': 'text/html;charset=utf-8' },
   });
+}
+
+/**
+ * Handles the errors React Router kept from loaders and actions, one per error
+ * boundary, the way the dispatcher handles a route handler's error: records the
+ * first one as the request error, and logs each one at ERROR with its stack
+ * unless it is an `HttpException`. A thrown `Response` or `HttpResponse` is a
+ * redirect or a status the loader chose, not an error.
+ */
+function reportLoaderErrors(
+  context: StaticHandlerContext | Response,
+  reqContext: HttpRequestContext,
+  logger: Logger,
+): void {
+  if (!('errors' in context) || !context.errors) return;
+  let recorded = false;
+  for (const error of Object.values(context.errors)) {
+    if (isRouteErrorResponse(error) || error instanceof Response || error instanceof HttpResponse) continue;
+    if (!recorded) {
+      recordRequestError(reqContext, error);
+      recorded = true;
+    }
+    if (!(error instanceof HttpException)) logger.error(error);
+  }
 }
 
 function handleStaticContext(reactStaticContext: StaticHandlerContext | Response): HttpResponse | undefined {
