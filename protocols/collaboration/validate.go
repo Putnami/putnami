@@ -742,6 +742,7 @@ func (c *checker) evidence(field string, items []Evidence) {
 
 func (c *checker) task(field string, task Task) {
 	c.ref(field+".ref", task.Ref)
+	c.optionalToken(field+".key", task.Key)
 	c.token(field+".revision", task.Revision)
 	c.url(field+".url", task.URL)
 	c.title(field+".title", task.Title)
@@ -754,6 +755,7 @@ func (c *checker) task(field string, task Task) {
 		c.ref(field+".parent", *task.Parent)
 	}
 	c.optionalToken(field+".holder", task.Holder)
+	c.timestamp(field+".createdAt", task.CreatedAt, false)
 	c.timestamp(field+".updatedAt", task.UpdatedAt, false)
 }
 

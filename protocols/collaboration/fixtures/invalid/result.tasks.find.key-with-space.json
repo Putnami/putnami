@@ -1,0 +1,15 @@
+{
+  "items": [
+    {
+      "ref": {
+        "source": "github:acme/app",
+        "id": "42"
+      },
+      "key": "issue 42",
+      "revision": "etag-42",
+      "title": "Fix the login redirect",
+      "state": "open"
+    }
+  ],
+  "page": {}
+}
