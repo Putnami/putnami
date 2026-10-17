@@ -29,7 +29,8 @@ type FlagPresence struct {
 }
 
 // SessionStart contains the closed-vocabulary dimensions of a session-start
-// event. Commands not in the public job-command registry are omitted.
+// event. Commands not in the public job-command registry are omitted, and a
+// repeated command is recorded once.
 type SessionStart struct {
 	Commands    []string
 	Projects    int
@@ -49,10 +50,16 @@ type SessionEnd struct {
 // TrackSessionStart records the fixed session-start telemetry shape.
 func (c *Client) TrackSessionStart(session SessionStart) {
 	commands := make([]string, 0, len(session.Commands))
+	seen := make(map[string]struct{}, len(session.Commands))
 	for _, command := range session.Commands {
-		if _, allowed := allowedCommands[command]; allowed {
-			commands = append(commands, command)
+		if _, allowed := allowedCommands[command]; !allowed {
+			continue
 		}
+		if _, duplicate := seen[command]; duplicate {
+			continue
+		}
+		seen[command] = struct{}{}
+		commands = append(commands, command)
 	}
 
 	c.track(Event{

@@ -257,10 +257,15 @@ func IsCommand(command string) bool {
 }
 
 // IsCommands validates a comma-joined list against the receiver-known command
-// vocabulary. A record can create at most MaxCommands aggregate buckets.
+// vocabulary. The empty string is the empty list: a session whose commands are
+// all outside the vocabulary. A record can create at most MaxCommands
+// aggregate buckets.
 func IsCommands(value string) bool {
+	if value == "" {
+		return true
+	}
 	commands := strings.Split(value, ",")
-	if len(commands) == 0 || len(commands) > MaxCommands {
+	if len(commands) > MaxCommands {
 		return false
 	}
 	seen := make(map[string]struct{}, len(commands))
