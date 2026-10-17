@@ -234,8 +234,10 @@ func TestDepsPruneLeavesEveryFileAsItWasWhenTheGoStepFails(t *testing.T) {
 	if err == nil {
 		t.Fatalf("deps prune succeeded although go mod tidy cannot resolve the placeholder:\n%s%s", out.String(), output)
 	}
-	if !strings.Contains(err.Error(), "go mod tidy") {
-		t.Errorf("error = %v, want it to name go mod tidy", err)
+	for _, want := range []string{"go mod tidy", "back as it was"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %v, want it to state %q", err, want)
+		}
 	}
 	for _, file := range files {
 		if after := readFile(t, filepath.Join(root, file)); after != before[file] {
@@ -309,6 +311,75 @@ func TestDepsPruneDropsTheModulePathTheTargetGoModDeclares(t *testing.T) {
 	}
 	if !strings.Contains(output, "Removing example.com/lib in app") {
 		t.Errorf("prune output = %q, want it to name the module path", output)
+	}
+}
+
+// The tidy copy states a go.work replace directive unless a directive of the
+// module covers one of the versions it covers, and dropping what it stated
+// gives back the module's go.mod. A go.work this parser does not read adds
+// nothing.
+func TestWithGoWorkReplacesStatesOnlyWhatTheModuleDoesNot(t *testing.T) {
+	root := t.TempDir()
+	goWork := filepath.Join(root, "go.work")
+	writeRawFile(t, goWork, `go 1.22
+
+use ./app
+
+replace (
+	example.com/forked => example.com/forked v1.2.0
+	example.com/pinned v0.0.1 => example.com/pinned v0.9.3
+	example.com/pinned v0.0.2 => example.com/pinned v0.9.3
+	go.putnami.dev/client => go.putnami.dev/client v0.9.3
+	go.putnami.dev/local => ./third_party/local
+)
+`)
+	goModPath := filepath.Join(root, "app", "go.mod")
+	goMod := []byte(`module example.com/app
+
+go 1.22
+
+replace example.com/forked => ../forked
+
+replace example.com/pinned v0.0.1 => ../pinned
+
+replace go.putnami.dev/client v0.0.0 => ../old-client
+`)
+	copied, added, err := withGoWorkReplaces(goModPath, goMod, goWork)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stated []string
+	for _, old := range added {
+		stated = append(stated, old.String())
+	}
+	if got, want := strings.Join(stated, ","), "example.com/pinned@v0.0.2,go.putnami.dev/local"; got != want {
+		t.Fatalf("stated replaces = %s, want %s", got, want)
+	}
+	file, err := modfile.Parse(goModPath, copied, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targets := make(map[string]string)
+	for _, replace := range file.Replace {
+		targets[replace.Old.String()] = replace.New.String()
+	}
+	if got, want := targets["go.putnami.dev/local"], filepath.Join(root, "third_party", "local"); got != want {
+		t.Errorf("go.putnami.dev/local => %s, want the directory from go.work's directory, %s", got, want)
+	}
+	if got := targets["example.com/forked"]; got != "../forked" {
+		t.Errorf("example.com/forked => %s, want the module's own directive", got)
+	}
+	restored, err := withoutReplaces(goModPath, copied, added)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(restored) != string(goMod) {
+		t.Errorf("dropping the stated directives left:\n%s\nwant:\n%s", restored, goMod)
+	}
+
+	writeRawFile(t, goWork, "go 1.22\n\nnot-a-directive\n")
+	if copied, added, err := withGoWorkReplaces(goModPath, goMod, goWork); err != nil || len(added) != 0 || string(copied) != string(goMod) {
+		t.Errorf("an unreadable go.work = %q, %v, %v; want go.mod as it is", copied, added, err)
 	}
 }
 

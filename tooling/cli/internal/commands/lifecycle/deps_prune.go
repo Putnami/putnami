@@ -339,7 +339,7 @@ func applyPrune(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 }
 
 // pruneEditedFiles are the files a prune of projects may write: each project's
-// putnami.json, go.mod and go.sum.
+// putnami.json and the files of its Go module (goModuleFiles).
 func pruneEditedFiles(wsRoot string, projects []*workspace.Project) []string {
 	var files []string
 	for _, project := range projects {

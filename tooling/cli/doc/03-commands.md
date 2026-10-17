@@ -753,10 +753,13 @@ TypeScript, edit `package.json` and run `putnami deps install`.
 
 `go mod tidy` does not read `go.work`. So `add`, `remove` and `prune` run it on a
 copy of the module's `go.mod` that also states each `go.work` `replace` directive
-the module does not replace itself, such as the framework release `putnami
-upgrade` pins in place of a generated client's `v0.0.1` placeholder. `go.mod` and
-`go.sum` take the tidied copy without those directives. When a Go step fails, the
-command leaves every `go.mod`, `go.sum` and `putnami.json` it edits as it was.
+for a module version the module does not replace itself, such as the framework
+release `putnami upgrade` pins in place of a generated client's
+`v0.0.1` placeholder. `go.mod` and `go.sum` take the tidied copy without those
+directives. A `go.work` `use` line is not copied: a module requires a sibling
+workspace module through its own `replace` directive, which `putnami projects
+sync` writes. When a Go step fails, the command leaves every `putnami.json`,
+`go.mod`, `go.sum` and `go.work.sum` it edits as it was.
 
 `prune` reads the provider view that the last install or build recorded. When a
 file that view was recorded from changed since, such as a hand-edited `go.mod`,

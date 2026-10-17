@@ -332,8 +332,9 @@ func goDepsResult(action string, installErr, err error) error {
 }
 
 // runGoDeps resolves the target Go module and the go command (goDepsCommand),
-// then edits the module's requirements (editGoModule). installErr is the
-// failure of the workspace installers that installed the go; err is the
+// then edits the module's requirements (editGoModule), and puts the files of
+// the module back as they were when the edit fails (goModuleFiles). installErr
+// is the failure of the workspace installers that installed the go; err is the
 // failure of the edit. The caller reports both (goDepsResult).
 func runGoDeps(ctx context.Context, wsRoot, action string, modules []string, projectSelector, rerun string, lifecycleEnv LifecycleEnv) (installErr, err error) {
 	if len(modules) == 0 {
@@ -352,7 +353,14 @@ func runGoDeps(ctx context.Context, wsRoot, action string, modules []string, pro
 	if err != nil {
 		return nil, err
 	}
-	return goCmd.installErr, editGoModule(ctx, wsRoot, proj, goCmd, action, modules)
+	snapshot, err := snapshotFiles(goModuleFiles(filepath.Join(wsRoot, proj.Path))...)
+	if err != nil {
+		return goCmd.installErr, err
+	}
+	if err := editGoModule(ctx, wsRoot, proj, goCmd, action, modules); err != nil {
+		return goCmd.installErr, snapshot.restoreAfter(err)
+	}
+	return goCmd.installErr, nil
 }
 
 // goDepsCommand returns the go command a deps edit runs: the one a task of the
@@ -378,8 +386,8 @@ func goDepsCommand(ctx context.Context, wsRoot, projectPath, action, rerun strin
 // tidies it (tidyGoModule), both in the module directory with GOWORK pointed
 // at the workspace file. add runs `go get` with the module specs as given;
 // remove runs `go get <module>@none`; prune runs `go mod edit
-// -droprequire=<module>` (goDepsEdit says why). A failure of either step puts
-// go.mod and go.sum back as they were.
+// -droprequire=<module>` (goDepsEdit says why). The caller puts the files back
+// when it fails (goModuleFiles).
 func editGoModule(ctx context.Context, wsRoot string, proj *workspace.Project, goCmd goCommand, action string, modules []string) error {
 	moduleDir := filepath.Join(wsRoot, proj.Path)
 	env := shared.GoCommandEnvFrom(goCmd.env, moduleDir)
@@ -387,16 +395,12 @@ func editGoModule(ctx context.Context, wsRoot string, proj *workspace.Project, g
 	verb := map[string]string{"add": "Adding", "remove": "Removing", "prune": "Removing"}[action]
 	iox.Fprintf(os.Stdout, "  %s %s in %s...\n", verb, strings.Join(modules, " "), proj.Name)
 
-	snapshot, err := snapshotFiles(goModuleFiles(moduleDir)...)
-	if err != nil {
-		return err
-	}
 	edit, name := goDepsEdit(action, modules)
 	if err := runGoInModule(ctx, goCmd.path, moduleDir, env, edit); err != nil {
-		return snapshot.restoreAfter(fmt.Errorf("%s: %w", name, err))
+		return fmt.Errorf("%s: %w", name, err)
 	}
 	if err := tidyGoModule(ctx, goCmd.path, moduleDir, env); err != nil {
-		return snapshot.restoreAfter(fmt.Errorf("go mod tidy: %w", err))
+		return fmt.Errorf("go mod tidy: %w", err)
 	}
 	iox.Fprintf(os.Stdout, "  ✓ updated %s\n", filepath.Join(proj.Path, "go.mod"))
 	return nil

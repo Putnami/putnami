@@ -79,10 +79,12 @@ func tidyGoModule(ctx context.Context, goPath, moduleDir string, env []string) e
 }
 
 // withGoWorkReplaces returns goMod with each replace directive of the go.work
-// at goWorkPath whose module goMod does not replace, and the module versions
-// those directives replace. A directory a go.work directive names is relative
-// to go.work, so it is stated as an absolute path. Without a go.work, goMod is
-// returned as it is.
+// at goWorkPath for a module version goMod does not replace itself, and the
+// module versions those directives replace (replacesVersion). A directory a
+// go.work directive names is relative to go.work, so it is stated as an
+// absolute path. When go.work states no replace directive, or when go.work or
+// goMod is a file this parser does not read, goMod is returned as it is and
+// tidy runs on it unchanged.
 func withGoWorkReplaces(goModPath string, goMod []byte, goWorkPath string) ([]byte, []module.Version, error) {
 	if goWorkPath == "" {
 		return goMod, nil, nil
@@ -92,20 +94,16 @@ func withGoWorkReplaces(goModPath string, goMod []byte, goWorkPath string) ([]by
 		return nil, nil, err
 	}
 	work, err := modfile.ParseWork(goWorkPath, workData, nil)
-	if err != nil {
-		return nil, nil, err
+	if err != nil || len(work.Replace) == 0 {
+		return goMod, nil, nil
 	}
 	file, err := modfile.Parse(goModPath, goMod, nil)
 	if err != nil {
-		return nil, nil, err
-	}
-	replaced := make(map[string]bool, len(file.Replace))
-	for _, replace := range file.Replace {
-		replaced[replace.Old.Path] = true
+		return goMod, nil, nil
 	}
 	var added []module.Version
 	for _, replace := range work.Replace {
-		if replaced[replace.Old.Path] {
+		if replacesVersion(file.Replace, replace.Old) {
 			continue
 		}
 		target := replace.New.Path
@@ -126,6 +124,21 @@ func withGoWorkReplaces(goModPath string, goMod []byte, goWorkPath string) ([]by
 		return nil, nil, err
 	}
 	return formatted, added, nil
+}
+
+// replacesVersion reports whether a directive of replaces covers some version
+// old covers: a directive for every version of old's module, a directive for
+// one version when old covers every version, or a directive for old's version.
+func replacesVersion(replaces []*modfile.Replace, old module.Version) bool {
+	for _, replace := range replaces {
+		if replace.Old.Path != old.Path {
+			continue
+		}
+		if replace.Old.Version == "" || old.Version == "" || replace.Old.Version == old.Version {
+			return true
+		}
+	}
+	return false
 }
 
 // withoutReplaces returns goMod without the replace directives of the module
@@ -158,9 +171,14 @@ func goModulePath(dir string) string {
 }
 
 // goModuleFiles are the files a Go dependency edit of the module in dir
-// writes.
+// writes: its go.mod and go.sum, and the go.work.sum beside the go.work that
+// governs it, which `go get` writes in workspace mode.
 func goModuleFiles(dir string) []string {
-	return []string{filepath.Join(dir, "go.mod"), filepath.Join(dir, "go.sum")}
+	files := []string{filepath.Join(dir, "go.mod"), filepath.Join(dir, "go.sum")}
+	if goWork := shared.FindGoWork(dir); goWork != "" {
+		files = append(files, filepath.Join(filepath.Dir(goWork), "go.work.sum"))
+	}
+	return files
 }
 
 // writeFileKeepingMode writes data to path with the permissions path has, or
@@ -170,7 +188,30 @@ func writeFileKeepingMode(path string, data []byte) error {
 	if info, err := os.Stat(path); err == nil {
 		mode = info.Mode().Perm()
 	}
-	return os.WriteFile(path, data, mode)
+	return writeFileAtomically(path, data, mode)
+}
+
+// writeFileAtomically replaces path with data and mode through a temporary
+// file in the same directory, so path holds either its old content or data,
+// never a part of data.
+func writeFileAtomically(path string, data []byte, mode fs.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".putnami-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmpName, mode); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }
 
 // fileSnapshot holds the content of files a command is about to edit, so a
@@ -215,19 +256,23 @@ func snapshotFiles(paths ...string) (*fileSnapshot, error) {
 }
 
 // restoreAfter puts every recorded file back as it was and returns cause,
-// joined with each file it could not put back.
+// stating that the files are back, or joined with each file it could not put
+// back.
 func (s *fileSnapshot) restoreAfter(cause error) error {
 	failures := []error{cause}
 	for _, file := range s.files {
 		var err error
 		if file.existed {
-			err = os.WriteFile(file.path, file.data, file.mode)
+			err = writeFileAtomically(file.path, file.data, file.mode)
 		} else if removeErr := os.Remove(file.path); removeErr != nil && !errors.Is(removeErr, fs.ErrNotExist) {
 			err = removeErr
 		}
 		if err != nil {
 			failures = append(failures, fmt.Errorf("restore %s: %w", file.path, err))
 		}
+	}
+	if len(failures) == 1 {
+		return fmt.Errorf("%w; every file the command edited is back as it was", cause)
 	}
 	return errors.Join(failures...)
 }
