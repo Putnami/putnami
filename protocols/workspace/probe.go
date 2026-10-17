@@ -162,6 +162,10 @@ type ProbeProject struct {
 	// carries and this map does not resolves to DependencySourceDeclared: the
 	// provider read it from a declaration rather than from an import.
 	//
+	// An EMPTY map is an answer: the provider attributed this project and
+	// found no edge its sources import. It is encoded as `{}`, distinct from
+	// an absent member, which means the provider did not attribute at all.
+	//
 	// It never changes WHICH edges a provider reports — it says where each one
 	// came from. A provider whose answer folds a declared list into the same
 	// list as its real imports (a `putnami` block inside package.json beside
@@ -175,7 +179,7 @@ type ProbeProject struct {
 	// It is a NEGOTIATED member: present only in an answer to a request that
 	// set ProbeRequest.DependencySources, so the v1 result shape a strict older
 	// core decodes is unchanged.
-	DependencySources map[string]DependencySource `json:"dependencySources,omitempty"`
+	DependencySources map[string]DependencySource `json:"dependencySources,omitzero"`
 	// Publish are publish channels the provider derives.
 	Publish []string `json:"publish,omitempty"`
 	// RunsWith are serve-mode service dependencies the provider derives.
@@ -331,7 +335,8 @@ func normalizeProbePaths(in []string) []string {
 // normalizeDependencySources canonicalizes an edge-provenance map: keys are
 // normalized as repo-relative paths, and an entry that names no reported
 // dependency, carries no path, or claims a source outside the closed set is
-// dropped.
+// dropped. A non-nil map stays non-nil, empty or not: it is the provider's
+// answer that it attributed the project, and nil is the absence of one.
 //
 // Dropping rather than keeping is what makes the digest a function of the facts
 // the answer actually carries: a provenance for an edge the answer does not
@@ -339,7 +344,7 @@ func normalizeProbePaths(in []string) []string {
 // must not produce two digests. The dropped entries are reported by
 // ValidateProbeResult, which runs on the raw answer before any merge.
 func normalizeDependencySources(in map[string]DependencySource, dependencies []string) map[string]DependencySource {
-	if len(in) == 0 {
+	if in == nil {
 		return nil
 	}
 	reported := make(map[string]bool, len(dependencies))
@@ -353,9 +358,6 @@ func normalizeDependencySources(in map[string]DependencySource, dependencies []s
 			continue
 		}
 		out[path] = StrongerDependencySource(out[path], source)
-	}
-	if len(out) == 0 {
-		return nil
 	}
 	return out
 }

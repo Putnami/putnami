@@ -60,7 +60,7 @@
     },
     {
       "id": "declared-edge-check",
-      "text": "Every workspace synchronization reports each declared dependency edge no import, contract or declared file input backs: a putnami.json entry, a language manifest entry no source imports, an orphan client.putnami.json. A project whose providers report no provenance is skipped with a notice. options.workspace.declaredEdges sets the severity. putnami deps prune removes what it can edit and names the hand edit for the rest, and the advice promises no more."
+      "text": "Every workspace synchronization reports each declared dependency edge no import, contract or declared file input backs: a putnami.json entry, a language manifest entry no source imports, an orphan client.putnami.json. A project with no provenance map is skipped with a notice if an entry names a workspace project; an empty map is an answer. options.workspace.declaredEdges sets the severity. putnami deps prune removes what it can edit and names the hand edit for the rest, and the advice promises no more."
     },
     {
       "id": "change-shape-report",

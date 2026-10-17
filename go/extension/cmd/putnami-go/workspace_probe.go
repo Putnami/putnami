@@ -748,11 +748,17 @@ func goReplaceTarget(fromDir, toDir string) string {
 // has. The edge SET is unchanged; a require stays an edge until someone removes
 // it from go.mod, and the consumers that act on real imports alone — the
 // visibility check, the declared-edge check — read the attribution rather than
-// re-deriving it.
+// re-deriving it. A module with no workspace edge is answered with an empty
+// map, which states that its sources import no workspace module. Only a module
+// whose sources were all read can state that: an authored image project has no
+// sources and an incomplete scan has no answer, so both report no map.
 func goDependencySources(c *goCandidate, dependencies []string, byModule map[string]*goCandidate,
 	scan moduleImportScan) map[string]wsproto.DependencySource {
 	if len(dependencies) == 0 {
-		return nil
+		if c.modFile == "" || !scan.complete {
+			return nil
+		}
+		return map[string]wsproto.DependencySource{}
 	}
 	moduleByPath := make(map[string]string, len(byModule))
 	for module, candidate := range byModule {

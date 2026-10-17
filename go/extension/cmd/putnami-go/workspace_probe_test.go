@@ -224,8 +224,9 @@ func TestProbe_AttributesEveryEdgeToTheModuleGraph(t *testing.T) {
 		}
 	}
 	core := projectAt(t, probeAll(t, root, "apps/svc", "libs/core"), "libs/core")
-	if len(core.DependencySources) != 0 {
-		t.Errorf("dependencySources = %v, want none for a project with no edge", core.DependencySources)
+	if core.DependencySources == nil || len(core.DependencySources) != 0 {
+		t.Errorf("dependencySources = %#v, want an empty map: the provider attributed a project with no edge",
+			core.DependencySources)
 	}
 }
 
@@ -1114,6 +1115,24 @@ func TestProbeDeclaresGoAndOCIMembers(t *testing.T) {
 		}
 		if !slices.Contains(project.WatchedFiles, "putnami.workspace.json") {
 			t.Fatalf("%s watched files = %v, want the workspace document", want.path, project.WatchedFiles)
+		}
+	}
+}
+
+// An empty attribution states that every source of the module was read and
+// none imports a workspace module. An authored image project has no source to
+// read and an incomplete scan has no answer, so neither reports a map.
+func TestProbe_ReportsNoAttributionWithoutAFullSourceScan(t *testing.T) {
+	root := probeFixture(t)
+	writeProbeFile(t, filepath.Join(root, "images", "base", "putnami.json"),
+		`{"name":"base","type":"image","options":{"publish":{"docker":true}}}`)
+	writeProbeFile(t, filepath.Join(root, "apps", "broken", "go.mod"), "module example.com/broken\n\ngo 1.25\n")
+	writeProbeFile(t, filepath.Join(root, "apps", "broken", "main.go"), "package main\n\nimport \"example.com/util\n")
+
+	result := probeAll(t, root, "images/base", "apps/broken", "libs/core")
+	for _, path := range []string{"images/base", "apps/broken"} {
+		if sources := projectAt(t, result, path).DependencySources; sources != nil {
+			t.Errorf("%s dependencySources = %#v, want none: its sources were not all read", path, sources)
 		}
 	}
 }

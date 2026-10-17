@@ -271,8 +271,10 @@ whose answer folds a declared list into the same list as its real imports
 reports both here, so a consumer that must act on imports alone can tell them
 apart without re-reading the provider's manifests. A dependency the map does not
 name is `declared`; `contract` is core's own derivation and no provider may
-claim it. The merge unions the maps, and an edge two providers describe
-differently resolves to the import.
+claim it. An empty map (`{}`) is an answer: the provider attributed the project
+and none of its edges is imported. An absent member means the provider did not
+attribute the project. The merge unions the maps, and an edge two providers
+describe differently resolves to the import.
 
 The reasoning behind the core/provider split and the digest rules is in
 [ADR 0001](doc/adr/0001-core-owns-identity-providers-own-language.md).

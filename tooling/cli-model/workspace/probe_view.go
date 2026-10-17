@@ -416,10 +416,12 @@ func resolveDependencyNames(p *Project, entries []string, byPath map[string]*Pro
 // the same reason resolveDependencyNames keeps an unresolvable entry: the entry
 // is then a name, and dropping it would silently lose the attribution of an
 // edge the graph still carries. An entry for a dependency the project does not
-// carry contributes nothing — it attributes no edge.
+// carry contributes nothing — it attributes no edge. A non-nil view resolves to
+// a non-nil map, empty or not: a provider attributed the project, and nil would
+// read as no provider having answered.
 func resolveDependencySources(p *Project, entries map[string]wsproto.DependencySource,
 	byPath map[string]*Project) map[string]wsproto.DependencySource {
-	if len(entries) == 0 {
+	if entries == nil {
 		return nil
 	}
 	carried := make(map[string]bool, len(p.Dependencies))
@@ -439,9 +441,6 @@ func resolveDependencySources(p *Project, entries map[string]wsproto.DependencyS
 			continue
 		}
 		out[name] = wsproto.StrongerDependencySource(out[name], source)
-	}
-	if len(out) == 0 {
-		return nil
 	}
 	return out
 }

@@ -257,3 +257,107 @@ func TestUnknownAttributionIsReportedOnceAndNeverAsAViolation(t *testing.T) {
 		t.Fatalf("attribution notices = %d, want exactly one", notices)
 	}
 }
+
+// zeroEdgeFixture is the workspace of a provider that answered and found no
+// edge, beside a project no provider answers about:
+//
+//   - apps/b declares /libs/a in putnami.json and reads a file inside it
+//     through a declared test input;
+//   - apps/c declares /libs/a in putnami.json and reads nothing of it;
+//   - docs/site declares only an entry that names no workspace project.
+//
+// The provider answers apps/b and apps/c with an empty dependencySources map:
+// their go.mod requires no workspace module.
+func zeroEdgeFixture(t *testing.T) (*Workspace, *countingProvider, []ProviderBinding) {
+	t.Helper()
+	root := t.TempDir()
+	writeFileAt(t, filepath.Join(root, "putnami.workspace.json"),
+		`{"includes":["libs/a","apps/b","apps/c","docs/site"]}`)
+	writeFileAt(t, filepath.Join(root, "libs", "a", "go.mod"), "module example.com/a\n\ngo 1.25\n")
+	writeFileAt(t, filepath.Join(root, "libs", "a", "putnami.json"), `{"name":"libs/a"}`)
+	writeFileAt(t, filepath.Join(root, "apps", "b", "go.mod"), "module example.com/b\n\ngo 1.25\n")
+	writeFileAt(t, filepath.Join(root, "apps", "b", "putnami.json"),
+		`{"name":"apps/b","dependencies":["/libs/a"],`+
+			`"options":{"test":{"filePatterns":["../../libs/a/testdata/*.json"]}}}`)
+	writeFileAt(t, filepath.Join(root, "apps", "c", "go.mod"), "module example.com/c\n\ngo 1.25\n")
+	writeFileAt(t, filepath.Join(root, "apps", "c", "putnami.json"),
+		`{"name":"apps/c","dependencies":["/libs/a"]}`)
+	writeFileAt(t, filepath.Join(root, "docs", "site", "putnami.json"),
+		`{"name":"docs/site","dependencies":["example.com/x/log"]}`)
+
+	InvalidateLoadCache(root)
+	t.Cleanup(func() { InvalidateLoadCache(root) })
+	ws, err := Load(root)
+	if err != nil {
+		t.Fatalf("load workspace: %v", err)
+	}
+	provider := &countingProvider{
+		name: "@acme/go",
+		answer: func(wsproto.ProbeRequest) wsproto.ProbeResult {
+			none := func() map[string]wsproto.DependencySource { return map[string]wsproto.DependencySource{} }
+			return wsproto.ProbeResult{
+				Version:   wsproto.ProbeProtocolVersion,
+				Extension: "@acme/go",
+				Projects: []wsproto.ProbeProject{
+					{Path: "libs/a", SourceName: "example.com/a", SourceFile: "libs/a/go.mod", DependencySources: none()},
+					{Path: "apps/b", SourceName: "example.com/b", SourceFile: "apps/b/go.mod", DependencySources: none()},
+					{Path: "apps/c", SourceName: "example.com/c", SourceFile: "apps/c/go.mod", DependencySources: none()},
+				},
+			}
+		},
+	}
+	bindings := []ProviderBinding{{
+		Scope:    scopeFor(t, "@acme/go", []string{"go.mod"}, []string{"**/go.mod"}),
+		Provider: provider,
+	}}
+	return ws, provider, bindings
+}
+
+func declaredEdgeDiagnosticsIn(diagnostics []diag.Diagnostic) []diag.Diagnostic {
+	var found []diag.Diagnostic
+	for _, d := range diagnostics {
+		if d.Code == DeclaredEdgeDiagnosticCode {
+			found = append(found, d)
+		}
+	}
+	return found
+}
+
+// A provider that answered and found no edge leaves every putnami.json entry
+// `declared`, so the check judges it: a declared input backs apps/b's entry,
+// nothing backs apps/c's. An entry naming no workspace project raises no
+// attribution notice. The answer survives the recorded snapshot.
+func TestAnAnswerWithNoEdgesLeavesEveryEntryDeclared(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "declared-edge-check",
+		"an-answer-with-no-edges-leaves-every-entry-declared")
+	ws, provider, bindings := zeroEdgeFixture(t)
+
+	for _, run := range []string{"probed", "recorded"} {
+		outcome, err := Synchronize(SyncRequest{Workspace: ws, Providers: bindings, Reason: wsproto.ProbeReasonLoad})
+		if err != nil {
+			t.Fatalf("%s: Synchronize: %v", run, err)
+		}
+		if run == "recorded" && (!outcome.Fresh || provider.calls != 1) {
+			t.Fatalf("recorded: fresh=%v calls=%d, want the snapshot replayed", outcome.Fresh, provider.calls)
+		}
+		found := declaredEdgeDiagnosticsIn(outcome.Diagnostics)
+		if len(found) != 1 || found[0].Field != "apps/c/putnami.json" {
+			t.Fatalf("%s: diagnostics = %+v, want only apps/c's unbacked putnami.json entry", run, found)
+		}
+	}
+}
+
+// An entry that names no workspace project is one the check never judges, so
+// it cannot make a project unattributed.
+func TestAnEntryNamingNoWorkspaceProjectRaisesNoAttributionNotice(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "declared-edge-check",
+		"an-entry-naming-no-workspace-project-raises-no-attribution-notice")
+	ws := declaredEdgeFixture(t)
+	external := &Project{ID: "/docs/site", Name: "docs/site", Path: "docs/site",
+		Config:       &wsproto.ProjectConfig{Name: "docs/site", Dependencies: []string{"example.com/x/log"}},
+		Dependencies: []string{"example.com/x/log"}}
+	ws = NewWorkspace(ws.Root, nil, append(ws.Projects, external))
+	if unattributed := UnattributedProjects(ws); len(unattributed) != 1 || unattributed[0] != "acme/py-app" {
+		t.Fatalf("unattributed = %v, want only the project whose entry names a workspace project", unattributed)
+	}
+}

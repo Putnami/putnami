@@ -463,10 +463,12 @@ func packageDirOf(root, candidate string) string {
 //
 // An import the reported set does not carry is attributed to nothing: the
 // protocol refuses provenance for an edge the answer does not report, and this
-// answer's edges are the ones precedence picked.
+// answer's edges are the ones precedence picked. A package with no reported
+// edge is answered with an empty map: the provider attributed it and nothing is
+// imported.
 func tsDependencySources(reported, imported []string) map[string]wsproto.DependencySource {
 	if len(reported) == 0 {
-		return nil
+		return map[string]wsproto.DependencySource{}
 	}
 	isImport := make(map[string]bool, len(imported))
 	for _, path := range imported {
