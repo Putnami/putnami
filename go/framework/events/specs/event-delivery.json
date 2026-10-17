@@ -49,6 +49,10 @@
     {
       "id": "push-receiver-mounting",
       "text": "Under push delivery the plugin mounts its receiver on the application's single server when the application configures, after it resolves the events config, and mounts it once however often the application configures. A push application that holds no server, or several, fails configure with an error that names RegisterOn. RegisterOn chooses the server and is never repeated. Pull and stream delivery need no server and mount no receiver."
+    },
+    {
+      "id": "push-refusal-envelope",
+      "text": "The push receiver answers 400 in the canonical error envelope, with the code http.bad_request, to a push body or an envelope it cannot decode, so the provider dead-letters the message."
     }
   ],
   "decisions": [

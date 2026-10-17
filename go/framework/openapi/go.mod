@@ -8,6 +8,7 @@ require (
 	go.putnami.dev/client v0.0.0-00010101000000-000000000000
 	go.putnami.dev/errors v0.0.1
 	go.putnami.dev/http v0.0.1
+	go.putnami.dev/logger v0.0.1
 	go.putnami.dev/protocol/clientcontract v0.0.0
 	go.putnami.dev/protocol/contracts v0.0.0
 	go.putnami.dev/protocol/features v0.0.0
@@ -20,7 +21,6 @@ require (
 	go.putnami.dev/config v0.0.1 // indirect
 	go.putnami.dev/ctxutil v0.0.0 // indirect
 	go.putnami.dev/inject v0.0.1 // indirect
-	go.putnami.dev/logger v0.0.1 // indirect
 	go.putnami.dev/migration v0.0.0 // indirect
 	go.putnami.dev/protocol/capabilities v0.0.0 // indirect
 	go.putnami.dev/protocol/config v0.0.0 // indirect

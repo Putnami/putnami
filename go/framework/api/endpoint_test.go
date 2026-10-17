@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -413,8 +414,13 @@ func TestEndpoint_BodyValidation(t *testing.T) {
 
 	req = httptest.NewRequest("POST", "/users", strings.NewReader(`{}`))
 	req.Header.Set("Content-Type", "application/json")
-	if got := handler(phttp.NewContext(httptest.NewRecorder(), req)).Status; got != 400 {
-		t.Errorf("invalid body → got %d, want 400", got)
+	invalid := handler(phttp.NewContext(httptest.NewRecorder(), req))
+	if invalid.Status != 400 {
+		t.Errorf("invalid body → got %d, want 400", invalid.Status)
+	}
+	envelope := badRequestEnvelope(t, invalid, "Validation failed")
+	if details, ok := envelope["details"].([]any); !ok || len(details) == 0 {
+		t.Errorf("validation 400 details = %v, want the failing fields", envelope["details"])
 	}
 
 	// The stage's product is what the handler reads, so assert that too: a field
@@ -669,6 +675,27 @@ func TestEndpoint_InvalidJSONBody(t *testing.T) {
 	if resp.Status != 400 {
 		t.Errorf("expected 400 for invalid JSON, got %d", resp.Status)
 	}
+	if envelope := badRequestEnvelope(t, resp, "Invalid request body"); len(envelope) != 3 {
+		t.Errorf("invalid JSON 400 = %v, want only code, error and message", envelope)
+	}
+}
+
+// badRequestEnvelope decodes a 400 answer and fails the test unless it is the
+// canonical error envelope with the code http.bad_request and message.
+func badRequestEnvelope(t *testing.T, resp *phttp.Response, message string) map[string]any {
+	t.Helper()
+	raw, err := resp.BodyBytes()
+	if err != nil {
+		t.Fatalf("reading body: %v", err)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(raw, &body); err != nil {
+		t.Fatalf("decoding body %s: %v", raw, err)
+	}
+	if body["code"] != "http.bad_request" || body["error"] != "Bad Request" || body["message"] != message {
+		t.Errorf("body = %s, want code http.bad_request, error Bad Request, message %q", raw, message)
+	}
+	return body
 }
 
 func TestEndpoint_BodySkippedForGET(t *testing.T) {

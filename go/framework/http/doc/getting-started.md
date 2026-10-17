@@ -152,7 +152,7 @@ server.POST("/users", func(ctx *http.Context) *http.Response {
         Email string `json:"email"`
     }
     if err := ctx.Body(&input); err != nil {
-        return http.JSONStatus(400, map[string]string{"error": err.Error()})
+        return http.ErrorResponse(errors.BadRequest("Invalid request body"))
     }
     return http.JSONStatus(201, input)
 })
@@ -218,7 +218,12 @@ the codes `not_found`, `unauthorized`, `forbidden` and `internal`. The server
 uses the same envelope for these answers: a route that does not exist answers
 `NotFound()`, and a panic that `Recovery` catches, or a request scope
 that cannot be created, resolved or committed, answers 500 with the code
-`internal` and the message `Internal Server Error`. `InternalError` sends its
+`internal` and the message `Internal Server Error`. A known path called with a
+method it does not route answers 405 with the code `http.method_not_allowed`
+and an `Allow` header naming the methods it routes, `HEAD` when it routes
+`GET`, and `OPTIONS`. The rate limiter's 429 carries the code
+`http.too_many_requests`, and a stream route or WebSocket upgrade the server
+refuses answers 400 with the code `http.bad_request`. `InternalError` sends its
 message to the client verbatim: pass a fixed message, and answer an error value
 with `ErrorResponse(err)`, which hides an internal cause.
 
@@ -359,7 +364,7 @@ Options:
 | `WindowMs` | `60000` | Time window in milliseconds |
 | `Max` | `100` | Maximum requests per window |
 | `KeyFunc` | IP-based | Function to extract the rate limit key from the context |
-| `Message` | `"Too Many Requests"` | Response body message |
+| `Message` | `"Too Many Requests"` | Message of the 429 error envelope, whose code is `http.too_many_requests` |
 | `Headers` | `true` | Include `RateLimit-*` response headers |
 
 The default key function uses `X-Forwarded-For` (first IP) or falls back to the remote address.
@@ -408,7 +413,7 @@ apiPlugin.Register(api.Endpoint("POST", "/users").
     Handle(func(ctx *http.EndpointContext) *http.Response {
         body, err := http.BodyAs[CreateUserBody](ctx)
         if err != nil {
-            return http.JSONStatus(400, map[string]string{"error": err.Error()})
+            return http.ErrorResponse(errors.BadRequest("Invalid request body"))
         }
         // create user...
         return http.JSONStatus(201, user)

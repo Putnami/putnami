@@ -3,11 +3,14 @@ package http
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	perrors "go.putnami.dev/errors"
 )
 
 // RateLimitOptions configures the rate limiting middleware.
@@ -19,7 +22,8 @@ type RateLimitOptions struct {
 	// KeyFunc extracts a rate limit key from the request context.
 	// Default: uses X-Forwarded-For or remote address.
 	KeyFunc func(ctx *Context) string
-	// Message is the response body when rate limited. Default: "Too Many Requests".
+	// Message is the message of the 429 envelope, whose code is
+	// http.too_many_requests. Default: "Too Many Requests".
 	Message string
 	// TrustedProxies is a list of trusted proxy IP addresses or CIDR ranges.
 	// When set, X-Forwarded-For is only used if the request comes from a trusted proxy.
@@ -156,10 +160,7 @@ func RateLimit(opts RateLimitOptions) Middleware {
 			if retryAfter < 1 {
 				retryAfter = 1
 			}
-			resp := JSONStatus(429, map[string]string{
-				"error":   "Too Many Requests",
-				"message": opts.Message,
-			})
+			resp := errorEnvelope(http.StatusTooManyRequests, perrors.CodeTooManyRequests, opts.Message)
 			resp.Headers.Set("Retry-After", fmt.Sprintf("%d", int(retryAfter)))
 			return resp
 		}

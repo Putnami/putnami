@@ -65,7 +65,7 @@ func handler(ctx *http.Context) *http.Response {
 
     var body CreateUserInput
     if err := ctx.Body(&body); err != nil {
-        return http.JSONStatus(400, map[string]string{"error": err.Error()})
+        return http.ErrorResponse(errors.BadRequest("Invalid request body"))
     }
 
     if ctx.IsSecured() {
@@ -220,6 +220,7 @@ extractors `http.ParamsAs` / `http.QueryAs` / `http.BodyAs` / `http.InjectedAs`.
 ```go
 import (
     "go.putnami.dev/api"
+    "go.putnami.dev/errors"
     "go.putnami.dev/http"
 )
 
@@ -238,7 +239,7 @@ apiPlugin.Register(api.Endpoint("POST", "/users").
     Handle(func(ctx *http.EndpointContext) *http.Response {
         body, err := http.BodyAs[CreateUserInput](ctx)
         if err != nil {
-            return http.JSONStatus(400, map[string]string{"error": err.Error()})
+            return http.ErrorResponse(errors.BadRequest("Invalid request body"))
         }
         db := ctx.Injected["db"]
         _ = db // ...

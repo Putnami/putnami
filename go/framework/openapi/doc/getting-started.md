@@ -326,7 +326,7 @@ Operation IDs are generated automatically from the HTTP method and path. The met
 
 When wired with `RegisterOn`, the plugin registers an **unauthenticated** GET handler on the configured route (default `/_/openapi.json`). Because the document discloses the API's security model (required roles/scopes, internal paths), the response is sent with `Cache-Control: no-store` by default so shared caches/CDNs do not retain it. Override via `PluginOptions.CacheControl` (e.g. `"public, max-age=3600"`) when the spec is meant to be public, and gate the route behind auth middleware when it is not.
 
-If the spec has not yet been generated (configure has not run), the endpoint returns a `503 Service Unavailable` response.
+If the spec has not yet been generated (configure has not run), the endpoint returns a `503 Service Unavailable` response with the code `http.service_unavailable`. A spec that fails to render returns 500 with the code `internal` and a fixed message; the cause is logged on the server, never sent.
 
 ## Plugin Lifecycle
 

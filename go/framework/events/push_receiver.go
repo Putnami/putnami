@@ -204,11 +204,11 @@ func (p *Plugin) allowPusher(user *phttp.Claims, _ *phttp.Context) bool {
 func (p *Plugin) handlePush(ctx *phttp.Context) *phttp.Response {
 	var wrapper protoevents.PushEnvelope
 	if err := ctx.Body(&wrapper); err != nil {
-		return phttp.JSONStatus(400, map[string]string{"error": "invalid push body"})
+		return phttp.ErrorResponse(errors.BadRequest("invalid push body"))
 	}
 	env, err := decodePushEnvelope(wrapper)
 	if err != nil {
-		return phttp.JSONStatus(400, map[string]string{"error": "invalid envelope"})
+		return phttp.ErrorResponse(errors.BadRequest("invalid envelope"))
 	}
 	// A failure moves to the request record when the request carries a field
 	// bag (the http Logging middleware wraps the route); otherwise the delivery

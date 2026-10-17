@@ -88,10 +88,7 @@ func (err *WebSocketCloseError) Error() string {
 
 func (p *ServerPlugin) serveWebSocket(ctx *Context, stream StreamHandler, subprotocol string) *Response {
 	if !isWebSocketRequest(ctx.Request) {
-		return JSONStatus(http.StatusBadRequest, map[string]string{
-			"error":   "Bad Request",
-			"message": "websocket upgrade required",
-		})
+		return badRequest("websocket upgrade required")
 	}
 	hijacker, ok := ctx.Writer.(http.Hijacker)
 	if !ok {
@@ -99,22 +96,13 @@ func (p *ServerPlugin) serveWebSocket(ctx *Context, stream StreamHandler, subpro
 	}
 	key := strings.TrimSpace(ctx.Request.Header.Get("Sec-WebSocket-Key"))
 	if key == "" {
-		return JSONStatus(http.StatusBadRequest, map[string]string{
-			"error":   "Bad Request",
-			"message": "missing Sec-WebSocket-Key",
-		})
+		return badRequest("missing Sec-WebSocket-Key")
 	}
 	if ctx.Request.Header.Get("Sec-WebSocket-Version") != "13" {
-		return JSONStatus(http.StatusBadRequest, map[string]string{
-			"error":   "Bad Request",
-			"message": "unsupported WebSocket version",
-		})
+		return badRequest("unsupported WebSocket version")
 	}
 	if decoded, err := base64.StdEncoding.DecodeString(key); err != nil || len(decoded) != 16 {
-		return JSONStatus(http.StatusBadRequest, map[string]string{
-			"error":   "Bad Request",
-			"message": "invalid Sec-WebSocket-Key",
-		})
+		return badRequest("invalid Sec-WebSocket-Key")
 	}
 
 	conn, rw, err := hijacker.Hijack()

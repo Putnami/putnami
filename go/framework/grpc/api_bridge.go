@@ -14,6 +14,7 @@ import (
 
 	"go.putnami.dev/api"
 	"go.putnami.dev/app"
+	perrors "go.putnami.dev/errors"
 	phttp "go.putnami.dev/http"
 	"go.putnami.dev/proto"
 	clientcontract "go.putnami.dev/protocol/clientcontract"
@@ -274,10 +275,7 @@ func (b *ApiBridge) bridgeHandler(def api.EndpointDefinition, path string) phttp
 		if ctx.Request.Body != nil {
 			read, err := io.ReadAll(ctx.Request.Body)
 			if err != nil {
-				return phttp.JSONStatus(400, map[string]string{
-					"error":   "Bad Request",
-					"message": "Failed to read Connect RPC body",
-				})
+				return phttp.ErrorResponse(perrors.BadRequest("Failed to read Connect RPC body"))
 			}
 			data = read
 		}
@@ -299,10 +297,7 @@ func applyBridgeEnvelope(ctx *phttp.Context, def api.EndpointDefinition, path st
 		decoder := json.NewDecoder(bytes.NewReader(data))
 		decoder.UseNumber()
 		if err := decoder.Decode(&envelope); err != nil {
-			return phttp.JSONStatus(400, map[string]string{
-				"error":   "Bad Request",
-				"message": "Invalid JSON body for Connect RPC",
-			})
+			return phttp.ErrorResponse(perrors.BadRequest("Invalid JSON body for Connect RPC"))
 		}
 	}
 
@@ -333,15 +328,23 @@ func applyBridgeEnvelope(ctx *phttp.Context, def api.EndpointDefinition, path st
 		ctx.Request.Body = io.NopCloser(strings.NewReader("{}"))
 		return nil
 	}
-	encoded, err := json.Marshal(envelope.Body)
-	if err != nil {
-		return phttp.JSONStatus(500, map[string]string{
-			"error":   "Internal Server Error",
-			"message": "Failed to re-encode bridged request body",
-		})
+	encoded, rejection := encodeBridgeBody(envelope.Body)
+	if rejection != nil {
+		return rejection
 	}
 	ctx.Request.Body = io.NopCloser(bytes.NewReader(encoded))
 	return nil
+}
+
+// encodeBridgeBody re-encodes the envelope's body section for the endpoint's
+// validation pipeline. A body it cannot encode answers 500 with the code
+// internal and a fixed message.
+func encodeBridgeBody(body map[string]any) ([]byte, *phttp.Response) {
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return nil, phttp.InternalError("Failed to re-encode bridged request body")
+	}
+	return encoded, nil
 }
 
 // bridgeValueToString renders a JSON-decoded envelope value as the string the

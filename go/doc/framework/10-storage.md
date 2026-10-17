@@ -176,7 +176,7 @@ func uploadAvatar(backend storage.Backend) fhttp.Handler {
     return func(ctx *fhttp.Context) *fhttp.Response {
         body, err := ctx.RawBody()
         if err != nil {
-            return fhttp.JSONStatus(400, map[string]string{"error": "invalid body"})
+            return fhttp.ErrorResponse(errors.BadRequest("Invalid request body"))
         }
 
         key := fmt.Sprintf("%s/avatar.png", ctx.Param("userId"))

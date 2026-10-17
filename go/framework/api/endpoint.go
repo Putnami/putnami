@@ -766,10 +766,7 @@ func (b *EndpointBuilder) validateBody(ctx *phttp.Context, ectx *phttp.EndpointC
 			slog.String("path", ctx.Path),
 			slog.Any("error", err),
 		)
-		return phttp.JSONStatus(400, map[string]string{
-			"error":   "Bad Request",
-			"message": "Invalid request body",
-		})
+		return phttp.ErrorResponse(perrors.BadRequest("Invalid request body"))
 	}
 	result := schema.Validate(b.bodySchema, bodyMap, schema.WithLabel("body"))
 	if result.HasErrors() {
@@ -803,9 +800,5 @@ func validationErrorResponse(errors []schema.FieldError, firstParty bool) *phttp
 	if firstParty {
 		return phttp.ErrorResponse(perrors.BadRequest("Validation failed"))
 	}
-	return phttp.JSONStatus(400, map[string]any{
-		"error":   "Bad Request",
-		"message": "Validation failed",
-		"details": errors,
-	})
+	return phttp.ErrorResponse(perrors.BadRequest("Validation failed", perrors.Any("details", errors)))
 }

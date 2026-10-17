@@ -96,8 +96,8 @@ func TestExternalContract_ConfigureRefusesContradictionsBeforeBinding(t *testing
 
 // A route an external authority owns is served by the standard pipeline on a
 // first-party API: its body is decoded leniently and a validation failure
-// answers the standard error body, while its first-party neighbor keeps the
-// strict decoding and the framework envelope. A stream keeps the raw
+// answers the error envelope with its field details, while its first-party
+// neighbor keeps the strict decoding and the envelope without details. A stream keeps the raw
 // transport instead of negotiating the first-party subprotocol.
 func TestExternalContract_RouteIsServedByTheStandardPipeline(t *testing.T) {
 	spectest.Proves(t, "go/api-contracts", "external-contract-operations",
@@ -146,12 +146,12 @@ func TestExternalContract_RouteIsServedByTheStandardPipeline(t *testing.T) {
 	}
 
 	status, body := call("/v2/{name}/manifests/{reference}", `{}`)
-	if status != 400 || !strings.Contains(body, `"details"`) || strings.Contains(body, `"code"`) {
-		t.Fatalf("external validation failure = %d %s, want the standard error body", status, body)
+	if status != 400 || !strings.Contains(body, `"details"`) || !strings.Contains(body, `"code":"http.bad_request"`) {
+		t.Fatalf("external validation failure = %d %s, want the standard error body with its field details", status, body)
 	}
 	status, body = call("/v2/_putnami/manifests", `{}`)
-	if status != 400 || !strings.Contains(body, `"code"`) {
-		t.Fatalf("first-party validation failure = %d %s, want the framework envelope", status, body)
+	if status != 400 || !strings.Contains(body, `"code":"http.bad_request"`) || strings.Contains(body, `"details"`) {
+		t.Fatalf("first-party validation failure = %d %s, want the strict framework envelope", status, body)
 	}
 
 	subprotocols := map[string]string{}

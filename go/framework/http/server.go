@@ -471,16 +471,24 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 			// middleware can answer the preflight (analogous to HEAD→GET).
 			// Without this, routing is method-keyed and the preflight 404s
 			// before any middleware runs, silently breaking CORS.
-			if match == nil && r.Method == "OPTIONS" {
-				if allowed := p.routes.allowedMethods(r.URL.Path); len(allowed) > 0 {
-					match = &routeMatch[Handler]{
-						Handlers: []Handler{p.preflightHandler(allowed)},
-						Pattern:  r.URL.Path,
-					}
+			var allowed []string
+			if match == nil {
+				allowed = p.routes.allowedMethods(r.URL.Path)
+			}
+			if match == nil && r.Method == "OPTIONS" && len(allowed) > 0 {
+				match = &routeMatch[Handler]{
+					Handlers: []Handler{p.preflightHandler(allowed)},
+					Pattern:  r.URL.Path,
 				}
 			}
 			if match == nil {
-				if err := writeResponse(w, r, NotFound()); err != nil {
+				// A path that only an OPTIONS route matches, such as a CORS
+				// catch-all, is not a resource: it answers 404.
+				refusal := NotFound()
+				if slices.ContainsFunc(allowed, func(method string) bool { return method != http.MethodOptions }) {
+					refusal = methodNotAllowed(allowed)
+				}
+				if err := writeResponse(w, r, refusal); err != nil {
 					p.logWriteFailure(r, "write response", err)
 				}
 				return
@@ -694,7 +702,7 @@ func requestOutcome(reqCtx context.Context, resp *Response) error {
 // response; absent CORS, it answers 204 with an Allow header listing the
 // registered methods plus OPTIONS.
 func (p *ServerPlugin) preflightHandler(allowed []string) Handler {
-	allow := strings.Join(append(allowed, "OPTIONS"), ", ")
+	allow := allowHeader(allowed)
 	base := func(ctx *Context) *Response {
 		ctx.SetHeader("Allow", allow)
 		return NoContent()
@@ -703,6 +711,28 @@ func (p *ServerPlugin) preflightHandler(allowed []string) Handler {
 		return p.composedChain(base)
 	}
 	return base
+}
+
+// allowHeader returns the Allow header value for a path that routes methods:
+// those methods, HEAD when they include GET, and OPTIONS.
+func allowHeader(methods []string) string {
+	allow := slices.Clone(methods)
+	if slices.Contains(allow, http.MethodGet) && !slices.Contains(allow, http.MethodHead) {
+		allow = append(allow, http.MethodHead)
+	}
+	if !slices.Contains(allow, http.MethodOptions) {
+		allow = append(allow, http.MethodOptions)
+	}
+	return strings.Join(allow, ", ")
+}
+
+// methodNotAllowed creates the 405 a known path answers for a method it does
+// not route: the canonical error envelope with the code
+// http.method_not_allowed, and an Allow header naming what the path routes.
+func methodNotAllowed(methods []string) *Response {
+	resp := errorEnvelope(http.StatusMethodNotAllowed, errors.CodeMethodNotAllowed, "The requested method is not allowed for this resource")
+	resp.Headers.Set("Allow", allowHeader(methods))
+	return resp
 }
 
 func (p *ServerPlugin) buildServer(handler http.Handler) (string, *http.Server) {
