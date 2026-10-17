@@ -119,10 +119,25 @@ Run `./putnamiw test --projects go.putnami.dev/protocol/collaboration --enforce-
   placement, binding location, provider declaration, versioning, routing names,
   outcome semantics, the 4 MiB document bound and shorter pages, proposal
   `labels` and `assignees`, what a revision covers, and the shared scenarios.
+- [ADR 0002 — The contracts are published as preview](doc/adr/0002-the-contracts-are-published-as-preview.md):
+  publication, the `preview` status, the task `key` and `createdAt`, and why the
+  version 1 documents are fixed from the first published module.
 
 ## Support
 
-The module is not published yet and claims no support status: publication and
-a status are a separate reviewed decision recorded in
-[`putnami.support.json`](../../putnami.support.json). Providers in this
-repository consume it by `replace`.
+- **Status:** `preview`, recorded as
+  `{"id": "go.putnami.dev/protocol/collaboration", "kind": "protocol", "status": "preview"}`
+  in the workspace-root [`putnami.support.json`](../../putnami.support.json)
+  catalog (contract: [`protocols/support`](../support/README.md)).
+- **Owner:** the Putnami maintainers, as repository owners of `protocols/`.
+- **Evidence:** the CLI routes every collaboration call through this module;
+  `@putnami/local-collaboration`, `@putnami/github-collaboration` and
+  `@putnami/memory-store` run the shared `providertest` scenarios; the fixture
+  corpus, the drift tests and the catalog tests pin every document.
+- **What may still change:** new optional operations, the Go helpers (`Serve`,
+  `ReadProviderOffer`, `providertest`) and the guides. The version 1 documents
+  do not change: a new member is a new contract version
+  ([ADR 0002](doc/adr/0002-the-contracts-are-published-as-preview.md)).
+- **Why not `stable`:** the CLI route and every provider live in this
+  repository. No consumer across a boundary this repository does not control
+  uses the contracts yet.
