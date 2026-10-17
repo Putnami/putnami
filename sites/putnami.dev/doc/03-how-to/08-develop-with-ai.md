@@ -7,7 +7,7 @@ Use AI coding assistants like Claude Code, Codex, Cursor, or GitHub Copilot to b
 `putnami init` writes two things for assistants at the workspace root:
 
 - **`AGENTS.md` / `CLAUDE.md`** — one delimited Putnami block. A new `CLAUDE.md` is only `@AGENTS.md`; an existing file keeps every line outside the block, and an edited block is preserved, never overwritten
-- **`.mcp.json`** — the `putnami` MCP server entry, so a new agent session reaches the Putnami tools with no manual step. `putnami install` and `putnami upgrade` add the entry too when it is missing
+- **`.mcp.json`** — the `putnami` MCP server entry, so a new Claude Code session reaches the Putnami tools with no manual step. `putnami install` and `putnami upgrade` add the entry too when it is missing
 
 The block is short on purpose. It states:
 
@@ -138,7 +138,7 @@ it, then rerun.
 
 ## Reach the MCP server
 
-An agent IDE discovers the server through a `.mcp.json` file at the workspace root. `putnami init`, `putnami install` and `putnami upgrade` add the `putnami` entry when it is missing. They merge: other servers and unknown keys are preserved, a `putnami` entry you changed is kept as you wrote it, and a file that does not parse is left untouched with a warning. The entry runs `putnami mcp`, or `./putnamiw mcp` in a workspace that builds its own CLI from source and has a `putnamiw` file at its root.
+Claude Code discovers the server through a `.mcp.json` file at the workspace root. Other hosts do not read that file: Codex reads `.codex/config.toml`, Cursor reads `.cursor/mcp.json`, and VS Code reads `.vscode/mcp.json`. Putnami commands write none of them. `putnami init`, `putnami install` and `putnami upgrade` add the `putnami` entry when it is missing. They merge: other servers and unknown keys are preserved, a `putnami` entry you changed is kept as you wrote it, and a file that does not parse is left untouched with a warning. The entry runs `putnami mcp`, or `./putnamiw mcp` in a workspace that builds its own CLI from source and has a `putnamiw` file at its root.
 
 To write or repair the entry explicitly, run:
 

@@ -402,8 +402,8 @@ func TestContextGenerateNeverWritesMCPConfig(t *testing.T) {
 	}
 }
 
-// `putnami mcp install` is the documented, explicit path an agent IDE reaches
-// the server through, and it is merge-aware over a human's own servers.
+// `putnami mcp install` is the documented, explicit way to write the .mcp.json
+// entry Claude Code reads, and it is merge-aware over a human's own servers.
 func TestMCPInstallIsTheExplicitRegistrationPath(t *testing.T) {
 	spectest.Proves(t, "cli/context-mcp-discovery", "host-session-launcher", "mcp-registration-is-explicit-and-merge-aware")
 	dir := t.TempDir()

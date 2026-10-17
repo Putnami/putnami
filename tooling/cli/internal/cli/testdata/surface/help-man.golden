@@ -327,7 +327,7 @@ Report available local CPU and memory for check admission.
 Run the MCP server over stdio for AI agent harnesses.
 .TP
 .B mcp install
-Register the MCP server in .mcp.json for agent IDEs.
+Register the MCP server in .mcp.json for Claude Code.
 .SS Other
 .TP
 .B telemetry on|off|status|show
@@ -901,7 +901,7 @@ Run the Model Context Protocol server over stdio so an AI agent harness can disc
 .br
 putnami mcp [install]
 .SS mcp install
-Write the putnami entry into .mcp.json at the workspace root so agent IDEs (Claude Code, Cursor, VS Code) auto-discover the MCP server. init, install and upgrade already add a missing entry; this explicit write is the only one that also rewrites a diverged putnami entry. Merge-aware: other servers and unknown keys are preserved, and an unparseable file is refused untouched.
+Write the putnami entry into .mcp.json at the workspace root, where Claude Code discovers the MCP server. Codex, Cursor and VS Code read their own files and do not see this entry. init, install and upgrade already add a missing entry; this explicit write is the only one that also rewrites a diverged putnami entry. Merge-aware: other servers and unknown keys are preserved, and an unparseable file is refused untouched.
 .PP
 .B Usage:
 .br

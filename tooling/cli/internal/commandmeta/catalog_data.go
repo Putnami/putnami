@@ -1277,8 +1277,8 @@ var catalog = []Command{
 		Path:        "mcp install",
 		Kind:        KindStructured,
 		Category:    "Agents",
-		Summary:     "Register the MCP server in .mcp.json for agent IDEs",
-		Description: "Write the putnami entry into .mcp.json at the workspace root so agent IDEs (Claude Code, Cursor, VS Code) auto-discover the MCP server. init, install and upgrade already add a missing entry; this explicit write is the only one that also rewrites a diverged putnami entry. Merge-aware: other servers and unknown keys are preserved, and an unparseable file is refused untouched.",
+		Summary:     "Register the MCP server in .mcp.json for Claude Code",
+		Description: "Write the putnami entry into .mcp.json at the workspace root, where Claude Code discovers the MCP server. Codex, Cursor and VS Code read their own files and do not see this entry. init, install and upgrade already add a missing entry; this explicit write is the only one that also rewrites a diverged putnami entry. Merge-aware: other servers and unknown keys are preserved, and an unparseable file is refused untouched.",
 		Usage:       "putnami mcp install",
 		Examples: []string{
 			"putnami mcp install",

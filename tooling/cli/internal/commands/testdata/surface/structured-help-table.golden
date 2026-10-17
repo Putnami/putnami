@@ -191,7 +191,7 @@ usage: putnami mcp [install]
 example: putnami mcp
 example: putnami mcp install
 ═══ mcp install ═══
-description: Write the putnami entry into .mcp.json at the workspace root so agent IDEs (Claude Code, Cursor, VS Code) auto-discover the MCP server. init, install and upgrade already add a missing entry; this explicit write is the only one that also rewrites a diverged putnami entry. Merge-aware: other servers and unknown keys are preserved, and an unparseable file is refused untouched.
+description: Write the putnami entry into .mcp.json at the workspace root, where Claude Code discovers the MCP server. Codex, Cursor and VS Code read their own files and do not see this entry. init, install and upgrade already add a missing entry; this explicit write is the only one that also rewrites a diverged putnami entry. Merge-aware: other servers and unknown keys are preserved, and an unparseable file is refused untouched.
 usage: putnami mcp install
 example: putnami mcp install
 ═══ migrate vnext ═══

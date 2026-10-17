@@ -14,8 +14,9 @@ import (
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
 
-// mcpConfigPath is the workspace-relative MCP registration file that agent
-// IDEs (Claude Code, Cursor, VS Code) auto-discover at the project root.
+// mcpConfigPath is the workspace-relative MCP registration file that Claude
+// Code discovers at the project root. Codex (.codex/config.toml), Cursor
+// (.cursor/mcp.json) and VS Code (.vscode/mcp.json) do not read it.
 const mcpConfigPath = ".mcp.json"
 
 // mcpServerEntry is the canonical registration for the putnami MCP server in
@@ -209,7 +210,7 @@ func MCPInstall(wsRoot string) error {
 	}
 	switch status {
 	case mcpConfigCreated:
-		iox.Fprintf(os.Stdout, "  ✓ %s created — putnami MCP server registered for agent IDEs\n", mcpConfigPath)
+		iox.Fprintf(os.Stdout, "  ✓ %s created — putnami MCP server registered for Claude Code\n", mcpConfigPath)
 	case mcpConfigAdded:
 		iox.Fprintf(os.Stdout, "  ✓ putnami MCP server added to %s\n", mcpConfigPath)
 	case mcpConfigUpdated:

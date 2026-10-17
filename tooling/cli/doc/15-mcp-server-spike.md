@@ -239,9 +239,8 @@ whether it cuts retry loops is, again, for the A/B to confirm.
 
 ## `.mcp.json` (distribution)
 
-Distribution is free — the server ships in the existing binary. Agent IDEs
-(Claude Code, Cursor, VS Code) auto-discover it through a workspace-root
-`.mcp.json`:
+Distribution is free — the server ships in the existing binary. Claude Code
+discovers it through a workspace-root `.mcp.json`:
 
 ```json
 {
