@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -18,6 +20,7 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/npmpublish"
 	"go.putnami.dev/sdk/extension/recorded"
 )
 
@@ -380,196 +383,6 @@ func TestManagedNPMConfigDoesNotGiveBearerToLocalPack(t *testing.T) {
 	}
 }
 
-func TestSendManagedNPMPublishUsesAuthenticatedTaglessPut(t *testing.T) {
-	var method, escapedPath, authorization, contentType string
-	var received managedNPMPublishPayload
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		method = r.Method
-		escapedPath = r.URL.EscapedPath()
-		authorization = r.Header.Get("Authorization")
-		contentType = r.Header.Get("Content-Type")
-		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
-			t.Errorf("decode managed npm request: %v", err)
-		}
-		w.WriteHeader(http.StatusCreated)
-	}))
-	defer server.Close()
-
-	payload := managedNPMPublishPayload{
-		Name:        "@test/pkg",
-		Versions:    map[string]json.RawMessage{"1.2.3-r42": json.RawMessage(`{"name":"@test/pkg","version":"1.2.3-r42"}`)},
-		Attachments: map[string]managedNPMAttachment{"pkg-1.2.3-r42.tgz": {ContentType: "application/octet-stream", Data: "dGd6", Length: 3}},
-		DistTags:    map[string]string{},
-	}
-	if err := sendManagedNPMPublish(server.URL, "target-token", payload); err != nil {
-		t.Fatalf("send managed npm publish: %v", err)
-	}
-	if method != http.MethodPut || escapedPath != "/@test%2Fpkg" {
-		t.Fatalf("managed npm endpoint = %s %s, want PUT /@test%%2Fpkg", method, escapedPath)
-	}
-	if authorization != "Bearer target-token" || contentType != "application/json" {
-		t.Fatalf("managed npm headers authorization=%q content-type=%q", authorization, contentType)
-	}
-	if received.Name != payload.Name || len(received.DistTags) != 0 || len(received.Versions) != 1 || len(received.Attachments) != 1 {
-		t.Fatalf("managed npm wire payload = %#v, want exact tagless payload", received)
-	}
-}
-
-func TestSendManagedNPMPublishIgnoresAmbientProxyAndRedactsEchoedToken(t *testing.T) {
-	t.Setenv("HTTP_PROXY", "")
-	t.Setenv("http_proxy", "")
-	t.Setenv("HTTPS_PROXY", "")
-	t.Setenv("https_proxy", "")
-	t.Setenv("NO_PROXY", "")
-	t.Setenv("no_proxy", "")
-
-	var proxyRequests int
-	var proxyAuthorization string
-	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		proxyRequests++
-		proxyAuthorization = r.Header.Get("Authorization")
-		http.Error(w, "reflected target-token", http.StatusBadGateway)
-	}))
-	defer proxy.Close()
-	t.Setenv("HTTP_PROXY", proxy.URL)
-	t.Setenv("http_proxy", proxy.URL)
-
-	payload := managedNPMPublishPayload{
-		Name:        "@test/pkg",
-		Versions:    map[string]json.RawMessage{"1.2.3-r42": json.RawMessage(`{"name":"@test/pkg","version":"1.2.3-r42"}`)},
-		Attachments: map[string]managedNPMAttachment{"pkg-1.2.3-r42.tgz": {ContentType: "application/octet-stream", Data: "dGd6", Length: 3}},
-		DistTags:    map[string]string{},
-	}
-	err := sendManagedNPMPublish("http://registry.example.invalid", "target-token", payload)
-	if err == nil {
-		t.Fatal("managed npm publish error = nil, want unreachable target")
-	}
-	if proxyRequests != 0 || proxyAuthorization != "" {
-		t.Fatalf("ambient proxy observed managed request/token: requests=%d authorization=%q", proxyRequests, proxyAuthorization)
-	}
-	if strings.Contains(err.Error(), "target-token") {
-		t.Fatalf("managed npm error leaked token: %v", err)
-	}
-}
-
-func TestSendManagedNPMPublishRedactsTokenFromRegistryError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "reflected target-token", http.StatusForbidden)
-	}))
-	defer server.Close()
-	payload := managedNPMPublishPayload{
-		Name:        "@test/pkg",
-		Versions:    map[string]json.RawMessage{"1.2.3-r42": json.RawMessage(`{"name":"@test/pkg","version":"1.2.3-r42"}`)},
-		Attachments: map[string]managedNPMAttachment{"pkg-1.2.3-r42.tgz": {ContentType: "application/octet-stream", Data: "dGd6", Length: 3}},
-		DistTags:    map[string]string{},
-	}
-	err := sendManagedNPMPublish(server.URL, "target-token", payload)
-	if err == nil || !strings.Contains(err.Error(), "403") {
-		t.Fatalf("managed npm registry error = %v, want 403", err)
-	}
-	if strings.Contains(err.Error(), "target-token") {
-		t.Fatalf("managed npm registry error leaked reflected token: %v", err)
-	}
-}
-
-// The registry's error body names the cause (a stale ownership copy looks the
-// same as a refusal by status alone), so the error carries a bounded,
-// single-line excerpt of it with every bearer credential redacted.
-func TestManagedNPMRegistryErrorsShowBoundedRedactedBody(t *testing.T) {
-	cause := `{"code":"distribution.local_access.stale","error":"package ownership data on this registry is stale; retry shortly"}`
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		_, _ = w.Write([]byte(cause + "\x1b[31m\r\n echoed " + r.Header.Get("Authorization") +
-			" raw target-token and Bearer other-secret " + strings.Repeat("x", 1000)))
-	}))
-	defer server.Close()
-	payload := managedNPMPublishPayload{
-		Name:        "@test/pkg",
-		Versions:    map[string]json.RawMessage{"1.2.3-r42": json.RawMessage(`{"name":"@test/pkg","version":"1.2.3-r42"}`)},
-		Attachments: map[string]managedNPMAttachment{"pkg-1.2.3-r42.tgz": {ContentType: "application/octet-stream", Data: "dGd6", Length: 3}},
-		DistTags:    map[string]string{},
-	}
-	digest := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte("x")))
-	_, probeErr := probeManagedNPMArtifact(server.URL, "target-token", "@test/pkg", "1.2.3-r42", digest, 1)
-	for name, err := range map[string]error{
-		"publish": sendManagedNPMPublish(server.URL, "target-token", payload),
-		"probe":   probeErr,
-	} {
-		if err == nil {
-			t.Fatalf("%s error = nil, want the registry 503", name)
-		}
-		message := err.Error()
-		if !strings.Contains(message, "503 Service Unavailable: "+cause) {
-			t.Fatalf("%s error = %q, want the status and the registry's cause", name, message)
-		}
-		if strings.Contains(message, "target-token") || strings.Contains(message, "other-secret") {
-			t.Fatalf("%s error leaked a bearer credential: %q", name, message)
-		}
-		if !strings.Contains(message, "Bearer [redacted]") || strings.ContainsAny(message, "\x1b\r\n") {
-			t.Fatalf("%s error = %q, want redacted bearers and no control characters", name, message)
-		}
-		_, excerpt, _ := strings.Cut(message, "Service Unavailable: ")
-		if got := len([]rune(excerpt)); got > managedNPMRegistryExcerptLimit+len("...") {
-			t.Fatalf("%s excerpt has %d characters, want at most %d", name, got, managedNPMRegistryExcerptLimit)
-		}
-	}
-}
-
-func TestProbeManagedNPMArtifactUsesAuthenticatedBoundedTarballRead(t *testing.T) {
-	artifact := []byte("immutable npm tarball bytes")
-	digest := fmt.Sprintf("sha256:%x", sha256.Sum256(artifact))
-	var gotPath, gotAuthorization string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.EscapedPath()
-		gotAuthorization = r.Header.Get("Authorization")
-		_, _ = w.Write(artifact)
-	}))
-	defer server.Close()
-
-	found, err := probeManagedNPMArtifact(server.URL+"/npm", "target-token", "@test/pkg", "1.2.3-r42", digest, int64(len(artifact)))
-	if err != nil || !found {
-		t.Fatalf("probe managed npm artifact found=%t err=%v", found, err)
-	}
-	if gotPath != "/npm/@test/pkg/-/pkg-1.2.3-r42.tgz" || gotAuthorization != "Bearer target-token" {
-		t.Fatalf("managed npm tarball request path=%q authorization=%q", gotPath, gotAuthorization)
-	}
-
-	found, err = probeManagedNPMArtifact(server.URL+"/npm", "target-token", "@test/pkg", "1.2.3-r42", digest, int64(len(artifact)-1))
-	if found || err == nil || !strings.Contains(err.Error(), "size mismatch") {
-		t.Fatalf("overlong managed npm artifact found=%t err=%v", found, err)
-	}
-}
-
-func TestProbeManagedNPMArtifactRejectsRedirectAndErrorBody(t *testing.T) {
-	var redirected int
-	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		redirected++
-		_, _ = w.Write([]byte("target-token"))
-	}))
-	defer target.Close()
-	redirect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, target.URL, http.StatusFound)
-	}))
-	defer redirect.Close()
-	digest := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte("x")))
-	found, err := probeManagedNPMArtifact(redirect.URL, "target-token", "@test/pkg", "1.2.3-r42", digest, 1)
-	if found || err == nil || !strings.Contains(err.Error(), "302") || strings.Contains(err.Error(), "target-token") {
-		t.Fatalf("redirect probe found=%t err=%v", found, err)
-	}
-	if redirected != 0 {
-		t.Fatalf("managed npm verification followed %d redirects", redirected)
-	}
-
-	errorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "reflected target-token", http.StatusForbidden)
-	}))
-	defer errorServer.Close()
-	found, err = probeManagedNPMArtifact(errorServer.URL, "target-token", "@test/pkg", "1.2.3-r42", digest, 1)
-	if found || err == nil || !strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), "target-token") {
-		t.Fatalf("error-body probe found=%t err=%v", found, err)
-	}
-}
-
 func TestManagedNPMHTTPClientDisablesProxyAndRedirects(t *testing.T) {
 	client, err := newManagedNPMHTTPClient()
 	if err != nil {
@@ -585,29 +398,6 @@ func TestManagedNPMHTTPClientDisablesProxyAndRedirects(t *testing.T) {
 	}
 	if got := client.CheckRedirect(request, nil); !errors.Is(got, http.ErrUseLastResponse) {
 		t.Fatalf("managed npm redirect policy = %v, want http.ErrUseLastResponse", got)
-	}
-}
-
-func TestBuildManagedNPMPublishPayloadStripsPublishConfigFromWire(t *testing.T) {
-	dir := t.TempDir()
-	manifest := []byte(`{"name":"@test/pkg","version":"1.2.3-r42","publishConfig":{"provenance":true}}`)
-	if err := os.WriteFile(filepath.Join(dir, "package.json"), manifest, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	artifact := filepath.Join(dir, "pkg.tgz")
-	if err := os.WriteFile(artifact, []byte("tgz"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	payload, err := buildManagedNPMPublishPayload(dir, artifact, "@test/pkg", "1.2.3-r42")
-	if err != nil {
-		t.Fatalf("build managed npm payload: %v", err)
-	}
-	var wireManifest map[string]json.RawMessage
-	if err := json.Unmarshal(payload.Versions["1.2.3-r42"], &wireManifest); err != nil {
-		t.Fatalf("decode wire manifest: %v", err)
-	}
-	if _, present := wireManifest["publishConfig"]; present {
-		t.Fatalf("managed npm wire manifest retained repository publishConfig: %s", payload.Versions["1.2.3-r42"])
 	}
 }
 
@@ -759,7 +549,7 @@ func TestRunPublishNpm_ManagedRejectsAuthenticated404WithoutEvidence(t *testing.
 	ctx.Params = pctx.Params{"releaseSetPlan": oneMemberNPMPlan(t, "@test/pkg")}
 	stageNPMFixture(t, dir)
 	calls := mockManagedNPM(t, false, false)
-	calls.remoteFailure = "404 Not Found"
+	calls.dropUpload = true
 
 	var status string
 	var runErr error
@@ -777,21 +567,71 @@ func TestRunPublishNpm_ManagedRejectsAuthenticated404WithoutEvidence(t *testing.
 	}
 }
 
-func TestRunPublishNpm_ManagedRejectsRegistryDigestMismatch(t *testing.T) {
+// One 503 on the PUT does not fail a managed publication outside a release-set
+// outbox: the PUT is sent again after a probe shows the version is still
+// absent. tooling/extension-sdk/npmpublish covers the probe retries, without
+// the real waits this test takes.
+func TestRunPublishNpm_ManagedRetriesATransientRegistryFailure(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "managed-publication-retries-transient-failures", "a-transient-put-is-sent-again-after-a-probe")
+
 	ctx, dir := makeTestCtx(t)
 	ctx.Params = pctx.Params{"releaseSetPlan": oneMemberNPMPlan(t, "@test/pkg")}
 	stageNPMFixture(t, dir)
-	mockManagedNPM(t, true, true)
+	calls := mockManagedNPM(t, false, false)
+	calls.transientPuts = 1
+
 	var status string
-	var err error
+	var data map[string]any
+	var runErr error
 	events := captureEvents(t, func() {
-		status, _, err = runPublishNpm(ctx, jsonl.New(), nil)
+		status, data, runErr = runPublishNpm(ctx, jsonl.New(), nil)
 	})
-	if status != "FAILED" || err == nil || !strings.Contains(err.Error(), "digest mismatch") {
-		t.Fatalf("digest mismatch status=%q err=%v", status, err)
+	if runErr != nil || status != "OK" {
+		t.Fatalf("publish after transient failures status=%q err=%v", status, runErr)
 	}
-	if findEvent(events, func(event map[string]any) bool { return event["kind"] == "published" }) != nil {
-		t.Fatalf("digest mismatch emitted publication evidence: %#v", events)
+	// Probes: 404, 404 before the second PUT, then the verification.
+	if calls.publish != 2 || calls.remoteVerify != 3 {
+		t.Fatalf("registry requests = %d PUTs and %d probes, want 2 and 3", calls.publish, calls.remoteVerify)
+	}
+	if data["digestVerified"] != true || data["alreadyPublished"] != nil {
+		t.Fatalf("publish data = %#v, want a fresh verified upload", data)
+	}
+	if findEvent(events, func(event map[string]any) bool {
+		return event["kind"] == extproto.PublishedMemberEventKind && event["artifactDigest"] == data["artifactDigest"]
+	}) == nil {
+		t.Fatalf("publish after transient failures emitted no published member: %#v", events)
+	}
+	if findEvent(events, func(event map[string]any) bool {
+		return event["type"] == "phase" && event["name"] == "npm-publish" && str(event["action"]) == "end" && str(event["status"]) == "success"
+	}) == nil {
+		t.Fatalf("no successful npm-publish phase: %#v", events)
+	}
+}
+
+// A registry that serves other bytes fails the publication, whether it held
+// them before the upload or stores them from it.
+func TestRunPublishNpm_ManagedRejectsRegistryDigestMismatch(t *testing.T) {
+	for _, alreadyPublished := range []bool{true, false} {
+		ctx, dir := makeTestCtx(t)
+		ctx.Params = pctx.Params{"releaseSetPlan": oneMemberNPMPlan(t, "@test/pkg")}
+		stageNPMFixture(t, dir)
+		mockManagedNPM(t, alreadyPublished, true)
+		var status string
+		var err error
+		events := captureEvents(t, func() {
+			status, _, err = runPublishNpm(ctx, jsonl.New(), nil)
+		})
+		if status != "FAILED" || err == nil || !strings.Contains(err.Error(), "digest mismatch") {
+			t.Fatalf("alreadyPublished=%v digest mismatch status=%q err=%v", alreadyPublished, status, err)
+		}
+		if findEvent(events, func(event map[string]any) bool { return event["kind"] == "published" }) != nil {
+			t.Fatalf("alreadyPublished=%v digest mismatch emitted publication evidence: %#v", alreadyPublished, events)
+		}
+		if findEvent(events, func(event map[string]any) bool {
+			return event["type"] == "phase" && event["name"] == "npm-publish" && str(event["action"]) == "end" && str(event["status"]) == "failed"
+		}) == nil {
+			t.Fatalf("alreadyPublished=%v digest mismatch did not fail the npm-publish phase: %#v", alreadyPublished, events)
+		}
 	}
 }
 
@@ -975,33 +815,50 @@ func stageNPMFixture(t *testing.T, workspaceRoot string) {
 }
 
 type npmMockCalls struct {
-	total           int
-	publish         int
-	remotePack      int
-	remoteVerify    int
-	anonymousPack   int
-	unisolated      int
-	remoteFailure   string
-	publishPayload  managedNPMPublishPayload
+	total         int
+	publish       int
+	remotePack    int
+	remoteVerify  int
+	anonymousPack int
+	unisolated    int
+	// dropUpload makes the fake registry accept a PUT without storing it, so
+	// the verification probe answers 404.
+	dropUpload bool
+	// transientPuts is how many first PUTs the fake registry answers with 503.
+	transientPuts   int
+	publishPayload  npmpublish.Payload
 	publishRegistry string
 	remoteRegistry  string
 	tokenHosts      []string
 }
 
+// managedTestTarball is the tarball the bun pm pack fake writes.
+var managedTestTarball = []byte("immutable npm tarball bytes")
+
+// The paths, after the registry URL, of the fixture's tarball and publish
+// document.
+const (
+	managedTestTarballPath  = "/@test/pkg/-/pkg-1.2.3-r42.tgz"
+	managedTestDocumentPath = "/@test%2Fpkg"
+)
+
+// mockManagedNPM fakes bun, the credential seam and the registry. The fake
+// registry is an HTTP transport, so the real npmpublish.Publish runs and no
+// request leaves the process. It serves the fixture's tarball when
+// alreadyPublished, and the uploaded tarball after a stored PUT. With
+// mismatch, it serves bytes of the same size with another digest instead.
 func mockManagedNPM(t *testing.T, alreadyPublished, mismatch bool) *npmMockCalls {
 	t.Helper()
 	calls := &npmMockCalls{}
 	original := npmExecRun
 	originalTokenResolver := npmResolveRegistryToken
-	originalManagedPublish := npmSendManagedPublish
-	originalManagedProbe := npmProbeManagedArtifact
+	originalHTTPClient := npmManagedHTTPClient
 	originalBun := resolveBunBin
 	originalGOOS := npmGOOS
 	t.Cleanup(func() {
 		npmExecRun = original
 		npmResolveRegistryToken = originalTokenResolver
-		npmSendManagedPublish = originalManagedPublish
-		npmProbeManagedArtifact = originalManagedProbe
+		npmManagedHTTPClient = originalHTTPClient
 		resolveBunBin = originalBun
 		npmGOOS = originalGOOS
 	})
@@ -1014,40 +871,69 @@ func mockManagedNPM(t *testing.T, alreadyPublished, mismatch bool) *npmMockCalls
 		calls.tokenHosts = append(calls.tokenHosts, host)
 		return "test-registry-token", ""
 	}
-	npmSendManagedPublish = func(registry, token string, payload managedNPMPublishPayload) error {
-		calls.publish++
-		calls.publishRegistry = registry
-		calls.publishPayload = payload
-		if token != "test-registry-token" {
-			t.Fatalf("managed publish token = %q, want the host credential", token)
-		}
-		if len(payload.DistTags) != 0 {
-			t.Fatalf("managed publish supplied dist-tags: %#v", payload.DistTags)
-		}
-		if len(payload.Versions) != 1 || len(payload.Attachments) != 1 {
-			t.Fatalf("managed publish payload is not exact: %#v", payload)
-		}
-		return nil
-	}
-	npmProbeManagedArtifact = func(registry, token, packageName, version, _ string, _ int64) (bool, error) {
-		calls.remoteVerify++
-		calls.remoteRegistry = registry
-		if token == "" {
-			calls.anonymousPack++
-		}
-		if token != "test-registry-token" || packageName != "@test/pkg" || version != "1.2.3-r42" {
-			t.Fatalf("managed verification target token=%q package=%q version=%q", token, packageName, version)
-		}
-		if !alreadyPublished && calls.remoteVerify == 1 {
-			return false, nil
-		}
-		if calls.remoteFailure != "" {
-			return false, fmt.Errorf("%s", calls.remoteFailure)
-		}
+	var served []byte
+	serve := func(tarball []byte) {
+		served = tarball
 		if mismatch {
-			return false, fmt.Errorf("published npm artifact digest mismatch")
+			served = bytes.ToUpper(tarball)
 		}
-		return true, nil
+	}
+	if alreadyPublished {
+		serve(managedTestTarball)
+	}
+	npmManagedHTTPClient = func() (*http.Client, error) {
+		return &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			target := r.URL.String()
+			token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+			switch {
+			case r.Method == http.MethodGet && strings.HasSuffix(target, managedTestTarballPath):
+				calls.remoteVerify++
+				calls.remoteRegistry = strings.TrimSuffix(target, managedTestTarballPath)
+				if token == "" {
+					calls.anonymousPack++
+				}
+				if token != "test-registry-token" {
+					t.Errorf("managed verification token = %q, want the host credential", token)
+				}
+				if served == nil {
+					return fakeRegistryAnswer(r, http.StatusNotFound, nil), nil
+				}
+				return fakeRegistryAnswer(r, http.StatusOK, served), nil
+			case r.Method == http.MethodPut && strings.HasSuffix(target, managedTestDocumentPath):
+				calls.publish++
+				calls.publishRegistry = strings.TrimSuffix(target, managedTestDocumentPath)
+				if token != "test-registry-token" {
+					t.Errorf("managed publish token = %q, want the host credential", token)
+				}
+				var payload npmpublish.Payload
+				if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+					t.Errorf("decode managed publish payload: %v", err)
+				}
+				calls.publishPayload = payload
+				if len(payload.DistTags) != 0 {
+					t.Errorf("managed publish supplied dist-tags: %#v", payload.DistTags)
+				}
+				if len(payload.Versions) != 1 || len(payload.Attachments) != 1 {
+					t.Errorf("managed publish payload is not exact: %#v", payload)
+				}
+				if calls.transientPuts > 0 {
+					calls.transientPuts--
+					return fakeRegistryAnswer(r, http.StatusServiceUnavailable, nil), nil
+				}
+				if !calls.dropUpload {
+					for _, attachment := range payload.Attachments {
+						tarball, err := base64.StdEncoding.DecodeString(attachment.Data)
+						if err != nil {
+							t.Errorf("decode managed publish attachment: %v", err)
+						}
+						serve(tarball)
+					}
+				}
+				return fakeRegistryAnswer(r, http.StatusCreated, nil), nil
+			}
+			t.Errorf("unexpected registry request %s %s", r.Method, target)
+			return fakeRegistryAnswer(r, http.StatusBadRequest, nil), nil
+		})}, nil
 	}
 	npmExecRun = func(name string, args []string, opts ...exec.Option) (*exec.Result, error) {
 		calls.total++
@@ -1075,8 +961,7 @@ func mockManagedNPM(t *testing.T, alreadyPublished, mismatch bool) *npmMockCalls
 				t.Fatalf("managed local pack runs lifecycle scripts: %v", args)
 			}
 			destination := flagValue(args, "--destination")
-			payload := []byte("immutable npm tarball bytes")
-			if err := os.WriteFile(filepath.Join(destination, "artifact.tgz"), payload, 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(destination, "artifact.tgz"), managedTestTarball, 0o644); err != nil {
 				t.Fatalf("stage mock tarball: %v", err)
 			}
 			return &exec.Result{Success: true}, nil
@@ -1092,6 +977,18 @@ func mockManagedNPM(t *testing.T, alreadyPublished, mismatch bool) *npmMockCalls
 		return &exec.Result{Success: false, ExitCode: 1, Stderr: "unexpected npm subcommand"}, nil
 	}
 	return calls
+}
+
+// fakeRegistryAnswer is the response of the fake registry to r.
+func fakeRegistryAnswer(r *http.Request, status int, body []byte) *http.Response {
+	return &http.Response{
+		StatusCode:    status,
+		Status:        fmt.Sprintf("%d %s", status, http.StatusText(status)),
+		Header:        http.Header{},
+		Body:          io.NopCloser(bytes.NewReader(body)),
+		ContentLength: int64(len(body)),
+		Request:       r,
+	}
 }
 
 // managedTestBun is the bun resolveBunBin returns under mockManagedNPM.

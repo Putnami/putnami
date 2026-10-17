@@ -156,7 +156,14 @@ read. Repository `access` parameters cannot control managed visibility: the
 registry's server-owned policy keeps the candidate private. A future public
 release requires a separate explicit server attestation; neither the
 selection nor release-set metadata is visibility authority. An authenticated
-404 or a byte mismatch fails publication without emitting proof. The npm upload
+404 or a byte mismatch fails publication without emitting proof. A transient
+registry failure, such as a 502 or 503 answer or a dropped connection, does
+not fail publication at once: the download that checks whether the version
+exists, the upload, and the download that verifies it are sent again a
+bounded number of times. Before it uploads again, publication downloads the
+version and skips the upload when the registry already serves the same bytes.
+An upload the engine sends from the publication outbox retries the same way.
+The npm upload
 uses the registry's native PUT with an empty `dist-tags` map: no dist-tag is
 written on any path, by design, because a channel is moved by the release and
 never by a publisher. The
