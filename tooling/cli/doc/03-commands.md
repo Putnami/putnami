@@ -751,12 +751,19 @@ version probe within 5 seconds is not missing: they install nothing, edit no
 `deps` command to run next. For
 TypeScript, edit `package.json` and run `putnami deps install`.
 
+`go mod tidy` does not read `go.work`. So `add`, `remove` and `prune` run it on a
+copy of the module's `go.mod` that also states each `go.work` `replace` directive
+the module does not replace itself, such as the framework release `putnami
+upgrade` pins in place of a generated client's `v0.0.1` placeholder. `go.mod` and
+`go.sum` take the tidied copy without those directives. When a Go step fails, the
+command leaves every `go.mod`, `go.sum` and `putnami.json` it edits as it was.
+
 `prune` reads the provider view that the last install or build recorded. When a
 file that view was recorded from changed since, such as a hand-edited `go.mod`,
 `prune` refuses, names the changed files, and asks you to run `putnami install`
-first. It drops a Go requirement with `go mod edit -droprequire`, not `go get`,
-so a requirement that only `go.work` satisfies, one that no module proxy serves,
-is removed too.
+first. It drops a Go requirement with `go mod edit -droprequire` of the module
+path the target's `go.mod` declares, not `go get`, so a requirement that only
+`go.work` satisfies, one that no module proxy serves, is removed too.
 
 ### `cache`
 

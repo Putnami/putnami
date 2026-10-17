@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -22,12 +23,13 @@ import (
 //   - a putnami.json `dependencies` entry goes through core's project-config
 //     writer, which preserves key order and leaves unrelated members
 //     byte-identical;
-//   - a Go module requirement is dropped with `go mod edit -droprequire` and
-//     the module tidied with `go mod tidy`, through the go command `deps
-//     remove` runs, so the module graph and go.sum stay consistent. It is not
-//     `deps remove`'s `go get <module>@none`: that resolves the requirement it
-//     removes, and a workspace module no proxy serves cannot be resolved
-//     (goDepsEdit);
+//   - a Go module requirement is dropped with `go mod edit -droprequire` of
+//     the module path the target's go.mod declares, and the module tidied with
+//     `go mod tidy` as go.work resolves it (tidyGoModule), through the go
+//     command `deps remove` runs, so the module graph and go.sum stay
+//     consistent. It is not `deps remove`'s `go get <module>@none`: that
+//     resolves the requirement it removes, and a workspace module no proxy
+//     serves cannot be resolved (goDepsEdit);
 //   - a TypeScript package dependency has no removal path in this CLI yet —
 //     `deps remove` refuses a TypeScript target for the same reason — so it is
 //     reported with the edit to make, never half-applied: remove it from the
@@ -276,7 +278,9 @@ func manualManifestEdit(entry routedFinding) string {
 // The go the Go module edits run with is resolved once, before the first edit
 // of any file. A go that cannot be found, or whose version probe timed out,
 // stops the command before it edits any go.mod or putnami.json, so the rerun
-// it names reads the provider view this one read.
+// it names reads the provider view this one read. Any later failure puts every
+// putnami.json, go.mod and go.sum the command edits back as it was, for the
+// same reason.
 func applyPrune(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 	routed []routedFinding, pruned int, rerun string, out io.Writer, env LifecycleEnv) error {
 	byProject := make(map[string][]routedFinding)
@@ -310,20 +314,40 @@ func applyPrune(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 		}
 	}
 	installErr := goCmd.installErr
+	edited := make([]*workspace.Project, 0, len(projects))
 	for _, id := range projects {
 		project := ws.ProjectByID(id)
 		if project == nil {
 			return goDepsResult("prune", installErr, fmt.Errorf("project %s disappeared from the workspace while pruning", id))
 		}
-		if err := pruneProjectConfig(wsRoot, project, byProject[id]); err != nil {
-			return goDepsResult("prune", installErr, err)
+		edited = append(edited, project)
+	}
+	snapshot, err := snapshotFiles(pruneEditedFiles(wsRoot, edited)...)
+	if err != nil {
+		return goDepsResult("prune", installErr, err)
+	}
+	for _, project := range edited {
+		if err := pruneProjectConfig(wsRoot, project, byProject[project.ID]); err != nil {
+			return goDepsResult("prune", installErr, snapshot.restoreAfter(err))
 		}
-		if err := pruneGoModule(ctx, wsRoot, ws, project, byProject[id], goCmd); err != nil {
-			return goDepsResult("prune", installErr, err)
+		if err := pruneGoModule(ctx, wsRoot, ws, project, byProject[project.ID], goCmd); err != nil {
+			return goDepsResult("prune", installErr, snapshot.restoreAfter(err))
 		}
 	}
 	iox.Fprintf(out, "  ✓ pruned %d declared edge(s) across %d project(s)\n", pruned, len(projects))
 	return goDepsResult("prune", installErr, keptFindingsError(kept))
+}
+
+// pruneEditedFiles are the files a prune of projects may write: each project's
+// putnami.json, go.mod and go.sum.
+func pruneEditedFiles(wsRoot string, projects []*workspace.Project) []string {
+	var files []string
+	for _, project := range projects {
+		dir := filepath.Join(wsRoot, project.Path)
+		files = append(files, wsproto.ResolveFile(dir, wsproto.ConfigFilename))
+		files = append(files, goModuleFiles(dir)...)
+	}
+	return files
 }
 
 // keptFindingsError reports the findings this command leaves for a manual
@@ -392,7 +416,7 @@ func pruneGoModule(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 		if entry.route != pruneRouteGoModule {
 			continue
 		}
-		module := goModulePathOf(ws.ProjectByID(entry.finding.Target))
+		module := goModulePathOf(wsRoot, ws.ProjectByID(entry.finding.Target))
 		if module == "" {
 			return fmt.Errorf("cannot name the module of %s to remove it from %s",
 				entry.finding.TargetName, project.Name)
@@ -406,14 +430,11 @@ func pruneGoModule(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 	return editGoModule(ctx, wsRoot, project, goCmd, "prune", modules)
 }
 
-// goModulePathOf is a project's module path: the identity its own manifest
-// declares, which the probe reports as the project's source name.
-func goModulePathOf(project *workspace.Project) string {
+// goModulePathOf is a project's module path: the one its go.mod declares. The
+// project's name and source name are not: a putnami.json name replaces both.
+func goModulePathOf(wsRoot string, project *workspace.Project) string {
 	if project == nil {
 		return ""
 	}
-	if project.SourceName != "" {
-		return project.SourceName
-	}
-	return project.Name
+	return goModulePath(filepath.Join(wsRoot, project.Path))
 }

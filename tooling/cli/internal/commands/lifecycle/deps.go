@@ -374,11 +374,12 @@ func goDepsCommand(ctx context.Context, wsRoot, projectPath, action, rerun strin
 	return goCmd, nil
 }
 
-// editGoModule edits the requirements of proj's Go module with goCmd and runs
-// `go mod tidy`, both in the module directory with GOWORK pointed at the
-// workspace file so `replace` directives resolve. add runs `go get` with the
-// module specs as given; remove runs `go get <module>@none`; prune runs `go mod
-// edit -droprequire=<module>` (goDepsEdit says why).
+// editGoModule edits the requirements of proj's Go module with goCmd, then
+// tidies it (tidyGoModule), both in the module directory with GOWORK pointed
+// at the workspace file. add runs `go get` with the module specs as given;
+// remove runs `go get <module>@none`; prune runs `go mod edit
+// -droprequire=<module>` (goDepsEdit says why). A failure of either step puts
+// go.mod and go.sum back as they were.
 func editGoModule(ctx context.Context, wsRoot string, proj *workspace.Project, goCmd goCommand, action string, modules []string) error {
 	moduleDir := filepath.Join(wsRoot, proj.Path)
 	env := shared.GoCommandEnvFrom(goCmd.env, moduleDir)
@@ -386,13 +387,16 @@ func editGoModule(ctx context.Context, wsRoot string, proj *workspace.Project, g
 	verb := map[string]string{"add": "Adding", "remove": "Removing", "prune": "Removing"}[action]
 	iox.Fprintf(os.Stdout, "  %s %s in %s...\n", verb, strings.Join(modules, " "), proj.Name)
 
+	snapshot, err := snapshotFiles(goModuleFiles(moduleDir)...)
+	if err != nil {
+		return err
+	}
 	edit, name := goDepsEdit(action, modules)
 	if err := runGoInModule(ctx, goCmd.path, moduleDir, env, edit); err != nil {
-		return fmt.Errorf("%s: %w", name, err)
+		return snapshot.restoreAfter(fmt.Errorf("%s: %w", name, err))
 	}
-	// Reconcile the module graph so the closure and go.sum stay consistent.
-	if err := runGoInModule(ctx, goCmd.path, moduleDir, env, []string{"mod", "tidy"}); err != nil {
-		return fmt.Errorf("go mod tidy: %w", err)
+	if err := tidyGoModule(ctx, goCmd.path, moduleDir, env); err != nil {
+		return snapshot.restoreAfter(fmt.Errorf("go mod tidy: %w", err))
 	}
 	iox.Fprintf(os.Stdout, "  ✓ updated %s\n", filepath.Join(proj.Path, "go.mod"))
 	return nil
@@ -406,8 +410,8 @@ func editGoModule(ctx context.Context, wsRoot string, proj *workspace.Project, g
 // through the module proxy even when go.work uses that module. A requirement
 // that only go.work satisfies, such as `require example.com/lib v0.0.0` of a
 // workspace module no proxy serves, then fails the very prune that removes it.
-// The requirements prune drops are workspace modules no import backs, so the
-// `go mod tidy` that follows has nothing of theirs to resolve.
+// The `go mod tidy` that follows resolves the rest of the graph with the
+// replace directives of go.work (tidyGoModule).
 func goDepsEdit(action string, modules []string) (args []string, name string) {
 	switch action {
 	case "prune":

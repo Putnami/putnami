@@ -69,6 +69,10 @@
       "text": "When the workspace-install that putnami deps add, deps remove or deps prune runs to install a missing Go fails but still leaves a go, the command edits the Go modules with that go, and prune edits every module it selected. It runs the installers no second time and exits non-zero naming putnami deps install, as putnami projects create does, so a failed install never ends in success."
     },
     {
+      "id": "deps-tidy-resolves-as-the-workspace-does",
+      "text": "putnami deps add, deps remove and deps prune run go mod tidy on a copy of the module's go.mod that also states each go.work replace directive the module does not, so tidy resolves the module graph as the workspace build does, such as the framework release go.work pins in place of a generated client's placeholder requirement. go.mod and go.sum take the tidied copy without those directives. A failed go step leaves every go.mod, go.sum and putnami.json the command edits as it was."
+    },
+    {
       "id": "go-pin-reuses-the-machine-record",
       "text": "A Go pin takes the entry go.dev published for the release from a record under the Putnami home, toolchains/go/go-<version>.pin.json, and makes no request. It asks the release index only without a record that names the version and the go.dev source and maps only supported platforms to SHA-256 digests. It then writes the fetched entry as the record through a rename; a write that fails does not fail the pin. The lock holds the same bytes from the record and from the index."
     }
