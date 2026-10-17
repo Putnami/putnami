@@ -15,6 +15,7 @@
     "typescript/typescript-project-toolchain#hook-discovery-fails-closed",
     "typescript/typescript-project-toolchain#hook-order-determinism",
     "typescript/typescript-project-toolchain#lint-covers-the-project",
+    "typescript/typescript-project-toolchain#managed-publication-retries-transient-failures",
     "typescript/typescript-project-toolchain#member-event-per-publication",
     "typescript/typescript-project-toolchain#npm-agent-content",
     "typescript/typescript-project-toolchain#npm-ecosystem-profile",

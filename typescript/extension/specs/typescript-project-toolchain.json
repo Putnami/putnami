@@ -124,6 +124,10 @@
       "text": "Every npm publication, new or reused, reports one published member with its verified digest and writes no dist-tag."
     },
     {
+      "id": "managed-publication-retries-transient-failures",
+      "text": "A release-set npm publication that uploads itself sends the read that checks whether the version exists, the upload, and the read that verifies it again after a transient registry failure, a bounded number of times. It uploads again only after a read shows the registry does not serve the version."
+    },
+    {
       "id": "managed-publication-packs-only",
       "text": "When the engine names a publication outbox, a release-set npm member and a Docker image for the managed registry are packed into it with a descriptor that names their bytes, and the job resolves no credential, sends no registry request, writes nothing else outside its build outputs and reports no published member. Publication to any other registry ignores the outbox, and without one, publication is unchanged."
     },

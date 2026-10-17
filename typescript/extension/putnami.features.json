@@ -459,6 +459,19 @@
           }
         },
         {
+          "id": "managed-publication-retries-transient-failures",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-transient-put-is-sent-again-after-a-probe"
+            ]
+          }
+        },
+        {
           "id": "managed-publication-packs-only",
           "stage": "coded",
           "evidenceKinds": [

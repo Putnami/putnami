@@ -12,10 +12,12 @@ import (
 	"net/url"
 	"os"
 	osexec "os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
+	"syscall"
 
 	extproto "go.putnami.dev/protocol/extension"
 	pctx "go.putnami.dev/sdk/extension/context"
@@ -60,8 +62,7 @@ func resolveManagedNPMRoute(registry string) (endpoint, credentialHost string, e
 var (
 	npmExecRun              = exec.Run
 	npmResolveRegistryToken = registrycred.ResolveToken
-	npmSendManagedPublish   = sendManagedNPMPublish
-	npmProbeManagedArtifact = probeManagedNPMArtifact
+	npmManagedHTTPClient    = newManagedNPMHTTPClient
 	npmLookPath             = osexec.LookPath
 	npmGOOS                 = runtime.GOOS
 )
@@ -263,7 +264,7 @@ func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 	}
 
 	if managedReleaseSet {
-		return publishManagedNPM(emit, wsRoot, projectPath, npmDir, packageName, version, publishEndpoint, registryToken)
+		return publishManagedNPM(emit, wsRoot, projectPath, npmDir, pkgData, packageName, version, publishEndpoint, registryToken)
 	}
 
 	// Resolve npm once for both runs below, so a refused npm fails before any
@@ -446,8 +447,12 @@ func packManagedNPMIntoOutbox(emit *jsonl.Emitter, wsRoot, projectPath, npmDir s
 // dist-tags map, then downloads the registry copy to prove the bytes match. The
 // repository cannot select visibility or a channel through npm argv, ambient
 // config, or publishConfig; Cloud advances a channel only after release-set
-// reconciliation.
-func publishManagedNPM(emit *jsonl.Emitter, wsRoot, projectPath, npmDir, packageName, version, registry, registryToken string) (string, map[string]any, error) {
+// reconciliation. manifest is the staged package.json bytes the caller
+// validated. npmpublish.Publish sends the probe, the PUT and the verification
+// probe, and sends each again after a transient registry failure, as the
+// engine's outbox upload does. One npm-publish phase spans all three. An
+// interrupt ends a retry wait, so the deferred cleanups run.
+func publishManagedNPM(emit *jsonl.Emitter, wsRoot, projectPath, npmDir string, manifest []byte, packageName, version, registry, registryToken string) (string, map[string]any, error) {
 	npmConfig, configCleanup, err := newManagedNPMConfig(nil)
 	if err != nil {
 		return "FAILED", nil, err
@@ -461,44 +466,30 @@ func publishManagedNPM(emit *jsonl.Emitter, wsRoot, projectPath, npmDir, package
 	if err != nil {
 		return "FAILED", nil, err
 	}
-
-	artifactInfo, err := os.Stat(localArtifact)
+	tarball, err := os.ReadFile(localArtifact)
 	if err != nil {
-		return "FAILED", nil, fmt.Errorf("stat managed npm artifact: %w", err)
+		return "FAILED", nil, fmt.Errorf("read managed npm artifact: %w", err)
 	}
-
-	emit.PhaseStart("check-version")
-	alreadyPublished, probeErr := npmProbeManagedArtifact(registry, registryToken, packageName, version, localDigest, artifactInfo.Size())
-	if probeErr != nil {
-		emit.PhaseEnd("check-version", "failed")
-		return "FAILED", nil, fmt.Errorf("check published npm artifact: %w", probeErr)
+	if digest := npmpublish.Digest(tarball); digest != localDigest {
+		return "FAILED", nil, fmt.Errorf("packed npm tarball changed after it was hashed: %s, then %s", localDigest, digest)
 	}
-	emit.PhaseEnd("check-version", "success")
-
-	if !alreadyPublished {
-		emit.PhaseStart("npm-publish")
-		payload, buildErr := buildManagedNPMPublishPayload(npmDir, localArtifact, packageName, version)
-		if buildErr != nil {
-			emit.PhaseEnd("npm-publish", "failed")
-			return "FAILED", nil, buildErr
-		}
-		if publishErr := npmSendManagedPublish(registry, registryToken, payload); publishErr != nil {
-			emit.PhaseEnd("npm-publish", "failed")
-			return "FAILED", nil, fmt.Errorf("managed npm publish failed: %w", publishErr)
-		}
-		emit.PhaseEnd("npm-publish", "success")
-	} else {
-		emit.Info(fmt.Sprintf("Version %s already published; verifying immutable registry bytes", version))
+	client, err := npmManagedHTTPClient()
+	if err != nil {
+		return "FAILED", nil, err
 	}
+	stopped, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	if !alreadyPublished {
-		found, verifyErr := npmProbeManagedArtifact(registry, registryToken, packageName, version, localDigest, artifactInfo.Size())
-		if verifyErr != nil {
-			return "FAILED", nil, fmt.Errorf("verify published npm artifact: %w", verifyErr)
-		}
-		if !found {
-			return "FAILED", nil, fmt.Errorf("verify published npm artifact: authenticated tarball returned 404 Not Found")
-		}
+	emit.PhaseStart("npm-publish")
+	artifact := npmpublish.Artifact{Name: packageName, Version: version, Manifest: manifest, Tarball: tarball}
+	alreadyPublished, err := npmpublish.Publish(stopped, client, registry, registryToken, artifact)
+	if err != nil {
+		emit.PhaseEnd("npm-publish", "failed")
+		return "FAILED", nil, err
+	}
+	emit.PhaseEnd("npm-publish", "success")
+	if alreadyPublished {
+		emit.Info(fmt.Sprintf("Version %s already published with the same bytes; reusing it", version))
 	}
 
 	emit.Summary(fmt.Sprintf("Published %s@%s [%s]", packageName, version, localDigest))
@@ -618,47 +609,10 @@ func packNPMArtifact(config *managedNPMConfig, wsRoot, projectPath, npmDir strin
 	return matches[0], digest, cleanup, nil
 }
 
-// The managed npm upload lives in go.putnami.dev/sdk/extension/npmpublish;
-// these names bind this job and its tests to it.
-type (
-	managedNPMAttachment     = npmpublish.Attachment
-	managedNPMPublishPayload = npmpublish.Payload
-)
-
-// managedNPMRegistryExcerptLimit bounds, in characters, how much of a registry
-// error body a managed npm error carries.
-const managedNPMRegistryExcerptLimit = npmpublish.ErrorExcerptLimit
-
-func buildManagedNPMPublishPayload(npmDir, artifact, packageName, version string) (managedNPMPublishPayload, error) {
-	manifest, err := os.ReadFile(filepath.Join(npmDir, "package.json"))
-	if err != nil {
-		return managedNPMPublishPayload{}, fmt.Errorf("read managed npm manifest: %w", err)
-	}
-	artifactBytes, err := os.ReadFile(artifact)
-	if err != nil {
-		return managedNPMPublishPayload{}, fmt.Errorf("read managed npm artifact: %w", err)
-	}
-	return npmpublish.BuildPayload(npmpublish.Artifact{Name: packageName, Version: version, Manifest: manifest, Tarball: artifactBytes})
-}
-
-func sendManagedNPMPublish(registry, token string, payload managedNPMPublishPayload) error {
-	client, err := newManagedNPMHTTPClient()
-	if err != nil {
-		return err
-	}
-	return npmpublish.Put(context.Background(), client, registry, token, payload)
-}
-
+// newManagedNPMHTTPClient returns the client every managed registry request
+// sends through.
 func newManagedNPMHTTPClient() (*http.Client, error) {
 	return npmpublish.NewHTTPClient()
-}
-
-func probeManagedNPMArtifact(registry, token, packageName, version, wantDigest string, wantSize int64) (bool, error) {
-	client, err := newManagedNPMHTTPClient()
-	if err != nil {
-		return false, err
-	}
-	return npmpublish.Probe(context.Background(), client, registry, token, packageName, version, wantDigest, wantSize)
 }
 
 // getManagedNPMTarball sends a GET of the tarball of packageName at version to
