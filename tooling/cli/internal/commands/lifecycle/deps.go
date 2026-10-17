@@ -332,8 +332,9 @@ func goDepsResult(action string, installErr, err error) error {
 }
 
 // runGoDeps resolves the target Go module and the go command (goDepsCommand),
-// then edits the module's requirements (editGoModule). installErr is the
-// failure of the workspace installers that installed the go; err is the
+// then edits the module's requirements (editGoModule), and puts the files of
+// the module back as they were when the edit fails (goModuleFiles). installErr
+// is the failure of the workspace installers that installed the go; err is the
 // failure of the edit. The caller reports both (goDepsResult).
 func runGoDeps(ctx context.Context, wsRoot, action string, modules []string, projectSelector, rerun string, lifecycleEnv LifecycleEnv) (installErr, err error) {
 	if len(modules) == 0 {
@@ -352,7 +353,14 @@ func runGoDeps(ctx context.Context, wsRoot, action string, modules []string, pro
 	if err != nil {
 		return nil, err
 	}
-	return goCmd.installErr, editGoModule(ctx, wsRoot, proj, goCmd, action, modules)
+	snapshot, err := snapshotFiles(goModuleFiles(filepath.Join(wsRoot, proj.Path))...)
+	if err != nil {
+		return goCmd.installErr, err
+	}
+	if err := editGoModule(ctx, wsRoot, proj, goCmd, action, modules); err != nil {
+		return goCmd.installErr, snapshot.restoreAfter(err)
+	}
+	return goCmd.installErr, nil
 }
 
 // goDepsCommand returns the go command a deps edit runs: the one a task of the
@@ -374,11 +382,12 @@ func goDepsCommand(ctx context.Context, wsRoot, projectPath, action, rerun strin
 	return goCmd, nil
 }
 
-// editGoModule edits the requirements of proj's Go module with goCmd and runs
-// `go mod tidy`, both in the module directory with GOWORK pointed at the
-// workspace file so `replace` directives resolve. add runs `go get` with the
-// module specs as given; remove runs `go get <module>@none`; prune runs `go mod
-// edit -droprequire=<module>` (goDepsEdit says why).
+// editGoModule edits the requirements of proj's Go module with goCmd, then
+// tidies it (tidyGoModule), both in the module directory with GOWORK pointed
+// at the workspace file. add runs `go get` with the module specs as given;
+// remove runs `go get <module>@none`; prune runs `go mod edit
+// -droprequire=<module>` (goDepsEdit says why). The caller puts the files back
+// when it fails (goModuleFiles).
 func editGoModule(ctx context.Context, wsRoot string, proj *workspace.Project, goCmd goCommand, action string, modules []string) error {
 	moduleDir := filepath.Join(wsRoot, proj.Path)
 	env := shared.GoCommandEnvFrom(goCmd.env, moduleDir)
@@ -390,8 +399,7 @@ func editGoModule(ctx context.Context, wsRoot string, proj *workspace.Project, g
 	if err := runGoInModule(ctx, goCmd.path, moduleDir, env, edit); err != nil {
 		return fmt.Errorf("%s: %w", name, err)
 	}
-	// Reconcile the module graph so the closure and go.sum stay consistent.
-	if err := runGoInModule(ctx, goCmd.path, moduleDir, env, []string{"mod", "tidy"}); err != nil {
+	if err := tidyGoModule(ctx, goCmd.path, moduleDir, env); err != nil {
 		return fmt.Errorf("go mod tidy: %w", err)
 	}
 	iox.Fprintf(os.Stdout, "  ✓ updated %s\n", filepath.Join(proj.Path, "go.mod"))
@@ -406,8 +414,8 @@ func editGoModule(ctx context.Context, wsRoot string, proj *workspace.Project, g
 // through the module proxy even when go.work uses that module. A requirement
 // that only go.work satisfies, such as `require example.com/lib v0.0.0` of a
 // workspace module no proxy serves, then fails the very prune that removes it.
-// The requirements prune drops are workspace modules no import backs, so the
-// `go mod tidy` that follows has nothing of theirs to resolve.
+// The `go mod tidy` that follows resolves the rest of the graph with the
+// replace directives of go.work (tidyGoModule).
 func goDepsEdit(action string, modules []string) (args []string, name string) {
 	switch action {
 	case "prune":

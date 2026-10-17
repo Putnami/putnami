@@ -29,14 +29,21 @@ func (f goCreateFixture) withGoProject(t *testing.T) {
 	workspace.InvalidateLoadCache(f.root)
 }
 
-// depsCalls returns the go invocations as "<args>|<binary>".
+// depsCalls returns the go invocations as "<args>|<binary>", with the
+// temporary go.mod copy that `go mod tidy -modfile` reads shown as <copy>.
 func (f goCreateFixture) depsCalls(t *testing.T) []string {
 	t.Helper()
 	calls := f.goCalls(t)
 	out := make([]string, 0, len(calls))
 	for _, call := range calls {
 		fields := strings.Split(call, "|")
-		out = append(out, fields[0]+"|"+fields[len(fields)-1])
+		args := strings.Fields(fields[0])
+		for i, arg := range args {
+			if strings.HasPrefix(arg, "-modfile=") {
+				args[i] = "-modfile=<copy>"
+			}
+		}
+		out = append(out, strings.Join(args, " ")+"|"+fields[len(fields)-1])
 	}
 	return out
 }
@@ -67,9 +74,9 @@ func TestDepsAddAndRemoveRunThePinnedGo(t *testing.T) {
 	}
 	want := []string{
 		"get example.com/lib@v1.0.0|" + f.pinned,
-		"mod tidy|" + f.pinned,
+		"mod tidy -modfile=<copy>|" + f.pinned,
 		"get example.com/lib@none|" + f.pinned,
-		"mod tidy|" + f.pinned,
+		"mod tidy -modfile=<copy>|" + f.pinned,
 	}
 	if got := f.depsCalls(t); strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("go calls =\n%s\nwant, with the pinned go:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
@@ -109,7 +116,7 @@ func TestDepsAddInstallsThePinnedGoOnAHostWithoutGo(t *testing.T) {
 	if got := strings.Join(steps, ","); got != "pin,workspace-install" {
 		t.Fatalf("steps = %s, want the pin, then the installers", got)
 	}
-	want := []string{"get example.com/lib@v1.0.0|" + f.pinned, "mod tidy|" + f.pinned}
+	want := []string{"get example.com/lib@v1.0.0|" + f.pinned, "mod tidy -modfile=<copy>|" + f.pinned}
 	if got := f.depsCalls(t); strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("go calls =\n%s\nwant, with the installed go:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
@@ -230,7 +237,7 @@ func TestDepsAddAndRemoveNameDepsInstallWhenTheGoInstallFails(t *testing.T) {
 			if got := strings.Join(jobs, ","); got != "workspace-install" {
 				t.Fatalf("workspace jobs = %s, want the one install that installed go", got)
 			}
-			want := []string{tc.get + "|" + f.pinned, "mod tidy|" + f.pinned}
+			want := []string{tc.get + "|" + f.pinned, "mod tidy -modfile=<copy>|" + f.pinned}
 			if got := f.depsCalls(t); strings.Join(got, "\n") != strings.Join(want, "\n") {
 				t.Fatalf("go calls =\n%s\nwant the edit with the installed go:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 			}
@@ -356,9 +363,9 @@ func TestDepsPruneNamesDepsInstallWhenTheGoInstallFails(t *testing.T) {
 	}
 	want := []string{
 		"mod edit -droprequire=example.com/lib|" + f.pinned,
-		"mod tidy|" + f.pinned,
+		"mod tidy -modfile=<copy>|" + f.pinned,
 		"mod edit -droprequire=example.com/lib|" + f.pinned,
-		"mod tidy|" + f.pinned,
+		"mod tidy -modfile=<copy>|" + f.pinned,
 	}
 	if got := f.depsCalls(t); strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("go calls =\n%s\nwant both modules edited with the installed go:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))

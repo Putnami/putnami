@@ -301,7 +301,8 @@
               "enforce-refuses-the-graph-and-report-is-the-default",
               "a-declared-input-backs-an-edge-and-unattributed-projects-are-skipped",
               "the-advice-promises-only-the-repair-prune-makes",
-              "prune-names-the-hand-edit-for-a-manifest-it-keeps"
+              "prune-names-the-hand-edit-for-a-manifest-it-keeps",
+              "prune-drops-the-module-path-the-target-go-mod-declares"
             ]
           }
         },
@@ -1889,6 +1890,20 @@
             "checks": [
               "deps-add-and-remove-edit-and-name-deps-install-when-the-go-install-fails",
               "deps-prune-edits-every-module-and-names-deps-install-when-the-go-install-fails"
+            ]
+          }
+        },
+        {
+          "id": "deps-tidy-resolves-as-the-workspace-does",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "deps-tidy-reads-the-go-work-replace-directives",
+              "a-failed-go-step-leaves-every-file-as-it-was"
             ]
           }
         },
