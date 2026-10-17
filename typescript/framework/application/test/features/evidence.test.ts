@@ -33,6 +33,20 @@ describe('feature evidence protocol', () => {
     expect(validateFeatureEvidenceDocument(document).map(({ code, field }) => `${code}|${field}`)).toEqual(signature);
   });
 
+  it('names a finding by the record position in the file, not in canonical order', () => {
+    const document = JSON.parse(readFileSync(EQUIVALENCE_FIXTURE, 'utf8')) as FeatureEvidenceDocument;
+    document.evidence[0]!.feature = 'zeta/feature';
+    document.evidence[0]!.stage = 'unknown' as FeatureEvidenceDocument['evidence'][number]['stage'];
+    document.evidence.push(document.evidence[1]!);
+
+    const fields = validateFeatureEvidenceDocument(document).map(({ code, field }) => `${code}|${field}`);
+    expect(fields).toContain('features.invalid_stage|evidence[0].stage');
+    expect(fields).toContain('features.duplicate_evidence|evidence[4].id');
+    expect(validateFeatureEvidenceDocument(document).find(({ field }) => field === 'evidence[4].id')?.message).toBe(
+      'evidence is duplicated; first declaration is evidence[1]',
+    );
+  });
+
   it('requires full RFC 3339 timestamps and attestation subjects for observations', () => {
     const document = JSON.parse(readFileSync(EQUIVALENCE_FIXTURE, 'utf8')) as FeatureEvidenceDocument;
     document.evidence[0]!.observedAt = '2026-08-10';

@@ -87,6 +87,10 @@
     {
       "id": "spec-findings-name-file-positions",
       "text": "A spec finding names a requirement or decision link by its position in the file, never by its position in the canonical ID order, so specs validate and specs inspect point at the entry an author finds at that index. A requirement text finding also names the requirement ID and the 512-byte bound."
+    },
+    {
+      "id": "feature-findings-name-file-positions",
+      "text": "A feature manifest, evidence or verification report finding names a feature, relation, requirement, evidence kind, check, evidence record or observation by its position in the file, never by its position in the canonical order, so features validate points at the entry an author finds at that index. A feature name, outcome or owner finding states the 512-byte bound."
     }
   ],
   "decisions": [

@@ -18,6 +18,8 @@ const (
 	// specTextMaxLength bounds one spec outcome, non-goal, or requirement text
 	// in bytes.
 	specTextMaxLength = 512
+	// featureTextMaxLength bounds one feature name, outcome, or owner in bytes.
+	featureTextMaxLength = 512
 	// checkIDMaxLength bounds one declared or observed check identity.
 	checkIDMaxLength = 128
 	// semanticCodeMaxLength bounds metric, unit, and environment codes.
@@ -134,6 +136,10 @@ type SpecSource struct {
 // ValidateManifest validates semantics that are local to one authored
 // document. Workspace-wide identity, relation, and evidence resolution are
 // intentionally deferred to ValidateRepository.
+//
+// It walks features, relations, requirements, evidence kinds, and checks in
+// file order, not in canonical order, so a field index names the entry an
+// author finds at that position in the file.
 func ValidateManifest(input *Manifest) []diag.Diagnostic {
 	if input == nil {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, "", "feature manifest is nil")}
@@ -142,17 +148,16 @@ func ValidateManifest(input *Manifest) []diag.Diagnostic {
 	if input.Features == nil {
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeParseError, "features", "features is required and must be an array"))
 	}
-	manifest := CanonicalManifest(input)
-	if !supportedManifestVersions[manifest.ProtocolVersion] {
-		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidProtocolVersion, "protocolVersion", "protocolVersion %d is not supported (want %d or %d)", manifest.ProtocolVersion, MinimumManifestProtocolVersion, ManifestProtocolVersion))
+	if !supportedManifestVersions[input.ProtocolVersion] {
+		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidProtocolVersion, "protocolVersion", "protocolVersion %d is not supported (want %d or %d)", input.ProtocolVersion, MinimumManifestProtocolVersion, ManifestProtocolVersion))
 	}
-	if !segmentIDPattern.MatchString(manifest.Namespace) {
-		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, "namespace", "namespace %q must be one lower-case ASCII ID segment", manifest.Namespace))
+	if !segmentIDPattern.MatchString(input.Namespace) {
+		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, "namespace", "namespace %q must be one lower-case ASCII ID segment", input.Namespace))
 	}
 	seenFeatures := make(map[string]string)
-	for i, feature := range manifest.Features {
+	for i, feature := range input.Features {
 		field := fmt.Sprintf("features[%d]", i)
-		diagnostics = append(diagnostics, validateFeature(field, manifest.Namespace, manifest.ProtocolVersion, feature)...)
+		diagnostics = append(diagnostics, validateFeature(field, input.Namespace, input.ProtocolVersion, feature)...)
 		if first, exists := seenFeatures[feature.ID]; exists {
 			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeDuplicateFeature, field+".id", "feature %q is duplicated; first declaration is %s", feature.ID, first))
 		} else {
@@ -172,8 +177,8 @@ func validateFeature(field, namespace string, version int, feature Feature) []di
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidType, field+".type", "feature type %q is not supported", feature.Type))
 	}
 	for name, value := range map[string]string{"name": feature.Name, "outcome": feature.Outcome, "owner": feature.Owner} {
-		if !boundedText(value, 512) {
-			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, field+"."+name, "%s must be non-empty bounded text without control characters", name))
+		if !boundedText(value, featureTextMaxLength) {
+			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, field+"."+name, "%s must be non-blank, at most %d bytes, without control characters", name, featureTextMaxLength))
 		}
 	}
 	targetRank, validTarget := StageRank(feature.Target)
@@ -370,7 +375,9 @@ func validateVerificationWindow(field string, stage MaturityStage, criterion Ver
 // ValidateVerificationReport validates one run-scoped report in isolation.
 // Whether an observed check is declared by a criterion, which project may claim
 // it, and how it resolves are deliberately not decided here: the report is
-// transport, and the evaluator plus core own the verdict.
+// transport, and the evaluator plus core own the verdict. It walks
+// observations in file order, so a field index names the observation at that
+// position in the file.
 func ValidateVerificationReport(input *VerificationReport) []diag.Diagnostic {
 	if input == nil {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, "", "verification report is nil")}
@@ -379,15 +386,14 @@ func ValidateVerificationReport(input *VerificationReport) []diag.Diagnostic {
 	if input.Observations == nil {
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeParseError, "observations", "observations is required and must be an array"))
 	}
-	report := CanonicalVerificationReport(input)
-	if report.ProtocolVersion != VerificationReportProtocolVersion {
-		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidProtocolVersion, "protocolVersion", "protocolVersion %d is not supported (want %d)", report.ProtocolVersion, VerificationReportProtocolVersion))
+	if input.ProtocolVersion != VerificationReportProtocolVersion {
+		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidProtocolVersion, "protocolVersion", "protocolVersion %d is not supported (want %d)", input.ProtocolVersion, VerificationReportProtocolVersion))
 	}
-	if len(report.Observations) > VerificationReportMaxObservations {
+	if len(input.Observations) > VerificationReportMaxObservations {
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidObservation, "observations", "a verification report carries at most %d observations", VerificationReportMaxObservations))
 	}
-	seen := make(map[string]string, len(report.Observations))
-	for i, observation := range report.Observations {
+	seen := make(map[string]string, len(input.Observations))
+	for i, observation := range input.Observations {
 		field := fmt.Sprintf("observations[%d]", i)
 		diagnostics = append(diagnostics, validateObservation(field, observation)...)
 		key := observation.Feature + "\x00" + observation.Requirement + "\x00" + observation.Check
@@ -468,7 +474,8 @@ func validateMeasuredObservation(field string, observation VerificationObservati
 
 // ValidateEvidenceDocument validates record shapes local to one evidence
 // fragment. Global IDs and feature/requirement references are checked by
-// ValidateRepository.
+// ValidateRepository. It walks records in file order, so a field index names
+// the record at that position in the file.
 func ValidateEvidenceDocument(input *EvidenceDocument) []diag.Diagnostic {
 	if input == nil {
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, "", "evidence document is nil")}
@@ -477,12 +484,11 @@ func ValidateEvidenceDocument(input *EvidenceDocument) []diag.Diagnostic {
 	if input.Evidence == nil {
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeParseError, "evidence", "evidence is required and must be an array"))
 	}
-	document := CanonicalEvidenceDocument(input)
-	if document.ProtocolVersion != EvidenceProtocolVersion {
-		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidProtocolVersion, "protocolVersion", "protocolVersion %d is not supported (want 1)", document.ProtocolVersion))
+	if input.ProtocolVersion != EvidenceProtocolVersion {
+		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidProtocolVersion, "protocolVersion", "protocolVersion %d is not supported (want 1)", input.ProtocolVersion))
 	}
 	seenEvidence := make(map[string]string)
-	for i, evidence := range document.Evidence {
+	for i, evidence := range input.Evidence {
 		field := fmt.Sprintf("evidence[%d]", i)
 		diagnostics = append(diagnostics, validateEvidenceRecord(field, evidence)...)
 		if first, exists := seenEvidence[evidence.ID]; exists {
@@ -788,7 +794,10 @@ func ValidateSpecRepository(specSources []SpecSource, authoredFeatureIDs []strin
 
 // ValidateRepository validates all local shapes plus workspace-wide feature
 // and evidence identities and references. Inputs are sorted by canonical path;
-// caller order never affects findings.
+// caller order never affects findings. Within one document, it walks features,
+// their relations, and evidence records in file order, so a field index names
+// the entry at that position in the file, and a duplicate across documents
+// names the first declaration of the first source path.
 func ValidateRepository(manifestSources []ManifestSource, evidenceSources []EvidenceSource) []diag.Diagnostic {
 	manifests := append([]ManifestSource(nil), manifestSources...)
 	evidence := append([]EvidenceSource(nil), evidenceSources...)
@@ -809,8 +818,7 @@ func ValidateRepository(manifestSources []ManifestSource, evidenceSources []Evid
 		if source.Manifest == nil {
 			continue
 		}
-		manifest := CanonicalManifest(source.Manifest)
-		for i, feature := range manifest.Features {
+		for i, feature := range source.Manifest.Features {
 			location := sourceField(canonicalSource, fmt.Sprintf("features[%d]", i))
 			featureDeclarations[feature.ID] = append(featureDeclarations[feature.ID], featureAt{feature: feature, field: location, source: canonicalSource})
 		}
@@ -820,7 +828,6 @@ func ValidateRepository(manifestSources []ManifestSource, evidenceSources []Evid
 	uniqueFeatures := make(map[string]featureAt)
 	for _, id := range featureIDs {
 		declarations := featureDeclarations[id]
-		sort.Slice(declarations, func(i, j int) bool { return declarations[i].field < declarations[j].field })
 		bySource := firstFeatureBySource(declarations)
 		if len(bySource) > 1 {
 			for i := 1; i < len(bySource); i++ {
@@ -846,8 +853,7 @@ func ValidateRepository(manifestSources []ManifestSource, evidenceSources []Evid
 		if source.Document == nil {
 			continue
 		}
-		document := CanonicalEvidenceDocument(source.Document)
-		for i, record := range document.Evidence {
+		for i, record := range source.Document.Evidence {
 			location := sourceField(canonicalSource, fmt.Sprintf("evidence[%d]", i))
 			evidenceDeclarations[record.ID] = append(evidenceDeclarations[record.ID], evidenceAt{record: record, field: location, source: canonicalSource})
 			declaration, exists := uniqueFeatures[record.Feature]
@@ -872,7 +878,6 @@ func ValidateRepository(manifestSources []ManifestSource, evidenceSources []Evid
 	}
 	for _, id := range sortedKeys(evidenceDeclarations) {
 		declarations := evidenceDeclarations[id]
-		sort.Slice(declarations, func(i, j int) bool { return declarations[i].field < declarations[j].field })
 		bySource := firstEvidenceBySource(declarations)
 		for i := 1; i < len(bySource); i++ {
 			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeDuplicateEvidence, bySource[i].field+".id", "evidence %q is duplicated across source documents; first declaration is %s", id, bySource[0].field))

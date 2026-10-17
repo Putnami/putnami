@@ -13,6 +13,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	featureproto "go.putnami.dev/protocol/features"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	featureengine "go.putnami.dev/tooling/sdd/extension/internal/features"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
@@ -150,6 +151,109 @@ func TestFeaturesValidateCarriesTypedFailureData(t *testing.T) {
 	// attached copy and the returned one must be one document.
 	if len(returned.Diagnostics) != len(report.Diagnostics) || returned.Counts != report.Counts {
 		t.Fatalf("returned report = %+v, want the attached one", returned)
+	}
+}
+
+// TestFeaturesValidateNamesAnEntryByItsFilePosition pins that a finding names
+// the feature and requirement an author finds at that index of the file, not
+// their index in the canonical order.
+func TestFeaturesValidateNamesAnEntryByItsFilePosition(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "feature-findings-name-file-positions",
+		"a-feature-finding-names-the-entry-position-in-the-file")
+	spectest.Proves(t, "tooling/specification-driven-development", "feature-findings-name-file-positions",
+		"a-feature-text-finding-states-its-bound")
+	ws := featureCommandsWorkspace(t, false)
+	writeFixtureFile(t, filepath.Join(ws.Root, "app", featureproto.ManifestFilename), `{
+  "protocolVersion": 1,
+  "namespace": "billing",
+  "features": [{
+    "id": "billing/zeta",
+    "type": "feature",
+    "name": "`+strings.Repeat("x", 513)+`",
+    "outcome": "Customers can refund",
+    "owner": "payments",
+    "target": "coded",
+    "requirements": [
+      {"id":"zeta-implementation","stage":"unknown-stage","evidenceKinds":["capability"]},
+      {"id":"alpha-implementation","stage":"coded","evidenceKinds":["capability"]}
+    ]
+  }, {
+    "id": "billing/alpha",
+    "type": "feature",
+    "name": "Checkout",
+    "outcome": "Customers can pay",
+    "owner": "payments",
+    "target": "coded",
+    "requirements": [{"id":"implementation","stage":"coded","evidenceKinds":["capability"]}]
+  }]
+}`)
+
+	_, err := BuildFeatureValidationResult(ws, Selection{})
+	if !errors.Is(err, protocolcli.ErrInvalidConfig) {
+		t.Fatalf("features validate error = %v, want ErrInvalidConfig", err)
+	}
+	report, ok := ResultData(err).(FeatureValidationReport)
+	if !ok {
+		t.Fatalf("failure data = %T, want FeatureValidationReport", ResultData(err))
+	}
+	byField := make(map[string]string)
+	for _, finding := range report.Diagnostics {
+		byField[finding.Field] = finding.Message
+	}
+	const manifest = "app/" + featureproto.ManifestFilename
+	if _, found := byField[manifest+"#features[0].requirements[0].stage"]; !found {
+		t.Fatalf("no stage finding at the requirement's file position in %v", byField)
+	}
+	name, found := byField[manifest+"#features[0].name"]
+	if !found {
+		t.Fatalf("no name finding at the feature's file position in %v", byField)
+	}
+	if !strings.Contains(name, "512 bytes") {
+		t.Fatalf("name message = %q, want the bound", name)
+	}
+
+	writeFixtureFile(t, filepath.Join(ws.Root, "app", featureproto.ManifestFilename), `{
+  "protocolVersion": 1,
+  "namespace": "billing",
+  "features": [{
+    "id": "billing/zeta",
+    "type": "feature",
+    "name": "Refunds",
+    "outcome": "Customers can refund",
+    "owner": "payments",
+    "target": "wired",
+    "requirements": [
+      {"id":"zeta-wiring","stage":"wired","evidenceKinds":["capability"]},
+      {"id":"alpha-implementation","stage":"coded","evidenceKinds":["capability"]}
+    ]
+  }, {
+    "id": "billing/alpha",
+    "type": "feature",
+    "name": "Checkout",
+    "outcome": "Customers can pay",
+    "owner": "payments",
+    "target": "coded",
+    "requirements": [{"id":"implementation","stage":"coded","evidenceKinds":["capability"]}]
+  }]
+}`)
+	valid, err := BuildFeatureValidationResult(ws, Selection{})
+	if err != nil {
+		t.Fatalf("features validate: %v", err)
+	}
+	warnings := make(map[string]string)
+	for _, finding := range valid.Diagnostics {
+		if finding.Code == featureproto.WarningCodeMissingEvidence {
+			warnings[finding.Field] = finding.Message
+		}
+	}
+	for field, requirement := range map[string]string{
+		manifest + "#features[0].requirements[0]": "zeta-wiring",
+		manifest + "#features[0].requirements[1]": "alpha-implementation",
+		manifest + "#features[1].requirements[0]": "implementation",
+	} {
+		if !strings.Contains(warnings[field], `"`+requirement+`"`) {
+			t.Errorf("warning at %s = %q, want requirement %q", field, warnings[field], requirement)
+		}
 	}
 }
 
