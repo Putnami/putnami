@@ -748,11 +748,12 @@ func goReplaceTarget(fromDir, toDir string) string {
 // has. The edge SET is unchanged; a require stays an edge until someone removes
 // it from go.mod, and the consumers that act on real imports alone — the
 // visibility check, the declared-edge check — read the attribution rather than
-// re-deriving it.
+// re-deriving it. A module with no workspace edge is answered with an empty
+// map: the provider attributed it and nothing is imported.
 func goDependencySources(c *goCandidate, dependencies []string, byModule map[string]*goCandidate,
 	scan moduleImportScan) map[string]wsproto.DependencySource {
 	if len(dependencies) == 0 {
-		return nil
+		return map[string]wsproto.DependencySource{}
 	}
 	moduleByPath := make(map[string]string, len(byModule))
 	for module, candidate := range byModule {

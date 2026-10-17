@@ -125,7 +125,7 @@
         },
         "dependencySources": {
           "type": "object",
-          "description": "Manifest family each reported dependency edge was derived from, keyed by the same repo-relative path. A dependency absent from this map is declared: the provider read it from a declaration rather than from an import. It never changes which edges are reported.",
+          "description": "Manifest family each reported dependency edge was derived from, keyed by the same repo-relative path. A dependency absent from this map is declared: the provider read it from a declaration rather than from an import. An empty object is an answer: the provider attributed the project and none of its edges is imported. It never changes which edges are reported.",
           "additionalProperties": { "$ref": "#/definitions/providerDependencySource" }
         },
         "publish": {
@@ -169,7 +169,7 @@
         "dependencies": { "type": "array", "items": { "$ref": "#/definitions/relativePath" } },
         "dependencySources": {
           "type": "object",
-          "description": "Union of the providers' edge provenance, keyed by the same repo-relative paths dependencies carries. An edge only the authored putnami.json declares is absent from it.",
+          "description": "Union of the providers' edge provenance, keyed by the same repo-relative paths dependencies carries. An edge only the authored putnami.json declares is absent from it. It is an empty object when a provider attributed the project and found no imported edge.",
           "additionalProperties": { "$ref": "#/definitions/dependencySource" }
         },
         "publish": { "type": "array", "items": { "type": "string" } },

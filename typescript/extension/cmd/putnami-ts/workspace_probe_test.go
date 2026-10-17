@@ -261,6 +261,11 @@ func TestProbe_AttributesWorkspaceDependenciesToThePackageManifest(t *testing.T)
 		t.Errorf("dependencySources = %v, want one entry per reported edge %v",
 			web.DependencySources, web.Dependencies)
 	}
+	core := projectAt(t, probeAll(t, root, "apps/web", "libs/core"), "libs/core")
+	if core.DependencySources == nil || len(core.DependencySources) != 0 {
+		t.Errorf("dependencySources = %#v, want an empty map: the provider attributed a package with no edge",
+			core.DependencySources)
+	}
 }
 
 // A `workspace:` dependency no source file imports is a DECLARATION, not an

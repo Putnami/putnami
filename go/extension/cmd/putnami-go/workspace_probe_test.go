@@ -224,8 +224,9 @@ func TestProbe_AttributesEveryEdgeToTheModuleGraph(t *testing.T) {
 		}
 	}
 	core := projectAt(t, probeAll(t, root, "apps/svc", "libs/core"), "libs/core")
-	if len(core.DependencySources) != 0 {
-		t.Errorf("dependencySources = %v, want none for a project with no edge", core.DependencySources)
+	if core.DependencySources == nil || len(core.DependencySources) != 0 {
+		t.Errorf("dependencySources = %#v, want an empty map: the provider attributed a project with no edge",
+			core.DependencySources)
 	}
 }
 

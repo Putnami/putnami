@@ -835,7 +835,11 @@ file input that reads inside the dependency: `options.<layer>.filePatterns`,
 declaration the cache hashes and `--impacted` seeds from, so declaring what a
 project really reads both silences the finding and makes its key honest.
 A project for which no provider reported any provenance at all is skipped with
-one warning (`attribution unavailable`), because silence is not evidence.
+one warning (`attribution unavailable`), because silence is not evidence. The
+warning counts only entries that name a workspace project, since the check
+judges no other entry. A provider that answers with no edge for a project has
+reported provenance: every `putnami.json` entry of that project is then judged
+as `declared`.
 
 A `workspace:` **devDependency** is out of scope: that is how a project requests
 an extension, and the build reads it by running it.

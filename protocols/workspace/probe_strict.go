@@ -267,8 +267,9 @@ type MergedProject struct {
 	// DependencySources is the union of the providers' edge provenance, keyed
 	// by the same paths Dependencies carries. An edge only the authored
 	// putnami.json declares is absent from it, which is what
-	// DependencySourceDeclared means for a consumer.
-	DependencySources map[string]DependencySource `json:"dependencySources,omitempty"`
+	// DependencySourceDeclared means for a consumer. It is empty, not nil, when
+	// a provider attributed the project and found no imported edge.
+	DependencySources map[string]DependencySource `json:"dependencySources,omitzero"`
 	Publish           []string                    `json:"publish,omitempty"`
 	RunsWith          []string                    `json:"runsWith,omitempty"`
 	Extensions        []string                    `json:"extensions,omitempty"`
@@ -393,9 +394,10 @@ func MergeProbeResults(results []ProbeResult, explicit map[string]ExplicitProjec
 // manifest, so a Go service that also carries a package.json contributes both
 // families. One edge claimed twice resolves through StrongerDependencySource,
 // which is order-independent — the merge sorts providers by name, and the
-// answer must not depend on that order either.
+// answer must not depend on that order either. An empty map from a provider
+// still makes the union non-nil: that provider attributed the project.
 func mergeDependencySources(into, from map[string]DependencySource) map[string]DependencySource {
-	if len(from) == 0 {
+	if from == nil {
 		return into
 	}
 	if into == nil {

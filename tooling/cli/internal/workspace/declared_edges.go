@@ -38,13 +38,15 @@ import (
 //     dependent's key and a change to them selects it, so the edge is exactly
 //     as real as an import — it is simply declared instead of imported.
 //
-// UNKNOWN is not DECLARED. A project for which no provider reported any
-// `dependencySources` at all has an unattributed edge set: nothing has said
+// UNKNOWN is not DECLARED. A project for which no provider reported a
+// `dependencySources` map at all has an unattributed edge set: nothing has said
 // which of its edges its sources import, and reading that silence as "none of
 // them" would report every edge of a whole ecosystem as a phantom. Such a
-// project is skipped and named once in the diagnostics. An entry ABSENT from a
-// map a provider did report stays `declared`: there the provider answered, and
-// the answer is that nothing imports it.
+// project is skipped and named once in the diagnostics, when one of its entries
+// names a workspace project: an entry naming none is never judged. An entry
+// ABSENT from a map a provider did report stays `declared`, and an EMPTY map is
+// a report: there the provider answered, and the answer is that nothing imports
+// it.
 //
 // Four classes, one per file a phantom can live in:
 //
@@ -197,8 +199,9 @@ func declaredEdgesModeNames() string {
 	return fmt.Sprintf("%v", names)
 }
 
-// UnattributedProjects names, in project order, every project that carries
-// dependency edges and for which no provider reported any provenance at all.
+// UnattributedProjects names, in project order, every project that carries a
+// dependency edge to a workspace project and for which no provider reported a
+// provenance map.
 //
 // Its edges are not judged, and the answer is stated rather than silently
 // skipped: a workspace has to be able to see that a whole ecosystem is outside
@@ -209,17 +212,27 @@ func UnattributedProjects(ws *Workspace) []string {
 	}
 	var unattributed []string
 	for _, project := range ws.Projects {
-		if project != nil && attributionUnavailable(project) {
+		if project != nil && attributionUnavailable(ws, project) {
 			unattributed = append(unattributed, project.Name)
 		}
 	}
 	return unattributed
 }
 
-// attributionUnavailable reports that a project has edges and no provider said
-// anything about any of them.
-func attributionUnavailable(project *Project) bool {
-	return len(project.Dependencies) > 0 && len(project.DependencySources) == 0
+// attributionUnavailable reports that a project has an edge the check would
+// judge — one whose entry resolves to a workspace project — and that no provider
+// reported a provenance map for it. A non-nil empty map is a provider's answer
+// that none of the project's edges is imported.
+func attributionUnavailable(ws *Workspace, project *Project) bool {
+	if project.DependencySources != nil {
+		return false
+	}
+	for _, entry := range project.Dependencies {
+		if dependencyTargetID(ws, entry) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // DeclaredEdgeFindings returns every declaration of the workspace's resolved
@@ -250,7 +263,7 @@ func DeclaredEdgeFindings(ws *Workspace) []DeclaredEdgeFinding {
 // projectDeclaredEdges evaluates one project's declarations.
 func projectDeclaredEdges(ws *Workspace, project *Project,
 	assets map[string][]string) []DeclaredEdgeFinding {
-	if project == nil || attributionUnavailable(project) {
+	if project == nil || attributionUnavailable(ws, project) {
 		return nil
 	}
 	imported := backedTargets(ws, project, assets)

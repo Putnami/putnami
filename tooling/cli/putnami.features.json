@@ -301,6 +301,8 @@
               "enforce-refuses-the-graph-and-report-is-the-default",
               "a-declared-input-backs-an-edge-and-unattributed-projects-are-skipped",
               "the-advice-promises-only-the-repair-prune-makes",
+              "an-answer-with-no-edges-leaves-every-entry-declared",
+              "an-entry-naming-no-workspace-project-raises-no-attribution-notice",
               "prune-names-the-hand-edit-for-a-manifest-it-keeps",
               "prune-drops-the-module-path-the-target-go-mod-declares"
             ]

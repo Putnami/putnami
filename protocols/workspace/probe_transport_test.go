@@ -277,3 +277,46 @@ func TestServeProbe_AnswersDependencySourcesOnlyWhenAsked(t *testing.T) {
 		}
 	}
 }
+
+// An empty dependencySources map is an answer — the provider attributed the
+// project and found no imported edge — and it stays distinct from an absent
+// member through the wire, the parse, normalization and the merge.
+func TestServeProbe_AnEmptyDependencySourcesMapSurvivesAsAnAnswer(t *testing.T) {
+	answer := func(ProbeRequest) (ProbeResult, error) {
+		return ProbeResult{Projects: []ProbeProject{
+			{Path: "apps/web", SourceName: "@acme/web", DependencySources: map[string]DependencySource{}},
+			{Path: "libs/core", SourceName: "@acme/core"},
+		}}, nil
+	}
+	var request bytes.Buffer
+	if err := EncodeProbeRequest(&request, ProbeRequest{
+		Extension:         "@putnami/typescript",
+		Paths:             []string{"apps/web", "libs/core"},
+		DependencySources: true,
+	}); err != nil {
+		t.Fatalf("EncodeProbeRequest: %v", err)
+	}
+	var stdout bytes.Buffer
+	if _, err := ServeProbe(ProbeControlArgs(), &request, &stdout, answer); err != nil {
+		t.Fatalf("ServeProbe: %v", err)
+	}
+	if got := strings.Count(stdout.String(), `"dependencySources":{}`); got != 1 {
+		t.Fatalf("answer carries %d empty dependencySources members, want exactly the attributed project's:\n%s",
+			got, stdout.String())
+	}
+
+	parsed, diags := ParseAndValidateProbeResult(stdout.Bytes())
+	if len(diags) != 0 {
+		t.Fatalf("ParseAndValidateProbeResult: %v", diags)
+	}
+	merged, mergeDiags := MergeProbeResults([]ProbeResult{*parsed}, nil)
+	if len(mergeDiags) != 0 {
+		t.Fatalf("MergeProbeResults: %v", mergeDiags)
+	}
+	if web := merged["apps/web"].DependencySources; web == nil || len(web) != 0 {
+		t.Errorf("apps/web dependencySources = %#v, want an empty map", web)
+	}
+	if core := merged["libs/core"].DependencySources; core != nil {
+		t.Errorf("libs/core dependencySources = %#v, want none: that provider did not attribute it", core)
+	}
+}
