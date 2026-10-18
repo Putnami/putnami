@@ -45,8 +45,13 @@ func TestExtensionManifestActivatesAndOwnsNativeArchivePublishing(t *testing.T) 
 		if _, exists := publish.Flags[retired]; exists {
 			t.Fatalf("publish retained retired archive authority flag %q", retired)
 		}
-		if _, exists := manifest.Commands["cloud-publish-archives"].Flags[retired]; exists {
-			t.Fatalf("cloud-publish-archives retained retired archive authority flag %q", retired)
+	}
+	// `cloud packages publish` shares the cloud-packages flag surface, where
+	// `channel` belongs to `packages grants create`; the other two flags have
+	// no packages subcommand to serve.
+	for _, retired := range []string{"archive-owner-workspace", "stable"} {
+		if _, exists := manifest.Commands["cloud-packages"].Flags[retired]; exists {
+			t.Fatalf("cloud-packages retained retired archive authority flag %q", retired)
 		}
 	}
 	var foundArchiveStep bool

@@ -104,7 +104,7 @@ type OCIRevertResult struct {
 	Reverted string `json:"reverted"`
 }
 
-// OCI backs `putnami cloud packages copy|retag|revert` (alias: `cloud oci`): server-side image copy,
+// OCI backs `putnami cloud packages copy|retag|revert`: server-side image copy,
 // retag, and tag rollback against the Putnami OCI registry.
 //
 //	putnami cloud packages copy <src-ref> <dst-ref>

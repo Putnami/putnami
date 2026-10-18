@@ -71,7 +71,7 @@ The package has no sub-packages:
 - `configapi.go`: binds config-api's generated client
   ([`cloud/clients/config-api`](../../../clients/config-api)) through the control-plane
   host the workspace link names, and forwards the caller's bearer per call.
-  The config, secrets and publish-config commands share it.
+  The config and secrets commands, `config publish` included, share it.
 - `drift.go`, `metadata_token.go`: the drift check. Without a user token, it
   authenticates with the runner's Google metadata ID token.
 - `flags.go`: registers the domain's value-less flags with `clicore`.

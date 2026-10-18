@@ -1616,7 +1616,6 @@ func TestExtensionManifestDeclaresV3RuntimeAndTypedCloudContributions(t *testing
 			t.Fatalf("task %q schema must be a typed task port, not a file-scan fallback", taskName)
 		}
 	}
-	assertSchemaInput("cloud-publish-config")
 	assertSchemaInput("cloud-publish-config-project")
 
 	assertEffects := func(taskName string, want ...string) {
@@ -1686,7 +1685,6 @@ func TestExtensionManifestDeclaresV3RuntimeAndTypedCloudContributions(t *testing
 			t.Fatalf("task %q must declare mutatesSources=true", taskName)
 		}
 	}
-	assertSourceMutation("cloud-publish-config")
 	assertSourceMutation("cloud-publish-config-project")
 
 	deploy, ok := tasks["cloud-deploy"].(map[string]any)
@@ -1969,6 +1967,20 @@ func TestExtensionManifestRegistersSetupAndTokenCommands(t *testing.T) {
 	}
 
 	commands := manifest["commands"].(map[string]any)
+	for _, deleted := range []string{
+		"tokens", "distribution", "oci", "publish-archives", "track",
+		"report", "validate-config", "publish-config", "publish-migration",
+	} {
+		if _, ok := subcommands[deleted]; ok {
+			t.Fatalf("cloud %s subcommand should not be registered", deleted)
+		}
+		if _, ok := commands["cloud-"+deleted]; ok {
+			t.Fatalf("cloud-%s command should not be declared", deleted)
+		}
+		if _, ok := manifest["tasks"].(map[string]any)["cloud-"+deleted]; ok {
+			t.Fatalf("cloud-%s task should not be declared", deleted)
+		}
+	}
 	setupCommand := commands["cloud-setup"].(map[string]any)
 	setupRun := setupCommand["run"].([]any)[0].(map[string]any)
 	if setupRun["task"] != "cloud-setup" {
@@ -2002,11 +2014,11 @@ func TestExtensionManifestRegistersSetupAndTokenCommands(t *testing.T) {
 	if tokenRun["task"] != "cloud-token" {
 		t.Fatalf("cloud-token run task = %v, want cloud-token", tokenRun["task"])
 	}
-	distributionCommand := commands["cloud-distribution"].(map[string]any)
+	distributionCommand := commands["cloud-packages"].(map[string]any)
 	distributionFlags := distributionCommand["flags"].(map[string]any)
 	for _, retired := range []string{"purpose", "action", "grantee-kind", "grantee-id"} {
 		if _, ok := distributionFlags[retired]; ok {
-			t.Fatalf("cloud-distribution must not expose retired grant authority --%s", retired)
+			t.Fatalf("cloud-packages must not expose retired grant authority --%s", retired)
 		}
 	}
 	// --package is retired as grant authority and is still refused by grants
@@ -2015,17 +2027,17 @@ func TestExtensionManifestRegistersSetupAndTokenCommands(t *testing.T) {
 	packageFlag, _ := distributionFlags["package"].(map[string]any)
 	if description, _ := packageFlag["description"].(string); packageFlag["type"] != "string" ||
 		!strings.Contains(description, "archive mirror target") || strings.Contains(description, "grant") {
-		t.Fatalf("cloud-distribution package flag = %v, want the archive mirror target's package only", distributionFlags["package"])
+		t.Fatalf("cloud-packages package flag = %v, want the archive mirror target's package only", distributionFlags["package"])
 	}
 	for _, name := range []string{"ecosystem", "id", "destination", "alias", "username"} {
 		if flag, ok := distributionFlags[name].(map[string]any); !ok || flag["type"] != "string" {
-			t.Fatalf("cloud-distribution %s flag = %v, want a declared string flag for mirrors add", name, distributionFlags[name])
+			t.Fatalf("cloud-packages %s flag = %v, want a declared string flag for mirrors add", name, distributionFlags[name])
 		}
 	}
 	for _, name := range []string{"grantee-workspace-id", "channel", "registry-put-url"} {
 		flag, ok := distributionFlags[name].(map[string]any)
 		if !ok || flag["type"] != "string" {
-			t.Fatalf("cloud-distribution %s flag = %v, want a string flag", name, distributionFlags[name])
+			t.Fatalf("cloud-packages %s flag = %v, want a string flag", name, distributionFlags[name])
 		}
 	}
 	installCommand := commands["workspace-install"].(map[string]any)
@@ -2777,7 +2789,7 @@ func TestAdoptContextProject(t *testing.T) {
 }
 
 // TestAdoptPositionalApp covers the convention that lets users write
-// `putnami cloud publish-config <app>` rather than the more verbose
+// `putnami cloud config publish <app>` rather than the more verbose
 // `--app <app>` — matches the native putnami CLI (`putnami build <app>`).
 func TestAdoptPositionalApp(t *testing.T) {
 	t.Run("picks up positional app", func(t *testing.T) {
@@ -2818,7 +2830,7 @@ func TestAdoptPositionalApp(t *testing.T) {
 		// user's positional. Without the firstPositional-aware scan the
 		// extension reads args[0]="--putnamiContext", bails on the flag
 		// guard, and reports "could not determine app" even though the
-		// user wrote `putnami cloud publish-config <app>`.
+		// user wrote `putnami cloud config publish <app>`.
 		params := map[string]any{}
 		adoptPositionalApp(params, []string{"--putnamiContext", "/tmp/ctx.json", "apps/api"})
 		if params["app"] != "apps/api" {

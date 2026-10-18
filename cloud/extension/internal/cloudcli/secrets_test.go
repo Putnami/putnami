@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// The config/secrets/publish-config command tests live with their sources
+// The config, secrets and `config publish` command tests live with their sources
 // in internal/configcli. What remains here is the shared
 // fixture the retained aggregator suites still need: writeLinkFile seeds a
 // linked workspace for cache_test.go, cli_test.go, and the RunMain

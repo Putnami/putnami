@@ -49,7 +49,7 @@ func TestHelpListsExactlyThePublicRoot(t *testing.T) {
 	if !slices.Equal(names, wantPublicRoot) {
 		t.Fatalf("help lists %v, want the 20 public entries %v", names, wantPublicRoot)
 	}
-	hidden := slices.Concat(slices.Collect(maps.Keys(hiddenAliases)), machineCommands, slices.Collect(maps.Keys(operatorCommands)))
+	hidden := slices.Concat(machineCommands, slices.Collect(maps.Keys(operatorCommands)))
 	for _, name := range hidden {
 		if slices.Contains(names, name) {
 			t.Fatalf("help lists the hidden command %q", name)
@@ -57,9 +57,9 @@ func TestHelpListsExactlyThePublicRoot(t *testing.T) {
 	}
 }
 
-// TestHiddenAliasesStayOutOfThePublicRoot keeps the three lists disjoint: a
-// name is public, a hidden alias, a machine command or an operator command.
-func TestHiddenAliasesStayOutOfThePublicRoot(t *testing.T) {
+// TestRootListsStayDisjoint keeps the three lists disjoint: a name is public,
+// a machine command or an operator command.
+func TestRootListsStayDisjoint(t *testing.T) {
 	seen := map[string]string{}
 	add := func(kind string, names ...string) {
 		for _, name := range names {
@@ -70,14 +70,8 @@ func TestHiddenAliasesStayOutOfThePublicRoot(t *testing.T) {
 		}
 	}
 	add("public", wantPublicRoot...)
-	add("alias", slices.Collect(maps.Keys(hiddenAliases))...)
 	add("machine", machineCommands...)
 	add("operator", slices.Collect(maps.Keys(operatorCommands))...)
-	for alias, target := range hiddenAliases {
-		if !slices.Contains(wantPublicRoot, strings.Fields(target)[0]) {
-			t.Fatalf("alias %s points at %q, which is not a public entry", alias, target)
-		}
-	}
 }
 
 func TestEntryHelpListsTheVerbs(t *testing.T) {
@@ -113,10 +107,9 @@ func TestEntryHelpListsTheVerbs(t *testing.T) {
 	}
 }
 
-// TestHelpNeverActs pins that `putnami cloud <name> help` only prints: an alias
-// names its replacement, and an entry without verbs prints its usage instead
-// of signing out, signing in or deploying. No request leaves the process and
-// the stored session survives.
+// TestHelpNeverActs pins that `putnami cloud <name> help` only prints: an entry
+// without verbs prints its usage instead of signing out, signing in or
+// deploying. No request leaves the process and the stored session survives.
 func TestHelpNeverActs(t *testing.T) {
 	home := t.TempDir()
 	env := hometest.Env(home, map[string]string{"PUTNAMI_AUTH_URL": testBaseURL, "PUTNAMI_WORKSPACE_ROOT": t.TempDir()})
@@ -133,11 +126,6 @@ func TestHelpNeverActs(t *testing.T) {
 			t.Fatalf("cloud %s %v: %v", command, args, err)
 		}
 		return strings.Join(output, "\n")
-	}
-	for alias, replacement := range hiddenAliases {
-		if text := run(alias, "help"); !strings.Contains(text, "older name of `putnami cloud "+replacement+"`") {
-			t.Fatalf("cloud %s help = %q", alias, text)
-		}
 	}
 	for _, command := range wantPublicRoot {
 		if selfHelpEntries[command] {
@@ -157,9 +145,6 @@ func TestHelpNeverActs(t *testing.T) {
 	if text := run("cache", "disable", "help"); !strings.Contains(text, "cloud cache disable") {
 		t.Fatalf("cloud cache disable help = %q", text)
 	}
-	if text := run("tokens", "revoke", "help"); !strings.Contains(text, "older name of `putnami cloud token create|list|revoke`") {
-		t.Fatalf("cloud tokens revoke help = %q", text)
-	}
 	if text := run("channels", "--help"); !strings.Contains(text, "cloud channels follow") {
 		t.Fatalf("cloud channels --help = %q", text)
 	}
@@ -168,15 +153,6 @@ func TestHelpNeverActs(t *testing.T) {
 	}
 	if auth, err := clicore.ReadAuth(env, false); err != nil || auth == nil || auth.RefreshToken != "refresh-token" {
 		t.Fatalf("stored session after help = %+v, %v", auth, err)
-	}
-
-	var structured struct {
-		Alias       string `json:"alias"`
-		Replacement string `json:"replacement"`
-	}
-	decodeJSON(t, run("track", "help", "--output=json"), &structured)
-	if structured.Alias != "cloud track" || structured.Replacement != "cloud channels follow" {
-		t.Fatalf("structured alias help = %+v", structured)
 	}
 }
 
@@ -197,6 +173,20 @@ func TestOperatorCommandsNameTheirNewHome(t *testing.T) {
 		_, err := runSurface(t, tc.command, tc.args...)
 		if clicore.ExitCode(err) != ExitUsage || !strings.Contains(err.Error(), tc.want) {
 			t.Fatalf("cloud %s %v error = %v, want a usage error naming %q", tc.command, tc.args, err, tc.want)
+		}
+	}
+}
+
+// TestDeletedAliasesAreUnknownCommands pins that the nine root names that
+// used to alias a public entry now fail like any other unknown command.
+func TestDeletedAliasesAreUnknownCommands(t *testing.T) {
+	for _, name := range []string{
+		"tokens", "distribution", "oci", "publish-archives", "track",
+		"report", "validate-config", "publish-config", "publish-migration",
+	} {
+		_, err := runSurface(t, name)
+		if clicore.ExitCode(err) != ExitUsage || !strings.Contains(err.Error(), "unknown @putnami/cloud command: "+name) {
+			t.Fatalf("cloud %s error = %v, want an unknown command usage error", name, err)
 		}
 	}
 }

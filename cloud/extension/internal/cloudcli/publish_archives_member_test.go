@@ -107,7 +107,7 @@ func TestPublishArchivesEmitsMemberOnlyAfterAcceptedPutResponse(t *testing.T) {
 	})
 
 	var output []string
-	exitCode := RunMain([]string{"publish-archives", "--putnamiContext", contextFile}, IO{
+	exitCode := RunMain([]string{"packages", "publish", "--putnamiContext", contextFile}, IO{
 		Env: env, Client: server.Client(),
 		Stdout: func(line string) { output = append(output, line) },
 		Stderr: func(string) {},

@@ -14,11 +14,10 @@ import (
 	sourcecli "go.putnami.dev/cloud/extension/internal/sourcecli"
 )
 
-// The public Cloud CLI is flat: one root entry per thing the user knows
-// Domains stay an internal code boundary, so an entry may
-// route its verbs to several domain libraries. Every name the root carried
-// before keeps working as a hidden alias; machine commands stay callable and
-// hidden; platform maintenance commands live in the operator CLI.
+// The public Cloud CLI is flat: one root entry per thing the user knows.
+// Domains stay an internal code boundary, so an entry may route its verbs to
+// several domain libraries. Machine commands stay callable and hidden;
+// platform maintenance commands live in the operator CLI.
 
 // publicEntry is one root entry of `putnami cloud`.
 type publicEntry struct {
@@ -51,22 +50,6 @@ var publicEntries = []publicEntry{
 	{"metrics", "metrics", "query a project's metrics"},
 }
 
-// hiddenAliases maps each retired root name to the entry that replaced it.
-// The alias still runs, and the CLI's own help never lists it. The framework
-// still lists it in `putnami cloud --help`, because the extension manifest has
-// no hidden field.
-var hiddenAliases = map[string]string{
-	"tokens":            "token create|list|revoke",
-	"distribution":      "packages namespaces|grants|mirrors",
-	"oci":               "packages copy|retag|revert",
-	"publish-archives":  "packages publish",
-	"track":             "channels follow",
-	"report":            "ci report",
-	"validate-config":   "config validate",
-	"publish-config":    "config publish",
-	"publish-migration": "db migrations publish",
-}
-
 // machineCommands are called by the engine, a provider seam, or another
 // command. They stay callable and never appear in help. Their names are
 // protocol: do not rename them.
@@ -95,18 +78,13 @@ var selfHelpEntries = map[string]bool{
 // asking for help never acts: `logout help` does not sign you out,
 // `registries logout help` keeps every registry credential and `deploy help`
 // deploys nothing. A bare `help` counts at any position after the entry, so a
-// positional value spelled `help` also reads as a help request. A hidden alias
-// names the entry that replaced it, and an entry without verbs prints its
-// usage line. An entry with verbs gets `help` as its first positional, so
+// positional value spelled `help` also reads as a help request. An entry
+// without verbs prints its usage line. An entry with verbs gets `help` as its first positional, so
 // --help and a later `help` reach its own help too. answered reports that the
 // help is already printed.
 func rootHelpArgs(params map[string]any, ioctx IO, command string, args []string) ([]string, bool, error) {
 	if !slices.Contains(clicore.Positionals(args), "help") && !clicore.BoolParam(params, false, "help") {
 		return args, false, nil
-	}
-	if replacement, ok := hiddenAliases[command]; ok {
-		aliasHelp(params, ioctx, command, replacement)
-		return args, true, nil
 	}
 	if selfHelpEntries[command] {
 		if clicore.FirstPositional(args) != "help" {
@@ -122,16 +100,6 @@ func rootHelpArgs(params map[string]any, ioctx IO, command string, args []string
 		}
 	}
 	return args, false, nil
-}
-
-// aliasHelp answers help on a hidden alias with the entry that replaced it.
-func aliasHelp(params map[string]any, ioctx IO, alias, replacement string) {
-	if clicore.StructuredOutput(params) {
-		writeResult(map[string]any{"alias": "cloud " + alias, "replacement": "cloud " + replacement}, params, ioctx, "")
-		return
-	}
-	entry := strings.Fields(replacement)[0]
-	ioctx.Stdout(fmt.Sprintf("`putnami cloud %s` is an older name of `putnami cloud %s`; it still runs. Run `putnami cloud %s help` for the verbs.", alias, replacement, entry))
 }
 
 // movedToOperator is the answer of the public CLI to a command that moved to
@@ -232,7 +200,7 @@ func routeChannels(params map[string]any, args []string, workspaceRoot string, e
 }
 
 // adoptFollowPositionals maps `channels follow <namespace> <channel|rs_id>`
-// onto the --namespace, --channel and --release-set flags `cloud track` reads.
+// onto the --namespace, --channel and --release-set flags the channel follow reads.
 func adoptFollowPositionals(params map[string]any, positionals []string) error {
 	if len(positionals) > 2 {
 		return newError("cloud channels follow takes <namespace> and one <channel|rs_id>", ExitUsage)
@@ -262,8 +230,7 @@ func routeSource(params map[string]any, args []string, workspaceRoot string, env
 }
 
 // routeConfig serves `cloud config`. `show` absorbs the retired
-// `config <project>`, `config list` and `config resolve` through options;
-// validate and publish are the retired validate-config and publish-config.
+// `config <project>`, `config list` and `config resolve` through options.
 func routeConfig(params map[string]any, args []string, workspaceRoot string, env map[string]string, ioctx IO) error {
 	switch clicore.FirstPositional(args) {
 	case "validate":
@@ -315,8 +282,7 @@ func configShowArgs(params map[string]any, args []string) ([]string, error) {
 	}
 }
 
-// routeDB serves `cloud db`; `db migrations publish` is the retired
-// publish-migration.
+// routeDB serves `cloud db`.
 func routeDB(params map[string]any, args []string, workspaceRoot string, env map[string]string, ioctx IO) error {
 	if clicore.FirstPositional(args) != "migrations" {
 		return datacli.DB(params, args, workspaceRoot, env, ioctx)

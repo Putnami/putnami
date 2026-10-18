@@ -67,12 +67,12 @@ func TestDistributionAdminDerivesOwnerAndPinsExactRequests(t *testing.T) {
 	client := distributionAdminClient(t, &calls, &tokenCapture)
 	run := func(args ...string) {
 		t.Helper()
-		if err := RunCommand("distribution", IO{Env: env, Client: client, Now: fixedNow, Stdout: func(string) {}, Stderr: func(string) {}}, args); err != nil {
-			t.Fatalf("distribution %v: %v", args, err)
+		if err := RunCommand("packages", IO{Env: env, Client: client, Now: fixedNow, Stdout: func(string) {}, Stderr: func(string) {}}, args); err != nil {
+			t.Fatalf("packages %v: %v", args, err)
 		}
 	}
-	run("bindings", "activate", "--protocol", "npm", "--namespace", "@owner", "--idempotency-key", "npm-owner")
-	run("bindings", "list")
+	run("namespaces", "activate", "--protocol", "npm", "--namespace", "@owner", "--idempotency-key", "npm-owner")
+	run("namespaces", "list")
 	run("grants", "create", "--grantee-workspace-id", "ws-reader", "--channel", "stable", "--idempotency-key", "stable-read")
 	run("grants", "list", "--include-revoked")
 	run("grants", "revoke", "grant-1")
@@ -125,7 +125,7 @@ func TestDistributionAdminRejectsOwnerOverrideBeforeRequest(t *testing.T) {
 	_, env := distributionLeaseFixture(t)
 	var calls []distributionAdminCall
 	var tokenCapture userTokenCapture
-	err := RunCommand("distribution", IO{
+	err := RunCommand("packages", IO{
 		Env: env, Client: distributionAdminClient(t, &calls, &tokenCapture), Now: fixedNow,
 		Stdout: func(string) {}, Stderr: func(string) {},
 	}, []string{"grants", "create", "--grantee-workspace-id", "ws-reader", "--idempotency-key", "key", "--workspace", "ws-attacker"})

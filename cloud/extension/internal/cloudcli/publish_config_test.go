@@ -181,6 +181,8 @@ func TestValidateConfigFailsClosedForMissingSchemaAndNamespace(t *testing.T) {
 	})
 }
 
+// `cloud config validate` reaches validateConfig through the cloud-config
+// command; its task must stay uncached and local, with nothing to hash or write.
 func TestValidateConfigManifestIsPublicUncachedAndLocalOnly(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", "putnami.extension.json"))
 	if err != nil {
@@ -193,19 +195,19 @@ func TestValidateConfigManifestIsPublicUncachedAndLocalOnly(t *testing.T) {
 	groups := manifest["commandGroups"].(map[string]any)
 	cloud := groups["cloud"].(map[string]any)
 	subcommands := cloud["subcommands"].(map[string]any)
-	if node, ok := subcommands["validate-config"].(map[string]any); !ok || node["command"] != "cloud-validate-config" {
-		t.Fatalf("cloud validate-config tree node = %#v", subcommands["validate-config"])
+	if node, ok := subcommands["config"].(map[string]any); !ok || node["command"] != "cloud-config" {
+		t.Fatalf("cloud config tree node = %#v", subcommands["config"])
 	}
 	commands := manifest["commands"].(map[string]any)
-	command := commands["cloud-validate-config"].(map[string]any)
+	command := commands["cloud-config"].(map[string]any)
 	run := command["run"].([]any)
-	if len(run) != 1 || run[0].(map[string]any)["task"] != "cloud-validate-config" {
-		t.Fatalf("cloud-validate-config run = %#v", run)
+	if len(run) != 1 || run[0].(map[string]any)["task"] != "cloud-config" {
+		t.Fatalf("cloud-config run = %#v", run)
 	}
 	tasks := manifest["tasks"].(map[string]any)
-	task := tasks["cloud-validate-config"].(map[string]any)
+	task := tasks["cloud-config"].(map[string]any)
 	if task["cache"] != false || task["cwd"] != "{workspaceRoot}" {
-		t.Fatalf("cloud-validate-config task = %#v", task)
+		t.Fatalf("cloud-config task = %#v", task)
 	}
 	for _, forbidden := range []string{"inputs", "writes", "declares"} {
 		if _, present := task[forbidden]; present {
