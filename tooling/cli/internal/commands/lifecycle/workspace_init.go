@@ -408,8 +408,7 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	iox.Fprintf(os.Stdout, "  ✓ Workspace ready: %s\n", name)
 	iox.Fprintf(os.Stdout, "    Path: %s\n", cwd)
 	iox.Fprintf(os.Stdout, "    Extension: %s\n", extConfig.packageName)
-	iox.Fprintln(os.Stdout, "    Agent skills: not installed. To add them, declare @putnami/contributor in")
-	iox.Fprintln(os.Stdout, "    extensions and extension:@putnami/contributor in agentArtifacts, then run putnami install")
+	iox.Fprintln(os.Stdout, "    Agent skills: not installed. To add them, declare @putnami/contributor in\n    extensions and extension:@putnami/contributor in agentArtifacts, then run putnami install")
 	iox.Fprintln(os.Stdout)
 
 	iox.Fprintln(os.Stdout, "  Next:")
