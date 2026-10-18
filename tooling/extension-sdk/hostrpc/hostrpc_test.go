@@ -191,7 +191,7 @@ func TestWorkspaceOwnersReturnsTheHostsEntriesInRequestOrder(t *testing.T) {
 		}
 		return result(t, request, wire.WorkspaceOwnersResult{Owners: []wire.PathOwners{
 			{Path: "b/x.go", Projects: []wire.OwningProject{app}},
-			{Path: "a.go", Projects: []wire.OwningProject{}},
+			{Path: "a.go"}, // encodes as "projects": null
 			{Path: "b/x.go", Projects: []wire.OwningProject{app}},
 		}})
 	})
@@ -204,7 +204,7 @@ func TestWorkspaceOwnersReturnsTheHostsEntriesInRequestOrder(t *testing.T) {
 			t.Errorf("entry %d is for %q, want %q", i, owners[i].Path, path)
 		}
 	}
-	if len(owners[0].Projects) != 1 || owners[0].Projects[0] != app || len(owners[1].Projects) != 0 {
+	if len(owners[0].Projects) != 1 || owners[0].Projects[0] != app || owners[1].Projects == nil || len(owners[1].Projects) != 0 {
 		t.Errorf("owners = %+v", owners)
 	}
 }

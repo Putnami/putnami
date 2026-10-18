@@ -62,13 +62,12 @@ const (
 	// VerificationReportParams. Result: VerificationReportResult.
 	MethodVerificationReport = "verification.report"
 	// MethodWorkspaceOwners answers which workspace projects own each path.
-	// A project owns a path when it is the nearest project whose directory
-	// holds the path, or when it claims the path as an asset: the rule the
-	// CLI applies to a changed file before it follows the dependency graph.
+	// A project owns a path when impact analysis treats it as an owner: the
+	// nearest project whose directory holds the path, every project that claims
+	// the path as an asset, and, for a file at the workspace root, every project
+	// whose provider lists that file as watched. The CLI applies this rule to a changed file
+	// before it follows the dependency graph.
 	// Params: WorkspaceOwnersParams. Result: WorkspaceOwnersResult.
-	//
-	// The method is additive, so ProtocolVersion stays 1. A client finds it
-	// in the methods host.hello lists.
 	MethodWorkspaceOwners = "workspace.owners"
 )
 
@@ -200,14 +199,16 @@ type WorkspaceOwnersResult struct {
 type PathOwners struct {
 	// Path repeats the requested path.
 	Path string `json:"path"`
-	// Projects are the owners, sorted by ID. It is an empty array, never
+	// Projects are the owners of Path under the rule OwningProject states,
+	// sorted by ID. It is an empty array, never
 	// null, when no project owns the path.
 	Projects []OwningProject `json:"projects"`
 }
 
-// OwningProject names one project that owns a path. A project owns a path
-// when it is the nearest project whose directory holds the path, or when it
-// claims the path as an asset.
+// OwningProject names one project that owns a path. A project owns a path when
+// impact analysis treats it as an owner: it is the nearest project whose
+// directory holds the path, it claims the path as an asset, or, for a file at
+// the workspace root, its provider lists that file as watched.
 type OwningProject struct {
 	// ID is the project's canonical ID, as the workspace model holds it.
 	ID string `json:"id"`
@@ -218,7 +219,8 @@ type OwningProject struct {
 
 // ValidWorkspacePath reports whether p is a workspace-relative path in io/fs
 // form that names something below the workspace root. It refuses ".", the
-// root itself. The host and the client both apply it to the paths of
+// root itself. A backslash is an ordinary character of a name, not a
+// separator. The host and the client both apply it to the paths of
 // workspace.owners.
 func ValidWorkspacePath(p string) bool {
 	return fs.ValidPath(p) && p != "."

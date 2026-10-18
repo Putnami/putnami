@@ -131,9 +131,11 @@ func (c *Client) VerificationReport(ctx context.Context, ref wire.VerificationRe
 // WorkspaceOwners returns which workspace projects own each path: one entry
 // for each path, in the order given, with the owners sorted by project ID.
 // A path is workspace-relative and in io/fs form (wire.ValidWorkspacePath). A
-// project owns a path when it is the nearest project whose directory holds
-// it, or when it claims the path as an asset. A path no project owns has an
-// empty list. The client refuses an empty list and an invalid path without
+// project owns a path when impact analysis treats it as an owner: the nearest
+// project whose directory holds the path, every project that claims the path
+// as an asset, and, for a file at the workspace root, every project whose
+// provider lists that file as watched. A path no project owns has an empty
+// list. The client refuses an empty list and an invalid path without
 // sending anything, and it returns an error, leaving the client usable, when
 // the host answers other entries than the ones requested.
 func (c *Client) WorkspaceOwners(ctx context.Context, paths []string) ([]wire.PathOwners, error) {
@@ -155,6 +157,9 @@ func (c *Client) WorkspaceOwners(ctx context.Context, paths []string) ([]wire.Pa
 	for i, owners := range result.Owners {
 		if owners.Path != paths[i] {
 			return nil, fmt.Errorf("putnami host RPC workspace.owners answered %q for path %d, which is %q", owners.Path, i+1, paths[i])
+		}
+		if owners.Projects == nil {
+			result.Owners[i].Projects = []wire.OwningProject{}
 		}
 	}
 	return result.Owners, nil

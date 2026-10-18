@@ -27,9 +27,12 @@ which is a command, not an operation, with `-32602`.
 `tooling/cli/main.go`: no leading or trailing slash, no `.` or `..` element,
 and not `.` itself. `WorkspaceOwners` refuses an empty list and the first path
 that is not in that form (`wire.ValidWorkspacePath`) before it sends anything,
-and the client stays usable. A project owns a path when it is the nearest
-project whose directory holds the path, or when it claims the path as an
-asset. Each entry holds the path and its owners, sorted by project ID, each
+and the client stays usable. A project owns a path when impact analysis
+treats it as an owner: the nearest project whose directory holds the path,
+every project that claims the path as an asset, and, for a file at the
+workspace root such as `go.work`, every project whose provider lists that file
+as watched. A root file can therefore have many owners. A backslash is an
+ordinary character of a name, not a separator. Each entry holds the path and its owners, sorted by project ID, each
 with its canonical `ID` and its workspace-relative `Path`. A path no project
 owns gets an empty list. Outside a workspace the host answers `-32002`. If the
 host answers other entries than the paths you asked for, `WorkspaceOwners`

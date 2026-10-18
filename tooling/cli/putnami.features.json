@@ -1163,6 +1163,7 @@
             "checks": [
               "workspace-owners-answers-one-entry-per-path-in-request-order",
               "workspace-owners-are-the-nearest-project-and-every-asset-claimant",
+              "workspace-owners-include-every-project-whose-provider-watches-a-root-file",
               "workspace-owners-are-sorted-by-id-and-empty-when-none-owns-the-path",
               "workspace-owners-refuses-an-empty-list-and-a-path-outside-io-fs-form",
               "workspace-owners-is-unavailable-outside-a-workspace"

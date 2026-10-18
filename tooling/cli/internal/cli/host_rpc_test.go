@@ -27,6 +27,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/hostrpc"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // The host RPC channel of an interactive extension subcommand, end to end: the
@@ -397,7 +398,35 @@ func hostRPCOwnersWorkspace(t *testing.T) string {
 		writeParityFile(t, root, "packages/"+file, "x\n")
 	}
 	writeParityFile(t, root, "README.md", "x\n")
+	recordWatchedRootFile(t, root, "go.work", "packages/outer", "packages/claimant")
 	return root
+}
+
+// recordWatchedRootFile records, in the workspace index, a provider answer in
+// which each project at the given paths lists the workspace-root file as
+// watched, the way a probing run records it. The workspace loads that answer
+// without starting a provider.
+func recordWatchedRootFile(t *testing.T, root, file string, projectPaths ...string) {
+	t.Helper()
+	ws, err := workspace.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := wsproto.ProbeResult{Version: wsproto.ProbeProtocolVersion, Extension: "@putnami/fixture"}
+	for _, path := range projectPaths {
+		result.Projects = append(result.Projects, wsproto.ProbeProject{Path: path, WatchedFiles: []string{file}})
+	}
+	wsproto.NormalizeProbeResult(&result)
+	snapshot := workspace.NewSnapshotWithProviders(ws, ws.ProbeDigest(), []workspace.SnapshotProvider{{
+		Extension: result.Extension,
+		Digest:    wsproto.ProbeResultDigest(result),
+		Result:    result,
+	}})
+	if err := workspace.WriteSnapshot(root, snapshot, workspace.SnapshotWritePolicy{}); err != nil {
+		t.Fatal(err)
+	}
+	workspace.InvalidateLoadCache(root)
+	t.Cleanup(func() { workspace.InvalidateLoadCache(root) })
 }
 
 func TestHostRPC_WorkspaceOwnersAnswersWhatTheWorkspaceModelOwns(t *testing.T) {
@@ -420,6 +449,7 @@ func TestHostRPC_WorkspaceOwnersAnswersWhatTheWorkspaceModelOwns(t *testing.T) {
 		{"the deeper project owns its files, not the outer one", []string{"packages/outer/inner/b.go"}, [][]hostrpcproto.OwningProject{{inner}}},
 		{"the outer project owns the rest of its directory", []string{"packages/outer/a.go"}, [][]hostrpcproto.OwningProject{{outer}}},
 		{"an asset claimant owns the file with its project, sorted by ID", []string{"packages/schema/d.json"}, [][]hostrpcproto.OwningProject{{claimant, schema}}},
+		{"a path equal to a project directory belongs to that project", []string{"packages/outer/inner", "packages/outer"}, [][]hostrpcproto.OwningProject{{inner}, {outer}}},
 		{"no project owns a file outside every project", []string{"README.md", "packages/other/e.go"}, [][]hostrpcproto.OwningProject{{}, {}}},
 		{"the answer keeps the request order and repeats a duplicate",
 			[]string{"packages/schema/d.json", "README.md", "packages/outer/inner/b.go", "packages/schema/d.json"},
@@ -439,6 +469,24 @@ func TestHostRPC_WorkspaceOwnersAnswersWhatTheWorkspaceModelOwns(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestHostRPC_WorkspaceOwnersIncludesTheProjectsWhoseProviderWatchesARootFile(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, hostRPCFeature, hostRPCOwners, "workspace-owners-include-every-project-whose-provider-watches-a-root-file")
+	root := hostRPCOwnersWorkspace(t)
+	client := dialHostRPC(t, hostRPCBinding{root: root, config: wsproto.Load(root)})
+	claimant := hostrpcproto.OwningProject{ID: "/packages/claimant", Path: "packages/claimant"}
+	outer := hostrpcproto.OwningProject{ID: "/packages/outer", Path: "packages/outer"}
+	owners, err := client.WorkspaceOwners(t.Context(), []string{"go.work", "go.work.sum", "packages/go.work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, want := range [][]hostrpcproto.OwningProject{{claimant, outer}, {}, {}} {
+		if !slices.Equal(owners[i].Projects, want) {
+			t.Errorf("entry %d = %+v, want owners %+v: only a watched file at the workspace root has them", i, owners[i], want)
+		}
 	}
 }
 

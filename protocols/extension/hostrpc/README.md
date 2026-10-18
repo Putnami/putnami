@@ -74,12 +74,17 @@ with `-32602`.
 is workspace-relative and in `io/fs` form (`ValidWorkspacePath`): no leading
 or trailing slash, no empty, `.` or `..` element, and not `.` itself. The
 result holds one entry for each requested path, in request order, and a path
-that repeats gets an entry each time. A project owns a path when it is the
-nearest project whose directory holds the path, or when it claims the path as
-an asset. This is the rule the CLI applies to a changed file before it follows
-the dependency graph. An entry lists its owners sorted by project ID, with the
-project's canonical ID and its workspace-relative directory. A path that no
-project owns gets an empty `projects` array. An empty `paths` array, or a path
+that repeats gets an entry each time. A project owns a path when impact
+analysis treats it as an owner: the nearest project whose directory holds the
+path (a project rooted at the workspace root owns what no deeper project
+holds), every project that claims the path as an asset, and, for a file at the
+workspace root such as `go.work`, every project whose provider lists that file
+as watched. The CLI applies this rule to a changed file before it follows the
+dependency graph, so a root file can have many owners. A backslash is an
+ordinary character of a name, not a separator. An entry lists its owners
+sorted by project ID, with the project's canonical ID and its
+workspace-relative directory. A path that no project owns gets an empty
+`projects` array. An empty `paths` array, or a path
 that is not in `io/fs` form, is `-32602`. Outside a workspace the method
 answers `-32002`.
 

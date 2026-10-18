@@ -175,7 +175,7 @@
     },
     {
       "id": "host-rpc-workspace-owners",
-      "text": "workspace.owners takes workspace-relative paths in io/fs form and answers one entry per path, in request order. A path's owners are its nearest project and every project that claims it as an asset, sorted by ID; none gives an empty list. An empty list of paths, or a path outside io/fs form, is invalid params. Outside a workspace the method is unavailable."
+      "text": "workspace.owners takes workspace-relative paths in io/fs form and answers one entry per path, in request order. A path's owners are the projects impact analysis treats as owners: its nearest project, every project that claims it as an asset, and, for a workspace-root file, every project whose provider watches it. They are sorted by ID; none gives an empty list. An empty list of paths, or a path outside io/fs form, is invalid params. Outside a workspace the method is unavailable."
     },
     {
       "id": "source-bound-cache",
