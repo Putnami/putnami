@@ -83,8 +83,8 @@
       "text": "No declaration uses a pin under agentArtifacts in putnami.lock.json: an `extension:<name>` entry follows its extension's own pin. An explicit putnami install drops every such pin and leaves the ownership records to upgrade. The implicit bootstrap keeps the committed lock as it is, and a hosted install that would drop a pin fails before any phase runs, with the lock unchanged, and asks for putnami install without the run credential."
     },
     {
-      "id": "starter-opts-into-contributor",
-      "text": "Every built-in starter declares the `@putnami/contributor` extension and opts into its agent content, and `putnami init` installs that extension and materializes its content. When the extension cannot be installed, init keeps both declarations, writes no agent file, and names `putnami install` as the next step."
+      "id": "starter-agent-content-opt-in",
+      "text": "No built-in starter opts into agent content: `putnami init` declares and installs no agent-content extension. A workspace asks by declaring `@putnami/contributor` in `extensions` and `extension:@putnami/contributor` in `agentArtifacts`, then running `putnami install`. A starter that names one has init install it and materialize its content; if the install fails, init keeps both declarations, writes no agent file, and names `putnami install`."
     }
   ],
   "decisions": [

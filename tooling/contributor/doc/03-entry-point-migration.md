@@ -82,14 +82,12 @@ promotion. Until the channel a workspace resolves serves it:
 
 - A workspace that declares the extension by path, as this repository does,
   installs its content with this release's CLI.
-- Every built-in starter still writes `@putnami/contributor` in `extensions`
-  and `extension:@putnami/contributor` in `agentArtifacts`. `putnami init`
-  reports that the content could not be installed, names `putnami install`,
-  and finishes the workspace without workflow files. `putnami install` fails
-  at its extensions phase in that workspace, because the channel does not
-  serve the extension yet. To install the rest of the workspace now, remove
-  both entries, or resolve `canary`, and add them back once the channel
-  serves it.
+- No built-in starter writes `@putnami/contributor` in `extensions` or
+  `extension:@putnami/contributor` in `agentArtifacts`: `putnami init` finishes
+  the workspace without workflow files. A workspace that declares the
+  extension before the channel serves it fails `putnami install` at its
+  extensions phase. To install the rest of the workspace now, remove both
+  entries, or resolve `canary`, and add them back once the channel serves it.
 - A workspace that declared `@putnami/agent-workflows` or
   `@putnami/maintainer-workflows` either switches by hand with this CLI
   (above) or stays on an earlier CLI release, which installs its pins exactly

@@ -29,7 +29,9 @@ type initExtensionConfig struct {
 	packageName string
 	template    string
 	// agentContent is the extension whose agent content this starter opts
-	// into. It is DATA, not policy: init declares exactly that extension in
+	// into. No built-in starter names one: a workspace asks for
+	// @putnami/contributor by declaring it, then running `putnami install`. It is DATA,
+	// not policy: init declares exactly that extension in
 	// `extensions`, opts into its content with `extension:<name>` in
 	// `agentArtifacts`, and materializes exactly that. Empty opts into nothing.
 	//
@@ -43,9 +45,6 @@ type initExtensionConfig struct {
 	registries map[string]json.RawMessage
 }
 
-// starterAgentContent is the extension every built-in starter opts into.
-const starterAgentContent = "@putnami/contributor"
-
 // starterNPMRegistries maps the @putnami npm scope to the Putnami package
 // registry, which serves the TypeScript framework packages the TypeScript
 // templates depend on.
@@ -54,9 +53,9 @@ var starterNPMRegistries = map[string]json.RawMessage{
 }
 
 var initExtensions = map[string]initExtensionConfig{
-	"ts": {packageName: "@putnami/typescript", template: "typescript-web", agentContent: starterAgentContent, registries: starterNPMRegistries},
-	"go": {packageName: "@putnami/go", template: "go-server", agentContent: starterAgentContent},
-	"py": {packageName: "@putnami/python", template: "python-server", agentContent: starterAgentContent},
+	"ts": {packageName: "@putnami/typescript", template: "typescript-web", registries: starterNPMRegistries},
+	"go": {packageName: "@putnami/go", template: "go-server"},
+	"py": {packageName: "@putnami/python", template: "python-server"},
 }
 
 // installExtension is swapped in tests so init tests never perform a real
@@ -409,6 +408,7 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	iox.Fprintf(os.Stdout, "  ✓ Workspace ready: %s\n", name)
 	iox.Fprintf(os.Stdout, "    Path: %s\n", cwd)
 	iox.Fprintf(os.Stdout, "    Extension: %s\n", extConfig.packageName)
+	iox.Fprintln(os.Stdout, "    Agent skills: not installed. To add them, declare @putnami/contributor in\n    extensions and extension:@putnami/contributor in agentArtifacts, then run putnami install")
 	iox.Fprintln(os.Stdout)
 
 	iox.Fprintln(os.Stdout, "  Next:")
