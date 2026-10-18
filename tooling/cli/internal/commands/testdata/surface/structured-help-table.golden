@@ -117,10 +117,12 @@ example: putnami dev template test
 example: putnami dev template package
 ═══ doctor ═══
 description: Run a read-only production-readiness preflight over the selected projects: derives production-safety findings (incomplete capabilities, missing required config, invalid committed schemas, config shadowing) from committed manifests and grades them by deployment profile. Under --profile production a high/critical finding fails with exit 2; dev/test stay advisory. Config values are never read or emitted
-usage: putnami doctor [--profile <dev|test|production>] [--project <selector>] [--output <format>]
+usage: putnami doctor [--profile <dev|test|production>] [--project <selector>] [--machine] [--output <format>]
 flag: --profile | <profile> | Deployment profile to evaluate under (dev|test|production); production is strictest
 flag: --project | <selector> | Project ID, path, or name (comma-separated); default is every workspace project
+flag: --machine |  | Report the one-minute load per logical CPU, or unknown, instead of the readiness preflight; takes neither --profile nor --project
 example: putnami doctor
+example: putnami doctor --machine
 example: putnami doctor --profile production
 example: putnami doctor --profile production --project /tooling/cli
 example: putnami doctor --profile production --output=jsonl

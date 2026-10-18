@@ -145,14 +145,16 @@ putnami doctor
 Run a read-only production-readiness preflight over the selected projects: derives production-safety findings (incomplete capabilities, missing required config, invalid committed schemas, config shadowing) from committed manifests and grades them by deployment profile. Under --profile production a high/critical finding fails with exit 2; dev/test stay advisory. Config values are never read or emitted
 
 Usage:
-  putnami doctor [--profile <dev|test|production>] [--project <selector>] [--output <format>]
+  putnami doctor [--profile <dev|test|production>] [--project <selector>] [--machine] [--output <format>]
 
 Command Flags:
   --profile <profile>          Deployment profile to evaluate under (dev|test|production); production is strictest
   --project <selector>         Project ID, path, or name (comma-separated); default is every workspace project
+  --machine                    Report the one-minute load per logical CPU, or unknown, instead of the readiness preflight; takes neither --profile nor --project
 
 Examples:
   putnami doctor
+  putnami doctor --machine
   putnami doctor --profile production
   putnami doctor --profile production --project /tooling/cli
   putnami doctor --profile production --output=jsonl

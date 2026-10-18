@@ -445,6 +445,10 @@
       "path": "doctor",
       "flags": [
         {
+          "long": "--machine",
+          "type": "bool"
+        },
+        {
           "long": "--profile",
           "type": "value"
         },

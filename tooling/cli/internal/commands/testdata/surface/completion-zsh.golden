@@ -289,6 +289,7 @@ _putnami_flags_for() {
             ;;
         'doctor')
             reply=(
+                '--machine[Report the one-minute load per logical CPU, or unknown, instead of the readiness preflight; takes neither --profile nor --project]'
                 '--profile[Deployment profile to evaluate under (dev|test|production); production is strictest]:profile:'
                 '--project[Project ID, path, or name (comma-separated); default is every workspace project]:selector:'
             )
