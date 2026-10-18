@@ -20,7 +20,7 @@ import (
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -86,7 +86,7 @@ func TestTheHostPreparesTheContributorRuntimeWithTheLockedGo(t *testing.T) {
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
 
 	ctx := context.Background()
-	if err := jobs.SynchronizeExtensionRuntimes(
+	if err := scheduler.SynchronizeExtensionRuntimes(
 		ctx, &workspace.Workspace{Root: repoRoot}, []*extension.ExtensionDescription{ext}, nil,
 	); err != nil {
 		t.Fatalf("prepare the contributor runtime with GOROOT=%q: %v", os.Getenv("GOROOT"), err)

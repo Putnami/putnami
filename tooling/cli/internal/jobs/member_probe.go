@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	distribution "go.putnami.dev/protocol/distribution"
 	extproto "go.putnami.dev/protocol/extension"
 	runtimeproto "go.putnami.dev/protocol/runtime"
@@ -43,17 +44,17 @@ type MemberProbeReport struct {
 // other session. On a blocking verdict it adds a failed result row whose error
 // names every one and which carries one error diagnostic per verdict, so the
 // machine output lists them.
-func (report MemberProbeReport) Finalizer() func(map[string]*JobResult) {
+func (report MemberProbeReport) Finalizer() func(map[string]*jobmodel.JobResult) {
 	if !report.DryRun || !slices.Contains(report.Commands, "publish") {
 		return nil
 	}
-	return func(results map[string]*JobResult) {
+	return func(results map[string]*jobmodel.JobResult) {
 		summary := summarizeMemberProbes(report.Run, results)
 		summary.print(report.Out, report.Quiet)
 		if failure := summary.failure(); failure != "" {
-			results[memberProbeResultKey] = &JobResult{
+			results[memberProbeResultKey] = &jobmodel.JobResult{
 				Status: "failed",
-				Error:  &JobError{Message: failure},
+				Error:  &jobmodel.JobError{Message: failure},
 				Events: summary.diagnosticEvents(),
 			}
 		}
@@ -99,7 +100,7 @@ type memberProbeSummary struct {
 // prints the same report. Under a plan, a probe for a member the plan does not
 // select is rejected, as reconcilePublishedReleaseSet rejects an unexpected
 // publication.
-func summarizeMemberProbes(run *ReleaseSetRun, results map[string]*JobResult) memberProbeSummary {
+func summarizeMemberProbes(run *ReleaseSetRun, results map[string]*jobmodel.JobResult) memberProbeSummary {
 	var summary memberProbeSummary
 	planned := run != nil && run.plan != nil
 	selected := map[string]releaseset.PlannedMember{}
@@ -123,7 +124,7 @@ func summarizeMemberProbes(run *ReleaseSetRun, results map[string]*JobResult) me
 		}
 		for _, event := range result.Events {
 			kind, _ := event.Data["kind"].(string)
-			if event.Type != EventTypeArtifact || kind != extproto.MemberProbeEventKind {
+			if event.Type != jobmodel.EventTypeArtifact || kind != extproto.MemberProbeEventKind {
 				continue
 			}
 			probe, err := memberprobe.Decode(event.Data)
@@ -247,13 +248,13 @@ func (summary memberProbeSummary) failure() string {
 
 // diagnosticEvents is one error diagnostic event per blocking verdict, in the
 // shape a job's own diagnostic has.
-func (summary memberProbeSummary) diagnosticEvents() []RawJobEvent {
+func (summary memberProbeSummary) diagnosticEvents() []jobmodel.RawJobEvent {
 	verdicts := summary.blocked()
-	events := make([]RawJobEvent, 0, len(verdicts))
+	events := make([]jobmodel.RawJobEvent, 0, len(verdicts))
 	for _, verdict := range verdicts {
-		events = append(events, RawJobEvent{
+		events = append(events, jobmodel.RawJobEvent{
 			Version: runtimeproto.MaxKnownProtocolVersion,
-			Type:    EventTypeDiagnostic,
+			Type:    jobmodel.EventTypeDiagnostic,
 			Message: verdict.message,
 			Data: map[string]any{
 				"severity": string(runtimeproto.SeverityError),

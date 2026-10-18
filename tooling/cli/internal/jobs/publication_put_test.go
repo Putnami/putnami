@@ -15,6 +15,7 @@ import (
 	"sync"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
 	distribution "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
@@ -219,7 +220,7 @@ func (f putMemberFixture) pack(t *testing.T, writer *publicationoutbox.Writer) e
 // member's publish step and runs script, with registries.put.registry naming
 // registry. The plan records the member's kind, as a plan with member
 // attribution does.
-func addPutMember(h *publicationHarness, f putMemberFixture, registry string, script fixtureScript) *ScheduledJob {
+func addPutMember(h *publicationHarness, f putMemberFixture, registry string, script fixtureScript) *jobmodel.ScheduledJob {
 	h.t.Helper()
 	job := h.addMember(f.ecosystem, f.coordinate, f.version, f.path, map[string]string{"put": registriesEntry("registry", registry)}, script)
 	job.JobDef.StepID, job.JobDef.Name = f.step, "publish~"+f.step
@@ -231,7 +232,7 @@ func addPutMember(h *publicationHarness, f putMemberFixture, registry string, sc
 }
 
 // packedPutMember adds the member with a publication job that packs it.
-func packedPutMember(t *testing.T, h *publicationHarness, f putMemberFixture, registry string, before ...[]string) *ScheduledJob {
+func packedPutMember(t *testing.T, h *publicationHarness, f putMemberFixture, registry string, before ...[]string) *jobmodel.ScheduledJob {
 	t.Helper()
 	outbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
 		return []extensionproto.OutboxMember{f.pack(t, w)}
@@ -250,7 +251,7 @@ func TestEngineUploadsPutRegistryMembers(t *testing.T) {
 	reg := newPutRegistry(t)
 	h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: []string{serverHost(t, reg.server)}})
 	fixtures := putMemberFixtures()
-	jobs := map[string]*ScheduledJob{}
+	jobs := map[string]*jobmodel.ScheduledJob{}
 	environs := map[string]string{}
 	for _, f := range fixtures {
 		environs[f.key()] = filepath.Join(h.root, f.path+"-environ")

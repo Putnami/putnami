@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	modelextension "go.putnami.dev/cli/model/extension"
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/credentialprovider/providertest"
@@ -13,11 +14,11 @@ import (
 
 // planEdges maps each planned key to its sorted dependsOn and serializeAfter
 // edges, the parts of a plan an expected plan compares beside the task.
-func planEdges(planned []*ScheduledJob) map[string][2][]string {
+func planEdges(planned []*jobmodel.ScheduledJob) map[string][2][]string {
 	edges := make(map[string][2][]string, len(planned))
 	for _, job := range planned {
 		if job != nil {
-			edges[job.Key()] = [2][]string{dedupeSorted(slices.Clone(job.DependsOn)), dedupeSorted(slices.Clone(job.SerializeAfter))}
+			edges[job.Key()] = [2][]string{jobmodel.DedupeSorted(slices.Clone(job.DependsOn)), jobmodel.DedupeSorted(slices.Clone(job.SerializeAfter))}
 		}
 	}
 	return edges
@@ -25,8 +26,8 @@ func planEdges(planned []*ScheduledJob) map[string][2][]string {
 
 // cloneJobs copies each job and its edges, so a second attachment of the same
 // jobs starts from the edges the planner gave them.
-func cloneJobs(planned []*ScheduledJob) []*ScheduledJob {
-	clones := make([]*ScheduledJob, 0, len(planned))
+func cloneJobs(planned []*jobmodel.ScheduledJob) []*jobmodel.ScheduledJob {
+	clones := make([]*jobmodel.ScheduledJob, 0, len(planned))
 	for _, job := range planned {
 		copied := *job
 		copied.DependsOn, copied.SerializeAfter = slices.Clone(job.DependsOn), slices.Clone(job.SerializeAfter)
@@ -48,7 +49,7 @@ func TestWithoutPublicationNodesIsTheLegacyPlan(t *testing.T) {
 			web := h.addMember("npm", "@putnami/web", "1.2.3", "web", nil, nil)
 			mod := h.addMember("go", "example.com/mod", "v1.0.0", "mod", nil, nil)
 			gate := h.addGate("web", filepath.Join(h.root, "gate"))
-			deploy := &ScheduledJob{
+			deploy := &jobmodel.ScheduledJob{
 				Project: web.Project, Extension: h.publisher, SelectedProjects: []*workspace.Project{web.Project, mod.Project},
 				DependsOn: []string{gate.Key()},
 				JobDef:    &modelextension.JobDefinition{Name: "deploy~ship", CommandName: "deploy", StepID: "ship", ExtensionName: h.publisher.Name},
@@ -87,7 +88,7 @@ func TestWithoutPublicationNodesIsTheLegacyPlan(t *testing.T) {
 
 			scheduled := planEdges(planned)
 			uploads := []string{h.uploadKey(mod), h.uploadKey(web)}
-			if _, open := scheduled[publicationOpenKey]; !open || !slices.Equal(scheduled[releaseSetResultKey][0], dedupeSorted(append([]string{publicationOpenKey, mod.Key(), web.Key()}, uploads...))) {
+			if _, open := scheduled[publicationOpenKey]; !open || !slices.Equal(scheduled[releaseSetResultKey][0], jobmodel.DedupeSorted(append([]string{publicationOpenKey, mod.Key(), web.Key()}, uploads...))) {
 				t.Errorf("the plan the scheduler runs lost a publication node or edge: release depends on %v", scheduled[releaseSetResultKey][0])
 			}
 			if same := legacyRun.WithoutPublicationNodes(legacy); len(same) != len(legacy) || &same[0] != &legacy[0] {
@@ -107,7 +108,7 @@ func TestWithoutPublicationNodesRewritesEveryEdge(t *testing.T) {
 	gate := h.addGate("web", filepath.Join(h.root, "gate"))
 	planned, _ := h.plan(nil, fixedAncestry{testRevision}, nil)
 	upload := h.uploadKey(web)
-	report := &ScheduledJob{
+	report := &jobmodel.ScheduledJob{
 		Project: web.Project, Extension: h.publisher,
 		DependsOn:      []string{upload, web.Key(), gate.Key()},
 		SerializeAfter: []string{publicationOpenKey, upload},
@@ -123,7 +124,7 @@ func TestWithoutPublicationNodesRewritesEveryEdge(t *testing.T) {
 		t.Error("the projection keeps the open node")
 	}
 	edges := projected[report.Key()]
-	if want := dedupeSorted([]string{gate.Key(), web.Key()}); !slices.Equal(edges[0], want) {
+	if want := jobmodel.DedupeSorted([]string{gate.Key(), web.Key()}); !slices.Equal(edges[0], want) {
 		t.Errorf("projected dependsOn %v, want %v", edges[0], want)
 	}
 	if want := []string{web.Key()}; !slices.Equal(edges[1], want) {

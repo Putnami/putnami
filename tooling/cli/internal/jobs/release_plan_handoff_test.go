@@ -14,10 +14,13 @@ import (
 	"testing"
 	"time"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	distribution "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/releaseset"
+	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -38,16 +41,32 @@ func capabilityNoImpactPlan(t *testing.T) *ReleaseSetRun {
 	head := &distribution.ChannelHead{Ref: ref, Generation: 1, ReleaseSet: set}
 	return &ReleaseSetRun{plan: &releaseset.Plan{ProtocolVersion: distribution.ProtocolVersion, Namespace: "putnami", Channels: []string{"canary"}, Heads: map[string]*distribution.ChannelHead{"canary": head}, Members: []releaseset.PlannedMember{{Ecosystem: "npm", Coordinate: "@putnami/api", Version: "1.2.3", ArtifactDigest: digestFor('f'), ProjectID: "/private/repository/api", SourceRevision: testRevision, SelectionFingerprint: digestFor('a'), Dependencies: []distribution.ReleaseSetDependency{}}}}, sourceRevision: testRevision}
 }
-func capabilityPublishJob(t *testing.T) *ScheduledJob {
-	return capabilityTestJob(t.TempDir(), &workspace.Project{ID: "/api", Name: "api"}, "publish", "publish", "/unused", extensionproto.SideEffectsRegistry)
+
+// capabilityPublishJob is a publish job with a registry side effect, the job
+// that arms the broker. It never runs: it carries no wall-clock budget.
+func capabilityPublishJob(t *testing.T) *jobmodel.ScheduledJob {
+	return &jobmodel.ScheduledJob{
+		Project:   &workspace.Project{ID: "/api", Name: "api"},
+		Extension: &extension.ExtensionDescription{Name: "@putnami/test", Path: t.TempDir()},
+		JobDef: &extension.JobDefinition{
+			ExtensionName: "@putnami/test",
+			Name:          "publish",
+			CommandName:   "publish",
+			Kind:          "command",
+			Command:       "/unused",
+			TimeoutMs:     -1,
+			Traits:        extension.CommandTraits{SideEffects: extensionproto.SideEffectsRegistry},
+		},
+	}
 }
+
 func callbackContext(t *testing.T, endpoint string) context.Context {
 	t.Helper()
-	t.Setenv(InternalReleasePlanCallbackEnv, endpoint)
+	t.Setenv(scheduler.InternalReleasePlanCallbackEnv, endpoint)
 	t.Setenv(extensionproto.CloudTokenEnv, "opaque-local-client-token-keep-private")
 	t.Setenv(extensionproto.CloudCapabilityAfterEnv, "test,lint")
-	ctx := CaptureProcessCapabilities(t.Context())
-	if _, exists := os.LookupEnv(InternalReleasePlanCallbackEnv); exists {
+	ctx := scheduler.CaptureProcessCapabilities(t.Context())
+	if _, exists := os.LookupEnv(scheduler.InternalReleasePlanCallbackEnv); exists {
 		t.Fatal("callback left in ambient environment")
 	}
 	return ctx
@@ -155,7 +174,7 @@ func TestReleaseCapabilityHandoffPrivateIdempotentACK(t *testing.T) {
 	defer server.Close()
 	ctx := callbackContext(t, server.URL+releasePlanCallbackPath)
 	run := capabilityReleasePlan()
-	jobs := []*ScheduledJob{capabilityPublishJob(t)}
+	jobs := []*jobmodel.ScheduledJob{capabilityPublishJob(t)}
 	if err := HandoffReleaseSetPlan(ctx, run, jobs, true); err != nil {
 		t.Fatal(err)
 	}
@@ -165,12 +184,6 @@ func TestReleaseCapabilityHandoffPrivateIdempotentACK(t *testing.T) {
 	run.plan.Members[0].Version = "1.2.4"
 	if err := HandoffReleaseSetPlan(ctx, run, jobs, true); err == nil || calls != 1 {
 		t.Fatal("different plan obtained same capability")
-	}
-	env := scopeProcessCapabilities(ctx, []string{InternalReleasePlanCallbackEnv + "=hostile"}, jobs[0])
-	for _, entry := range env {
-		if strings.HasPrefix(entry, InternalReleasePlanCallbackEnv+"=") {
-			t.Fatal("job inherited callback")
-		}
 	}
 }
 
@@ -207,7 +220,7 @@ func TestReleaseCapabilityHandoffRefusesInvalidACKAndRedirects(t *testing.T) {
 				}
 			}))
 			defer server.Close()
-			err := HandoffReleaseSetPlan(callbackContext(t, server.URL+releasePlanCallbackPath), capabilityReleasePlan(), []*ScheduledJob{capabilityPublishJob(t)}, true)
+			err := HandoffReleaseSetPlan(callbackContext(t, server.URL+releasePlanCallbackPath), capabilityReleasePlan(), []*jobmodel.ScheduledJob{capabilityPublishJob(t)}, true)
 			if mode == "denied" && (err == nil || !strings.Contains(err.Error(), "HTTP 403")) {
 				t.Fatalf("missing refusal status: %v", err)
 			}
@@ -217,7 +230,7 @@ func TestReleaseCapabilityHandoffRefusesInvalidACKAndRedirects(t *testing.T) {
 		})
 	}
 	for _, endpoint := range []string{"https://127.0.0.1:123/v1/release-plan", "http://example.com:123/v1/release-plan", "http://localhost:123/v1/release-plan", "http://user@127.0.0.1:123/v1/release-plan", "http://127.0.0.1:123/v1/release-plan?other=1", "http://127.0.0.1:123/other"} {
-		if err := HandoffReleaseSetPlan(callbackContext(t, endpoint), capabilityReleasePlan(), []*ScheduledJob{capabilityPublishJob(t)}, true); err == nil {
+		if err := HandoffReleaseSetPlan(callbackContext(t, endpoint), capabilityReleasePlan(), []*jobmodel.ScheduledJob{capabilityPublishJob(t)}, true); err == nil {
 			t.Fatalf("unsafe endpoint accepted %s", endpoint)
 		}
 	}
@@ -230,7 +243,7 @@ func TestReleaseCapabilityHandoffSkipsNonexecutingPlans(t *testing.T) {
 	defer server.Close()
 	ctx := callbackContext(t, server.URL+releasePlanCallbackPath)
 	run := capabilityReleasePlan()
-	jobs := []*ScheduledJob{capabilityPublishJob(t)}
+	jobs := []*jobmodel.ScheduledJob{capabilityPublishJob(t)}
 	if err := HandoffReleaseSetPlan(ctx, run, jobs, false); err != nil {
 		t.Fatal(err)
 	}
@@ -263,45 +276,6 @@ func TestReleaseCapabilityWireMatchesCloudDigest(t *testing.T) {
 	digest := sha256.Sum256(encoded)
 	if got := "sha256:" + hex.EncodeToString(digest[:]); got != "sha256:e75cd832da7476399dd2aaccf24c97583fa4ae75d3c29399774525f70b6549ce" {
 		t.Fatalf("cross-language digest = %s", got)
-	}
-}
-
-func TestReleasePlanCallbackWithoutAfterIsRefusedAtCapture(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "private-selected-publication-handoff", "callback-without-after-refused")
-	for _, after := range []string{"", " "} {
-		t.Run("after="+after, func(t *testing.T) {
-			t.Setenv(InternalReleasePlanCallbackEnv, "http://127.0.0.1:123/v1/release-plan")
-			t.Setenv(extensionproto.CloudTokenEnv, "private-token-never-log")
-			t.Setenv(extensionproto.CloudCapabilityAfterEnv, after)
-			output, err := os.CreateTemp(t.TempDir(), "stderr")
-			if err != nil {
-				t.Fatal(err)
-			}
-			previous := os.Stderr
-			os.Stderr = output
-			defer func() { os.Stderr = previous; _ = output.Close() }()
-			ctx := CaptureProcessCapabilities(t.Context())
-			capabilities := processCapabilitiesFromContext(ctx)
-			if capabilities == nil || capabilities.planCallback != "" || capabilities.cloudToken != "" {
-				t.Fatal("callback retained without AFTER")
-			}
-			if _, present := os.LookupEnv(extensionproto.CloudTokenEnv); present {
-				t.Fatal("capability remained ambient")
-			}
-			if _, present := os.LookupEnv(InternalReleasePlanCallbackEnv); present {
-				t.Fatal("callback remained ambient")
-			}
-			if _, err := output.Seek(0, 0); err != nil {
-				t.Fatal(err)
-			}
-			diagnostic, err := io.ReadAll(output)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !strings.Contains(string(diagnostic), "PUTNAMI_CLOUD_CAPABILITY_AFTER is required") || strings.Contains(string(diagnostic), "private-token-never-log") {
-				t.Fatalf("unsafe or missing capture diagnostic: %s", diagnostic)
-			}
-		})
 	}
 }
 
@@ -340,7 +314,7 @@ func TestReleaseCapabilityHandoffSlowBrokerRetryAndTimeoutClass(t *testing.T) {
 			ackHandler(w, r)
 		}))
 		defer server.Close()
-		if err := HandoffReleaseSetPlan(callbackContext(t, server.URL+releasePlanCallbackPath), capabilityReleasePlan(), []*ScheduledJob{capabilityPublishJob(t)}, true); err != nil {
+		if err := HandoffReleaseSetPlan(callbackContext(t, server.URL+releasePlanCallbackPath), capabilityReleasePlan(), []*jobmodel.ScheduledJob{capabilityPublishJob(t)}, true); err != nil {
 			t.Fatal(err)
 		}
 		if calls.Load() != 1 {
@@ -365,7 +339,7 @@ func TestReleaseCapabilityHandoffSlowBrokerRetryAndTimeoutClass(t *testing.T) {
 			ackHandler(w, r)
 		}))
 		defer server.Close()
-		if err := HandoffReleaseSetPlan(callbackContext(t, server.URL+releasePlanCallbackPath), capabilityReleasePlan(), []*ScheduledJob{capabilityPublishJob(t)}, true); err != nil {
+		if err := HandoffReleaseSetPlan(callbackContext(t, server.URL+releasePlanCallbackPath), capabilityReleasePlan(), []*jobmodel.ScheduledJob{capabilityPublishJob(t)}, true); err != nil {
 			t.Fatal(err)
 		}
 		if calls.Load() != 2 {
@@ -386,7 +360,7 @@ func TestReleaseCapabilityHandoffSlowBrokerRetryAndTimeoutClass(t *testing.T) {
 		}))
 		defer server.Close()
 		defer close(release)
-		err := HandoffReleaseSetPlan(callbackContext(t, server.URL+releasePlanCallbackPath), capabilityReleasePlan(), []*ScheduledJob{capabilityPublishJob(t)}, true)
+		err := HandoffReleaseSetPlan(callbackContext(t, server.URL+releasePlanCallbackPath), capabilityReleasePlan(), []*jobmodel.ScheduledJob{capabilityPublishJob(t)}, true)
 		if err == nil || !strings.Contains(err.Error(), "timed out after 200ms") || strings.Contains(err.Error(), "opaque-local-client-token") {
 			t.Fatalf("timeout not classified safely: %v", err)
 		}
@@ -400,7 +374,7 @@ func TestReleaseCapabilityHandoffSlowBrokerRetryAndTimeoutClass(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(ackHandler))
 		endpoint := server.URL + releasePlanCallbackPath
 		server.Close()
-		err := HandoffReleaseSetPlan(callbackContext(t, endpoint), capabilityReleasePlan(), []*ScheduledJob{capabilityPublishJob(t)}, true)
+		err := HandoffReleaseSetPlan(callbackContext(t, endpoint), capabilityReleasePlan(), []*jobmodel.ScheduledJob{capabilityPublishJob(t)}, true)
 		if err == nil || !strings.Contains(err.Error(), "is unavailable (2 attempts): ") || strings.Contains(err.Error(), "timed out") {
 			t.Fatalf("unavailable broker not classified: %v", err)
 		}
@@ -414,7 +388,7 @@ func TestReleaseCapabilityHandoffSlowBrokerRetryAndTimeoutClass(t *testing.T) {
 			w.WriteHeader(http.StatusConflict)
 		}))
 		defer server.Close()
-		err := HandoffReleaseSetPlan(callbackContext(t, server.URL+releasePlanCallbackPath), capabilityReleasePlan(), []*ScheduledJob{capabilityPublishJob(t)}, true)
+		err := HandoffReleaseSetPlan(callbackContext(t, server.URL+releasePlanCallbackPath), capabilityReleasePlan(), []*jobmodel.ScheduledJob{capabilityPublishJob(t)}, true)
 		if err == nil || !strings.Contains(err.Error(), "HTTP 409") || calls.Load() != 1 {
 			t.Fatalf("refusal retried or unnamed: %v calls=%d", err, calls.Load())
 		}

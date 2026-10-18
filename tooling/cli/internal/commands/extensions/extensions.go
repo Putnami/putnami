@@ -15,7 +15,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hooks"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -400,7 +400,7 @@ func runExtensionInstallHooks(ctx context.Context, wsRoot string, cfg *wsproto.C
 	if err != nil {
 		ws = workspace.NewWorkspace(wsRoot, hookCfg, nil)
 	}
-	if err := jobs.SynchronizeExtensionRuntimes(ctx, ws, hookExtensions, nil); err != nil {
+	if err := scheduler.SynchronizeExtensionRuntimes(ctx, ws, hookExtensions, nil); err != nil {
 		return fmt.Errorf("synchronize extension runtimes: %w", err)
 	}
 

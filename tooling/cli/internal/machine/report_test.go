@@ -15,7 +15,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -42,13 +42,13 @@ func reportMeta() ReportMeta {
 
 // reportTask is one counted row: a plan key, a verdict, a provenance and the
 // timings the report sums.
-func reportTask(key string, status jobs.TaskStatus, reuse jobs.ReuseKind, wall, cpu time.Duration) Task {
+func reportTask(key string, status scheduler.TaskStatus, reuse scheduler.ReuseKind, wall, cpu time.Duration) Task {
 	return Task{
 		Identity: identityOfKey(key),
-		Result: jobs.TaskResult{
+		Result: scheduler.TaskResult{
 			Status: status,
 			Reuse:  reuse,
-			Timing: jobs.TaskTiming{Duration: wall, CPUTime: cpu},
+			Timing: scheduler.TaskTiming{Duration: wall, CPUTime: cpu},
 		},
 	}
 }
@@ -57,24 +57,24 @@ func reportTask(key string, status jobs.TaskStatus, reuse jobs.ReuseKind, wall, 
 // a fresh success, a local cache hit, a coalesced task, and a failure carrying
 // one error and one warning.
 func gateLikeRun() Run {
-	failing := reportTask("/a:test~exec", jobs.TaskStatusFailed, jobs.ReuseNone, 900*time.Millisecond, 1500*time.Millisecond)
-	failing.Result.Error = &jobs.JobError{Message: "2 assertions failed"}
-	failing.Result.Diagnostics = []jobs.TaskDiagnostic{
+	failing := reportTask("/a:test~exec", scheduler.TaskStatusFailed, scheduler.ReuseNone, 900*time.Millisecond, 1500*time.Millisecond)
+	failing.Result.Error = &scheduler.JobError{Message: "2 assertions failed"}
+	failing.Result.Diagnostics = []scheduler.TaskDiagnostic{
 		{Severity: "error", Message: "expected 1, got 2", File: "a_test.go", Line: 12},
 		{Severity: "warning", Message: "deprecated helper"},
 	}
 	return Run{
-		Session: &jobs.SessionResult{
+		Session: &scheduler.SessionResult{
 			Tasks:    4,
-			Status:   jobs.TaskCounts{Succeeded: 3, Failed: 1},
-			Fresh:    jobs.TaskCounts{Succeeded: 1, Failed: 1},
-			Reuse:    jobs.ReuseCounts{LocalCache: 1, Coalesced: 1},
+			Status:   scheduler.TaskCounts{Succeeded: 3, Failed: 1},
+			Fresh:    scheduler.TaskCounts{Succeeded: 1, Failed: 1},
+			Reuse:    scheduler.ReuseCounts{LocalCache: 1, Coalesced: 1},
 			Duration: 2 * time.Second,
 		},
 		Tasks: []Task{
-			reportTask("/a:build~compile", jobs.TaskStatusSuccess, jobs.ReuseNone, 700*time.Millisecond, 1200*time.Millisecond),
-			reportTask("/b:build~compile", jobs.TaskStatusSuccess, jobs.ReuseLocalCache, 400*time.Millisecond, 0),
-			reportTask("/b:test~exec", jobs.TaskStatusSuccess, jobs.ReuseCoalesced, 300*time.Millisecond, 0),
+			reportTask("/a:build~compile", scheduler.TaskStatusSuccess, scheduler.ReuseNone, 700*time.Millisecond, 1200*time.Millisecond),
+			reportTask("/b:build~compile", scheduler.TaskStatusSuccess, scheduler.ReuseLocalCache, 400*time.Millisecond, 0),
+			reportTask("/b:test~exec", scheduler.TaskStatusSuccess, scheduler.ReuseCoalesced, 300*time.Millisecond, 0),
 			failing,
 		},
 	}
@@ -102,10 +102,10 @@ func encodeReport(t *testing.T, report *protocolcli.ReportFile) []byte {
 // restated here.
 func TestReport_ValidatesAgainstTheContract(t *testing.T) {
 	run := quotaLimitedSession(t)
-	report := run.Report(reportMeta(), &jobs.TuningReport{
-		Parallel:     jobs.ParallelDecision{Mode: "auto", Workers: 8, LogicalCPU: 16},
-		CriticalPath: &jobs.CriticalPath{DurationMs: 1800},
-	}, &jobs.CacheStatsSnapshot{
+	report := run.Report(reportMeta(), &scheduler.TuningReport{
+		Parallel:     scheduler.ParallelDecision{Mode: "auto", Workers: 8, LogicalCPU: 16},
+		CriticalPath: &scheduler.CriticalPath{DurationMs: 1800},
+	}, &scheduler.CacheStatsSnapshot{
 		Hits: 4, Misses: 2, Restored: 3, Uploads: 1,
 		TimeSavedMs: 5200, BytesFetched: 900, BytesUploaded: 120,
 	})
@@ -187,16 +187,16 @@ func TestReport_CommandsPartitionTheRun(t *testing.T) {
 // dependency-skipped task is stated rather than dropped into the successes.
 func TestReport_CommandRowsCarryEveryVerdictAndProvenance(t *testing.T) {
 	run := Run{
-		Session: &jobs.SessionResult{
+		Session: &scheduler.SessionResult{
 			Tasks:  4,
-			Status: jobs.TaskCounts{Succeeded: 2, Canceled: 1, Skipped: 1},
-			Reuse:  jobs.ReuseCounts{RemoteCache: 1, Coalesced: 1},
+			Status: scheduler.TaskCounts{Succeeded: 2, Canceled: 1, Skipped: 1},
+			Reuse:  scheduler.ReuseCounts{RemoteCache: 1, Coalesced: 1},
 		},
 		Tasks: []Task{
-			reportTask("/a:lint~check", jobs.TaskStatusSuccess, jobs.ReuseRemoteCache, time.Second, 0),
-			reportTask("/b:lint~check", jobs.TaskStatusSuccess, jobs.ReuseCoalesced, time.Second, 0),
-			reportTask("/c:lint~check", jobs.TaskStatusCanceled, jobs.ReuseNone, 200*time.Millisecond, 0),
-			reportTask("/d:lint~check", jobs.TaskStatusSkipped, jobs.ReuseNone, 0, 0),
+			reportTask("/a:lint~check", scheduler.TaskStatusSuccess, scheduler.ReuseRemoteCache, time.Second, 0),
+			reportTask("/b:lint~check", scheduler.TaskStatusSuccess, scheduler.ReuseCoalesced, time.Second, 0),
+			reportTask("/c:lint~check", scheduler.TaskStatusCanceled, scheduler.ReuseNone, 200*time.Millisecond, 0),
+			reportTask("/d:lint~check", scheduler.TaskStatusSkipped, scheduler.ReuseNone, 0, 0),
 		},
 	}
 	report := run.Report(reportMeta(), nil, nil)
@@ -264,21 +264,21 @@ func TestReport_AbsentIsNotZero(t *testing.T) {
 // successes before failures, which is why the run block needs no failures[].
 func TestReport_BoundsTheJobListAndCountsTheRest(t *testing.T) {
 	const total = protocolcli.ReportMaxJobs + 40
-	run := Run{Session: &jobs.SessionResult{Tasks: total, Status: jobs.TaskCounts{Succeeded: total - 2, Failed: 2}}}
+	run := Run{Session: &scheduler.SessionResult{Tasks: total, Status: scheduler.TaskCounts{Succeeded: total - 2, Failed: 2}}}
 	for i := 0; i < total-2; i++ {
 		// Ascending wall, so the untruncated successes would win on wall alone if
 		// the class ordering were not applied first.
-		task := reportTask(fmt.Sprintf("/p%03d:build~compile", i), jobs.TaskStatusSuccess,
-			jobs.ReuseNone, time.Duration(i)*time.Millisecond, 0)
+		task := reportTask(fmt.Sprintf("/p%03d:build~compile", i), scheduler.TaskStatusSuccess,
+			scheduler.ReuseNone, time.Duration(i)*time.Millisecond, 0)
 		if i == 0 {
-			task.Result.Diagnostics = []jobs.TaskDiagnostic{{Severity: "warning", Message: "slow"}}
+			task.Result.Diagnostics = []scheduler.TaskDiagnostic{{Severity: "warning", Message: "slow"}}
 		}
 		run.Tasks = append(run.Tasks, task)
 	}
 	// The two failures are the SHORTEST tasks in the run.
 	for i := 0; i < 2; i++ {
 		run.Tasks = append(run.Tasks, reportTask(fmt.Sprintf("/f%d:build~compile", i),
-			jobs.TaskStatusFailed, jobs.ReuseNone, time.Millisecond, 0))
+			scheduler.TaskStatusFailed, scheduler.ReuseNone, time.Millisecond, 0))
 	}
 
 	report := run.Report(reportMeta(), nil, nil)
@@ -344,12 +344,12 @@ func TestReport_IsDeterministic(t *testing.T) {
 // the one thing the contract's accounting clauses reject.
 func TestReport_FinalizerNeverReachesTheDocument(t *testing.T) {
 	project := &workspace.Project{ID: "/proj", Name: "proj", Path: "."}
-	node := func(stepID, task, runOn string) *jobs.ScheduledJob {
+	node := func(stepID, task, runOn string) *scheduler.ScheduledJob {
 		step := &extension.PipelineStep{ID: stepID, Task: task, RunOn: runOn}
 		if runOn == extensionproto.StepRunOnFinally {
 			step.Finalizes = &extensionproto.FinalizesRelation{Producer: "setup", Consumers: []string{"run"}}
 		}
-		return &jobs.ScheduledJob{
+		return &scheduler.ScheduledJob{
 			Project: project,
 			Step:    step,
 			JobDef: &extension.JobDefinition{
@@ -362,13 +362,13 @@ func TestReport_FinalizerNeverReachesTheDocument(t *testing.T) {
 	producer := node("setup", "test-env-up", "")
 	consumer := node("run", "test-exec", "")
 	finalizer := node("teardown", "test-env-down", extensionproto.StepRunOnFinally)
-	results := map[string]*jobs.JobResult{
+	results := map[string]*scheduler.JobResult{
 		producer.Key():  {Status: "success"},
 		consumer.Key():  {Status: "success"},
-		finalizer.Key(): {Status: "failed", Error: &jobs.JobError{Message: "provider unreachable"}},
+		finalizer.Key(): {Status: "failed", Error: &scheduler.JobError{Message: "provider unreachable"}},
 	}
 
-	run := RunOf([]*jobs.ScheduledJob{producer, consumer, finalizer}, results, jobs.SessionOutcome{})
+	run := RunOf([]*scheduler.ScheduledJob{producer, consumer, finalizer}, results, scheduler.SessionOutcome{})
 	report := run.Report(reportMeta(), nil, nil)
 	encodeReport(t, report)
 
@@ -406,7 +406,7 @@ func TestReport_RefusesToDescribeADifferentTaskSet(t *testing.T) {
 // same filter on both sides, which is what keeps the totals agreeing.
 func TestReport_UncountableStatusStaysOutOfBothSides(t *testing.T) {
 	run := gateLikeRun()
-	run.Tasks = append(run.Tasks, reportTask("/c:build~compile", jobs.TaskStatus("weird"), jobs.ReuseNone, time.Second, 0))
+	run.Tasks = append(run.Tasks, reportTask("/c:build~compile", scheduler.TaskStatus("weird"), scheduler.ReuseNone, time.Second, 0))
 	report := run.Report(reportMeta(), nil, nil)
 	encodeReport(t, report)
 
@@ -444,7 +444,7 @@ func TestReport_OriginIsClosed(t *testing.T) {
 // have been materialized, so a drifted counter is floored rather than published
 // as a document a consumer must reject.
 func TestReportCache_RestoredNeverExceedsHits(t *testing.T) {
-	report := gateLikeRun().Report(reportMeta(), nil, &jobs.CacheStatsSnapshot{Hits: 2, Restored: 5, Misses: 1})
+	report := gateLikeRun().Report(reportMeta(), nil, &scheduler.CacheStatsSnapshot{Hits: 2, Restored: 5, Misses: 1})
 	encodeReport(t, report)
 	if report.Cache.Restored != 2 {
 		t.Errorf("restored = %d, want it floored at the 2 hits", report.Cache.Restored)
@@ -481,20 +481,20 @@ func TestReport_JobsCarryTheirDiagnostics(t *testing.T) {
 // contract's "truncation costs the examples, never the totals".
 func TestReport_JobDiagnosticsAreBoundedAndHonest(t *testing.T) {
 	spectest.Proves(t, "cli/diagnostics-results", "bounded-test-output", "report-diagnostics-obey-limits-with-omission-accounting")
-	noisy := reportTask("/a:lint~check", jobs.TaskStatusSuccess, jobs.ReuseNone, 100*time.Millisecond, 0)
+	noisy := reportTask("/a:lint~check", scheduler.TaskStatusSuccess, scheduler.ReuseNone, 100*time.Millisecond, 0)
 	for i := range protocolcli.ReportMaxJobDiagnostics + 5 {
-		noisy.Result.Diagnostics = append(noisy.Result.Diagnostics, jobs.TaskDiagnostic{
+		noisy.Result.Diagnostics = append(noisy.Result.Diagnostics, scheduler.TaskDiagnostic{
 			Severity: "warning", Message: fmt.Sprintf("w%d", i),
 		})
 	}
-	noisy.Result.Diagnostics = append(noisy.Result.Diagnostics, jobs.TaskDiagnostic{
+	noisy.Result.Diagnostics = append(noisy.Result.Diagnostics, scheduler.TaskDiagnostic{
 		Severity: "error", Message: "the one error",
 	})
 	run := Run{
-		Session: &jobs.SessionResult{
+		Session: &scheduler.SessionResult{
 			Tasks:    1,
-			Status:   jobs.TaskCounts{Succeeded: 1},
-			Fresh:    jobs.TaskCounts{Succeeded: 1},
+			Status:   scheduler.TaskCounts{Succeeded: 1},
+			Fresh:    scheduler.TaskCounts{Succeeded: 1},
 			Duration: 2 * time.Second,
 		},
 		Tasks: []Task{noisy},
@@ -523,25 +523,25 @@ func TestReport_JobDiagnosticsAreBoundedAndHonest(t *testing.T) {
 
 func TestReport_ProducerFailureOmissionsReachEveryAccountingSurface(t *testing.T) {
 	spectest.Proves(t, "cli/diagnostics-results", "bounded-test-output", "report-diagnostics-obey-limits-with-omission-accounting")
-	task := reportTask("/a:test~exec", jobs.TaskStatusFailed, jobs.ReuseNone, time.Second, 0)
-	task.Result.Error = &jobs.JobError{Message: "test run failed"}
+	task := reportTask("/a:test~exec", scheduler.TaskStatusFailed, scheduler.ReuseNone, time.Second, 0)
+	task.Result.Error = &scheduler.JobError{Message: "test run failed"}
 	task.Result.Tests = &runtimeproto.TestSummary{
 		Total: 1, Failed: 1, FailureDetailsTruncated: 3,
 	}
-	task.Result.Diagnostics = append(task.Result.Diagnostics, jobs.TaskDiagnostic{
+	task.Result.Diagnostics = append(task.Result.Diagnostics, scheduler.TaskDiagnostic{
 		Severity: "error", Code: "COVERAGE_THRESHOLD_NOT_MET", Message: "coverage below threshold",
 	})
 	for i := 1; i < protocolcli.ReportMaxJobDiagnostics; i++ {
-		task.Result.Diagnostics = append(task.Result.Diagnostics, jobs.TaskDiagnostic{
+		task.Result.Diagnostics = append(task.Result.Diagnostics, scheduler.TaskDiagnostic{
 			Severity: "error", Code: "TEST_FAILED", Message: fmt.Sprintf("failure %d", i),
 		})
 	}
-	task.Result.Diagnostics = append(task.Result.Diagnostics, jobs.TaskDiagnostic{
+	task.Result.Diagnostics = append(task.Result.Diagnostics, scheduler.TaskDiagnostic{
 		Severity: "info", Code: protocolcli.TestFailureDetailsTruncatedCode, Message: "3 failure details omitted",
 	})
 	run := Run{
-		Session: &jobs.SessionResult{
-			Tasks: 1, Status: jobs.TaskCounts{Failed: 1}, Fresh: jobs.TaskCounts{Failed: 1}, Duration: 2 * time.Second,
+		Session: &scheduler.SessionResult{
+			Tasks: 1, Status: scheduler.TaskCounts{Failed: 1}, Fresh: scheduler.TaskCounts{Failed: 1}, Duration: 2 * time.Second,
 		},
 		Tasks: []Task{task},
 	}
@@ -578,19 +578,19 @@ func TestReport_ProducerFailureOmissionsReachEveryAccountingSurface(t *testing.T
 }
 
 func TestReport_ShortDiagnosticListMayCarryProducerOmissions(t *testing.T) {
-	task := reportTask("/a:test~exec", jobs.TaskStatusFailed, jobs.ReuseNone, time.Second, 0)
-	task.Result.Error = &jobs.JobError{Message: "test run failed"}
+	task := reportTask("/a:test~exec", scheduler.TaskStatusFailed, scheduler.ReuseNone, time.Second, 0)
+	task.Result.Error = &scheduler.JobError{Message: "test run failed"}
 	task.Result.Tests = &runtimeproto.TestSummary{
 		Total: 1, Failed: 1, FailureDetailsTruncated: 5,
 	}
-	task.Result.Diagnostics = []jobs.TaskDiagnostic{
+	task.Result.Diagnostics = []scheduler.TaskDiagnostic{
 		{Severity: "error", Code: "TEST_FAILED", Message: "failure one"},
 		{Severity: "error", Code: "TEST_FAILED", Message: "failure two"},
 		{Severity: "info", Code: protocolcli.TestFailureDetailsTruncatedCode, Message: "5 failure details omitted"},
 	}
 	run := Run{
-		Session: &jobs.SessionResult{
-			Tasks: 1, Status: jobs.TaskCounts{Failed: 1}, Fresh: jobs.TaskCounts{Failed: 1}, Duration: 2 * time.Second,
+		Session: &scheduler.SessionResult{
+			Tasks: 1, Status: scheduler.TaskCounts{Failed: 1}, Fresh: scheduler.TaskCounts{Failed: 1}, Duration: 2 * time.Second,
 		},
 		Tasks: []Task{task},
 	}
@@ -615,14 +615,14 @@ func TestReport_ShortDiagnosticListMayCarryProducerOmissions(t *testing.T) {
 func TestReport_JobDiagnosticMessageIsByteBoundedKeepingTheTail(t *testing.T) {
 	long := bytes.Repeat([]byte{'x'}, protocolcli.ReportMaxMessageBytes)
 	message := "é" + string(long) + "--- FAIL: TestTail" // the two-byte rune straddles the tail cut
-	task := reportTask("/a:test~exec", jobs.TaskStatusFailed, jobs.ReuseNone, time.Second, 0)
-	task.Result.Error = &jobs.JobError{Message: "failed"}
-	task.Result.Diagnostics = []jobs.TaskDiagnostic{{Severity: "error", Message: message}}
+	task := reportTask("/a:test~exec", scheduler.TaskStatusFailed, scheduler.ReuseNone, time.Second, 0)
+	task.Result.Error = &scheduler.JobError{Message: "failed"}
+	task.Result.Diagnostics = []scheduler.TaskDiagnostic{{Severity: "error", Message: message}}
 	run := Run{
-		Session: &jobs.SessionResult{
+		Session: &scheduler.SessionResult{
 			Tasks:    1,
-			Status:   jobs.TaskCounts{Failed: 1},
-			Fresh:    jobs.TaskCounts{Failed: 1},
+			Status:   scheduler.TaskCounts{Failed: 1},
+			Fresh:    scheduler.TaskCounts{Failed: 1},
 			Duration: 2 * time.Second,
 		},
 		Tasks: []Task{task},
@@ -650,7 +650,7 @@ func TestReport_JobDiagnosticMessageIsByteBoundedKeepingTheTail(t *testing.T) {
 // measuredTask is a passing test task carrying the typed payloads an extension
 // emits in its result data — the shape jobs.TaskResultOf now records.
 func measuredTask(key string, tests *runtimeproto.TestSummary, coverage *runtimeproto.CoverageSummary) Task {
-	task := reportTask(key, jobs.TaskStatusSuccess, jobs.ReuseNone, 500*time.Millisecond, 0)
+	task := reportTask(key, scheduler.TaskStatusSuccess, scheduler.ReuseNone, 500*time.Millisecond, 0)
 	task.Result.Tests = tests
 	task.Result.Coverage = coverage
 	return task
@@ -660,10 +660,10 @@ func measuredTask(key string, tests *runtimeproto.TestSummary, coverage *runtime
 // so the projection's accounting check passes and the document validates.
 func measuredRun(tasks ...Task) Run {
 	return Run{
-		Session: &jobs.SessionResult{
+		Session: &scheduler.SessionResult{
 			Tasks:    len(tasks),
-			Status:   jobs.TaskCounts{Succeeded: len(tasks)},
-			Fresh:    jobs.TaskCounts{Succeeded: len(tasks)},
+			Status:   scheduler.TaskCounts{Succeeded: len(tasks)},
+			Fresh:    scheduler.TaskCounts{Succeeded: len(tasks)},
 			Duration: 2 * time.Second,
 		},
 		Tasks: tasks,
@@ -824,16 +824,16 @@ func TestReport_CoverageBearingJobsSurviveTheBound(t *testing.T) {
 		// Ascending wall, so the ordinary tasks would win on wall alone if the
 		// class ordering were not applied first.
 		run.Tasks = append(run.Tasks, reportTask(fmt.Sprintf("/p%03d:build~compile", i),
-			jobs.TaskStatusSuccess, jobs.ReuseNone, time.Duration(i+10)*time.Second, 0))
+			scheduler.TaskStatusSuccess, scheduler.ReuseNone, time.Duration(i+10)*time.Second, 0))
 	}
-	noisy := reportTask("/n:lint~check", jobs.TaskStatusSuccess, jobs.ReuseNone, time.Millisecond, 0)
-	noisy.Result.Diagnostics = []jobs.TaskDiagnostic{{Severity: "warning", Message: "slow"}}
+	noisy := reportTask("/n:lint~check", scheduler.TaskStatusSuccess, scheduler.ReuseNone, time.Millisecond, 0)
+	noisy.Result.Diagnostics = []scheduler.TaskDiagnostic{{Severity: "warning", Message: "slow"}}
 	covered := measuredTask("/c:test~exec", &runtimeproto.TestSummary{Total: 3, Passed: 3},
 		&runtimeproto.CoverageSummary{Percentage: 91.5, Granularity: "statements", Covered: 183, Total: 200})
 	covered.Result.Timing.Duration = time.Millisecond
 	run.Tasks = append(run.Tasks, noisy, covered)
 	run.Session.Tasks = len(run.Tasks)
-	run.Session.Status = jobs.TaskCounts{Succeeded: len(run.Tasks)}
+	run.Session.Status = scheduler.TaskCounts{Succeeded: len(run.Tasks)}
 	run.Session.Fresh = run.Session.Status
 
 	report := run.Report(reportMeta(), nil, nil)

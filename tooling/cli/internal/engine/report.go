@@ -8,7 +8,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/machine"
 	"go.putnami.dev/tooling/cli/internal/profiler"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
@@ -29,18 +29,18 @@ import (
 // re-derived the reuse classification from them — including a fallback for a
 // producer that had not filled "outcome" in. jobs.ReuseKind makes both the
 // re-derivation and that fallback structurally impossible.
-func recordProfilerSessionEvent(prof *profiler.Profiler, record jobs.SessionRecord) {
-	if record.Type != jobs.SessionRecordJobEnd || record.Task == nil {
+func recordProfilerSessionEvent(prof *profiler.Profiler, record scheduler.SessionRecord) {
+	if record.Type != scheduler.SessionRecordJobEnd || record.Task == nil {
 		return
 	}
 	task := record.Task
 	traceStatus := string(task.Status)
-	if task.Reuse == jobs.ReuseCoalesced {
-		traceStatus = jobs.JobOutcomeCoalesced
+	if task.Reuse == scheduler.ReuseCoalesced {
+		traceStatus = scheduler.JobOutcomeCoalesced
 	}
 	prof.JobEnd(record.JobKey, traceStatus, task.Timing.Duration)
 	switch {
-	case task.Reuse == jobs.ReuseCoalesced:
+	case task.Reuse == scheduler.ReuseCoalesced:
 		prof.Instant(record.JobKey, "cache-coalesced", "cache", nil)
 	case task.Reuse.CacheHit():
 		prof.Instant(record.JobKey, "cache-hit", "cache", nil)
@@ -52,7 +52,7 @@ func recordProfilerSessionEvent(prof *profiler.Profiler, record jobs.SessionReco
 // in verbose/debug (and whenever profiling is on); the critical path and ready
 // wait detail show in debug or with --trace-profile, so profiling needs no
 // external trace analysis. Quiet suppresses everything.
-func reportSchedulerTuning(w io.Writer, g *GlobalFlags, tuning *jobs.TuningReport) {
+func reportSchedulerTuning(w io.Writer, g *GlobalFlags, tuning *scheduler.TuningReport) {
 	if tuning == nil || g.Quiet {
 		return
 	}
@@ -118,7 +118,7 @@ func reportSchedulerTuning(w io.Writer, g *GlobalFlags, tuning *jobs.TuningRepor
 // in-process and child-process work that otherwise sits between near-zero task
 // spans. When a remote provider participated, its economics follow on a
 // separate line. Quiet suppresses everything.
-func reportCacheSummary(w io.Writer, g *GlobalFlags, c *jobs.CacheStatsSnapshot) {
+func reportCacheSummary(w io.Writer, g *GlobalFlags, c *scheduler.CacheStatsSnapshot) {
 	if c == nil || g.Quiet || !c.HasActivity() {
 		return
 	}
@@ -211,8 +211,8 @@ func writeRunReport(
 	session *workspace_state.Session,
 	run machine.Run,
 	req *Request,
-	tuning *jobs.TuningReport,
-	cache *jobs.CacheStatsSnapshot,
+	tuning *scheduler.TuningReport,
+	cache *scheduler.CacheStatsSnapshot,
 ) error {
 	if session == nil || req == nil {
 		return nil

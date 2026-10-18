@@ -32,7 +32,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
 // PortableTaskDeadlineMs is the budget of a fixture task that portable
@@ -42,7 +42,7 @@ import (
 // The ChangePlan projection refuses a task with no hard deadline, so these
 // tasks take the engine's default instead: five minutes, far above any host
 // load, for a shell that exits at once.
-const PortableTaskDeadlineMs = jobs.DefaultTimeoutMs
+const PortableTaskDeadlineMs = scheduler.DefaultTimeoutMs
 
 // Main is the TestMain body of an e2e package. It drops a hosted run's
 // invocation broker before any test runs: the broker wins over every

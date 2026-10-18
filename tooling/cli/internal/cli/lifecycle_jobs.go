@@ -12,7 +12,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -207,7 +207,7 @@ func reportWorkspaceIndexAction(req lifecycle.WorkspaceJobRequest, before, after
 // reportWorkspaceJobActions reports one action per provider only after every
 // planned step for that provider succeeds. The engine result does not claim a
 // package-manager diff, so the wording truthfully describes reconciliation.
-func reportWorkspaceJobActions(req lifecycle.WorkspaceJobRequest, plan []*jobs.ScheduledJob, results map[string]*jobs.JobResult) {
+func reportWorkspaceJobActions(req lifecycle.WorkspaceJobRequest, plan []*scheduler.ScheduledJob, results map[string]*scheduler.JobResult) {
 	if req.OnAction == nil {
 		return
 	}
@@ -223,7 +223,7 @@ func reportWorkspaceJobActions(req lifecycle.WorkspaceJobRequest, plan []*jobs.S
 			providers[name] = true
 		}
 		result := results[job.Key()]
-		if result == nil || result.Status != string(jobs.TaskStatusSuccess) {
+		if result == nil || result.Status != string(scheduler.TaskStatusSuccess) {
 			providers[name] = false
 		}
 	}

@@ -8,7 +8,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	runtimeproto "go.putnami.dev/protocol/runtime"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
 // The report projection — surface #5 of the ONE canonical reduction
@@ -70,8 +70,8 @@ type ReportMeta struct {
 // be written is a missing file, never a failed run".
 func (r Run) Report(
 	meta ReportMeta,
-	scheduler *jobs.TuningReport,
-	cache *jobs.CacheStatsSnapshot,
+	scheduler *scheduler.TuningReport,
+	cache *scheduler.CacheStatsSnapshot,
 ) *protocolcli.ReportFile {
 	// The wall is the session's own — end minus start — for the same reason
 	// Session.FinalizeV2 re-derives it: the run's CPU allocation is stated
@@ -123,9 +123,9 @@ func (r Run) countedTasks() []Task {
 // countedStatus reports whether a verdict reaches one of the four buckets the
 // reduction histograms. jobs.TaskCounts.add drops anything else, and so does
 // this document.
-func countedStatus(status jobs.TaskStatus) bool {
+func countedStatus(status scheduler.TaskStatus) bool {
 	switch status {
-	case jobs.TaskStatusSuccess, jobs.TaskStatusFailed, jobs.TaskStatusCanceled, jobs.TaskStatusSkipped:
+	case scheduler.TaskStatusSuccess, scheduler.TaskStatusFailed, scheduler.TaskStatusCanceled, scheduler.TaskStatusSkipped:
 		return true
 	default:
 		return false
@@ -425,27 +425,27 @@ func boundedPercentage(percentage float64) float64 {
 
 // addCounts folds one verdict into a command's histogram, on the same buckets
 // the reduction uses.
-func addCounts(counts *protocolcli.RunCounts, status jobs.TaskStatus) {
+func addCounts(counts *protocolcli.RunCounts, status scheduler.TaskStatus) {
 	switch status {
-	case jobs.TaskStatusSuccess:
+	case scheduler.TaskStatusSuccess:
 		counts.Succeeded++
-	case jobs.TaskStatusFailed:
+	case scheduler.TaskStatusFailed:
 		counts.Failed++
-	case jobs.TaskStatusCanceled:
+	case scheduler.TaskStatusCanceled:
 		counts.Canceled++
-	case jobs.TaskStatusSkipped:
+	case scheduler.TaskStatusSkipped:
 		counts.Skipped++
 	}
 }
 
 // addReuse folds one reused task's provenance in.
-func addReuse(reuse *protocolcli.RunReuse, kind jobs.ReuseKind) {
+func addReuse(reuse *protocolcli.RunReuse, kind scheduler.ReuseKind) {
 	switch kind {
-	case jobs.ReuseLocalCache:
+	case scheduler.ReuseLocalCache:
 		reuse.LocalCache++
-	case jobs.ReuseRemoteCache:
+	case scheduler.ReuseRemoteCache:
 		reuse.RemoteCache++
-	case jobs.ReuseCoalesced:
+	case scheduler.ReuseCoalesced:
 		reuse.Coalesced++
 	}
 }
@@ -454,7 +454,7 @@ func addReuse(reuse *protocolcli.RunReuse, kind jobs.ReuseKind) {
 // reported, including records the bounded job list will drop. The producer's
 // synthetic omission marker is accounting rather than another error; its
 // omitted details are added separately from the typed test summary.
-func countDiagnostics(row *protocolcli.ReportCommand, reported []jobs.TaskDiagnostic) {
+func countDiagnostics(row *protocolcli.ReportCommand, reported []scheduler.TaskDiagnostic) {
 	for i := range reported {
 		if reported[i].Code == protocolcli.TestFailureDetailsTruncatedCode {
 			continue
@@ -521,7 +521,7 @@ func reportJobList(tasks []Task, enforced bool) ([]protocolcli.ReportJob, int) {
 // per-command row states the command's aggregate, never this project's share.
 func noteworthiness(task *Task) int {
 	switch {
-	case task.Result.Status == jobs.TaskStatusFailed:
+	case task.Result.Status == scheduler.TaskStatusFailed:
 		return rankFailed
 	case len(task.Result.Diagnostics) > 0:
 		return rankDiagnostic
@@ -584,7 +584,7 @@ func reportJob(task Task, enforced bool) protocolcli.ReportJob {
 // counters fold every real reported diagnostic, elided or not, and
 // reportCommands separately adds producer-side omitted failure details. The
 // synthetic accounting marker is informational rather than another error.
-func reportJobDiagnostics(reported []jobs.TaskDiagnostic) ([]protocolcli.Diagnostic, int) {
+func reportJobDiagnostics(reported []scheduler.TaskDiagnostic) ([]protocolcli.Diagnostic, int) {
 	if len(reported) == 0 {
 		return nil, 0
 	}
@@ -661,7 +661,7 @@ func truncateMessage(message string) string {
 // would claim the cache was asked and answered nothing, which is a different
 // fact. Per-command byte traffic is deliberately not offered anywhere: any
 // split of a deduplicated transfer is a fiction, so bytes are stated once.
-func reportCache(cache *jobs.CacheStatsSnapshot) *protocolcli.ReportCache {
+func reportCache(cache *scheduler.CacheStatsSnapshot) *protocolcli.ReportCache {
 	if cache == nil || (cache.KeysRequested == 0 && cache.Hits == 0 && cache.Misses == 0 &&
 		cache.Restored == 0 && cache.Uploads == 0 && cache.BytesFetched == 0 && cache.BytesUploaded == 0) {
 		return nil
@@ -690,7 +690,7 @@ func reportCache(cache *jobs.CacheStatsSnapshot) *protocolcli.ReportCache {
 // the free-form scheduler report. It is absent when the run recorded no scheduler report; a plan
 // with no positive-duration chain really did measure a zero critical path, so
 // that zero is kept.
-func reportScheduler(tuning *jobs.TuningReport) *protocolcli.ReportScheduler {
+func reportScheduler(tuning *scheduler.TuningReport) *protocolcli.ReportScheduler {
 	if tuning == nil || tuning.Parallel.Workers < 1 {
 		return nil
 	}

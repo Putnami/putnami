@@ -26,11 +26,12 @@ import (
 //
 // depguard is an IMPORT-path linter, and the invariant here is not about import
 // paths: internal/cli, internal/commands, internal/mcp, internal/output and
-// internal/watch all legitimately import internal/jobs — for jobs.JobResult,
-// jobs.RawJobEvent, jobs.ScheduledJob, jobs.ReduceRun and the event-type
-// constants. What must not cross the boundary is a SYMBOL SET: the execution
-// entry points. depguard cannot express "this package may be imported, but only
-// internal/engine may name RunPlan in it", so a depguard rule strong enough to
+// internal/watch all legitimately import internal/jobs/scheduler — for
+// scheduler.JobResult, scheduler.RawJobEvent, scheduler.ScheduledJob,
+// scheduler.ReduceRun and the event-type constants. What must not cross the
+// boundary is a SYMBOL SET: the execution entry points. depguard cannot express
+// "this package may be imported, but only internal/engine may name RunPlan in
+// it", so a depguard rule strong enough to
 // hold the invariant would have to ban the whole package and would be turned off
 // within a week.
 //
@@ -45,7 +46,7 @@ import (
 //
 // # How the test seam stays out of production reach
 //
-// The ~62 direct scheduler constructions live in internal/jobs/*_test.go and use
+// The ~62 direct scheduler constructions live in internal/jobs/scheduler/*_test.go and use
 // the package-private newScheduler. They are not a back door: an unexported
 // identifier is unreachable from every other package by the COMPILER, test file
 // or not. That is why A6a unexported the constructor and the two setters rather
@@ -53,8 +54,10 @@ import (
 // exported to be usable, and an exported helper is the boundary this slice
 // exists to close.
 
-// jobsImportPath is the package whose execution surface is engine-only.
-const jobsImportPath = "go.putnami.dev/tooling/cli/internal/jobs"
+// schedulerImportPath is the package whose execution surface is engine-only.
+// The scheduler left internal/jobs, so its surface is restricted under its own
+// import path.
+const schedulerImportPath = "go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 
 // remoteCacheImportPath is the remote cache client the engine loads and hands
 // to the scheduler. It left internal/jobs, so its loader and its type are
@@ -69,35 +72,81 @@ const plannerImportPath = "go.putnami.dev/tooling/cli/internal/jobs/planner"
 // client to wire one into an in-package scheduler, which was unqualified before
 // the client left internal/jobs. Its production files may not name it: the
 // scheduler reaches the client only through the cachekey.RemoteCache interface.
-const schedulerTestDir = "internal/jobs"
+const schedulerTestDir = "internal/jobs/scheduler"
 
-// plannerPlanTestException is one scheduler test that plans a fixture with
-// planner.Plan so the scheduler can run the plan. It is a named file, not a
-// directory, so a new test under internal/jobs cannot start planning silently.
+// releaseSetTestDir holds the release-set and publication tests. They stayed in
+// internal/jobs when the scheduler left it, and some of them plan or run a
+// fixture the way the scheduler's own tests do.
+const releaseSetTestDir = "internal/jobs"
+
+// plannerPlanTestException is one scheduler or release-set test that plans a
+// fixture with planner.Plan so the scheduler can run the plan. It is a named
+// file, not a directory, so a new test under either directory cannot start
+// planning silently.
 type plannerPlanTestException struct {
-	// file is the test file, module relative.
+	// dir is the test's package directory, module relative: schedulerTestDir
+	// or releaseSetTestDir.
+	dir string
+	// file is the test file name in dir.
 	file string
 	// why states what the test needs a real plan for.
 	why string
 }
 
-// plannerPlanTestExceptions are the scheduler tests allowed to name planner.Plan.
-// The list is checked in both directions: a listed file that no longer calls
+// path is the exception's test file, module relative.
+func (e plannerPlanTestException) path() string { return e.dir + "/" + e.file }
+
+// plannerPlanTestExceptions are the tests allowed to name planner.Plan. The
+// list is checked in both directions: a listed file that no longer calls
 // planner.Plan fails, so the entry is deleted rather than left as a standing
 // permission. A test that only plans belongs in internal/jobs/planner, where the
 // call is unqualified.
 var plannerPlanTestExceptions = []plannerPlanTestException{
 	{
-		file: "internal/jobs/integration_test.go",
+		dir:  schedulerTestDir,
+		file: "integration_test.go",
 		why:  "plans a fixture workspace, then runs the plan end to end through the scheduler",
 	},
 	{
-		file: "internal/jobs/release_set_deployment_test.go",
-		why:  "plans a package step, then reads release-set fixtures and helpers that live in the scheduler package",
+		dir:  releaseSetTestDir,
+		file: "release_set_deployment_test.go",
+		why:  "plans a package step, then reads release-set fixtures and helpers that live in the jobs package",
 	},
 	{
-		file: "internal/jobs/tree_keyed_cache_test.go",
+		dir:  schedulerTestDir,
+		file: "tree_keyed_cache_test.go",
 		why:  "plans under a history fixture, then calls the scheduler package's unexported version-file step and BuildRunVersions",
+	},
+}
+
+// schedulerRunTestException is one release-set or publication test that runs
+// its fixture plan with scheduler.RunPlan, as it did in-package before the
+// scheduler left internal/jobs.
+type schedulerRunTestException struct {
+	// file is the test file, module relative, directly under releaseSetTestDir.
+	file string
+	// why states what the test needs a real run for.
+	why string
+}
+
+// schedulerRunSymbols are the restricted scheduler symbols a test listed in
+// schedulerRunTestExceptions may name: the run entry, its request and its
+// tuning. Constructing a Scheduler or reading a raw SchedulerResult stays
+// engine-only.
+var schedulerRunSymbols = map[string]bool{"RunPlan": true, "RunRequest": true, "SchedulerConfig": true}
+
+// schedulerRunTestExceptions are the tests outside the engine allowed to name
+// schedulerRunSymbols. The list is checked in both directions, like
+// plannerPlanTestExceptions: a listed file that no longer calls
+// scheduler.RunPlan fails, so the entry is deleted.
+var schedulerRunTestExceptions = []schedulerRunTestException{
+	{
+		file: "internal/jobs/publication_test.go",
+		why:  "runs a publication plan through the scheduler, so the engine-side uploads and the outbox seam run as they do in a release",
+	},
+	{
+		file: "internal/jobs/release_set_e2e_test.go",
+		why:  "runs a release-set plan end to end through the scheduler: the barrier, the publish jobs, the finalizer and a deploy",
 	},
 }
 
@@ -110,10 +159,10 @@ const enginePackageDir = "internal/engine"
 // "running a plan". Naming any of them outside internal/engine is a second run
 // loop being born.
 var restrictedJobSymbols = map[string]map[string]string{
-	jobsImportPath: {
+	schedulerImportPath: {
 		"RunPlan":         "the ONE execution entry (engine/execute.go); a second caller is a run without the session file, run markers, profiler or remote cache",
 		"RunRequest":      "RunPlan's argument; naming it outside the engine means assembling a run elsewhere",
-		"Scheduler":       "ADR 0001 §3: no adapter constructs or configures a jobs.Scheduler",
+		"Scheduler":       "ADR 0001 §3: no adapter constructs or configures a scheduler.Scheduler",
 		"SchedulerConfig": "scheduler tuning is derived from the engine Request's global flags, in one place",
 		"SchedulerResult": "the raw scheduler result; adapters read the canonical engine.SessionResult instead",
 	},
@@ -135,14 +184,15 @@ type jobSymbolReference struct {
 }
 
 // qualified spells the reference the way the source does by default, as
-// "jobs.RunPlan" or "remotecache.LoadRemoteCache".
+// "scheduler.RunPlan" or "remotecache.LoadRemoteCache".
 func (r jobSymbolReference) qualified() string {
 	return r.pkg[strings.LastIndex(r.pkg, "/")+1:] + "." + r.symbol
 }
 
 // boundaryExempt reports whether ref may name its symbol outside the engine: a
-// scheduler test naming the remote cache client, or one of the scheduler tests
-// listed in plannerPlanTestExceptions naming planner.Plan.
+// scheduler test naming the remote cache client, one of the tests listed in
+// plannerPlanTestExceptions naming planner.Plan, or one of the tests listed in
+// schedulerRunTestExceptions naming a schedulerRunSymbols symbol.
 func boundaryExempt(ref jobSymbolReference) bool {
 	if !strings.HasSuffix(ref.file, "_test.go") {
 		return false
@@ -152,6 +202,15 @@ func boundaryExempt(ref jobSymbolReference) bool {
 		return filepath.ToSlash(filepath.Dir(ref.file)) == schedulerTestDir
 	case plannerImportPath:
 		for _, exception := range plannerPlanTestExceptions {
+			if exception.path() == ref.file {
+				return true
+			}
+		}
+	case schedulerImportPath:
+		if !schedulerRunSymbols[ref.symbol] {
+			return false
+		}
+		for _, exception := range schedulerRunTestExceptions {
 			if exception.file == ref.file {
 				return true
 			}
@@ -191,33 +250,42 @@ func TestEngineBoundary_OnlyTheEngineRunsJobs(t *testing.T) {
 	// Self-check: if the scan found nothing in the engine either, the walk or an
 	// import path is wrong and the assertion above passed vacuously. The engine
 	// calls these entry points today, by construction.
-	for _, symbol := range []string{"planner.Plan", "jobs.RunPlan", "remotecache.LoadRemoteCache"} {
+	for _, symbol := range []string{"planner.Plan", "scheduler.RunPlan", "remotecache.LoadRemoteCache"} {
 		if !engineRefs[symbol] {
 			t.Fatalf("scan found no reference to %s in %s — the boundary scan is broken, not the tree "+
-				"(check %s, %s, %s and the walk root %s)", symbol, enginePackageDir, jobsImportPath, plannerImportPath, remoteCacheImportPath, root)
+				"(check %s, %s, %s and the walk root %s)", symbol, enginePackageDir, schedulerImportPath, plannerImportPath, remoteCacheImportPath, root)
 		}
 	}
 }
 
 // TestEngineBoundary_OnlySchedulerTestsNameTheRemoteCacheClientOrPlan pins the
 // exemptions: a scheduler test may name the remote cache client, only the
-// scheduler tests listed in plannerPlanTestExceptions may name planner.Plan, a
-// scheduler production file or any other package may name neither, and the jobs
-// symbols get no exemption at all.
+// tests listed in plannerPlanTestExceptions may name planner.Plan, only the
+// release-set and publication tests listed in schedulerRunTestExceptions may
+// name the scheduler's run entry, its request and its tuning, and a production
+// file or any other package may name none of them.
 func TestEngineBoundary_OnlySchedulerTestsNameTheRemoteCacheClientOrPlan(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
 		ref  jobSymbolReference
 		want bool
 	}{
-		{jobSymbolReference{file: "internal/jobs/remote_task_test.go", pkg: remoteCacheImportPath, symbol: "LoadRemoteCache"}, true},
-		{jobSymbolReference{file: "internal/jobs/scheduler.go", pkg: remoteCacheImportPath, symbol: "RemoteCache"}, false},
+		{jobSymbolReference{file: "internal/jobs/scheduler/remote_task_test.go", pkg: remoteCacheImportPath, symbol: "LoadRemoteCache"}, true},
+		{jobSymbolReference{file: "internal/jobs/scheduler/scheduler.go", pkg: remoteCacheImportPath, symbol: "RemoteCache"}, false},
+		{jobSymbolReference{file: "internal/jobs/release_set_test.go", pkg: remoteCacheImportPath, symbol: "RemoteCache"}, false},
 		{jobSymbolReference{file: "internal/jobs/toolchain/toolchain_test.go", pkg: remoteCacheImportPath, symbol: "RemoteCache"}, false},
 		{jobSymbolReference{file: "internal/commands/sessions/sessions_run_test.go", pkg: remoteCacheImportPath, symbol: "LoadRemoteCache"}, false},
-		{jobSymbolReference{file: "internal/jobs/run_plan_test.go", pkg: jobsImportPath, symbol: "RunPlan"}, false},
-		{jobSymbolReference{file: "internal/jobs/integration_test.go", pkg: plannerImportPath, symbol: "Plan"}, true},
-		{jobSymbolReference{file: "internal/jobs/unlisted_test.go", pkg: plannerImportPath, symbol: "Plan"}, false},
-		{jobSymbolReference{file: "internal/jobs/scheduler.go", pkg: plannerImportPath, symbol: "Plan"}, false},
+		{jobSymbolReference{file: "internal/jobs/scheduler/run_plan_test.go", pkg: schedulerImportPath, symbol: "RunPlan"}, false},
+		{jobSymbolReference{file: "internal/jobs/release_set_e2e_test.go", pkg: schedulerImportPath, symbol: "RunPlan"}, true},
+		{jobSymbolReference{file: "internal/jobs/publication_test.go", pkg: schedulerImportPath, symbol: "SchedulerConfig"}, true},
+		{jobSymbolReference{file: "internal/jobs/release_set_e2e_test.go", pkg: schedulerImportPath, symbol: "Scheduler"}, false},
+		{jobSymbolReference{file: "internal/jobs/unlisted_test.go", pkg: schedulerImportPath, symbol: "RunPlan"}, false},
+		{jobSymbolReference{file: "internal/jobs/release_set.go", pkg: schedulerImportPath, symbol: "RunPlan"}, false},
+		{jobSymbolReference{file: "internal/jobs/scheduler/integration_test.go", pkg: plannerImportPath, symbol: "Plan"}, true},
+		{jobSymbolReference{file: "internal/jobs/release_set_deployment_test.go", pkg: plannerImportPath, symbol: "Plan"}, true},
+		{jobSymbolReference{file: "internal/jobs/scheduler/unlisted_test.go", pkg: plannerImportPath, symbol: "Plan"}, false},
+		{jobSymbolReference{file: "internal/jobs/integration_test.go", pkg: plannerImportPath, symbol: "Plan"}, false},
+		{jobSymbolReference{file: "internal/jobs/scheduler/scheduler.go", pkg: plannerImportPath, symbol: "Plan"}, false},
 		{jobSymbolReference{file: "internal/commands/lifecycle/deps_test.go", pkg: plannerImportPath, symbol: "Plan"}, false},
 	} {
 		if got := boundaryExempt(c.ref); got != c.want {
@@ -240,24 +308,55 @@ func TestEngineBoundary_PlannerPlanTestExceptionsAreExact(t *testing.T) {
 		}
 	}
 	for _, exception := range plannerPlanTestExceptions {
-		if !strings.HasSuffix(exception.file, "_test.go") ||
-			filepath.ToSlash(filepath.Dir(exception.file)) != schedulerTestDir {
-			t.Errorf("%s is not a test file directly under %s — the exemption covers scheduler tests only",
-				exception.file, schedulerTestDir)
+		if !strings.HasSuffix(exception.file, "_test.go") || strings.Contains(exception.file, "/") ||
+			(exception.dir != schedulerTestDir && exception.dir != releaseSetTestDir) {
+			t.Errorf("%s is not a test file directly under %s or %s — the exemption covers scheduler and release-set tests only",
+				exception.path(), schedulerTestDir, releaseSetTestDir)
 		}
 		if strings.TrimSpace(exception.why) == "" {
-			t.Errorf("%s is exempt without a reason — state what the test needs a real plan for", exception.file)
+			t.Errorf("%s is exempt without a reason — state what the test needs a real plan for", exception.path())
 		}
-		if !naming[exception.file] {
+		if !naming[exception.path()] {
 			t.Errorf("%s no longer names planner.Plan, so its exception is stale — delete it.\n"+
 				"  An exception nobody needs is a standing permission the next test under %s falls through.",
-				exception.file, schedulerTestDir)
+				exception.path(), exception.dir)
+		}
+	}
+}
+
+// TestEngineBoundary_SchedulerRunTestExceptionsAreExact checks the run
+// exception list in both directions: every listed file is a release-set test
+// that still names scheduler.RunPlan. The other direction, a file naming the
+// run surface that is not listed, is a violation of
+// TestEngineBoundary_OnlyTheEngineRunsJobs.
+func TestEngineBoundary_SchedulerRunTestExceptionsAreExact(t *testing.T) {
+	t.Parallel()
+	root := moduleRoot(t)
+	running := map[string]bool{}
+	for _, ref := range restrictedJobReferences(t, root) {
+		if ref.pkg == schedulerImportPath && ref.symbol == "RunPlan" {
+			running[ref.file] = true
+		}
+	}
+	for _, exception := range schedulerRunTestExceptions {
+		if !strings.HasSuffix(exception.file, "_test.go") ||
+			filepath.ToSlash(filepath.Dir(exception.file)) != releaseSetTestDir {
+			t.Errorf("%s is not a test file directly under %s — the exemption covers release-set tests only",
+				exception.file, releaseSetTestDir)
+		}
+		if strings.TrimSpace(exception.why) == "" {
+			t.Errorf("%s is exempt without a reason — state what the test needs a real run for", exception.file)
+		}
+		if !running[exception.file] {
+			t.Errorf("%s no longer names scheduler.RunPlan, so its exception is stale — delete it.\n"+
+				"  An exception nobody needs is a standing permission the next test under %s falls through.",
+				exception.file, releaseSetTestDir)
 		}
 	}
 }
 
 // restrictedJobReferences returns every selector expression in the module that
-// names a restricted symbol through an import of internal/jobs or
+// names a restricted symbol through an import of internal/jobs/scheduler or
 // internal/jobs/remotecache or internal/jobs/planner, as module relative "dir/file.go" paths.
 //
 // It reads the AST, so occurrences in comments and string literals do not count:
@@ -343,8 +442,8 @@ func restrictedJobReferences(t *testing.T, root string) []jobSymbolReference {
 // jobsImportName returns the identifier importPath is bound to in file (its
 // alias, or the last element of the path), and whether the file imports it at
 // all. A blank or dot import is reported as not imported: neither can produce
-// a "jobs.X" selector, and a dot import of internal/jobs would not compile
-// against the unexported constructor anyway.
+// a "scheduler.X" selector, and a dot import of internal/jobs/scheduler would
+// not compile against the unexported constructor anyway.
 func jobsImportName(file *ast.File, importPath string) (string, bool) {
 	for _, spec := range file.Imports {
 		path, err := strconv.Unquote(spec.Path.Value)
@@ -364,7 +463,7 @@ func jobsImportName(file *ast.File, importPath string) (string, bool) {
 
 // TestEngineBoundary_SchedulerSeamIsPackagePrivate pins the compiler-enforced
 // half of the boundary: the scheduler's construction and configuration seams are
-// unexported, so no package outside internal/jobs can reach them however hard it
+// unexported, so no package outside internal/jobs/scheduler can reach them however hard it
 // tries — including a test file, which is what makes the ~62 in-package
 // constructions safe rather than a back door.
 //
@@ -375,7 +474,7 @@ func TestEngineBoundary_SchedulerSeamIsPackagePrivate(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "single-engine", "the-scheduler-seam-is-package-private")
 	root := moduleRoot(t)
-	path := filepath.Join(root, "internal", "jobs", "scheduler.go")
+	path := filepath.Join(root, "internal", "jobs", "scheduler", "scheduler.go")
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, path, nil, 0)
 	if err != nil {
@@ -399,14 +498,14 @@ func TestEngineBoundary_SchedulerSeamIsPackagePrivate(t *testing.T) {
 			want[fn.Name.Name] = true
 		}
 		if unexported, isForbidden := forbidden[fn.Name.Name]; isForbidden {
-			t.Errorf("internal/jobs/scheduler.go declares exported %s — it must be %s.\n"+
+			t.Errorf("internal/jobs/scheduler/scheduler.go declares exported %s — it must be %s.\n"+
 				"  Exporting it hands every package a way to build a run without the engine's\n"+
 				"  session, run markers, profiler and remote cache (ADR 0001 §3).", fn.Name.Name, unexported)
 		}
 	}
 	for name, found := range want {
 		if !found {
-			t.Errorf("internal/jobs/scheduler.go no longer declares %s; if it moved, move this pin with it", name)
+			t.Errorf("internal/jobs/scheduler/scheduler.go no longer declares %s; if it moved, move this pin with it", name)
 		}
 	}
 }

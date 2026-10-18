@@ -5,6 +5,7 @@ import (
 	"maps"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	ciproto "go.putnami.dev/protocol/ci"
 	distribution "go.putnami.dev/protocol/distribution"
 	"go.putnami.dev/protocol/features/spectest"
@@ -33,7 +34,7 @@ func TestReleaseCarriesMirrorIntentOnAlreadyCurrentPublication(t *testing.T) {
 	// The accepted publication uses the policy captured at planning time, even
 	// if another caller later changes the parsed CI configuration in memory.
 	policy.Registries["npm"].Mirror.To = "https://other.example.com"
-	results := map[string]*JobResult{}
+	results := map[string]*jobmodel.JobResult{}
 	run.Finalizer(context.Background())(results)
 	if result := results[releaseSetResultKey]; result == nil || result.Status != "success" {
 		t.Fatalf("already-current mirror release failed: %+v", result)

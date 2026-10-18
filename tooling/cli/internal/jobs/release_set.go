@@ -1,3 +1,6 @@
+// Package jobs prepares the release set, publication and deploy targets of a
+// run: it adds the internal jobs and targets they need to a plan, and the
+// scheduler package runs that plan.
 package jobs
 
 import (
@@ -10,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
 	ciproto "go.putnami.dev/protocol/ci"
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -24,6 +28,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -78,7 +83,7 @@ var newReleaseSetProvider = func(ctx context.Context, provider *extension.Resolv
 	// workspace's extensions.
 	runcredential.MarkRepositoryCodeStarted("putnami cloud release-set")
 	client := releaseset.NewClient(executable)
-	client.Env = ReleaseSetProviderProcessEnv(ctx, provider)
+	client.Env = scheduler.ReleaseSetProviderProcessEnv(ctx, provider)
 	return client, nil
 }
 
@@ -884,7 +889,7 @@ func taggedReleaseChannel(options ReleaseSetOptions) (string, error) {
 // represented by one expanded command. It is used only after planning, so a
 // dependent command's local apps/projectIf policy — not the outer CLI's wider
 // selection — defines the publish jobs the release set may rely on.
-func PlannedCommandProjects(planned []*ScheduledJob, command string) []*workspace.Project {
+func PlannedCommandProjects(planned []*jobmodel.ScheduledJob, command string) []*workspace.Project {
 	byID := make(map[string]*workspace.Project)
 	for _, job := range planner.SchedulableJobs(planned) {
 		if job == nil || job.JobDef == nil || job.CommandName() != command {
@@ -923,7 +928,7 @@ func PrepareDependentRun(
 	options ReleaseSetOptions,
 	deploy DeployOptions,
 	ws *workspace.Workspace,
-	planned []*ScheduledJob,
+	planned []*jobmodel.ScheduledJob,
 	discovered *extension.DiscoveryResult,
 ) (*ReleaseSetRun, error) {
 	run, err := prepareDependentReleaseSet(ctx, prepared, options, ws, planned, discovered)
@@ -945,7 +950,7 @@ func prepareDependentReleaseSet(
 	prepared *ReleaseSetRun,
 	options ReleaseSetOptions,
 	ws *workspace.Workspace,
-	planned []*ScheduledJob,
+	planned []*jobmodel.ScheduledJob,
 	discovered *extension.DiscoveryResult,
 ) (*ReleaseSetRun, error) {
 	if prepared != nil || (len(options.Channels) == 0 && !options.Tagged) {
@@ -973,7 +978,7 @@ func prepareDependentReleaseSet(
 // A run that publishes through a publication-v1 provider first gains its open
 // and upload nodes (attachPublication), and the barrier then waits for every
 // upload too.
-func (run *ReleaseSetRun) AttachBarrier(planned []*ScheduledJob) ([]*ScheduledJob, map[string]InternalJobRunner, error) {
+func (run *ReleaseSetRun) AttachBarrier(planned []*jobmodel.ScheduledJob) ([]*jobmodel.ScheduledJob, map[string]scheduler.InternalJobRunner, error) {
 	if run == nil || run.provider == nil || run.plan == nil {
 		return planned, nil, nil
 	}
@@ -985,9 +990,9 @@ func (run *ReleaseSetRun) AttachBarrier(planned []*ScheduledJob) ([]*ScheduledJo
 
 // attachDeployBarrier adds the release node every deploy waits for, when the
 // plan holds a deploy.
-func (run *ReleaseSetRun) attachDeployBarrier(planned []*ScheduledJob) ([]*ScheduledJob, map[string]InternalJobRunner, error) {
+func (run *ReleaseSetRun) attachDeployBarrier(planned []*jobmodel.ScheduledJob) ([]*jobmodel.ScheduledJob, map[string]scheduler.InternalJobRunner, error) {
 	var publishKeys []string
-	var deployJobs []*ScheduledJob
+	var deployJobs []*jobmodel.ScheduledJob
 	selectedByID := make(map[string]*workspace.Project)
 	for _, job := range planner.SchedulableJobs(planned) {
 		if job == nil || job.JobDef == nil || job.Project == nil {
@@ -1008,7 +1013,7 @@ func (run *ReleaseSetRun) attachDeployBarrier(planned []*ScheduledJob) ([]*Sched
 	if len(deployJobs) == 0 {
 		return planned, nil, nil
 	}
-	publishKeys = dedupeSorted(publishKeys)
+	publishKeys = jobmodel.DedupeSorted(publishKeys)
 	if len(publishKeys) == 0 {
 		return nil, nil, fmt.Errorf("same-session release set has deploy jobs but no publish jobs")
 	}
@@ -1022,7 +1027,7 @@ func (run *ReleaseSetRun) attachDeployBarrier(planned []*ScheduledJob) ([]*Sched
 	for _, id := range selectedIDs {
 		selected = append(selected, selectedByID[id])
 	}
-	barrier := &ScheduledJob{
+	barrier := &jobmodel.ScheduledJob{
 		Project:          releaseSetInternalProject,
 		Extension:        releaseSetInternalExtension,
 		SelectedProjects: selected,
@@ -1042,17 +1047,17 @@ func (run *ReleaseSetRun) attachDeployBarrier(planned []*ScheduledJob) ([]*Sched
 		return nil, nil, fmt.Errorf("release-set coordinator identity = %q, want %q", barrier.Key(), releaseSetResultKey)
 	}
 	for _, deploy := range deployJobs {
-		deploy.DependsOn = dedupeSorted(append(deploy.DependsOn, barrier.Key()))
+		deploy.DependsOn = jobmodel.DedupeSorted(append(deploy.DependsOn, barrier.Key()))
 	}
 	planned = append(planned, barrier)
 	if err := planner.ValidatePlanDAG(planner.SchedulableJobs(planned)); err != nil {
 		return nil, nil, fmt.Errorf("attach release-set coordinator: %w", err)
 	}
 	run.barrierAttached = true
-	return planned, map[string]InternalJobRunner{
-		barrier.Key(): func(ctx context.Context, results map[string]*JobResult) *JobResult {
+	return planned, map[string]scheduler.InternalJobRunner{
+		barrier.Key(): func(ctx context.Context, results map[string]*jobmodel.JobResult) *jobmodel.JobResult {
 			if run.dryRun {
-				return &JobResult{Status: "success"}
+				return &jobmodel.JobResult{Status: "success"}
 			}
 			result := run.commit(ctx, results)
 			if result == nil || result.Status != "success" {
@@ -1223,7 +1228,7 @@ func prepareReleaseSetRun(
 // requireFullClone is the git precondition seam of a release. Tests replace it
 // with the provenance seam beside it, because a fixture workspace is a
 // temporary directory rather than a clone.
-var requireFullClone = RequireFullClone
+var requireFullClone = scheduler.RequireFullClone
 
 // releaseSetNamespace is the declared provider identity, independent of the
 // workspace's local name. Repositories without a policy retain the name default.
@@ -1366,7 +1371,7 @@ func PrepareReleaseSetRun(
 	verification *ReleaseSetVerification,
 	planning []*extension.ExtensionDescription,
 	discovered *extension.DiscoveryResult,
-	keying []*ScheduledJob,
+	keying []*jobmodel.ScheduledJob,
 	commandParams map[string]any,
 	cache *store.CacheManager,
 	selection *protocoljob.Selection,
@@ -1426,7 +1431,7 @@ func resolveSelectionFingerprints(
 	options ReleaseSetOptions,
 	ws *workspace.Workspace,
 	discovered *extension.DiscoveryResult,
-	keying []*ScheduledJob,
+	keying []*jobmodel.ScheduledJob,
 	commandParams map[string]any,
 	cache *store.CacheManager,
 ) (ReleaseSetOptions, error) {
@@ -1455,19 +1460,6 @@ func resolveSelectionFingerprints(
 	}
 	options.Fingerprints = fingerprints
 	return options, nil
-}
-
-// NewRunCacheManager builds the one cache manager a run uses, honoring a
-// cache-verification store override. It is built even under --no-cache: the
-// memoized file hashing it carries is what lets the execution keys and a
-// release-set publish's selection keys share one pass over the tree, and the
-// caller drops it before anything consumes it as a cache of results.
-func NewRunCacheManager(workspaceRoot, storeRootOverride string) *store.CacheManager {
-	storeRoot := store.ResolveStoreRoot(workspaceRoot)
-	if strings.TrimSpace(storeRootOverride) != "" {
-		storeRoot = storeRootOverride
-	}
-	return store.NewCacheManager(store.NewLocalStore(storeRoot))
 }
 
 // RunSelection returns the selection block the session reports. When the plan
@@ -2547,7 +2539,7 @@ func publishTaskRoute(route releaseMemberRoute) releaseTaskRoute {
 	}
 }
 
-func plannedTaskRoute(job *ScheduledJob) (releaseTaskRoute, bool) {
+func plannedTaskRoute(job *jobmodel.ScheduledJob) (releaseTaskRoute, bool) {
 	if job == nil || job.Project == nil || job.Extension == nil || job.JobDef == nil {
 		return releaseTaskRoute{}, false
 	}
@@ -2572,7 +2564,7 @@ func plannedTaskRoute(job *ScheduledJob) (releaseTaskRoute, bool) {
 // step that declares another member of the same project, and removing that
 // node would leave the kept build without its input. Package jobs of
 // wholly unchanged dependency projects are reached transitively the same way.
-func (run *ReleaseSetRun) AttachPlan(planned []*ScheduledJob) ([]*ScheduledJob, error) {
+func (run *ReleaseSetRun) AttachPlan(planned []*jobmodel.ScheduledJob) ([]*jobmodel.ScheduledJob, error) {
 	if run == nil {
 		return planned, nil
 	}
@@ -2624,8 +2616,8 @@ func (run *ReleaseSetRun) AttachPlan(planned []*ScheduledJob) ([]*ScheduledJob, 
 		}
 	}
 
-	packageJobs := make(map[releaseTaskRoute][]*ScheduledJob, len(selectedPackageRoutes))
-	publishJobs := make(map[releaseTaskRoute][]*ScheduledJob, len(selectedPublishRoutes))
+	packageJobs := make(map[releaseTaskRoute][]*jobmodel.ScheduledJob, len(selectedPackageRoutes))
+	publishJobs := make(map[releaseTaskRoute][]*jobmodel.ScheduledJob, len(selectedPublishRoutes))
 	for _, job := range planned {
 		route, ok := plannedTaskRoute(job)
 		if !ok {
@@ -2687,7 +2679,7 @@ func (run *ReleaseSetRun) AttachPlan(planned []*ScheduledJob) ([]*ScheduledJob, 
 	run.collectUncoordinatedPublication(planned, selectedProjects, publishCommands, dropped, candidates)
 	dropUnreachedCandidates(planned, candidates, dropped)
 
-	scoped := make([]*ScheduledJob, 0, len(planned)-len(dropped))
+	scoped := make([]*jobmodel.ScheduledJob, 0, len(planned)-len(dropped))
 	for _, job := range planned {
 		if job == nil {
 			scoped = append(scoped, job)
@@ -2731,7 +2723,7 @@ func (run *ReleaseSetRun) AttachPlan(planned []*ScheduledJob) ([]*ScheduledJob, 
 // that NAMES package keeps its package nodes: the caller asked for the
 // artifacts.
 func (run *ReleaseSetRun) collectUncoordinatedPublication(
-	planned []*ScheduledJob,
+	planned []*jobmodel.ScheduledJob,
 	memberProjects map[string]struct{},
 	publishCommands map[string]struct{},
 	dropped map[string]struct{},
@@ -2768,12 +2760,12 @@ func (run *ReleaseSetRun) collectUncoordinatedPublication(
 //
 // It runs once every rule has filled dropped and candidates, so a node it
 // retains is retained by a node the session actually keeps.
-func dropUnreachedCandidates(planned []*ScheduledJob, candidates, dropped map[string]struct{}) {
+func dropUnreachedCandidates(planned []*jobmodel.ScheduledJob, candidates, dropped map[string]struct{}) {
 	if len(candidates) == 0 {
 		return
 	}
-	byKey := make(map[string]*ScheduledJob, len(planned))
-	reachable := make([]*ScheduledJob, 0, len(planned))
+	byKey := make(map[string]*jobmodel.ScheduledJob, len(planned))
+	reachable := make([]*jobmodel.ScheduledJob, 0, len(planned))
 	for _, job := range planned {
 		if job == nil {
 			continue
@@ -2823,7 +2815,7 @@ func withoutReleaseJobs(keys []string, dropped map[string]struct{}) []string {
 	return kept
 }
 
-func attachReleaseSetContext(planned []*ScheduledJob, plan *releaseset.Plan, publishCommands map[string]struct{}) {
+func attachReleaseSetContext(planned []*jobmodel.ScheduledJob, plan *releaseset.Plan, publishCommands map[string]struct{}) {
 	if plan == nil {
 		return
 	}
@@ -2855,7 +2847,7 @@ func attachReleaseSetContext(planned []*ScheduledJob, plan *releaseset.Plan, pub
 
 // AttachReleaseSetPlan carries one SDK-owned plan through every selected
 // package and publish node, including package nodes reached transitively.
-func AttachReleaseSetPlan(planned []*ScheduledJob, plan *releaseset.Plan) error {
+func AttachReleaseSetPlan(planned []*jobmodel.ScheduledJob, plan *releaseset.Plan) error {
 	if plan == nil {
 		return nil
 	}
@@ -2908,11 +2900,11 @@ func (run *ReleaseSetRun) Plan() *releaseset.Plan {
 // Finalizer reconciles publication proofs and releases the set through the
 // provider's one transactional operation. It is nil when the run has no plan,
 // and when a deploy barrier releases the set instead (AttachBarrier).
-func (run *ReleaseSetRun) Finalizer(ctx context.Context) func(map[string]*JobResult) {
+func (run *ReleaseSetRun) Finalizer(ctx context.Context) func(map[string]*jobmodel.JobResult) {
 	if run == nil || run.provider == nil || run.plan == nil || run.barrierAttached {
 		return nil
 	}
-	return func(results map[string]*JobResult) {
+	return func(results map[string]*jobmodel.JobResult) {
 		if run.dryRun {
 			return
 		}
@@ -2934,7 +2926,7 @@ func (run *ReleaseSetRun) Finalizer(ctx context.Context) func(map[string]*JobRes
 // member changed releases the head set unchanged, which the provider answers
 // with already-current; a plan that builds nothing but reuses a member
 // releases a new set, which it answers with released.
-func (run *ReleaseSetRun) commit(ctx context.Context, results map[string]*JobResult) *JobResult {
+func (run *ReleaseSetRun) commit(ctx context.Context, results map[string]*jobmodel.JobResult) *jobmodel.JobResult {
 	if err := ensureNoReleaseSetOutcome(results); err != nil {
 		return releaseSetFailure(err)
 	}
@@ -3053,7 +3045,7 @@ func (run *ReleaseSetRun) channelConflictError(response *distribution.ReleaseRes
 // generic "missing verified records" it would produce hides the actual cause:
 // the job never ran because a gate or dependency withheld it. Name the jobs
 // and their recorded causes so the session shows why nothing was published.
-func (run *ReleaseSetRun) ensureNoSkippedPublication(results map[string]*JobResult) error {
+func (run *ReleaseSetRun) ensureNoSkippedPublication(results map[string]*jobmodel.JobResult) error {
 	var skipped []string
 	for jobKey, memberKey := range run.publishJobKeys {
 		result := results[jobKey]
@@ -3080,7 +3072,7 @@ func (run *ReleaseSetRun) ensureNoSkippedPublication(results map[string]*JobResu
 // this run's outbox, so it packed nothing into it, and any published-member
 // event its result replays names an upload this run did not make. Without
 // publication-v1 the check is not made.
-func (run *ReleaseSetRun) ensureNoReusedPublication(results map[string]*JobResult) error {
+func (run *ReleaseSetRun) ensureNoReusedPublication(results map[string]*jobmodel.JobResult) error {
 	if !run.Publication() {
 		return nil
 	}
@@ -3100,7 +3092,7 @@ func (run *ReleaseSetRun) ensureNoReusedPublication(results map[string]*JobResul
 		len(reused), strings.Join(reused, "; "))
 }
 
-func ensureNoReleaseSetOutcome(results map[string]*JobResult) error {
+func ensureNoReleaseSetOutcome(results map[string]*jobmodel.JobResult) error {
 	if _, occupied := results[releaseSetResultKey]; occupied {
 		return fmt.Errorf("duplicate release-set coordinator result")
 	}
@@ -3119,7 +3111,7 @@ func ensureNoReleaseSetOutcome(results map[string]*JobResult) error {
 // events into the next full snapshot. Every selected member needs exactly one
 // verified, non-dry-run publication at its planned version; unchanged members
 // keep their head record.
-func reconcilePublishedReleaseSet(plan *releaseset.Plan, results map[string]*JobResult) (*distribution.ReleaseSet, error) {
+func reconcilePublishedReleaseSet(plan *releaseset.Plan, results map[string]*jobmodel.JobResult) (*distribution.ReleaseSet, error) {
 	selected := make(map[string]releaseset.PlannedMember)
 	for _, member := range plan.SelectedMembers() {
 		selected[releaseset.MemberKey(member.Ecosystem, member.Coordinate)] = member
@@ -3131,7 +3123,7 @@ func reconcilePublishedReleaseSet(plan *releaseset.Plan, results map[string]*Job
 		}
 		for _, event := range result.Events {
 			kind, _ := event.Data["kind"].(string)
-			if event.Type != EventTypeArtifact || kind != extproto.PublishedMemberEventKind {
+			if event.Type != jobmodel.EventTypeArtifact || kind != extproto.PublishedMemberEventKind {
 				continue
 			}
 			member, err := parsePublishedMemberEvent(event.Data)
@@ -3232,12 +3224,12 @@ func firstReleaseSetDiagnostic(diagnostics []diag.Diagnostic) string {
 	return "validation failed"
 }
 
-func releaseSetFailure(err error) *JobResult {
-	return &JobResult{Status: "failed", Error: &JobError{Message: err.Error()}}
+func releaseSetFailure(err error) *jobmodel.JobResult {
+	return &jobmodel.JobResult{Status: "failed", Error: &jobmodel.JobError{Message: err.Error()}}
 }
 
-func releaseSetSuccess(outcome distribution.ReleaseSetPublishOutcome) *JobResult {
-	result := &JobResult{Status: "success", Data: extension.ParamMap{}}
+func releaseSetSuccess(outcome distribution.ReleaseSetPublishOutcome) *jobmodel.JobResult {
+	result := &jobmodel.JobResult{Status: "success", Data: extension.ParamMap{}}
 	result.Data[runtimeproto.ReleaseSetResultDataKey] = outcome
 	return result
 }

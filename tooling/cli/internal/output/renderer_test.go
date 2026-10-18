@@ -13,20 +13,20 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/machine"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-func makeRendererTestJob() *jobs.ScheduledJob {
-	return &jobs.ScheduledJob{
+func makeRendererTestJob() *scheduler.ScheduledJob {
+	return &scheduler.ScheduledJob{
 		Project:   &workspace.Project{Name: "my-app", Path: "packages/my-app"},
 		Extension: &extension.ExtensionDescription{Name: "test-ext", Path: "/ext"},
 		JobDef:    &extension.JobDefinition{Name: "build", ExtensionName: "test-ext"},
 	}
 }
 
-func makeRendererDiagnostic(t *testing.T, severity runtimeproto.DiagnosticSeverity, message string) jobs.RawJobEvent {
+func makeRendererDiagnostic(t *testing.T, severity runtimeproto.DiagnosticSeverity, message string) scheduler.RawJobEvent {
 	t.Helper()
 	wire, err := json.Marshal(&runtimeproto.Event{
 		V:        runtimeproto.MaxKnownProtocolVersion,
@@ -49,17 +49,17 @@ func TestTextRenderer_SuccessOutput(t *testing.T) {
 	r := NewTextRenderer(&out, &errOut, TextRendererConfig{Verbose: true})
 
 	job := makeRendererTestJob()
-	planned := []*jobs.ScheduledJob{job}
+	planned := []*scheduler.ScheduledJob{job}
 
 	r.Start(planned)
 	r.JobStart(job)
-	r.JobComplete(job, &jobs.JobResult{
+	r.JobComplete(job, &scheduler.JobResult{
 		Status:   "success",
 		Duration: 150 * time.Millisecond,
 	})
-	r.Finish(map[string]*jobs.JobResult{
+	r.Finish(map[string]*scheduler.JobResult{
 		job.Key(): {Status: "success"},
-	}, jobs.SessionOutcome{})
+	}, scheduler.SessionOutcome{})
 
 	output := errOut.String()
 	if !strings.Contains(output, "done") {
@@ -77,16 +77,16 @@ func TestTextRenderer_FailureOutput(t *testing.T) {
 
 	job := makeRendererTestJob()
 
-	r.Start([]*jobs.ScheduledJob{job})
+	r.Start([]*scheduler.ScheduledJob{job})
 	r.JobStart(job)
-	r.JobComplete(job, &jobs.JobResult{
+	r.JobComplete(job, &scheduler.JobResult{
 		Status:   "failed",
 		Duration: 200 * time.Millisecond,
-		Error:    &jobs.JobError{Message: "compilation error"},
+		Error:    &scheduler.JobError{Message: "compilation error"},
 	})
-	r.Finish(map[string]*jobs.JobResult{
+	r.Finish(map[string]*scheduler.JobResult{
 		job.Key(): {Status: "failed"},
-	}, jobs.SessionOutcome{})
+	}, scheduler.SessionOutcome{})
 
 	output := errOut.String()
 	if !strings.Contains(output, "FAIL") {
@@ -106,9 +106,9 @@ func TestTextRenderer_QuietMode(t *testing.T) {
 
 	job := makeRendererTestJob()
 
-	r.Start([]*jobs.ScheduledJob{job})
+	r.Start([]*scheduler.ScheduledJob{job})
 	r.JobStart(job)
-	r.JobComplete(job, &jobs.JobResult{Status: "success", Duration: 100 * time.Millisecond})
+	r.JobComplete(job, &scheduler.JobResult{Status: "success", Duration: 100 * time.Millisecond})
 
 	// In quiet mode, no per-job output before finish
 	beforeFinish := errOut.String()
@@ -124,12 +124,12 @@ func TestLifecycleRenderer_CompactSuccessAndVisibleDiagnostics(t *testing.T) {
 	warning := makeRendererDiagnostic(t, runtimeproto.SeverityWarning, "optional tool unavailable")
 	errorDiagnostic := makeRendererDiagnostic(t, runtimeproto.SeverityError, "provider reported an error")
 
-	r.Start([]*jobs.ScheduledJob{job})
+	r.Start([]*scheduler.ScheduledJob{job})
 	r.JobStart(job)
 	r.JobEvent(job, warning)
 	r.JobEvent(job, errorDiagnostic)
-	r.JobComplete(job, &jobs.JobResult{Status: "success"})
-	r.Finish(map[string]*jobs.JobResult{job.Key(): {Status: "success"}}, jobs.SessionOutcome{})
+	r.JobComplete(job, &scheduler.JobResult{Status: "success"})
+	r.Finish(map[string]*scheduler.JobResult{job.Key(): {Status: "success"}}, scheduler.SessionOutcome{})
 
 	got := errOut.String()
 	if !strings.Contains(got, "warning: optional tool unavailable") {
@@ -152,13 +152,13 @@ func TestLifecycleRenderer_QuietTakesPrecedenceAndShowsFailureDetails(t *testing
 	}, true)
 	job := makeRendererTestJob()
 	warning := makeRendererDiagnostic(t, runtimeproto.SeverityWarning, "optional tool unavailable")
-	failed := &jobs.JobResult{Status: "failed", Error: &jobs.JobError{Message: "installer failed"}}
+	failed := &scheduler.JobResult{Status: "failed", Error: &scheduler.JobError{Message: "installer failed"}}
 
-	r.Start([]*jobs.ScheduledJob{job})
+	r.Start([]*scheduler.ScheduledJob{job})
 	r.JobStart(job)
 	r.JobEvent(job, warning)
 	r.JobComplete(job, failed)
-	r.Finish(map[string]*jobs.JobResult{job.Key(): failed}, jobs.SessionOutcome{})
+	r.Finish(map[string]*scheduler.JobResult{job.Key(): failed}, scheduler.SessionOutcome{})
 
 	got := errOut.String()
 	if !strings.Contains(got, "warning: optional tool unavailable") ||
@@ -182,20 +182,20 @@ func TestJSONLRenderer_EmitsTheV2SessionStream(t *testing.T) {
 
 	job := makeRendererTestJob()
 
-	r.Start([]*jobs.ScheduledJob{job})
+	r.Start([]*scheduler.ScheduledJob{job})
 	r.JobStart(job)
-	r.JobEvent(job, jobs.RawJobEvent{
+	r.JobEvent(job, scheduler.RawJobEvent{
 		Version: 1,
 		Type:    "phase",
 		Data:    map[string]any{"name": "compile", "action": "start"},
 	})
-	r.JobComplete(job, &jobs.JobResult{
+	r.JobComplete(job, &scheduler.JobResult{
 		Status:   "success",
 		Duration: 100 * time.Millisecond,
 	})
-	r.Finish(map[string]*jobs.JobResult{
+	r.Finish(map[string]*scheduler.JobResult{
 		job.Key(): {Status: "success"},
-	}, jobs.SessionOutcome{})
+	}, scheduler.SessionOutcome{})
 
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
 	if len(lines) < 3 {
@@ -236,16 +236,16 @@ func TestMachineRenderers_BoundedStreamOmitsButAggregateCarriesCacheSummary(t *t
 	var buf bytes.Buffer
 	r := NewRenderer(Config{Output: "jsonl", Out: &buf, Err: &buf})
 	job := makeRendererTestJob()
-	cached := &jobs.JobResult{Status: "success", CacheHit: true}
+	cached := &scheduler.JobResult{Status: "success", CacheHit: true}
 
-	r.Start([]*jobs.ScheduledJob{job})
+	r.Start([]*scheduler.ScheduledJob{job})
 	r.JobStart(job)
 	r.JobComplete(job, cached)
-	cache := &jobs.CacheStatsSnapshot{
+	cache := &scheduler.CacheStatsSnapshot{
 		LocalHits: 1, LocalServedMs: 80, LocalKeysMs: 20,
 		LocalBindingsMs: 50, LocalRestoreVerifyMs: 10, LocalSpawnedProcesses: 2,
 	}
-	r.Finish(map[string]*jobs.JobResult{job.Key(): cached}, jobs.SessionOutcome{Cache: cache})
+	r.Finish(map[string]*scheduler.JobResult{job.Key(): cached}, scheduler.SessionOutcome{Cache: cache})
 
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
 	var end protocolcli.SessionStreamRecord
@@ -261,8 +261,8 @@ func TestMachineRenderers_BoundedStreamOmitsButAggregateCarriesCacheSummary(t *t
 
 	var aggregate bytes.Buffer
 	jsonRenderer := newMachineV2Renderer(&aggregate, "build", false)
-	jsonRenderer.Start([]*jobs.ScheduledJob{job})
-	jsonRenderer.Finish(map[string]*jobs.JobResult{job.Key(): cached}, jobs.SessionOutcome{Cache: cache})
+	jsonRenderer.Start([]*scheduler.ScheduledJob{job})
+	jsonRenderer.Finish(map[string]*scheduler.JobResult{job.Key(): cached}, scheduler.SessionOutcome{Cache: cache})
 	var envelope protocolcli.ResultV2
 	if err := json.Unmarshal(aggregate.Bytes(), &envelope); err != nil {
 		t.Fatal(err)
@@ -282,14 +282,14 @@ func TestMachineV2Renderer_ProjectsDockerPublicationFactsOnBothMachineSurfaces(t
 	packageB := dockerPublicationTestJob("/services/b", "b", "package~docker", "package")
 	publishA := dockerPublicationTestJob("/services/a", "a", "publish~docker", "publish")
 	publishB := dockerPublicationTestJob("/services/b", "b", "publish~docker", "publish")
-	planned := []*jobs.ScheduledJob{packageA, packageB, publishA, publishB}
+	planned := []*scheduler.ScheduledJob{packageA, packageB, publishA, publishB}
 	artifactA := dockerPublicationArtifact("ghcr.io/acme/a", "release-1", digestA, "miss", "pushed", false)
 	artifactB := dockerPublicationArtifact("ghcr.io/acme/b", "release-1", digestB, "hit", "retagged", true)
-	results := map[string]*jobs.JobResult{
+	results := map[string]*scheduler.JobResult{
 		packageA.Key(): {Status: "success", TaskWall: 40 * time.Millisecond},
 		packageB.Key(): {Status: "success", TaskWall: 60 * time.Millisecond},
-		publishA.Key(): {Status: "success", Events: []jobs.RawJobEvent{artifactA}},
-		publishB.Key(): {Status: "success", Events: []jobs.RawJobEvent{artifactB}},
+		publishA.Key(): {Status: "success", Events: []scheduler.RawJobEvent{artifactA}},
+		publishB.Key(): {Status: "success", Events: []scheduler.RawJobEvent{artifactB}},
 	}
 
 	var stream bytes.Buffer
@@ -306,7 +306,7 @@ func TestMachineV2Renderer_ProjectsDockerPublicationFactsOnBothMachineSurfaces(t
 	jsonl.JobEvent(publishB, dockerPushPhase("end"))
 	jsonl.JobComplete(publishA, results[publishA.Key()])
 	jsonl.JobComplete(publishB, results[publishB.Key()])
-	jsonl.Finish(results, jobs.SessionOutcome{})
+	jsonl.Finish(results, scheduler.SessionOutcome{})
 
 	var terminal protocolcli.SessionStreamRecord
 	sawTypedArtifact := false
@@ -316,7 +316,7 @@ func TestMachineV2Renderer_ProjectsDockerPublicationFactsOnBothMachineSurfaces(t
 			t.Fatalf("decode machine record: %v", err)
 		}
 		if record.Record == protocolcli.RecordTaskEvent && record.Event["kind"] == "published" {
-			sawTypedArtifact = record.Event["type"] == jobs.EventTypeArtifact &&
+			sawTypedArtifact = record.Event["type"] == scheduler.EventTypeArtifact &&
 				(record.Event["imageDigest"] == digestA || record.Event["imageDigest"] == digestB)
 		}
 		if record.Record == protocolcli.RecordSessionEnd {
@@ -339,7 +339,7 @@ func TestMachineV2Renderer_ProjectsDockerPublicationFactsOnBothMachineSurfaces(t
 	jsonOutput := newMachineV2Renderer(&aggregate, "publish", false)
 	jsonOutput.SetPublishConcurrency(100)
 	jsonOutput.Start(planned)
-	jsonOutput.Finish(results, jobs.SessionOutcome{})
+	jsonOutput.Finish(results, scheduler.SessionOutcome{})
 	var envelope protocolcli.ResultV2
 	if err := json.Unmarshal(aggregate.Bytes(), &envelope); err != nil {
 		t.Fatalf("decode --output=json envelope: %v\n%s", err, aggregate.String())
@@ -357,8 +357,8 @@ func TestMachineV2Renderer_ProjectsDockerPublicationFactsOnBothMachineSurfaces(t
 	}
 }
 
-func dockerPublicationTestJob(projectID, projectName, taskName, command string) *jobs.ScheduledJob {
-	return &jobs.ScheduledJob{
+func dockerPublicationTestJob(projectID, projectName, taskName, command string) *scheduler.ScheduledJob {
+	return &scheduler.ScheduledJob{
 		Project:   &workspace.Project{ID: projectID, Name: projectName},
 		Extension: &extension.ExtensionDescription{Name: "docker-test"},
 		JobDef: &extension.JobDefinition{
@@ -371,10 +371,10 @@ func dockerPublicationTestJob(projectID, projectName, taskName, command string) 
 	}
 }
 
-func dockerPublicationArtifact(name, version, digest, cacheOutcome, contentStatus string, digestReused bool) jobs.RawJobEvent {
-	return jobs.RawJobEvent{
+func dockerPublicationArtifact(name, version, digest, cacheOutcome, contentStatus string, digestReused bool) scheduler.RawJobEvent {
+	return scheduler.RawJobEvent{
 		Version: 2,
-		Type:    jobs.EventTypeArtifact,
+		Type:    scheduler.EventTypeArtifact,
 		Data: map[string]any{
 			"id": "docker", "name": name, "kind": "published", "path": name + "@" + digest,
 			"registry": "docker", "targetRegistry": "ghcr.io", "version": version, "tags": []any{"edge"},
@@ -388,8 +388,8 @@ func dockerPublicationArtifact(name, version, digest, cacheOutcome, contentStatu
 	}
 }
 
-func dockerPushPhase(action string) jobs.RawJobEvent {
-	return jobs.RawJobEvent{Version: 2, Type: jobs.EventTypePhase, Data: map[string]any{"name": "docker-push", "action": action}}
+func dockerPushPhase(action string) scheduler.RawJobEvent {
+	return scheduler.RawJobEvent{Version: 2, Type: scheduler.EventTypePhase, Data: map[string]any{"name": "docker-push", "action": action}}
 }
 
 // TestJSONLRenderer_TaskEndCarriesTheTasksDiagnostics pins the one thing a
@@ -409,7 +409,7 @@ func TestJSONLRenderer_TaskEndCarriesTheTasksDiagnostics(t *testing.T) {
 	// The event is decoded from its wire bytes rather than spelled as a literal
 	// payload: this is the shape jobs.parseRawEvent leaves behind, and the
 	// record extraction under test reads exactly that.
-	event := jobs.RawJobEvent{Version: 2, Type: "diagnostic", Time: "2026-01-01T00:00:05Z"}
+	event := scheduler.RawJobEvent{Version: 2, Type: "diagnostic", Time: "2026-01-01T00:00:05Z"}
 	if err := json.Unmarshal([]byte(`{
 		"severity": "error",
 		"code": "ASSERT",
@@ -418,18 +418,18 @@ func TestJSONLRenderer_TaskEndCarriesTheTasksDiagnostics(t *testing.T) {
 	}`), &event.Data); err != nil {
 		t.Fatalf("decode diagnostic payload: %v", err)
 	}
-	failed := &jobs.JobResult{
-		Status:   string(jobs.TaskStatusFailed),
+	failed := &scheduler.JobResult{
+		Status:   string(scheduler.TaskStatusFailed),
 		Duration: 100 * time.Millisecond,
-		Error:    &jobs.JobError{Message: "2 assertions failed"},
-		Events:   []jobs.RawJobEvent{event},
+		Error:    &scheduler.JobError{Message: "2 assertions failed"},
+		Events:   []scheduler.RawJobEvent{event},
 	}
 
-	r.Start([]*jobs.ScheduledJob{job})
+	r.Start([]*scheduler.ScheduledJob{job})
 	r.JobStart(job)
 	r.JobEvent(job, event)
 	r.JobComplete(job, failed)
-	r.Finish(map[string]*jobs.JobResult{job.Key(): failed}, jobs.SessionOutcome{})
+	r.Finish(map[string]*scheduler.JobResult{job.Key(): failed}, scheduler.SessionOutcome{})
 
 	var end protocolcli.SessionStreamRecord
 	for _, line := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
@@ -464,15 +464,15 @@ func TestCloudLoggingRenderer_EmitsStructuredJSON(t *testing.T) {
 
 	job := makeRendererTestJob()
 
-	r.Start([]*jobs.ScheduledJob{job})
+	r.Start([]*scheduler.ScheduledJob{job})
 	r.JobStart(job)
-	r.JobComplete(job, &jobs.JobResult{
+	r.JobComplete(job, &scheduler.JobResult{
 		Status:   "success",
 		Duration: 100 * time.Millisecond,
 	})
-	r.Finish(map[string]*jobs.JobResult{
+	r.Finish(map[string]*scheduler.JobResult{
 		job.Key(): {Status: "success"},
-	}, jobs.SessionOutcome{})
+	}, scheduler.SessionOutcome{})
 
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
 	if len(lines) < 2 {
@@ -501,18 +501,18 @@ func TestTextRenderer_DebugEvents(t *testing.T) {
 
 	job := makeRendererTestJob()
 
-	r.Start([]*jobs.ScheduledJob{job})
+	r.Start([]*scheduler.ScheduledJob{job})
 	r.JobStart(job)
 
-	r.JobEvent(job, jobs.RawJobEvent{
+	r.JobEvent(job, scheduler.RawJobEvent{
 		Version: 1, Type: "phase",
 		Data: map[string]any{"name": "compile", "action": "start"},
 	})
-	r.JobEvent(job, jobs.RawJobEvent{
+	r.JobEvent(job, scheduler.RawJobEvent{
 		Version: 1, Type: "progress",
 		Data: map[string]any{"current": float64(1), "total": float64(3), "label": "Compiling..."},
 	})
-	r.JobEvent(job, jobs.RawJobEvent{
+	r.JobEvent(job, scheduler.RawJobEvent{
 		Version: 1, Type: "metric",
 		Data: map[string]any{"name": "binary-size", "value": float64(4096), "unit": "bytes"},
 	})

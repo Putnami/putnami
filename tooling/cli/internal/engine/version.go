@@ -8,8 +8,8 @@ import (
 	internalextension "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -25,7 +25,7 @@ func BuildVersionInfo(ws *workspace.Workspace) (cachekey.RunVersions, error) {
 	}
 	// A line git cannot read degrades rather than failing the command: an
 	// extension command is not a release (jobs.BuildRunVersions).
-	versions, _ := jobs.BuildRunVersions(ws, snapshot)
+	versions, _ := scheduler.BuildRunVersions(ws, snapshot)
 	return versions, nil
 }
 
@@ -143,7 +143,7 @@ func newRunCacheManager(req *Request, ws *workspace.Workspace) *store.CacheManag
 	if req.CacheVerification != nil {
 		storeRootOverride = req.CacheVerification.StoreRoot
 	}
-	cache := jobs.NewRunCacheManager(req.WorkspaceRoot, storeRootOverride)
+	cache := scheduler.NewRunCacheManager(req.WorkspaceRoot, storeRootOverride)
 	if req.VersionSnapshot != nil && !req.Portable.frozen() {
 		cache.RecordManagedRoot(ws.Root)
 	}
@@ -163,9 +163,9 @@ func (req *Request) runVersions(ws *workspace.Workspace) cachekey.RunVersions {
 			// the snapshot carries no tags or history to derive them from.
 			req.versions = portableRunVersions(req.Portable.Request.Source.Versions)
 		} else {
-			req.versions, req.versionsErr = jobs.BuildRunVersions(ws, req.VersionSnapshot)
+			req.versions, req.versionsErr = scheduler.BuildRunVersions(ws, req.VersionSnapshot)
 			if req.Global.Debug {
-				for _, reason := range jobs.DegradedVersionLines(req.versionsErr) {
+				for _, reason := range scheduler.DegradedVersionLines(req.versionsErr) {
 					iox.Fprintf(os.Stderr, "[debug] version line degraded: %s\n", reason)
 				}
 			}

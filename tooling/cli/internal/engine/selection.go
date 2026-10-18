@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -105,7 +106,7 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 			// The whole trace, uncapped, for the session record and the JSONL
 			// stream: the block printed below under --verbose is its capped
 			// rendering, and a hosted run has no terminal to print it on.
-			req.selectionEvidence.openingEvents = []jobs.SessionRecord{{
+			req.selectionEvidence.openingEvents = []scheduler.SessionRecord{{
 				Type: workspace.ImpactTraceRecordType, Data: selection.TraceRecord().EventData(),
 			}}
 			// The per-project scope does not survive the flattening into

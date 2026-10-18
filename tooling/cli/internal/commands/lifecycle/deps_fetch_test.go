@@ -10,7 +10,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -27,7 +27,7 @@ var (
 // recordedJob names the job req runs, with the hosted fetch step that ctx
 // marks, if any.
 func recordedJob(ctx context.Context, req WorkspaceJobRequest) string {
-	if step := jobs.HostedFetchStep(ctx); step != "" {
+	if step := scheduler.HostedFetchStep(ctx); step != "" {
 		return req.Job + " (" + step + ")"
 	}
 	return req.Job
@@ -90,7 +90,7 @@ func TestDepsInstallFetchesFirstOnAHostedRun(t *testing.T) {
 				}
 				return WorkspaceJobResult{Outcome: WorkspaceJobOK}, nil
 			}, BeforeRepositoryCode: func(ctx context.Context) error {
-				if step := jobs.HostedFetchStep(ctx); step != "" {
+				if step := scheduler.HostedFetchStep(ctx); step != "" {
 					t.Errorf("BeforeRepositoryCode runs in the %s", step)
 				}
 				ran = append(ran, beforeRepositoryCode)

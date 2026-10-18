@@ -16,7 +16,7 @@ import (
 
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
@@ -99,17 +99,17 @@ const (
 // ---------------------------------------------------------------------------
 
 type wireFixture struct {
-	Name      string             `json:"name"`
-	Command   string             `json:"command"`
-	Commands  []string           `json:"commands"`
-	SessionID string             `json:"sessionId"`
-	StartTime string             `json:"startTime"`
-	Outcome   wireFixtureOutcome `json:"outcome"`
-	Scheduler *jobs.TuningReport `json:"scheduler"`
+	Name      string                  `json:"name"`
+	Command   string                  `json:"command"`
+	Commands  []string                `json:"commands"`
+	SessionID string                  `json:"sessionId"`
+	StartTime string                  `json:"startTime"`
+	Outcome   wireFixtureOutcome      `json:"outcome"`
+	Scheduler *scheduler.TuningReport `json:"scheduler"`
 	// Cache is the remote-cache snapshot embedded in session.json. Nil models a
 	// local-only run, where the writer must omit the key entirely.
-	Cache *jobs.CacheStatsSnapshot `json:"cache"`
-	Tasks []wireFixtureTask        `json:"tasks"`
+	Cache *scheduler.CacheStatsSnapshot `json:"cache"`
+	Tasks []wireFixtureTask             `json:"tasks"`
 }
 
 type wireFixtureOutcome struct {
@@ -140,7 +140,7 @@ type wireFixtureTask struct {
 	FirstEventObserved  bool                     `json:"firstEventObserved"`
 	CacheHit            bool                     `json:"cacheHit"`
 	Coalesced           bool                     `json:"coalesced"`
-	Reuse               jobs.ReuseKind           `json:"reuse"`
+	Reuse               scheduler.ReuseKind      `json:"reuse"`
 	Error               *wireFixtureError        `json:"error"`
 	Events              []wireFixtureEvent       `json:"events"`
 	SessionEvent        *wireFixtureSessionEvent `json:"sessionEvent"`
@@ -185,11 +185,11 @@ type wireFixtureSessionEvent struct {
 // the renderers and the session writer.
 type wireRun struct {
 	fixture   wireFixture
-	planned   []*jobs.ScheduledJob
-	results   map[string]*jobs.JobResult
-	outcome   jobs.SessionOutcome
+	planned   []*scheduler.ScheduledJob
+	results   map[string]*scheduler.JobResult
+	outcome   scheduler.SessionOutcome
 	startTime time.Time
-	events    map[string][]jobs.RawJobEvent
+	events    map[string][]scheduler.RawJobEvent
 	session   []workspace_state.SessionEvent
 }
 
@@ -215,15 +215,15 @@ func loadWireRun(t *testing.T, name string) *wireRun {
 
 	run := &wireRun{
 		fixture:   fixture,
-		results:   make(map[string]*jobs.JobResult, len(fixture.Tasks)),
-		outcome:   jobs.SessionOutcome{Aborted: fixture.Outcome.Aborted, AbortedBy: fixture.Outcome.AbortedBy},
+		results:   make(map[string]*scheduler.JobResult, len(fixture.Tasks)),
+		outcome:   scheduler.SessionOutcome{Aborted: fixture.Outcome.Aborted, AbortedBy: fixture.Outcome.AbortedBy},
 		startTime: startTime,
-		events:    make(map[string][]jobs.RawJobEvent, len(fixture.Tasks)),
+		events:    make(map[string][]scheduler.RawJobEvent, len(fixture.Tasks)),
 	}
 
 	for i := range fixture.Tasks {
 		task := fixture.Tasks[i]
-		job := &jobs.ScheduledJob{
+		job := &scheduler.ScheduledJob{
 			Project:   &workspace.Project{ID: task.ProjectID, Name: task.ProjectName},
 			Extension: &extension.ExtensionDescription{Name: task.Extension},
 			JobDef: &extension.JobDefinition{
@@ -244,7 +244,7 @@ func loadWireRun(t *testing.T, name string) *wireRun {
 			t.Fatalf("fixture task %d: duplicate key %q", i, task.Key)
 		}
 
-		result := &jobs.JobResult{
+		result := &scheduler.JobResult{
 			Status:             task.Status,
 			Duration:           time.Duration(task.DurationMs) * time.Millisecond,
 			TaskWall:           time.Duration(task.TaskWallMs) * time.Millisecond,
@@ -256,7 +256,7 @@ func loadWireRun(t *testing.T, name string) *wireRun {
 			Reuse:              task.Reuse,
 		}
 		if task.Error != nil {
-			result.Error = &jobs.JobError{Message: task.Error.Message, Code: task.Error.Code}
+			result.Error = &scheduler.JobError{Message: task.Error.Message, Code: task.Error.Code}
 		}
 		// The fixture states all three encodings (the Reuse kind and the two
 		// booleans) and this asserts they agree — the invariant
@@ -303,12 +303,12 @@ func loadWireRun(t *testing.T, name string) *wireRun {
 	return run
 }
 
-func decodeFixtureEvents(t *testing.T, task wireFixtureTask) []jobs.RawJobEvent {
+func decodeFixtureEvents(t *testing.T, task wireFixtureTask) []scheduler.RawJobEvent {
 	t.Helper()
 	if len(task.Events) == 0 {
 		return nil
 	}
-	decoded := make([]jobs.RawJobEvent, 0, len(task.Events))
+	decoded := make([]scheduler.RawJobEvent, 0, len(task.Events))
 	for i, event := range task.Events {
 		// A fixture event models parseRawEvent's OUTPUT, and the parser drops
 		// anything that is not the one version it knows, so a fixture event
@@ -318,7 +318,7 @@ func decodeFixtureEvents(t *testing.T, task wireFixtureTask) []jobs.RawJobEvent 
 				"this event could not have reached a result",
 				task.Key, i, event.Version, runtimeproto.MaxKnownProtocolVersion)
 		}
-		raw := jobs.RawJobEvent{
+		raw := scheduler.RawJobEvent{
 			Version: event.Version,
 			Type:    event.Type,
 			Time:    event.Time,
@@ -338,7 +338,7 @@ func decodeFixtureEvents(t *testing.T, task wireFixtureTask) []jobs.RawJobEvent 
 // drive replays the run through a renderer in the same order jobs.Scheduler
 // does: Start once, then per task JobStart → JobEvent* → JobComplete, then one
 // Finish with the whole result map and the session outcome.
-func (r *wireRun) drive(renderer jobs.Renderer) {
+func (r *wireRun) drive(renderer scheduler.Renderer) {
 	renderer.Start(r.planned)
 	for i, job := range r.planned {
 		if !r.fixture.Tasks[i].ReportedToRenderer {
@@ -415,19 +415,19 @@ func TestWireGoldenFixtureCoverage(t *testing.T) {
 	for _, task := range run.fixture.Tasks {
 		projects[task.ProjectName] = true
 		switch {
-		case task.Reuse == jobs.ReuseLocalCache:
+		case task.Reuse == scheduler.ReuseLocalCache:
 			required["local cache hit"] = true
-		case task.Reuse == jobs.ReuseRemoteCache:
+		case task.Reuse == scheduler.ReuseRemoteCache:
 			required["remote cache hit"] = true
-		case task.Reuse == jobs.ReuseCoalesced:
+		case task.Reuse == scheduler.ReuseCoalesced:
 			required["coalesced"] = true
-		case task.Status == string(jobs.TaskStatusSuccess):
+		case task.Status == string(scheduler.TaskStatusSuccess):
 			required["fresh success"] = true
-		case task.Status == string(jobs.TaskStatusFailed):
+		case task.Status == string(scheduler.TaskStatusFailed):
 			required["fresh failure"] = true
-		case task.Status == string(jobs.TaskStatusSkipped):
+		case task.Status == string(scheduler.TaskStatusSkipped):
 			required["skipped"] = true
-		case task.Status == string(jobs.TaskStatusCanceled):
+		case task.Status == string(scheduler.TaskStatusCanceled):
 			required["canceled"] = true
 		}
 		if task.Error != nil && task.Error.Message != "" {
@@ -465,7 +465,7 @@ func TestWireGoldenFixtureCoverage(t *testing.T) {
 	// surviving goldens are comparable to.
 	fresh := 0
 	for _, task := range run.fixture.Tasks {
-		if task.Status == string(jobs.TaskStatusFailed) && !task.CacheHit && !task.Coalesced {
+		if task.Status == string(scheduler.TaskStatusFailed) && !task.CacheHit && !task.Coalesced {
 			fresh++
 		}
 	}
@@ -481,7 +481,7 @@ func TestWireGoldenFixtureCoverage(t *testing.T) {
 	// one field an agent reads a failed run for. That is exactly the state B1r
 	// found the corpus in.
 	for _, task := range run.fixture.Tasks {
-		if task.Status != string(jobs.TaskStatusFailed) {
+		if task.Status != string(scheduler.TaskStatusFailed) {
 			continue
 		}
 		diagnostics := 0

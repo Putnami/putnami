@@ -19,7 +19,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/launch"
 	"go.putnami.dev/tooling/cli/internal/machine"
 	"go.putnami.dev/tooling/cli/internal/output"
@@ -153,13 +153,13 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// process environment is clean before artifact setup, extension discovery,
 	// bootstrap, hooks, probes, cache providers, or repository jobs can spawn.
 	if !providerChild {
-		ctx = jobs.CaptureProcessCapabilities(ctx)
+		ctx = scheduler.CaptureProcessCapabilities(ctx)
 	}
 	// The credential-provider choice holds for this process; nothing it
 	// starts inherits the variable.
 	providersEnv := takeProvidersEnv()
 	ctx = sessionreporter.Capture(ctx)
-	providerMode, err := jobs.ValidateReleaseSetProviderInvocation(ctx, args)
+	providerMode, err := scheduler.ValidateReleaseSetProviderInvocation(ctx, args)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
 		return ExitUsage
@@ -577,9 +577,9 @@ func requireHostedArtifactStore(hosted bool, globalRoot func() (string, bool)) e
 }
 
 func captureEarlyReleaseSetProviderCapability(ctx context.Context) (context.Context, bool) {
-	providerChild := jobs.HasInternalReleaseSetProviderCapability()
+	providerChild := scheduler.HasInternalReleaseSetProviderCapability()
 	if providerChild {
-		ctx = jobs.CaptureProcessCapabilities(ctx)
+		ctx = scheduler.CaptureProcessCapabilities(ctx)
 	}
 	return ctx, providerChild
 }

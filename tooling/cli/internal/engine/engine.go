@@ -59,6 +59,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/sessionreporter"
 	"go.putnami.dev/tooling/cli/internal/specgate"
@@ -78,7 +79,7 @@ const (
 // renderer contract, so the adapters that already own a renderer (watch, MCP)
 // can pass theirs unchanged. A nil sink makes the engine build the default
 // renderer from Request.Global.
-type EventSink = jobs.Renderer
+type EventSink = scheduler.Renderer
 
 // Observer receives the engine's run-lifecycle observations. It is the
 // telemetry SEAM required by ADR 0001 §4, not telemetry itself: the engine
@@ -285,7 +286,7 @@ type Request struct {
 	// plumbing between two of this package's own phases, not an adapter knob. An
 	// adapter that builds a Request gets the attribution for free; nothing it can
 	// set changes it.
-	preparation *jobs.PreparationReport
+	preparation *scheduler.PreparationReport
 	// synchronizedExtensions are the extensions phase 1c synchronizes, whose
 	// runtime toolchain resolutions the report after the run reads (Run). Nil
 	// when the run ended before phase 1c.
@@ -345,11 +346,11 @@ type Request struct {
 	// processCapabilityAuthorization is derived inside Engine.Run from the final
 	// planned DAG and an in-memory runner contract. It is never adapter input,
 	// manifest data, plan output, or session data.
-	processCapabilityAuthorization *jobs.ProcessCapabilityAuthorization
+	processCapabilityAuthorization *scheduler.ProcessCapabilityAuthorization
 	// internalJobs carries framework-owned in-process runners for visible DAG
 	// nodes added by this engine run. It is populated only after the final plan
 	// is known and never exposed to adapters or manifests.
-	internalJobs map[string]jobs.InternalJobRunner
+	internalJobs map[string]scheduler.InternalJobRunner
 	// HostedRemoteCache is the remote cache a hosted run reads through when
 	// its adapter shares one with the first-use bootstrap, which starts its
 	// provider before the implicit install's first repository code. Nil gives
@@ -502,11 +503,11 @@ type SessionResult struct {
 	ExitCode int
 	// Session is the canonical reduction of the run, or nil when no scheduler ran
 	// (--plan, --dry-run, watch mode, an aborted-before-execution stage).
-	Session *jobs.SessionResult
+	Session *scheduler.SessionResult
 	// Results are the raw job results, keyed by job key. Nil when nothing ran.
-	Results map[string]*jobs.JobResult
+	Results map[string]*scheduler.JobResult
 	// Plan is the scheduled plan, or nil when planning did not complete.
-	Plan []*jobs.ScheduledJob
+	Plan []*scheduler.ScheduledJob
 	// Projects are the selected projects, or nil when selection did not complete.
 	Projects []*workspace.Project
 	// Workspace is the workspace the run planned against. Set only by a
@@ -514,7 +515,7 @@ type SessionResult struct {
 	Workspace *workspace.Workspace
 	// Withheld are the serve steps a Request.WithholdServeSteps run planned and
 	// did not start, one per selected project that has one, in plan order.
-	Withheld []*jobs.ScheduledJob
+	Withheld []*scheduler.ScheduledJob
 	// ancestry is the snapshot the run read before its first hook, or nil
 	// (Request.ancestry).
 	ancestry *AncestrySnapshot
@@ -542,7 +543,7 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	// App.Run captures before its pre-discovery/bootstrap work. Capture again at
 	// this public engine boundary for MCP/tests/adapters that invoke it directly,
 	// before version discovery or repository lifecycle hooks can spawn.
-	ctx = jobs.CaptureProcessCapabilities(ctx)
+	ctx = scheduler.CaptureProcessCapabilities(ctx)
 	req := &request
 	req.versions, req.versionsErr = nil, nil
 	// A version 2 bound request names the selection this engine resolves; it
@@ -651,7 +652,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// The dependency fetch of a hosted install sees only the extensions
 	// installed from the artifact store: no path extension starts beside the
 	// job credential.
-	discovered = jobs.CredentialedFetchView(ctx, req.WorkspaceRoot, discovered)
+	discovered = scheduler.CredentialedFetchView(ctx, req.WorkspaceRoot, discovered)
 	extensions := discovered.Extensions
 
 	// Phase 1b: the command-scoped half of the single parse-and-validation pass.
@@ -687,9 +688,9 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	//
 	// The path-extension fetch of a hosted install plans only the extensions
 	// the dependency fetch left out.
-	planningExtensions := jobs.PathExtensionFetchPlan(ctx, req.WorkspaceRoot, req.planExtensions(discovered))
-	req.preparation, req.synchronizedExtensions = &jobs.PreparationReport{}, planningExtensions
-	if err := jobs.SynchronizeExtensionRuntimesForCommands(
+	planningExtensions := scheduler.PathExtensionFetchPlan(ctx, req.WorkspaceRoot, req.planExtensions(discovered))
+	req.preparation, req.synchronizedExtensions = &scheduler.PreparationReport{}, planningExtensions
+	if err := scheduler.SynchronizeExtensionRuntimesForCommands(
 		ctx, ws, planningExtensions, req.Commands, req.preparation,
 	); err != nil {
 		iox.Fprintf(os.Stderr, "putnami: synchronize extension runtimes: %v\n", err)
@@ -845,7 +846,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// trait alone never carries authority. Build an opaque proof from the exact
 	// final plan and the runner-owned AFTER contract; the scheduler will still
 	// require successful terminal results before granting a job.
-	req.processCapabilityAuthorization, err = jobs.PrepareProcessCapabilityAuthorization(
+	req.processCapabilityAuthorization, err = scheduler.PrepareProcessCapabilityAuthorization(
 		ctx, planned, !req.Global.Plan && !req.previewsOnly(),
 	)
 	if err != nil {
@@ -908,7 +909,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 
 	// Phase 4: execute.
 	fatalUnpublishedArchives := len(unpublishedArchives) > 0 && !req.previewsOnly()
-	var finalizers []func(map[string]*jobs.JobResult)
+	var finalizers []func(map[string]*scheduler.JobResult)
 	if fatalUnpublishedArchives {
 		finalizers = append(finalizers, unpublishedArchiveFailure(unpublishedArchives, unannouncedArchives, discovered.Skipped))
 	}
@@ -950,7 +951,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 // and returns the context that carries the private outboxes of a
 // publication-v1 run's publication jobs, and the function that removes them
 // when the run ends.
-func releaseSetExecution(ctx context.Context, req *Request, run *jobs.ReleaseSetRun, finalizers []func(map[string]*jobs.JobResult)) (context.Context, []func(map[string]*jobs.JobResult), func(), error) {
+func releaseSetExecution(ctx context.Context, req *Request, run *jobs.ReleaseSetRun, finalizers []func(map[string]*scheduler.JobResult)) (context.Context, []func(map[string]*scheduler.JobResult), func(), error) {
 	finalizers = append(finalizers, publishFinalizers(ctx, req, run)...)
 	ctx, closeOutboxes, err := run.PublicationContext(ctx)
 	return ctx, finalizers, closeOutboxes, err
@@ -960,7 +961,7 @@ func releaseSetExecution(ctx context.Context, req *Request, run *jobs.ReleaseSet
 // plan with the in-process runners of those nodes. A run that publishes
 // through a publication-v1 provider first binds what open sends: its plan
 // tuple and the ancestry snapshot the run read before any repository code ran.
-func attachReleaseSet(req *Request, run *jobs.ReleaseSetRun, planned []*jobs.ScheduledJob) ([]*jobs.ScheduledJob, map[string]jobs.InternalJobRunner, error) {
+func attachReleaseSet(req *Request, run *jobs.ReleaseSetRun, planned []*scheduler.ScheduledJob) ([]*scheduler.ScheduledJob, map[string]scheduler.InternalJobRunner, error) {
 	planned, err := run.AttachPlan(planned)
 	if err != nil {
 		return planned, nil, err
@@ -991,9 +992,9 @@ func attachReleaseSet(req *Request, run *jobs.ReleaseSetRun, planned []*jobs.Sch
 // session gate or of the probe report, and publishes no successful outcome
 // after one. A run whose deploy barrier releases the set has no release
 // finalizer.
-func publishFinalizers(ctx context.Context, req *Request, releaseSetRun *jobs.ReleaseSetRun) []func(map[string]*jobs.JobResult) {
+func publishFinalizers(ctx context.Context, req *Request, releaseSetRun *jobs.ReleaseSetRun) []func(map[string]*scheduler.JobResult) {
 	dryRun, _ := req.CommandParams["dry-run"].(bool)
-	finalizers := []func(map[string]*jobs.JobResult){jobs.MemberProbeReport{
+	finalizers := []func(map[string]*scheduler.JobResult){jobs.MemberProbeReport{
 		Run: releaseSetRun, Commands: req.Commands, DryRun: dryRun, Quiet: req.Global.Quiet, Out: os.Stderr,
 	}.Finalizer()}
 	if release := releaseSetRun.Finalizer(ctx); release != nil {
@@ -1034,7 +1035,7 @@ func keyingPlan(
 	planningExtensions []*extension.ExtensionDescription,
 	discovered *extension.DiscoveryResult,
 	options jobs.ReleaseSetOptions,
-) ([]*jobs.ScheduledJob, int) {
+) ([]*scheduler.ScheduledJob, int) {
 	planned, code := buildPlan(req, ws, selectedProjects, planningExtensions, discovered)
 	if code == ExitSuccess && refusesUnauthorizedPublication(req, options, planned) {
 		return planned, ExitError
@@ -1048,13 +1049,13 @@ func keyingPlan(
 // release-set publication the request enables. It runs before the release-set
 // preparation and every later stage that can start a provider, so a gate-only
 // request starts none. It prints the refusal and reports whether it refused.
-func refusesUnauthorizedPublication(req *Request, options jobs.ReleaseSetOptions, planned []*jobs.ScheduledJob) bool {
+func refusesUnauthorizedPublication(req *Request, options jobs.ReleaseSetOptions, planned []*scheduler.ScheduledJob) bool {
 	if invocation := req.Portable.invocation(); invocation == nil || invocation.Publication != nil {
 		return false
 	}
 	var err error
 	for _, job := range planned {
-		if slices.Contains(runner.PublicationCommands, job.CommandName()) || jobs.HasExternalEffects(job) {
+		if slices.Contains(runner.PublicationCommands, job.CommandName()) || scheduler.HasExternalEffects(job) {
 			err = fmt.Errorf("runner: plan task %s publishes, but the request carries no invocation.publication", job.TypedIdentity().Key)
 			break
 		}

@@ -30,7 +30,7 @@ import (
 //     move more code: a new module is one entry in cliModules.
 //   - Production vs test is decided by filename: a file is test-only iff its
 //     name ends in "_test.go". The ~60 jobs.NewScheduler constructions in
-//     internal/jobs/*_test.go are excluded from the production count that way,
+//     internal/jobs/scheduler/*_test.go are excluded from the production count that way,
 //     and pinned separately below so a slice that moves construction into a
 //     helper is still visible.
 //   - Call-site pins are RATCHETS, not just ceilings: exceeding one fails ("a
@@ -91,8 +91,8 @@ func (s structuralScope) String() string {
 
 var structuralPins = []structuralPin{
 	{
-		name:  "production jobs.RunPlan call sites",
-		token: "jobs.RunPlan(",
+		name:  "production scheduler.RunPlan call sites",
+		token: "scheduler.RunPlan(",
 		scope: productionFiles,
 		want:  1,
 		why: "the ONE execution site left: internal/engine/execute.go. An earlier change " +
@@ -122,14 +122,16 @@ var structuralPins = []structuralPin{
 			"replan over Engine.Run (internal/engine/watch.go binds the watch.RunIteration seam), so " +
 			"it inherits contract validation, the missing-extension guards and the canonical " +
 			"session, and states its own no-marker / no-remote-cache / no-preflight policy in one " +
-			"place instead of forking the lifecycle",
+			"place instead of forking the lifecycle. The scheduler left internal/jobs for " +
+			"internal/jobs/scheduler, so the token is now scheduler.RunPlan( and the count is " +
+			"unchanged: the same engine site",
 	},
 	{
 		name:  "scheduler constructor declaration",
 		token: "func newScheduler(",
 		scope: productionFiles,
 		want:  1,
-		why: "there is exactly one scheduler constructor (internal/jobs/scheduler.go); a second is a " +
+		why: "there is exactly one scheduler constructor (internal/jobs/scheduler/scheduler.go); a second is a " +
 			"fork. An earlier change unexported it: an unexported identifier is unreachable from " +
 			"every other package by the COMPILER, so ADR 0001 §3's 'no adapter constructs or " +
 			"configures jobs.Scheduler' stopped being a convention. An EXPORTED spelling " +
@@ -140,7 +142,7 @@ var structuralPins = []structuralPin{
 		token: "newScheduler(",
 		scope: testFiles,
 		want:  60,
-		why: "all in internal/jobs/*_test.go, exercising the scheduler directly. Pinned separately " +
+		why: "all in internal/jobs/scheduler/*_test.go, exercising the scheduler directly. Pinned separately " +
 			"so they can never inflate the production count above. An earlier change removes the inferred " +
 			"capture lifecycle but retains its supported scheduler coverage under explicit task " +
 			"contracts: local event replay, project and port-resolved output materialization, " +

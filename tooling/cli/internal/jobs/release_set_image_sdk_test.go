@@ -17,6 +17,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/registry"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
 	ciproto "go.putnami.dev/protocol/ci"
 	distribution "go.putnami.dev/protocol/distribution"
@@ -179,7 +180,7 @@ func testReleaseSetImageSDK(t *testing.T, probeBinary string) {
 			if legacyEvidence != 1 {
 				t.Fatalf("legacy publication event count = %d, want 1", legacyEvidence)
 			}
-			results := map[string]*JobResult{member.ProjectID + ":publish": {Status: "success", Events: events}}
+			results := map[string]*jobmodel.JobResult{member.ProjectID + ":publish": {Status: "success", Events: events}}
 			run.Finalizer(context.Background())(results)
 			outcome := releaseSetE2EOutcome(t, results)
 			set := ledger.mustReleaseSet(t, outcome.Ref)
@@ -342,7 +343,7 @@ func loadImageSDKWorkspace(t *testing.T, root, projectPath, binary string) (*wor
 	return ws, project
 }
 
-func publishImageSDKEvents(t *testing.T, ctx *pctx.Context) ([]RawJobEvent, string) {
+func publishImageSDKEvents(t *testing.T, ctx *pctx.Context) ([]jobmodel.RawJobEvent, string) {
 	t.Helper()
 	output, err := os.CreateTemp(t.TempDir(), "sdk-events-")
 	if err != nil {
@@ -362,9 +363,9 @@ func publishImageSDKEvents(t *testing.T, ctx *pctx.Context) ([]RawJobEvent, stri
 	if err != nil {
 		t.Fatal(err)
 	}
-	var events []RawJobEvent
+	var events []jobmodel.RawJobEvent
 	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
-		event, ok := parseRawEvent(line)
+		event, ok := jobmodel.ParseRawEvent(line)
 		if !ok {
 			t.Fatalf("SDK event rejected by CLI runtime parser: %s", line)
 		}

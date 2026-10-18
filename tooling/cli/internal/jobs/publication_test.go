@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/random"
 
 	modelextension "go.putnami.dev/cli/model/extension"
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
 	distribution "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
@@ -37,6 +38,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/credentialprovider/providertest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -175,8 +177,8 @@ type publicationHarness struct {
 	projects  []*workspace.Project
 	members   []releaseset.PlannedMember
 	routes    map[string]releaseMemberRoute
-	jobs      []*ScheduledJob
-	publish   map[string]*ScheduledJob
+	jobs      []*jobmodel.ScheduledJob
+	publish   map[string]*jobmodel.ScheduledJob
 	run       *ReleaseSetRun
 	// cache serves and stores reusable results when set; without it every
 	// job executes.
@@ -200,13 +202,13 @@ func newPublicationHarness(t *testing.T, config providertest.Config) *publicatio
 		t: t, root: root, provider: provider, session: session,
 		publisher: &modelextension.ExtensionDescription{Name: "@test/publisher", Path: root},
 		routes:    map[string]releaseMemberRoute{},
-		publish:   map[string]*ScheduledJob{},
+		publish:   map[string]*jobmodel.ScheduledJob{},
 	}
 }
 
 // addMember adds a project publishing ecosystem/coordinate@version, with its
 // package job and a publication job that runs script.
-func (h *publicationHarness) addMember(ecosystem, coordinate, version, path string, registries map[string]string, script fixtureScript) *ScheduledJob {
+func (h *publicationHarness) addMember(ecosystem, coordinate, version, path string, registries map[string]string, script fixtureScript) *jobmodel.ScheduledJob {
 	h.t.Helper()
 	project := &workspace.Project{
 		ID: "/" + path, Name: path, Path: path, Version: version, Type: "library",
@@ -229,11 +231,11 @@ func (h *publicationHarness) addMember(ecosystem, coordinate, version, path stri
 		projectID: project.ID, publisher: h.publisher.Name, packagePublisher: h.publisher.Name,
 		packageStep: ecosystem, publishCommand: "publish", publishStep: ecosystem,
 	}
-	packageJob := &ScheduledJob{Project: project, Extension: h.publisher, JobDef: &modelextension.JobDefinition{
+	packageJob := &jobmodel.ScheduledJob{Project: project, Extension: h.publisher, JobDef: &modelextension.JobDefinition{
 		Name: "package~" + ecosystem, CommandName: "package", StepID: ecosystem, ExtensionName: h.publisher.Name,
 	}}
 	fixtureTask(h.t, packageJob.JobDef, fixtureScript{{"print", releaseSetSuccessLine}})
-	publishJob := &ScheduledJob{Project: project, Extension: h.publisher, JobDef: &modelextension.JobDefinition{
+	publishJob := &jobmodel.ScheduledJob{Project: project, Extension: h.publisher, JobDef: &modelextension.JobDefinition{
 		Name: "publish~" + ecosystem, CommandName: "publish", StepID: ecosystem, ExtensionName: h.publisher.Name,
 	}, DependsOn: []string{packageJob.Key()}}
 	fixtureTask(h.t, publishJob.JobDef, script.then(fixtureScript{{"print", releaseSetSuccessLine}}))
@@ -258,13 +260,13 @@ func (h *publicationHarness) reuseMember(channel string, head *distribution.Chan
 }
 
 // addGate adds a test job to the project at path that writes marker.
-func (h *publicationHarness) addGate(path, marker string) *ScheduledJob {
+func (h *publicationHarness) addGate(path, marker string) *jobmodel.ScheduledJob {
 	h.t.Helper()
 	index := slices.IndexFunc(h.projects, func(project *workspace.Project) bool { return project.Path == path })
 	if index < 0 {
 		h.t.Fatalf("no project at %s", path)
 	}
-	gate := &ScheduledJob{Project: h.projects[index], Extension: h.publisher, JobDef: &modelextension.JobDefinition{
+	gate := &jobmodel.ScheduledJob{Project: h.projects[index], Extension: h.publisher, JobDef: &modelextension.JobDefinition{
 		Name: "test~unit", CommandName: "test", StepID: "unit", ExtensionName: h.publisher.Name,
 	}}
 	fixtureTask(h.t, gate.JobDef, fixtureScript{{"write", "passed", marker}, {"print", releaseSetSuccessLine}})
@@ -274,7 +276,7 @@ func (h *publicationHarness) addGate(path, marker string) *ScheduledJob {
 
 // plan builds the run over the members added, the plan nodes, and their
 // in-process runners, as the engine does: plan, bind, attach.
-func (h *publicationHarness) plan(heads map[string]*distribution.ChannelHead, ancestry AncestryReader, barrier []string) ([]*ScheduledJob, map[string]InternalJobRunner) {
+func (h *publicationHarness) plan(heads map[string]*distribution.ChannelHead, ancestry AncestryReader, barrier []string) ([]*jobmodel.ScheduledJob, map[string]scheduler.InternalJobRunner) {
 	h.t.Helper()
 	if heads == nil {
 		heads = map[string]*distribution.ChannelHead{"canary": nil}
@@ -319,7 +321,7 @@ func (h *publicationHarness) plan(heads map[string]*distribution.ChannelHead, an
 
 // execute runs the plan in ctx, then the session finalizer, and returns every
 // result.
-func (h *publicationHarness) execute(ctx context.Context, planned []*ScheduledJob, internal map[string]InternalJobRunner, authorization *ProcessCapabilityAuthorization) map[string]*JobResult {
+func (h *publicationHarness) execute(ctx context.Context, planned []*jobmodel.ScheduledJob, internal map[string]scheduler.InternalJobRunner, authorization *scheduler.ProcessCapabilityAuthorization) map[string]*jobmodel.JobResult {
 	h.t.Helper()
 	ctx, closeOutboxes, err := h.run.PublicationContext(ctx)
 	if err != nil {
@@ -327,10 +329,10 @@ func (h *publicationHarness) execute(ctx context.Context, planned []*ScheduledJo
 	}
 	defer closeOutboxes()
 	h.renderer = &mockRenderer{}
-	result := RunPlan(ctx, RunRequest{
+	result := scheduler.RunPlan(ctx, scheduler.RunRequest{
 		Workspace: workspace.NewWorkspace(h.root, &wsproto.Config{Name: "putnami"}, h.projects),
 		Plan:      planned, InternalJobs: internal, ProcessCapabilityAuthorization: authorization,
-		Config:   SchedulerConfig{MaxParallel: 4, NoCache: h.cache == nil, ContinueOnError: true},
+		Config:   scheduler.SchedulerConfig{MaxParallel: 4, NoCache: h.cache == nil, ContinueOnError: true},
 		Renderer: h.renderer, Cache: h.cache,
 	})
 	if finalize := h.run.Finalizer(ctx); finalize != nil {
@@ -340,7 +342,7 @@ func (h *publicationHarness) execute(ctx context.Context, planned []*ScheduledJo
 }
 
 // uploadKey is the key of the upload node of the publication job publish.
-func (h *publicationHarness) uploadKey(publish *ScheduledJob) string {
+func (h *publicationHarness) uploadKey(publish *jobmodel.ScheduledJob) string {
 	h.t.Helper()
 	for upload, job := range h.run.uploads {
 		if job == publish.Key() {
@@ -534,14 +536,14 @@ func registriesEntry(field, endpoint string) string {
 	return fmt.Sprintf(`{%q:%q}`, field, endpoint)
 }
 
-func uploadEvents(t *testing.T, result *JobResult) []*extensionproto.PublishedMember {
+func uploadEvents(t *testing.T, result *jobmodel.JobResult) []*extensionproto.PublishedMember {
 	t.Helper()
 	var members []*extensionproto.PublishedMember
 	if result == nil {
 		return nil
 	}
 	for _, event := range result.Events {
-		if kind, _ := event.Data["kind"].(string); event.Type != EventTypeArtifact || kind != extensionproto.PublishedMemberEventKind {
+		if kind, _ := event.Data["kind"].(string); event.Type != jobmodel.EventTypeArtifact || kind != extensionproto.PublishedMemberEventKind {
 			continue
 		}
 		member, err := parsePublishedMemberEvent(event.Data)
@@ -553,7 +555,7 @@ func uploadEvents(t *testing.T, result *JobResult) []*extensionproto.PublishedMe
 	return members
 }
 
-func resultMessage(result *JobResult) string {
+func resultMessage(result *jobmodel.JobResult) string {
 	if result == nil {
 		return "<no result>"
 	}
@@ -580,7 +582,7 @@ func TestSessionOpenIsSentOnceAfterEveryBarrierLeaf(t *testing.T) {
 				fixtureScript{{"copy-tree", outbox, "$PUTNAMI_PUBLICATION_OUTBOX"}})
 			markers := []string{filepath.Join(h.root, "first-gate"), filepath.Join(h.root, "second-gate")}
 			first := h.addGate("web", markers[0])
-			second := &ScheduledJob{Project: first.Project, Extension: h.publisher, JobDef: &modelextension.JobDefinition{
+			second := &jobmodel.ScheduledJob{Project: first.Project, Extension: h.publisher, JobDef: &modelextension.JobDefinition{
 				Name: "test~integration", CommandName: "test", StepID: "integration", ExtensionName: h.publisher.Name,
 			}, DependsOn: []string{first.Key()}}
 			fixtureTask(t, second.JobDef, fixtureScript{{"write", "passed", markers[1]}, {"print", releaseSetSuccessLine}})
@@ -720,10 +722,10 @@ func TestPublishJobReceivesNoCredentialUnderPublicationV1(t *testing.T) {
 	})
 	h.addGate("web", filepath.Join(h.root, "gate"))
 	planned, internal := h.plan(nil, fixedAncestry{testRevision}, nil)
-	if err := PlanProcessCapabilityGates(ctx, planned); err != nil {
+	if err := scheduler.PlanProcessCapabilityGates(ctx, planned); err != nil {
 		t.Fatal(err)
 	}
-	authorization, err := AuthorizeProcessCapabilities(ctx, planned, true)
+	authorization, err := scheduler.AuthorizeProcessCapabilities(ctx, planned, true)
 	if err != nil {
 		t.Fatalf("authorize: %v", err)
 	}
@@ -740,7 +742,7 @@ func TestPublishJobReceivesNoCredentialUnderPublicationV1(t *testing.T) {
 	outboxes := 0
 	for _, line := range strings.Split(string(dump), "\n") {
 		name, value, _ := strings.Cut(line, "=")
-		if withheldFromOutboxJob(name) {
+		if scheduler.WithheldFromOutboxJob(name) {
 			t.Errorf("the publication job received %s", name)
 		}
 		if strings.Contains(value, token) || strings.Contains(value, publicationBearer) {
@@ -822,7 +824,7 @@ func TestEngineUploadsManagedMembersAndEmitsPublishedMembers(t *testing.T) {
 		"go\x00example.test/mod": fmt.Sprintf("sha256:%x", sha256.Sum256(zip)),
 		"oci\x00team/app":        imageDigest,
 	}
-	for _, job := range []*ScheduledJob{npmJob, goJob, ociJob} {
+	for _, job := range []*jobmodel.ScheduledJob{npmJob, goJob, ociJob} {
 		if events := uploadEvents(t, results[job.Key()]); len(events) != 0 {
 			t.Fatalf("the publication job %s reported %d published members", job.Key(), len(events))
 		}
@@ -830,7 +832,7 @@ func TestEngineUploadsManagedMembersAndEmitsPublishedMembers(t *testing.T) {
 		if len(events) != 1 || events[0].ArtifactDigest != want[events[0].Ecosystem+"\x00"+events[0].Coordinate] {
 			t.Fatalf("upload of %s reported %+v", job.Key(), events)
 		}
-		rendered := uploadEvents(t, &JobResult{Events: h.renderer.eventsOfType(h.uploadKey(job), EventTypeArtifact)})
+		rendered := uploadEvents(t, &jobmodel.JobResult{Events: h.renderer.eventsOfType(h.uploadKey(job), jobmodel.EventTypeArtifact)})
 		if len(rendered) != 1 || !reflect.DeepEqual(rendered[0], events[0]) {
 			t.Fatalf("upload of %s rendered %+v; want its published member %+v", job.Key(), rendered, events[0])
 		}
@@ -861,7 +863,7 @@ func TestEngineUploadsManagedMembersAndEmitsPublishedMembers(t *testing.T) {
 // image as ociHost/team/app at 1.2.3 and whose package step built it, under
 // registries.oci.publish declared. It returns the publication job and the
 // image's manifest digest.
-func addOCIMember(t *testing.T, h *publicationHarness, ociHost, declared string) (*ScheduledJob, string) {
+func addOCIMember(t *testing.T, h *publicationHarness, ociHost, declared string) (*jobmodel.ScheduledJob, string) {
 	t.Helper()
 	image, err := random.Image(256, 1)
 	if err != nil {
@@ -1364,11 +1366,11 @@ func TestLegacyPathIsUnchangedWhenTheCapabilityIsNotEchoed(t *testing.T) {
 	member := run.Plan().SelectedMembers()[0]
 	owner := &modelextension.ExtensionDescription{Name: "test-provider", Path: root}
 	environ := filepath.Join(root, "environ")
-	packageJob := &ScheduledJob{Project: project, Extension: owner, JobDef: &modelextension.JobDefinition{
+	packageJob := &jobmodel.ScheduledJob{Project: project, Extension: owner, JobDef: &modelextension.JobDefinition{
 		Name: "package~npm", CommandName: "package", StepID: "npm", ExtensionName: owner.Name,
 	}}
 	fixtureTask(t, packageJob.JobDef, fixtureScript{{"print", releaseSetSuccessLine}})
-	publish := &ScheduledJob{Project: project, Extension: owner, JobDef: &modelextension.JobDefinition{
+	publish := &jobmodel.ScheduledJob{Project: project, Extension: owner, JobDef: &modelextension.JobDefinition{
 		Name: "publish~npm", CommandName: "publish", StepID: "npm", ExtensionName: owner.Name,
 	}, DependsOn: []string{packageJob.Key()}}
 	fixtureTask(t, publish.JobDef, fixtureScript{
@@ -1376,7 +1378,7 @@ func TestLegacyPathIsUnchangedWhenTheCapabilityIsNotEchoed(t *testing.T) {
 		{"print", publishedMemberRuntimeLine(member, digestFor('c'))},
 		{"print", releaseSetSuccessLine},
 	})
-	planned, err := run.AttachPlan([]*ScheduledJob{packageJob, publish})
+	planned, err := run.AttachPlan([]*jobmodel.ScheduledJob{packageJob, publish})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1392,8 +1394,8 @@ func TestLegacyPathIsUnchangedWhenTheCapabilityIsNotEchoed(t *testing.T) {
 		t.Fatalf("legacy publication context changed: %v", err)
 	}
 	defer closeOutboxes()
-	result := RunPlan(runCtx, RunRequest{
-		Workspace: ws, Plan: planned, Config: SchedulerConfig{MaxParallel: 1, NoCache: true}, Renderer: &mockRenderer{},
+	result := scheduler.RunPlan(runCtx, scheduler.RunRequest{
+		Workspace: ws, Plan: planned, Config: scheduler.SchedulerConfig{MaxParallel: 1, NoCache: true}, Renderer: &mockRenderer{},
 	})
 	run.Finalizer(runCtx)(result.Results)
 	outcome := releaseSetE2EOutcome(t, result.Results)

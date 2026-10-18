@@ -15,7 +15,7 @@ import (
 
 // auxKillDelay bounds how long a canceled auxiliary subprocess may keep
 // running after SIGTERM before it is force-killed. It mirrors the job
-// runner's process-group kill delay (internal/jobs/runner.go).
+// runner's process-group kill delay (internal/jobs/scheduler/runner.go).
 const auxKillDelay = 5 * time.Second
 
 // configureGroupCancellation makes cmd the root of its own process tree and,
@@ -95,7 +95,7 @@ func RunGroupStreaming(ctx context.Context, dir string, env []string, name strin
 
 // forceKillAuxGroupAfter kills the process tree once delay elapses, unless the
 // tree has already finished (signaled via done). Mirrors
-// internal/jobs/runner.go's forceKillProcessGroupAfter.
+// internal/jobs/scheduler/runner.go's forceKillProcessGroupAfter.
 func forceKillAuxGroupAfter(done <-chan struct{}, tree *proctree.Tree, delay time.Duration) {
 	select {
 	case <-done:

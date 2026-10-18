@@ -14,8 +14,8 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hooks"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/machine"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/profiler"
@@ -44,7 +44,7 @@ func executionRenderer(
 	extensions []*extension.ExtensionDescription,
 	sink EventSink,
 	isServeMode, isRunMode bool,
-) jobs.Renderer {
+) scheduler.Renderer {
 	if sink != nil {
 		return sink
 	}
@@ -66,10 +66,10 @@ func executionRenderer(
 }
 
 func executionSessionRenderer(
-	renderer jobs.Renderer,
+	renderer scheduler.Renderer,
 	session *workspace_state.Session,
 	verbose bool,
-) jobs.Renderer {
+) scheduler.Renderer {
 	if session != nil {
 		return output.WithSessionRecording(renderer, session, verbose)
 	}
@@ -146,10 +146,10 @@ func (e *Engine) execute(
 	ws *workspace.Workspace,
 	selectedProjects []*workspace.Project,
 	discovered *extension.DiscoveryResult,
-	planned []*jobs.ScheduledJob,
+	planned []*scheduler.ScheduledJob,
 	cache *store.CacheManager,
 	sink EventSink,
-	resultFinalizers ...func(map[string]*jobs.JobResult),
+	resultFinalizers ...func(map[string]*scheduler.JobResult),
 ) SessionResult {
 	if !req.previewsOnly() {
 		lease, err := store.AcquireScratch(req.WorkspaceRoot)
@@ -184,10 +184,10 @@ func (e *Engine) executeSession(
 	ws *workspace.Workspace,
 	selectedProjects []*workspace.Project,
 	discovered *extension.DiscoveryResult,
-	planned []*jobs.ScheduledJob,
+	planned []*scheduler.ScheduledJob,
 	cache *store.CacheManager,
 	sink EventSink,
-	resultFinalizers ...func(map[string]*jobs.JobResult),
+	resultFinalizers ...func(map[string]*scheduler.JobResult),
 ) SessionResult {
 	wsRoot := req.WorkspaceRoot
 	extensions := discovered.Extensions
@@ -244,7 +244,7 @@ func (e *Engine) executeSession(
 	versionInfo := req.runVersions(ws)
 
 	// Build scheduler config
-	schedCfg := jobs.SchedulerConfig{
+	schedCfg := scheduler.SchedulerConfig{
 		MaxParallel:       req.Global.MaxParallel,
 		MaxParallelMode:   req.Global.MaxParallelMode,
 		ResourceBudgets:   req.Global.ResourceBudgets,
@@ -351,11 +351,11 @@ func (e *Engine) executeSession(
 	// Wire scheduler/recovery audit signals into the v2 artifact and profiler.
 	// Canonical task ends are recorded by renderer.JobComplete, so the recorder
 	// ignores the scheduler's legacy job:end projection.
-	var sessionEvents jobs.SessionEventHandler
+	var sessionEvents scheduler.SessionEventHandler
 	if session != nil || prof.IsEnabled() {
-		sessionEvents = func(record jobs.SessionRecord) {
+		sessionEvents = func(record scheduler.SessionRecord) {
 			if recorder, ok := renderer.(interface {
-				RecordSessionEvent(jobs.SessionRecord)
+				RecordSessionEvent(scheduler.SessionRecord)
 			}); ok {
 				recorder.RecordSessionEvent(record)
 			}
@@ -407,7 +407,7 @@ func (e *Engine) executeSession(
 	// budget). It is armed in this literal, as the run starts, because the
 	// instant it is created is the run's protection boundary: an in-run
 	// collection pass spares every entry used at or after it.
-	result := jobs.RunPlan(ctx, jobs.RunRequest{
+	result := scheduler.RunPlan(ctx, scheduler.RunRequest{
 		Workspace:                      ws,
 		Plan:                           planned,
 		CommandParams:                  req.CommandParams,
@@ -546,7 +546,7 @@ func boundMachineCachesAfterRun(req *Request, ws *workspace.Workspace, extension
 // nil has to be returned untyped. (The v1 session writer guarded the same trap
 // with a conditional SetCache call; both it and that path are deleted, and this
 // is the one guard left.)
-func cacheSummary(cache *jobs.CacheStatsSnapshot) any {
+func cacheSummary(cache *scheduler.CacheStatsSnapshot) any {
 	if cache == nil {
 		return nil
 	}
@@ -569,7 +569,7 @@ func cacheSummary(cache *jobs.CacheStatsSnapshot) any {
 // with this function — status "aborted", exitCode 130 — while still counting and
 // listing the failures the run collected (machine.Run.Summary). One reduction,
 // one precedence, on both the process and the wire.
-func sessionExitCode(session *jobs.SessionResult, forwarded func() (int, bool)) int {
+func sessionExitCode(session *scheduler.SessionResult, forwarded func() (int, bool)) int {
 	if session.Aborted {
 		return ExitSignalReceived
 	}
@@ -584,11 +584,11 @@ func sessionExitCode(session *jobs.SessionResult, forwarded func() (int, bool)) 
 	return ExitError
 }
 
-func attachResultFinalizers(schedCfg *jobs.SchedulerConfig, resultFinalizers []func(map[string]*jobs.JobResult)) {
+func attachResultFinalizers(schedCfg *scheduler.SchedulerConfig, resultFinalizers []func(map[string]*scheduler.JobResult)) {
 	if len(resultFinalizers) == 0 {
 		return
 	}
-	schedCfg.FinalizeResults = func(results map[string]*jobs.JobResult) {
+	schedCfg.FinalizeResults = func(results map[string]*scheduler.JobResult) {
 		for _, finalize := range resultFinalizers {
 			if finalize != nil {
 				finalize(results)
@@ -602,7 +602,7 @@ func attachResultFinalizers(schedCfg *jobs.SchedulerConfig, resultFinalizers []f
 // (0, false) when no run workload reported a non-zero code (e.g. an upstream
 // build step failed before the workload ran), leaving the caller to use the
 // generic failure code.
-func runForwardedExitCode(planned []*jobs.ScheduledJob, results map[string]*jobs.JobResult) (int, bool) {
+func runForwardedExitCode(planned []*scheduler.ScheduledJob, results map[string]*scheduler.JobResult) (int, bool) {
 	for _, job := range planned {
 		if job.CommandName() != "run" {
 			continue

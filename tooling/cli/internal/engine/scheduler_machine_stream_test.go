@@ -15,7 +15,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
@@ -182,7 +182,7 @@ func TestSchedulerInitializesMachineRetentionBeforeAuditEvents(t *testing.T) {
 		Err:     &live,
 	}), session, false)
 	recorder, ok := renderer.(interface {
-		RecordSessionEvent(jobs.SessionRecord)
+		RecordSessionEvent(scheduler.SessionRecord)
 	})
 	if !ok {
 		t.Fatalf("renderer %T does not record scheduler events", renderer)
@@ -190,14 +190,14 @@ func TestSchedulerInitializesMachineRetentionBeforeAuditEvents(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	jobs.RunPlan(ctx, jobs.RunRequest{
+	scheduler.RunPlan(ctx, scheduler.RunRequest{
 		Workspace: &workspace.Workspace{
 			Name:  "machine-order",
 			Root:  root,
 			Graph: workspace.BuildGraph(nil),
 		},
 		Plan:          nil,
-		Config:        jobs.SchedulerConfig{MaxParallel: 1, NoCache: true},
+		Config:        scheduler.SchedulerConfig{MaxParallel: 1, NoCache: true},
 		Renderer:      renderer,
 		SessionEvents: recorder.RecordSessionEvent,
 	})
@@ -225,7 +225,7 @@ func TestExecutionRendererWithoutSessionMakesNoArtifactClaim(t *testing.T) {
 		Err:     &live,
 	}), nil, false)
 	renderer.Start(nil)
-	renderer.Finish(nil, jobs.SessionOutcome{})
+	renderer.Finish(nil, scheduler.SessionOutcome{})
 
 	lines := bytes.Split(bytes.TrimSpace(live.Bytes()), []byte{'\n'})
 	final := lines[len(lines)-1]

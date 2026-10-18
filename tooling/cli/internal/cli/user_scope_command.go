@@ -12,7 +12,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -85,7 +85,7 @@ func (a *App) runUserScopeSubcommand(
 
 	ws := workspace.NewWorkspace(userRoot, &wsproto.Config{Name: userScopeWorkspaceName}, nil)
 	if resolved.Extension.Runtime != nil && resolved.Extension.RuntimeExecutable == "" {
-		if err := jobs.SynchronizeExtensionRuntimes(
+		if err := scheduler.SynchronizeExtensionRuntimes(
 			ctx, ws, []*extension.ExtensionDescription{resolved.Extension}, nil); err != nil {
 			iox.Fprintf(stderr, "putnami: prepare the %s runtime: %v\n", resolved.Extension.Name, err)
 			return ExitError
@@ -94,7 +94,7 @@ func (a *App) runUserScopeSubcommand(
 	jobDef := *resolved.JobDefinition
 	jobDef.Flags = effectiveFlags
 	jobDef.Args = append(append([]string{}, jobDef.Args...), parsed.RawJobArgs...)
-	job := &jobs.ScheduledJob{
+	job := &scheduler.ScheduledJob{
 		Project:   workspaceOnceProject(ws),
 		Extension: resolved.Extension,
 		JobDef:    &jobDef,

@@ -175,6 +175,64 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"provider session, under the run credential and trust policy; the caller hands it the " +
 			"provider's launch, so it never imports the scheduler or the runner",
 	},
+	{
+		dir: "internal/jobs/scheduler",
+		allowed: []string{
+			"go.putnami.dev/cli/model/jobs",
+			"go.putnami.dev/protocol/cache",
+			"go.putnami.dev/protocol/cli",
+			"go.putnami.dev/protocol/distribution",
+			"go.putnami.dev/protocol/extension",
+			"go.putnami.dev/protocol/job",
+			"go.putnami.dev/protocol/registry",
+			"go.putnami.dev/protocol/runner",
+			"go.putnami.dev/protocol/runtime",
+			"go.putnami.dev/sdk/extension/dirlink",
+			"go.putnami.dev/sdk/extension/envkeys",
+			"go.putnami.dev/sdk/extension/pkgmeta",
+			"go.putnami.dev/sdk/extension/proctree",
+			"go.putnami.dev/sdk/extension/releaseset",
+			"go.putnami.dev/tooling/cli/internal/abort",
+			"go.putnami.dev/tooling/cli/internal/artifactstore",
+			"go.putnami.dev/tooling/cli/internal/extension",
+			"go.putnami.dev/tooling/cli/internal/flock",
+			"go.putnami.dev/tooling/cli/internal/git",
+			"go.putnami.dev/tooling/cli/internal/hooks",
+			"go.putnami.dev/tooling/cli/internal/iox",
+			"go.putnami.dev/tooling/cli/internal/jobs/cachekey",
+			"go.putnami.dev/tooling/cli/internal/jobs/machineprobe",
+			"go.putnami.dev/tooling/cli/internal/jobs/planner",
+			"go.putnami.dev/tooling/cli/internal/jobs/procdeadline",
+			"go.putnami.dev/tooling/cli/internal/jobs/toolchain",
+			"go.putnami.dev/tooling/cli/internal/runcredential",
+			"go.putnami.dev/tooling/cli/internal/store",
+			"go.putnami.dev/tooling/cli/internal/useragent",
+			"go.putnami.dev/tooling/cli/internal/workspace",
+		},
+		testOnly: []string{
+			"go.putnami.dev/cli/model/extension",
+			"go.putnami.dev/cli/model/workspace",
+			"go.putnami.dev/protocol/diagnostic",
+			"go.putnami.dev/protocol/features",
+			"go.putnami.dev/protocol/workspace",
+			"go.putnami.dev/sdk/extension/context",
+			"go.putnami.dev/sdk/extension/dockerpublish",
+			"go.putnami.dev/sdk/extension/jsonl",
+			"go.putnami.dev/sdk/extension/ownerperm",
+			"go.putnami.dev/sdk/extension/registrycred",
+			"go.putnami.dev/tooling/cli/internal/cacheprovider",
+			"go.putnami.dev/tooling/cli/internal/fixtureproc",
+			"go.putnami.dev/tooling/cli/internal/jobs/remotecache",
+			"go.putnami.dev/tooling/cli/internal/lockfile",
+			"golang.org/x/sys/windows",
+		},
+		why: "the scheduler, the runner and the cache use: it runs the jobs of the plan the planner " +
+			"builds, restores and stores their task cache entries, and starts extension runtimes, " +
+			"providers and host RPC under the run credential and the process capabilities. The " +
+			"release-set and publication code in internal/jobs imports it, so it never imports " +
+			"internal/jobs. Its tests wire in a remote cache client and a fake cache provider, and " +
+			"read the publish and registry fixtures of the SDK",
+	},
 }
 
 func TestJobsSplitPackagesImportOnlyTheirAllowance(t *testing.T) {
@@ -292,10 +350,10 @@ func jobsSplitImportAllowed(path string, allowed []string) bool {
 // jobsSchedulerDir holds the scheduler and the runner. Their production files
 // reach the remote cache client only through the cachekey.RemoteCache
 // interface the engine hands them, so they do not import the client.
-const jobsSchedulerDir = "internal/jobs"
+const jobsSchedulerDir = "internal/jobs/scheduler"
 
 // TestJobsSplitSchedulerDoesNotImportTheRemoteCacheClient fails when a
-// production file of internal/jobs imports internal/jobs/remotecache. The
+// production file of internal/jobs/scheduler imports internal/jobs/remotecache. The
 // engine loads the client; a scheduler import of it, for any name, would make
 // the scheduler depend on the client again and rerun its tests on the
 // client's changes. Its tests may import it to wire a client in.

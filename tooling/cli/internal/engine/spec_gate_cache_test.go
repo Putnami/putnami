@@ -10,9 +10,9 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	features "go.putnami.dev/protocol/features"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -122,7 +122,7 @@ type recoveryPlanFixture struct {
 	ws      *workspace.Workspace
 	cache   *store.CacheManager
 	source  *cachedObservationRecovery
-	planned []*jobs.ScheduledJob
+	planned []*scheduler.ScheduledJob
 	keys    map[string]string
 }
 

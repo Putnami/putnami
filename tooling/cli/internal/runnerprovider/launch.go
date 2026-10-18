@@ -7,7 +7,7 @@ import (
 
 	"go.putnami.dev/cli/model/extension"
 	internalextension "go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -33,7 +33,7 @@ func LaunchSpecFor(ctx context.Context, wsRoot string, extensions []*extension.E
 	if strings.TrimSpace(job.Command) == "" {
 		return LaunchSpec{}, fmt.Errorf("runner provider command %q has no executable", provider.Command)
 	}
-	launch, err := jobs.PrepareProviderLaunch(ctx, wsRoot, ext, provider.Command)
+	launch, err := scheduler.PrepareProviderLaunch(ctx, wsRoot, ext, provider.Command)
 	if err != nil {
 		return LaunchSpec{}, fmt.Errorf("prepare runner provider %s: %w", provider.ExtensionName, err)
 	}

@@ -15,8 +15,8 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	internalextension "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/output"
 )
 
@@ -49,7 +49,7 @@ func buildPlan(
 	selectedProjects []*workspace.Project,
 	extensions []*extension.ExtensionDescription,
 	discovered *internalextension.DiscoveryResult,
-) ([]*jobs.ScheduledJob, int) {
+) ([]*scheduler.ScheduledJob, int) {
 	loaded, skipped := extensions, []extension.SkippedExtension(nil)
 	if discovered != nil {
 		loaded, skipped = discovered.Extensions, discovered.Skipped
@@ -175,7 +175,7 @@ func buildPlan(
 	// A task claiming more units of a named resource than --resource declared
 	// exists would sit in the pending queue forever, so it is refused HERE, with
 	// the resource and both amounts named, rather than at admission time.
-	if err := jobs.ValidateResourceBudgets(planned, req.Global.ResourceBudgets); err != nil {
+	if err := scheduler.ValidateResourceBudgets(planned, req.Global.ResourceBudgets); err != nil {
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
 		return nil, ExitUsage
 	}
@@ -183,7 +183,7 @@ func buildPlan(
 	// Runtime synchronization left a task toolchain the lock does not satisfy
 	// unresolved. A planned job that requires one fails the run here, before
 	// any job runs or is keyed, and a run that planned none goes on.
-	if err := jobs.RequirePlannedRuntimeToolchains(ws, planned); err != nil {
+	if err := scheduler.RequirePlannedRuntimeToolchains(ws, planned); err != nil {
 		iox.Fprintf(os.Stderr, "putnami: synchronize extension runtimes: %v\n", err)
 		return nil, ExitError
 	}
@@ -200,9 +200,9 @@ func buildPlan(
 // composition reused the planned slice's backing array (planned[:0]), which is
 // safe only while nothing else holds the plan — and the engine hands the plan
 // back on SessionResult.Plan.
-func dedupePlanByExtension(planned []*jobs.ScheduledJob) []*jobs.ScheduledJob {
+func dedupePlanByExtension(planned []*scheduler.ScheduledJob) []*scheduler.ScheduledJob {
 	seen := make(map[string]bool, len(planned))
-	deduped := make([]*jobs.ScheduledJob, 0, len(planned))
+	deduped := make([]*scheduler.ScheduledJob, 0, len(planned))
 	for _, j := range planned {
 		if j == nil {
 			continue
@@ -391,7 +391,7 @@ func missingRegistryExtensions(cfg *wsproto.Config, extensions []*extension.Exte
 // A command a loaded extension declares but that merely matched no
 // selected project is a legitimate no-op and is excluded; that exclusion is what
 // keeps this guard from failing healthy partial plans.
-func selectedCommandsWithoutJobs(commands []string, planned []*jobs.ScheduledJob, extensions []*extension.ExtensionDescription) []string {
+func selectedCommandsWithoutJobs(commands []string, planned []*scheduler.ScheduledJob, extensions []*extension.ExtensionDescription) []string {
 	plannedCommands := make(map[string]bool, len(planned))
 	for _, job := range planned {
 		if job == nil {
@@ -423,11 +423,11 @@ func selectedCommandsWithoutJobs(commands []string, planned []*jobs.ScheduledJob
 // dependency (planner_deps.go). The footer separates the two, because one
 // number that covers both changes with the command set for the same diff and
 // reads as "--impacted selected 106 projects" when it selected 72.
-func printPlan(w io.Writer, planned []*jobs.ScheduledJob, selected []*workspace.Project) {
+func printPlan(w io.Writer, planned []*scheduler.ScheduledJob, selected []*workspace.Project) {
 	// Group by project
 	type projectGroup struct {
 		name string
-		jobs []*jobs.ScheduledJob
+		jobs []*scheduler.ScheduledJob
 	}
 	groups := make(map[string]*projectGroup)
 	var order []string
@@ -453,7 +453,7 @@ func printPlan(w io.Writer, planned []*jobs.ScheduledJob, selected []*workspace.
 			// cache and a structurally uncacheable task stop looking identical.
 			// CanUseCache already covers JobDef.Cache.
 			cache := "MISS"
-			if !jobs.CanUseCache(j) {
+			if !scheduler.CanUseCache(j) {
 				cache = "NO-CACHE"
 			}
 			deps := ""
@@ -475,7 +475,7 @@ func printPlan(w io.Writer, planned []*jobs.ScheduledJob, selected []*workspace.
 		iox.Fprintln(w)
 	}
 
-	m := jobs.ComputePlanMetrics(planned)
+	m := scheduler.ComputePlanMetrics(planned)
 	// The project count covers every project that owns a planned job. When the
 	// plan pulled dependencies in, say how many of them are the selection and
 	// how many are those builds; when it pulled none, print the footer this
@@ -512,7 +512,7 @@ func printPlan(w io.Writer, planned []*jobs.ScheduledJob, selected []*workspace.
 // --dry-run. Explicit JSON modes receive a typed plan verdict; every human mode
 // retains the existing table byte-for-byte. A preview never constructs a
 // renderer or session because no task executed and no session artifact exists.
-func renderPlan(req *Request, planned []*jobs.ScheduledJob, selected []*workspace.Project) int {
+func renderPlan(req *Request, planned []*scheduler.ScheduledJob, selected []*workspace.Project) int {
 	written, err := output.WritePreviewPlan(
 		req.stdout(), req.Global.Output, strings.Join(req.Commands, ","), planned,
 	)
@@ -555,7 +555,7 @@ func machineOutputRequested(req *Request) bool {
 	return protocolcli.OutputMode(req.Global.Output).IsStructured()
 }
 
-func displayJobName(job *jobs.ScheduledJob) string {
+func displayJobName(job *scheduler.ScheduledJob) string {
 	name := job.DisplayName()
 	if job.PlanName() != name && job.Extension != nil && job.Extension.Name != "" {
 		return name + " (" + job.Extension.Name + ")"
@@ -590,7 +590,7 @@ func displayJobName(job *jobs.ScheduledJob) string {
 //     stays previewsOnly's (request_seams_test pins that); this decides which
 //     jobs are SAFE inside a run that is already executing, from the
 //     synthesized param itself.
-func dropUndryableSideEffectJobs(req *Request, planned []*jobs.ScheduledJob) []*jobs.ScheduledJob {
+func dropUndryableSideEffectJobs(req *Request, planned []*scheduler.ScheduledJob) []*scheduler.ScheduledJob {
 	if !req.ExecutesUnderDryRun || req.PlanExtension != nil {
 		return planned
 	}
@@ -631,7 +631,7 @@ func dropUndryableSideEffectJobs(req *Request, planned []*jobs.ScheduledJob) []*
 		}
 	}
 
-	kept := make([]*jobs.ScheduledJob, 0, len(planned)-len(excluded))
+	kept := make([]*scheduler.ScheduledJob, 0, len(planned)-len(excluded))
 	dropped := make([]string, 0, len(excluded))
 	for _, job := range planned {
 		if reason, gone := excluded[job.Key()]; gone {
@@ -650,7 +650,7 @@ func dropUndryableSideEffectJobs(req *Request, planned []*jobs.ScheduledJob) []*
 // jobDeclaresDryRun reports whether a job can consume the synthesized dry-run
 // parameter. Pipeline steps intentionally do not carry CLI flags; they inherit
 // their flag surface from the command that expanded them.
-func jobDeclaresDryRun(job *jobs.ScheduledJob) bool {
+func jobDeclaresDryRun(job *scheduler.ScheduledJob) bool {
 	if _, declared := job.JobDef.Flags["dry-run"]; declared {
 		return true
 	}

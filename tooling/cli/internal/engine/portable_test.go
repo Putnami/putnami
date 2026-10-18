@@ -13,12 +13,12 @@ import (
 	protocoljob "go.putnami.dev/protocol/job"
 	runner "go.putnami.dev/protocol/runner"
 	internalextension "go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
-func portableJob(project *workspace.Project, name string, dependsOn ...string) *jobs.ScheduledJob {
-	return &jobs.ScheduledJob{
+func portableJob(project *workspace.Project, name string, dependsOn ...string) *scheduler.ScheduledJob {
+	return &scheduler.ScheduledJob{
 		Project:   project,
 		Extension: &extension.ExtensionDescription{Name: "@fixture/gate", Version: "1.0.0"},
 		JobDef: &extension.JobDefinition{
@@ -30,10 +30,10 @@ func portableJob(project *workspace.Project, name string, dependsOn ...string) *
 	}
 }
 
-func portablePlan() []*jobs.ScheduledJob {
+func portablePlan() []*scheduler.ScheduledJob {
 	app := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
 	lib := &workspace.Project{ID: "/lib", Name: "lib", Path: "lib"}
-	planned := []*jobs.ScheduledJob{portableJob(app, "build", "/lib:build"), portableJob(lib, "build"), portableJob(app, "test~unit", "/app:build")}
+	planned := []*scheduler.ScheduledJob{portableJob(app, "build", "/lib:build"), portableJob(lib, "build"), portableJob(app, "test~unit", "/app:build")}
 	modeljobs.AttachIdentities(planned)
 	return planned
 }
@@ -72,23 +72,31 @@ func TestValidateExpectedPlanRefusesEveryDivergence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cases := map[string]func([]*jobs.ScheduledJob) []*jobs.ScheduledJob{
-		"missing task": func(p []*jobs.ScheduledJob) []*jobs.ScheduledJob { return p[:2] },
-		"extra task":   func(p []*jobs.ScheduledJob) []*jobs.ScheduledJob { return append(p, portableJob(p[0].Project, "lint")) },
-		"edge dropped": func(p []*jobs.ScheduledJob) []*jobs.ScheduledJob { p[0].DependsOn = nil; return p },
-		"serialize edge": func(p []*jobs.ScheduledJob) []*jobs.ScheduledJob {
+	cases := map[string]func([]*scheduler.ScheduledJob) []*scheduler.ScheduledJob{
+		"missing task": func(p []*scheduler.ScheduledJob) []*scheduler.ScheduledJob { return p[:2] },
+		"extra task": func(p []*scheduler.ScheduledJob) []*scheduler.ScheduledJob {
+			return append(p, portableJob(p[0].Project, "lint"))
+		},
+		"edge dropped": func(p []*scheduler.ScheduledJob) []*scheduler.ScheduledJob { p[0].DependsOn = nil; return p },
+		"serialize edge": func(p []*scheduler.ScheduledJob) []*scheduler.ScheduledJob {
 			p[0].SerializeAfter = []string{"/lib:build"}
 			return p
 		},
-		"contract": func(p []*jobs.ScheduledJob) []*jobs.ScheduledJob {
+		"contract": func(p []*scheduler.ScheduledJob) []*scheduler.ScheduledJob {
 			p[1].JobDef.ContractDigest = "tc1:" + strings.Repeat("b", 64)
 			return p
 		},
-		"deadline":  func(p []*jobs.ScheduledJob) []*jobs.ScheduledJob { p[1].JobDef.TimeoutMs = 1; return p },
-		"cacheable": func(p []*jobs.ScheduledJob) []*jobs.ScheduledJob { p[1].JobDef.Cache = false; return p },
-		"resource":  func(p []*jobs.ScheduledJob) []*jobs.ScheduledJob { p[1].JobDef.Writes = p[1].JobDef.Reads; return p },
-		"extension": func(p []*jobs.ScheduledJob) []*jobs.ScheduledJob { p[2].Extension.Name = "@other/gate"; return p },
-		"provider version": func(p []*jobs.ScheduledJob) []*jobs.ScheduledJob {
+		"deadline":  func(p []*scheduler.ScheduledJob) []*scheduler.ScheduledJob { p[1].JobDef.TimeoutMs = 1; return p },
+		"cacheable": func(p []*scheduler.ScheduledJob) []*scheduler.ScheduledJob { p[1].JobDef.Cache = false; return p },
+		"resource": func(p []*scheduler.ScheduledJob) []*scheduler.ScheduledJob {
+			p[1].JobDef.Writes = p[1].JobDef.Reads
+			return p
+		},
+		"extension": func(p []*scheduler.ScheduledJob) []*scheduler.ScheduledJob {
+			p[2].Extension.Name = "@other/gate"
+			return p
+		},
+		"provider version": func(p []*scheduler.ScheduledJob) []*scheduler.ScheduledJob {
 			p[2].Extension = &extension.ExtensionDescription{Name: "@fixture/gate", Version: "2.0.0"}
 			return p
 		},
@@ -123,18 +131,18 @@ func TestRejectUnsupportedRemoteShape(t *testing.T) {
 	if err := rejectUnsupportedRemoteShape(base(), planned); err != nil {
 		t.Fatalf("finite verification refused: %v", err)
 	}
-	cases := map[string]func(*Request, []*jobs.ScheduledJob){
-		"watch":   func(r *Request, _ []*jobs.ScheduledJob) { r.Global.Watch = true },
-		"serve":   func(r *Request, _ []*jobs.ScheduledJob) { r.Commands = []string{"build", "serve"} },
-		"run":     func(r *Request, _ []*jobs.ScheduledJob) { r.Commands = []string{"run"} },
-		"qualify": func(r *Request, _ []*jobs.ScheduledJob) { r.Commands = []string{"qualify"} },
-		"format":  func(r *Request, _ []*jobs.ScheduledJob) { r.Commands = []string{"format"} },
-		"dry-run": func(r *Request, _ []*jobs.ScheduledJob) { r.ExecutesUnderDryRun = true },
-		"side effects": func(_ *Request, p []*jobs.ScheduledJob) {
+	cases := map[string]func(*Request, []*scheduler.ScheduledJob){
+		"watch":   func(r *Request, _ []*scheduler.ScheduledJob) { r.Global.Watch = true },
+		"serve":   func(r *Request, _ []*scheduler.ScheduledJob) { r.Commands = []string{"build", "serve"} },
+		"run":     func(r *Request, _ []*scheduler.ScheduledJob) { r.Commands = []string{"run"} },
+		"qualify": func(r *Request, _ []*scheduler.ScheduledJob) { r.Commands = []string{"qualify"} },
+		"format":  func(r *Request, _ []*scheduler.ScheduledJob) { r.Commands = []string{"format"} },
+		"dry-run": func(r *Request, _ []*scheduler.ScheduledJob) { r.ExecutesUnderDryRun = true },
+		"side effects": func(_ *Request, p []*scheduler.ScheduledJob) {
 			p[0].JobDef.Traits.SideEffects = extensionproto.SideEffectsRegistry
 		},
-		"external cwd":     func(_ *Request, p []*jobs.ScheduledJob) { p[0].JobDef.Cwd = hostAbs("/elsewhere") },
-		"declared effects": func(_ *Request, p []*jobs.ScheduledJob) { declareTaskEffect(p[0], extension.EffectRegistry) },
+		"external cwd":     func(_ *Request, p []*scheduler.ScheduledJob) { p[0].JobDef.Cwd = hostAbs("/elsewhere") },
+		"declared effects": func(_ *Request, p []*scheduler.ScheduledJob) { declareTaskEffect(p[0], extension.EffectRegistry) },
 	}
 	for name, mutate := range cases {
 		req, planned := base(), portablePlan()
@@ -235,7 +243,7 @@ func TestPortableRequestFreezesInvocationSelectionAndEnvironment(t *testing.T) {
 
 // declareTaskEffect makes job execute a manifest task that declares effect,
 // with no side effects in its command's traits.
-func declareTaskEffect(job *jobs.ScheduledJob, effect string) {
+func declareTaskEffect(job *scheduler.ScheduledJob, effect string) {
 	job.Step = &extension.PipelineStep{Task: "push"}
 	job.Extension.Tasks = map[string]extension.TaskDefinition{
 		"push": {Kind: "command", Command: "true", Declares: &extension.TaskDeclaration{Effects: []string{effect}}},
@@ -249,7 +257,7 @@ func declareTaskEffect(job *jobs.ScheduledJob, effect string) {
 // publication block whose barrier tasks it waits for.
 func TestValidatePortablePublicationClassifiesByDeclaredEffects(t *testing.T) {
 	t.Parallel()
-	shipping := func(dependsOn ...string) ([]*jobs.ScheduledJob, runner.ExecutionRequest) {
+	shipping := func(dependsOn ...string) ([]*scheduler.ScheduledJob, runner.ExecutionRequest) {
 		planned := portablePlan()
 		ship := portableJob(planned[0].Project, "ship", dependsOn...)
 		ship.JobDef.Traits.SideEffects = extensionproto.SideEffectsCloud
@@ -267,7 +275,7 @@ func TestValidatePortablePublicationClassifiesByDeclaredEffects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := jobs.ValidatePortablePublication(runner.ExecutionRequest{Invocation: runner.InvocationBlock{Commands: []string{"build", "test"}}, Plan: plan}, plain); err != nil {
+	if err := scheduler.ValidatePortablePublication(runner.ExecutionRequest{Invocation: runner.InvocationBlock{Commands: []string{"build", "test"}}, Plan: plan}, plain); err != nil {
 		t.Fatalf("a plan without effects needs no publication block: %v", err)
 	}
 
@@ -275,17 +283,17 @@ func TestValidatePortablePublicationClassifiesByDeclaredEffects(t *testing.T) {
 	if runner.ValidatePublication(request.Invocation, request.Plan, runner.IsPublicationTask) != nil {
 		t.Fatal("the fixture must be invisible to the command-name classifier")
 	}
-	if err := jobs.ValidatePortablePublication(request, planned); err == nil || !strings.Contains(err.Error(), "no invocation.publication") {
+	if err := scheduler.ValidatePortablePublication(request, planned); err == nil || !strings.Contains(err.Error(), "no invocation.publication") {
 		t.Fatalf("a cloud task ran without a publication block: %v", err)
 	}
 	request.Invocation.Publication = &runner.PublicationBlock{Barrier: []string{"build", "test"}}
-	if err := jobs.ValidatePortablePublication(request, planned); err != nil {
+	if err := scheduler.ValidatePortablePublication(request, planned); err != nil {
 		t.Fatalf("a cloud task behind its barrier was refused: %v", err)
 	}
 
 	planned, request = shipping("/app:build")
 	request.Invocation.Publication = &runner.PublicationBlock{Barrier: []string{"build", "test"}}
-	if err := jobs.ValidatePortablePublication(request, planned); err == nil || !strings.Contains(err.Error(), "does not wait for barrier task /app:test~unit") {
+	if err := scheduler.ValidatePortablePublication(request, planned); err == nil || !strings.Contains(err.Error(), "does not wait for barrier task /app:test~unit") {
 		t.Fatalf("a cloud task that skips a barrier task was admitted: %v", err)
 	}
 }
@@ -306,14 +314,14 @@ func TestValidatePortablePublicationEnforcesBothDirections(t *testing.T) {
 	if err := runner.ValidatePublication(blocked.Invocation, blocked.Plan, runner.IsPublicationTask); err != nil {
 		t.Fatalf("the protocol refused a block it cannot classify: %v", err)
 	}
-	if err := jobs.ValidatePortablePublication(blocked, plain); err == nil || !strings.Contains(err.Error(), "no planned task declares registry or cloud effects") {
+	if err := scheduler.ValidatePortablePublication(blocked, plain); err == nil || !strings.Contains(err.Error(), "no planned task declares registry or cloud effects") {
 		t.Fatalf("a publication block over a plan without effects was accepted: %v", err)
 	}
 
 	app := plain[0].Project
 	push := portableJob(app, "build", "/app:lint")
 	declareTaskEffect(push, extension.EffectRegistry)
-	pushing := []*jobs.ScheduledJob{push, portableJob(app, "lint")}
+	pushing := []*scheduler.ScheduledJob{push, portableJob(app, "lint")}
 	modeljobs.AttachIdentities(pushing)
 	pushPlan, err := expectedPlan(pushing)
 	if err != nil {
@@ -323,11 +331,11 @@ func TestValidatePortablePublicationEnforcesBothDirections(t *testing.T) {
 	if err := runner.ValidatePublication(request.Invocation, request.Plan, runner.IsPublicationTask); err != nil {
 		t.Fatalf("the protocol refused a registry write under build: %v", err)
 	}
-	if err := jobs.ValidatePortablePublication(request, pushing); err != nil {
+	if err := scheduler.ValidatePortablePublication(request, pushing); err != nil {
 		t.Fatalf("the engine refused a registry write under build behind its barrier: %v", err)
 	}
 	request.Invocation.Publication = nil
-	if err := jobs.ValidatePortablePublication(request, pushing); err == nil || !strings.Contains(err.Error(), "no invocation.publication") {
+	if err := scheduler.ValidatePortablePublication(request, pushing); err == nil || !strings.Contains(err.Error(), "no invocation.publication") {
 		t.Fatalf("a registry write under build ran without a publication block: %v", err)
 	}
 }

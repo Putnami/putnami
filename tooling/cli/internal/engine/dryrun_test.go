@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -39,12 +40,12 @@ func TestProcessCapabilityAuthorization_PlanOnlyNeverRequiresAGateOrGrant(t *tes
 		t.Run(test.name, func(t *testing.T) {
 			t.Setenv(extensionproto.CloudTokenEnv, "preview-only-runtime-capability")
 			t.Setenv(extensionproto.CloudCapabilityAfterEnv, "missing-gate")
-			ctx := jobs.CaptureProcessCapabilities(context.Background())
+			ctx := scheduler.CaptureProcessCapabilities(context.Background())
 			protected := dryRunFixtureJob("publish", extension.SideEffectsRegistry, false)
 
 			req := test.req()
-			authorization, err := jobs.AuthorizeProcessCapabilities(
-				ctx, []*jobs.ScheduledJob{protected}, !req.Global.Plan && !req.previewsOnly(),
+			authorization, err := scheduler.AuthorizeProcessCapabilities(
+				ctx, []*scheduler.ScheduledJob{protected}, !req.Global.Plan && !req.previewsOnly(),
 			)
 			if err != nil {
 				t.Fatalf("preview capability authorization = %v, want success without validating execution gates", err)
@@ -56,13 +57,13 @@ func TestProcessCapabilityAuthorization_PlanOnlyNeverRequiresAGateOrGrant(t *tes
 	}
 }
 
-func dryRunFixtureJob(name, sideEffects string, declaresDryRun bool, deps ...string) *jobs.ScheduledJob {
+func dryRunFixtureJob(name, sideEffects string, declaresDryRun bool, deps ...string) *scheduler.ScheduledJob {
 	def := &extension.JobDefinition{Name: name, ExtensionName: "@putnami/test"}
 	def.Traits.SideEffects = sideEffects
 	if declaresDryRun {
 		def.Flags = map[string]extension.FlagDefinition{"dry-run": {}}
 	}
-	return &jobs.ScheduledJob{
+	return &scheduler.ScheduledJob{
 		Project:   &workspace.Project{ID: "/p", Name: "p", Path: "p"},
 		Extension: &extension.ExtensionDescription{Name: "@putnami/test"},
 		JobDef:    def,
@@ -89,7 +90,7 @@ func TestDropUndryableSideEffectJobs_ExcludesUndeclaredSideEffects(t *testing.T)
 	dependent := dryRunFixtureJob("verify", "", false, undeclared.Key())
 
 	kept := dropUndryableSideEffectJobs(executingDryRunRequest(),
-		[]*jobs.ScheduledJob{declared, undeclared, local, dependent})
+		[]*scheduler.ScheduledJob{declared, undeclared, local, dependent})
 
 	names := make(map[string]bool, len(kept))
 	for _, job := range kept {
@@ -116,13 +117,13 @@ func TestDropUndryableSideEffectJobs_ExcludesAPublishWhoseTraitsNameNoSideEffect
 	ext := extension.Resolve(&extension.Manifest{Name: "@acme/release", Commands: map[string]extension.CommandDefinition{
 		"publish": {Traits: &extension.CommandTraits{InjectPublishChannels: true}},
 	}}, "/ext")
-	publisher := &jobs.ScheduledJob{
+	publisher := &scheduler.ScheduledJob{
 		Project:   &workspace.Project{ID: "/p", Name: "p", Path: "p"},
 		Extension: ext,
 		JobDef:    ext.Jobs["publish"],
 	}
 
-	if kept := dropUndryableSideEffectJobs(executingDryRunRequest(), []*jobs.ScheduledJob{publisher}); len(kept) != 0 {
+	if kept := dropUndryableSideEffectJobs(executingDryRunRequest(), []*scheduler.ScheduledJob{publisher}); len(kept) != 0 {
 		t.Fatalf("kept = %v, want the publish excluded from an executing dry-run", kept)
 	}
 }
@@ -139,7 +140,7 @@ func TestDropUndryableSideEffectJobs_KeepsPipelineStepsWithCommandDryRunFlag(t *
 		},
 	}
 
-	kept := dropUndryableSideEffectJobs(executingDryRunRequest(), []*jobs.ScheduledJob{publisher})
+	kept := dropUndryableSideEffectJobs(executingDryRunRequest(), []*scheduler.ScheduledJob{publisher})
 	if len(kept) != 1 || kept[0] != publisher {
 		t.Fatalf("kept = %#v, want pipeline publisher kept when its command declares --dry-run", kept)
 	}
@@ -153,7 +154,7 @@ func TestDropUndryableSideEffectJobs_InertOutsideExecutingDryRun(t *testing.T) {
 	// Not executing under dry-run at all (ordinary run).
 	plain := &Request{}
 	plain.Global.Quiet = true
-	if kept := dropUndryableSideEffectJobs(plain, []*jobs.ScheduledJob{undeclared}); len(kept) != 1 {
+	if kept := dropUndryableSideEffectJobs(plain, []*scheduler.ScheduledJob{undeclared}); len(kept) != 1 {
 		t.Fatal("an ordinary run must not be filtered")
 	}
 
@@ -161,7 +162,7 @@ func TestDropUndryableSideEffectJobs_InertOutsideExecutingDryRun(t *testing.T) {
 	// there, but no dry-run param was synthesized — the job must run.
 	alias := &Request{ExecutesUnderDryRun: true}
 	alias.Global.Quiet = true
-	if kept := dropUndryableSideEffectJobs(alias, []*jobs.ScheduledJob{undeclared}); len(kept) != 1 {
+	if kept := dropUndryableSideEffectJobs(alias, []*scheduler.ScheduledJob{undeclared}); len(kept) != 1 {
 		t.Fatal("an alias run without --dry-run must not be filtered")
 	}
 
@@ -171,7 +172,7 @@ func TestDropUndryableSideEffectJobs_InertOutsideExecutingDryRun(t *testing.T) {
 	// (PlanExtension marks the alias path).
 	aliasDryRun := executingDryRunRequest()
 	aliasDryRun.PlanExtension = &PlanExtensionSelection{Name: "@putnami/test", Command: "deploy"}
-	if kept := dropUndryableSideEffectJobs(aliasDryRun, []*jobs.ScheduledJob{undeclared}); len(kept) != 1 {
+	if kept := dropUndryableSideEffectJobs(aliasDryRun, []*scheduler.ScheduledJob{undeclared}); len(kept) != 1 {
 		t.Fatal("an alias dry-run must not be filtered: the alias gates the param on its own flag surface")
 	}
 }

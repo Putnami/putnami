@@ -28,7 +28,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/credentialprovider"
 	"go.putnami.dev/tooling/cli/internal/credentialprovider/providertest"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -316,7 +316,7 @@ func TestBoundRequestPublishesThroughThePublicationProvider(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	versions, err := jobs.BuildRunVersions(ws, nil)
+	versions, err := scheduler.BuildRunVersions(ws, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

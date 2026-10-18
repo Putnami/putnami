@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	registry "go.putnami.dev/protocol/registry"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
 // ReadCredential returns the broker's read credential, whatever hosts it
@@ -31,5 +31,5 @@ func (b *Broker) InstallJobRead() (restore func()) {
 	if !b.Enabled(registry.PurposeRead) {
 		return func() {}
 	}
-	return jobs.InstallJobReadCredential(b.ReadCredential)
+	return scheduler.InstallJobReadCredential(b.ReadCredential)
 }

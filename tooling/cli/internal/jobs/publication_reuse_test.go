@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	modelextension "go.putnami.dev/cli/model/extension"
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/credentialprovider/providertest"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -44,7 +45,7 @@ func TestCachedPublicationJobThatPackedNothingFailsTheRelease(t *testing.T) {
 	h.provider, h.session = newSessionPublication(t, providertest.Config{})
 	planned, internal = h.plan(nil, fixedAncestry{testRevision}, nil)
 	warm := h.execute(context.Background(), planned, internal, nil)
-	if result := warm[publish.Key()]; result == nil || result.ReuseKind() != ReuseLocalCache {
+	if result := warm[publish.Key()]; result == nil || result.ReuseKind() != jobmodel.ReuseLocalCache {
 		t.Fatalf("warm publication job was not served from cache: %s", resultMessage(result))
 	}
 	if upload := warm[h.uploadKey(publish)]; upload == nil || len(upload.Events) != 0 {

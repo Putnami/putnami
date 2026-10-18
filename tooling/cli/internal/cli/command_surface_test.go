@@ -10,7 +10,7 @@ import (
 
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -84,12 +84,12 @@ func TestTheCLIDeliversTheWinningCommandSurfaceUnderTheCamelCaseKey(t *testing.T
 		if len(diagnostics) > 0 {
 			t.Fatalf("%s: %v", testCase.name, diagnostics)
 		}
-		job := &jobs.ScheduledJob{
+		job := &scheduler.ScheduledJob{
 			Project:   &workspace.Project{Name: "lib", Path: "lib", Config: config},
 			Extension: &extension.ExtensionDescription{Name: "@putnami/go", Path: "go/extension"},
 			JobDef:    &extension.JobDefinition{Name: "validate", ExtensionName: "@putnami/go"},
 		}
-		ctx := jobs.BuildJobContext(&workspace.Workspace{Name: "ws", Root: "/ws"}, job, nil, nil, nil)
+		ctx := scheduler.BuildJobContext(&workspace.Workspace{Name: "ws", Root: "/ws"}, job, nil, nil, nil)
 		if got := ctx.Params["commandSurface"]; got != "b.json" {
 			t.Errorf("%s: commandSurface = %v, want b.json", testCase.name, got)
 		}

@@ -21,7 +21,7 @@ import (
 	providerext "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hooks"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/launch"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -594,7 +594,7 @@ func upgradeRestartEnv(flags UpgradeFlags) []string {
 	if len(flags.Providers) == 0 {
 		return nil
 	}
-	return []string{jobs.ProvidersEnv + "=" + strings.Join(flags.Providers, ",")}
+	return []string{scheduler.ProvidersEnv + "=" + strings.Join(flags.Providers, ",")}
 }
 
 func directUpgradeCommand(binaryPath string, env, args []string) string {

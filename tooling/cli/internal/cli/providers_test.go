@@ -20,7 +20,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/credentialprovider"
 	"go.putnami.dev/tooling/cli/internal/env"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -181,13 +181,13 @@ func TestInstallCredentialProvidersSourcesTheFetchJob(t *testing.T) {
 			restoreCredential()
 			t.Fatalf("hosted %t: installCredentialProviders = %v; want the broker installed", bearer != "", err)
 		}
-		_, err = jobs.ReadJobCredential(context.Background())
+		_, err = scheduler.ReadJobCredential(context.Background())
 		restore()
 		restoreCredential()
 		if !errors.Is(err, extension.ErrProviderAmbiguous) {
 			t.Fatalf("hosted %t, installed: err = %v; want the broker's answer, ErrProviderAmbiguous", bearer != "", err)
 		}
-		if credential, err := jobs.ReadJobCredential(context.Background()); credential != nil || err != nil {
+		if credential, err := scheduler.ReadJobCredential(context.Background()); credential != nil || err != nil {
 			t.Fatalf("hosted %t, restored: %v, %v; want no source", bearer != "", credential, err)
 		}
 	}
@@ -221,7 +221,7 @@ func TestInstallCredentialProvidersSourcesTheFetchJob(t *testing.T) {
 		if !c.refused(err) {
 			t.Errorf("%s: installCredentialProviders = %v; want the holder refusal", c.name, err)
 		}
-		if credential, err := jobs.ReadJobCredential(context.Background()); credential != nil || err != nil {
+		if credential, err := scheduler.ReadJobCredential(context.Background()); credential != nil || err != nil {
 			t.Errorf("%s: a refused provider left a source that answers %v, %v", c.name, credential, err)
 		}
 	}

@@ -11,7 +11,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/sessionreporter"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -141,7 +141,7 @@ func reportingResolver(ctx context.Context, capability sessionreporter.Capabilit
 			if job == nil || strings.TrimSpace(job.Command) == "" || len(job.PipelineSteps) != 1 {
 				return sessionreporter.LaunchSpec{}, fmt.Errorf("reporter must resolve to one executable command")
 			}
-			launch, err := jobs.PrepareProviderLaunch(setupCtx, ws.Root, ext, capability.Name)
+			launch, err := scheduler.PrepareProviderLaunch(setupCtx, ws.Root, ext, capability.Name)
 			if err != nil {
 				return sessionreporter.LaunchSpec{}, err
 			}

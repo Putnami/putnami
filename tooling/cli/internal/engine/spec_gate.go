@@ -12,8 +12,8 @@ import (
 	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/specgate"
 )
 
@@ -62,16 +62,16 @@ type specGateOutcome struct {
 // producers names the selected projects a criteria-projection producer applies
 // to. It may be nil, and then a session that projected nothing records
 // nothing.
-func specGateFinalizer(req *Request, ws *workspace.Workspace, planned []*jobs.ScheduledJob,
+func specGateFinalizer(req *Request, ws *workspace.Workspace, planned []*scheduler.ScheduledJob,
 	recovery specgate.ObservationRecovery, producers specgate.ProjectionProducers,
-	outcome *specGateOutcome) func(map[string]*jobs.JobResult) {
+	outcome *specGateOutcome) func(map[string]*scheduler.JobResult) {
 	if ws == nil || outcome == nil || !slices.Contains(req.Commands, "test") {
 		return nil
 	}
 	if !specgate.GateActive(ws) {
 		return nil
 	}
-	return func(results map[string]*jobs.JobResult) {
+	return func(results map[string]*scheduler.JobResult) {
 		record, err := specgate.Collect(ws, planned, results, time.Now(), recovery, producers)
 		if err != nil {
 			// A collection the workspace's own config makes impossible was
@@ -104,10 +104,10 @@ func specGateFinalizer(req *Request, ws *workspace.Workspace, planned []*jobs.Sc
 			// The coded diagnostic reaches the machine records (session.json
 			// run.failures, report.json); the terminal keeps printing the
 			// error message alone.
-			results[projectID+":"+specGateResultTask] = &jobs.JobResult{
+			results[projectID+":"+specGateResultTask] = &scheduler.JobResult{
 				Status: "failed",
-				Error:  &jobs.JobError{Message: sanction.Message},
-				Canonical: &jobs.TaskResult{Diagnostics: []jobs.TaskDiagnostic{{
+				Error:  &scheduler.JobError{Message: sanction.Message},
+				Canonical: &scheduler.TaskResult{Diagnostics: []scheduler.TaskDiagnostic{{
 					Severity: "error", Code: sanction.Code, Message: sanction.Message,
 				}}},
 			}
@@ -189,7 +189,7 @@ func (plan *validateProducerPlan) ApplicableProjects() (map[string]bool, error) 
 	}
 	applicable := make(map[string]bool)
 	for _, job := range planned {
-		if job != nil && job.Project != nil && selected[job.Project.ID] && jobs.ProducesSpecCriteriaProjection(job) {
+		if job != nil && job.Project != nil && selected[job.Project.ID] && scheduler.ProducesSpecCriteriaProjection(job) {
 			applicable[job.Project.ID] = true
 		}
 	}

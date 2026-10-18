@@ -25,7 +25,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hostrpc"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
 // The host RPC channel of an interactive extension subcommand, end to end: the
@@ -109,7 +109,7 @@ func hostRPCProviderEnv(t *testing.T, root string) []string {
 			"provider": {ExtensionName: "@test/hostrpc-provider", Name: "provider", Command: executable},
 		},
 	}
-	launch, err := jobs.PrepareProviderLaunch(t.Context(), root, provider, "provider")
+	launch, err := scheduler.PrepareProviderLaunch(t.Context(), root, provider, "provider")
 	if err != nil {
 		t.Fatal(err)
 	}

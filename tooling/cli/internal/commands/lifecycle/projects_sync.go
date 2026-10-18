@@ -15,7 +15,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/jsonutil"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -483,7 +483,7 @@ func syncRuntimeResolver(ctx context.Context, wsRoot string, ext *extension.Exte
 		if err != nil {
 			return "", err
 		}
-		if err := jobs.SynchronizeExtensionRuntimes(ctx, ws,
+		if err := scheduler.SynchronizeExtensionRuntimes(ctx, ws,
 			[]*extension.ExtensionDescription{ext}, nil); err != nil {
 			return "", err
 		}

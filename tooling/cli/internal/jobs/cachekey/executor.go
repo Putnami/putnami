@@ -234,7 +234,7 @@ func TaskIsVersionAware(job *jobmodel.ScheduledJob) bool {
 // TaskIsSourceBound reports whether the job's task declares that its outputs
 // embed the source binding of its own project (cache.sourceBound). The binding
 // is NOT a key input: it is part of the entry's store key instead
-// (SourceBoundEntryKey, jobs/source_bound.go). Folding it into the key
+// (SourceBoundEntryKey, jobs/scheduler/source_bound.go). Folding it into the key
 // would move the key of every dependent on an edit, a test file for one, that
 // none of them reads.
 func TaskIsSourceBound(job *jobmodel.ScheduledJob) bool {

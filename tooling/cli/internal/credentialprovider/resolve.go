@@ -8,7 +8,7 @@ import (
 
 	registry "go.putnami.dev/protocol/registry"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -16,7 +16,7 @@ import (
 // CLI reads it once per process and removes it from its own environment, so
 // no process it starts inherits the choice; the provider launch strips it
 // too.
-const ProvidersEnv = jobs.ProvidersEnv
+const ProvidersEnv = scheduler.ProvidersEnv
 
 // New returns the broker for the purposes providers enable, served by the one
 // loaded extension that declares registry.CredentialProviderCommand. source
@@ -55,7 +55,7 @@ func New(workspaceRoot string, extensions []*extension.ExtensionDescription, pro
 		if ext == nil {
 			return nil, fmt.Errorf("credential provider extension %q was not loaded", provider.ExtensionName)
 		}
-		launch, err := jobs.PrepareProviderLaunch(ctx, workspaceRoot, ext, provider.Command)
+		launch, err := scheduler.PrepareProviderLaunch(ctx, workspaceRoot, ext, provider.Command)
 		if err != nil {
 			return nil, fmt.Errorf("prepare credential provider %s: %w", provider.ExtensionName, err)
 		}

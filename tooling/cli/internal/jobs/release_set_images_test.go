@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	distribution "go.putnami.dev/protocol/distribution"
 	"go.putnami.dev/sdk/extension/releaseset"
 )
@@ -69,7 +70,7 @@ func TestFinalizerPreservesConfigProducerRouteWithoutCoordinateInference(t *test
 		releaseset.MemberKey(image.Ecosystem, image.Coordinate):   {projectID: image.ProjectID, publisher: "@putnami/cloud", publishCommand: "publish", publishStep: "cloud-image"},
 		releaseset.MemberKey(config.Ecosystem, config.Coordinate): {projectID: config.ProjectID, publisher: "@putnami/cloud", publishCommand: "publish", publishStep: "cloud-publish-config"},
 	}}
-	results := map[string]*JobResult{"image": {Status: "success", Events: []RawJobEvent{publishedMemberEvent(image, digestFor('b'))}}, "config": {Status: "success", Events: []RawJobEvent{publishedMemberEvent(config, digestFor('c'))}}}
+	results := map[string]*jobmodel.JobResult{"image": {Status: "success", Events: []jobmodel.RawJobEvent{publishedMemberEvent(image, digestFor('b'))}}, "config": {Status: "success", Events: []jobmodel.RawJobEvent{publishedMemberEvent(config, digestFor('c'))}}}
 	run.Finalizer(t.Context())(results)
 	if result := results[releaseSetResultKey]; result == nil || result.Status != "success" {
 		t.Fatalf("result=%+v", result)

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	distribution "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
 	protocoljob "go.putnami.dev/protocol/job"
@@ -156,7 +157,7 @@ func TestADeploymentMemberIsClassifiedByItsPackageStep(t *testing.T) {
 	assertPlanParses(t, run.plan)
 
 	// One publish job reports both members of the project.
-	results := map[string]*JobResult{image.ProjectID + ":publish": {Status: "success", Events: []RawJobEvent{
+	results := map[string]*jobmodel.JobResult{image.ProjectID + ":publish": {Status: "success", Events: []jobmodel.RawJobEvent{
 		publishedMemberEvent(image, digestFor('d')),
 		publishedMemberEvent(declaration, digestFor('e')),
 	}}}
@@ -270,7 +271,7 @@ func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing
 	memberKey := releaseset.MemberKey("put", "putnami/app-deployment")
 	members := map[string]*workspace.Project{memberKey: app}
 
-	plan := func(params extension.ParamMap) []*ScheduledJob {
+	plan := func(params extension.ParamMap) []*jobmodel.ScheduledJob {
 		t.Helper()
 		planned, err := planner.Plan(ws, []string{"package"}, []*workspace.Project{app},
 			[]*extension.ExtensionDescription{goExtension}, params, nil, nil)
@@ -281,7 +282,7 @@ func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing
 	}
 	params := extension.ParamMap{"deployment": true}
 	planned := plan(params)
-	var step *ScheduledJob
+	var step *jobmodel.ScheduledJob
 	for _, job := range planned {
 		if job.Project != nil && job.Project.ID == app.ID && job.StepID() == "deployment" {
 			step = job

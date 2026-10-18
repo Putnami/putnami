@@ -490,7 +490,13 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // ceiling keeps lean. It imports only the wire contract, the SDK's scratch and
 // ownerperm packages and internal/runcredential, a leaf. It adds no vertical
 // and no engine stage.
-const internalPackageCountCeiling = 77
+//
+// RAISED 77 → 78: the scheduler, the runner and the cache use move to
+// internal/jobs/scheduler. The release-set and publication code that stays in
+// internal/jobs imports it, and it never imports internal/jobs, so a change to
+// a release set no longer reruns the scheduler's tests. It adds no vertical
+// and no engine stage.
+const internalPackageCountCeiling = 78
 
 func TestInternalPackageCountCeiling(t *testing.T) {
 	t.Parallel()

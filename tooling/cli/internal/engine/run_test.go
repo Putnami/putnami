@@ -28,8 +28,8 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	internalgit "go.putnami.dev/tooling/cli/internal/git"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/profiler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
@@ -105,7 +105,7 @@ type executeFixture struct {
 	req      *Request
 	project  *workspace.Project
 	ext      *extension.ExtensionDescription
-	planned  []*jobs.ScheduledJob
+	planned  []*scheduler.ScheduledJob
 	procPath string // resolved absolute path to the binary the job will run
 }
 
@@ -135,7 +135,7 @@ func newExecuteFixture(t *testing.T, opts ...func(*executeFixture)) *executeFixt
 		Path: "/ext/test",
 	}
 
-	job := &jobs.ScheduledJob{
+	job := &scheduler.ScheduledJob{
 		Project:   proj,
 		Extension: ext,
 		JobDef: &extension.JobDefinition{
@@ -154,7 +154,7 @@ func newExecuteFixture(t *testing.T, opts ...func(*executeFixture)) *executeFixt
 		req:      &Request{WorkspaceRoot: wsRoot, Config: cfg, Commands: []string{"build"}},
 		project:  proj,
 		ext:      ext,
-		planned:  []*jobs.ScheduledJob{job},
+		planned:  []*scheduler.ScheduledJob{job},
 		procPath: procPath,
 	}
 	for _, opt := range opts {
@@ -828,10 +828,10 @@ func TestExecute_SuccessfulRun(t *testing.T) {
 func TestExecute_ResultFinalizerFailureIncludedInJSONLStream(t *testing.T) {
 	f := newExecuteFixture(t)
 	f.req.Global.Output = "jsonl"
-	finalize := func(results map[string]*jobs.JobResult) {
-		results[unpublishedArchiveFailureKey] = &jobs.JobResult{
+	finalize := func(results map[string]*scheduler.JobResult) {
+		results[unpublishedArchiveFailureKey] = &scheduler.JobResult{
 			Status: "failed",
-			Error:  &jobs.JobError{Message: "archive publisher missing"},
+			Error:  &scheduler.JobError{Message: "archive publisher missing"},
 		}
 	}
 
@@ -1086,15 +1086,15 @@ func TestRecordProfilerSessionEvent_Coalesced(t *testing.T) {
 	// Built through the canonical projection, so the trace is driven by the same
 	// typed value the scheduler hands the handler — not by a hand-written payload
 	// that could disagree with it.
-	task := jobs.TaskResultOf(nil, &jobs.JobResult{
+	task := scheduler.TaskResultOf(nil, &scheduler.JobResult{
 		Status:    "success",
 		Coalesced: true,
 		Duration:  125 * time.Millisecond,
 	})
-	recordProfilerSessionEvent(p, jobs.SessionRecord{
+	recordProfilerSessionEvent(p, scheduler.SessionRecord{
 		JobKey: "/proj:build",
-		Type:   jobs.SessionRecordJobEnd,
-		Data:   jobs.JobEndPayload(&task, 0),
+		Type:   scheduler.SessionRecordJobEnd,
+		Data:   scheduler.JobEndPayload(&task, 0),
 		Task:   &task,
 	})
 
@@ -1112,7 +1112,7 @@ func TestRecordProfilerSessionEvent_Coalesced(t *testing.T) {
 	}
 	var sawOutcome, sawInstant bool
 	for _, event := range events {
-		if event.Name == "/proj:build" && event.Phase == "E" && event.Args["status"] == jobs.JobOutcomeCoalesced {
+		if event.Name == "/proj:build" && event.Phase == "E" && event.Args["status"] == scheduler.JobOutcomeCoalesced {
 			sawOutcome = true
 		}
 		if event.Name == "cache-coalesced" && event.Category == "cache" && event.Phase == "i" {

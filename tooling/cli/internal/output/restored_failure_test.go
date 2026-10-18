@@ -10,7 +10,7 @@ import (
 )
 
 // restoredDriftFailure is a cache hit whose declared output drifted from the
-// checkout it landed in (jobs/task_drift.go): the entry held the successful
+// checkout it landed in (jobs/scheduler/task_drift.go): the entry held the successful
 // run, the verdict is this run's.
 func restoredDriftFailure() *jobs.JobResult {
 	result := &jobs.JobResult{

@@ -16,6 +16,7 @@ import (
 	protocoljob "go.putnami.dev/protocol/job"
 	runner "go.putnami.dev/protocol/runner"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
 // The executing side of a bound request that carries no
@@ -121,9 +122,9 @@ func TestRefusesUnauthorizedPublicationClassifiesByEffects(t *testing.T) {
 	modeljobs.AttachIdentities(shipping)
 	push := portableJob(app, "build")
 	declareTaskEffect(push, extension.EffectRegistry)
-	pushing := []*jobs.ScheduledJob{push}
+	pushing := []*scheduler.ScheduledJob{push}
 	modeljobs.AttachIdentities(pushing)
-	publishing := []*jobs.ScheduledJob{portableJob(app, "publish")}
+	publishing := []*scheduler.ScheduledJob{portableJob(app, "publish")}
 	modeljobs.AttachIdentities(publishing)
 	tagged := jobs.ReleaseSetOptions{Commands: []string{"publish"}, Tagged: true}
 
@@ -136,7 +137,7 @@ func TestRefusesUnauthorizedPublicationClassifiesByEffects(t *testing.T) {
 		name    string
 		req     *Request
 		options jobs.ReleaseSetOptions
-		planned []*jobs.ScheduledJob
+		planned []*scheduler.ScheduledJob
 		names   string
 	}{
 		{"a gate plan", request(nil), jobs.ReleaseSetOptions{}, plain, ""},

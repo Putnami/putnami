@@ -11,8 +11,8 @@ import (
 
 	proto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -92,7 +92,7 @@ func extensionToolRuntime(
 	if err != nil {
 		return "", fmt.Errorf("load workspace: %w", err)
 	}
-	if err := jobs.SynchronizeExtensionRuntimes(
+	if err := scheduler.SynchronizeExtensionRuntimes(
 		ctx, ws, []*extension.ExtensionDescription{ext}, nil); err != nil {
 		return "", fmt.Errorf("prepare the %s runtime for tool %s: %w", ext.Name, candidate.name, err)
 	}

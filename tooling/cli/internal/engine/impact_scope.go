@@ -8,7 +8,7 @@ import (
 	modelext "go.putnami.dev/cli/model/extension"
 	modeljobs "go.putnami.dev/cli/model/jobs"
 	extensionproto "go.putnami.dev/protocol/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -57,18 +57,18 @@ const extensionScopeSeparator = "#"
 // Every other job of a task-scoped project is dropped: no action of the project
 // that the diff reaches runs that task. The order of the plan is preserved, and
 // a new slice is returned for the reason dedupePlanByExtension states.
-func narrowToTaskScopes(ws *workspace.Workspace, planned []*jobs.ScheduledJob, scopes map[string][]string) []*jobs.ScheduledJob {
+func narrowToTaskScopes(ws *workspace.Workspace, planned []*scheduler.ScheduledJob, scopes map[string][]string) []*scheduler.ScheduledJob {
 	if len(scopes) == 0 {
 		return planned
 	}
-	byKey := make(map[string]*jobs.ScheduledJob, len(planned))
+	byKey := make(map[string]*scheduler.ScheduledJob, len(planned))
 	for _, job := range planned {
 		if job != nil && job.Project != nil && job.JobDef != nil {
 			byKey[job.Key()] = job
 		}
 	}
 	kept := make(map[string]bool, len(planned))
-	var frontier []*jobs.ScheduledJob
+	var frontier []*scheduler.ScheduledJob
 	judged := make(map[string]bool)
 	for _, job := range planned {
 		if job == nil || job.Project == nil || job.JobDef == nil {
@@ -85,7 +85,7 @@ func narrowToTaskScopes(ws *workspace.Workspace, planned []*jobs.ScheduledJob, s
 		if !scoped || sideEffects || neverNarrowedCommands[command] || jobInScope(ws, job, scope) {
 			kept[job.Key()] = true
 			frontier = append(frontier, job)
-			if scoped && jobs.ProducesSpecCriteriaProjection(job) {
+			if scoped && scheduler.ProducesSpecCriteriaProjection(job) {
 				judged[job.Project.ID] = true
 			}
 		}
@@ -115,7 +115,7 @@ func narrowToTaskScopes(ws *workspace.Workspace, planned []*jobs.ScheduledJob, s
 			}
 		}
 	}
-	narrowed := make([]*jobs.ScheduledJob, 0, len(kept))
+	narrowed := make([]*scheduler.ScheduledJob, 0, len(kept))
 	for _, job := range planned {
 		if job == nil || job.Project == nil || job.JobDef == nil || kept[job.Key()] {
 			narrowed = append(narrowed, job)
@@ -137,7 +137,7 @@ func narrowToTaskScopes(ws *workspace.Workspace, planned []*jobs.ScheduledJob, s
 // the scope a selection computed without a task index produces (ADR 0042,
 // ImpactTrace.Scopes). Matching it is what keeps such a selection narrowing
 // what it always narrowed.
-func jobInScope(ws *workspace.Workspace, job *jobs.ScheduledJob, scope []string) bool {
+func jobInScope(ws *workspace.Workspace, job *scheduler.ScheduledJob, scope []string) bool {
 	task := jobTaskScope(job)
 	for _, entry := range scope {
 		extensionID, taskEntry, qualified := strings.Cut(entry, extensionScopeSeparator)
@@ -162,7 +162,7 @@ func jobInScope(ws *workspace.Workspace, job *jobs.ScheduledJob, scope []string)
 
 // jobTaskScope is a planned job's task scope: `<command>~<step>`, or the
 // command alone for a job that is not an expanded pipeline step.
-func jobTaskScope(job *jobs.ScheduledJob) string {
+func jobTaskScope(job *scheduler.ScheduledJob) string {
 	command := job.CommandName()
 	step := job.StepID()
 	if step == "" {
@@ -177,7 +177,7 @@ func jobTaskScope(job *jobs.ScheduledJob) string {
 // (internal/extension discovery), and a pinned build names the project whose
 // manifest it replaces; names are not compared, because a registry-installed
 // extension can share a name with a project.
-func extensionProjectIs(ws *workspace.Workspace, job *jobs.ScheduledJob, projectID string) bool {
+func extensionProjectIs(ws *workspace.Workspace, job *scheduler.ScheduledJob, projectID string) bool {
 	if job.Extension == nil {
 		return false
 	}

@@ -14,7 +14,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
 func TestAppRun_InternalReleaseSetProviderCapabilityIsBoundToResolvedProvider(t *testing.T) {
@@ -39,7 +39,7 @@ func TestAppRun_InternalReleaseSetProviderCapabilityIsBoundToResolvedProvider(t 
 	// The parent coordinator resolved this exact reserved provider before it
 	// launched the nested CLI. The workspace alias is deliberately hostile: the
 	// internal invocation must parse the fixed provider argv without repo aliases.
-	t.Setenv(jobs.InternalReleaseSetProviderCapabilityEnv,
+	t.Setenv(scheduler.InternalReleaseSetProviderCapabilityEnv,
 		`{"extensionName":"@local/release-set-provider","version":"0.1.0","command":"cloud-release-set"}`)
 	t.Setenv(extensionproto.CloudTokenEnv, token)
 	t.Setenv(extensionproto.CloudCapabilityAfterEnv, "")
@@ -74,7 +74,7 @@ func TestAppRun_InternalReleaseSetProviderCapabilityIsBoundToResolvedProvider(t 
 		t.Fatalf("stale bootstrap hook ran during internal provider dispatch: %q (err=%v)", data, err)
 	}
 	for _, name := range []string{
-		jobs.InternalReleaseSetProviderCapabilityEnv,
+		scheduler.InternalReleaseSetProviderCapabilityEnv,
 		extensionproto.CloudTokenEnv,
 		extensionproto.CloudCapabilityAfterEnv,
 		runtimeproto.ReleaseSetPublishedImagesFileEnv,

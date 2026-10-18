@@ -11,7 +11,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -69,7 +69,7 @@ func extensionsPrepare(ctx context.Context, wsRoot string, cfg *wsproto.Config, 
 			built = append(built, ext)
 		}
 	}
-	if err := jobs.PrepareSourceBuiltRuntimes(ctx, ws, built); err != nil {
+	if err := scheduler.PrepareSourceBuiltRuntimes(ctx, ws, built); err != nil {
 		return fmt.Errorf("prepare extension runtimes: %w", err)
 	}
 

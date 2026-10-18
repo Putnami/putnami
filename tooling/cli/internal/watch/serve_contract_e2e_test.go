@@ -16,7 +16,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/proctree"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -225,8 +225,8 @@ type readinessRecorder struct {
 	v1Ready    int
 }
 
-func (r *readinessRecorder) observe(event jobs.RawJobEvent) {
-	if event.Type != jobs.EventTypeReady {
+func (r *readinessRecorder) observe(event scheduler.RawJobEvent) {
+	if event.Type != scheduler.EventTypeReady {
 		return
 	}
 	r.mu.Lock()
@@ -277,14 +277,14 @@ func TestServeLoop_TypedReadinessFromARealJobArmsAndReArms(t *testing.T) {
 	ws.Name = "serve-e2e"
 
 	recorder := &readinessRecorder{}
-	runIteration := func(ctx context.Context, _ []*workspace.Project, sink jobs.Renderer) IterationResult {
+	runIteration := func(ctx context.Context, _ []*workspace.Project, sink scheduler.Renderer) IterationResult {
 		recorder.startIteration()
-		job := &jobs.ScheduledJob{
+		job := &scheduler.ScheduledJob{
 			Project:   project,
 			Extension: desc,
 			JobDef:    desc.Jobs["serve"],
 		}
-		result, err := jobs.RunJob(ctx, ws, job, nil, nil, nil, func(event jobs.RawJobEvent) {
+		result, err := scheduler.RunJob(ctx, ws, job, nil, nil, nil, func(event scheduler.RawJobEvent) {
 			recorder.observe(event)
 			sink.JobEvent(job, event)
 		})
@@ -414,7 +414,7 @@ func TestServeFixtureAnswersTheAdvertisedProtocolVersion(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	readyCh := make(chan jobs.RawJobEvent, 1)
+	readyCh := make(chan scheduler.RawJobEvent, 1)
 	jobCtx, stop := context.WithCancel(ctx)
 	defer stop()
 	runDone := make(chan struct{})
@@ -432,12 +432,12 @@ func TestServeFixtureAnswersTheAdvertisedProtocolVersion(t *testing.T) {
 	}()
 	go func() {
 		defer close(runDone)
-		_, _ = jobs.RunJob(jobCtx, ws, &jobs.ScheduledJob{
+		_, _ = scheduler.RunJob(jobCtx, ws, &scheduler.ScheduledJob{
 			Project:   project,
 			Extension: desc,
 			JobDef:    desc.Jobs["serve"],
-		}, nil, nil, nil, func(event jobs.RawJobEvent) {
-			if event.Type == jobs.EventTypeReady {
+		}, nil, nil, nil, func(event scheduler.RawJobEvent) {
+			if event.Type == scheduler.EventTypeReady {
 				select {
 				case readyCh <- event:
 				default:

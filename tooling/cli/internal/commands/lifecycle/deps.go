@@ -23,7 +23,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -211,7 +211,7 @@ func (e LifecycleEnv) fetchBeforeRepositoryCode(ctx context.Context, wsRoot stri
 	}
 	// Only the jobs of this run receive the job credential of a hosted run;
 	// every one of them must.
-	if err := depsFetch(jobs.WithDependencyFetch(ctx), wsRoot, cfg, filterTag, excludeTag, e); err != nil {
+	if err := depsFetch(scheduler.WithDependencyFetch(ctx), wsRoot, cfg, filterTag, excludeTag, e); err != nil {
 		return err
 	}
 	if e.BeforeRepositoryCode != nil {
@@ -219,7 +219,7 @@ func (e LifecycleEnv) fetchBeforeRepositoryCode(ctx context.Context, wsRoot stri
 			return err
 		}
 	}
-	return depsFetch(jobs.WithPathExtensionFetch(ctx), wsRoot, cfg, filterTag, excludeTag, e)
+	return depsFetch(scheduler.WithPathExtensionFetch(ctx), wsRoot, cfg, filterTag, excludeTag, e)
 }
 
 // DepsInstall runs the "workspace-install" task from all extensions that

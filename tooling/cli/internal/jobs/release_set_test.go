@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	modelextension "go.putnami.dev/cli/model/extension"
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
 	ciproto "go.putnami.dev/protocol/ci"
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -36,6 +37,7 @@ import (
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
 const testRevision = "8d5edb7513d93b9165ba2a7cb48466d022fc3f63"
@@ -299,7 +301,7 @@ func TestPrepareReleaseSetNoImpactConfirmsHeadThroughOneRelease(t *testing.T) {
 	if provider.resolveCalls != 1 {
 		t.Fatalf("no-impact resolve calls = %d, want exactly one", provider.resolveCalls)
 	}
-	results := map[string]*JobResult{}
+	results := map[string]*jobmodel.JobResult{}
 	run.Finalizer(context.Background())(results)
 	result := results[releaseSetResultKey]
 	if result == nil || result.Status != "success" {
@@ -346,7 +348,7 @@ func TestPrepareReleaseSetDryRunDoesNotClaimPublication(t *testing.T) {
 	if err != nil || run == nil || !run.NoImpact() || !run.dryRun {
 		t.Fatalf("dry-run preparation = %+v, %v", run, err)
 	}
-	results := map[string]*JobResult{}
+	results := map[string]*jobmodel.JobResult{}
 	run.Finalizer(context.Background())(results)
 	if results[releaseSetResultKey] != nil || provider.releaseCalls != 0 {
 		t.Fatalf("dry-run claimed publication: result=%+v provider=%+v", results[releaseSetResultKey], provider)
@@ -371,7 +373,7 @@ func TestReleaseSetProtocolClientReceivesCapturedRunnerBearerWithoutAfter(t *tes
 	if got := envValues(client.Env, extensionproto.CloudTokenEnv); len(got) != 1 || got[0] != token {
 		t.Fatalf("nested CLI bearer transport = %q, want exact captured bearer", got)
 	}
-	markers := envValues(client.Env, InternalReleaseSetProviderCapabilityEnv)
+	markers := envValues(client.Env, scheduler.InternalReleaseSetProviderCapabilityEnv)
 	if len(markers) != 1 || !strings.Contains(markers[0], `"extensionName":"provider"`) ||
 		!strings.Contains(markers[0], `"command":"cloud-release-set"`) {
 		t.Fatalf("nested CLI provider identity marker = %q, want exact resolved provider", markers)
@@ -448,7 +450,7 @@ func TestReleaseSetProtocolClientTokenOnlyKeepsHistoricalParentAndUsesReservedCh
 	if err := os.Unsetenv(extensionproto.CloudCapabilityAfterEnv); err != nil {
 		t.Fatal(err)
 	}
-	ctx := CaptureProcessCapabilities(context.Background())
+	ctx := scheduler.CaptureProcessCapabilities(context.Background())
 	provider, err := newReleaseSetProvider(ctx, &extension.ResolvedProvider{
 		ExtensionName: "provider",
 		Version:       "0.1.0",
@@ -464,7 +466,7 @@ func TestReleaseSetProtocolClientTokenOnlyKeepsHistoricalParentAndUsesReservedCh
 	if got := envValues(client.Env, extensionproto.CloudTokenEnv); len(got) != 1 || got[0] != token {
 		t.Fatalf("token-only release-set child token = %q, want exact ambient token", got)
 	}
-	if got := envValues(client.Env, InternalReleaseSetProviderCapabilityEnv); len(got) != 1 {
+	if got := envValues(client.Env, scheduler.InternalReleaseSetProviderCapabilityEnv); len(got) != 1 {
 		t.Fatalf("token-only release-set child marker = %q, want exact reserved-provider marker", got)
 	}
 	if got := envValues(client.Env, extensionproto.CloudCapabilityAfterEnv); len(got) != 0 {
@@ -723,8 +725,8 @@ func TestReleaseSetAttachPlanDropsNonMemberPublishNodes(t *testing.T) {
 		}},
 		verification: &releaseVerificationScope{commands: []string{"test", "publish"}},
 	}
-	job := func(project *workspace.Project, command, step string) *ScheduledJob {
-		return &ScheduledJob{
+	job := func(project *workspace.Project, command, step string) *jobmodel.ScheduledJob {
+		return &jobmodel.ScheduledJob{
 			Project: project, Extension: publisher,
 			JobDef: &modelextension.JobDefinition{Name: command + "~" + step, CommandName: command, StepID: step},
 		}
@@ -746,7 +748,7 @@ func TestReleaseSetAttachPlanDropsNonMemberPublishNodes(t *testing.T) {
 	memberPackage.DependsOn = []string{libraryPackage.Key()}
 	memberPublish.SerializeAfter = []string{libraryPublish.Key()}
 
-	scoped, err := run.AttachPlan([]*ScheduledJob{
+	scoped, err := run.AttachPlan([]*jobmodel.ScheduledJob{
 		memberPackage, memberPublish, libraryPackage, libraryPublish, libraryBuild, libraryTest, libraryUpload,
 	})
 	if err != nil {
@@ -756,12 +758,12 @@ func TestReleaseSetAttachPlanDropsNonMemberPublishNodes(t *testing.T) {
 	for _, planned := range scoped {
 		kept[planned.Key()] = true
 	}
-	for _, dropped := range []*ScheduledJob{libraryPublish, libraryUpload} {
+	for _, dropped := range []*jobmodel.ScheduledJob{libraryPublish, libraryUpload} {
 		if kept[dropped.Key()] {
 			t.Fatalf("%s survived: work outside both the release transaction and the session's commands", dropped.Key())
 		}
 	}
-	for _, retained := range []*ScheduledJob{memberPackage, memberPublish, libraryBuild, libraryTest, libraryPackage} {
+	for _, retained := range []*jobmodel.ScheduledJob{memberPackage, memberPublish, libraryBuild, libraryTest, libraryPackage} {
 		if !kept[retained.Key()] {
 			t.Fatalf("%s was dropped: the gate and the member chain both keep it", retained.Key())
 		}
@@ -781,7 +783,7 @@ func TestReleaseSetAttachPlanDropsNonMemberPublishNodes(t *testing.T) {
 	orphan := job(library, "package", "npm")
 	orphanPublish := job(library, "publish", "npm")
 	orphanPublish.DependsOn = []string{orphan.Key()}
-	scoped, err = run.AttachPlan([]*ScheduledJob{
+	scoped, err = run.AttachPlan([]*jobmodel.ScheduledJob{
 		job(downstream, "package", "npm"), job(downstream, "publish", "npm"), orphan, orphanPublish,
 	})
 	if err != nil {
@@ -1248,7 +1250,7 @@ func TestParseReleaseSetChannels(t *testing.T) {
 	}
 }
 
-func releaseSetOutcomeOf(t *testing.T, results map[string]*JobResult) distribution.ReleaseSetPublishOutcome {
+func releaseSetOutcomeOf(t *testing.T, results map[string]*jobmodel.JobResult) distribution.ReleaseSetPublishOutcome {
 	t.Helper()
 	outcome, ok := results[releaseSetResultKey].Data[runtimeproto.ReleaseSetResultDataKey].(distribution.ReleaseSetPublishOutcome)
 	if !ok {
@@ -1538,7 +1540,7 @@ func TestAttachReleaseSetPlanUsesOneSDKOwnedContextOnPackageAndPublish(t *testin
 	if err := json.Unmarshal([]byte(`{"BoundParams":{"existing":true}}`), shared); err != nil {
 		t.Fatal(err)
 	}
-	planned := []*ScheduledJob{
+	planned := []*jobmodel.ScheduledJob{
 		{Project: upstream, JobDef: &modelextension.JobDefinition{Name: "package~npm", CommandName: "package"}},
 		{Project: downstream, JobDef: shared},
 		{Project: downstream, JobDef: &modelextension.JobDefinition{Name: "publish~npm", CommandName: "publish"}},
@@ -1595,8 +1597,8 @@ func TestReleaseSetAttachPlanRoutesOneProjectToExactSelectedArtifactSteps(t *tes
 			},
 		},
 	}
-	job := func(command, step string) *ScheduledJob {
-		return &ScheduledJob{
+	job := func(command, step string) *jobmodel.ScheduledJob {
+		return &jobmodel.ScheduledJob{
 			Project: project, Extension: publisher,
 			JobDef: &modelextension.JobDefinition{Name: command + "~" + step, CommandName: command, StepID: step},
 		}
@@ -1605,13 +1607,13 @@ func TestReleaseSetAttachPlanRoutesOneProjectToExactSelectedArtifactSteps(t *tes
 	packageDocker := job("package", "docker")
 	publishNPM := job("publish", "npm")
 	publishDocker := job("publish", "docker")
-	deploy := &ScheduledJob{
+	deploy := &jobmodel.ScheduledJob{
 		Project: project, Extension: &modelextension.ExtensionDescription{Name: "@putnami/cloud"},
 		JobDef:    &modelextension.JobDefinition{Name: "deploy~service", CommandName: "deploy", StepID: "service"},
 		DependsOn: []string{publishNPM.Key(), publishDocker.Key()},
 	}
 
-	scoped, err := run.AttachPlan([]*ScheduledJob{packageNPM, packageDocker, publishNPM, publishDocker, deploy})
+	scoped, err := run.AttachPlan([]*jobmodel.ScheduledJob{packageNPM, packageDocker, publishNPM, publishDocker, deploy})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1628,7 +1630,7 @@ func TestReleaseSetAttachPlanRoutesOneProjectToExactSelectedArtifactSteps(t *tes
 	if !slices.Equal(deploy.DependsOn, []string{publishNPM.Key()}) {
 		t.Fatalf("deploy dependencies = %v, want only selected publication %q", deploy.DependsOn, publishNPM.Key())
 	}
-	for _, planned := range []*ScheduledJob{packageNPM, publishNPM} {
+	for _, planned := range []*jobmodel.ScheduledJob{packageNPM, publishNPM} {
 		if planned.JobDef.BoundParams[releaseset.ContextParamName] == nil {
 			t.Fatalf("%s has no release-set context", planned.Key())
 		}
@@ -1649,7 +1651,7 @@ func TestReleaseSetAttachPlanRoutesOneProjectToExactSelectedArtifactSteps(t *tes
 	ociRoute.publishStep = "docker"
 	run.routes[ociKey] = ociRoute
 
-	_, err = run.AttachPlan([]*ScheduledJob{publishNPM})
+	_, err = run.AttachPlan([]*jobmodel.ScheduledJob{publishNPM})
 	if err == nil || !strings.Contains(err.Error(), `package steps "npm"`) {
 		t.Fatalf("missing exact package route error = %v", err)
 	}
@@ -1681,8 +1683,8 @@ func TestReleaseSetAttachPlanKeepsUnselectedPackageStepAKeptJobNeeds(t *testing.
 			},
 		},
 	}
-	job := func(command, step string, dependsOn ...string) *ScheduledJob {
-		return &ScheduledJob{
+	job := func(command, step string, dependsOn ...string) *jobmodel.ScheduledJob {
+		return &jobmodel.ScheduledJob{
 			Project: project, Extension: publisher,
 			JobDef:    &modelextension.JobDefinition{Name: command + "~" + step, CommandName: command, StepID: step},
 			DependsOn: dependsOn,
@@ -1694,14 +1696,14 @@ func TestReleaseSetAttachPlanKeepsUnselectedPackageStepAKeptJobNeeds(t *testing.
 	publishDocker := job("publish", "docker", packageDocker.Key())
 	publishMigration := job("publish", "migration", generate.Key())
 	publishMigration.SerializeAfter = []string{publishDocker.Key()}
-	deploy := &ScheduledJob{
+	deploy := &jobmodel.ScheduledJob{
 		Project: project, Extension: &modelextension.ExtensionDescription{Name: "@putnami/cloud"},
 		JobDef:         &modelextension.JobDefinition{Name: "deploy~service", CommandName: "deploy", StepID: "service"},
 		DependsOn:      []string{publishDocker.Key(), publishMigration.Key()},
 		SerializeAfter: []string{publishMigration.Key()},
 	}
 
-	scoped, err := run.AttachPlan([]*ScheduledJob{generate, compile, packageDocker, publishDocker, publishMigration, deploy})
+	scoped, err := run.AttachPlan([]*jobmodel.ScheduledJob{generate, compile, packageDocker, publishDocker, publishMigration, deploy})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1712,7 +1714,7 @@ func TestReleaseSetAttachPlanKeepsUnselectedPackageStepAKeptJobNeeds(t *testing.
 	if kept[publishMigration.Key()] {
 		t.Fatalf("unselected migration publication survived: %v", kept)
 	}
-	for _, retained := range []*ScheduledJob{generate, compile, packageDocker, publishDocker, deploy} {
+	for _, retained := range []*jobmodel.ScheduledJob{generate, compile, packageDocker, publishDocker, deploy} {
 		if !kept[retained.Key()] {
 			t.Fatalf("%s was dropped: the kept build step depends on it", retained.Key())
 		}
@@ -1741,7 +1743,7 @@ func TestReleaseSetAttachPlanKeepsUnselectedPackageStepAKeptJobNeeds(t *testing.
 	orphanPublish := job("publish", "migration", orphan.Key())
 	compileAlone := job("build", "compile")
 	dockerAlone := job("package", "docker", compileAlone.Key())
-	scoped, err = run.AttachPlan([]*ScheduledJob{orphan, orphanPublish, compileAlone, dockerAlone, job("publish", "docker", dockerAlone.Key())})
+	scoped, err = run.AttachPlan([]*jobmodel.ScheduledJob{orphan, orphanPublish, compileAlone, dockerAlone, job("publish", "docker", dockerAlone.Key())})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1771,8 +1773,8 @@ func TestReleaseSetAttachPlanRoutesPackageAndPublicationToDistinctProviders(t *t
 			publishCommand: "cloud-publish-archives", publishStep: "cloud-publish-archives",
 		}},
 	}
-	job := func(owner *modelextension.ExtensionDescription, command, step string) *ScheduledJob {
-		return &ScheduledJob{
+	job := func(owner *modelextension.ExtensionDescription, command, step string) *jobmodel.ScheduledJob {
+		return &jobmodel.ScheduledJob{
 			Project: project, Extension: owner,
 			JobDef: &modelextension.JobDefinition{Name: command + "~" + step, CommandName: command, StepID: step},
 		}
@@ -1780,7 +1782,7 @@ func TestReleaseSetAttachPlanRoutesPackageAndPublicationToDistinctProviders(t *t
 	packageJob := job(packager, "package", "archives")
 	publishJob := job(publisher, "cloud-publish-archives", "cloud-publish-archives")
 
-	planned, err := run.AttachPlan([]*ScheduledJob{packageJob, publishJob})
+	planned, err := run.AttachPlan([]*jobmodel.ScheduledJob{packageJob, publishJob})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1839,7 +1841,7 @@ func TestReleaseSetFinalizerOutcomesPartialDuplicateAndDryRun(t *testing.T) {
 
 	t.Run("partial publication never writes", func(t *testing.T) {
 		provider := &fakeReleaseSetProvider{}
-		results := map[string]*JobResult{"down:publish": {Status: "success"}}
+		results := map[string]*jobmodel.JobResult{"down:publish": {Status: "success"}}
 		(&ReleaseSetRun{plan: plan, provider: provider}).Finalizer(context.Background())(results)
 		assertReleaseSetFailure(t, results)
 		if provider.releaseCalls != 0 {
@@ -1861,7 +1863,7 @@ func TestReleaseSetFinalizerOutcomesPartialDuplicateAndDryRun(t *testing.T) {
 			skippedKey = member.ProjectID + ":publish"
 			publishJobKeys[skippedKey] = releaseset.MemberKey(member.Ecosystem, member.Coordinate)
 		}
-		results[skippedKey] = &JobResult{Status: "skipped", Error: &JobError{Message: "dependency failed"}}
+		results[skippedKey] = &jobmodel.JobResult{Status: "skipped", Error: &jobmodel.JobError{Message: "dependency failed"}}
 		run := &ReleaseSetRun{plan: plan, provider: provider, publishJobKeys: publishJobKeys}
 		run.Finalizer(context.Background())(results)
 		assertReleaseSetFailure(t, results)
@@ -1882,7 +1884,7 @@ func TestReleaseSetFinalizerOutcomesPartialDuplicateAndDryRun(t *testing.T) {
 	t.Run("pre-existing policy failure never writes", func(t *testing.T) {
 		provider := &fakeReleaseSetProvider{}
 		results := cloneResults(validResults)
-		results["downstream:specs~verify"] = &JobResult{Status: "failed"}
+		results["downstream:specs~verify"] = &jobmodel.JobResult{Status: "failed"}
 		(&ReleaseSetRun{plan: plan, provider: provider}).Finalizer(context.Background())(results)
 		if provider.releaseCalls != 0 {
 			t.Fatalf("failed session gate called provider: %+v", provider)
@@ -1927,7 +1929,7 @@ func TestReleaseSetFinalizerOutcomesPartialDuplicateAndDryRun(t *testing.T) {
 		provider := &fakeReleaseSetProvider{}
 		results := publishedResults(plan, digestFor('c'))
 		for _, result := range results {
-			result.Events[0].Data["type"] = EventTypeArtifact
+			result.Events[0].Data["type"] = jobmodel.EventTypeArtifact
 			result.Events[0].Data["time"] = "2026-09-04T00:00:00.000Z"
 		}
 		(&ReleaseSetRun{plan: plan, provider: provider}).Finalizer(context.Background())(results)
@@ -1939,7 +1941,7 @@ func TestReleaseSetFinalizerOutcomesPartialDuplicateAndDryRun(t *testing.T) {
 	t.Run("duplicate outcome never writes", func(t *testing.T) {
 		provider := &fakeReleaseSetProvider{}
 		results := cloneResults(validResults)
-		rogue := &JobResult{Status: "success"}
+		rogue := &jobmodel.JobResult{Status: "success"}
 		if err := json.Unmarshal([]byte(`{"releaseSet":"rogue"}`), &rogue.Data); err != nil {
 			t.Fatal(err)
 		}
@@ -2430,23 +2432,23 @@ func releaseSetAllOptions() ReleaseSetOptions {
 // publishedResults is what a publish job emits per member it actually
 // published: one `published-member` artifact event carrying the member's own
 // (ecosystem, coordinate), because one project may publish several members.
-func publishedResults(plan *releaseset.Plan, digest string) map[string]*JobResult {
-	results := make(map[string]*JobResult)
+func publishedResults(plan *releaseset.Plan, digest string) map[string]*jobmodel.JobResult {
+	results := make(map[string]*jobmodel.JobResult)
 	for index, member := range plan.SelectedMembers() {
 		memberDigest := digest
 		if index > 0 {
 			memberDigest = digestFor(byte('d' + index))
 		}
-		results[member.ProjectID+":publish"] = &JobResult{
+		results[member.ProjectID+":publish"] = &jobmodel.JobResult{
 			Status: "success",
-			Events: []RawJobEvent{publishedMemberEvent(member, memberDigest)},
+			Events: []jobmodel.RawJobEvent{publishedMemberEvent(member, memberDigest)},
 		}
 	}
 	return results
 }
 
-func publishedMemberEvent(member releaseset.PlannedMember, digest string) RawJobEvent {
-	parsed, ok := parseRawEvent(strings.TrimSpace(publishedMemberRuntimeLine(member, digest)))
+func publishedMemberEvent(member releaseset.PlannedMember, digest string) jobmodel.RawJobEvent {
+	parsed, ok := jobmodel.ParseRawEvent(strings.TrimSpace(publishedMemberRuntimeLine(member, digest)))
 	if !ok {
 		panic("published member runtime artifact failed strict parsing")
 	}
@@ -2454,7 +2456,7 @@ func publishedMemberEvent(member releaseset.PlannedMember, digest string) RawJob
 }
 
 func publishedMemberRuntimeLine(member releaseset.PlannedMember, digest string) string {
-	event := RawJobEvent{}
+	event := jobmodel.RawJobEvent{}
 	wire, err := json.Marshal(extensionproto.PublishedMember{
 		Ecosystem:      string(member.Ecosystem),
 		Coordinate:     member.Coordinate,
@@ -2475,18 +2477,18 @@ func publishedMemberRuntimeLine(member releaseset.PlannedMember, digest string) 
 	return stream.String()
 }
 
-func cloneResults(input map[string]*JobResult) map[string]*JobResult {
-	result := make(map[string]*JobResult, len(input))
+func cloneResults(input map[string]*jobmodel.JobResult) map[string]*jobmodel.JobResult {
+	result := make(map[string]*jobmodel.JobResult, len(input))
 	for key, value := range input {
 		clone := *value
 		clone.Data = maps.Clone(value.Data)
-		clone.Events = append([]RawJobEvent(nil), value.Events...)
+		clone.Events = append([]jobmodel.RawJobEvent(nil), value.Events...)
 		result[key] = &clone
 	}
 	return result
 }
 
-func assertReleaseSetFailure(t *testing.T, results map[string]*JobResult) {
+func assertReleaseSetFailure(t *testing.T, results map[string]*jobmodel.JobResult) {
 	t.Helper()
 	result := results[releaseSetResultKey]
 	if result == nil || result.Status != "failed" || result.Data != nil {
@@ -3186,7 +3188,7 @@ func TestPrepareReleaseSetReleasesWhatTheReuseChannelPublished(t *testing.T) {
 
 	// The release advances canary alone, from canary's head, and stores pr-7's
 	// artifact under this commit.
-	results := map[string]*JobResult{}
+	results := map[string]*jobmodel.JobResult{}
 	run.Finalizer(context.Background())(results)
 	if result := results[releaseSetResultKey]; result == nil || result.Status != "success" {
 		t.Fatalf("reuse release = %+v", result)
@@ -3236,7 +3238,7 @@ func TestReleaseSetReusedMemberCarriesTheRunTree(t *testing.T) {
 			want = ""
 		}
 		currentReleaseSourceTree = func(string) string { return want }
-		results := map[string]*JobResult{}
+		results := map[string]*jobmodel.JobResult{}
 		run.Finalizer(context.Background())(results)
 		if result := results[releaseSetResultKey]; result == nil || result.Status != "success" || provider.releaseRequest == nil {
 			t.Fatalf("checkout moved %v: release = %+v", moved, result)
