@@ -34,20 +34,20 @@ func ValidatePlanDAG(planned []*jobmodel.ScheduledJob) error {
 	}
 
 	state := NewDAGState(planned)
-	queue := state.ready()
+	queue := state.Ready()
 	visited := 0
 	for len(queue) > 0 {
 		job := queue[0]
 		queue = queue[1:]
 		visited++
-		queue = append(queue, state.complete(job.Key())...)
+		queue = append(queue, state.Complete(job.Key())...)
 	}
 
 	if visited == len(planned) {
 		return nil
 	}
 
-	_, remaining := state.remainingSnapshot()
+	_, remaining := state.RemainingSnapshot()
 	lines := blockedDependencyLines(planned, remaining, maxDAGDiagnosticLines)
 	return fmt.Errorf("dependency graph cannot be scheduled; possible dependency cycle:\n%s", strings.Join(lines, "\n"))
 }
