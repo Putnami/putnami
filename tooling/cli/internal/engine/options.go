@@ -63,6 +63,7 @@ type GlobalFlags struct {
 	Baseline        string
 	TraceProfile    string // --trace-profile: path for Chrome trace output (empty = disabled)
 	EnvProfile      string // --profile: resolved deployment profile (dev|test|production)
+	ProfileFlag     bool   // --profile was passed on the command line
 	// Providers is --providers, else PUTNAMI_PROVIDERS: the sorted, unique
 	// invocation providers (runner.InvocationProviders) whose credentials the
 	// workspace's credential provider serves — install for the read

@@ -919,6 +919,7 @@ putnami doctor
 putnami doctor --profile production
 putnami doctor --profile production --project /tooling/cli
 putnami doctor --profile production --output=jsonl
+putnami doctor --machine
 ```
 
 Findings are derived from **committed** artifacts — manifests, declared capabilities, required config keys, committed schemas, config shadowing — and graded by deployment profile: under `--profile production` a high or critical finding exits `2`, while `dev`/`test` stay advisory. Config *values* are never read or emitted, so the report is safe to attach to a build log.
@@ -926,6 +927,8 @@ Findings are derived from **committed** artifacts — manifests, declared capabi
 Three codes are repository hygiene rather than production readiness and never block a profile: `doctor.missing_readme` reports a project with no `README.md` at its root (a template project, which ships `README.md.template` for the project it renders, and a generated client project are exempt), `doctor.committed_manifest_stability` reports a committed generated artifact whose content is derived from workspace state (a workspace version string, a dependency-closure enumeration, a source binding) instead of the project's own declared inputs, and `doctor.undeclared_schema_commit` reports a project that tracks generated schemas without declaring `options.generate.schema`. The last two are explained in [configuration](05-configuration.md#generated-schema-commit-regime). All three are waivable per project and per field.
 
 `putnami doctor` also checks the workstation the workspace is checked out on. These findings are scoped to the workspace root (`/`), never block a profile, and are waivable. `doctor.crlf_checkout` reports tracked text files that the working tree holds with CRLF endings while the commit has LF, or `core.autocrlf=true` with no `.gitattributes` rule that sets `eol=lf`. On Windows only, `doctor.long_paths_disabled` reports that the `LongPathsEnabled` registry value (`HKLM\SYSTEM\CurrentControlSet\Control\FileSystem`) is not 1, `doctor.git_long_paths_disabled` reports that Git does not set `core.longpaths`, and `doctor.vc_runtime_missing` reports that `vcruntime140.dll` is not in the Windows system directory, so Biome, which `@putnami/typescript` runs to lint and format TypeScript, cannot start. The human report prints each finding's fix. The production gate inside job commands does not run these checks.
+
+`putnami doctor --machine` skips the preflight and reports the machine load: the one-minute load average divided by the logical CPU count, printed as a ratio such as `0.50`, or `unknown` when the host cannot report it. With `--output=json` it prints `{"known":true,"oneMinute":2,"cpus":4,"ratio":0.5}`, or `{"known":false}`. It prints exactly what `putnami contributor machine-load` prints. Passing `--profile` or `--project` with `--machine` is a usage error.
 
 The same gate runs inside a job command: `putnami <jobs> --profile production` aborts between plan and execution on an unwaived high/critical finding, so nothing runs against a workspace that would fail the preflight.
 
