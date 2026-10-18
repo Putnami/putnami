@@ -447,7 +447,7 @@ func TestAgentWorkflows_InitPreservesAnExistingOptIn(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "reinit-preserves-optin", "init-force-unions-the-declaration")
 	root := agentWorkspaceDeclaring(t, "extension:@acme/other", testAgentArtifact+":1.4.x", "extension:"+contentExtensionName)
 	got := initAgentArtifacts(root, initExtensionConfig{packageName: "@putnami/go", agentContent: contentExtensionName})
-	want := []string{"extension:@acme/other", testAgentArtifact + ":1.4.x", "extension:" + contentExtensionName}
+	want := []string{"extension:@acme/other", "extension:" + contentExtensionName, testAgentArtifact + ":1.4.x"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("initAgentArtifacts = %v, want %v", got, want)
 	}
