@@ -333,6 +333,11 @@ func TestInteractiveExitCode(t *testing.T) {
 			ExitError, deadlineLine,
 		},
 		{
+			"deadline, child exits 0",
+			scheduler.JobResult{Status: "failed", ExitCode: 0, TimedOut: true, Error: &scheduler.JobError{Message: "job timed out"}},
+			ExitError, deadlineLine,
+		},
+		{
 			"deadline with code -1",
 			scheduler.JobResult{Status: "failed", ExitCode: -1, TimedOut: true, Error: &scheduler.JobError{Message: "job timed out"}},
 			ExitError, deadlineLine,

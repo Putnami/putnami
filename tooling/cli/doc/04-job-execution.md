@@ -711,8 +711,10 @@ whatever the teardown had to do.
 An interactive subcommand that passes its deadline prints
 ``putnami: `<group> <subcommand>` stopped: it passed its <deadline> deadline``
 and exits 1, whatever code its process returned. A process that ends from a
-signal outside a deadline also exits 1, and putnami prints the signal. A
-positive exit code passes through, because the process printed its own error.
+signal outside a deadline also exits 1, and putnami prints the signal, except
+SIGINT: a Ctrl+C that reaches the process first is an interrupted run, which
+exits 130 and prints nothing. A positive exit code passes through, because the
+process printed its own error.
 
 ### Version Info
 

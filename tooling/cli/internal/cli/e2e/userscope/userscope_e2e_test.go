@@ -29,6 +29,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	protocoljob "go.putnami.dev/protocol/job"
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
@@ -74,7 +75,7 @@ echo "context-end"
 // needs a workspace; `scan` is not interactive. `audit-run` is also a flat
 // command. `hang` and `crash` are interactive and workspace-optional: `hang`
 // runs a task that outlives its 300 ms deadline and never traps SIGTERM, and
-// `crash` kills itself with SIGKILL.
+// `crash` kills itself with SIGKILL, and `interrupt` with SIGINT.
 func userScopeExtensionManifest(name, version string) string {
 	return fmt.Sprintf(`{
   "name": %q,
@@ -83,7 +84,8 @@ func userScopeExtensionManifest(name, version string) string {
   "commands": {
     "audit-run": {"description": "Audit the current directory.", "run": [{"id": "run", "task": "audit-exec"}]},
     "audit-hang": {"description": "Outlive the task deadline.", "run": [{"id": "hang", "task": "audit-hang-exec"}]},
-    "audit-crash": {"description": "Die from a signal.", "run": [{"id": "crash", "task": "audit-crash-exec"}]}
+    "audit-crash": {"description": "Die from a signal.", "run": [{"id": "crash", "task": "audit-crash-exec"}]},
+    "audit-interrupt": {"description": "Die from SIGINT.", "run": [{"id": "interrupt", "task": "audit-interrupt-exec"}]}
   },
   "commandGroups": {
     "audit": {
@@ -94,14 +96,16 @@ func userScopeExtensionManifest(name, version string) string {
         "check": {"command": "audit-run", "interactive": true, "description": "Audit a workspace."},
         "scan":  {"command": "audit-run", "description": "Scan a workspace."},
         "hang":  {"command": "audit-hang", "interactive": true, "workspace": "optional", "description": "Outlive the task deadline."},
-        "crash": {"command": "audit-crash", "interactive": true, "workspace": "optional", "description": "Die from a signal."}
+        "crash": {"command": "audit-crash", "interactive": true, "workspace": "optional", "description": "Die from a signal."},
+        "interrupt": {"command": "audit-interrupt", "interactive": true, "workspace": "optional", "description": "Die from SIGINT."}
       }
     }
   },
   "tasks": {
     "audit-exec": {"kind": "command", "command": "{extensionRoot}/run.sh", "cache": false},
     "audit-hang-exec": {"kind": "command", "command": "{extensionRoot}/hang.sh", "cache": false, "timeoutMs": 300},
-    "audit-crash-exec": {"kind": "command", "command": "{extensionRoot}/crash.sh", "cache": false}
+    "audit-crash-exec": {"kind": "command", "command": "{extensionRoot}/crash.sh", "cache": false},
+    "audit-interrupt-exec": {"kind": "command", "command": "{extensionRoot}/interrupt.sh", "cache": false}
   }
 }`, name, version, protocolcli.CurrentContract)
 }
@@ -142,6 +146,7 @@ func pinUserScopeExtension(t *testing.T, userRoot, marker string) {
 	// not trap it.
 	writeTestFile(t, filepath.Join(dir, "hang.sh"), "#!/bin/sh\nexec sleep 30\n", 0o755)
 	writeTestFile(t, filepath.Join(dir, "crash.sh"), "#!/bin/sh\nkill -KILL $$\n", 0o755)
+	writeTestFile(t, filepath.Join(dir, "interrupt.sh"), "#!/bin/sh\nkill -INT $$\n", 0o755)
 	writeUserScopeLockEntry(t, userRoot, lockfile.LockEntry{Version: "1.0.0"})
 }
 
@@ -334,8 +339,9 @@ func TestAppRun_UserScope_OptionalSubcommandRunsInCallerDir(t *testing.T) {
 // TestAppRun_UserScope_InteractiveDeadlineExitsOneAndSaysSo pins a run that
 // passes its deadline: the child never traps SIGTERM, so it dies from the signal
 // and reports no exit code of its own. putnami names the command and the
-// deadline and exits 1, not 255, and does not wait out the kill delay.
+// deadline, exits 1 and does not wait out the kill delay.
 func TestAppRun_UserScope_InteractiveDeadlineExitsOneAndSaysSo(t *testing.T) {
+	spectest.Proves(t, "cli/diagnostics-results", "terminal-outcome", "an-interactive-run-that-passes-its-deadline-exits-one-and-names-it")
 	userRoot, _ := userScopeTestEnv(t)
 	pinUserScopeExtension(t, userRoot, "user-scope")
 
@@ -361,6 +367,7 @@ func TestAppRun_UserScope_InteractiveDeadlineExitsOneAndSaysSo(t *testing.T) {
 // that dies from a signal with no deadline involved: exit 1, and the error
 // names the signal.
 func TestAppRun_UserScope_InteractiveSignalDeathExitsOneAndSaysWhy(t *testing.T) {
+	spectest.Proves(t, "cli/diagnostics-results", "terminal-outcome", "an-interactive-child-that-ends-from-a-signal-exits-one-and-names-it")
 	userRoot, _ := userScopeTestEnv(t)
 	pinUserScopeExtension(t, userRoot, "user-scope")
 
@@ -373,6 +380,24 @@ func TestAppRun_UserScope_InteractiveSignalDeathExitsOneAndSaysWhy(t *testing.T)
 	}
 	if strings.Contains(output, "deadline") {
 		t.Fatalf("a crash outside a deadline mentions one:\n%s", output)
+	}
+}
+
+// TestAppRun_UserScope_InteractiveInterruptExitsSignalReceivedSilently pins a
+// terminal Ctrl+C that reaches the child before putnami's own cancel does: the
+// child ends from SIGINT, and the run is an interrupted one, exit 130, with no
+// line from putnami.
+func TestAppRun_UserScope_InteractiveInterruptExitsSignalReceivedSilently(t *testing.T) {
+	spectest.Proves(t, "cli/diagnostics-results", "terminal-outcome", "an-interactive-child-that-ends-from-sigint-is-an-interrupted-run")
+	userRoot, _ := userScopeTestEnv(t)
+	pinUserScopeExtension(t, userRoot, "user-scope")
+
+	code, output := runApp(t, "audit", "interrupt")
+	if code != cli.ExitSignalReceived {
+		t.Fatalf("audit interrupt exit = %d, want %d:\n%s", code, cli.ExitSignalReceived, output)
+	}
+	if strings.Contains(output, "putnami:") {
+		t.Fatalf("an interrupted run prints a putnami line:\n%s", output)
 	}
 }
 

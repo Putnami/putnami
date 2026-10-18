@@ -4,6 +4,7 @@ package scheduler
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -83,5 +84,66 @@ func TestRunJobInteractive_SharesParentProcessGroup(t *testing.T) {
 	}
 	if childPgid != parentPgid {
 		t.Errorf("child pgid = %d, want parent pgid %d: an interactive child placed in its own process group cannot read the controlling TTY", childPgid, parentPgid)
+	}
+}
+
+// TestRunJobInteractive_ChildEndedBySIGINTIsCanceled pins the terminal Ctrl+C
+// race: the keystroke reaches the child directly, and when the child ends
+// before this process cancels the run, the run is still an interrupted one.
+func TestRunJobInteractive_ChildEndedBySIGINTIsCanceled(t *testing.T) {
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skip("/bin/sh unavailable on this platform")
+	}
+
+	wsRoot := t.TempDir()
+	scriptPath := filepath.Join(wsRoot, "interrupt.sh")
+	writeExecutable(t, scriptPath, "#!/bin/sh\nkill -INT $$\n")
+
+	ws := &workspace.Workspace{Root: wsRoot, Name: "test-ws"}
+	ext := &extension.ExtensionDescription{Name: "@putnami/test", Path: wsRoot}
+	job := &ScheduledJob{
+		Project:   &workspace.Project{ID: "test-ws", Name: "test-ws", Path: "."},
+		Extension: ext,
+		JobDef: &extension.JobDefinition{
+			ExtensionName: "@putnami/test",
+			Name:          "demo-interrupt",
+			Kind:          "command",
+			Command:       scriptPath,
+			TimeoutMs:     unboundedJobTimeoutMs,
+		},
+	}
+
+	res, err := RunJobInteractive(t.Context(), ws, job, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("RunJobInteractive: %v", err)
+	}
+	if res.Status != "canceled" || res.Error != nil {
+		t.Fatalf("status = %q, error = %v, want canceled with no error", res.Status, res.Error)
+	}
+}
+
+func TestEndedByInterrupt(t *testing.T) {
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skip("/bin/sh unavailable on this platform")
+	}
+	for _, tc := range []struct {
+		name   string
+		script string
+		want   bool
+	}{
+		{"SIGINT", "kill -INT $$", true},
+		{"SIGTERM", "kill -TERM $$", false},
+		{"positive exit code", "exit 2", false},
+		{"success", "exit 0", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := exec.Command("/bin/sh", "-c", tc.script).Run()
+			if got := endedByInterrupt(err); got != tc.want {
+				t.Fatalf("endedByInterrupt(%v) = %t, want %t", err, got, tc.want)
+			}
+		})
+	}
+	if endedByInterrupt(nil) {
+		t.Fatal("endedByInterrupt(nil) = true")
 	}
 }

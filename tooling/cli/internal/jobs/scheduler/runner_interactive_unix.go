@@ -3,6 +3,7 @@
 package scheduler
 
 import (
+	"errors"
 	"os/exec"
 	"syscall"
 	"time"
@@ -35,4 +36,16 @@ func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) erro
 		return err
 	}
 	return cmd.Wait()
+}
+
+// endedByInterrupt reports whether the child ended from SIGINT. A terminal
+// Ctrl+C reaches the child directly, because it shares the CLI's foreground
+// process group, and the child can exit before the CLI's own cancel lands.
+func endedByInterrupt(err error) bool {
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		return false
+	}
+	status, ok := exitErr.Sys().(syscall.WaitStatus)
+	return ok && status.Signaled() && status.Signal() == syscall.SIGINT
 }

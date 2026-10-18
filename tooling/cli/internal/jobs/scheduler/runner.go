@@ -98,14 +98,11 @@ func applyTaskDeadline(env []string, job *ScheduledJob) []string {
 	if job == nil {
 		return removeEnvKey(env, extensionproto.TaskDeadlineMsEnv)
 	}
-	timeoutMs := job.EffectiveTimeoutMs()
-	if timeoutMs < 0 {
+	deadline, bounded := TaskDeadline(job)
+	if !bounded {
 		return removeEnvKey(env, extensionproto.TaskDeadlineMsEnv)
 	}
-	if timeoutMs == 0 {
-		timeoutMs = DefaultTimeoutMs
-	}
-	return append(env, fmt.Sprintf("%s=%d", extensionproto.TaskDeadlineMsEnv, boundedDeadlineMs(timeoutMs, 1)))
+	return append(env, fmt.Sprintf("%s=%d", extensionproto.TaskDeadlineMsEnv, deadline.Milliseconds()))
 }
 
 // runtimeEventsAdvertisement is the CLI half of the runtime event protocol

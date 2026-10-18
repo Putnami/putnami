@@ -41,3 +41,8 @@ func runInteractive(cmd *exec.Cmd, startJob func(start func() error) error) erro
 	close(waitDone)
 	return err
 }
+
+// endedByInterrupt reports whether the child ended from an interrupt. Windows
+// reports no signal in an exit status, so it never does: a Ctrl+C reaches the
+// CLI, which cancels the job.
+func endedByInterrupt(error) bool { return false }
