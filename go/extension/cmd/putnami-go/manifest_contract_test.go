@@ -1122,7 +1122,7 @@ func sortedKeysOf[V any](m map[string]V) []string {
 // from a record each packager writes inside the directory it owns, so it is not
 // a file at all. What remains at that path is the archive publication manifest,
 // which describes the archives in the sibling archives/ directory and is read by
-// the archive uploader out of tree (@putnami/cloud publish-archives). It has one
+// the archive uploader out of tree (@putnami/cloud packages publish). It has one
 // producer — the archive packager — so it is DECLARED, and a restore of that
 // task reproduces it.
 func TestTheArchivePackagerOwnsTheArchivePublicationManifest(t *testing.T) {

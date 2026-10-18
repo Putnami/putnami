@@ -47,7 +47,7 @@
             "root": "command-output",
             "path": "metadata.json",
             "optionalEmpty": true,
-            "description": "Archive publication manifest read by the archive uploader (@putnami/cloud publish-archives): version, artifact, stable, channels, template. Sole owner of <command-output>/metadata.json for a content project — no other task writes it, and this one states the whole document rather than merging into it. Absent on a dry run."
+            "description": "Archive publication manifest read by the archive uploader (@putnami/cloud packages publish): version, artifact, stable, channels, template. Sole owner of <command-output>/metadata.json for a content project — no other task writes it, and this one states the whole document rather than merging into it. Absent on a dry run."
           }
         }
       }
