@@ -73,7 +73,7 @@ func TestCommandRegistryCoversStructuredCommands(t *testing.T) {
 	want := []string{
 		"extensions", "templates", "projects", "workspace", "version", "deps",
 		"cache", "config", "context", "migrate", "sessions", "completion",
-		"install", "telemetry", "upgrade", "help", "init", "dev", "infra", "scopes",
+		"install", "telemetry", "upgrade", "help", "init", "dev", "scopes",
 		"mcp", "pin", "doctor", "impact-plan", "report", "tree",
 		"compose", "qualify", "contributor", "cli",
 	}

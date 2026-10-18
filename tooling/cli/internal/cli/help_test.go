@@ -207,7 +207,7 @@ func TestPrintSubcommandHelp_IncludesRootStructuredCommandHelp(t *testing.T) {
 		command string
 		want    string
 	}{
-		{"infra", "putnami infra plan [--output <format>]"},
+		{"install", "putnami install [--latest]"},
 		{"scopes", "putnami scopes list [--output <format>]"},
 	}
 	for _, tt := range tests {

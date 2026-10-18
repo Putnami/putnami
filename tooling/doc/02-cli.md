@@ -191,6 +191,7 @@ has no successor command: its document is the projection of an impact plan.
 | `putnami ci init`, `ci validate`, `ci fmt`, `ci explain` | `putnami cloud ci init`, `cloud ci validate`, `cloud ci fmt`, `cloud ci explain` | `@putnami/cloud` |
 | `putnami features`, `specs`, `architecture`, `contracts` | Unchanged | `@putnami/sdd` |
 | `putnami version list`, `putnami version use <name>` | `putnami cli list`, `putnami cli use <name>` | None: the core serves `cli` |
+| `putnami infra plan [<project>]` | `putnami cloud infra plan [<project>]` | `@putnami/cloud` |
 | `putnami change-plan --base <commit>` | `putnami impact-plan lint,test,build,validate --base <commit>`, then `ChangePlanFromImpactPlan` from `go.putnami.dev/protocol/ci` | None: the core serves `impact-plan` |
 
 To get a moved command, add its extension to `extensions` in
@@ -202,8 +203,8 @@ To get a moved command, add its extension to `extensions` in
 }
 ```
 
-The CLI refuses `putnami channel …`, `putnami ci …` and `putnami change-plan`,
-and `putnami help` of each, with exit code 2, unless an installed extension declares that root. A
+The CLI refuses `putnami channel …`, `putnami ci …`, `putnami change-plan` and
+`putnami infra …`, and `putnami help` of each, with exit code 2, unless an installed extension declares that root. A
 run of a moved SDD command that plans no job prints a hint. Both messages link
 to this section, and so does the `impact-plan` refusal of a command that no
 installed extension declares.

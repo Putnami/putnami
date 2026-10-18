@@ -10,7 +10,7 @@ import (
 // removedCoreRoots are the command roots the core CLI no longer serves. An
 // extension may serve each of them under its own command group, so the core
 // names no destination: the refusal cites the published reference that does.
-var removedCoreRoots = []string{"channel", "ci", "change-plan"}
+var removedCoreRoots = []string{"channel", "ci", "change-plan", "infra"}
 
 // refuseRemovedCoreRoot returns a usage error when command is a removed core
 // root that no extension declares, as a command group or as a job, and nil

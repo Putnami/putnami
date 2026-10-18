@@ -50,7 +50,6 @@ func init() {
 	registerCommand("cli", cmdCLI)
 	registerCommand("deps", cmdDeps)
 	registerCommand("cache", cmdCache)
-	registerCommand("infra", cmdInfra)
 	registerCommand("config", cmdConfig)
 	registerCommand("context", cmdContext)
 	registerCommand("contributor", cmdContributor)
@@ -622,21 +621,6 @@ func newCacheVerifyRunner(
 			Projects: result.Projects,
 			Results:  result.Results,
 		}, err
-	}
-}
-
-func cmdInfra(env *CommandEnv) error {
-	if err := env.requireWorkspace(); err != nil {
-		return err
-	}
-	switch env.Sub {
-	case "plan", "":
-		if env.OutputFormat == "jsonl" {
-			return lifecycle.InfraPlanJSON(env.WsRoot, env.Args)
-		}
-		return lifecycle.InfraPlan(env.WsRoot, env.Args)
-	default:
-		return usageErrorf("unknown subcommand: infra %s\n  Available: plan", env.Sub)
 	}
 }
 

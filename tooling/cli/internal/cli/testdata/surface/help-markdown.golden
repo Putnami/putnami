@@ -122,7 +122,6 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 | `putnami workspace describe` | Describe the active workspace |
 | `putnami version get|tag` | Versions derived from git and release tags |
 | `putnami cli list|use` | Installed CLI binaries |
-| `putnami infra plan` | Plan workspace infra (--output=jsonl) |
 
 ## Extensions & Templates
 
@@ -581,21 +580,6 @@ putnami cli use <name> [--global]
 
 - `putnami cli use go-dev`
 - `putnami cli use go-source-1a2b3c4 --global`
-
-### `putnami infra plan`
-
-Show the aggregated infrastructure plan inferred from project descriptors
-
-**Usage**
-
-```
-putnami infra plan [--output <format>]
-```
-
-**Examples**
-
-- `putnami infra plan`
-- `putnami infra plan --output=jsonl`
 
 ### `putnami extensions install`
 

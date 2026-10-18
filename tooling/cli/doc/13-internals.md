@@ -65,7 +65,7 @@ Principal packages only. `internal/` holds 76 production packages in all — the
 | `configcmd` | `config` and `telemetry` |
 | `doctor` | `doctor`, its check families, the gate and waivers |
 | `extensions` | `extensions`, `templates`, artifacts, validation |
-| `lifecycle` | `install`, `upgrade`, `init`, `deps`, `infra`, `projects*`, `scopes`, `workspace`, bootstrap and ensure |
+| `lifecycle` | `install`, `upgrade`, `init`, `deps`, `projects*`, `scopes`, `workspace`, bootstrap and ensure |
 | `migrate` | `migrate vnext`, the lock-file format migration |
 | `sdd` | `contracts`, `features`, `specs` and their diffs |
 | `sessions` | `sessions`, the gate, inspection, reports |

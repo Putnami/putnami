@@ -265,21 +265,9 @@ putnami scopes list                          # Tabular view (scope, projects, gr
 putnami scopes list --output=jsonl           # Structured output (one ScopeInfo per line)
 ```
 
-### `infra`
+### Infrastructure plan
 
-Show the aggregated infrastructure plan inferred from project descriptors
-(databases, queues, services, etc.). Supports `--output=jsonl` for
-structured consumers.
-
-It READS `<workload>/.gen/requirements.json`; it never produces one. That
-artifact is emitted by the `infra` step of each language's `build` pipeline
-(aggregation moved into the extensions), so a workload with
-no plan has not been built yet.
-
-```bash
-putnami infra plan
-putnami infra plan --output=jsonl
-```
+The core CLI has no `infra` command. `putnami infra …` exits with a usage error unless an installed extension declares that root. `putnami cloud infra plan [<project>]` from `@putnami/cloud` shows the aggregated infrastructure plan; [Commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli) lists the move.
 
 ### Specification-driven development — `features`, `specs`, `architecture`, `contracts`
 

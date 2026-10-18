@@ -176,16 +176,6 @@ flag: --base | <commit> | Required base commit or ref; emitted as its full immut
 flag: --head | <commit> | Optional head commit or ref; it must resolve to the checked-out HEAD
 example: putnami impact-plan test,build --base origin/main --output=json
 example: putnami impact-plan lint --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl
-═══ infra ═══
-description: Show the aggregated infrastructure plan inferred from project descriptors
-usage: putnami infra plan [--output <format>]
-example: putnami infra plan
-example: putnami infra plan --output=jsonl
-═══ infra plan ═══
-description: Show the aggregated infrastructure plan inferred from project descriptors
-usage: putnami infra plan [--output <format>]
-example: putnami infra plan
-example: putnami infra plan --output=jsonl
 ═══ init ═══
 description: Initialize a new workspace
 usage: putnami init [--workspace <name>] [--extension <ts|go|py>] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
