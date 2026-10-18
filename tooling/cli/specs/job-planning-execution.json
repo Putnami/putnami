@@ -172,6 +172,10 @@
     {
       "id": "host-rpc-core-calls",
       "text": "The channel speaks JSON-RPC 2.0, one request per line of at most 32 MiB; a larger frame is refused. A request without the launch token is refused, compared in constant time, and its connection closed. An unknown method is method-not-found. Calls run one at a time, and stopping the channel cancels the call in flight. host.hello returns the protocol version and methods, collaboration.call the envelope putnami <contract> <operation> --output=json prints, and verification.report what the cache corroborates."
+    },
+    {
+      "id": "source-bound-cache",
+      "text": "A task that declares cache.sourceBound stores and looks up its entry, locally and remotely, at a key derived from its cache key and its project's source binding: the stamped binding when storing, the current one when looking up, the empty one in an unmanaged workspace. A binding the CLI cannot compute inside a repository gives no hit and no store. Dependents fold the unchanged cache key, so a test-only edit keeps every key. A source-bound failure is never replayed, and its entry prunes no producer."
     }
   ],
   "decisions": [
@@ -193,6 +197,7 @@
     "tooling/cli/doc/adr/0065-an-optional-command-output-directory-is-emptied-on-execution-and-on-an-empty-restore.md",
     "tooling/cli/doc/adr/0066-a-main-publication-releases-what-its-pull-request-published.md",
     "tooling/cli/doc/adr/0067-putnami-dev-declares-the-development-verbs.md",
-    "tooling/cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md"
+    "tooling/cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md",
+    "tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md"
   ]
 }

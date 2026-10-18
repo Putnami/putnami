@@ -203,6 +203,13 @@ read the loaded vocabularies first, and a job whose command declares no traits
 takes its verb's default traits. A reader below 9 would plan those jobs with
 other traits, so it refuses the stamp. The floor binds a manifest wherever it
 loads from. Only a manifest that declares the section is stamped 9.
+Contract `10` (`SourceBoundCacheContract`) is additive for the
+`cache.sourceBound` task policy. From 10 on, the CLI stores and looks up the
+task's entry at a key derived from its cache key and the source binding of the
+task's own project, so an entry serves only at the binding its outputs embed.
+A reader below 10 stores the entry at the cache key alone and would replay
+outputs that embed a stale binding, so it refuses the stamp. The floor binds a manifest wherever it loads from. Only a manifest
+with a task that declares the field is stamped 10.
 Contract `6` is additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs. A reader limited to contract 5 refuses that
 manifest before interpreting its inputs; unrelated manifests retain their

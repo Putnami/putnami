@@ -99,6 +99,7 @@ func Resolve(manifest *Manifest, extPath string) *ExtensionDescription {
 						policy.Deterministic = task.Cache.Deterministic
 						policy.VersionAware = task.Cache.VersionAware
 						policy.NoOutput = task.Cache.NoOutput
+						policy.SourceBound = task.Cache.SourceBound
 					}
 					job.TaskCachePolicy = policy
 				} else if task.Cache != nil {

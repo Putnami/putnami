@@ -622,6 +622,7 @@ an input.
 
 - `enabled` — Whether caching is allowed (default: `true`).
 - `deterministic` — Whether the task produces identical output for identical input.
+- `sourceBound` — Whether the task's outputs embed the source binding of its own project. The CLI stores and looks up the task's entry at a key derived from its cache key and that binding, so an entry serves only at the binding its outputs embed; the binding is not a key input. Requires CLI contract 10 — see [Source-Bound Tasks](10-caching.md#source-bound-tasks).
 - `key.files` — Glob patterns for files whose content contributes to the cache key.
 - `key.env` — Environment variable names whose values contribute to the cache key.
 

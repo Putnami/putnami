@@ -54,8 +54,15 @@ type taskWork struct {
 	cacheEnabled    bool
 	cacheHash       string
 	sourceInputHash string
-	release         func()
-	started         time.Time
+	// sourceBinding is the binding of the project's own sources that a
+	// source-bound execution is stamped with, read once its stamp is final
+	// (source_bound.go). The entry's store key binds it. sourceBindingStamped
+	// is false when the stamp named none, and the execution then stores no
+	// entry.
+	sourceBinding        string
+	sourceBindingStamped bool
+	release              func()
+	started              time.Time
 	// shared is this task's participation in a plan-level shared node, or nil
 	// when the node has no content-identical peer. The LEADER publishes its
 	// terminal result through it; a follower carries the adopted result below
@@ -354,6 +361,12 @@ func (s *Scheduler) prepareTask(
 		// source fixer may invalidate the shared memo concurrently.
 		item.sourceInputHash, _ = sourceInputDigest(s.ws, job, s.commandParams, s.cache)
 	}
+	if item.cacheEnabled && item.sharedResult == nil && cachekey.TaskIsSourceBound(job) {
+		// After the stamp refresh and the preBuild hook, the stamp holds the
+		// binding the subprocess is about to read. A follower reads nothing
+		// here: it adopts its leader's binding with the tree it captures.
+		item.sourceBinding, item.sourceBindingStamped = s.stampedSourceBinding(job)
+	}
 	return &item, jobDone{}
 }
 
@@ -638,6 +651,11 @@ func (s *Scheduler) closeTask(
 			Error:  &JobError{Message: "runner returned no result for " + item.job.Key()},
 		}
 	}
+	if item.sharedResult == nil && cachekey.TaskIsSourceBound(item.job) {
+		// The entry is stored at a key that binds the binding the outputs
+		// embed, so a later run finds it only at that binding.
+		result.SourceBinding, result.SourceBindingStamped = item.sourceBinding, item.sourceBindingStamped
+	}
 	result = s.finalizeExecutedJob(
 		ctx, item.job, result, item.cacheEnabled, item.cacheHash, item.sourceInputHash, mu, hashes)
 	// Drift is judged AFTER publication on purpose: the entry holds the
@@ -788,10 +806,14 @@ func (s *Scheduler) finalizeExecutedJob(
 
 	// Cache store (on success, or a deterministic in-job skip) always publishes
 	// a task-owned entry. cachekey.IsCacheEnabled admits only usesDeclaredCapture jobs.
-	if cacheEnabled && s.cache != nil && cacheHash != "" && cachekey.IsCacheableResult(job, result) {
-		stored := s.storeDeclaredCapture(job, result, cacheHash)
+	// The entry key is the cache key, except for a source-bound task: its key
+	// also binds the binding the execution was stamped with, and a stamp that
+	// named none stores nothing (source_bound.go).
+	entryKey := cachekey.ExecutedEntryKey(job, cacheHash, result)
+	if cacheEnabled && s.cache != nil && entryKey != "" && cachekey.IsCacheableResult(job, result) {
+		stored := s.storeDeclaredCapture(job, result, entryKey)
 		if stored && !result.SourceMutated && s.remote != nil {
-			s.remote.UploadTaskEntry(ctx, cacheHash, job, s.cache)
+			s.remote.UploadTaskEntry(ctx, entryKey, job, s.cache)
 		}
 	}
 

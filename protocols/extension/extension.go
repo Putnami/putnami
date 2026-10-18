@@ -883,6 +883,18 @@ type TaskCachePolicy struct {
 	// task); and the remote required-input guard treats the task's files-less
 	// hits as legitimate instead of rebuilding them locally on every run.
 	NoOutput bool `json:"noOutput,omitempty"`
+	// SourceBound declares that the task's outputs embed the source binding
+	// of its own project: the source-v1 digest the CLI stamps into
+	// .gen/version.json, which covers every project file, tests and specs
+	// included. The binding is not a key input, so an edit the task does not
+	// read leaves the key, and every dependent key, unchanged. Instead, the CLI
+	// stores and looks up the task's entry at a key derived from its cache key
+	// and the binding: the binding the execution was stamped with when
+	// storing, the project's current one when looking up. A binding the CLI
+	// cannot compute inside a repository gives no hit and no store, so the
+	// task executes. A task that declares it requires CLI contract
+	// protocolcli.SourceBoundCacheContract.
+	SourceBound bool `json:"sourceBound,omitempty"`
 }
 
 // IsEnabled returns whether caching is enabled for this task.

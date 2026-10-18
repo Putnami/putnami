@@ -190,6 +190,7 @@ func ExpandPipelineWithOptions(
 				effectiveCachePolicy.Deterministic = task.Cache.Deterministic
 				effectiveCachePolicy.VersionAware = task.Cache.VersionAware
 				effectiveCachePolicy.NoOutput = task.Cache.NoOutput
+				effectiveCachePolicy.SourceBound = task.Cache.SourceBound
 			}
 		} else if task.Cache != nil && task.Cache.Key != nil {
 			filePatterns = task.Cache.Key.Files

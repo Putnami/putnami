@@ -260,6 +260,46 @@ func TestExpandPipeline_NoOutputPropagates(t *testing.T) {
 	}
 }
 
+// TestSourceBoundPropagatesThroughTheDerivedPolicy guards both inputs-derived
+// policy rebuilds, the pipeline expansion and the single-step command job of
+// Resolve. A dropped sourceBound would store and look up a describe entry at
+// its cache key alone, so a hit could serve another source binding's result.
+func TestSourceBoundPropagatesThroughTheDerivedPolicy(t *testing.T) {
+	describe := TaskDefinition{
+		Kind:    "command",
+		Command: "runtime",
+		Inputs: map[string]TaskInputPort{
+			"sources": {From: "project", Files: []string{"**/*.go"}},
+		},
+		Cache: &TaskCachePolicy{Deterministic: true, SourceBound: true},
+	}
+	ext := &ExtensionDescription{Name: "@putnami/go", Tasks: map[string]TaskDefinition{"build-describe": describe}}
+
+	expanded, err := ExpandPipeline("build", &JobDefinition{Name: "build"}, []PipelineStep{{ID: "describe", Task: "build-describe"}}, ext, nil)
+	if err != nil {
+		t.Fatalf("ExpandPipeline: %v", err)
+	}
+	if len(expanded) != 1 {
+		t.Fatalf("expected 1 expanded step, got %d", len(expanded))
+	}
+	if policy := expanded[0].JobDef.TaskCachePolicy; policy == nil || !policy.SourceBound || policy.Key == nil {
+		t.Errorf("pipeline step: expected sourceBound beside the derived key, got %+v", policy)
+	}
+
+	resolved := Resolve(&Manifest{
+		Name:     "@putnami/go",
+		Commands: map[string]CommandDefinition{"describe": {Run: []PipelineStep{{ID: "describe", Task: "build-describe"}}}},
+		Tasks:    map[string]TaskDefinition{"build-describe": describe},
+	}, t.TempDir())
+	job := resolved.Jobs["describe"]
+	if job == nil {
+		t.Fatalf("Resolve produced no describe job: %v", resolved.Jobs)
+	}
+	if policy := job.TaskCachePolicy; policy == nil || !policy.SourceBound || policy.Key == nil {
+		t.Errorf("single-step command job: expected sourceBound beside the derived key, got %+v", policy)
+	}
+}
+
 func TestExpandPipeline_BatchablePolicyPropagates(t *testing.T) {
 	policy := &TaskBatchPolicy{
 		Tool:        "biome",

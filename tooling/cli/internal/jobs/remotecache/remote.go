@@ -341,6 +341,16 @@ func (r *RemoteCache) Negotiate(
 			executesLocally = true
 			continue
 		}
+		// A source-bound task's entry lives at a store key that also binds the
+		// project's current source binding (cachekey.SourceBoundEntryKey), which
+		// this negotiation does not compute. Nothing is ever published at the
+		// address of its plain key, so it is not offered: the restore fetches the
+		// entry on demand at the bound key, and counting the task as executing
+		// keeps the provider up for it.
+		if cachekey.TaskIsSourceBound(job) {
+			executesLocally = true
+			continue
+		}
 		// A declared-capture task negotiates the FORMAT-QUALIFIED address rather
 		// than the raw key: that is where its entry lives in the remote cache, and
 		// the separation is what keeps a pre-B4c binary from ever receiving a

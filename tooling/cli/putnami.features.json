@@ -1151,6 +1151,27 @@
               "verification-report-returns-what-the-cache-corroborates"
             ]
           }
+        },
+        {
+          "id": "source-bound-cache",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-entry-is-found-only-at-its-binding",
+              "an-entry-at-the-plain-key-never-serves",
+              "a-binding-error-inside-a-repository-executes-and-stores-nothing",
+              "an-unmanaged-workspace-uses-the-empty-binding",
+              "the-remote-and-status-only-legs-use-the-bound-key",
+              "a-lease-at-one-binding-never-holds-a-waiter-at-another",
+              "a-source-bound-failure-is-never-replayed",
+              "a-source-bound-entry-prunes-no-producer",
+              "a-test-only-edit-stores-beside-the-first-entry-and-keeps-every-key"
+            ]
+          }
         }
       ]
     },

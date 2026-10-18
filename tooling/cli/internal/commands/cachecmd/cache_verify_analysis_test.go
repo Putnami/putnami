@@ -65,6 +65,32 @@ func TestAnalyzeRejectsUnclassifiedGeneratedPaths(t *testing.T) {
 	assertFinding(t, report, "gen-classification", "error")
 }
 
+// A source-bound task stores each run's entry at its cache key bound to the
+// source binding that run was stamped with. The double-run comparison reads
+// each entry there; a run whose stamp named no binding stored nothing, and
+// reads as unpublished.
+func TestAnalyzeReadsASourceBoundEntryAtItsStampedBinding(t *testing.T) {
+	const binding = "source-v1:sha256:tree"
+	// The entries at the plain key differ, so reading them there would report
+	// a double-run artifact change.
+	fixture := newVerificationFixture(t, "stable-key", "stable-key", "first", "second")
+	fixture.job.JobDef.TaskCachePolicy.SourceBound = true
+	ingestVerificationEntry(t, fixture.first.StoreRoot, cachekey.SourceBoundEntryKey("stable-key", binding), "same")
+	ingestVerificationEntry(t, fixture.second.StoreRoot, cachekey.SourceBoundEntryKey("stable-key", binding), "same")
+	for _, run := range []Run{fixture.first, fixture.second} {
+		result := run.Results[fixture.job.Key()]
+		result.SourceBinding, result.SourceBindingStamped = binding, true
+	}
+	report := Analyze([]string{"build"}, fixture.first, fixture.second, fixture.hit)
+	if report.Status != "passed" || report.Summary.Blocking != 0 {
+		t.Fatalf("report = %+v, want each run's entry read at its stamped binding", report)
+	}
+
+	fixture.second.Results[fixture.job.Key()].SourceBindingStamped = false
+	report = Analyze([]string{"build"}, fixture.first, fixture.second, fixture.hit)
+	assertFinding(t, report, "double-run-artifact", "error")
+}
+
 func TestWriteAllowedResolvesProjectAndWorkspaceOutputRoots(t *testing.T) {
 	job := &jobs.ScheduledJob{Project: &workspace.Project{ID: "/app", Path: "apps/app"}}
 	contract := cachekey.VerificationContract{Outputs: []cachekey.VerificationOutput{

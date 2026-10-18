@@ -81,7 +81,8 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: VerbVocabularyContract for a verb vocabulary,
+// the manifest: SourceBoundCacheContract for a task that declares
+// cache.sourceBound, VerbVocabularyContract for a verb vocabulary,
 // ExtensionDependenciesContract for extensionDependencies that
 // name a registry extension, ReleaseBaselineInputContract for a task that
 // declares the releaseBaseline runtime input, GitInputModeContract (the same
@@ -125,6 +126,9 @@ func RequiredLoadContract(m *Manifest) int {
 		if declaresGoEmbedSelector(task) {
 			required = max(required, protocolcli.GoEmbedInputsContract)
 		}
+		if declaresSourceBound(task) {
+			required = max(required, protocolcli.SourceBoundCacheContract)
+		}
 	}
 	// A vocabulary's default traits change plans wherever the manifest loads
 	// from, so its rung is part of the load floor.
@@ -132,6 +136,13 @@ func RequiredLoadContract(m *Manifest) int {
 		required = max(required, protocolcli.VerbVocabularyContract)
 	}
 	return required
+}
+
+// declaresSourceBound reports whether a task declares the source-bound cache
+// policy, whose stored results the CLI serves only while the project's source
+// binding is unchanged.
+func declaresSourceBound(task TaskDefinition) bool {
+	return task.Cache != nil && task.Cache.SourceBound
 }
 
 // declaresGitInput reports whether a task selects files with a `git:` pattern
