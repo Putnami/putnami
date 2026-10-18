@@ -251,7 +251,9 @@ binding does cover test files, specs and `putnami.features.json`. So
 key. The CLI stores describe's entry at a key that also binds the binding, so
 the first run after the edit executes the owning project's describe and stores
 a second entry, and a later run at either tree hits its own entry. Its
-dependents keep their keys and their hits. See [Source-Bound Tasks](../../../tooling/cli/doc/10-caching.md#source-bound-tasks).
+dependents keep their keys and their hits. Describe declares the committed
+`schema/feature-evidence/go-framework.json` as an output, so a hit also
+restores the committed evidence of the binding it was stored at. See [Source-Bound Tasks](../../../tooling/cli/doc/10-caching.md#source-bound-tasks).
 
 `test-exec` declares `**/*_test.go`, because it runs those files: excluding them
 there would serve a stored verdict for a test the run never executed.

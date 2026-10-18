@@ -150,6 +150,11 @@ type RemoteCache struct {
 	// stats accumulates this run's cache activity (hits, bytes, time saved vs
 	// spent) for the post-run summary. Always non-nil for a live RemoteCache.
 	stats *cachekey.CacheStats
+
+	// sourceBoundEntryKey resolves the store key a source-bound task is
+	// looked up at (SetSourceBoundEntryKey). Nil means negotiation cannot
+	// tell whether such a task hits locally.
+	sourceBoundEntryKey func(job *jobmodel.ScheduledJob, key string) (string, bool)
 }
 
 // Stats returns this run's accumulated cache activity, or nil for a nil cache
@@ -177,6 +182,31 @@ func (r *RemoteCache) SetCacheStats(stats *cachekey.CacheStats) {
 	if r != nil {
 		r.stats = stats
 	}
+}
+
+// SetSourceBoundEntryKey makes resolve the way negotiation finds the store key
+// a source-bound task is looked up at. The scheduler hands it the resolver its
+// own lookup uses. A nil cache ignores it.
+func (r *RemoteCache) SetSourceBoundEntryKey(resolve func(job *jobmodel.ScheduledJob, key string) (string, bool)) {
+	if r != nil {
+		r.sourceBoundEntryKey = resolve
+	}
+}
+
+// sourceBoundHitsLocally reports whether the local store holds a full entry at
+// the store key a source-bound task is looked up at, for the project's binding
+// as negotiation sees it. Without a resolver or a binding it answers false, so
+// the task counts as one that may execute.
+func (r *RemoteCache) sourceBoundHitsLocally(job *jobmodel.ScheduledJob, hash string, cm *store.CacheManager) bool {
+	if r.sourceBoundEntryKey == nil {
+		return false
+	}
+	entryKey, ok := r.sourceBoundEntryKey(job, hash)
+	if !ok {
+		return false
+	}
+	entry, err := cm.LookupTaskEntry(entryKey)
+	return err == nil && entry != nil
 }
 
 // RecordSetup attributes the pre-run config resolution time to this run's cache
@@ -342,13 +372,17 @@ func (r *RemoteCache) Negotiate(
 			continue
 		}
 		// A source-bound task's entry lives at a store key that also binds the
-		// project's current source binding (cachekey.SourceBoundEntryKey), which
-		// this negotiation does not compute. Nothing is ever published at the
-		// address of its plain key, so it is not offered: the restore fetches the
-		// entry on demand at the bound key, and counting the task as executing
-		// keeps the provider up for it.
+		// project's current source binding (cachekey.SourceBoundEntryKey).
+		// Nothing is ever published at the address of its plain key, so it is
+		// not offered. Whether it may execute is asked at its bound key: a local
+		// entry there is a hit that needs no provider, so a fully warm rebuild
+		// still spins up nothing, and without one the task may execute, which
+		// keeps the provider up for its restore and its object cache. It stays
+		// out of LocalHits, because a planned write can still move the binding.
 		if cachekey.TaskIsSourceBound(job) {
-			executesLocally = true
+			if !r.sourceBoundHitsLocally(job, hash, cm) {
+				executesLocally = true
+			}
 			continue
 		}
 		// A declared-capture task negotiates the FORMAT-QUALIFIED address rather

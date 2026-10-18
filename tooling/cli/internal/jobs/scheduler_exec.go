@@ -361,11 +361,16 @@ func (s *Scheduler) prepareTask(
 		// source fixer may invalidate the shared memo concurrently.
 		item.sourceInputHash, _ = sourceInputDigest(s.ws, job, s.commandParams, s.cache)
 	}
-	if item.cacheEnabled && item.sharedResult == nil && cachekey.TaskIsSourceBound(job) {
-		// After the stamp refresh and the preBuild hook, the stamp holds the
-		// binding the subprocess is about to read. A follower reads nothing
-		// here: it adopts its leader's binding with the tree it captures.
-		item.sourceBinding, item.sourceBindingStamped = s.stampedSourceBinding(job)
+	if item.sharedResult == nil && cachekey.TaskIsSourceBound(job) {
+		// The stamp is written once per project per session, so it can name a
+		// binding an earlier task of this run has moved. Bring it to the
+		// current tree first, then read the binding the subprocess is about to
+		// read. A follower does neither: it adopts its leader's binding with
+		// the tree it captures.
+		s.restampSourceBinding(job)
+		if item.cacheEnabled {
+			item.sourceBinding, item.sourceBindingStamped = s.stampedSourceBinding(job)
+		}
 	}
 	return &item, jobDone{}
 }
@@ -809,7 +814,7 @@ func (s *Scheduler) finalizeExecutedJob(
 	// The entry key is the cache key, except for a source-bound task: its key
 	// also binds the binding the execution was stamped with, and a stamp that
 	// named none stores nothing (source_bound.go).
-	entryKey := cachekey.ExecutedEntryKey(job, cacheHash, result)
+	entryKey := s.executedEntryKey(job, cacheEnabled, cacheHash, result)
 	if cacheEnabled && s.cache != nil && entryKey != "" && cachekey.IsCacheableResult(job, result) {
 		stored := s.storeDeclaredCapture(job, result, entryKey)
 		if stored && !result.SourceMutated && s.remote != nil {

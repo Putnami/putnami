@@ -1644,8 +1644,10 @@ The local store and the remote cache use the same store key.
 
 1. When it stores the entry, the scheduler uses the binding the execution was
    stamped with: the one the stamp names for the project after the stamp
-   refresh and the preBuild hook. A follower of a shared execution uses its
-   leader's binding.
+   refresh and the preBuild hook. An earlier task of the run, such as a lint
+   fix, can move the binding after the stamp was written, so the scheduler
+   rewrites the stamp from the current binding first. A follower of a shared
+   execution uses its leader's binding.
 2. When it looks up the entry, the scheduler uses the project's current
    binding. An entry is found only at the binding its outputs embed.
 3. A workspace root Git does not manage uses the empty binding on both sides.
@@ -1656,15 +1658,22 @@ The local store and the remote cache use the same store key.
 6. The failure cache neither records nor replays a source-bound failure. Its
    record lives at the cache key alone, and the cause can be a file the key
    leaves out, such as an invalid `putnami.features.json`.
-7. Invocation pruning, the impact plan and remote negotiation work from cache
-   keys alone, so they report a source-bound entry as absent. The restore
-   fetches the remote entry on demand at its store key.
+7. Invocation pruning and the impact plan work from cache keys alone, so they
+   report a source-bound entry as absent. Remote negotiation never offers the
+   task's key, and the restore fetches the remote entry on demand at its store
+   key. Negotiation looks for a local entry at the store key: with one, a warm
+   run starts no cache provider for the task; without one, the task may
+   execute, and the provider starts as for any such task.
+8. The task declares every output that embeds the binding. For Go
+   `build-describe` that is `.gen/schema` and the committed
+   `schema/feature-evidence/go-framework.json`, so a hit restores the
+   committed evidence too.
 
 Entries stay immutable. A test-only edit stores a second entry beside the
 first, the next run at the same tree hits it, and a tree that returns to the
-earlier binding hits the earlier entry. Two sessions at the same cache key
-with different bindings lease different store keys, so neither waits on, or
-receives, the other's entry.
+earlier binding hits the earlier entry and gets its committed evidence back.
+Two sessions at the same cache key with different bindings lease different
+store keys, so neither waits on, or receives, the other's entry.
 
 A manifest with a task that declares `sourceBound` requires CLI contract 10
 (`SourceBoundCacheContract`), so an older CLI refuses the manifest instead of

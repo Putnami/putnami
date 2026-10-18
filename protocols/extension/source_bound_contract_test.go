@@ -9,10 +9,11 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 )
 
-// A reader before rung 10 has no check of the recorded source binding, so it
-// would replay outputs that embed a stale binding. A manifest with a task that
-// declares cache.sourceBound therefore needs rung 10, and a lower stamp is
-// refused with the reason.
+// A reader before rung 10 stores and looks up a source-bound entry at its
+// cache key alone, not at a key that also binds the project's source binding,
+// so it would serve outputs that embed another tree's binding. A manifest with
+// a task that declares cache.sourceBound therefore needs rung 10, and a lower
+// stamp is refused with the reason.
 func TestASourceBoundTaskRequiresTheSourceBoundCacheContract(t *testing.T) {
 	manifest := []byte(`{"name":"@test/go","cliContract":9,"commands":{"build":{"run":[{"id":"describe","task":"describe"}]}},"tasks":{"describe":{"kind":"command","command":"echo","inputs":{"sources":{"from":"project","files":["**/*.go"]}},"cache":{"enabled":true,"deterministic":true,"sourceBound":true}}}}`)
 	_, err := NegotiateManifest("go.json", manifest)

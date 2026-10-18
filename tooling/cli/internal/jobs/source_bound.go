@@ -22,8 +22,9 @@ import (
 // every store operation addresses while the cache key stays what dependents
 // fold:
 //
-//   - WRITE. prepareTask reads the binding the execution is about to be
-//     stamped with, from the stamp on disk, the one the subprocess reads.
+//   - WRITE. prepareTask brings the stamp to the current tree
+//     (restampSourceBinding), then reads the binding the execution is about
+//     to be stamped with, from the stamp on disk, the one the subprocess reads.
 //     closeTask puts it on the result, and finalizeExecutedJob stores and
 //     uploads the entry at the cache key bound to it
 //     (cachekey.ExecutedEntryKey). A follower adopts its leader's binding with
@@ -41,6 +42,31 @@ import (
 // executes, and its stamp names no binding either, so it stores nothing. The
 // failure cache stays keyed by the cache key alone, so it neither records nor
 // replays a source-bound failure (task_failure.go).
+
+// restampSourceBinding brings the build stamp of job's project to the tree as
+// it stands, before a source-bound execution reads it. refreshVersionFile
+// writes the stamp once per project per session, for the first task of the
+// project that executes. A later task can rewrite a project file, a lint fix
+// for example, and every execution drops its project's binding memo
+// (finalizeExecutedJob). Without this write the subprocess would read the
+// earlier binding, and its evidence and its entry would name a tree the run
+// has left. The write keeps a stamp whose identity already matches, so it
+// changes nothing when no source moved.
+func (s *Scheduler) restampSourceBinding(job *ScheduledJob) {
+	if s.ws == nil || job == nil || job.Project == nil {
+		return
+	}
+	s.versionFilesMu.Lock()
+	started := time.Now()
+	spawned := generateVersionFilesAtWithSourceBindings(
+		s.ws, []*ScheduledJob{job}, s.cfg.VersionInfo, s.versionBuildTime, true, s.capabilitySourceBindings,
+	)
+	s.versionFilesMu.Unlock()
+	s.cacheStats.RecordLocalBindings(started, time.Now(), spawned)
+	s.cache.InvalidateFileHashesUnder([]string{
+		filepath.Join(s.ws.Root, job.Project.Path, filepath.FromSlash(versionStampRelPath)),
+	})
+}
 
 // stampedSourceBinding returns the binding of job's own project that the build
 // stamp on disk carries, which is the one an execution started now reads. The
@@ -99,6 +125,19 @@ func (s *Scheduler) currentSourceBinding(job *ScheduledJob) (string, bool) {
 		return "", false
 	}
 	return result.binding, true
+}
+
+// executedEntryKey returns the store key an execution's entry is stored and
+// uploaded at (cachekey.ExecutedEntryKey). Under --debug it says when a
+// source-bound execution has none, because its stamp named no usable binding
+// and the task stores nothing.
+func (s *Scheduler) executedEntryKey(job *ScheduledJob, cacheEnabled bool, key string, result *JobResult) string {
+	entryKey := cachekey.ExecutedEntryKey(job, key, result)
+	if entryKey == "" && key != "" && cacheEnabled && s.cfg.Debug {
+		// The CLI installs no debug-level slog handler (storeDeclaredCapture).
+		slog.Info("source-bound task was stamped with no usable source binding; storing no entry", "job", job.Key())
+	}
+	return entryKey
 }
 
 // lookupEntryKey returns the store key that job's entry is looked up, leased

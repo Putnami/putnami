@@ -25,6 +25,11 @@ The two facts collide. After an edit to a test file, a spec or
 the entry an earlier tree produced. Its evidence names the earlier binding,
 and the committed `schema/feature-evidence/go-framework.json` goes stale.
 
+The committed evidence was also not a declared output. Only an executing
+describe wrote it, so a hit restored `.gen/schema/feature-evidence` and left
+the committed copy as it stood. The binding leaves `schema/feature-evidence/**`
+out, so it cannot see a stale committed copy either.
+
 ## Decision
 
 1. **A task declares that its outputs embed its project's binding.** The task
@@ -38,10 +43,13 @@ and the committed `schema/feature-evidence/go-framework.json` goes stale.
    digest of the cache key and the binding. The local store and the remote
    cache use the same key. The store takes it as an opaque key and does not
    change.
-   - **At store time** the binding is the one the execution was stamped with:
-     after the stamp refresh and the preBuild hook, the scheduler reads the
-     binding the stamp names for the task's own project. A follower of a
-     shared execution uses its leader's binding.
+   - **At store time** the binding is the one the execution was stamped with.
+     The stamp is written once per project per session, and an earlier task
+     of the run, such as a lint fix, can move the binding after that. So
+     after the stamp refresh and the preBuild hook, the scheduler first
+     rewrites the stamp from the current binding when the two differ, then
+     reads the binding the stamp names for the task's own project. A
+     follower of a shared execution uses its leader's binding.
    - **At lookup** the binding is the project's current one, from the memo the
      stamp writer reads.
    - **An unmanaged workspace** uses the empty binding on both sides.
@@ -57,11 +65,25 @@ and the committed `schema/feature-evidence/go-framework.json` goes stale.
    the cache key alone, so it records no source-bound failure and replays
    none: the cause can be a file the key leaves out.
 7. **No projection counts a source-bound entry as present.** Invocation
-   pruning, the impact plan and remote negotiation work from cache keys and
-   do not compute the current binding. They report the entry absent, and the
-   restore fetches it on demand at its store key. `cache verify` reads each
-   run's entry at the store key that run used.
-8. **A manifest that declares the field requires CLI contract 10**
+   pruning and the impact plan work from cache keys and do not compute the
+   current binding, so they report the entry absent. Remote negotiation
+   never offers the task's key, and the restore fetches the remote entry on
+   demand at its store key. To decide whether the run needs the cache
+   provider, negotiation asks the local store for an entry at the store key
+   of the current binding. With one, a warm run starts no provider for the
+   task. Without one, the task may execute, and the provider starts as for
+   any task that may execute. Negotiation still leaves the entry out of its
+   local hits, because a planned write can move the binding before the
+   lookup. `cache verify` reads each run's entry at the store key that run
+   used.
+8. **Every output that embeds the binding is declared.** `build-describe`
+   declares `.gen/schema` and the committed
+   `schema/feature-evidence/go-framework.json` (`featureEvidence`, optional,
+   not emptied, no drift). The app's describe binary is the only writer of
+   that file, so the claim is exclusive. A hit restores both copies, so a
+   tree that returns to an earlier binding gets that binding's evidence back
+   in the committed file too.
+9. **A manifest that declares the field requires CLI contract 10**
    (`protocols/cli.SourceBoundCacheContract`) wherever it loads from. An older
    CLI stores the entry at its cache key alone, so it refuses the manifest.
 
@@ -95,6 +117,19 @@ and the committed `schema/feature-evidence/go-framework.json` goes stale.
   it.
 - A test-only edit executes describe once. The next run at the same tree hits
   the new entry, and dependents stay served from their unchanged keys.
+- An edit, a run, a revert and a run leave the committed evidence at the
+  reverted tree's binding: the last run hits the first entry and restores its
+  committed copy.
+- `featureEvidence` declares no drift. The evidence moves with every binding
+  move, so a comparison would fail or warn on the first run after every test
+  edit. The clean-tree check of CI catches evidence left uncommitted.
+- Describe itself rewrites committed sidecars that `source-v1` covers, such
+  as `schema/http-routes.json` and `infra/requirements.json`. When an
+  execution changes one, its evidence names the binding before that write,
+  and the next run misses once and converges. This ADR does not change it.
+- Describe never deletes a committed evidence file. An app that loses its
+  last feature keeps the earlier file, and its entry captures the file as it
+  stands.
 - Each binding a project passes through leaves one describe entry. Store
   collection reclaims them like any other entry.
 - Two sessions at the same cache key and different bindings take different

@@ -1169,7 +1169,8 @@
               "a-lease-at-one-binding-never-holds-a-waiter-at-another",
               "a-source-bound-failure-is-never-replayed",
               "a-source-bound-entry-prunes-no-producer",
-              "a-test-only-edit-stores-beside-the-first-entry-and-keeps-every-key"
+              "a-test-only-edit-stores-beside-the-first-entry-and-keeps-every-key",
+              "an-execution-after-an-in-run-rewrite-reads-the-current-binding"
             ]
           }
         }

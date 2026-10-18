@@ -216,7 +216,8 @@ func publishSourceBoundMatrixEntry(t *testing.T, server *fakeCacheServer, job *S
 
 // The remote cache addresses the same bound key on every leg. A full restore
 // and a status-only hit, remote or local, serve only at the binding the
-// producer was stamped with, and negotiation never offers the plain key.
+// producer was stamped with, and negotiation never offers the plain key. A
+// warm run, whose store holds the entry at the bound key, starts no provider.
 func TestSourceBoundRemoteAndStatusOnlyLegsUseTheBoundKey(t *testing.T) {
 	spectest.Proves(t, sourceBoundFeature, sourceBoundRequirement, "the-remote-and-status-only-legs-use-the-bound-key")
 	const stamped, other = "source-v1:sha256:producer", "source-v1:sha256:other"
@@ -226,11 +227,17 @@ func TestSourceBoundRemoteAndStatusOnlyLegsUseTheBoundKey(t *testing.T) {
 		job := sourceBoundMatrixJob()
 		key, want := publishSourceBoundMatrixEntry(t, server, job, stamped)
 		consumer, remote := resultOnlyConsumer(t, server, cache.ModeFull)
+		stubSourceBinding(consumer.sched, other, nil, false)
+		started := server.requestCount(cache.OpInitialize)
 		remote.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, cachekey.CacheBypass{})
 		if slices.Contains(server.prefetched(), store.RemoteTaskEntryKey(key)) {
 			t.Fatal("negotiation offered the plain key of a source-bound task")
 		}
-		stubSourceBinding(consumer.sched, other, nil, false)
+		// The store holds no entry at the bound key, so the task may execute,
+		// and negotiation starts the provider for it as for any such task.
+		if got := server.requestCount(cache.OpInitialize); got != started+1 {
+			t.Fatalf("initialize requests after a cold negotiation = %d, want %d", got, started+1)
+		}
 		if result := consumer.runDeclaredLookup(t, job, key); result != nil {
 			t.Fatalf("a remote entry stored at another binding was served: %+v", result)
 		}
@@ -239,6 +246,21 @@ func TestSourceBoundRemoteAndStatusOnlyLegsUseTheBoundKey(t *testing.T) {
 			t.Fatalf("remote lookup at the producer's binding = %+v, want a remote-cache hit", result)
 		}
 		assertSameTree(t, "remote at the producer's binding", want, declaredTree(t, consumer))
+
+		// The next run of the workspace finds the restored entry at the bound
+		// key. Negotiation asks that key, so the warm run starts no provider.
+		next := attachRemote(t, consumer, cache.ModeFull)
+		warm := server.requestCount(cache.OpInitialize)
+		next.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, cachekey.CacheBypass{})
+		if got := server.requestCount(cache.OpInitialize); got != warm {
+			t.Fatalf("a warm negotiation started the provider for a source-bound task (%d initialize requests, want %d)", got, warm)
+		}
+		if result := consumer.runDeclaredLookup(t, job, key); result == nil || result.Reuse != ReuseLocalCache {
+			t.Fatalf("warm lookup at the producer's binding = %+v, want a local-cache hit", result)
+		}
+		if got := server.requestCount(cache.OpInitialize); got != warm {
+			t.Fatalf("a warm local hit started the provider (%d initialize requests, want %d)", got, warm)
+		}
 	})
 
 	t.Run("status only", func(t *testing.T) {
@@ -247,6 +269,7 @@ func TestSourceBoundRemoteAndStatusOnlyLegsUseTheBoundKey(t *testing.T) {
 		job := sourceBoundMatrixJob()
 		key, _ := publishSourceBoundMatrixEntry(t, server, job, stamped)
 		consumer, remote := resultOnlyConsumer(t, server, cache.ModeMinimal)
+		stubSourceBinding(consumer.sched, other, nil, false)
 		remote.Negotiate(t.Context(), consumer.ws, []*ScheduledJob{job}, nil, nil, consumer.cache, cachekey.CacheBypass{})
 		if remote.TaskFilesNeeded(job) {
 			t.Fatal("the fixture reads the task's files, so the status-only legs would not run")
@@ -254,7 +277,6 @@ func TestSourceBoundRemoteAndStatusOnlyLegsUseTheBoundKey(t *testing.T) {
 		if slices.Contains(server.prefetchedResultOnly(), store.RemoteTaskEntryKey(key)) {
 			t.Fatal("negotiation offered the plain key of a source-bound task as result-only")
 		}
-		stubSourceBinding(consumer.sched, other, nil, false)
 		if result := consumer.runDeclaredLookup(t, job, key); result != nil {
 			t.Fatalf("a status-only hit stored at another binding was served: %+v", result)
 		}
@@ -422,30 +444,54 @@ func TestStampedSourceBindingReadsOnlyAUsableOwnBinding(t *testing.T) {
 	}
 }
 
+// sourceBoundEvents is the protocol v2 event stream of a script that
+// succeeds.
+const sourceBoundEvents = "printf '%s\\n' '{\"v\":2,\"type\":\"meta\",\"data\":{\"protocol\":2}}'\n" +
+	"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"OK\"}}'\n"
+
+// committedFeatureEvidence is where the Go framework's committed feature
+// evidence lives, relative to its project.
+const committedFeatureEvidence = "schema/feature-evidence/go-framework.json"
+
 // sourceBoundRunFixture is a Git-managed workspace with one project, a
-// source-bound describe task that copies the build stamp into a committed
-// evidence file, and a compile task whose key folds describe's. Neither key
-// reads test files.
+// describe task and a compile task whose key folds describe's.
+//
+// The describe task is @putnami/go's real build-describe contract: the
+// fixture reads its declared outputs and its cache policy from
+// go/extension/putnami.extension.json. Only its command is a script, which
+// writes the evidence the way the describe binary does: the build stamp
+// copied into .gen/schema/feature-evidence, then promoted to the committed
+// copy. The key reads the project's Go files without test files, as the real
+// sources input does; the fixture needs none of its other inputs.
 func sourceBoundRunFixture(t *testing.T, describeLog, compileLog string) (*workspace.Workspace, []*ScheduledJob) {
 	t.Helper()
+	goExtension := extension.LoadExtensionFromDir(filepath.Join(findJobsRepoRoot(t), "go", "extension"), "/go/extension")
+	if goExtension == nil {
+		t.Fatal("go/extension/putnami.extension.json did not load")
+	}
+	describeTask, ok := goExtension.Tasks["build-describe"]
+	if !ok || describeTask.Declares == nil || describeTask.Cache == nil || !describeTask.Cache.SourceBound {
+		t.Fatalf("build-describe = %+v, want a declared, source-bound task", describeTask)
+	}
+	describePolicy := *describeTask.Cache
+
 	root := t.TempDir()
 	runVersionsGit(t, root, "init")
 	writeTestFile(t, filepath.Join(root, "app", "main.go"), "package main\n")
 	writeTestFile(t, filepath.Join(root, "app", "main_test.go"), "package main\n\n// first comment\n")
 
 	scripts := t.TempDir()
-	events := "printf '%s\\n' '{\"v\":2,\"type\":\"meta\",\"data\":{\"protocol\":2}}'\n" +
-		"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"OK\"}}'\n"
 	describe := filepath.Join(scripts, "describe.sh")
 	writeExecutable(t, describe, "#!/bin/sh\n"+
 		"printf 'run\\n' >> "+shellQuote(describeLog)+"\n"+
-		"mkdir -p schema/feature-evidence\n"+
-		"cp .gen/version.json schema/feature-evidence/probe.json\n"+
-		events+"exit 0\n")
+		"mkdir -p .gen/schema/feature-evidence schema/feature-evidence\n"+
+		"cp .gen/version.json .gen/schema/feature-evidence/go-framework.json\n"+
+		"cp .gen/schema/feature-evidence/go-framework.json "+committedFeatureEvidence+"\n"+
+		sourceBoundEvents+"exit 0\n")
 	compile := filepath.Join(scripts, "compile.sh")
 	writeExecutable(t, compile, "#!/bin/sh\n"+
 		"printf 'run\\n' >> "+shellQuote(compileLog)+"\n"+
-		events+"exit 0\n")
+		sourceBoundEvents+"exit 0\n")
 
 	project := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
 	ws := workspace.NewWorkspace(root, nil, []*workspace.Project{project})
@@ -455,10 +501,8 @@ func sourceBoundRunFixture(t *testing.T, describeLog, compileLog string) (*works
 		Version: "1.0.0",
 		Path:    filepath.Join(root, "ext"),
 		Tasks: map[string]extension.TaskDefinition{
-			"probe-describe": {Declares: &extension.TaskDeclaration{Outputs: map[string]extension.DeclaredOutput{
-				"evidence": fileDeclaration(extension.OutputRootProject, "schema/feature-evidence/probe.json", false),
-			}}},
-			"probe-compile": {Declares: &extension.TaskDeclaration{}},
+			"build-describe": describeTask,
+			"probe-compile":  {Declares: &extension.TaskDeclaration{}},
 		},
 	}
 	sources := []string{"**/*.go", "!**/*_test.go"}
@@ -474,17 +518,41 @@ func sourceBoundRunFixture(t *testing.T, describeLog, compileLog string) (*works
 			},
 		}
 	}
-	describeJob := job("build~describe", "probe-describe", describe, &extension.TaskCachePolicy{Deterministic: true, SourceBound: true})
+	describeJob := job("build~describe", "build-describe", describe, &describePolicy)
 	compileJob := job("build~compile", "probe-compile", compile, &extension.TaskCachePolicy{Deterministic: true, NoOutput: true})
 	compileJob.DependsOn = []string{describeJob.Key()}
 	return ws, []*ScheduledJob{describeJob, compileJob}
 }
 
-// The defect this policy closes, end to end through the real scheduler. An
-// edit to a test file moves the project's source binding and no key. The
-// first run after it executes describe and stores a second entry beside the
-// first, the next run at the same tree hits it, and a tree that returns to the
-// earlier binding hits the earlier entry. The describe key, and the key of the
+// sourceBoundEvidenceBinding returns the binding the committed feature
+// evidence of the fixture's project names, after checking that the .gen copy
+// holds the same bytes.
+func sourceBoundEvidenceBinding(t *testing.T, projectRoot string) string {
+	t.Helper()
+	committed := readFileAt(t, filepath.Join(projectRoot, filepath.FromSlash(committedFeatureEvidence)))
+	if generated := readFileAt(t, filepath.Join(projectRoot, ".gen", filepath.FromSlash(committedFeatureEvidence))); generated != committed {
+		t.Fatalf("the committed evidence and its .gen copy differ:\n committed %s\n generated %s", committed, generated)
+	}
+	var stamp VersionInfo
+	if err := json.Unmarshal([]byte(committed), &stamp); err != nil {
+		t.Fatalf("decode evidence: %v", err)
+	}
+	for _, pkg := range stamp.CapabilityPackages {
+		if pkg.Package == "app" {
+			return pkg.SourceBinding
+		}
+	}
+	t.Fatalf("evidence names no binding for app: %+v", stamp)
+	return ""
+}
+
+// The defect this policy closes, end to end through the real scheduler and
+// the real build-describe declaration. An edit to a test file moves the
+// project's source binding and no key. The first run after it executes
+// describe and stores a second entry beside the first, and the next run at the
+// same tree hits it. Reverting the edit returns the tree to the earlier
+// binding: the run hits the earlier entry, and its restore puts the committed
+// evidence back at the earlier binding. The describe key, and the key of the
 // task that folds it, never move, and the dependent is served from its key on
 // every run.
 func TestSourceBoundTestOnlyEditStoresBesideTheFirstEntryAndKeepsEveryKey(t *testing.T) {
@@ -524,17 +592,7 @@ func TestSourceBoundTestOnlyEditStoresBesideTheFirstEntryAndKeepsEveryKey(t *tes
 	}
 	evidenceBinding := func() string {
 		t.Helper()
-		var stamp VersionInfo
-		if err := json.Unmarshal([]byte(readFileAt(t, filepath.Join(projectRoot, "schema", "feature-evidence", "probe.json"))), &stamp); err != nil {
-			t.Fatalf("decode evidence: %v", err)
-		}
-		for _, pkg := range stamp.CapabilityPackages {
-			if pkg.Package == "app" {
-				return pkg.SourceBinding
-			}
-		}
-		t.Fatalf("evidence names no binding for app: %+v", stamp)
-		return ""
+		return sourceBoundEvidenceBinding(t, projectRoot)
 	}
 	storedAt := func(binding string) bool {
 		t.Helper()
@@ -569,12 +627,17 @@ func TestSourceBoundTestOnlyEditStoresBesideTheFirstEntryAndKeepsEveryKey(t *tes
 		t.Fatalf("second run left evidence binding %q, want %q", got, after)
 	}
 
+	// Revert the edit. Only the restore can rewrite the committed evidence
+	// now, because describe does not execute.
 	writeTestFile(t, testFile, "package main\n\n// first comment\n")
 	if got := resultOf(t, run("back at the earlier tree", 2), planned, 0); !got.Reuse.CacheHit() {
 		t.Fatalf("back at the earlier tree: describe = %+v, want a hit on the earlier entry", got)
 	}
 	if got := evidenceBinding(); got != before {
-		t.Fatalf("back at the earlier tree: evidence binding %q, want the earlier %q", got, before)
+		t.Fatalf("back at the earlier tree: committed evidence binding %q, want the earlier %q", got, before)
+	}
+	if stamped := readVersionStamp(t, projectRoot); stamped.CapabilityPackages[0].SourceBinding != before {
+		t.Fatalf("back at the earlier tree: stamp binding %q, want the earlier %q", stamped.CapabilityPackages[0].SourceBinding, before)
 	}
 
 	// Both entries sit side by side at their bound keys, and none at the
@@ -584,5 +647,75 @@ func TestSourceBoundTestOnlyEditStoresBesideTheFirstEntryAndKeepsEveryKey(t *tes
 	}
 	if entry, err := cache.LookupTaskEntry(keys[0]); err != nil || entry != nil {
 		t.Fatalf("a describe entry was stored at the plain key: %+v, %v", entry, err)
+	}
+}
+
+// An earlier task of the same run rewrites a test file of the project after
+// the project's stamp was written, the way a lint fix does. Describe executes
+// at the binding of the rewritten tree: its evidence and its entry name that
+// binding, so the next run at the same tree hits.
+func TestSourceBoundExecutionAfterAnInRunRewriteReadsTheCurrentBinding(t *testing.T) {
+	spectest.Proves(t, sourceBoundFeature, sourceBoundRequirement, "an-execution-after-an-in-run-rewrite-reads-the-current-binding")
+	requireShell(t)
+	logs := t.TempDir()
+	describeLog, compileLog := filepath.Join(logs, "describe"), filepath.Join(logs, "compile")
+	ws, planned := sourceBoundRunFixture(t, describeLog, compileLog)
+	projectRoot := filepath.Join(ws.Root, "app")
+
+	// The fixer is uncached, so it executes on every run and is the first
+	// task of the project to execute: it writes the project's stamp, then
+	// rewrites the test file.
+	describeJob := planned[0]
+	fixer := filepath.Join(t.TempDir(), "fix.sh")
+	writeExecutable(t, fixer, "#!/bin/sh\n"+
+		"printf 'package main\\n\\n// fixed comment\\n' > main_test.go\n"+
+		sourceBoundEvents+"exit 0\n")
+	commandName, step := jobCommandAndStep("lint~fix")
+	describeJob.Extension.Tasks["probe-fix"] = extension.TaskDefinition{Declares: &extension.TaskDeclaration{}}
+	fixJob := &ScheduledJob{
+		Project:   describeJob.Project,
+		Extension: describeJob.Extension,
+		Step:      &extension.PipelineStep{ID: step, Task: "probe-fix"},
+		JobDef: &extension.JobDefinition{
+			ExtensionName: "@test/probe", Name: "lint~fix", CommandName: commandName, StepID: step,
+			Command: fixer, Cwd: "{projectRoot}",
+		},
+	}
+	describeJob.DependsOn = []string{fixJob.Key()}
+	planned = append(planned, fixJob)
+
+	cache := sharedRuntimeCache(t)
+	run := func(name string) *JobResult {
+		t.Helper()
+		result := runSharedScheduler(t.Context(), ws, planned, SchedulerConfig{MaxParallel: 1}, cache)
+		for i := range planned {
+			if got := resultOf(t, result, planned, i); got.Status != "success" {
+				t.Fatalf("%s: %s = %+v, want success", name, planned[i].Key(), got)
+			}
+		}
+		return resultOf(t, result, planned, 0)
+	}
+
+	if got := run("the run that rewrites the test file"); got.Reuse.CacheHit() {
+		t.Fatalf("the run that rewrites the test file: describe = %+v, want an execution", got)
+	}
+	evidence := sourceBoundEvidenceBinding(t, projectRoot)
+	if got := readFileAt(t, filepath.Join(projectRoot, "main_test.go")); !strings.Contains(got, "fixed comment") {
+		t.Fatalf("the fixer did not rewrite the test file: %q", got)
+	}
+
+	second := run("the next run at the rewritten tree")
+	if !second.Reuse.CacheHit() {
+		t.Fatalf("the next run at the rewritten tree: describe = %+v, want a hit: the first run stored its entry at the binding before the rewrite", second)
+	}
+	if got := subprocessRuns(t, describeLog); got != 1 {
+		t.Fatalf("describe executions = %d, want 1", got)
+	}
+	// The second run stamps the rewritten tree before any task runs.
+	if stamped := readVersionStamp(t, projectRoot).CapabilityPackages[0].SourceBinding; stamped != evidence {
+		t.Fatalf("the first run's evidence names %q, the rewritten tree's binding is %q", evidence, stamped)
+	}
+	if got := sourceBoundEvidenceBinding(t, projectRoot); got != evidence {
+		t.Fatalf("the hit left evidence binding %q, want %q", got, evidence)
 	}
 }

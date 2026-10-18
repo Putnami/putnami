@@ -139,8 +139,9 @@ func RequiredLoadContract(m *Manifest) int {
 }
 
 // declaresSourceBound reports whether a task declares the source-bound cache
-// policy, whose stored results the CLI serves only while the project's source
-// binding is unchanged.
+// policy, whose entries the CLI stores and looks up at a key derived from the
+// cache key and the project's source binding, so an entry serves only at the
+// binding it was stored at.
 func declaresSourceBound(task TaskDefinition) bool {
 	return task.Cache != nil && task.Cache.SourceBound
 }
