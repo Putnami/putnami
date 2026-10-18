@@ -403,6 +403,22 @@
               "a-tree-that-cannot-be-identified-has-no-fingerprint"
             ]
           }
+        },
+        {
+          "id": "host-rpc-client",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "dial-without-a-channel-names-putnami-and-the-missing-variables",
+              "every-request-carries-the-token-and-a-fresh-id",
+              "a-host-refusal-is-a-typed-error",
+              "an-answer-the-client-cannot-trust-breaks-it"
+            ]
+          }
         }
       ]
     }

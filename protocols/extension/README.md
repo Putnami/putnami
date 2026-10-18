@@ -105,6 +105,9 @@ validated, tested, cached on, and reasoned about by tooling in any language.
   `_meta["putnami.dev/provider"]` declaration and the routing belong to
   [`protocols/collaboration`](../collaboration/README.md); this package does
   not import it.
+- The subpackage [`hostrpc`](hostrpc/README.md) is the wire contract of the
+  host RPC channel: the calls an interactive subcommand's process makes into
+  the CLI that started it, over a Unix socket the CLI opens for that launch.
 
 Detailed contract documentation lives in [`doc/`](doc):
 [01 manifest](doc/01-manifest.md), [02 commands and tasks](doc/02-commands-and-tasks.md),

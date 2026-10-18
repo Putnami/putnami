@@ -247,6 +247,19 @@ The CLI reads `workspace`, `interactive` and `default` on the group and the
 top-level subcommand it dispatches. A nested subcommand is validated with the
 same rules and carries no dispatch meaning.
 
+An `interactive` subcommand's process can call the CLI that started it. The
+CLI opens a host RPC channel for that launch and passes the socket path in
+`PUTNAMI_HOST_RPC` and a per-launch token in `PUTNAMI_HOST_RPC_TOKEN`. The
+channel closes when the process exits. Through it, the process calls a
+collaboration contract operation and gets the envelope `putnami <contract>
+<operation> --output=json` prints, without starting `putnami` again. A
+subcommand that is not `interactive` runs as a planned job and gets no
+channel: its result is cached, and a call its cache key does not cover must
+not decide it. The wire contract is
+[`hostrpc`](../hostrpc/README.md); Go extensions call it through
+`go.putnami.dev/sdk/extension/hostrpc`. No manifest member declares the
+channel, so it does not move the `cliContract`.
+
 Neither member moves the manifest's `cliContract`. A CLI that predates them
 ignores both: it prints the group help where a newer CLI runs the default, and
 it never runs a subcommand outside a workspace. Both readings fail safe, so no

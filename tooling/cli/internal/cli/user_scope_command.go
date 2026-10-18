@@ -102,7 +102,9 @@ func (a *App) runUserScopeSubcommand(
 	}
 	// No version snapshot: the user scope is not a repository, and the caller's
 	// directory is none of the CLI's business beyond being where the job runs.
-	return runInteractiveExtensionCommand(ctx, ws, job, commandParams, nil, stdin, stdout, stderr)
+	// The host RPC channel has no workspace to answer from either, so its
+	// workspace methods refuse.
+	return runInteractiveExtensionCommand(ctx, ws, job, commandParams, nil, hostRPCBinding{}, stdin, stdout, stderr)
 }
 
 // userScopeSelectionFlags names the project-selection flags present in global,

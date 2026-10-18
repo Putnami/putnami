@@ -1,0 +1,94 @@
+# Host RPC protocol
+
+`go.putnami.dev/protocol/extension/hostrpc` is the wire contract of the host
+RPC channel. Through it, an extension command calls into the `putnami` process
+that launched it. It does not start a second `putnami` process.
+
+## Why
+
+An extension command sometimes needs an answer that only the core has: the
+envelope of a collaboration contract operation, or a verification report the
+cache can corroborate. Before this channel, the only way to get one was to run
+`putnami` again as a subprocess. That second process loads the workspace again,
+resolves the extensions again and can disagree with its parent. The channel
+lets the extension ask the process that already holds that state.
+
+## Who receives it
+
+The host opens one channel for each interactive command-group subcommand it
+launches, and closes it when that process exits. The child's environment
+carries two variables:
+
+| Variable | Value |
+|---|---|
+| `PUTNAMI_HOST_RPC` (`SocketEnv`) | The path of a Unix socket in a fresh directory that only the user can open (mode 0700). |
+| `PUTNAMI_HOST_RPC_TOKEN` (`TokenEnv`) | 32 random bytes (`TokenBytes`), hex-encoded. |
+
+The host sets neither variable for these processes:
+
+- a planned job, such as a build job or a non-interactive subcommand, whose
+  result the cache keys and whose answer must not depend on a call the key
+  does not cover;
+- a provider tool the core calls;
+- any process of a hosted run (`--credential-fd`).
+
+The host also removes an inherited value from these processes, so a nested
+`putnami` run never passes its parent's channel on. If the host cannot open
+the channel, the child receives no variable and the host prints a warning.
+
+## Frames
+
+- JSON-RPC 2.0. Each frame is one JSON object followed by a newline (`\n`).
+- A frame is at most 32 MiB (`MaxFrameBytes`) without its newline, in both
+  directions. The host answers a longer frame with `-32600` and closes the
+  connection.
+- One connection serves its requests in order, one at a time. The host
+  serializes calls across connections too.
+- Every request carries the token in a top-level `token` member. The host
+  compares it in constant time. A request with any other token gets `-32001`,
+  and the host closes the connection.
+- A request without an `id` is a notification. No method accepts one, so the
+  host answers nothing.
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"host.hello","token":"<64 hex characters>"}
+{"jsonrpc":"2.0","id":1,"result":{"protocol":1,"methods":["collaboration.call","host.hello","verification.report"]}}
+```
+
+## Methods
+
+| Method | Params | Result |
+|---|---|---|
+| `host.hello` | none | `{"protocol": 1, "methods": [...]}` (`HelloResult`) |
+| `collaboration.call` | `{"contract", "operation", "input"}` (`CollaborationCallParams`) | The envelope `putnami <contract> <operation> --output=json` prints for the same request, byte for byte. |
+| `verification.report` | `{"project", "task", "path", "digest"}` (`VerificationReportParams`) | `{"report": "<base64>"}` (`VerificationReportResult`): the bytes a successful cached test run produced, after the cache corroborated them. |
+
+Params are strict: an unknown member is `-32602`. `collaboration.call` routes
+contract operations only. `proposals finalize` is a command, not an operation,
+and is refused with `-32602`.
+
+## Errors
+
+| Code | Meaning |
+|---|---|
+| `-32700` | The frame is not JSON. |
+| `-32600` | The frame is not a request object, or exceeds the frame limit. |
+| `-32601` | The host does not serve this method. `host.hello` lists the ones it does. |
+| `-32602` | The params are not the method's. |
+| `-32603` | The host failed. |
+| `-32001` | The token is not this launch's. |
+| `-32002` | This launch cannot serve the method, for example `collaboration.call` outside a workspace that declares `options.collaboration`. |
+| `-32003` | The cache does not corroborate the requested verification report. |
+
+An operation that fails at the provider is not an error: the envelope reports
+it, exactly as the CLI prints it.
+
+## Implementations
+
+| Side | Package |
+|---|---|
+| Extension (client) | [`go.putnami.dev/sdk/extension/hostrpc`](../../../tooling/extension-sdk/hostrpc) |
+| Host (server) | `tooling/cli/internal/hostrpc`, started by `tooling/cli/internal/cli` |
+
+The decision and its alternatives are recorded in
+[ADR 0071 of `@putnami/cli`](../../../tooling/cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md).

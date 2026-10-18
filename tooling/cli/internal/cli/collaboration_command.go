@@ -124,12 +124,12 @@ func (a *App) runCollaborationCommand(
 		iox.Fprintf(stderr, "  Rename the extension command, or remove options.collaboration from putnami.workspace.json.\n")
 		return ExitUsage
 	}
-	providers, unavailable := collaborationProviders(ctx, wsRoot, cfg, extensions)
 	if contract == collab.ContractProposals && parsed.Subcommand == "finalize" && parsed.Global.Help {
 		printFinalizeHelp(stdout)
 		return ExitSuccess
 	}
 	if parsed.Subcommand == "" || parsed.Subcommand == "help" || parsed.Global.Help {
+		providers, unavailable := collaborationProviders(ctx, wsRoot, cfg, extensions)
 		printCollaborationContractHelp(stdout, wsRoot, contract, providers, unavailable)
 		if contract == collab.ContractProposals {
 			printFinalizeHelp(stdout)
@@ -149,12 +149,7 @@ func (a *App) runCollaborationCommand(
 		iox.Fprintf(stderr, "putnami: %s %s: %v\n", contract, parsed.Subcommand, err)
 		return ExitUsage
 	}
-	envelope := mcp.CallProviderOperation(ctx, mcp.ProviderEnvironment{
-		WorkspaceRoot: wsRoot,
-		Extensions:    providers,
-		Unavailable:   unavailable,
-		AttachView:    cliWorkspaceView(wsRoot),
-	}, contract, parsed.Subcommand, arguments)
+	envelope := collaborationEnvelope(ctx, wsRoot, cfg, extensions, contract, parsed.Subcommand, arguments)
 
 	text, err := mcp.EnvelopeText(envelope, !output.StructuredOutput(parsed.Global.Output))
 	if err != nil {
@@ -166,6 +161,23 @@ func (a *App) runCollaborationCommand(
 		return ExitError
 	}
 	return ExitSuccess
+}
+
+// collaborationEnvelope routes one contract operation call from the CLI's
+// provider selection. `putnami <contract> <operation>` and the host RPC method
+// collaboration.call both answer through it, so for one request the two return
+// the same envelope.
+func collaborationEnvelope(
+	ctx context.Context, wsRoot string, cfg *wsproto.Config, extensions []*extension.ExtensionDescription,
+	contract, operation string, arguments json.RawMessage,
+) collab.Envelope {
+	providers, unavailable := collaborationProviders(ctx, wsRoot, cfg, extensions)
+	return mcp.CallProviderOperation(ctx, mcp.ProviderEnvironment{
+		WorkspaceRoot: wsRoot,
+		Extensions:    providers,
+		Unavailable:   unavailable,
+		AttachView:    cliWorkspaceView(wsRoot),
+	}, contract, operation, arguments)
 }
 
 // collaborationProviders is the provider selection of the CLI entry path. It

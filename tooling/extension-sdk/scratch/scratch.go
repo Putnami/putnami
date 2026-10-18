@@ -83,11 +83,21 @@ type Dir struct {
 // exits mid-sweep leaves the rest to the next one. Where the file system
 // refuses the lock, the directory is returned without an owner lock.
 func New(prefix string) (*Dir, error) {
+	return NewIn(os.TempDir(), prefix)
+}
+
+// NewIn is New under root instead of os.TempDir(), for a caller that needs a
+// shorter path than the temporary directory gives, such as a Unix socket. Its
+// sweep covers root.
+func NewIn(root, prefix string) (*Dir, error) {
 	if !strings.HasPrefix(prefix, Namespace) || strings.ContainsAny(prefix, `/\*`) {
 		return nil, fmt.Errorf("scratch prefix %q must start with %q and hold no '/', '\\' or '*'", prefix, Namespace)
 	}
-	startSweep(prefix)
-	path, err := os.MkdirTemp("", prefix)
+	if root == "" {
+		return nil, errors.New("scratch root is empty")
+	}
+	startSweep(root, prefix)
+	path, err := os.MkdirTemp(root, prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -121,11 +131,10 @@ func (d *Dir) Remove() error {
 	return filelock.RemoveDir(path, OwnerLockName, lock.Close)
 }
 
-// startSweep sweeps the current temporary directory for prefix in the
-// background, at most once per resweepInterval in this process. The root is
-// read now: the sweep never follows a later change of TMPDIR.
-func startSweep(prefix string) {
-	root := os.TempDir()
+// startSweep sweeps root for prefix in the background, at most once per
+// resweepInterval in this process. New reads the temporary directory before
+// it calls startSweep: the sweep never follows a later change of TMPDIR.
+func startSweep(root, prefix string) {
 	key := root + "\x00" + prefix
 	now := time.Now()
 	sweptMu.Lock()

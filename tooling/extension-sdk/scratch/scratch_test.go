@@ -312,3 +312,49 @@ func TestNewRefusesAPatternPrefix(t *testing.T) {
 		}
 	}
 }
+
+func TestNewInCreatesAndSweepsUnderItsRoot(t *testing.T) {
+	tempDir := isolateTempDir(t)
+	root := t.TempDir()
+
+	// A creator killed under root, as a process whose temporary directory was
+	// root would leave it.
+	t.Setenv("TMPDIR", root)
+	cmd, leaked := startCreator(t, "putnami-scratch-test-")
+	t.Setenv("TMPDIR", tempDir)
+	if err := cmd.Process.Signal(syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	_ = cmd.Wait()
+	awaitLockRelease(t, leaked)
+
+	dir, err := NewIn(root, "putnami-scratch-other-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dir.Remove() })
+	sweeping.Wait()
+
+	if parent := filepath.Dir(dir.Path()); parent != root {
+		t.Fatalf("NewIn created %s, want a directory directly under %s", dir.Path(), root)
+	}
+	info, err := os.Stat(dir.Path())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode := info.Mode().Perm(); mode != 0o700 {
+		t.Errorf("NewIn created mode %04o, want 0700", mode)
+	}
+	if _, err := os.Stat(filepath.Join(dir.Path(), OwnerLockName)); err != nil {
+		t.Fatalf("the directory must hold its owner lock: %v", err)
+	}
+	if _, err := os.Stat(leaked); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("NewIn must sweep its own root and remove %s, stat: %v", leaked, err)
+	}
+}
+
+func TestNewInRefusesAnEmptyRoot(t *testing.T) {
+	if _, err := NewIn("", "putnami-scratch-test-"); err == nil {
+		t.Fatal("NewIn with an empty root must be refused")
+	}
+}

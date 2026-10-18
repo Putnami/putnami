@@ -279,6 +279,7 @@ func (a *App) runExtensionStructuredCommand(
 		}
 		return runInteractiveExtensionCommand(
 			ctx, ws, job, commandParams, versions,
+			hostRPCBinding{root: wsRoot, config: cfg, extensions: extensions},
 			stdin, stdout, stderr,
 		)
 	}
@@ -383,12 +384,18 @@ func extensionAliasPlanSelection(resolved *extension.ResolvedSubcommand) *engine
 // directly — no scheduler, no renderer, no JSONL parsing. The subprocess
 // inherits stdin/stdout/stderr so its output appears in the terminal as if
 // the user ran a built-in CLI command.
+//
+// The subprocess also gets this launch's host RPC channel, through which it
+// calls into this process; the channel closes when the subprocess exits,
+// however it exits. It is the only launch that gets one: a planned job's
+// result is cached, and a call its cache key does not cover must not decide it.
 func runInteractiveExtensionCommand(
 	ctx context.Context,
 	ws *workspace.Workspace,
 	job *jobs.ScheduledJob,
 	commandParams map[string]any,
 	versions cachekey.RunVersions,
+	binding hostRPCBinding,
 	stdin io.Reader,
 	stdout, stderr io.Writer,
 ) int {
@@ -397,8 +404,10 @@ func runInteractiveExtensionCommand(
 		configDefaults = ws.Config.GetCommandDefaults(job.JobDef.Name, job.Extension.Name)
 	}
 
+	hostEnv, closeHostRPC := startHostRPC(ctx, binding, stderr)
+	defer closeHostRPC()
 	result, err := jobs.RunJobInteractiveWithStreams(
-		ctx, ws, job, commandParams, configDefaults, versions, stdin, stdout, stderr,
+		ctx, ws, job, commandParams, configDefaults, versions, stdin, stdout, stderr, hostEnv...,
 	)
 	if err != nil {
 		iox.Fprintf(stderr, "putnami: %v\n", err)

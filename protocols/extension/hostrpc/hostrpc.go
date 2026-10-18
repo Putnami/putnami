@@ -1,0 +1,234 @@
+// Package hostrpc is the wire contract of the host RPC channel: the calls an
+// extension command makes into the running putnami process that launched it.
+//
+// The channel is JSON-RPC 2.0 over a Unix domain socket. Each frame is one
+// JSON object followed by a newline, at most MaxFrameBytes long. A connection
+// serves its requests in order, one at a time. Every request carries the
+// launch's token in the top-level "token" member; a request with any other
+// token is refused with CodeUnauthorized, and the host closes the connection.
+//
+// The host names the socket in SocketEnv and the token in TokenEnv. It sets
+// both only for an interactive command-group subcommand it launches. A build
+// job, a provider tool and a hosted run (--credential-fd) never receive them.
+//
+// The extension side is go.putnami.dev/sdk/extension/hostrpc; the host side
+// is internal to the CLI. Both read this package, so neither defines a frame,
+// a method or an error code of its own.
+package hostrpc
+
+import (
+	"bufio"
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"slices"
+)
+
+const (
+	// ProtocolVersion is the version host.hello reports. A change that an
+	// existing client cannot read moves it.
+	ProtocolVersion = 1
+
+	// SocketEnv names the path of the Unix socket the host listens on.
+	SocketEnv = "PUTNAMI_HOST_RPC"
+	// TokenEnv names the token every request carries: TokenBytes random
+	// bytes, hex-encoded.
+	TokenEnv = "PUTNAMI_HOST_RPC_TOKEN"
+	// TokenBytes is the number of random bytes in a token.
+	TokenBytes = 32
+
+	// JSONRPCVersion is the value of the jsonrpc member of every frame.
+	JSONRPCVersion = "2.0"
+
+	// MaxFrameBytes bounds one frame, without its newline, in both
+	// directions. It holds the largest verification report the host returns
+	// (16 MiB, base64-encoded) and the largest collaboration envelope.
+	MaxFrameBytes = 32 << 20
+)
+
+// The methods the host serves.
+const (
+	// MethodHello answers with a HelloResult. It takes no params.
+	MethodHello = "host.hello"
+	// MethodCollaborationCall routes one collaboration contract operation and
+	// answers with the envelope `putnami <contract> <operation> --output=json`
+	// prints for the same request. Params: CollaborationCallParams.
+	MethodCollaborationCall = "collaboration.call"
+	// MethodVerificationReport returns the bytes of a verification report
+	// that a successful cached test run of the workspace produced. Params:
+	// VerificationReportParams. Result: VerificationReportResult.
+	MethodVerificationReport = "verification.report"
+)
+
+// Methods lists every method the host serves, sorted.
+func Methods() []string {
+	methods := []string{MethodHello, MethodCollaborationCall, MethodVerificationReport}
+	slices.Sort(methods)
+	return methods
+}
+
+// The error codes of an Error. The first five are JSON-RPC 2.0's own.
+const (
+	// CodeParseError answers a frame that is not JSON.
+	CodeParseError = -32700
+	// CodeInvalidRequest answers a frame that is not a request object, and a
+	// frame longer than MaxFrameBytes.
+	CodeInvalidRequest = -32600
+	// CodeMethodNotFound answers a method the host does not serve.
+	CodeMethodNotFound = -32601
+	// CodeInvalidParams answers params the method refuses.
+	CodeInvalidParams = -32602
+	// CodeInternalError answers a failure of the host itself.
+	CodeInternalError = -32603
+	// CodeUnauthorized answers a request whose token is not the launch's.
+	CodeUnauthorized = -32001
+	// CodeUnavailable answers a method the launch cannot serve, such as a
+	// workspace method outside any workspace.
+	CodeUnavailable = -32002
+	// CodeNotVerified answers a verification report the cache does not
+	// corroborate.
+	CodeNotVerified = -32003
+)
+
+// Request is one JSON-RPC request frame.
+type Request struct {
+	// JSONRPC is JSONRPCVersion.
+	JSONRPC string `json:"jsonrpc"`
+	// ID is a JSON string or number that the response repeats. A request
+	// without one is a notification, which no method accepts: the host
+	// answers nothing.
+	ID json.RawMessage `json:"id,omitempty"`
+	// Method names the method.
+	Method string `json:"method"`
+	// Params is the method's params object.
+	Params json.RawMessage `json:"params,omitempty"`
+	// Token is the value of TokenEnv.
+	Token string `json:"token"`
+}
+
+// Response is one JSON-RPC response frame: exactly one of Result and Error.
+type Response struct {
+	// JSONRPC is JSONRPCVersion.
+	JSONRPC string `json:"jsonrpc"`
+	// ID repeats the request's id, or is null when the request had none
+	// the host could read.
+	ID json.RawMessage `json:"id"`
+	// Result is the method's result.
+	Result json.RawMessage `json:"result,omitempty"`
+	// Error is the reason the method returned no result.
+	Error *Error `json:"error,omitempty"`
+}
+
+// Error is a JSON-RPC error object.
+type Error struct {
+	// Code is one of the Code constants.
+	Code int `json:"code"`
+	// Message says what failed, in one sentence.
+	Message string `json:"message"`
+}
+
+// Error returns the message with its code.
+func (e *Error) Error() string {
+	return fmt.Sprintf("putnami host RPC error %d: %s", e.Code, e.Message)
+}
+
+// HelloResult is the result of host.hello.
+type HelloResult struct {
+	// Protocol is the host's ProtocolVersion.
+	Protocol int `json:"protocol"`
+	// Methods lists the methods the host serves, sorted.
+	Methods []string `json:"methods"`
+}
+
+// CollaborationCallParams are the params of collaboration.call.
+type CollaborationCallParams struct {
+	// Contract is the collaboration contract, such as "tasks".
+	Contract string `json:"contract"`
+	// Operation is the contract operation, such as "find".
+	Operation string `json:"operation"`
+	// Input is the request document `--input` would carry. Absent is the
+	// empty request.
+	Input json.RawMessage `json:"input,omitempty"`
+}
+
+// VerificationReportParams are the params of verification.report. They name
+// one report the way a recorded verdict does (features.VerificationReportRef).
+type VerificationReportParams struct {
+	// Project is the reporting project's canonical ID.
+	Project string `json:"project"`
+	// Task is the producing task's canonical key.
+	Task string `json:"task"`
+	// Path is the workspace-relative path the report was read from.
+	Path string `json:"path"`
+	// Digest is the lower-case sha256:<hex> content address of the report.
+	Digest string `json:"digest"`
+}
+
+// VerificationReportResult is the result of verification.report.
+type VerificationReportResult struct {
+	// Report holds the report bytes, base64-encoded on the wire.
+	Report []byte `json:"report"`
+}
+
+// ErrFrameTooLarge is the error ReadFrame returns for a frame longer than its
+// limit. The stream holds the rest of that frame, so the reader closes the
+// connection.
+var ErrFrameTooLarge = errors.New("the frame exceeds the host RPC frame limit")
+
+// ReadFrame reads one frame from r and returns it without its newline. It
+// returns ErrFrameTooLarge as soon as the frame grows past limit bytes, and
+// io.ErrUnexpectedEOF for a stream that ends inside a frame.
+func ReadFrame(r *bufio.Reader, limit int) ([]byte, error) {
+	var frame []byte
+	for {
+		chunk, err := r.ReadSlice('\n')
+		size := len(frame) + len(chunk)
+		if err == nil {
+			size-- // the newline
+		}
+		if size > limit {
+			return nil, ErrFrameTooLarge
+		}
+		frame = append(frame, chunk...)
+		switch {
+		case err == nil:
+			return frame[:len(frame)-1], nil
+		case errors.Is(err, bufio.ErrBufferFull):
+			continue
+		case errors.Is(err, io.EOF) && len(frame) > 0:
+			return nil, io.ErrUnexpectedEOF
+		default:
+			return nil, err
+		}
+	}
+}
+
+// EncodeFrame encodes v as one frame, with its newline. It refuses a value
+// whose encoding exceeds MaxFrameBytes.
+func EncodeFrame(v any) ([]byte, error) {
+	encoded, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	if len(encoded) > MaxFrameBytes {
+		return nil, fmt.Errorf("%w: %d bytes, limit %d", ErrFrameTooLarge, len(encoded), MaxFrameBytes)
+	}
+	return append(encoded, '\n'), nil
+}
+
+// DecodeStrict decodes one JSON value into v and refuses an unknown member
+// and trailing data, so that a misspelled param fails instead of being
+// dropped.
+func DecodeStrict(data []byte, v any) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(v); err != nil {
+		return err
+	}
+	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
+		return errors.New("trailing data after the JSON value")
+	}
+	return nil
+}
