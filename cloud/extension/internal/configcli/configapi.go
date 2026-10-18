@@ -19,7 +19,7 @@ import (
 
 // configAPI reaches config-api's generated client through the control-plane
 // host the workspace link names, with the caller's bearer forwarded per call.
-// The config, secrets and publish-config commands share it.
+// The config and secrets commands, `config publish` included, share it.
 type configAPI struct {
 	controlPlane string
 	authToken    clicore.Bearer

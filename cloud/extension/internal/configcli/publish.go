@@ -300,7 +300,7 @@ func publishConfig(params map[string]any, args []string, workspaceRoot string, e
 		// last, so a multi-block publish rolls exactly ONE revision carrying the
 		// complete config instead of one per block. This is the server-side
 		// contract (PUT /api/configs `roll=defer`, served by config-api) and
-		// `config put` has always honored it — publish-config sending an empty
+		// `config put` has always honored it — `config publish` sending an empty
 		// query rolled N revisions for N blocks, each one a synchronous re-stamp +
 		// readiness poll inside the same request.
 		roll := ""
@@ -331,7 +331,7 @@ func publishConfig(params map[string]any, args []string, workspaceRoot string, e
 
 // WritePublishResult writes the command result envelope and, for non-JSON
 // output, appends any warning lines. Exported because the distribution-domain
-// publish verbs (publish-archives, publish-migration) share this result shape.
+// publish verbs (`packages publish`, `db migrations publish`) share this result shape.
 func WritePublishResult(data any, params map[string]any, ioctx clicore.IO, message string, warnings []string) {
 	clicore.WriteResult(data, params, ioctx, message)
 	if clicore.StructuredOutput(params) || len(warnings) == 0 {

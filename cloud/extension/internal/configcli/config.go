@@ -1,5 +1,5 @@
 // Package configcli holds the config-domain command implementations for the
-// @putnami/cloud CLI extension: config, secrets, and publish-config. The
+// @putnami/cloud CLI extension: config, secrets, and config publish. The
 // extension binary registers these commands; the shared toolkit they build
 // on lives in internal/clicore.
 package configcli

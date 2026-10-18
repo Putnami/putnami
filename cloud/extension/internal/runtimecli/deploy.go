@@ -14,7 +14,7 @@ import (
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 )
 
-// DeployDefaultEnvironment matches the secrets/publish-config commands.
+// DeployDefaultEnvironment matches the secrets and config publish commands.
 const DeployDefaultEnvironment = "prod"
 
 // deployPollTimeout caps the total time the CLI keeps polling

@@ -582,7 +582,7 @@ it. Bundles are immutable release artifacts — no secrets, DSNs, or credentials
 
 ```
 Publishing a bundle?
-└── `putnami cloud db migrations publish` (add `--dry-run` to preview)
+└── `putnami cloud publish-migration` (add `--dry-run` to preview)
     validates, hash-verifies payloads, and uploads the complete bundle.
 
 Executing a published bundle (no app graph / service image)?

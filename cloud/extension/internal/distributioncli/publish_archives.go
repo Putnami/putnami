@@ -69,7 +69,7 @@ type ArchivePublishResult struct {
 }
 
 // PublishArchives backs `putnami cloud packages publish`. It mirrors
-// publish-migration: discover the build artifact — here the per-platform
+// `db migrations publish`: discover the build artifact — here the per-platform
 // archives the framework's `package --archives` step writes under
 // .putnami/out/<project>/package/archives plus its metadata.json — then upload
 // each as a content-addressed blob and publish one immutable archive manifest.
@@ -134,7 +134,7 @@ func PublishArchivesWithResult(params map[string]any, args []string, workspaceRo
 	archivesDir := archivesOutputDir(workspaceRoot, projectPath)
 	if override := clicore.StringParam(params, "archives-from", "archivesFrom"); override != "" {
 		// Resolve a relative override against the workspace root (matching
-		// --schema-from on publish-config) rather than the process cwd.
+		// --schema-from on `config publish`) rather than the process cwd.
 		archivesDir = override
 		if !filepath.IsAbs(archivesDir) {
 			archivesDir = filepath.Join(realWorkspaceRoot(workspaceRoot), archivesDir)

@@ -385,7 +385,7 @@ func manifestLink(options map[string]any) (map[string]any, bool, error) {
 // putnami.json. Returns the project's `name` field + true on hit. The
 // native putnami CLI uses an equivalent walk for project resolution; this
 // is the cloud extension catching up so `cd <workload> && putnami cloud
-// publish-config` doesn't need an explicit --app flag.
+// config publish` doesn't need an explicit --app flag.
 //
 // The walk is constrained to descendants of workspaceRoot so it doesn't
 // cross workspace boundaries (matters for tests that set

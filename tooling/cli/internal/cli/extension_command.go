@@ -337,7 +337,7 @@ func negatedGlobalFlagNames(originalArgs []string, flags map[string]extension.Fl
 
 func buildExtensionCommandParams(parsed *ParsedArgs, flags map[string]extension.FlagDefinition) map[string]any {
 	params := buildCommandParams(parsed.RawJobArgs)
-	// Extension command groups such as `putnami cloud config publish` use
+	// Extension command groups such as `putnami cloud publish-config` use
 	// command-local flags, but ParseArgs consumes globally-known flags before
 	// dispatch. Preserve the common dry-run flag only for commands whose
 	// effective flag surface (flat command ⊕ group ⊕ subcommand) declares it so

@@ -183,7 +183,7 @@ func resolveBundleDir(workspaceRoot, appDir, projectRel string) string {
 
 // MigrationBundleBuilt reports whether the last build of the project at
 // projectPath (slash-separated, relative to workspaceRoot) produced a
-// migration bundle, read from the same locations publish-migration reads.
+// migration bundle, read from the same locations `db migrations publish` reads.
 // `putnami cloud env doctor` uses it to find a workload that ships
 // migrations but declares no namespace to publish them under.
 func MigrationBundleBuilt(workspaceRoot, projectPath string) bool {
