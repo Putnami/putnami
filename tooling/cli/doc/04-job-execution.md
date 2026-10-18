@@ -708,6 +708,12 @@ shares the CLI's process group, and the runner signals only its root. A
 timed-out job stays failed with its error, and a canceled job stays canceled,
 whatever the teardown had to do.
 
+An interactive subcommand that passes its deadline prints
+``putnami: `<group> <subcommand>` stopped: it passed its <deadline> deadline``
+and exits 1, whatever code its process returned. A process that ends from a
+signal outside a deadline also exits 1, and putnami prints the signal. A
+positive exit code passes through, because the process printed its own error.
+
 ### Version Info
 
 The CLI computes git metadata once per session and combines it with each project's effective version. The effective version is resolved as project, then nearest scope, then workspace. This allows jobs (e.g., publish, build-info) to embed version information without running git themselves:

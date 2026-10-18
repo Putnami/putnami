@@ -71,6 +71,21 @@ func applyCPUBudget(env []string, job *ScheduledJob) []string {
 	return append(env, fmt.Sprintf("GOMAXPROCS=%d", job.CPUBudget))
 }
 
+// TaskDeadline is the wall-clock bound a job's subprocess runs under: a positive
+// timeout is that value, zero is DefaultTimeoutMs, and a negative one is
+// unbounded, reported as false. The subprocess context and the message that
+// names a passed deadline both read it, so they cannot disagree.
+func TaskDeadline(job *ScheduledJob) (time.Duration, bool) {
+	timeoutMs := job.EffectiveTimeoutMs()
+	if timeoutMs == 0 {
+		timeoutMs = DefaultTimeoutMs
+	}
+	if timeoutMs < 0 {
+		return 0, false
+	}
+	return time.Duration(boundedDeadlineMs(timeoutMs, 1)) * time.Millisecond, true
+}
+
 // applyTaskDeadline exports the deadline this child process actually runs
 // under. It runs at the exec seam, after cache-key computation, so a scheduler
 // tuning remains execution-only while runtimes can derive their own tool timeout
@@ -412,15 +427,9 @@ func prepareJobInvocation(
 		return nil, nil, nil, fmt.Errorf("write context file: %w", err)
 	}
 
-	// Set timeout: positive → use that value, zero → use default, negative → no
-	// timeout. The resolver is shared with coalescing, batching and finalization.
-	timeoutMs := job.EffectiveTimeoutMs()
-	if timeoutMs == 0 {
-		timeoutMs = DefaultTimeoutMs
-	}
 	cancel := context.CancelFunc(func() {})
-	if timeoutMs > 0 {
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(boundedDeadlineMs(timeoutMs, 1))*time.Millisecond)
+	if deadline, bounded := TaskDeadline(job); bounded {
+		ctx, cancel = context.WithTimeout(ctx, deadline)
 	}
 
 	inv := buildJobInvocation(ws, job, jobCtx, extraEnv, runtimePath)

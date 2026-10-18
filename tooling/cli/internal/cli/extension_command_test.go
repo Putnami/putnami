@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	distribution "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
@@ -299,6 +300,62 @@ func TestAppRun_ExtensionStructuredCommand_PropagatesExitCode(t *testing.T) {
 	code := app.Run(context.Background(), []string{"demo", "fail"})
 	if code == ExitSuccess {
 		t.Fatalf("expected non-zero exit code for failing subcommand, got %d", code)
+	}
+}
+
+// TestInteractiveExitCode pins the exit code and the stderr line for every way
+// an interactive run ends. A child that ends from a signal has code -1, which is
+// outside the exit taxonomy, so it never reaches the process exit status.
+func TestInteractiveExitCode(t *testing.T) {
+	t.Parallel()
+	const deadlineLine = "putnami: `change finalize` stopped: it passed its 1m30s deadline\n"
+	tests := []struct {
+		name       string
+		result     scheduler.JobResult
+		wantCode   int
+		wantStderr string
+	}{
+		{"success", scheduler.JobResult{Status: "success"}, ExitSuccess, ""},
+		{"canceled", scheduler.JobResult{Status: "canceled", ExitCode: -1}, ExitSignalReceived, ""},
+		{
+			"positive code stays silent",
+			scheduler.JobResult{Status: "failed", ExitCode: 7, Error: &scheduler.JobError{Message: "exit status 7"}},
+			7, "",
+		},
+		{
+			"signal outside a deadline",
+			scheduler.JobResult{Status: "failed", ExitCode: -1, Error: &scheduler.JobError{Message: "signal: killed"}},
+			ExitError, "putnami: signal: killed\n",
+		},
+		{
+			"deadline with code 1",
+			scheduler.JobResult{Status: "failed", ExitCode: 1, TimedOut: true, Error: &scheduler.JobError{Message: "job timed out"}},
+			ExitError, deadlineLine,
+		},
+		{
+			"deadline with code -1",
+			scheduler.JobResult{Status: "failed", ExitCode: -1, TimedOut: true, Error: &scheduler.JobError{Message: "job timed out"}},
+			ExitError, deadlineLine,
+		},
+		{
+			"error without a code",
+			scheduler.JobResult{Status: "failed", Error: &scheduler.JobError{Message: "start job: no such file"}},
+			ExitError, "putnami: start job: no such file\n",
+		},
+		{"failure without a code or an error", scheduler.JobResult{Status: "failed"}, ExitError, ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var stderr strings.Builder
+			got := interactiveExitCode(&tc.result, "change finalize", 90*time.Second, &stderr)
+			if got != tc.wantCode {
+				t.Errorf("exit code = %d, want %d", got, tc.wantCode)
+			}
+			if stderr.String() != tc.wantStderr {
+				t.Errorf("stderr = %q, want %q", stderr.String(), tc.wantStderr)
+			}
+		})
 	}
 }
 

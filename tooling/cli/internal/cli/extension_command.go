@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -278,7 +279,7 @@ func (a *App) runExtensionStructuredCommand(
 			return ExitError
 		}
 		return runInteractiveExtensionCommand(
-			ctx, ws, job, commandParams, versions,
+			ctx, ws, job, group+" "+sub, commandParams, versions,
 			hostRPCBinding{root: wsRoot, config: cfg, extensions: extensions},
 			stdin, stdout, stderr,
 		)
@@ -389,10 +390,14 @@ func extensionAliasPlanSelection(resolved *extension.ResolvedSubcommand) *engine
 // calls into this process; the channel closes when the subprocess exits,
 // however it exits. It is the only launch that gets one: a planned job's
 // result is cached, and a call its cache key does not cover must not decide it.
+//
+// commandPath is the group and subcommand the user typed, for the line that
+// names a command that passed its deadline.
 func runInteractiveExtensionCommand(
 	ctx context.Context,
 	ws *workspace.Workspace,
 	job *scheduler.ScheduledJob,
+	commandPath string,
 	commandParams map[string]any,
 	versions cachekey.RunVersions,
 	binding hostRPCBinding,
@@ -413,17 +418,37 @@ func runInteractiveExtensionCommand(
 		iox.Fprintf(stderr, "putnami: %v\n", err)
 		return ExitError
 	}
-	switch result.Status {
-	case "success":
+	deadline, _ := scheduler.TaskDeadline(job)
+	return interactiveExitCode(result, commandPath, deadline, stderr)
+}
+
+// interactiveExitCode maps the result of an interactive run to the process exit
+// code, and says on stderr what the child did not say itself.
+//
+//   - A run that passed its deadline exits ExitError whatever code the child
+//     returned: putnami ended it, and a child that ended from SIGTERM has no
+//     code of its own.
+//   - A child that exits with a positive code keeps it, silently, because it
+//     printed its own error.
+//   - Any other failed run exits ExitError and prints its error: a child that
+//     ended from a signal outside a deadline (code -1), or a run that never
+//     started.
+func interactiveExitCode(result *scheduler.JobResult, commandPath string, deadline time.Duration, stderr io.Writer) int {
+	switch {
+	case result.Status == "success":
 		return ExitSuccess
-	case "canceled":
+	case result.Status == "canceled":
 		return ExitSignalReceived
-	default:
-		if result.ExitCode != 0 {
-			return result.ExitCode
-		}
+	case result.TimedOut:
+		iox.Fprintf(stderr, "putnami: `%s` stopped: it passed its %s deadline\n", commandPath, deadline)
 		return ExitError
+	case result.ExitCode > 0:
+		return result.ExitCode
 	}
+	if result.Error != nil {
+		iox.Fprintf(stderr, "putnami: %s\n", result.Error.Message)
+	}
+	return ExitError
 }
 
 // runPlannedExtensionAlias is the EXTENSION-ALIAS ADAPTER over engine.Run.
