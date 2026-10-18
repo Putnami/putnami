@@ -82,7 +82,7 @@ workflow checks this capability explicitly. Framework recipes are generated in t
 reference. `putnami change language` checks English-language signals in
 text, tracked files, commits and task records; `putnami doctor --machine`
 reports local check capacity. `putnami tree fingerprint` supplies the native
-tree binding, and `putnami proposals finalize` publishes through the configured
+tree binding, and `putnami change finalize` publishes through the configured
 proposals provider without running another local gate. Configured content
 updates remain explicit-only. A natural-language build
 request authorizes its objective; task publication, merge and deployment still
