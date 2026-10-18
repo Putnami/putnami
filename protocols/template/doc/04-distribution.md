@@ -21,7 +21,7 @@ define → test → package → publish → install → create
 ## Packaging
 
 ```bash
-putnami templates package [path] [--version <ver>] [--stable] [--output <dir>]
+putnami templates package [path] [--version <ver>] [--stable]
 ```
 
 The archive is a single platform-independent `<name>-<version>.tar.gz`
@@ -36,7 +36,6 @@ The version is resolved as `--version`, else the manifest's `version`, else
 |------|---------|
 | `--version <ver>` | Version stamped into the packaged manifest |
 | `--stable` | Record the archive as a stable release in the metadata |
-| `--output <dir>` | Override the archive output directory |
 
 Default output, relative to the template directory:
 
