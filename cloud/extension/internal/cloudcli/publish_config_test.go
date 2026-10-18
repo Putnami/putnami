@@ -181,39 +181,6 @@ func TestValidateConfigFailsClosedForMissingSchemaAndNamespace(t *testing.T) {
 	})
 }
 
-func TestValidateConfigManifestIsPublicUncachedAndLocalOnly(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("..", "..", "putnami.extension.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var manifest map[string]any
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		t.Fatal(err)
-	}
-	groups := manifest["commandGroups"].(map[string]any)
-	cloud := groups["cloud"].(map[string]any)
-	subcommands := cloud["subcommands"].(map[string]any)
-	if node, ok := subcommands["validate-config"].(map[string]any); !ok || node["command"] != "cloud-validate-config" {
-		t.Fatalf("cloud validate-config tree node = %#v", subcommands["validate-config"])
-	}
-	commands := manifest["commands"].(map[string]any)
-	command := commands["cloud-validate-config"].(map[string]any)
-	run := command["run"].([]any)
-	if len(run) != 1 || run[0].(map[string]any)["task"] != "cloud-validate-config" {
-		t.Fatalf("cloud-validate-config run = %#v", run)
-	}
-	tasks := manifest["tasks"].(map[string]any)
-	task := tasks["cloud-validate-config"].(map[string]any)
-	if task["cache"] != false || task["cwd"] != "{workspaceRoot}" {
-		t.Fatalf("cloud-validate-config task = %#v", task)
-	}
-	for _, forbidden := range []string{"inputs", "writes", "declares"} {
-		if _, present := task[forbidden]; present {
-			t.Fatalf("local validation task declares %s = %#v", forbidden, task[forbidden])
-		}
-	}
-}
-
 func TestValidateConfigProjectChecksDeclaredMemberAndSkipsUnrelatedProjects(t *testing.T) {
 	t.Run("declared production member", func(t *testing.T) {
 		root := configValidationFixture(t)

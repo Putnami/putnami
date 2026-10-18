@@ -555,129 +555,6 @@
             }
           ]
         },
-        "tokens": {
-          "description": "Alias of `putnami cloud token create|list|revoke`.",
-          "command": "cloud-tokens",
-          "interactive": true,
-          "examples": [
-            {
-              "command": "putnami cloud tokens create --name ci-cache --scopes cache.read",
-              "description": "Create a workspace machine token (the raw pkt_* is shown once)"
-            },
-            {
-              "command": "putnami cloud tokens list --output=jsonl",
-              "description": "List workspace machine tokens (machine-readable)"
-            },
-            {
-              "command": "putnami cloud tokens revoke ci-deploy",
-              "description": "Revoke a workspace machine token by id or name"
-            }
-          ]
-        },
-        "distribution": {
-          "description": "Alias of `putnami cloud packages namespaces|grants|mirrors`.",
-          "command": "cloud-distribution",
-          "interactive": true,
-          "examples": [
-            {
-              "command": "putnami cloud distribution bindings activate --protocol npm --namespace @owner --idempotency-key npm-owner",
-              "description": "Activate the linked owner workspace's immutable npm namespace"
-            },
-            {
-              "command": "putnami cloud distribution grants create --grantee-workspace-id <uuid> --channel latest --idempotency-key latest-reader",
-              "description": "Grant a workspace read access to release history through latest"
-            },
-            {
-              "command": "putnami cloud distribution grants list --output=jsonl",
-              "description": "List the linked owner workspace's grants"
-            }
-          ]
-        },
-        "oci": {
-          "description": "Alias of `putnami cloud packages copy|retag|revert`.",
-          "command": "cloud-oci",
-          "interactive": true,
-          "examples": [
-            {
-              "command": "putnami cloud oci copy source:tag dest:tag",
-              "description": "Copy an image server-side"
-            },
-            {
-              "command": "putnami cloud oci revert repo:channel",
-              "description": "Re-point a channel to its recorded prior target"
-            }
-          ]
-        },
-        "publish-archives": {
-          "description": "Alias of `putnami cloud packages publish`.",
-          "command": "cloud-publish-archives",
-          "interactive": true,
-          "examples": [
-            {
-              "command": "putnami cloud publish-archives --app my-app",
-              "description": "Publish pre-built immutable archives without moving a native channel"
-            }
-          ]
-        },
-        "track": {
-          "description": "Alias of `putnami cloud channels follow`.",
-          "command": "cloud-track",
-          "interactive": true,
-          "examples": [
-            {
-              "command": "putnami cloud track --namespace putnami --channel stable --runner-channel stable",
-              "description": "Track the stable framework channel while holding the runner stable."
-            }
-          ]
-        },
-        "report": {
-          "description": "Alias of `putnami cloud ci report`.",
-          "command": "cloud-report",
-          "interactive": true,
-          "examples": [
-            {
-              "command": "putnami cloud report --status completed --conclusion success",
-              "description": "Report a successful delivery run"
-            },
-            {
-              "command": "putnami cloud report --status completed --conclusion failure --output=jsonl",
-              "description": "Machine-readable for scripts/agents"
-            }
-          ]
-        },
-        "validate-config": {
-          "description": "Alias of `putnami cloud config validate`.",
-          "command": "cloud-validate-config",
-          "interactive": true,
-          "examples": [
-            {
-              "command": "putnami cloud validate-config apps/api --env prod",
-              "description": "Validate one project's generated schema, authored fields, production values, link, and version"
-            }
-          ]
-        },
-        "publish-config": {
-          "description": "Alias of `putnami cloud config publish`.",
-          "command": "cloud-publish-config",
-          "interactive": true,
-          "examples": [
-            {
-              "command": "putnami cloud publish-config --app my-app --env prod",
-              "description": "Publish an app's config for an environment"
-            }
-          ]
-        },
-        "publish-migration": {
-          "description": "Alias of `putnami cloud db migrations publish`.",
-          "command": "cloud-publish-migration",
-          "interactive": true,
-          "examples": [
-            {
-              "command": "putnami cloud publish-migration --app my-app --namespace workspace-native",
-              "description": "Publish an app's migration bundle"
-            }
-          ]
-        },
         "release-set": {
           "description": "Machine command: the distribution/release-set/v2 provider the engine calls.",
           "command": "cloud-release-set",
@@ -943,49 +820,6 @@
         }
       ]
     },
-    "cloud-tokens": {
-      "activationFiles": [
-        "putnami.extension.json"
-      ],
-      "description": "Create, list, and revoke workspace-owned machine tokens (create, list, revoke).",
-      "flags": {
-        "auth-url": {
-          "type": "string",
-          "description": "Putnami auth base URL."
-        },
-        "client-id": {
-          "type": "string",
-          "default": "putnami-cli",
-          "description": "OAuth client ID."
-        },
-        "name": {
-          "type": "string",
-          "description": "For `tokens create`: a human label for the token, shown in list output."
-        },
-        "scopes": {
-          "type": "string",
-          "description": "For `tokens create`: comma- or space-separated permission scopes granted to the token."
-        },
-        "allowed-client-ids": {
-          "type": "string",
-          "description": "For `tokens create`: comma-separated OAuth client row UUIDs restricting token audiences (not client names). Review workers require the review-worker client alone (`--allowed-clients review-worker`)."
-        },
-        "allowed-clients": {
-          "type": "string",
-          "description": "For `tokens create`: comma- or space-separated OAuth client names (public client ids) restricting token audiences; combined with --allowed-client-ids. Review workers require the review-worker client alone (`--allowed-clients review-worker`)."
-        },
-        "expires": {
-          "type": "string",
-          "description": "For `tokens create`: optional lifetime (e.g. 30d, 12h) or an explicit RFC3339 expiry."
-        }
-      },
-      "run": [
-        {
-          "id": "tokens",
-          "task": "cloud-tokens"
-        }
-      ]
-    },
     "cloud-db": {
       "activationFiles": [
         "putnami.extension.json"
@@ -1109,82 +943,6 @@
         {
           "id": "registries",
           "task": "cloud-registries"
-        }
-      ]
-    },
-    "cloud-distribution": {
-      "activationFiles": [
-        "putnami.extension.json"
-      ],
-      "description": "Manage Distribution namespace bindings and workspace access to release history.",
-      "flags": {
-        "auth-url": {
-          "type": "string",
-          "description": "Putnami auth base URL."
-        },
-        "client-id": {
-          "type": "string",
-          "default": "putnami-cli",
-          "description": "OAuth client ID."
-        },
-        "protocol": {
-          "type": "string",
-          "description": "Registry protocol for bindings activate: gomod, npm, put, oci."
-        },
-        "namespace": {
-          "type": "string",
-          "description": "Exact immutable namespace for bindings activate."
-        },
-        "channel": {
-          "type": "string",
-          "description": "Optional release channel whose history the workspace grant covers."
-        },
-        "grantee-workspace-id": {
-          "type": "string",
-          "description": "Canonical workspace UUID receiving release-history read access."
-        },
-        "registry-put-url": {
-          "type": "string",
-          "description": "Put registry URL for the owner-backed workspace grant operations."
-        },
-        "idempotency-key": {
-          "type": "string",
-          "description": "Caller-stable command key required for activate and create retries."
-        },
-        "include-revoked": {
-          "type": "boolean",
-          "default": false,
-          "description": "Include revoked rows in grants list and mirrors list."
-        },
-        "ecosystem": {
-          "type": "string",
-          "description": "Ecosystem for mirrors add: npm, oci, archive (put platform archives copied to GitHub Release assets)."
-        },
-        "id": {
-          "type": "string",
-          "description": "Stable id of the public mirror target for mirrors add."
-        },
-        "destination": {
-          "type": "string",
-          "description": "Public destination for mirrors add: an npm registry URL, an OCI repository prefix, or github.com/<owner>/<repository>."
-        },
-        "alias": {
-          "type": "string",
-          "description": "Exact alternate destination spelling for mirrors add; comma-separate several."
-        },
-        "username": {
-          "type": "string",
-          "description": "Basic-credential username for an oci mirror target; the password is read from standard input."
-        },
-        "package": {
-          "type": "string",
-          "description": "The one <namespace>/<name> package an archive mirror target copies."
-        }
-      },
-      "run": [
-        {
-          "id": "distribution",
-          "task": "cloud-distribution"
         }
       ]
     },
@@ -1356,84 +1114,6 @@
         {
           "id": "cache",
           "task": "cloud-cache"
-        }
-      ]
-    },
-    "cloud-report": {
-      "activationFiles": [
-        "putnami.extension.json"
-      ],
-      "description": "Submit a delivery run conclusion for the current pushed commit to the Delivery ingest. Refuses on a dirty working tree or an unpushed HEAD.",
-      "flags": {
-        "conclusion": {
-          "type": "string",
-          "description": "Pre-captured run conclusion: success, failure, canceled, skipped, neutral, or timed_out."
-        },
-        "exit-code": {
-          "type": "string",
-          "description": "Derive the conclusion from an exit code (0 = success, else failure)."
-        },
-        "status": {
-          "type": "string",
-          "default": "completed",
-          "description": "Run status to record (default completed)."
-        },
-        "control-plane-url": {
-          "type": "string",
-          "description": "Putnami control-plane API base URL (override the linked URL)."
-        }
-      },
-      "run": [
-        {
-          "id": "report",
-          "task": "cloud-report"
-        }
-      ]
-    },
-    "cloud-track": {
-      "activationFiles": [
-        "putnami.extension.json"
-      ],
-      "description": "Change a workspace producer track and optional runner channel atomically.",
-      "flags": {
-        "workspace": {
-          "type": "string",
-          "description": "any verb: workspace id (override the linked workspace)."
-        },
-        "control-plane-url": {
-          "type": "string",
-          "description": "any verb: Putnami control-plane API base URL (override the linked URL)."
-        },
-        "auth-url": {
-          "type": "string",
-          "description": "any verb: Putnami auth base URL."
-        },
-        "client-id": {
-          "type": "string",
-          "default": "putnami-cli",
-          "description": "any verb: OAuth client ID."
-        },
-        "namespace": {
-          "type": "string",
-          "description": "Producer namespace; ownership is resolved by the server."
-        },
-        "channel": {
-          "type": "string",
-          "description": "Live producer channel: stable or canary."
-        },
-        "release-set": {
-          "type": "string",
-          "description": "Exact immutable release-set pin; mutually exclusive with channel."
-        },
-        "runner-channel": {
-          "type": "string",
-          "description": "Optionally set the runner channel in the same update: stable or canary."
-        }
-      },
-      "run": [
-        {
-          "id": "track",
-          "task": "cloud-track"
         }
       ]
     },
@@ -2288,164 +1968,6 @@
         }
       ]
     },
-    "cloud-publish-config": {
-      "activationFiles": [
-        "putnami.extension.json"
-      ],
-      "description": "Register the app schema and push conf/env.<env>.yaml values to control-plane-api.",
-      "flags": {
-        "app": {
-          "type": "string",
-          "description": "App name; defaults to the workspace-root putnami.json name."
-        },
-        "auth-url": {
-          "type": "string",
-          "description": "Putnami auth base URL."
-        },
-        "client-id": {
-          "type": "string",
-          "default": "putnami-cli",
-          "description": "OAuth client ID."
-        },
-        "control-plane-url": {
-          "type": "string",
-          "description": "Putnami control-plane API base URL (override the linked URL)."
-        },
-        "dry-run": {
-          "type": "boolean",
-          "default": false,
-          "description": "Show the planned schema and config writes without hitting the network."
-        },
-        "env": {
-          "type": "string",
-          "default": "prod",
-          "description": "Environment to target."
-        },
-        "schema-from": {
-          "type": "string",
-          "description": "Path to a schema/config.json artifact (workspace-root relative or absolute) overriding auto-discovery."
-        },
-        "namespace": {
-          "type": "string",
-          "description": "Explicit intended Put namespace for native Config publication."
-        }
-      },
-      "run": [
-        {
-          "id": "publish-config",
-          "task": "cloud-publish-config"
-        }
-      ]
-    },
-    "cloud-validate-config": {
-      "activationFiles": [
-        "putnami.extension.json"
-      ],
-      "description": "Validate a project's local authored Config inputs without writing package artifacts or using the network.",
-      "flags": {
-        "env": {
-          "type": "string",
-          "default": "prod",
-          "description": "Environment to validate; native authored Config currently supports prod only."
-        },
-        "schema-from": {
-          "type": "string",
-          "description": "Path to an existing schema/config.json artifact (workspace-root relative or absolute) overriding auto-discovery."
-        },
-        "namespace": {
-          "type": "string",
-          "description": "Explicit intended Put namespace when the project manifest does not declare one."
-        }
-      },
-      "run": [
-        {
-          "id": "validate-config",
-          "task": "cloud-validate-config"
-        }
-      ]
-    },
-    "cloud-publish-migration": {
-      "activationFiles": [
-        "putnami.extension.json"
-      ],
-      "description": "Publish a workload's migration bundle through the Data owner API.",
-      "flags": {
-        "app": {
-          "type": "string",
-          "description": "App name; defaults to the workspace-root putnami.json name."
-        },
-        "bundle-from": {
-          "type": "string",
-          "description": "Path to a .gen/migration-bundle directory overriding auto-discovery."
-        },
-        "namespace": {
-          "type": "string",
-          "description": "Expected workspace-owned Put namespace. Required explicitly and revalidated by Data against Distribution authority."
-        },
-        "bundle-version": {
-          "type": "string",
-          "description": "Version (default: the bundle's own version, then the image version from .gen/version.json)."
-        },
-        "registry-put-url": {
-          "type": "string",
-          "description": "Put registry base URL override."
-        },
-        "source-revision": {
-          "type": "string",
-          "description": "Exact source revision for a direct local publication. Managed publication takes this from the selected release-set member."
-        },
-        "selection-fingerprint": {
-          "type": "string",
-          "description": "Exact selection fingerprint for a direct local publication. Managed publication takes this from the selected release-set member."
-        },
-        "dry-run": {
-          "type": "boolean",
-          "default": false,
-          "description": "Show the planned Data publication without credentials or network requests."
-        }
-      },
-      "run": [
-        {
-          "id": "publish-migration",
-          "task": "cloud-publish-migration"
-        }
-      ]
-    },
-    "cloud-publish-archives": {
-      "activationFiles": [
-        "putnami.extension.json"
-      ],
-      "description": "Publish a workload's pre-built archives as one immutable Put version and emit its native archive member.",
-      "flags": {
-        "app": {
-          "type": "string",
-          "description": "App name; defaults to the workspace-root putnami.json name."
-        },
-        "archives-from": {
-          "type": "string",
-          "description": "Path to a package/archives directory overriding auto-discovery."
-        },
-        "binary-name": {
-          "type": "string",
-          "description": "Override the artifact/package name derived from metadata (e.g. publish the CLI as 'putnami')."
-        },
-        "registry-put-url": {
-          "type": "string",
-          "description": "Put registry base URL override."
-        },
-        "dry-run": {
-          "type": "boolean",
-          "default": false,
-          "description": "Show the planned immutable archive uploads without hitting the network."
-        }
-      },
-      "run": [
-        {
-          "id": "publish-archives",
-          "task": "cloud-publish-archives"
-        }
-      ]
-    },
     "cloud-secrets": {
       "activationFiles": [
         "putnami.extension.json"
@@ -2691,37 +2213,6 @@
           "task": "cloud-source"
         }
       ]
-    },
-    "cloud-oci": {
-      "activationFiles": [
-        "putnami.extension.json"
-      ],
-      "description": "Copy, retag, or revert images on the Putnami OCI registry server-side (copy <src-ref> <dst-ref>, retag <ref> <tag...>, revert <repo>:<channel>).",
-      "flags": {
-        "auth-url": {
-          "type": "string",
-          "description": "Putnami auth base URL."
-        },
-        "client-id": {
-          "type": "string",
-          "default": "putnami-cli",
-          "description": "OAuth client ID."
-        },
-        "registry-oci-url": {
-          "type": "string",
-          "description": "OCI registry (oci.putnami.dev) base URL override."
-        },
-        "source-ref": {
-          "type": "string",
-          "description": "Opaque provenance ref recorded on the channel move (e.g. run/<run-id> or release/<release-id>)."
-        }
-      },
-      "run": [
-        {
-          "id": "oci",
-          "task": "cloud-oci"
-        }
-      ]
     }
   },
   "tasks": {
@@ -2780,17 +2271,6 @@
       "description": "Mint a workspace, cache or registry bearer, or manage workspace machine tokens.",
       "timeoutMs": 30000
     },
-    "cloud-tokens": {
-      "kind": "command",
-      "command": "{extensionRuntime}",
-      "args": [
-        "tokens"
-      ],
-      "cwd": "{workspaceRoot}",
-      "cache": false,
-      "description": "Create, list, and revoke workspace-owned machine tokens.",
-      "timeoutMs": 30000
-    },
     "cloud-registries": {
       "kind": "command",
       "command": "{extensionRuntime}",
@@ -2801,17 +2281,6 @@
       "cache": false,
       "description": "Manage per-registry personal access tokens.",
       "timeoutMs": 120000
-    },
-    "cloud-distribution": {
-      "kind": "command",
-      "command": "{extensionRuntime}",
-      "args": [
-        "distribution"
-      ],
-      "cwd": "{workspaceRoot}",
-      "cache": false,
-      "description": "Manage immutable registry namespace bindings and exact owner grants.",
-      "timeoutMs": 30000
     },
     "cloud-packages": {
       "kind": "command",
@@ -2846,17 +2315,6 @@
       "description": "Mint your registry bearer for one known registry host.",
       "timeoutMs": 30000
     },
-    "cloud-oci": {
-      "kind": "command",
-      "command": "{extensionRuntime}",
-      "args": [
-        "oci"
-      ],
-      "cwd": "{workspaceRoot}",
-      "cache": false,
-      "description": "Copy or retag images on the Putnami OCI registry server-side.",
-      "timeoutMs": 120000
-    },
     "cloud-cache": {
       "kind": "command",
       "command": "{extensionRuntime}",
@@ -2867,28 +2325,6 @@
       "cache": false,
       "description": "Show or disable the remote build cache config.",
       "timeoutMs": 30000
-    },
-    "cloud-report": {
-      "kind": "command",
-      "command": "{extensionRuntime}",
-      "args": [
-        "report"
-      ],
-      "cwd": "{workspaceRoot}",
-      "cache": false,
-      "description": "Submit a delivery run conclusion for the current pushed commit.",
-      "timeoutMs": 900000
-    },
-    "cloud-track": {
-      "kind": "command",
-      "command": "{extensionRuntime}",
-      "args": [
-        "track"
-      ],
-      "cwd": "{workspaceRoot}",
-      "cache": false,
-      "description": "Change a workspace producer track and optional runner channel atomically.",
-      "timeoutMs": 900000
     },
     "cloud-channels": {
       "kind": "command",
@@ -3125,17 +2561,6 @@
       "description": "Validate the declared native Config member from existing local artifacts; skip projects without a Config namespace. Cached on the files and parameters the extension README lists; refuses --schema-from and any project other than the one in its working directory.",
       "timeoutMs": 60000
     },
-    "cloud-validate-config": {
-      "kind": "command",
-      "command": "{extensionRuntime}",
-      "args": [
-        "validate-config"
-      ],
-      "cwd": "{workspaceRoot}",
-      "cache": false,
-      "description": "Validate an authored Config member from existing local artifacts only; writes no package artifact and performs no network request.",
-      "timeoutMs": 60000
-    },
     "cloud-source": {
       "kind": "command",
       "command": "{extensionRuntime}",
@@ -3146,33 +2571,6 @@
       "cache": false,
       "description": "Connect, inspect, or disconnect a workspace GitHub repository.",
       "timeoutMs": 1800000
-    },
-    "cloud-publish-config": {
-      "kind": "command",
-      "command": "{extensionRuntime}",
-      "args": [
-        "publish-config"
-      ],
-      "cwd": "{workspaceRoot}",
-      "cache": false,
-      "inputs": {
-        "schema": {
-          "from": "task",
-          "optional": true
-        }
-      },
-      "writes": [
-        "sources"
-      ],
-      "declares": {
-        "effects": [
-          "cloud",
-          "network"
-        ],
-        "mutatesSources": true
-      },
-      "description": "Publish app schema + per-env config values.",
-      "timeoutMs": 120000
     },
     "cloud-package-config-member": {
       "kind": "command",
@@ -3186,22 +2584,12 @@
       "description": "Build the canonical secret-free production Config member consumed by native publication. Uncached: the member embeds the full HEAD commit, the origin repository and the linked workspace id, and is written outside the project under .putnami/out.",
       "timeoutMs": 120000
     },
-    "cloud-publish-migration": {
-      "kind": "command",
-      "command": "{extensionRuntime}",
-      "args": [
-        "publish-migration"
-      ],
-      "cwd": "{workspaceRoot}",
-      "cache": false,
-      "description": "Publish a workload's migration bundle to the Put registry.",
-      "timeoutMs": 120000
-    },
     "cloud-publish-config-project": {
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
-        "publish-config",
+        "config",
+        "publish",
         "--if-present"
       ],
       "cwd": "{projectRoot}",
@@ -3229,7 +2617,9 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
-        "publish-migration",
+        "db",
+        "migrations",
+        "publish",
         "--if-present"
       ],
       "cwd": "{projectRoot}",
@@ -3245,23 +2635,6 @@
       ],
       "description": "Send the selected project's migration bundle to Data when one was built; an existing bundle requires an explicit project namespace. It reads the bundle from the project's .gen, so it declares the gen resource: no other generate of the session rewrites .gen while it reads.",
       "timeoutMs": 120000
-    },
-    "cloud-publish-archives": {
-      "kind": "command",
-      "command": "{extensionRuntime}",
-      "args": [
-        "publish-archives"
-      ],
-      "cwd": "{workspaceRoot}",
-      "cache": false,
-      "declares": {
-        "effects": [
-          "network",
-          "registry"
-        ]
-      },
-      "description": "Publish a workload's pre-built archives to the Put registry.",
-      "timeoutMs": 600000
     },
     "cloud-package-site-content": {
       "kind": "command",
@@ -3314,7 +2687,8 @@
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
-        "publish-archives",
+        "packages",
+        "publish",
         "--if-present"
       ],
       "cwd": "{projectRoot}",

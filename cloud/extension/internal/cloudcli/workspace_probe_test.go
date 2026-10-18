@@ -259,7 +259,7 @@ func TestCloudWorkspaceProbeTransportIsReservedStrictAndBounded(t *testing.T) {
 	}
 
 	var ordinary bytes.Buffer
-	if handled, err := HandleWorkspaceProbe([]string{"publish-archives"}, strings.NewReader("{}"), &ordinary); handled || err != nil || ordinary.Len() != 0 {
+	if handled, err := HandleWorkspaceProbe([]string{"packages", "publish"}, strings.NewReader("{}"), &ordinary); handled || err != nil || ordinary.Len() != 0 {
 		t.Fatalf("ordinary command handled=%v err=%v stdout=%q", handled, err, ordinary.String())
 	}
 }

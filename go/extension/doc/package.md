@@ -429,7 +429,7 @@ describes. The channel index `publish` reads is derived over those records
 
 `metadata.json` is the archive publication manifest, written by
 `package-archives` alone and read by an archive uploader
-(`@putnami/cloud publish-archives`):
+(`@putnami/cloud packages publish`):
 
 ```json
 {

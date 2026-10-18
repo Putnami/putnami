@@ -36,7 +36,7 @@ func machineTokensEnv(t *testing.T) (map[string]string, *fakeTransport) {
 func runTokens(t *testing.T, env map[string]string, fake *fakeTransport, args ...string) []string {
 	t.Helper()
 	var out []string
-	if err := RunCommand("tokens", IO{
+	if err := RunCommand("token", IO{
 		Env:    env,
 		Stdout: func(line string) { out = append(out, line) },
 		Stderr: func(string) {},
@@ -223,7 +223,7 @@ func TestMachineTokensRevokeIsIdempotent(t *testing.T) {
 		t.Fatalf("revokedIDs = %v, want the DELETE re-issued on the second revoke", fake.revokedIDs)
 	}
 
-	err := RunCommand("tokens", IO{
+	err := RunCommand("token", IO{
 		Env:    env,
 		Stdout: func(string) {},
 		Stderr: func(string) {},
@@ -239,7 +239,7 @@ func TestMachineTokensRevokeIsIdempotent(t *testing.T) {
 func TestMachineTokensCreateRequiresNameAndScopes(t *testing.T) {
 	env, fake := machineTokensEnv(t)
 
-	err := RunCommand("tokens", IO{
+	err := RunCommand("token", IO{
 		Env:    env,
 		Stdout: func(string) {},
 		Stderr: func(string) {},
@@ -251,7 +251,7 @@ func TestMachineTokensCreateRequiresNameAndScopes(t *testing.T) {
 	}
 	assertContains(t, err.Error(), "--name")
 
-	err = RunCommand("tokens", IO{
+	err = RunCommand("token", IO{
 		Env:    env,
 		Stdout: func(string) {},
 		Stderr: func(string) {},
@@ -266,13 +266,13 @@ func TestMachineTokensCreateRequiresNameAndScopes(t *testing.T) {
 
 func TestMachineTokensUnknownSubcommandErrors(t *testing.T) {
 	env, fake := machineTokensEnv(t)
-	err := RunCommand("tokens", IO{
+	err := machineTokens(map[string]any{}, []string{"rotate"}, t.TempDir(), env, IO{
 		Env:    env,
 		Stdout: func(string) {},
 		Stderr: func(string) {},
 		Client: fake.client(),
 		Now:    fixedNow,
-	}, []string{"rotate"})
+	})
 	if err == nil {
 		t.Fatalf("expected an error for an unknown tokens subcommand")
 	}
@@ -283,7 +283,7 @@ func TestMachineTokensRevokeUnknownTargetErrors(t *testing.T) {
 	env, fake := machineTokensEnv(t)
 	runTokens(t, env, fake, "create", "--name", "present", "--scopes", "cache.read")
 
-	err := RunCommand("tokens", IO{
+	err := RunCommand("token", IO{
 		Env:    env,
 		Stdout: func(string) {},
 		Stderr: func(string) {},
@@ -324,7 +324,7 @@ func TestMachineTokensCreateSurfacesServerForbidden(t *testing.T) {
 		}
 	})}
 
-	err := RunCommand("tokens", IO{
+	err := RunCommand("token", IO{
 		Env:    env,
 		Stdout: func(string) {},
 		Stderr: func(string) {},

@@ -141,7 +141,7 @@ workspace from the root manifest name. The selected workspace is committed with
 the repository through the root manifest, so every contributor and CI job
 resolves the same cloud workspace.
 
-Workspace-scoped API calls (`deploy`, `publish-config`, `secrets`, and
+Workspace-scoped API calls (`deploy`, `config publish`, `secrets`, and
 `token`) mint a short-lived access token from the global refresh
 token. The scoped access token is cached in `~/.putnami/auth.json` until it is
 near expiry, so repeated cloud commands do not rotate the refresh token on
@@ -501,13 +501,10 @@ flows. Because the scaffold writes project sources, both config-publication
 tasks declare `mutatesSources` with the project-scoped `sources` write resource.
 
 The CLI has 20 commands. Each one answers `help` with its own verbs, for
-example `putnami cloud packages help`. The older names, such as `cloud track`
-or `cloud tokens`, still run as hidden aliases;
-[`internal/cloudcli/surface.go`](internal/cloudcli/surface.go) maps each one to
-its new form. The commands the engine or a provider calls, such as
-`release-set` and `registry-token`, keep their names. The framework builds
-`putnami cloud --help` from `putnami.extension.json`, which has no hidden field
-yet, so that list also shows the aliases and three machine commands.
+example `putnami cloud packages help`. The commands the engine or a provider
+calls, such as `release-set` and `registry-token`, keep their names. The
+framework builds `putnami cloud --help` from `putnami.extension.json`, which has
+no hidden field yet, so that list also shows three machine commands.
 
 Platform maintenance commands (`sql-proxy`, `publish-doc`,
 `source bind|unbind` and `token --global`) are not part of this extension. They

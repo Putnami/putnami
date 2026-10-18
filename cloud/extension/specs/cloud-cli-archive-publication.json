@@ -12,7 +12,7 @@
   "requirements": [
     {
       "id": "member-only-after-accepted-put-response",
-      "text": "`publish-archives` uploads each archive, then publishes the version without a channel. It emits one published-member event only after Put accepted both requests. The member is keyed by the archive ecosystem and the package coordinate, and carries the version, the artifact digest and one digest per platform, so it passes the published-member validation and matches the member the release plan declared."
+      "text": "`putnami cloud packages publish` uploads each archive, then publishes the version without a channel. It emits one published-member event only after Put accepted both requests. The member is keyed by the archive ecosystem and the package coordinate, and carries the version, the artifact digest and one digest per platform, so it passes the published-member validation and matches the member the release plan declared."
     }
   ]
 }

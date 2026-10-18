@@ -45,8 +45,8 @@ func TestExtensionManifestActivatesAndOwnsNativeArchivePublishing(t *testing.T) 
 		if _, exists := publish.Flags[retired]; exists {
 			t.Fatalf("publish retained retired archive authority flag %q", retired)
 		}
-		if _, exists := manifest.Commands["cloud-publish-archives"].Flags[retired]; exists {
-			t.Fatalf("cloud-publish-archives retained retired archive authority flag %q", retired)
+		if _, exists := manifest.Commands["cloud-packages"].Flags[retired]; exists {
+			t.Fatalf("cloud-packages retained retired archive authority flag %q", retired)
 		}
 	}
 	var foundArchiveStep bool

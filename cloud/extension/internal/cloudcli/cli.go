@@ -330,26 +330,6 @@ func RunCommand(command string, ioctx IO, args []string) error {
 	case "metrics":
 		return observabilitycli.Metrics(params, args, workspaceRoot, env, ioctx)
 
-	// Hidden aliases: every retired root name still runs (hiddenAliases).
-	case "tokens":
-		return machineTokens(params, args, workspaceRoot, env, ioctx)
-	case "distribution":
-		return distributioncli.Distribution(params, args, workspaceRoot, env, ioctx)
-	case "oci":
-		return distributioncli.OCI(params, args, workspaceRoot, env, ioctx)
-	case "publish-archives":
-		return publishArchives(params, args, workspaceRoot, env, ioctx)
-	case "track":
-		return deliverycli.Track(params, args, workspaceRoot, env, ioctx)
-	case "report":
-		return deliverycli.Report(params, args, workspaceRoot, env, ioctx)
-	case "validate-config":
-		return validateConfig(params, args, workspaceRoot, ioctx)
-	case "publish-config":
-		return publishConfig(params, args, workspaceRoot, env, ioctx)
-	case "publish-migration":
-		return publishMigration(params, args, workspaceRoot, env, ioctx)
-
 	// Platform maintenance lives in the operator CLI.
 	case "sql-proxy", "publish-doc":
 		return movedToOperator(command, operatorCommands[command])
