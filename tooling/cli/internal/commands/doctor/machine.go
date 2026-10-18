@@ -1,12 +1,17 @@
-package contributor
+package doctor
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
+
+	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/output"
 )
 
 // LoadSample is a read-only measurement; unavailable hosts report Known=false.
@@ -81,4 +86,22 @@ func (s LoadSample) String() string {
 		return "unknown"
 	}
 	return fmt.Sprintf("%.2f", s.Ratio)
+}
+
+// MachineCommand is `putnami doctor --machine`: it samples the machine load and
+// prints it, as JSON under structured output and as the bare ratio (or
+// "unknown") otherwise. `putnami contributor machine-load` calls it too.
+func MachineCommand(outputFormat string, reader LoadReader) error {
+	return WriteMachineLoad(iox.Stdout(), outputFormat, MachineLoad(reader))
+}
+
+// WriteMachineLoad prints one sample to out.
+func WriteMachineLoad(out io.Writer, outputFormat string, sample LoadSample) error {
+	if output.StructuredOutput(outputFormat) {
+		data, _ := json.Marshal(sample)
+		iox.Fprintln(out, string(data))
+	} else {
+		iox.Fprintln(out, sample.String())
+	}
+	return nil
 }

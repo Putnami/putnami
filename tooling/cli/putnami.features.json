@@ -1183,6 +1183,19 @@
           }
         },
         {
+          "id": "doctor-machine",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "machine-load-is-a-ratio-or-unknown"
+            ]
+          }
+        },
+        {
           "id": "doctor-names-a-missing-readme",
           "stage": "coded",
           "evidenceKinds": [

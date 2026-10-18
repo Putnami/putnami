@@ -19,6 +19,7 @@ import (
 	featureproto "go.putnami.dev/protocol/features"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/contributor"
+	"go.putnami.dev/tooling/cli/internal/commands/doctor"
 	"go.putnami.dev/tooling/cli/internal/commands/proposals"
 	"go.putnami.dev/tooling/cli/internal/commands/treecmd"
 	"go.putnami.dev/tooling/cli/internal/engine"
@@ -41,14 +42,7 @@ func cmdContributor(env *CommandEnv) error {
 		if len(env.Args) != 0 {
 			return usageErrorf("contributor machine-load takes no arguments")
 		}
-		sample := contributor.MachineLoad(contributor.NativeLoadReader())
-		if output.StructuredOutput(env.OutputFormat) {
-			data, _ := json.Marshal(sample)
-			iox.Fprintln(iox.Stdout(), string(data))
-		} else {
-			iox.Fprintln(iox.Stdout(), sample.String())
-		}
-		return nil
+		return doctor.MachineCommand(env.OutputFormat, doctor.NativeLoadReader())
 	case "language":
 		if len(env.Args) == 0 {
 			return usageErrorf("contributor language needs text, files, commits or tasks")

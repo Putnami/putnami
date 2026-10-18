@@ -701,13 +701,16 @@ Run a read-only production-readiness preflight over the selected projects: deriv
 .PP
 .B Usage:
 .br
-putnami doctor [--profile <dev|test|production>] [--project <selector>] [--output <format>]
+putnami doctor [--profile <dev|test|production>] [--project <selector>] [--machine] [--output <format>]
 .TP
 .B --profile
 Deployment profile to evaluate under (dev|test|production); production is strictest.
 .TP
 .B --project
 Project ID, path, or name (comma-separated); default is every workspace project.
+.TP
+.B --machine
+Report the one-minute load per logical CPU, or unknown, instead of the readiness preflight; takes neither --profile nor --project.
 .SS tree fingerprint
 Print one digest covering HEAD, the tracked diff against it, and the content of every untracked non-ignored file. It exists because "the same files are dirty" is not "the same bytes are on disk": git status reports paths and status codes, so an agent that gates a tree and then edits a file it had already dirtied leaves that output identical. Human output is the bare digest; --output=json adds dirty and headSHA, the same members a recorded session's tree block carries. Reads the repository and writes nothing, and needs no workspace.
 .PP

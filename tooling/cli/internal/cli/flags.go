@@ -349,6 +349,7 @@ func applyGlobalFlag(g *GlobalFlags, arg, value string) error {
 		g.Baseline = value
 	case "--profile":
 		g.EnvProfile = value
+		g.ProfileFlag = true
 	case "--trace-profile":
 		g.TraceProfile = value
 	}

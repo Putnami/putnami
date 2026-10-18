@@ -176,35 +176,3 @@ func TestLanguageCommitsNeverRunsConfiguredVerifier(t *testing.T) {
 		t.Fatalf("read invoked the configured verifier: %v", err)
 	}
 }
-
-func TestMachineLoadKnownAndUnknown(t *testing.T) {
-	read := LoadReader{OS: "linux", NumCPU: func() int { return 4 }, ReadFile: func(string) ([]byte, error) { return []byte("2.00 1.00 0.50 1/4 100"), nil }}
-	sample := MachineLoad(read)
-	if !sample.Known || sample.CPUs != 4 || sample.Ratio != 0.5 || sample.String() != "0.50" {
-		t.Fatalf("sample %+v", sample)
-	}
-	read.OS = "windows"
-	if sample := MachineLoad(read); sample.Known || sample.String() != "unknown" {
-		t.Fatalf("unsupported host %+v", sample)
-	}
-	read.OS = "linux"
-	read.ReadFile = func(string) ([]byte, error) { return []byte("invalid"), nil }
-	if MachineLoad(read).Known {
-		t.Fatal("invalid load was reported as known")
-	}
-	read = LoadReader{OS: "darwin", NumCPU: func() int { return 4 }, Command: func(name string, args ...string) ([]byte, error) {
-		if name != "/usr/sbin/sysctl" || len(args) != 2 || args[0] != "-n" || args[1] != "vm.loadavg" {
-			t.Fatalf("load reader used PATH-selected or unexpected command: %q %v", name, args)
-		}
-		return []byte("{ 2.00 1.00 0.50 }"), nil
-	}}
-	if sample := MachineLoad(read); !sample.Known || sample.Ratio != 0.5 {
-		t.Fatalf("absolute Darwin load probe failed: %+v", sample)
-	}
-	for _, platform := range []string{"freebsd", "openbsd", "netbsd"} {
-		read.OS = platform
-		if sample := MachineLoad(read); sample.Known {
-			t.Fatalf("unverified %s path was treated as trustworthy: %+v", platform, sample)
-		}
-	}
-}

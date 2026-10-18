@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -228,6 +229,17 @@ func cmdDoctor(env *CommandEnv) error {
 	}
 	if env.Sub != "" {
 		return usageErrorf("doctor takes no subcommand: run `putnami doctor [--profile <profile>] [--project <selector>]`")
+	}
+	if slices.Contains(env.Args, "--machine") {
+		if env.Global.ProfileFlag || env.Global.Projects != "" || slices.ContainsFunc(env.Args, func(a string) bool {
+			return a == "--project" || strings.HasPrefix(a, "--project=")
+		}) {
+			return usageErrorf("doctor --machine reports the machine load and takes neither --profile nor --project")
+		}
+		if len(env.Args) != 1 {
+			return usageErrorf("doctor --machine takes no other arguments")
+		}
+		return doctor.MachineCommand(env.OutputFormat, doctor.NativeLoadReader())
 	}
 	return doctor.DoctorCommand(env.WsRoot, env.Args, env.Global.Projects, env.Global.EnvProfile, env.OutputFormat)
 }

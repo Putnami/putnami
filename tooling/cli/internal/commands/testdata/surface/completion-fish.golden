@@ -202,6 +202,7 @@ complete -c putnami -n '__putnami_seen_path dev template' -l 'keep' -d 'With tes
 complete -c putnami -n '__putnami_seen_path dev template' -l 'skip-build' -d 'With test: render the template without running build and test on it'
 complete -c putnami -n '__putnami_seen_path dev template' -l 'stable' -d 'With package: publish under a stable version instead of a prerelease'
 complete -c putnami -n '__putnami_seen_path dev template' -l 'version' -d 'With package: version to stamp on the produced archive' -r
+complete -c putnami -n '__putnami_seen_path doctor' -l 'machine' -d 'Report the one-minute load per logical CPU, or unknown, instead of the readiness preflight; takes neither --profile nor --project'
 complete -c putnami -n '__putnami_seen_path doctor' -l 'profile' -d 'Deployment profile to evaluate under (dev|test|production); production is strictest' -r
 complete -c putnami -n '__putnami_seen_path doctor' -l 'project' -d 'Project ID, path, or name (comma-separated); default is every workspace project' -r
 complete -c putnami -n '__putnami_seen_path extensions install' -l 'dest' -d 'Materialize into this artifact-store root instead of the machine-global one' -r

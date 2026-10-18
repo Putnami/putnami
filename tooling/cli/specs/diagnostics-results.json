@@ -37,6 +37,10 @@
       "text": "Doctor is read-only and deterministic; production runs stop before execution on unwaived high or critical findings and fail closed when the gate is unavailable or malformed."
     },
     {
+      "id": "doctor-machine",
+      "text": "Doctor --machine prints the one-minute load per logical CPU as a ratio, or unknown when the host cannot report it, and prints exactly what contributor machine-load prints. It takes neither --profile nor --project."
+    },
+    {
       "id": "doctor-names-a-missing-readme",
       "text": "Doctor reports a project that has no README.md at its root as an advisory doctor.missing_readme finding, whose remediation names the purpose, commands and documentation a README states. A template project, which ships README.md.template for the project it renders, and a generated client project are exempt."
     },
