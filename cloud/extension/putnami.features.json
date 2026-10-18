@@ -30,7 +30,7 @@
       "id": "cloud/cli-infra-plan",
       "type": "feature",
       "name": "Infrastructure plan from the Cloud CLI",
-      "outcome": "putnami cloud infra plan lists the workspace workloads from the job context, with the output of the core infra plan, and refuses a context that does not give the project type",
+      "outcome": "putnami cloud infra plan lists the workspace workloads from the job context, with the output the core infra plan printed before the core deleted it, and refuses a context that does not give the project type",
       "owner": "cloud",
       "target": "coded",
       "requirements": [
