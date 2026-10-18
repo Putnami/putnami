@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/cli/model/jobs"
 )
 
 // TestPassthroughRenderer_EmitsNothing verifies that the passthrough renderer

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/cli/model/jobs"
 )
 
 func TestFailurePaneRollingLastN(t *testing.T) {

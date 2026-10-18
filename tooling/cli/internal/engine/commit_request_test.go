@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/cli/model/jobs"
 	modeljobs "go.putnami.dev/cli/model/jobs"
 	extensionproto "go.putnami.dev/protocol/extension"
 	runner "go.putnami.dev/protocol/runner"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 )
 
 // commitExecution is the engine binding of a version 2 request over

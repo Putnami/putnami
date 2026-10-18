@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/cli/model/jobs"
 )
 
 // nullRenderer is a no-op renderer for testing.

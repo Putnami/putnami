@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/cli/model/jobs"
 )
 
 func makeLogEvent(level, message string, ctx map[string]any) jobs.RawJobEvent {

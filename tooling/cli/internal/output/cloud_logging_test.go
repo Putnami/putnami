@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/cli/model/jobs"
 )
 
 func TestCloudLoggingRenderer_JobStart(t *testing.T) {

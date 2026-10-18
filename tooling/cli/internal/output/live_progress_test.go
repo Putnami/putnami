@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/cli/model/jobs"
 )
 
 // wallJob is a test job carrying a learned expected wall-clock duration, the

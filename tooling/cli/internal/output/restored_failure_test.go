@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 )
 
 // restoredDriftFailure is a cache hit whose declared output drifted from the
