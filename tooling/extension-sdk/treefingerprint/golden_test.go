@@ -33,7 +33,7 @@ const goldenPreimage = "putnami-tree-fingerprint/2\n" +
 	"file 528eee7ba2c0adea12842fd3eab1088d4d8402d115182154b0baef559f2164f2 12\nnew file.txt\n"
 
 // goldenFingerprint is the SHA-256 of goldenPreimage. Sessions, qualify
-// verdicts and tree verify dossiers compare this digest across hosts and
+// verdicts and verified dossiers compare this digest across hosts and
 // releases, so it moves only with treeFingerprintPreimageVersion.
 const goldenFingerprint = "c69d763284805d5771b16083822e7fd93eb3e30b9a63ffc11c781a538e7f4635"
 

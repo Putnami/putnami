@@ -60,10 +60,10 @@ see its [contributor journey](../../contributor/doc/01-contributor-journey.md).
 `build` coordinates only the requested outcome, including its issue or epic.
 It plans observable delivery units, challenges material proposals independently,
 implements and repairs through one loop, and derives progress from exact artifact
-references and actual evidence. The CLI checks its separately versioned local
-record with `tree verify --workflow`; a planning verdict cannot establish
-readiness. An optional `workflow` reference extends a v2 execution dossier
-without changing old dossiers or closed hosted review reports. The
+references and actual evidence. `putnami change verify --workflow`, which
+`@putnami/contributor` serves, checks its separately versioned local record; a
+planning verdict cannot establish readiness. An optional `workflow` reference
+extends a v2 execution dossier without changing old dossiers or closed hosted review reports. The
 [workflow record contract](../../contributor/doc/04-workflow-contract.md) describes
 stages, materialization and review responsibilities.
 

@@ -1,6 +1,7 @@
 // Package verify is `putnami change verify`: it checks the evidence the build
-// skill records against the worktree it runs in. It is a copy of the core's
-// `putnami tree verify` with the same verdicts and output bytes. For a gate
+// skill records against the worktree it runs in. It is a copy of the verifier
+// the core keeps for `putnami proposals finalize`, with the same verdicts and
+// output bytes as the goldens recorded from `putnami tree verify`. For a gate
 // record it also asks the workspace CLI for a dry-run plan, and it reads a
 // restored verification report through the putnami host channel. It writes
 // nothing: no session record, no workspace state, no file.

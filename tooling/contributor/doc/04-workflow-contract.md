@@ -67,8 +67,9 @@ For the handoff unit, its `handoff.inputs` includes every exact next-cycle
 provider receipt and local task record ref; a provider task without a receipt
 is only a planning reference, not a transferred task body.
 
-Check `putnami tree verify --help` for `--workflow` before relying on a new
-record. `tree verify --workflow <file>` can validate and project planning
+[Verify local evidence](05-change-verify.md) specifies the dossier and the
+workflow record. Check `putnami change verify --help` for `--workflow` before
+relying on a new record. `change verify --workflow <file>` can validate and project planning
 progress, including pending work; it never grants the ready stamp. An optional
 exact `workflow` ref on the v2 dossier makes the native verifier require
 complete current requirements from the actual producer session and its

@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -42,7 +41,7 @@ func (a *App) runStructuredCommand(ctx context.Context, parsed *ParsedArgs, cfg 
 	// exception a second time: its stdout is the recorded document itself, and
 	// the two modes differ there in FRAMING — pretty bytes under json, one
 	// compact line under jsonl — so it must see the mode that was asked.
-	if protocolcli.OutputMode(outputFormat).IsStructured() && !c.rawOutput(sub) {
+	if protocolcli.OutputMode(outputFormat).IsStructured() && !c.rawMachineOutput {
 		outputFormat = string(protocolcli.OutputJSONL)
 	}
 
@@ -72,7 +71,7 @@ func (a *App) runStructuredCommand(ctx context.Context, parsed *ParsedArgs, cfg 
 	// so its stdout is forwarded untouched instead of being captured and wrapped:
 	// wrapping a document a consumer binds to directly would make every consumer
 	// unwrap it first. Its FAILURES still take the shared envelope below.
-	if c.rawOutput(sub) {
+	if c.rawMachineOutput {
 		if err := c.run(env); err != nil {
 			return writeStructuredFailure(os.Stdout, os.Stderr, protocolcli.OutputMode(parsed.Global.Output),
 				commandmeta.CanonicalPath(cmd, sub), err)
@@ -183,14 +182,7 @@ func ensureJSONEOF(decoder *json.Decoder) error {
 // CLI's stdout. One behavior follows from the v2 contract rather than from this
 // function: a signal-classified failure now reports status "aborted" with exit
 // code 130 instead of being folded into a plain failure.
-//
-// A reportedFailure is the one exception: its command already wrote the
-// failure on stdout as its own document, so this writes nothing and returns the
-// exit code alone.
 func writeStructuredFailure(stdout, stderr io.Writer, mode protocolcli.OutputMode, cmdPath string, err error) int {
-	if errors.As(err, new(reportedFailure)) {
-		return exitCodeForError(err)
-	}
 	if !mode.IsStructured() {
 		printCommandError(stderr, err)
 		return exitCodeForError(err)
@@ -199,16 +191,6 @@ func writeStructuredFailure(stdout, stderr io.Writer, mode protocolcli.OutputMod
 	iox.Fprintf(stderr, "putnami: %v\n", err)
 	return code
 }
-
-// reportedFailure is a command failure the command already reported on stdout
-// in its own machine document, such as the not-verified verdict of `tree
-// verify`. The dispatcher exits with the code of the wrapped error and writes
-// nothing else: no "putnami:" line on stderr, no result envelope on stdout.
-type reportedFailure struct{ err error }
-
-func (f reportedFailure) Error() string { return f.err.Error() }
-
-func (f reportedFailure) Unwrap() error { return f.err }
 
 // printCommandError writes a structured command's failure to w in human mode:
 // the standard "putnami: <message>" line, followed — when the error carries a

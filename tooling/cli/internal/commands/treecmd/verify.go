@@ -23,7 +23,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
-// VerifyUsage is the one-line usage `putnami tree verify --help` prints.
+// VerifyUsage is the one-line usage Run prints for --help.
 const VerifyUsage = "usage: putnami tree verify (--record FILE | --workflow FILE | --snapshot | --ref FILE | --gate SESSION --report REPORT) [--base REV]\n"
 
 // Verifier checks local workflow evidence against the worktree it runs in. It
@@ -54,7 +54,7 @@ type Verifier struct {
 // The caller exits 1 and prints nothing else: stdout already holds the reason.
 var ErrNotVerified = errors.New("not verified")
 
-// Run parses args, the flags after `tree verify`, and writes the verdict.
+// Run parses args, the verifier's mode flags, and writes the verdict.
 //
 // Success writes the mode's document and returns nil. Any failure, including a
 // usage error, writes {"verdict":"not-verified","reason":"<message>"} on one
@@ -500,7 +500,7 @@ func workspacePlan(root string, commands, flags []string, baseSHA string) (keys 
 		executable = filepath.Join(root, "putnamiw")
 	}
 	// The workspace CLI may be a build of the workspace's source.
-	runcredential.MarkRepositoryCodeStarted("tree verify native plan")
+	runcredential.MarkRepositoryCodeStarted("verifier native plan")
 	args := append([]string{strings.Join(commands, ","), "--impacted", "--baseline", baseSHA}, flags...)
 	command := exec.Command(executable, append(args, "--plan", "--output=json")...)
 	command.Dir = root

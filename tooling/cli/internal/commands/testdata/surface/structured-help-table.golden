@@ -340,20 +340,6 @@ description: Print one digest covering HEAD, the tracked diff against it, and th
 usage: putnami tree fingerprint [--output <format>]
 example: putnami tree fingerprint
 example: putnami tree fingerprint --output=json
-═══ tree verify ═══
-description: Check the local evidence of an execute run against the worktree it runs in, and print one JSON verdict. --record verifies a dossier: its tree binding, changed files, policy files, consulted scopes, independent review, gate, qualification verdicts, acceptance evidence and an optional v1 workflow record. --workflow validates a separately versioned local workflow and reports progress without minting readiness. --snapshot prints the dossier skeleton for the current tree, --ref prints a file reference with its SHA-256, and --gate checks that a recorded gate session and report can replace the gate the PR finalizer would run. A gate must cover the native impacted plan, which the workspace CLI of the checked repository answers as a dry run. Paths resolve against the Git top level. A failure prints {"verdict":"not-verified","reason":...} on one line and exits 1 with nothing on stderr; --output does not change the document. It is a consistency check, not a signed review or an access boundary, and it writes nothing
-usage: putnami tree verify (--record <file> | --workflow <file> | --snapshot | --ref <file> | --gate <session> --report <report>) [--base <rev>]
-flag: --record | <file> | Verify the dossier this file holds and print the verified verdict
-flag: --workflow | <file> | Validate a v1 local workflow and report progress without a ready verdict
-flag: --snapshot |  | Print the dossier skeleton for the current tree
-flag: --ref | <file> | Print the reference to this file: its path as given and its SHA-256
-flag: --gate | <session> | Check that the recorded gate session can replace the finalizer's gate
-flag: --report | <report> | Session report of the --gate session
-flag: --base | <rev> | Base revision; default origin/main for --snapshot and --gate, and for --record the base the dossier must name
-example: putnami tree verify --snapshot --base origin/main
-example: putnami tree verify --workflow .context/workflow.json
-example: putnami tree verify --record .context/dossier.json
-example: putnami tree verify --gate .putnami/sessions/<id>/session.json --report .putnami/reports/<id>.json
 ═══ upgrade ═══
 description: Upgrade the CLI, extensions, templates, and framework dependencies in one command; a channel resolves on each ecosystem's own registry
 usage: putnami upgrade [--global] [--cli] [--extensions] [--deps] [--channel <stable|canary>] [--release <rs_id> --namespace <namespace>] [--version <version>] [--from-source] [--dry-run]

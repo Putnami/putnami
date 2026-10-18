@@ -10,16 +10,19 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	wire "go.putnami.dev/protocol/extension/hostrpc"
 )
 
 // The build skill runs `putnami change verify`, which the installed
-// @putnami/contributor serves through an interactive launch. While the core
-// still serves `putnami tree verify`, both print the same stdout and exit with
-// the same code for one invocation in one workspace. The cases pin what only
-// the launch decides: an inline `--flag=value` reaches the executable, the
-// executable starts in the workspace root whatever directory the user runs
-// putnami from, and its exit code is the command's.
-func TestChangeVerifyThroughPutnamiMatchesTreeVerify(t *testing.T) {
+// @putnami/contributor serves through an interactive launch. For one invocation
+// in one workspace, the command prints the same stdout and exits with the same
+// code as the contributor executable run directly in the workspace root with
+// the arguments putnami hands it and no host channel. The cases pin what only the launch
+// decides: an inline `--flag=value` reaches the executable, the executable
+// starts in the workspace root whatever directory the user runs putnami from,
+// and its exit code is the command's.
+func TestChangeVerifyThroughPutnamiRunsTheContributorExecutable(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the harness launcher requires bash")
 	}
@@ -56,11 +59,8 @@ func TestChangeVerifyThroughPutnamiMatchesTreeVerify(t *testing.T) {
 	git("add", ".")
 	git("commit", "-m", "docs: add the verify fixture")
 
-	putnami := func(dir string, args ...string) (string, int) {
+	run := func(cmd *exec.Cmd) (string, int) {
 		t.Helper()
-		cmd := exec.Command(filepath.Join(harness, "putnami"), args...)
-		cmd.Dir = filepath.Join(root, filepath.FromSlash(dir))
-		cmd.Env = env
 		var stdout, stderr bytes.Buffer
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
@@ -72,26 +72,54 @@ func TestChangeVerifyThroughPutnamiMatchesTreeVerify(t *testing.T) {
 		case errors.As(err, &exit):
 			return stdout.String(), exit.ExitCode()
 		}
-		t.Fatalf("putnami %v did not run: %v: %s", args, err, stderr.String())
+		t.Fatalf("%v did not run: %v: %s", cmd.Args, err, stderr.String())
 		return "", 0
 	}
+	putnami := func(dir string, args ...string) (string, int) {
+		t.Helper()
+		cmd := exec.Command(filepath.Join(harness, "putnami"), args...)
+		cmd.Dir = filepath.Join(root, filepath.FromSlash(dir))
+		cmd.Env = env
+		return run(cmd)
+	}
+	// The executable run directly has no host channel: neither variable
+	// reaches it.
+	direct := func(args ...string) (string, int) {
+		t.Helper()
+		cmd := exec.Command(filepath.Join(harness, programName("putnami-contributor")), append([]string{"verify"}, args...)...)
+		cmd.Dir = root
+		for _, entry := range env {
+			if !strings.HasPrefix(entry, wire.SocketEnv+"=") && !strings.HasPrefix(entry, wire.TokenEnv+"=") {
+				cmd.Env = append(cmd.Env, entry)
+			}
+		}
+		return run(cmd)
+	}
+	// received is what the executable gets when it differs from what the user
+	// types: putnami splits an inline `--flag=value` into the flag and its value,
+	// and the executable reads only the split form.
 	for _, tc := range []struct {
 		dir      string
 		args     []string
+		received []string
 		wantExit int
 	}{
-		{".", []string{"--ref", "README.md"}, 0},
-		{".", []string{"--ref=README.md"}, 0},
-		{"docs", []string{"--ref", "docs/guide.md"}, 0},
-		{".", []string{"--ref", "absent.md"}, 1},
-		{".", []string{"--snapshot", "--base=main"}, 0},
+		{".", []string{"--ref", "README.md"}, nil, 0},
+		{".", []string{"--ref=README.md"}, []string{"--ref", "README.md"}, 0},
+		{"docs", []string{"--ref", "docs/guide.md"}, nil, 0},
+		{".", []string{"--ref", "absent.md"}, nil, 1},
+		{".", []string{"--snapshot", "--base=main"}, []string{"--snapshot", "--base", "main"}, 0},
 	} {
 		name := tc.dir + " " + strings.Join(tc.args, " ")
-		core, coreExit := putnami(tc.dir, append([]string{"tree", "verify"}, tc.args...)...)
-		moved, movedExit := putnami(tc.dir, append([]string{"change", "verify"}, tc.args...)...)
-		if coreExit != tc.wantExit || movedExit != coreExit || moved != core {
-			t.Errorf("%s: change verify exited %d with\n%s\ntree verify exited %d with\n%s\nwant both to exit %d with the same output",
-				name, movedExit, moved, coreExit, core, tc.wantExit)
+		received := tc.received
+		if received == nil {
+			received = tc.args
+		}
+		want, wantExit := direct(received...)
+		got, gotExit := putnami(tc.dir, append([]string{"change", "verify"}, tc.args...)...)
+		if wantExit != tc.wantExit || gotExit != wantExit || got != want {
+			t.Errorf("%s: change verify exited %d with\n%s\nthe executable exited %d with\n%s\nwant both to exit %d with the same output",
+				name, gotExit, got, wantExit, want, tc.wantExit)
 		}
 	}
 }

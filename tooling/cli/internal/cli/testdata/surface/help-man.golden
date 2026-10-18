@@ -286,9 +286,6 @@ Preflight production readiness under a deployment profile.
 .B tree fingerprint
 Print the digest identifying this worktree's exact state.
 .TP
-.B tree verify
-Check local workflow evidence against this worktree.
-.TP
 .B sessions list
 List recent execution sessions.
 .TP
@@ -740,33 +737,6 @@ Print one digest covering HEAD, the tracked diff against it, and the content of 
 .B Usage:
 .br
 putnami tree fingerprint [--output <format>]
-.SS tree verify
-Check the local evidence of an execute run against the worktree it runs in, and print one JSON verdict. --record verifies a dossier: its tree binding, changed files, policy files, consulted scopes, independent review, gate, qualification verdicts, acceptance evidence and an optional v1 workflow record. --workflow validates a separately versioned local workflow and reports progress without minting readiness. --snapshot prints the dossier skeleton for the current tree, --ref prints a file reference with its SHA-256, and --gate checks that a recorded gate session and report can replace the gate the PR finalizer would run. A gate must cover the native impacted plan, which the workspace CLI of the checked repository answers as a dry run. Paths resolve against the Git top level. A failure prints {"verdict":"not-verified","reason":...} on one line and exits 1 with nothing on stderr; --output does not change the document. It is a consistency check, not a signed review or an access boundary, and it writes nothing.
-.PP
-.B Usage:
-.br
-putnami tree verify (--record <file> | --workflow <file> | --snapshot | --ref <file> | --gate <session> --report <report>) [--base <rev>]
-.TP
-.B --record
-Verify the dossier this file holds and print the verified verdict.
-.TP
-.B --workflow
-Validate a v1 local workflow and report progress without a ready verdict.
-.TP
-.B --snapshot
-Print the dossier skeleton for the current tree.
-.TP
-.B --ref
-Print the reference to this file: its path as given and its SHA-256.
-.TP
-.B --gate
-Check that the recorded gate session can replace the finalizer's gate.
-.TP
-.B --report
-Session report of the --gate session.
-.TP
-.B --base
-Base revision; default origin/main for --snapshot and --gate, and for --record the base the dossier must name.
 .SS compose
 Start the selected workload and the transitive closure of its runsWith projects in one invocation. Every process binds an ephemeral port and answers behind a local reverse proxy whose URL stays stable across restarts; dependency URLs travel through the clients config block and databases declared in infra/requirements.json are provisioned per composition. Dependencies run production-mode without watch; the target watches by default. Stops every owned process, proxy and database on exit; the next invocation reaps what an ungraceful death left behind.
 .PP

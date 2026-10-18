@@ -26,6 +26,13 @@ var removedRootSuccessors = map[string]string{
 		"and an extension may provide the language check under its own command group",
 }
 
+// removedCoreSubcommands are the subcommands the core no longer serves under a
+// command root it still serves, as the command path a user types. The core
+// owns the root, so no extension serves the path itself; an extension may serve
+// the command under its own command group. The refusal names no destination
+// and cites the published reference that does.
+var removedCoreSubcommands = []string{"tree verify"}
+
 // refuseRemovedCoreRoot returns a usage error when command is a removed core
 // root that no extension declares, as a command group or as a job, and nil
 // otherwise. App.Run calls it after the parse and before the workspace
@@ -42,8 +49,28 @@ func refuseRemovedCoreRoot(command string, groups map[string]bool, extensions []
 		return usageErrorf("`putnami %s` is no longer a core command: %s. "+
 			"%s lists where each moved command is now", command, successors, commandmeta.CommandsThatLeftTheCoreURL)
 	}
+	return removedWithoutSuccessor(command)
+}
+
+// removedWithoutSuccessor is the refusal of a command path the core does not
+// serve and names no successor for.
+func removedWithoutSuccessor(path string) error {
 	return usageErrorf("`putnami %s` is no longer a core command: an extension may provide it under its own command group. "+
-		"%s lists where each moved command is now", command, commandmeta.CommandsThatLeftTheCoreURL)
+		"%s lists where each moved command is now", path, commandmeta.CommandsThatLeftTheCoreURL)
+}
+
+// refuseRemovedCoreSubcommand returns a usage error when command and sub name a
+// removed core subcommand, and nil otherwise. App.Run calls it beside
+// refuseRemovedCoreRoot, and cmdHelp for `putnami help <command> <sub>`, so
+// `putnami tree verify`, `putnami tree verify --help` and `putnami help tree
+// verify` give the same answer before the workspace bootstrap, in a workspace
+// and outside one.
+func refuseRemovedCoreSubcommand(command, sub string) error {
+	path := command + " " + sub
+	if !slices.Contains(removedCoreSubcommands, path) {
+		return nil
+	}
+	return removedWithoutSuccessor(path)
 }
 
 // refuseHelpOfRemovedCoreRoot applies refuseRemovedCoreRoot to `putnami help

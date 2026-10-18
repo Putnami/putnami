@@ -58,7 +58,6 @@ Configuration:
 Diagnostics:
   doctor                       Preflight production readiness under a deployment profile
   tree fingerprint             Print the digest identifying this worktree's exact state
-  tree verify                  Check local workflow evidence against this worktree
   sessions list                List recent execution sessions
   sessions inspect             Inspect a specific session
   sessions replay              Resume delivery of a retained execution session

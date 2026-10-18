@@ -116,7 +116,6 @@ _putnami_subcommands_for() {
         'tree')
             reply=(
                 'fingerprint'
-                'verify'
             )
             ;;
         'version')
@@ -207,7 +206,6 @@ _putnami_path_known() {
         'templates validate') return 0 ;;
         'tree') return 0 ;;
         'tree fingerprint') return 0 ;;
-        'tree verify') return 0 ;;
         'upgrade') return 0 ;;
         'version') return 0 ;;
         'version get') return 0 ;;
@@ -396,17 +394,6 @@ _putnami_flags_for() {
                 '--skip-build[Render the template without running build and test on it]'
             )
             ;;
-        'tree verify')
-            reply=(
-                '--base[Base revision; default origin/main for --snapshot and --gate, and for --record the base the dossier must name]:rev:'
-                '--gate[Check that the recorded gate session can replace the finalizer'\''s gate]:session:'
-                '--record[Verify the dossier this file holds and print the verified verdict]:file:'
-                '--ref[Print the reference to this file: its path as given and its SHA-256]:file:'
-                '--report[Session report of the --gate session]:report:'
-                '--snapshot[Print the dossier skeleton for the current tree]'
-                '--workflow[Validate a v1 local workflow and report progress without a ready verdict]:file:'
-            )
-            ;;
         'upgrade')
             reply=(
                 '--channel[Resolve a release channel (stable by default; canary for latest prerelease)]:channel:'
@@ -497,7 +484,7 @@ _putnami() {
         'sessions:Inspect execution sessions'
         'telemetry:Manage anonymous telemetry'
         'templates:Manage templates'
-        'tree:Identify the worktree the CLI runs in and check evidence against it'
+        'tree:Identify the worktree the CLI runs in'
         'upgrade:Upgrade CLI, extensions, and dependencies'
         'version:Versions derived from git and release tags'
         'workspace:Manage workspace'

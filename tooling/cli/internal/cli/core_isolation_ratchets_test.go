@@ -316,8 +316,9 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // package, which internal/git, the git boundary, exposes to core and which the
 // session recorder reads too; this package holds the choice
 // between the two output shapes, which is what a vertical is for. It also holds
-// `tree verify`, which checks an agent's recorded evidence against that same
-// identity and needs no workspace either; it adds no package.
+// Verifier, which `proposals finalize` applies to an agent's recorded evidence
+// against that same identity and which needs no workspace either; it adds no
+// package.
 // RAISED to 53: internal/runnersource owns the effectful immutable
 // source boundary (bounded worktree capture, private CAS publication and safe
 // materialization). It cannot live in protocols/runner, whose wire types must

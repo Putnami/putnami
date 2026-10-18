@@ -1393,7 +1393,6 @@
             "kind": "acceptance",
             "checks": [
               "a-bare-call-is-a-not-verified-verdict-on-stdout-alone",
-              "a-verdict-reaches-stdout-untouched-in-every-output-mode",
               "evidence-is-read-strictly-against-the-git-top-level"
             ]
           }

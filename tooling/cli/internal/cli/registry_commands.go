@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -55,8 +54,6 @@ func init() {
 	registerCommand("migrate", cmdMigrate)
 	registerCommand("sessions", cmdSessions)
 	registerCommand("tree", cmdTree)
-	// Raw: workflow consumers parse the native verdict document.
-	registerRawSubcommand("tree", "verify")
 	// Raw: a composition streams its start document before it runs and its exit
 	// document when it stops, so its stdout cannot be captured until exit.
 	registerRawCommand("compose", cmdCompose)
@@ -754,16 +751,9 @@ func cmdSessions(env *CommandEnv) error {
 // carry no putnami.json. The digest covers the tree the CALLER is in, resolved
 // from the process working directory rather than from env.WsRoot, so a workspace
 // nested in a larger repository still fingerprints the repository it sits in.
-//
-// `tree verify` checks local workflow evidence against that tree. Its stdout
-// is always one verdict document, whatever --output asks, and a not-verified
-// verdict exits 1 with nothing on stderr: the verdict already says why.
 func cmdTree(env *CommandEnv) error {
-	if env.Sub == "verify" {
-		return cmdTreeVerify(env)
-	}
 	if env.Sub != "fingerprint" {
-		return usageErrorf("unknown subcommand: tree %s\n  Available: fingerprint, verify", env.Sub)
+		return usageErrorf("unknown subcommand: tree %s\n  Available: fingerprint", env.Sub)
 	}
 	parsed, err := parseCatalogCommandFlags("tree fingerprint", env.Args)
 	if err != nil {
@@ -777,21 +767,6 @@ func cmdTree(env *CommandEnv) error {
 		return fmt.Errorf("resolve the working directory: %w", err)
 	}
 	return treecmd.Fingerprint(workingDirectory, env.OutputFormat)
-}
-
-// cmdTreeVerify runs the verifier on the flags after `tree verify`. The
-// verifier parses them itself, so a missing or conflicting flag is a
-// not-verified verdict on stdout rather than a usage error on stderr.
-func cmdTreeVerify(env *CommandEnv) error {
-	workingDirectory, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("resolve the working directory: %w", err)
-	}
-	err = treecmd.Verifier{Dir: workingDirectory, Stdout: iox.Stdout(), RecoverReport: engine.VerifyCachedVerificationReport}.Run(env.Args)
-	if errors.Is(err, treecmd.ErrNotVerified) {
-		return reportedFailure{err: err}
-	}
-	return err
 }
 
 // cmdCompose serves a workload together with the transitive closure of the
@@ -984,6 +959,9 @@ func cmdHelp(env *CommandEnv) error {
 		}
 		command := resolveAliasOrSelf(env.Sub, commandAliases{user: env.Cfg.Aliases})
 		if err := refuseHelpOfRemovedCoreRoot(env, command); err != nil {
+			return err
+		}
+		if err := refuseRemovedCoreSubcommand(command, nestedSub); err != nil {
 			return err
 		}
 		// The aliases of a loaded vocabulary come first, so the command is

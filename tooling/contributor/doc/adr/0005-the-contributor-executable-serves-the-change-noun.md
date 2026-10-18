@@ -88,13 +88,14 @@ Known differences from `putnami contributor language`:
 - **(c) Messages.** Every message names `change language`, the command the user
   typed, where the core's name `contributor language`.
 
-### 6. The core deletes `contributor language`
+### 6. The core deletes `contributor language` and `tree verify`
 
-The core no longer serves `contributor language`: `putnami contributor …` is a
-usage error that links the reference of moved commands. The core keeps its
+The core no longer serves `contributor language` or `tree verify`:
+`putnami contributor …` and `putnami tree verify …` are usage errors that link
+the reference of moved commands. The core keeps `treecmd.Verifier`, because
+`proposals finalize` verifies the dossier in-process. It keeps its
 French-signal evaluator in `internal/commands/shared`, because
-`proposals finalize` applies it to the proposal it publishes. The core's
-`tree verify` keeps working until a later slice deletes it.
+`proposals finalize` applies it to the proposal it publishes.
 
 ### 7. `change verify` reads restored reports over the host channel
 
@@ -168,9 +169,9 @@ Known differences from `putnami tree verify`:
 - `change language` reports the same findings and exit codes as `contributor
   language` for every mode that needs no provider. Goldens recorded from the
   core command pin this.
-- `change verify` prints the same verdict document and exit code as `tree
-  verify` in every mode. Goldens recorded from the core command, on a
-  deterministic Git fixture, pin this.
+- `change verify` prints the same verdict document and exit code as goldens
+  recorded from `tree verify`, the core command it replaces, in every mode.
+  The goldens come from a deterministic Git fixture.
 - Only the tasks mode of `change language`, and a restored report in `change
   verify`, dial the host channel.
 - No process the executable starts receives the host channel variables.
@@ -194,8 +195,7 @@ Known differences from `putnami tree verify`:
 - The build skill and its references call `putnami change verify`. A consumer
   needs @putnami/contributor with the command; outside a workspace, it needs
   the extension installed in user scope.
-- The core keeps a copy of the verifier, which `tree verify` and
-  `proposals finalize` use, and a copy of the evaluator, which
+- The core keeps a copy of the verifier and a copy of the evaluator, which
   `proposals finalize` uses. A behavior change to a core copy needs the same
   change in the executable's copy.
 - `change finalize` follows the same pattern: a subcommand in the `change`

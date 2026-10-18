@@ -32,7 +32,7 @@ its manifest declares only `agentContent` in the authored form (`source: src`,
 `path: content`, `supersedes` naming `@putnami/agent-workflows` and
 `@putnami/maintainer-workflows`) and `cliContract: 5`. It carries the skills,
 the worker profiles and the build references; `options.agent-artifact.requiredSkills`
-lists the skills. `putnami tree verify`, `putnami proposals finalize`,
+lists the skills. `putnami change verify`, `putnami proposals finalize`,
 `putnami change language` and `putnami doctor --machine` provide the native
 verifier, publication, language check and machine load. An active audit integration retains only a thin shell relay at
 `check/scripts/english-only.sh` to the native language command; no separate

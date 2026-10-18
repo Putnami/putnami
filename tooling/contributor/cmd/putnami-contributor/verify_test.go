@@ -28,8 +28,9 @@ const (
 	// feature languageFeature names.
 	verifyRequirement = "change-verify-parity"
 
-	// recordVerifyEnv names the core command a recording run takes the
-	// goldens from, such as the repository's putnamiw. When it is set,
+	// recordVerifyEnv names the command a recording run takes the goldens
+	// from. The current core refuses `tree verify`, so the command is a putnami
+	// release that still serves it. When it is set,
 	// TestChangeVerifyMatchesTheCoreCommand runs `<command> tree verify
 	// <arguments>` for every case and writes testdata/verify/<case>.golden
 	// instead of comparing.
@@ -580,11 +581,11 @@ func refuseEveryReport(wire.VerificationReportParams) ([]byte, *wire.Error) {
 // TestChangeVerifyMatchesTheCoreCommand runs the built executable on the
 // fixture repository for every case of testdata/verify/cases.txt and
 // compares its exit code and stdout with testdata/verify/<case>.golden. The
-// goldens are the core command's answers: a run with recordVerifyEnv set
-// wrote them from `putnami tree verify` on the same fixture, which the test
-// builds the same way on every machine. The test never reads the core's
-// files, so a change to the core cannot change what it compares against.
-// No normalization applies.
+// goldens hold what `putnami tree verify`, the core command change verify
+// replaces, answered on the same fixture: a run with recordVerifyEnv set wrote
+// them, and the test builds the fixture the same way on every machine. The
+// test never reads the core's files, so a change to the core cannot change
+// what it compares against. No normalization applies.
 //
 // Each launch has a host channel whose cache corroborates no report, as the
 // core's cache does for the fixture. The fake putnamiw fails a gate when the

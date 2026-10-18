@@ -57,7 +57,7 @@
     },
     {
       "id": "change-verify-parity",
-      "text": "putnami change verify, served by the @putnami/contributor executable, prints the same verdict document and exit code as putnami tree verify in every mode, with or without a workspace. It reads a restored verification report through the host RPC channel putnami opens for the launch; without that channel only such a report is not verified, with a reason naming the channel. No process the verifier starts receives the channel."
+      "text": "putnami change verify, served by the @putnami/contributor executable, prints the same verdict document and exit code as goldens recorded from putnami tree verify, the core command it replaces, in every mode, with or without a workspace. It reads a restored verification report through the host RPC channel putnami opens for the launch; without that channel only such a report is not verified, with a reason naming the channel. No process the verifier starts receives the channel."
     },
     {
       "id": "canonical-consumer-migration",
