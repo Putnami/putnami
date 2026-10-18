@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -132,6 +133,11 @@ func TestParseArgs_BuiltInRejectsUnreadPassthrough(t *testing.T) {
 		if !errors.Is(parsed.Err, cmderr.ErrUsage) || !strings.Contains(parsed.Err.Error(), "takes no arguments after --") {
 			t.Errorf("ParseArgs(%q).Err = %v, want the passthrough usage error", args, parsed.Err)
 		}
+	}
+	extension := []string{"change", "language", "files", "--", "--not-a-flag"}
+	parsed := ParseArgs(extension, nil, map[string]bool{"change": true})
+	if parsed.Err != nil || !slices.Equal(parsed.RawJobArgs, []string{"files", "--", "--not-a-flag"}) {
+		t.Errorf("ParseArgs(%q) = %q, %v; an extension command keeps its passthrough", extension, parsed.RawJobArgs, parsed.Err)
 	}
 }
 

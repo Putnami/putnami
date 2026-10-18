@@ -27,7 +27,7 @@ func TestLanguageFileExclusions(t *testing.T) {
 		!ExcludedLanguagePath("tooling/contributor/internal/language/evaluate.go") {
 		t.Fatal("the native detector's signal vocabulary was scanned as public prose")
 	}
-	for _, path := range []string{"tooling/cli/internal/commands/contributor/language.go", "somewhere/else/language.go"} {
+	for _, path := range []string{"tooling/contributor/internal/language/runner.go", "somewhere/else/language.go"} {
 		if ExcludedLanguagePath(path) {
 			t.Errorf("unrelated source %s was excluded", path)
 		}
