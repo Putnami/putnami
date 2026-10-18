@@ -95,6 +95,10 @@ func RunJobInteractiveWithStreams(
 			} else {
 				result.Status = "canceled"
 			}
+		} else if endedByInterrupt(runErr) {
+			// A terminal Ctrl+C reached the child before this process's own
+			// cancel did. It is the same interrupted run.
+			result.Status = "canceled"
 		} else {
 			result.Error = &JobError{Message: runErr.Error()}
 		}

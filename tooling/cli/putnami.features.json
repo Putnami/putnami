@@ -1322,7 +1322,10 @@
             "checks": [
               "errors-map-to-stable-exit-codes",
               "session-exit-derives-from-the-canonical-reduction",
-              "an-interrupt-is-a-distinct-aborted-status"
+              "an-interrupt-is-a-distinct-aborted-status",
+              "an-interactive-run-that-passes-its-deadline-exits-one-and-names-it",
+              "an-interactive-child-that-ends-from-a-signal-exits-one-and-names-it",
+              "an-interactive-child-that-ends-from-sigint-is-an-interrupted-run"
             ]
           }
         },
