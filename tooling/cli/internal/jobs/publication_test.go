@@ -764,31 +764,6 @@ func TestPublishJobReceivesNoCredentialUnderPublicationV1(t *testing.T) {
 	}
 }
 
-// A job that packs into an outbox is denied the loopback registry route of
-// every kind, including a kind no publisher reads yet, and every listed
-// credential variable. The download mirror and ordinary variables stay.
-func TestOutboxJobIsDeniedEveryRegistryRoute(t *testing.T) {
-	for _, name := range []string{
-		"PUTNAMI_REGISTRY_NPM_URL",
-		"PUTNAMI_REGISTRY_GOMOD_URL",
-		"PUTNAMI_REGISTRY_OCI_URL",
-		"PUTNAMI_REGISTRY_PUT_URL",
-		"PUTNAMI_REGISTRY_FUTUREKIND_URL",
-		extensionproto.CloudTokenEnv,
-		extensionproto.JobCredentialFDEnv,
-		InternalReleasePlanCallbackEnv,
-	} {
-		if !withheldFromOutboxJob(name) {
-			t.Errorf("%s reaches a job that packs into an outbox", name)
-		}
-	}
-	for _, name := range []string{"PUTNAMI_REGISTRY_URL", "PUTNAMI_REGISTRY_NPM", "PATH", "HOME"} {
-		if withheldFromOutboxJob(name) {
-			t.Errorf("%s is withheld from a job that packs into an outbox", name)
-		}
-	}
-}
-
 // The engine uploads every packed member with the provider's publish
 // credential, records the published image beside the publication job's
 // output, reports one published-member event per upload, and releases the

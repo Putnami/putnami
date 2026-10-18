@@ -2853,32 +2853,6 @@ func attachReleaseSetContext(planned []*ScheduledJob, plan *releaseset.Plan, pub
 	}
 }
 
-// isReleaseSetMemberPublication reports whether a job is a publish of a
-// release-set member: attachReleaseSetContext bound the immutable plan to it.
-// Such a job is admitted on its own functional ancestors; the AFTER gate
-// applies to the release-set stamp instead (ADR 0023).
-//
-// Presence of the key is not enough: a manifest's session-prerequisite params
-// can bind any name into BoundParams, and a literal decodes as a map. Only the
-// coordinator's typed plan counts, and only when it names this job's project
-// as a member — otherwise a repository could exempt an arbitrary publish from
-// the gate by spelling the key.
-func isReleaseSetMemberPublication(job *ScheduledJob) bool {
-	if job == nil || job.JobDef == nil || job.Project == nil || job.CommandName() != "publish" {
-		return false
-	}
-	plan, ok := job.JobDef.BoundParams[releaseset.ContextParamName].(*releaseset.Plan)
-	if !ok || plan == nil {
-		return false
-	}
-	for _, member := range plan.Members {
-		if member.ProjectID == job.Project.ID {
-			return true
-		}
-	}
-	return false
-}
-
 // AttachReleaseSetPlan carries one SDK-owned plan through every selected
 // package and publish node, including package nodes reached transitively.
 func AttachReleaseSetPlan(planned []*ScheduledJob, plan *releaseset.Plan) error {
