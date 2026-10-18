@@ -350,9 +350,10 @@ func TestDepsAddAndRemoveEditAModuleThatRequiresAnUnservedVersion(t *testing.T) 
 		t.Errorf("deps remove wrote go.work.sum: %v", err)
 	}
 
-	// A bare spec of a module go.mod does not require yet asks for @latest: an
-	// @upgrade query would load the module graph, where example.com/lib v0.0.0
-	// is unserved. go.work replaces lib with a directory so the tidy resolves it.
+	// A bare spec queries @latest, which loads no module graph. An @upgrade
+	// query would load it for a module go.mod does not require, where
+	// example.com/lib v0.0.0 is unserved. go.work replaces lib with a directory
+	// so the tidy resolves it.
 	writeRawFile(t, filepath.Join(root, "lib", "go.mod"), "module example.com/lib\n\ngo 1.22\n")
 	writeRawFile(t, filepath.Join(root, "lib", "lib.go"), "package lib\n\nconst Name = \"lib\"\n")
 	writeRawFile(t, filepath.Join(root, "go.work"), "go 1.22\n\nuse ./api\n\nreplace example.com/lib => ./lib\n")

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/mod/module"
+
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -186,6 +188,103 @@ func TestDepsCommandIsTheCommandTheUserRan(t *testing.T) {
 	} {
 		if got := depsCommand(tc.action, tc.modules, tc.selector); got != tc.want {
 			t.Errorf("depsCommand(%q, %q, %q) = %q, want %q", tc.action, tc.modules, tc.selector, got, tc.want)
+		}
+	}
+}
+
+// A spec whose version is none asks `go get` to drop a module. deps add refuses
+// it before any go command runs, edits nothing, and suggests the exact deps
+// remove command.
+func TestDepsAddRefusesTheVersionNoneAndSuggestsDepsRemove(t *testing.T) {
+	f := newGoCreateFixture(t)
+	f.withGoProject(t)
+	f.pin(t)
+	f.writeGoResolvingLib(t, f.pinned)
+	goMod := readFile(t, filepath.Join(f.root, "app", "go.mod"))
+
+	output, err := captureStdout(t, func() error {
+		return DepsAdd(context.Background(), f.root, []string{"example.com/lib@none", "example.com/other@v1.0.0"}, "app", f.refusingGoInstall(t))
+	})
+	if err == nil {
+		t.Fatalf("deps add example.com/lib@none succeeded:\n%s", output)
+	}
+	if got, want := protocolcli.SuggestedNext(err), "putnami deps remove example.com/lib --projects app"; got != want {
+		t.Fatalf("next command = %q, want %q (error %v)", got, want, err)
+	}
+	if !strings.Contains(err.Error(), "deps add does not drop a module") {
+		t.Errorf("error = %v, want it to say deps add does not drop a module", err)
+	}
+	if calls := f.depsCalls(t); len(calls) != 0 {
+		t.Errorf("deps add ran go before it refused the spec: %v", calls)
+	}
+	if after := readFile(t, filepath.Join(f.root, "app", "go.mod")); after != goMod {
+		t.Errorf("deps add edited go.mod:\n%s", after)
+	}
+}
+
+// A go list -m that fails stops deps add before any edit and leaves go.mod as
+// it was. The error carries go's output and names the rule a spec follows, and
+// suggests no command: the failure may be the network or an unknown version,
+// not a spec.
+func TestDepsAddReportsAFailedGoListWithoutASuggestedCommand(t *testing.T) {
+	f := newGoCreateFixture(t)
+	f.withGoProject(t)
+	f.pin(t)
+	f.writeGoAnswering(t, f.pinned, goFixtureVersion, map[string]fixtureproc.Outcome{
+		"list -m -json -mod=readonly example.com/lib@v1.0.0": {Stderr: "go: module example.com/lib: reading proxy: 404 Not Found\n", Exit: 1},
+	})
+	goMod := readFile(t, filepath.Join(f.root, "app", "go.mod"))
+
+	output, err := captureStdout(t, func() error {
+		return DepsAdd(context.Background(), f.root, []string{"example.com/lib@v1.0.0"}, "", f.refusingGoInstall(t))
+	})
+	if err == nil {
+		t.Fatalf("deps add succeeded although go list -m failed:\n%s", output)
+	}
+	if next := protocolcli.SuggestedNext(err); next != "" {
+		t.Errorf("next command = %q, want none (error %v)", next, err)
+	}
+	for _, want := range []string{"go list -m", "a spec names a module path, not a package path"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %v, want it to contain %q", err, want)
+		}
+	}
+	want := []string{"list -m -json -mod=readonly example.com/lib@v1.0.0|" + f.pinned}
+	if got := f.depsCalls(t); strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("go calls =\n%s\nwant only the failed go list:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	if after := readFile(t, filepath.Join(f.root, "app", "go.mod")); after != goMod {
+		t.Errorf("a failed deps add changed go.mod:\n%s", after)
+	}
+}
+
+// A bare spec means @upgrade: the latest version, unless go.mod requires a
+// newer one, which stays. An exact version or a module go.mod does not require
+// is taken as it was resolved.
+func TestKeepNewerRequiredNeverDowngradesABareSpec(t *testing.T) {
+	resolved := []module.Version{
+		{Path: "example.com/newer", Version: "v0.3.0"},
+		{Path: "example.com/older", Version: "v0.3.0"},
+		{Path: "example.com/same", Version: "v0.3.0"},
+		{Path: "example.com/placeholder", Version: "v0.3.0"},
+		{Path: "example.com/pinned", Version: "v0.3.0"},
+		{Path: "example.com/new", Version: "v0.3.0"},
+		{Path: "example.com/pseudo", Version: "v0.3.0"},
+	}
+	bare := []bool{true, true, true, true, false, true, true}
+	required := map[string]string{
+		"example.com/newer":       "v0.4.0",
+		"example.com/older":       "v0.2.0",
+		"example.com/same":        "v0.3.0",
+		"example.com/placeholder": "v0.0.0",
+		"example.com/pinned":      "v0.4.0",
+		"example.com/pseudo":      "v0.3.1-0.20260101000000-abcdefabcdef",
+	}
+	want := []string{"v0.4.0", "v0.3.0", "v0.3.0", "v0.3.0", "v0.3.0", "v0.3.0", "v0.3.1-0.20260101000000-abcdefabcdef"}
+	got := keepNewerRequired(resolved, bare, required)
+	for i, m := range got {
+		if m.Version != want[i] {
+			t.Errorf("%s = %s, want %s", m.Path, m.Version, want[i])
 		}
 	}
 }
