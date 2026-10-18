@@ -13,8 +13,8 @@ import (
 	modeljobs "go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
 	runtimeproto "go.putnami.dev/protocol/runtime"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/watch"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -33,8 +33,8 @@ const (
 // from internal/watch (serve_ready.go), where it is unexported: the type must be
 // `ready`, the envelope v2, and the payload a claim inside the closed target
 // vocabulary. Anything else fails closed — the member stays not ready.
-func isServeReadyEvent(event jobs.RawJobEvent) bool {
-	if event.Type != jobs.EventTypeReady || event.Version != runtimeproto.ProtocolVersion2 {
+func isServeReadyEvent(event scheduler.RawJobEvent) bool {
+	if event.Type != scheduler.EventTypeReady || event.Version != runtimeproto.ProtocolVersion2 {
 		return false
 	}
 	data, err := runtimeproto.ExtractReadyData(event.Data)
@@ -47,7 +47,7 @@ func isServeReadyEvent(event jobs.RawJobEvent) bool {
 // readyClaim is the target of a readiness claim and the port the proxy should
 // forward to: the first http or https endpoint, because the proxy speaks HTTP,
 // else the first endpoint, else 0 for a claim that carries none.
-func readyClaim(event jobs.RawJobEvent) (target string, port int) {
+func readyClaim(event scheduler.RawJobEvent) (target string, port int) {
 	data, err := runtimeproto.ExtractReadyData(event.Data)
 	if err != nil || data == nil {
 		return "", 0
@@ -74,7 +74,7 @@ type memberRuntime struct {
 
 	ws             *workspace.Workspace
 	versions       cachekey.RunVersions
-	output         jobs.Renderer
+	output         scheduler.Renderer
 	observeProcess func(pgid int)
 	// releaseProcess is told every group a serve step spawned once the step
 	// returned.
@@ -133,8 +133,8 @@ func serveParams() map[string]any { return map[string]any{serveParamPort: serveP
 // the backend where an earlier claim put it, because it says nothing about
 // where the member listens. A workload claim also records that the member's
 // application completed its startup.
-func (rt *memberRuntime) observe(event jobs.RawJobEvent) {
-	if event.Type == jobs.EventTypeLog && event.Message != "" {
+func (rt *memberRuntime) observe(event scheduler.RawJobEvent) {
+	if event.Type == scheduler.EventTypeLog && event.Message != "" {
 		rt.mu.Lock()
 		rt.tail.add(event.Message)
 		rt.mu.Unlock()
@@ -158,7 +158,7 @@ func (rt *memberRuntime) observe(event jobs.RawJobEvent) {
 
 // runOnce executes the member's serve step once and returns its result. The
 // proxy answers 503 again as soon as the process is gone.
-func (rt *memberRuntime) runOnce(ctx context.Context, sink jobs.Renderer) (*jobs.JobResult, error) {
+func (rt *memberRuntime) runOnce(ctx context.Context, sink scheduler.Renderer) (*scheduler.JobResult, error) {
 	job := rt.member.ServeJob
 	if sink != nil {
 		sink.JobStart(job)
@@ -175,11 +175,11 @@ func (rt *memberRuntime) runOnce(ctx context.Context, sink jobs.Renderer) (*jobs
 			rt.observeProcess(pgid)
 		}
 	}
-	result, err := jobs.RunJobWithProcessEnv(
-		jobs.WithProcessGroupObserver(ctx, observe),
+	result, err := scheduler.RunJobWithProcessEnv(
+		scheduler.WithProcessGroupObserver(ctx, observe),
 		rt.ws, job, serveParams(), rt.ws.Config.GetCommandDefaults(modeljobs.JobCommandName(job), job.Extension.Name),
 		rt.versions, rt.env,
-		func(event jobs.RawJobEvent) {
+		func(event scheduler.RawJobEvent) {
 			rt.observe(event)
 			if sink != nil {
 				sink.JobEvent(job, event)
@@ -261,7 +261,7 @@ func (rt *memberRuntime) start(ctx context.Context) {
 		ServeMode:        true,
 		Renderer:         rt.output,
 		BoundPort:        func() int { return int(rt.lastPort.Load()) },
-		RunIteration: func(ctx context.Context, _ []*workspace.Project, sink jobs.Renderer) watch.IterationResult {
+		RunIteration: func(ctx context.Context, _ []*workspace.Project, sink scheduler.Renderer) watch.IterationResult {
 			result, err := rt.runOnce(ctx, sink)
 			switch {
 			case err != nil:

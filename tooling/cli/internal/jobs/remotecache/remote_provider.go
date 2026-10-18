@@ -144,7 +144,7 @@ func loadProviderRemoteCache(ctx context.Context, wsRoot string, exts []*extensi
 // Launcher resolves how to start the provider command of ext: the runtime
 // preparation a task gets, the command's templates, toolchains and
 // environment. The engine passes the runner's provider launch
-// (jobs.PrepareProviderLaunch), so this package never imports the runner.
+// (scheduler.PrepareProviderLaunch), so this package never imports the runner.
 type Launcher func(ctx context.Context, workspaceRoot string, ext *extension.ExtensionDescription, command string) (cacheprovider.LaunchSpec, error)
 
 // providerLaunchSpec resolves how to start the cache provider. The provider

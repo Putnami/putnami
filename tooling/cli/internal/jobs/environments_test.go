@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	modelextension "go.putnami.dev/cli/model/extension"
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
 	ciproto "go.putnami.dev/protocol/ci"
 	distribution "go.putnami.dev/protocol/distribution"
@@ -109,15 +110,15 @@ func deployHead(t *testing.T) map[string]*distribution.ChannelHead {
 }
 
 // deployJobsFor plans one deploy task per named project.
-func deployJobsFor(ws *workspace.Workspace, ids ...string) []*ScheduledJob {
+func deployJobsFor(ws *workspace.Workspace, ids ...string) []*jobmodel.ScheduledJob {
 	ext := &modelextension.ExtensionDescription{Name: "@putnami/cloud"}
-	planned := make([]*ScheduledJob, 0, len(ids))
+	planned := make([]*jobmodel.ScheduledJob, 0, len(ids))
 	for _, id := range ids {
 		for _, project := range ws.Projects {
 			if project.ID != id {
 				continue
 			}
-			planned = append(planned, &ScheduledJob{
+			planned = append(planned, &jobmodel.ScheduledJob{
 				Project: project, Extension: ext,
 				JobDef: &modelextension.JobDefinition{
 					Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name, Cache: true,
@@ -134,7 +135,7 @@ func deployJobsFor(ws *workspace.Workspace, ids ...string) []*ScheduledJob {
 // ws.Projects and no selector can name it — carrying the real workloads in
 // SelectedProjects. It sits beside deployJobsFor rather than replacing it:
 // both shapes are legitimate and both must bind.
-func deployWorkspaceJobFor(ws *workspace.Workspace, ids ...string) *ScheduledJob {
+func deployWorkspaceJobFor(ws *workspace.Workspace, ids ...string) *jobmodel.ScheduledJob {
 	ext := &modelextension.ExtensionDescription{Name: "@putnami/cloud"}
 	selected := make([]*workspace.Project, 0, len(ids))
 	for _, id := range ids {
@@ -144,7 +145,7 @@ func deployWorkspaceJobFor(ws *workspace.Workspace, ids ...string) *ScheduledJob
 			}
 		}
 	}
-	return &ScheduledJob{
+	return &jobmodel.ScheduledJob{
 		Project: planner.WorkspaceOnceProject(ws), Extension: ext, SelectedProjects: selected,
 		JobDef: &modelextension.JobDefinition{
 			Name: "deploy~cloud-release", CommandName: "deploy", ExtensionName: ext.Name,
@@ -156,7 +157,7 @@ func deployWorkspaceJobFor(ws *workspace.Workspace, ids ...string) *ScheduledJob
 // deployWorkloadOf reads the contract one deploy job carries for one workload,
 // by the project id that entry names. A consumer reads it the same way,
 // whatever the scope of the job it runs in.
-func deployWorkloadOf(t *testing.T, job *ScheduledJob, projectID string) DeployWorkloadTarget {
+func deployWorkloadOf(t *testing.T, job *jobmodel.ScheduledJob, projectID string) DeployWorkloadTarget {
 	t.Helper()
 	target, bound := deployTargetOf(job)
 	if !bound {
@@ -173,7 +174,7 @@ func deployWorkloadOf(t *testing.T, job *ScheduledJob, projectID string) DeployW
 
 // deployWorkloadIDs lists, in order, the workloads one deploy job's contract
 // names.
-func deployWorkloadIDs(job *ScheduledJob) []string {
+func deployWorkloadIDs(job *jobmodel.ScheduledJob) []string {
 	target, bound := deployTargetOf(job)
 	if !bound {
 		return nil
@@ -485,7 +486,7 @@ func TestWorkspaceScopedDeployJobReceivesEveryWorkload(t *testing.T) {
 			options := deployOptions("prod", "")
 			options.WorkspaceRoot = ws.Root
 			job := deployWorkspaceJobFor(ws, "/api", "/worker")
-			if err := PrepareDeployTargets(context.Background(), options, ws, providerDiscovery(), []*ScheduledJob{job}, false); err != nil {
+			if err := PrepareDeployTargets(context.Background(), options, ws, providerDiscovery(), []*jobmodel.ScheduledJob{job}, false); err != nil {
 				t.Fatalf("prepare deploy targets: %v", err)
 			}
 			target, bound := deployTargetOf(job)
@@ -541,7 +542,7 @@ func TestSelectWorkloadsExcludesTheWorkspaceOnceProject(t *testing.T) {
 		if err != nil {
 			t.Fatalf("load environment: %v", err)
 		}
-		planned := []*ScheduledJob{deployWorkspaceJobFor(ws, "/api", "/worker")}
+		planned := []*jobmodel.ScheduledJob{deployWorkspaceJobFor(ws, "/api", "/worker")}
 		candidates := PlannedCommandProjects(planned, "deploy")
 		if got := projectIDs(candidates); strings.Join(got, ",") != "/api,/worker,putnami" {
 			t.Fatalf("planned deploy projects = %v, want the synthetic project among them", got)
@@ -577,7 +578,7 @@ func TestMixedScopeDeployJobsBindTheirOwnWorkloads(t *testing.T) {
 	options.WorkspaceRoot = ws.Root
 	aggregate := deployWorkspaceJobFor(ws, "/api", "/worker")
 	perProject := deployJobsFor(ws, "/web")
-	planned := append([]*ScheduledJob{aggregate}, perProject...)
+	planned := append([]*jobmodel.ScheduledJob{aggregate}, perProject...)
 	if err := PrepareDeployTargets(context.Background(), options, ws, providerDiscovery(), planned, false); err != nil {
 		t.Fatalf("prepare deploy targets: %v", err)
 	}
@@ -601,7 +602,7 @@ func TestSameSessionAggregateDeployTakesTheReleasedSet(t *testing.T) {
 	options := deployOptions("prod", "")
 	options.WorkspaceRoot = ws.Root
 	job := deployWorkspaceJobFor(ws, "/api", "/worker")
-	planned := []*ScheduledJob{job}
+	planned := []*jobmodel.ScheduledJob{job}
 
 	if err := PrepareDeployTargets(context.Background(), options, ws, providerDiscovery(), planned, true); err != nil {
 		t.Fatalf("prepare same-session deploy targets: %v", err)
@@ -636,7 +637,7 @@ func TestBindDeployTargetsRefusesAWorkloadNoDeployJobCovers(t *testing.T) {
 		"/api":    {Project: "/api"},
 		"/worker": {Project: "/worker"},
 	}
-	planned := []*ScheduledJob{deployWorkspaceJobFor(ws, "/api")}
+	planned := []*jobmodel.ScheduledJob{deployWorkspaceJobFor(ws, "/api")}
 	err := bindDeployTargets(planned, "prod", targets, false)
 	if err == nil || !strings.Contains(err.Error(), "environment workloads [/worker] have no deploy task in this plan") {
 		t.Fatalf("bind with an uncovered workload = %v", err)

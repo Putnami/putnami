@@ -13,7 +13,7 @@ import (
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
@@ -31,7 +31,7 @@ type testCaseStream struct {
 // recordTestCaseStream drives renderer through run, closes the session and
 // reads both outputs back. It fails the test when the pair violates the
 // whole-stream contract, which recomputes the live selection.
-func recordTestCaseStream(t *testing.T, renderer jobs.Renderer, session *workspace_state.Session, live *bytes.Buffer, run func(jobs.Renderer)) testCaseStream {
+func recordTestCaseStream(t *testing.T, renderer scheduler.Renderer, session *workspace_state.Session, live *bytes.Buffer, run func(scheduler.Renderer)) testCaseStream {
 	t.Helper()
 	run(renderer)
 	session.Close()
@@ -105,22 +105,22 @@ func assertNoTaskEventCarriesTestCases(t *testing.T, stream testCaseStream) {
 }
 
 // testCaseJob is a test task whose typed identity key equals its plan key.
-func testCaseJob(id string) *jobs.ScheduledJob {
-	return &jobs.ScheduledJob{
+func testCaseJob(id string) *scheduler.ScheduledJob {
+	return &scheduler.ScheduledJob{
 		Project:   &workspace.Project{ID: "/" + id, Name: id, Path: id},
 		Extension: &extension.ExtensionDescription{Name: "test-ext", Path: "/ext"},
 		JobDef:    &extension.JobDefinition{Name: "test", ExtensionName: "test-ext", CommandName: "test"},
 	}
 }
 
-func parsedResult(t *testing.T, line string) (jobs.RawJobEvent, *jobs.JobResult) {
+func parsedResult(t *testing.T, line string) (scheduler.RawJobEvent, *scheduler.JobResult) {
 	t.Helper()
 	event, ok := jobmodel.ParseRawEvent(line)
 	if !ok {
 		t.Fatalf("runtime event did not parse: %s", line)
 	}
 	result := jobmodel.ExtractResult(event.Data)
-	result.Events = []jobs.RawJobEvent{event}
+	result.Events = []scheduler.RawJobEvent{event}
 	return event, result
 }
 
@@ -141,12 +141,12 @@ func TestMachineStreamEmitsTestCasesBeforeTheirTaskEnd(t *testing.T) {
 			job := testCaseJob("app")
 			event, result := parsedResult(t, failedAndSkippedResult)
 
-			stream := recordTestCaseStream(t, renderer, session, &live, func(renderer jobs.Renderer) {
-				renderer.Start([]*jobs.ScheduledJob{job})
+			stream := recordTestCaseStream(t, renderer, session, &live, func(renderer scheduler.Renderer) {
+				renderer.Start([]*scheduler.ScheduledJob{job})
 				renderer.JobStart(job)
 				renderer.JobEvent(job, event)
 				renderer.JobComplete(job, result)
-				renderer.Finish(map[string]*jobs.JobResult{job.Key(): result}, jobs.SessionOutcome{})
+				renderer.Finish(map[string]*scheduler.JobResult{job.Key(): result}, scheduler.SessionOutcome{})
 			})
 
 			end := assertCasesPrecedeTaskEnd(t, stream, job.Key(), "TestFails", "TestSkips")
@@ -184,12 +184,12 @@ func TestMachineStreamCountsEveryCaseWithoutARecord(t *testing.T) {
 	}
 	event, result := parsedResult(t, `{"v":2,"type":"result","data":{"status":"OK","data":{"testCasesDropped":3,"testCases":[`+strings.Join(cases, ",")+`]}}}`)
 
-	stream := recordTestCaseStream(t, renderer, session, &live, func(renderer jobs.Renderer) {
-		renderer.Start([]*jobs.ScheduledJob{job})
+	stream := recordTestCaseStream(t, renderer, session, &live, func(renderer scheduler.Renderer) {
+		renderer.Start([]*scheduler.ScheduledJob{job})
 		renderer.JobStart(job)
 		renderer.JobEvent(job, event)
 		renderer.JobComplete(job, result)
-		renderer.Finish(map[string]*jobs.JobResult{job.Key(): result}, jobs.SessionOutcome{})
+		renderer.Finish(map[string]*scheduler.JobResult{job.Key(): result}, scheduler.SessionOutcome{})
 	})
 
 	names := make([]string, 0, protocolcli.TestCaseMaxPerTask)
@@ -225,30 +225,30 @@ func TestMachineStreamAttributesBatchTestCasesToTheirMember(t *testing.T) {
 	}
 	// The members' results as the batch split builds them: the member's slice
 	// of the wire as Data, beside its canonical records.
-	memberResult := func(status jobs.TaskStatus, data string) *jobs.JobResult {
-		result := &jobs.JobResult{Status: string(status), Canonical: &jobs.TaskResult{Status: status}}
+	memberResult := func(status scheduler.TaskStatus, data string) *scheduler.JobResult {
+		result := &scheduler.JobResult{Status: string(status), Canonical: &scheduler.TaskResult{Status: status}}
 		if err := json.Unmarshal([]byte(data), &result.Data); err != nil {
 			t.Fatal(err)
 		}
 		return result
 	}
-	resultA := memberResult(jobs.TaskStatusFailed, `{"testCases":[{"name":"TestA","suite":"example.com/a","status":"failed","output":"boom"}]}`)
-	resultB := memberResult(jobs.TaskStatusSuccess, `{"testCases":[{"name":"TestB","suite":"example.com/b","status":"passed"}]}`)
+	resultA := memberResult(scheduler.TaskStatusFailed, `{"testCases":[{"name":"TestA","suite":"example.com/a","status":"failed","output":"boom"}]}`)
+	resultB := memberResult(scheduler.TaskStatusSuccess, `{"testCases":[{"name":"TestB","suite":"example.com/b","status":"passed"}]}`)
 
-	stream := recordTestCaseStream(t, renderer, session, &live, func(renderer jobs.Renderer) {
+	stream := recordTestCaseStream(t, renderer, session, &live, func(renderer scheduler.Renderer) {
 		batch, ok := renderer.(interface {
-			BatchJobEvent(*jobs.ScheduledJob, jobs.RawJobEvent)
+			BatchJobEvent(*scheduler.ScheduledJob, scheduler.RawJobEvent)
 		})
 		if !ok {
 			t.Fatalf("renderer %T does not record batch events", renderer)
 		}
-		renderer.Start([]*jobs.ScheduledJob{a, b})
+		renderer.Start([]*scheduler.ScheduledJob{a, b})
 		renderer.JobStart(a)
 		renderer.JobStart(b)
 		batch.BatchJobEvent(a, batchEvent)
 		renderer.JobComplete(a, resultA)
 		renderer.JobComplete(b, resultB)
-		renderer.Finish(map[string]*jobs.JobResult{a.Key(): resultA, b.Key(): resultB}, jobs.SessionOutcome{})
+		renderer.Finish(map[string]*scheduler.JobResult{a.Key(): resultA, b.Key(): resultB}, scheduler.SessionOutcome{})
 	})
 
 	assertCasesPrecedeTaskEnd(t, stream, a.Key(), "TestA")
@@ -273,12 +273,12 @@ func TestSessionRecordingEmitsTestCasesBesideAHumanRenderer(t *testing.T) {
 	job := testCaseJob("app")
 	event, result := parsedResult(t, failedAndSkippedResult)
 
-	stream := recordTestCaseStream(t, renderer, session, nil, func(renderer jobs.Renderer) {
-		renderer.Start([]*jobs.ScheduledJob{job})
+	stream := recordTestCaseStream(t, renderer, session, nil, func(renderer scheduler.Renderer) {
+		renderer.Start([]*scheduler.ScheduledJob{job})
 		renderer.JobStart(job)
 		renderer.JobEvent(job, event)
 		renderer.JobComplete(job, result)
-		renderer.Finish(map[string]*jobs.JobResult{job.Key(): result}, jobs.SessionOutcome{})
+		renderer.Finish(map[string]*scheduler.JobResult{job.Key(): result}, scheduler.SessionOutcome{})
 	})
 
 	assertCasesPrecedeTaskEnd(t, stream, job.Key(), "TestFails", "TestSkips")

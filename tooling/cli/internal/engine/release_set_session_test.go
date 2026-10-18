@@ -18,6 +18,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -291,7 +292,7 @@ func touchFixtureProject(t *testing.T, root, project string) {
 	}
 }
 
-func planKeys(t *testing.T, planned []*jobs.ScheduledJob) []string {
+func planKeys(t *testing.T, planned []*scheduler.ScheduledJob) []string {
 	t.Helper()
 	keys := make([]string, 0, len(planned))
 	for _, job := range planned {
@@ -568,7 +569,7 @@ func useUnchangedReleaseSetHead(t *testing.T, root string, req Request) {
 		t.Fatalf("build keying plan = exit %d", code)
 	}
 	preparation, err := jobs.PrepareReleaseSetRun(ctx, options, ws, selected, verification, extensions, discovered,
-		keying, probe.CommandParams, jobs.NewRunCacheManager(root, ""), probe.selection, false)
+		keying, probe.CommandParams, scheduler.NewRunCacheManager(root, ""), probe.selection, false)
 	if err != nil || preparation.Run == nil || preparation.Run.Plan() == nil {
 		t.Fatalf("prepare fixture release set = %+v, %v", preparation, err)
 	}
@@ -603,7 +604,7 @@ func useUnchangedReleaseSetHead(t *testing.T, root string, req Request) {
 
 // plannedSelection reads the resolved selection the run stamped on every node,
 // which is the same block a task receives on the wire and the session records.
-func plannedSelection(t *testing.T, planned []*jobs.ScheduledJob) *protocoljob.Selection {
+func plannedSelection(t *testing.T, planned []*scheduler.ScheduledJob) *protocoljob.Selection {
 	t.Helper()
 	if len(planned) == 0 {
 		t.Fatal("the run planned nothing")

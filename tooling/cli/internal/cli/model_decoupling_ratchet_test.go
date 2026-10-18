@@ -45,16 +45,19 @@ import (
 // count; this file names all four literally, one line below.
 
 // internalWorkspaceImportPath and internalExtensionImportPath are the two other
-// origin packages the model was lifted out of. The third, internal/jobs, is
-// already spelled by engine_boundary_test.go as jobsImportPath and is reused
-// here rather than written twice. internalCacheKeyImportPath is the part of
-// internal/jobs split out of it with the job-context version block, so a
-// consumer that reaches it reaches the same execution half; so is the remote
-// cache client, spelled there as remoteCacheImportPath, and the planner, spelled
-// there as plannerImportPath.
+// origin packages the model was lifted out of. The third, internal/jobs, was
+// split: the scheduler, which now holds its alias layer, is already spelled by
+// engine_boundary_test.go as schedulerImportPath and is reused here rather than
+// written twice, and internalJobsImportPath is the release-set and publication
+// code that stayed. internalCacheKeyImportPath is the part of internal/jobs
+// split out of it with the job-context version block, so a consumer that
+// reaches it reaches the same execution half; so is the remote cache client,
+// spelled there as remoteCacheImportPath, and the planner, spelled there as
+// plannerImportPath.
 const (
 	internalWorkspaceImportPath = "go.putnami.dev/tooling/cli/internal/workspace"
 	internalExtensionImportPath = "go.putnami.dev/tooling/cli/internal/extension"
+	internalJobsImportPath      = "go.putnami.dev/tooling/cli/internal/jobs"
 	internalCacheKeyImportPath  = "go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
@@ -71,7 +74,8 @@ type modelOrigin struct {
 }
 
 var modelOrigins = []modelOrigin{
-	{jobsImportPath, "jobs", "the planner, scheduler, executor, cache and job-context writer"},
+	{schedulerImportPath, "scheduler", "the scheduler, executor, cache use and job-context writer"},
+	{internalJobsImportPath, "jobs", "the release-set, publication and deploy-target preparation of a run"},
 	{internalWorkspaceImportPath, "workspace", "workspace discovery, loading, probing, syncing and snapshotting"},
 	{internalExtensionImportPath, "extension", "extension discovery, install, integrity, registry and lockfile I/O"},
 	{internalCacheKeyImportPath, "cachekey", "the task cache key and the job-context inputs it hashes"},
@@ -116,18 +120,18 @@ type modelDecouplingException struct {
 var modelDecouplingExceptions = []modelDecouplingException{
 	{
 		file:   "internal/changeplan/changeplan.go",
-		origin: jobsImportPath,
-		symbol: "jobs.DefaultTimeoutMs",
-		why: "the subprocess timeout default (internal/jobs/types.go), declared beside the runner " +
+		origin: schedulerImportPath,
+		symbol: "scheduler.DefaultTimeoutMs",
+		why: "the subprocess timeout default (internal/jobs/scheduler/types.go), declared beside the runner " +
 			"and the batch executor that apply it. A change plan states the hard deadline each task " +
 			"WOULD run under, so it reads the executor's default instead of restating it — a second " +
 			"spelling is how the planned deadline and the executed one start to disagree.",
 	},
 	{
 		file:   "internal/machine/report.go",
-		origin: jobsImportPath,
-		symbol: "jobs.TuningReport",
-		why: "the scheduler's auto-tuning summary (internal/jobs/scheduler_metrics.go), assembled " +
+		origin: schedulerImportPath,
+		symbol: "scheduler.TuningReport",
+		why: "the scheduler's auto-tuning summary (internal/jobs/scheduler/scheduler_metrics.go), assembled " +
 			"from the parallelism decision, the CPU allocator's grants and the measured ready-waits — " +
 			"facts that exist only inside a scheduler that ran. The v2 report document forwards two of " +
 			"them (parallelism, critical path), so this wire depends on the execution half by " +

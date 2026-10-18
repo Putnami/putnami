@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
 	ciproto "go.putnami.dev/protocol/ci"
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -267,7 +268,7 @@ func PrepareDeployTargets(
 	options DeployOptions,
 	ws *workspace.Workspace,
 	discovered *extension.DiscoveryResult,
-	planned []*ScheduledJob,
+	planned []*jobmodel.ScheduledJob,
 	releasing bool,
 ) error {
 	if !requestedDeployEnvironment(options) {
@@ -493,7 +494,7 @@ func deployMemberKeys(project *workspace.Project) (map[string]struct{}, error) {
 // A contract the release completes is bound on a job that can no longer be
 // served from the cache: its input exists only after this session's release,
 // so an entry keyed before it would answer for a different set.
-func bindDeployTargets(planned []*ScheduledJob, environment string, targets map[string]*DeployWorkloadTarget, releasing bool) error {
+func bindDeployTargets(planned []*jobmodel.ScheduledJob, environment string, targets map[string]*DeployWorkloadTarget, releasing bool) error {
 	bound := make(map[string]struct{}, len(targets))
 	for _, job := range planner.SchedulableJobs(planned) {
 		if job == nil || job.JobDef == nil || job.Project == nil || job.CommandName() != "deploy" {
@@ -539,7 +540,7 @@ func bindDeployTargets(planned []*ScheduledJob, environment string, targets map[
 // selected under it — the same projects whose package and publish tasks it
 // already depends on. Entries are ordered by project id, so two runs of the
 // same plan bind the same bytes.
-func deployJobWorkloads(job *ScheduledJob, targets map[string]*DeployWorkloadTarget) []DeployWorkloadTarget {
+func deployJobWorkloads(job *jobmodel.ScheduledJob, targets map[string]*DeployWorkloadTarget) []DeployWorkloadTarget {
 	if target, selected := targets[job.Project.ID]; selected {
 		return []DeployWorkloadTarget{*target}
 	}
@@ -570,7 +571,7 @@ func deployJobWorkloads(job *ScheduledJob, targets map[string]*DeployWorkloadTar
 // project: a job that deploys the whole workspace owns no member itself, and
 // completing it against its own project would answer that every workload is
 // unpublished.
-func completeDeployTargets(deployJobs []*ScheduledJob, ref distribution.ReleaseSetRef, members []distribution.ReleaseSetMember) error {
+func completeDeployTargets(deployJobs []*jobmodel.ScheduledJob, ref distribution.ReleaseSetRef, members []distribution.ReleaseSetMember) error {
 	for _, job := range deployJobs {
 		target, bound := deployTargetOf(job)
 		if !bound {
@@ -598,7 +599,7 @@ func completeDeployTargets(deployJobs []*ScheduledJob, ref distribution.ReleaseS
 // one of the projects it selected otherwise. It reads the workload from the
 // same place bindDeployTargets covered it from, so the barrier completes every
 // contract against the very project that earned it.
-func deployWorkloadProject(job *ScheduledJob, projectID string) *workspace.Project {
+func deployWorkloadProject(job *jobmodel.ScheduledJob, projectID string) *workspace.Project {
 	if job.Project != nil && job.Project.ID == projectID {
 		return job.Project
 	}
@@ -612,7 +613,7 @@ func deployWorkloadProject(job *ScheduledJob, projectID string) *workspace.Proje
 
 // deployTargetOf reads the workload contract bound to one deploy job, so the
 // parameter name is spelled in exactly one place.
-func deployTargetOf(job *ScheduledJob) (*DeployTarget, bool) {
+func deployTargetOf(job *jobmodel.ScheduledJob) (*DeployTarget, bool) {
 	if job == nil || job.JobDef == nil || job.Project == nil {
 		return nil, false
 	}

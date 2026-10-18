@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	registry "go.putnami.dev/protocol/registry"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
 // ReadCredential returns the broker's read credential, whatever hosts it
@@ -24,12 +24,12 @@ func (b *Broker) ReadCredential(ctx context.Context) (*registry.Credential, erro
 }
 
 // InstallJobRead makes the broker's read credential the one a hosted run hands
-// its fetch job (jobs.InstallJobReadCredential), and returns the function that
+// its fetch job (scheduler.InstallJobReadCredential), and returns the function that
 // restores the previous source. A broker that does not serve the read purpose
 // installs nothing: the job then receives absence.
 func (b *Broker) InstallJobRead() (restore func()) {
 	if !b.Enabled(registry.PurposeRead) {
 		return func() {}
 	}
-	return jobs.InstallJobReadCredential(b.ReadCredential)
+	return scheduler.InstallJobReadCredential(b.ReadCredential)
 }

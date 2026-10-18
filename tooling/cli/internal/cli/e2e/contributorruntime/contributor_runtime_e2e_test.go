@@ -20,7 +20,7 @@ import (
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -49,7 +49,7 @@ func repositoryRoot(t *testing.T) string {
 }
 
 // TestTheHostPreparesTheContributorRuntimeWithTheLockedGo runs the real
-// bin/prepare of @putnami/contributor through jobs.SynchronizeExtensionRuntimes.
+// bin/prepare of @putnami/contributor through scheduler.SynchronizeExtensionRuntimes.
 // The host resolves the prepare toolchain from putnami.lock.json against this
 // process's environment, where the Go extension's test task sets GOROOT to the
 // pinned Go release. It runs bin/prepare in an isolated source view, stores
@@ -86,7 +86,7 @@ func TestTheHostPreparesTheContributorRuntimeWithTheLockedGo(t *testing.T) {
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
 
 	ctx := context.Background()
-	if err := jobs.SynchronizeExtensionRuntimes(
+	if err := scheduler.SynchronizeExtensionRuntimes(
 		ctx, &workspace.Workspace{Root: repoRoot}, []*extension.ExtensionDescription{ext}, nil,
 	); err != nil {
 		t.Fatalf("prepare the contributor runtime with GOROOT=%q: %v", os.Getenv("GOROOT"), err)

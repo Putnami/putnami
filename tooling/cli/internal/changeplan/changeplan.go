@@ -19,7 +19,7 @@ import (
 	"go.putnami.dev/cli/model/extension"
 	"go.putnami.dev/cli/model/workspace"
 	ciproto "go.putnami.dev/protocol/ci"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
 // Input is the checked, planner-owned data used to construct one ImpactPlan.
@@ -32,7 +32,7 @@ type Input struct {
 	ChangedFiles     []string
 	DirectProjects   []*workspace.Project
 	ImpactedProjects []*workspace.Project
-	Planned          []*jobs.ScheduledJob
+	Planned          []*scheduler.ScheduledJob
 	Cache            ciproto.ChangePlanCache
 }
 
@@ -113,11 +113,11 @@ func canonicalProjects(projects []*workspace.Project) ([]ciproto.ChangePlanProje
 // same way, and the portable runner request reuses it, so an ImpactPlan and the
 // execution request can never describe the same plan two ways. It adds nothing
 // to the ChangePlan digest domain.
-func ProjectTasks(planned []*jobs.ScheduledJob) ([]ciproto.ChangePlanTask, error) {
+func ProjectTasks(planned []*scheduler.ScheduledJob) ([]ciproto.ChangePlanTask, error) {
 	return canonicalTasks(planned, changePlanNoun)
 }
 
-func canonicalTasks(planned []*jobs.ScheduledJob, noun string) ([]ciproto.ChangePlanTask, error) {
+func canonicalTasks(planned []*scheduler.ScheduledJob, noun string) ([]ciproto.ChangePlanTask, error) {
 	byKey := make(map[string]ciproto.ChangePlanTask, len(planned))
 	for _, job := range planned {
 		task, err := projectTask(job, noun)
@@ -137,7 +137,7 @@ func canonicalTasks(planned []*jobs.ScheduledJob, noun string) ([]ciproto.Change
 	return out, nil
 }
 
-func projectTask(job *jobs.ScheduledJob, noun string) (ciproto.ChangePlanTask, error) {
+func projectTask(job *scheduler.ScheduledJob, noun string) (ciproto.ChangePlanTask, error) {
 	if job == nil || job.JobDef == nil || job.Project == nil || job.Extension == nil {
 		return ciproto.ChangePlanTask{}, fmt.Errorf("%s contains incomplete planned task", noun)
 	}
@@ -147,7 +147,7 @@ func projectTask(job *jobs.ScheduledJob, noun string) (ciproto.ChangePlanTask, e
 	}
 	deadline := job.JobDef.TimeoutMs
 	if deadline == 0 {
-		deadline = jobs.DefaultTimeoutMs
+		deadline = scheduler.DefaultTimeoutMs
 	}
 	if deadline < 1 {
 		return ciproto.ChangePlanTask{}, fmt.Errorf("task %s has no hard deadline", identity.Key)

@@ -7,7 +7,7 @@ import (
 
 	"go.putnami.dev/cli/model/extension"
 	internalextension "go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -16,7 +16,7 @@ import (
 // same rule the cache provider follows: no product name, no version floor.
 //
 // The provider command gets the runtime preparation a task gets (see
-// jobs.PrepareProviderLaunch). A runtime that cannot be prepared is an error,
+// scheduler.PrepareProviderLaunch). A runtime that cannot be prepared is an error,
 // so a remote run stops before it submits anything.
 func LaunchSpecFor(ctx context.Context, wsRoot string, extensions []*extension.ExtensionDescription, provider *extension.ResolvedProvider) (LaunchSpec, error) {
 	if provider == nil {
@@ -33,7 +33,7 @@ func LaunchSpecFor(ctx context.Context, wsRoot string, extensions []*extension.E
 	if strings.TrimSpace(job.Command) == "" {
 		return LaunchSpec{}, fmt.Errorf("runner provider command %q has no executable", provider.Command)
 	}
-	launch, err := jobs.PrepareProviderLaunch(ctx, wsRoot, ext, provider.Command)
+	launch, err := scheduler.PrepareProviderLaunch(ctx, wsRoot, ext, provider.Command)
 	if err != nil {
 		return LaunchSpec{}, fmt.Errorf("prepare runner provider %s: %w", provider.ExtensionName, err)
 	}

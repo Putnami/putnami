@@ -10,7 +10,7 @@ import (
 	modeljobs "go.putnami.dev/cli/model/jobs"
 	extensionproto "go.putnami.dev/protocol/extension"
 	runner "go.putnami.dev/protocol/runner"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
 // commitExecution is the engine binding of a version 2 request over
@@ -95,7 +95,7 @@ func TestCommitRequestSeamChecksItsOwnPlan(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		portable *PortableExecution
-		planned  []*jobs.ScheduledJob
+		planned  []*scheduler.ScheduledJob
 		refusal  string
 	}{
 		{"a frozen request with another plan", &PortableExecution{}, plain, "differs from the expected plan"},
@@ -145,7 +145,7 @@ func TestCommitPublicationHoldsAPublishingPlanToTheBarrier(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		request runner.CommitRequest
-		planned []*jobs.ScheduledJob
+		planned []*scheduler.ScheduledJob
 		refusal string
 	}{
 		{"a gate plan without the block", request(nil), plain, ""},

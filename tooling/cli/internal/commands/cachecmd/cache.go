@@ -12,7 +12,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hooks"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -209,7 +209,7 @@ func runExtensionCacheCommands(
 	if loadErr != nil || ws == nil {
 		ws = workspace.NewWorkspace(wsRoot, cfg, nil)
 	}
-	if err := jobs.SynchronizeExtensionRuntimes(ctx, ws, declaring, nil); err != nil {
+	if err := scheduler.SynchronizeExtensionRuntimes(ctx, ws, declaring, nil); err != nil {
 		return fmt.Errorf("synchronize extension runtimes: %w", err)
 	}
 

@@ -25,7 +25,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hostrpc"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
 // The host RPC channel of an interactive extension subcommand, end to end: the
@@ -92,7 +92,7 @@ func hostRPCVariables(env []string) string {
 }
 
 // hostRPCProviderEnv is the environment of a provider the core prepares in
-// root (jobs.PrepareProviderLaunch), as it prepares the cache provider, the
+// root (scheduler.PrepareProviderLaunch), as it prepares the cache provider, the
 // runner provider and the session reporter. The provider's own root is root
 // too: the nested process exits without running its test cleanup.
 func hostRPCProviderEnv(t *testing.T, root string) []string {
@@ -109,7 +109,7 @@ func hostRPCProviderEnv(t *testing.T, root string) []string {
 			"provider": {ExtensionName: "@test/hostrpc-provider", Name: "provider", Command: executable},
 		},
 	}
-	launch, err := jobs.PrepareProviderLaunch(t.Context(), root, provider, "provider")
+	launch, err := scheduler.PrepareProviderLaunch(t.Context(), root, provider, "provider")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +295,7 @@ func TestHostRPC_AHostedRunOpensNoChannel(t *testing.T) {
 // TestHostRPC_AProviderToolReceivesNoChannel starts provider tools the way the
 // core does while a channel is open: from the process that opened it, and from
 // a nested putnami that the launched command runs, which inherits the pair.
-// Neither a provider the core prepares (jobs.PrepareProviderLaunch: the cache
+// Neither a provider the core prepares (scheduler.PrepareProviderLaunch: the cache
 // provider, the runner provider, the session reporter) nor the collaboration
 // provider tool that collaboration.call reaches receives the channel, and the
 // nested process drops the pair it inherited. The nested putnami is a child

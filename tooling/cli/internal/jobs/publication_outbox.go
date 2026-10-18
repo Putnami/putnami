@@ -17,6 +17,7 @@ import (
 
 	"github.com/google/go-containerregistry/pkg/name"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
 	distribution "go.putnami.dev/protocol/distribution"
 	extproto "go.putnami.dev/protocol/extension"
@@ -32,6 +33,7 @@ import (
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
 // publicationOpenKey is the plan key of the node that opens the plan.
@@ -68,7 +70,7 @@ func (run *ReleaseSetRun) PublicationContext(ctx context.Context) (context.Conte
 		outboxes[key] = dir
 	}
 	run.outboxes = outboxes
-	return WithPublicationOutboxes(ctx, outboxes), cleanup, nil
+	return scheduler.WithPublicationOutboxes(ctx, outboxes), cleanup, nil
 }
 
 // attachPublication adds the publication-v1 nodes to the plan. One open node
@@ -77,7 +79,7 @@ func (run *ReleaseSetRun) PublicationContext(ctx context.Context) (context.Conte
 // publication. One upload node per selected publication job waits for that
 // job and for open; it uploads what the job packed. A deploy then waits for
 // the release, as without publication-v1.
-func (run *ReleaseSetRun) attachPublication(planned []*ScheduledJob) ([]*ScheduledJob, map[string]InternalJobRunner, error) {
+func (run *ReleaseSetRun) attachPublication(planned []*jobmodel.ScheduledJob) ([]*jobmodel.ScheduledJob, map[string]scheduler.InternalJobRunner, error) {
 	if run.open == nil {
 		return nil, nil, errors.New("attach the publication: the plan was not bound before planning ended")
 	}
@@ -87,7 +89,7 @@ func (run *ReleaseSetRun) attachPublication(planned []*ScheduledJob) ([]*Schedul
 		}
 	}
 	byKey := planner.JobsByPlanKey(planned)
-	open := &ScheduledJob{
+	open := &jobmodel.ScheduledJob{
 		Project:   releaseSetInternalProject,
 		Extension: releaseSetInternalExtension,
 		DependsOn: run.openDependencies(planner.SchedulableJobs(planned)),
@@ -106,7 +108,7 @@ func (run *ReleaseSetRun) attachPublication(planned []*ScheduledJob) ([]*Schedul
 	if _, collides := byKey[open.Key()]; collides {
 		return nil, nil, fmt.Errorf("publication open key %q collides with a planned job", open.Key())
 	}
-	runners := map[string]InternalJobRunner{open.Key(): run.openRunner(open)}
+	runners := map[string]scheduler.InternalJobRunner{open.Key(): run.openRunner(open)}
 	planned = append(planned, open)
 	run.uploads = make(map[string]string, len(run.publishJobKeys))
 	for _, publishKey := range slices.Sorted(maps.Keys(run.publishJobKeys)) {
@@ -114,10 +116,10 @@ func (run *ReleaseSetRun) attachPublication(planned []*ScheduledJob) ([]*Schedul
 		if publish == nil {
 			return nil, nil, fmt.Errorf("selected publication job %q is not in the plan", publishKey)
 		}
-		upload := &ScheduledJob{
+		upload := &jobmodel.ScheduledJob{
 			Project:   publish.Project,
 			Extension: releaseSetInternalExtension,
-			DependsOn: dedupeSorted([]string{open.Key(), publishKey}),
+			DependsOn: jobmodel.DedupeSorted([]string{open.Key(), publishKey}),
 			JobDef: &extension.JobDefinition{
 				ExtensionName: releaseSetInternalExtension.Name,
 				Name:          publish.PlanName() + "~" + publicationUploadStep,
@@ -183,7 +185,7 @@ func admitPublicationMember(member releaseset.PlannedMember, kind distribution.M
 // task of a barrier command. Without one, it is every task that neither
 // publishes nor depends on a task that does, so every check the run makes
 // finishes before the provider issues a publish credential.
-func (run *ReleaseSetRun) openDependencies(planned []*ScheduledJob) []string {
+func (run *ReleaseSetRun) openDependencies(planned []*jobmodel.ScheduledJob) []string {
 	var keys []string
 	if len(run.barrierCommands) > 0 {
 		for _, job := range planned {
@@ -191,7 +193,7 @@ func (run *ReleaseSetRun) openDependencies(planned []*ScheduledJob) []string {
 				keys = append(keys, job.Key())
 			}
 		}
-		return dedupeSorted(keys)
+		return jobmodel.DedupeSorted(keys)
 	}
 	byKey := planner.JobsByPlanKey(planned)
 	publishes := make(map[string]bool, len(planned))
@@ -205,7 +207,7 @@ func (run *ReleaseSetRun) openDependencies(planned []*ScheduledJob) []string {
 			return false
 		}
 		visiting[key] = true
-		result := slices.Contains(runner.PublicationCommands, job.CommandName()) || hasCloudCapabilitySideEffects(job)
+		result := slices.Contains(runner.PublicationCommands, job.CommandName()) || scheduler.HasCloudCapabilitySideEffects(job)
 		for _, dependency := range job.DependsOn {
 			if result {
 				break
@@ -223,46 +225,46 @@ func (run *ReleaseSetRun) openDependencies(planned []*ScheduledJob) []string {
 			keys = append(keys, job.Key())
 		}
 	}
-	return dedupeSorted(keys)
+	return jobmodel.DedupeSorted(keys)
 }
 
 // openRunner opens the plan once every task open waits for succeeded and
 // nothing in the run failed.
-func (run *ReleaseSetRun) openRunner(open *ScheduledJob) InternalJobRunner {
-	return func(ctx context.Context, results map[string]*JobResult) *JobResult {
+func (run *ReleaseSetRun) openRunner(open *jobmodel.ScheduledJob) scheduler.InternalJobRunner {
+	return func(ctx context.Context, results map[string]*jobmodel.JobResult) *jobmodel.JobResult {
 		if waiting := unsatisfiedDependency(open, results); waiting != "" {
-			return &JobResult{Status: "skipped", Error: &JobError{Message: fmt.Sprintf("the plan is not opened: %s did not succeed", waiting)}}
+			return &jobmodel.JobResult{Status: "skipped", Error: &jobmodel.JobError{Message: fmt.Sprintf("the plan is not opened: %s did not succeed", waiting)}}
 		}
 		for key, result := range results {
 			if result != nil && (result.Status == "failed" || result.Status == "canceled") {
-				return &JobResult{Status: "skipped", Error: &JobError{Message: fmt.Sprintf("the plan is not opened: %s %s", key, result.Status)}}
+				return &jobmodel.JobResult{Status: "skipped", Error: &jobmodel.JobError{Message: fmt.Sprintf("the plan is not opened: %s %s", key, result.Status)}}
 			}
 		}
 		if run.dryRun {
-			return &JobResult{Status: "success"}
+			return &jobmodel.JobResult{Status: "success"}
 		}
 		if err := run.publication.Open(ctx, run.open); err != nil {
 			return releaseSetFailure(fmt.Errorf("release-set publish: %w", err))
 		}
-		return &JobResult{Status: "success"}
+		return &jobmodel.JobResult{Status: "success"}
 	}
 }
 
 // uploadRunner uploads what publish packed for memberKey, once publish and
 // open succeeded.
-func (run *ReleaseSetRun) uploadRunner(upload, publish *ScheduledJob, memberKey string) InternalJobRunner {
-	return func(ctx context.Context, results map[string]*JobResult) *JobResult {
+func (run *ReleaseSetRun) uploadRunner(upload, publish *jobmodel.ScheduledJob, memberKey string) scheduler.InternalJobRunner {
+	return func(ctx context.Context, results map[string]*jobmodel.JobResult) *jobmodel.JobResult {
 		if waiting := unsatisfiedDependency(upload, results); waiting != "" {
-			return &JobResult{Status: "skipped", Error: &JobError{Message: fmt.Sprintf("nothing is uploaded for %s: %s did not succeed", printableReleaseKey(memberKey), waiting)}}
+			return &jobmodel.JobResult{Status: "skipped", Error: &jobmodel.JobError{Message: fmt.Sprintf("nothing is uploaded for %s: %s did not succeed", printableReleaseKey(memberKey), waiting)}}
 		}
 		if run.dryRun {
-			return &JobResult{Status: "success"}
+			return &jobmodel.JobResult{Status: "success"}
 		}
 		published, err := run.uploadOutbox(ctx, publish, memberKey)
 		if err != nil {
 			return releaseSetFailure(fmt.Errorf("upload %s: %w", printableReleaseKey(memberKey), err))
 		}
-		result := &JobResult{Status: "success"}
+		result := &jobmodel.JobResult{Status: "success"}
 		for _, member := range published {
 			result.Events = append(result.Events, publishedMemberRawEvent(member))
 		}
@@ -272,9 +274,9 @@ func (run *ReleaseSetRun) uploadRunner(upload, publish *ScheduledJob, memberKey 
 
 // unsatisfiedDependency is the first dependency of job that did not succeed,
 // "" when every one did.
-func unsatisfiedDependency(job *ScheduledJob, results map[string]*JobResult) string {
+func unsatisfiedDependency(job *jobmodel.ScheduledJob, results map[string]*jobmodel.JobResult) string {
 	for _, dependency := range job.DependsOn {
-		if !capabilityAncestorSatisfied(results[dependency]) {
+		if !scheduler.CapabilityAncestorSatisfied(results[dependency]) {
 			return dependency
 		}
 	}
@@ -285,7 +287,7 @@ func unsatisfiedDependency(job *ScheduledJob, results map[string]*JobResult) str
 // against the plan before any upload, and uploads each with a publish
 // credential the provider issues for its registry. A job that packed nothing
 // wrote no descriptor: it published, or skipped, on its own route.
-func (run *ReleaseSetRun) uploadOutbox(ctx context.Context, publish *ScheduledJob, memberKey string) ([]*extproto.PublishedMember, error) {
+func (run *ReleaseSetRun) uploadOutbox(ctx context.Context, publish *jobmodel.ScheduledJob, memberKey string) ([]*extproto.PublishedMember, error) {
 	root := run.outboxes[publish.Key()]
 	if root == "" {
 		return nil, errors.New("the publication job had no outbox")
@@ -353,7 +355,7 @@ func (run *ReleaseSetRun) checkPacked(packed extproto.OutboxMember, planned rele
 // artifact digest: the npm tarball's, the Go module zip's, the OCI
 // manifest's, or the stored Put manifest payload's, with the platforms of an
 // archive.
-func (run *ReleaseSetRun) uploadPacked(ctx context.Context, publish *ScheduledJob, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember, kind distribution.MemberKind) (string, map[string]string, error) {
+func (run *ReleaseSetRun) uploadPacked(ctx context.Context, publish *jobmodel.ScheduledJob, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember, kind distribution.MemberKind) (string, map[string]string, error) {
 	var digest string
 	var err error
 	switch packed.Ecosystem {
@@ -590,7 +592,7 @@ func putRegistryEndpoint(project *workspace.Project) (string, error) {
 // uploadOCI pushes the packed layout, then records the published image beside
 // the publication job's output, where a same-run consumer reads it
 // (pkgmeta.PublishedImageManifestPath).
-func (run *ReleaseSetRun) uploadOCI(ctx context.Context, publish *ScheduledJob, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember) (string, error) {
+func (run *ReleaseSetRun) uploadOCI(ctx context.Context, publish *jobmodel.ScheduledJob, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember) (string, error) {
 	repository, err := name.NewRepository(packed.OCI.Repository, name.StrictValidation)
 	if err != nil {
 		return "", fmt.Errorf("OCI repository %q: %w", packed.OCI.Repository, err)
@@ -701,7 +703,7 @@ func declaredRegistryEndpoint(project *workspace.Project, ecosystem, field strin
 // reports, in the shape the reconciliation reads (parsePublishedMemberEvent),
 // with the artifact envelope a publication job's own event carries: the
 // ecosystem as its id and the coordinate as its name.
-func publishedMemberRawEvent(member *extproto.PublishedMember) RawJobEvent {
+func publishedMemberRawEvent(member *extproto.PublishedMember) jobmodel.RawJobEvent {
 	data := map[string]any{
 		"id":             member.Ecosystem,
 		"name":           member.Coordinate,
@@ -718,7 +720,7 @@ func publishedMemberRawEvent(member *extproto.PublishedMember) RawJobEvent {
 		}
 		data["platforms"] = platforms
 	}
-	return RawJobEvent{Version: runtimeproto.MaxKnownProtocolVersion, Type: EventTypeArtifact, Data: data}
+	return jobmodel.RawJobEvent{Version: runtimeproto.MaxKnownProtocolVersion, Type: jobmodel.EventTypeArtifact, Data: data}
 }
 
 // ensureEngineUploadedPutMembers refuses a publication-v1 release in which a
@@ -727,7 +729,7 @@ func publishedMemberRawEvent(member *extproto.PublishedMember) RawJobEvent {
 // node published. A publication job holds no publish credential and packs a
 // Put registry member into its outbox; an event it reports for one names
 // bytes the engine never uploaded.
-func (run *ReleaseSetRun) ensureEngineUploadedPutMembers(results map[string]*JobResult) error {
+func (run *ReleaseSetRun) ensureEngineUploadedPutMembers(results map[string]*jobmodel.JobResult) error {
 	if !run.Publication() {
 		return nil
 	}
@@ -740,7 +742,7 @@ func (run *ReleaseSetRun) ensureEngineUploadedPutMembers(results map[string]*Job
 		for _, event := range result.Events {
 			kind, _ := event.Data["kind"].(string)
 			ecosystem, _ := event.Data["ecosystem"].(string)
-			if event.Type != EventTypeArtifact || kind != extproto.PublishedMemberEventKind ||
+			if event.Type != jobmodel.EventTypeArtifact || kind != extproto.PublishedMemberEventKind ||
 				(ecosystem != extproto.OutboxEcosystemPut && ecosystem != extproto.OutboxEcosystemArchive) {
 				continue
 			}

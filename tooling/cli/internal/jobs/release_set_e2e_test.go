@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	modelextension "go.putnami.dev/cli/model/extension"
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
 	distribution "go.putnami.dev/protocol/distribution"
 	"go.putnami.dev/protocol/features/spectest"
@@ -19,6 +20,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
 // releaseSetSuccessLine is the result line a fixture task that succeeds prints.
@@ -136,11 +138,11 @@ func TestReleaseSetE2EArchiveRoutesItsPackageProviderBeforeCoordinatorCommit(t *
 
 	packager := &modelextension.ExtensionDescription{Name: "@putnami/go", Path: root}
 	publisher := &modelextension.ExtensionDescription{Name: "@putnami/cloud", Path: root}
-	packageJob := &ScheduledJob{Project: project, Extension: packager, JobDef: &modelextension.JobDefinition{
+	packageJob := &jobmodel.ScheduledJob{Project: project, Extension: packager, JobDef: &modelextension.JobDefinition{
 		Name: "package~archives", CommandName: "package", StepID: "archives", ExtensionName: packager.Name,
 	}}
 	fixtureTask(t, packageJob.JobDef, fixtureScript{{"write", "packaged\n", packageMarker}, {"print", releaseSetSuccessLine}})
-	publishJob := &ScheduledJob{Project: project, Extension: publisher, JobDef: &modelextension.JobDefinition{
+	publishJob := &jobmodel.ScheduledJob{Project: project, Extension: publisher, JobDef: &modelextension.JobDefinition{
 		Name: "publish~cloud-publish-archives", CommandName: "publish", StepID: "cloud-publish-archives", ExtensionName: publisher.Name,
 	}, DependsOn: []string{packageJob.Key()}}
 	fixtureTask(t, publishJob.JobDef, fixtureScript{
@@ -148,12 +150,12 @@ func TestReleaseSetE2EArchiveRoutesItsPackageProviderBeforeCoordinatorCommit(t *
 		{"cat", eventFile},
 		{"print", releaseSetSuccessLine},
 	})
-	deployJob := &ScheduledJob{Project: project, Extension: publisher, JobDef: &modelextension.JobDefinition{
+	deployJob := &jobmodel.ScheduledJob{Project: project, Extension: publisher, JobDef: &modelextension.JobDefinition{
 		Name: "deploy~cloud", CommandName: "deploy", StepID: "cloud", ExtensionName: publisher.Name,
 	}, DependsOn: []string{publishJob.Key()}}
 	fixtureTask(t, deployJob.JobDef, fixtureScript{{"exit-unless", "1", "nonempty:" + releaseMarker}, {"print", releaseSetSuccessLine}})
 
-	planned, err := run.AttachPlan([]*ScheduledJob{packageJob, publishJob, deployJob})
+	planned, err := run.AttachPlan([]*jobmodel.ScheduledJob{packageJob, publishJob, deployJob})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,9 +163,9 @@ func TestReleaseSetE2EArchiveRoutesItsPackageProviderBeforeCoordinatorCommit(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	result := RunPlan(ctx, RunRequest{
+	result := scheduler.RunPlan(ctx, scheduler.RunRequest{
 		Workspace: ws, Plan: planned, InternalJobs: internal,
-		Config: SchedulerConfig{MaxParallel: 1, NoCache: true}, Renderer: &mockRenderer{},
+		Config: scheduler.SchedulerConfig{MaxParallel: 1, NoCache: true}, Renderer: &mockRenderer{},
 	})
 	if !result.Success || result.Results[deployJob.Key()] == nil || result.Results[deployJob.Key()].Status != "success" {
 		t.Fatalf("archive coordinator run success=%v package=%+v publish=%+v release=%+v deploy=%+v",
@@ -203,7 +205,7 @@ func TestReleaseSetE2ESameSessionCommitsBeforeDependentDeploy(t *testing.T) {
 	}
 	member := run.Plan().SelectedMembers()[0]
 	ext := &modelextension.ExtensionDescription{Name: "@test/release-boundary", Path: root}
-	publish := &ScheduledJob{
+	publish := &jobmodel.ScheduledJob{
 		Project: project, Extension: ext,
 		JobDef: &modelextension.JobDefinition{
 			Name: "publish~npm", CommandName: "publish", ExtensionName: ext.Name,
@@ -214,7 +216,7 @@ func TestReleaseSetE2ESameSessionCommitsBeforeDependentDeploy(t *testing.T) {
 			member.Coordinate, member.Version, releaseSetE2EDigest('c'))},
 		{"print", releaseSetSuccessLine},
 	})
-	deploy := &ScheduledJob{
+	deploy := &jobmodel.ScheduledJob{
 		Project: project, Extension: ext,
 		JobDef: &modelextension.JobDefinition{
 			Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name,
@@ -226,15 +228,15 @@ func TestReleaseSetE2ESameSessionCommitsBeforeDependentDeploy(t *testing.T) {
 		{"exit-unless", "1", "nonempty:" + marker},
 		{"print", releaseSetSuccessLine},
 	})
-	planned, internalJobs, err := run.AttachBarrier([]*ScheduledJob{publish, deploy})
+	planned, internalJobs, err := run.AttachBarrier([]*jobmodel.ScheduledJob{publish, deploy})
 	if err != nil {
 		t.Fatalf("attach same-session release-set barrier: %v", err)
 	}
 	renderer := &mockRenderer{}
-	result := RunPlan(ctx, RunRequest{
+	result := scheduler.RunPlan(ctx, scheduler.RunRequest{
 		Workspace: ws,
 		Plan:      planned,
-		Config: SchedulerConfig{
+		Config: scheduler.SchedulerConfig{
 			MaxParallel: 1,
 			NoCache:     true,
 		},
@@ -263,21 +265,21 @@ func TestReleaseSetBarrierCompletesTheDeployContractFromTheReleasedSet(t *testin
 		Metadata: releaseSetProjectMetadata(t, plan.Members[0].Ecosystem, plan.Members[0].Coordinate),
 	}
 	ext := &modelextension.ExtensionDescription{Name: "@putnami/go"}
-	publish := &ScheduledJob{Project: workload, Extension: ext, JobDef: &modelextension.JobDefinition{
+	publish := &jobmodel.ScheduledJob{Project: workload, Extension: ext, JobDef: &modelextension.JobDefinition{
 		Name: "publish~docker", CommandName: "publish", ExtensionName: ext.Name, Kind: "docker-publish",
 	}}
-	deploy := &ScheduledJob{Project: workload, Extension: ext, JobDef: &modelextension.JobDefinition{
+	deploy := &jobmodel.ScheduledJob{Project: workload, Extension: ext, JobDef: &modelextension.JobDefinition{
 		Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name,
 		BoundParams: modelextension.ParamMap{DeployTargetParamName: &DeployTarget{
 			Environment: "prod",
 			Workloads:   []DeployWorkloadTarget{{Project: workload.ID}},
 		}},
 	}, DependsOn: []string{publish.Key()}}
-	planned, internal, err := run.AttachBarrier([]*ScheduledJob{publish, deploy})
+	planned, internal, err := run.AttachBarrier([]*jobmodel.ScheduledJob{publish, deploy})
 	if err != nil || len(planned) != 3 {
 		t.Fatalf("AttachBarrier = %d jobs, err=%v", len(planned), err)
 	}
-	result := internal[releaseSetResultKey](context.Background(), map[string]*JobResult{
+	result := internal[releaseSetResultKey](context.Background(), map[string]*jobmodel.JobResult{
 		publish.Key(): {Status: "success"},
 	})
 	if result == nil || result.Status != "success" {
@@ -309,21 +311,21 @@ func TestReleaseSetBarrierFailsWhenAWorkloadIsNotInTheReleasedSet(t *testing.T) 
 		Metadata: releaseSetProjectMetadata(t, "oci", "putnami/never-published"),
 	}
 	ext := &modelextension.ExtensionDescription{Name: "@putnami/go"}
-	publish := &ScheduledJob{Project: workload, Extension: ext, JobDef: &modelextension.JobDefinition{
+	publish := &jobmodel.ScheduledJob{Project: workload, Extension: ext, JobDef: &modelextension.JobDefinition{
 		Name: "publish~docker", CommandName: "publish", ExtensionName: ext.Name, Kind: "docker-publish",
 	}}
-	deploy := &ScheduledJob{Project: workload, Extension: ext, JobDef: &modelextension.JobDefinition{
+	deploy := &jobmodel.ScheduledJob{Project: workload, Extension: ext, JobDef: &modelextension.JobDefinition{
 		Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name,
 		BoundParams: modelextension.ParamMap{DeployTargetParamName: &DeployTarget{
 			Environment: "prod",
 			Workloads:   []DeployWorkloadTarget{{Project: workload.ID}},
 		}},
 	}, DependsOn: []string{publish.Key()}}
-	_, internal, err := run.AttachBarrier([]*ScheduledJob{publish, deploy})
+	_, internal, err := run.AttachBarrier([]*jobmodel.ScheduledJob{publish, deploy})
 	if err != nil {
 		t.Fatal(err)
 	}
-	result := internal[releaseSetResultKey](context.Background(), map[string]*JobResult{
+	result := internal[releaseSetResultKey](context.Background(), map[string]*jobmodel.JobResult{
 		publish.Key(): {Status: "success"},
 	})
 	if result == nil || result.Status != "failed" {
@@ -349,21 +351,21 @@ func TestReleaseSetE2ESameSessionNoImpactConfirmsExactHeadBeforeDeploy(t *testin
 	}
 
 	ext := &modelextension.ExtensionDescription{Name: "@test/release-boundary", Path: root}
-	publish := &ScheduledJob{Project: upstream, Extension: ext, JobDef: &modelextension.JobDefinition{
+	publish := &jobmodel.ScheduledJob{Project: upstream, Extension: ext, JobDef: &modelextension.JobDefinition{
 		Name: "publish~noop", CommandName: "publish", ExtensionName: ext.Name,
 	}}
 	fixtureTask(t, publish.JobDef, fixtureScript{{"print", releaseSetSuccessLine}})
-	deploy := &ScheduledJob{Project: upstream, Extension: ext, JobDef: &modelextension.JobDefinition{
+	deploy := &jobmodel.ScheduledJob{Project: upstream, Extension: ext, JobDef: &modelextension.JobDefinition{
 		Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name,
 	}, DependsOn: []string{publish.Key()}}
 	fixtureTask(t, deploy.JobDef, fixtureScript{{"exit-unless", "1", "nonempty:" + marker}, {"print", releaseSetSuccessLine}})
-	planned, internalJobs, err := run.AttachBarrier([]*ScheduledJob{publish, deploy})
+	planned, internalJobs, err := run.AttachBarrier([]*jobmodel.ScheduledJob{publish, deploy})
 	if err != nil {
 		t.Fatalf("attach no-impact release-set barrier: %v", err)
 	}
-	result := RunPlan(ctx, RunRequest{
+	result := scheduler.RunPlan(ctx, scheduler.RunRequest{
 		Workspace: ws, Plan: planned, InternalJobs: internalJobs,
-		Config: SchedulerConfig{MaxParallel: 1, NoCache: true}, Renderer: &mockRenderer{},
+		Config: scheduler.SchedulerConfig{MaxParallel: 1, NoCache: true}, Renderer: &mockRenderer{},
 	})
 	if !result.Success || result.Results[deploy.Key()] == nil || result.Results[deploy.Key()].Status != "success" {
 		t.Fatalf("no-impact deploy boundary = success:%v deploy:%+v releaseSet:%+v",
@@ -589,7 +591,7 @@ func TestReleaseSetE2ENoImpactAndPartialPublicationFailClosed(t *testing.T) {
 	if err != nil || run == nil || !run.NoImpact() || run.Plan() == nil {
 		t.Fatalf("no-impact preparation = %+v, %v; want a plan that selects nothing", run, err)
 	}
-	noImpactResults := map[string]*JobResult{}
+	noImpactResults := map[string]*jobmodel.JobResult{}
 	run.Finalizer(ctx)(noImpactResults)
 	noImpactOutcome := releaseSetE2EOutcome(t, noImpactResults)
 	countsAfterNoImpact := ledger.counts()
@@ -741,7 +743,7 @@ func TestReleaseSetE2ETwoConcurrentAllWritersHaveOneCASWinner(t *testing.T) {
 	var ready, done sync.WaitGroup
 	ready.Add(2)
 	done.Add(2)
-	finalize := func(run *ReleaseSetRun, results map[string]*JobResult) {
+	finalize := func(run *ReleaseSetRun, results map[string]*jobmodel.JobResult) {
 		defer done.Done()
 		ready.Done()
 		<-start
@@ -755,7 +757,7 @@ func TestReleaseSetE2ETwoConcurrentAllWritersHaveOneCASWinner(t *testing.T) {
 
 	successes, failures := 0, 0
 	var winner distribution.ReleaseSetRef
-	for _, results := range []map[string]*JobResult{firstResults, secondResults} {
+	for _, results := range []map[string]*jobmodel.JobResult{firstResults, secondResults} {
 		result := results[releaseSetResultKey]
 		switch {
 		case result != nil && result.Status == "success":
@@ -797,7 +799,7 @@ func TestReleaseSetE2ETwoConcurrentImpactedWritersHaveOneCASWinner(t *testing.T)
 	var ready, done sync.WaitGroup
 	ready.Add(2)
 	done.Add(2)
-	finalize := func(run *ReleaseSetRun, results map[string]*JobResult) {
+	finalize := func(run *ReleaseSetRun, results map[string]*jobmodel.JobResult) {
 		defer done.Done()
 		ready.Done()
 		<-start
@@ -811,7 +813,7 @@ func TestReleaseSetE2ETwoConcurrentImpactedWritersHaveOneCASWinner(t *testing.T)
 
 	successes, failures := 0, 0
 	var winner distribution.ReleaseSetRef
-	for _, results := range []map[string]*JobResult{firstResults, secondResults} {
+	for _, results := range []map[string]*jobmodel.JobResult{firstResults, secondResults} {
 		result := results[releaseSetResultKey]
 		switch {
 		case result != nil && result.Status == "success":
@@ -1085,8 +1087,8 @@ type releaseSetE2ERegistry struct {
 	uploaded map[string][]string
 }
 
-func releaseSetE2EPublish(plan *releaseset.Plan, digestChar byte, skipUpload map[string]bool) (map[string]*JobResult, *releaseSetE2ERegistry) {
-	results := make(map[string]*JobResult)
+func releaseSetE2EPublish(plan *releaseset.Plan, digestChar byte, skipUpload map[string]bool) (map[string]*jobmodel.JobResult, *releaseSetE2ERegistry) {
+	results := make(map[string]*jobmodel.JobResult)
 	registry := &releaseSetE2ERegistry{packaged: make(map[string][]string), uploaded: make(map[string][]string)}
 	for index, member := range plan.SelectedMembers() {
 		registry.packaged[member.Coordinate] = append(registry.packaged[member.Coordinate], member.Version)
@@ -1095,9 +1097,9 @@ func releaseSetE2EPublish(plan *releaseset.Plan, digestChar byte, skipUpload map
 		}
 		registry.uploaded[member.Coordinate] = append(registry.uploaded[member.Coordinate], member.Version)
 		digest := releaseSetE2EDigest(digestChar + byte(index))
-		results[member.ProjectID+":publish"] = &JobResult{
+		results[member.ProjectID+":publish"] = &jobmodel.JobResult{
 			Status: "success",
-			Events: []RawJobEvent{publishedMemberEvent(member, digest)},
+			Events: []jobmodel.RawJobEvent{publishedMemberEvent(member, digest)},
 		}
 	}
 	return results, registry
@@ -1199,7 +1201,7 @@ func releaseSetE2ENoImpactOCIPlan(t *testing.T) *releaseset.Plan {
 	return plan
 }
 
-func releaseSetE2EOutcome(t *testing.T, results map[string]*JobResult) distribution.ReleaseSetPublishOutcome {
+func releaseSetE2EOutcome(t *testing.T, results map[string]*jobmodel.JobResult) distribution.ReleaseSetPublishOutcome {
 	t.Helper()
 	result := results[releaseSetResultKey]
 	if result == nil || result.Status != "success" || len(result.Data) != 1 {
@@ -1313,7 +1315,7 @@ func releaseSetE2ECountOutcome(outcomes []distribution.ReleaseOutcome, want dist
 	return count
 }
 
-func releaseSetErrorMessage(result *JobResult) string {
+func releaseSetErrorMessage(result *jobmodel.JobResult) string {
 	if result == nil || result.Error == nil {
 		return ""
 	}
@@ -1527,7 +1529,7 @@ func TestReleaseSetE2EMainBuildsWhatAnEarlierPushPublished(t *testing.T) {
 	if !run.NoImpact() {
 		t.Fatalf("final push selected %+v; want pr-7's record kept", run.plan.SelectedMembers())
 	}
-	results = map[string]*JobResult{}
+	results = map[string]*jobmodel.JobResult{}
 	run.Finalizer(ctx)(results)
 	if head, ok := ledger.head("putnami", "pr-7"); !ok || head != firstPushRef ||
 		releaseSetE2EMember(t, ledger.mustReleaseSet(t, head), downstream.Name).SourceRevision != firstPushRevision {

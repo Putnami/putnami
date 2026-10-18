@@ -2,13 +2,13 @@ package engine
 
 import (
 	modeljobs "go.putnami.dev/cli/model/jobs"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // withholdRequestedServeSteps applies withholdServeSteps when the request asks
 // for it, and returns the plan unchanged otherwise.
-func withholdRequestedServeSteps(req *Request, planned []*jobs.ScheduledJob, selected []*workspace.Project) (kept, withheld []*jobs.ScheduledJob) {
+func withholdRequestedServeSteps(req *Request, planned []*scheduler.ScheduledJob, selected []*workspace.Project) (kept, withheld []*scheduler.ScheduledJob) {
 	if !req.WithholdServeSteps {
 		return planned, nil
 	}
@@ -17,7 +17,7 @@ func withholdRequestedServeSteps(req *Request, planned []*jobs.ScheduledJob, sel
 
 // attachWithheldServeSteps hands a serve preparation's withheld steps, and the
 // workspace they were planned against, back on its result.
-func attachWithheldServeSteps(result SessionResult, req *Request, ws *workspace.Workspace, withheld []*jobs.ScheduledJob) SessionResult {
+func attachWithheldServeSteps(result SessionResult, req *Request, ws *workspace.Workspace, withheld []*scheduler.ScheduledJob) SessionResult {
 	if req.WithholdServeSteps {
 		result.Workspace, result.Withheld = ws, withheld
 	}
@@ -27,7 +27,7 @@ func attachWithheldServeSteps(result SessionResult, req *Request, ws *workspace.
 // servePreparationWithoutFiniteSteps reports a serve preparation whose
 // pipelines declare nothing but their serve steps, with its successful result:
 // the scheduler is not started for an empty plan.
-func servePreparationWithoutFiniteSteps(req *Request, planned []*jobs.ScheduledJob, selected []*workspace.Project, ws *workspace.Workspace, withheld []*jobs.ScheduledJob) (SessionResult, bool) {
+func servePreparationWithoutFiniteSteps(req *Request, planned []*scheduler.ScheduledJob, selected []*workspace.Project, ws *workspace.Workspace, withheld []*scheduler.ScheduledJob) (SessionResult, bool) {
 	if !req.WithholdServeSteps || len(planned) > 0 {
 		return SessionResult{}, false
 	}
@@ -64,7 +64,7 @@ func forcesServeWatch(req *Request, isServeMode bool) bool {
 //
 // The kept plan stays a closed graph: no kept job can name a withheld one,
 // by the last rule.
-func withholdServeSteps(planned []*jobs.ScheduledJob, selected []*workspace.Project) (kept, withheld []*jobs.ScheduledJob) {
+func withholdServeSteps(planned []*scheduler.ScheduledJob, selected []*workspace.Project) (kept, withheld []*scheduler.ScheduledJob) {
 	selectedIDs := make(map[string]bool, len(selected))
 	for _, project := range selected {
 		if project != nil {
@@ -80,7 +80,7 @@ func withholdServeSteps(planned []*jobs.ScheduledJob, selected []*workspace.Proj
 			predecessors[key] = true
 		}
 	}
-	kept = make([]*jobs.ScheduledJob, 0, len(planned))
+	kept = make([]*scheduler.ScheduledJob, 0, len(planned))
 	for _, job := range planned {
 		if isWithheldServeStep(job, selectedIDs, predecessors) {
 			withheld = append(withheld, job)
@@ -91,7 +91,7 @@ func withholdServeSteps(planned []*jobs.ScheduledJob, selected []*workspace.Proj
 	return kept, withheld
 }
 
-func isWithheldServeStep(job *jobs.ScheduledJob, selectedIDs, predecessors map[string]bool) bool {
+func isWithheldServeStep(job *scheduler.ScheduledJob, selectedIDs, predecessors map[string]bool) bool {
 	if job == nil || job.Project == nil || job.JobDef == nil {
 		return false
 	}

@@ -12,15 +12,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/sdk/extension/releaseset"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
-
-// InternalReleasePlanCallbackEnv is a runner-owned, process-private callback.
-// It is captured before repository execution and never inherited by jobs.
-const InternalReleasePlanCallbackEnv = "PUTNAMI_INTERNAL_RELEASE_PLAN_CALLBACK"
 
 const releasePlanCallbackPath = "/v1/release-plan"
 const maxReleasePlanBytes = 1 << 20
@@ -78,9 +75,9 @@ func (run *ReleaseSetRun) capabilityPlan() (releasePlanHandoff, error) {
 // publication tuple. The ACK grants no job authority: the normal scheduler
 // still requires every configured functional gate to succeed. The broker owns
 // Distribution credentials and renewal; no bearer is returned to Framework.
-func HandoffReleaseSetPlan(ctx context.Context, run *ReleaseSetRun, planned []*ScheduledJob, executes bool) error {
-	capabilities := processCapabilitiesFromContext(ctx)
-	if capabilities == nil || capabilities.planCallback == "" || !executes || run == nil || run.dryRun {
+func HandoffReleaseSetPlan(ctx context.Context, run *ReleaseSetRun, planned []*jobmodel.ScheduledJob, executes bool) error {
+	callback := scheduler.ReleasePlanCallbackFrom(ctx)
+	if callback == nil || !executes || run == nil || run.dryRun {
 		return nil
 	}
 	// A publication-v1 run opens its plan with its own provider, after the
@@ -93,7 +90,7 @@ func HandoffReleaseSetPlan(ctx context.Context, run *ReleaseSetRun, planned []*S
 	// armed, or the head-confirming release is refused as an unarmed write.
 	hasPublish := run.NoImpact()
 	for _, job := range planned {
-		if hasCloudCapabilitySideEffects(job) {
+		if scheduler.HasCloudCapabilitySideEffects(job) {
 			hasPublish = true
 			break
 		}
@@ -101,10 +98,10 @@ func HandoffReleaseSetPlan(ctx context.Context, run *ReleaseSetRun, planned []*S
 	if !hasPublish {
 		return nil
 	}
-	if capabilities.after == "" || capabilities.cloudToken == "" || len(capabilities.cloudToken) > 64<<10 || strings.ContainsAny(capabilities.cloudToken, " \t\r\n\x00") {
+	if !callback.Authorized() {
 		return fmt.Errorf("release plan callback requires a captured runner capability")
 	}
-	endpoint, err := privateReleasePlanEndpoint(capabilities.planCallback)
+	endpoint, err := privateReleasePlanEndpoint(callback.Endpoint())
 	if err != nil {
 		return err
 	}
@@ -112,14 +109,15 @@ func HandoffReleaseSetPlan(ctx context.Context, run *ReleaseSetRun, planned []*S
 	if err != nil {
 		return err
 	}
-	capabilities.planHandoffMu.Lock()
-	defer capabilities.planHandoffMu.Unlock()
-	if capabilities.planHandoffDigest != "" {
-		if capabilities.planHandoffDigest != plan.PlanDigest {
-			return fmt.Errorf("runner capability is already bound to another release plan")
-		}
-		return nil
-	}
+	return callback.Bind(plan.PlanDigest, func() error {
+		return postReleasePlan(ctx, callback, endpoint, plan)
+	})
+}
+
+// postReleasePlan posts plan to the private callback endpoint with the
+// captured runner capability as its bearer, and accepts only an
+// acknowledgment of exactly that plan.
+func postReleasePlan(ctx context.Context, callback *scheduler.ReleasePlanCallback, endpoint *url.URL, plan releasePlanHandoff) error {
 	body, err := json.Marshal(plan)
 	if err != nil || len(body) > maxReleasePlanBytes {
 		return fmt.Errorf("release capability plan exceeds its bound")
@@ -135,7 +133,7 @@ func HandoffReleaseSetPlan(ctx context.Context, run *ReleaseSetRun, planned []*S
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
-		req.Header.Set("Authorization", "Bearer "+capabilities.cloudToken)
+		callback.SetAuthHeader(req)
 		response, err = client.Do(req) //nolint:gosec // G704: numeric HTTP loopback with a fixed path, no proxy and no redirects; validated above.
 		if err == nil {
 			break
@@ -161,7 +159,6 @@ func HandoffReleaseSetPlan(ctx context.Context, run *ReleaseSetRun, planned []*S
 	if decoder.Decode(&ack) != nil || decoder.Decode(&struct{}{}) != io.EOF || ack.ProtocolVersion != releasePlanProtocolVersion || ack.PlanDigest != plan.PlanDigest {
 		return fmt.Errorf("release plan callback returned a different acknowledgment")
 	}
-	capabilities.planHandoffDigest = plan.PlanDigest
 	return nil
 }
 

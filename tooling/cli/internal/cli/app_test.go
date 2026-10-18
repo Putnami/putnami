@@ -968,7 +968,7 @@ func TestParseFlags_ValueFlagAtEnd(t *testing.T) {
 
 // TestParseFlags_RejectsUnparseableValues pins the other two silent failures:
 // a bad --retry int was dropped (Retry stayed 0) and a bad
-// --max-parallel value normalized to auto in internal/jobs/parallel.go.
+// --max-parallel value normalized to auto in internal/jobs/scheduler/parallel.go.
 func TestParseFlags_RejectsUnparseableValues(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{

@@ -1,6 +1,10 @@
 package jobs
 
-import "slices"
+import (
+	"slices"
+
+	jobmodel "go.putnami.dev/cli/model/jobs"
+)
 
 // WithoutPublicationNodes is planned as the legacy attachment plans the same
 // run: without the open node and the upload nodes attachPublication adds, and
@@ -17,7 +21,7 @@ import "slices"
 // changes planned.
 //
 // A run that does not publish through publication-v1 returns planned.
-func (run *ReleaseSetRun) WithoutPublicationNodes(planned []*ScheduledJob) []*ScheduledJob {
+func (run *ReleaseSetRun) WithoutPublicationNodes(planned []*jobmodel.ScheduledJob) []*jobmodel.ScheduledJob {
 	if !run.Publication() || run.uploads == nil {
 		return planned
 	}
@@ -26,7 +30,7 @@ func (run *ReleaseSetRun) WithoutPublicationNodes(planned []*ScheduledJob) []*Sc
 	for upload, publish := range run.uploads {
 		derived[upload] = publish
 	}
-	projected := make([]*ScheduledJob, 0, len(planned))
+	projected := make([]*jobmodel.ScheduledJob, 0, len(planned))
 	for _, job := range planned {
 		if job == nil {
 			projected = append(projected, job)
@@ -65,5 +69,5 @@ func withoutDerivedEdges(edges []string, derived map[string]string) ([]string, b
 			rewritten = append(rewritten, target)
 		}
 	}
-	return dedupeSorted(rewritten), true
+	return jobmodel.DedupeSorted(rewritten), true
 }

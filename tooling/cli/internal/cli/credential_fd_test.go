@@ -106,7 +106,7 @@ func TestRunCredentialIsCapturedBeforeAnythingStarts(t *testing.T) {
 	for _, later := range [][2]string{
 		{"workspace", "FindRoot"},
 		{"launch", "Relaunch"},
-		{"jobs", "CaptureProcessCapabilities"},
+		{"scheduler", "CaptureProcessCapabilities"},
 		{"sessionreporter", "Capture"},
 	} {
 		offset, ok := qualifiedCallOffset(t, "app.go", "Run", later[0], later[1])

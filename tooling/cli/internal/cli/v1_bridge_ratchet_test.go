@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"go/token"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -370,15 +371,17 @@ func TestV1Ratchet_NoManifestAdaptation(t *testing.T) {
 
 // --- Ratchet 4: the runtime-event reader accepts exactly one version ---
 
-// jobsPackageName is the Go package the runtime-event reader lives in. The
+// jobsPackageNames are the Go packages the runtime-event reader lives in. The
 // forbidden-symbol scan below is scoped by PACKAGE rather than by directory
 // because the job layer is split across two modules — the pure model,
 // ParseRawEvent included, into go.putnami.dev/cli/model/jobs; the scheduler,
-// executor and cache into tooling/cli's internal/jobs — and both halves are the
-// same package to a reader of the acceptance rule. A package name follows the
-// code through every remaining move; a directory prefix would have to be
-// re-listed after each one, and would quietly scan nothing in between.
-const jobsPackageName = "jobs"
+// executor and cache into tooling/cli's internal/jobs/scheduler — and both
+// halves are the same package to a reader of the acceptance rule. A package
+// name follows the code through a move between directories; a directory prefix
+// would have to be re-listed after each one, and would quietly scan nothing in
+// between. The scheduler's move out of internal/jobs also renamed its package,
+// so it is listed by its own name, and each name must match a file.
+var jobsPackageNames = []string{"jobs", "scheduler"}
 
 // eventParserFile is the file whose acceptance rule is pinned. It is named
 // rather than searched for, so a move stays a REVIEWED event: the pin fails,
@@ -443,20 +446,22 @@ func TestV1Ratchet_RuntimeEventAcceptanceIsExact(t *testing.T) {
 			"extension, which is the manifest and the wire disagreeing (B6c, B7a).", eventParserFile)
 	}
 
-	scanned := 0
+	scanned := map[string]int{}
 	for rel, file := range files {
-		if file.Name.Name != jobsPackageName {
+		if !slices.Contains(jobsPackageNames, file.Name.Name) {
 			continue
 		}
-		scanned++
+		scanned[file.Name.Name]++
 		for _, site := range qualifiedSelectors(fset, file, v1RatchetProtocolRuntime, "runtime", loosenedRuntimeVersionSymbols) {
 			line, symbol, _ := strings.Cut(site, ": ")
 			t.Errorf("%s:%s names protocols/runtime's %s — %s", rel, line, symbol, loosenedRuntimeVersionSymbols[symbol])
 		}
 	}
-	if scanned == 0 {
-		t.Fatalf("no production file declares package %s — the forbidden-symbol scan matched nothing "+
-			"and would pass however a looser predicate came back", jobsPackageName)
+	for _, name := range jobsPackageNames {
+		if scanned[name] == 0 {
+			t.Fatalf("no production file declares package %s — the forbidden-symbol scan matched nothing "+
+				"there and would pass however a looser predicate came back", name)
+		}
 	}
 
 	// Non-vacuity: the scan must be able to SEE the runtime protocol's symbols

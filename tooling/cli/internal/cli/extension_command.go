@@ -18,8 +18,8 @@ import (
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -97,7 +97,7 @@ func (a *App) runExtensionStructuredCommand(
 		iox.Fprintf(stderr, "  Remove one of them, or ask their authors to rename the command.\n")
 		return ExitUsage
 	}
-	if err := jobs.ValidateReleaseSetProviderResolution(
+	if err := scheduler.ValidateReleaseSetProviderResolution(
 		ctx,
 		resolved.Extension.Name,
 		resolved.Extension.Version,
@@ -159,7 +159,7 @@ func (a *App) runExtensionStructuredCommand(
 		// runtime at all, because that case has its own named failure downstream.
 		if resolved.Extension != nil && resolved.Extension.Runtime != nil &&
 			resolved.Extension.RuntimeExecutable == "" {
-			if err := jobs.SynchronizeExtensionRuntimes(
+			if err := scheduler.SynchronizeExtensionRuntimes(
 				ctx, ws, []*extension.ExtensionDescription{resolved.Extension}, nil); err != nil {
 				iox.Fprintf(stderr, "putnami: prepare the %s runtime: %v\n", resolved.Extension.Name, err)
 				return ExitError
@@ -194,7 +194,7 @@ func (a *App) runExtensionStructuredCommand(
 		// the shared extension's flag map.
 		jobDef.Flags = effectiveFlags
 		jobDef.Args = append(append([]string{}, jobDef.Args...), parsed.RawJobArgs...)
-		job := &jobs.ScheduledJob{
+		job := &scheduler.ScheduledJob{
 			Project:   workspaceOnceProject(ws),
 			Extension: resolved.Extension,
 			JobDef:    &jobDef,
@@ -267,7 +267,7 @@ func (a *App) runExtensionStructuredCommand(
 		if parsed.Global.Baseline != "" {
 			commandParams["baseline"] = parsed.Global.Baseline
 		}
-		ctx, err = jobs.GrantReleaseSetProviderJob(ctx, job)
+		ctx, err = scheduler.GrantReleaseSetProviderJob(ctx, job)
 		if err != nil {
 			iox.Fprintf(stderr, "putnami: %v\n", err)
 			return ExitUsage
@@ -392,7 +392,7 @@ func extensionAliasPlanSelection(resolved *extension.ResolvedSubcommand) *engine
 func runInteractiveExtensionCommand(
 	ctx context.Context,
 	ws *workspace.Workspace,
-	job *jobs.ScheduledJob,
+	job *scheduler.ScheduledJob,
 	commandParams map[string]any,
 	versions cachekey.RunVersions,
 	binding hostRPCBinding,
@@ -406,7 +406,7 @@ func runInteractiveExtensionCommand(
 
 	hostEnv, closeHostRPC := startHostRPC(ctx, binding, stderr)
 	defer closeHostRPC()
-	result, err := jobs.RunJobInteractiveWithStreams(
+	result, err := scheduler.RunJobInteractiveWithStreams(
 		ctx, ws, job, commandParams, configDefaults, versions, stdin, stdout, stderr, hostEnv...,
 	)
 	if err != nil {

@@ -16,7 +16,7 @@ import (
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
 
@@ -33,28 +33,28 @@ func TestMachineStreamIsBoundedFailureFirstSanitizedAndCompletelyRecorded(t *tes
 		false,
 	)
 	job := makeRendererTestJob()
-	failed := &jobs.JobResult{
-		Status:   string(jobs.TaskStatusFailed),
+	failed := &scheduler.JobResult{
+		Status:   string(scheduler.TaskStatusFailed),
 		Duration: 100 * time.Millisecond,
-		Error:    &jobs.JobError{Message: "compile failed"},
+		Error:    &scheduler.JobError{Message: "compile failed"},
 	}
 
-	renderer.Start([]*jobs.ScheduledJob{job})
+	renderer.Start([]*scheduler.ScheduledJob{job})
 	recorder, ok := renderer.(interface {
-		RecordSessionEvent(jobs.SessionRecord)
+		RecordSessionEvent(scheduler.SessionRecord)
 	})
 	if !ok {
 		t.Fatalf("renderer %T does not retain session audit signals", renderer)
 	}
-	recorder.RecordSessionEvent(jobs.SessionRecord{Type: "invocation:reaped", Data: map[string]any{
+	recorder.RecordSessionEvent(scheduler.SessionRecord{Type: "invocation:reaped", Data: map[string]any{
 		"invocationId":  "orphan-1",
 		"Authorization": "session-secret",
 	}})
 	renderer.JobStart(job)
 	for i := 0; i < 800; i++ {
-		renderer.JobEvent(job, jobs.RawJobEvent{
+		renderer.JobEvent(job, scheduler.RawJobEvent{
 			Version: 2,
-			Type:    jobs.EventTypeLog,
+			Type:    scheduler.EventTypeLog,
 			Data: map[string]any{
 				"type":    "log",
 				"level":   "info",
@@ -63,9 +63,9 @@ func TestMachineStreamIsBoundedFailureFirstSanitizedAndCompletelyRecorded(t *tes
 		})
 	}
 	secret := "gh" + "p_" + strings.Repeat("a", 36)
-	renderer.JobEvent(job, jobs.RawJobEvent{
+	renderer.JobEvent(job, scheduler.RawJobEvent{
 		Version: 2,
-		Type:    jobs.EventTypeLog,
+		Type:    scheduler.EventTypeLog,
 		Data: map[string]any{
 			"type":          "log",
 			"level":         "error",
@@ -74,7 +74,7 @@ func TestMachineStreamIsBoundedFailureFirstSanitizedAndCompletelyRecorded(t *tes
 		},
 	})
 	renderer.JobComplete(job, failed)
-	renderer.Finish(map[string]*jobs.JobResult{job.Key(): failed}, jobs.SessionOutcome{})
+	renderer.Finish(map[string]*scheduler.JobResult{job.Key(): failed}, scheduler.SessionOutcome{})
 	session.Close()
 
 	artifact, err := os.ReadFile(filepath.Join(session.Dir(), protocolcli.MachineOutputArtifactPath))
@@ -123,15 +123,15 @@ func TestMachineStreamVerboseChangesCapacityNotVerdict(t *testing.T) {
 		var out bytes.Buffer
 		renderer := newMachineV2RendererMode(&out, "build", true, mode)
 		job := makeRendererTestJob()
-		result := &jobs.JobResult{Status: string(jobs.TaskStatusSuccess)}
-		renderer.Start([]*jobs.ScheduledJob{job})
+		result := &scheduler.JobResult{Status: string(scheduler.TaskStatusSuccess)}
+		renderer.Start([]*scheduler.ScheduledJob{job})
 		for i := 0; i < 1200; i++ {
-			renderer.JobEvent(job, jobs.RawJobEvent{Data: map[string]any{
+			renderer.JobEvent(job, scheduler.RawJobEvent{Data: map[string]any{
 				"type": "log", "level": "info", "message": "bounded",
 			}})
 		}
 		renderer.JobComplete(job, result)
-		renderer.Finish(map[string]*jobs.JobResult{job.Key(): result}, jobs.SessionOutcome{})
+		renderer.Finish(map[string]*scheduler.JobResult{job.Key(): result}, scheduler.SessionOutcome{})
 		lines := bytes.Split(bytes.TrimSpace(out.Bytes()), []byte{'\n'})
 		var final protocolcli.BoundedSessionEndRecord
 		if err := json.Unmarshal(lines[len(lines)-1], &final); err != nil {
@@ -173,8 +173,8 @@ func TestMachineStreamNormalSuppressesDebugTranscriptAndVerboseRetainsIt(t *test
 			verbose,
 		)
 		job := makeRendererTestJob()
-		result := &jobs.JobResult{Status: string(jobs.TaskStatusSuccess)}
-		event := func(raw string) jobs.RawJobEvent {
+		result := &scheduler.JobResult{Status: string(scheduler.TaskStatusSuccess)}
+		event := func(raw string) scheduler.RawJobEvent {
 			t.Helper()
 			parsed, ok := jobmodel.ParseRawEvent(raw)
 			if !ok {
@@ -182,12 +182,12 @@ func TestMachineStreamNormalSuppressesDebugTranscriptAndVerboseRetainsIt(t *test
 			}
 			return parsed
 		}
-		renderer.Start([]*jobs.ScheduledJob{job})
+		renderer.Start([]*scheduler.ScheduledJob{job})
 		renderer.JobStart(job)
 		renderer.JobEvent(job, event(`{"v":2,"type":"log","level":"debug","message":"passing test transcript"}`))
 		renderer.JobEvent(job, event(`{"v":2,"type":"summary","message":"1/1 passed"}`))
 		renderer.JobComplete(job, result)
-		renderer.Finish(map[string]*jobs.JobResult{job.Key(): result}, jobs.SessionOutcome{})
+		renderer.Finish(map[string]*scheduler.JobResult{job.Key(): result}, scheduler.SessionOutcome{})
 		session.Close()
 
 		artifact, err := os.ReadFile(filepath.Join(session.Dir(), protocolcli.MachineOutputArtifactPath))
@@ -240,11 +240,11 @@ func TestMachineStreamReservesNormalizedFailedResultAfterOrdinaryExhaustion(t *t
 	}
 	renderer := WithSessionRecording(newMachineV2Renderer(&live, "test", true), session, false)
 	job := makeRendererTestJob()
-	failed := &jobs.JobResult{Status: string(jobs.TaskStatusFailed), Error: &jobs.JobError{Message: "tests failed"}}
+	failed := &scheduler.JobResult{Status: string(scheduler.TaskStatusFailed), Error: &scheduler.JobError{Message: "tests failed"}}
 
-	renderer.Start([]*jobs.ScheduledJob{job})
+	renderer.Start([]*scheduler.ScheduledJob{job})
 	for i := 0; i < 800; i++ {
-		renderer.JobEvent(job, jobs.RawJobEvent{Data: map[string]any{
+		renderer.JobEvent(job, scheduler.RawJobEvent{Data: map[string]any{
 			"type": "log", "level": "info", "message": "ordinary",
 		}})
 	}
@@ -257,7 +257,7 @@ func TestMachineStreamReservesNormalizedFailedResultAfterOrdinaryExhaustion(t *t
 	}
 	renderer.JobEvent(job, resultEvent)
 	renderer.JobComplete(job, failed)
-	renderer.Finish(map[string]*jobs.JobResult{job.Key(): failed}, jobs.SessionOutcome{})
+	renderer.Finish(map[string]*scheduler.JobResult{job.Key(): failed}, scheduler.SessionOutcome{})
 	session.Close()
 
 	artifact, err := os.ReadFile(filepath.Join(session.Dir(), protocolcli.MachineOutputArtifactPath))
@@ -286,17 +286,17 @@ func TestMachineStreamReservesABuiltFailedResultAfterOrdinaryExhaustion(t *testi
 	}
 	renderer := WithSessionRecording(newMachineV2Renderer(&live, "test", true), session, false)
 	job := makeRendererTestJob()
-	failed := &jobs.JobResult{Status: string(jobs.TaskStatusFailed), Error: &jobs.JobError{Message: "tests failed"}}
+	failed := &scheduler.JobResult{Status: string(scheduler.TaskStatusFailed), Error: &scheduler.JobError{Message: "tests failed"}}
 
-	renderer.Start([]*jobs.ScheduledJob{job})
+	renderer.Start([]*scheduler.ScheduledJob{job})
 	for i := 0; i < 800; i++ {
-		renderer.JobEvent(job, jobs.RawJobEvent{Data: map[string]any{
+		renderer.JobEvent(job, scheduler.RawJobEvent{Data: map[string]any{
 			"type": "log", "level": "info", "message": "ordinary",
 		}})
 	}
-	renderer.JobEvent(job, jobs.RawJobEvent{
+	renderer.JobEvent(job, scheduler.RawJobEvent{
 		Version: runtimeproto.MaxKnownProtocolVersion,
-		Type:    jobs.EventTypeResult,
+		Type:    scheduler.EventTypeResult,
 		Level:   "info",
 		Message: "Job FAILED",
 		Data: map[string]any{
@@ -305,7 +305,7 @@ func TestMachineStreamReservesABuiltFailedResultAfterOrdinaryExhaustion(t *testi
 		},
 	})
 	renderer.JobComplete(job, failed)
-	renderer.Finish(map[string]*jobs.JobResult{job.Key(): failed}, jobs.SessionOutcome{})
+	renderer.Finish(map[string]*scheduler.JobResult{job.Key(): failed}, scheduler.SessionOutcome{})
 	session.Close()
 
 	artifact, err := os.ReadFile(filepath.Join(session.Dir(), protocolcli.MachineOutputArtifactPath))
@@ -334,33 +334,33 @@ func TestMachineStreamNamesTheTypeOfEventsTheCLIBuilds(t *testing.T) {
 	renderer := WithSessionRecording(newMachineV2Renderer(&live, "test,publish", true), session, false)
 	test := testCaseJob("app")
 	upload := dockerPublicationTestJob("/app", "app", "publish~docker~upload", "publish")
-	cached := &jobs.JobResult{Status: string(jobs.TaskStatusSuccess), CacheHit: true, Data: map[string]any{
+	cached := &scheduler.JobResult{Status: string(scheduler.TaskStatusSuccess), CacheHit: true, Data: map[string]any{
 		"coverageSummary": map[string]any{"percentage": 78.57, "granularity": "statements", "threshold": float64(70)},
 	}}
-	replayed := jobs.RawJobEvent{
+	replayed := scheduler.RawJobEvent{
 		Version: runtimeproto.MaxKnownProtocolVersion,
-		Type:    jobs.EventTypeResult,
+		Type:    scheduler.EventTypeResult,
 		Data:    map[string]any{"status": cached.Status, "data": cached.Data},
 	}
-	published := jobs.RawJobEvent{
+	published := scheduler.RawJobEvent{
 		Version: runtimeproto.MaxKnownProtocolVersion,
-		Type:    jobs.EventTypeArtifact,
+		Type:    scheduler.EventTypeArtifact,
 		Data: map[string]any{
 			"id": "oci", "name": "acme/app", "kind": "published-member", "ecosystem": "oci",
 			"coordinate": "acme/app", "version": "1.0.0", "artifactDigest": "sha256:" + strings.Repeat("a", 64),
 		},
 	}
-	uploaded := &jobs.JobResult{Status: string(jobs.TaskStatusSuccess), Events: []jobs.RawJobEvent{published}}
+	uploaded := &scheduler.JobResult{Status: string(scheduler.TaskStatusSuccess), Events: []scheduler.RawJobEvent{published}}
 
-	stream := recordTestCaseStream(t, renderer, session, &live, func(renderer jobs.Renderer) {
-		renderer.Start([]*jobs.ScheduledJob{test, upload})
+	stream := recordTestCaseStream(t, renderer, session, &live, func(renderer scheduler.Renderer) {
+		renderer.Start([]*scheduler.ScheduledJob{test, upload})
 		renderer.JobStart(test)
 		renderer.JobEvent(test, replayed)
 		renderer.JobComplete(test, cached)
 		renderer.JobStart(upload)
 		renderer.JobEvent(upload, published)
 		renderer.JobComplete(upload, uploaded)
-		renderer.Finish(map[string]*jobs.JobResult{test.Key(): cached, upload.Key(): uploaded}, jobs.SessionOutcome{})
+		renderer.Finish(map[string]*scheduler.JobResult{test.Key(): cached, upload.Key(): uploaded}, scheduler.SessionOutcome{})
 	})
 
 	for name, output := range map[string][]byte{"live": stream.live, "events.jsonl": stream.artifact} {
@@ -373,11 +373,11 @@ func TestMachineStreamNamesTheTypeOfEventsTheCLIBuilds(t *testing.T) {
 		}
 		result := events[test.Key()]
 		data, _ := result["data"].(map[string]any)
-		if result["type"] != jobs.EventTypeResult || data["coverageSummary"] == nil {
+		if result["type"] != scheduler.EventTypeResult || data["coverageSummary"] == nil {
 			t.Errorf("%s: the cache hit's result event = %v, want type result with its coverageSummary", name, result)
 		}
 		artifact := events[upload.Key()]
-		if artifact["type"] != jobs.EventTypeArtifact || artifact["kind"] != "published-member" || artifact["coordinate"] != "acme/app" {
+		if artifact["type"] != scheduler.EventTypeArtifact || artifact["kind"] != "published-member" || artifact["coordinate"] != "acme/app" {
 			t.Errorf("%s: the upload's event = %v, want a published-member artifact", name, artifact)
 		}
 	}
@@ -408,22 +408,22 @@ func TestMachineStreamEmitsOneCanonicalReleaseSetResultBeforeSyntheticTerminal(t
 			}
 			renderer := WithSessionRecording(newMachineV2Renderer(&live, "publish", true), session, false)
 			job := makeRendererTestJob()
-			result := &jobs.JobResult{Status: string(jobs.TaskStatusSuccess)}
-			releaseResult := &jobs.JobResult{
-				Status: string(jobs.TaskStatusSuccess),
+			result := &scheduler.JobResult{Status: string(scheduler.TaskStatusSuccess)}
+			releaseResult := &scheduler.JobResult{
+				Status: string(scheduler.TaskStatusSuccess),
 				Data:   extension.ParamMap{runtimeproto.ReleaseSetResultDataKey: outcome},
 			}
 
-			renderer.Start([]*jobs.ScheduledJob{job})
+			renderer.Start([]*scheduler.ScheduledJob{job})
 			if saturated {
 				for i := 0; i < 800; i++ {
-					renderer.JobEvent(job, jobs.RawJobEvent{Data: extension.ParamMap{
+					renderer.JobEvent(job, scheduler.RawJobEvent{Data: extension.ParamMap{
 						"type": "log", "level": "info", "message": strings.Repeat("ordinary publish detail ", 100),
 					}})
 				}
 			}
 			renderer.JobComplete(job, result)
-			renderer.Finish(map[string]*jobs.JobResult{job.Key(): result, resultKey: releaseResult}, jobs.SessionOutcome{})
+			renderer.Finish(map[string]*scheduler.JobResult{job.Key(): result, resultKey: releaseResult}, scheduler.SessionOutcome{})
 			session.Close()
 
 			artifact, err := os.ReadFile(filepath.Join(session.Dir(), protocolcli.MachineOutputArtifactPath))
@@ -445,7 +445,7 @@ func TestMachineStreamEmitsOneCanonicalReleaseSetResultBeforeSyntheticTerminal(t
 				t.Fatal("release-set result was not emitted before stdout session:end")
 			}
 
-			identity := jobs.TaskIdentityOfKey(resultKey)
+			identity := scheduler.TaskIdentityOfKey(resultKey)
 			if got := artifactRecords[artifactIndex].Identity; got == nil || *got != identity {
 				t.Fatalf("release-set identity = %#v, want canonical fallback %#v", got, identity)
 			}
@@ -494,22 +494,22 @@ func TestMachineStreamReleaseSetResultFailsClosed(t *testing.T) {
 	valid := releaseSetRendererTestOutcome("b")
 	tests := []struct {
 		name    string
-		results map[string]*jobs.JobResult
+		results map[string]*scheduler.JobResult
 	}{
-		{name: "zero", results: map[string]*jobs.JobResult{"publish": {Status: string(jobs.TaskStatusSuccess)}}},
+		{name: "zero", results: map[string]*scheduler.JobResult{"publish": {Status: string(scheduler.TaskStatusSuccess)}}},
 		{name: "dry-run", results: nil},
-		{name: "duplicate", results: map[string]*jobs.JobResult{
-			"publish-a": {Status: string(jobs.TaskStatusSuccess), Data: extension.ParamMap{runtimeproto.ReleaseSetResultDataKey: valid}},
-			"publish-b": {Status: string(jobs.TaskStatusSuccess), Data: extension.ParamMap{runtimeproto.ReleaseSetResultDataKey: valid}},
+		{name: "duplicate", results: map[string]*scheduler.JobResult{
+			"publish-a": {Status: string(scheduler.TaskStatusSuccess), Data: extension.ParamMap{runtimeproto.ReleaseSetResultDataKey: valid}},
+			"publish-b": {Status: string(scheduler.TaskStatusSuccess), Data: extension.ParamMap{runtimeproto.ReleaseSetResultDataKey: valid}},
 		}},
-		{name: "failed-result", results: map[string]*jobs.JobResult{
-			"publish": {Status: string(jobs.TaskStatusFailed), Data: extension.ParamMap{runtimeproto.ReleaseSetResultDataKey: valid}},
+		{name: "failed-result", results: map[string]*scheduler.JobResult{
+			"publish": {Status: string(scheduler.TaskStatusFailed), Data: extension.ParamMap{runtimeproto.ReleaseSetResultDataKey: valid}},
 		}},
-		{name: "malformed", results: map[string]*jobs.JobResult{
-			"publish": {Status: string(jobs.TaskStatusSuccess), Data: extension.ParamMap{runtimeproto.ReleaseSetResultDataKey: extension.ParamMap{"protocolVersion": 1}}},
+		{name: "malformed", results: map[string]*scheduler.JobResult{
+			"publish": {Status: string(scheduler.TaskStatusSuccess), Data: extension.ParamMap{runtimeproto.ReleaseSetResultDataKey: extension.ParamMap{"protocolVersion": 1}}},
 		}},
-		{name: "cas-conflict", results: map[string]*jobs.JobResult{
-			"publish": {Status: string(jobs.TaskStatusFailed), Error: &jobs.JobError{Message: "release-set channel CAS conflict"}},
+		{name: "cas-conflict", results: map[string]*scheduler.JobResult{
+			"publish": {Status: string(scheduler.TaskStatusFailed), Error: &scheduler.JobError{Message: "release-set channel CAS conflict"}},
 		}},
 	}
 
@@ -518,7 +518,7 @@ func TestMachineStreamReleaseSetResultFailsClosed(t *testing.T) {
 			var live bytes.Buffer
 			renderer := WithoutSessionArtifact(newMachineV2Renderer(&live, "publish", true))
 			renderer.Start(nil)
-			renderer.Finish(testCase.results, jobs.SessionOutcome{})
+			renderer.Finish(testCase.results, scheduler.SessionOutcome{})
 			records, lines := parseOuterV2Records(t, live.Bytes())
 			for i, record := range records {
 				if isReleaseSetOuterEvent(record) {
@@ -635,25 +635,25 @@ func TestMachineBatchStreamRecordsPhysicalEventsOnceUnderWorkspaceIdentity(t *te
 	}
 	renderer := WithSessionRecording(newMachineV2Renderer(&live, "test", true), session, false)
 	job := makeRendererTestJob()
-	result := &jobs.JobResult{Status: string(jobs.TaskStatusSuccess)}
-	renderer.Start([]*jobs.ScheduledJob{job})
+	result := &scheduler.JobResult{Status: string(scheduler.TaskStatusSuccess)}
+	renderer.Start([]*scheduler.ScheduledJob{job})
 	batchRenderer, ok := renderer.(interface {
-		BatchJobEvent(*jobs.ScheduledJob, jobs.RawJobEvent)
-		BatchMemberJobEvent(*jobs.ScheduledJob, jobs.RawJobEvent)
+		BatchJobEvent(*scheduler.ScheduledJob, scheduler.RawJobEvent)
+		BatchMemberJobEvent(*scheduler.ScheduledJob, scheduler.RawJobEvent)
 	})
 	if !ok {
 		t.Fatalf("renderer %T does not implement batch recording", renderer)
 	}
 	for i := 0; i < 800; i++ {
-		batchRenderer.BatchJobEvent(job, jobs.RawJobEvent{Data: map[string]any{
+		batchRenderer.BatchJobEvent(job, scheduler.RawJobEvent{Data: map[string]any{
 			"type": "log", "level": "info", "message": "physical-batch-event",
 		}})
 	}
-	batchRenderer.BatchMemberJobEvent(job, jobs.RawJobEvent{Data: map[string]any{
+	batchRenderer.BatchMemberJobEvent(job, scheduler.RawJobEvent{Data: map[string]any{
 		"type": "log", "level": "info", "message": "projected-member-duplicate",
 	}})
 	renderer.JobComplete(job, result)
-	renderer.Finish(map[string]*jobs.JobResult{job.Key(): result}, jobs.SessionOutcome{})
+	renderer.Finish(map[string]*scheduler.JobResult{job.Key(): result}, scheduler.SessionOutcome{})
 	session.Close()
 
 	artifact, err := os.ReadFile(filepath.Join(session.Dir(), protocolcli.MachineOutputArtifactPath))
@@ -680,15 +680,15 @@ func TestMachineStreamWithoutArtifactFallsBackWithoutFalseReference(t *testing.T
 	var live bytes.Buffer
 	renderer := WithoutSessionArtifact(newMachineV2Renderer(&live, "build", true))
 	job := makeRendererTestJob()
-	result := &jobs.JobResult{Status: string(jobs.TaskStatusSuccess)}
-	renderer.Start([]*jobs.ScheduledJob{job})
+	result := &scheduler.JobResult{Status: string(scheduler.TaskStatusSuccess)}
+	renderer.Start([]*scheduler.ScheduledJob{job})
 	for i := 0; i < 1100; i++ {
-		renderer.JobEvent(job, jobs.RawJobEvent{Data: map[string]any{
+		renderer.JobEvent(job, scheduler.RawJobEvent{Data: map[string]any{
 			"type": "log", "level": "info", "message": "complete fallback",
 		}})
 	}
 	renderer.JobComplete(job, result)
-	renderer.Finish(map[string]*jobs.JobResult{job.Key(): result}, jobs.SessionOutcome{})
+	renderer.Finish(map[string]*scheduler.JobResult{job.Key(): result}, scheduler.SessionOutcome{})
 	if got := bytes.Count(live.Bytes(), []byte("complete fallback")); got != 1100 {
 		t.Fatalf("fallback events = %d, want complete 1100", got)
 	}
@@ -709,13 +709,13 @@ func TestMachineStreamSurfacesArtifactAppendFailureWithoutBoundedClaim(t *testin
 		return os.ErrPermission
 	}, protocolcli.MachineOutputModeNormal)
 	job := makeRendererTestJob()
-	result := &jobs.JobResult{Status: string(jobs.TaskStatusSuccess)}
-	renderer.Start([]*jobs.ScheduledJob{job})
+	result := &scheduler.JobResult{Status: string(scheduler.TaskStatusSuccess)}
+	renderer.Start([]*scheduler.ScheduledJob{job})
 	for i := 0; i < 1100; i++ {
-		renderer.JobEvent(job, jobs.RawJobEvent{Data: map[string]any{"type": "log", "message": "event"}})
+		renderer.JobEvent(job, scheduler.RawJobEvent{Data: map[string]any{"type": "log", "message": "event"}})
 	}
 	renderer.JobComplete(job, result)
-	renderer.Finish(map[string]*jobs.JobResult{job.Key(): result}, jobs.SessionOutcome{})
+	renderer.Finish(map[string]*scheduler.JobResult{job.Key(): result}, scheduler.SessionOutcome{})
 	if err := SessionRecordingError(renderer); err == nil {
 		t.Fatal("artifact append failure was not surfaced")
 	}

@@ -29,6 +29,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runnerprovider"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
@@ -105,7 +106,7 @@ type selectionEvidence struct {
 	// record after its opening event: the --impacted selection's complete
 	// trace (workspace.ImpactedSelection.TraceRecord), nil for any other
 	// selection.
-	openingEvents []jobs.SessionRecord
+	openingEvents []scheduler.SessionRecord
 	// closingNotes are printed after the run: the --impacted change's size by
 	// category and its mixed-intent warning
 	// (workspace.ImpactedSelection.ChangeShapeEvidence), "" for any other
@@ -127,15 +128,15 @@ type selectionEvidence struct {
 // registry or cloud effects, is held to both version 1 checks over the plan
 // without the nodes a publication-v1 provider adds: the protocol's, which
 // classifies by command name and which a version 1 request passes when it is
-// parsed, and the executing engine's (jobs.ValidatePortablePublication). It
+// parsed, and the executing engine's (scheduler.ValidatePortablePublication). It
 // needs invocation.publication, and every publication task waits for every
 // task of the barrier commands. A plan with no publication task passes, the
 // block or not: the caller authorized publication before any plan existed,
 // and a commit whose selection publishes nothing is a run that publishes
 // nothing.
-func validateCommitPublication(request runner.CommitRequest, comparable, planned []*jobs.ScheduledJob) error {
-	if !slices.ContainsFunc(planned, func(job *jobs.ScheduledJob) bool {
-		return jobs.HasExternalEffects(job) || slices.Contains(runner.PublicationCommands, job.CommandName())
+func validateCommitPublication(request runner.CommitRequest, comparable, planned []*scheduler.ScheduledJob) error {
+	if !slices.ContainsFunc(planned, func(job *scheduler.ScheduledJob) bool {
+		return scheduler.HasExternalEffects(job) || slices.Contains(runner.PublicationCommands, job.CommandName())
 	}) {
 		return nil
 	}
@@ -146,7 +147,7 @@ func validateCommitPublication(request runner.CommitRequest, comparable, planned
 	if err := runner.ValidatePublication(request.Invocation, plan, runner.IsPublicationTask); err != nil {
 		return err
 	}
-	return jobs.ValidatePortablePublication(runner.ExecutionRequest{Invocation: request.Invocation, Plan: plan}, planned)
+	return scheduler.ValidatePortablePublication(runner.ExecutionRequest{Invocation: request.Invocation, Plan: plan}, planned)
 }
 
 // remoteDeadline is the finite deadline a submission carries. The provider
@@ -177,7 +178,7 @@ const remoteDeadline = 4 * time.Hour
 // env-keyed task before anything is captured. The executing side re-derives
 // the same decision on the materialized tree and refuses a divergence exactly
 // as it refuses a divergent plan.
-func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.Workspace, discovered *internalextension.DiscoveryResult, planned []*jobs.ScheduledJob, releaseSetRun *jobs.ReleaseSetRun) (SessionResult, bool) {
+func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.Workspace, discovered *internalextension.DiscoveryResult, planned []*scheduler.ScheduledJob, releaseSetRun *jobs.ReleaseSetRun) (SessionResult, bool) {
 	if req.Portable != nil && !req.Portable.frozen() {
 		for _, job := range planned {
 			if err := outsideWorkspace(req.WorkspaceRoot, job); err != nil {
@@ -196,7 +197,7 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 			iox.Fprintf(os.Stderr, "putnami: portable execution refused: %v\n", err)
 			return SessionResult{ExitCode: ExitError, Plan: planned}, true
 		}
-		if err := jobs.ValidatePortablePublication(req.Portable.Request, planned); err != nil {
+		if err := scheduler.ValidatePortablePublication(req.Portable.Request, planned); err != nil {
 			iox.Fprintf(os.Stderr, "putnami: portable execution refused: %v\n", err)
 			return SessionResult{ExitCode: ExitError, Plan: planned}, true
 		}
@@ -278,7 +279,7 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 // precise diagnostic, never a silent modification of the request. Its command
 // refusals cover runner.UnportableCommands, which a version 2 request meets in
 // the protocol instead.
-func rejectUnsupportedRemoteShape(req *Request, planned []*jobs.ScheduledJob) error {
+func rejectUnsupportedRemoteShape(req *Request, planned []*scheduler.ScheduledJob) error {
 	if req.Global.Watch {
 		return fmt.Errorf("--watch is not portable; remote execution covers finite commands only")
 	}
@@ -302,7 +303,7 @@ func rejectUnsupportedRemoteShape(req *Request, planned []*jobs.ScheduledJob) er
 		if job.JobDef.Traits.SideEffects != extensionproto.SideEffectsNone {
 			return fmt.Errorf("task %s declares %s side effects; publication and deployment never ride a verification request", job.Key(), job.JobDef.Traits.SideEffects)
 		}
-		if jobs.HasExternalEffects(job) {
+		if scheduler.HasExternalEffects(job) {
 			return fmt.Errorf("task %s declares registry or cloud effects; publication and deployment never ride a verification request", job.Key())
 		}
 		if err := outsideWorkspace(req.WorkspaceRoot, job); err != nil {
@@ -314,7 +315,7 @@ func rejectUnsupportedRemoteShape(req *Request, planned []*jobs.ScheduledJob) er
 
 // outsideWorkspace refuses a task whose absolute working directory lies
 // outside the workspace root: a portable run reaches nothing beyond its tree.
-func outsideWorkspace(root string, job *jobs.ScheduledJob) error {
+func outsideWorkspace(root string, job *scheduler.ScheduledJob) error {
 	if job == nil || job.JobDef == nil {
 		return nil
 	}
@@ -329,7 +330,7 @@ func outsideWorkspace(root string, job *jobs.ScheduledJob) error {
 // expected plan, the pinned environment and the admitted bound inputs. The
 // source identity is bound by the provider client from the snapshot it
 // captures, which carries exactly the bound set named here.
-func portableRequest(req *Request, ws *workspace.Workspace, discovered *internalextension.DiscoveryResult, planned []*jobs.ScheduledJob, bound []string) (runner.ExecutionRequest, error) {
+func portableRequest(req *Request, ws *workspace.Workspace, discovered *internalextension.DiscoveryResult, planned []*scheduler.ScheduledJob, bound []string) (runner.ExecutionRequest, error) {
 	params := make(map[string]runner.ParamValue, len(req.CommandParams))
 	for name, value := range req.CommandParams {
 		param, err := runner.NewParam(value)
@@ -402,7 +403,7 @@ func portableRequest(req *Request, ws *workspace.Workspace, discovered *internal
 // and adds the one plan property that projection omits: whether a task is
 // cacheable at all.
 // Cache PRESENCE is deliberately absent; it is an observation, not identity.
-func expectedPlan(planned []*jobs.ScheduledJob) (runner.PlanBlock, error) {
+func expectedPlan(planned []*scheduler.ScheduledJob) (runner.PlanBlock, error) {
 	tasks, err := changeplan.ProjectTasks(planned)
 	if err != nil {
 		return runner.PlanBlock{}, err
@@ -430,7 +431,7 @@ func expectedPlan(planned []*jobs.ScheduledJob) (runner.PlanBlock, error) {
 // every identity, edge, contract digest and resource declaration. A
 // difference means the snapshot, the engine or an extension diverged from
 // what was submitted, and nothing is scheduled.
-func validateExpectedPlan(expected runner.PlanBlock, planned []*jobs.ScheduledJob) error {
+func validateExpectedPlan(expected runner.PlanBlock, planned []*scheduler.ScheduledJob) error {
 	actual, err := expectedPlan(planned)
 	if err != nil {
 		return err

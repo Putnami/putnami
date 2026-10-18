@@ -13,7 +13,7 @@ import (
 	runner "go.putnami.dev/protocol/runner"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runnersource"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -110,7 +110,7 @@ func Execute(ctx context.Context, offload Offload) (Outcome, error) {
 	}
 	if len(request.Invocation.Providers) > 0 && !contains(c.capabilities, runner.CapabilityInvocationProvidersV1) {
 		return outcome, fmt.Errorf("%w: runner provider %s does not echo %s, which --where remote needs for the providers --providers or %s enabled; run without them, or update the runner provider",
-			ErrUnsupportedRequest, offload.ProviderName, runner.CapabilityInvocationProvidersV1, jobs.ProvidersEnv)
+			ErrUnsupportedRequest, offload.ProviderName, runner.CapabilityInvocationProvidersV1, scheduler.ProvidersEnv)
 	}
 
 	// A submission still in flight for these inputs is THIS run: a CLI that

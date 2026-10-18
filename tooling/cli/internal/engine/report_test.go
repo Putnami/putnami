@@ -6,14 +6,14 @@ import (
 	"testing"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/machine"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-func sampleTuning() *jobs.TuningReport {
-	return &jobs.TuningReport{
-		Parallel: jobs.ParallelDecision{
+func sampleTuning() *scheduler.TuningReport {
+	return &scheduler.TuningReport{
+		Parallel: scheduler.ParallelDecision{
 			Mode:             "auto",
 			Workers:          8,
 			LogicalCPU:       16,
@@ -23,17 +23,17 @@ func sampleTuning() *jobs.TuningReport {
 			MemoryCapWorkers: 8,
 		},
 		HeavyJobRatio: 0.25,
-		ReadyWait: []jobs.ReadyWaitByCommand{
+		ReadyWait: []scheduler.ReadyWaitByCommand{
 			{Command: "test", Jobs: 3, TotalMs: 1200, MaxMs: 800},
 		},
-		CriticalPath: &jobs.CriticalPath{
+		CriticalPath: &scheduler.CriticalPath{
 			DurationMs: 2500,
-			Chain: []jobs.CriticalPathNode{
+			Chain: []scheduler.CriticalPathNode{
 				{Job: "/app:build~types", Command: "build", DurationMs: 1700},
 				{Job: "/app:test~test", Command: "test", DurationMs: 800},
 			},
 		},
-		CPUBudgets: []jobs.JobCPUBudget{
+		CPUBudgets: []scheduler.JobCPUBudget{
 			{Job: "/app:test~test", Weight: 3, ExpectedCPUMs: 80_000, Budget: 6},
 		},
 	}
@@ -108,7 +108,7 @@ func TestReportSchedulerTuning_QuietAndNilAreSilent(t *testing.T) {
 func TestReportCacheSummary_HeadlineShowsByDefault(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	c := &jobs.CacheStatsSnapshot{
+	c := &scheduler.CacheStatsSnapshot{
 		SetupMs: 90, NegotiateMs: 60, UploadMs: 30,
 		KeysRequested: 15, Hits: 12, Misses: 3,
 		Restored: 12, TimeSavedMs: 260000,
@@ -136,7 +136,7 @@ func TestReportCacheSummary_HeadlineShowsByDefault(t *testing.T) {
 func TestReportCacheSummary_AttributesLocalOnlyServing(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	reportCacheSummary(&buf, &GlobalFlags{}, &jobs.CacheStatsSnapshot{
+	reportCacheSummary(&buf, &GlobalFlags{}, &scheduler.CacheStatsSnapshot{
 		LocalHits:             120,
 		LocalMisses:           0,
 		LocalServedMs:         11_200,
@@ -162,7 +162,7 @@ func TestReportCacheSummary_AttributesLocalOnlyServing(t *testing.T) {
 func TestReportCacheSummary_VerboseAddsBytes(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	c := &jobs.CacheStatsSnapshot{KeysRequested: 2, Hits: 1, Misses: 1, BytesFetched: 8_400_000}
+	c := &scheduler.CacheStatsSnapshot{KeysRequested: 2, Hits: 1, Misses: 1, BytesFetched: 8_400_000}
 	reportCacheSummary(&buf, &GlobalFlags{Verbose: true}, c)
 	if !strings.Contains(buf.String(), "8.0 MB fetched") {
 		t.Errorf("verbose should show fetched bytes: %q", buf.String())
@@ -173,13 +173,13 @@ func TestReportCacheSummary_SilentWhenIdleOrQuietOrNil(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	// No keys, no uploads, no restores: stay silent rather than print zeros.
-	reportCacheSummary(&buf, &GlobalFlags{}, &jobs.CacheStatsSnapshot{SetupMs: 5})
+	reportCacheSummary(&buf, &GlobalFlags{}, &scheduler.CacheStatsSnapshot{SetupMs: 5})
 	if buf.Len() != 0 {
 		t.Errorf("idle cache should print nothing, got %q", buf.String())
 	}
 
 	buf.Reset()
-	reportCacheSummary(&buf, &GlobalFlags{Quiet: true}, &jobs.CacheStatsSnapshot{KeysRequested: 5, Hits: 5})
+	reportCacheSummary(&buf, &GlobalFlags{Quiet: true}, &scheduler.CacheStatsSnapshot{KeysRequested: 5, Hits: 5})
 	if buf.Len() != 0 {
 		t.Errorf("quiet should suppress the summary, got %q", buf.String())
 	}
@@ -194,7 +194,7 @@ func TestReportCacheSummary_SilentWhenIdleOrQuietOrNil(t *testing.T) {
 func TestReportCacheSummary_FlagsUploadErrors(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	c := &jobs.CacheStatsSnapshot{KeysRequested: 4, Misses: 4, Uploads: 4, UploadErrors: 2}
+	c := &scheduler.CacheStatsSnapshot{KeysRequested: 4, Misses: 4, Uploads: 4, UploadErrors: 2}
 	reportCacheSummary(&buf, &GlobalFlags{}, c)
 	if !strings.Contains(buf.String(), "2 upload error(s)") {
 		t.Errorf("upload errors should be surfaced: %q", buf.String())
@@ -204,7 +204,7 @@ func TestReportCacheSummary_FlagsUploadErrors(t *testing.T) {
 func TestReportCacheSummary_ExplainsWarmedHints(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	reportCacheSummary(&buf, &GlobalFlags{}, &jobs.CacheStatsSnapshot{
+	reportCacheSummary(&buf, &GlobalFlags{}, &scheduler.CacheStatsSnapshot{
 		KeysRequested: 1, Misses: 1, HintsWarmed: 1,
 	})
 	out := buf.String()
@@ -238,7 +238,7 @@ func TestFormatBytes(t *testing.T) {
 // writes.
 func TestRecordedPlanIncludesSerializeAfter(t *testing.T) {
 	t.Parallel()
-	planned := []*jobs.ScheduledJob{
+	planned := []*scheduler.ScheduledJob{
 		{
 			Project:        &workspace.Project{ID: "/app", Name: "app", Path: "app"},
 			Extension:      &extension.ExtensionDescription{Name: "@putnami/typescript"},

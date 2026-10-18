@@ -358,7 +358,7 @@ func applyGlobalFlag(g *GlobalFlags, arg, value string) error {
 
 // applyMaxParallel binds --max-parallel, which accepts either a worker count or
 // one of the named modes. An unrecognized value used to fall through with no
-// default and normalize to "auto" in internal/jobs/parallel.go, so a user who
+// default and normalize to "auto" in internal/jobs/scheduler/parallel.go, so a user who
 // asked for something specific silently got auto.
 func applyMaxParallel(g *GlobalFlags, value string) error {
 	if workers, err := strconv.Atoi(value); err == nil {

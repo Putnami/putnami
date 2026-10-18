@@ -1,0 +1,1355 @@
+package scheduler
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+
+	protocolcli "go.putnami.dev/protocol/cli"
+	extensionproto "go.putnami.dev/protocol/extension"
+	runtimeproto "go.putnami.dev/protocol/runtime"
+	"go.putnami.dev/sdk/extension/dirlink"
+	"go.putnami.dev/sdk/extension/envkeys"
+	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/tooling/cli/internal/artifactstore"
+	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
+	"go.putnami.dev/tooling/cli/internal/jobs/procdeadline"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
+	"go.putnami.dev/tooling/cli/internal/runcredential"
+	"go.putnami.dev/tooling/cli/internal/store"
+	"go.putnami.dev/tooling/cli/internal/workspace"
+)
+
+type extensionRuntimeError struct {
+	code string
+	err  error
+}
+
+func (e *extensionRuntimeError) Error() string {
+	return fmt.Sprintf("%s: %v", e.code, e.err)
+}
+
+func (e *extensionRuntimeError) Unwrap() error { return e.err }
+
+func runtimeFailure(code, format string, args ...any) error {
+	return &extensionRuntimeError{code: code, err: fmt.Errorf(format, args...)}
+}
+
+func jobReferencesExtensionRuntime(job *ScheduledJob) bool {
+	if job == nil || job.JobDef == nil {
+		return false
+	}
+	return definitionReferencesExtensionRuntime(job.JobDef)
+}
+
+func definitionReferencesExtensionRuntime(def *extension.JobDefinition) bool {
+	if def == nil {
+		return false
+	}
+	return fieldsReferenceExtensionRuntime(def.Command, def.Cwd, def.Args, def.Env)
+}
+
+func jobRuntimeUse(
+	ext *extension.ExtensionDescription,
+	def *extension.JobDefinition,
+) *extensionRuntimeUse {
+	if def == nil {
+		return nil
+	}
+	if definitionReferencesExtensionRuntime(def) {
+		return &extensionRuntimeUse{kind: "task", name: def.Name}
+	}
+	for _, step := range def.PipelineSteps {
+		task, ok := ext.Tasks[step.Task]
+		if ok && fieldsReferenceExtensionRuntime(task.Command, task.Cwd, task.Args, task.Env) {
+			return &extensionRuntimeUse{kind: "task", name: step.Task}
+		}
+	}
+	return nil
+}
+
+func hookReferencesExtensionRuntime(def *extension.HookDefinition) bool {
+	if def == nil {
+		return false
+	}
+	return fieldsReferenceExtensionRuntime(def.Command, def.Cwd, def.Args, def.Env)
+}
+
+func fieldsReferenceExtensionRuntime(command, cwd string, args []string, env map[string]string) bool {
+	token := "{" + extensionproto.TemplateVarExtensionRuntime + "}"
+	if strings.Contains(command, token) || strings.Contains(cwd, token) {
+		return true
+	}
+	for _, arg := range args {
+		if strings.Contains(arg, token) {
+			return true
+		}
+	}
+	for _, value := range env {
+		if strings.Contains(value, token) {
+			return true
+		}
+	}
+	return false
+}
+
+type extensionRuntimeUse struct {
+	kind string
+	name string
+}
+
+// SynchronizeExtensionRuntimes resolves every declared runtime in the extension
+// set. Explicit hook callers and focused callers use this complete operation;
+// the engine uses the command-scoped wrapper below to choose the demanded
+// extension set first. Local sources are prepared once per content digest by
+// artifactstore.Admit; installed sources are validated in place.
+//
+// THE STAGE IS A DAG, AND THE ONLY EDGES IT HAS ARE WITHIN ONE EXTENSION.
+// Each extension's chain is resolve digest → (store hit ?
+// verify : stage → generate → verify → publish) → verify handshake, and no
+// chain reads anything another chain writes:
+//
+//   - the digest is computed from the extension's own source tree and the local
+//     module replacements it declares, all read-only;
+//   - preparation happens in a staging directory the store creates privately per
+//     admit, and is published by atomic rename;
+//   - the only shared writable state is the machine-global artifact store, whose
+//     per-digest ownership lock already serializes the mutating step ACROSS
+//     PROCESSES (flock(2) keys on the open file description, so sibling
+//     goroutines in this process are held apart by the same lock);
+//   - the only per-extension write is that extension's own RuntimeExecutable /
+//     RuntimeDigest, and the plan below visits each description exactly once.
+//
+// So the chains run concurrently and the mutations stay exclusive without a new
+// lock. report may be nil, which records no attribution.
+//
+// Errors keep the serial function's identity: an undeclared runtime is reported
+// for the FIRST extension in slice order that has one, before any preparation
+// starts, and a preparation failure is reported for the lowest-indexed
+// extension that failed. Siblings are NOT canceled when one fails — a canceled
+// sibling's error would race the real one for the report, and a stage that
+// blames the wrong extension costs more than the seconds it saves.
+func SynchronizeExtensionRuntimes(
+	ctx context.Context,
+	ws *workspace.Workspace,
+	extensions []*extension.ExtensionDescription,
+	report *PreparationReport,
+) error {
+	return synchronizeExtensionRuntimesResolving(ctx, workspaceRootOf(ws), extensions, report, false)
+}
+
+// workspaceRootOf is the root the runtime stage resolves the artifact store
+// and toolchain lock from, or "" without a workspace.
+func workspaceRootOf(ws *workspace.Workspace) string {
+	if ws == nil {
+		return ""
+	}
+	return ws.Root
+}
+
+// synchronizeExtensionRuntimesResolving is SynchronizeExtensionRuntimes whose
+// prepare toolchains resolve as the provisioning command's do when
+// provisioning is set (see toolchain.ProvisioningOnlyRun). An extension this
+// run starts from the source build (extension.FromSourceBuild) resolves no
+// toolchain and prepares nothing: its runtime loads from the store
+// (loadSourceBuiltRuntimes).
+func synchronizeExtensionRuntimesResolving(
+	ctx context.Context,
+	workspaceRoot string,
+	extensions []*extension.ExtensionDescription,
+	report *PreparationReport,
+	provisioning bool,
+) error {
+	artifacts := artifactstore.New(store.ResolveArtifactStoreRoot(workspaceRoot))
+	var built []*extension.ExtensionDescription
+	prepared := make([]*extension.ExtensionDescription, 0, len(extensions))
+	for _, ext := range extensions {
+		if extension.FromSourceBuild(workspaceRoot, ext) {
+			built = append(built, ext)
+			continue
+		}
+		prepared = append(prepared, ext)
+	}
+	if err := loadSourceBuiltRuntimes(ctx, workspaceRoot, built, report, artifacts); err != nil {
+		return err
+	}
+	if err := toolchain.ResolveRuntimeToolchainsForPreparation(ctx, workspaceRoot, prepared, os.Environ(), provisioning); err != nil {
+		return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
+			"resolve extension runtime toolchains: %v", err)
+	}
+	return synchronizeExtensionRuntimesWithEnv(ctx, prepared, report, artifacts, os.Environ())
+}
+
+// loadSourceBuiltRuntimes loads the runtime of each extension of built, which
+// this run starts from the source build (extension.FromSourceBuild), and
+// records the time it took in report.
+func loadSourceBuiltRuntimes(
+	ctx context.Context,
+	workspaceRoot string,
+	built []*extension.ExtensionDescription,
+	report *PreparationReport,
+	artifacts *artifactstore.Store,
+) error {
+	if len(built) == 0 {
+		return nil
+	}
+	started := time.Now()
+	spans := &preparationSpans{}
+	defer func() {
+		report.merge(spans)
+		report.observeStage(time.Since(started), 1)
+	}()
+	for _, ext := range built {
+		if err := loadSourceBuiltRuntime(ctx, workspaceRoot, ext, spans, artifacts); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// loadSourceBuiltRuntime sets the runtime of ext, which this run starts from
+// the source build (extension.FromSourceBuild), to the one artifacts holds
+// under the digest of its tested inputs (sourceBuiltRuntimeDigest). It runs no
+// prepare command and no toolchain probe, and records no repository code: the
+// one process it starts is the runtime-info handshake of that runtime. A
+// runtime the store lacks is an error, because this run never prepares one.
+func loadSourceBuiltRuntime(
+	ctx context.Context,
+	workspaceRoot string,
+	ext *extension.ExtensionDescription,
+	spans *preparationSpans,
+	artifacts *artifactstore.Store,
+) error {
+	resolving := time.Now()
+	digest, err := sourceBuiltRuntimeDigest(workspaceRoot, ext)
+	spans.since(PreparationResolution, resolving)
+	if err != nil {
+		return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
+			"digest extension %q runtime inputs: %v", ext.Name, err)
+	}
+	if !artifacts.Has(digest) {
+		return runtimeFailure(extensionproto.FailureRuntimeExecutableMissing,
+			"extension %q has no runtime for these sources in the artifact store %s: a hosted run of a source workspace starts the runtime that ./putnamiw --print-engine prepared before the run, and prepares none itself",
+			ext.Name, artifacts.Root())
+	}
+	artifacts.Touch(digest)
+	executable := runtimeExecutablePath(filepath.Join(artifacts.Path(digest), "runtime"), ext.Runtime.Executable, runtime.GOOS)
+	verifying := time.Now()
+	if err := validateRuntimeExecutable(executable); err != nil {
+		spans.since(PreparationVerification, verifying)
+		return runtimeFailure(extensionproto.FailureRuntimeExecutableMissing,
+			"extension %q runtime prepared by the source build is unavailable: %v", ext.Name, err)
+	}
+	spans.since(PreparationVerification, verifying)
+	if err := validateRuntimeHandshake(ctx, executable, ext, spans); err != nil {
+		return err
+	}
+	ext.RuntimeExecutable = executable
+	ext.RuntimeDigest = digest
+	return nil
+}
+
+// sourceBuiltRuntimeDigest is the runtime input digest under which `putnami
+// extensions prepare` admitted the runtime of ext. The identity of its prepare
+// toolchains comes from the workspace lock
+// (toolchain.LockedRuntimeToolchainIdentityForRefs), not from a probe.
+func sourceBuiltRuntimeDigest(workspaceRoot string, ext *extension.ExtensionDescription) (string, error) {
+	identity, err := toolchain.LockedRuntimeToolchainIdentityForRefs(workspaceRoot, ext, ext.Runtime.Prepare.Toolchains)
+	if err != nil {
+		return "", err
+	}
+	return cachekey.ExtensionRuntimeDigestWithToolchains(ext, identity)
+}
+
+// runtimeInputDigest is the runtime input digest of ext, whose runtime
+// runtime.prepare builds from local source, as synchronization computes it
+// in this run.
+func runtimeInputDigest(workspaceRoot string, ext *extension.ExtensionDescription) (string, error) {
+	if extension.FromSourceBuild(workspaceRoot, ext) {
+		return sourceBuiltRuntimeDigest(workspaceRoot, ext)
+	}
+	return cachekey.ExtensionRuntimeDigest(ext)
+}
+
+// PrepareSourceBuiltRuntimes prepares into the artifact store the runtime of
+// each extension of built, whose runtime the source build prepares
+// (extension.PreparedBySourceBuild), and fails unless a hosted run of the same
+// tree finds it there. Its provider commands must probe no runtime toolchain:
+// a hosted run records repository code before such a probe
+// (toolchain.CommandRuntimeToolchainRefs), so the provider would receive no
+// credential. The runtime must sit under the digest the hosted run computes
+// from the workspace lock (sourceBuiltRuntimeDigest), not only under the one
+// this run's probes gave.
+func PrepareSourceBuiltRuntimes(ctx context.Context, ws *workspace.Workspace, built []*extension.ExtensionDescription) error {
+	for _, ext := range built {
+		for _, command := range extension.ProviderCommands(ext) {
+			active := toolchain.CommandDependencyClosure([]*extension.ExtensionDescription{ext}, []string{command})
+			if refs := toolchain.CommandRuntimeToolchainRefs(ext, active); len(refs) > 0 {
+				return fmt.Errorf("extension %q: provider command %q resolves the runtime toolchains %s, and a hosted run probes no toolchain before it hands the run credential to a provider",
+					ext.Name, command, strings.Join(refs, ", "))
+			}
+		}
+	}
+	if err := SynchronizeExtensionRuntimes(ctx, ws, built, nil); err != nil {
+		return err
+	}
+	root := workspaceRootOf(ws)
+	for _, ext := range built {
+		digest, err := sourceBuiltRuntimeDigest(root, ext)
+		if err != nil {
+			return fmt.Errorf("extension %q: digest the runtime a hosted run starts: %w", ext.Name, err)
+		}
+		if digest != ext.RuntimeDigest {
+			return fmt.Errorf("extension %q: the runtime prepared here has the digest %s, and a hosted run looks for %s: a prepare toolchain resolved to another identity than the workspace lock records",
+				ext.Name, ext.RuntimeDigest, digest)
+		}
+	}
+	return nil
+}
+
+// synchronizeExtensionRuntimes carries the artifact store as an explicit stage
+// dependency. Production resolves the machine-global store above; focused
+// callers can supply an isolated store without mutating PUTNAMI_ARTIFACT_DIR,
+// which also makes independent runtime chains safe to exercise concurrently.
+func synchronizeExtensionRuntimes(
+	ctx context.Context,
+	extensions []*extension.ExtensionDescription,
+	report *PreparationReport,
+	artifacts *artifactstore.Store,
+) error {
+	return synchronizeExtensionRuntimesWithEnv(ctx, extensions, report, artifacts, os.Environ())
+}
+
+func synchronizeExtensionRuntimesWithEnv(
+	ctx context.Context,
+	extensions []*extension.ExtensionDescription,
+	report *PreparationReport,
+	artifacts *artifactstore.Store,
+	prepareEnv []string,
+) error {
+	nodes, err := planExtensionRuntimeSync(extensions)
+	if err != nil {
+		return err
+	}
+	if len(nodes) == 0 {
+		return nil
+	}
+
+	started := time.Now()
+	workers := preparationWorkers(len(nodes), runtime.NumCPU(), machineprobe.TotalMemoryBytes())
+	spans := make([]*preparationSpans, len(nodes))
+	errs := make([]error, len(nodes))
+	for i := range spans {
+		spans[i] = &preparationSpans{}
+	}
+
+	if workers <= 1 || len(nodes) == 1 {
+		// One worker is the pre-parallel stage exactly: nothing is in flight when
+		// a node fails, so stopping is the same verdict as joining would give and
+		// no work is started that the run will not use.
+		for i, ext := range nodes {
+			if errs[i] = synchronizeDeclaredExtensionRuntimeWithEnv(ctx, ext, spans[i], artifacts, prepareEnv); errs[i] != nil {
+				break
+			}
+		}
+	} else {
+		gate := make(chan struct{}, workers)
+		var wg sync.WaitGroup
+		for i, ext := range nodes {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				gate <- struct{}{}
+				defer func() { <-gate }()
+				errs[i] = synchronizeDeclaredExtensionRuntimeWithEnv(ctx, ext, spans[i], artifacts, prepareEnv)
+			}()
+		}
+		wg.Wait()
+	}
+
+	for _, worker := range spans {
+		report.merge(worker)
+	}
+	report.observeStage(time.Since(started), workers)
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// planExtensionRuntimeSync turns the requested extension set into the stage's
+// independent nodes, rejecting a manifest that cannot run before any work
+// starts.
+//
+// Descriptions are de-duplicated BY POINTER, not by name: two entries for the
+// same description would otherwise become two workers writing the same
+// RuntimeExecutable field. Two DISTINCT descriptions that resolve to the same
+// content digest stay two nodes and converge in the store, which is the
+// content-addressed reuse working rather than a case to special-case here.
+func planExtensionRuntimeSync(
+	extensions []*extension.ExtensionDescription,
+) ([]*extension.ExtensionDescription, error) {
+	nodes := make([]*extension.ExtensionDescription, 0, len(extensions))
+	seen := make(map[*extension.ExtensionDescription]bool, len(extensions))
+	for _, ext := range extensions {
+		if ext == nil || seen[ext] {
+			continue
+		}
+		seen[ext] = true
+		if ext.Runtime == nil {
+			if use := firstExtensionRuntimeUse(ext, true); use != nil {
+				return nil, runtimeNotDeclared(ext, use)
+			}
+			continue
+		}
+		nodes = append(nodes, ext)
+	}
+	return nodes, nil
+}
+
+// preparationWorkers bounds the stage's fan-out.
+//
+// Every node is a COMPILE that already fans out inside its own toolchain, so
+// the CPU bound is the visible core count rather than the scheduler's 2x/3x
+// oversubscription for mixed plans — and the same memory-pressure cap the
+// scheduler applies to an all-heavy plan applies here, because that is exactly
+// what this plan is. Hardware is a parameter so the policy is testable without
+// one.
+func preparationWorkers(nodes, logicalCPU int, totalMemoryBytes uint64) int {
+	if nodes <= 1 {
+		return 1
+	}
+	workers := min(nodes, max(1, logicalCPU))
+	if memoryCap := memoryWorkerCap(parallelModeAuto, totalMemoryBytes, 1000); memoryCap > 0 {
+		workers = min(workers, memoryCap)
+	}
+	return max(1, workers)
+}
+
+// SynchronizeExtensionRuntimesForCommands resolves only runtimes used by the
+// selected commands (including their command dependency closure) and by the
+// preBuild hook that will bracket those jobs. It still runs before project
+// selection and planning; only the demanded extension surface is narrower.
+//
+// A task toolchain the workspace lock does not satisfy stays unresolved rather
+// than failing here: the run may plan no job that requires it, as in a
+// workspace with an extension and no project of its language. The caller runs
+// RequirePlannedRuntimeToolchains on the plan before any job runs.
+func SynchronizeExtensionRuntimesForCommands(
+	ctx context.Context,
+	ws *workspace.Workspace,
+	extensions []*extension.ExtensionDescription,
+	commands []string,
+	report *PreparationReport,
+) error {
+	return synchronizeExtensionRuntimesForCommands(ctx, workspaceRootOf(ws), extensions, commands, report, toolchain.ResolveDeferred)
+}
+
+// synchronizeExtensionRuntimesForCommands is SynchronizeExtensionRuntimesForCommands
+// for a caller that holds the workspace root rather than the loaded workspace.
+// mode applies to the task toolchains of the active commands other than
+// toolchain.ToolchainProvisioningCommand.
+func synchronizeExtensionRuntimesForCommands(
+	ctx context.Context,
+	workspaceRoot string,
+	extensions []*extension.ExtensionDescription,
+	commands []string,
+	report *PreparationReport,
+	mode toolchain.ToolchainResolutionMode,
+) error {
+	activeCommands := toolchain.CommandDependencyClosure(extensions, commands)
+	demanded := make([]*extension.ExtensionDescription, 0, len(extensions))
+	for _, ext := range extensions {
+		if ext == nil {
+			continue
+		}
+		use := commandRuntimeUse(ext, activeCommands)
+		if use == nil {
+			continue
+		}
+		if ext.Runtime == nil {
+			return runtimeNotDeclared(ext, use)
+		}
+		demanded = append(demanded, ext)
+	}
+	if err := synchronizeExtensionRuntimesResolving(ctx, workspaceRoot, demanded, report, toolchain.ProvisioningOnlyRun(activeCommands)); err != nil {
+		return err
+	}
+	// Task toolchains are resolved for EVERY extension whose active commands
+	// declare one, not only the demanded ones: an extension can pin the tool a
+	// task runs without its own runtime executable being referenced by this
+	// command. Resolution has to happen here — before selection, planning and
+	// every cache key — so the identity a job runs with is the identity it is
+	// keyed under. A task toolchain mode leaves unresolved resolves once the
+	// plan is final (RequirePlannedRuntimeToolchains), still before any key.
+	return resolveCommandRuntimeToolchains(ctx, workspaceRoot, extensions, activeCommands, mode)
+}
+
+// resolveCommandRuntimeToolchains resolves the toolchains the active commands
+// of extensions declare, the last step of synchronizeExtensionRuntimesForCommands.
+func resolveCommandRuntimeToolchains(
+	ctx context.Context,
+	workspaceRoot string,
+	extensions []*extension.ExtensionDescription,
+	activeCommands map[string]bool,
+	mode toolchain.ToolchainResolutionMode,
+) error {
+	if err := toolchain.ResolveRuntimeToolchainsForCommandsMode(ctx, workspaceRoot, extensions, activeCommands, os.Environ(), mode); err != nil {
+		return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
+			"resolve extension runtime toolchains: %v", err)
+	}
+	return nil
+}
+
+func commandRuntimeUse(
+	ext *extension.ExtensionDescription,
+	activeCommands map[string]bool,
+) *extensionRuntimeUse {
+	contributes := false
+	for commandName, def := range ext.Jobs {
+		if !activeCommands[commandName] {
+			continue
+		}
+		contributes = true
+		if use := jobRuntimeUse(ext, def); use != nil {
+			return use
+		}
+	}
+	if contributes {
+		return firstHookRuntimeUse(ext, false)
+	}
+	return nil
+}
+
+func firstHookRuntimeUse(ext *extension.ExtensionDescription, all bool) *extensionRuntimeUse {
+	if ext == nil || ext.Hooks == nil {
+		return nil
+	}
+	type hookRuntimeDefinition struct {
+		name string
+		def  *extension.HookDefinition
+	}
+	hooks := []hookRuntimeDefinition{
+		{name: "preBuild", def: ext.Hooks.PreBuild},
+	}
+	if all {
+		// The cache lifecycle is no longer a hook: it is
+		// the reserved cache-clean/cache-gc COMMANDS, whose {extensionRuntime}
+		// use is already found by the ordinary job scan in
+		// firstExtensionRuntimeUse, so it needs no entry here.
+		hooks = append(hooks,
+			hookRuntimeDefinition{name: "onInstall", def: ext.Hooks.OnInstall},
+		)
+	}
+	for _, hook := range hooks {
+		if hookReferencesExtensionRuntime(hook.def) {
+			return &extensionRuntimeUse{kind: "hook", name: hook.name}
+		}
+	}
+	return nil
+}
+
+func firstExtensionRuntimeUse(
+	ext *extension.ExtensionDescription,
+	allHooks bool,
+) *extensionRuntimeUse {
+	for _, def := range ext.Jobs {
+		if use := jobRuntimeUse(ext, def); use != nil {
+			return use
+		}
+	}
+	return firstHookRuntimeUse(ext, allHooks)
+}
+
+func runtimeNotDeclared(
+	ext *extension.ExtensionDescription,
+	use *extensionRuntimeUse,
+) error {
+	return runtimeFailure(extensionproto.FailureRuntimeNotDeclared,
+		"%s %q references {%s}, but extension %q declares no runtime",
+		use.kind, use.name, extensionproto.TemplateVarExtensionRuntime, ext.Name)
+}
+
+func synchronizeDeclaredExtensionRuntimeWithEnv(
+	ctx context.Context,
+	ext *extension.ExtensionDescription,
+	spans *preparationSpans,
+	artifacts *artifactstore.Store,
+	prepareEnv []string,
+) error {
+	digest := ""
+	if ext.LocalSource && ext.Runtime.Prepare != nil {
+		var err error
+		resolving := time.Now()
+		digest, err = cachekey.ExtensionRuntimeDigest(ext)
+		spans.since(PreparationResolution, resolving)
+		if err != nil {
+			return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
+				"digest extension %q runtime inputs: %v", ext.Name, err)
+		}
+	}
+	executable, err := prepareOrLoadExtensionRuntimeWithDigestAndEnv(ctx, artifacts, ext, digest, spans, prepareEnv)
+	if err != nil {
+		return err
+	}
+	ext.RuntimeExecutable = executable
+	ext.RuntimeDigest = digest
+	return nil
+}
+
+// ExtensionImplementationIdentity names the implementation a provider binding
+// runs, for the workspace snapshot to key a recorded probe answer on: the
+// runtime input digest of a workspace-local extension (the value its prepared
+// runtime carries), the version of a registry-installed one. Empty when the
+// extension declares no runtime or its inputs cannot be read.
+func ExtensionImplementationIdentity(ext *extension.ExtensionDescription) string {
+	if ext == nil {
+		return ""
+	}
+	if ext.RuntimeDigest != "" {
+		return ext.RuntimeDigest
+	}
+	if ext.Runtime == nil || ext.Runtime.Prepare == nil {
+		return ""
+	}
+	if !ext.LocalSource {
+		return ext.Version
+	}
+	digest, err := cachekey.ExtensionRuntimeDigest(ext)
+	if err != nil {
+		return ""
+	}
+	return digest
+}
+
+func resolvedExtensionRuntime(job *ScheduledJob) (string, error) {
+	if !jobReferencesExtensionRuntime(job) {
+		return "", nil
+	}
+	if job == nil || job.Extension == nil || job.Extension.Runtime == nil {
+		return "", runtimeFailure(extensionproto.FailureRuntimeNotDeclared,
+			"task %q references {%s}, but extension %q declares no runtime",
+			job.JobDef.Name, extensionproto.TemplateVarExtensionRuntime, extensionName(job))
+	}
+	if job.Extension.RuntimeExecutable == "" {
+		return "", runtimeFailure(extensionproto.FailureRuntimeExecutableMissing,
+			"extension %q runtime was not resolved during workspace synchronization",
+			job.Extension.Name)
+	}
+	return job.Extension.RuntimeExecutable, nil
+}
+
+func extensionName(job *ScheduledJob) string {
+	if job != nil && job.Extension != nil {
+		return job.Extension.Name
+	}
+	return ""
+}
+
+func prepareOrLoadExtensionRuntime(
+	ctx context.Context,
+	artifacts *artifactstore.Store,
+	ext *extension.ExtensionDescription,
+) (string, error) {
+	return prepareOrLoadExtensionRuntimeWithDigestAndEnv(ctx, artifacts, ext, "", nil, os.Environ())
+}
+
+func prepareOrLoadExtensionRuntimeWithDigestAndEnv(
+	ctx context.Context,
+	artifacts *artifactstore.Store,
+	ext *extension.ExtensionDescription,
+	digest string,
+	spans *preparationSpans,
+	prepareEnv []string,
+) (string, error) {
+	def := ext.Runtime
+	root := filepath.Clean(ext.Path)
+	if root == "." || root == "" {
+		root = filepath.Clean(cachekey.JobExtensionRoot(nil, &ScheduledJob{Extension: ext}))
+	}
+	// Both branches below start the extension's code: its prepare command and
+	// its runtime-info handshake. An extension installed from the artifact
+	// store is registry code; any other extension, a local one first of all,
+	// is repository code, recorded before the first spawn.
+	if artifacts == nil || !extension.InStoreRoot(artifacts.Root(), ext) {
+		runcredential.MarkRepositoryCodeStarted("extension runtime of " + ext.Name)
+	}
+
+	if !ext.LocalSource || def.Prepare == nil {
+		executable := runtimeExecutablePath(root, def.Executable, runtime.GOOS)
+		verifying := time.Now()
+		if err := validateRuntimeExecutable(executable); err != nil {
+			spans.since(PreparationVerification, verifying)
+			return "", runtimeFailure(extensionproto.FailureRuntimeExecutableMissing,
+				"extension %q runtime %q is unavailable: %v%s", ext.Name, def.Executable, err,
+				unsuffixedRuntimeHint(root, def.Executable, runtime.GOOS))
+		}
+		spans.since(PreparationVerification, verifying)
+		if err := validateRuntimeHandshake(ctx, executable, ext, spans); err != nil {
+			return "", err
+		}
+		return executable, nil
+	}
+
+	if digest == "" {
+		var err error
+		resolving := time.Now()
+		digest, err = cachekey.ExtensionRuntimeDigest(ext)
+		spans.since(PreparationResolution, resolving)
+		if err != nil {
+			return "", runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
+				"digest extension %q runtime inputs: %v", ext.Name, err)
+		}
+	}
+	// The store admit IS the mutation step: it takes the per-digest ownership
+	// lock, hands out a private staging tree, and publishes by atomic rename.
+	// The classified spans filed by the stage callback below are disjoint
+	// sub-intervals of it, so the residual — the admit's wall minus what the
+	// callback accounted for — is exactly the lock wait plus the publish, and
+	// cannot go negative. Attributing it as mutation is what makes the
+	// serialization cost of two processes contending on one workspace visible
+	// instead of vanishing into an unattributed remainder.
+	admitting := time.Now()
+	accountedBefore := spans.elapsed()
+	dir, err := artifacts.AdmitContext(ctx, digest, func(stageDir string) error {
+		sourceView := filepath.Join(stageDir, ".source")
+		outputRoot := filepath.Join(stageDir, "runtime")
+		staging := time.Now()
+		if err := os.MkdirAll(sourceView, 0o755); err != nil {
+			spans.since(PreparationMutation, staging)
+			return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
+				"create isolated source view: %v", err)
+		}
+		if err := os.MkdirAll(outputRoot, 0o755); err != nil {
+			spans.since(PreparationMutation, staging)
+			return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
+				"create runtime output: %v", err)
+		}
+		spans.since(PreparationMutation, staging)
+
+		resolving := time.Now()
+		inputs, collectErr := cachekey.CollectRuntimeInputs(root, def.Prepare.Inputs)
+		spans.since(PreparationResolution, resolving)
+		if collectErr != nil {
+			return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
+				"collect extension %q runtime inputs: %v", ext.Name, collectErr)
+		}
+		staging = time.Now()
+		sourceRoot, copyErr := stageRuntimeSourceView(root, sourceView, inputs)
+		spans.since(PreparationMutation, staging)
+		if copyErr != nil {
+			return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
+				"stage extension %q runtime inputs: %v", ext.Name, copyErr)
+		}
+
+		vars := map[string]string{
+			"extensionRoot":                         sourceRoot,
+			extensionproto.TemplateVarRuntimeOutput: outputRoot,
+		}
+		command := extension.ExpandTemplateVars(def.Prepare.Command, vars)
+		args := make([]string, len(def.Prepare.Args))
+		for i, arg := range def.Prepare.Args {
+			args[i] = extension.ExpandTemplateVars(arg, vars)
+		}
+		env := toolchain.ApplyRuntimeToolchains(prepareEnv, ext, def.Prepare.Toolchains)
+		env = setEnv(env, "GOWORK", "off")
+		env = setEnv(env, "PUTNAMI_EXTENSION_ROOT", sourceRoot)
+		env = setEnv(env, "PWD", sourceRoot)
+		generating := time.Now()
+		out, processState, runErr := runRuntimePrepareCommand(ctx, command, args, sourceRoot, env)
+		spans.add(PreparationGeneration, time.Since(generating), spawnCPU(processState))
+		if runErr != nil {
+			return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
+				"prepare extension %q runtime with %q: %v: %s",
+				ext.Name, def.Prepare.Command, runErr, strings.TrimSpace(string(out)))
+		}
+		executable := runtimeExecutablePath(outputRoot, def.Executable, runtime.GOOS)
+		verifying := time.Now()
+		if err := validateRuntimeExecutable(executable); err != nil {
+			spans.since(PreparationVerification, verifying)
+			return runtimeFailure(extensionproto.FailureRuntimePrepareOutputMissing,
+				"extension %q prepare did not produce executable %q: %v%s",
+				ext.Name, def.Executable, err, unsuffixedRuntimeHint(outputRoot, def.Executable, runtime.GOOS))
+		}
+		// Re-hashing the inputs is VERIFICATION, not resolution: the identity is
+		// already decided, and this run only proves the source did not move under
+		// the preparation that claims to implement it.
+		after, digestErr := cachekey.ExtensionRuntimeDigest(ext)
+		spans.since(PreparationVerification, verifying)
+		if digestErr != nil {
+			return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
+				"re-hash extension %q runtime inputs: %v", ext.Name, digestErr)
+		}
+		if after != digest {
+			return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
+				"extension %q runtime inputs changed during preparation", ext.Name)
+		}
+		if handshakeErr := validateRuntimeHandshake(ctx, executable, ext, spans); handshakeErr != nil {
+			return handshakeErr
+		}
+		reclaiming := time.Now()
+		removeErr := os.RemoveAll(sourceView)
+		spans.since(PreparationMutation, reclaiming)
+		if removeErr != nil {
+			return runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
+				"remove isolated source view: %v", removeErr)
+		}
+		return nil
+	})
+	spans.add(PreparationMutation, time.Since(admitting)-(spans.elapsed()-accountedBefore), 0)
+	if err != nil {
+		if ctx.Err() != nil {
+			return "", runtimeFailure(extensionproto.FailureRuntimePrepareFailed,
+				"admit extension %q runtime: %w", ext.Name, err)
+		}
+		return "", err
+	}
+	executable := runtimeExecutablePath(filepath.Join(dir, "runtime"), def.Executable, runtime.GOOS)
+	verifying := time.Now()
+	if err := validateRuntimeExecutable(executable); err != nil {
+		spans.since(PreparationVerification, verifying)
+		return "", runtimeFailure(extensionproto.FailureRuntimeExecutableMissing,
+			"prepared extension %q runtime disappeared: %v", ext.Name, err)
+	}
+	spans.since(PreparationVerification, verifying)
+	if err := validateRuntimeHandshake(ctx, executable, ext, spans); err != nil {
+		return "", err
+	}
+	return executable, nil
+}
+
+func runRuntimePrepareCommand(
+	ctx context.Context,
+	command string,
+	args []string,
+	dir string,
+	env []string,
+) ([]byte, *os.ProcessState, error) {
+	const attempts = 6
+	delay := 5 * time.Millisecond
+	for attempt := range attempts {
+		cmd := exec.CommandContext(ctx, command, args...)
+		cmd.Dir = dir
+		cmd.Env = env
+		out, err := cmd.CombinedOutput()
+		if err == nil || !isTextFileBusy(err) || attempt == attempts-1 {
+			return out, cmd.ProcessState, err
+		}
+		select {
+		case <-ctx.Done():
+			return out, cmd.ProcessState, ctx.Err()
+		case <-time.After(delay):
+			delay *= 2
+		}
+	}
+	panic("unreachable runtime prepare retry loop")
+}
+
+func isTextFileBusy(err error) bool {
+	return errors.Is(err, syscall.ETXTBSY)
+}
+
+func copyRuntimeInputs(root, dest string, inputs []string) error {
+	for _, rel := range inputs {
+		source := filepath.Join(root, filepath.FromSlash(rel))
+		target := filepath.Join(dest, filepath.FromSlash(rel))
+		targetDir := filepath.Dir(target)
+		if err := os.MkdirAll(targetDir, 0o755); err != nil {
+			return err
+		}
+		info, err := os.Lstat(source)
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+			return fmt.Errorf("runtime input %q is not a regular non-symlink file", rel)
+		}
+		mode := os.FileMode(0o444)
+		if info.Mode()&0o111 != 0 {
+			mode = 0o555
+		}
+		if err := copyRuntimeInputFile(source, target, mode); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// copyRuntimeTree stages a replaced module's enumerated tree. Regular files are
+// copied; a contained symlink is recreated verbatim, so the staged view keeps
+// the shape hashRuntimeReplacementTree fingerprinted. cachekey.CollectRuntimeTree already
+// refused every link that leaves the replacement root, so a recreated link can
+// only resolve inside the staged copy.
+func copyRuntimeTree(root, dest string, entries []cachekey.RuntimeTreeEntry) error {
+	for _, entry := range entries {
+		source := filepath.Join(root, filepath.FromSlash(entry.Rel))
+		target := filepath.Join(dest, filepath.FromSlash(entry.Rel))
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		if entry.Symlink {
+			if err := stageRuntimeSymlink(source, entry.Target, target); err != nil {
+				return err
+			}
+			continue
+		}
+		info, err := os.Lstat(source)
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			// The entry changed type after the enumeration classified it. Refuse
+			// rather than copy through a link the digest never validated.
+			return fmt.Errorf("module replacement input %q is not a regular non-symlink file", entry.Rel)
+		}
+		mode := os.FileMode(0o444)
+		if info.Mode()&0o111 != 0 {
+			mode = 0o555
+		}
+		if err := copyRuntimeInputFile(source, target, mode); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// stageRuntimeSymlink recreates the link at source. A link to a directory goes
+// through dirlink, which makes it a junction on Windows, where a symbolic link
+// needs Developer Mode. A link to a file stays a symbolic link, and on Windows
+// without Developer Mode its error names the way out.
+func stageRuntimeSymlink(source, linkTarget, linkPath string) error {
+	create := symlinkRuntimeFile(source)
+	if info, err := os.Stat(source); err == nil && info.IsDir() {
+		create = dirlink.Create
+	}
+	err := create(linkTarget, linkPath)
+	if err == nil || !errors.Is(err, os.ErrExist) {
+		return err
+	}
+	// Two staged roots can nest — a replacement living inside another
+	// replacement's directory stages the same path twice. Both stagings come
+	// from the same enumeration of the same bytes, so replace instead of
+	// failing, the way the file copy's rename already does.
+	if err := os.Remove(linkPath); err != nil {
+		return err
+	}
+	return create(linkTarget, linkPath)
+}
+
+// symlinkRuntimeFile returns os.Symlink for the replaced module's file link at
+// source. When the platform refuses the link for want of the symbolic-link
+// privilege, the error names Developer Mode and source.
+func symlinkRuntimeFile(source string) func(target, link string) error {
+	return func(target, link string) error {
+		err := os.Symlink(target, link)
+		if err != nil && symlinkPrivilegeMissing(err) {
+			return fmt.Errorf(
+				"module replacement input %s is a file symbolic link, which Windows creates only with Developer Mode: "+
+					"turn on Developer Mode (Settings > System > For developers), or replace the link with a regular file: %w",
+				source, err)
+		}
+		return err
+	}
+}
+
+func copyRuntimeInputFile(source, target string, mode os.FileMode) error {
+	in, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	targetDir := filepath.Dir(target)
+	// Never expose an executable at its final path while its inode is still
+	// open for writing. Linux rejects a concurrent exec in that window with
+	// ETXTBSY, which is observable when several runtimes are staged together.
+	// A closed temporary inode followed by rename makes the final path ready
+	// for exec from the instant it becomes visible.
+	out, err := os.CreateTemp(targetDir, ".putnami-runtime-input-")
+	if err != nil {
+		_ = in.Close()
+		return err
+	}
+	temporary := out.Name()
+	removeTemporary := true
+	defer func() {
+		if removeTemporary {
+			_ = os.Remove(temporary)
+		}
+	}()
+	if err := out.Chmod(mode); err != nil {
+		_ = out.Close()
+		_ = in.Close()
+		return err
+	}
+	_, copyErr := io.Copy(out, in)
+	closeOutErr := out.Close()
+	closeInErr := in.Close()
+	if copyErr != nil {
+		return copyErr
+	}
+	if closeOutErr != nil {
+		return closeOutErr
+	}
+	if closeInErr != nil {
+		return closeInErr
+	}
+	if err := os.Rename(temporary, target); err != nil {
+		return err
+	}
+	removeTemporary = false
+	return nil
+}
+
+func stageRuntimeSourceView(extensionRoot, viewRoot string, inputs []string) (string, error) {
+	physicalExtensionRoot, err := dirlink.Resolve(extensionRoot)
+	if err != nil {
+		return "", fmt.Errorf("resolve extension source root: %w", err)
+	}
+	extensionRoot = physicalExtensionRoot
+	replacements, err := cachekey.RuntimeReplacementClosure(extensionRoot)
+	if err != nil {
+		return "", err
+	}
+	common := filepath.Clean(extensionRoot)
+	// Two directories staged at one path would merge into one tree.
+	staged := map[string]string{common: common}
+	for _, replacement := range replacements {
+		if other, ok := staged[replacement.Stage]; ok {
+			return "", fmt.Errorf("runtime sources %q and %q both stage at %q", other, replacement.Root, replacement.Stage)
+		}
+		staged[replacement.Stage] = replacement.Root
+		common = commonPathAncestor(common, replacement.Stage)
+	}
+	stagePath := func(root string) (string, error) {
+		rel, err := filepath.Rel(common, root)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return "", fmt.Errorf("runtime source %q is outside common module root %q", root, common)
+		}
+		return filepath.Join(viewRoot, rel), nil
+	}
+	stagedExtension, err := stagePath(extensionRoot)
+	if err != nil {
+		return "", err
+	}
+	if err := copyRuntimeInputs(extensionRoot, stagedExtension, inputs); err != nil {
+		return "", err
+	}
+	for _, replacement := range replacements {
+		stagedReplacement, err := stagePath(replacement.Stage)
+		if err != nil {
+			return "", err
+		}
+		entries, err := cachekey.CollectRuntimeTree(replacement.Root)
+		if err != nil {
+			return "", err
+		}
+		if err := copyRuntimeTree(replacement.Root, stagedReplacement, entries); err != nil {
+			return "", err
+		}
+	}
+	return stagedExtension, nil
+}
+
+func commonPathAncestor(a, b string) string {
+	a = filepath.Clean(a)
+	b = filepath.Clean(b)
+	for {
+		rel, err := filepath.Rel(a, b)
+		if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return a
+		}
+		parent := filepath.Dir(a)
+		if parent == a {
+			return a
+		}
+		a = parent
+	}
+}
+
+// runtimeExecutablePath is the file under root that holds the runtime a
+// manifest declares at executable, on a machine running goos. Every manifest
+// declares the path without a suffix (compiled/putnami-go); on windows the
+// file is compiled/putnami-go.exe, the name pkgmeta.ExecutableName gives it,
+// which is the one the packagers write into a Windows archive. It is the only
+// name the CLI runs: a file at the declared name without the suffix is not a
+// Windows build of the runtime, so its absence is runtime.executable_missing.
+func runtimeExecutablePath(root, executable, goos string) string {
+	return filepath.Join(root, filepath.FromSlash(pkgmeta.ExecutableName(goos, executable)))
+}
+
+// unsuffixedRuntimeHint completes a missing-runtime error on goos when root
+// holds the declared executable without the ".exe" suffix runtimeExecutablePath
+// requires. It is empty when the two names agree, which is every platform but
+// Windows, and when no such file exists.
+func unsuffixedRuntimeHint(root, executable, goos string) string {
+	declared := filepath.Join(root, filepath.FromSlash(executable))
+	expected := runtimeExecutablePath(root, executable, goos)
+	if declared == expected {
+		return ""
+	}
+	if info, err := os.Lstat(declared); err != nil || !info.Mode().IsRegular() {
+		return ""
+	}
+	return fmt.Sprintf("; %s exists without the .exe suffix, which is not a Windows build of the runtime: "+
+		"the extension must provide a windows/amd64 executable at %s", executable, pkgmeta.ExecutableName(goos, executable))
+}
+
+func validateRuntimeExecutable(executable string) error {
+	info, err := os.Lstat(executable)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return errors.New("executable is a symlink")
+	}
+	if !info.Mode().IsRegular() || (runtime.GOOS != "windows" && info.Mode()&0o111 == 0) {
+		return errors.New("path is not an executable regular file")
+	}
+	return nil
+}
+
+// describeRuntimeExecutable renders the on-disk identity of a runtime
+// executable for handshake-failure diagnostics. A handshake subprocess that
+// dies on a signal (SIGSEGV/SIGBUS) with empty stderr, or returns truncated
+// output, can mean a file whose bytes moved under an in-flight exec — so the
+// message must answer two questions without a re-run: WHICH tree the
+// executable came from (an in-stage <store>/tmp/staging-* path vs. the
+// published <store>/sha256/... entry) and whether the file was still intact.
+// size/mode/mtime come from the portable FileInfo; the platform stat carries
+// the inode and device, which identify the file even after a rename. Purely
+// diagnostic: it never changes the failure verdict, and a stat that itself
+// fails (the tree really did disappear) is reported rather than swallowed.
+func describeRuntimeExecutable(executable string) string {
+	info, err := os.Lstat(executable)
+	if err != nil {
+		return fmt.Sprintf("executable %s: stat failed: %v", executable, err)
+	}
+	identity := ""
+	if sys := info.Sys(); sys != nil {
+		identity = fmt.Sprintf(" stat=%+v", sys)
+	}
+	return fmt.Sprintf("executable %s: size=%d mode=%v mtime=%s%s",
+		executable, info.Size(), info.Mode(),
+		info.ModTime().UTC().Format(time.RFC3339Nano), identity)
+}
+
+// runtimeHandshakeDeadline is how long a runtime may take to answer
+// `__putnami runtime-info`, counted from its first instruction, less the time
+// it waits for a CPU.
+//
+// The value is settled. Raising it would only move the load at which a
+// healthy runtime is refused — the same rule applied to the capability probes.
+const runtimeHandshakeDeadline = 10 * time.Second
+
+// runtimeHandshakeClock arms the deadline of one handshake. It is called exactly
+// once, after exec.Cmd.Start has returned, so process is the started runtime. It
+// returns the watch whose Expired channel closes when the runtime's time to
+// answer is over.
+//
+// Production arms procdeadline.HostProcessDeadline (hostHandshakeDeadline). A test
+// substitutes a deadline it controls, so a timeout classification is asserted
+// without a budget that a loaded host could miss.
+type runtimeHandshakeClock func(process *os.Process) *procdeadline.ProcessWatch
+
+func hostHandshakeDeadline(process *os.Process) *procdeadline.ProcessWatch {
+	return procdeadline.HostProcessDeadline(runtimeHandshakeDeadline).Watch(process, nil)
+}
+
+// validateRuntimeHandshake proves the resolved executable really is the runtime
+// the manifest describes, before anything else is allowed to invoke it.
+//
+// spans, when non-nil, charges the whole handshake to the VERIFICATION phase of
+// the preparation attribution, with the subprocess's measured child CPU read
+// from the same ProcessState the physical execution ledger reads. A process
+// that never started reports no CPU rather than a measured zero.
+//
+// The deadline counts from the runtime's first instruction, not from the spawn
+// request and not from the return of exec.Cmd.Start. On darwin, Start returns
+// before the host has finished checking a binary written moments earlier: the
+// host holds the new process until the check ends, and the check queues behind
+// every other fresh binary on a loaded machine. Once the runtime runs, the
+// deadline does not count the time it is ready to run and waits for a CPU
+// either. Neither consumes the runtime's own time, so neither is charged to
+// the deadline; procdeadline.UncountedTimeBound bounds both together instead.
+// A deadline that does fire is reported as runtime.handshake_timeout, with the
+// measured start, hold, CPU wait, run, and CPU times, so no reader mistakes
+// load for a malformed build.
+func validateRuntimeHandshake(
+	ctx context.Context,
+	executable string,
+	ext *extension.ExtensionDescription,
+	spans *preparationSpans,
+) error {
+	return runRuntimeHandshake(ctx, executable, ext, spans, hostHandshakeDeadline)
+}
+
+// startRuntimeHandshake starts `executable __putnami runtime-info`, retrying
+// ETXTBSY with the same bounded backoff as runRuntimePrepareCommand. The
+// executable was written moments earlier, and a process forked by another
+// goroutine in that window keeps the write descriptor until it execs: Linux
+// refuses the exec for that instant.
+func startRuntimeHandshake(ctx context.Context, executable string, stdout, stderr *bytes.Buffer) (*exec.Cmd, error) {
+	const attempts = 6
+	delay := 5 * time.Millisecond
+	for attempt := range attempts {
+		// executable is one of exactly three paths this package builds — the
+		// installed tree's declared executable, the in-stage prepare output, or
+		// the published store entry — each joined from a manifest-declared
+		// relative path and each passed through validateRuntimeExecutable
+		// (regular file, not a symlink, executable bit) IMMEDIATELY before the
+		// handshake. Executing it is the handshake's entire purpose: it is how
+		// the CLI refuses to invoke a binary that is not the runtime the
+		// manifest describes.
+		//
+		// The project already excludes gosec's G204 for this ("CLI spawns build
+		// tools from extension manifests — not user input"). G702 is its
+		// interprocedural taint sibling. Suppressed HERE rather than added to the
+		// project excludes, so the analyzer stays armed for every other exec in
+		// the CLI.
+		//nolint:gosec // G702: validated, manifest-declared runtime path; executing it is the point.
+		cmd := exec.CommandContext(ctx, executable, "__putnami", "runtime-info")
+		cmd.Stdout = stdout
+		cmd.Stderr = stderr
+		err := cmd.Start()
+		if err == nil || !isTextFileBusy(err) || attempt == attempts-1 {
+			return cmd, err
+		}
+		select {
+		case <-ctx.Done():
+			return cmd, err
+		case <-time.After(delay):
+			delay *= 2
+		}
+	}
+	panic("unreachable runtime handshake start retry loop")
+}
+
+func runRuntimeHandshake(
+	ctx context.Context,
+	executable string,
+	ext *extension.ExtensionDescription,
+	spans *preparationSpans,
+	clock runtimeHandshakeClock,
+) error {
+	started := time.Now()
+	var stdout, stderr bytes.Buffer
+	cmd, err := startRuntimeHandshake(ctx, executable, &stdout, &stderr)
+	defer func() { spans.add(PreparationVerification, time.Since(started), spawnCPU(cmd.ProcessState)) }()
+	if err != nil {
+		return runtimeFailure(extensionproto.FailureRuntimeHandshakeFailed,
+			"extension %q runtime-info failed: %v: stderr=%q: %s",
+			ext.Name, err, strings.TrimSpace(stderr.String()), describeRuntimeExecutable(executable))
+	}
+	starting := time.Since(started)
+	deadline := clock(cmd.Process)
+	// os.Process tolerates a Kill concurrent with Wait: exec.CommandContext
+	// cancels a running command exactly this way. The buffered channel lets the
+	// waiter finish even if nothing receives, although every path below does.
+	// The waiter stops the deadline's watch as soon as Wait returns.
+	waited := make(chan error, 1)
+	go func() {
+		err := cmd.Wait()
+		deadline.Stop()
+		waited <- err
+	}()
+	deadlineFired := false
+	var runErr error
+	select {
+	case runErr = <-waited:
+	case <-deadline.Expired():
+		deadlineFired = true
+		// A Kill error means the runtime ended at the same instant. Wait reports
+		// how it ended, and an answer that arrived in time is still honored below.
+		_ = cmd.Process.Kill()
+		runErr = <-waited
+	}
+	timing := deadline.Stop()
+	if runErr != nil {
+		// A canceled caller context kills the process too. That is an
+		// interruption, not a runtime that ran out of time.
+		if deadlineFired && ctx.Err() == nil {
+			return runtimeHandshakeTimeout(ext, executable, starting, timing,
+				spawnCPU(cmd.ProcessState), strings.TrimSpace(stderr.String()))
+		}
+		return runtimeFailure(extensionproto.FailureRuntimeHandshakeFailed,
+			"extension %q runtime-info failed: %v: stderr=%q: %s",
+			ext.Name, runErr, strings.TrimSpace(stderr.String()), describeRuntimeExecutable(executable))
+	}
+	if stdout.Len() > 64*1024 {
+		return runtimeFailure(extensionproto.FailureRuntimeHandshakeFailed,
+			"extension %q runtime-info exceeded 64 KiB", ext.Name)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(stdout.Bytes()))
+	decoder.DisallowUnknownFields()
+	var info runtimeproto.Info
+	if err := decoder.Decode(&info); err != nil {
+		return runtimeFailure(extensionproto.FailureRuntimeHandshakeFailed,
+			"extension %q returned malformed runtime-info: %v: %s",
+			ext.Name, err, describeRuntimeExecutable(executable))
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return runtimeFailure(extensionproto.FailureRuntimeHandshakeFailed,
+			"extension %q runtime-info contains trailing data", ext.Name)
+	}
+	wantPlatform := runtime.GOOS + "/" + runtime.GOARCH
+	if info.Extension != ext.Name || info.Version != ext.Version ||
+		info.Platform != wantPlatform ||
+		info.CLIContract != protocolcli.CurrentContract ||
+		info.RuntimeProtocol != runtimeproto.MaxKnownProtocolVersion ||
+		info.RuntimeABI != runtimeproto.RuntimeABIVersion {
+		return runtimeFailure(extensionproto.FailureRuntimeIdentityMismatch,
+			"extension %q runtime-info mismatch: got %+v; want identity %q@%q, platform %q, CLI contract %d, runtime protocol %d, ABI %d",
+			ext.Name, info, ext.Name, ext.Version, wantPlatform, protocolcli.CurrentContract,
+			runtimeproto.MaxKnownProtocolVersion, runtimeproto.RuntimeABIVersion)
+	}
+	return nil
+}
+
+// runtimeHandshakeTimeout reports a handshake whose deadline fired. It states
+// apart the time Start took, the time the host held the runtime before its
+// first instruction, and the time the runtime waited for a CPU, which the
+// deadline does not count, and the time the runtime ran, which it does.
+func runtimeHandshakeTimeout(
+	ext *extension.ExtensionDescription,
+	executable string,
+	starting time.Duration,
+	timing procdeadline.ProcessTiming,
+	cpu time.Duration,
+	stderr string,
+) error {
+	if timing.UncountedPastBound {
+		return runtimeFailure(extensionproto.FailureRuntimeHandshakeTimeout,
+			"extension %q runtime-info timed out at its %s bound on time not counted, and the runtime was stopped: "+
+				"%s (starting the process took %s, not counted; CPU used %s). A runtime held or starved of CPU by a "+
+				"loaded host is not a malformed build: rerun when the machine is less loaded, and if it repeats run "+
+				"`%s __putnami runtime-info` by hand: stderr=%q: %s",
+			ext.Name, procdeadline.UncountedTimeBound, timing.Uncounted(), starting.Round(time.Millisecond),
+			cpu, executable, stderr, describeRuntimeExecutable(executable))
+	}
+	return runtimeFailure(extensionproto.FailureRuntimeHandshakeTimeout,
+		"extension %q runtime-info timed out: the runtime ran %s without answering and was stopped "+
+			"(deadline %s, counted from its first instruction; starting the process took %s, not counted; "+
+			"%s; CPU used %s). A runtime blocked or starved of CPU is not a malformed build: rerun when the "+
+			"machine is less loaded, and if it repeats run `%s __putnami runtime-info` by hand: stderr=%q: %s",
+		ext.Name, timing.Ran.Round(time.Millisecond), runtimeHandshakeDeadline, starting.Round(time.Millisecond),
+		timing.Uncounted(), cpu, executable, stderr, describeRuntimeExecutable(executable))
+}
+
+func setEnv(env []string, key, value string) []string {
+	return envkeys.Host.Set(env, key, value)
+}

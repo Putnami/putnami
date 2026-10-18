@@ -22,8 +22,8 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -439,7 +439,7 @@ func TestHostedRunRemoteCacheNeverStartsAProviderAfterRepositoryCode(t *testing.
 		}},
 	}}}
 	ws := workspace.NewWorkspace(wsRoot, nil, nil)
-	cm := jobs.NewRunCacheManager(wsRoot, "")
+	cm := scheduler.NewRunCacheManager(wsRoot, "")
 	req := &Request{WorkspaceRoot: wsRoot, Global: GlobalFlags{CacheTrust: string(store.CacheTrustAny)}}
 
 	t.Cleanup(runcredential.SetForTest("prc_engine_custody"))

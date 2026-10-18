@@ -11,7 +11,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -37,7 +37,7 @@ type preparedRuntimeEntry struct {
 // ExtensionsPrepare prepares, into the artifact store, the runtime of every
 // extension of wsRoot that the source build prepares
 // (extension.PreparedBySourceBuild), with its prepare toolchains resolved
-// strictly (jobs.PrepareSourceBuiltRuntimes). `./putnamiw --print-engine` runs
+// strictly (scheduler.PrepareSourceBuiltRuntimes). `./putnamiw --print-engine` runs
 // it with the engine it built, so a hosted run of the same tree loads these
 // runtimes from the store and prepares none itself. A workspace whose lock pins
 // a published CLI has no such extension, and the command prepares nothing. A
@@ -69,7 +69,7 @@ func extensionsPrepare(ctx context.Context, wsRoot string, cfg *wsproto.Config, 
 			built = append(built, ext)
 		}
 	}
-	if err := jobs.PrepareSourceBuiltRuntimes(ctx, ws, built); err != nil {
+	if err := scheduler.PrepareSourceBuiltRuntimes(ctx, ws, built); err != nil {
 		return fmt.Errorf("prepare extension runtimes: %w", err)
 	}
 

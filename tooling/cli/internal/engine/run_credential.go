@@ -17,9 +17,9 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -36,10 +36,10 @@ func remoteCacheOptions() []remotecache.RemoteCacheOption {
 }
 
 // launchCacheProvider starts the cache provider the way the CLI starts every
-// provider it owns (jobs.PrepareProviderLaunch). The engine hands it to the
+// provider it owns (scheduler.PrepareProviderLaunch). The engine hands it to the
 // remote cache loader, so the remote cache client never imports the runner.
 func launchCacheProvider(ctx context.Context, workspaceRoot string, ext *extension.ExtensionDescription, command string) (cacheprovider.LaunchSpec, error) {
-	launch, err := jobs.PrepareProviderLaunch(ctx, workspaceRoot, ext, command)
+	launch, err := scheduler.PrepareProviderLaunch(ctx, workspaceRoot, ext, command)
 	return cacheprovider.LaunchSpec(launch), err
 }
 
@@ -162,7 +162,7 @@ func startHostedRemoteCache(ctx context.Context, req *Request) (*remotecache.Rem
 	if req.CacheVerification != nil {
 		storeRootOverride = req.CacheVerification.StoreRoot
 	}
-	if err := remote.StartProvider(ctx, ws, jobs.NewRunCacheManager(req.WorkspaceRoot, storeRootOverride)); err != nil {
+	if err := remote.StartProvider(ctx, ws, scheduler.NewRunCacheManager(req.WorkspaceRoot, storeRootOverride)); err != nil {
 		remote.Close()
 		return nil, err
 	}

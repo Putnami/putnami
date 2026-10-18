@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
@@ -17,7 +18,7 @@ import (
 // memberProbeEvent is one member-probe event as a publish job emits it and the
 // scheduler reads it back: written by the runtime emitter, parsed by the
 // reader every job event goes through.
-func memberProbeEvent(t *testing.T, probe extensionproto.MemberProbe) RawJobEvent {
+func memberProbeEvent(t *testing.T, probe extensionproto.MemberProbe) jobmodel.RawJobEvent {
 	t.Helper()
 	wire, err := json.Marshal(probe)
 	if err != nil {
@@ -30,14 +31,14 @@ func memberProbeEvent(t *testing.T, probe extensionproto.MemberProbe) RawJobEven
 	return rawArtifactEvent(t, probe.Ecosystem, probe.Coordinate, extensionproto.MemberProbeEventKind, data)
 }
 
-func rawArtifactEvent(t *testing.T, id, name, kind string, data map[string]any) RawJobEvent {
+func rawArtifactEvent(t *testing.T, id, name, kind string, data map[string]any) jobmodel.RawJobEvent {
 	t.Helper()
 	var stream bytes.Buffer
 	emitter := runtimeproto.NewEmitterForVersion(&stream, runtimeproto.MaxKnownProtocolVersion)
 	if err := emitter.ArtifactData(id, name, kind, "", data); err != nil {
 		t.Fatal(err)
 	}
-	event, ok := parseRawEvent(strings.TrimSpace(stream.String()))
+	event, ok := jobmodel.ParseRawEvent(strings.TrimSpace(stream.String()))
 	if !ok {
 		t.Fatalf("runtime artifact %q failed strict parsing", stream.String())
 	}
@@ -61,19 +62,19 @@ func probeOf(ecosystem, coordinate, version, registry, state string) extensionpr
 }
 
 // dryRunResults is one successful publish job per probe, keyed in order.
-func dryRunResults(t *testing.T, probes ...extensionproto.MemberProbe) map[string]*JobResult {
+func dryRunResults(t *testing.T, probes ...extensionproto.MemberProbe) map[string]*jobmodel.JobResult {
 	t.Helper()
-	results := make(map[string]*JobResult, len(probes))
+	results := make(map[string]*jobmodel.JobResult, len(probes))
 	for index, probe := range probes {
 		key := string(rune('a'+index)) + ":publish~" + probe.Ecosystem
-		results[key] = &JobResult{Status: "success", Events: []RawJobEvent{memberProbeEvent(t, probe)}}
+		results[key] = &jobmodel.JobResult{Status: "success", Events: []jobmodel.RawJobEvent{memberProbeEvent(t, probe)}}
 	}
 	return results
 }
 
 // finalizeDryRun runs the dry-run finalizer over results and returns the report
 // it printed and the failure it recorded, empty when the run still passes.
-func finalizeDryRun(t *testing.T, run *ReleaseSetRun, results map[string]*JobResult) (report, failure string) {
+func finalizeDryRun(t *testing.T, run *ReleaseSetRun, results map[string]*jobmodel.JobResult) (report, failure string) {
 	t.Helper()
 	var out bytes.Buffer
 	finalize := MemberProbeReport{Run: run, Commands: []string{"publish"}, DryRun: true, Out: &out}.Finalizer()
@@ -383,13 +384,13 @@ func TestDryRunFailureCarriesOneDiagnosticPerVerdict(t *testing.T) {
 		probeOf("npm", "@putnami/runtime", "1.4.0", testNPMRegistry, extensionproto.MemberProbeUnverified),
 		probeOf("oci", "putnami/cli", "1.4.0", testOCIRegistry, extensionproto.MemberProbeAbsent),
 	)
-	results["d:publish~put"] = &JobResult{Status: "success", Events: []RawJobEvent{
+	results["d:publish~put"] = &jobmodel.JobResult{Status: "success", Events: []jobmodel.RawJobEvent{
 		rawArtifactEvent(t, "put", "putnami/cli", extensionproto.MemberProbeEventKind, map[string]any{"state": "superseded"}),
 	}}
 
 	_, failure := finalizeDryRun(t, nil, results)
 
-	task := TaskResultOf(nil, results[memberProbeResultKey])
+	task := jobmodel.TaskResultOf(nil, results[memberProbeResultKey])
 	want := []struct{ code, message string }{
 		{MemberProbeConflictCode, "conflict go go.putnami.dev/sdk/extension@v1.4.0 at https://go.putnami.dev: "},
 		{MemberProbeUnverifiedCode, "unverified npm @putnami/runtime@1.4.0 at https://npm.putnami.dev: "},
@@ -437,7 +438,7 @@ func TestDryRunAggregatesWithoutAPlan(t *testing.T) {
 		probeOf("npm", "@acme/gadget", "2.0.0", "https://registry.npmjs.org", extensionproto.MemberProbeAbsent),
 	)
 	// A job of the same session that emitted no probe changes nothing.
-	results["z:build"] = &JobResult{Status: "success"}
+	results["z:build"] = &jobmodel.JobResult{Status: "success"}
 
 	report, failure := finalizeDryRun(t, nil, results)
 
@@ -491,9 +492,9 @@ func TestDryRunFailsOnAProbeTheStrictReaderRefuses(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			data := maps.Clone(valid)
 			data[change.key] = change.value
-			results := map[string]*JobResult{"a:publish~npm": {
+			results := map[string]*jobmodel.JobResult{"a:publish~npm": {
 				Status: "success",
-				Events: []RawJobEvent{rawArtifactEvent(t, "npm", "@putnami/runtime", extensionproto.MemberProbeEventKind, data)},
+				Events: []jobmodel.RawJobEvent{rawArtifactEvent(t, "npm", "@putnami/runtime", extensionproto.MemberProbeEventKind, data)},
 			}}
 
 			report, failure := finalizeDryRun(t, nil, results)
@@ -511,7 +512,7 @@ func TestDryRunFailsOnAProbeTheStrictReaderRefuses(t *testing.T) {
 // A dry-run publish whose jobs reported no probe at all does not pass in
 // silence either: without a plan the report says that nothing asked.
 func TestDryRunSaysWhenNoPublisherAskedARegistry(t *testing.T) {
-	results := map[string]*JobResult{"a:publish~archives": {Status: "success"}}
+	results := map[string]*jobmodel.JobResult{"a:publish~archives": {Status: "success"}}
 
 	report, failure := finalizeDryRun(t, nil, results)
 

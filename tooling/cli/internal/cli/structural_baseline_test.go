@@ -30,7 +30,7 @@ import (
 //     move more code: a new module is one entry in cliModules.
 //   - Production vs test is decided by filename: a file is test-only iff its
 //     name ends in "_test.go". The ~60 jobs.NewScheduler constructions in
-//     internal/jobs/*_test.go are excluded from the production count that way,
+//     internal/jobs/scheduler/*_test.go are excluded from the production count that way,
 //     and pinned separately below so a slice that moves construction into a
 //     helper is still visible.
 //   - Call-site pins are RATCHETS, not just ceilings: exceeding one fails ("a
@@ -91,13 +91,13 @@ func (s structuralScope) String() string {
 
 var structuralPins = []structuralPin{
 	{
-		name:  "production jobs.RunPlan call sites",
-		token: "jobs.RunPlan(",
+		name:  "production scheduler.RunPlan call sites",
+		token: "scheduler.RunPlan(",
 		scope: productionFiles,
 		want:  1,
 		why: "the ONE execution site left: internal/engine/execute.go. An earlier change " +
 			"unexported jobs.NewScheduler and its two setters, so 'construct, maybe wire the " +
-			"remote cache, maybe wire session events, run' became one indivisible jobs.RunPlan " +
+			"remote cache, maybe wire session events, run' became one indivisible scheduler.RunPlan " +
 			"call — this token replaced `jobs.NewScheduler(`, which no package outside " +
 			"internal/jobs can spell any more. A second site is a run with no session file, no " +
 			"run marker, no profiler and no remote cache; " +
@@ -122,17 +122,19 @@ var structuralPins = []structuralPin{
 			"replan over Engine.Run (internal/engine/watch.go binds the watch.RunIteration seam), so " +
 			"it inherits contract validation, the missing-extension guards and the canonical " +
 			"session, and states its own no-marker / no-remote-cache / no-preflight policy in one " +
-			"place instead of forking the lifecycle",
+			"place instead of forking the lifecycle. The scheduler left internal/jobs for " +
+			"internal/jobs/scheduler, so the token is now scheduler.RunPlan( and the count is " +
+			"unchanged: the same engine site",
 	},
 	{
 		name:  "scheduler constructor declaration",
 		token: "func newScheduler(",
 		scope: productionFiles,
 		want:  1,
-		why: "there is exactly one scheduler constructor (internal/jobs/scheduler.go); a second is a " +
+		why: "there is exactly one scheduler constructor (internal/jobs/scheduler/scheduler.go); a second is a " +
 			"fork. An earlier change unexported it: an unexported identifier is unreachable from " +
 			"every other package by the COMPILER, so ADR 0001 §3's 'no adapter constructs or " +
-			"configures jobs.Scheduler' stopped being a convention. An EXPORTED spelling " +
+			"configures scheduler.Scheduler' stopped being a convention. An EXPORTED spelling " +
 			"reappearing is caught by engine_boundary_test.go, which reads the declaration",
 	},
 	{
@@ -140,7 +142,7 @@ var structuralPins = []structuralPin{
 		token: "newScheduler(",
 		scope: testFiles,
 		want:  60,
-		why: "all in internal/jobs/*_test.go, exercising the scheduler directly. Pinned separately " +
+		why: "all in internal/jobs/scheduler/*_test.go, exercising the scheduler directly. Pinned separately " +
 			"so they can never inflate the production count above. An earlier change removes the inferred " +
 			"capture lifecycle but retains its supported scheduler coverage under explicit task " +
 			"contracts: local event replay, project and port-resolved output materialization, " +
@@ -300,7 +302,7 @@ var structuralPins = []structuralPin{
 			"carrying a typed *TaskResult, and both readers (the profiler projection in " +
 			"jobs_run.go and workspace_state's job table) read that instead of the map. The " +
 			"reduction is small on purpose: historical events.jsonl is a PERSISTED wire the sessions " +
-			"gate parses, so jobs.JobEndPayload remains as the one legacy projection beside its " +
+			"gate parses, so scheduler.JobEndPayload remains as the one legacy projection beside its " +
 			"compatibility reader even though new writers use typed v2 records. " +
 			"Another change took it back from 207 to 208: engine.Request carries the job " +
 			"params as data (CommandParams, RunMarkerParams, and the accessor that defaults one " +
@@ -311,7 +313,7 @@ var structuralPins = []structuralPin{
 			"A later change took it back to 207 with runScheduledExtensionPlan; the pin " +
 			"stayed at 208 through A4/A5a/A5b because this one is a ceiling and a reduction is " +
 			"the goal. A further change closes the epic, so the ceiling is ratcheted down to the " +
-			"tree's real count (205: A4/A5a/A5b's deleted composers, minus jobs.RunRequest's " +
+			"tree's real count (205: A4/A5a/A5b's deleted composers, minus scheduler.RunRequest's " +
 			"CommandParams field, which is the params map arriving as data at the one execution " +
 			"site). From here a ceiling of 205 is a real ceiling rather than 3 lines of slack. " +
 			"Another change raised 205→206: machine/documents.go's eventPayload alias " +
@@ -403,7 +405,7 @@ var structuralPins = []structuralPin{
 			"the seam directly. Nothing decodes, stores or forwards a new untyped document, and the " +
 			"added environment is deliberately NOT part of that payload: it is a []string that " +
 			"reaches cmd.Env and never a cache key. A later change raises 248→249 for the ONE line in " +
-			"jobs/task_drift.go that projects a drift verdict onto the runtime event wire: a " +
+			"jobs/scheduler/task_drift.go that projects a drift verdict onto the runtime event wire: a " +
 			"diagnostic event's Data is the decoded JSON object protocols/runtime owns, and the " +
 			"engine's own diagnostic has to take the exact shape a subprocess diagnostic has so " +
 			"every consumer reads it through the one existing path (the batch projection in " +
@@ -413,7 +415,7 @@ var structuralPins = []structuralPin{
 			"portable admission hands the command params map to keyFilePatterns, exactly as " +
 			"the cache key and the mutation detector do, so the files it binds are the files " +
 			"the key hashes. Nothing decodes, stores or forwards a new untyped document. " +
-			"A later change (`putnami compose`) raises 250→253: two lines are jobs.RunJobWithProcessEnv's " +
+			"A later change (`putnami compose`) raises 250→253: two lines are scheduler.RunJobWithProcessEnv's " +
 			"copy of runJob's command params and config defaults, the same pair itemized above for " +
 			"runJob itself, and the third is internal/compose's serveParams, the one param a " +
 			"composed serve step receives (port 0) stated in the existing untyped params bag. The " +
@@ -443,7 +445,7 @@ var structuralPins = []structuralPin{
 			"TestWatchIterationRequest_ForwardsTheRunsIdentity states the outer run's params so " +
 			"the per-iteration Request can be proved to forward that exact map, types included. " +
 			"A further change added the fourth and last: the params now cross ONE more hop " +
-			"(engine.Request → jobs.RunRequest → the scheduler), so " +
+			"(engine.Request → scheduler.RunRequest → the scheduler), so " +
 			"TestRunRequest_ForwardsCommandParamsWithTheirGoTypes states a map with one value per " +
 			"Go type buildCommandParams produces and proves the scheduler receives that same map, " +
 			"unconverted — a stringified int there would invalidate every warm cache entry. " +
@@ -515,13 +517,13 @@ var structuralPins = []structuralPin{
 			"for the ONE committed-policy literal in specgate/recover_test.go: the gate's enforce " +
 			"mode is read out of the open options surface (options.sdd.verification.specs), and a " +
 			"fixture that proves an enforce-mode group must state that surface with its Go type. " +
-			"A later change raises 618→619 for the ONE payload literal in jobs/task_failure_test.go: the " +
+			"A later change raises 618→619 for the ONE payload literal in jobs/scheduler/task_failure_test.go: the " +
 			"failure cache memoizes one negative entry per key per run, and proving that two " +
 			"members of a plan-level shared node are served that record WITHOUT sharing a mutable " +
 			"alias of its payload requires stating the payload — one member rewrites a key and the " +
 			"other must still read the original. JobResult.Data is that untyped bag, so the " +
 			"fixture states it with its Go type. Another change raises 619→620 for the ONE result-data " +
-			"literal in jobs/task_drift_test.go: proving that a pathFrom output is judged at the " +
+			"literal in jobs/scheduler/task_drift_test.go: proving that a pathFrom output is judged at the " +
 			"path the task REPORTED requires stating the task's result data — the port value is the " +
 			"extension-owned payload the existing capture fixtures already state the same way. That same change also " +
 			"raises 620→621 for the ONE diagnostic-event literal in output/restored_failure_test.go: " +

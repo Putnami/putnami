@@ -10,7 +10,7 @@ import (
 	"time"
 
 	registry "go.putnami.dev/protocol/registry"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
 // ReadCredential answers the read credential whatever hosts it names, absence
@@ -67,15 +67,15 @@ func TestInstallJobReadIsTheFetchJobSource(t *testing.T) {
 		bearer: "b", hosts: []string{"put.putnami.dev"}, lifetime: time.Hour,
 	}, &opens))
 	t.Cleanup(func() { _ = broker.Close() })
-	t.Cleanup(jobs.InstallJobReadCredential(nil))
+	t.Cleanup(scheduler.InstallJobReadCredential(nil))
 
 	restore := broker.InstallJobRead()
-	credential, err := jobs.ReadJobCredential(context.Background())
+	credential, err := scheduler.ReadJobCredential(context.Background())
 	if err != nil || credential == nil || credential.Bearer != "b-read" {
 		t.Fatalf("installed: %v, %v; want the broker's read credential", credential, err)
 	}
 	restore()
-	if credential, err := jobs.ReadJobCredential(context.Background()); credential != nil || err != nil {
+	if credential, err := scheduler.ReadJobCredential(context.Background()); credential != nil || err != nil {
 		t.Fatalf("restored: %v, %v; want no source", credential, err)
 	}
 
@@ -83,7 +83,7 @@ func TestInstallJobReadIsTheFetchJobSource(t *testing.T) {
 	t.Cleanup(func() { _ = publishOnly.Close() })
 	restore = publishOnly.InstallJobRead()
 	defer restore()
-	if credential, err := jobs.ReadJobCredential(context.Background()); credential != nil || err != nil {
+	if credential, err := scheduler.ReadJobCredential(context.Background()); credential != nil || err != nil {
 		t.Fatalf("a publish-only broker installed %v, %v", credential, err)
 	}
 }

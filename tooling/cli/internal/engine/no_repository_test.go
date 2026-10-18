@@ -16,7 +16,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	workspacepb "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/git"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
@@ -465,7 +465,7 @@ func TestRun_BuildOutsideARepositoryRunsEndToEnd(t *testing.T) {
 			if err != nil {
 				t.Fatalf("the task wrote no copy of the stamp: %v", err)
 			}
-			var stamp jobs.VersionInfo
+			var stamp scheduler.VersionInfo
 			if err := json.Unmarshal(data, &stamp); err != nil {
 				t.Fatalf("the stamp the task read is not a version stamp: %v\n%s", err, data)
 			}

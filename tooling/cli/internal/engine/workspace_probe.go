@@ -11,7 +11,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -142,7 +142,7 @@ func workspaceProviderBindings(
 	ctx context.Context,
 	ws *workspace.Workspace,
 	discovered *extension.DiscoveryResult,
-	preparation *jobs.PreparationReport,
+	preparation *scheduler.PreparationReport,
 ) []workspace.ProviderBinding {
 	if discovered == nil {
 		return nil
@@ -158,7 +158,7 @@ func workspaceProviderBindings(
 		}
 		bindings = append(bindings, workspace.ProviderBinding{
 			Scope:          scope,
-			Implementation: jobs.ExtensionImplementationIdentity(ext),
+			Implementation: scheduler.ExtensionImplementationIdentity(ext),
 			Provider: &workspace.ExecProbeProvider{
 				Extension:         ext.Name,
 				Dir:               ws.Root,
@@ -183,11 +183,11 @@ func runtimeResolverFor(
 	ctx context.Context,
 	ws *workspace.Workspace,
 	ext *extension.ExtensionDescription,
-	preparation *jobs.PreparationReport,
+	preparation *scheduler.PreparationReport,
 ) func() (string, error) {
 	return func() (string, error) {
 		if ext.RuntimeExecutable == "" {
-			if err := jobs.SynchronizeExtensionRuntimes(
+			if err := scheduler.SynchronizeExtensionRuntimes(
 				ctx, ws, []*extension.ExtensionDescription{ext}, preparation,
 			); err != nil {
 				return "", err

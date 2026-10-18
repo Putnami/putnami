@@ -21,8 +21,8 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -30,8 +30,8 @@ import (
 // scopedJob is a planned job whose command declares no traits, so it carries
 // the traits the manifest loader resolves for that command: the well-known
 // verb's defaults, or none.
-func scopedJob(project *workspace.Project, extRelPath, name string, predecessors ...string) *jobs.ScheduledJob {
-	return &jobs.ScheduledJob{
+func scopedJob(project *workspace.Project, extRelPath, name string, predecessors ...string) *scheduler.ScheduledJob {
+	return &scheduler.ScheduledJob{
 		Project:   project,
 		Extension: &extension.ExtensionDescription{Name: "@fixture/" + filepath.Base(extRelPath), RelPath: extRelPath},
 		JobDef:    &extension.JobDefinition{Name: name, Traits: extensionproto.EffectiveTraits(name, nil)},
@@ -52,7 +52,7 @@ func TestNarrowToTaskScopes_KeepsTheScopedExtensionsJobsAndTheirPredecessors(t *
 	full := &workspace.Project{ID: "/full", Name: "full", Path: "full"}
 	ws := workspace.NewWorkspace("/workspace", nil, []*workspace.Project{goExt, tsExt, lib, app, full})
 
-	planned := []*jobs.ScheduledJob{
+	planned := []*scheduler.ScheduledJob{
 		// lib: scoped to the Go extension. Its Go test depends on a TS
 		// generate step, which is kept through the closure.
 		scopedJob(lib, "typescript/extension", "generate"),
@@ -116,14 +116,14 @@ func TestNarrowToTaskScopes_KeepsTheScopedExtensionsJobsAndTheirPredecessors(t *
 	// is not the workspace project the scope names.
 	foreign := scopedJob(lib, "", "build")
 	foreign.Extension.Name = "@putnami/go"
-	if got := narrowToTaskScopes(ws, []*jobs.ScheduledJob{foreign}, scopes); len(got) != 0 {
+	if got := narrowToTaskScopes(ws, []*scheduler.ScheduledJob{foreign}, scopes); len(got) != 0 {
 		t.Errorf("a registry extension named like the scoped project was kept: %v", got)
 	}
 	// A registry build pinned over that project replaces it: the scope that
 	// names the project keeps the pinned build's jobs.
 	pinned := scopedJob(lib, "", "build")
 	pinned.Extension.Name, pinned.Extension.PinnedOver = "@putnami/go", "go/extension"
-	if got := narrowToTaskScopes(ws, []*jobs.ScheduledJob{pinned}, scopes); len(got) != 1 {
+	if got := narrowToTaskScopes(ws, []*scheduler.ScheduledJob{pinned}, scopes); len(got) != 1 {
 		t.Errorf("a registry build pinned over the scoped project was dropped: %v", got)
 	}
 }
@@ -140,7 +140,7 @@ func TestNarrowToTaskScopes_MatchesTheJobsCommandAndStep(t *testing.T) {
 	tool := &workspace.Project{ID: "/tool", Name: "tool", Path: "tool"}
 	ws := workspace.NewWorkspace("/workspace", nil, []*workspace.Project{goExt, tsExt, lib, tool})
 
-	planned := []*jobs.ScheduledJob{
+	planned := []*scheduler.ScheduledJob{
 		// lib runs its tests: the scope names test~test, and the closure keeps
 		// the generate it sits behind whichever extension owns it.
 		scopedJob(lib, "typescript/extension", "build~generate"),
@@ -173,7 +173,7 @@ func TestNarrowToTaskScopes_MatchesTheJobsCommandAndStep(t *testing.T) {
 // namespacedJob is a job the planner namespaced because two extensions serve
 // one command on one project: its display name carries the extension, while its
 // command and step stay the manifest's.
-func namespacedJob(project *workspace.Project, extRelPath, command, step string) *jobs.ScheduledJob {
+func namespacedJob(project *workspace.Project, extRelPath, command, step string) *scheduler.ScheduledJob {
 	job := scopedJob(project, extRelPath, command+"~"+filepath.Base(extRelPath)+":"+step)
 	job.JobDef.CommandName = command
 	job.JobDef.StepID = step
@@ -287,7 +287,7 @@ func projectIDs(projects []*workspace.Project) []string {
 func TestNarrowToTaskScopes_KeepsValidateOnATaskScopedProject(t *testing.T) {
 	project := &workspace.Project{ID: "/libs/http", Name: "http", Path: "libs/http"}
 	ws := workspace.NewWorkspace("/ws", nil, []*workspace.Project{project})
-	planned := []*jobs.ScheduledJob{
+	planned := []*scheduler.ScheduledJob{
 		namespacedJob(project, "go/extension", "build", "compile"),
 		namespacedJob(project, "go/extension", "test", "test"),
 		namespacedJob(project, "tooling/sdd-extension", "validate", "features"),
@@ -314,7 +314,7 @@ func TestNarrowToTaskScopes_KeepsValidateOnATaskScopedProject(t *testing.T) {
 // declaredJob is a pipeline step whose manifest task carries a v3 declaration,
 // the shape the spec gate's producer predicates read.
 func declaredJob(project *workspace.Project, extRelPath, command, step string,
-	declaration *extension.TaskDeclaration, predecessors ...string) *jobs.ScheduledJob {
+	declaration *extension.TaskDeclaration, predecessors ...string) *scheduler.ScheduledJob {
 	job := scopedJob(project, extRelPath, command+"~"+step, predecessors...)
 	task := command + "-" + step
 	job.JobDef.CommandName, job.JobDef.StepID = command, step
@@ -344,9 +344,9 @@ func TestNarrowToTaskScopes_KeepsTheTestsAKeptSpecGateJudges(t *testing.T) {
 	ws := workspace.NewWorkspace("/ws", nil, []*workspace.Project{sdd, http, core})
 	report := declaresFile(features.VerificationReportFilename)
 	projection := declaresFile(features.SpecCriteriaProjectionFilename)
-	plan := func(project *workspace.Project, withSpecs bool) []*jobs.ScheduledJob {
+	plan := func(project *workspace.Project, withSpecs bool) []*scheduler.ScheduledJob {
 		id := project.ID
-		planned := []*jobs.ScheduledJob{
+		planned := []*scheduler.ScheduledJob{
 			declaredJob(project, "go/extension", "build", "compile", nil),
 			declaredJob(project, "go/extension", "test", "generate", nil),
 			declaredJob(project, "go/extension", "test", "test", report, id+":build~compile", id+":test~generate"),
@@ -552,9 +552,9 @@ func TestNarrowToTaskScopes_KeepsWhatEveryFirstPartyCommandKept(t *testing.T) {
 			t.Fatalf("first-party extension %s did not load", dir)
 		}
 		for _, def := range ext.Jobs {
-			job := &jobs.ScheduledJob{Project: project, Extension: ext, JobDef: def}
+			job := &scheduler.ScheduledJob{Project: project, Extension: ext, JobDef: def}
 			command := modeljobs.JobCommandName(job)
-			got := len(narrowToTaskScopes(ws, []*jobs.ScheduledJob{job}, scopes)) == 1
+			got := len(narrowToTaskScopes(ws, []*scheduler.ScheduledJob{job}, scopes)) == 1
 			if got != keptByName[command] {
 				t.Errorf("%s %s: kept under a scope that does not name it = %t, want %t (traits %+v)",
 					dir, command, got, keptByName[command], def.Traits)
@@ -572,7 +572,7 @@ func TestNarrowToTaskScopes_KeepsWhatEveryFirstPartyCommandKept(t *testing.T) {
 	}
 }
 
-func sortedJobKeys(planned []*jobs.ScheduledJob) []string {
+func sortedJobKeys(planned []*scheduler.ScheduledJob) []string {
 	keys := make([]string, 0, len(planned))
 	for _, job := range planned {
 		if job != nil {

@@ -46,7 +46,7 @@ func replayedFailureSuffix(result *jobs.JobResult) string {
 // reusedFailureSuffix names the provenance of a failure that was not executed
 // in this run: an entry — a cache hit, or one a sibling process published while
 // this run waited on the lease — whose declared output drifted from this
-// checkout (jobs/task_drift.go). Without it the row reads like a task that ran
+// checkout (jobs/scheduler/task_drift.go). Without it the row reads like a task that ran
 // and failed, and the reader looks for a subprocess that never existed.
 func reusedFailureSuffix(result *jobs.JobResult) string {
 	if result == nil {

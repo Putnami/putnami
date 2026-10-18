@@ -10,9 +10,9 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/specgate"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -127,7 +127,7 @@ func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.
 		// test-environment steps are cache:false by contract and a generation
 		// entry can be evicted on its own; counting either read a candidate whose
 		// report entry was recorded EMPTY as unreachable, which excused its gap.
-		if job == nil || job.Project == nil || !jobs.ProducesVerificationReport(job) {
+		if job == nil || job.Project == nil || !scheduler.ProducesVerificationReport(job) {
 			continue
 		}
 		outcome := outcomes[job.Project.ID]
@@ -222,7 +222,7 @@ func (source *cachedObservationRecovery) unconsultedAll(candidates []*workspace.
 // protocol's reserved filename. An output recorded empty means the task ran and
 // observed nothing — a fact, not a missing file — and must never be answered
 // with whatever happens to sit at that address.
-func reportInEntry(wsRoot string, job *jobs.ScheduledJob, entry *store.TaskEntry) *specgate.RecoveredReport {
+func reportInEntry(wsRoot string, job *scheduler.ScheduledJob, entry *store.TaskEntry) *specgate.RecoveredReport {
 	if entry.FilesDir == "" {
 		return nil
 	}

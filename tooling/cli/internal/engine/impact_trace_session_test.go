@@ -15,7 +15,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
@@ -153,24 +153,24 @@ func TestSchedulerRecordsOpeningSessionEventsAfterTheOpeningEvent(t *testing.T) 
 		Output: "jsonl", Command: "build", Out: &live, Err: &live,
 	}), session, false)
 	recorder, ok := renderer.(interface {
-		RecordSessionEvent(jobs.SessionRecord)
+		RecordSessionEvent(scheduler.SessionRecord)
 	})
 	if !ok {
 		t.Fatalf("renderer %T does not record session events", renderer)
 	}
-	opening := []jobs.SessionRecord{
+	opening := []scheduler.SessionRecord{
 		{Type: workspace.ImpactTraceRecordType, Data: workspace.ImpactTraceRecord{Baseline: "origin/main"}.EventData()},
 		{Type: "second:record"},
 	}
 	ws := &workspace.Workspace{Name: "opening-records", Root: root, Graph: workspace.BuildGraph(nil)}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	jobs.RunPlan(ctx, jobs.RunRequest{
-		Workspace: ws, Config: jobs.SchedulerConfig{MaxParallel: 1, NoCache: true},
+	scheduler.RunPlan(ctx, scheduler.RunRequest{
+		Workspace: ws, Config: scheduler.SchedulerConfig{MaxParallel: 1, NoCache: true},
 		Renderer: renderer, SessionEvents: recorder.RecordSessionEvent, OpeningSessionEvents: opening,
 	})
-	jobs.RunPlan(ctx, jobs.RunRequest{
-		Workspace: ws, Config: jobs.SchedulerConfig{MaxParallel: 1, NoCache: true},
+	scheduler.RunPlan(ctx, scheduler.RunRequest{
+		Workspace: ws, Config: scheduler.SchedulerConfig{MaxParallel: 1, NoCache: true},
 		Renderer:             output.WithoutSessionArtifact(output.NewRenderer(output.Config{Output: "jsonl", Command: "build", Out: &bytes.Buffer{}})),
 		OpeningSessionEvents: opening,
 	})

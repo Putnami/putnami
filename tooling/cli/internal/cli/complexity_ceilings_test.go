@@ -52,13 +52,12 @@ import (
 //
 // # Units, not packages
 //
-// The planner is a package of its own, internal/jobs/planner, and the scheduler
-// is still a file group inside internal/jobs, because A6a made the whole
-// execution surface package-private (engine_boundary_test.go). Splitting the
-// scheduler out to satisfy a test would reopen that boundary, so its unit is a
-// path PREFIX and the package stays whole. The planner may be a package because
-// the engine boundary now holds by import path: only internal/engine names
-// planner.Plan.
+// The planner and the scheduler are packages of their own, internal/jobs/planner
+// and internal/jobs/scheduler, because the engine boundary holds by import path:
+// only internal/engine names planner.Plan and scheduler.RunPlan
+// (engine_boundary_test.go). A unit is still a path PREFIX, not a package: the
+// scheduler package also holds the runner and the cache use, so the scheduler
+// and invocation units are file groups inside it.
 
 // complexityCeiling is one unit's pinned size. Both counts are ceilings.
 type complexityCeiling struct {
@@ -342,7 +341,7 @@ var complexityCeilings = []complexityCeiling{
 			"to 19/112: session_baseline.go — the seventh raise's stage — is deleted. " +
 			"Its only consumer, the clientgen guard's render comparison, no longer exists: the " +
 			"question it captured evidence for is answered by the scheduler on each generator " +
-			"task's declared output (jobs/task_drift.go, protocols/extension ADR 0004), at the " +
+			"task's declared output (jobs/scheduler/task_drift.go, protocols/extension ADR 0004), at the " +
 			"one moment the pre-write bytes are still there. ADR 0034 records the decision. " +
 			"RAISED A TWELFTH TIME, from 19/112 to 20/124 (ADR 0032): portable.go is the " +
 			"portable-execution SEAM, and it is named here because it is one. Between the " +
@@ -465,10 +464,10 @@ var complexityCeilings = []complexityCeiling{
 	},
 	{
 		unit:   "scheduler",
-		prefix: "internal/jobs/scheduler",
+		prefix: "internal/jobs/scheduler/scheduler",
 		files:  6,
 		funcs:  97,
-		why: "internal/jobs/scheduler*.go: dispatch, batching, per-task cache boundaries, retry and " +
+		why: "internal/jobs/scheduler/scheduler*.go: dispatch, batching, per-task cache boundaries, retry and " +
 			"metrics. The largest unit here by function count and the one with the most concurrency " +
 			"per line, so it is also the one where an added branch is hardest to reason about — " +
 			"per-task batching is why it is this size. An earlier change removed the v2 " +
@@ -587,15 +586,17 @@ var complexityCeilings = []complexityCeiling{
 			"in ONE sorted acquisition after every member's openTask returned and releases them after " +
 			"closeTask, except a project key only a preparation needs, released once every member's " +
 			"prepareTask returned, so no key is held across a lease, follower or restore wait, and a " +
-			"member's preparation and capture both run inside the hold (task_output_lock.go)",
+			"member's preparation and capture both run inside the hold (task_output_lock.go). " +
+			"MOVED, unchanged at 6/97: the unit left internal/jobs for internal/jobs/scheduler, so " +
+			"the prefix gains the directory and keeps the same six files",
 	},
 	{
 		unit:         "invocation",
-		prefix:       "internal/jobs/invocation",
+		prefix:       "internal/jobs/scheduler/invocation",
 		files:        5,
 		funcs:        55,
 		perFileFuncs: 16,
-		why: "internal/jobs/invocation*.go: the invocation-scoped lifecycle — resolving a " +
+		why: "internal/jobs/scheduler/invocation*.go: the invocation-scoped lifecycle — resolving a " +
 			"`finalizes` relation onto the plan and pruning it, the private scratch and the lease " +
 			"that outlives a SIGKILL, the sensitive-artifact leak guard (needle derivation and " +
 			"redaction), and exactly-once finalization. This unit is pinned for a different reason " +
@@ -620,7 +621,9 @@ var complexityCeilings = []complexityCeiling{
 			"filter and the producer's invocation outputs (six functions in invocation.go and one in " +
 			"invocation_lease.go) belong to planning, and the scheduler only reads them; this " +
 			"unit keeps the runtime half and its four invariants. perFileFuncs stays 16: " +
-			"invocation_redact.go did not change",
+			"invocation_redact.go did not change. MOVED, unchanged at 5/55/16: the unit left " +
+			"internal/jobs for internal/jobs/scheduler with the scheduler, so the prefix gains the " +
+			"directory and keeps the same five files",
 	},
 	{
 		unit:   "cache",
@@ -964,10 +967,10 @@ func TestComplexityCeilings_PerUnit(t *testing.T) {
 }
 
 // TestComplexityCeilings_UnitsAreDisjoint keeps the units from overlapping. The
-// planner and scheduler prefixes both select inside internal/jobs, so a file
-// named for both (a "scheduler_plan*.go") would be counted twice and could sit
-// under one ceiling while breaching the other — a pin that lies is worse than
-// no pin.
+// scheduler and invocation prefixes both select inside internal/jobs/scheduler,
+// so a prefix widened to the directory would count the other unit's files twice
+// and could sit under one ceiling while breaching the other — a pin that lies
+// is worse than no pin.
 func TestComplexityCeilings_UnitsAreDisjoint(t *testing.T) {
 	t.Parallel()
 	root := moduleRoot(t)
