@@ -192,7 +192,7 @@ type DisableConfig struct {
 //
 // A project's own putnami.json is deliberately NOT merged here. Project-level
 // options are applied per project during plan-time param resolution
-// (mergeParamLayers, via proj.Config.Options). Merging the current directory's
+// (cachekey.MergeParamLayers, via proj.Config.Options). Merging the current directory's
 // project file into the workspace-wide Config leaked a single project's options
 // (e.g. options.package.docker) onto every project — so running `--all` from
 // inside a Docker-packaged workload scheduled docker packaging for all projects.

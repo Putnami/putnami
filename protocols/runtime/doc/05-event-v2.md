@@ -166,10 +166,11 @@ which used to be silent: an old-SDK extension forwarding the `putnami.ready` log
 marker as ordinary context noise instead of a typed `ready` event, and a
 v1-stream serve job whose watcher never armed.
 
-One helper resolves this on both sides — `NegotiatedVersion` in
-[`negotiation.go`](../negotiation.go) — so the CLI writer
-(`tooling/cli/internal/jobs/runner.go`) and the SDK reader
-(`tooling/extension-sdk/jsonl`) cannot disagree. The TypeScript mirror is
+One file, [`negotiation.go`](../negotiation.go), holds both sides, so they
+cannot disagree: the CLI writer
+(`tooling/cli/internal/jobs/scheduler/runner.go`) advertises with
+`AdvertisedVersionEnv`, and the SDK reader (`tooling/extension-sdk/jsonl`)
+resolves the advertisement with `NegotiatedVersion`. The TypeScript mirror is
 `negotiatedRuntimeEventVersion` in
 [`typescript/framework/runtime/src/jobs/events.ts`](../../../typescript/framework/runtime/src/jobs/events.ts).
 

@@ -17,8 +17,8 @@ import (
 )
 
 // testBatchDiagnostic mirrors the scheduler's batchWireDiagnostic JSON shape
-// (tooling/cli/internal/jobs/scheduler_batch_exec.go). The json tags MUST stay
-// byte-identical or the scheduler silently drops the finding.
+// (tooling/cli/internal/jobs/scheduler/scheduler_batch_exec.go). The json tags
+// MUST stay byte-identical or the scheduler silently drops the finding.
 type testBatchDiagnostic struct {
 	Category    string `json:"category,omitempty"`
 	Severity    string `json:"severity"`

@@ -31,8 +31,8 @@ sets.
 ## How
 
 - The CLI builds the context in
-  `tooling/cli/internal/jobs/context.go` and proves conformance with a
-  test that round-trips its output through `ParseAndValidate`.
+  `tooling/cli/internal/jobs/scheduler/context.go` and proves conformance with
+  a test that round-trips its output through `ParseAndValidate`.
 - The Go extension SDK (`go.putnami.dev/sdk/extension/context`) aliases
   these types, so all extensions consume the protocol shapes directly.
 - Fixtures under `fixtures/{valid,invalid}` are the cross-language
@@ -419,7 +419,7 @@ honest.
   required-field and version reject branch is triggered by a fixture, so a
   relaxed check turns a red fixture green and fails. The producer proves
   conformance by round-tripping its own output through `ParseAndValidate`
-  (`tooling/cli/internal/jobs/context_protocol_test.go`).
+  (`tooling/cli/internal/jobs/scheduler/context_protocol_test.go`).
 - **Cross-implementation parity is claimed by nothing.** The fixture corpus is
   written to be language-neutral and is the file set a non-Go SDK would validate
   against, but today the only parser is this Go package (every first-party

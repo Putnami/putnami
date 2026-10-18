@@ -218,10 +218,11 @@ memory.
 
 **`publication-v1` consumer** — the CLI engine. Its session
 (`tooling/cli/internal/credentialprovider`) offers the capability and sends the
-three ops. The release set (`tooling/cli/internal/jobs`) resolves through it,
-opens after the barrier, uploads every packed npm, Go module, OCI and Put
-registry member in the engine with the `publish` credential, and releases. A
-Put registry member is written with [`put-write/v1`](../put/README.md). A
+three ops. The release set (`tooling/cli/internal/jobs/publication`) resolves
+through it, opens after the barrier, uploads every packed npm, Go module, OCI
+and Put registry member in the engine with the `publish` credential, and
+releases. A Put registry member is written with
+[`put-write/v1`](../put/README.md). A
 session without the echo leaves the release set on its release-set provider
 process, unchanged.
 

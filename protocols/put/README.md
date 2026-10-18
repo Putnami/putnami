@@ -140,8 +140,8 @@ registry answered.
 
 **Client (in this repository)** — `tooling/extension-sdk/putpublish` sends
 every request; the engine's publication upload node
-(`tooling/cli/internal/jobs`) calls it for every `put` and `archive` member a
-publication job packed into its outbox
+(`tooling/cli/internal/jobs/publication`) calls it for every `put` and
+`archive` member a publication job packed into its outbox
 ([extension protocol](../extension/README.md)). The bearer is the provider's
 publish credential for the registry host, and no error carries it.
 

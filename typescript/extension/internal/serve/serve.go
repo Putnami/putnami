@@ -29,8 +29,8 @@ var execRunFunc = pexec.Run
 // SIGTERM before it is force-killed with SIGKILL. It ends before the CLI job
 // runner's own deadline, five seconds from the SIGTERM it sends the job's
 // process group to the SIGKILL that follows (processGroupKillDelay in
-// tooling/cli/internal/jobs/runner.go), so the extension still escalates and
-// reaps bun itself before the runner kills the whole group.
+// tooling/cli/internal/jobs/scheduler/runner.go), so the extension still
+// escalates and reaps bun itself before the runner kills the whole group.
 const terminateGrace = 3 * time.Second
 
 // signalGroup asks the process tree pgid to exit on SIGTERM and ends it on

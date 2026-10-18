@@ -28,7 +28,7 @@ const commandSurfaceAlias = "commandSurface"
 // optionLayers are the keys of a project's putnami.json options that reach
 // the validate task of this extension, lowest precedence first: the command,
 // the extension, and the extension's command. It is the project part of the
-// CLI's parameter merge (tooling/cli/internal/jobs mergeParamLayers).
+// CLI's parameter merge (tooling/cli/internal/jobs/cachekey MergeParamLayers).
 var optionLayers = []string{"validate", "@putnami/go", "@putnami/go:validate"}
 
 // projectConfigMaxBytes bounds the putnami.json the check reads at a tag.
@@ -66,7 +66,7 @@ func optionsFromParams(params pctx.Params) (Options, error) {
 // the tag's side to each option layer, which surfaceOptionOfLayers then merges
 // as the CLI does. The rule follows the CLI's: it writes every kebab-case key
 // of a layer also under its camelCase alias, unless the layer sets that alias
-// itself (tooling/cli/internal/jobs projectParamAliases), so the merged
+// itself (tooling/cli/internal/jobs/cachekey ProjectParamAliases), so the merged
 // camelCase key holds the winning layer's value whatever spelling each layer
 // used.
 func surfaceOptionIn(params map[string]json.RawMessage) (json.RawMessage, bool) {
@@ -79,7 +79,7 @@ func surfaceOptionIn(params map[string]json.RawMessage) (json.RawMessage, bool) 
 
 // surfaceOptionOfLayers returns the raw value of the command-surface option a
 // project's option layers give, merged as the CLI merges them
-// (tooling/cli/internal/jobs mergeParamLayers): a layer later in optionLayers
+// (tooling/cli/internal/jobs/cachekey MergeParamLayers): a layer later in optionLayers
 // replaces what an earlier one gave.
 func surfaceOptionOfLayers(options map[string]map[string]json.RawMessage) (raw json.RawMessage, ok bool) {
 	for _, layer := range optionLayers {

@@ -199,7 +199,7 @@ func createExtensionArchives(ctx *pctx.Context, emit *jsonl.Emitter, packageName
 
 // cpuBudgetEnv carries the CPU grant the scheduler gives each job. The CLI
 // exports it to every job it runs (applyCPUBudget in
-// tooling/cli/internal/jobs/runner.go).
+// tooling/cli/internal/jobs/scheduler/runner.go).
 const cpuBudgetEnv = "PUTNAMI_CPU_BUDGET"
 
 // archiveParallelism returns how many platforms package at the same time and

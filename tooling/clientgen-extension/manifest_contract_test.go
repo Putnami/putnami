@@ -348,8 +348,8 @@ func TestWorkspaceCommandsOwnTheirBuildAndTheProjectCommandDependsOnBuild(t *tes
 // .gen/clientgen/config.json, and `package` rewrites .gen through a generate
 // step no functional edge orders against `clientgen`. Reading the project `gen`
 // resource, which the language extensions' generate steps write, is what makes
-// the planner sequence the two. The planning half is asserted against
-// the real planner in tooling/cli/internal/jobs/clientgen_native_gate_test.go.
+// the planner sequence the two. The planning half is asserted against the real
+// planner in tooling/cli/internal/jobs/planner/clientgen_native_gate_test.go.
 func TestProjectGeneratorsReadTheGeneratedTree(t *testing.T) {
 	manifest := loadExtensionManifest(t)
 	for _, name := range []string{"clientgen-go", "clientgen-ts"} {
@@ -383,7 +383,7 @@ func TestProjectGeneratorsReadTheGeneratedTree(t *testing.T) {
 // else, so that cut is its whole read set, and it stores no output. The planning
 // half — exactly one node for any selection, the barrier's edges, and none
 // for another command — is asserted against the real planner in
-// tooling/cli/internal/jobs/clientgen_native_gate_test.go.
+// tooling/cli/internal/jobs/planner/clientgen_native_gate_test.go.
 func TestValidateContributesTheWorkspaceGuard(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "native-validation-gate", "validate-contributes-exactly-one-workspace-guard-for-any-selection")
 	spectest.Proves(t, clientgenFeature, "native-validation-gate", "the-guard-reads-the-git-candidate-cut-and-keys-on-it")
