@@ -475,7 +475,12 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // The scheduler reaches it through the cachekey.RemoteCache interface and the
 // engine hands it the provider's launch, so it imports neither the scheduler
 // nor the runner. It adds no vertical and no engine stage.
-const internalPackageCountCeiling = 75
+//
+// RAISED 75 → 76: the planner moves to internal/jobs/planner. It reads the
+// job model, the workspace and extension models and the cache key package, and
+// never imports the scheduler or the runner. It adds no vertical and no engine
+// stage.
+const internalPackageCountCeiling = 76
 
 func TestInternalPackageCountCeiling(t *testing.T) {
 	t.Parallel()

@@ -17,13 +17,14 @@
 // manifest (no declaration, no verdict) until B3 populates the data. That is
 // deliberate: the machinery lands with its tests before the data arrives, so
 // populating a manifest cannot smuggle an unowned output past the planner.
-package jobs
+package planner
 
 import (
 	"fmt"
 	"sort"
 	"strings"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -32,7 +33,7 @@ import (
 // validatePlanContract rejects a plan that contradicts the v3 task contract.
 // Ordering is plan order, then sorted output id, so the diagnostics of two runs
 // over one workspace are byte-identical.
-func validatePlanContract(planned []*ScheduledJob, ws *workspace.Workspace) error {
+func validatePlanContract(planned []*jobmodel.ScheduledJob, ws *workspace.Workspace) error {
 	if len(planned) == 0 {
 		return nil
 	}
@@ -50,7 +51,7 @@ func validatePlanContract(planned []*ScheduledJob, ws *workspace.Workspace) erro
 // outputs claim the same filesystem region, naming BOTH owners. Only refs that
 // share a resolved root are compared, so the pairwise scan stays proportional
 // to the collisions that are actually possible.
-func overlappingOutputLines(planned []*ScheduledJob, ws *workspace.Workspace, limit int) []string {
+func overlappingOutputLines(planned []*jobmodel.ScheduledJob, ws *workspace.Workspace, limit int) []string {
 	owners := cachekey.DeclaredOutputOwners(planned, ws)
 	if len(owners) < 2 {
 		return nil
@@ -118,7 +119,7 @@ func overlappingOutputLines(planned []*ScheduledJob, ws *workspace.Workspace, li
 // manifest task is identified by extension name plus the pipeline step's task
 // reference (the declaration lives on the manifest task, not the plan node);
 // non-pipeline nodes compare by job definition name.
-func sameManifestTask(a, b *ScheduledJob) bool {
+func sameManifestTask(a, b *jobmodel.ScheduledJob) bool {
 	if a == nil || b == nil || a.Project == nil || b.Project == nil {
 		return false
 	}
@@ -132,7 +133,7 @@ func sameManifestTask(a, b *ScheduledJob) bool {
 }
 
 // manifestTaskName names the manifest task a plan node executes.
-func manifestTaskName(job *ScheduledJob) string {
+func manifestTaskName(job *jobmodel.ScheduledJob) string {
 	if job.Step != nil && job.Step.Task != "" {
 		return job.Step.Task
 	}
@@ -154,11 +155,11 @@ func describeOutputRef(ref extension.OutputRef) string {
 // check sees only the task's own policy; the plan node carries the effective
 // one (step override included), which is the answer that decides whether the
 // registry push, the cloud mutation or the process actually happens.
-func conflictingEffectLines(planned []*ScheduledJob, limit int) []string {
+func conflictingEffectLines(planned []*jobmodel.ScheduledJob, limit int) []string {
 	var lines []string
 	total := 0
 	for _, job := range planned {
-		declaration := taskDeclarationOf(job)
+		declaration := jobmodel.TaskDeclarationOf(job)
 		if declaration == nil || len(declaration.Effects) == 0 {
 			continue
 		}

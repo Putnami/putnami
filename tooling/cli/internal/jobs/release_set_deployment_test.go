@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -270,7 +272,7 @@ func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing
 
 	plan := func(params extension.ParamMap) []*ScheduledJob {
 		t.Helper()
-		planned, err := Plan(ws, []string{"package"}, []*workspace.Project{app},
+		planned, err := planner.Plan(ws, []string{"package"}, []*workspace.Project{app},
 			[]*extension.ExtensionDescription{goExtension}, params, nil, nil)
 		if err != nil {
 			t.Fatalf("plan package: %v", err)
@@ -344,4 +346,19 @@ func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing
 	if err == nil || !strings.Contains(err.Error(), `package step "deployment"`) {
 		t.Fatalf("keying the member without its package step = %v, want a refusal naming the step", err)
 	}
+}
+
+// pinInstalledTree points ext, loaded from this repository as an installed
+// extension, at a copy of its manifest. The key of an installed extension's
+// task digests every file under ext.Path, and a build of the same run writes
+// into the repository's extension directory, so the installed tree is one only
+// the test writes.
+func pinInstalledTree(t *testing.T, ext *extension.ExtensionDescription) {
+	t.Helper()
+	manifest, err := os.ReadFile(filepath.Join(ext.Path, extension.ManifestFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ext.Path = t.TempDir()
+	writeTestFile(t, filepath.Join(ext.Path, extension.ManifestFilename), string(manifest))
 }

@@ -171,24 +171,6 @@ func sourceInputDigest(
 	return digest + ":" + workspaceDigest, nil
 }
 
-// declaresCommandOutput reports whether a task owns bytes under the shared
-// per-command directory. It is used before a real execution to detach a stale
-// cache symlink before the task can mutate it, and by sharedExecutionEligible,
-// which must refuse every such task: a shared-node follower would capture a
-// command-output directory its leader never wrote.
-func declaresCommandOutput(job *ScheduledJob) bool {
-	declaration := taskDeclarationOf(job)
-	if declaration == nil {
-		return false
-	}
-	for _, output := range declaration.Outputs {
-		if output.EffectiveRoot() == extension.OutputRootCommandOutput {
-			return true
-		}
-	}
-	return false
-}
-
 // versionStampWithin returns the path of the scheduler's build stamp relative
 // to a directory output at rel under root, and whether that output holds it.
 // The stamp lives under the project root only. The containment folds case, as

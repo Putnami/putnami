@@ -488,7 +488,7 @@ func declaresSourceWrite(task proto.TaskDefinition) bool {
 // The former TestMultiCommandTasksDeclareNoProjectScopedOutputs guard is
 // deleted: the plan-time owner check now counts ONE manifest task scheduled by
 // several commands as one owner (sameManifestTask exemption in
-// tooling/cli/internal/jobs/plan_contract.go, pinned there by
+// tooling/cli/internal/jobs/planner/plan_contract.go, pinned there by
 // TestPlanContract_OneTaskScheduledBySeveralCommandsIsOneOwner), which is what
 // makes build-generate's project-rooted .gen ownership plannable under
 // multi-command invocations.

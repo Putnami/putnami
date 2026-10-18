@@ -18,6 +18,7 @@ import (
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 )
 
 // DeployTargetParamName is the one structured job-context parameter through
@@ -494,7 +495,7 @@ func deployMemberKeys(project *workspace.Project) (map[string]struct{}, error) {
 // so an entry keyed before it would answer for a different set.
 func bindDeployTargets(planned []*ScheduledJob, environment string, targets map[string]*DeployWorkloadTarget, releasing bool) error {
 	bound := make(map[string]struct{}, len(targets))
-	for _, job := range schedulableJobs(planned) {
+	for _, job := range planner.SchedulableJobs(planned) {
 		if job == nil || job.JobDef == nil || job.Project == nil || job.CommandName() != "deploy" {
 			continue
 		}

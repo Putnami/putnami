@@ -1,4 +1,4 @@
-package jobs
+package planner
 
 import (
 	"path/filepath"
@@ -6,6 +6,7 @@ import (
 	"sort"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -115,7 +116,7 @@ func sharedProbeWorkspace(root string) *workspace.Workspace {
 }
 
 // planSharedProbe plans `build,test` over the probe fixture.
-func planSharedProbe(t *testing.T, root string) []*ScheduledJob {
+func planSharedProbe(t *testing.T, root string) []*jobmodel.ScheduledJob {
 	t.Helper()
 	return planSharedProbeWithExtension(t, root, sharedProbeExtension())
 }
@@ -124,7 +125,7 @@ func planSharedProbeWithExtension(
 	t *testing.T,
 	root string,
 	ext *extension.ExtensionDescription,
-) []*ScheduledJob {
+) []*jobmodel.ScheduledJob {
 	t.Helper()
 	ws := sharedProbeWorkspace(root)
 	planned, err := Plan(ws, []string{"build", "test"}, ws.Projects,
@@ -135,8 +136,8 @@ func planSharedProbeWithExtension(
 	return planned
 }
 
-func plannedByName(planned []*ScheduledJob) map[string]*ScheduledJob {
-	byName := make(map[string]*ScheduledJob, len(planned))
+func plannedByName(planned []*jobmodel.ScheduledJob) map[string]*jobmodel.ScheduledJob {
+	byName := make(map[string]*jobmodel.ScheduledJob, len(planned))
 	for _, job := range planned {
 		byName[job.DisplayName()] = job
 	}
@@ -206,11 +207,11 @@ func TestSharedExecutions_NeverMixCapabilityAndOrdinaryJobsInEitherOrder(t *test
 func TestSharedExecutions_SeparateDescribeAfterDifferentLiteralProducers(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	plan := func() []*ScheduledJob {
+	plan := func() []*jobmodel.ScheduledJob {
 		return planSharedProbeWithExtension(t, root, sharedProbeExtensionWithTestMode())
 	}
 
-	identityMap := func(planned []*ScheduledJob) map[string]string {
+	identityMap := func(planned []*jobmodel.ScheduledJob) map[string]string {
 		t.Helper()
 		ws := sharedProbeWorkspace(root)
 		resolver := newSharedProducerIdentityResolver(ws, planned, nil)
@@ -446,7 +447,7 @@ func TestSharedExecutions_AreDeterministic(t *testing.T) {
 	}
 }
 
-func sharedExecutionMap(planned []*ScheduledJob) map[string]string {
+func sharedExecutionMap(planned []*jobmodel.ScheduledJob) map[string]string {
 	out := map[string]string{}
 	for _, job := range planned {
 		if id := job.SharedExecution(); id != "" {
@@ -456,7 +457,7 @@ func sharedExecutionMap(planned []*ScheduledJob) map[string]string {
 	return out
 }
 
-func plannedNames(planned []*ScheduledJob) []string {
+func plannedNames(planned []*jobmodel.ScheduledJob) []string {
 	names := make([]string, 0, len(planned))
 	for _, job := range planned {
 		names = append(names, job.DisplayName())

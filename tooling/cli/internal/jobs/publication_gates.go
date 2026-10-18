@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	runner "go.putnami.dev/protocol/runner"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 )
 
 // PlanProcessCapabilityGates materializes the captured runner-owned AFTER
@@ -43,7 +44,7 @@ func PlanProcessCapabilityGates(ctx context.Context, planned []*ScheduledJob) er
 		}
 		candidate[index] = &copy
 	}
-	if err := validatePlanDAG(candidate); err != nil {
+	if err := planner.ValidatePlanDAG(candidate); err != nil {
 		return fmt.Errorf("runner publication gates are not schedulable: %w", err)
 	}
 	for index, job := range planned {

@@ -1,10 +1,11 @@
-package jobs
+package planner
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	protocoljob "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -437,7 +438,7 @@ func TestAttachRunSelection_StampsEveryPlannedNode(t *testing.T) {
 	selection := &protocoljob.Selection{
 		Mode: protocoljob.SelectionModeProjects, Scoped: true, ProjectIDs: []string{"/a"},
 	}
-	planned := []*ScheduledJob{
+	planned := []*jobmodel.ScheduledJob{
 		{JobDef: &extension.JobDefinition{Name: "build"}},
 		nil,
 		{JobDef: &extension.JobDefinition{Name: "validate"}},
@@ -454,7 +455,7 @@ func TestAttachRunSelection_StampsEveryPlannedNode(t *testing.T) {
 
 	// A run that resolved nothing stamps nothing: an absent member is the honest
 	// answer, and a consumer must not receive an invented selection.
-	unstamped := []*ScheduledJob{{JobDef: &extension.JobDefinition{Name: "build"}}}
+	unstamped := []*jobmodel.ScheduledJob{{JobDef: &extension.JobDefinition{Name: "build"}}}
 	AttachRunSelection(unstamped, nil)
 	if unstamped[0].Selection != nil {
 		t.Errorf("Selection = %+v, want nil when the run resolved none", unstamped[0].Selection)

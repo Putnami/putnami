@@ -1,4 +1,4 @@
-package jobs
+package planner
 
 import (
 	"os"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/protocol/features/spectest"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -94,7 +95,7 @@ func TestPlan_CrossProjectDeps(t *testing.T) {
 	}
 
 	// Find app:build~generate — it should depend on utils:build~generate
-	var appGenerate *ScheduledJob
+	var appGenerate *jobmodel.ScheduledJob
 	for _, j := range planned {
 		if j.Project.Name == "app" && j.JobDef.Name == "build~generate" {
 			appGenerate = j
@@ -131,7 +132,7 @@ func TestPlan_IntraPipelineDeps(t *testing.T) {
 	}
 
 	// Find utils:build~transpile — it should depend on utils:build~generate
-	var utilsTranspile *ScheduledJob
+	var utilsTranspile *jobmodel.ScheduledJob
 	for _, j := range planned {
 		if j.Project.Name == "utils" && j.JobDef.Name == "build~transpile" {
 			utilsTranspile = j
@@ -276,7 +277,7 @@ func TestPlan_AlsoRunsPlansTheCompanionCommand(t *testing.T) {
 
 func TestScheduledJob_Key(t *testing.T) {
 	t.Parallel()
-	j := &ScheduledJob{
+	j := &jobmodel.ScheduledJob{
 		Project: &workspace.Project{ID: "@putnami/utils", Name: "@putnami/utils"},
 		JobDef:  &extension.JobDefinition{Name: "build~transpile"},
 	}
@@ -406,7 +407,7 @@ func TestResolveExternalDeps_UpstreamCaret(t *testing.T) {
 	ws := workspace.NewWorkspace("", nil, projects)
 	ws.Name = "test"
 
-	jobs := []*ScheduledJob{
+	jobs := []*jobmodel.ScheduledJob{
 		{
 			Project: projects[0], // utils
 			JobDef:  &extension.JobDefinition{Name: "build~generate"},
@@ -670,7 +671,7 @@ func TestResolveExternalDeps_Star(t *testing.T) {
 	ws := workspace.NewWorkspace("", nil, projects)
 	ws.Name = "test"
 
-	jobs := []*ScheduledJob{
+	jobs := []*jobmodel.ScheduledJob{
 		{Project: projects[0], JobDef: &extension.JobDefinition{Name: "build~compile"}},
 		{Project: projects[1], JobDef: &extension.JobDefinition{Name: "build~compile"}},
 		{Project: projects[2], JobDef: &extension.JobDefinition{Name: "build~compile"}},
@@ -704,7 +705,7 @@ func TestResolveExternalDeps_StarPrefixMatch(t *testing.T) {
 	ws := workspace.NewWorkspace("", nil, projects)
 	ws.Name = "test"
 
-	jobs := []*ScheduledJob{
+	jobs := []*jobmodel.ScheduledJob{
 		{Project: projects[0], JobDef: &extension.JobDefinition{Name: "package~template"}},
 		{Project: projects[1], JobDef: &extension.JobDefinition{Name: "package~template"}},
 		{Project: projects[0], JobDef: &extension.JobDefinition{Name: "publish~npm", DependsOn: []string{"*package"}}},
@@ -927,7 +928,7 @@ func TestResolveExternalDeps_PreservesCommandDepsWhenResolvingStepDeps(t *testin
 	ws := workspace.NewWorkspace("", nil, projects)
 	ws.Name = "test"
 
-	jobs := []*ScheduledJob{
+	jobs := []*jobmodel.ScheduledJob{
 		{Project: projects[0], JobDef: &extension.JobDefinition{Name: "build~compile"}},
 		{Project: projects[1], JobDef: &extension.JobDefinition{Name: "package~archive"}},
 		{
@@ -1242,7 +1243,7 @@ func TestPlanWorkspaceOnceCommandCanDependOnAllPublishJobs(t *testing.T) {
 		t.Fatalf("Plan: %v", err)
 	}
 
-	var deploy *ScheduledJob
+	var deploy *jobmodel.ScheduledJob
 	for _, job := range planned {
 		if job.Key() == "test-workspace:deploy~apply" {
 			deploy = job
@@ -1296,7 +1297,7 @@ func TestPlanSessionDependencyWorkspaceOnceCarriesSelectedProjects(t *testing.T)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
-	var deploy *ScheduledJob
+	var deploy *jobmodel.ScheduledJob
 	for _, job := range planned {
 		if job.Key() == "test-workspace:deploy~apply" {
 			deploy = job
@@ -1707,7 +1708,7 @@ func publishGraphGoExtension() *extension.ExtensionDescription {
 	}
 }
 
-func scheduledJobByKey(jobs []*ScheduledJob, key string) *ScheduledJob {
+func scheduledJobByKey(jobs []*jobmodel.ScheduledJob, key string) *jobmodel.ScheduledJob {
 	for _, job := range jobs {
 		if job.Key() == key {
 			return job
@@ -1716,8 +1717,8 @@ func scheduledJobByKey(jobs []*ScheduledJob, key string) *ScheduledJob {
 	return nil
 }
 
-func dependsTransitively(jobs []*ScheduledJob, from, to string) bool {
-	index := make(map[string]*ScheduledJob, len(jobs))
+func dependsTransitively(jobs []*jobmodel.ScheduledJob, from, to string) bool {
+	index := make(map[string]*jobmodel.ScheduledJob, len(jobs))
 	for _, job := range jobs {
 		index[job.Key()] = job
 	}
@@ -1748,7 +1749,7 @@ func dependsTransitively(jobs []*ScheduledJob, from, to string) bool {
 	return walk(from)
 }
 
-func jobKeys(jobs []*ScheduledJob) []string {
+func jobKeys(jobs []*jobmodel.ScheduledJob) []string {
 	keys := make([]string, len(jobs))
 	for i, job := range jobs {
 		keys[i] = job.Key()

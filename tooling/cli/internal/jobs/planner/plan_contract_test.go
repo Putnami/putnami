@@ -1,9 +1,10 @@
-package jobs
+package planner
 
 import (
 	"strings"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -319,8 +320,8 @@ func TestPlanContract_OneTaskScheduledBySeveralCommandsIsOneOwner(t *testing.T) 
 			"other-generate": {Kind: "command", Command: "true", Declares: declares},
 		},
 	}
-	node := func(command, task string) *ScheduledJob {
-		return &ScheduledJob{
+	node := func(command, task string) *jobmodel.ScheduledJob {
+		return &jobmodel.ScheduledJob{
 			Project:   proj,
 			Extension: ext,
 			JobDef:    &extension.JobDefinition{Name: command + "~generate", CommandName: command, StepID: "generate"},
@@ -328,13 +329,13 @@ func TestPlanContract_OneTaskScheduledBySeveralCommandsIsOneOwner(t *testing.T) 
 		}
 	}
 
-	sameTaskTwice := []*ScheduledJob{node("build", "build-generate"), node("test", "build-generate")}
+	sameTaskTwice := []*jobmodel.ScheduledJob{node("build", "build-generate"), node("test", "build-generate")}
 	if lines := overlappingOutputLines(sameTaskTwice, ws, 10); len(lines) != 0 {
 		t.Fatalf("one task scheduled by two commands was reported as overlapping:\n%s", strings.Join(lines, "\n"))
 	}
 
 	// Positive control: two DIFFERENT manifest tasks, same path — still an error.
-	pair := []*ScheduledJob{node("build", "build-generate"), node("test", "other-generate")}
+	pair := []*jobmodel.ScheduledJob{node("build", "build-generate"), node("test", "other-generate")}
 	if lines := overlappingOutputLines(pair, ws, 10); len(lines) == 0 {
 		t.Fatal("two different tasks claiming .gen were not reported")
 	}
@@ -384,8 +385,8 @@ func TestPlanContract_CededSubpathHasOneOwner(t *testing.T) {
 			},
 		}
 	}
-	node := func(ext *extension.ExtensionDescription, step, task string) *ScheduledJob {
-		return &ScheduledJob{
+	node := func(ext *extension.ExtensionDescription, step, task string) *jobmodel.ScheduledJob {
+		return &jobmodel.ScheduledJob{
 			Project:   proj,
 			Extension: ext,
 			JobDef:    &extension.JobDefinition{Name: "build~" + step, CommandName: "build", StepID: step},
@@ -394,7 +395,7 @@ func TestPlanContract_CededSubpathHasOneOwner(t *testing.T) {
 	}
 
 	ceding := ext(genOutput(".gen/migration-bundle"))
-	pair := []*ScheduledJob{
+	pair := []*jobmodel.ScheduledJob{
 		node(ceding, "generate", "build-generate"),
 		node(ceding, "describe", "build-describe"),
 	}
@@ -405,7 +406,7 @@ func TestPlanContract_CededSubpathHasOneOwner(t *testing.T) {
 	// Control: the same pair without the carve-out is exactly the collision the
 	// carve-out exists to resolve.
 	owningWhole := ext(genOutput())
-	whole := []*ScheduledJob{
+	whole := []*jobmodel.ScheduledJob{
 		node(owningWhole, "generate", "build-generate"),
 		node(owningWhole, "describe", "build-describe"),
 	}
@@ -427,12 +428,12 @@ func TestPlanContract_CededSubpathHasOneOwner(t *testing.T) {
 			}},
 		},
 	}
-	if lines := overlappingOutputLines([]*ScheduledJob{node(selfCeding, "generate", "build-generate")}, ws, 10); len(lines) == 0 {
+	if lines := overlappingOutputLines([]*jobmodel.ScheduledJob{node(selfCeding, "generate", "build-generate")}, ws, 10); len(lines) == 0 {
 		t.Error("a task ceding a subpath to itself was accepted; its two outputs have no restore order")
 	}
 
 	// Control: the ceded region has ONE owner, not none.
-	contested := append(append([]*ScheduledJob{}, pair...), node(ceding, "third", "third-party"))
+	contested := append(append([]*jobmodel.ScheduledJob{}, pair...), node(ceding, "third", "third-party"))
 	lines := overlappingOutputLines(contested, ws, 10)
 	if len(lines) == 0 {
 		t.Fatal("a third task claiming the ceded subpath was not reported")

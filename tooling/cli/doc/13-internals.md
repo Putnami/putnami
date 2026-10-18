@@ -35,6 +35,7 @@ internal/
 │   ├── cachekey/              Task cache keys: inputs, hashing, key movement, precompute, portable inputs
 │   │   └── framing/           Labeled-field framing every cache key and content digest hashes
 │   ├── machineprobe/          Runner CPU, memory and pressure readings, rusage of a finished process
+│   ├── planner/               Planner: the plan of a run, its dependency edges, the plan contract, shared executions
 │   ├── procdeadline/          Deadline of a started child process, counted from its first instruction
 │   ├── remotecache/           Remote cache client: provider session, negotiation, restore, upload, run markers
 │   └── toolchain/             Runtime toolchain resolution against the lock, child environment, key identity
@@ -49,7 +50,7 @@ internal/
 └── workspace_state/           Session recording and audit trails
 ```
 
-Principal packages only. `internal/` holds 75 production packages in all — the rest are small, single-purpose support packages (`abort`, `agentartifacts`, `cmderr`, `env`, `flock`, `iox`, `launch`, `layout`, `lockfile`, `mcp`, `progress`, …). `core_isolation_ratchets_test.go` pins the count as a ceiling, so a new package is a reviewed event.
+Principal packages only. `internal/` holds 76 production packages in all — the rest are small, single-purpose support packages (`abort`, `agentartifacts`, `cmderr`, `env`, `flock`, `iox`, `launch`, `layout`, `lockfile`, `mcp`, `progress`, …). `core_isolation_ratchets_test.go` pins the count as a ceiling, so a new package is a reviewed event.
 
 ### Command verticals — `internal/commands/`
 
@@ -174,10 +175,10 @@ The coordinator avoids deadlock by using non-blocking sends with a pending queue
 
 ### DAG State Machine
 
-Job readiness is tracked with dependency counters:
+Job readiness is tracked with dependency counters. The type lives in the planner package (`internal/jobs/planner/dag_state.go`), because the planner walks it to prove a plan can be scheduled and the scheduler walks the same state to dispatch the plan:
 
 ```go
-type dagState struct {
+type DAGState struct {
     remaining  map[string]int              // jobKey → unresolved dependency count
     dependents map[string][]string         // jobKey → dependent job keys
     jobs       map[string]*ScheduledJob    // jobKey → job
@@ -370,7 +371,7 @@ Test files are colocated with their source files following Go convention:
 ```
 internal/cli/args.go       → internal/cli/args_test.go
 internal/store/cache.go    → internal/store/cache_test.go
-internal/jobs/planner.go   → internal/jobs/planner_test.go
+internal/jobs/planner/planner.go → internal/jobs/planner/planner_test.go
 ```
 
 ### Running Tests

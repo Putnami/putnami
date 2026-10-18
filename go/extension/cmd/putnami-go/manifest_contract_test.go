@@ -1220,7 +1220,7 @@ func TestCommittedSidecarsAreDeliberatelyUnclaimed(t *testing.T) {
 // project-rooted path on a task five commands schedule is plannable only
 // because the plan-time owner check counts one manifest task scheduled by
 // several commands as ONE owner (sameManifestTask in
-// tooling/cli/internal/jobs/plan_contract.go, pinned there by
+// tooling/cli/internal/jobs/planner/plan_contract.go, pinned there by
 // TestPlanContract_OneTaskScheduledBySeveralCommandsIsOneOwner).
 //
 // A cede is a two-sided statement, so this test checks both sides: a claim

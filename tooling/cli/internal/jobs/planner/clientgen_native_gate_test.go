@@ -1,4 +1,4 @@
-package jobs
+package planner
 
 import (
 	"os"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -80,7 +81,7 @@ func clientgenConsumerWorkspace(t *testing.T, projects int) (*workspace.Workspac
 	return &workspace.Workspace{Root: root, Name: "consumers", Projects: selected}, selected
 }
 
-func planValidate(t *testing.T, projects int) []*ScheduledJob {
+func planValidate(t *testing.T, projects int) []*jobmodel.ScheduledJob {
 	t.Helper()
 	description := loadClientgenExtension(t)
 	ws, selected := clientgenConsumerWorkspace(t, projects)
@@ -92,8 +93,8 @@ func planValidate(t *testing.T, projects int) []*ScheduledJob {
 	return planned
 }
 
-func clientgenNodes(planned []*ScheduledJob) []*ScheduledJob {
-	var nodes []*ScheduledJob
+func clientgenNodes(planned []*jobmodel.ScheduledJob) []*jobmodel.ScheduledJob {
+	var nodes []*jobmodel.ScheduledJob
 	for _, node := range planned {
 		if node.JobDef != nil && node.JobDef.ExtensionName == clientgenExtensionName {
 			nodes = append(nodes, node)

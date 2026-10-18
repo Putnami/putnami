@@ -36,7 +36,7 @@ import (
 // frontierTerminal reports whether every consumer of the relation has reached a
 // terminal state in results. The caller holds the results mutex.
 func (rel *invocationRelation) frontierTerminal(results map[string]*JobResult) bool {
-	for _, consumer := range rel.consumers {
+	for _, consumer := range rel.Consumers {
 		if results[consumer.Key()] == nil {
 			return false
 		}
@@ -157,7 +157,7 @@ func (s *Scheduler) runFinalizer(
 	if !rel.claimFinalizer() {
 		return
 	}
-	job := rel.finalizer
+	job := rel.Finalizer
 	cleanupCtx, cancel := finalizerCleanupContext(ctx, job)
 	defer cancel()
 
@@ -199,7 +199,7 @@ func (s *Scheduler) settleFinalizers(results map[string]*JobResult, mu *sync.Mut
 	var settled []jobDone
 	mu.Lock()
 	for _, rel := range s.invocations.relations {
-		key := rel.finalizer.Key()
+		key := rel.Finalizer.Key()
 		if _, exists := results[key]; exists {
 			continue
 		}
@@ -214,7 +214,7 @@ func (s *Scheduler) settleFinalizers(results map[string]*JobResult, mu *sync.Mut
 			Error:  &JobError{Message: "no invocation-scoped resource was provisioned"},
 		}
 		results[key] = skipped
-		settled = append(settled, jobDone{job: rel.finalizer, result: skipped})
+		settled = append(settled, jobDone{job: rel.Finalizer, result: skipped})
 	}
 	mu.Unlock()
 

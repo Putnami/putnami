@@ -1,4 +1,4 @@
-package jobs
+package planner
 
 import (
 	"strings"
@@ -247,7 +247,7 @@ func TestPlan_LiteralBindingSatisfiesRequiredInput(t *testing.T) {
 
 // TestPlan_ExternalProducerRefIsDeferredToTheDAG keeps one rule for
 // cross-project references: resolveExternalDeps expands `^`/`/`/`*` and
-// validatePlanDAG proves the result is schedulable. Re-resolving them here with
+// ValidatePlanDAG proves the result is schedulable. Re-resolving them here with
 // a second rule is how two validators come to disagree.
 func TestPlan_ExternalProducerRefIsDeferredToTheDAG(t *testing.T) {
 	t.Parallel()

@@ -19,6 +19,7 @@ import (
 	"go.putnami.dev/sdk/extension/ownerperm"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -730,7 +731,7 @@ func TestInvocation_AStepInTwoFrontiersIsRefusedRatherThanGivenAWinner(t *testin
 	planned := append(append([]*ScheduledJob(nil), fixture.planned...), secondProducer, secondFinalizer)
 
 	// PLAN TIME: the run refuses to start, naming the step and both relations.
-	err := validateInvocationFrontiers(planned)
+	err := planner.ValidateInvocationFrontiers(planned)
 	if err == nil {
 		t.Fatal("a plan that puts one step in two finalizes relations was accepted")
 	}
@@ -859,7 +860,7 @@ func TestInvocation_AllHitFrontierPrunesSetupAndFinalizer(t *testing.T) {
 	// The consumer's key folds in the producing action's digest, so the plan's
 	// relations must be resolved before the key the test publishes at can match
 	// the one the scheduler looks up.
-	resolveInvocationRelations(fixture.planned)
+	planner.ResolveInvocationRelations(fixture.planned)
 	keys, err := cachekey.PrecomputeKeys(fixture.ws, fixture.planned, nil, nil, cache, cachekey.CacheBypass{})
 	if err != nil {
 		t.Fatalf("PrecomputeKeys: %v", err)
@@ -958,7 +959,7 @@ func TestInvocation_PruneIfPreservesImperativeSideEffects(t *testing.T) {
 			}
 
 			cache := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
-			resolveInvocationRelations(fixture.planned)
+			planner.ResolveInvocationRelations(fixture.planned)
 			keys, err := cachekey.PrecomputeKeys(fixture.ws, fixture.planned, params, nil, cache, cachekey.CacheBypass{})
 			if err != nil {
 				t.Fatalf("PrecomputeKeys: %v", err)
@@ -1041,7 +1042,7 @@ func TestInvocation_PrunedRelationStillServesTheConsumersCachedResult(t *testing
 	}
 
 	cache := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
-	resolveInvocationRelations(fixture.planned)
+	planner.ResolveInvocationRelations(fixture.planned)
 	keys, err := cachekey.PrecomputeKeys(fixture.ws, fixture.planned, nil, nil, cache, cachekey.CacheBypass{})
 	if err != nil {
 		t.Fatalf("PrecomputeKeys: %v", err)
@@ -1118,7 +1119,7 @@ func TestInvocation_ConsumerKeyFollowsTheProducingAction(t *testing.T) {
 		Command:  fixture.consumer.JobDef.Command,
 		Declares: &extensionproto.TaskDeclaration{},
 	}
-	resolveInvocationRelations(fixture.planned)
+	planner.ResolveInvocationRelations(fixture.planned)
 
 	consumerKey := func() string {
 		t.Helper()
@@ -1260,7 +1261,7 @@ func TestInvocation_ConsumerKeyFollowsTheProducersClosure(t *testing.T) {
 	}, false, nil)
 
 	planned := []*ScheduledJob{producer, consumer, finalizer}
-	resolveInvocationRelations(planned)
+	planner.ResolveInvocationRelations(planned)
 	if consumer.InvocationProducer != producer {
 		t.Fatal("the fixture must resolve the finalizes relation for the fold to exist")
 	}
@@ -1412,12 +1413,12 @@ func TestResolveInvocationRelations_DropsAnIncompleteFrontier(t *testing.T) {
 	t.Parallel()
 	fixture := newInvocationFixture(t, provisionBody, consumeBody)
 
-	complete := resolveInvocationRelations(fixture.planned)
+	complete := planner.ResolveInvocationRelations(fixture.planned)
 	if len(complete) != 1 {
 		t.Fatalf("resolved %d relations, want 1", len(complete))
 	}
-	if complete[0].producer != fixture.producer || complete[0].finalizer != fixture.finalizer ||
-		len(complete[0].consumers) != 1 || complete[0].consumers[0] != fixture.consumer {
+	if complete[0].Producer != fixture.producer || complete[0].Finalizer != fixture.finalizer ||
+		len(complete[0].Consumers) != 1 || complete[0].Consumers[0] != fixture.consumer {
 		t.Fatalf("relation resolved onto the wrong nodes: %+v", complete[0])
 	}
 	if fixture.consumer.InvocationProducer != fixture.producer {
@@ -1425,11 +1426,11 @@ func TestResolveInvocationRelations_DropsAnIncompleteFrontier(t *testing.T) {
 	}
 
 	withoutConsumer := []*ScheduledJob{fixture.producer, fixture.finalizer}
-	if got := resolveInvocationRelations(withoutConsumer); len(got) != 0 {
+	if got := planner.ResolveInvocationRelations(withoutConsumer); len(got) != 0 {
 		t.Errorf("resolved %d relations with an absent consumer, want none", len(got))
 	}
 	withoutProducer := []*ScheduledJob{fixture.consumer, fixture.finalizer}
-	if got := resolveInvocationRelations(withoutProducer); len(got) != 0 {
+	if got := planner.ResolveInvocationRelations(withoutProducer); len(got) != 0 {
 		t.Errorf("resolved %d relations with an absent producer, want none", len(got))
 	}
 }
@@ -1440,7 +1441,7 @@ func TestResolveInvocationRelations_DropsAnIncompleteFrontier(t *testing.T) {
 func TestSchedulableJobs_HoldsFinalizersOutOfTheDAG(t *testing.T) {
 	t.Parallel()
 	fixture := newInvocationFixture(t, provisionBody, consumeBody)
-	schedulable := schedulableJobs(fixture.planned)
+	schedulable := planner.SchedulableJobs(fixture.planned)
 	if len(schedulable) != 2 {
 		t.Fatalf("schedulable = %d jobs, want 2", len(schedulable))
 	}
@@ -1450,7 +1451,7 @@ func TestSchedulableJobs_HoldsFinalizersOutOfTheDAG(t *testing.T) {
 		}
 	}
 	plain := []*ScheduledJob{fixture.producer, fixture.consumer}
-	if got := schedulableJobs(plain); len(got) != 2 {
+	if got := planner.SchedulableJobs(plain); len(got) != 2 {
 		t.Errorf("a plan with no finalizer must be returned unchanged, got %d", len(got))
 	}
 }
@@ -1514,7 +1515,7 @@ func TestInvocation_LeakGuardLeavesDeclaredArtifactPathsPublishable(t *testing.T
 		Step:   &extension.PipelineStep{Task: "test-run"},
 	}
 	needles := sensitiveNeedles(scratch, "database/bindings.json",
-		(&invocationRelation{producer: job}).publicStructure())
+		(&invocationRelation{InvocationRelation: planner.InvocationRelation{Producer: job}}).publicStructure())
 	for _, identifier := range []string{projectPath, "marketing"} {
 		if containsNeedle(needles, identifier) {
 			t.Fatalf("needles %v carry the workspace identifier %q — structure is not payload", needles, identifier)

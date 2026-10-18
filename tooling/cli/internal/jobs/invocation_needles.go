@@ -39,6 +39,7 @@ import (
 	"sort"
 	"strings"
 
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -102,7 +103,7 @@ func (rel *invocationRelation) loadNeedles() {
 		return
 	}
 	public := rel.publicStructure()
-	for _, output := range sortedInvocationOutputs(rel.producer) {
+	for _, output := range planner.SortedInvocationOutputs(rel.Producer) {
 		if output.PathFrom != "" || !output.Sensitive {
 			continue
 		}
@@ -129,7 +130,7 @@ func (rel *invocationRelation) publicStructure() map[string]bool {
 			}
 		}
 	}
-	participants := append([]*ScheduledJob{rel.producer, rel.finalizer}, rel.consumers...)
+	participants := append([]*ScheduledJob{rel.Producer, rel.Finalizer}, rel.Consumers...)
 	for _, job := range participants {
 		if job == nil || job.Project == nil {
 			continue

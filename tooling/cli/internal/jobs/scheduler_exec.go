@@ -12,6 +12,7 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/hooks"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -305,7 +306,7 @@ func (s *Scheduler) prepareTask(
 	// can write its declared subtree. The task-owned entry model never relinks a
 	// whole command directory, so this is the only shared-output coordination
 	// needed after the inferred-capture path is gone.
-	if declaresCommandOutput(job) {
+	if planner.DeclaresCommandOutput(job) {
 		if err := s.ensureCommandOutputWritable(job); err != nil {
 			return fail(fmt.Errorf("prepare command output: %w", err))
 		}

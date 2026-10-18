@@ -1,48 +1,32 @@
-package jobs
+package planner
 
 import (
 	"sort"
 	"sync"
+
+	jobmodel "go.putnami.dev/cli/model/jobs"
 )
 
-// jobDone pairs a completed job with its result.
-type jobDone struct {
-	job    *ScheduledJob
-	result *JobResult
-}
-
-// jobGroup is one scheduler dispatch. A singleton preserves the historical
-// execution path; multiple jobs are an opportunistic same-key batch formed
-// only from work that was already ready.
-type jobGroup struct {
-	jobs        []*ScheduledJob
-	reservation resourceReservation
-}
-
-// jobGroupDone returns every original per-project result from one dispatch.
-// The coordinator still completes DAG nodes, renderer rows, and session rows
-// individually so batching never changes public job accounting.
-type jobGroupDone struct {
-	jobs        []jobDone
-	reservation resourceReservation
-}
-
-// dagState tracks the DAG execution state.
-type dagState struct {
+// DAGState tracks the DAG execution state. The planner walks it to prove a
+// plan can be scheduled, and the scheduler walks the same state to dispatch
+// the plan, so the two cannot disagree on what a dependency count means.
+type DAGState struct {
 	// remaining maps jobKey → number of unresolved dependencies
 	remaining map[string]int
 	// dependents maps jobKey → list of job keys that depend on it
 	dependents map[string][]string
 	// jobs maps jobKey → ScheduledJob
-	jobs map[string]*ScheduledJob
+	jobs map[string]*jobmodel.ScheduledJob
 	mu   sync.Mutex
 }
 
-func newDAGState(planned []*ScheduledJob) *dagState {
-	ds := &dagState{
+// NewDAGState builds the state of a plan: every job with its unresolved
+// scheduling predecessors counted.
+func NewDAGState(planned []*jobmodel.ScheduledJob) *DAGState {
+	ds := &DAGState{
 		remaining:  make(map[string]int, len(planned)),
 		dependents: make(map[string][]string),
-		jobs:       make(map[string]*ScheduledJob, len(planned)),
+		jobs:       make(map[string]*jobmodel.ScheduledJob, len(planned)),
 	}
 
 	for _, job := range planned {
@@ -58,12 +42,12 @@ func newDAGState(planned []*ScheduledJob) *dagState {
 	return ds
 }
 
-// ready returns all jobs with zero unresolved dependencies.
-func (ds *dagState) ready() []*ScheduledJob {
+// Ready returns all jobs with zero unresolved dependencies.
+func (ds *DAGState) Ready() []*jobmodel.ScheduledJob {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 
-	var ready []*ScheduledJob
+	var ready []*jobmodel.ScheduledJob
 	for key, count := range ds.remaining {
 		if count == 0 {
 			ready = append(ready, ds.jobs[key])
@@ -72,14 +56,14 @@ func (ds *dagState) ready() []*ScheduledJob {
 	return ready
 }
 
-// complete marks a job as done and returns newly-ready dependents.
-func (ds *dagState) complete(key string) []*ScheduledJob {
+// Complete marks a job as done and returns newly-ready dependents.
+func (ds *DAGState) Complete(key string) []*jobmodel.ScheduledJob {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 
 	delete(ds.remaining, key)
 
-	var newReady []*ScheduledJob
+	var newReady []*jobmodel.ScheduledJob
 	for _, depKey := range ds.dependents[key] {
 		if _, exists := ds.remaining[depKey]; !exists {
 			continue // already completed or removed
@@ -93,10 +77,10 @@ func (ds *dagState) complete(key string) []*ScheduledJob {
 	return newReady
 }
 
-// remainingSnapshot returns the jobs that cannot yet run, plus their current
+// RemainingSnapshot returns the jobs that cannot yet run, plus their current
 // unresolved dependency counts. It is used only when the scheduler has no
 // ready or in-flight work left before every job completed.
-func (ds *dagState) remainingSnapshot() ([]*ScheduledJob, map[string]int) {
+func (ds *DAGState) RemainingSnapshot() ([]*jobmodel.ScheduledJob, map[string]int) {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 
@@ -106,7 +90,7 @@ func (ds *dagState) remainingSnapshot() ([]*ScheduledJob, map[string]int) {
 	}
 	sort.Strings(keys)
 
-	jobs := make([]*ScheduledJob, 0, len(keys))
+	jobs := make([]*jobmodel.ScheduledJob, 0, len(keys))
 	counts := make(map[string]int, len(keys))
 	for _, key := range keys {
 		if job := ds.jobs[key]; job != nil {
@@ -117,11 +101,11 @@ func (ds *dagState) remainingSnapshot() ([]*ScheduledJob, map[string]int) {
 	return jobs, counts
 }
 
-// size is the number of jobs the DAG still accounts for — the plan the
+// Size is the number of jobs the DAG still accounts for — the plan the
 // coordinator dispatches, which excludes the finalizer nodes the invocation
 // runtime owns. It is read only before the workers start and from the
 // coordinator, which is the goroutine that mutates it.
-func (ds *dagState) size() int {
+func (ds *DAGState) Size() int {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 	return len(ds.jobs)

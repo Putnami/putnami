@@ -16,6 +16,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 )
 
 // The deploy side of distribution v2: an environment follows a channel, the
@@ -144,7 +145,7 @@ func deployWorkspaceJobFor(ws *workspace.Workspace, ids ...string) *ScheduledJob
 		}
 	}
 	return &ScheduledJob{
-		Project: workspaceOnceProject(ws), Extension: ext, SelectedProjects: selected,
+		Project: planner.WorkspaceOnceProject(ws), Extension: ext, SelectedProjects: selected,
 		JobDef: &modelextension.JobDefinition{
 			Name: "deploy~cloud-release", CommandName: "deploy", ExtensionName: ext.Name,
 			Kind: "cloud-deploy", Activation: "workspace-once", Cache: true,

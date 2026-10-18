@@ -125,8 +125,8 @@ type ScheduledJob struct {
 
 	// InvocationProducer is the plan node whose invocation-scoped output this
 	// node consumes, for a member of a `finalizes` relation's consumer frontier.
-	// It is stamped by resolveInvocationRelations and is
-	// what lets a consumer's cache key fold in the PRODUCING ACTION's digest
+	// It is stamped by planner.ResolveInvocationRelations and
+	// is what lets a consumer's cache key fold in the PRODUCING ACTION's digest
 	// instead of anything the producer wrote — a secret's content must never
 	// reach a cache key.
 	InvocationProducer *ScheduledJob

@@ -50,7 +50,8 @@ import (
 // here rather than written twice. internalCacheKeyImportPath is the part of
 // internal/jobs split out of it with the job-context version block, so a
 // consumer that reaches it reaches the same execution half; so is the remote
-// cache client, spelled there as remoteCacheImportPath.
+// cache client, spelled there as remoteCacheImportPath, and the planner, spelled
+// there as plannerImportPath.
 const (
 	internalWorkspaceImportPath = "go.putnami.dev/tooling/cli/internal/workspace"
 	internalExtensionImportPath = "go.putnami.dev/tooling/cli/internal/extension"
@@ -75,6 +76,7 @@ var modelOrigins = []modelOrigin{
 	{internalExtensionImportPath, "extension", "extension discovery, install, integrity, registry and lockfile I/O"},
 	{internalCacheKeyImportPath, "cachekey", "the task cache key and the job-context inputs it hashes"},
 	{remoteCacheImportPath, "remotecache", "the remote cache client a run restores from and shares with"},
+	{plannerImportPath, "planner", "the planner that turns a selection of projects and commands into the typed plan of a run"},
 }
 
 // modelOnlyPackages are the consumers A5 flipped onto

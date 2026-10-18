@@ -1,4 +1,4 @@
-package jobs
+package planner
 
 import (
 	"crypto/sha256"
@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
@@ -89,17 +90,17 @@ const sharedExecutionPrefix = "shared-"
 //
 // It runs after every edge is resolved and after the invocation relations are
 // attached (a node that participates in one is never shared), and BEFORE
-// attachIdentities, so a node's typed identity is stamped on the same value the
-// scheduler later reads. It adds no edge and rewrites no dependency: the DAG,
+// jobmodel.AttachIdentities, so a node's typed identity is stamped on the same
+// value the scheduler later reads. It adds no edge and rewrites no dependency: the DAG,
 // every cache key and every artifact owner are exactly what they were without
 // it. The only thing it changes is how many subprocesses the scheduler spawns.
-func attachSharedExecutions(ws *workspace.Workspace, jobs []*ScheduledJob, commandParams map[string]any) {
+func attachSharedExecutions(ws *workspace.Workspace, jobs []*jobmodel.ScheduledJob, commandParams map[string]any) {
 	if len(jobs) < 2 {
 		return
 	}
 
 	producers := newSharedProducerIdentityResolver(ws, jobs, commandParams)
-	byIdentity := make(map[string][]*ScheduledJob)
+	byIdentity := make(map[string][]*jobmodel.ScheduledJob)
 	for _, job := range jobs {
 		identity, ok := sharedExecutionIdentity(ws, job, commandParams, producers)
 		if !ok {
@@ -147,7 +148,7 @@ func attachSharedExecutions(ws *workspace.Workspace, jobs []*ScheduledJob, comma
 // other. It is not a cache key and never becomes one: each node keeps its own.
 func sharedExecutionIdentity(
 	ws *workspace.Workspace,
-	job *ScheduledJob,
+	job *jobmodel.ScheduledJob,
 	commandParams map[string]any,
 	producers *sharedProducerIdentityResolver,
 ) (string, bool) {
@@ -174,7 +175,7 @@ func sharedExecutionIdentity(
 // with one vocabulary.
 func executionIdentityParts(
 	ws *workspace.Workspace,
-	job *ScheduledJob,
+	job *jobmodel.ScheduledJob,
 	commandParams map[string]any,
 ) []string {
 	// Non-nil for directly shareable/comparable tasks. Keep the local guard so
@@ -226,20 +227,20 @@ func sharedIdentityDigest(parts []string) string {
 type sharedProducerIdentityResolver struct {
 	ws            *workspace.Workspace
 	commandParams map[string]any
-	jobsByKey     map[string]*ScheduledJob
+	jobsByKey     map[string]*jobmodel.ScheduledJob
 	memo          map[string]string
 	visiting      map[string]bool
 }
 
 func newSharedProducerIdentityResolver(
 	ws *workspace.Workspace,
-	jobs []*ScheduledJob,
+	jobs []*jobmodel.ScheduledJob,
 	commandParams map[string]any,
 ) *sharedProducerIdentityResolver {
 	return &sharedProducerIdentityResolver{
 		ws:            ws,
 		commandParams: commandParams,
-		jobsByKey:     jobsByPlanKey(jobs),
+		jobsByKey:     JobsByPlanKey(jobs),
 		memo:          make(map[string]string),
 		visiting:      make(map[string]bool),
 	}
@@ -249,12 +250,12 @@ func newSharedProducerIdentityResolver(
 // functional producers. Each producer recursively carries its own producers,
 // so a behavioral difference anywhere in the dependency chain reaches the
 // candidate shared node.
-func (r *sharedProducerIdentityResolver) upstreamIdentity(job *ScheduledJob) (string, bool) {
+func (r *sharedProducerIdentityResolver) upstreamIdentity(job *jobmodel.ScheduledJob) (string, bool) {
 	if r == nil || job == nil || len(job.DependsOn) == 0 {
 		return "", r != nil && job != nil
 	}
 
-	depKeys := dedupeSorted(append([]string(nil), job.DependsOn...))
+	depKeys := jobmodel.DedupeSorted(append([]string(nil), job.DependsOn...))
 	identities := make([]string, 0, len(depKeys))
 	for _, depKey := range depKeys {
 		producer := r.jobsByKey[depKey]
@@ -271,7 +272,7 @@ func (r *sharedProducerIdentityResolver) upstreamIdentity(job *ScheduledJob) (st
 	return strings.Join(identities, "\x1f"), true
 }
 
-func (r *sharedProducerIdentityResolver) identity(job *ScheduledJob) (string, bool) {
+func (r *sharedProducerIdentityResolver) identity(job *jobmodel.ScheduledJob) (string, bool) {
 	if job == nil || job.Project == nil || job.JobDef == nil {
 		return "", false
 	}
@@ -313,13 +314,13 @@ func (r *sharedProducerIdentityResolver) identity(job *ScheduledJob) (string, bo
 // Literal bindings are comparable because BoundParams carries their resolved
 // value. Context/result bindings are not materialized into that bag, so they
 // remain opaque and fail closed.
-func sharedProducerComparable(job *ScheduledJob) bool {
+func sharedProducerComparable(job *jobmodel.ScheduledJob) bool {
 	if job == nil || job.Project == nil || job.Extension == nil || job.JobDef == nil || job.Step == nil {
 		return false
 	}
 	if job.Step.Task == "" || job.JobDef.ContractDigest == "" ||
 		job.JobDef.TaskCachePolicy == nil || job.JobDef.TaskCachePolicy.Key == nil ||
-		!cachekey.TaskIsDeterministic(job) || isFinalizerJob(job) ||
+		!cachekey.TaskIsDeterministic(job) || jobmodel.IsFinalizerJob(job) ||
 		job.InvocationProducer != nil || job.Invocation != nil {
 		return false
 	}
@@ -334,7 +335,7 @@ func sharedProducerComparable(job *ScheduledJob) bool {
 // sharedExecutionEligible is the conservative gate on the mechanism. Every
 // condition removes a way one physical run could fail to be what the other node
 // would have produced.
-func sharedExecutionEligible(job *ScheduledJob) bool {
+func sharedExecutionEligible(job *jobmodel.ScheduledJob) bool {
 	if job == nil || job.Project == nil || job.Extension == nil || job.JobDef == nil || job.Step == nil {
 		return false
 	}
@@ -378,16 +379,34 @@ func sharedExecutionEligible(job *ScheduledJob) bool {
 	// the follower's, and a follower runs nothing, so it never empties it: the
 	// follower would capture an earlier run's bytes under a key that says its
 	// entry holds only its own run's files (ADR 0064).
-	if declaresCommandOutput(job) {
+	if DeclaresCommandOutput(job) {
 		return false
 	}
 	// A finalizer is never dispatched by the DAG, and a participant in an
 	// invocation relation is keyed on the producing ACTION — neither shape has a
 	// second node it could be identical to.
-	if isFinalizerJob(job) || job.InvocationProducer != nil || job.Invocation != nil {
+	if jobmodel.IsFinalizerJob(job) || job.InvocationProducer != nil || job.Invocation != nil {
 		return false
 	}
 	return true
+}
+
+// DeclaresCommandOutput reports whether a task owns bytes under the shared
+// per-command directory. The scheduler uses it before a real execution to
+// detach a stale cache symlink before the task can mutate it, and
+// sharedExecutionEligible uses it to refuse every such task: a shared-node
+// follower would capture a command-output directory its leader never wrote.
+func DeclaresCommandOutput(job *jobmodel.ScheduledJob) bool {
+	declaration := jobmodel.TaskDeclarationOf(job)
+	if declaration == nil {
+		return false
+	}
+	for _, output := range declaration.Outputs {
+		if output.EffectiveRoot() == extension.OutputRootCommandOutput {
+			return true
+		}
+	}
+	return false
 }
 
 // canonicalDeclaredParams renders the values of the params the TASK declared as
@@ -404,7 +423,7 @@ func sharedExecutionEligible(job *ScheduledJob) bool {
 // which is the same premise the contract digest in every cache key rests on.
 func canonicalDeclaredParams(
 	ws *workspace.Workspace,
-	job *ScheduledJob,
+	job *jobmodel.ScheduledJob,
 	commandParams map[string]any,
 ) string {
 	namesSet := make(map[string]struct{})
@@ -422,7 +441,7 @@ func canonicalDeclaredParams(
 
 	var configDefaults map[string]any
 	if ws != nil && ws.Config != nil {
-		configDefaults = ws.Config.GetCommandDefaults(jobCommandName(job), job.Extension.Name)
+		configDefaults = ws.Config.GetCommandDefaults(jobmodel.JobCommandName(job), job.Extension.Name)
 	}
 	resolved := cachekey.ResolvedJobParams(job, commandParams, configDefaults)
 
@@ -454,7 +473,7 @@ func canonicalStrings(values []string) string {
 	if len(values) == 0 {
 		return ""
 	}
-	return strings.Join(dedupeSorted(append([]string(nil), values...)), "\x1f")
+	return strings.Join(jobmodel.DedupeSorted(append([]string(nil), values...)), "\x1f")
 }
 
 // canonicalResourceRefs renders declared resource accesses by the conflict key
@@ -466,7 +485,7 @@ func canonicalResourceRefs(projectID string, refs []extension.ResourceRef) strin
 	}
 	keys := make([]string, 0, len(refs))
 	for _, ref := range refs {
-		keys = append(keys, resourceConflictKey(projectID, ref))
+		keys = append(keys, ResourceConflictKey(projectID, ref))
 	}
 	return canonicalStrings(keys)
 }

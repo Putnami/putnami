@@ -217,6 +217,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/flock"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -422,11 +423,11 @@ func taskReadLockNames(job *ScheduledJob) []string {
 	}
 	written := make(map[string]bool, len(job.JobDef.Writes))
 	for _, ref := range job.JobDef.Writes {
-		written[resourceConflictKey(job.Project.ID, ref)] = true
+		written[planner.ResourceConflictKey(job.Project.ID, ref)] = true
 	}
 	projectRead, workspaceRead := false, false
 	for _, ref := range job.JobDef.Reads {
-		if ref.ID == extension.ResourceIDSources || written[resourceConflictKey(job.Project.ID, ref)] {
+		if ref.ID == extension.ResourceIDSources || written[planner.ResourceConflictKey(job.Project.ID, ref)] {
 			continue
 		}
 		if ref.EffectiveScope() == extension.ResourceScopeWorkspace {
