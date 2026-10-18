@@ -184,8 +184,11 @@ func TestJavaScriptHelpers(t *testing.T) {
 }
 
 // TestVerifierArgumentErrors pins the reasons the verifier gives before it
-// reads Git, so none of these needs a repository.
+// reads Git, so none of these needs a repository. A call with no mode writes
+// one not-verified verdict line on its stdout, which is its only stream.
 func TestVerifierArgumentErrors(t *testing.T) {
+	spectest.Proves(t, "cli/diagnostics-results", "local-evidence-verification",
+		"a-bare-call-is-a-not-verified-verdict-on-stdout-alone")
 	t.Parallel()
 	cases := []struct {
 		args   []string
@@ -217,17 +220,6 @@ func TestVerifierArgumentErrors(t *testing.T) {
 				t.Fatalf("stdout = %q, want %q", stdout.String(), want)
 			}
 		})
-	}
-}
-
-func TestVerifierHelpWinsOverEveryOtherArgument(t *testing.T) {
-	t.Parallel()
-	var stdout bytes.Buffer
-	if err := (Verifier{Dir: t.TempDir(), Stdout: &stdout}).Run([]string{"--record", "--help", "--unknown"}); err != nil {
-		t.Fatalf("Run = %v, want nil", err)
-	}
-	if stdout.String() != VerifyUsage {
-		t.Fatalf("stdout = %q, want the usage line", stdout.String())
 	}
 }
 

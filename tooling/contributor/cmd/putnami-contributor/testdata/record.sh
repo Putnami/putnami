@@ -6,7 +6,8 @@
 # Usage: record.sh <putnami-binary> <out-directory>
 #
 # <putnami-binary> must serve `putnami contributor language`. The current core
-# refuses that root, so the binary is a putnami release that still serves it.
+# refuses that root, so the binary is a putnami built from a commit before the
+# core deleted it. The script stops when the binary refuses the command.
 #
 # The script builds the fixture repository with fixture.sh, adds a minimal
 # workspace file because the core command needs one, runs
@@ -34,6 +35,10 @@ while IFS='|' read -r name input arguments; do
   code=0
   # shellcheck disable=SC2086
   "$putnami" contributor language $arguments < "$stdin_file" > "$work/stdout" 2> "$work/stderr" || code=$?
+  if [ "$code" = 2 ] && grep -q 'is no longer a core command' "$work/stderr"; then
+    echo "record.sh: $putnami refuses contributor language; use a putnami built before the core deleted it" >&2
+    exit 1
+  fi
   {
     printf 'exit %s\n-- stdout --\n' "$code"
     cat "$work/stdout"

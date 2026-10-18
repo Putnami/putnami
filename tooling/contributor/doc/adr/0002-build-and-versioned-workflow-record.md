@@ -38,7 +38,7 @@ feature/spec sources, partitions their full requirement inventory and maps
 observable units, stage contracts, material artifact challenge, experiments,
 handoffs and actual delivery receipts. It authors no expected check inventory
 or passing producer verdict: feature declarations and actual native session
-reports supply those. `tree verify --workflow` validates progress and never
+reports supply those. `change verify --workflow` validates progress and never
 grants ready. The v2 dossier may reference the workflow by exact path and
 digest; the current CLI then joins complete current requirements to producer
 evidence while retaining the existing dossier's review, gate, qualification

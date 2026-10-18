@@ -71,8 +71,8 @@ Host session limits remain the host runtime's responsibility.
 The active audit integration retains `check/scripts/english-only.sh` as a
 thin relay to the native language command; it carries no separate evaluator.
 
-The build skill's dossier and workflow checker is the CLI command
-`putnami tree verify`. Its standalone `--workflow` validates a local progress
+The build skill's dossier and workflow checker is `putnami change verify`,
+which this extension's executable serves. Its standalone `--workflow` validates a local progress
 projection. An optional workflow ref on the v2 dossier adds native
 requirement/producer completeness to the existing ready check. Only the
 dossier can compute `Putnami verified` for the declared local scope.

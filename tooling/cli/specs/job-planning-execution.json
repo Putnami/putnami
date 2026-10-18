@@ -19,7 +19,7 @@
     },
     {
       "id": "command-catalog",
-      "text": "One command catalog defines public command paths, aliases, flags, help, completion, structured output, and workspace requirements. Unless an installed extension declares that exact root as a command group or as a job, a root that left the core (channel, ci, change-plan, infra, dev, contributor) is a usage error, as is putnami help of it. The error comes before the workspace bootstrap and planning and links the reference of moved commands. It names no extension; dev and contributor name core successors."
+      "text": "One command catalog defines public command paths, aliases, flags, help, completion, structured output, and workspace requirements. A root that left the core (channel, ci, change-plan, infra, dev, contributor) is a usage error unless an installed extension declares it as a command group or job; tree verify always is. So is putnami help of either. The error precedes the workspace bootstrap and planning and links the moved-commands reference. It names no extension; dev and contributor name core successors."
     },
     {
       "id": "workspace-scoped-help",

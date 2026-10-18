@@ -117,7 +117,7 @@ var complexityCeilings = []complexityCeiling{
 			"engine's existing cache key, result, manifest, and bounded-byte checks; they add no run stage, " +
 			"scheduler, or cache store. " +
 			"RAISED 173→174 (cli/report-fix): the run report states the run's explicit --fix value, " +
-			"which `tree verify` requires as fix: false for a CI policy that lists --fix=false. " +
+			"which the evidence verifier requires as fix: false for a CI policy that lists --fix=false. " +
 			"report.go holds reportFix, which reads the `fix` command param as only a bool or the " +
 			"strings \"true\" and \"false\"; reportEnforceCoverage also reads \"1\", so the two stay " +
 			"apart. The member's shape lives in protocols/cli and its projection in internal/machine, " +

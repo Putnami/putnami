@@ -980,7 +980,7 @@ var catalog = []Command{
 	{
 		Path:    "tree",
 		Kind:    KindStructured,
-		Summary: "Identify the worktree the CLI runs in and check evidence against it",
+		Summary: "Identify the worktree the CLI runs in",
 		Workspace: WorkspaceNeed{
 			Note: "cmdTree reads git alone and is run inside repositories that are not workspaces",
 		},
@@ -1000,34 +1000,6 @@ var catalog = []Command{
 		StructuredOutput: true,
 		Workspace: WorkspaceNeed{
 			Note: "cmdTree reads git alone and is run inside repositories that are not workspaces",
-		},
-	},
-	{
-		Path:        "tree verify",
-		Kind:        KindStructured,
-		Category:    "Diagnostics",
-		Summary:     "Check local workflow evidence against this worktree",
-		Description: "Check the local evidence of an execute run against the worktree it runs in, and print one JSON verdict. --record verifies a dossier: its tree binding, changed files, policy files, consulted scopes, independent review, gate, qualification verdicts, acceptance evidence and an optional v1 workflow record. --workflow validates a separately versioned local workflow and reports progress without minting readiness. --snapshot prints the dossier skeleton for the current tree, --ref prints a file reference with its SHA-256, and --gate checks that a recorded gate session and report can replace the gate the PR finalizer would run. A gate must cover the native impacted plan, which the workspace CLI of the checked repository answers as a dry run. Paths resolve against the Git top level. A failure prints {\"verdict\":\"not-verified\",\"reason\":...} on one line and exits 1 with nothing on stderr; --output does not change the document. It is a consistency check, not a signed review or an access boundary, and it writes nothing",
-		Usage:       "putnami tree verify (--record <file> | --workflow <file> | --snapshot | --ref <file> | --gate <session> --report <report>) [--base <rev>]",
-		Flags: []Flag{
-			{Long: "--record", Type: FlagValue, ValueName: "<file>", Description: "Verify the dossier this file holds and print the verified verdict"},
-			{Long: "--workflow", Type: FlagValue, ValueName: "<file>", Description: "Validate a v1 local workflow and report progress without a ready verdict"},
-			{Long: "--snapshot", Type: FlagBool, Description: "Print the dossier skeleton for the current tree"},
-			{Long: "--ref", Type: FlagValue, ValueName: "<file>", Description: "Print the reference to this file: its path as given and its SHA-256"},
-			{Long: "--gate", Type: FlagValue, ValueName: "<session>", Description: "Check that the recorded gate session can replace the finalizer's gate"},
-			{Long: "--report", Type: FlagValue, ValueName: "<report>", Description: "Session report of the --gate session"},
-			{Long: "--base", Type: FlagValue, ValueName: "<rev>", Description: "Base revision; default origin/main for --snapshot and --gate, and for --record the base the dossier must name"},
-		},
-		Examples: []string{
-			"putnami tree verify --snapshot --base origin/main",
-			"putnami tree verify --workflow .context/workflow.json",
-			"putnami tree verify --record .context/dossier.json",
-			"putnami tree verify --gate .putnami/sessions/<id>/session.json --report .putnami/reports/<id>.json",
-		},
-		Related:          []string{"tree fingerprint", "sessions inspect"},
-		StructuredOutput: true,
-		Workspace: WorkspaceNeed{
-			Note: "cmdTree reads git and evidence files and is run inside repositories that are not workspaces; only the native plan a gate is checked against comes from the workspace CLI",
 		},
 	},
 	{

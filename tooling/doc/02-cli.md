@@ -187,7 +187,8 @@ has no successor command: its document is the projection of an impact plan.
 The `dev` root moved to the `extensions` and `templates` commands of the core,
 which need no extension. The `contributor` root split: its machine load moved
 to `putnami doctor --machine` in the core, and its language check moved to the
-`change` command group of `@putnami/contributor`.
+`change` command group of `@putnami/contributor`. The `tree` command keeps
+`tree fingerprint`; `tree verify` moved to the same `change` group.
 
 | Former command | Command now | Extension that serves it |
 |---|---|---|
@@ -201,6 +202,7 @@ to `putnami doctor --machine` in the core, and its language check moved to the
 | `putnami dev template validate [path]`, `dev template test [path]`, `dev template package [path]` | `putnami templates validate [path]`, `templates test [path]`, `templates package [path]` | None: the core serves `templates` |
 | `putnami contributor language <mode>` | `putnami change language <mode>` | `@putnami/contributor` |
 | `putnami contributor machine-load` | `putnami doctor --machine` | None: the core serves `doctor` |
+| `putnami tree verify` | `putnami change verify` | `@putnami/contributor` |
 
 To get a moved command, add its extension to `extensions` in
 `putnami.workspace.json`, then run `putnami install`:
@@ -212,12 +214,15 @@ To get a moved command, add its extension to `extensions` in
 ```
 
 The CLI refuses `putnami channel …`, `putnami ci …`, `putnami change-plan`,
-`putnami infra …`, `putnami dev …` and `putnami contributor …`, and `putnami help` of each, with exit code 2, unless an installed extension declares that root.
-The refusal of `putnami dev …` names the `extensions` and `templates` spellings,
-and the refusal of `putnami contributor …` names `putnami doctor --machine`. A
-run of a moved SDD command that plans no job prints a hint. Both messages link
-to this section, and so does the `impact-plan` refusal of a command that no
-installed extension declares.
+`putnami infra …`, `putnami dev …` and `putnami contributor …`, and `putnami
+help` of each, with exit code 2, unless an installed extension declares that
+root. It always refuses `putnami tree verify …` and `putnami help tree verify`,
+because the core still serves `tree`. The refusal of `putnami dev …` names the
+`extensions` and `templates` spellings, and the refusal of `putnami contributor
+…` names `putnami doctor --machine`. The refusal of `putnami tree verify …`
+names no successor. A run of a moved SDD command that plans no job prints a
+hint. The refusals and the hint link to this section, and so does the
+`impact-plan` refusal of a command that no installed extension declares.
 
 ## Project targeting
 

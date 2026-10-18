@@ -1126,22 +1126,6 @@ func TestVerifierGate(t *testing.T) {
 	}
 }
 
-func TestVerifierHelpWorksOutsideAGitCheckout(t *testing.T) {
-	t.Parallel()
-	for _, flag := range []string{"--help", "-h"} {
-		t.Run(flag, func(t *testing.T) {
-			t.Parallel()
-			var stdout bytes.Buffer
-			if err := (Verifier{Dir: t.TempDir(), Stdout: &stdout}).Run([]string{flag}); err != nil {
-				t.Fatalf("Run(%s) = %v, want nil", flag, err)
-			}
-			if stdout.String() != VerifyUsage {
-				t.Fatalf("help = %q, want %q", stdout.String(), VerifyUsage)
-			}
-		})
-	}
-}
-
 func TestWorkspaceCLI(t *testing.T) {
 	t.Parallel()
 	executable := func(t *testing.T, root string) {

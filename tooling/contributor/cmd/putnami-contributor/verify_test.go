@@ -28,11 +28,13 @@ const (
 	// feature languageFeature names.
 	verifyRequirement = "change-verify-parity"
 
-	// recordVerifyEnv names the core command a recording run takes the
-	// goldens from, such as the repository's putnamiw. When it is set,
+	// recordVerifyEnv names the command a recording run takes the goldens
+	// from. The current core refuses `tree verify`, so the command is a putnami
+	// built from a commit before the core deleted it. When it is set,
 	// TestChangeVerifyMatchesTheCoreCommand runs `<command> tree verify
 	// <arguments>` for every case and writes testdata/verify/<case>.golden
-	// instead of comparing.
+	// instead of comparing. No case exits 2, so a recording run fails on an
+	// exit 2, which is how a putnami that refuses `tree verify` answers.
 	recordVerifyEnv = "PUTNAMI_CONTRIBUTOR_RECORD_VERIFY"
 
 	// restoredCase is the one case whose workflow proof restores a report,
@@ -580,11 +582,11 @@ func refuseEveryReport(wire.VerificationReportParams) ([]byte, *wire.Error) {
 // TestChangeVerifyMatchesTheCoreCommand runs the built executable on the
 // fixture repository for every case of testdata/verify/cases.txt and
 // compares its exit code and stdout with testdata/verify/<case>.golden. The
-// goldens are the core command's answers: a run with recordVerifyEnv set
-// wrote them from `putnami tree verify` on the same fixture, which the test
-// builds the same way on every machine. The test never reads the core's
-// files, so a change to the core cannot change what it compares against.
-// No normalization applies.
+// goldens hold what `putnami tree verify`, the core command change verify
+// replaces, answered on the same fixture: a run with recordVerifyEnv set wrote
+// them, and the test builds the fixture the same way on every machine. The
+// test never reads the core's files, so a change to the core cannot change
+// what it compares against. No normalization applies.
 //
 // Each launch has a host channel whose cache corroborates no report, as the
 // core's cache does for the fixture. The fake putnamiw fails a gate when the
@@ -610,6 +612,9 @@ func TestChangeVerifyMatchesTheCoreCommand(t *testing.T) {
 				// it built there.
 				recorded := repo.launch(t, repo.dir(t, c), slices.Concat([]string{core, "tree", "verify"}, c.args),
 					"PUTNAMI_HOME="+putnamiHome(t), "PUTNAMI_NO_RELAUNCH=1")
+				if recorded.code == 2 {
+					t.Fatalf("%s tree verify exited 2, so it does not serve the command; record with a putnami built before the core deleted it:\n%s", core, recorded.stderr)
+				}
 				if err := os.WriteFile(filepath.Join("testdata", "verify", c.name+".golden"), []byte(renderVerdict(recorded)), 0o644); err != nil {
 					t.Fatal(err)
 				}

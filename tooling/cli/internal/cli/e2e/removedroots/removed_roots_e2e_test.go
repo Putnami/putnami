@@ -62,6 +62,10 @@ func TestRemovedRootsAreRefusedBeforeTheWorkspaceBootstrap(t *testing.T) {
 		{"contributor", "language", "files", "--", "a.go"},
 		{"contributor", "machine-load", "--output=json"},
 		{"help", "contributor"},
+		{"tree", "verify"},
+		{"tree", "verify", "--record", ".context/dossier.json"},
+		{"tree", "verify", "--help"},
+		{"help", "tree", "verify"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			t.Setenv(bootstrappedEnv, "")
@@ -71,7 +75,7 @@ func TestRemovedRootsAreRefusedBeforeTheWorkspaceBootstrap(t *testing.T) {
 			if code != 2 {
 				t.Fatalf("exit = %d, want 2:\n%s", code, output)
 			}
-			requireRefusal(t, removedRoot(args), output)
+			requireRefusal(t, removedPath(args), output)
 			if strings.Contains(output, "no project matched") || strings.Contains(output, "no job matched") {
 				t.Fatalf("the root reached selection or planning:\n%s", output)
 			}
@@ -123,31 +127,38 @@ func TestRemovedRootsAreRefusedOutsideAWorkspace(t *testing.T) {
 		{"contributor", "language", "commits", "HEAD~1..HEAD"},
 		{"contributor", "machine-load"},
 		{"help", "contributor"},
+		{"tree", "verify", "--snapshot"},
+		{"tree", "verify", "--help"},
+		{"help", "tree", "verify"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			code, output := clitest.RunGateArgs(t, t.TempDir(), args...)
 			if code != 2 {
 				t.Fatalf("exit = %d, want 2:\n%s", code, output)
 			}
-			requireRefusal(t, removedRoot(args), output)
+			requireRefusal(t, removedPath(args), output)
 		})
 	}
 }
 
-// removedRoot is the root an invocation names: the first argument, or the
-// command `putnami help` is asked about.
-func removedRoot(args []string) string {
+// removedPath is the command path an invocation names: the root, which is the
+// first argument or the command `putnami help` is asked about, or `tree verify`,
+// the one subcommand of a served root that left the core.
+func removedPath(args []string) string {
 	if args[0] == "help" {
-		return args[1]
+		args = args[1:]
+	}
+	if args[0] == "tree" {
+		return "tree verify"
 	}
 	return args[0]
 }
 
-// requireRefusal fails unless output carries the refusal of root with the
+// requireRefusal fails unless output carries the refusal of path with the
 // reference that lists where it moved, and no remedy that needs a workspace.
-func requireRefusal(t *testing.T, root, output string) {
+func requireRefusal(t *testing.T, path, output string) {
 	t.Helper()
-	if want := "putnami: `putnami " + root + "` is no longer a core command"; !strings.Contains(output, want) {
+	if want := "putnami: `putnami " + path + "` is no longer a core command"; !strings.Contains(output, want) {
 		t.Fatalf("output does not carry %q:\n%s", want, output)
 	}
 	if !strings.Contains(output, commandmeta.CommandsThatLeftTheCoreURL) {

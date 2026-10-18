@@ -975,40 +975,6 @@
       "positionals": []
     },
     {
-      "path": "tree verify",
-      "flags": [
-        {
-          "long": "--base",
-          "type": "value"
-        },
-        {
-          "long": "--gate",
-          "type": "value"
-        },
-        {
-          "long": "--record",
-          "type": "value"
-        },
-        {
-          "long": "--ref",
-          "type": "value"
-        },
-        {
-          "long": "--report",
-          "type": "value"
-        },
-        {
-          "long": "--snapshot",
-          "type": "bool"
-        },
-        {
-          "long": "--workflow",
-          "type": "value"
-        }
-      ],
-      "positionals": []
-    },
-    {
       "path": "upgrade",
       "flags": [
         {

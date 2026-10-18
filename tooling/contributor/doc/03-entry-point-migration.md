@@ -109,13 +109,13 @@ published extension; this repository's self-consumption does not prove it.
 
 ## Evidence limits
 
-- `tree verify --workflow` validates a versioned local progress projection;
+- `change verify --workflow` validates a versioned local progress projection;
   it never emits the candidate-ready verdict. Confirm that capability before
   relying on an optional workflow reference in a v2 dossier, since an older
   CLI can ignore an unknown dossier member. Current native requirements and
   producer check reports constrain completion; a unit's task count or
   polished artifact does not.
-- `putnami tree verify` checks the consistency of declared, local inputs: tree binding,
+- `putnami change verify` checks the consistency of declared, local inputs: tree binding,
   producer records, review coverage and scope notes. It does not authenticate
   authors, prove scope completeness, or replace a producer's full schema
   validator. Agents sharing write access can alter notes and policy.

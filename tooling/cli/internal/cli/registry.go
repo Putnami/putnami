@@ -71,15 +71,6 @@ type command struct {
 	// structured output mode: it writes its own machine document to stdout and
 	// the dispatcher forwards it untouched. See registerRawCommand.
 	rawMachineOutput bool
-	// rawSubcommands names the subcommands that write their own machine
-	// document, the way rawMachineOutput does for every subcommand. See
-	// registerRawSubcommand.
-	rawSubcommands map[string]bool
-}
-
-// rawOutput reports whether sub writes its own machine document.
-func (c *command) rawOutput(sub string) bool {
-	return c.rawMachineOutput || c.rawSubcommands[sub]
 }
 
 // commandRegistry binds each structured command NAME to its handler. It is a
@@ -127,28 +118,6 @@ func registerCommand(name string, run CommandFunc) {
 func registerRawCommand(name string, run CommandFunc) {
 	registerCommand(name, run)
 	commandRegistry[name].rawMachineOutput = true
-}
-
-// registerRawSubcommand marks one subcommand of a registered command as raw,
-// the way registerRawCommand marks a whole command: its stdout is a document a
-// consumer binds to directly, forwarded untouched in every output mode.
-// `tree verify` qualifies: `proposals finalize` and the build skill parse its
-// verdict document, and a bare call that prints no such document tells them the
-// CLI lacks the verifier. Marking a subcommand of an unregistered command, or a
-// path the catalog does not declare, panics like registerCommand does.
-func registerRawSubcommand(name, sub string) {
-	c, ok := commandRegistry[name]
-	if !ok {
-		panic(fmt.Sprintf("cli: raw subcommand %q of unregistered command %q", sub, name))
-	}
-	if _, declared := commandmeta.Lookup(name + " " + sub); !declared {
-		panic(fmt.Sprintf("cli: %q is not a command in the catalog "+
-			"(internal/commandmeta/catalog_data.go) — add it there first", name+" "+sub))
-	}
-	if c.rawSubcommands == nil {
-		c.rawSubcommands = map[string]bool{}
-	}
-	c.rawSubcommands[sub] = true
 }
 
 // lookupCommand returns the registered command for name, if any.

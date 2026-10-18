@@ -763,8 +763,8 @@ func TestSpecGateEvidenceScope_EndToEnd(t *testing.T) {
 			group.Reports[0].Project != "/library" {
 			t.Fatalf("report refs = %+v, want one restored reference to /library", group.Reports)
 		}
-		// `tree verify --workflow` corroborates this restored reference through
-		// the same native cache bridge: the real store must answer its bytes,
+		// The verifier's --workflow mode corroborates this restored reference
+		// through the same native cache bridge: the real store must answer its bytes,
 		// and a reference whose digest the store does not hold must fail.
 		restored := group.Reports[0]
 		data, err := engine.VerifyCachedVerificationReport(wsRoot, restored)

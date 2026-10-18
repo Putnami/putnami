@@ -560,7 +560,7 @@ var structuralPins = []structuralPin{
 			"lines are a single constructor every case calls; writing the layers per case would " +
 			"have cost six. " +
 			"A later change raises 638→639 for ONE line: treecmd/verify_test.go names the untyped " +
-			"JSON object once (fxObj) to build the dossier, session and report documents `tree verify` " +
+			"JSON object once (fxObj) to build the dossier, session and report documents the verifier " +
 			"reads. Those documents are the execute skill's wire, written by agents as JSON, so the " +
 			"fixtures state them as the decoded JSON they are; production adds none, because the " +
 			"verifier reads them through its own ordered JSON values. " +
@@ -637,7 +637,7 @@ var structuralPins = []structuralPin{
 			"A later change raises 885→889 = 253 production + 635 test for the one option-layer constructor itemized on the test pin above; production adds none. " +
 			"A further change raises 889→892 = 253 production + 638 test for the three declared-edges test lines itemized on the test pin above; production adds none. " +
 			"The final change raises 892→893 = 255 production + 638 test for the one test-case decode itemized on the production pin above; tests add none. " +
-			"A later change raises 893→894 = 255 production + 639 test for the one `tree verify` fixture alias itemized on the test pin above; production adds none. " +
+			"A later change raises 893→894 = 255 production + 639 test for the one verifier fixture alias itemized on the test pin above; production adds none. " +
 			"Another change raises 894→895 = 256 production + 639 test for jobs.keyInputs, itemized on the production pin above; tests add none. " +
 			"A later change raises 895→911 = 256 production + 655 test for the sixteen test lines of jobs.RawJobEvent.RecordPayload, itemized on the test pin above; production stays at its ceiling. " +
 			"A later change raises 911→912 for the ONE --no-watch serve fixture line itemized on the test pin above",

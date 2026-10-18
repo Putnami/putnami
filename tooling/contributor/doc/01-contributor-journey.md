@@ -41,7 +41,7 @@ request alone grants no task claim, merge or deployment.
    reachable workloads. Native feature checks come from actual producer
    observations, not handwritten status. `check` remains directly callable;
    build performs the applicable check automatically.
-7. **Project progress.** `tree verify --workflow <file>` validates the
+7. **Project progress.** `change verify --workflow <file>` validates the
    separately versioned local map and reports progress, including pending
    stages. A workflow ref may be attached to a v2 dossier; first confirm the
    CLI advertises `--workflow`, because an older dossier reader can ignore an

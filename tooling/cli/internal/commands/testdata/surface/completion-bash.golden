@@ -18,7 +18,7 @@ _putnami_subcommands_for() {
         'sessions') printf '%s\n' 'export inspect list replay summary' ;;
         'telemetry') printf '%s\n' 'off on show status' ;;
         'templates') printf '%s\n' 'install list package remove test update validate' ;;
-        'tree') printf '%s\n' 'fingerprint verify' ;;
+        'tree') printf '%s\n' 'fingerprint' ;;
         'version') printf '%s\n' 'get tag' ;;
         'workspace') printf '%s\n' 'describe init' ;;
     esac
@@ -97,7 +97,6 @@ _putnami_path_known() {
         'templates validate') return 0 ;;
         'tree') return 0 ;;
         'tree fingerprint') return 0 ;;
-        'tree verify') return 0 ;;
         'upgrade') return 0 ;;
         'version') return 0 ;;
         'version get') return 0 ;;
@@ -140,7 +139,6 @@ _putnami_flags_for() {
         'templates install') printf '%s\n' '--latest' ;;
         'templates package') printf '%s\n' '--stable --version' ;;
         'templates test') printf '%s\n' '--keep --skip-build' ;;
-        'tree verify') printf '%s\n' '--base --gate --record --ref --report --snapshot --workflow' ;;
         'upgrade') printf '%s\n' '--channel --cli --deps --dry-run --extensions --from-source --global --namespace --release --version' ;;
         'version get') printf '%s\n' '--scope' ;;
         'version tag') printf '%s\n' '--dry-run --push --scope --yes' ;;

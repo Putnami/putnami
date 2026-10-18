@@ -86,7 +86,7 @@ complete -c putnami -n '__fish_use_subcommand' -a 'scopes' -d 'List workspace sc
 complete -c putnami -n '__fish_use_subcommand' -a 'sessions' -d 'Inspect execution sessions'
 complete -c putnami -n '__fish_use_subcommand' -a 'telemetry' -d 'Manage anonymous telemetry'
 complete -c putnami -n '__fish_use_subcommand' -a 'templates' -d 'Manage templates'
-complete -c putnami -n '__fish_use_subcommand' -a 'tree' -d 'Identify the worktree the CLI runs in and check evidence against it'
+complete -c putnami -n '__fish_use_subcommand' -a 'tree' -d 'Identify the worktree the CLI runs in'
 complete -c putnami -n '__fish_use_subcommand' -a 'upgrade' -d 'Upgrade CLI, extensions, and dependencies'
 complete -c putnami -n '__fish_use_subcommand' -a 'version' -d 'Versions derived from git and release tags'
 complete -c putnami -n '__fish_use_subcommand' -a 'workspace' -d 'Manage workspace'
@@ -139,7 +139,6 @@ complete -c putnami -n '__putnami_complete_children templates' -a 'test'
 complete -c putnami -n '__putnami_complete_children templates' -a 'update'
 complete -c putnami -n '__putnami_complete_children templates' -a 'validate'
 complete -c putnami -n '__putnami_complete_children tree' -a 'fingerprint'
-complete -c putnami -n '__putnami_complete_children tree' -a 'verify'
 complete -c putnami -n '__putnami_complete_children version' -a 'get'
 complete -c putnami -n '__putnami_complete_children version' -a 'tag'
 complete -c putnami -n '__putnami_complete_children workspace' -a 'describe'
@@ -240,13 +239,6 @@ complete -c putnami -n '__putnami_seen_path templates package' -l 'stable' -d 'P
 complete -c putnami -n '__putnami_seen_path templates package' -l 'version' -d 'Version to stamp on the produced archive' -r
 complete -c putnami -n '__putnami_seen_path templates test' -l 'keep' -d 'Keep the rendered temporary workspace for inspection'
 complete -c putnami -n '__putnami_seen_path templates test' -l 'skip-build' -d 'Render the template without running build and test on it'
-complete -c putnami -n '__putnami_seen_path tree verify' -l 'base' -d 'Base revision; default origin/main for --snapshot and --gate, and for --record the base the dossier must name' -r
-complete -c putnami -n '__putnami_seen_path tree verify' -l 'gate' -d 'Check that the recorded gate session can replace the finalizer\'s gate' -r
-complete -c putnami -n '__putnami_seen_path tree verify' -l 'record' -d 'Verify the dossier this file holds and print the verified verdict' -r
-complete -c putnami -n '__putnami_seen_path tree verify' -l 'ref' -d 'Print the reference to this file: its path as given and its SHA-256' -r
-complete -c putnami -n '__putnami_seen_path tree verify' -l 'report' -d 'Session report of the --gate session' -r
-complete -c putnami -n '__putnami_seen_path tree verify' -l 'snapshot' -d 'Print the dossier skeleton for the current tree'
-complete -c putnami -n '__putnami_seen_path tree verify' -l 'workflow' -d 'Validate a v1 local workflow and report progress without a ready verdict' -r
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'channel' -d 'Resolve a release channel (stable by default; canary for latest prerelease)' -r
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'cli' -d 'Only upgrade the CLI binary'
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'deps' -d 'Only upgrade framework dependencies'

@@ -111,6 +111,41 @@ func TestRefuseRemovedContributorRootNamesDoctorMachine(t *testing.T) {
 	}
 }
 
+// TestRefuseRemovedCoreSubcommandRefusesTreeVerify pins the refusal of the
+// deleted `tree verify`: the same words as a removed root, no extension named,
+// no workspace assumed, and `tree fingerprint` untouched.
+func TestRefuseRemovedCoreSubcommandRefusesTreeVerify(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "command-catalog", "a-root-that-left-the-core-is-refused-unless-an-extension-declares-it")
+	t.Parallel()
+	err := refuseRemovedCoreSubcommand("tree", "verify")
+	if protocolcli.ExitCodeForError(err) != protocolcli.ExitUsage {
+		t.Fatalf("error = %v, want a usage error", err)
+	}
+	message := err.Error()
+	for _, want := range []string{"`putnami tree verify` is no longer a core command", "an extension may provide it", commandmeta.CommandsThatLeftTheCoreURL} {
+		if !strings.Contains(message, want) {
+			t.Errorf("message = %q, want %q", message, want)
+		}
+	}
+	if strings.Contains(message, "@putnami/") || strings.Contains(message, "change verify") || strings.Contains(message, "extensions list") {
+		t.Errorf("message = %q names an extension or assumes a workspace", message)
+	}
+	for _, path := range [][2]string{{"tree", "fingerprint"}, {"tree", ""}, {"sessions", "verify"}, {"change", "verify"}} {
+		if err := refuseRemovedCoreSubcommand(path[0], path[1]); err != nil {
+			t.Errorf("%s %s is refused as a removed subcommand: %v", path[0], path[1], err)
+		}
+	}
+	for _, args := range [][]string{{"tree", "verify"}, {"tree", "verify", "--help"}, {"tree", "verify", "--record", "dossier.json"}} {
+		parsed := ParseArgs(args, nil, nil)
+		if parsed.Commands[0] != "tree" || parsed.Subcommand != "verify" {
+			t.Errorf("ParseArgs(%v) = %v, %q; the refusal reads the command and its subcommand", args, parsed.Commands, parsed.Subcommand)
+		}
+	}
+	if parsed := ParseArgs([]string{"tree", "fingerprint"}, nil, nil); parsed.Err != nil || parsed.Subcommand != "fingerprint" {
+		t.Errorf("ParseArgs(tree fingerprint) = %q, %v", parsed.Subcommand, parsed.Err)
+	}
+}
+
 // TestRemovedCoreRootIsReadAfterAliases keeps a workspace alias named like a
 // removed root working: the refusal reads the command the alias resolves to.
 func TestRemovedCoreRootIsReadAfterAliases(t *testing.T) {
