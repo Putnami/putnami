@@ -1,0 +1,18 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/cli-infra-plan",
+  "outcomes": [
+    "putnami cloud infra plan lists the workspace workloads from the job context, with the output of the core infra plan, and refuses a context that does not give the project type"
+  ],
+  "nonGoals": [
+    "Building a workload or writing its aggregated infra manifest. putnami build does both",
+    "Deleting the core infra plan command, which a later change does"
+  ],
+  "requirements": [
+    {
+      "id": "plan-lists-workloads-from-job-context",
+      "text": "`putnami cloud infra plan` plans every workspace project whose type is application, sorted by name, or the one project it names, and prints what the core `infra plan` prints for each: human text, or one result envelope under `--output`. A job context without `workspaceProjects`, or with a project that has no `type`, fails. A missing type is never read as application."
+    }
+  ]
+}

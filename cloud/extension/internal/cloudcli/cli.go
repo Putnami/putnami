@@ -25,6 +25,7 @@ import (
 	runtimecli "go.putnami.dev/cloud/extension/internal/runtimecli"
 	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/job"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 )
 
@@ -321,6 +322,8 @@ func RunCommand(command string, ioctx IO, args []string) error {
 		return routeDB(params, args, workspaceRoot, env, ioctx)
 	case "env":
 		return routeEnv(params, args, workspaceRoot, env, ioctx)
+	case "infra":
+		return routeInfra(params, args, context.WorkspaceProjects, ioctx)
 	case "deploy":
 		return runtimecli.Deploy(params, args, workspaceRoot, env, ioctx)
 	case "logs":
@@ -1193,6 +1196,11 @@ func workspaceName(workspaceRoot string) string {
 type putnamiContext struct {
 	WorkspaceRoot string         `json:"workspaceRoot"`
 	Params        map[string]any `json:"params"`
+
+	// WorkspaceProjects is the complete workspace membership the native CLI
+	// resolved, each project with its resolved type. `cloud infra plan` reads
+	// it instead of loading the workspace.
+	WorkspaceProjects []job.ProjectRef `json:"workspaceProjects"`
 	// Project is the active project the native putnami CLI resolved from the
 	// invocation cwd (the same resolution `putnami build` / `putnami test`
 	// use). Name is the workload's putnami.json `name` when invoked from

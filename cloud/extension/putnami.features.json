@@ -27,6 +27,30 @@
       ]
     },
     {
+      "id": "cloud/cli-infra-plan",
+      "type": "feature",
+      "name": "Infrastructure plan from the Cloud CLI",
+      "outcome": "putnami cloud infra plan lists the workspace workloads from the job context, with the output of the core infra plan, and refuses a context that does not give the project type",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "plan-lists-workloads-from-job-context",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "infra-plan-output-matches-core",
+              "infra-plan-refuses-untyped-context"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "cloud/local-session-reporting",
       "type": "feature",
       "name": "Gate sessions reported from a developer machine",

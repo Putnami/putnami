@@ -1754,8 +1754,8 @@ func TestRunMainEmitsPutnamiJSONLResultEvents(t *testing.T) {
 	}
 	payload := data["data"].(map[string]any)
 	commands := payload["commands"].([]any)
-	if len(commands) != 20 {
-		t.Fatalf("help lists %d commands, want the 20 public entries", len(commands))
+	if len(commands) != 21 {
+		t.Fatalf("help lists %d commands, want the 21 public entries", len(commands))
 	}
 	first := commands[0].(map[string]any)
 	if first["command"] != "cloud login" {

@@ -10,8 +10,10 @@ import (
 	datacli "go.putnami.dev/cloud/extension/internal/datacli"
 	deliverycli "go.putnami.dev/cloud/extension/internal/deliverycli"
 	distributioncli "go.putnami.dev/cloud/extension/internal/distributioncli"
+	infracli "go.putnami.dev/cloud/extension/internal/infracli"
 	runtimecli "go.putnami.dev/cloud/extension/internal/runtimecli"
 	sourcecli "go.putnami.dev/cloud/extension/internal/sourcecli"
+	"go.putnami.dev/protocol/job"
 )
 
 // The public Cloud CLI is flat: one root entry per thing the user knows.
@@ -44,6 +46,7 @@ var publicEntries = []publicEntry{
 	{"secrets", "secrets status | list | set | reveal | delete", "workspace and project secrets"},
 	{"db", "db status | list | info | connect | grant | migrations", "databases: access grants, a local bridge, migrations"},
 	{"env", "env status | doctor | enable", "environments: what runs where, and their prerequisites"},
+	{"infra", "infra plan [<project>]", "the deployment plan of each workspace workload, from its aggregated infra manifest"},
 	{"deploy", "deploy status <release> | publish-v2 --request-file <path>", "show one release, or submit a release set"},
 	{"logs", "logs", "query a project's logs"},
 	{"traces", "traces", "query a project's traces"},
@@ -308,6 +311,17 @@ func routeEnv(params map[string]any, args []string, workspaceRoot string, env ma
 		return runtimecli.EnvStatus(params, clicore.DropFirstPositional(args), workspaceRoot, env, ioctx)
 	default:
 		return runtimecli.Env(params, args, workspaceRoot, env, ioctx, envDoctorPublish)
+	}
+}
+
+// routeInfra serves `cloud infra`. The workspace projects come from the job
+// context: the command does not load the workspace.
+func routeInfra(params map[string]any, args []string, projects []job.ProjectRef, ioctx IO) error {
+	switch sub := clicore.FirstPositional(args); sub {
+	case "", "plan":
+		return infracli.Plan(params, clicore.DropFirstPositional(args), projects, ioctx)
+	default:
+		return newError("unknown cloud infra command: "+sub+"; expected plan", ExitUsage)
 	}
 }
 

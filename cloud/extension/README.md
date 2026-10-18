@@ -500,7 +500,7 @@ Putnami Cloud config publication and is only needed for legacy config-server
 flows. Because the scaffold writes project sources, both config-publication
 tasks declare `mutatesSources` with the project-scoped `sources` write resource.
 
-The CLI has 20 commands. Each one answers `help` with its own verbs, for
+The CLI has 21 commands. Each one answers `help` with its own verbs, for
 example `putnami cloud packages help`. The commands the engine or a provider
 calls, such as `release-set` and `registry-token`, keep their names. The
 framework builds `putnami cloud --help` from `putnami.extension.json`, which has
@@ -576,6 +576,7 @@ putnami cloud env status [<env>] [--strict] [--output=json]  # each declared env
 putnami cloud env status [<env>] --health|--provenance  # the deployment table: CD header, then per-workload revision/health; --health adds errors (10m), top error, and on-main; --provenance shows commit → release → revision → config version
 putnami cloud env doctor [<env>] [--strict]       # CD prerequisites as a status node; exits 1 when one is missing
 putnami cloud env enable [<env>]
+putnami cloud infra plan [<project>] [--output=json]  # the deployment plan of each workspace workload, from its aggregated infra manifest
 putnami cloud deploy publish-v2 --request-file ./publish-v2-deploy.json [--env prod] [--wait] [--timeout <dur>]  # operator: submit an exact release set
 putnami cloud deploy status <release-id>           # one release as a status node; exits 1 when it failed, or ended partial or skipped
 putnami cloud logs [<app>] [--env <env>] [--since <t>] [--level <sev>] [--follow] [--output=jsonl]
@@ -584,6 +585,26 @@ putnami cloud traces [<app>] [--env <env>] [--slow <dur>] [--from <t>] [--to <t>
 putnami cloud metrics [<app>] [--env <env>] [--window <dur>] [--output=jsonl]
 putnami cloud registry-token --host <host>         # machine command: host-based compatibility alias
 ```
+
+`putnami cloud infra plan` prints, for each application workload of the
+workspace, what its aggregated infra manifest (`.gen/requirements.json`) asks a
+deployer to provide: databases, events, storage, secrets, scheduled jobs and
+runtime. It reads the manifests a build wrote and runs no build, so a workload
+that was never built shows `No aggregated manifest`. It makes no network
+request and needs no sign-in. Name a project to plan only that project; a
+project that is not an application workload is refused. Workloads print sorted
+by name. With `--output=json` or `--output=jsonl` the result envelope's `data`
+holds one entry per workload (`workload`, `status` of `ok`, `missing` or
+`invalid`, and the `manifest` or the `diagnostics`): an object for one workload,
+an array for several, `[]` for none.
+
+The command does not load the workspace. The CLI lists every workspace project
+with its resolved `type` in the job context, and the command plans the projects
+whose type is `application`. A context without the `workspaceProjects` member, or with a project that gives
+no `type` (a CLI older than the job context change), is refused with a message
+that says to upgrade the CLI; the command never reads a missing type as
+`application`. A workspace with no projects prints `No workloads found.`, as the
+core does.
 
 `putnami cloud status` reads 12 entries at once and gives each a state: `ok`,
 `degraded`, `failing` or `unknown`. The entries are `whoami`, `token`,
@@ -1262,6 +1283,7 @@ and exposes them.
 | [`internal/datacli`](internal/datacli) | `db` (`status`, `list`, `info`, `grant`, `connect`) and the Data side of migration publication |
 | [`internal/runtimecli`](internal/runtimecli) | `env`, `deploy` |
 | [`internal/identitycli`](internal/identitycli) | `login` (OAuth device flow), `whoami` |
+| [`internal/infracli`](internal/infracli) | `infra plan`, read from the workspace projects of the job context |
 | [`internal/observabilitycli`](internal/observabilitycli) | `logs` (query and `--follow` SSE live tail), `traces` (`--slow`), `metrics` (`--window`), all with `--output=jsonl` as the agent surface |
 | [`internal/cloudcli`](internal/cloudcli) | The aggregator: `RunMain`/`RunCommand` dispatch, the `putnami.extension.json` manifest and the extension binary, and the cross-cutting commands that orchestrate several domains (`login`/`logout`/`setup`/`install`/`status`/`token`) plus workspace-link and CLI-runtime plumbing. |
 
