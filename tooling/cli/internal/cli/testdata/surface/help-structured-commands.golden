@@ -129,16 +129,6 @@ Global Options:
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
-═══ dev ═══
-putnami dev
-
-Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
-  Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
-
 ═══ doctor ═══
 putnami doctor
 
@@ -829,60 +819,6 @@ Related Commands:
   putnami extensions install
   putnami upgrade
 
-═══ dev extension ═══
-putnami dev extension
-
-Develop extensions: validate manifests against the protocol
-
-Usage:
-  putnami dev extension validate [path]
-
-Examples:
-  putnami dev extension validate
-  putnami dev extension validate ./my-extension/
-
-Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
-  Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
-
-Related Commands:
-  putnami dev template
-  putnami extensions install
-
-═══ dev template ═══
-putnami dev template
-
-Develop and package templates: validate manifests, test rendering output, or package for distribution
-
-Usage:
-  putnami dev template <validate|test|package> [path] [--skip-build] [--keep] [--version <version>] [--stable]
-
-Command Flags:
-  --skip-build                 With test: render the template without running build and test on it
-  --keep                       With test: keep the rendered temporary workspace for inspection
-  --version <version>          With package: version to stamp on the produced archive
-  --stable                     With package: publish under a stable version instead of a prerelease
-
-Examples:
-  putnami dev template validate
-  putnami dev template validate ./my-template/
-  putnami dev template test
-  putnami dev template package
-
-Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
-  Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
-
-Related Commands:
-  putnami dev extension
-  putnami templates install
-
 ═══ extensions install ═══
 putnami extensions install
 
@@ -991,6 +927,29 @@ Global Options:
 Related Commands:
   putnami extensions install
   putnami extensions list
+
+═══ extensions validate ═══
+putnami extensions validate
+
+Develop extensions: validate manifests against the protocol
+
+Usage:
+  putnami extensions validate [path]
+
+Examples:
+  putnami extensions validate
+  putnami extensions validate ./my-extension/
+
+Global Options:
+  Common: --verbose, --debug, --watch, --plan, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
+  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Output: --output, --json, --quiet, --color, --no-color
+  Advanced: --trace-profile
+
+Related Commands:
+  putnami templates validate
+  putnami extensions install
 
 ═══ features diff ═══
 putnami features diff
@@ -1477,6 +1436,33 @@ Related Commands:
   putnami templates install
   putnami templates update
 
+═══ templates package ═══
+putnami templates package
+
+Package a template into a distributable archive
+
+Usage:
+  putnami templates package [path] [--version <version>] [--stable]
+
+Command Flags:
+  --version <version>          Version to stamp on the produced archive
+  --stable                     Publish under a stable version instead of a prerelease
+
+Examples:
+  putnami templates package
+  putnami templates package ./my-template/ --version 1.2.3 --stable
+
+Global Options:
+  Common: --verbose, --debug, --watch, --plan, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
+  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Output: --output, --json, --quiet, --color, --no-color
+  Advanced: --trace-profile
+
+Related Commands:
+  putnami templates validate
+  putnami templates test
+
 ═══ templates remove ═══
 putnami templates remove
 
@@ -1498,6 +1484,33 @@ Global Options:
 Related Commands:
   putnami templates list
   putnami templates install
+
+═══ templates test ═══
+putnami templates test
+
+Test a template by rendering it into a temporary workspace and running build and test on the result
+
+Usage:
+  putnami templates test [path] [--skip-build] [--keep]
+
+Command Flags:
+  --skip-build                 Render the template without running build and test on it
+  --keep                       Keep the rendered temporary workspace for inspection
+
+Examples:
+  putnami templates test
+  putnami templates test ./my-template/ --skip-build
+
+Global Options:
+  Common: --verbose, --debug, --watch, --plan, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
+  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Output: --output, --json, --quiet, --color, --no-color
+  Advanced: --trace-profile
+
+Related Commands:
+  putnami templates validate
+  putnami templates package
 
 ═══ templates update ═══
 putnami templates update
@@ -1521,6 +1534,31 @@ Global Options:
 Related Commands:
   putnami templates install
   putnami templates list
+
+═══ templates validate ═══
+putnami templates validate
+
+Validate a template manifest against the protocol
+
+Usage:
+  putnami templates validate [path]
+
+Examples:
+  putnami templates validate
+  putnami templates validate ./my-template/
+
+Global Options:
+  Common: --verbose, --debug, --watch, --plan, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
+  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Output: --output, --json, --quiet, --color, --no-color
+  Advanced: --trace-profile
+
+Related Commands:
+  putnami templates test
+  putnami templates package
+  putnami extensions validate
+  putnami templates install
 
 ═══ version get ═══
 putnami version get

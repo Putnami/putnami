@@ -34,6 +34,14 @@ func TestRefuseRemovedCoreRootRefusesOnlyWhatNoExtensionDeclares(t *testing.T) {
 				!strings.Contains(message, commandmeta.CommandsThatLeftTheCoreURL) {
 				t.Fatalf("message = %q, want the root and the reference that lists where it moved", message)
 			}
+			if successors, moved := removedRootSuccessors[root]; moved {
+				// A root the core still serves under another spelling names it.
+				if !strings.Contains(message, successors) {
+					t.Fatalf("message = %q, want the new spelling %q", message, successors)
+				}
+			} else if !strings.Contains(message, "an extension may provide it") {
+				t.Fatalf("message = %q, want the extension hint", message)
+			}
 			if strings.Contains(message, "@putnami/") || strings.Contains(message, "cloud") {
 				t.Fatalf("message = %q names an extension", message)
 			}
@@ -56,6 +64,26 @@ func TestRefuseRemovedCoreRootRefusesOnlyWhatNoExtensionDeclares(t *testing.T) {
 	for _, command := range []string{"lint", "build", "cloud", "typo", ""} {
 		if err := refuseRemovedCoreRoot(command, nil, nil); err != nil {
 			t.Errorf("%q is refused as a removed root: %v", command, err)
+		}
+	}
+}
+
+// TestRefuseRemovedDevRootNamesTheNewSpellings pins the words a user who types
+// the deleted dev root reads: both new spellings, and no transition alias.
+func TestRefuseRemovedDevRootNamesTheNewSpellings(t *testing.T) {
+	t.Parallel()
+	err := refuseRemovedCoreRoot("dev", nil, nil)
+	if err == nil {
+		t.Fatal("`putnami dev` is not refused")
+	}
+	for _, want := range []string{"`putnami extensions validate [path]`", "`putnami templates validate|test|package [path]`"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("message = %q, want %q", err.Error(), want)
+		}
+	}
+	for _, spelling := range [][]string{{"extensions", "validate"}, {"templates", "validate"}, {"templates", "test"}, {"templates", "package"}} {
+		if parsed := ParseArgs(spelling, nil, nil); parsed.Err != nil || parsed.Commands[0] != spelling[0] || parsed.Subcommand != spelling[1] {
+			t.Errorf("ParseArgs(%v) = %v, %q, %v", spelling, parsed.Commands, parsed.Subcommand, parsed.Err)
 		}
 	}
 }

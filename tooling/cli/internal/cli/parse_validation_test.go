@@ -57,8 +57,10 @@ func TestValidateStructuredFlags_AcceptsDeclaredAndGlobalFlags(t *testing.T) {
 		// including the inline spelling the global parser normalizes away.
 		{"extensions", "install", []string{"--platform", "linux/amd64", "--dest", "./.gen/warm"}},
 		{"extensions", "install", []string{"--platform=linux/amd64", "--dest=./.gen/warm"}},
-		{"dev", "template", []string{"test", "--keep", "--skip-build"}},
-		{"dev", "template", []string{"package", "--version", "1.2.3", "--stable"}},
+		{"templates", "validate", []string{"./my-template/"}},
+		{"templates", "test", []string{"--keep", "--skip-build"}},
+		{"templates", "package", []string{"--version", "1.2.3", "--stable"}},
+		{"extensions", "validate", []string{"./my-extension/"}},
 		{"cli", "use", []string{"0.1.0", "-g"}},
 		{"doctor", "", []string{"--project", "@putnami/cli"}},
 		// Globals are always accepted alongside a command's own flags.
@@ -128,7 +130,7 @@ func TestParseArgs_BuiltInRejectsUnreadPassthrough(t *testing.T) {
 		{"version", "tag", "--", "--push"},
 		{"version", "--", "tag"},
 		{"tree", "verify", "--", "--help"},
-		{"dev", "template", "package", "--", "--stable"},
+		{"templates", "package", "--", "--stable"},
 		{"upgrade", "--", "--from-source"},
 		{"upgrade", "1.2.3", "--", "--from-source"},
 		{"init", "--", "--force"},

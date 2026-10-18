@@ -132,10 +132,14 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 | `putnami extensions update` | Update extensions |
 | `putnami extensions remove` | Remove an extension |
 | `putnami extensions prepare` | Prepare the provider runtimes of a source workspace |
+| `putnami extensions validate` | Validate an extension manifest |
 | `putnami templates install` | Install templates from config |
 | `putnami templates list` | List installed templates |
 | `putnami templates update` | Update templates |
 | `putnami templates remove` | Remove a template |
+| `putnami templates validate` | Validate a template manifest |
+| `putnami templates test` | Test a template in a temporary workspace |
+| `putnami templates package` | Package a template into an archive |
 
 ## Dependencies
 
@@ -182,13 +186,6 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 | Command | Description |
 |---------|-------------|
 | `putnami migrate vnext` | Migrate putnami.lock.json to the current format |
-
-## Authoring
-
-| Command | Description |
-|---------|-------------|
-| `putnami dev extension validate` | Validate an extension manifest |
-| `putnami dev template <action>` | Validate, test, or package a template |
 
 ## Agents
 
@@ -680,6 +677,21 @@ putnami extensions prepare [--output <format>]
 - `putnami extensions prepare`
 - `putnami extensions prepare --output=jsonl`
 
+### `putnami extensions validate`
+
+Develop extensions: validate manifests against the protocol
+
+**Usage**
+
+```
+putnami extensions validate [path]
+```
+
+**Examples**
+
+- `putnami extensions validate`
+- `putnami extensions validate ./my-extension/`
+
 ### `putnami templates install`
 
 Install templates from workspace configuration
@@ -745,6 +757,65 @@ putnami templates remove <name>
 **Examples**
 
 - `putnami templates remove go-server`
+
+### `putnami templates validate`
+
+Validate a template manifest against the protocol
+
+**Usage**
+
+```
+putnami templates validate [path]
+```
+
+**Examples**
+
+- `putnami templates validate`
+- `putnami templates validate ./my-template/`
+
+### `putnami templates test`
+
+Test a template by rendering it into a temporary workspace and running build and test on the result
+
+**Usage**
+
+```
+putnami templates test [path] [--skip-build] [--keep]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--skip-build` | Render the template without running build and test on it |
+| `--keep` | Keep the rendered temporary workspace for inspection |
+
+**Examples**
+
+- `putnami templates test`
+- `putnami templates test ./my-template/ --skip-build`
+
+### `putnami templates package`
+
+Package a template into a distributable archive
+
+**Usage**
+
+```
+putnami templates package [path] [--version <version>] [--stable]
+```
+
+**Flags**
+
+| Flag | Description |
+|------|-------------|
+| `--version` <version> | Version to stamp on the produced archive |
+| `--stable` | Publish under a stable version instead of a prerelease |
+
+**Examples**
+
+- `putnami templates package`
+- `putnami templates package ./my-template/ --version 1.2.3 --stable`
 
 ### `putnami deps install`
 
@@ -1176,47 +1247,6 @@ putnami migrate vnext [--check] [--apply] [--output <format>]
 - `putnami migrate vnext --check`
 - `putnami migrate vnext --check --output=json`
 - `putnami migrate vnext --apply`
-
-### `putnami dev extension`
-
-Develop extensions: validate manifests against the protocol
-
-**Usage**
-
-```
-putnami dev extension validate [path]
-```
-
-**Examples**
-
-- `putnami dev extension validate`
-- `putnami dev extension validate ./my-extension/`
-
-### `putnami dev template`
-
-Develop and package templates: validate manifests, test rendering output, or package for distribution
-
-**Usage**
-
-```
-putnami dev template <validate|test|package> [path] [--skip-build] [--keep] [--version <version>] [--stable]
-```
-
-**Flags**
-
-| Flag | Description |
-|------|-------------|
-| `--skip-build` | With test: render the template without running build and test on it |
-| `--keep` | With test: keep the rendered temporary workspace for inspection |
-| `--version` <version> | With package: version to stamp on the produced archive |
-| `--stable` | With package: publish under a stable version instead of a prerelease |
-
-**Examples**
-
-- `putnami dev template validate`
-- `putnami dev template validate ./my-template/`
-- `putnami dev template test`
-- `putnami dev template package`
 
 ### `putnami contributor`
 

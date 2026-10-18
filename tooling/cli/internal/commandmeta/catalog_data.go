@@ -595,6 +595,23 @@ var catalog = []Command{
 		Workspace:        requiredWorkspace(),
 	},
 	{
+		Path:        "extensions validate",
+		Kind:        KindStructured,
+		Category:    "Extensions & Templates",
+		Summary:     "Validate an extension manifest",
+		Description: "Develop extensions: validate manifests against the protocol",
+		Usage:       "putnami extensions validate [path]",
+		Positionals: []Positional{{Name: "path"}},
+		Examples: []string{
+			"putnami extensions validate",
+			"putnami extensions validate ./my-extension/",
+		},
+		Related: []string{"templates validate", "extensions install"},
+		Workspace: WorkspaceNeed{
+			Note: "cmdExtensions validates an authored manifest from a path, with no workspace lookup",
+		},
+	},
+	{
 		Path:       "templates",
 		Kind:       KindStructured,
 		Summary:    "Manage templates",
@@ -664,6 +681,65 @@ var catalog = []Command{
 		},
 		Related:   []string{"templates list", "templates install"},
 		Workspace: requiredWorkspace(),
+	},
+	{
+		Path:        "templates validate",
+		Kind:        KindStructured,
+		Category:    "Extensions & Templates",
+		Summary:     "Validate a template manifest",
+		Description: "Validate a template manifest against the protocol",
+		Usage:       "putnami templates validate [path]",
+		Positionals: []Positional{{Name: "path"}},
+		Examples: []string{
+			"putnami templates validate",
+			"putnami templates validate ./my-template/",
+		},
+		Related: []string{"templates test", "templates package", "extensions validate", "templates install"},
+		Workspace: WorkspaceNeed{
+			Note: "cmdTemplates validates an authored template from a path, with no workspace lookup",
+		},
+	},
+	{
+		Path:        "templates test",
+		Kind:        KindStructured,
+		Category:    "Extensions & Templates",
+		Summary:     "Test a template in a temporary workspace",
+		Description: "Test a template by rendering it into a temporary workspace and running build and test on the result",
+		Usage:       "putnami templates test [path] [--skip-build] [--keep]",
+		Flags: []Flag{
+			{Long: "--skip-build", Description: "Render the template without running build and test on it"},
+			{Long: "--keep", Description: "Keep the rendered temporary workspace for inspection"},
+		},
+		Positionals: []Positional{{Name: "path"}},
+		Examples: []string{
+			"putnami templates test",
+			"putnami templates test ./my-template/ --skip-build",
+		},
+		Related: []string{"templates validate", "templates package"},
+		Workspace: WorkspaceNeed{
+			Note: "cmdTemplates renders an authored template from a path into a temporary workspace, with no workspace lookup",
+		},
+	},
+	{
+		Path:        "templates package",
+		Kind:        KindStructured,
+		Category:    "Extensions & Templates",
+		Summary:     "Package a template into an archive",
+		Description: "Package a template into a distributable archive",
+		Usage:       "putnami templates package [path] [--version <version>] [--stable]",
+		Flags: []Flag{
+			{Long: "--version", Type: FlagValue, ValueName: "<version>", Description: "Version to stamp on the produced archive"},
+			{Long: "--stable", Description: "Publish under a stable version instead of a prerelease"},
+		},
+		Positionals: []Positional{{Name: "path"}},
+		Examples: []string{
+			"putnami templates package",
+			"putnami templates package ./my-template/ --version 1.2.3 --stable",
+		},
+		Related: []string{"templates validate", "templates test"},
+		Workspace: WorkspaceNeed{
+			Note: "cmdTemplates packages an authored template from a path, with no workspace lookup",
+		},
 	},
 
 	// ── Dependencies ─────────────────────────────────────────────────────
@@ -1139,63 +1215,6 @@ var catalog = []Command{
 		StructuredOutput: true,
 		Workspace: WorkspaceNeed{
 			Note: "cmdMigrate falls back to os.Getwd(): vnext migrates the lock file found at the workspace root or the current directory",
-		},
-	},
-
-	// ── Authoring ────────────────────────────────────────────────────────
-	{
-		Path:    "dev",
-		Kind:    KindStructured,
-		Summary: "Author extensions and templates",
-		Workspace: WorkspaceNeed{
-			Note: "cmdDev validates and packages authored artifacts from a path, with no workspace lookup",
-		},
-	},
-	{
-		Path:        "dev extension",
-		Kind:        KindStructured,
-		Category:    "Authoring",
-		Label:       "dev extension validate",
-		Summary:     "Validate an extension manifest",
-		Description: "Develop extensions: validate manifests against the protocol",
-		Usage:       "putnami dev extension validate [path]",
-		Positionals: []Positional{{Name: "path"}},
-		Examples: []string{
-			"putnami dev extension validate",
-			"putnami dev extension validate ./my-extension/",
-		},
-		Related: []string{"dev template", "extensions install"},
-		Workspace: WorkspaceNeed{
-			Note: "cmdDev validates an authored manifest from a path, with no workspace lookup",
-		},
-	},
-	{
-		Path:        "dev template",
-		Kind:        KindStructured,
-		Category:    "Authoring",
-		Label:       "dev template <action>",
-		Summary:     "Validate, test, or package a template",
-		Description: "Develop and package templates: validate manifests, test rendering output, or package for distribution",
-		Usage:       "putnami dev template <validate|test|package> [path] [--skip-build] [--keep] [--version <version>] [--stable]",
-		Flags: []Flag{
-			{Long: "--skip-build", Description: "With test: render the template without running build and test on it"},
-			{Long: "--keep", Description: "With test: keep the rendered temporary workspace for inspection"},
-			{Long: "--version", Type: FlagValue, ValueName: "<version>", Description: "With package: version to stamp on the produced archive"},
-			{Long: "--stable", Description: "With package: publish under a stable version instead of a prerelease"},
-		},
-		Positionals: []Positional{
-			{Name: "validate|test|package", Required: true},
-			{Name: "path"},
-		},
-		Examples: []string{
-			"putnami dev template validate",
-			"putnami dev template validate ./my-template/",
-			"putnami dev template test",
-			"putnami dev template package",
-		},
-		Related: []string{"dev extension", "templates install"},
-		Workspace: WorkspaceNeed{
-			Note: "cmdDev renders and packages an authored template from a path, with no workspace lookup",
 		},
 	},
 

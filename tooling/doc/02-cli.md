@@ -184,6 +184,8 @@ than one version line. To update installed CLI binaries, use
 These commands left the core CLI. Most moved into the extension that owns
 their domain, and work once a workspace declares that extension. `change-plan`
 has no successor command: its document is the projection of an impact plan.
+The `dev` root moved to the `extensions` and `templates` commands of the core,
+which need no extension.
 
 | Former command | Command now | Extension that serves it |
 |---|---|---|
@@ -193,6 +195,8 @@ has no successor command: its document is the projection of an impact plan.
 | `putnami version list`, `putnami version use <name>` | `putnami cli list`, `putnami cli use <name>` | None: the core serves `cli` |
 | `putnami infra plan [<project>]` | `putnami cloud infra plan [<project>]` | `@putnami/cloud` |
 | `putnami change-plan --base <commit>` | `putnami impact-plan lint,test,build,validate --base <commit>`, then `ChangePlanFromImpactPlan` from `go.putnami.dev/protocol/ci` | None: the core serves `impact-plan` |
+| `putnami dev extension validate [path]` | `putnami extensions validate [path]` | None: the core serves `extensions` |
+| `putnami dev template validate [path]`, `dev template test [path]`, `dev template package [path]` | `putnami templates validate [path]`, `templates test [path]`, `templates package [path]` | None: the core serves `templates` |
 
 To get a moved command, add its extension to `extensions` in
 `putnami.workspace.json`, then run `putnami install`:
@@ -203,8 +207,9 @@ To get a moved command, add its extension to `extensions` in
 }
 ```
 
-The CLI refuses `putnami channel …`, `putnami ci …`, `putnami change-plan` and
-`putnami infra …`, and `putnami help` of each, with exit code 2, unless an installed extension declares that root. A
+The CLI refuses `putnami channel …`, `putnami ci …`, `putnami change-plan`,
+`putnami infra …` and `putnami dev …`, and `putnami help` of each, with exit code 2, unless an installed extension declares that root.
+The refusal of `putnami dev …` names the `extensions` and `templates` spellings. A
 run of a moved SDD command that plans no job prints a hint. Both messages link
 to this section, and so does the `impact-plan` refusal of a command that no
 installed extension declares.

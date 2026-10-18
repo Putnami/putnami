@@ -11,15 +11,14 @@ _putnami_subcommands_for() {
         'context') printf '%s\n' 'generate map pack' ;;
         'contributor') printf '%s\n' 'language machine-load' ;;
         'deps') printf '%s\n' 'add install remove' ;;
-        'dev') printf '%s\n' 'extension template' ;;
-        'extensions') printf '%s\n' 'install list prepare remove update' ;;
+        'extensions') printf '%s\n' 'install list prepare remove update validate' ;;
         'mcp') printf '%s\n' 'install' ;;
         'migrate') printf '%s\n' 'vnext' ;;
         'projects') printf '%s\n' 'create describe list sync tag' ;;
         'scopes') printf '%s\n' 'list' ;;
         'sessions') printf '%s\n' 'export inspect list replay summary' ;;
         'telemetry') printf '%s\n' 'off on show status' ;;
-        'templates') printf '%s\n' 'install list remove update' ;;
+        'templates') printf '%s\n' 'install list package remove test update validate' ;;
         'tree') printf '%s\n' 'fingerprint verify' ;;
         'version') printf '%s\n' 'get tag' ;;
         'workspace') printf '%s\n' 'describe init' ;;
@@ -54,9 +53,6 @@ _putnami_path_known() {
         'deps add') return 0 ;;
         'deps install') return 0 ;;
         'deps remove') return 0 ;;
-        'dev') return 0 ;;
-        'dev extension') return 0 ;;
-        'dev template') return 0 ;;
         'doctor') return 0 ;;
         'extensions') return 0 ;;
         'extensions install') return 0 ;;
@@ -64,6 +60,7 @@ _putnami_path_known() {
         'extensions prepare') return 0 ;;
         'extensions remove') return 0 ;;
         'extensions update') return 0 ;;
+        'extensions validate') return 0 ;;
         'help') return 0 ;;
         'impact-plan') return 0 ;;
         'init') return 0 ;;
@@ -97,8 +94,11 @@ _putnami_path_known() {
         'templates') return 0 ;;
         'templates install') return 0 ;;
         'templates list') return 0 ;;
+        'templates package') return 0 ;;
         'templates remove') return 0 ;;
+        'templates test') return 0 ;;
         'templates update') return 0 ;;
+        'templates validate') return 0 ;;
         'tree') return 0 ;;
         'tree fingerprint') return 0 ;;
         'tree verify') return 0 ;;
@@ -122,7 +122,6 @@ _putnami_flags_for() {
         'context map') printf '%s\n' '--print' ;;
         'context pack') printf '%s\n' '--check --project' ;;
         'contributor language') printf '%s\n' '--diff --label --limit' ;;
-        'dev template') printf '%s\n' '--keep --skip-build --stable --version' ;;
         'doctor') printf '%s\n' '--machine --profile --project' ;;
         'extensions install') printf '%s\n' '--dest --latest --platform --user' ;;
         'extensions list') printf '%s\n' '--user' ;;
@@ -144,6 +143,8 @@ _putnami_flags_for() {
         'sessions replay') printf '%s\n' '--session' ;;
         'sessions summary') printf '%s\n' '--by-digest --command --since' ;;
         'templates install') printf '%s\n' '--latest' ;;
+        'templates package') printf '%s\n' '--stable --version' ;;
+        'templates test') printf '%s\n' '--keep --skip-build' ;;
         'tree verify') printf '%s\n' '--base --gate --record --ref --report --snapshot --workflow' ;;
         'upgrade') printf '%s\n' '--channel --cli --deps --dry-run --extensions --from-source --global --namespace --release --version' ;;
         'version get') printf '%s\n' '--scope' ;;
@@ -156,8 +157,8 @@ _putnami_completions() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="D P b build cache cli completion compose config context contributor d deploy deps dev doctor extensions f format generate help impact-plan init install l lint mcp migrate p package pin projects publish qualify report run s scopes serve sessions t telemetry templates test tree upgrade validate version workspace"
-    local structured="cache cli completion compose config context contributor deps dev doctor extensions help impact-plan init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade version workspace"
+    local commands="D P b build cache cli completion compose config context contributor d deploy deps doctor extensions f format generate help impact-plan init install l lint mcp migrate p package pin projects publish qualify report run s scopes serve sessions t telemetry templates test tree upgrade validate version workspace"
+    local structured="cache cli completion compose config context contributor deps doctor extensions help impact-plan init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade version workspace"
     local global_flags="--verbose --debug --watch --plan --help --all --impacted --projects --tag --exclude-tag --exclude --baseline --impacted-strict --where --providers --credential-fd --no-cache --no-cache-projects --cache-trust --continue-on-error --max-parallel --resource --cpu-policy --retry --retry-failed --profile --dry-run --output --json --quiet --color --no-color --trace-profile --version"
     local projects=""
     local project_ids=""

@@ -10,7 +10,18 @@ import (
 // removedCoreRoots are the command roots the core CLI no longer serves. An
 // extension may serve each of them under its own command group, so the core
 // names no destination: the refusal cites the published reference that does.
-var removedCoreRoots = []string{"channel", "ci", "change-plan", "infra"}
+// The exception is a root whose successors the core serves itself
+// (removedRootSuccessors): its refusal names them.
+var removedCoreRoots = []string{"channel", "ci", "change-plan", "infra", "dev"}
+
+// removedRootSuccessors names, for a removed root whose commands the core still
+// serves under another spelling, where they went. The core serves them in any
+// workspace and outside one, so the refusal can name them without assuming
+// either.
+var removedRootSuccessors = map[string]string{
+	"dev": "use `putnami extensions validate [path]` to validate an extension manifest, " +
+		"and `putnami templates validate|test|package [path]` to validate, test or package a template",
+}
 
 // refuseRemovedCoreRoot returns a usage error when command is a removed core
 // root that no extension declares, as a command group or as a job, and nil
@@ -23,6 +34,10 @@ func refuseRemovedCoreRoot(command string, groups map[string]bool, extensions []
 	}
 	if len(extension.BuildJobMap(extensions)[command]) > 0 {
 		return nil
+	}
+	if successors, ok := removedRootSuccessors[command]; ok {
+		return usageErrorf("`putnami %s` is no longer a core command: %s. "+
+			"%s lists where each moved command is now", command, successors, commandmeta.CommandsThatLeftTheCoreURL)
 	}
 	return usageErrorf("`putnami %s` is no longer a core command: an extension may provide it under its own command group. "+
 		"%s lists where each moved command is now", command, commandmeta.CommandsThatLeftTheCoreURL)

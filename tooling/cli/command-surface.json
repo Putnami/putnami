@@ -396,52 +396,6 @@
       "positionals": []
     },
     {
-      "path": "dev",
-      "flags": [],
-      "positionals": []
-    },
-    {
-      "path": "dev extension",
-      "flags": [],
-      "positionals": [
-        {
-          "name": "path",
-          "required": false
-        }
-      ]
-    },
-    {
-      "path": "dev template",
-      "flags": [
-        {
-          "long": "--keep",
-          "type": "bool"
-        },
-        {
-          "long": "--skip-build",
-          "type": "bool"
-        },
-        {
-          "long": "--stable",
-          "type": "bool"
-        },
-        {
-          "long": "--version",
-          "type": "value"
-        }
-      ],
-      "positionals": [
-        {
-          "name": "validate|test|package",
-          "required": true
-        },
-        {
-          "name": "path",
-          "required": false
-        }
-      ]
-    },
-    {
       "path": "doctor",
       "flags": [
         {
@@ -520,6 +474,16 @@
       "path": "extensions update",
       "flags": [],
       "positionals": []
+    },
+    {
+      "path": "extensions validate",
+      "flags": [],
+      "positionals": [
+        {
+          "name": "path",
+          "required": false
+        }
+      ]
     },
     {
       "path": "f",
@@ -966,6 +930,25 @@
       "positionals": []
     },
     {
+      "path": "templates package",
+      "flags": [
+        {
+          "long": "--stable",
+          "type": "bool"
+        },
+        {
+          "long": "--version",
+          "type": "value"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "path",
+          "required": false
+        }
+      ]
+    },
+    {
       "path": "templates remove",
       "flags": [],
       "positionals": [
@@ -976,9 +959,38 @@
       ]
     },
     {
+      "path": "templates test",
+      "flags": [
+        {
+          "long": "--keep",
+          "type": "bool"
+        },
+        {
+          "long": "--skip-build",
+          "type": "bool"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "path",
+          "required": false
+        }
+      ]
+    },
+    {
       "path": "templates update",
       "flags": [],
       "positionals": []
+    },
+    {
+      "path": "templates validate",
+      "flags": [],
+      "positionals": [
+        {
+          "name": "path",
+          "required": false
+        }
+      ]
     },
     {
       "path": "test",

@@ -226,6 +226,9 @@ Remove an extension.
 .B extensions prepare
 Prepare the provider runtimes of a source workspace.
 .TP
+.B extensions validate
+Validate an extension manifest.
+.TP
 .B templates install
 Install templates from config.
 .TP
@@ -237,6 +240,15 @@ Update templates.
 .TP
 .B templates remove
 Remove a template.
+.TP
+.B templates validate
+Validate a template manifest.
+.TP
+.B templates test
+Test a template in a temporary workspace.
+.TP
+.B templates package
+Package a template into an archive.
 .SS Dependencies
 .TP
 .B deps install
@@ -305,13 +317,6 @@ Run a workload's derived smoke contract against a target and emit one verdict.
 .TP
 .B migrate vnext
 Migrate putnami.lock.json to the current format.
-.SS Authoring
-.TP
-.B dev extension validate
-Validate an extension manifest.
-.TP
-.B dev template <action>
-Validate, test, or package a template.
 .SS Agents
 .TP
 .B contributor
@@ -594,6 +599,12 @@ Prepare into the artifact store the runtime of each path extension that serves a
 .B Usage:
 .br
 putnami extensions prepare [--output <format>]
+.SS extensions validate
+Develop extensions: validate manifests against the protocol.
+.PP
+.B Usage:
+.br
+putnami extensions validate [path]
 .SS templates install
 Install templates from workspace configuration.
 .PP
@@ -621,6 +632,36 @@ Remove an installed template.
 .B Usage:
 .br
 putnami templates remove <name>
+.SS templates validate
+Validate a template manifest against the protocol.
+.PP
+.B Usage:
+.br
+putnami templates validate [path]
+.SS templates test
+Test a template by rendering it into a temporary workspace and running build and test on the result.
+.PP
+.B Usage:
+.br
+putnami templates test [path] [--skip-build] [--keep]
+.TP
+.B --skip-build
+Render the template without running build and test on it.
+.TP
+.B --keep
+Keep the rendered temporary workspace for inspection.
+.SS templates package
+Package a template into a distributable archive.
+.PP
+.B Usage:
+.br
+putnami templates package [path] [--version <version>] [--stable]
+.TP
+.B --version
+Version to stamp on the produced archive.
+.TP
+.B --stable
+Publish under a stable version instead of a prerelease.
 .SS deps install
 Install project dependencies by delegating to extension-provided installers.
 .PP
@@ -846,30 +887,6 @@ Report the pending migration without writing (default); exits non-zero when a mi
 .TP
 .B --apply
 Perform the migration, atomically and idempotently.
-.SS dev extension
-Develop extensions: validate manifests against the protocol.
-.PP
-.B Usage:
-.br
-putnami dev extension validate [path]
-.SS dev template
-Develop and package templates: validate manifests, test rendering output, or package for distribution.
-.PP
-.B Usage:
-.br
-putnami dev template <validate|test|package> [path] [--skip-build] [--keep] [--version <version>] [--stable]
-.TP
-.B --skip-build
-With test: render the template without running build and test on it.
-.TP
-.B --keep
-With test: keep the rendered temporary workspace for inspection.
-.TP
-.B --version
-With package: version to stamp on the produced archive.
-.TP
-.B --stable
-With package: publish under a stable version instead of a prerelease.
 .SS contributor
 Run the local contributor helpers used by the build workflow. Language checks read text, tracked files, commit messages, or tasks through the configured collaboration provider; machine-load reads local resource capacity. Neither command runs the project gate.
 .PP

@@ -10,7 +10,7 @@
 // time, far from the extension that caused it.
 //
 // This package moves that verdict to authoring time. Build runs exactly the
-// gate `putnami dev extension validate` and the package job run
+// gate `putnami extensions validate` and the package job run
 // (extension.FullValidateManifest, whose v3 half is
 // extension.ValidateTaskContracts), so an authored manifest that violates
 //

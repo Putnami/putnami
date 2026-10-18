@@ -297,10 +297,9 @@ func TestTemplatesPackage_Success(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "main.go.template"), []byte("package {{.Name}}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	outDir := filepath.Join(t.TempDir(), "out")
 
 	out, err := sharedtest.CaptureStdout(t, func() error {
-		return TemplatesPackage(context.Background(), []string{dir, "--output", outDir, "--version", "1.2.3"})
+		return TemplatesPackage(context.Background(), []string{dir, "--version", "1.2.3"})
 	})
 	if err != nil {
 		t.Fatalf("TemplatesPackage: %v", err)

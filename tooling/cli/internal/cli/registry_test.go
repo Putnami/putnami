@@ -68,12 +68,11 @@ func TestUsageErrorfMessageHasNoSentinelSuffix(t *testing.T) {
 // isStructuredCommand from the registry preserves the recognized command set.
 func TestCommandRegistryCoversStructuredCommands(t *testing.T) {
 	t.Parallel()
-	// The native contributor language and machine-load helpers add the 29th
-	// structured root; the catalog and dispatcher must expose the same root.
+	// The catalog and the dispatcher must expose the same structured roots.
 	want := []string{
 		"extensions", "templates", "projects", "workspace", "version", "deps",
 		"cache", "config", "context", "migrate", "sessions", "completion",
-		"install", "telemetry", "upgrade", "help", "init", "dev", "scopes",
+		"install", "telemetry", "upgrade", "help", "init", "scopes",
 		"mcp", "pin", "doctor", "impact-plan", "report", "tree",
 		"compose", "qualify", "contributor", "cli",
 	}
