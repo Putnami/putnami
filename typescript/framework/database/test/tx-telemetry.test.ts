@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { setCollector, TelemetryCollector } from '@putnami/application';
+import { drainMetrics } from '@putnami/application/testing';
 import { runInContext } from '@putnami/runtime';
 import { MemoryLogger } from '@putnami/runtime/testing';
 import { specTest } from '@putnami/spectest';
@@ -109,7 +110,7 @@ describe('Transaction telemetry — commit', () => {
       });
     });
 
-    const bucket = collector.drainAll()[0];
+    const bucket = drainMetrics(collector);
     expect(bucket.counters['sql.tx.outcome.committed']).toBe(1);
     expect(bucket.histograms['sql.tx.duration']).toBeDefined();
     expect(bucket.histograms['sql.tx.retries'].sum).toBe(0);
@@ -158,7 +159,7 @@ describe('Transaction telemetry — rollback', () => {
         }).catch(() => {});
       });
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMetrics(collector);
       expect(bucket.counters['sql.tx.outcome.rolled-back']).toBe(1);
       expect(bucket.counters['sql.tx.rollback.40001']).toBe(1);
       expect(bucket.histograms['sql.tx.duration']).toBeDefined();
@@ -185,7 +186,7 @@ describe('Transaction telemetry — rollback', () => {
       await rollback();
     });
 
-    const bucket = collector.drainAll()[0];
+    const bucket = drainMetrics(collector);
     expect(bucket.counters['sql.tx.rollback.explicit-rollback']).toBe(1);
   });
 
@@ -199,7 +200,7 @@ describe('Transaction telemetry — rollback', () => {
       await uow.finalize(driverErr);
     });
 
-    const bucket = collector.drainAll()[0];
+    const bucket = drainMetrics(collector);
     expect(bucket.counters['sql.tx.outcome.rolled-back']).toBe(1);
     expect(bucket.counters['sql.tx.rollback.40001']).toBe(1);
   });

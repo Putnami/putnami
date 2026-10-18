@@ -218,7 +218,8 @@ function seriesKey(name: string, attributes: TelemetryAttributes): string {
   return `${name}\0${JSON.stringify(attributes)}`;
 }
 
-function compareSeries(
+/** Orders attributed series by name, then attributes: the order each bucket keeps. */
+export function compareSeries(
   left: AttributedCounterAggregate | AttributedHistogramAggregate,
   right: AttributedCounterAggregate | AttributedHistogramAggregate,
 ): number {
