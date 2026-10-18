@@ -1,8 +1,8 @@
 package engine
 
 import (
-	"go.putnami.dev/cli/model/jobs"
 	modeljobs "go.putnami.dev/cli/model/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
