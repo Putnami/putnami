@@ -2948,6 +2948,21 @@
           }
         },
         {
+          "id": "change-verify-parity",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "change-verify-prints-what-tree-verify-prints",
+              "a-restored-report-is-read-through-the-host-channel",
+              "without-a-channel-only-a-restored-report-is-not-verified",
+              "no-process-receives-the-host-channel",
+              "change-verify-runs-with-and-without-a-workspace"
+            ]
+          }
+        },
+        {
           "id": "canonical-consumer-migration",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

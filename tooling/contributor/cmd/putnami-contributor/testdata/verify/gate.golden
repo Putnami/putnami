@@ -1,0 +1,10 @@
+exit 0
+-- stdout --
+{
+  "verdict": "gate reusable",
+  "gateSession": "synthetic-gate",
+  "session": ".context/session.json",
+  "report": ".context/report.json",
+  "fingerprint": "c775d7d67f6a53d6c4079e20e6fa019d63f774a5258fa1526021c2230470829c",
+  "baseSHA": "683c624f3bfcd883ab636de07832087ea3203e26"
+}

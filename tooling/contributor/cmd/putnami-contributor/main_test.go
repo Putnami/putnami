@@ -134,7 +134,7 @@ func TestRunRefusesEveryOtherInvocation(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{
 		nil,
-		{"verify"},
+		{"finalize"},
 		{"__putnami"},
 		{"__putnami", "runtime-info", "extra"},
 	} {

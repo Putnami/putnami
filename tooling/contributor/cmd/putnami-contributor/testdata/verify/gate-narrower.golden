@@ -1,0 +1,3 @@
+exit 1
+-- stdout --
+{"verdict":"not-verified","reason":"gate is narrower than the native unfiltered impacted plan"}

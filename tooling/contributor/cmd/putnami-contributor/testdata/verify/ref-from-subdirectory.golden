@@ -1,0 +1,6 @@
+exit 0
+-- stdout --
+{
+  "path": "app.txt",
+  "sha256": "7f8b1dfc466b6249f06cbe55c9174df2578e7754da793fded244ef5cba2a38f1"
+}
