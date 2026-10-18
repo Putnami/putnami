@@ -37,8 +37,8 @@ import (
 // channel produced, and whether the artifact is a template (which the uploader
 // fans out to every platform from one blob).
 //
-// ITS READER IS OUT OF TREE. `@putnami/cloud`'s `publish-archives`
-// (distribution/libs/cli/publish_archives.go) reads exactly these five fields
+// ITS READER IS OUT OF TREE. `@putnami/cloud`'s `packages publish`
+// (cloud/extension/internal/distributioncli/publish_archives.go) reads exactly these five fields
 // from exactly this path, and its task runs with --if-present, so a missing or
 // channel-less file is a SILENT SKIP rather than a failed publication. That is
 // why the file survived with an owner instead of being replaced by the

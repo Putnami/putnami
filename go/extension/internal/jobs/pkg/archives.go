@@ -538,7 +538,7 @@ func refuseTemplateArchiveLinks(stageDir string) error {
 // reproduces them with the archives they describe.
 //
 // The manifest is not an index: the archive uploader (@putnami/cloud
-// publish-archives) reads exactly its five fields to decide what to upload and
+// packages publish) reads exactly its five fields to decide what to upload and
 // under which version. `template` stays false here on purpose — this extension
 // writes one archive PER platform even for a template, so the uploader must key
 // each blob by its own platform instead of fanning one out to all of them.

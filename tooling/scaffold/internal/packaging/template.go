@@ -37,7 +37,7 @@ const (
 //   - README.md, LICENSE.md (if present)
 //
 // Output is written to .putnami/out/{projectPath}/package/ so that
-// publish-archives (owned by @putnami/cloud) can pick it up.
+// `cloud packages publish` (owned by @putnami/cloud) can pick it up.
 //
 // Content dispatches to it; it is reached only for a project whose
 // putnami.template.json selects this packager.
@@ -143,7 +143,7 @@ func Template(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, ma
 	}
 	emit.PhaseEnd("archive", "success")
 
-	// Record the channel for publish-archives to consume: the channel record
+	// Record the channel for `cloud packages publish` to consume: the channel record
 	// inside the archives directory this task owns, and the archive publication
 	// manifest the archive uploader reads, which carries the template marker it
 	// fans one blob out to every platform on.

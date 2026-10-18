@@ -15,7 +15,7 @@ import (
 //
 // Both are declared outputs of this task, so a cache restore reproduces them
 // with the archive they describe. The manifest is not an index and has
-// no second writer — the archive uploader (@putnami/cloud publish-archives)
+// no second writer — the archive uploader (@putnami/cloud packages publish)
 // reads exactly its five fields — so this states the whole document rather than
 // merging into whatever was there.
 func writeArchiveRecords(ctx *pctx.Context, outputDir string, metadata pkgmeta.PackageMetadata, extra map[string]any) error {
