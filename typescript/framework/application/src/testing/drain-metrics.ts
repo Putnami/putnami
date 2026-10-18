@@ -1,15 +1,12 @@
-import type { HistogramAggregate, MetricsBucket, TelemetryCollector } from '@putnami/application';
+import type { HistogramAggregate, MetricsBucket, TelemetryCollector } from '../telemetry/telemetry.collector';
 
 /**
  * Merge drained buckets into one view so an assertion does not depend on where
  * a Unix-second boundary falls. Counters sum, gauges keep the last value in
  * time order, histograms combine count, sum, min and max, and attributed series
  * merge by name and attributes. `ts` is the earliest bucket's second.
- *
- * Test-only. `database/test/utils/drain-merged.ts` and
- * `client/test/runtime/drain-merged.ts` carry an identical copy.
  */
-export function mergeBuckets(buckets: readonly MetricsBucket[]): MetricsBucket {
+function mergeMetricBuckets(buckets: readonly MetricsBucket[]): MetricsBucket {
   const ordered = [...buckets].sort((a, b) => a.ts - b.ts);
   const merged: MetricsBucket = { ts: ordered[0]?.ts ?? 0, counters: {}, gauges: {}, histograms: {} };
 
@@ -37,9 +34,13 @@ export function mergeBuckets(buckets: readonly MetricsBucket[]): MetricsBucket {
   return merged;
 }
 
-/** Drain every bucket of the collector, including the current second, and merge them. */
-export function drainMerged(collector: TelemetryCollector): MetricsBucket {
-  return mergeBuckets(collector.drainAll());
+/**
+ * Drain every bucket of the collector, including the current second, and return
+ * them as one merged bucket. Test-only: read metrics through this instead of
+ * `drainAll()[0]`, which misses metrics that land after a second boundary.
+ */
+export function drainMetrics(collector: TelemetryCollector): MetricsBucket {
+  return mergeMetricBuckets(collector.drainAll());
 }
 
 function combine(left: HistogramAggregate | undefined, right: HistogramAggregate): HistogramAggregate {

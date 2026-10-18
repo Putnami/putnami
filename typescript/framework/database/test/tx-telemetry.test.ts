@@ -13,7 +13,7 @@ import {
   withTransaction,
 } from '../src/transaction';
 import { UnitOfWork } from '../src/unit-of-work';
-import { drainMerged } from './utils/drain-merged';
+import { drainMetrics } from '@putnami/application/testing';
 
 /**
  * A deterministic, in-memory stand-in for the postgres.js connection layer that
@@ -110,7 +110,7 @@ describe('Transaction telemetry — commit', () => {
       });
     });
 
-    const bucket = drainMerged(collector);
+    const bucket = drainMetrics(collector);
     expect(bucket.counters['sql.tx.outcome.committed']).toBe(1);
     expect(bucket.histograms['sql.tx.duration']).toBeDefined();
     expect(bucket.histograms['sql.tx.retries'].sum).toBe(0);
@@ -159,7 +159,7 @@ describe('Transaction telemetry — rollback', () => {
         }).catch(() => {});
       });
 
-      const bucket = drainMerged(collector);
+      const bucket = drainMetrics(collector);
       expect(bucket.counters['sql.tx.outcome.rolled-back']).toBe(1);
       expect(bucket.counters['sql.tx.rollback.40001']).toBe(1);
       expect(bucket.histograms['sql.tx.duration']).toBeDefined();
@@ -186,7 +186,7 @@ describe('Transaction telemetry — rollback', () => {
       await rollback();
     });
 
-    const bucket = drainMerged(collector);
+    const bucket = drainMetrics(collector);
     expect(bucket.counters['sql.tx.rollback.explicit-rollback']).toBe(1);
   });
 
@@ -200,7 +200,7 @@ describe('Transaction telemetry — rollback', () => {
       await uow.finalize(driverErr);
     });
 
-    const bucket = drainMerged(collector);
+    const bucket = drainMetrics(collector);
     expect(bucket.counters['sql.tx.outcome.rolled-back']).toBe(1);
     expect(bucket.counters['sql.tx.rollback.40001']).toBe(1);
   });

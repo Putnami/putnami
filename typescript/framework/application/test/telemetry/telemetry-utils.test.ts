@@ -8,6 +8,7 @@ import {
   setCollector,
   setGauge,
 } from '../../src/telemetry/telemetry.utils';
+import { drainMetrics } from '../../src/testing/drain-metrics';
 
 describe('telemetry utils', () => {
   let collector: TelemetryCollector;
@@ -25,24 +26,23 @@ describe('telemetry utils', () => {
     incCounter('my.counter');
     incCounter('my.counter', 5);
 
-    const buckets = collector.drainAll();
-    expect(buckets).toHaveLength(1);
-    expect(buckets[0].counters['my.counter']).toBe(6);
+    const bucket = drainMetrics(collector);
+    expect(bucket.counters['my.counter']).toBe(6);
   });
 
   it('setGauge should delegate to the collector', () => {
     setGauge('my.gauge', 42);
 
-    const buckets = collector.drainAll();
-    expect(buckets[0].gauges['my.gauge']).toBe(42);
+    const bucket = drainMetrics(collector);
+    expect(bucket.gauges['my.gauge']).toBe(42);
   });
 
   it('observeHistogram should delegate to the collector', () => {
     observeHistogram('my.hist', 10);
     observeHistogram('my.hist', 20);
 
-    const buckets = collector.drainAll();
-    const h = buckets[0].histograms['my.hist'];
+    const bucket = drainMetrics(collector);
+    const h = bucket.histograms['my.hist'];
     expect(h.count).toBe(2);
     expect(h.sum).toBe(30);
     expect(h.min).toBe(10);

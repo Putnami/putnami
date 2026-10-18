@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { TelemetryCollector } from '@putnami/application';
-import { drainMerged } from './drain-merged';
+import { TelemetryCollector } from '../../src/telemetry/telemetry.collector';
+import { drainMetrics } from '../../src/testing/drain-metrics';
 
-describe('drainMerged', () => {
+describe('drainMetrics', () => {
   // These two instants are one millisecond apart and fall in different Unix
   // seconds: the split a loaded runner produces by chance.
   const lastMsOfSecond = 1_700_000_000_999;
@@ -23,7 +23,7 @@ describe('drainMerged', () => {
     collector.incCounter('document.transaction.started', 1, lastMsOfSecond);
     collector.incCounter('document.transaction.committed', 1, firstMsOfNextSecond);
 
-    const merged = drainMerged(collector);
+    const merged = drainMetrics(collector);
     expect(merged.counters['document.transaction.started']).toBe(1);
     expect(merged.counters['document.transaction.committed']).toBe(1);
   });
@@ -39,7 +39,7 @@ describe('drainMerged', () => {
     collector.observeHistogram('duration', 10, firstMsOfNextSecond);
     collector.observeHistogram('duration', 1, firstMsOfNextSecond);
 
-    const merged = drainMerged(collector);
+    const merged = drainMetrics(collector);
     expect(merged.counters['calls']).toBe(5);
     expect(merged.gauges['active']).toBe(0);
     expect(merged.histograms['duration']).toEqual({ count: 3, sum: 15, min: 1, max: 10 });
@@ -53,7 +53,7 @@ describe('drainMerged', () => {
     collector.observeHistogramWithAttributes('duration', 5, attributes, lastMsOfSecond);
     collector.observeHistogramWithAttributes('duration', 7, attributes, firstMsOfNextSecond);
 
-    const merged = drainMerged(collector);
+    const merged = drainMetrics(collector);
     expect(merged.counterSeries).toEqual([{ name: 'calls', attributes, value: 3 }]);
     expect(merged.histogramSeries).toEqual([
       { name: 'duration', attributes, aggregate: { count: 2, sum: 12, min: 5, max: 7 } },
@@ -61,7 +61,7 @@ describe('drainMerged', () => {
   });
 
   it('returns an empty bucket when nothing was recorded', () => {
-    const merged = drainMerged(new TelemetryCollector());
+    const merged = drainMetrics(new TelemetryCollector());
     expect(merged.counters).toEqual({});
     expect(merged.gauges).toEqual({});
     expect(merged.histograms).toEqual({});
