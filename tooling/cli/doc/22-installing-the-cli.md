@@ -466,7 +466,7 @@ Every flag has an environment equivalent. The flag wins.
 
 | Flag | Environment | Default | What it does |
 |---|---|---|---|
-| `--version <tag>` | `PUTNAMI_VERSION` | `latest` | Channel (`latest`, `stable`, `canary`, a branch) or exact version. A bare semver is `v`-prefixed, matching `putnami version use`. |
+| `--version <tag>` | `PUTNAMI_VERSION` | `latest` | Channel (`latest`, `stable`, `canary`, a branch) or exact version. A bare semver is `v`-prefixed, matching `putnami cli use`. |
 | `--install-dir <dir>` | `PUTNAMI_INSTALL_DIR` | `~/.putnami/bin` | Install under the plain name `putnami` in this directory instead of the versioned layout. |
 | `--variant <go\|ts>` | `PUTNAMI_VARIANT` | `go` | Names the binary `putnami-<variant>-<version>` in the versioned layout. |
 | `--download-url <url>` | `PUTNAMI_DOWNLOAD_URL` | — | Fetch an explicit asset URL instead of resolving a channel. Requires `--sha256` unless the URL advertises a digest. |
@@ -488,7 +488,7 @@ Two layouts, chosen by whether `--install-dir` is given:
 
 - **Default (versioned).** `~/.putnami/bin/putnami-<variant>-<tag>`, with
   `~/.putnami/bin/putnami` as a relative symlink to it. This is the layout
-  `putnami version use` and `putnami upgrade --global` manage, so installs and
+  `putnami cli use` and `putnami upgrade --global` manage, so installs and
   upgrades land in the same shape and you can switch between them later.
 - **`--install-dir <dir>`.** `<dir>/putnami`, plain name. Host registrations,
   when Claude Code or Codex is installed, still live in the host's user config;
@@ -668,7 +668,7 @@ elevates. The differences are Windows details:
   executable, but allows a rename. The installer holds a lock on
   `.putnami-switch.lock` in the install directory, renames the current file
   aside to a `.old-` name that starts with a dot, and moves the new one in. A
-  later install, `putnami upgrade` or `putnami version use` deletes the file
+  later install, `putnami upgrade` or `putnami cli use` deletes the file
   that was moved aside, once it no longer runs. All three follow the same lock
   and names. When the new file cannot move in, the old one moves back. When
   that fails too, the old one stays at its `.old-` path and the error names

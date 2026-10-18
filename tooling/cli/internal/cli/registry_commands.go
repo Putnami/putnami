@@ -46,6 +46,7 @@ func init() {
 	registerCommand("init", cmdInit)
 	registerCommand("workspace", cmdWorkspace)
 	registerCommand("version", cmdVersion)
+	registerCommand("cli", cmdCLI)
 	registerCommand("deps", cmdDeps)
 	registerCommand("cache", cmdCache)
 	registerCommand("infra", cmdInfra)
@@ -412,11 +413,10 @@ func cmdWorkspace(env *CommandEnv) error {
 	}
 }
 
-func cmdVersion(env *CommandEnv) error {
-	// list/use manage the installed CLI binaries in .putnami/bin (local) or
-	// ~/.putnami/bin (--global) and so do not need a workspace when --global,
-	// mirroring `upgrade --global`. get/set/bump/tag operate on workspace,
-	// scope, and project release versions and always require a workspace.
+// cmdCLI manages the installed CLI binaries in .putnami/bin (local) or
+// ~/.putnami/bin (--global), so it needs no workspace when --global, mirroring
+// `upgrade --global`.
+func cmdCLI(env *CommandEnv) error {
 	switch env.Sub {
 	case "list":
 		binDir, err := cliBinDir(env)
@@ -430,8 +430,15 @@ func cmdVersion(env *CommandEnv) error {
 			return err
 		}
 		return versioncmd.VersionUse(env.Ctx, binDir, firstPositionalArg(env.Args), suppliedFlag(env.Args, "--global", "-g"))
+	default:
+		return usageErrorf("unknown subcommand: cli %s\n  Available: list, use", env.Sub)
 	}
+}
 
+// cmdVersion serves the release versions of the workspace, its scopes, and its
+// projects; get and tag always require a workspace. The installed CLI binaries
+// belong to cmdCLI.
+func cmdVersion(env *CommandEnv) error {
 	if err := env.requireWorkspace(); err != nil {
 		return err
 	}
@@ -450,7 +457,7 @@ func cmdVersion(env *CommandEnv) error {
 		}
 		return versioncmd.VersionTag(env.Ctx, env.WsRoot, args)
 	default:
-		return usageErrorf("unknown subcommand: version %s\n  Available: get, tag, list, use", env.Sub)
+		return usageErrorf("unknown subcommand: version %s\n  Available: get, tag", env.Sub)
 	}
 }
 

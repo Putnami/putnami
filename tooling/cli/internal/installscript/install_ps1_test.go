@@ -849,7 +849,7 @@ func TestInstallPS1TakesTheOptionsOfInstallSh(t *testing.T) {
 }
 
 // install.ps1 switches binaries in %USERPROFILE%\.putnami\bin by the same
-// contract as `putnami upgrade` and `putnami version use` on Windows: the same
+// contract as `putnami upgrade` and `putnami cli use` on Windows: the same
 // lock file, the same locked byte, and the same moved-aside names. A drift
 // lets an install and an upgrade interleave in one directory.
 func TestInstallPS1FollowsTheBinarySwitchContract(t *testing.T) {

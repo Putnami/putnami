@@ -108,7 +108,7 @@ The `putnami` symlink points to whichever variant is active.
 On Windows the files carry `.exe`, and `putnami.exe` is a copy of the active
 binary rather than a link, because a symbolic link needs Developer Mode there.
 Windows refuses to delete or overwrite a running executable but allows a
-rename, so `putnami upgrade` and `putnami version use` switch binaries under a
+rename, so `putnami upgrade` and `putnami cli use` switch binaries under a
 lock on `.putnami-switch.lock`: the current `putnami.exe` is renamed aside
 to a `.old-` name that starts with a dot, the new copy moves in, and a later
 switch deletes the file that was moved aside once it no longer runs. When the
@@ -324,15 +324,15 @@ putnami upgrade --from-source --global   # ...and replace the global ~/.putnami/
 
 This builds `tooling/cli/cmd/putnami`, stamps a `0.0.0-source-<sha>` version (so `--version` plainly shows a local build, with `-dirty` when the tree has uncommitted changes), installs it as `putnami-go-source-<sha>` through a new inode + atomic symlink swap (never rewriting the running binary), and points `putnami` at it. It requires the framework workspace (the CLI source) and is mutually exclusive with `--channel`/`--version`/`--extensions`/`--deps`.
 
-Because these are recovery paths, they are **exempt from the workspace pin**: `upgrade --from-source`, `version list`, and `version use` run as the binary you invoked rather than relaunching into the pinned engine — so they still work when the pinned binary is broken or predates the flag. (`./putnamiw` also sets `PUTNAMI_NO_RELAUNCH=1` for its own from-source builds.)
+Because these are recovery paths, they are **exempt from the workspace pin**: `upgrade --from-source`, `cli list`, and `cli use` run as the binary you invoked rather than relaunching into the pinned engine — so they still work when the pinned binary is broken or predates the flag. (`./putnamiw` also sets `PUTNAMI_NO_RELAUNCH=1` for its own from-source builds.)
 
 List the installed binaries and switch the active one:
 
 ```bash
-putnami version list                     # installed CLI binaries (* = active)
-putnami version list --global            # ...in ~/.putnami/bin
-putnami version use go-source-1a2b3c4    # switch the active binary
-putnami version use go-1.2.0 --global    # switch the global active binary
+putnami cli list                     # installed CLI binaries (* = active)
+putnami cli list --global            # ...in ~/.putnami/bin
+putnami cli use go-source-1a2b3c4    # switch the active binary
+putnami cli use go-1.2.0 --global    # switch the global active binary
 ```
 
 ## Pinning the CLI per workspace
@@ -411,7 +411,7 @@ Because resolution is fail-closed, the way out is never optional — these hatch
 | Hatch | What it does |
 | --- | --- |
 | `putnami pin <version>` / `putnami pin --remove` | Never relaunched, so you can always complete, change, or drop a pin — even when the pinned engine is broken or predates the `pin` command. |
-| `putnami version list` / `putnami version use <name>` | Never relaunched, so you can inspect and switch the installed binaries. |
+| `putnami cli list` / `putnami cli use <name>` | Never relaunched, so you can inspect and switch the installed binaries. |
 | `putnami upgrade --from-source` | Never relaunched, so you can build and adopt a local CLI when the channel is unavailable. |
 | `PUTNAMI_NO_RELAUNCH=1 <any command>` | Bypasses the launcher for one command and everything it spawns, no matter how badly the pinned engine, the lock, or the network is broken. `./putnamiw` sets it automatically for from-source builds, so local CLI development is never hijacked by a workspace pin. |
 
@@ -571,7 +571,7 @@ $env:PUTNAMI_VERSION = '1.2.0'; irm https://putnami.dev/install.ps1 | iex
 
 Three properties matter for the layouts and the upgrade path in this document:
 
-- **The default layout is the one `version use` and `upgrade --global` manage.**
+- **The default layout is the one `cli use` and `upgrade --global` manage.**
   `~/.putnami/bin/putnami-<variant>-<tag>` plus a relative `putnami` symlink, so
   an install and an upgrade land in the same shape. On Windows it is
   `putnami-<variant>-<tag>.exe` plus a `putnami.exe` copy, switched as

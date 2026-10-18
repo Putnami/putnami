@@ -14,6 +14,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -28,7 +29,7 @@ func TestDispatchUnknownSubcommandIsUsageError(t *testing.T) {
 	t.Parallel()
 	wsRoot := t.TempDir()
 
-	groups := []string{"extensions", "templates", "projects", "scopes", "workspace", "version"}
+	groups := []string{"extensions", "templates", "projects", "scopes", "workspace", "version", "cli"}
 	for _, name := range groups {
 		t.Run(name, func(t *testing.T) {
 			cmd, ok := lookupCommand(name)
@@ -344,38 +345,62 @@ func TestResolveBinDir(t *testing.T) {
 	}
 }
 
-// TestCmdVersion_BinaryManagementRequiresWorkspaceOrGlobal verifies that the
+// TestCmdCLI_BinaryManagementRequiresWorkspaceOrGlobal verifies that the
 // CLI-binary subcommands (list/use) need a workspace unless --global retargets
 // them at ~/.putnami/bin, mirroring `upgrade --global`.
-func TestCmdVersion_BinaryManagementRequiresWorkspaceOrGlobal(t *testing.T) {
+func TestCmdCLI_BinaryManagementRequiresWorkspaceOrGlobal(t *testing.T) {
 	t.Parallel()
-	cmd, ok := lookupCommand("version")
+	cmd, ok := lookupCommand("cli")
 	if !ok {
-		t.Fatal("version command is not registered")
+		t.Fatal("cli command is not registered")
 	}
 	for _, sub := range []string{"list", "use"} {
 		env := &CommandEnv{Ctx: context.Background(), Cfg: &wsproto.Config{}, WsRoot: "", Sub: sub, Args: []string{"go-dev"}}
 		if err := cmd.run(env); !errors.Is(err, cmderr.ErrNoWorkspace) {
-			t.Errorf("version %s without workspace: err = %v, want ErrNoWorkspace", sub, err)
+			t.Errorf("cli %s without workspace: err = %v, want ErrNoWorkspace", sub, err)
 		}
 	}
 }
 
-func TestCmdVersion_ListGlobalNeedsNoWorkspace(t *testing.T) {
+func TestCmdCLI_ListGlobalNeedsNoWorkspace(t *testing.T) {
 	hometest.Temp(t)
-	cmd, ok := lookupCommand("version")
+	cmd, ok := lookupCommand("cli")
 	if !ok {
-		t.Fatal("version command is not registered")
+		t.Fatal("cli command is not registered")
 	}
 	// Empty ~/.putnami/bin: list succeeds and reports nothing installed.
 	env := &CommandEnv{Ctx: context.Background(), Cfg: &wsproto.Config{}, WsRoot: "", Sub: "list", Args: []string{"--global"}}
 	output := captureStdout(t, func() {
 		if err := cmd.run(env); err != nil {
-			t.Fatalf("version list --global: %v", err)
+			t.Fatalf("cli list --global: %v", err)
 		}
 	})
 	if !strings.Contains(output, "No CLI versions installed") {
 		t.Errorf("expected empty-list message; got:\n%s", output)
+	}
+}
+
+// D-018 moved the installed-binary commands from the version noun to the cli
+// noun with no alias: the old spellings are unknown subcommands of version, and
+// the version catalog no longer documents them.
+func TestCmdVersion_BinaryManagementMovedToCLI(t *testing.T) {
+	t.Parallel()
+	cmd, ok := lookupCommand("version")
+	if !ok {
+		t.Fatal("version command is not registered")
+	}
+	wsRoot := t.TempDir()
+	for _, sub := range []string{"list", "use"} {
+		env := &CommandEnv{Ctx: context.Background(), Cfg: &wsproto.Config{}, WsRoot: wsRoot, Sub: sub, Args: []string{"go-dev"}}
+		if err := cmd.run(env); !errors.Is(err, cmderr.ErrUsage) {
+			t.Errorf("version %s: err = %v, want a usage error", sub, err)
+		}
+		if _, ok := commandmeta.Lookup("version " + sub); ok {
+			t.Errorf("the catalog still documents `version %s`", sub)
+		}
+		if _, ok := commandmeta.Lookup("cli " + sub); !ok {
+			t.Errorf("the catalog does not document `cli %s`", sub)
+		}
 	}
 }
 

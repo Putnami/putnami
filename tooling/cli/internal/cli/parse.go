@@ -250,7 +250,7 @@ func suppliedFlag(args []string, spellings ...string) bool {
 }
 
 // firstPositionalArg returns the first non-flag argument, or "" if there is
-// none (e.g. the <name> in `version use <name>`).
+// none (e.g. the <name> in `cli use <name>`).
 func firstPositionalArg(args []string) string {
 	for _, arg := range args {
 		if !strings.HasPrefix(arg, "-") {

@@ -174,6 +174,11 @@ A version is derived from git, never declared: there is no `version set` and no
 than one version line. To update installed CLI binaries, use
 `putnami upgrade --cli` (workspace pin) or `putnami upgrade --global`.
 
+### `putnami cli`
+
+- `putnami cli list [--global]` — List the installed CLI binaries in `.putnami/bin` (or `~/.putnami/bin` with `--global`) and mark the active one
+- `putnami cli use <name> [--global]` — Switch the active CLI binary to an installed `putnami-<name>`
+
 ## Commands that left the core CLI
 
 These commands left the core CLI. Most moved into the extension that owns
@@ -185,6 +190,7 @@ has no successor command: its document is the projection of an impact plan.
 | `putnami channel set`, `putnami channel status` | `putnami cloud channels set`, `putnami cloud channels status` | `@putnami/cloud`, which owns hosted delivery |
 | `putnami ci init`, `ci validate`, `ci fmt`, `ci explain` | `putnami cloud ci init`, `cloud ci validate`, `cloud ci fmt`, `cloud ci explain` | `@putnami/cloud` |
 | `putnami features`, `specs`, `architecture`, `contracts` | Unchanged | `@putnami/sdd` |
+| `putnami version list`, `putnami version use <name>` | `putnami cli list`, `putnami cli use <name>` | None: the core serves `cli` |
 | `putnami change-plan --base <commit>` | `putnami impact-plan lint,test,build,validate --base <commit>`, then `ChangePlanFromImpactPlan` from `go.putnami.dev/protocol/ci` | None: the core serves `impact-plan` |
 
 To get a moved command, add its extension to `extensions` in

@@ -145,7 +145,7 @@ every sign-in and sign-out.
   `HKCU\Environment`; it opens the machine `Path` read-only.
 - `putnami.exe` is a copy of the versioned binary, not a link. Windows refuses
   to overwrite a running executable but allows a rename, so `install.ps1`,
-  `putnami upgrade` and `putnami version use` switch the same way: under a lock
+  `putnami upgrade` and `putnami cli use` switch the same way: under a lock
   on `.putnami-switch.lock`, the current file moves aside, the new one moves in,
   and a later switch deletes the aside file. When the new file cannot move in,
   the old one moves back; when that fails, the old one stays aside and the error

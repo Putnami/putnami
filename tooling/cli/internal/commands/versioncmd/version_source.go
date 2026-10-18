@@ -51,7 +51,7 @@ func VersionInstallFromSource(ctx context.Context, wsRoot, binDir string, dryRun
 
 	version := sourceBuildVersion(ctx, wsRoot)
 	// Mirror the putnami-go-<version> family that `upgrade` installs so
-	// `version list`/`version use` treat a source build like any other.
+	// `cli list`/`cli use` treat a source build like any other.
 	targetName := pkgmeta.ExecutableName(runtime.GOOS, "putnami-go-"+strings.TrimPrefix(version, "0.0.0-"))
 	targetPath := filepath.Join(binDir, targetName)
 	binLink := CLIPath(binDir)

@@ -940,7 +940,7 @@ func TestInstallScriptAdvertisesTheServedURL(t *testing.T) {
 }
 
 // Backward compatibility: --variant and a semver --version keep producing the
-// versioned ~/.putnami/bin layout `putnami version use` and `upgrade` manage.
+// versioned ~/.putnami/bin layout `putnami cli use` and `upgrade` manage.
 func TestInstallHonorsVariantAndExactVersion(t *testing.T) {
 	requireBash(t)
 	body := stubCLI("1.2.3")
@@ -957,7 +957,7 @@ func TestInstallHonorsVariantAndExactVersion(t *testing.T) {
 	}
 
 	binDir := filepath.Join(e.home, ".putnami", "bin")
-	// normalize_tag v-prefixes a bare semver, matching `putnami version use`.
+	// normalize_tag v-prefixes a bare semver, matching `putnami cli use`.
 	if _, err := os.Stat(filepath.Join(binDir, "putnami-ts-v1.2.3")); err != nil {
 		t.Fatalf("versioned binary was not installed: %v\n%s", err, res.output)
 	}
@@ -1250,7 +1250,7 @@ func TestInstallRedactsRegistryCredentials(t *testing.T) {
 
 // The variant becomes part of the installed filename (putnami-<variant>-<tag>),
 // so an unchecked value installs a binary under a name neither the symlink nor
-// `putnami version use` resolves. The flag and the environment variable are held
+// `putnami cli use` resolves. The flag and the environment variable are held
 // to the same rule.
 func TestInstallRejectsUnknownVariant(t *testing.T) {
 	requireBash(t)

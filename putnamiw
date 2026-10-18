@@ -234,7 +234,7 @@ touch_recency() {
 # GC's idle sweep. Best-effort.
 #
 # The link target may be ABSOLUTE (download_cli points $CLI_BINARY into
-# ~/.putnami/artifacts) or a RELATIVE sibling (`putnami version use` symlinks
+# ~/.putnami/artifacts) or a RELATIVE sibling (`putnami cli use` symlinks
 # putnami -> putnami-<ver> in the same dir). For a relative target `dirname`
 # alone yields ".", so anchor it at the link's own (absolute) directory — the
 # stamp must land in the store dir, never in the current working directory.
@@ -254,7 +254,7 @@ touch_cli_recency() {
 # is anchored at the link's own directory), or nothing for a non-symlink. The
 # staleness gate compares a symlinked CLI against source by the TARGET binary's
 # mtime: `find -newer <symlink>` reads the symlink's OWN (lstat) mtime, so a
-# freshly created `version use`/`upgrade` pin pointing at an OLD binary would
+# freshly created `cli use`/`upgrade` pin pointing at an OLD binary would
 # falsely pass the check and keep running stale.
 resolve_link_target() {
   local link="$1" target
@@ -1165,7 +1165,7 @@ if [ "$BOOTSTRAP" = "false" ] && [ -x "$CLI_BINARY" ]; then
     # Content-keyed from-source fast path. Two things must agree before this
     # binary is accepted without a build: the marker records the key these
     # sources hash to, AND $CLI_BINARY actually points at that key's blob. The
-    # second check is not redundant — `putnami version use` and `upgrade
+    # second check is not redundant — `putnami cli use` and `upgrade
     # --from-source` both re-point $CLI_BINARY without touching the marker, so
     # the marker alone would vouch for a binary it never described. Anything
     # else — no marker, an older key, a re-pointed link, a blob the GC reaped —
@@ -1191,7 +1191,7 @@ if [ "$BOOTSTRAP" = "false" ] && [ -x "$CLI_BINARY" ]; then
     # (tooling/cli present) it must always run a binary that reflects those
     # sources. A binary older than the sources cannot, and running it silently
     # shadows local edits and merged fixes (the stale-binary trap — e.g. a
-    # `version use`/`upgrade` symlink surviving a `git pull`), so fall through and
+    # `cli use`/`upgrade` symlink surviving a `git pull`), so fall through and
     # rebuild. Compare against the resolved TARGET of a symlink, not the symlink
     # itself (find -newer reads the symlink's own mtime, which a just-created pin
     # over an old binary would falsely pass). In a consumer workspace tooling/cli

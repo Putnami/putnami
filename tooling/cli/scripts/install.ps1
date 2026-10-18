@@ -109,7 +109,7 @@ $CommandMapMaxBytes = [long]1048576
 # registry cannot fill the disk.
 $MaxDownloadBytes = [long]500 * 1024 * 1024
 
-# The binary switch contract `putnami upgrade` and `putnami version use` follow
+# The binary switch contract `putnami upgrade` and `putnami cli use` follow
 # on Windows: an exclusive byte-range lock on this file serializes switches in a
 # directory, and a replaced binary that may still run moves aside under a hidden
 # name containing the marker, for a later switch to delete. The locked byte sits
@@ -312,7 +312,7 @@ function Enter-SwitchLock([string]$Directory) {
             if ([DateTime]::UtcNow -ge $deadline) {
                 $stream.Dispose()
                 Write-InstallError "Another Putnami process still holds ${path} after $SwitchLockTimeoutSeconds seconds; nothing was installed."
-                Write-Hint 'Let the running putnami upgrade or putnami version use finish, then re-run.'
+                Write-Hint 'Let the running putnami upgrade or putnami cli use finish, then re-run.'
                 Stop-Install
             }
             if (-not $announced) {
@@ -830,7 +830,7 @@ function Install-ByRenameAside([string]$Source, [string]$Destination) {
 }
 
 # Install the binary under a versioned name and make putnami.exe a copy of it.
-# This is the layout `putnami version use` and `putnami upgrade --global` manage
+# This is the layout `putnami cli use` and `putnami upgrade --global` manage
 # on Windows, where a symbolic link would need Developer Mode.
 function Install-VersionedBinary([string]$Source, [string]$BinDir, [string]$Variant, [string]$Tag) {
     $target = Join-Path $BinDir "putnami-$Variant-$Tag.exe"
@@ -1460,7 +1460,7 @@ function Invoke-PutnamiInstaller([string[]]$Arguments) {
 
     # The variant becomes part of the installed file name
     # (putnami-<variant>-<tag>.exe), so an unchecked typo installs a binary
-    # under a name `putnami version use` never resolves.
+    # under a name `putnami cli use` never resolves.
     if (@('go', 'ts') -cnotcontains $variant) {
         Write-InstallError "Unknown variant ""$variant"" (expected go or ts)"
         Stop-Install
@@ -1486,7 +1486,7 @@ function Invoke-PutnamiInstaller([string[]]$Arguments) {
 
     # An explicit --install-dir installs under the plain name, for callers that
     # manage the directory themselves. Otherwise the versioned
-    # %USERPROFILE%\.putnami\bin layout is used, so `putnami version use` and
+    # %USERPROFILE%\.putnami\bin layout is used, so `putnami cli use` and
     # `upgrade` can switch between installs later.
     $useVersioned = $true
     if ($installDir) {

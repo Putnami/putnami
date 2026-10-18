@@ -148,7 +148,7 @@ type Positional struct {
 //
 // This codifies the CLI's current, deliberately non-uniform behavior rather than
 // normalizing it: `cache clean --all` and `cache gc` act on the machine-global
-// store, `version list|use --global` and `upgrade --global` manage the installed
+// store, `cli list|use --global` and `upgrade --global` manage the installed
 // CLI binaries in ~/.putnami/bin, and `init`/`migrate` exist to bootstrap a
 // workspace that does not exist yet.
 type WorkspaceNeed struct {
@@ -211,7 +211,7 @@ type Command struct {
 	// (a bare group root, or a subcommand collapsed into a sibling's row).
 	Category string
 	// Label overrides Path in the categorized listing, for rows that collapse
-	// several paths ("version get|set|bump|tag|list|use") or name an argument
+	// several paths ("version get|tag") or name an argument
 	// ("completion <shell>"). Display only.
 	Label string
 	// Summary is the one-line listing description. It is deliberately shorter
