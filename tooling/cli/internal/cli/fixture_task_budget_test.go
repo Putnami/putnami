@@ -29,6 +29,20 @@ var fixtureTaskBudget = regexp.MustCompile(`"timeoutMs"\s*:\s*([^\s,}]+)`)
 // fixture may declare outside a "-1".
 const portableTaskDeadline = "PortableTaskDeadlineMs"
 
+// budgetIsTheSubject names the top-level declarations whose literal budget is
+// what the test proves, keyed by the function or the const or var that holds it.
+// It is a census, not an allowlist: every name must still carry a budget other
+// than -1, so a declaration that stops needing one leaves the list. The same
+// shape as the census in internal/jobs/scheduler.
+//
+//   - userScopeDeadlineManifest declares the 300 ms deadline an interactive
+//     extension subcommand passes. Its child sleeps for 30 s and never finishes
+//     in time, so a loaded host only reaches the deadline sooner, and the
+//     verdict (exit 1 and the deadline line) does not change.
+var budgetIsTheSubject = map[string]bool{
+	"userScopeDeadlineManifest": true,
+}
+
 // TestFixtureTasksCarryNoIncidentalWallClockBudget reads the test sources of
 // this package and of the e2e packages, and the clitest helpers they share,
 // because a budget comes back one manifest literal or one TimeoutMs field at a
@@ -45,47 +59,80 @@ func TestFixtureTasksCarryNoIncidentalWallClockBudget(t *testing.T) {
 		files = append(files, matches...)
 	}
 	fset := token.NewFileSet()
+	seen := map[string]bool{}
 	for _, file := range files {
 		parsed, err := parser.ParseFile(fset, file, nil, 0)
 		if err != nil {
 			t.Fatalf("parse %s: %v", file, err)
 		}
-		ast.Inspect(parsed, func(node ast.Node) bool {
-			switch node := node.(type) {
-			case *ast.BasicLit:
-				if node.Kind != token.STRING {
-					return true
+		for _, decl := range parsed.Decls {
+			owner := declName(decl)
+			// report states a refused budget, or records that a census entry
+			// still carries one.
+			report := func(pos token.Pos, format string, args ...any) {
+				if budgetIsTheSubject[owner] {
+					seen[owner] = true
+					return
 				}
-				text, err := strconv.Unquote(node.Value)
-				if err != nil {
-					t.Fatalf("%s: unquote %s: %v", fset.Position(node.Pos()), node.Value, err)
-				}
-				for _, match := range fixtureTaskBudget.FindAllStringSubmatch(text, -1) {
-					if match[1] != "-1" {
-						t.Errorf("%s: a fixture declares a timeoutMs of %s; declare -1 on a task, omit it on a tool", fset.Position(node.Pos()), match[1])
-					}
-				}
-			case *ast.KeyValueExpr:
-				if key, ok := node.Key.(*ast.Ident); ok && key.Name == "TimeoutMs" {
-					checkFixtureBudget(t, fset, node.Value)
-				}
-			case *ast.AssignStmt:
-				for i, lhs := range node.Lhs {
-					if sel, ok := lhs.(*ast.SelectorExpr); ok && sel.Sel.Name == "TimeoutMs" && i < len(node.Rhs) {
-						checkFixtureBudget(t, fset, node.Rhs[i])
-					}
-				}
+				t.Errorf("%s: "+format, append([]any{fset.Position(pos)}, args...)...)
 			}
-			return true
-		})
+			ast.Inspect(decl, func(node ast.Node) bool {
+				switch node := node.(type) {
+				case *ast.BasicLit:
+					if node.Kind != token.STRING {
+						return true
+					}
+					text, err := strconv.Unquote(node.Value)
+					if err != nil {
+						t.Fatalf("%s: unquote %s: %v", fset.Position(node.Pos()), node.Value, err)
+					}
+					for _, match := range fixtureTaskBudget.FindAllStringSubmatch(text, -1) {
+						if match[1] != "-1" {
+							report(node.Pos(), "a fixture declares a timeoutMs of %s; declare -1 on a task, omit it on a tool, or list %s in budgetIsTheSubject if the budget is what the test proves", match[1], owner)
+						}
+					}
+				case *ast.KeyValueExpr:
+					if key, ok := node.Key.(*ast.Ident); ok && key.Name == "TimeoutMs" {
+						checkFixtureBudget(report, node.Value)
+					}
+				case *ast.AssignStmt:
+					for i, lhs := range node.Lhs {
+						if sel, ok := lhs.(*ast.SelectorExpr); ok && sel.Sel.Name == "TimeoutMs" && i < len(node.Rhs) {
+							checkFixtureBudget(report, node.Rhs[i])
+						}
+					}
+				}
+				return true
+			})
+		}
 	}
+	for name := range budgetIsTheSubject {
+		if !seen[name] {
+			t.Errorf("%s no longer carries a budget other than -1; remove it from budgetIsTheSubject", name)
+		}
+	}
+}
+
+// declName is the name of a top-level function, or of the first const or var a
+// declaration holds, and "" for any other declaration.
+func declName(decl ast.Decl) string {
+	switch decl := decl.(type) {
+	case *ast.FuncDecl:
+		return decl.Name.Name
+	case *ast.GenDecl:
+		for _, spec := range decl.Specs {
+			if value, ok := spec.(*ast.ValueSpec); ok && len(value.Names) > 0 {
+				return value.Names[0].Name
+			}
+		}
+	}
+	return ""
 }
 
 // checkFixtureBudget accepts a TimeoutMs value that is a negative literal or
 // names PortableTaskDeadlineMs, and refuses any other: a positive literal, or
 // a constant or expression the guard cannot read.
-func checkFixtureBudget(t *testing.T, fset *token.FileSet, value ast.Expr) {
-	t.Helper()
+func checkFixtureBudget(report func(pos token.Pos, format string, args ...any), value ast.Expr) {
 	switch value := value.(type) {
 	case *ast.UnaryExpr:
 		if lit, ok := value.X.(*ast.BasicLit); ok && value.Op == token.SUB && lit.Kind == token.INT {
@@ -100,6 +147,6 @@ func checkFixtureBudget(t *testing.T, fset *token.FileSet, value ast.Expr) {
 			return
 		}
 	}
-	t.Errorf("%s: a fixture declares TimeoutMs %s; declare -1 on a task, omit it on a tool, or use clitest.%s where the ChangePlan needs a hard deadline",
-		fset.Position(value.Pos()), types.ExprString(value), portableTaskDeadline)
+	report(value.Pos(), "a fixture declares TimeoutMs %s; declare -1 on a task, omit it on a tool, or use clitest.%s where the ChangePlan needs a hard deadline",
+		types.ExprString(value), portableTaskDeadline)
 }
