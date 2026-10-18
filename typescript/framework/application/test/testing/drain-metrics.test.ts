@@ -60,6 +60,16 @@ describe('drainMetrics', () => {
     ]);
   });
 
+  it('keeps attributed series in the order the collector keeps them in one bucket', () => {
+    const collector = new TelemetryCollector();
+    collector.incCounterWithAttributes('a', 1, { k: 'v' }, lastMsOfSecond);
+    collector.incCounterWithAttributes('c', 1, { k: 'v' }, lastMsOfSecond);
+    collector.incCounterWithAttributes('b', 1, { k: 'v' }, firstMsOfNextSecond);
+
+    const merged = drainMetrics(collector);
+    expect(merged.counterSeries?.map((entry) => entry.name)).toEqual(['a', 'b', 'c']);
+  });
+
   it('returns an empty bucket when nothing was recorded', () => {
     const merged = drainMetrics(new TelemetryCollector());
     expect(merged.counters).toEqual({});

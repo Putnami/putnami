@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect } from 'bun:test';
 import { setCollector, TelemetryCollector } from '@putnami/application';
+import { drainMetrics } from '@putnami/application/testing';
 import { Int, resetConfigLoader, runInContext } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
 import { Collection, DocumentId, Field } from '../src/collection';
 import { TransactionNotSupported } from '../src/errors';
 import { closeAllBackends } from '../src/factory';
 import { Repository } from '../src/repository/repository';
-import { drainMetrics } from '@putnami/application/testing';
 import { runInTransaction } from '../src/transaction';
 
 describe('document transactions', () => {

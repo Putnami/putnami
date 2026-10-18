@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { TelemetryCollector, setCollector } from '@putnami/application';
+import { drainMetrics } from '@putnami/application/testing';
 import {
   type QueryMetrics,
   recordPoolClosed,
@@ -10,7 +11,6 @@ import {
   recordSlowQuery,
   recordTransaction,
 } from '../src/observability';
-import { drainMetrics } from '@putnami/application/testing';
 
 describe('SQL Metrics', () => {
   let collector: TelemetryCollector;

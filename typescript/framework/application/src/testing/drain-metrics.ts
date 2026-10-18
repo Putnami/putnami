@@ -1,10 +1,16 @@
-import type { HistogramAggregate, MetricsBucket, TelemetryCollector } from '../telemetry/telemetry.collector';
+import {
+  compareSeries,
+  type HistogramAggregate,
+  type MetricsBucket,
+  type TelemetryCollector,
+} from '../telemetry/telemetry.collector';
 
 /**
  * Merge drained buckets into one view so an assertion does not depend on where
  * a Unix-second boundary falls. Counters sum, gauges keep the last value in
  * time order, histograms combine count, sum, min and max, and attributed series
- * merge by name and attributes. `ts` is the earliest bucket's second.
+ * merge by name and attributes, in the collector's order. `ts` is the earliest
+ * bucket's second.
  */
 function mergeMetricBuckets(buckets: readonly MetricsBucket[]): MetricsBucket {
   const ordered = [...buckets].sort((a, b) => a.ts - b.ts);
@@ -31,6 +37,8 @@ function mergeMetricBuckets(buckets: readonly MetricsBucket[]): MetricsBucket {
       else merged.histogramSeries.push({ ...entry, aggregate: { ...entry.aggregate } });
     }
   }
+  merged.counterSeries?.sort(compareSeries);
+  merged.histogramSeries?.sort(compareSeries);
   return merged;
 }
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect } from 'bun:test';
 import { setCollector, TelemetryCollector } from '@putnami/application';
+import { drainMetrics } from '@putnami/application/testing';
 import { resetConfigLoader } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
 import { Collection, DocumentId, Field } from '../src/collection';
@@ -16,7 +17,6 @@ import {
   recordTransactionStarted,
 } from '../src/observability';
 import { Repository } from '../src/repository/repository';
-import { drainMetrics } from '@putnami/application/testing';
 
 function configureMemory(overrides: Record<string, unknown> = {}) {
   resetConfigLoader();

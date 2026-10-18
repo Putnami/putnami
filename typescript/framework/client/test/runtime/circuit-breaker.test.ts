@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { setCollector, TelemetryCollector } from '@putnami/application';
+import { drainMetrics } from '@putnami/application/testing';
 import { specTest } from '@putnami/runtime/spectest';
 import { CircuitBreaker, CircuitOpenError, circuitBreakerInterceptor } from '../../src/runtime/circuit-breaker';
 import type { ClientRequest, ClientResponse } from '../../src/runtime/transport.type';
 import { isDisposableInterceptor } from '../../src/runtime/transport.type';
-import { drainMetrics } from '@putnami/application/testing';
 
 function makeRequest(): ClientRequest {
   return { method: 'GET', path: '/test', headers: new Headers() };
@@ -454,7 +454,7 @@ describe('CircuitBreaker telemetry', () => {
       breaker.dispose();
 
       const bucket = drainMetrics(collector);
-      // Gauge is last-write-wins within the second → final state is closed (0).
+      // A gauge keeps its latest value across buckets → final state is closed (0).
       expect(bucket.gauges['client.users.circuit.state']).toBe(0);
       // One counter per transition we drove.
       expect(bucket.counters['client.users.circuit.transition.open']).toBe(1);

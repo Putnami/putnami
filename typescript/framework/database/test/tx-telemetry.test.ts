@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { setCollector, TelemetryCollector } from '@putnami/application';
+import { drainMetrics } from '@putnami/application/testing';
 import { runInContext } from '@putnami/runtime';
 import { MemoryLogger } from '@putnami/runtime/testing';
 import { specTest } from '@putnami/spectest';
@@ -13,7 +14,6 @@ import {
   withTransaction,
 } from '../src/transaction';
 import { UnitOfWork } from '../src/unit-of-work';
-import { drainMetrics } from '@putnami/application/testing';
 
 /**
  * A deterministic, in-memory stand-in for the postgres.js connection layer that
