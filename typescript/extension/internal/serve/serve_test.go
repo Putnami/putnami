@@ -687,8 +687,8 @@ func waitFileExists(path string, timeout time.Duration) bool {
 }
 
 // runnerProcessGroupKillDelay mirrors processGroupKillDelay in
-// tooling/cli/internal/jobs/runner.go: the delay between the SIGTERM the CLI
-// job runner sends a job's process group and its SIGKILL.
+// tooling/cli/internal/jobs/scheduler/runner.go: the delay between the SIGTERM
+// the CLI job runner sends a job's process group and its SIGKILL.
 const runnerProcessGroupKillDelay = 5 * time.Second
 
 func TestTerminateGrace_EndsBeforeTheRunnerKillsTheJob(t *testing.T) {

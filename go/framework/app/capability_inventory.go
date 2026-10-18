@@ -18,7 +18,8 @@ import (
 )
 
 // generatedCapabilityPackage is one entry of the scheduler stamp written to
-// .gen/version.json (tooling/cli/internal/jobs.CapabilityPackageStamp).
+// .gen/version.json
+// (tooling/cli/internal/jobs/scheduler.CapabilityPackageStamp).
 //
 // The stamp covers WORKSPACE projects only — the CLI reaches them through
 // putnami.json dependencies — so an inventory entry always describes source the

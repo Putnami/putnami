@@ -89,7 +89,7 @@ type JobResult struct {
 	// A consumer never has to string-match the error
 	// message. A timeout depends on host load rather than on the cache key,
 	// which is why the failure cache refuses to record one
-	// (internal/jobs/task_failure.go).
+	// (internal/jobs/scheduler/task_failure.go).
 	TimedOut bool `json:"-"`
 	// ReplayedFailure is set when this failed result was served from the local
 	// failure cache instead of executed, because the task's cache key — and

@@ -174,7 +174,7 @@ linters:
     # per-function nolints — see exclusions.rules.
     #
     # funlen: ratcheted down from 190/115, after splitting
-    # jobs.Scheduler.Run (185 lines / 103 statements — the tree's largest by
+    # scheduler.Scheduler.Run (185 lines / 103 statements — the tree's largest by
     # statements, and the original ceiling's own named offender, regrown) into named phase
     # helpers, leaving it at 106/53. Each number is now exactly one above the
     # tree's real maximum, internal/commands/lifecycle.WorkspaceInit (moved

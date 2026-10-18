@@ -168,7 +168,7 @@ v1-stream serve job whose watcher never armed.
 
 One helper resolves this on both sides — `NegotiatedVersion` in
 [`negotiation.go`](../negotiation.go) — so the CLI writer
-(`tooling/cli/internal/jobs/runner.go`) and the SDK reader
+(`tooling/cli/internal/jobs/scheduler/runner.go`) and the SDK reader
 (`tooling/extension-sdk/jsonl`) cannot disagree. The TypeScript mirror is
 `negotiatedRuntimeEventVersion` in
 [`typescript/framework/runtime/src/jobs/events.ts`](../../../typescript/framework/runtime/src/jobs/events.ts).

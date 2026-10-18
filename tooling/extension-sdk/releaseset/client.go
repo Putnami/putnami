@@ -259,7 +259,7 @@ const providerFailureReasonLimit = 512
 // providerSecretMinLength is the shortest value redacted from a failure reason.
 // Below it, matching removes ordinary words far more often than it removes a
 // secret; it is the floor the CLI's own leak guard applies to a byte-derived
-// needle (sensitiveNeedleMin in tooling/cli/internal/jobs).
+// needle (sensitiveNeedleMin in tooling/cli/internal/jobs/scheduler).
 const providerSecretMinLength = 8
 
 // redactedSecret replaces a credential in a failure reason.
@@ -340,7 +340,7 @@ func secretEnvKey(key string) bool {
 // INSIDE the value, and GOPROXY, npm_config_registry and their kind are named
 // for what they address, not for what they carry, so the key-name rule cannot
 // see them. It is the rule the CLI's leak guard already applies to a byte
-// candidate (urlUserinfoPassword in tooling/cli/internal/jobs).
+// candidate (urlUserinfoPassword in tooling/cli/internal/jobs/scheduler).
 func providerEnvSecrets(env []string) []string {
 	secrets := make([]string, 0, 4)
 	keep := func(candidate string) {

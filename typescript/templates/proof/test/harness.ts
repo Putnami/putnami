@@ -466,7 +466,7 @@ export function lint(rendered: RenderedProject): Promise<StepResult> {
 /**
  * Replays test~test (typescript/extension/internal/testjob): `bun test` in the
  * project directory, with the project and workspace roots the CLI exports to
- * every task (tooling/cli/internal/jobs/context.go, BuildEnvVars).
+ * every task (tooling/cli/internal/jobs/scheduler/context.go, BuildEnvVars).
  */
 export function runTests(rendered: RenderedProject): Promise<StepResult> {
   return run([process.execPath, 'test'], { cwd: rendered.project, env: childEnv(rendered), timeoutMs: 300_000 });

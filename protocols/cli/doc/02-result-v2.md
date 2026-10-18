@@ -45,7 +45,7 @@ shipped wire — see
 ## Decision 1 — unified success is STRICT
 
 Version 1 ships two success predicates
-(`tooling/cli/internal/jobs/result_reduce.go`):
+(`tooling/cli-model/jobs/result_reduce.go`):
 
 - `Success` — strict: a task whose **failed** result was reused still fails the
   run. The process exit code, the recorded session verdict and `--output=json`

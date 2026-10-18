@@ -82,7 +82,7 @@ Who implements or consumes each protocol today, and how conformance is verified.
 | `storage` | — | — | ✅ `go.putnami.dev/storage` (manifest projection + runtime binding) | ⚠️ `@putnami/storage` emits the infra projection (shared golden); backends come from framework config, not a binding | — |
 | `database` | — | ✅ `dbtestenv` test bindings | ✅ `go.putnami.dev/database` binding + test provider | ✅ `@putnami/database` binding + test provider | — |
 | `gomod` | ✅ registry publish provider + gate | — | — | — | — *(proprietary write side)* |
-| `put` | ✅ publication-v1 upload node (`internal/jobs`) | ✅ `putpublish` client | — | — | — *(the Put registry server is a separate repository)* |
+| `put` | ✅ publication-v1 upload node (`internal/jobs/publication`) | ✅ `putpublish` client | — | — | — *(the Put registry server is a separate repository)* |
 | `registry` | ✅ `credential-provider` client (`internal/credentialprovider`, archive downloads) | ✅ `registrycred` client (Go module, npm, OCI, Docker publishers) | — | — | — *(the `putnami cloud registry-token` producer is a separate repository; no `credential-provider` producer ships yet)* |
 | `oci` | ✅ registry publish gate | ✅ tag-digest + push client | — | — | — |
 | `sitecontent` | — | — | — | — | — *(consumed by the `sites/putnami.dev` content pipeline)* |

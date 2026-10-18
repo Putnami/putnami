@@ -33,8 +33,8 @@ import (
 // stop before it is killed. It ends before the CLI job runner's own deadline,
 // five seconds from the SIGTERM it sends the job's process group to the
 // SIGKILL that follows (processGroupKillDelay in
-// tooling/cli/internal/jobs/runner.go), so the extension reaps the workload
-// itself and reports how the run ended.
+// tooling/cli/internal/jobs/scheduler/runner.go), so the extension reaps the
+// workload itself and reports how the run ended.
 const stopGrace = 3 * time.Second
 
 // exitCodeKey is the result-data key carrying the workload's exit code. The CLI

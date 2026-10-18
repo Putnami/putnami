@@ -38,8 +38,8 @@ import (
 // asked to stop before it is killed. It ends before the CLI job runner's own
 // deadline, five seconds from the SIGTERM it sends the job's process group to
 // the SIGKILL that follows (processGroupKillDelay in
-// tooling/cli/internal/jobs/runner.go), so the extension reaps the program
-// itself.
+// tooling/cli/internal/jobs/scheduler/runner.go), so the extension reaps the
+// program itself.
 const stopGrace = 3 * time.Second
 
 // Run executes the serve job.

@@ -1927,10 +1927,11 @@ func TestTestEnvironmentIsGatedAndKeyedOnTheDependencyClosure(t *testing.T) {
 //
 // TestEveryTaskDeadlineIsFiniteAndPositive is the MANIFEST half of "a
 // deliberately hung task still terminates". The executing half belongs to the
-// orchestrator, not to this extension: tooling/cli/internal/jobs/runner.go arms
-// a context.WithTimeout for every positive deadline (resolving 0 to
-// jobs.DefaultTimeoutMs and treating a negative as "no timeout"), hands that
-// context to exec.CommandContext, and on expiry SIGTERMs the job's whole
+// orchestrator, not to this extension:
+// tooling/cli/internal/jobs/scheduler/runner.go arms a context.WithTimeout for
+// every positive deadline (resolving 0 to scheduler.DefaultTimeoutMs and
+// treating a negative as "no timeout"), hands that context to
+// exec.CommandContext, and on expiry SIGTERMs the job's whole
 // process group and force-kills whatever survives. No test here can exercise
 // that — the deadline is imposed on the runtime from outside, and watching a
 // real 600s deadline expire would be a ten-minute test of somebody else's code.
@@ -2044,11 +2045,11 @@ func TestAuditedHeavyTaskDeadlines(t *testing.T) {
 
 // TestEveryTaskDeadlineIsFiniteAndPositive is the manifest half of "a
 // deliberately hung task still terminates". A task that loses its deadline
-// resolves to the CLI default (300000ms, jobs.DefaultTimeoutMs) rather than to
-// "forever", so the dangerous regression is not a MISSING value but a NEGATIVE
-// one: tooling/cli/internal/jobs/runner.go reads a negative timeout as "no
-// timeout" and never arms a context deadline. Only the two documented
-// long-lived tasks may say that.
+// resolves to the CLI default (300000ms, scheduler.DefaultTimeoutMs) rather
+// than to "forever", so the dangerous regression is not a MISSING value but a
+// NEGATIVE one: tooling/cli/internal/jobs/scheduler/runner.go reads a negative
+// timeout as "no timeout" and never arms a context deadline. Only the two
+// documented long-lived tasks may say that.
 func TestEveryTaskDeadlineIsFiniteAndPositive(t *testing.T) {
 	m := loadExtensionManifest(t)
 

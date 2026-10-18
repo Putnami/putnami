@@ -134,8 +134,8 @@ func TestWatchedServerStop_EndsTheProgramGoRunStarted(t *testing.T) {
 }
 
 // runnerProcessGroupKillDelay mirrors processGroupKillDelay in
-// tooling/cli/internal/jobs/runner.go: the delay between the SIGTERM the CLI
-// job runner sends a job's process group and its SIGKILL.
+// tooling/cli/internal/jobs/scheduler/runner.go: the delay between the SIGTERM
+// the CLI job runner sends a job's process group and its SIGKILL.
 const runnerProcessGroupKillDelay = 5 * time.Second
 
 func TestStopGrace_EndsBeforeTheRunnerKillsTheJob(t *testing.T) {
