@@ -1,0 +1,7 @@
+exit 1
+-- stdout --
+docs/francais.md: non-English signals: avec, dans, dépôt, est, fichier, le, nous
+docs/francais.md:1:Nous corrigeons le code avec le fichier.
+docs/francais.md:2:Ce fichier est dans le dépôt.
+-- stderr --
+contributor language: 1 of 1 scanned unit(s) are not in English

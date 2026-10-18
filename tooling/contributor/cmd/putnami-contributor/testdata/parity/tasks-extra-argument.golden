@@ -1,0 +1,5 @@
+exit 2
+-- stdout --
+-- stderr --
+contributor language: tasks accepts only --limit <positive integer>
+putnami: contributor language failed

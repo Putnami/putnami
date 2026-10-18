@@ -65,7 +65,7 @@ func TestTheManifestDeclaresThisRuntime(t *testing.T) {
 	if prepare.Command != "{extensionRoot}/bin/prepare" || !slices.Equal(prepare.Args, []string{"--output", "{runtimeOutput}"}) {
 		t.Errorf("prepare runs %s %v, want bin/prepare --output {runtimeOutput}", prepare.Command, prepare.Args)
 	}
-	for _, input := range []string{"bin/prepare", "cmd/**", "go.mod", "go.sum"} {
+	for _, input := range []string{"bin/prepare", "cmd/**", "internal/**", "go.mod", "go.sum"} {
 		if !slices.Contains(prepare.Inputs, input) {
 			t.Errorf("prepare inputs %v omit %s, which the build reads", prepare.Inputs, input)
 		}

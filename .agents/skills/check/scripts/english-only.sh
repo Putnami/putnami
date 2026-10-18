@@ -6,6 +6,6 @@ set -euo pipefail
 
 root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 if [ -n "$root" ] && [ -x "$root/putnamiw" ]; then
-  exec "$root/putnamiw" contributor language "$@"
+  exec "$root/putnamiw" change language "$@"
 fi
-exec putnami contributor language "$@"
+exec putnami change language "$@"

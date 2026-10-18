@@ -1,0 +1,5 @@
+exit 2
+-- stdout --
+-- stderr --
+contributor language: files --diff needs one revision range
+putnami: contributor language failed

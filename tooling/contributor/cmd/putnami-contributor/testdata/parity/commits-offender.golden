@@ -1,0 +1,7 @@
+exit 1
+-- stdout --
+commit 38d1941: non-English signals: dans, dépôt, est, fichier, le, nous
+commit 38d1941:1:fix: Nous corrigeons le code
+commit 38d1941:3:Le fichier est dans le dépôt.
+-- stderr --
+contributor language: 1 of 1 scanned unit(s) are not in English

@@ -1,0 +1,5 @@
+exit 2
+-- stdout --
+-- stderr --
+contributor language: invalid revision range "nosuch..HEAD": exit status 128
+putnami: contributor language failed

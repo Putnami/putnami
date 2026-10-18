@@ -52,12 +52,17 @@
       "text": "The native verifier checks tracked, safe feature/spec sources, complete requirement/check coverage, units, stage entry/exit contracts, preserved challenges and native producer provenance. Reached stages are monotonic; current-unit readiness ignores superseded or later artifacts. Hosted ready needs exact policy-named provider checks on the same head and tree; native replay preserves the original workflow. Pending, blocked, stale, missing and unsupported states remain visible."
     },
     {
+      "id": "change-language-parity",
+      "text": "putnami change language, served by the @putnami/contributor executable, reports the same findings and exit codes as putnami contributor language. The tasks mode reads the tasks provider through the host RPC channel putnami opens for the launch, and the other modes never open it. A run with no channel exits 2 and names the interactive launch."
+    },
+    {
       "id": "canonical-consumer-migration",
       "text": "Both hosts install canonical source/package content with exact resource links, one build recipe index, repeat-install idempotence and edited-file protection. Legacy workflows and shell implementations are deleted; the active audit language relay only calls the native evaluator. Workflow records require advertised native support. Stage changes, reviews, adapters and publication rechecks never execute another gate; actual released adoption is distinct."
     }
   ],
   "decisions": [
     "tooling/contributor/doc/adr/0001-one-contributor-extension.md",
-    "tooling/contributor/doc/adr/0002-build-and-versioned-workflow-record.md"
+    "tooling/contributor/doc/adr/0002-build-and-versioned-workflow-record.md",
+    "tooling/contributor/doc/adr/0005-the-contributor-executable-serves-the-change-noun.md"
   ]
 }

@@ -58,6 +58,7 @@
         "../contributor/putnami.extension.json",
         "../contributor/bin/**",
         "../contributor/cmd/**",
+        "../contributor/internal/**",
         "../contributor/go.mod",
         "../contributor/go.sum",
         "../contributor/src/**",

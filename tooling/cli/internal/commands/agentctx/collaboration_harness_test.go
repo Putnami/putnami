@@ -15,10 +15,11 @@ import (
 )
 
 // The contributor helpers reach tasks and proposals only through `putnami
-// tasks|proposals <operation>`. Their shell suites therefore run against a real
-// CLI built from this tree and the shipped local provider, compiled the way its
-// bin/prepare compiles it: the collaboration route, the binding and the
-// provider's store are the real ones.
+// tasks|proposals <operation>`, and the language check only through `putnami
+// change language`. Their shell suites therefore run against a real CLI built
+// from this tree, the shipped local provider and the contributor executable,
+// each compiled the way its bin/prepare compiles it: the collaboration route,
+// the binding, the provider's store and the extension command are the real ones.
 
 var (
 	collaborationHarnessOnce    sync.Once
@@ -50,8 +51,8 @@ export DO_NOT_TRACK=1
 exec @BINARY@ "$@"
 `
 
-// collaborationHarness builds the CLI and the local provider once per test
-// process and returns the directory holding them.
+// collaborationHarness builds the CLI, the local provider and the contributor
+// executable once per test process and returns the directory holding them.
 func collaborationHarness(t *testing.T) string {
 	t.Helper()
 	collaborationHarnessOnce.Do(func() {
@@ -64,7 +65,7 @@ func collaborationHarness(t *testing.T) string {
 }
 
 func prepareCollaborationHarness() string {
-	// Scratch-owned: the harness holds two built binaries, and the next run
+	// Scratch-owned: the harness holds three built binaries, and the next run
 	// reclaims them when this one is killed before TestMain removes them.
 	harness, err := scratch.New("putnami-contributor-harness-")
 	if err != nil {
@@ -75,11 +76,14 @@ func prepareCollaborationHarness() string {
 	collaborationHarnessDir = dir
 	cliRoot := filepath.Join("..", "..", "..")
 	providerRoot := filepath.Join(cliRoot, "..", "local-collaboration")
+	contributorRoot := filepath.Join(cliRoot, "..", "contributor")
 	binary := filepath.Join(dir, programName("putnami-binary"))
 	provider := filepath.Join(dir, programName("putnami-local-collaboration"))
+	contributor := filepath.Join(dir, programName("putnami-contributor"))
 	builds := []struct{ dir, pkg, output string }{
 		{cliRoot, "./cmd/putnami", binary},
 		{providerRoot, "./cmd/putnami-local-collaboration", provider},
+		{contributorRoot, "./cmd/putnami-contributor", contributor},
 	}
 	for _, build := range builds {
 		cmd := exec.Command("go", "build", "-o", build.output, build.pkg)
@@ -98,22 +102,48 @@ func prepareCollaborationHarness() string {
 	if err := os.WriteFile(filepath.Join(dir, "putnami"), []byte(launcher), 0o755); err != nil {
 		return err.Error()
 	}
-	shipped, err := os.ReadFile(filepath.Join(providerRoot, "putnami.extension.json"))
-	if err != nil {
-		return err.Error()
+	// Each extension directory holds only the shipped manifest, pointed at the
+	// built runtime.
+	extensions := []struct{ root, runtime, dir string }{
+		{providerRoot, provider, "local-collaboration"},
+		{contributorRoot, contributor, "contributor"},
 	}
-	resolved, err := resolveExtensionRuntime(shipped, provider)
-	if err != nil {
-		return err.Error()
-	}
-	extensionDir := filepath.Join(dir, "local-collaboration")
-	if err := os.MkdirAll(extensionDir, 0o755); err != nil {
-		return err.Error()
-	}
-	if err := os.WriteFile(filepath.Join(extensionDir, "putnami.extension.json"), resolved, 0o644); err != nil {
-		return err.Error()
+	for _, ext := range extensions {
+		shipped, err := os.ReadFile(filepath.Join(ext.root, "putnami.extension.json"))
+		if err != nil {
+			return err.Error()
+		}
+		resolved, err := harnessManifest(shipped, ext.runtime)
+		if err != nil {
+			return err.Error()
+		}
+		extensionDir := filepath.Join(dir, ext.dir)
+		if err := os.MkdirAll(extensionDir, 0o755); err != nil {
+			return err.Error()
+		}
+		if err := os.WriteFile(filepath.Join(extensionDir, "putnami.extension.json"), resolved, 0o644); err != nil {
+			return err.Error()
+		}
 	}
 	return ""
+}
+
+// harnessManifest is a shipped extension manifest with every {extensionRuntime}
+// pointed at the built runtime and no runtime declaration. The harness built
+// the runtime already; a declared one would make the CLI prepare it again
+// from bin/prepare, which the harness extension directory does not hold, before
+// an interactive extension command.
+func harnessManifest(shipped json.RawMessage, runtimePath string) (json.RawMessage, error) {
+	resolved, err := resolveExtensionRuntime(shipped, runtimePath)
+	if err != nil {
+		return nil, err
+	}
+	var manifest map[string]json.RawMessage
+	if err := json.Unmarshal(resolved, &manifest); err != nil {
+		return nil, err
+	}
+	delete(manifest, "runtime")
+	return json.Marshal(manifest)
 }
 
 // resolveExtensionRuntime points every {extensionRuntime} in a shipped

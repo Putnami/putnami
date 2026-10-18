@@ -21,9 +21,10 @@ type auditNativeWorkspace struct {
 	} `json:"options"`
 }
 
-// The managed audit's proposal scan must reach the one native language
-// evaluator through the installed check relay, with an ordinary provider
-// binding. The fixture has a remote-tracking head, as the audit helper expects.
+// The managed audit's proposal scan must reach the language evaluator of the
+// installed @putnami/contributor through the check relay, with an ordinary
+// provider binding. The fixture has a remote-tracking head, as the audit helper
+// expects.
 func TestManagedAuditProposalScanUsesNativeLanguage(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the managed audit helper requires bash")
@@ -36,7 +37,8 @@ func TestManagedAuditProposalScanUsesNativeLanguage(t *testing.T) {
 	harness := collaborationHarness(t)
 	root := t.TempDir()
 	providerDir := filepath.ToSlash(filepath.Join(harness, "local-collaboration"))
-	workspace := auditNativeWorkspace{Name: "audit-language-fixture", Extensions: []string{providerDir}}
+	contributorDir := filepath.ToSlash(filepath.Join(harness, "contributor"))
+	workspace := auditNativeWorkspace{Name: "audit-language-fixture", Extensions: []string{providerDir, contributorDir}}
 	workspace.Options.Collaboration = collab.Bindings{collab.ContractProposals: {
 		Provider: "@putnami/local-collaboration", Version: 1,
 		Settings: json.RawMessage(`{"repository":"acme/app"}`),

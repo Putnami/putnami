@@ -97,6 +97,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/collaboration"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
           "producerProject": "/protocols/database"
         },
         {
@@ -170,7 +175,7 @@
           "producerProject": "/protocols/workspace"
         }
       ],
-      "justification": "The contributor extension's runtime speaks to the CLI through the shared strict wire contracts: the runtime descriptor, the CLI contract and the extension manifest it ships. Its module builds outside the Go workspace, so it resolves every contract module the SDK requires from this repository."
+      "justification": "The contributor extension's runtime speaks to the CLI through the shared strict wire contracts: the runtime descriptor, the CLI contract, the extension manifest it ships and the collaboration envelope it reads tasks through. Its module builds outside the Go workspace, so it resolves every contract module the SDK requires from this repository."
     }
   ]
 }
