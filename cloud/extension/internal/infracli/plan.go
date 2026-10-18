@@ -63,7 +63,9 @@ func Plan(params map[string]any, args []string, projects []job.ProjectRef, ioctx
 // an entry without it comes from a CLI that predates the member, and reading
 // it as "application" would plan a library as a workload.
 func requireProjectTypes(projects []job.ProjectRef) error {
-	if len(projects) == 0 {
+	// nil means the job context has no workspaceProjects member (an older CLI);
+	// an empty non-nil slice means a workspace with no projects.
+	if projects == nil {
 		return errors.New("cloud infra plan needs the workspace projects from the putnami CLI, and the job context lists none: " +
 			"an older putnami CLI omits them, so upgrade the CLI")
 	}

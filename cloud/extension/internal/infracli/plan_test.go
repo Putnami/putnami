@@ -240,6 +240,26 @@ func TestPlanWithoutWorkloadsSaysSo(t *testing.T) {
 	}
 }
 
+func TestPlanOfAnEmptyWorkspacePlansNoWorkloads(t *testing.T) {
+	empty := []job.ProjectRef{}
+
+	got, err := plan(map[string]any{}, nil, empty)
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if got != "No workloads found.\n" {
+		t.Fatalf("plan output = %q, want the no-workloads line", got)
+	}
+
+	structured, err := plan(map[string]any{"output": "jsonl"}, nil, empty)
+	if err != nil {
+		t.Fatalf("plan --output=jsonl: %v", err)
+	}
+	if data := envelopeData(t, structured); !reflect.DeepEqual(data, []any{}) {
+		t.Fatalf("data = %#v, want []", data)
+	}
+}
+
 func TestPlanReportsAnInvalidManifestInThePlan(t *testing.T) {
 	w := newWorkspace(t)
 	worker := w.project(workerName)
@@ -354,12 +374,13 @@ func TestPlanRefusesAContextWithoutWorkspaceProjects(t *testing.T) {
 	}
 }
 
-// coreStructuredOutput is the structured output of the core `putnami infra plan`
-// for the workloads, in the order the core lists them. It follows the core's
-// path step by step: `InfraPlanJSON` writes one JSON object per workload, the
-// dispatcher decodes the documents it captured and puts one document, or the
-// array of several, under the data member of one result envelope. Only the
-// command name differs, because this command is `cloud infra`.
+// coreStructuredOutput is a copy of the core's structured path for
+// `putnami infra plan`, not the core code: it re-implements `InfraPlanJSON`
+// (one JSON object per workload) and the dispatcher's `structuredPayload` (one
+// document, an array of several, or [] under the data member of one result
+// envelope). It proves the envelope framing and the object, array or [] rule.
+// It cannot detect drift in the core. The command name differs because this
+// command is `cloud infra`.
 func coreStructuredOutput(t *testing.T, workloads []job.ProjectRef, mode protocolcli.OutputMode) string {
 	t.Helper()
 	var captured bytes.Buffer

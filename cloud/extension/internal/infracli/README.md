@@ -17,9 +17,14 @@ CLI lists every workspace project, with its resolved `type`, in the
 `workspaceProjects` member of the job context, and the command plans the
 projects whose type is `application`. A project without a `type` comes from a
 CLI that predates the member, so the command fails and says to upgrade the CLI.
-It does not read a missing type as `application`.
+A context without the member is refused the same way, while an empty member
+means a workspace with no projects and prints `No workloads found.` It does not
+read a missing type as `application`.
 
 The output is the output of `putnami infra plan` in the core CLI: the same
 projects in the same order, the same text, the same `data` in the result
-envelope, and the same exit codes. Only the envelope's `command` differs
-(`cloud infra`).
+envelope, and the same exit codes. Two things differ:
+
+- The envelope's `command` is `cloud infra`.
+- On a failure in structured mode, the core also prints `putnami: <message>` on
+  stderr. The Cloud runtime prints only the failure envelope on stdout.

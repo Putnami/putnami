@@ -600,9 +600,11 @@ an array for several, `[]` for none.
 
 The command does not load the workspace. The CLI lists every workspace project
 with its resolved `type` in the job context, and the command plans the projects
-whose type is `application`. A context from an older CLI that gives no `type`,
-or no projects, fails with a message that says to upgrade the CLI; the command
-never reads a missing type as `application`.
+whose type is `application`. A context without the `workspaceProjects` member, or with a project that gives
+no `type` (a CLI older than the job context change), is refused with a message
+that says to upgrade the CLI; the command never reads a missing type as
+`application`. A workspace with no projects prints `No workloads found.`, as the
+core does.
 
 `putnami cloud status` reads 12 entries at once and gives each a state: `ok`,
 `degraded`, `failing` or `unknown`. The entries are `whoami`, `token`,
