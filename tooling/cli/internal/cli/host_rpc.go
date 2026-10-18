@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
@@ -18,6 +19,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/hostrpc"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/mcp"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // The host RPC channel of an interactive extension subcommand: the calls the
@@ -43,6 +45,7 @@ func startHostRPC(ctx context.Context, binding hostRPCBinding, stderr io.Writer)
 	server, err := hostrpc.Start(ctx, hostrpc.Methods{
 		Collaboration:      binding.collaborationCall,
 		VerificationReport: binding.verificationReport,
+		WorkspaceOwners:    binding.workspaceOwners,
 	})
 	return hostRPCLaunch(server, err, stderr)
 }
@@ -121,4 +124,31 @@ func (b hostRPCBinding) verificationReport(_ context.Context, ref hostrpcproto.V
 		return nil, &hostrpcproto.Error{Code: hostrpcproto.CodeNotVerified, Message: err.Error()}
 	}
 	return report, nil
+}
+
+// workspaceOwners answers workspace.owners with what workspace.ProjectOwnersForPath
+// returns for each path in the launch's workspace: the nearest project whose
+// directory holds the path, plus every project that claims it as an asset.
+// It loads the workspace once for the call. The server has already refused an
+// empty list and a path that is not a workspace-relative io/fs path.
+func (b hostRPCBinding) workspaceOwners(_ context.Context, params hostrpcproto.WorkspaceOwnersParams) (hostrpcproto.WorkspaceOwnersResult, error) {
+	if b.root == "" {
+		return hostrpcproto.WorkspaceOwnersResult{}, &hostrpcproto.Error{Code: hostrpcproto.CodeUnavailable,
+			Message: "this command runs outside any workspace, so no project owns a path"}
+	}
+	ws, err := workspace.Load(b.root)
+	if err != nil {
+		return hostrpcproto.WorkspaceOwnersResult{}, err
+	}
+	result := hostrpcproto.WorkspaceOwnersResult{Owners: make([]hostrpcproto.PathOwners, 0, len(params.Paths))}
+	for _, path := range params.Paths {
+		owners := workspace.ProjectOwnersForPath(ws, path)
+		projects := make([]hostrpcproto.OwningProject, 0, len(owners))
+		for _, project := range owners {
+			projects = append(projects, hostrpcproto.OwningProject{ID: project.ID, Path: project.Path})
+		}
+		slices.SortFunc(projects, func(a, b hostrpcproto.OwningProject) int { return strings.Compare(a.ID, b.ID) })
+		result.Owners = append(result.Owners, hostrpcproto.PathOwners{Path: path, Projects: projects})
+	}
+	return result, nil
 }

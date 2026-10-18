@@ -111,6 +111,10 @@
     {
       "id": "host-rpc-client",
       "text": "The Go client Dial reads PUTNAMI_HOST_RPC and PUTNAMI_HOST_RPC_TOKEN; without them it returns a NoHostError that names putnami and the missing variables. Every request carries the token and a fresh id. A host refusal is a typed error with its code, and the client stays usable. An answer to another id, a frame over 32 MiB, a broken connection or a context that ends before the whole answer arrives breaks the client; an answer that arrived whole stands."
+    },
+    {
+      "id": "host-rpc-workspace-owners-client",
+      "text": "The Go client's WorkspaceOwners sends the paths and returns one entry per path, in request order, each with its owners. It refuses an empty list and a path outside io/fs form before it sends anything. An answer with another count of entries, or an entry for another path, is an error that leaves the client usable."
     }
   ],
   "decisions": [

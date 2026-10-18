@@ -128,6 +128,43 @@ func (c *Client) VerificationReport(ctx context.Context, ref wire.VerificationRe
 	return report.Report, nil
 }
 
+// WorkspaceOwners returns which workspace projects own each path: one entry
+// for each path, in the order given, with the owners sorted by project ID.
+// A path is workspace-relative and in io/fs form (wire.ValidWorkspacePath). A
+// project owns a path when impact analysis treats it as an owner: the nearest
+// project whose directory holds the path, every project that claims the path
+// as an asset, and, for a file at the workspace root, every project whose
+// provider lists that file as watched. A path no project owns has an empty
+// list. The client refuses an empty list and an invalid path without
+// sending anything, and it returns an error, leaving the client usable, when
+// the host answers other entries than the ones requested.
+func (c *Client) WorkspaceOwners(ctx context.Context, paths []string) ([]wire.PathOwners, error) {
+	if len(paths) == 0 {
+		return nil, errors.New("putnami host RPC workspace.owners needs one or more paths")
+	}
+	for _, path := range paths {
+		if !wire.ValidWorkspacePath(path) {
+			return nil, fmt.Errorf("putnami host RPC workspace.owners takes workspace-relative paths in io/fs form, such as dir/file.go; %q is not one", path)
+		}
+	}
+	var result wire.WorkspaceOwnersResult
+	if err := c.call(ctx, wire.MethodWorkspaceOwners, wire.WorkspaceOwnersParams{Paths: paths}, &result); err != nil {
+		return nil, err
+	}
+	if len(result.Owners) != len(paths) {
+		return nil, fmt.Errorf("putnami host RPC workspace.owners answered %d entries for %d paths", len(result.Owners), len(paths))
+	}
+	for i, owners := range result.Owners {
+		if owners.Path != paths[i] {
+			return nil, fmt.Errorf("putnami host RPC workspace.owners answered %q for path %d, which is %q", owners.Path, i+1, paths[i])
+		}
+		if owners.Projects == nil {
+			result.Owners[i].Projects = []wire.OwningProject{}
+		}
+	}
+	return result.Owners, nil
+}
+
 // call sends one request and decodes its result into result. The host's
 // refusal is returned as a *wire.Error.
 func (c *Client) call(ctx context.Context, method string, params, result any) error {

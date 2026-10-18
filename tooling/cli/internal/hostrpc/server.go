@@ -63,6 +63,10 @@ type Methods struct {
 	Collaboration func(context.Context, wire.CollaborationCallParams) (json.RawMessage, error)
 	// VerificationReport answers verification.report with the report bytes.
 	VerificationReport func(context.Context, wire.VerificationReportParams) ([]byte, error)
+	// WorkspaceOwners answers workspace.owners with the projects that own
+	// each path. The server has already checked that the paths are not empty
+	// and are valid workspace paths.
+	WorkspaceOwners func(context.Context, wire.WorkspaceOwnersParams) (wire.WorkspaceOwnersResult, error)
 }
 
 // Server is one open host RPC channel.
@@ -391,6 +395,29 @@ func (s *Server) dispatch(method string, params json.RawMessage) (json.RawMessag
 				return nil, err
 			}
 			return json.Marshal(wire.VerificationReportResult{Report: data})
+		})
+	case wire.MethodWorkspaceOwners:
+		var owners wire.WorkspaceOwnersParams
+		if err := decodeParams(params, &owners); err != nil {
+			return nil, err
+		}
+		if len(owners.Paths) == 0 {
+			return nil, invalidParams("workspace.owners needs one or more paths")
+		}
+		for _, path := range owners.Paths {
+			if !wire.ValidWorkspacePath(path) {
+				return nil, invalidParams(fmt.Sprintf("workspace.owners takes workspace-relative paths in io/fs form, such as dir/file.go; %q is not one", path))
+			}
+		}
+		if s.methods.WorkspaceOwners == nil {
+			return nil, unavailable(method)
+		}
+		return s.call(func(ctx context.Context) (json.RawMessage, error) {
+			result, err := s.methods.WorkspaceOwners(ctx, owners)
+			if err != nil {
+				return nil, err
+			}
+			return json.Marshal(result)
 		})
 	default:
 		return nil, &wire.Error{Code: wire.CodeMethodNotFound,
