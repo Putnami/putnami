@@ -220,7 +220,7 @@ The CLI refuses `putnami channel …`, `putnami ci …`, `putnami change-plan`,
 `putnami infra …`, `putnami dev …` and `putnami contributor …`, and `putnami
 help` of each, with exit code 2, unless an installed extension declares that
 root. It always refuses `putnami tree verify …`, `putnami proposals finalize …`
-and `putnami help` of each, because the core still serves `tree` and
+and `putnami help` of each, because the core still answers `tree` and
 `proposals`. The refusal of `putnami dev …` names the `extensions` and
 `templates` spellings, and the refusal of `putnami contributor …` names
 `putnami doctor --machine`. The refusals of `putnami tree verify …` and

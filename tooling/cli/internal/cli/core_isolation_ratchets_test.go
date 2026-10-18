@@ -438,11 +438,12 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // graph. It adds no vertical and no engine stage.
 //
 // RAISED 67 → 69 (cli/contributor-workflows): internal/commands/contributor
-// owns native language and machine-load commands, and internal/commands/proposals
-// owns native proposal finalization. These replace shell implementations with
+// owned native language and machine-load commands, and internal/commands/proposals
+// owned native proposal finalization. They replaced shell implementations with
 // two distinct command surfaces under ADR 0006. Their shared pure language
-// evaluator stays in the existing commands/shared package, so this adds exactly
-// two production packages and no execution engine or scheduling stage.
+// evaluator stayed in the existing commands/shared package, so this added exactly
+// two production packages and no execution engine or scheduling stage, until
+// both commands left the core.
 //
 // RAISED 69 → 70: internal/jobs/machineprobe is the first
 // package split out of internal/jobs. It reads the machine a run executes on:
