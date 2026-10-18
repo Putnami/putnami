@@ -293,7 +293,6 @@ type (
 
 var (
 	applyTaskIdentity       = model.ApplyTaskIdentity
-	attachIdentities        = model.AttachIdentities
 	batchNumber             = model.BatchNumber
 	dedupeSorted            = model.DedupeSorted
 	eventField              = model.EventField
