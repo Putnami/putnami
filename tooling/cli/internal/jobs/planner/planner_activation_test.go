@@ -1,15 +1,16 @@
-package jobs
+package planner
 
 import (
 	"path/filepath"
 	"slices"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-func planKeySet(planned []*ScheduledJob) map[string]bool {
+func planKeySet(planned []*jobmodel.ScheduledJob) map[string]bool {
 	keys := make(map[string]bool, len(planned))
 	for _, j := range planned {
 		keys[j.Key()] = true
@@ -17,7 +18,7 @@ func planKeySet(planned []*ScheduledJob) map[string]bool {
 	return keys
 }
 
-func findScheduled(planned []*ScheduledJob, key string) *ScheduledJob {
+func findScheduled(planned []*jobmodel.ScheduledJob, key string) *jobmodel.ScheduledJob {
 	for _, j := range planned {
 		if j.Key() == key {
 			return j
@@ -113,7 +114,7 @@ func TestPlan_DescribePrunedForNonAppProject(t *testing.T) {
 
 	// app describe's ^describe pointed at lib; lib describe is pruned, so the
 	// edge must resolve away cleanly with no dangling dependency. (Plan already
-	// runs validatePlanDAG, which would have failed on an unresolved ref.)
+	// runs ValidatePlanDAG, which would have failed on an unresolved ref.)
 	appDescribe := findScheduled(planned, "/app:build~describe")
 	if appDescribe == nil {
 		t.Fatal("app describe missing")
@@ -130,13 +131,13 @@ func TestPlan_DescribePrunedForNonAppProject(t *testing.T) {
 
 func TestComputePlanMetrics(t *testing.T) {
 	t.Parallel()
-	planned := []*ScheduledJob{
+	planned := []*jobmodel.ScheduledJob{
 		makeJob("app", "build~generate", nil),
 		makeJob("app", "build~compile", []string{"/app:build~generate"}),
 		makeJob("app", "test~test", []string{"/app:build~generate"}),
 		makeJob("lib", "build~generate", nil),
 	}
-	m := ComputePlanMetrics(planned)
+	m := jobmodel.ComputePlanMetrics(planned)
 	if m.Jobs != 4 {
 		t.Errorf("Jobs = %d, want 4", m.Jobs)
 	}
@@ -163,7 +164,7 @@ func TestComputePlanMetricsCountsSerializeAfterEdges(t *testing.T) {
 	reader := makeJob("app", "build~compile", nil)
 	reader.SerializeAfter = []string{writer.Key()}
 
-	m := ComputePlanMetrics([]*ScheduledJob{writer, reader})
+	m := jobmodel.ComputePlanMetrics([]*jobmodel.ScheduledJob{writer, reader})
 	if m.Edges != 1 {
 		t.Errorf("Edges = %d, want 1 serialize edge", m.Edges)
 	}

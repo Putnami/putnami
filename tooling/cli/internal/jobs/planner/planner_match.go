@@ -1,4 +1,4 @@
-package jobs
+package planner
 
 import (
 	"path/filepath"

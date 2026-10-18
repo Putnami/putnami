@@ -11,6 +11,7 @@ import (
 
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -84,7 +85,7 @@ func requireOrder(t *testing.T, pos map[string]int, earlier, later string) {
 func TestPlanSchedule_EndToEnd(t *testing.T) {
 	ws, ext := makeIntegrationWorkspace(t)
 
-	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := planner.Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -141,7 +142,7 @@ func TestPlanSchedule_FailurePropagatesAcrossProjects(t *testing.T) {
 		Declares: &extension.TaskDeclaration{},
 	}
 
-	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := planner.Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -242,7 +243,7 @@ func TestPlanSchedule_CacheHitReplaysResultEvents(t *testing.T) {
 	defer cancel()
 
 	cold := &mockRenderer{}
-	planned, err := Plan(ws, []string{"test"}, ws.Projects, exts, nil, nil, nil)
+	planned, err := planner.Plan(ws, []string{"test"}, ws.Projects, exts, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -255,7 +256,7 @@ func TestPlanSchedule_CacheHitReplaysResultEvents(t *testing.T) {
 	}
 
 	warm := &mockRenderer{}
-	planned2, err := Plan(ws, []string{"test"}, ws.Projects, exts, nil, nil, nil)
+	planned2, err := planner.Plan(ws, []string{"test"}, ws.Projects, exts, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan 2: %v", err)
 	}
@@ -328,7 +329,7 @@ func TestPlanSchedule_DynamicCPUBudgets(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	planned, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := planner.Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -349,7 +350,7 @@ func TestPlanSchedule_DynamicCPUBudgets(t *testing.T) {
 		t.Fatalf("expected run history to be persisted: %v", err)
 	}
 
-	planned2, err := Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned2, err := planner.Plan(ws, []string{"build"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan 2: %v", err)
 	}

@@ -1,4 +1,4 @@
-package jobs
+package planner
 
 import (
 	"reflect"
@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -69,7 +70,7 @@ func TestPlan_SessionPrerequisitePolicy(t *testing.T) {
 			"/B:validate~features",
 			"test-workspace:validate-workspace~architecture",
 		}
-		for _, publish := range []*ScheduledJob{docker, migration} {
+		for _, publish := range []*jobmodel.ScheduledJob{docker, migration} {
 			if !reflect.DeepEqual(publish.DependsOn, wantGateKeys) {
 				t.Fatalf("%s functional deps = %v, want every verification leaf %v", publish.Key(), publish.DependsOn, wantGateKeys)
 			}
@@ -380,7 +381,7 @@ func TestPlan_SessionPrerequisiteFinalizersStayOutsideFunctionalDAG(t *testing.T
 	if !stringSliceContains(publish.DependsOn, wantLeaf) {
 		t.Fatalf("publish dependencies = %v, want functional test leaf %q", publish.DependsOn, wantLeaf)
 	}
-	if err := validatePlanDAG(schedulableJobs(planned)); err != nil {
+	if err := ValidatePlanDAG(SchedulableJobs(planned)); err != nil {
 		t.Fatalf("DAG after holding finalizers is not schedulable: %v", err)
 	}
 }
@@ -820,7 +821,7 @@ func sessionPrerequisiteJob(extensionName, command, step, task, activation strin
 	}
 }
 
-func findSessionPrerequisiteJob(jobs []*ScheduledJob, projectID, extensionName, command, step string) *ScheduledJob {
+func findSessionPrerequisiteJob(jobs []*jobmodel.ScheduledJob, projectID, extensionName, command, step string) *jobmodel.ScheduledJob {
 	for _, job := range jobs {
 		if job.Project.ID == projectID && job.Extension != nil && job.Extension.Name == extensionName &&
 			job.CommandName() == command && job.Step != nil && job.Step.ID == step {
@@ -830,8 +831,8 @@ func findSessionPrerequisiteJob(jobs []*ScheduledJob, projectID, extensionName, 
 	return nil
 }
 
-func sessionPrerequisiteCommandJobs(jobs []*ScheduledJob, projectID, command string) []*ScheduledJob {
-	var matched []*ScheduledJob
+func sessionPrerequisiteCommandJobs(jobs []*jobmodel.ScheduledJob, projectID, command string) []*jobmodel.ScheduledJob {
+	var matched []*jobmodel.ScheduledJob
 	for _, job := range jobs {
 		if job != nil && job.Project != nil && job.Project.ID == projectID && job.CommandName() == command {
 			matched = append(matched, job)
@@ -844,7 +845,7 @@ func sessionPrerequisiteCommandJobs(jobs []*ScheduledJob, projectID, command str
 // Reflection keeps the RED behavioral: before the model gains the execution-
 // only fact, planning fails on the empty gate rather than this test failing to
 // compile merely because the field does not exist yet.
-func sessionPrerequisiteNoopGates(job *ScheduledJob) []string {
+func sessionPrerequisiteNoopGates(job *jobmodel.ScheduledJob) []string {
 	if job == nil {
 		return nil
 	}

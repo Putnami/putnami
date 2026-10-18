@@ -1,4 +1,4 @@
-package jobs
+package planner
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -19,7 +20,7 @@ const sessionCommandDependencyPrefix = "!"
 // a single project, all its transitive upstream dependencies get the
 // necessary pipeline steps (e.g., build~generate) planned.
 func emitUpstreamJobs(
-	allJobs *[]*ScheduledJob,
+	allJobs *[]*jobmodel.ScheduledJob,
 	ws *workspace.Workspace,
 	jobMap map[string][]*extension.JobDefinition,
 	disabledJobs, disabledExts map[string]bool,
@@ -127,7 +128,7 @@ func emitUpstreamJobs(
 
 				for _, e := range expanded {
 					s := e.Step
-					sj := &ScheduledJob{
+					sj := &jobmodel.ScheduledJob{
 						Project:   proj,
 						Extension: ext,
 						JobDef:    e.JobDef,
@@ -214,7 +215,7 @@ func collectPipelineStepClosure(
 // command's leaf steps to complete. Session-scoped dependencies ("!build") are
 // handled separately by emitSessionCommandDeps.
 func emitCommandDeps(
-	allJobs *[]*ScheduledJob,
+	allJobs *[]*jobmodel.ScheduledJob,
 	ws *workspace.Workspace,
 	jobMap map[string][]*extension.JobDefinition,
 	disabledJobs, disabledExts map[string]bool,
@@ -313,7 +314,7 @@ func emitCommandDeps(
 // plan, so side-effecting commands such as publish/deploy can wait for the
 // whole session gate instead of only their own project.
 func emitSessionCommandDeps(
-	allJobs *[]*ScheduledJob,
+	allJobs *[]*jobmodel.ScheduledJob,
 	ws *workspace.Workspace,
 	projects []*workspace.Project,
 	jobMap map[string][]*extension.JobDefinition,
@@ -407,7 +408,7 @@ func emitSessionCommandDeps(
 // prerequisite after its selector and per-project policy have been resolved.
 // Params are invocation-local overrides for the prerequisite command only.
 type sessionPrerequisiteRelation struct {
-	owner           *ScheduledJob
+	owner           *jobmodel.ScheduledJob
 	definition      extension.SessionPrerequisiteDefinition
 	projects        []*workspace.Project
 	paramsByProject map[string]extension.ParamMap
@@ -428,7 +429,7 @@ func resolveSessionPrerequisiteForOwner(
 	ws *workspace.Workspace,
 	fallbackProjects []*workspace.Project,
 	commandParams extension.ParamMap,
-	owner *ScheduledJob,
+	owner *jobmodel.ScheduledJob,
 	index int,
 ) (sessionPrerequisiteResolution, error) {
 	definition := owner.JobDef.SessionPrerequisites[index]
@@ -495,7 +496,7 @@ func resolveSessionPrerequisiteForOwner(
 			resolved.selectionIDs = append(resolved.selectionIDs, project.ID)
 		}
 	}
-	resolved.selectionIDs = dedupeSorted(resolved.selectionIDs)
+	resolved.selectionIDs = jobmodel.DedupeSorted(resolved.selectionIDs)
 
 	paramNames := make([]string, 0, len(definition.Params))
 	for name := range definition.Params {
@@ -559,7 +560,7 @@ func resolveSessionPrerequisiteForOwner(
 // any jobs. Re-running it at the fixpoint and again before edge resolution is
 // deterministic because all of its inputs are immutable plan facts.
 func activeSessionPrerequisites(
-	jobs []*ScheduledJob,
+	jobs []*jobmodel.ScheduledJob,
 	ws *workspace.Workspace,
 	fallbackProjects []*workspace.Project,
 	commandParams extension.ParamMap,
@@ -576,7 +577,7 @@ func activeSessionPrerequisites(
 			if seen[key] {
 				continue
 			}
-			var roots []*ScheduledJob
+			var roots []*jobmodel.ScheduledJob
 			for _, candidate := range jobs {
 				if candidate == nil || candidate.Project == nil || candidate.Extension == nil || !isCommandRoot(candidate) ||
 					candidate.Project.ID != owner.Project.ID || candidate.Extension.Name != owner.Extension.Name ||
@@ -643,7 +644,7 @@ func activeSessionPrerequisites(
 // emitSessionPrerequisites plans each active prerequisite and every declared
 // gate across the prerequisite's resolved project selection.
 func emitSessionPrerequisites(
-	allJobs *[]*ScheduledJob,
+	allJobs *[]*jobmodel.ScheduledJob,
 	ws *workspace.Workspace,
 	projects []*workspace.Project,
 	explicitCommands map[string]bool,
@@ -692,7 +693,7 @@ func emitSessionPrerequisites(
 // overrides affect both plan-time `if` conditions and the eventual task
 // context, but only for jobs introduced by this prerequisite relation.
 func emitCommandForSelection(
-	allJobs *[]*ScheduledJob,
+	allJobs *[]*jobmodel.ScheduledJob,
 	ws *workspace.Workspace,
 	command string,
 	projects []*workspace.Project,
@@ -730,7 +731,7 @@ func emitCommandForSelection(
 	if err := extension.ValidateCommandFlags(command, workspaceJobs); err != nil {
 		return false, err
 	}
-	var workspaceCandidates []*ScheduledJob
+	var workspaceCandidates []*jobmodel.ScheduledJob
 	workspaceParams, _ := cachekey.ProjectParamAliases(commandParams)
 	if len(workspaceOverrides) > 0 {
 		cachekey.ApplyProjectedParamLayer(workspaceParams, workspaceOverrides)
@@ -768,7 +769,7 @@ func emitCommandForSelection(
 		if len(overrides) > 0 {
 			cachekey.ApplyProjectedParamLayer(effectiveParams, overrides)
 		}
-		var candidates []*ScheduledJob
+		var candidates []*jobmodel.ScheduledJob
 		for _, jobDef := range jobDefs {
 			ext := extension.FindExtensionByName(extensions, jobDef.ExtensionName)
 			if ext == nil {
@@ -794,9 +795,9 @@ func emitCommandForSelection(
 // task-local parameters agree; workspace selections are then unioned rather
 // than discarded by first-wins key de-duplication.
 func mergeSessionPrerequisiteCandidates(
-	allJobs *[]*ScheduledJob,
+	allJobs *[]*jobmodel.ScheduledJob,
 	command, projectID string,
-	candidates []*ScheduledJob,
+	candidates []*jobmodel.ScheduledJob,
 	overrides extension.ParamMap,
 	selectedProjects []*workspace.Project,
 ) (bool, error) {
@@ -834,13 +835,13 @@ func mergeSessionPrerequisiteCandidates(
 		candidate.JobDef = definition
 	}
 
-	existing := make(map[string]*ScheduledJob)
+	existing := make(map[string]*jobmodel.ScheduledJob)
 	for _, job := range *allJobs {
 		if job != nil && job.Project != nil && job.Project.ID == projectID && job.CommandName() == command {
 			existing[job.Key()] = job
 		}
 	}
-	candidateByKey := make(map[string]*ScheduledJob, len(candidates))
+	candidateByKey := make(map[string]*jobmodel.ScheduledJob, len(candidates))
 	for _, candidate := range candidates {
 		candidateByKey[candidate.Key()] = candidate
 	}
@@ -856,7 +857,7 @@ func mergeSessionPrerequisiteCandidates(
 }
 
 func mergeExistingSessionPrerequisiteCandidates(
-	existing, candidates map[string]*ScheduledJob,
+	existing, candidates map[string]*jobmodel.ScheduledJob,
 	command, projectID string,
 	paramNames []string,
 	selectedProjects []*workspace.Project,
@@ -937,7 +938,7 @@ func ownerGateLeafFrontier(
 		}
 	}
 	for ownerKey := range frontier {
-		frontier[ownerKey] = dedupeSorted(frontier[ownerKey])
+		frontier[ownerKey] = jobmodel.DedupeSorted(frontier[ownerKey])
 	}
 	return frontier
 }
@@ -959,7 +960,7 @@ func ownerGateLeafFrontier(
 // projects: the sibling's protected jobs sit beside — not after — the new
 // leaves, and authorization fails closed.
 func resolveSessionPrerequisites(
-	jobs []*ScheduledJob,
+	jobs []*jobmodel.ScheduledJob,
 	ws *workspace.Workspace,
 	projects []*workspace.Project,
 	commandParams extension.ParamMap,
@@ -975,7 +976,7 @@ func resolveSessionPrerequisites(
 	gatePolicyProjectsByJob := make(map[string]map[string]bool)
 
 	ownerGateLeaves := ownerGateLeafFrontier(relations, leaves, workspaceID)
-	plannedByKey := jobsByPlanKey(jobs)
+	plannedByKey := JobsByPlanKey(jobs)
 
 	for _, relation := range relations {
 		if len(relation.projects) == 0 {
@@ -993,16 +994,16 @@ func resolveSessionPrerequisites(
 			for projectID := range included {
 				commandGateLeaves = append(commandGateLeaves, leaves[projectID+":"+gate]...)
 			}
-			commandGateLeaves = dedupeSorted(commandGateLeaves)
+			commandGateLeaves = jobmodel.DedupeSorted(commandGateLeaves)
 			if len(commandGateLeaves) == 0 {
 				noopGates = append(noopGates, gate)
 				continue
 			}
 			gateLeaves = append(gateLeaves, commandGateLeaves...)
 		}
-		gateLeaves = dedupeSorted(gateLeaves)
-		noopGates = dedupeSorted(noopGates)
-		gatePolicy := dedupeSorted(append([]string(nil), relation.definition.DependsOn...))
+		gateLeaves = jobmodel.DedupeSorted(gateLeaves)
+		noopGates = jobmodel.DedupeSorted(noopGates)
+		gatePolicy := jobmodel.DedupeSorted(append([]string(nil), relation.definition.DependsOn...))
 		relationNoopGates := make(map[string]bool, len(noopGates))
 		for _, gate := range noopGates {
 			relationNoopGates[gate] = true
@@ -1056,7 +1057,7 @@ func resolveSessionPrerequisites(
 					}
 					filtered = append(filtered, leaf)
 				}
-				job.DependsOn = dedupeSorted(append(job.DependsOn, filtered...))
+				job.DependsOn = jobmodel.DedupeSorted(append(job.DependsOn, filtered...))
 			}
 		}
 
@@ -1064,14 +1065,14 @@ func resolveSessionPrerequisites(
 		for projectID := range included {
 			prerequisiteLeaves = append(prerequisiteLeaves, leaves[projectID+":"+relation.definition.Command]...)
 		}
-		prerequisiteLeaves = dedupeSorted(prerequisiteLeaves)
+		prerequisiteLeaves = jobmodel.DedupeSorted(prerequisiteLeaves)
 		if len(prerequisiteLeaves) == 0 {
 			return fmt.Errorf("%s session prerequisite %q planned no jobs", relation.owner.Key(), relation.definition.Command)
 		}
 		for _, job := range jobs {
 			if job.Project.ID == relation.owner.Project.ID && job.Extension != nil &&
 				job.Extension.Name == relation.owner.Extension.Name && job.CommandName() == relation.owner.CommandName() && isCommandRoot(job) {
-				job.DependsOn = dedupeSorted(append(job.DependsOn, prerequisiteLeaves...))
+				job.DependsOn = jobmodel.DedupeSorted(append(job.DependsOn, prerequisiteLeaves...))
 			}
 		}
 	}
@@ -1079,7 +1080,7 @@ func resolveSessionPrerequisites(
 }
 
 func finalizeSessionPrerequisiteNoopGates(
-	jobs []*ScheduledJob,
+	jobs []*jobmodel.ScheduledJob,
 	gatePolicyByJob map[string][]string,
 	noopGatesByJob, gatePolicyProjectsByJob map[string]map[string]bool,
 ) error {
@@ -1096,7 +1097,7 @@ func finalizeSessionPrerequisiteNoopGates(
 					uncovered = append(uncovered, project.ID)
 				}
 			}
-			uncovered = dedupeSorted(uncovered)
+			uncovered = jobmodel.DedupeSorted(uncovered)
 			if len(uncovered) > 0 {
 				return fmt.Errorf(
 					"session prerequisite workspace-once command %q reuses %s with selected projects %s outside its gate policy provenance",
@@ -1113,8 +1114,8 @@ func finalizeSessionPrerequisiteNoopGates(
 	return nil
 }
 
-func isCommandRoot(job *ScheduledJob) bool {
-	if isFinalizerJob(job) {
+func isCommandRoot(job *jobmodel.ScheduledJob) bool {
+	if jobmodel.IsFinalizerJob(job) {
 		return false
 	}
 	for _, dependency := range job.JobDef.DependsOn {
@@ -1135,7 +1136,7 @@ func isCommandRoot(job *ScheduledJob) bool {
 // whose dependencies do not run that step. A reference that matches nothing
 // exactly but WOULD have bound through one of the removed spellings is an
 // error, not a silent rebind and not a silent drop — see legacyReferenceLines.
-func resolveExternalDeps(jobs []*ScheduledJob, ws *workspace.Workspace) error {
+func resolveExternalDeps(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace) error {
 	// Build the lookup index once: by key, by project, and by identity name
 	// (the last drives the "*" wildcard branch below without rescanning jobs).
 	idx := buildPlannedIndex(jobs)
@@ -1213,7 +1214,7 @@ func resolveExternalDeps(jobs []*ScheduledJob, ws *workspace.Workspace) error {
 			}
 		}
 
-		job.DependsOn = dedupeSorted(resolved)
+		job.DependsOn = jobmodel.DedupeSorted(resolved)
 	}
 
 	if lines := legacyReferenceLines(legacy, maxDAGDiagnosticLines); len(lines) > 0 {
@@ -1271,7 +1272,7 @@ func resolveExternalDeps(jobs []*ScheduledJob, ws *workspace.Workspace) error {
 // through the writer's dependencies, and the others wait. The check is over every edge the plan holds —
 // functional, write-serialization, and the contract edges already added — so
 // the pass runs after serializeWriteResources, and nothing later adds an edge.
-func orderContractClients(jobs []*ScheduledJob, ws *workspace.Workspace) {
+func orderContractClients(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace) {
 	idx := buildPlannedIndex(jobs)
 	predecessors := make(map[string][]string, len(jobs))
 	inPlan := make(map[string]bool, len(jobs))
@@ -1314,9 +1315,9 @@ func orderContractClients(jobs []*ScheduledJob, ws *workspace.Workspace) {
 			strings.HasPrefix(a, b+"/") || strings.HasPrefix(b, a+"/")
 	}
 	// writesClientTree applies the tree rule to one provider job.
-	writesClientTree := func(providerJob, client *ScheduledJob) bool {
-		declaration := taskDeclarationOf(providerJob)
-		if declaration == nil || isFinalizerJob(providerJob) {
+	writesClientTree := func(providerJob, client *jobmodel.ScheduledJob) bool {
+		declaration := jobmodel.TaskDeclarationOf(providerJob)
+		if declaration == nil || jobmodel.IsFinalizerJob(providerJob) {
 			return false
 		}
 		for _, output := range declaration.Outputs {
@@ -1336,7 +1337,7 @@ func orderContractClients(jobs []*ScheduledJob, ws *workspace.Workspace) {
 	}
 
 	for _, job := range jobs {
-		if job.JobDef == nil || isFinalizerJob(job) {
+		if job.JobDef == nil || jobmodel.IsFinalizerJob(job) {
 			continue
 		}
 		providerID := ws.Graph.ContractProviderOf(job.Project.ID)
@@ -1364,7 +1365,7 @@ func orderContractClients(jobs []*ScheduledJob, ws *workspace.Workspace) {
 			functional[dep] = true
 		}
 		var extra []string
-		for _, providerKey := range dedupeSorted(candidates) {
+		for _, providerKey := range jobmodel.DedupeSorted(candidates) {
 			if providerKey == key || functional[providerKey] || runsBefore(key, providerKey) {
 				continue
 			}
@@ -1374,7 +1375,7 @@ func orderContractClients(jobs []*ScheduledJob, ws *workspace.Workspace) {
 		if len(extra) == 0 {
 			continue
 		}
-		job.SerializeAfter = dedupeSorted(append(job.SerializeAfter, extra...))
+		job.SerializeAfter = jobmodel.DedupeSorted(append(job.SerializeAfter, extra...))
 	}
 }
 
@@ -1383,7 +1384,7 @@ func orderContractClients(jobs []*ScheduledJob, ws *workspace.Workspace) {
 // exists so the removal fails loudly at plan time instead of quietly dropping
 // an edge the manifest author believed in.
 type legacyReference struct {
-	job *ScheduledJob
+	job *jobmodel.ScheduledJob
 	ref string
 	// want describes the exact identity the reference was looked up under, so
 	// the diagnostic states what the manifest would have to provide.
@@ -1397,7 +1398,7 @@ func exactIdentityDescription(cmdName, stepID string) string {
 	return fmt.Sprintf("command %q, step %q", cmdName, stepID)
 }
 
-func appendLegacyReference(acc []legacyReference, job *ScheduledJob, ref, want string, would []string) []legacyReference {
+func appendLegacyReference(acc []legacyReference, job *jobmodel.ScheduledJob, ref, want string, would []string) []legacyReference {
 	if len(would) == 0 {
 		return acc
 	}
@@ -1426,15 +1427,15 @@ func legacyReferenceLines(refs []legacyReference, limit int) []string {
 // computeCommandLeaves finds the leaf steps (steps not depended on by
 // any other step in the same command+project) for each (project, command).
 // Returns a map of "projectID:commandName" → list of leaf job keys.
-func computeCommandLeaves(jobs []*ScheduledJob) map[string][]string {
+func computeCommandLeaves(jobs []*jobmodel.ScheduledJob) map[string][]string {
 	// Group jobs by project+command
 	type cmdKey struct {
 		projectID string
 		cmdName   string
 	}
-	groups := make(map[cmdKey][]*ScheduledJob)
+	groups := make(map[cmdKey][]*jobmodel.ScheduledJob)
 	for _, j := range jobs {
-		if isFinalizerJob(j) {
+		if jobmodel.IsFinalizerJob(j) {
 			continue
 		}
 		cmd := j.CommandName()
@@ -1470,7 +1471,7 @@ func computeCommandLeaves(jobs []*ScheduledJob) map[string][]string {
 // For each job whose command has CommandDependsOn, its root steps (steps
 // with no intra-pipeline deps) get dependencies on the leaf steps of
 // each prerequisite command in the same project.
-func resolveCommandDeps(jobs []*ScheduledJob, leaves map[string][]string) {
+func resolveCommandDeps(jobs []*jobmodel.ScheduledJob, leaves map[string][]string) {
 	for _, job := range jobs {
 		if len(job.JobDef.CommandDependsOn) == 0 {
 			continue
@@ -1496,14 +1497,14 @@ func resolveCommandDeps(jobs []*ScheduledJob, leaves map[string][]string) {
 			mapKey := job.Project.ID + ":" + depCmd
 			job.DependsOn = append(job.DependsOn, leaves[mapKey]...)
 		}
-		job.DependsOn = dedupeSorted(job.DependsOn)
+		job.DependsOn = jobmodel.DedupeSorted(job.DependsOn)
 	}
 }
 
 // resolveSessionCommandDeps wires "!command" dependencies into job-level deps.
 // For each root step of the dependent command, it waits for all leaf jobs of
 // the prerequisite command that are present anywhere in the plan.
-func resolveSessionCommandDeps(jobs []*ScheduledJob, leaves map[string][]string) {
+func resolveSessionCommandDeps(jobs []*jobmodel.ScheduledJob, leaves map[string][]string) {
 	sessionLeaves := make(map[string][]string)
 	for projectCommand, keys := range leaves {
 		_, cmdName, ok := strings.Cut(projectCommand, ":")
@@ -1513,7 +1514,7 @@ func resolveSessionCommandDeps(jobs []*ScheduledJob, leaves map[string][]string)
 		sessionLeaves[cmdName] = append(sessionLeaves[cmdName], keys...)
 	}
 	for cmdName, keys := range sessionLeaves {
-		sessionLeaves[cmdName] = dedupeSorted(keys)
+		sessionLeaves[cmdName] = jobmodel.DedupeSorted(keys)
 	}
 
 	for _, job := range jobs {
@@ -1543,7 +1544,7 @@ func resolveSessionCommandDeps(jobs []*ScheduledJob, leaves map[string][]string)
 				}
 			}
 		}
-		job.DependsOn = dedupeSorted(job.DependsOn)
+		job.DependsOn = jobmodel.DedupeSorted(job.DependsOn)
 	}
 }
 
@@ -1560,25 +1561,25 @@ func commandDependencyTarget(dep string) (target string, sessionScoped bool) {
 // rescanning the whole job list (and re-deriving job-name strings) on every
 // query.
 type plannedIndex struct {
-	byKey     map[string]*ScheduledJob
-	byProject map[string][]*ScheduledJob
+	byKey     map[string]*jobmodel.ScheduledJob
+	byProject map[string][]*jobmodel.ScheduledJob
 	// byStepName indexes each job under its IDENTITY names only: the command
 	// it belongs to and the step it is. These are the two things a reference is
 	// allowed to name.
-	byStepName map[string][]*ScheduledJob
+	byStepName map[string][]*jobmodel.ScheduledJob
 	// byLegacyName indexes each job under its DERIVED spellings (display name,
 	// plan name). Nothing resolves through it — it exists so a reference that
 	// used to bind through one of those spellings can be reported instead of
 	// silently losing its edge.
-	byLegacyName map[string][]*ScheduledJob
+	byLegacyName map[string][]*jobmodel.ScheduledJob
 }
 
-func buildPlannedIndex(jobs []*ScheduledJob) *plannedIndex {
+func buildPlannedIndex(jobs []*jobmodel.ScheduledJob) *plannedIndex {
 	idx := &plannedIndex{
-		byKey:        make(map[string]*ScheduledJob, len(jobs)),
-		byProject:    make(map[string][]*ScheduledJob),
-		byStepName:   make(map[string][]*ScheduledJob),
-		byLegacyName: make(map[string][]*ScheduledJob),
+		byKey:        make(map[string]*jobmodel.ScheduledJob, len(jobs)),
+		byProject:    make(map[string][]*jobmodel.ScheduledJob),
+		byStepName:   make(map[string][]*jobmodel.ScheduledJob),
+		byLegacyName: make(map[string][]*jobmodel.ScheduledJob),
 	}
 	for _, job := range jobs {
 		idx.byKey[job.Key()] = job
@@ -1593,7 +1594,7 @@ func buildPlannedIndex(jobs []*ScheduledJob) *plannedIndex {
 // indexJobNames adds job to index under each distinct non-empty name. An empty
 // name is skipped deliberately: a non-pipeline job has no step id, and matching
 // it by "no name" is the accidental binding this slice removes.
-func indexJobNames(index map[string][]*ScheduledJob, job *ScheduledJob, names ...string) {
+func indexJobNames(index map[string][]*jobmodel.ScheduledJob, job *jobmodel.ScheduledJob, names ...string) {
 	seen := make(map[string]bool, len(names))
 	for _, name := range names {
 		if name == "" || seen[name] {
@@ -1615,7 +1616,7 @@ func (idx *plannedIndex) matchingKeys(projectID, cmdName, stepID string) []strin
 			keys = append(keys, job.Key())
 		}
 	}
-	return dedupeSorted(keys)
+	return jobmodel.DedupeSorted(keys)
 }
 
 // legacyKeys returns the plan keys a REMOVED spelling would have bound for a
@@ -1633,12 +1634,12 @@ func (idx *plannedIndex) legacyKeys(projectID, cmdName, stepID string) []string 
 	if key := projectID + ":" + extension.StepJobName(cmdName, stepID); idx.byKey[key] != nil {
 		keys = append(keys, key)
 	}
-	return dedupeSorted(keys)
+	return jobmodel.DedupeSorted(keys)
 }
 
 // legacyWildcardKeys is legacyKeys for the "*" reference, which spans projects:
 // it reports the jobs a derived-name wildcard match would have pulled in.
-func (idx *plannedIndex) legacyWildcardKeys(job *ScheduledJob, stepID string) []string {
+func (idx *plannedIndex) legacyWildcardKeys(job *jobmodel.ScheduledJob, stepID string) []string {
 	var keys []string
 	for _, candidate := range idx.byLegacyName[stepID] {
 		if candidate.Key() == job.Key() {
@@ -1646,5 +1647,5 @@ func (idx *plannedIndex) legacyWildcardKeys(job *ScheduledJob, stepID string) []
 		}
 		keys = append(keys, candidate.Key())
 	}
-	return dedupeSorted(keys)
+	return jobmodel.DedupeSorted(keys)
 }

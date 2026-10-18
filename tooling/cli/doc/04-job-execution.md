@@ -45,7 +45,7 @@ Command(s) + Project Selection
 
 ## Planning
 
-The planner (`internal/jobs/planner.go`) produces a flat list of `ScheduledJob` entries with resolved dependencies.
+The planner (`internal/jobs/planner/planner.go`) produces a flat list of `ScheduledJob` entries with resolved dependencies.
 
 ### Job Matching
 
@@ -178,7 +178,7 @@ with an explicit `scope`:
 | `workspace` | Accesses to the same id conflict across every project (e.g. a shared registry or output root). |
 
 After functional dependencies are resolved, `serializeWriteResources`
-(`internal/jobs/planner_resources.go`) inspects declared accesses and adds
+(`internal/jobs/planner/planner_resources.go`) inspects declared accesses and adds
 **serialize edges** (`ScheduledJob.SerializeAfter`) so that, per resource:
 
 - two **writers** never run concurrently;
@@ -206,7 +206,7 @@ sooner.
 A generated client is a project of its own whose provider writes its directory.
 Resources cannot express that relation, because a resource conflicts only
 within one project. After write serialization, `orderContractClients`
-(`internal/jobs/planner_deps.go`) adds serialize edges from each job of a
+(`internal/jobs/planner/planner_deps.go`) adds serialize edges from each job of a
 contract client to its provider's jobs, under two rules:
 
 - **Step rule.** A client step that references `^<step>` also waits for the
@@ -237,7 +237,7 @@ collapse that duplication: a task-owned entry is addressed partly by the job
 name, so one command's node cannot reach another's entry no matter how
 identical the work is.
 
-`attachSharedExecutions` (`internal/jobs/plan_shared.go`) groups those nodes at
+`attachSharedExecutions` (`internal/jobs/planner/plan_shared.go`) groups those nodes at
 plan time and stamps each group with a shared id, visible in `--plan` as
 `[shared-1]`. At run time the first member to reach a cache **miss** executes;
 every later member adopts its result instead of spawning an identical subprocess

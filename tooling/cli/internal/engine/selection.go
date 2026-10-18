@@ -15,6 +15,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -152,7 +153,7 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 				// The engine still plans the workspace-scoped tasks of this run,
 				// and one that reads the change since the baseline, such as the
 				// breaking marker of validate-workspace, needs it.
-				req.selection = jobs.ResolvedRunSelection(
+				req.selection = planner.ResolvedRunSelection(
 					protocoljob.SelectionModeImpacted, selection.Baseline, string(selection.BaselineSource), nil)
 				req.selection.EmptyImpact = true
 				return nil, ExitSuccess
@@ -225,7 +226,7 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 	if code := resolveNoCacheProjects(req, ws); code != ExitSuccess {
 		return nil, code
 	}
-	req.selection = jobs.ResolvedRunSelection(
+	req.selection = planner.ResolvedRunSelection(
 		selectionMode, selectionBaseline, selectionBaselineSource, selectedProjects)
 	return selectedProjects, ExitSuccess
 }

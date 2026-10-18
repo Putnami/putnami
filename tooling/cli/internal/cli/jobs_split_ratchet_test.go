@@ -100,6 +100,32 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"name protocol features",
 	},
 	{
+		dir: "internal/jobs/planner",
+		allowed: []string{
+			"go.putnami.dev/cli/model/jobs",
+			"go.putnami.dev/protocol/job",
+			"go.putnami.dev/tooling/cli/internal/extension",
+			"go.putnami.dev/tooling/cli/internal/jobs/cachekey",
+			"go.putnami.dev/tooling/cli/internal/jobs/toolchain",
+			"go.putnami.dev/tooling/cli/internal/workspace",
+		},
+		testOnly: []string{
+			"go.putnami.dev/protocol/cli",
+			"go.putnami.dev/protocol/extension",
+			"go.putnami.dev/protocol/features/spectest",
+			"go.putnami.dev/protocol/workspace",
+			"go.putnami.dev/tooling/cli/internal/store",
+		},
+		why: "the planner: it turns a selection of projects and commands into the typed plan of a " +
+			"run, from the workspace and extension models, the job model and the task cache key " +
+			"package (a plan stamps the identities and shared-execution digests the keys fold in, " +
+			"and reads the runtime toolchain identity). It never imports the scheduler or the " +
+			"runner: the scheduler reads the plan and the plan-time halves of the DAG state and the " +
+			"invocation relation, and the engine is the only package that calls Plan. Its tests " +
+			"read the committed first-party manifests through the protocol packages and write " +
+			"fixture workspaces and a store root",
+	},
+	{
 		dir: "internal/jobs/toolchain",
 		allowed: []string{
 			"go.putnami.dev/cli/model/extension",

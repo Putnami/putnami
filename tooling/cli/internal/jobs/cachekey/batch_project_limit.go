@@ -1,4 +1,4 @@
-package jobs
+package cachekey
 
 import (
 	"encoding/json"
@@ -7,11 +7,9 @@ import (
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
-	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// batchProjectLimit resolves how many projects one shared invocation of a
+// BatchProjectLimit resolves how many projects one shared invocation of a
 // batchable task may hold. It returns the cap (0 means unbounded) and whether
 // the job may batch at all.
 //
@@ -25,7 +23,7 @@ import (
 //
 // The lookup follows the rest of the CLI: the exact spelling first, then the
 // camelCase alias the parameter layers derive from a kebab-case name.
-func batchProjectLimit(policy *extension.TaskBatchPolicy, params extension.ParamMap) (int, bool, error) {
+func BatchProjectLimit(policy *extension.TaskBatchPolicy, params extension.ParamMap) (int, bool, error) {
 	if policy == nil {
 		return 0, false, nil
 	}
@@ -35,7 +33,7 @@ func batchProjectLimit(policy *extension.TaskBatchPolicy, params extension.Param
 	}
 	raw, ok := params[name]
 	if !ok && strings.Contains(name, "-") {
-		raw, ok = params[cachekey.KebabToCamel(name)]
+		raw, ok = params[KebabToCamel(name)]
 	}
 	if !ok || raw == nil {
 		return policy.MaxProjects, true, nil
@@ -71,28 +69,4 @@ func positiveIntegerParam(raw any) (int, bool) {
 		}
 	}
 	return 0, false
-}
-
-// validateBatchProjectLimits fails the plan when a job's batch cap option holds
-// anything but a positive integer. Checking at plan time turns a typo in
-// putnami.workspace.json into an error before any task runs, instead of a
-// grouping nobody asked for. The scheduler still refuses to batch such a job
-// if a value reaches it by another route.
-//
-// It reads the cap exactly as Scheduler.readyBatch does: batchProjectLimit over
-// deliveredJobParams with jobConfigDefaults. The one input that differs is the
-// run's execution-only extension parameters, which the engine overlays after
-// planning; they are framework globals, never a batch cap.
-func validateBatchProjectLimits(planned []*ScheduledJob, ws *workspace.Workspace, commandParams extension.ParamMap) error {
-	for _, job := range planned {
-		if job == nil || job.JobDef == nil || job.JobDef.Batchable == nil ||
-			job.JobDef.Batchable.MaxProjectsParam == "" || job.Extension == nil || job.Project == nil {
-			continue
-		}
-		params := deliveredJobParams(job, commandParams, jobConfigDefaults(ws, job))
-		if _, _, err := batchProjectLimit(job.JobDef.Batchable, params); err != nil {
-			return fmt.Errorf("invalid batch size for %s: %w", job.Key(), err)
-		}
-	}
-	return nil
 }

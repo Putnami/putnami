@@ -11,6 +11,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/machineprobe"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -646,7 +647,7 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 	s.prepareRemote(ctx)
 
 	// Build dependency state
-	state := newDAGState(schedulableJobs(s.planned))
+	state := planner.NewDAGState(planner.SchedulableJobs(s.planned))
 
 	results := make(map[string]*JobResult, len(s.planned))
 	hashes := make(map[string]string) // jobKey → cache hash
@@ -676,7 +677,7 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 	// Uses a pending queue to avoid blocking on readyCh while doneCh has results.
 	// The queue dispatches historical long poles first so the task that bounds
 	// the makespan starts immediately instead of behind the short tail.
-	pending := state.ready()
+	pending := state.Ready()
 	sortPendingLongestFirst(pending)
 	for _, job := range pending {
 		s.metrics.markReady(job.Key())
@@ -684,7 +685,7 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 	inFlight := 0
 	totalCompleted := 0
 
-	for totalCompleted < state.size() {
+	for totalCompleted < state.Size() {
 		// Try to send pending jobs to workers without blocking
 		for len(pending) > 0 && inFlight < maxWorkers {
 			group, rest, admitted := s.takeAdmissiblePendingGroup(pending)
@@ -704,7 +705,7 @@ func (s *Scheduler) Run(ctx context.Context) *SchedulerResult {
 
 	waitForDone:
 		if inFlight == 0 && len(pending) == 0 {
-			if totalCompleted < state.size() {
+			if totalCompleted < state.Size() {
 				s.failStuckDAG(state, results, &mu)
 			}
 			break
@@ -932,7 +933,7 @@ func (s *Scheduler) startWorkers(
 // drainInFlight.
 func (s *Scheduler) recordCompletedGroup(
 	completed jobGroupDone,
-	state *dagState,
+	state *planner.DAGState,
 	results map[string]*JobResult,
 	mu *sync.Mutex,
 	totalCompleted *int,
@@ -948,7 +949,7 @@ func (s *Scheduler) recordCompletedGroup(
 		s.emitSessionJobEnd(done.job, done.result)
 		s.invocations.observe(done.job, done.result)
 		groupFailed = groupFailed || done.result.Status == "failed"
-		newlyReady = append(newlyReady, state.complete(done.job.Key())...)
+		newlyReady = append(newlyReady, state.Complete(done.job.Key())...)
 	}
 	return groupFailed, newlyReady
 }
@@ -965,7 +966,7 @@ func (s *Scheduler) recordCompletedGroup(
 func (s *Scheduler) queueReady(
 	pending []*ScheduledJob,
 	newlyReady []*ScheduledJob,
-	state *dagState,
+	state *planner.DAGState,
 	results map[string]*JobResult,
 	mu *sync.Mutex,
 	totalCompleted *int,
@@ -1225,13 +1226,13 @@ func (s *Scheduler) emitSchedulerSummary(decision ParallelDecision) {
 	}
 }
 
-func (s *Scheduler) failStuckDAG(state *dagState, results map[string]*JobResult, mu *sync.Mutex) {
-	remainingJobs, remainingCounts := state.remainingSnapshot()
+func (s *Scheduler) failStuckDAG(state *planner.DAGState, results map[string]*JobResult, mu *sync.Mutex) {
+	remainingJobs, remainingCounts := state.RemainingSnapshot()
 	if len(remainingJobs) == 0 {
 		return
 	}
 
-	message := stuckDAGMessage(s.planned, remainingCounts)
+	message := planner.StuckDAGMessage(s.planned, remainingCounts)
 	failedJob := remainingJobs[0]
 	failed := &JobResult{
 		Status: "failed",
@@ -1286,7 +1287,7 @@ func (s *Scheduler) drainInFlight(doneCh <-chan jobGroupDone, count int, results
 // nothing a caller can act on, while `sensitive.setup_failed` names the
 // provisioning task's failure as the reason this task never ran against a
 // resource that does not exist.
-func (s *Scheduler) skipJob(job *ScheduledJob, state *dagState, results map[string]*JobResult, mu *sync.Mutex, totalCompleted *int) {
+func (s *Scheduler) skipJob(job *ScheduledJob, state *planner.DAGState, results map[string]*JobResult, mu *sync.Mutex, totalCompleted *int) {
 	cause := s.invocations.blockedError(job)
 	if cause == nil {
 		cause = &JobError{Message: "dependency failed"}
@@ -1303,7 +1304,7 @@ func (s *Scheduler) skipJob(job *ScheduledJob, state *dagState, results map[stri
 	s.emitSessionJobEnd(job, skipped)
 	*totalCompleted++
 
-	for _, cascaded := range state.complete(job.Key()) {
+	for _, cascaded := range state.Complete(job.Key()) {
 		s.skipJob(cascaded, state, results, mu, totalCompleted)
 	}
 }

@@ -1,10 +1,11 @@
-package jobs
+package planner
 
 import (
 	"sort"
 	"strings"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -27,8 +28,8 @@ func exactRefWorkspace(t *testing.T, extensions ...string) (*workspace.Workspace
 	return ws, utils, app
 }
 
-func jobNamed(proj *workspace.Project, def *extension.JobDefinition) *ScheduledJob {
-	return &ScheduledJob{Project: proj, JobDef: def}
+func jobNamed(proj *workspace.Project, def *extension.JobDefinition) *jobmodel.ScheduledJob {
+	return &jobmodel.ScheduledJob{Project: proj, JobDef: def}
 }
 
 func requireLegacyRejection(t *testing.T, err error, wants ...string) {
@@ -50,7 +51,7 @@ func requireLegacyRejection(t *testing.T, err error, wants ...string) {
 func TestResolveExternalDeps_RejectsDisplayNameFallback(t *testing.T) {
 	t.Parallel()
 	ws, utils, app := exactRefWorkspace(t)
-	jobs := []*ScheduledJob{
+	jobs := []*jobmodel.ScheduledJob{
 		// A standalone `generate` command in the upstream project. It is NOT
 		// the build pipeline's generate step, and nothing may bind to it as if
 		// it were.
@@ -73,7 +74,7 @@ func TestResolveExternalDeps_RejectsDisplayNameFallback(t *testing.T) {
 func TestResolveExternalDeps_ExactStepStillResolves(t *testing.T) {
 	t.Parallel()
 	ws, utils, app := exactRefWorkspace(t)
-	jobs := []*ScheduledJob{
+	jobs := []*jobmodel.ScheduledJob{
 		jobNamed(utils, &extension.JobDefinition{Name: "generate"}),
 		jobNamed(utils, &extension.JobDefinition{Name: "build~generate"}),
 		jobNamed(app, &extension.JobDefinition{Name: "build~generate", DependsOn: []string{"^generate"}}),
@@ -95,7 +96,7 @@ func TestResolveExternalDeps_ExactStepStillResolves(t *testing.T) {
 func TestResolveExternalDeps_RejectsPlanNameFallback(t *testing.T) {
 	t.Parallel()
 	ws, utils, app := exactRefWorkspace(t)
-	jobs := []*ScheduledJob{
+	jobs := []*jobmodel.ScheduledJob{
 		jobNamed(utils, &extension.JobDefinition{Name: "build~generate"}),
 		jobNamed(app, &extension.JobDefinition{Name: "test~check", DependsOn: []string{"^build~generate"}}),
 	}
@@ -117,7 +118,7 @@ func TestResolveExternalDeps_RejectsSynthesizedStepKeyFallback(t *testing.T) {
 		CommandName:  "package",
 		StepID:       "gen",
 	}
-	jobs := []*ScheduledJob{
+	jobs := []*jobmodel.ScheduledJob{
 		jobNamed(utils, upstream),
 		jobNamed(app, &extension.JobDefinition{Name: "build~generate", DependsOn: []string{"^generate"}}),
 	}
@@ -132,7 +133,7 @@ func TestResolveExternalDeps_WorkspaceRefRejectsLegacyName(t *testing.T) {
 	t.Parallel()
 	ws, _, app := exactRefWorkspace(t)
 	wsProj := &workspace.Project{ID: ws.Name, Name: ws.Name, Path: "."}
-	jobs := []*ScheduledJob{
+	jobs := []*jobmodel.ScheduledJob{
 		jobNamed(wsProj, &extension.JobDefinition{Name: "workspace-install~workspace-install"}),
 		jobNamed(app, &extension.JobDefinition{Name: "lint~format", DependsOn: []string{"/workspace-install~workspace-install"}}),
 	}
@@ -148,7 +149,7 @@ func TestResolveExternalDeps_WorkspaceRefRejectsLegacyName(t *testing.T) {
 func TestResolveExternalDeps_UnmatchedUpstreamRefIsNotAnError(t *testing.T) {
 	t.Parallel()
 	ws, utils, app := exactRefWorkspace(t)
-	jobs := []*ScheduledJob{
+	jobs := []*jobmodel.ScheduledJob{
 		jobNamed(utils, &extension.JobDefinition{Name: "build~transpile"}),
 		jobNamed(app, &extension.JobDefinition{Name: "build~tidy", DependsOn: []string{"^tidy"}}),
 	}
@@ -171,7 +172,7 @@ func TestResolveExternalDeps_WildcardMatchesIdentityNamesOnly(t *testing.T) {
 	ws, utils, app := exactRefWorkspace(t)
 
 	t.Run("step id resolves", func(t *testing.T) {
-		jobs := []*ScheduledJob{
+		jobs := []*jobmodel.ScheduledJob{
 			jobNamed(utils, &extension.JobDefinition{Name: "build~generate"}),
 			jobNamed(app, &extension.JobDefinition{Name: "deploy~apply", DependsOn: []string{"*generate"}}),
 		}
@@ -184,7 +185,7 @@ func TestResolveExternalDeps_WildcardMatchesIdentityNamesOnly(t *testing.T) {
 	})
 
 	t.Run("plan name is rejected", func(t *testing.T) {
-		jobs := []*ScheduledJob{
+		jobs := []*jobmodel.ScheduledJob{
 			jobNamed(utils, &extension.JobDefinition{Name: "build~generate"}),
 			jobNamed(app, &extension.JobDefinition{Name: "deploy~apply", DependsOn: []string{"*build~generate"}}),
 		}
@@ -193,7 +194,7 @@ func TestResolveExternalDeps_WildcardMatchesIdentityNamesOnly(t *testing.T) {
 	})
 
 	t.Run("bare wildcard matches nothing", func(t *testing.T) {
-		jobs := []*ScheduledJob{
+		jobs := []*jobmodel.ScheduledJob{
 			jobNamed(utils, &extension.JobDefinition{Name: "install"}),
 			jobNamed(app, &extension.JobDefinition{Name: "deploy~apply", DependsOn: []string{"*"}}),
 		}
@@ -243,7 +244,7 @@ func TestPlan_DoesNotEmitUpstreamCommandJobByDisplayName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
-	var compile *ScheduledJob
+	var compile *jobmodel.ScheduledJob
 	for _, job := range planned {
 		if job.Key() == "/utils:build" {
 			t.Errorf("upstream command job %s was emitted by display-name equality", job.Key())
@@ -315,7 +316,7 @@ func legacyMatchingKeys(idx *plannedIndex, projectID, cmdName, stepID string) []
 		}
 	}
 	if len(keys) > 0 {
-		return dedupeSorted(keys)
+		return jobmodel.DedupeSorted(keys)
 	}
 	for _, job := range candidates {
 		if job.DisplayName() == stepID || job.PlanName() == stepID {
@@ -330,7 +331,7 @@ func legacyMatchingKeys(idx *plannedIndex, projectID, cmdName, stepID string) []
 			keys = append(keys, key)
 		}
 	}
-	return dedupeSorted(keys)
+	return jobmodel.DedupeSorted(keys)
 }
 
 // TestResolveExternalDeps_ExactManifestsResolveIdenticallyToLegacy is the

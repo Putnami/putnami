@@ -158,6 +158,42 @@ func ResolvedJobParams(
 	return params
 }
 
+// DeliveredJobParams is the parameter bag BuildJobContext hands a task as
+// ctx.Params. The batch key and the plan-time batch cap check read it through
+// this one function, so neither can resolve a parameter differently from what
+// the task receives.
+func DeliveredJobParams(
+	job *jobmodel.ScheduledJob,
+	commandParams extensionmodel.ParamMap,
+	configDefaults extensionmodel.ParamMap,
+) extensionmodel.ParamMap {
+	params := ResolvedJobParams(job, commandParams, configDefaults)
+	// The project's effective registry endpoints, one raw entry per ecosystem,
+	// travel to the task that publishes: an extension reads its own ecosystem's
+	// entry and generates the native registry file from it, so no endpoint is
+	// hard-coded in an extension or hand-written into a dotfile.
+	//
+	// Deliberately set AFTER ResolvedJobParams and never through BoundParams:
+	// ResolvedJobParams is the exact projection the cache-key builder hashes, so
+	// routing the endpoints through it would make a mirror change every task's
+	// key and evict a store that holds the same bytes.
+	if len(job.Project.Registries) > 0 {
+		params["registries"] = job.Project.Registries
+	}
+	return params
+}
+
+// JobConfigDefaults returns the workspace option layers that apply to a job's
+// command and extension: options["*"], options[command], options[extension]
+// and options[extension:command], merged in that order. A workspace without a
+// config contributes nothing.
+func JobConfigDefaults(ws *workspace.Workspace, job *jobmodel.ScheduledJob) extensionmodel.ParamMap {
+	if ws == nil || ws.Config == nil || job.Extension == nil {
+		return nil
+	}
+	return ws.Config.GetCommandDefaults(jobmodel.JobCommandName(job), job.Extension.Name)
+}
+
 // ApplyBoundParams is the single precedence rule for planned task-local
 // parameters. The planner uses it when a prerequisite command becomes the
 // owner of another prerequisite, and BuildJobContext uses it at dispatch, so a

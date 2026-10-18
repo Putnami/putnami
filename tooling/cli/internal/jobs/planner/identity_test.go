@@ -1,10 +1,11 @@
-package jobs
+package planner
 
 import (
 	"encoding/json"
 	"strings"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -65,14 +66,14 @@ func TestTypedIdentity_StampedEqualsDerived(t *testing.T) {
 func TestPlan_RejectsAmbiguousProviders(t *testing.T) {
 	t.Parallel()
 	proj := &workspace.Project{ID: "/app", Name: "app"}
-	mk := func(extName string) *ScheduledJob {
-		return &ScheduledJob{
+	mk := func(extName string) *jobmodel.ScheduledJob {
+		return &jobmodel.ScheduledJob{
 			Project:   proj,
 			Extension: &extension.ExtensionDescription{Name: extName},
 			JobDef:    &extension.JobDefinition{Name: "build"},
 		}
 	}
-	err := validatePlanDAG([]*ScheduledJob{mk("@a/ext"), mk("@b/ext")})
+	err := ValidatePlanDAG([]*jobmodel.ScheduledJob{mk("@a/ext"), mk("@b/ext")})
 	if err == nil {
 		t.Fatal("two jobs sharing key /app:build validated cleanly")
 	}

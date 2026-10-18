@@ -1,10 +1,11 @@
-package jobs
+package planner
 
 import (
 	"path/filepath"
 	"reflect"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -135,7 +136,7 @@ func planGoProject(
 	projectType string,
 	commands []string,
 	options string,
-) []*ScheduledJob {
+) []*jobmodel.ScheduledJob {
 	t.Helper()
 	root := t.TempDir()
 	writeProjectFile(t, root, "subject", "go.mod", "module example.com/subject\n\ngo 1.25\n")

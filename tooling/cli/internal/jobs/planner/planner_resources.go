@@ -1,8 +1,9 @@
-package jobs
+package planner
 
 import (
 	"sort"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
@@ -27,10 +28,10 @@ import (
 // parallel. Functional dependencies (DependsOn) are never modified, and every
 // edge is consistent with a topological order of the functional graph, so the
 // combined graph stays acyclic.
-func serializeWriteResources(jobs []*ScheduledJob) {
+func serializeWriteResources(jobs []*jobmodel.ScheduledJob) {
 	pos, ok := functionalTopoOrder(jobs)
 	if !ok {
-		// The functional graph has a cycle; validatePlanDAG reports it. Adding
+		// The functional graph has a cycle; ValidatePlanDAG reports it. Adding
 		// edges on an inconsistent order could only make the diagnosis worse.
 		return
 	}
@@ -68,7 +69,7 @@ func serializeWriteResources(jobs []*ScheduledJob) {
 		key := job.Key()
 		written := make(map[string]bool)
 		for _, ref := range job.JobDef.Writes {
-			ck := resourceConflictKey(job.Project.ID, ref)
+			ck := ResourceConflictKey(job.Project.ID, ref)
 			if written[ck] {
 				continue
 			}
@@ -76,7 +77,7 @@ func serializeWriteResources(jobs []*ScheduledJob) {
 			ensure(ck).writers[key] = true
 		}
 		for _, ref := range job.JobDef.Reads {
-			ck := resourceConflictKey(job.Project.ID, ref)
+			ck := ResourceConflictKey(job.Project.ID, ref)
 			if written[ck] {
 				continue
 			}
@@ -176,7 +177,7 @@ func serializeWriteResources(jobs []*ScheduledJob) {
 		if len(extra) == 0 {
 			continue
 		}
-		job.SerializeAfter = dedupeSorted(append(job.SerializeAfter, extra...))
+		job.SerializeAfter = jobmodel.DedupeSorted(append(job.SerializeAfter, extra...))
 	}
 }
 
@@ -205,10 +206,10 @@ func nearestAncestorWriter(start string, writers map[string]bool, deps map[strin
 	return best
 }
 
-// resourceConflictKey maps a resource reference to the key two accesses must
+// ResourceConflictKey maps a resource reference to the key two accesses must
 // share to conflict. Project-scoped resources are confined to their project;
 // workspace-scoped resources collide across the whole workspace.
-func resourceConflictKey(projectID string, ref extension.ResourceRef) string {
+func ResourceConflictKey(projectID string, ref extension.ResourceRef) string {
 	if ref.EffectiveScope() == extension.ResourceScopeWorkspace {
 		return "ws::" + ref.ID
 	}
@@ -219,7 +220,7 @@ func resourceConflictKey(projectID string, ref extension.ResourceRef) string {
 // over functional dependencies alone, as a map of job key → position. The ready
 // queue is drained in sorted-key order so the result does not depend on slice
 // order or map iteration. ok is false when the functional graph has a cycle.
-func functionalTopoOrder(jobs []*ScheduledJob) (map[string]int, bool) {
+func functionalTopoOrder(jobs []*jobmodel.ScheduledJob) (map[string]int, bool) {
 	_, indegree, dependents := cachekey.FunctionalDegrees(jobs)
 
 	var ready []string

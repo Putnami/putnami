@@ -27,13 +27,14 @@
 // has a source", not "a subprocess must run". Cross-project refs (`^`, `/`,
 // `*`) are resolved by resolveExternalDeps and validated by the DAG check, so
 // they are accepted here rather than re-resolved with a second, divergent rule.
-package jobs
+package planner
 
 import (
 	"fmt"
 	"sort"
 	"strings"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
@@ -48,7 +49,7 @@ func producerStepKey(projectID, extensionName, command, stepID string) string {
 // validatePlanProducers rejects a plan in which a required typed task input has
 // no producer. Ordering is plan order, then sorted port name, so two runs over
 // one workspace emit byte-identical diagnostics.
-func validatePlanProducers(planned []*ScheduledJob) error {
+func validatePlanProducers(planned []*jobmodel.ScheduledJob) error {
 	if len(planned) == 0 {
 		return nil
 	}
@@ -61,7 +62,7 @@ func validatePlanProducers(planned []*ScheduledJob) error {
 // missingProducerLines reports every required task input port the plan cannot
 // satisfy, naming both identities. Nodes that are not expanded pipeline steps
 // contribute nothing, so a plain command job is never implicated.
-func missingProducerLines(planned []*ScheduledJob, limit int) []string {
+func missingProducerLines(planned []*jobmodel.ScheduledJob, limit int) []string {
 	present := make(map[string]bool, len(planned))
 	for _, job := range planned {
 		if job == nil || job.Project == nil || job.Extension == nil || job.StepID() == "" {
@@ -112,7 +113,7 @@ func missingProducerLines(planned []*ScheduledJob, limit int) []string {
 // to tell the manifest author. The two gaps are distinct faults with distinct
 // fixes: an unbound port is a manifest that never named a producer, a pruned
 // producer is a manifest that named one this plan did not keep.
-func producerGap(job *ScheduledJob, port string, present map[string]bool) (string, bool) {
+func producerGap(job *jobmodel.ScheduledJob, port string, present map[string]bool) (string, bool) {
 	binding, bound := job.Step.With[port]
 	switch {
 	case !bound:

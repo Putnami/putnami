@@ -1,9 +1,10 @@
-package jobs
+package planner
 
 import (
 	"path/filepath"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -71,7 +72,7 @@ func assertCLIValidationPolicy(t *testing.T) {
 	}
 }
 
-func planCLIValidationCadence(t *testing.T, commandParams extension.ParamMap) []*ScheduledJob {
+func planCLIValidationCadence(t *testing.T, commandParams extension.ParamMap) []*jobmodel.ScheduledJob {
 	t.Helper()
 	repoRoot := findJobsRepoRoot(t)
 	projectRoot := filepath.Join(repoRoot, "tooling", "cli")
@@ -121,7 +122,7 @@ func planCLIValidationCadence(t *testing.T, commandParams extension.ParamMap) []
 	return planned
 }
 
-func requireCLIPlanJob(t *testing.T, planned []*ScheduledJob, name string) *ScheduledJob {
+func requireCLIPlanJob(t *testing.T, planned []*jobmodel.ScheduledJob, name string) *jobmodel.ScheduledJob {
 	t.Helper()
 	job := findCLIPlanJob(planned, name)
 	if job == nil {
@@ -130,7 +131,7 @@ func requireCLIPlanJob(t *testing.T, planned []*ScheduledJob, name string) *Sche
 	return job
 }
 
-func findCLIPlanJob(planned []*ScheduledJob, name string) *ScheduledJob {
+func findCLIPlanJob(planned []*jobmodel.ScheduledJob, name string) *jobmodel.ScheduledJob {
 	for _, job := range planned {
 		if job.Project.ID == "/tooling/cli" && job.JobDef.Name == name {
 			return job
@@ -148,7 +149,7 @@ func hasResource(refs []extension.ResourceRef, id string) bool {
 	return false
 }
 
-func assertNoOrderingEdge(t *testing.T, a, b *ScheduledJob) {
+func assertNoOrderingEdge(t *testing.T, a, b *jobmodel.ScheduledJob) {
 	t.Helper()
 	for _, edge := range append(append([]string(nil), a.DependsOn...), a.SerializeAfter...) {
 		if edge == b.Key() {

@@ -3,6 +3,7 @@ package cachekey
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
@@ -107,5 +108,69 @@ func TestBatchProjectCapNeverKeysTheTask(t *testing.T) {
 	}
 	if got := keyWith(extension.ParamMap{"race": true}); got == unset {
 		t.Fatal("a declared flag did not move the task cache key; the comparison above proves nothing")
+	}
+}
+
+// TestBatchProjectLimitResolvesTheNamedOption pins the resolution rule. A
+// policy that names no parameter, or whose parameter is unset, keeps its static
+// cap. A positive integer replaces it, through either spelling the CLI
+// delivers. 1 means one project per invocation, which is singleton dispatch.
+// Anything else is an error, never a silent grouping.
+func TestBatchProjectLimitResolvesTheNamedOption(t *testing.T) {
+	t.Parallel()
+	static := &extension.TaskBatchPolicy{Tool: "suite", MaxProjects: 4}
+	named := &extension.TaskBatchPolicy{Tool: "suite", MaxProjects: 4, MaxProjectsParam: batchCapOption}
+	unbounded := &extension.TaskBatchPolicy{Tool: "suite", MaxProjectsParam: batchCapOption}
+
+	for _, tc := range []struct {
+		name    string
+		policy  *extension.TaskBatchPolicy
+		params  extension.ParamMap
+		limit   int
+		batches bool
+		fails   bool
+	}{
+		{name: "no policy", policy: nil},
+		{name: "a policy naming no param ignores the option", policy: static,
+			params: extension.ParamMap{batchCapOption: 2.0}, limit: 4, batches: true},
+		{name: "unset keeps the static cap", policy: named, limit: 4, batches: true},
+		{name: "unset keeps an unbounded policy unbounded", policy: unbounded, limit: 0, batches: true},
+		{name: "null keeps the static cap", policy: named,
+			params: extension.ParamMap{batchCapOption: nil}, limit: 4, batches: true},
+		{name: "kebab spelling", policy: named,
+			params: extension.ParamMap{batchCapOption: 6.0}, limit: 6, batches: true},
+		{name: "camel alias", policy: named,
+			params: extension.ParamMap{"batchMaxProjects": 6.0}, limit: 6, batches: true},
+		{name: "go int", policy: unbounded,
+			params: extension.ParamMap{batchCapOption: 3}, limit: 3, batches: true},
+		{name: "1 runs every project alone", policy: unbounded,
+			params: extension.ParamMap{batchCapOption: 1.0}, limit: 1, batches: false},
+		{name: "zero", policy: unbounded, params: extension.ParamMap{batchCapOption: 0.0}, fails: true},
+		{name: "negative", policy: unbounded, params: extension.ParamMap{batchCapOption: -2.0}, fails: true},
+		{name: "fraction", policy: unbounded, params: extension.ParamMap{batchCapOption: 2.5}, fails: true},
+		{name: "too large", policy: unbounded, params: extension.ParamMap{batchCapOption: 1e12}, fails: true},
+		{name: "string", policy: unbounded, params: extension.ParamMap{batchCapOption: "6"}, fails: true},
+		{name: "boolean", policy: unbounded, params: extension.ParamMap{batchCapOption: true}, fails: true},
+	} {
+		limit, batches, err := BatchProjectLimit(tc.policy, tc.params)
+		if tc.fails {
+			if err == nil || !strings.Contains(err.Error(), batchCapOption) {
+				t.Errorf("%s: err = %v, want an error naming %s", tc.name, err, batchCapOption)
+			}
+			if batches {
+				t.Errorf("%s: an invalid cap still batches", tc.name)
+			}
+			continue
+		}
+		if err != nil || limit != tc.limit || batches != tc.batches {
+			t.Errorf("%s: got (%d, %t, %v), want (%d, %t, nil)", tc.name, limit, batches, err, tc.limit, tc.batches)
+		}
+	}
+
+	// A quoted number is the likeliest mistake, and an undeclared command-line
+	// flag arrives the same way; the error says why "2" is refused.
+	if _, _, err := BatchProjectLimit(unbounded, extension.ParamMap{batchCapOption: "2"}); err == nil ||
+		!strings.Contains(err.Error(), "JSON number") {
+		t.Errorf("quoted number: err = %v, want an error asking for a JSON number", err)
 	}
 }

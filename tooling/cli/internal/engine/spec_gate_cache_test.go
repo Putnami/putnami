@@ -12,6 +12,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -145,7 +146,7 @@ func newRecoveryPlanFixture(t *testing.T, withTestEnv bool) *recoveryPlanFixture
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(root, ".putnami", "store")))
 	source := newCachedObservationRecovery(&Request{Commands: []string{"test"}}, ws,
 		[]*extension.ExtensionDescription{recoveryTestExtension()}, cache)
-	planned, err := jobs.Plan(ws, []string{"test"}, ws.Projects, source.extensions, nil, nil, nil)
+	planned, err := planner.Plan(ws, []string{"test"}, ws.Projects, source.extensions, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}

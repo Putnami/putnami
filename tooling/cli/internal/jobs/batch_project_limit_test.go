@@ -8,76 +8,13 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // batchCapOption is the parameter the fixtures' batch policy names, spelled as
 // the Go extension names it for go-test.
 const batchCapOption = "batch-max-projects"
-
-// TestBatchProjectLimitResolvesTheNamedOption pins the resolution rule. A
-// policy that names no parameter, or whose parameter is unset, keeps its static
-// cap. A positive integer replaces it, through either spelling the CLI
-// delivers. 1 means one project per invocation, which is singleton dispatch.
-// Anything else is an error, never a silent grouping.
-func TestBatchProjectLimitResolvesTheNamedOption(t *testing.T) {
-	t.Parallel()
-	static := &extension.TaskBatchPolicy{Tool: "suite", MaxProjects: 4}
-	named := &extension.TaskBatchPolicy{Tool: "suite", MaxProjects: 4, MaxProjectsParam: batchCapOption}
-	unbounded := &extension.TaskBatchPolicy{Tool: "suite", MaxProjectsParam: batchCapOption}
-
-	for _, tc := range []struct {
-		name    string
-		policy  *extension.TaskBatchPolicy
-		params  extension.ParamMap
-		limit   int
-		batches bool
-		fails   bool
-	}{
-		{name: "no policy", policy: nil},
-		{name: "a policy naming no param ignores the option", policy: static,
-			params: extension.ParamMap{batchCapOption: 2.0}, limit: 4, batches: true},
-		{name: "unset keeps the static cap", policy: named, limit: 4, batches: true},
-		{name: "unset keeps an unbounded policy unbounded", policy: unbounded, limit: 0, batches: true},
-		{name: "null keeps the static cap", policy: named,
-			params: extension.ParamMap{batchCapOption: nil}, limit: 4, batches: true},
-		{name: "kebab spelling", policy: named,
-			params: extension.ParamMap{batchCapOption: 6.0}, limit: 6, batches: true},
-		{name: "camel alias", policy: named,
-			params: extension.ParamMap{"batchMaxProjects": 6.0}, limit: 6, batches: true},
-		{name: "go int", policy: unbounded,
-			params: extension.ParamMap{batchCapOption: 3}, limit: 3, batches: true},
-		{name: "1 runs every project alone", policy: unbounded,
-			params: extension.ParamMap{batchCapOption: 1.0}, limit: 1, batches: false},
-		{name: "zero", policy: unbounded, params: extension.ParamMap{batchCapOption: 0.0}, fails: true},
-		{name: "negative", policy: unbounded, params: extension.ParamMap{batchCapOption: -2.0}, fails: true},
-		{name: "fraction", policy: unbounded, params: extension.ParamMap{batchCapOption: 2.5}, fails: true},
-		{name: "too large", policy: unbounded, params: extension.ParamMap{batchCapOption: 1e12}, fails: true},
-		{name: "string", policy: unbounded, params: extension.ParamMap{batchCapOption: "6"}, fails: true},
-		{name: "boolean", policy: unbounded, params: extension.ParamMap{batchCapOption: true}, fails: true},
-	} {
-		limit, batches, err := batchProjectLimit(tc.policy, tc.params)
-		if tc.fails {
-			if err == nil || !strings.Contains(err.Error(), batchCapOption) {
-				t.Errorf("%s: err = %v, want an error naming %s", tc.name, err, batchCapOption)
-			}
-			if batches {
-				t.Errorf("%s: an invalid cap still batches", tc.name)
-			}
-			continue
-		}
-		if err != nil || limit != tc.limit || batches != tc.batches {
-			t.Errorf("%s: got (%d, %t, %v), want (%d, %t, nil)", tc.name, limit, batches, err, tc.limit, tc.batches)
-		}
-	}
-
-	// A quoted number is the likeliest mistake, and an undeclared command-line
-	// flag arrives the same way; the error says why "2" is refused.
-	if _, _, err := batchProjectLimit(unbounded, extension.ParamMap{batchCapOption: "2"}); err == nil ||
-		!strings.Contains(err.Error(), "JSON number") {
-		t.Errorf("quoted number: err = %v, want an error asking for a JSON number", err)
-	}
-}
 
 // makeGoTestBatchFixture plans four go-test-like jobs whose batch policy
 // names the cap option and carries no static cap, as the Go extension's
@@ -251,51 +188,12 @@ func TestGoTestBatchesHonourTheWorkspaceProjectCap(t *testing.T) {
 	if key := scheduler.readyBatchKey(a); key != "" {
 		t.Fatalf("invalid cap batch key = %q, want singleton dispatch", key)
 	}
-	err := validateBatchProjectLimits(planned, ws, nil)
+	err := planner.ValidateBatchProjectLimits(planned, ws, nil)
 	if err == nil || !strings.Contains(err.Error(), batchCapOption) || !strings.Contains(err.Error(), a.Key()) {
 		t.Fatalf("plan validation = %v, want an error naming %s and %s", err, batchCapOption, a.Key())
 	}
 	setGoTestOptions(ws, extension.ParamMap{batchCapOption: 4.0})
-	if err := validateBatchProjectLimits(planned, ws, nil); err != nil {
+	if err := planner.ValidateBatchProjectLimits(planned, ws, nil); err != nil {
 		t.Fatalf("valid cap refused: %v", err)
-	}
-}
-
-// TestPlanRefusesAnInvalidBatchProjectCap pins the wiring: a bad value fails
-// Plan itself, so every adapter (run, --plan, MCP) reports it before a task
-// starts, while a valid or absent value plans normally.
-func TestPlanRefusesAnInvalidBatchProjectCap(t *testing.T) {
-	t.Parallel()
-	plan := func(options extension.ParamMap) error {
-		t.Helper()
-		ws := makeTestWorkspace()
-		ext := makeTestExtension()
-		ext.Jobs["test"].Batchable = &extension.TaskBatchPolicy{Tool: "suite", MaxProjectsParam: batchCapOption}
-		ws.Config = &wsproto.Config{}
-		if options != nil {
-			ws.Config.Options = map[string]extension.ParamMap{"test": options}
-		}
-		_, err := Plan(ws, []string{"test"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
-		return err
-	}
-
-	for name, options := range map[string]extension.ParamMap{
-		"unset": nil,
-		"cap 2": {batchCapOption: 2.0},
-		"cap 1": {batchCapOption: 1.0},
-	} {
-		if err := plan(options); err != nil {
-			t.Errorf("%s: Plan = %v, want success", name, err)
-		}
-	}
-	for name, options := range map[string]extension.ParamMap{
-		"zero":   {batchCapOption: 0.0},
-		"string": {batchCapOption: "six"},
-		"camel":  {"batchMaxProjects": -1.0},
-	} {
-		err := plan(options)
-		if err == nil || !strings.Contains(err.Error(), "invalid batch size") {
-			t.Errorf("%s: Plan = %v, want an invalid batch size error", name, err)
-		}
 	}
 }

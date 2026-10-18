@@ -35,6 +35,7 @@ import (
 	protocoljob "go.putnami.dev/protocol/job"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -74,7 +75,7 @@ func (rt *invocationRuntime) arm(job *ScheduledJob, actionDigest string) (reaped
 	// "the next invocation after a kill recovers the orphan" true.
 	reaped = store.ReapOrphanInvocations(root)
 
-	scratch, err := store.NewInvocationScratch(root, rel.provider, actionDigest)
+	scratch, err := store.NewInvocationScratch(root, rel.Provider, actionDigest)
 	if err != nil {
 		// Arming is the last step before the producer's subprocess exists, so a
 		// failure here is a setup failure the frontier must be told about: the
@@ -87,15 +88,15 @@ func (rt *invocationRuntime) arm(job *ScheduledJob, actionDigest string) (reaped
 	rel.armed = true
 
 	locator := &protocoljob.Invocation{ID: scratch.ID(), ArtifactRoot: scratch.ArtifactRoot()}
-	rel.producer.Invocation = locator
-	rel.finalizer.Invocation = locator
-	for _, consumer := range rel.consumers {
+	rel.Producer.Invocation = locator
+	rel.Finalizer.Invocation = locator
+	for _, consumer := range rel.Consumers {
 		consumer.Invocation = locator
 	}
 
 	// Reserve each declared sensitive artifact at mode 0600 before the producer
 	// can create it at the process umask.
-	for _, output := range sortedInvocationOutputs(rel.producer) {
+	for _, output := range planner.SortedInvocationOutputs(rel.Producer) {
 		if output.PathFrom != "" {
 			continue
 		}
@@ -141,7 +142,7 @@ func (rt *invocationRuntime) provisioned(job *ScheduledJob, result *JobResult) *
 		return nil
 	}
 
-	for _, output := range sortedInvocationOutputs(rel.producer) {
+	for _, output := range planner.SortedInvocationOutputs(rel.Producer) {
 		if output.PathFrom != "" {
 			continue
 		}
@@ -217,7 +218,7 @@ func (rt *invocationRuntime) blockedError(job *ScheduledJob) *JobError {
 		return nil
 	}
 	message := fmt.Sprintf(
-		"blocked: %s did not provision its invocation-scoped resource", rel.producer.Key())
+		"blocked: %s did not provision its invocation-scoped resource", rel.Producer.Key())
 	if rel.conflict != "" {
 		message = "blocked: " + rel.conflict
 	}
@@ -284,28 +285,6 @@ func verifyProducedArtifact(scratch *store.InvocationScratch, output extension.D
 			store.ErrInvocationArtifactMissing, output.Path)
 	}
 	return nil
-}
-
-// sortedInvocationOutputs returns the job's invocation-scoped declared outputs
-// in canonical id order, so preparation, verification and hardening are
-// order-independent.
-func sortedInvocationOutputs(job *ScheduledJob) []extension.DeclaredOutput {
-	declaration := taskDeclarationOf(job)
-	if declaration == nil {
-		return nil
-	}
-	ids := make([]string, 0, len(declaration.Outputs))
-	for id, output := range declaration.Outputs {
-		if output.IsInvocationScoped() {
-			ids = append(ids, id)
-		}
-	}
-	sort.Strings(ids)
-	out := make([]extension.DeclaredOutput, 0, len(ids))
-	for _, id := range ids {
-		out = append(out, declaration.Outputs[id])
-	}
-	return out
 }
 
 // armInvocation creates the private scratch and publishes the lease for a

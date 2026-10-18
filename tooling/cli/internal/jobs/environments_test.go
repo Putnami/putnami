@@ -133,6 +133,16 @@ func deployJobsFor(ws *workspace.Workspace, ids ...string) []*ScheduledJob {
 // ws.Projects and no selector can name it — carrying the real workloads in
 // SelectedProjects. It sits beside deployJobsFor rather than replacing it:
 // both shapes are legitimate and both must bind.
+// workspaceOnceProject is the synthetic project a workspace-once job runs
+// under: the workspace itself, rooted at ".".
+func workspaceOnceProject(ws *workspace.Workspace) *workspace.Project {
+	name := ws.Name
+	if name == "" {
+		name = "workspace"
+	}
+	return &workspace.Project{ID: name, Name: name, Path: "."}
+}
+
 func deployWorkspaceJobFor(ws *workspace.Workspace, ids ...string) *ScheduledJob {
 	ext := &modelextension.ExtensionDescription{Name: "@putnami/cloud"}
 	selected := make([]*workspace.Project, 0, len(ids))

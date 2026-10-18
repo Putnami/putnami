@@ -36,6 +36,7 @@ import (
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/credentialprovider/providertest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -593,7 +594,7 @@ func TestSessionOpenIsSentOnceAfterEveryBarrierLeaf(t *testing.T) {
 			}
 
 			planned, internal := h.plan(nil, fixedAncestry{testRevision}, barrier)
-			open := jobsByPlanKey(planned)[publicationOpenKey]
+			open := planner.JobsByPlanKey(planned)[publicationOpenKey]
 			if open == nil || !slices.Contains(open.DependsOn, first.Key()) || !slices.Contains(open.DependsOn, second.Key()) {
 				t.Fatalf("open waits for %v, want both gate tasks", open.DependsOn)
 			}

@@ -11,6 +11,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -261,7 +262,7 @@ func planClientgenOnAGoProvider(t *testing.T) *clientgenPlan {
 		loadShippedExtension(t, "go/extension", "@putnami/go"),
 		loadShippedExtension(t, "tooling/clientgen-extension", "@putnami/clientgen"),
 	}
-	planned, err := Plan(ws, []string{"clientgen"}, ws.Projects, exts, nil, nil, nil)
+	planned, err := planner.Plan(ws, []string{"clientgen"}, ws.Projects, exts, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan clientgen: %v", err)
 	}

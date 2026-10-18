@@ -318,13 +318,13 @@ func (rt *invocationRuntime) eventSink(job *ScheduledJob, handler EventHandler) 
 	// makes this node: the relation it PRODUCES for is the one whose needles do
 	// not exist yet.
 	if rel := rt.byProducer[job.Key()]; rel != nil {
-		if !rel.sensitive {
+		if !rel.Sensitive {
 			return handler
 		}
 		return rel.holdEvents(handler)
 	}
 	rel := rt.relationFor(job)
-	if rel == nil || !rel.sensitive {
+	if rel == nil || !rel.Sensitive {
 		return handler
 	}
 	return func(event RawJobEvent) {
@@ -357,8 +357,8 @@ func (rel *invocationRelation) holdEvents(handler EventHandler) EventHandler {
 		}
 		needles := append([]string(nil), rel.needles...)
 		rel.mu.Unlock()
-		if redactEvent(rel.producer, &event, needles) {
-			rel.recordLeak(rel.producer)
+		if redactEvent(rel.Producer, &event, needles) {
+			rel.recordLeak(rel.Producer)
 		}
 		handler(event)
 	}
@@ -406,7 +406,7 @@ func (rt *invocationRuntime) releaseProducerEvents(job *ScheduledJob, sink Event
 		return
 	}
 	rel := rt.byProducer[job.Key()]
-	if rel == nil || !rel.sensitive {
+	if rel == nil || !rel.Sensitive {
 		return
 	}
 	rel.mu.Lock()

@@ -60,7 +60,7 @@ func (s *Scheduler) readyBatch(job *ScheduledJob) (string, int) {
 		}
 	}
 
-	jobCtx := BuildJobContext(s.ws, job, s.taskParams, jobConfigDefaults(s.ws, job), s.cfg.VersionInfo)
+	jobCtx := BuildJobContext(s.ws, job, s.taskParams, cachekey.JobConfigDefaults(s.ws, job), s.cfg.VersionInfo)
 	params, err := json.Marshal(jobCtx.Params)
 	if err != nil {
 		return "", 0
@@ -71,7 +71,7 @@ func (s *Scheduler) readyBatch(job *ScheduledJob) (string, int) {
 	// never share a batch. A cap of 1, or a value the plan refuses, keeps
 	// singleton dispatch. validateBatchProjectLimits reads the same bag
 	// (deliveredJobParams, which BuildJobContext assigns to jobCtx.Params).
-	maxProjects, batches, err := batchProjectLimit(job.JobDef.Batchable, jobCtx.Params)
+	maxProjects, batches, err := cachekey.BatchProjectLimit(job.JobDef.Batchable, jobCtx.Params)
 	if err != nil || !batches {
 		return "", 0
 	}

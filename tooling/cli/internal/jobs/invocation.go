@@ -39,44 +39,40 @@
 //     warm consumer is warm because its inputs are unchanged and not because a
 //     secret happened to repeat.
 //
-// THIS file owns the relation itself and the two decisions that precede any
-// execution: resolving `finalizes` onto plan nodes (which is also where the
-// producing-action stamp the cache identity needs is attached), the
-// one-invocation-per-step rule that keeps ownership of a step unambiguous, and
-// the pruning that answers "does this resource need to exist at all" before
-// anything is provisioned. Every member of invocationRelation is declared here
-// and guarded by its mutex; the sibling files are the state machines that move
+// THIS file owns the runtime relation and the decision that precedes any
+// execution: the pruning that answers "does this resource need to exist at all"
+// before anything is provisioned. The plan-time half of the relation lives in
+// internal/jobs/planner/invocation.go: resolving `finalizes` onto plan nodes
+// (which is also where the producing-action stamp the cache identity needs is
+// attached) and the one-invocation-per-step rule that keeps ownership of a step
+// unambiguous. Every runtime member of invocationRelation is declared here and
+// guarded by its mutex; the sibling files are the state machines that move
 // them.
 package jobs
 
 import (
-	"fmt"
-	"sort"
 	"strings"
 	"sync"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // invocationRelation is one `finalizes` relation resolved onto plan nodes.
 //
+// The embedded planner.InvocationRelation is the plan-time half: the producer,
+// the consumer frontier, the finalizer and whether the relation needs the leak
+// guard. This type adds the runtime half.
+//
 // It owns the whole lifecycle of one invocation-scoped resource: the private
 // scratch, the lease, the artifacts' confinement, and the single finalizer run.
 // Its mutex guards every mutable member because the producer's worker, the
 // consumers' workers and the coordinator all touch it.
 type invocationRelation struct {
-	provider  string
-	producer  *ScheduledJob
-	consumers []*ScheduledJob
-	finalizer *ScheduledJob
-	// sensitive records that the producer declares at least one sensitive
-	// invocation-scoped output, so the relation needs the leak guard at all. It
-	// is resolved once, off the declaration, and never changes: a relation
-	// without it keeps the unwrapped event handler and pays nothing per event.
-	sensitive bool
+	planner.InvocationRelation
 
 	mu sync.Mutex
 	// armed records that the producer STARTED. It is the finalizer's trigger and
@@ -151,9 +147,13 @@ type invocationRuntime struct {
 // node so cache-key derivation can fold in the producing action's digest
 // without a second resolution pass.
 func newInvocationRuntime(ws *workspace.Workspace, planned []*ScheduledJob) *invocationRuntime {
-	relations := resolveInvocationRelations(planned)
-	if len(relations) == 0 {
+	resolved := planner.ResolveInvocationRelations(planned)
+	if len(resolved) == 0 {
 		return nil
+	}
+	relations := make([]*invocationRelation, 0, len(resolved))
+	for _, relation := range resolved {
+		relations = append(relations, &invocationRelation{InvocationRelation: *relation})
 	}
 	rt := &invocationRuntime{
 		ws:           ws,
@@ -164,12 +164,12 @@ func newInvocationRuntime(ws *workspace.Workspace, planned []*ScheduledJob) *inv
 		participants: make(map[string]*invocationRelation),
 	}
 	for _, rel := range relations {
-		rt.byProducer[rel.producer.Key()] = rel
-		rt.byFinalizer[rel.finalizer.Key()] = rel
-		rt.participants[rel.producer.Key()] = rel
-		rt.participants[rel.finalizer.Key()] = rel
-		for _, consumer := range rel.consumers {
-			// A step belongs to at most ONE invocation, which validateInvocationFrontiers
+		rt.byProducer[rel.Producer.Key()] = rel
+		rt.byFinalizer[rel.Finalizer.Key()] = rel
+		rt.participants[rel.Producer.Key()] = rel
+		rt.participants[rel.Finalizer.Key()] = rel
+		for _, consumer := range rel.Consumers {
+			// A step belongs to at most ONE invocation, which planner.ValidateInvocationFrontiers
 			// rejects a plan for violating and manifest validation rejects a manifest
 			// for authoring. Overwriting here would silently pick a winner: the
 			// consumer would hold one relation's private artifact tree while the
@@ -177,7 +177,7 @@ func newInvocationRuntime(ws *workspace.Workspace, planned []*ScheduledJob) *inv
 			// relations are refused instead, so the frontier is skipped with a cause
 			// that names the collision rather than executed against a coin flip.
 			if owner := rt.byConsumer[consumer.Key()]; owner != nil && owner != rel {
-				reason := sharedConsumerReason(consumer, owner, rel)
+				reason := planner.SharedConsumerReason(consumer, &owner.InvocationRelation, &rel.InvocationRelation)
 				owner.refuse(reason)
 				rel.refuse(reason)
 				continue
@@ -189,46 +189,6 @@ func newInvocationRuntime(ws *workspace.Workspace, planned []*ScheduledJob) *inv
 	return rt
 }
 
-// validateInvocationFrontiers is the plan-time half of the one-invocation-per-step
-// rule, and the reason it is an ERROR rather than a repair: the manifest check
-// makes an authored collision unpublishable, so a plan that still carries one
-// means the expansion produced a shape no manifest describes. Running it would
-// mean choosing which relation owns the step.
-//
-// It resolves the relations as a side effect, which is also what stamps each
-// consumer's producing action for cache-key derivation, so Plan calls this
-// instead of resolving separately.
-func validateInvocationFrontiers(planned []*ScheduledJob) error {
-	owner := make(map[string]*invocationRelation)
-	var lines []string
-	for _, rel := range resolveInvocationRelations(planned) {
-		for _, consumer := range rel.consumers {
-			existing, claimed := owner[consumer.Key()]
-			if !claimed {
-				owner[consumer.Key()] = rel
-				continue
-			}
-			lines = append(lines, "  "+sharedConsumerReason(consumer, existing, rel))
-		}
-	}
-	if len(lines) == 0 {
-		return nil
-	}
-	sort.Strings(lines)
-	return fmt.Errorf("plan shares a step between two finalizes relations:\n%s", strings.Join(lines, "\n"))
-}
-
-// sharedConsumerReason names the step and BOTH relations, because either one
-// alone leaves the reader guessing which other declaration they have to change.
-func sharedConsumerReason(consumer *ScheduledJob, first, second *invocationRelation) string {
-	return fmt.Sprintf(
-		"%s is in the consumer frontier of %s (finalized by %s) and of %s (finalized by %s); "+
-			"a step belongs to at most one invocation",
-		consumer.Key(),
-		first.producer.Key(), first.finalizer.Key(),
-		second.producer.Key(), second.finalizer.Key())
-}
-
 // refuse marks the relation unusable: its frontier is blocked with reason and
 // never runs against a resource whose ownership is ambiguous.
 func (rel *invocationRelation) refuse(reason string) {
@@ -236,130 +196,6 @@ func (rel *invocationRelation) refuse(reason string) {
 	rel.setupFailed = true
 	rel.conflict = reason
 	rel.mu.Unlock()
-}
-
-// resolveInvocationRelations turns every `runOn: finally` plan node into a
-// resolved relation, dropping any whose producer or consumer frontier is not in
-// the plan.
-//
-// A dropped relation leaves its finalizer inert rather than half-wired: the
-// frontier is the contract's completion signal, and a finalizer that cannot see
-// its whole frontier would run at an arbitrary moment. Pipeline expansion can
-// legitimately remove a step (a plan-time `if`), so this is a normal outcome and
-// not an error.
-//
-// The function is PURE in the plan apart from the producer stamp it attaches,
-// which is idempotent, so Plan and the scheduler can both call it and cannot
-// disagree.
-func resolveInvocationRelations(planned []*ScheduledJob) []*invocationRelation {
-	var finalizers []*ScheduledJob
-	for _, job := range planned {
-		if isFinalizerJob(job) {
-			finalizers = append(finalizers, job)
-		}
-	}
-	if len(finalizers) == 0 {
-		return nil
-	}
-
-	byStep := make(map[string]*ScheduledJob, len(planned))
-	for _, job := range planned {
-		byStep[invocationStepKey(job, job.StepID())] = job
-	}
-
-	relations := make([]*invocationRelation, 0, len(finalizers))
-	for _, finalizer := range finalizers {
-		relation := finalizer.Step.Finalizes
-		producer := byStep[invocationStepKey(finalizer, strings.TrimSpace(relation.Producer))]
-		if producer == nil || producer == finalizer {
-			continue
-		}
-		consumers := make([]*ScheduledJob, 0, len(relation.Consumers))
-		complete := len(relation.Consumers) > 0
-		for _, authored := range relation.Consumers {
-			consumer := byStep[invocationStepKey(finalizer, strings.TrimSpace(authored))]
-			if consumer == nil {
-				complete = false
-				break
-			}
-			consumers = append(consumers, consumer)
-		}
-		if !complete {
-			continue
-		}
-		provider := ""
-		if producer.Extension != nil {
-			provider = producer.Extension.Name
-		}
-		for _, consumer := range consumers {
-			consumer.InvocationProducer = producer
-		}
-		relations = append(relations, &invocationRelation{
-			provider:  provider,
-			producer:  producer,
-			consumers: consumers,
-			finalizer: finalizer,
-			sensitive: declaresSensitiveArtifact(producer),
-		})
-	}
-	if len(relations) == 0 {
-		return nil
-	}
-	return relations
-}
-
-// declaresSensitiveArtifact reports whether the producer declares an
-// invocation-scoped output marked sensitive — the only thing that can put a
-// needle in the guard. A relation without one is exempt from the event guard
-// entirely rather than paying a lock per event to be told the needle set is
-// empty.
-func declaresSensitiveArtifact(producer *ScheduledJob) bool {
-	for _, output := range sortedInvocationOutputs(producer) {
-		if output.Sensitive && output.PathFrom == "" {
-			return true
-		}
-	}
-	return false
-}
-
-// invocationStepKey addresses a sibling step of the same pipeline: same
-// project, same extension, same command. A finalizes relation never crosses any
-// of those boundaries — it names step ids inside one command's `run` list.
-func invocationStepKey(sibling *ScheduledJob, stepID string) string {
-	project, ext := "", ""
-	if sibling.Project != nil {
-		project = sibling.Project.ID
-	}
-	if sibling.Extension != nil {
-		ext = sibling.Extension.Name
-	}
-	return project + "\x00" + ext + "\x00" + sibling.CommandName() + "\x00" + stepID
-}
-
-// schedulableJobs returns the plan minus its finalizer nodes.
-//
-// A finalizer is never dispatched by the DAG. Its trigger is producer START and
-// its completion frontier is the consumers' TERMINAL states — neither of which a
-// dependency DAG can express, since the DAG only knows "ran successfully".
-// Leaving it in would make it ready immediately (a finalizer has no dependsOn,
-// by contract) and run it before the work it tears down.
-func schedulableJobs(planned []*ScheduledJob) []*ScheduledJob {
-	held := 0
-	for _, job := range planned {
-		if isFinalizerJob(job) {
-			held++
-		}
-	}
-	if held == 0 {
-		return planned
-	}
-	out := make([]*ScheduledJob, 0, len(planned)-held)
-	for _, job := range planned {
-		if !isFinalizerJob(job) {
-			out = append(out, job)
-		}
-	}
-	return out
 }
 
 // relationFor returns the relation a job participates in, or nil.
@@ -418,7 +254,7 @@ func (rt *invocationRuntime) isPruned(job *ScheduledJob, present func(consumer *
 	}
 
 	confirmed := true
-	for _, consumer := range rel.consumers {
+	for _, consumer := range rel.Consumers {
 		if !present(consumer) {
 			confirmed = false
 			break
@@ -479,8 +315,8 @@ func (rt *invocationRuntime) prune(
 	var movement *cachekey.KeyMovement
 	var byKey map[string]*ScheduledJob
 	for _, rel := range rt.relations {
-		allHit := len(rel.consumers) > 0
-		for _, consumer := range rel.consumers {
+		allHit := len(rel.Consumers) > 0
+		for _, consumer := range rel.Consumers {
 			hash, ok := keys[consumer.Key()]
 			if !ok || !cachedEntryPresent(cache, consumer, hash) {
 				allHit = false
@@ -490,7 +326,7 @@ func (rt *invocationRuntime) prune(
 		if !allHit {
 			continue
 		}
-		if expression := strings.TrimSpace(rel.finalizer.Step.Finalizes.PruneIf); expression != "" {
+		if expression := strings.TrimSpace(rel.Finalizer.Step.Finalizes.PruneIf); expression != "" {
 			prune, valid := extension.EvaluateExpressionChecked(
 				expression, &extension.WhenContext{Params: commandParams})
 			if !valid || !prune {
@@ -503,12 +339,12 @@ func (rt *invocationRuntime) prune(
 			byKey = cachekey.JobsByKey(planned)
 		}
 		recheck, settled := false, true
-		for _, consumer := range rel.consumers {
+		for _, consumer := range rel.Consumers {
 			if !movement.Moving[consumer.Key()] {
 				continue
 			}
 			recheck = true
-			if !cachekey.SettlesBefore(rel.producer, consumer, *movement, byKey) {
+			if !cachekey.SettlesBefore(rel.Producer, consumer, *movement, byKey) {
 				settled = false
 				break
 			}

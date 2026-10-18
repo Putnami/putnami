@@ -16,6 +16,7 @@ import (
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/sdk/extension/envkeys"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 )
 
 // InternalReleaseSetProviderCapabilityEnv is an implementation-private hop
@@ -276,11 +277,11 @@ func AuthorizeProcessCapabilities(
 	if err != nil {
 		return nil, err
 	}
-	if err := validatePlanDAG(planned); err != nil {
+	if err := planner.ValidatePlanDAG(planned); err != nil {
 		return nil, fmt.Errorf("capability plan is not schedulable: %w", err)
 	}
 
-	jobsByKey := jobsByPlanKey(planned)
+	jobsByKey := planner.JobsByPlanKey(planned)
 	leavesByCommand := capabilityLeavesByCommand(planned)
 	requiredLeaves := make([]string, 0)
 	for _, command := range requiredCommands {

@@ -23,6 +23,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -885,7 +886,7 @@ func taggedReleaseChannel(options ReleaseSetOptions) (string, error) {
 // selection — defines the publish jobs the release set may rely on.
 func PlannedCommandProjects(planned []*ScheduledJob, command string) []*workspace.Project {
 	byID := make(map[string]*workspace.Project)
-	for _, job := range schedulableJobs(planned) {
+	for _, job := range planner.SchedulableJobs(planned) {
 		if job == nil || job.JobDef == nil || job.CommandName() != command {
 			continue
 		}
@@ -988,7 +989,7 @@ func (run *ReleaseSetRun) attachDeployBarrier(planned []*ScheduledJob) ([]*Sched
 	var publishKeys []string
 	var deployJobs []*ScheduledJob
 	selectedByID := make(map[string]*workspace.Project)
-	for _, job := range schedulableJobs(planned) {
+	for _, job := range planner.SchedulableJobs(planned) {
 		if job == nil || job.JobDef == nil || job.Project == nil {
 			continue
 		}
@@ -1044,7 +1045,7 @@ func (run *ReleaseSetRun) attachDeployBarrier(planned []*ScheduledJob) ([]*Sched
 		deploy.DependsOn = dedupeSorted(append(deploy.DependsOn, barrier.Key()))
 	}
 	planned = append(planned, barrier)
-	if err := validatePlanDAG(schedulableJobs(planned)); err != nil {
+	if err := planner.ValidatePlanDAG(planner.SchedulableJobs(planned)); err != nil {
 		return nil, nil, fmt.Errorf("attach release-set coordinator: %w", err)
 	}
 	run.barrierAttached = true
@@ -1496,7 +1497,7 @@ func (run *ReleaseSetRun) RunSelection(previous *protocoljob.Selection, projects
 			baseline = head.ID
 		}
 	}
-	selection := ResolvedRunSelection(mode, baseline, baselineSource, projects)
+	selection := planner.ResolvedRunSelection(mode, baseline, baselineSource, projects)
 	selection.ReleaseSetProjects = run.memberProjectIDs()
 	selection.Reuse = run.reuseSelection()
 	return selection

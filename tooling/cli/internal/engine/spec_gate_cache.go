@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/specgate"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -106,7 +107,7 @@ func (source *cachedObservationRecovery) RecoverReports(candidates []*workspace.
 	if source.req.Config != nil && source.req.Config.Disable != nil {
 		disabledJobs, disabledExtensions = source.req.Config.Disable.Jobs, source.req.Config.Disable.Extensions
 	}
-	planned, err := jobs.Plan(source.ws, []string{"test"}, candidates, source.extensions,
+	planned, err := planner.Plan(source.ws, []string{"test"}, candidates, source.extensions,
 		source.req.CommandParams, disabledJobs, disabledExtensions)
 	if err != nil {
 		return source.unconsultedAll(candidates, fmt.Sprintf("their test plan could not be derived: %v", err))

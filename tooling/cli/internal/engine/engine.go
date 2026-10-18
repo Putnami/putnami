@@ -57,6 +57,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/sessionreporter"
@@ -794,7 +795,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// Every node, not just the workspace-scoped ones that carry
 	// SelectedProjects: a project-scoped task that reports on the workspace has
 	// to know the run was narrowed just as much as a workspace-scoped one does.
-	jobs.AttachRunSelection(planned, req.selection)
+	planner.AttachRunSelection(planned, req.selection)
 	// A dependent command can expand publish only after planning. Prepare its
 	// release set from that exact relation-local project selection; unlike an
 	// explicit publish, the outer deploy plan must remain intact and therefore

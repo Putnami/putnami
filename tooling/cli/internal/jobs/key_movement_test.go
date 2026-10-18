@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -410,7 +411,7 @@ func (f *invocationFixture) planLayersWriter(t *testing.T, content string, after
 // consumer's key over the tree as it stands.
 func (f *invocationFixture) publishConsumerEntry(t *testing.T, cm *store.CacheManager) {
 	t.Helper()
-	resolveInvocationRelations(f.planned)
+	planner.ResolveInvocationRelations(f.planned)
 	keys, err := cachekey.PrecomputeKeys(f.ws, f.planned, nil, nil, cm, cachekey.CacheBypass{})
 	if err != nil {
 		t.Fatalf("PrecomputeKeys: %v", err)

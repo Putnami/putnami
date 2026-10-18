@@ -16,6 +16,7 @@ import (
 	internalextension "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/output"
 )
 
@@ -94,7 +95,7 @@ func buildPlan(
 		}
 	}
 
-	planned, err := jobs.Plan(ws, req.Commands, selectedProjects, extensions, req.CommandParams, disabledJobs, disabledExts)
+	planned, err := planner.Plan(ws, req.Commands, selectedProjects, extensions, req.CommandParams, disabledJobs, disabledExts)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: plan: %v\n", err)
 		return nil, ExitError

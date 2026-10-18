@@ -18,6 +18,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/abort"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -205,9 +206,9 @@ func TestDAGState_Ready(t *testing.T) {
 	jobB := makeScheduledJob("proj", "b", []string{"/proj:a"})
 	jobC := makeScheduledJob("proj", "c", []string{"/proj:b"})
 
-	state := newDAGState([]*ScheduledJob{jobA, jobB, jobC})
+	state := planner.NewDAGState([]*ScheduledJob{jobA, jobB, jobC})
 
-	ready := state.ready()
+	ready := state.Ready()
 	if len(ready) != 1 {
 		t.Fatalf("expected 1 ready job, got %d", len(ready))
 	}
@@ -221,10 +222,10 @@ func TestDAGState_CompleteUnlocksDependents(t *testing.T) {
 	jobB := makeScheduledJob("proj", "b", []string{"/proj:a"})
 	jobC := makeScheduledJob("proj", "c", []string{"/proj:a"})
 
-	state := newDAGState([]*ScheduledJob{jobA, jobB, jobC})
+	state := planner.NewDAGState([]*ScheduledJob{jobA, jobB, jobC})
 
 	// Complete A should unlock B and C
-	newReady := state.complete("/proj:a")
+	newReady := state.Complete("/proj:a")
 	if len(newReady) != 2 {
 		t.Fatalf("expected 2 newly ready, got %d", len(newReady))
 	}
@@ -249,28 +250,28 @@ func TestDAGState_DiamondDependency(t *testing.T) {
 	jobC := makeScheduledJob("proj", "c", []string{"/proj:a"})
 	jobD := makeScheduledJob("proj", "d", []string{"/proj:b", "/proj:c"})
 
-	state := newDAGState([]*ScheduledJob{jobA, jobB, jobC, jobD})
+	state := planner.NewDAGState([]*ScheduledJob{jobA, jobB, jobC, jobD})
 
 	// Initially only A is ready
-	ready := state.ready()
+	ready := state.Ready()
 	if len(ready) != 1 || ready[0].Key() != "/proj:a" {
 		t.Fatalf("expected only A ready, got %v", ready)
 	}
 
 	// Complete A → B and C become ready
-	newReady := state.complete("/proj:a")
+	newReady := state.Complete("/proj:a")
 	if len(newReady) != 2 {
 		t.Fatalf("expected 2 ready after A, got %d", len(newReady))
 	}
 
 	// Complete B → D not yet ready (still waiting for C)
-	newReady = state.complete("/proj:b")
+	newReady = state.Complete("/proj:b")
 	if len(newReady) != 0 {
 		t.Fatalf("expected 0 ready after B (D waits for C), got %d", len(newReady))
 	}
 
 	// Complete C → D becomes ready
-	newReady = state.complete("/proj:c")
+	newReady = state.Complete("/proj:c")
 	if len(newReady) != 1 || newReady[0].Key() != "/proj:d" {
 		t.Fatalf("expected D ready after C, got %v", newReady)
 	}
@@ -282,9 +283,9 @@ func TestDAGState_ParallelReady(t *testing.T) {
 	jobB := makeScheduledJob("p2", "build", nil)
 	jobC := makeScheduledJob("p3", "build", nil)
 
-	state := newDAGState([]*ScheduledJob{jobA, jobB, jobC})
+	state := planner.NewDAGState([]*ScheduledJob{jobA, jobB, jobC})
 
-	ready := state.ready()
+	ready := state.Ready()
 	if len(ready) != 3 {
 		t.Fatalf("expected 3 ready, got %d", len(ready))
 	}
@@ -1645,7 +1646,7 @@ func TestFinalizeRun_TerminalPhaseOrder(t *testing.T) {
 // what it unblocked). Neither owns a channel or a goroutine, which is why they
 // could leave the loop at all — and this test exercises them without one.
 func TestCoordinatorStateTransitions_CompletionThenDispatch(t *testing.T) {
-	newFixture := func(continueOnError bool) (*Scheduler, *dagState, []*ScheduledJob) {
+	newFixture := func(continueOnError bool) (*Scheduler, *planner.DAGState, []*ScheduledJob) {
 		producer := makeScheduledJob("producer", "build", nil)
 		consumer := makeScheduledJob("consumer", "build", []string{producer.Key()})
 		jobs := []*ScheduledJob{producer, consumer}
@@ -1655,7 +1656,7 @@ func TestCoordinatorStateTransitions_CompletionThenDispatch(t *testing.T) {
 			metrics:  newSchedulerMetrics(),
 			cfg:      SchedulerConfig{ContinueOnError: continueOnError},
 		}
-		return s, newDAGState(jobs), jobs
+		return s, planner.NewDAGState(jobs), jobs
 	}
 
 	t.Run("a failed group is recorded and releases its dependents", func(t *testing.T) {
@@ -1700,7 +1701,7 @@ func TestCoordinatorStateTransitions_CompletionThenDispatch(t *testing.T) {
 			t.Errorf("results[%s] = %v, want a skipped row", consumer.Key(), r)
 		}
 		// The skip counts as a completion, or the coordinator's
-		// `totalCompleted < state.size()` loop can never terminate.
+		// `totalCompleted < state.Size()` loop can never terminate.
 		if totalCompleted != 2 {
 			t.Errorf("totalCompleted = %d, want 2 — a skip must count as a completion", totalCompleted)
 		}

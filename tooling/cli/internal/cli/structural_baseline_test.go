@@ -198,8 +198,8 @@ var structuralPins = []structuralPin{
 			"literal skips, and of nothing smaller; its four cases share ONE construction site",
 	},
 	{
-		name:  "production jobs.Plan call sites",
-		token: "jobs.Plan(",
+		name:  "production planner.Plan call sites",
+		token: "planner.Plan(",
 		scope: productionFiles,
 		want:  3,
 		why: "internal/engine/plan.go only (moved from internal/cli/jobs_run.go by an earlier change, " +
@@ -213,12 +213,12 @@ var structuralPins = []structuralPin{
 			"A later change took it to 1 by deleting internal/watch/session_iteration.go's: " +
 			"watch re-planned every iteration with no contract validation and no " +
 			"missing-extension guard, so a broken install kept rebuilding green in the loop. " +
-			"A later change froze it there: engine_boundary_test.go now rejects a jobs.Plan " +
+			"A later change froze it there: engine_boundary_test.go now rejects a planner.Plan " +
 			"reference from any package but internal/engine, so this pin only has to hold the count. " +
 			"An earlier change raises 1\u21922, and the second site is deliberately NOT a fork of the run's plan: " +
 			"spec_gate_cache.go plans `test` over the spec gate's candidate attesters purely to " +
 			"DERIVE THEIR CACHE KEYS. Nothing it produces is scheduled, executed, rendered or " +
-			"attached — jobs.Plan is pure, and the plan is discarded the moment PrecomputeKeys has " +
+			"attached — planner.Plan is pure, and the plan is discarded the moment PrecomputeKeys has " +
 			"read it. It is the only way to ask \"what key would this project's test task have?\" " +
 			"without duplicating the planner, and it stays inside internal/engine so the boundary " +
 			"test above is untouched. A later change raises 2\u21923 for the same kind of site: " +
@@ -226,14 +226,16 @@ var structuralPins = []structuralPin{
 			"only to ASK which of them a criteria-projection producer applies to, so the spec gate can " +
 			"tell \"no selected project states a requirement\" from \"a producer never answered\". " +
 			"Nothing it produces is scheduled, executed, rendered or attached, and the plan is discarded " +
-			"once read. A FOURTH site that hands its plan to a scheduler is still a fork",
+			"once read. A FOURTH site that hands its plan to a scheduler is still a fork. " +
+			"The planner left internal/jobs for internal/jobs/planner, so the token is now " +
+			"planner.Plan( and the count is unchanged: the same three engine sites",
 	},
 	{
-		name:  "jobs.Plan declaration",
+		name:  "planner.Plan declaration",
 		token: "func Plan(",
 		scope: productionFiles,
 		want:  1,
-		why:   "there is exactly one planner entrypoint (internal/jobs/planner.go)",
+		why:   "there is exactly one planner entrypoint (internal/jobs/planner/planner.go)",
 	},
 	{
 		name:  "canonical result reducer declaration",

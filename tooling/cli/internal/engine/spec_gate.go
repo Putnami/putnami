@@ -13,6 +13,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/specgate"
 )
 
@@ -181,7 +182,7 @@ func (plan *validateProducerPlan) ApplicableProjects() (map[string]bool, error) 
 		}
 		selected[project.ID] = true
 	}
-	planned, err := jobs.Plan(plan.ws, []string{"validate"}, plan.projects, plan.extensions,
+	planned, err := planner.Plan(plan.ws, []string{"validate"}, plan.projects, plan.extensions,
 		plan.req.CommandParams, nil, nil)
 	if err != nil {
 		return nil, err

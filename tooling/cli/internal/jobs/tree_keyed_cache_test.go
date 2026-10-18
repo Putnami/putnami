@@ -19,6 +19,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -223,7 +224,7 @@ func (l *treeKeyedLane) keys(
 	buildTime string,
 ) ([]*ScheduledJob, map[string]string) {
 	t.Helper()
-	planned, err := Plan(l.ws, commands, l.ws.Projects, exts, params, nil, nil)
+	planned, err := planner.Plan(l.ws, commands, l.ws.Projects, exts, params, nil, nil)
 	if err != nil {
 		t.Fatalf("plan %v: %v", commands, err)
 	}

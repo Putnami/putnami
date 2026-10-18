@@ -1,9 +1,10 @@
-package jobs
+package planner
 
 import (
 	"slices"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -37,7 +38,7 @@ func contractBuildExtension() *extension.ExtensionDescription {
 
 // contractPlan plans `build` for a provider, the generated client of its
 // contract, and a consumer of that client.
-func contractPlan(t *testing.T, providerDependsOnClient bool) []*ScheduledJob {
+func contractPlan(t *testing.T, providerDependsOnClient bool) []*jobmodel.ScheduledJob {
 	t.Helper()
 	root := t.TempDir()
 
@@ -122,7 +123,7 @@ func TestPlan_ContractEdgeKeepsThePlanADAG(t *testing.T) {
 	if slices.Contains(clientGenerate.SerializeAfter, "/services/catalog:build~generate") {
 		t.Errorf("client generate waits for a provider that already waits for it: %v", clientGenerate.SerializeAfter)
 	}
-	// Plan runs validatePlanDAG, so reaching here at all means the plan has no
+	// Plan runs ValidatePlanDAG, so reaching here at all means the plan has no
 	// cycle; the assertion above states which edge was dropped to keep it so.
 }
 
@@ -201,7 +202,7 @@ func clientTreeExtensions(writerRoot string) []*extension.ExtensionDescription {
 }
 
 // clientTreePlan plans build, lint, test and clientgen over the fixture.
-func clientTreePlan(t *testing.T, fixture clientTreeFixture) []*ScheduledJob {
+func clientTreePlan(t *testing.T, fixture clientTreeFixture) []*jobmodel.ScheduledJob {
 	t.Helper()
 	provider := &workspace.Project{
 		ID: treeProvider, Name: "catalog", Path: "services/catalog",
@@ -241,7 +242,7 @@ func clientTreePlan(t *testing.T, fixture clientTreeFixture) []*ScheduledJob {
 
 // scheduledOrFatal returns the planned job with key, failing the test when the
 // plan lacks it.
-func scheduledOrFatal(t *testing.T, planned []*ScheduledJob, key string) *ScheduledJob {
+func scheduledOrFatal(t *testing.T, planned []*jobmodel.ScheduledJob, key string) *jobmodel.ScheduledJob {
 	t.Helper()
 	job := findScheduled(planned, key)
 	if job == nil {
@@ -313,7 +314,7 @@ func TestPlan_ContractClientTreeRuleNeverWidensTheSelection(t *testing.T) {
 // unordered with it, and every other client job still waits.
 func TestPlan_ContractClientTreeRuleKeepsThePlanADAG(t *testing.T) {
 	t.Parallel()
-	// Plan runs validatePlanDAG, so a nil error already proves the plan acyclic.
+	// Plan runs ValidatePlanDAG, so a nil error already proves the plan acyclic.
 	planned := clientTreePlan(t, clientTreeFixture{
 		clientPath:              "services/catalog/clients/ts",
 		writerRoot:              extension.OutputRootProject,

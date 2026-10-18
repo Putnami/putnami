@@ -1,10 +1,11 @@
 // Package jobs handles job planning, scheduling, execution, and caching.
-package jobs
+package planner
 
 import (
 	"fmt"
 	"sort"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	protocoljob "go.putnami.dev/protocol/job"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -21,7 +22,7 @@ func Plan(
 	commandParams map[string]any,
 	disabledJobs []string,
 	disabledExtensions []string,
-) ([]*ScheduledJob, error) {
+) ([]*jobmodel.ScheduledJob, error) {
 	jobMap := extension.BuildJobMap(extensions)
 	commands = extension.ExpandAlsoRunCommands(commands, jobMap)
 	explicitCommands := toSet(commands)
@@ -72,7 +73,7 @@ func Plan(
 		}
 	}
 
-	var allJobs []*ScheduledJob
+	var allJobs []*jobmodel.ScheduledJob
 
 	for _, cmdName := range commands {
 		workspaceJobs := matchWorkspaceOnceJobs(cmdName, jobMap, disabledJobSet, disabledExtSet)
@@ -158,13 +159,13 @@ func Plan(
 	serializeWriteResources(allJobs)
 	orderContractClients(allJobs, ws)
 
-	if err := validatePlanDAG(allJobs); err != nil {
+	if err := ValidatePlanDAG(allJobs); err != nil {
 		return nil, err
 	}
 	if err := validatePlanContract(allJobs, ws); err != nil {
 		return nil, err
 	}
-	if err := validateBatchProjectLimits(allJobs, ws, commandParams); err != nil {
+	if err := ValidateBatchProjectLimits(allJobs, ws, commandParams); err != nil {
 		return nil, err
 	}
 	if err := validatePlanProducers(allJobs); err != nil {
@@ -177,7 +178,7 @@ func Plan(
 	// negotiation, `putnami plan` — sees the same value execution does.
 	// It also rejects a plan that puts one step in two relations' frontiers,
 	// which has no execution: a step receives exactly one invocation locator.
-	if err := validateInvocationFrontiers(allJobs); err != nil {
+	if err := ValidateInvocationFrontiers(allJobs); err != nil {
 		return nil, err
 	}
 
@@ -187,11 +188,11 @@ func Plan(
 	// graph is final and before identities are stamped.
 	attachSharedExecutions(ws, allJobs, commandParams)
 
-	attachIdentities(allJobs)
+	jobmodel.AttachIdentities(allJobs)
 	return allJobs, nil
 }
 
-func attachSelectedProjects(planned []*ScheduledJob, projects []*workspace.Project) {
+func attachSelectedProjects(planned []*jobmodel.ScheduledJob, projects []*workspace.Project) {
 	if len(planned) == 0 || len(projects) == 0 {
 		return
 	}
@@ -243,7 +244,7 @@ func ResolvedRunSelection(
 //
 // Nothing stamped here reaches a cache key: the key builder reads named job
 // fields, and this is not one of them (TestCacheKeyIgnoresTheRunSelection).
-func AttachRunSelection(planned []*ScheduledJob, selection *protocoljob.Selection) {
+func AttachRunSelection(planned []*jobmodel.ScheduledJob, selection *protocoljob.Selection) {
 	if selection == nil {
 		return
 	}
@@ -263,7 +264,7 @@ func expandJob(
 	commandParams map[string]any,
 	namespace bool,
 	cache *planCache,
-) ([]*ScheduledJob, error) {
+) ([]*jobmodel.ScheduledJob, error) {
 	if len(jobDef.PipelineSteps) == 0 {
 		plannedDef := jobDef
 		if namespace {
@@ -271,7 +272,7 @@ func expandJob(
 			plannedDef.InternalName = extension.NamespacedCommandJobName(cmdName, ext.Name)
 			plannedDef.CommandName = cmdName
 		}
-		return []*ScheduledJob{{
+		return []*jobmodel.ScheduledJob{{
 			Project:   proj,
 			Extension: ext,
 			JobDef:    plannedDef,
@@ -289,10 +290,10 @@ func expandJob(
 		return nil, fmt.Errorf("expand pipeline for %s/%s: %w", proj.Name, cmdName, err)
 	}
 
-	planned := make([]*ScheduledJob, 0, len(expanded))
+	planned := make([]*jobmodel.ScheduledJob, 0, len(expanded))
 	for _, step := range expanded {
 		s := step.Step
-		planned = append(planned, &ScheduledJob{
+		planned = append(planned, &jobmodel.ScheduledJob{
 			Project:   proj,
 			Extension: ext,
 			JobDef:    step.JobDef,

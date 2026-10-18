@@ -32,6 +32,7 @@ import (
 	"go.putnami.dev/sdk/extension/putpublish"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 )
 
 // publicationOpenKey is the plan key of the node that opens the plan.
@@ -153,11 +154,11 @@ func (run *ReleaseSetRun) attachPublication(planned []*ScheduledJob) ([]*Schedul
 			return nil, nil, err
 		}
 	}
-	byKey := jobsByPlanKey(planned)
+	byKey := planner.JobsByPlanKey(planned)
 	open := &ScheduledJob{
 		Project:   releaseSetInternalProject,
 		Extension: releaseSetInternalExtension,
-		DependsOn: run.openDependencies(schedulableJobs(planned)),
+		DependsOn: run.openDependencies(planner.SchedulableJobs(planned)),
 		JobDef: &extension.JobDefinition{
 			ExtensionName: releaseSetInternalExtension.Name,
 			Name:          "publish~open",
@@ -209,7 +210,7 @@ func (run *ReleaseSetRun) attachPublication(planned []*ScheduledJob) ([]*Schedul
 		return nil, nil, err
 	}
 	maps.Copy(runners, barrier)
-	if err := validatePlanDAG(schedulableJobs(planned)); err != nil {
+	if err := planner.ValidatePlanDAG(planner.SchedulableJobs(planned)); err != nil {
 		return nil, nil, fmt.Errorf("attach the publication: %w", err)
 	}
 	return planned, runners, nil
@@ -260,7 +261,7 @@ func (run *ReleaseSetRun) openDependencies(planned []*ScheduledJob) []string {
 		}
 		return dedupeSorted(keys)
 	}
-	byKey := jobsByPlanKey(planned)
+	byKey := planner.JobsByPlanKey(planned)
 	publishes := make(map[string]bool, len(planned))
 	var reaches func(key string, visiting map[string]bool) bool
 	reaches = func(key string, visiting map[string]bool) bool {

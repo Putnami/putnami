@@ -52,11 +52,13 @@ import (
 //
 // # Units, not packages
 //
-// The planner and the scheduler are file groups inside internal/jobs rather
-// than packages of their own, because A6a made the whole execution surface
-// package-private (engine_boundary_test.go). Splitting them out to satisfy a
-// test would reopen that boundary, so the unit is a path PREFIX and the
-// package stays whole.
+// The planner is a package of its own, internal/jobs/planner, and the scheduler
+// is still a file group inside internal/jobs, because A6a made the whole
+// execution surface package-private (engine_boundary_test.go). Splitting the
+// scheduler out to satisfy a test would reopen that boundary, so its unit is a
+// path PREFIX and the package stays whole. The planner may be a package because
+// the engine boundary now holds by import path: only internal/engine names
+// planner.Plan.
 
 // complexityCeiling is one unit's pinned size. Both counts are ceilings.
 type complexityCeiling struct {
@@ -285,7 +287,7 @@ var complexityCeilings = []complexityCeiling{
 			"internal/specgate, whose package doc forbids it from importing the CLI's planner, " +
 			"store or extension model. Turning a candidate project into cache bytes needs all " +
 			"three, so the lookup sits where they already are, and it cannot move to a package of " +
-			"its own: engine_boundary_test.go admits a jobs.Plan reference from internal/engine " +
+			"its own: engine_boundary_test.go admits a planner.Plan reference from internal/engine " +
 			"ONLY, and a new package would need a new ADR to break that boundary. The eight " +
 			"functions are one constructor, the interface method, three projections of it (the " +
 			"all-unconsulted answer, the per-candidate consulted-versus-unreachable rule, and the " +
@@ -386,10 +388,10 @@ var complexityCeilings = []complexityCeiling{
 	},
 	{
 		unit:   "planner",
-		prefix: "internal/jobs/plan",
+		prefix: "internal/jobs/planner/plan",
 		files:  10,
-		funcs:  86,
-		why: "internal/jobs/plan*.go: the single planner entrypoint (jobs.Plan), its dependency, " +
+		funcs:  88,
+		why: "internal/jobs/planner/plan*.go: the single planner entrypoint (planner.Plan), its dependency, " +
 			"activation, matching and resource passes, plus the plan contract and its validation. " +
 			"Planning is pure — selection in, typed plan out — and that purity is what lets the " +
 			"plan be validated, cached and replanned by watch without re-deriving anything. Growth " +
@@ -450,7 +452,16 @@ var complexityCeilings = []complexityCeiling{
 			"plan_contract.go and one each of planner_helpers.go and planner_resources.go moved to " +
 			"internal/jobs/cachekey, which computes keys and imports neither the planner nor the " +
 			"scheduler; the files they moved to keep planner names but sit in that package, outside " +
-			"this unit",
+			"this unit. MOVED, 10/86 to 10/88: the unit left internal/jobs for internal/jobs/planner, " +
+			"so the prefix gains the directory and keeps the same ten files. Two functions join it, " +
+			"neither new code: ValidateBatchProjectLimits is the plan-time batch cap check, moved " +
+			"from batch_project_limit.go into plan_validate.go beside the other plan " +
+			"validation, and DeclaresCommandOutput is the predicate sharedExecutionEligible reads, " +
+			"moved unchanged from the scheduler's task_capture.go and exported because the " +
+			"scheduler reads it too. Both were outside this unit only because they sat in files " +
+			"its prefix did not name. dag_state.go and invocation.go in the new directory hold the " +
+			"plan-time halves of the DAG state and the invocation relation, neither of which this " +
+			"prefix selects, as before the move",
 	},
 	{
 		unit:   "scheduler",
@@ -582,7 +593,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:         "invocation",
 		prefix:       "internal/jobs/invocation",
 		files:        5,
-		funcs:        62,
+		funcs:        55,
 		perFileFuncs: 16,
 		why: "internal/jobs/invocation*.go: the invocation-scoped lifecycle — resolving a " +
 			"`finalizes` relation onto the plan and pruning it, the private scratch and the lease " +
@@ -603,7 +614,13 @@ var complexityCeilings = []complexityCeiling{
 			"58→62 and 14→16 for CONFINEMENT's bounded producer spool and per-job leak side channel: " +
 			"the spool keeps pre-needle output off the heap and consumer-visible artifact root, while " +
 			"the side channel makes a late redacted event fail the task even after JobResult retention " +
-			"is exhausted. Creation, replay, leak accounting and cleanup are separate fail-closed edges",
+			"is exhausted. Creation, replay, leak accounting and cleanup are separate fail-closed edges. " +
+			"LOWERED, 62→55: the plan-time half of the relation left for internal/jobs/planner/invocation.go. " +
+			"Resolving a finalizes relation onto the plan, the one-invocation-per-step check, the finalizer " +
+			"filter and the producer's invocation outputs (six functions in invocation.go and one in " +
+			"invocation_lease.go) belong to planning, and the scheduler only reads them; this " +
+			"unit keeps the runtime half and its four invariants. perFileFuncs stays 16: " +
+			"invocation_redact.go did not change",
 	},
 	{
 		unit:   "cache",

@@ -35,6 +35,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 )
 
 const testRevision = "8d5edb7513d93b9165ba2a7cb48466d022fc3f63"
@@ -658,7 +659,7 @@ func TestReleaseSetScopePlanningNilVerificationIsPublishOnly(t *testing.T) {
 	// The selection block a publish-only session reports is the coordinator's:
 	// the head measured the impact, so the head is the baseline, and the
 	// release-set half is every project the run plans.
-	previous := ResolvedRunSelection(protocoljob.SelectionModeAll, "", "", []*workspace.Project{upstream, downstream, other})
+	previous := planner.ResolvedRunSelection(protocoljob.SelectionModeAll, "", "", []*workspace.Project{upstream, downstream, other})
 	reported := run.RunSelection(previous, projects)
 	if reported.Mode != protocoljob.SelectionModeImpacted || reported.BaselineSource != ReleaseSetHeadBaselineSource {
 		t.Fatalf("publish-only selection = %+v, want the head-measured tier", reported)
@@ -687,7 +688,7 @@ func TestReleaseSetRunSelectionReportsBothHalvesOfAMixedSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gate := ResolvedRunSelection(protocoljob.SelectionModeImpacted, "origin/main", "trunk",
+	gate := planner.ResolvedRunSelection(protocoljob.SelectionModeImpacted, "origin/main", "trunk",
 		[]*workspace.Project{library})
 	reported := run.RunSelection(gate, projects)
 	if reported.Mode != protocoljob.SelectionModeImpacted || reported.Baseline != "origin/main" ||

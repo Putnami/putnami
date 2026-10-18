@@ -15,6 +15,7 @@ import (
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -270,7 +271,7 @@ func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing
 
 	plan := func(params extension.ParamMap) []*ScheduledJob {
 		t.Helper()
-		planned, err := Plan(ws, []string{"package"}, []*workspace.Project{app},
+		planned, err := planner.Plan(ws, []string{"package"}, []*workspace.Project{app},
 			[]*extension.ExtensionDescription{goExtension}, params, nil, nil)
 		if err != nil {
 			t.Fatalf("plan package: %v", err)
