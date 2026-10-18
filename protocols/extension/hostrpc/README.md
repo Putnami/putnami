@@ -66,9 +66,9 @@ the channel, the child receives no variable and the host prints a warning.
 | `workspace.owners` | `{"paths": [...]}` (`WorkspaceOwnersParams`) | `{"owners": [{"path", "projects": [{"id", "path"}]}]}` (`WorkspaceOwnersResult`): the projects that own each path. |
 
 Params are strict: an unknown member is `-32602`. `collaboration.call` routes
-contract operations only. A `contract` that is not a collaboration contract,
-and `proposals finalize`, which is a command, not an operation, are refused
-with `-32602`.
+contract operations only. A `contract` that is not a collaboration contract is
+refused with `-32602`. An operation the contract does not define gets the
+envelope the command prints for it, whose outcome is `invalid`.
 
 `workspace.owners` answers which workspace projects own each path. Each path
 is workspace-relative and in `io/fs` form (`ValidWorkspacePath`): no leading
