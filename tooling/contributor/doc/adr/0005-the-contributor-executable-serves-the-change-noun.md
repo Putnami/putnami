@@ -59,13 +59,24 @@ launch by putnami. It does not fall back to another route to the provider.
 
 `internal/language` holds a copy of the core's language check: the
 French-signal evaluator, the four modes and the path exclusions. The copy keeps
-the core's messages, findings and exit codes (0 no finding, 1 findings, 2 usage
-or tool failure). It differs in two places. The call seam returns an error when
-a call never reaches a provider, which the core cannot report. The exclusion
-list also names the copy's evaluator, whose signal vocabulary is data.
+the core's findings and exit codes (0 no finding, 1 findings, 2 usage or tool
+failure). It differs in two places. The call seam returns an error when a call
+never reaches a provider, which the core cannot report. The exclusion list also
+names the copy's evaluator, whose signal vocabulary is data.
 
 The executable runs the check in its working directory, which is the workspace
-root, and reads Git state with the same read-only operations as the core.
+root, and reads Git state with the same read-only operations as the core. Those
+operations run without the host channel variables in their environment.
+
+Known differences from `putnami contributor language`:
+
+- **(a) Trailing line.** The core prints a final `putnami: contributor language
+  failed` line when the command exits 2. The executable does not.
+- **(b) Relative paths.** A relative path in `text <file>` resolves against the
+  workspace root, because the task runs in `{workspaceRoot}`. The core passes the
+  caller's directory only outside a workspace.
+- **(c) Messages.** Every message names `change language`, the command the user
+  typed, where the core's name `contributor language`.
 
 ### 6. The core copy stays for now
 

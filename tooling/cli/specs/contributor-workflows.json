@@ -53,7 +53,7 @@
     },
     {
       "id": "change-language-parity",
-      "text": "putnami change language, served by the @putnami/contributor executable, reports the same findings, messages and exit codes as putnami contributor language. The tasks mode reads the tasks provider through the host RPC channel putnami opens for the launch, and the other modes never open it. A run with no channel exits 2 and names the interactive launch."
+      "text": "putnami change language, served by the @putnami/contributor executable, reports the same findings and exit codes as putnami contributor language. The tasks mode reads the tasks provider through the host RPC channel putnami opens for the launch, and the other modes never open it. A run with no channel exits 2 and names the interactive launch."
     },
     {
       "id": "canonical-consumer-migration",

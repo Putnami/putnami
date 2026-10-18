@@ -88,14 +88,14 @@ func (r LanguageRunner) RunLanguage(ctx context.Context, mode string, args []str
 		err = fmt.Errorf("unknown mode %q (text, files, commits, tasks)", mode)
 	}
 	if err != nil {
-		fmt.Fprintf(r.Err, "contributor language: %v\n", err)
+		fmt.Fprintf(r.Err, "change language: %v\n", err)
 		return 2
 	}
 	if scan.offenders > 0 {
-		fmt.Fprintf(r.Err, "contributor language: %d of %d scanned unit(s) are not in English\n", scan.offenders, scan.units)
+		fmt.Fprintf(r.Err, "change language: %d of %d scanned unit(s) are not in English\n", scan.offenders, scan.units)
 		return 1
 	}
-	fmt.Fprintf(r.Err, "contributor language: %d scanned unit(s), no offender\n", scan.units)
+	fmt.Fprintf(r.Err, "change language: %d scanned unit(s), no offender\n", scan.units)
 	return 0
 }
 

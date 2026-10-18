@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	wire "go.putnami.dev/protocol/extension/hostrpc"
 )
 
 // TestTasksReportsACallThatNeverReachedAProvider covers the one seam this
@@ -21,7 +22,7 @@ func TestTasksReportsACallThatNeverReachedAProvider(t *testing.T) {
 		return collab.Envelope{}, os.ErrNotExist
 	}}
 	if status := runner.RunLanguage(context.Background(), "tasks", nil); status != 2 || out.Len() != 0 ||
-		errors.String() != "contributor language: file does not exist\n" {
+		errors.String() != "change language: file does not exist\n" {
 		t.Fatalf("status=%d output=%q error=%q", status, out.String(), errors.String())
 	}
 }
@@ -33,14 +34,15 @@ func TestTasksReportsAProviderFailureWithTheCoresWording(t *testing.T) {
 		return collab.Envelope{Outcome: collab.OutcomeUnsupported, Error: &collab.Error{Message: "no provider", Reason: collab.ReasonBindingMissing}}, nil
 	}}
 	if status := runner.RunLanguage(context.Background(), "tasks", nil); status != 2 ||
-		!strings.HasPrefix(errors.String(), "contributor language: tasks find answered unsupported: ") {
+		!strings.HasPrefix(errors.String(), "change language: tasks find answered unsupported: ") {
 		t.Fatalf("status=%d error=%q", status, errors.String())
 	}
 }
 
-func TestRepositoryEnvironmentDropsWhatRedirectsTheRepositoryReader(t *testing.T) {
+func TestRepositoryEnvironmentDropsWhatRedirectsTheRepositoryReaderAndTheHostChannel(t *testing.T) {
 	t.Parallel()
-	got := repositoryEnvironment([]string{"PATH=/bin", "GIT_DIR=/elsewhere", "GIT_CONFIG_COUNT=1", "GIT_WORK_TREE=/w", "HOME=/h"})
+	got := repositoryEnvironment([]string{"PATH=/bin", "GIT_DIR=/elsewhere", "GIT_CONFIG_COUNT=1", "GIT_WORK_TREE=/w", "HOME=/h",
+		wire.SocketEnv + "=/tmp/host.sock", wire.TokenEnv + "=secret"})
 	if strings.Join(got, " ") != "PATH=/bin HOME=/h" {
 		t.Fatalf("kept %v", got)
 	}

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -30,10 +31,33 @@ const (
 	// that exits 2. The core's command dispatcher adds it, not the language
 	// check, so the executable does not print it.
 	coreFailureLine = "putnami: contributor language failed\n"
+	// coreName and changeName are the one substitution applied to a golden
+	// before the comparison: the executable's messages name the command the
+	// user typed, and the core's name its own.
+	coreName   = "contributor language"
+	changeName = "change language"
 )
 
-// languageExecutable builds the executable from this module the way
-// bin/prepare does: outside the Go workspace, without cgo.
+var (
+	builtOnce sync.Once
+	builtPath string
+	builtErr  error
+	builtDir  string
+)
+
+// TestMain removes the directory the shared executable is built in.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if builtDir != "" {
+		_ = os.RemoveAll(builtDir)
+	}
+	os.Exit(code)
+}
+
+// languageExecutable returns the executable built from this module the way
+// bin/prepare builds it: outside the Go workspace, without cgo. The package
+// builds it once. A missing go or git fails the test, as the
+// repository's other binary-building tests do; -short and Windows skip it.
 func languageExecutable(t *testing.T) string {
 	t.Helper()
 	if testing.Short() {
@@ -42,18 +66,30 @@ func languageExecutable(t *testing.T) string {
 	if runtime.GOOS == "windows" {
 		t.Skip("the fixture repository is built by a bash script")
 	}
-	for _, tool := range []string{"bash", "git", "go"} {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash is not installed")
+	}
+	for _, tool := range []string{"go", "git"} {
 		if _, err := exec.LookPath(tool); err != nil {
-			t.Skipf("%s is not installed", tool)
+			t.Fatalf("%s is not installed: %v", tool, err)
 		}
 	}
-	built := filepath.Join(t.TempDir(), "putnami-contributor")
-	build := exec.Command("go", "build", "-o", built, ".")
-	build.Env = append(os.Environ(), "GOWORK=off", "CGO_ENABLED=0")
-	if output, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("build the executable: %v\n%s", err, output)
+	builtOnce.Do(func() {
+		builtDir, builtErr = os.MkdirTemp("", "putnami-contributor-build")
+		if builtErr != nil {
+			return
+		}
+		builtPath = filepath.Join(builtDir, "putnami-contributor")
+		build := exec.Command("go", "build", "-o", builtPath, ".")
+		build.Env = append(os.Environ(), "GOWORK=off", "CGO_ENABLED=0")
+		if output, err := build.CombinedOutput(); err != nil {
+			builtErr = fmt.Errorf("%w\n%s", err, output)
+		}
+	})
+	if builtErr != nil {
+		t.Fatalf("build the executable: %v", builtErr)
 	}
-	return built
+	return builtPath
 }
 
 // languageFixture builds the fixture repository fixture.sh describes.
@@ -106,8 +142,11 @@ func launchLanguage(t *testing.T, executable, dir, stdin string, args []string, 
 // core command: testdata/record.sh recorded them by running
 // `putnami contributor language` on the same fixture. The test never reads
 // that command's files, so a change to the core cannot change what this
-// test compares against.
+// test compares against. Two documented differences apply to a golden before
+// the comparison: the core's trailing coreFailureLine on an exit 2 is
+// removed, and coreName becomes changeName.
 func TestChangeLanguageMatchesTheCoreCommand(t *testing.T) {
+	t.Parallel()
 	spectest.Proves(t, languageFeature, languageRequirement, "change-language-reports-what-contributor-language-reports")
 	executable := languageExecutable(t)
 	fixture := languageFixture(t)
@@ -135,10 +174,11 @@ func TestChangeLanguageMatchesTheCoreCommand(t *testing.T) {
 				input += "\n"
 			}
 			got := launchLanguage(t, executable, fixture, input, arguments)
-			want := strings.TrimSuffix(string(golden), coreFailureLine)
-			if got.code != 2 {
-				want = string(golden)
+			want := string(golden)
+			if got.code == 2 {
+				want = strings.TrimSuffix(want, coreFailureLine)
 			}
+			want = strings.ReplaceAll(want, coreName, changeName)
 			if rendered := got.render(); rendered != want {
 				t.Errorf("the executable differs from the core command's golden\n--- got\n%s\n--- want\n%s", rendered, want)
 			}
@@ -278,6 +318,7 @@ func (h *fakeHost) seen() (int, []wire.Request) {
 // environment: it asks tasks find over that channel, pages with the cursor,
 // and reports a French task with the core's wording.
 func TestTasksReadsTheProviderThroughTheHostChannel(t *testing.T) {
+	t.Parallel()
 	spectest.Proves(t, languageFeature, languageRequirement, "tasks-reach-the-provider-through-the-host-channel")
 	executable := languageExecutable(t)
 	fixture := languageFixture(t)
@@ -295,7 +336,7 @@ func TestTasksReadsTheProviderThroughTheHostChannel(t *testing.T) {
 	want := languageResult{
 		code:   1,
 		stdout: "task two: non-English signals: nous\ntask two:1:Nous corrigeons le code\n",
-		stderr: "contributor language: 1 of 2 scanned unit(s) are not in English\n",
+		stderr: "change language: 1 of 2 scanned unit(s) are not in English\n",
 	}
 	if got != want {
 		t.Errorf("tasks over the channel answered\n%s\nwant\n%s", got.render(), want.render())
@@ -316,6 +357,7 @@ func TestTasksReadsTheProviderThroughTheHostChannel(t *testing.T) {
 // TestOtherModesNeverDialTheHost pins that text, files and commits run with a
 // channel in the environment and open no connection to it.
 func TestOtherModesNeverDialTheHost(t *testing.T) {
+	t.Parallel()
 	spectest.Proves(t, languageFeature, languageRequirement, "other-modes-never-dial-the-host")
 	executable := languageExecutable(t)
 	fixture := languageFixture(t)
@@ -333,6 +375,7 @@ func TestOtherModesNeverDialTheHost(t *testing.T) {
 // TestTasksWithoutAChannelNeedsAnInteractiveLaunch pins the answer of a run
 // that putnami did not launch interactively: exit 2, the remedy, no output.
 func TestTasksWithoutAChannelNeedsAnInteractiveLaunch(t *testing.T) {
+	t.Parallel()
 	spectest.Proves(t, languageFeature, languageRequirement, "tasks-without-a-channel-exit-2")
 	executable := languageExecutable(t)
 	fixture := languageFixture(t)
@@ -340,7 +383,7 @@ func TestTasksWithoutAChannelNeedsAnInteractiveLaunch(t *testing.T) {
 	if got.code != 2 || got.stdout != "" {
 		t.Errorf("exit %d, stdout %q, want 2 and nothing", got.code, got.stdout)
 	}
-	for _, want := range []string{"contributor language: ", "needs an interactive launch by putnami", "putnami change language tasks", wire.SocketEnv} {
+	for _, want := range []string{"change language: ", "needs an interactive launch by putnami", "putnami change language tasks", wire.SocketEnv} {
 		if !strings.Contains(got.stderr, want) {
 			t.Errorf("stderr %q does not say %q", got.stderr, want)
 		}

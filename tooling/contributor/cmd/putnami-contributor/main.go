@@ -73,12 +73,12 @@ func withoutContext(args []string) []string {
 // the working directory putnami launches the command in.
 func runLanguage(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "putnami-contributor: language needs text, files, commits or tasks")
+		fmt.Fprintln(stderr, "change language needs text, files, commits or tasks")
 		return 2
 	}
 	root, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(stderr, "putnami-contributor: %v\n", err)
+		fmt.Fprintf(stderr, "change language: %v\n", err)
 		return 2
 	}
 	caller := host.NewCaller()
