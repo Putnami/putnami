@@ -1,6 +1,6 @@
 # AGENTS.md
 
-<!-- putnami:guidance v2 begin sha256:26b7c5e798329fe55b22ac2ae5279057e848824cc25371153b0fd4d9f7349cc1 -->
+<!-- putnami:guidance v2 begin sha256:0bfc6f8f7879e914d3959f1307c0ed3d0274d06a03ab7cd423ae573a180e9237 -->
 This is a Putnami workspace.
 - Build, test, lint, install, add dependencies, and generate with `./putnamiw` when present, otherwise `putnami`. Never call npm, bun, go, pip, or cargo directly for those.
 - While iterating, select the projects you changed with `--projects <a>,<b>`; unlike `--impacted`, it skips every project that depends on them. Before declaring work complete, run `putnami lint,test,build,validate --impacted --enforce-coverage` once, when feasible.
@@ -28,8 +28,8 @@ This is a Putnami workspace.
   - D-018 — @putnami/dev owns the version noun; version list|use, which list and switch the installed CLI binaries, become cli list|use (settled 2026-10-18, review-only, held by a human reviewer)
   - D-019 — contributor machine-load becomes doctor --machine, in the core (settled 2026-10-18, review-only, held by a human reviewer)
   - D-020 — the core's dev noun is deleted: dev extension validate becomes extensions validate <path>, and dev template <action> becomes templates validate|test|package <path> (settled 2026-10-18, review-only, held by a human reviewer)
-  - D-021 — an extension manifest declares the kind of each command it adds, in an additive contract rung that ships with slice 5 of #256 (settled 2026-10-18, review-only, held by a human reviewer)
+  - D-021 — an extension manifest declares the kind of each command it adds, in an additive contract rung that ships with the traits that replace verb-name checks (settled 2026-10-18, review-only, held by a human reviewer)
   - D-022 — a feature declaration may list the commands and MCP tools that carry the feature (settled 2026-10-18, review-only, held by a human reviewer)
-  - D-023 — Cloud deletes its nine alias subcommands (tokens, distribution, oci, publish-archives, track, report, validate-config, publish-config, publish-migration) in a Cloud pull request outside #256 that ships as a breaking Cloud release (settled 2026-10-18, review-only, held by a human reviewer)
+  - D-023 — Cloud deletes its nine alias subcommands (tokens, distribution, oci, publish-archives, track, report, validate-config, publish-config, publish-migration) in a dedicated Cloud pull request that ships as a breaking Cloud release (settled 2026-10-18, review-only, held by a human reviewer)
   - Project decisions, returned by `putnami.context` with their project: `tooling/cli/decisions.json` (12).
 <!-- putnami:guidance v2 end -->

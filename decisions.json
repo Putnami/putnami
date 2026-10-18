@@ -154,7 +154,7 @@
     },
     {
       "id": "D-021",
-      "statement": "an extension manifest declares the kind of each command it adds, in an additive contract rung that ships with slice 5 of #256",
+      "statement": "an extension manifest declares the kind of each command it adds, in an additive contract rung that ships with the traits that replace verb-name checks",
       "settled": "2026-10-18",
       "settledBy": "fdumay",
       "reviewOnly": true
@@ -168,7 +168,7 @@
     },
     {
       "id": "D-023",
-      "statement": "Cloud deletes its nine alias subcommands (tokens, distribution, oci, publish-archives, track, report, validate-config, publish-config, publish-migration) in a Cloud pull request outside #256 that ships as a breaking Cloud release",
+      "statement": "Cloud deletes its nine alias subcommands (tokens, distribution, oci, publish-archives, track, report, validate-config, publish-config, publish-migration) in a dedicated Cloud pull request that ships as a breaking Cloud release",
       "settled": "2026-10-18",
       "settledBy": "fdumay",
       "reviewOnly": true
