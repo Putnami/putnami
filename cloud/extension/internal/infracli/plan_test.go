@@ -28,7 +28,7 @@ const (
 )
 
 // apiManifest is the aggregated manifest of the api workload. It declares every
-// kind the plan prints; the core `infra plan` tests use the same document.
+// kind the plan prints; the core `infra plan` tests used the same document.
 const apiManifest = `{
   "$schema": "https://putnami.dev/schemas/putnami-infra.json",
   "protocolVersion": 2,
@@ -157,9 +157,8 @@ func TestPlanHumanOutputMatchesCoreInfraPlan(t *testing.T) {
 		t.Fatalf("plan: %v", err)
 	}
 
-	// The golden is the text the core `putnami infra plan` prints for this
-	// workspace. The core command is internal to the CLI module, which the Cloud
-	// module cannot import, so the golden pins its output instead of running it.
+	// The golden is the text the core `putnami infra plan` printed for this
+	// workspace before the core deleted the command.
 	golden, err := os.ReadFile(filepath.Join("testdata", "plan.human.golden"))
 	if err != nil {
 		t.Fatal(err)
@@ -374,13 +373,12 @@ func TestPlanRefusesAContextWithoutWorkspaceProjects(t *testing.T) {
 	}
 }
 
-// coreStructuredOutput is a copy of the core's structured path for
-// `putnami infra plan`, not the core code: it re-implements `InfraPlanJSON`
-// (one JSON object per workload) and the dispatcher's `structuredPayload` (one
-// document, an array of several, or [] under the data member of one result
-// envelope). It proves the envelope framing and the object, array or [] rule.
-// It cannot detect drift in the core. The command name differs because this
-// command is `cloud infra`.
+// coreStructuredOutput re-implements the structured path the core's deleted
+// `putnami infra plan` had: `InfraPlanJSON` (one JSON object per workload) and
+// the dispatcher's `structuredPayload` (one document, an array of several, or
+// [] under the data member of one result envelope). It proves the envelope
+// framing and the object, array or [] rule. The command name differs because
+// this command is `cloud infra`.
 func coreStructuredOutput(t *testing.T, workloads []job.ProjectRef, mode protocolcli.OutputMode) string {
 	t.Helper()
 	var captured bytes.Buffer

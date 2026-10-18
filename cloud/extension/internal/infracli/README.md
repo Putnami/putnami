@@ -21,10 +21,11 @@ A context without the member is refused the same way, while an empty member
 means a workspace with no projects and prints `No workloads found.` It does not
 read a missing type as `application`.
 
-The output is the output of `putnami infra plan` in the core CLI: the same
-projects in the same order, the same text, the same `data` in the result
-envelope, and the same exit codes. Two things differ:
+The output is the output of `putnami infra plan`, which the core CLI served
+until it deleted the command: the same projects in the same order, the same
+text, the same `data` in the result envelope, and the same exit codes. Two
+things differ:
 
 - The envelope's `command` is `cloud infra`.
-- On a failure in structured mode, the core also prints `putnami: <message>` on
-  stderr. The Cloud runtime prints only the failure envelope on stdout.
+- On a failure in structured mode, the core also printed `putnami: <message>`
+  on stderr. The Cloud runtime prints only the failure envelope on stdout.
