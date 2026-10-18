@@ -1,0 +1,41 @@
+exit 0
+-- stdout --
+{
+  "version": 2,
+  "binding": {
+    "fingerprint": "c775d7d67f6a53d6c4079e20e6fa019d63f774a5258fa1526021c2230470829c",
+    "headSHA": "5519cb01be5f4463f5c485189724a21c8a446188",
+    "baseSHA": "683c624f3bfcd883ab636de07832087ea3203e26"
+  },
+  "changedFiles": [
+    "app.txt",
+    "new.txt",
+    "src/main.txt"
+  ],
+  "policies": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "7e98df7437f1b50bc0ea2ba7180f28bdb7a043cd2c6045e1783124cdba2fdcc5"
+    },
+    {
+      "path": "decisions.json",
+      "sha256": "b978cd21ee5e87abcf25831b3fc579982e98c43935ced463ab8651991ca7cd59"
+    },
+    {
+      "path": "putnami.ci.json",
+      "sha256": "d9858c82bb0466981fb7311af070e47c60ec667f9f6426f064e361b17cd5075d"
+    }
+  ],
+  "objective": null,
+  "scope": null,
+  "implementers": [],
+  "scopes": [],
+  "review": null,
+  "gate": null,
+  "qualification": {
+    "required": [],
+    "results": [],
+    "notApplicable": null
+  },
+  "acceptance": []
+}

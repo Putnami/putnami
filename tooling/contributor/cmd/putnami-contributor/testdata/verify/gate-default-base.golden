@@ -1,0 +1,3 @@
+exit 1
+-- stdout --
+{"verdict":"not-verified","reason":"git merge-base origin/main HEAD failed (128)"}

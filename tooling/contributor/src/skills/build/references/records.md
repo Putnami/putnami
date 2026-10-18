@@ -15,28 +15,32 @@ critical→critical; retain hosted high and original severity in the report.
 
 ## Commands
 
-The checker is the consumer Putnami CLI's `tree verify` command. It needs Git
-and a Putnami CLI that has `tree verify`; it needs no Bun, no Node.js and no
-workspace of its own. A CLI without the command answers `unknown subcommand:
-tree verify`: upgrade it. The checker obtains the native dry-run plan, but never
-executes gate tasks, edits source, or calls a collaboration provider. It prints
-one JSON document and exits 0 when the evidence is verified; otherwise it prints
-`{"verdict":"not-verified","reason":"..."}` on one line and exits 1.
+The checker is `change verify`, a command of the @putnami/contributor extension
+that ships these skills. It needs Git and a Putnami CLI with that extension; it
+needs no Bun and no Node.js. Outside a workspace it runs only when the extension
+is installed in user scope. A CLI without the command prints no verdict
+document: install or upgrade @putnami/contributor. The checker obtains the
+native dry-run plan, but never executes gate tasks, edits source, or calls a
+collaboration provider. It reads a restored verification report through the
+host channel putnami opens for the command, so a process putnami did not launch
+cannot verify one. It prints one JSON document and exits 0 when the evidence
+is verified; otherwise it prints `{"verdict":"not-verified","reason":"..."}` on
+one line and exits 1.
 
 ```bash
 PUTNAMI_CLI=putnami
 if [ -x ./putnamiw ]; then
   PUTNAMI_CLI=./putnamiw
 fi
-"$PUTNAMI_CLI" tree verify --snapshot --base origin/main > .context/execute/run/candidate.json
-"$PUTNAMI_CLI" tree verify --ref .context/execute/run/review-1.md
-"$PUTNAMI_CLI" tree verify --record .context/execute/run/candidate.json
-"$PUTNAMI_CLI" tree verify --gate .putnami/sessions/<id>/session.json --report .putnami/reports/<id>.json --base origin/main
+"$PUTNAMI_CLI" change verify --snapshot --base origin/main > .context/execute/run/candidate.json
+"$PUTNAMI_CLI" change verify --ref .context/execute/run/review-1.md
+"$PUTNAMI_CLI" change verify --record .context/execute/run/candidate.json
+"$PUTNAMI_CLI" change verify --gate .putnami/sessions/<id>/session.json --report .putnami/reports/<id>.json --base origin/main
 ```
 
 Create the ignored run directory first. Paths are absolute or relative to the
 workspace root. `--snapshot` emits a **pending** index; never report it as verified.
-`--ref` emits `{path, sha256}` for existing bytes. `tree verify --gate` is a
+`--ref` emits `{path, sha256}` for existing bytes. `change verify --gate` is a
 read-only standalone check of one session and report without a dossier; it
 does not supply an alternate input to `proposals finalize`. The verifier
 ignores the baseline the session recorded: the native plan against the base
@@ -74,7 +78,7 @@ Fill the remaining fields from actual work:
 | `workflow` | Optional exact `{path, sha256}` reference to the separate version 1 local [workflow record](../../build/references/workflow.md); it adds native requirement/unit completeness and never weakens the v2 checks |
 
 Before relying on `workflow`, confirm the consumer CLI advertises
-`tree verify --workflow` in its help. An older CLI may ignore an unknown v2
+`change verify --workflow` in its help. An older CLI may ignore an unknown v2
 member while accepting `--record`; that result is not workflow validation.
 Standalone `--workflow` returns a progress verdict, not ready. A dossier
 with a workflow can verify a current unit while reporting

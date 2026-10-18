@@ -25,8 +25,9 @@ copies; never inject defects into production to measure them:
 
 Exercise stale gates, report/session mismatch, incomplete coverage, missing
 qualification, unresolved objections and unsuccessful cleanup through the tests
-of `putnami tree verify` in the Putnami CLI test gate. Also test finalization's
-clean-tree and verifier-refusal boundaries with its existing shell harness.
+of `putnami change verify` in the @putnami/contributor test gate. Also test
+finalization's clean-tree and verifier-refusal boundaries with its existing
+shell harness.
 These tests may stub producer processes for controlled negatives and must say so.
 
 Record start/end timestamps, reviewer/scope owner session IDs, observed token

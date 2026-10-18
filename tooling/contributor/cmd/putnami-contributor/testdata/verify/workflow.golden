@@ -1,0 +1,64 @@
+exit 0
+-- stdout --
+{
+  "verdict": "workflow valid",
+  "stage": "progress",
+  "outcome": "fixture-outcome",
+  "currentRequirements": 1,
+  "verifiedRequirements": 1,
+  "laterRequirements": 0,
+  "outcomeComplete": false,
+  "units": [
+    {
+      "id": "first",
+      "outcome": "Both checks pass",
+      "boundary": {
+        "path": ".context/workflow-boundary.md",
+        "sha256": "f267d427fcc7e0a05a6645e6c90c91ed814132c1ba9e0abd5e55b8020f7cfe4c"
+      },
+      "stage": "candidate",
+      "requiredStage": "ready",
+      "requirementsVerified": true,
+      "requiredStageReached": false,
+      "requirements": [
+        {
+          "id": "fixture/workflow#acceptance",
+          "disposition": "current",
+          "state": "verified",
+          "checks": [
+            {
+              "id": "first-check",
+              "state": "satisfied",
+              "path": "",
+              "symbol": ""
+            },
+            {
+              "id": "second-check",
+              "state": "satisfied",
+              "path": "",
+              "symbol": ""
+            }
+          ],
+          "producerReports": [
+            {
+              "task": "/application:test",
+              "project": "/application",
+              "path": ".context/verification-report.json",
+              "digest": "sha256:3db5071aa3f578a405d5a3033bedd6d1b8fbeca5d0343ae1c20fbae1db02c502"
+            }
+          ]
+        }
+      ],
+      "nativeDiagnostics": [],
+      "nextResult": "Independent candidate review",
+      "nextCycleTasks": [],
+      "decisions": [],
+      "blockers": [
+        "required ready receipt pending"
+      ],
+      "deliveryReady": false
+    }
+  ],
+  "nativeDiagnostics": [],
+  "nextAction": "Inspect the candidate"
+}

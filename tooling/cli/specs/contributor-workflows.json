@@ -56,6 +56,10 @@
       "text": "putnami change language, served by the @putnami/contributor executable, reports the same findings and exit codes as putnami contributor language. The tasks mode reads the tasks provider through the host RPC channel putnami opens for the launch, and the other modes never open it. A run with no channel exits 2 and names the interactive launch."
     },
     {
+      "id": "change-verify-parity",
+      "text": "putnami change verify, served by the @putnami/contributor executable, prints the same verdict document and exit code as putnami tree verify in every mode, with or without a workspace. It reads a restored verification report through the host RPC channel putnami opens for the launch; without that channel only such a report is not verified, with a reason naming the channel. No process the verifier starts receives the channel."
+    },
+    {
       "id": "canonical-consumer-migration",
       "text": "Both hosts install canonical source/package content with exact resource links, one build recipe index, repeat-install idempotence and edited-file protection. Legacy workflows and shell implementations are deleted; the active audit language relay only calls the native evaluator. Workflow records require advertised native support. Stage changes, reviews, adapters and publication rechecks never execute another gate; actual released adoption is distinct."
     }

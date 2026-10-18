@@ -1,0 +1,78 @@
+exit 0
+-- stdout --
+{
+  "verdict": "Putnami verified",
+  "stage": "ready",
+  "assurance": "local-declared-scope",
+  "binding": {
+    "baseSHA": "683c624f3bfcd883ab636de07832087ea3203e26",
+    "fingerprint": "c775d7d67f6a53d6c4079e20e6fa019d63f774a5258fa1526021c2230470829c",
+    "headSHA": "5519cb01be5f4463f5c485189724a21c8a446188"
+  },
+  "gateSession": "synthetic-gate",
+  "review": {
+    "path": ".context/review.md",
+    "sha256": "464ee0a1307638312799c19dd1f275f40832e666ceec76cec60741a7b7693705"
+  },
+  "limits": "Shared write access: attribution, scope completeness and human judgments are conventions; no hosted stamp, merge, deployment or acceptance-in-production claim.",
+  "workflow": {
+    "verdict": "workflow valid",
+    "stage": "progress",
+    "outcome": "fixture-outcome",
+    "currentRequirements": 1,
+    "verifiedRequirements": 1,
+    "laterRequirements": 0,
+    "outcomeComplete": true,
+    "units": [
+      {
+        "id": "first",
+        "outcome": "Both checks pass",
+        "boundary": {
+          "path": ".context/workflow-boundary.md",
+          "sha256": "f267d427fcc7e0a05a6645e6c90c91ed814132c1ba9e0abd5e55b8020f7cfe4c"
+        },
+        "stage": "ready",
+        "requiredStage": "ready",
+        "requirementsVerified": true,
+        "requiredStageReached": true,
+        "requirements": [
+          {
+            "id": "fixture/workflow#acceptance",
+            "disposition": "current",
+            "state": "verified",
+            "checks": [
+              {
+                "id": "first-check",
+                "state": "satisfied",
+                "path": "",
+                "symbol": ""
+              },
+              {
+                "id": "second-check",
+                "state": "satisfied",
+                "path": "",
+                "symbol": ""
+              }
+            ],
+            "producerReports": [
+              {
+                "task": "/application:test",
+                "project": "/application",
+                "path": ".context/verification-report.json",
+                "digest": "sha256:3db5071aa3f578a405d5a3033bedd6d1b8fbeca5d0343ae1c20fbae1db02c502"
+              }
+            ]
+          }
+        ],
+        "nativeDiagnostics": [],
+        "nextResult": "Independent candidate review",
+        "nextCycleTasks": [],
+        "decisions": [],
+        "blockers": [],
+        "deliveryReady": true
+      }
+    ],
+    "nativeDiagnostics": [],
+    "nextAction": "Inspect the candidate"
+  }
+}

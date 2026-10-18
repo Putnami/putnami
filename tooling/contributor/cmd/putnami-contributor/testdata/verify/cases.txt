@@ -1,0 +1,32 @@
+# One case per line: name|directory|arguments of the verify command.
+# The directory is relative to the fixture repository that verify_test.go
+# builds; "outside" names a directory outside any Git repository. Arguments
+# split on spaces. Each case has a <name>.golden: the exit code and stdout of
+# `putnami tree verify <arguments>` in that directory.
+no-mode|.|
+unknown-argument|.|bogus
+two-modes|.|--snapshot --ref app.txt
+report-without-gate|.|--snapshot --report .context/report.json
+gate-without-report|.|--gate .context/session.json
+missing-value|.|--ref
+flag-as-value|.|--ref --snapshot
+outside-git|outside|--ref app.txt
+ref|.|--ref app.txt
+ref-from-subdirectory|src|--ref app.txt
+ref-missing|.|--ref absent.txt
+ref-directory|.|--ref src
+snapshot|.|--snapshot --base main~1
+snapshot-default-base|.|--snapshot
+snapshot-unknown-base|.|--snapshot --base nosuch
+record|.|--record .context/dossier.json
+record-with-workflow|.|--record .context/dossier-workflow.json
+record-base|.|--record .context/dossier.json --base main~1
+record-other-base|.|--record .context/dossier.json --base main
+record-stale|.|--record .context/dossier-stale.json
+record-missing|.|--record .context/absent.json
+workflow|.|--workflow .context/workflow.json
+workflow-restored|.|--workflow .context/workflow-restored.json
+workflow-missing|.|--workflow .context/absent.json
+gate|.|--gate .context/session.json --report .context/report.json --base main~1
+gate-default-base|.|--gate .context/session.json --report .context/report.json
+gate-narrower|.|--gate .context/session-narrow.json --report .context/report.json --base main~1

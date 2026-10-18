@@ -31,7 +31,7 @@ Use [records](../../../.agents/skills/build/references/records.md),
 and [repository policy](../../../.agents/skills/build/references/policy.md).
 The [workflow contract](../../../.agents/skills/build/references/workflow.md)
 describes the separate versioned local progress record and native artifacts.
-Before relying on it, confirm `"$PUTNAMI_CLI" tree verify --help` advertises
+Before relying on it, confirm `"$PUTNAMI_CLI" change verify --help` advertises
 `--workflow`. An older CLI ignores unknown v2 dossier members, so a dossier
 containing `workflow` is never accepted merely because an older `--record`
 command exits zero. Report the missing capability and required CLI upgrade.

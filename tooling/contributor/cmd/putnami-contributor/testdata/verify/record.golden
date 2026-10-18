@@ -1,0 +1,18 @@
+exit 0
+-- stdout --
+{
+  "verdict": "Putnami verified",
+  "stage": "ready",
+  "assurance": "local-declared-scope",
+  "binding": {
+    "baseSHA": "683c624f3bfcd883ab636de07832087ea3203e26",
+    "fingerprint": "c775d7d67f6a53d6c4079e20e6fa019d63f774a5258fa1526021c2230470829c",
+    "headSHA": "5519cb01be5f4463f5c485189724a21c8a446188"
+  },
+  "gateSession": "synthetic-gate",
+  "review": {
+    "path": ".context/review.md",
+    "sha256": "464ee0a1307638312799c19dd1f275f40832e666ceec76cec60741a7b7693705"
+  },
+  "limits": "Shared write access: attribution, scope completeness and human judgments are conventions; no hosted stamp, merge, deployment or acceptance-in-production claim."
+}

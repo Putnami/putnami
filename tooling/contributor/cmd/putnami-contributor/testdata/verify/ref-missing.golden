@@ -1,0 +1,3 @@
+exit 1
+-- stdout --
+{"verdict":"not-verified","reason":"ENOENT: no such file or directory, open 'absent.txt'"}

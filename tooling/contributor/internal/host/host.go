@@ -1,10 +1,12 @@
-// Package host gives the language checker its collaboration call through the
-// putnami process that launched the executable.
+// Package host gives the change commands their calls into the putnami process
+// that launched the executable: the language checker's collaboration call and
+// the verifier's restored verification reports.
 //
 // The executable never starts putnami again and never reads provider
 // configuration. putnami opens a host RPC channel for an interactive
 // command-group subcommand it launches, and names it in the environment. A
-// run with no channel, such as a hosted run, cannot reach a provider.
+// run with no channel, such as a hosted run, cannot reach a provider or the
+// task cache.
 package host
 
 import (

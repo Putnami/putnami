@@ -12,7 +12,10 @@ require (
 	go.putnami.dev/sdk/extension v0.0.0
 )
 
-require golang.org/x/sys v0.44.0 // indirect
+require (
+	go.putnami.dev/protocol/capabilities v0.0.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
+)
 
 replace (
 	go.putnami.dev/protocol/architecture => ../../protocols/architecture

@@ -117,7 +117,7 @@ re-run a `--projects` gate. An impacted gate that runs before the review ends
 is thrown away by the first finding, so it waits for the review.
 
 Capture the candidate with
-`"$PUTNAMI_CLI" tree verify --snapshot --base origin/<base>`: the remote base the
+`"$PUTNAMI_CLI" change verify --snapshot --base origin/<base>`: the remote base the
 PR targets, because a local base branch can be stale. Read the exact `binding.baseSHA` from it.
 
 Launch one independent `review` context on the frozen candidate, with the
@@ -188,14 +188,14 @@ of authorization or business behavior.
 
 ## Ready and delivery
 
-Run `"$PUTNAMI_CLI" tree verify --record <dossier.json>` on
+Run `"$PUTNAMI_CLI" change verify --record <dossier.json>` on
 the final tree. Only exit 0 produces
 `Putnami verified` at stage `ready`, with local declared-scope assurance. Keep
 missing/blocked states explicit. Do not hide non-applicability behind empty
 arrays: the reviewer must assess the scope and required-workload rationale.
 When a separately versioned workflow record is referenced, first confirm
-`"$PUTNAMI_CLI" tree verify --help` advertises `--workflow`, then run
-`"$PUTNAMI_CLI" tree verify --workflow <workflow.json>` for progress. Its
+`"$PUTNAMI_CLI" change verify --help` advertises `--workflow`, then run
+`"$PUTNAMI_CLI" change verify --workflow <workflow.json>` for progress. Its
 `workflow valid` result is not a ready verdict. An older verifier can ignore
 unknown v2 dossier members, so its successful `--record` response alone
 cannot validate the workflow. The referenced workflow needs producer-backed
@@ -249,7 +249,7 @@ behavior. The command refuses `fix` and `feat` on a branch whose every
 changed path is a test.
 
 The proposal stays a draft until native finalization marks it ready for review.
-Once the outcome is complete, the final local gate passes and `tree verify
+Once the outcome is complete, the final local gate passes and `change verify
 --record` returns `Putnami verified`, run the ready finalization without
 `--draft` in the same run; do not stop at a local ready verdict and wait to be
 asked. Keep it a draft at finalization when requested (`publication.draft` or

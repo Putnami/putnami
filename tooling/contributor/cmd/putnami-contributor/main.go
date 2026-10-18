@@ -5,6 +5,7 @@
 //
 //	putnami-contributor __putnami runtime-info    (the runtime handshake)
 //	putnami-contributor language <mode> [flags]   (putnami change language)
+//	putnami-contributor verify <mode> [flags]     (putnami change verify)
 //
 // It answers the runtime handshake, serves the change commands that moved
 // here, and refuses every other invocation. putnami launches a change command
@@ -14,6 +15,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -22,6 +24,7 @@ import (
 
 	"go.putnami.dev/tooling/contributor/internal/host"
 	"go.putnami.dev/tooling/contributor/internal/language"
+	"go.putnami.dev/tooling/contributor/internal/verify"
 )
 
 // extensionName must equal the manifest's name: core compares the runtime
@@ -52,10 +55,14 @@ func runIn(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if handled {
 		return 0
 	}
-	if args = withoutContext(args); len(args) > 0 && args[0] == "language" {
+	args = withoutContext(args)
+	if len(args) > 0 && args[0] == "language" {
 		return runLanguage(args[1:], stdin, stdout, stderr)
 	}
-	fmt.Fprintln(stderr, "putnami-contributor: unknown invocation; this runtime answers the Putnami runtime handshake and the language command")
+	if len(args) > 0 && args[0] == "verify" {
+		return runVerify(args[1:], stdout, stderr)
+	}
+	fmt.Fprintln(stderr, "putnami-contributor: unknown invocation; this runtime answers the Putnami runtime handshake and the language and verify commands")
 	return 2
 }
 
@@ -85,6 +92,30 @@ func runLanguage(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	defer func() { _ = caller.Close() }()
 	runner := language.LanguageRunner{Root: root, Stdin: stdin, Out: stdout, Err: stderr, Call: caller.Call}
 	return runner.RunLanguage(context.Background(), args[0], args[1:])
+}
+
+// runVerify runs putnami change verify in its working directory: putnami
+// launches it in the workspace root, or in the caller's directory outside a
+// workspace. Its stdout is one verdict document; a not-verified verdict exits
+// 1 with nothing on stderr. It takes the host channel out of the environment
+// before it starts any process.
+func runVerify(args []string, stdout, stderr io.Writer) int {
+	reports := host.TakeReports()
+	defer func() { _ = reports.Close() }()
+	dir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "change verify: resolve the working directory: %v\n", err)
+		return 1
+	}
+	err = verify.Verifier{Dir: dir, Stdout: stdout, RecoverReport: reports.Recover}.Run(args)
+	switch {
+	case err == nil:
+		return 0
+	case errors.Is(err, verify.ErrNotVerified):
+		return 1
+	}
+	fmt.Fprintf(stderr, "change verify: %v\n", err)
+	return 1
 }
 
 func main() {

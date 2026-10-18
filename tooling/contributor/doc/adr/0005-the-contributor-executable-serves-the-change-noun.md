@@ -14,28 +14,38 @@ and `change language` replace `tree verify`, `proposals finalize` and
 `contributor language`. D-014 settles that an extension command calls the
 collaboration providers through an RPC call to the core, made with an SDK
 client. ADR 0004 shipped the executable with no command. This record moves the
-first command, `change language`, and fixes the shape the other two follow.
+first two commands, `change language` and `change verify`, and fixes the shape
+`change finalize` follows.
 
 ## Decision
 
 ### 1. A `change` command group in the manifest
 
-The manifest declares `commandGroups.change` with the subcommand `language`.
-The subcommand routes to the flat command `change-language`, whose task
-launches `{extensionRuntime}` with the argument `language` in the workspace
-root and is never cached. The manifest declares the flags `--label`, `--diff`
-and `--limit` and the positional mode, so a launch prints no undeclared-flag
-warning. It keeps `cliContract` 5: nothing it adds needs a later rung.
+The manifest declares `commandGroups.change` with the subcommands `language`
+and `verify`. Each routes to a flat command, `change-language` or
+`change-verify`, whose task launches `{extensionRuntime}` with the subcommand
+name as its argument and is never cached. The manifest declares every flag and
+positional each subcommand accepts: `--label`, `--diff`, `--limit` and the mode
+for `language`; `--record`, `--workflow`, `--snapshot`, `--ref`, `--gate`,
+`--report` and `--base` for `verify`. A launch with those flags prints no
+undeclared-flag warning. It keeps `cliContract` 5: nothing it adds needs a
+later rung.
 
-### 2. The subcommand is interactive
+The `change-language` task runs in the workspace root. `verify` declares
+`workspace: optional` and its task declares no `cwd`: putnami starts it in the
+workspace root inside a workspace, and in the caller's directory outside one.
+The core's `tree verify` runs in any Git repository, so `change verify` must
+too.
 
-`language` declares `interactive: true`. putnami bypasses the job renderer,
-gives the executable the terminal's standard input, output and error, and sets
-`PUTNAMI_INTERACTIVE=1`. The executable reads the text mode's input from
-standard input and writes findings the way the core command does. putnami
-appends `--putnamiContext <file>` to every launch; the executable removes that
-pair before it parses the arguments, because the language check reads nothing
-from the context.
+### 2. The subcommands are interactive
+
+Both subcommands declare `interactive: true`. putnami bypasses the job
+renderer, gives the executable the terminal's standard input, output and error,
+and sets `PUTNAMI_INTERACTIVE=1`. The executable reads the text mode's input
+from standard input and writes findings or the verdict document the way the
+core command does. putnami appends `--putnamiContext <file>` to every launch;
+the executable removes that pair before it parses the arguments, because
+neither command reads anything from the context.
 
 ### 3. The tasks mode calls the core over the host RPC channel
 
@@ -78,17 +88,85 @@ Known differences from `putnami contributor language`:
 - **(c) Messages.** Every message names `change language`, the command the user
   typed, where the core's name `contributor language`.
 
-### 6. The core copy stays for now
+### 6. The core copies stay for now
 
-The core's `contributor language` keeps working. A later slice deletes it,
-with its copy of the check, once the other change commands have moved.
+The core's `contributor language` and `tree verify` keep working. A later
+slice deletes them, with their copies of the check and the verifier, once
+`change finalize` has moved.
+
+### 7. `change verify` reads restored reports over the host channel
+
+`internal/verify` holds a copy of the core's verifier: the five modes, the
+dossier, gate and qualification checks, and the workflow record validation. It
+prints the same verdict document and exits with the same code: 0 when the
+evidence is verified, 1 with `{"verdict":"not-verified","reason":"..."}` on one
+line otherwise. It computes the tree fingerprint with the SDK package
+`go.putnami.dev/sdk/extension/treefingerprint`, the implementation the core
+uses.
+
+A workflow record can name a verification report that a gate restored from the
+task cache. The core reads such a report from the cache itself. The executable
+asks the putnami process that launched it, with the host RPC method
+`verification.report`, which runs the same cache check for the workspace that
+process loaded. `internal/host` dials on the first read, so a verification
+that restores no report never dials. Outside a workspace the host refuses the
+call, because there is no cache to read.
+
+Without a channel, a restored report is not verified, with a reason that names
+`putnami change verify` and the two missing variables. Every other check needs
+no channel and gives the same verdict with or without one. The verifier does
+not trust a restored report it cannot have the host corroborate.
+
+The executable takes the channel out of its environment before it starts any
+process: Git, and the workspace CLI that answers the native dry-run plan, never
+receive the socket or its token. That plan comes from the workspace's own
+`putnamiw`, which may be a build of the workspace's source.
+
+The core marks repository code as started before it runs that plan, which
+guards the core's run credential. The executable holds no run credential, so it
+marks nothing.
+
+Known differences from `putnami tree verify`:
+
+- **(a) Help.** `--help` prints the help putnami builds from the manifest,
+  where the core prints its catalog help. Run without putnami, the executable
+  prints a usage line that names `change verify`.
+- **(b) Undeclared flags.** The core rejects an undeclared flag with a usage
+  error on stderr and exits 2. For `change verify`, putnami warns on stderr
+  that undeclared flags are deprecated and launches the executable, which
+  prints a not-verified verdict, `unknown argument: <flag>`, and exits 1. The
+  warning says putnami will reject such flags in the next minor release.
+- **(c) Working directory.** Inside a workspace the executable starts in the
+  workspace root, so the Git top level comes from the workspace root. The core
+  uses the caller's directory. They differ only when the caller stands in a
+  nested repository inside the workspace.
+- **(d) Report cache.** The host reads a restored report from the cache of the
+  workspace putnami loaded. The core reads the cache under the Git top level.
+  Outside a workspace the host refuses, where the core still reads the cache
+  under the Git top level.
+- **(e) No channel.** Without a channel only a restored report is not
+  verified, and its reason names the channel. The core has no such case.
+- **(f) Deadline.** The task has a 10-minute deadline. The core command has
+  none.
+- **(g) Run credential.** The executable marks no repository code as started.
+- **(h) Child environment.** Git and the workspace CLI run without the host
+  channel variables. The core passes its whole environment to the workspace
+  CLI.
+- **(i) Internal errors.** An error that is not a verdict, such as a failed
+  write to standard output, prints `change verify: <error>` where the core
+  prints `putnami: <error>`. Both exit 1.
 
 ## Invariants
 
 - `change language` reports the same findings and exit codes as `contributor
   language` for every mode that needs no provider. Goldens recorded from the
   core command pin this.
-- Only the tasks mode dials the host channel.
+- `change verify` prints the same verdict document and exit code as `tree
+  verify` in every mode. Goldens recorded from the core command, on a
+  deterministic Git fixture, pin this.
+- Only the tasks mode of `change language`, and a restored report in `change
+  verify`, dial the host channel.
+- No process the executable starts receives the host channel variables.
 - The executable never reads a file of another project and never imports
   `tooling/cli/internal`.
 - The runtime's `prepare` inputs include `internal/**`, so an edit to the check
@@ -106,8 +184,12 @@ with its copy of the check, once the other change commands have moved.
 ## Consequences
 
 - The check skill and its audit helper call `putnami change language`.
-- Two copies of the check exist until the core deletion slice. A behavior
-  change to one needs the same change in the other.
-- `change verify` and `change finalize` follow the same pattern: a subcommand
-  in the `change` group, an interactive launch, and the host channel for
-  anything that needs the core.
+- The build skill and its references call `putnami change verify`. A consumer
+  needs @putnami/contributor with the command; outside a workspace, it needs
+  the extension installed in user scope.
+- Until the core deletion slice, two copies of the check and two copies of
+  the verifier exist. A behavior change to one needs the same change in the
+  other.
+- `change finalize` follows the same pattern: a subcommand in the `change`
+  group, an interactive launch, and the host channel for anything that needs
+  the core.

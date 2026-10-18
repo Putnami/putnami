@@ -1,8 +1,8 @@
 # Local workflow record
 
 This is a versioned, workspace-local projection of an accepted outcome. Its
-consumer is the consumer workspace's `putnami tree verify --workflow FILE`.
-First check that `"$PUTNAMI_CLI" tree verify --help` advertises `--workflow`;
+consumer is the consumer workspace's `putnami change verify --workflow FILE`.
+First check that `"$PUTNAMI_CLI" change verify --help` advertises `--workflow`;
 an older CLI may accept a v2 dossier while ignoring its optional workflow
 member. An absent capability is a missing validator, never progress proof.
 Save records under the ignored `.context/execute/<run>/` directory. Give a v2
