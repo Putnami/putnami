@@ -35,7 +35,7 @@ const (
 	SocketEnv = "PUTNAMI_HOST_RPC"
 	// TokenEnv names the token every request carries: TokenBytes random
 	// bytes, hex-encoded.
-	TokenEnv = "PUTNAMI_HOST_RPC_TOKEN"
+	TokenEnv = "PUTNAMI_HOST_RPC_TOKEN" // #nosec G101 -- environment variable name, not a credential
 	// TokenBytes is the number of random bytes in a token.
 	TokenBytes = 32
 
@@ -178,30 +178,36 @@ type VerificationReportResult struct {
 var ErrFrameTooLarge = errors.New("the frame exceeds the host RPC frame limit")
 
 // ReadFrame reads one frame from r and returns it without its newline. It
-// returns ErrFrameTooLarge as soon as the frame grows past limit bytes, and
-// io.ErrUnexpectedEOF for a stream that ends inside a frame.
+// returns ErrFrameTooLarge as soon as more than limit bytes of the frame have
+// arrived, without waiting for more, and io.ErrUnexpectedEOF for a stream that
+// ends inside a frame.
 func ReadFrame(r *bufio.Reader, limit int) ([]byte, error) {
 	var frame []byte
 	for {
-		chunk, err := r.ReadSlice('\n')
-		size := len(frame) + len(chunk)
-		if err == nil {
-			size-- // the newline
-		}
-		if size > limit {
-			return nil, ErrFrameTooLarge
-		}
-		frame = append(frame, chunk...)
-		switch {
-		case err == nil:
-			return frame[:len(frame)-1], nil
-		case errors.Is(err, bufio.ErrBufferFull):
-			continue
-		case errors.Is(err, io.EOF) && len(frame) > 0:
-			return nil, io.ErrUnexpectedEOF
-		default:
+		// Peek(1) waits for one byte at most, so the bytes that arrived are
+		// judged before the next wait. ReadSlice would wait for a newline or a
+		// full buffer: a frame one byte over a limit that is a multiple of the
+		// buffer size would then wait for bytes that never come.
+		if _, err := r.Peek(1); err != nil {
+			if errors.Is(err, io.EOF) && len(frame) > 0 {
+				return nil, io.ErrUnexpectedEOF
+			}
 			return nil, err
 		}
+		arrived, _ := r.Peek(r.Buffered())
+		if end := bytes.IndexByte(arrived, '\n'); end >= 0 {
+			if len(frame)+end > limit {
+				return nil, ErrFrameTooLarge
+			}
+			frame = append(frame, arrived[:end]...)
+			_, _ = r.Discard(end + 1)
+			return frame, nil
+		}
+		if len(frame)+len(arrived) > limit {
+			return nil, ErrFrameTooLarge
+		}
+		frame = append(frame, arrived...)
+		_, _ = r.Discard(len(arrived))
 	}
 }
 

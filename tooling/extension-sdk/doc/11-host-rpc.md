@@ -18,8 +18,9 @@ check it before you call a method a later protocol version adds.
 
 `collaboration.call` routes contract operations through the same code as the
 CLI command, so the answer matches what the user sees. An operation that fails
-at the provider is not an error: the envelope reports it. `proposals finalize`
-is a command, not an operation, and the host refuses it.
+at the provider is not an error: the envelope reports it. The host refuses a
+contract name that is not a collaboration contract, and `proposals finalize`,
+which is a command, not an operation, with `-32602`.
 
 ## Who receives a channel
 
@@ -82,7 +83,7 @@ in a test that starts its own host.
 |---|---|---|
 | `*hostrpc.NoHostError` | The process received no channel. | No client exists. |
 | `*Error` of the protocol package `go.putnami.dev/protocol/extension/hostrpc` | The host refused the call. `Code` says why, for example `-32002` when this launch cannot serve the method, or `-32003` when the cache does not corroborate a report. | Yes. |
-| Any other error | The connection broke, the answer was not one the client can trust (another id, a frame over 32 MiB, not JSON), or the context ended before the answer. | No. Every later call returns the same error. Dial again. |
+| Any other error | The connection broke, the answer was not one the client can trust (another id, a frame over 32 MiB, not JSON), or the context ended before the whole answer arrived. An answer that arrived whole is returned even when the context ends right after. | No. Every later call returns the same error. Dial again. |
 
 ## Concurrency
 

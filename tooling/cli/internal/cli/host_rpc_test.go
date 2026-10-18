@@ -8,11 +8,13 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	collab "go.putnami.dev/protocol/collaboration"
 	extproto "go.putnami.dev/protocol/extension"
 	hostrpcproto "go.putnami.dev/protocol/extension/hostrpc"
 	features "go.putnami.dev/protocol/features"
@@ -20,8 +22,10 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	sdkhostrpc "go.putnami.dev/sdk/extension/hostrpc"
 	"go.putnami.dev/tooling/cli/internal/engine"
+	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/hostrpc"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/runcredential"
+	"go.putnami.dev/tooling/cli/internal/jobs"
 )
 
 // The host RPC channel of an interactive extension subcommand, end to end: the
@@ -30,14 +34,17 @@ import (
 
 const (
 	hostRPCExtensionEnv = "PUTNAMI_CLI_HOSTRPC_EXTENSION"
-	hostRPCFeature      = "cli/job-planning-execution"
-	hostRPCLifecycle    = "extension-command-host-rpc"
-	hostRPCCalls        = "host-rpc-core-calls"
+	// hostRPCNestedRootEnv names the workspace of the nested mode.
+	hostRPCNestedRootEnv = "PUTNAMI_CLI_HOSTRPC_NESTED_ROOT"
+	hostRPCFeature       = "cli/job-planning-execution"
+	hostRPCLifecycle     = "extension-command-host-rpc"
+	hostRPCCalls         = "host-rpc-core-calls"
 )
 
 // TestHostRPCExtensionHelperProcess is the fixture subcommand. It prints the
 // channel it received; in probe mode it then calls host.hello and
-// collaboration.call and prints the answers, and in exit mode it exits 7.
+// collaboration.call and prints the answers, in exit mode it exits 7, and in
+// nested mode it runs as a nested putnami (hostRPCNested).
 func TestHostRPCExtensionHelperProcess(t *testing.T) {
 	t.Parallel()
 	mode := os.Getenv(hostRPCExtensionEnv)
@@ -45,10 +52,68 @@ func TestHostRPCExtensionHelperProcess(t *testing.T) {
 		t.Skip("helper process: not invoked as a host RPC extension")
 	}
 	iox.Fprintf(os.Stdout, "socket=%s\ntoken=%s\n", os.Getenv(hostrpcproto.SocketEnv), os.Getenv(hostrpcproto.TokenEnv))
-	if mode == "exit" {
+	switch mode {
+	case "exit":
 		os.Exit(7)
+	case "nested":
+		os.Exit(hostRPCNested(t, os.Getenv(hostRPCNestedRootEnv), os.Stdout))
 	}
 	os.Exit(hostRPCProbe(context.Background(), os.Stdout))
+}
+
+// hostRPCNested is a nested putnami that the launched command runs, so it
+// inherits the launch's channel. It enters the process as putnami does, then
+// prints the channel variables its own environment, a provider the core
+// prepares, and the collaboration provider tool each hold. The fixture
+// provider tool refuses to serve when it receives a channel, so its outcome
+// says whether it did.
+func hostRPCNested(t *testing.T, root string, out io.Writer) int {
+	if err := enterProcess(nil); err != nil {
+		iox.Fprintf(out, "error=%v\n", err)
+		return 3
+	}
+	iox.Fprintf(out, "process=%s\n", hostRPCVariables(os.Environ()))
+	iox.Fprintf(out, "provider=%s\n", hostRPCVariables(hostRPCProviderEnv(t, root)))
+	envelope := collaborationEnvelope(t.Context(), root, wsproto.Load(root), collabCommandExtensions(t, root),
+		collab.ContractTasks, "find", json.RawMessage(`{}`))
+	iox.Fprintf(out, "tool=%s\n", envelope.Outcome)
+	return 0
+}
+
+// hostRPCVariables lists the channel variables env holds.
+func hostRPCVariables(env []string) string {
+	var held []string
+	for _, entry := range env {
+		if key, _, _ := strings.Cut(entry, "="); key == hostrpcproto.SocketEnv || key == hostrpcproto.TokenEnv {
+			held = append(held, entry)
+		}
+	}
+	return strings.Join(held, ",")
+}
+
+// hostRPCProviderEnv is the environment of a provider the core prepares in
+// root (jobs.PrepareProviderLaunch), as it prepares the cache provider, the
+// runner provider and the session reporter. The provider's own root is root
+// too: the nested process exits without running its test cleanup.
+func hostRPCProviderEnv(t *testing.T, root string) []string {
+	t.Helper()
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := &extension.ExtensionDescription{
+		Name:    "@test/hostrpc-provider",
+		Version: "0.0.1",
+		Path:    root,
+		Jobs: map[string]*extension.JobDefinition{
+			"provider": {ExtensionName: "@test/hostrpc-provider", Name: "provider", Command: executable},
+		},
+	}
+	launch, err := jobs.PrepareProviderLaunch(t.Context(), root, provider, "provider")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return launch.Env
 }
 
 // hostRPCProbe makes the probe's calls and prints their answers, one
@@ -208,28 +273,77 @@ func TestHostRPC_TheChannelClosesWhenTheSubcommandFails(t *testing.T) {
 	assertChannelClosed(t, hostRPCReport(stdout)["socket"])
 }
 
+// TestHostRPC_AHostedRunOpensNoChannel holds the launch's half: hostrpc.Start
+// refuses a hosted run with ErrHosted (internal/hostrpc proves it), and the
+// launch then receives no variable and no warning. Any other refusal warns.
 func TestHostRPC_AHostedRunOpensNoChannel(t *testing.T) {
+	t.Parallel()
 	spectest.Proves(t, hostRPCFeature, hostRPCLifecycle, "a-hosted-run-opens-no-channel")
-	t.Cleanup(runcredential.SetForTest("hosted-bearer"))
 	var stderr bytes.Buffer
-	env, stop := startHostRPC(t.Context(), hostRPCBinding{}, &stderr)
+	env, stop := hostRPCLaunch(nil, hostrpc.ErrHosted, &stderr)
 	stop()
 	if len(env) != 0 || stderr.Len() != 0 {
 		t.Fatalf("a hosted launch received %q and warned %q", env, stderr.String())
 	}
+	env, stop = hostRPCLaunch(nil, errors.New("the socket path is too long"), &stderr)
+	stop()
+	if len(env) != 0 || !strings.Contains(stderr.String(), "the socket path is too long") {
+		t.Fatalf("a launch whose channel did not open received %q and warned %q", env, stderr.String())
+	}
 }
 
-func TestHostRPC_AProcessDropsTheChannelItInherited(t *testing.T) {
+// TestHostRPC_AProviderToolReceivesNoChannel starts provider tools the way the
+// core does while a channel is open: from the process that opened it, and from
+// a nested putnami that the launched command runs, which inherits the pair.
+// Neither a provider the core prepares (jobs.PrepareProviderLaunch: the cache
+// provider, the runner provider, the session reporter) nor the collaboration
+// provider tool that collaboration.call reaches receives the channel, and the
+// nested process drops the pair it inherited. The nested putnami is a child
+// process, so the test never sets this process's environment.
+func TestHostRPC_AProviderToolReceivesNoChannel(t *testing.T) {
+	t.Parallel()
 	spectest.Proves(t, hostRPCFeature, hostRPCLifecycle, "a-planned-job-and-a-provider-tool-receive-no-channel")
-	t.Setenv(hostrpcproto.SocketEnv, "/outer/host.sock")
-	t.Setenv(hostrpcproto.TokenEnv, "outer-token")
-	if err := enterProcess(nil); err != nil {
+	root := collabCommandWorkspace(t, collabCommandBindings, nil)
+	var stderr bytes.Buffer
+	channel, stop := startHostRPC(t.Context(), hostRPCBinding{}, &stderr)
+	t.Cleanup(stop)
+	if len(channel) != 2 {
+		t.Fatalf("the channel did not open: %s", stderr.String())
+	}
+
+	// The process that opened the channel keeps it out of its own environment.
+	if held := hostRPCVariables(hostRPCProviderEnv(t, root)); held != "" {
+		t.Errorf("a provider the launching process starts receives %s", held)
+	}
+	envelope := collaborationEnvelope(t.Context(), root, wsproto.Load(root), collabCommandExtensions(t, root),
+		collab.ContractTasks, "find", json.RawMessage(`{}`))
+	if envelope.Outcome != collab.OutcomeOK {
+		t.Errorf("the collaboration provider tool the launching process starts answered %s: %+v", envelope.Outcome, envelope.Error)
+	}
+
+	executable, err := os.Executable()
+	if err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{hostrpcproto.SocketEnv, hostrpcproto.TokenEnv} {
-		if value, set := os.LookupEnv(key); set {
-			t.Errorf("%s=%s survived the process entry", key, value)
-		}
+	nested := exec.CommandContext(t.Context(), executable, "-test.run=^TestHostRPCExtensionHelperProcess$")
+	nested.Env = append(os.Environ(), hostRPCExtensionEnv+"=nested", hostRPCNestedRootEnv+"="+root)
+	nested.Env = append(nested.Env, channel...)
+	stdout, err := nested.Output()
+	report := hostRPCReport(string(stdout))
+	if err != nil {
+		t.Fatalf("the nested putnami failed: %v, error %q\n%s", err, report["error"], stdout)
+	}
+	if report["socket"] == "" || report["token"] == "" {
+		t.Fatalf("the nested putnami inherited no channel:\n%s", stdout)
+	}
+	if report["process"] != "" {
+		t.Errorf("the nested putnami kept %s after entering the process", report["process"])
+	}
+	if report["provider"] != "" {
+		t.Errorf("a provider the nested putnami starts receives %s", report["provider"])
+	}
+	if report["tool"] != string(collab.OutcomeOK) {
+		t.Errorf("the collaboration provider tool the nested putnami starts answered %q", report["tool"])
 	}
 }
 
@@ -289,6 +403,7 @@ func TestHostRPC_CollaborationCallRefusesWhatTheCommandPrintsNoEnvelopeFor(t *te
 	}{
 		{"outside any workspace", hostRPCBinding{}, "tasks", "find", hostrpcproto.CodeUnavailable},
 		{"no collaboration binding", binding(unbound), "tasks", "find", hostrpcproto.CodeUnavailable},
+		{"a word that is not a contract", binding(bound), "foo", "find", hostrpcproto.CodeInvalidParams},
 		{"proposals finalize is a command", binding(bound), "proposals", "finalize", hostrpcproto.CodeInvalidParams},
 		{"a command group owns the contract word", binding(conflicting), "tasks", "find", hostrpcproto.CodeUnavailable},
 	} {
@@ -299,5 +414,8 @@ func TestHostRPC_CollaborationCallRefusesWhatTheCommandPrintsNoEnvelopeFor(t *te
 				t.Fatalf("collaboration.call = %s, %v, want refusal %d", envelope, err, tc.code)
 			}
 		})
+	}
+	if isCollaborationCommand(bound, "foo") {
+		t.Fatal("the CLI routes foo to the collaboration command, so collaboration.call must too")
 	}
 }

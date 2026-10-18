@@ -49,9 +49,10 @@ func (e *NoHostError) Error() string {
 
 // Client is one connection to the host. Its methods are safe for concurrent
 // use; the host answers them one at a time. A call that fails on the
-// connection, or whose context ends before the host answers, breaks the
-// client: every later call returns the same error, and the extension dials
-// again.
+// connection, or whose context ends before the host's whole answer arrives,
+// breaks the client: every later call returns the same error, and the
+// extension dials again. An answer that arrived whole stands, even when the
+// context ends right after.
 type Client struct {
 	conn  net.Conn
 	token string
@@ -81,7 +82,7 @@ func Dial() (*Client, error) {
 
 // Connect connects to the channel at socket with token.
 func Connect(socket, token string) (*Client, error) {
-	conn, err := net.Dial("unix", socket)
+	conn, err := net.Dial("unix", socket) //nolint:gosec // G704: the destination is a local Unix socket, the one putnami named for this process or the one the caller names; connecting to it is this function's purpose
 	if err != nil {
 		return nil, fmt.Errorf("connect to the putnami host RPC channel %s: %w", socket, err)
 	}
@@ -159,7 +160,11 @@ func (c *Client) call(ctx context.Context, method string, params, result any) er
 	}
 	// A context that ends mid-call moves the deadline into the past, which
 	// unblocks the write or the read below.
-	stop := context.AfterFunc(ctx, func() { _ = c.conn.SetDeadline(time.Unix(1, 0)) })
+	ended := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		_ = c.conn.SetDeadline(time.Unix(1, 0))
+		close(ended)
+	})
 	defer stop()
 	if _, err := c.conn.Write(frame); err != nil {
 		return c.breakWith(ctx, method, err)
@@ -169,9 +174,10 @@ func (c *Client) call(ctx context.Context, method string, params, result any) er
 		return c.breakWith(ctx, method, err)
 	}
 	if !stop() {
-		// The context ended as the answer arrived, and the connection now
-		// carries a past deadline.
-		return c.breakWith(ctx, method, ctx.Err())
+		// The context ended once the whole answer had arrived, so the answer
+		// stands. Wait for the past deadline to land: the next call's
+		// SetDeadline then replaces it.
+		<-ended
 	}
 
 	// An error object may carry members this client does not know, such as

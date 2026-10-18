@@ -44,6 +44,12 @@ func startHostRPC(ctx context.Context, binding hostRPCBinding, stderr io.Writer)
 		Collaboration:      binding.collaborationCall,
 		VerificationReport: binding.verificationReport,
 	})
+	return hostRPCLaunch(server, err, stderr)
+}
+
+// hostRPCLaunch is what a launch receives from the channel hostrpc.Start
+// opened, or from its refusal err.
+func hostRPCLaunch(server *hostrpc.Server, err error, stderr io.Writer) ([]string, func()) {
 	if err != nil {
 		if !errors.Is(err, hostrpc.ErrHosted) {
 			iox.Fprintf(stderr, "putnami: warning: the host RPC channel did not open, so this command cannot call putnami: %v\n", err)
@@ -67,9 +73,15 @@ func dropInheritedHostRPC() {
 // collaborationCall answers collaboration.call through the route
 // `putnami <contract> <operation>` takes (collaborationEnvelope), and returns
 // the envelope that command prints under --output=json. Where that command
-// prints no envelope, the call is refused with the reason.
+// prints no envelope, the call is refused with the reason. The CLI routes a
+// word to that command only when it is a contract and the workspace declares
+// options.collaboration (isCollaborationCommand), so the call reaches the
+// route under the same two conditions.
 func (b hostRPCBinding) collaborationCall(ctx context.Context, call hostrpcproto.CollaborationCallParams) (json.RawMessage, error) {
 	switch {
+	case !collab.IsContract(call.Contract):
+		return nil, &hostrpcproto.Error{Code: hostrpcproto.CodeInvalidParams,
+			Message: fmt.Sprintf("%q is not a collaboration contract; the contracts are %s", call.Contract, strings.Join(collab.ContractNames, ", "))}
 	case b.root == "":
 		return nil, &hostrpcproto.Error{Code: hostrpcproto.CodeUnavailable,
 			Message: "this command runs outside any workspace, so no collaboration contract is bound"}

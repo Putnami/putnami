@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestReadFrameSplitsOnNewlines(t *testing.T) {
@@ -41,6 +42,38 @@ func TestReadFrameRefusesAFrameOverTheLimit(t *testing.T) {
 		if _, err := ReadFrame(reader, 100); !errors.Is(err, ErrFrameTooLarge) {
 			t.Errorf("ReadFrame of %d bytes = %v, want ErrFrameTooLarge", len(input), err)
 		}
+	}
+}
+
+// A frame one byte over a limit that is a multiple of the reader's buffer is
+// refused once that byte arrives, while the peer keeps the stream open and
+// sends nothing more.
+func TestReadFrameRefusesAFrameOverTheLimitWithoutWaitingForMore(t *testing.T) {
+	t.Parallel()
+	peer, sender := io.Pipe()
+	t.Cleanup(func() { _ = sender.Close() })
+	go func() { _, _ = io.WriteString(sender, strings.Repeat("x", 33)) }()
+	reader := bufio.NewReaderSize(peer, 16)
+	refused := make(chan error, 1)
+	go func() {
+		_, err := ReadFrame(reader, 32)
+		refused <- err
+	}()
+	select {
+	case err := <-refused:
+		if !errors.Is(err, ErrFrameTooLarge) {
+			t.Fatalf("ReadFrame = %v, want ErrFrameTooLarge", err)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("ReadFrame waits for more bytes after the frame passed its limit")
+	}
+}
+
+func TestReadFrameReturnsAnEmptyFrame(t *testing.T) {
+	t.Parallel()
+	frame, err := ReadFrame(bufio.NewReaderSize(strings.NewReader("\n{}\n"), 16), 8)
+	if err != nil || len(frame) != 0 {
+		t.Fatalf("ReadFrame = %q, %v, want the empty frame", frame, err)
 	}
 }
 

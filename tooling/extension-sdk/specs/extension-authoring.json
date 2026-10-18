@@ -110,7 +110,7 @@
     },
     {
       "id": "host-rpc-client",
-      "text": "The Go client Dial reads PUTNAMI_HOST_RPC and PUTNAMI_HOST_RPC_TOKEN; without them it returns a NoHostError that names putnami and the missing variables. Every request carries the token and a fresh id. A host refusal is a typed error with its code, and the client stays usable. An answer to another id, a frame over 32 MiB, a broken connection or an ended context breaks the client."
+      "text": "The Go client Dial reads PUTNAMI_HOST_RPC and PUTNAMI_HOST_RPC_TOKEN; without them it returns a NoHostError that names putnami and the missing variables. Every request carries the token and a fresh id. A host refusal is a typed error with its code, and the client stays usable. An answer to another id, a frame over 32 MiB, a broken connection or a context that ends before the whole answer arrives breaks the client; an answer that arrived whole stands."
     }
   ],
   "decisions": [

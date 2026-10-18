@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"time"
 
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/sdk/extension/ownerperm"
@@ -42,6 +43,10 @@ const (
 	// accepts: macOS holds 104 bytes in sun_path, its terminating NUL
 	// included.
 	maxSocketPath = 103
+	// firstAcceptWait and maxAcceptWait bound the wait before the accept
+	// loop tries again after a failed accept.
+	firstAcceptWait = 5 * time.Millisecond
+	maxAcceptWait   = time.Second
 )
 
 // ErrHosted is the refusal of Start in a hosted run (--credential-fd): a
@@ -80,13 +85,16 @@ type Server struct {
 	stopped bool
 	// serving counts the accept loop and the connection goroutines.
 	serving sync.WaitGroup
+	// stopping is closed by Stop, which ends the accept loop's wait between
+	// two failed accepts.
+	stopping chan struct{}
 
 	stopOnce sync.Once
 	stopErr  error
 }
 
 // Start opens a channel in a fresh socket directory and serves it until Stop.
-// Cancelling ctx cancels the call in flight, like Stop, but leaves the socket
+// Canceling ctx cancels the call in flight, like Stop, but leaves the socket
 // open. A hosted run gets ErrHosted.
 func Start(ctx context.Context, methods Methods) (*Server, error) {
 	if runcredential.Hosted() {
@@ -120,6 +128,11 @@ func startIn(ctx context.Context, methods Methods, roots []string) (*Server, err
 		_ = dir.Remove()
 		return nil, fmt.Errorf("listen on the host RPC socket %s: %w", socket, err)
 	}
+	return serveOn(ctx, methods, dir, socket, token, listener), nil
+}
+
+// serveOn serves listener, which listens on socket in dir, until Stop.
+func serveOn(ctx context.Context, methods Methods, dir *scratch.Dir, socket, token string, listener net.Listener) *Server {
 	server := &Server{
 		dir:      dir,
 		socket:   socket,
@@ -127,11 +140,12 @@ func startIn(ctx context.Context, methods Methods, roots []string) (*Server, err
 		listener: listener,
 		methods:  methods,
 		conns:    map[net.Conn]struct{}{},
+		stopping: make(chan struct{}),
 	}
 	server.ctx, server.cancel = context.WithCancel(ctx)
 	server.serving.Add(1)
 	go server.accept()
-	return server, nil
+	return server
 }
 
 // newToken returns wire.TokenBytes random bytes, hex-encoded.
@@ -184,6 +198,7 @@ func (s *Server) Env() []string {
 // the socket directory. It returns the first Stop's error on every call.
 func (s *Server) Stop() error {
 	s.stopOnce.Do(func() {
+		close(s.stopping)
 		s.cancel()
 		closeErr := s.listener.Close()
 		if errors.Is(closeErr, net.ErrClosed) {
@@ -201,13 +216,31 @@ func (s *Server) Stop() error {
 	return s.stopErr
 }
 
+// accept serves each connection the socket receives until Stop. A failed
+// accept, such as one past the open-file limit, is tried again after a wait
+// that doubles from firstAcceptWait up to maxAcceptWait, as
+// net/http.Server.Serve does, so the socket serves again once the cause
+// passes. Only a closed listener or Stop ends the loop.
 func (s *Server) accept() {
 	defer s.serving.Done()
+	var wait time.Duration
 	for {
 		conn, err := s.listener.Accept()
-		if err != nil {
+		if errors.Is(err, net.ErrClosed) {
 			return
 		}
+		if err != nil {
+			wait = min(max(2*wait, firstAcceptWait), maxAcceptWait)
+			timer := time.NewTimer(wait)
+			select {
+			case <-s.stopping:
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+			continue
+		}
+		wait = 0
 		s.connMu.Lock()
 		if s.stopped {
 			s.connMu.Unlock()
@@ -269,7 +302,9 @@ func (s *Server) write(conn net.Conn, response *wire.Response) error {
 }
 
 // handle answers one frame. It returns a nil response for a notification,
-// and keep false when the connection must close.
+// and keep false when the connection must close: after a frame with another
+// token, which gets -32001 when it is a request and no answer when it is a
+// notification.
 func (s *Server) handle(frame []byte) (*wire.Response, bool) {
 	if !json.Valid(frame) {
 		return failure(nil, wire.CodeParseError, "the frame is not JSON"), true
@@ -283,6 +318,9 @@ func (s *Server) handle(frame []byte) (*wire.Response, bool) {
 		id = nil
 	}
 	if subtle.ConstantTimeCompare([]byte(request.Token), []byte(s.token)) != 1 {
+		if len(request.ID) == 0 {
+			return nil, false // a notification gets no answer, not even a refusal
+		}
 		return failure(id, wire.CodeUnauthorized, "the token is not this launch's "+wire.TokenEnv), false
 	}
 	if len(request.ID) == 0 {

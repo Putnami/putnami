@@ -48,7 +48,8 @@ the channel, the child receives no variable and the host prints a warning.
   compares it in constant time. A request with any other token gets `-32001`,
   and the host closes the connection.
 - A request without an `id` is a notification. No method accepts one, so the
-  host answers nothing.
+  host answers nothing. A notification with any other token gets no answer
+  either, and the host closes the connection.
 
 ```json
 {"jsonrpc":"2.0","id":1,"method":"host.hello","token":"<64 hex characters>"}
@@ -64,8 +65,9 @@ the channel, the child receives no variable and the host prints a warning.
 | `verification.report` | `{"project", "task", "path", "digest"}` (`VerificationReportParams`) | `{"report": "<base64>"}` (`VerificationReportResult`): the bytes a successful cached test run produced, after the cache corroborated them. |
 
 Params are strict: an unknown member is `-32602`. `collaboration.call` routes
-contract operations only. `proposals finalize` is a command, not an operation,
-and is refused with `-32602`.
+contract operations only. A `contract` that is not a collaboration contract,
+and `proposals finalize`, which is a command, not an operation, are refused
+with `-32602`.
 
 ## Errors
 

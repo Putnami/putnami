@@ -155,6 +155,67 @@ func TestARequestWithoutTheTokenIsRefusedAndTheConnectionCloses(t *testing.T) {
 	}
 }
 
+// A notification gets no answer, so one with another token closes the
+// connection without the refusal a request would get (JSON-RPC 2.0).
+func TestANotificationWithoutTheTokenClosesTheConnectionUnanswered(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, feature, calls, "a-request-without-the-token-is-refused")
+	server := startServer(t, Methods{})
+	conn := dialRaw(t, server)
+	conn.send(t, `{"jsonrpc":"2.0","method":"host.hello","token":"wrong"}`)
+	if !conn.closed(t) {
+		t.Fatal("the host answered a notification with another token, or kept its connection open")
+	}
+}
+
+// failingListener fails its first accepts, as a listener past the open-file
+// limit does, and then accepts.
+type failingListener struct {
+	net.Listener
+	failures atomic.Int32
+}
+
+func (l *failingListener) Accept() (net.Conn, error) {
+	if l.failures.Add(-1) >= 0 {
+		return nil, &net.OpError{Op: "accept", Net: "unix", Err: errors.New("too many open files")}
+	}
+	return l.Listener.Accept()
+}
+
+func TestAFailedAcceptIsTriedAgain(t *testing.T) {
+	t.Parallel()
+	secret, err := newToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, socket, err := openSocketDir(socketRoots())
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("unix", socket)
+	if err != nil {
+		_ = dir.Remove()
+		t.Fatal(err)
+	}
+	failing := &failingListener{Listener: listener}
+	failing.failures.Store(3)
+	server := serveOn(t.Context(), Methods{}, dir, socket, secret, failing)
+	t.Cleanup(func() {
+		if err := server.Stop(); err != nil {
+			t.Error(err)
+		}
+	})
+	// A host whose accept loop ended would never answer: bound the wait.
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	if _, err := client(t, server).Hello(ctx); err != nil {
+		t.Fatalf("the host stopped serving after a failed accept: %v", err)
+	}
+	if failing.failures.Load() >= 0 {
+		t.Error("the host answered without accepting past the failed accepts")
+	}
+}
+
 func TestHelloReturnsTheProtocolVersionAndTheMethods(t *testing.T) {
 	t.Parallel()
 	hello, err := client(t, startServer(t, Methods{})).Hello(t.Context())

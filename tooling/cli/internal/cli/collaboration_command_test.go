@@ -13,6 +13,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	collab "go.putnami.dev/protocol/collaboration"
 	extproto "go.putnami.dev/protocol/extension"
+	hostrpcproto "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -33,6 +34,11 @@ func TestCollaborationCommandProviderHelperProcess(t *testing.T) {
 	t.Parallel()
 	if os.Getenv(collabCommandProviderEnv) == "" {
 		t.Skip("helper process: not invoked as a collaboration provider")
+	}
+	// A provider tool never receives a host RPC channel. This one refuses to
+	// serve when it does, so a leak fails every test that routes through it.
+	if os.Getenv(hostrpcproto.SocketEnv) != "" || os.Getenv(hostrpcproto.TokenEnv) != "" {
+		os.Exit(4)
 	}
 	key := func(contract, operation string) collab.OperationKey {
 		return collab.OperationKey{Contract: contract, Version: 1, Operation: operation}

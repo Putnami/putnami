@@ -28,11 +28,14 @@ command.
    launch of a command-group subcommand declared `interactive: true`, inside
    or outside a workspace, and stops it when the process exits, whatever its
    exit: the stop is deferred in `runInteractiveExtensionCommand`, so the
-   error and signal paths close it too. A planned job gets no channel. Its
-   result is cached, and a call its cache key does not cover must not decide
-   it. A provider tool the core calls gets none, and neither does any process
-   of a hosted run (`--credential-fd`): `hostrpc.Start` returns `ErrHosted`
-   there.
+   error path and a first interrupt, which cancels the run, close it too. A
+   forced exit, on a second interrupt or when the 10-second shutdown timer
+   fires, calls `os.Exit` and skips the deferred stop: it leaves the
+   directory behind until the next channel's sweep reclaims it (decision 3).
+   A planned job gets no channel. Its result is cached, and a call its cache
+   key does not cover must not decide it. A provider tool the core calls gets
+   none, and neither does any process of a hosted run (`--credential-fd`):
+   `hostrpc.Start` returns `ErrHosted` there.
 2. **The process receives two variables.** `PUTNAMI_HOST_RPC` names the
    socket, and `PUTNAMI_HOST_RPC_TOKEN` carries 32 random bytes, hex-encoded.
    `buildJobInvocation` removes both from the inherited environment and from
@@ -47,14 +50,20 @@ command.
    channel's sweep removes it. macOS holds at most 104 bytes in a socket path,
    its terminating NUL included, so a path over 103 bytes moves the directory
    to `/tmp`. Windows 10 version 1803 and later serve the same `AF_UNIX`
-   socket. When no directory works, the CLI prints a warning and starts the
+   socket, under the same 103-byte limit but with no `/tmp` fallback: a
+   temporary directory whose socket path is too long means no channel and a
+   warning. When no directory works, the CLI prints a warning and starts the
    process without the variables; the client's `NoHostError` says why they
    can be absent.
 4. **Every request carries the token.** The token is a top-level `token`
    member of each request, compared in constant time. A request with another
-   token gets `-32001`, and the host closes the connection. The directory
-   permissions keep other users out; the token keeps out the user's own
-   processes that this launch did not start.
+   token gets `-32001`, and the host closes the connection. A notification
+   with another token gets no answer, as JSON-RPC 2.0 requires, and the host
+   closes the connection too. The 0700 directory keeps other users out. A
+   process of the same user can read the launched process's environment
+   (`ps -E` on macOS, `/proc/<pid>/environ` on Linux), so the token does not
+   keep the user's own processes out: it is defense in depth against one that
+   finds the socket but not the environment.
 5. **JSON-RPC 2.0 in line frames.** A frame is one JSON object and a newline,
    at most 32 MiB without the newline, in both directions. The host reads
    with a bounded reader, answers a longer frame with `-32600` and closes the
@@ -66,10 +75,12 @@ command.
    - `collaboration.call` routes through `collaborationEnvelope`, the code
      `putnami <contract> <operation>` runs, and returns the envelope that
      command prints under `--output=json`, byte for byte. Where the command
-     prints no envelope, the method refuses with the reason: `-32002`
-     outside a workspace, without `options.collaboration`, or when an
-     extension command owns the contract word, and `-32602` for `proposals
-     finalize`, which is a command and not a contract operation.
+     prints no envelope, the method refuses with the reason: `-32602` for a
+     word that is not a collaboration contract, which the CLI does not route
+     to that command, and for `proposals finalize`, which is a command and
+     not a contract operation; `-32002` outside a workspace, without
+     `options.collaboration`, or when an extension command owns the contract
+     word.
    - `verification.report` returns what `engine.VerifyCachedVerificationReport`
      returns, as base64 bytes, and its refusal as `-32003` with the engine's
      message. Outside a workspace it answers `-32002`.

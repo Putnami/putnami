@@ -2,13 +2,16 @@ package hostrpc
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"net"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/protocol/features/spectest"
@@ -248,6 +251,72 @@ func TestAnEndedContextBreaksTheClient(t *testing.T) {
 	}
 	if _, again := client.Hello(t.Context()); !errors.Is(again, context.Canceled) {
 		t.Fatalf("the next call = %v, want the broken client's error", again)
+	}
+}
+
+// endsOnAnswer is a client connection that ends the call's context once the
+// host's whole answer is read, and hands the answer over only after the
+// client's context watcher has moved the deadline into the past.
+type endsOnAnswer struct {
+	net.Conn
+	end     context.CancelFunc
+	pastSet chan struct{}
+	once    sync.Once
+}
+
+func (c *endsOnAnswer) SetDeadline(deadline time.Time) error {
+	err := c.Conn.SetDeadline(deadline)
+	if !deadline.IsZero() && deadline.Before(time.Now()) {
+		c.once.Do(func() { close(c.pastSet) })
+	}
+	return err
+}
+
+func (c *endsOnAnswer) Read(p []byte) (int, error) {
+	n, err := c.Conn.Read(p)
+	if c.end != nil && bytes.IndexByte(p[:n], '\n') >= 0 {
+		end := c.end
+		c.end = nil
+		end()
+		<-c.pastSet
+	}
+	return n, err
+}
+
+func TestAnAnswerThatArrivedWholeStandsWhenTheContextEnds(t *testing.T) {
+	t.Parallel()
+	clientConn, hostConn := net.Pipe()
+	t.Cleanup(func() {
+		_ = clientConn.Close()
+		_ = hostConn.Close()
+	})
+	go func() {
+		reader := bufio.NewReader(hostConn)
+		for {
+			frame, err := wire.ReadFrame(reader, wire.MaxFrameBytes)
+			if err != nil {
+				return
+			}
+			var request wire.Request
+			if err := json.Unmarshal(frame, &request); err != nil {
+				return
+			}
+			if _, err := hostConn.Write(result(t, request, wire.HelloResult{Protocol: wire.ProtocolVersion, Methods: wire.Methods()})); err != nil {
+				return
+			}
+		}
+	}()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	client := newClient(&endsOnAnswer{Conn: clientConn, end: cancel, pastSet: make(chan struct{})}, testToken)
+	if hello, err := client.Hello(ctx); err != nil || hello.Protocol != wire.ProtocolVersion {
+		t.Fatalf("Hello = %+v, %v, want the answer that arrived before the context ended", hello, err)
+	}
+	if ctx.Err() == nil {
+		t.Fatal("the context did not end during the call")
+	}
+	if _, err := client.Hello(t.Context()); err != nil {
+		t.Fatalf("the next call = %v, want the host's answer", err)
 	}
 }
 
