@@ -65,7 +65,7 @@ validated, tested, cached on, and reasoned about by tooling in any language.
   declared root, no template expansion inside a path.
 - `ValidateTaskContracts()` is the task-contract conformance harness: it proves
   exact paths, one owner per output, and honest effects across a whole manifest.
-  `ValidateManifest()` runs it, so `putnami dev extension validate`, the
+  `ValidateManifest()` runs it, so `putnami extensions validate`, the
   package-time gate, and the extension SDK's build-time authoring gate all reach
   the same verdict from one implementation.
 - `ValidLifecycleFailureCodes` is the closed, typed vocabulary the runtime,

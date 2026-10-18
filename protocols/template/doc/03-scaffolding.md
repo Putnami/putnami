@@ -48,7 +48,7 @@ workspace rather than failing.
 Check that a template still produces a project that builds:
 
 ```bash
-putnami dev template test [path] [--skip-build] [--keep]
+putnami templates test [path] [--skip-build] [--keep]
 ```
 
 This:
@@ -91,7 +91,7 @@ Other keys are accepted by the manifest schema but ignored by the test command.
 ## Validating Templates
 
 ```bash
-putnami dev template validate [path]
+putnami templates validate [path]
 ```
 
 See [`01-manifest.md`](01-manifest.md) for exactly what it checks.

@@ -565,7 +565,7 @@ func TestConformance_TaskContracts_InvalidFixtures(t *testing.T) {
 // TestConformance_TaskContracts_StrictPathAgrees pins that the harness IS the
 // strict path's v3 half rather than a parallel implementation of it: every
 // diagnostic the harness reports must also come out of ValidateManifest, which
-// is what `putnami dev extension validate`, the package-time gate and the
+// is what `putnami extensions validate`, the package-time gate and the
 // extension SDK's build-time gate run.
 func TestConformance_TaskContracts_StrictPathAgrees(t *testing.T) {
 	for name := range v3InvalidFixtureCodes {

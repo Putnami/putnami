@@ -24,7 +24,7 @@ The smallest valid template manifest:
 | `version` | no | Template version (semver) |
 | `extension` | no | Extension to activate for projects created from this template |
 | `workspaceDevDependencies` | no | Dev dependencies to add to the workspace root |
-| `testVariables` | no | Render-variable overrides for `putnami dev template test` (`projectName`, `projectModule`) |
+| `testVariables` | no | Render-variable overrides for `putnami templates test` (`projectName`, `projectModule`) |
 
 Unknown fields are rejected by both the strict parser and the schema.
 
@@ -53,7 +53,7 @@ project content, so it never lands in the created project.
 Validate a template manifest:
 
 ```bash
-putnami dev template validate [path]
+putnami templates validate [path]
 ```
 
 `[path]` may be the manifest, or a directory containing one; with no argument
@@ -74,4 +74,4 @@ The formal schema is in [`schemas/template.json`](../schemas/template.json),
 published as `https://putnami.dev/schemas/putnami-template.json`. It constrains
 `name` to `^(@[a-z0-9-]+/[a-z0-9-]+|[a-z0-9][a-z0-9-]*)$`; the Go validator only
 requires that `name` be non-empty, so a schema-aware editor rejects a malformed
-name that `dev template validate` accepts.
+name that `templates validate` accepts.

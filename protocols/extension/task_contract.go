@@ -1115,7 +1115,7 @@ func validateDeclarationConflicts(base string, task TaskDefinition, declaration 
 
 // ValidateTaskContracts is the conformance harness for the v3 task contract: it
 // proves all three invariants over a whole parsed manifest and is what the
-// strict validation path calls, so an SDK author, `putnami dev extension
+// strict validation path calls, so an SDK author, `putnami extensions
 // validate`, the package-time gate and a conformance fixture can never disagree
 // about what conformance means.
 //
