@@ -686,8 +686,8 @@ func TestTheDeclarationAtTheTagFollowsTheOptionLayers(t *testing.T) {
 }
 
 // deliveredParams returns the task parameters the CLI delivers for a project's
-// option layers. It doubles the CLI's merge (tooling/cli/internal/jobs
-// mergeParamLayers and projectParamAliases): the command, extension and
+// option layers. It doubles the CLI's merge (tooling/cli/internal/jobs/cachekey
+// MergeParamLayers and ProjectParamAliases): the command, extension and
 // extension-command layers apply in that order, each replacing what the
 // earlier ones set, and a kebab-case key also sets its camelCase alias unless
 // its layer sets that alias itself. The CLI's half is pinned by

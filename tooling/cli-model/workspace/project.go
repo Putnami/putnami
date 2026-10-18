@@ -16,7 +16,7 @@ type Project struct {
 	// project — what its own native manifest declares. It is INFORMATIONAL:
 	// nothing in the job context, in a cache key, or in a release-set member
 	// reads it. The version an artifact is stamped with is derived from the git
-	// tags of the project's Line (jobs.RunVersions).
+	// tags of the project's Line (cachekey.RunVersions in the CLI).
 	Version      string
 	Type         string // "library" or "application" (empty defaults to "application")
 	Path         string // relative to workspace root

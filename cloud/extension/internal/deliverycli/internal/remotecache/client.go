@@ -52,8 +52,8 @@ const DefaultTimeout = 30 * time.Second
 const maxResponseBytes = 64 << 20 // 64 MiB
 
 // maxIdleConnsPerHost sizes the kept-alive (idle) connection pool per host. The
-// whole build's CAS traffic — concurrent blob uploads (jobs.uploadConcurrency ×
-// blobUploadConcurrency) plus the restores' downloads (prefetch downloads none) —
+// whole build's CAS traffic — concurrent blob uploads (the CLI's
+// remotecache.uploadConcurrency × blobUploadConcurrency) plus the restores' downloads (prefetch downloads none) —
 // fans out against one or two hosts (control plane and CAS). This does not cap
 // live concurrency (Go opens as many connections as the fan-out needs); it caps
 // reuse. The stdlib default keeps only 2 idle connections per host, so beyond

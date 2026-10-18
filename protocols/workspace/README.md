@@ -359,7 +359,7 @@ the languages it owns:
 |----------|-----|
 | `tooling/cli/internal/workspace` | Workspace/project/scope loading and merging |
 | `tooling/cli/internal/extension` | Extension declarations, install and lock entries |
-| `tooling/cli/internal/jobs`, `.../engine` | Plan-time option resolution and project selection |
+| `tooling/cli/internal/jobs/planner`, `.../jobs/cachekey`, `.../engine` | Plan-time option resolution and project selection |
 | `tooling/cli/internal/watch` | Watched-file invalidation |
 | `tooling/cli/internal/store` | Store tuning from workspace config |
 | `tooling/cli/internal/mcp`, `.../features`, `.../mapgen`, `.../hooks`, `.../cli` | Project identity, hooks, and generated views |
