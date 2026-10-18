@@ -91,3 +91,34 @@ func TestBuildJobContext_WorkspaceProjectsCarryTheResolvedType(t *testing.T) {
 		t.Errorf("selectedProjects = %s, want no type", selected)
 	}
 }
+
+// A workspace with no projects still answers: the context names an empty
+// workspaceProjects array, so a reader tells "no projects" from a CLI too old
+// to write the member.
+func TestBuildJobContext_WorkspaceProjectsNamesAnEmptyList(t *testing.T) {
+	t.Parallel()
+	ws := workspace.NewWorkspace("/workspace", &wsproto.Config{}, nil)
+	ws.Name = "ws"
+	own := &workspace.Project{ID: "/tools/own", Name: "own", Path: "tools/own"}
+	ctx := BuildJobContext(ws, &ScheduledJob{
+		Project:          own,
+		SelectedProjects: []*workspace.Project{own},
+		Extension:        &extension.ExtensionDescription{Name: "@putnami/cloud", Path: "/workspace/cloud"},
+		JobDef:           &extension.JobDefinition{Name: "cloud-infra-plan", ExtensionName: "@putnami/cloud"},
+	}, nil, nil, nil)
+
+	data, err := json.Marshal(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatal(err)
+	}
+	if got := string(raw["workspaceProjects"]); got != "[]" {
+		t.Errorf("workspaceProjects = %q, want []", got)
+	}
+	if _, diags := protocoljob.ParseAndValidate(data); diag.HasErrors(diags) {
+		t.Errorf("a context with an empty membership violates the job protocol: %v", diags)
+	}
+}

@@ -64,7 +64,7 @@ type JobCommandContext struct {
 	// feature relations resolve against every authored manifest in the
 	// workspace, so a project-scoped validation without this member reported a
 	// real cross-project relation as dangling.
-	WorkspaceProjects []cachekey.JobContextProjectRef `json:"workspaceProjects,omitempty"`
+	WorkspaceProjects []cachekey.JobContextProjectRef `json:"workspaceProjects"`
 	Extension         JobContextExtension             `json:"extension"`
 	Job               JobContextJob                   `json:"job"`
 	Params            map[string]any                  `json:"params"`
@@ -299,6 +299,11 @@ func BuildJobContext(
 	// what this member decides is whether it can SEE the workspace at all, and
 	// that is not a property of the task's activation.
 	ctx.WorkspaceProjects = cachekey.WorkspaceProjectsContext(ws, versions)
+	// An empty workspace writes "workspaceProjects": [] so a reader can tell
+	// "no projects" from a CLI too old to write the member.
+	if ctx.WorkspaceProjects == nil {
+		ctx.WorkspaceProjects = []cachekey.JobContextProjectRef{}
+	}
 
 	// Output path — use Path (not Name or ID) for filesystem safety.
 	// Name may contain slashes (@putnami/app), ID has "/" prefix.
