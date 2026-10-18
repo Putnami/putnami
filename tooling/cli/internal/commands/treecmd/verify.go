@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -22,9 +21,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
-
-// VerifyUsage is the one-line usage Run prints for --help.
-const VerifyUsage = "usage: putnami tree verify (--record FILE | --workflow FILE | --snapshot | --ref FILE | --gate SESSION --report REPORT) [--base REV]\n"
 
 // Verifier checks local workflow evidence against the worktree it runs in. It
 // is a consistency check, not a signed review or an access boundary, and it
@@ -46,7 +42,7 @@ type Verifier struct {
 	// RecoverReport verifies a restored native report against the current
 	// task-owned cache key and returns its validated bytes. Nil fails closed.
 	RecoverReport func(root string, report features.VerificationReportRef) ([]byte, error)
-	// Stdout receives exactly one JSON document, or the usage line for --help.
+	// Stdout receives exactly one JSON document.
 	Stdout io.Writer
 }
 
@@ -63,10 +59,6 @@ func (v Verifier) Run(args []string) error {
 	stdout := v.Stdout
 	if stdout == nil {
 		stdout = os.Stdout
-	}
-	if slices.ContainsFunc(args, func(arg string) bool { return arg == "--help" || arg == "-h" }) {
-		_, err := io.WriteString(stdout, VerifyUsage)
-		return err
 	}
 	value, err := v.verdict(args)
 	if err != nil {

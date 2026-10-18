@@ -214,13 +214,15 @@ To get a moved command, add its extension to `extensions` in
 ```
 
 The CLI refuses `putnami channel …`, `putnami ci …`, `putnami change-plan`,
-`putnami infra …`, `putnami dev …`, `putnami contributor …` and `putnami tree verify …`, and `putnami help` of each, with exit code 2, unless an installed extension declares that root.
-The refusal of `putnami dev …` names the `extensions` and `templates` spellings,
-and the refusal of `putnami contributor …` names `putnami doctor --machine`. The
-refusal of `putnami tree verify …` names no successor. A
-run of a moved SDD command that plans no job prints a hint. Both messages link
-to this section, and so does the `impact-plan` refusal of a command that no
-installed extension declares.
+`putnami infra …`, `putnami dev …` and `putnami contributor …`, and `putnami
+help` of each, with exit code 2, unless an installed extension declares that
+root. It always refuses `putnami tree verify …` and `putnami help tree verify`,
+because the core still serves `tree`. The refusal of `putnami dev …` names the
+`extensions` and `templates` spellings, and the refusal of `putnami contributor
+…` names `putnami doctor --machine`. The refusal of `putnami tree verify …`
+names no successor. A run of a moved SDD command that plans no job prints a
+hint. Both messages link to this section, and so does the `impact-plan` refusal
+of a command that no installed extension declares.
 
 ## Project targeting
 

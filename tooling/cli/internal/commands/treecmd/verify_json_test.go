@@ -223,17 +223,6 @@ func TestVerifierArgumentErrors(t *testing.T) {
 	}
 }
 
-func TestVerifierHelpWinsOverEveryOtherArgument(t *testing.T) {
-	t.Parallel()
-	var stdout bytes.Buffer
-	if err := (Verifier{Dir: t.TempDir(), Stdout: &stdout}).Run([]string{"--record", "--help", "--unknown"}); err != nil {
-		t.Fatalf("Run = %v, want nil", err)
-	}
-	if stdout.String() != VerifyUsage {
-		t.Fatalf("stdout = %q, want the usage line", stdout.String())
-	}
-}
-
 // verifyJSONRepo is a committed repository with AGENTS.md and f.txt, and an
 // empty sub directory.
 func verifyJSONRepo(t *testing.T) (root, head string) {
