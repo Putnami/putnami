@@ -114,7 +114,7 @@ be described as passed. Keep ordinary functional acceptance distinct from
 smoke and native check reports.
 
 On a partial unit proposal, pass `--partial-delivery` to
-`"$PUTNAMI_CLI" proposals finalize`, including its draft checkpoint. That
+`"$PUTNAMI_CLI" change finalize`, including its draft checkpoint. That
 retains a non-closing parent reference and leaves the parent task's delivered
 transition untouched. Use normal finalization only when the mandated outcome
 is complete and the required stage is supported by current evidence. Ready,

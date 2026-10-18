@@ -27,6 +27,8 @@ import (
 
 	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/sdk/extension/treefingerprint"
+
+	"go.putnami.dev/tooling/contributor/internal/childenv"
 )
 
 // VerifyUsage is the one-line usage the executable prints for --help.
@@ -90,6 +92,17 @@ func (v Verifier) Run(args []string) error {
 		_, err := io.WriteString(stdout, VerifyUsage)
 		return err
 	}
+	return v.WriteVerdict(args)
+}
+
+// WriteVerdict is Run without the --help check: every argument is read as a
+// flag or a flag's value, so a value such as -h is checked like any other.
+// change finalize calls it with the dossier file it was given.
+func (v Verifier) WriteVerdict(args []string) error {
+	stdout := v.Stdout
+	if stdout == nil {
+		stdout = os.Stdout
+	}
 	value, err := v.verdict(args)
 	if err != nil {
 		failure := obj([]string{"verdict", "reason"}, "not-verified", err.Error())
@@ -105,12 +118,12 @@ func (v Verifier) Run(args []string) error {
 }
 
 // The checks run in a fixed order, and each failure names a fixed reason:
-// `proposals finalize` and the build skill read those reasons. The evidence is read
-// with JavaScript semantics (see verify_json.go), the semantics its producers
-// and the skill's earlier JavaScript verifier share. A failed check, and a read
-// that JavaScript answers with a TypeError, unwinds with a verifyFailure panic;
-// verdict recovers every panic into the not-verified reason, so none leaves
-// Run.
+// `change finalize`, `proposals finalize` and the build skill read those
+// reasons. The evidence is read with JavaScript semantics (see
+// verify_json.go), the semantics its producers and the skill's earlier
+// JavaScript verifier share. A failed check, and a read that JavaScript
+// answers with a TypeError, unwinds with a verifyFailure panic; verdict
+// recovers every panic into the not-verified reason, so none leaves Run.
 
 // verifyFailure carries a not-verified reason up to verdict.
 type verifyFailure struct{ reason string }
@@ -417,7 +430,7 @@ func (r *verifyRun) fileList(args ...string) []string {
 func gitCommand(dir string, args ...string) *exec.Cmd {
 	command := exec.Command("git", args...)
 	command.Dir = dir
-	command.Env = repositoryEnvironment(os.Environ())
+	command.Env = childenv.Repository(os.Environ())
 	return command
 }
 
@@ -529,7 +542,7 @@ func workspacePlan(root string, commands, flags []string, baseSHA string) (keys 
 	args := append([]string{strings.Join(commands, ","), "--impacted", "--baseline", baseSHA}, flags...)
 	command := exec.Command(executable, append(args, "--plan", "--output=json")...)
 	command.Dir = root
-	command.Env = withoutHostChannel(os.Environ())
+	command.Env = childenv.WithoutHostChannel(os.Environ())
 	out, err := capture(name, command)
 	if err != nil {
 		return nil, err

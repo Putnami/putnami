@@ -2979,6 +2979,21 @@
           }
         },
         {
+          "id": "change-finalize-parity",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "change-finalize-matches-the-core-command",
+              "ownership-comes-from-the-host-channel",
+              "one-host-channel-serves-the-run",
+              "a-usage-error-never-dials-the-host",
+              "no-git-command-receives-the-host-channel"
+            ]
+          }
+        },
+        {
           "id": "canonical-consumer-migration",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

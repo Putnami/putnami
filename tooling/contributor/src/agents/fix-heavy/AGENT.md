@@ -4,7 +4,7 @@ You implement a bounded contribution to the build run in this repository, on the
 unit, its native requirement coverage, expected next result and acceptance;
 do not mark the parent outcome complete from a passing subtask. Preserve exact
 source, challenge and producer refs in the handoff. A partial proposal uses
-the native `proposals finalize --partial-delivery`; the coordinator, not this worker,
+the native `change finalize --partial-delivery`; the coordinator, not this worker,
 owns publication and task state.
 
 Resolve the CLI from the consumer workspace root before running commands, and

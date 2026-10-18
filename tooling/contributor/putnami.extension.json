@@ -120,6 +120,29 @@
               "description": "Check that a recorded gate can replace the finalizer's gate"
             }
           ]
+        },
+        "finalize": {
+          "description": "Publish a draft, or a committed change with current proof, as a proposal.",
+          "command": "change-finalize",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami change finalize --base main --branch topic --title \"feat: add the parser\" --body-file .context/body.md --draft",
+              "description": "Open a draft checkpoint before the first edit"
+            },
+            {
+              "command": "putnami change finalize --base main --branch topic --title \"feat: add the parser\" --body-file .context/body.md --verification-file .context/dossier.json --proof \"local run passed\"",
+              "description": "Publish a ready proposal with a verified local dossier"
+            },
+            {
+              "command": "putnami change finalize --base main --branch topic --title \"feat: add the parser\" --body-file .context/body.md --task-source <source> --task-id <id> --gate ci --workflow-file .context/workflow.json",
+              "description": "Wait for the hosted checks the policy names, then deliver the task"
+            },
+            {
+              "command": "putnami change finalize --base main --branch topic --title \"feat: add the parser\" --body-file .context/body.md --task-source <source> --task-id <id> --partial-delivery --verification-file .context/dossier.json",
+              "description": "Publish one unit of a task and keep the task open"
+            }
+          ]
         }
       }
     }
@@ -192,6 +215,68 @@
           "task": "change-verify"
         }
       ]
+    },
+    "change-finalize": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Publish a proposal through the collaboration contracts: a draft with --draft, or a clean committed change with current proof, either a dossier that change verify accepts (--verification-file) or the hosted checks the contributor policy names (--gate ci). It pushes the branch, writes the proposal, reads it back, and with a task delivers it, or with --partial-delivery keeps it open. It runs no local gate and never retries a write whose outcome is unknown. It reaches the providers, the workspace and the task cache through the putnami process that launched it. --output=json prints the result document; otherwise it prints PROPOSAL_REF and PROPOSAL_URL lines. A usage error exits 2 and a failure exits 1.",
+      "flags": {
+        "base": {
+          "type": "string",
+          "description": "Base branch the proposal targets."
+        },
+        "branch": {
+          "type": "string",
+          "description": "Branch to publish; it must be the current branch."
+        },
+        "title": {
+          "type": "string",
+          "description": "Proposal title, in Conventional Commits form."
+        },
+        "body-file": {
+          "type": "string",
+          "description": "File that holds the proposal body, which becomes the squash message."
+        },
+        "task-source": {
+          "type": "string",
+          "description": "Source of the task the proposal delivers; give it with --task-id."
+        },
+        "task-id": {
+          "type": "string",
+          "description": "ID of the task the proposal delivers; give it with --task-source."
+        },
+        "verification-file": {
+          "type": "string",
+          "description": "Dossier that proves the committed change locally."
+        },
+        "workflow-file": {
+          "type": "string",
+          "description": "With --gate ci: the workflow record that decides whether the task completes."
+        },
+        "gate": {
+          "type": "string",
+          "description": "ci waits for the hosted checks the contributor policy names, instead of a dossier."
+        },
+        "proof": {
+          "type": "string",
+          "description": "Local proof to record in the verification review comment."
+        },
+        "draft": {
+          "type": "boolean",
+          "description": "Publish a draft; a branch with no commit gets a title-only empty commit."
+        },
+        "partial-delivery": {
+          "type": "boolean",
+          "description": "Deliver one unit of the task: refer to the task without closing it, and leave it open."
+        }
+      },
+      "run": [
+        {
+          "id": "finalize",
+          "task": "change-finalize"
+        }
+      ]
     }
   },
   "tasks": {
@@ -215,6 +300,17 @@
       "cache": false,
       "description": "Check local workflow evidence against this worktree.",
       "timeoutMs": 600000
+    },
+    "change-finalize": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "finalize"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Publish a draft, or a committed change with current proof, as a proposal.",
+      "timeoutMs": 5400000
     }
   },
   "agentContent": {

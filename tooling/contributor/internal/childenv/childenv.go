@@ -1,4 +1,6 @@
-package verify
+// Package childenv builds the environment of a process the executable
+// starts. No such process receives the host RPC channel or its token.
+package childenv
 
 import (
 	"strings"
@@ -6,14 +8,13 @@ import (
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 )
 
-// repositoryEnvironment removes the selectors that could redirect a Git
-// command away from its explicit working directory, and the host channel.
-// Transport credentials and tracing (including GIT_SSH_COMMAND and
-// GIT_ASKPASS) pass through unchanged. It matches the core's helper of the
-// same purpose.
-func repositoryEnvironment(environ []string) []string {
+// Repository removes the selectors that could redirect a Git command away
+// from its explicit working directory, and the host channel. Transport
+// credentials and tracing (including GIT_SSH_COMMAND and GIT_ASKPASS) pass
+// through unchanged. It matches the core's helper of the same purpose.
+func Repository(environ []string) []string {
 	cleaned := make([]string, 0, len(environ))
-	for _, entry := range withoutHostChannel(environ) {
+	for _, entry := range WithoutHostChannel(environ) {
 		name, _, _ := strings.Cut(entry, "=")
 		if strings.HasPrefix(name, "GIT_CONFIG") {
 			continue
@@ -29,9 +30,9 @@ func repositoryEnvironment(environ []string) []string {
 	return cleaned
 }
 
-// withoutHostChannel removes the host RPC channel and its token, which no
-// process the verifier starts has a use for.
-func withoutHostChannel(environ []string) []string {
+// WithoutHostChannel removes the host RPC channel and its token, which no
+// process the executable starts has a use for.
+func WithoutHostChannel(environ []string) []string {
 	cleaned := make([]string, 0, len(environ))
 	for _, entry := range environ {
 		name, _, _ := strings.Cut(entry, "=")

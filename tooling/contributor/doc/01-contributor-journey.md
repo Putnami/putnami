@@ -48,7 +48,7 @@ request alone grants no task claim, merge or deployment.
    unknown member. The dossier's `--record` ready verdict still requires its
    own candidate review, gate, qualification and acceptance, and the optional
    workflow adds complete current native requirements.
-8. **Deliver within authority.** `putnami proposals finalize` marks the
+8. **Deliver within authority.** `putnami change finalize` marks the
    verified draft ready for review and reads it back, in the same run as the
    final gate. For a partial unit, pass
    `--partial-delivery` on draft and final calls: the parent stays linked and

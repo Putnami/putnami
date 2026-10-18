@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -72,8 +73,11 @@ func serveHost(t *testing.T, result any) string {
 	return socket
 }
 
-func callerFor(socket, token string) *Caller {
-	return &Caller{dial: func() (*hostrpc.Client, error) { return hostrpc.Connect(socket, token) }}
+// testRemedy stands for the launch a command names when it has no channel.
+const testRemedy = "the test command needs an interactive launch by putnami; run `putnami change test`"
+
+func callerFor(socket, token string) *Channel {
+	return &Channel{socket: socket, token: token, remedy: testRemedy, connect: hostrpc.Connect}
 }
 
 func TestCallReturnsTheEnvelopeTheHostAnswers(t *testing.T) {
@@ -121,16 +125,38 @@ func TestCallReportsAnAnswerThatIsNotAnEnvelope(t *testing.T) {
 func TestCallWithoutAChannelNeedsAnInteractiveLaunch(t *testing.T) {
 	t.Setenv(wire.SocketEnv, "")
 	t.Setenv(wire.TokenEnv, "")
-	caller := NewCaller()
+	caller := Take(testRemedy)
 	defer caller.Close()
 	_, err := caller.Call(context.Background(), collab.ContractTasks, collab.OperationFind, nil)
 	if err == nil {
 		t.Fatal("a call without a channel succeeded")
 	}
-	for _, want := range []string{"needs an interactive launch by putnami", "putnami change language tasks", wire.SocketEnv, wire.TokenEnv} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("error %q does not say %q", err, want)
+	want := testRemedy + " (a hosted run opens no channel; " + wire.SocketEnv + " and " + wire.TokenEnv + " not set)"
+	if err.Error() != want {
+		t.Errorf("error %q, want %q", err, want)
+	}
+}
+
+// TestLaunchErrorNamesTheRemedyOnlyWhenTheCommandHasOne pins both forms of
+// the missing-channel error: with a remedy, the remedy leads and the missing
+// variables follow in parentheses; without one, as for change verify, only
+// the missing variables remain.
+func TestLaunchErrorNamesTheRemedyOnlyWhenTheCommandHasOne(t *testing.T) {
+	t.Parallel()
+	missing := &hostrpc.NoHostError{Missing: []string{wire.SocketEnv, wire.TokenEnv}}
+	for _, tc := range []struct {
+		remedy, want string
+	}{
+		{testRemedy, testRemedy + " (a hosted run opens no channel; " + wire.SocketEnv + " and " + wire.TokenEnv + " not set)"},
+		{"", "a hosted run opens no channel; " + wire.SocketEnv + " and " + wire.TokenEnv + " not set"},
+	} {
+		if got := (&Channel{remedy: tc.remedy}).launchError(missing); got == nil || got.Error() != tc.want {
+			t.Errorf("remedy %q: error %v, want %q", tc.remedy, got, tc.want)
 		}
+	}
+	other := errors.New("dial refused")
+	if got := (&Channel{}).launchError(other); !errors.Is(got, other) || got.Error() != other.Error() {
+		t.Errorf("launchError changed an error that is not a missing channel: %v", got)
 	}
 }
 

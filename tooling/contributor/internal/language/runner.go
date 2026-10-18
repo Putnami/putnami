@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	collab "go.putnami.dev/protocol/collaboration"
+
+	"go.putnami.dev/tooling/contributor/internal/childenv"
 )
 
 // CallProvider uses the normal collaboration route, including its capability,
@@ -40,7 +42,7 @@ func (r LanguageRunner) git(args ...string) ([]byte, error) {
 	// Reading commits must not invoke a repository-configured signature
 	// verifier before provider credential custody is established.
 	cmd := exec.Command("git", append([]string{"-C", r.Root, "--no-pager", "-c", "core.fsmonitor=false", "-c", "log.showSignature=false"}, args...)...)
-	cmd.Env = repositoryEnvironment(os.Environ())
+	cmd.Env = childenv.Repository(os.Environ())
 	return cmd.Output()
 }
 

@@ -61,7 +61,7 @@ the opaque source/ID pair, never a concatenated display string. A task receipt
 or local task record for the handoff unit must also appear in its exact
 `handoff.inputs`.
 `--record` can establish `ready` for a current unit at `candidate` without a
-digest cycle. Hosted `proposals finalize --gate ci --workflow-file` can also
+digest cycle. Hosted `change finalize --gate ci --workflow-file` can also
 establish it after the policy-named checks pass on the exact full HEAD. To
 resume a unit already at `ready`, its `receipt: ref` points to the unchanged
 JSON output of either a prior successful `change verify --record` call or that

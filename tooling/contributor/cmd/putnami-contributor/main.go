@@ -6,11 +6,13 @@
 //	putnami-contributor __putnami runtime-info    (the runtime handshake)
 //	putnami-contributor language <mode> [flags]   (putnami change language)
 //	putnami-contributor verify [flags]            (putnami change verify)
+//	putnami-contributor finalize [flags]          (putnami change finalize)
 //
 // It answers the runtime handshake, serves the change commands that moved
 // here, and refuses every other invocation. putnami launches a change command
-// as an interactive subcommand and appends --putnamiContext <file>, which the
-// command ignores.
+// as an interactive subcommand and appends --putnamiContext <file>. finalize
+// reads the output mode and the project selection from that job context; the
+// other commands ignore it.
 package main
 
 import (
@@ -19,9 +21,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"go.putnami.dev/sdk/extension/runtimeinfo"
 
+	"go.putnami.dev/tooling/contributor/internal/finalize"
 	"go.putnami.dev/tooling/contributor/internal/host"
 	"go.putnami.dev/tooling/contributor/internal/language"
 	"go.putnami.dev/tooling/contributor/internal/verify"
@@ -39,6 +44,13 @@ var runtimeVersion string
 // path of the job context file.
 const contextFlag = "--putnamiContext"
 
+// languageRemedy and finalizeRemedy name the launch that opens the host
+// channel, for a run that needs the channel and has none.
+const (
+	languageRemedy = "the tasks mode needs an interactive launch by putnami, which opens the host channel it reads the tasks provider through; run `putnami change language tasks`"
+	finalizeRemedy = "this command needs an interactive launch by putnami, which opens the host channel it reaches the collaboration providers and the workspace through; run `putnami change finalize`"
+)
+
 // run is main with its process dependencies passed in. It returns the exit
 // code.
 func run(args []string, stdout, stderr io.Writer) int {
@@ -55,6 +67,7 @@ func runIn(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if handled {
 		return 0
 	}
+	contextFile := contextPath(args)
 	args = withoutContext(args)
 	if len(args) > 0 && args[0] == "language" {
 		return runLanguage(args[1:], stdin, stdout, stderr)
@@ -62,16 +75,37 @@ func runIn(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "verify" {
 		return runVerify(args[1:], stdout, stderr)
 	}
-	fmt.Fprintln(stderr, "putnami-contributor: unknown invocation; this runtime answers the Putnami runtime handshake and the language and verify commands")
+	if len(args) > 0 && args[0] == "finalize" {
+		return runFinalize(args[1:], contextFile, stdout, stderr)
+	}
+	fmt.Fprintln(stderr, "putnami-contributor: unknown invocation; this runtime answers the Putnami runtime handshake and the language, verify and finalize commands")
 	return 2
+}
+
+// contextIndex returns the index of the last --putnamiContext <file> pair,
+// or -1 when args has none.
+func contextIndex(args []string) int {
+	for i := len(args) - 2; i >= 0; i-- {
+		if args[i] == contextFlag {
+			return i
+		}
+	}
+	return -1
+}
+
+// contextPath returns the file of the last --putnamiContext <file> pair, or
+// "" when args has none.
+func contextPath(args []string) string {
+	if i := contextIndex(args); i >= 0 {
+		return args[i+1]
+	}
+	return ""
 }
 
 // withoutContext returns args without the last --putnamiContext <file> pair.
 func withoutContext(args []string) []string {
-	for i := len(args) - 2; i >= 0; i-- {
-		if args[i] == contextFlag {
-			return append(append([]string{}, args[:i]...), args[i+2:]...)
-		}
+	if i := contextIndex(args); i >= 0 {
+		return append(append([]string{}, args[:i]...), args[i+2:]...)
 	}
 	return args
 }
@@ -88,7 +122,7 @@ func runLanguage(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "change language: %v\n", err)
 		return 2
 	}
-	caller := host.NewCaller()
+	caller := host.Take(languageRemedy)
 	defer func() { _ = caller.Close() }()
 	runner := language.LanguageRunner{Root: root, Stdin: stdin, Out: stdout, Err: stderr, Call: caller.Call}
 	return runner.RunLanguage(context.Background(), args[0], args[1:])
@@ -100,7 +134,9 @@ func runLanguage(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 // 1 with nothing on stderr. It takes the host channel out of the environment
 // before it starts any process.
 func runVerify(args []string, stdout, stderr io.Writer) int {
-	reports := host.TakeReports()
+	// verify only reads reports, and a report read without a channel is a
+	// verify.NoChannelError with its own message, so it needs no remedy.
+	reports := host.Take("")
 	defer func() { _ = reports.Close() }()
 	dir, err := os.Getwd()
 	if err != nil {
@@ -116,6 +152,25 @@ func runVerify(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stderr, "change verify: %v\n", err)
 	return 1
+}
+
+// runFinalize runs putnami change finalize in the workspace root, which is
+// the working directory putnami launches the command in. It takes the host
+// channel out of the environment before it starts any process, and shares
+// one connection among every call into the host. SIGINT and SIGTERM cancel
+// the run.
+func runFinalize(args []string, contextFile string, stdout, stderr io.Writer) int {
+	channel := host.Take(finalizeRemedy)
+	defer func() { _ = channel.Close() }()
+	root, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "change finalize: %v\n", err)
+		return 1
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	command := finalize.Command{Root: root, ContextFile: contextFile, Host: channel, Stdout: stdout, Stderr: stderr}
+	return command.Run(ctx, args)
 }
 
 func main() {
