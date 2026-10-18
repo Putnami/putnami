@@ -21,7 +21,6 @@ import (
 	deliverycli "go.putnami.dev/cloud/extension/internal/deliverycli"
 	distributioncli "go.putnami.dev/cloud/extension/internal/distributioncli"
 	identitycli "go.putnami.dev/cloud/extension/internal/identitycli"
-	infracli "go.putnami.dev/cloud/extension/internal/infracli"
 	observabilitycli "go.putnami.dev/cloud/extension/internal/observabilitycli"
 	runtimecli "go.putnami.dev/cloud/extension/internal/runtimecli"
 	protocolcli "go.putnami.dev/protocol/cli"
