@@ -15,6 +15,7 @@ var machineLoadShape = regexp.MustCompile(`^(unknown|\d+\.\d\d)\n$`)
 // load moves between two calls, so this test checks the shape of each output;
 // the doctor package tests pin the exact bytes for a fixed sample.
 func TestDoctorMachineMatchesContributorMachineLoad(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	for _, format := range []string{"", "json"} {
 		doctorOut, err := iox.CaptureStdout(func() error {
@@ -44,6 +45,7 @@ func TestDoctorMachineMatchesContributorMachineLoad(t *testing.T) {
 }
 
 func TestDoctorMachineRejectsProfileAndProject(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	cases := []CommandEnv{
 		{WsRoot: root, Args: []string{"--machine", "--project", "x"}},

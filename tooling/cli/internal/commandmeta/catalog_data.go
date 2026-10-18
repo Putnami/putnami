@@ -901,7 +901,7 @@ var catalog = []Command{
 		Category:    "Diagnostics",
 		Summary:     "Preflight production readiness under a deployment profile",
 		Description: "Run a read-only production-readiness preflight over the selected projects: derives production-safety findings (incomplete capabilities, missing required config, invalid committed schemas, config shadowing) from committed manifests and grades them by deployment profile. Under --profile production a high/critical finding fails with exit 2; dev/test stay advisory. Config values are never read or emitted",
-		Usage:       "putnami doctor [--profile <dev|test|production>|--project <selector>|--machine] [--output <format>]",
+		Usage:       "putnami doctor [--profile <dev|test|production>] [--project <selector>] [--output <format>]",
 		Flags: []Flag{
 			{Long: "--profile", Type: FlagValue, ValueName: "<profile>", Description: "Deployment profile to evaluate under (dev|test|production); production is strictest"},
 			{Long: "--project", Type: FlagValue, ValueName: "<selector>", Description: "Project ID, path, or name (comma-separated); default is every workspace project"},

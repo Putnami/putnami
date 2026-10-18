@@ -148,7 +148,7 @@ var spawnSites = map[string]spawnSite{
 		why: "git init in a directory without a repository"},
 	"commands/contributor/language_modes.go:LanguageRunner.git": {spawns: 1, verdict: noRepositoryCode,
 		why: "fixed read-only git diff, ls-files, rev-list and log; ranges reject option-like input before spawn, diff disables external helpers and fsmonitor is disabled"},
-	"commands/contributor/load.go:NativeLoadReader": {spawns: 1, verdict: noRepositoryCode,
+	"commands/doctor/machine.go:NativeLoadReader": {spawns: 1, verdict: noRepositoryCode,
 		why: "fixed /usr/sbin/sysctl load probe on Darwin; unsupported systems return unknown and no PATH-selected command is run"},
 	"commands/proposals/git.go:NativeGit.run": {spawns: 1, verdict: noRepositoryCode,
 		why: "preflight Git read verbs only; fsmonitor and external diff helpers are disabled; commit and push use runWrite and mark repository code"},
