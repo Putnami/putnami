@@ -51,7 +51,7 @@ internal/
 └── workspace_state/           Session recording and audit trails
 ```
 
-Principal packages only. `internal/` holds 78 production packages in all — the rest are small, single-purpose support packages (`abort`, `agentartifacts`, `cmderr`, `env`, `flock`, `iox`, `launch`, `layout`, `lockfile`, `mcp`, `progress`, …). `core_isolation_ratchets_test.go` pins the count as a ceiling, so a new package is a reviewed event.
+Principal packages only. `internal/` holds 77 production packages in all — the rest are small, single-purpose support packages (`abort`, `agentartifacts`, `cmderr`, `env`, `flock`, `iox`, `launch`, `layout`, `lockfile`, `mcp`, `progress`, …). `core_isolation_ratchets_test.go` pins the count as a ceiling, so a new package is a reviewed event.
 
 ### Command verticals — `internal/commands/`
 
