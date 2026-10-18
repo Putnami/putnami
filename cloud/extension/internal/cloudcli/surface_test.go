@@ -1,7 +1,10 @@
 package cloudcli
 
 import (
+	"encoding/json"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -13,7 +16,7 @@ import (
 // wantPublicRoot is the public root, in help order.
 var wantPublicRoot = []string{
 	"login", "logout", "whoami", "setup", "status", "token", "registries", "packages", "channels",
-	"ci", "cache", "source", "config", "secrets", "db", "env", "deploy", "logs", "traces", "metrics",
+	"ci", "cache", "source", "config", "secrets", "db", "env", "infra", "deploy", "logs", "traces", "metrics",
 }
 
 func runSurface(t *testing.T, command string, args ...string) ([]string, error) {
@@ -47,7 +50,7 @@ func TestHelpListsExactlyThePublicRoot(t *testing.T) {
 		}
 	}
 	if !slices.Equal(names, wantPublicRoot) {
-		t.Fatalf("help lists %v, want the 20 public entries %v", names, wantPublicRoot)
+		t.Fatalf("help lists %v, want the 21 public entries %v", names, wantPublicRoot)
 	}
 	hidden := slices.Concat(machineCommands, slices.Collect(maps.Keys(operatorCommands)))
 	for _, name := range hidden {
@@ -204,6 +207,7 @@ func TestEntriesRefuseUnknownVerbs(t *testing.T) {
 		{"env", []string{"status", "prod", "dev"}, "at most one environment"},
 		{"env", []string{"status", "dev", "--env", "prod"}, "takes one environment"},
 		{"token", []string{"npm", "--for", "go"}, "takes one target"},
+		{"infra", []string{"bogus"}, "expected plan"},
 		{"bogus", nil, "unknown @putnami/cloud command"},
 	} {
 		_, err := runSurface(t, tc.command, tc.args...)
@@ -265,5 +269,135 @@ func TestConfigShowArgsSelectsTheView(t *testing.T) {
 	}
 	if _, err := configShowArgs(map[string]any{"key": "DATABASE_URL"}, []string{"show"}); clicore.ExitCode(err) != ExitUsage {
 		t.Fatalf("config show --key without a project error = %v, want a usage error", err)
+	}
+}
+
+// TestInfraPlanIsDeclaredAndRouted pins the three places `putnami cloud infra
+// plan` is wired: the subcommand the CLI lists, the command it runs, and the
+// task that starts the runtime with the `infra` verb.
+func TestInfraPlanIsDeclaredAndRouted(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "putnami.extension.json"))
+	if err != nil {
+		t.Fatalf("read extension manifest: %v", err)
+	}
+	var manifest struct {
+		CommandGroups struct {
+			Cloud struct {
+				Subcommands map[string]struct {
+					Command     string `json:"command"`
+					Interactive bool   `json:"interactive"`
+					Examples    []struct {
+						Command string `json:"command"`
+					} `json:"examples"`
+				} `json:"subcommands"`
+			} `json:"cloud"`
+		} `json:"commandGroups"`
+		Commands map[string]struct {
+			Run []struct {
+				Task string `json:"task"`
+			} `json:"run"`
+		} `json:"commands"`
+		Tasks map[string]struct {
+			Kind    string   `json:"kind"`
+			Command string   `json:"command"`
+			Args    []string `json:"args"`
+			Cache   *bool    `json:"cache"`
+		} `json:"tasks"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("parse manifest: %v", err)
+	}
+
+	sub, ok := manifest.CommandGroups.Cloud.Subcommands["infra"]
+	if !ok || sub.Command != "cloud-infra" || !sub.Interactive {
+		t.Fatalf("cloud infra subcommand = %+v (declared %t), want the interactive cloud-infra command", sub, ok)
+	}
+	planned := false
+	for _, example := range sub.Examples {
+		planned = planned || strings.HasPrefix(example.Command, "putnami cloud infra plan")
+	}
+	if !planned {
+		t.Fatalf("cloud infra examples = %+v, want one that runs `putnami cloud infra plan`", sub.Examples)
+	}
+	command, ok := manifest.Commands["cloud-infra"]
+	if !ok || len(command.Run) != 1 || command.Run[0].Task != "cloud-infra" {
+		t.Fatalf("cloud-infra command = %+v (declared %t), want it to run the cloud-infra task", command, ok)
+	}
+	task, ok := manifest.Tasks["cloud-infra"]
+	if !ok || task.Kind != "command" || task.Command != "{extensionRuntime}" || !slices.Equal(task.Args, []string{"infra"}) {
+		t.Fatalf("cloud-infra task = %+v (declared %t), want a runtime command with the infra verb", task, ok)
+	}
+	if task.Cache == nil || *task.Cache {
+		t.Fatalf("cloud-infra task cache = %v, want false: the plan reads files no cache key covers", task.Cache)
+	}
+	if !slices.Contains(wantPublicRoot, "infra") {
+		t.Fatal("infra is not in the public root")
+	}
+}
+
+// runInfra runs `cloud infra <args>` the way the CLI starts it: with a job
+// context that lists the workspace projects.
+func runInfra(t *testing.T, projects []map[string]any, args ...string) ([]string, error) {
+	t.Helper()
+	root := t.TempDir()
+	contextFile := filepath.Join(t.TempDir(), "context.json")
+	writeJSONFile(t, contextFile, map[string]any{
+		"workspaceRoot":     root,
+		"params":            map[string]any{},
+		"workspaceProjects": projects,
+	})
+	return runSurface(t, "infra", append(slices.Clone(args), "--putnamiContext", contextFile)...)
+}
+
+func TestInfraPlanReadsTheWorkspaceFromTheJobContext(t *testing.T) {
+	apiDir := filepath.Join(t.TempDir(), "apps", "api")
+	if err := os.MkdirAll(filepath.Join(apiDir, ".gen"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(apiDir, ".gen", "requirements.json"),
+		[]byte(`{"protocolVersion":2,"workload":"example/api"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	projects := []map[string]any{
+		{"name": "example/core", "path": "libs/core", "fullPath": filepath.Join(t.TempDir(), "libs", "core"), "type": "library"},
+		{"name": "example/api", "path": "apps/api", "fullPath": apiDir, "type": "application"},
+	}
+
+	for _, args := range [][]string{{"plan"}, {}, {"plan", "example/api"}} {
+		output, err := runInfra(t, projects, args...)
+		if err != nil {
+			t.Fatalf("cloud infra %v: %v", args, err)
+		}
+		want := []string{
+			"Workload: example/api",
+			strings.Repeat("─", len("Workload: example/api")),
+			"  (no infrastructure declared)",
+		}
+		if !slices.Equal(output, want) {
+			t.Fatalf("cloud infra %v printed %q, want %q", args, output, want)
+		}
+	}
+
+	_, err := runInfra(t, projects, "plan", "example/core")
+	if clicore.ExitCode(err) != ExitUsage || !strings.Contains(err.Error(), `project "example/core" is not an application workload (type="library")`) {
+		t.Fatalf("cloud infra plan example/core error = %v, want a usage error naming the library", err)
+	}
+}
+
+// TestInfraPlanDeclinesAProjectWithoutAType pins the rule for a job context
+// from a CLI that predates the project type: the command fails and does not
+// read the missing type as application.
+func TestInfraPlanDeclinesAProjectWithoutAType(t *testing.T) {
+	projects := []map[string]any{
+		{"name": "example/api", "path": "apps/api", "fullPath": filepath.Join(t.TempDir(), "apps", "api")},
+	}
+	for _, args := range [][]string{{"plan"}, {"plan", "--output=json"}} {
+		output, err := runInfra(t, projects, args...)
+		if err == nil || !strings.Contains(err.Error(), `"example/api"`) || !strings.Contains(err.Error(), "upgrade the CLI") {
+			t.Fatalf("cloud infra %v error = %v, want a refusal that names the project and says to upgrade the CLI", args, err)
+		}
+		if len(output) != 0 {
+			t.Fatalf("cloud infra %v printed %q before it refused the context", args, output)
+		}
 	}
 }

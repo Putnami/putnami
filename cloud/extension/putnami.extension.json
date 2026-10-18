@@ -495,6 +495,21 @@
             }
           ]
         },
+        "infra": {
+          "description": "Plan the workspace infrastructure: the aggregated infra manifest of each workload (plan).",
+          "command": "cloud-infra",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud infra plan",
+              "description": "The databases, events, storage, secrets, scheduled jobs and runtime of every workspace workload"
+            },
+            {
+              "command": "putnami cloud infra plan my-app --output=json",
+              "description": "One workload as data for scripts and agents"
+            }
+          ]
+        },
         "deploy": {
           "description": "Show one release (`deploy status <release-id>`), or submit a release set as an operator continuous-delivery request (`deploy publish-v2 --request-file <path>`).",
           "command": "cloud-deploy",
@@ -1789,6 +1804,18 @@
         }
       ]
     },
+    "cloud-infra": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Infrastructure plan: `infra plan [<project>]` prints the databases, events, storage, secrets, scheduled jobs and runtime that the aggregated infra manifest of each workspace workload declares (supports --output). It reads the manifests a build emitted and runs no build.",
+      "run": [
+        {
+          "id": "infra",
+          "task": "cloud-infra"
+        }
+      ]
+    },
     "cloud-logs": {
       "activationFiles": [
         "putnami.extension.json"
@@ -2740,6 +2767,17 @@
       "cache": false,
       "description": "Check or converge one environment's continuous-delivery prerequisites.",
       "timeoutMs": 300000
+    },
+    "cloud-infra": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "infra"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Print the infrastructure plan of the workspace workloads.",
+      "timeoutMs": 60000
     },
     "cloud-logs": {
       "kind": "command",

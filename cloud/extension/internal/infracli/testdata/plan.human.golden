@@ -1,0 +1,47 @@
+Workload: go.putnami.dev/example/api
+────────────────────────────────────
+
+  Databases (1):
+    postgres://primary
+      schemas: audit, iam
+      sources:
+        go.putnami.dev/example/audit (manual)
+        go.putnami.dev/example/iam (framework:database)
+
+  Events:
+    publishes:
+      workspace.deploy.completed
+        sources:
+          go.putnami.dev/example/api (manual)
+    subscribes:
+      billing.invoice.issued
+        sources:
+          go.putnami.dev/example/billing (manual)
+
+  Storage (1):
+    audit-logs (retention: 90d)
+      sources:
+        go.putnami.dev/example/audit (manual)
+
+  Secrets (1):
+    jwks_signing_key
+      sources:
+        go.putnami.dev/example/iam (manual)
+
+  Scheduled jobs (1):
+    nightly-rollup — "0 2 * * *" → jobs.NightlyRollup
+      sources:
+        go.putnami.dev/example/audit (manual)
+
+  Runtime:
+    ingress: api.example.com · public
+    scaling: max=100 · concurrency=80
+
+Workload: go.putnami.dev/example/empty
+──────────────────────────────────────
+  (no infrastructure declared)
+
+Workload: go.putnami.dev/example/worker
+───────────────────────────────────────
+  No aggregated manifest at {{root}}/apps/worker/.gen/requirements.json.
+  Run `putnami build` for this workload to emit one.
