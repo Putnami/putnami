@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -157,18 +158,14 @@ func newFinalizeTwin(t *testing.T, harness, change string) finalizeTwin {
 		"GIT_AUTHOR_DATE=2026-01-02T03:04:05Z", "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z")
 	binding := collab.Binding{Provider: "@putnami/local-collaboration", Version: 1,
 		Settings: json.RawMessage(`{"repository":"acme/app"}`)}
-	config, err := json.Marshal(map[string]any{
-		"name": "finalize-fixture",
-		"extensions": []string{filepath.ToSlash(filepath.Join(harness, "local-collaboration")),
+	workspace := finalizeTwinWorkspace{Name: "finalize-fixture",
+		Extensions: []string{filepath.ToSlash(filepath.Join(harness, "local-collaboration")),
 			filepath.ToSlash(filepath.Join(harness, "contributor"))},
-		"includes": []string{"lib", "app"},
-		"options": map[string]any{
-			"collaboration": collab.Bindings{collab.ContractTasks: binding, collab.ContractProposals: binding},
-			"@putnami/contributor": map[string]any{"version": 1,
-				"verification": map[string]any{"ciGate": map[string]any{"checks": []string{"Putnami CI"}, "pollSeconds": 1}},
-				"publication":  map[string]any{"draft": false}},
-		},
-	})
+		Includes: []string{"lib", "app"}}
+	workspace.Options.Collaboration = collab.Bindings{collab.ContractTasks: binding, collab.ContractProposals: binding}
+	workspace.Options.Contributor = json.RawMessage(`{"version":1,` +
+		`"verification":{"ciGate":{"checks":["Putnami CI"],"pollSeconds":1}},"publication":{"draft":false}}`)
+	config, err := json.Marshal(workspace)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,31 +301,23 @@ func (w finalizeTwin) store(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var state any
-	if err := json.Unmarshal(data, &state); err != nil {
+	var canonical bytes.Buffer
+	if err := json.Indent(&canonical, finalizeTwinTimestamp.ReplaceAll(data, []byte(`"$1":"<timestamp>"`)), "", "  "); err != nil {
 		t.Fatalf("the store is not JSON: %v\n%s", err, data)
 	}
-	var redact func(value any)
-	redact = func(value any) {
-		switch typed := value.(type) {
-		case map[string]any:
-			for key, child := range typed {
-				if key == "createdAt" || key == "updatedAt" {
-					typed[key] = "<timestamp>"
-					continue
-				}
-				redact(child)
-			}
-		case []any:
-			for _, child := range typed {
-				redact(child)
-			}
-		}
-	}
-	redact(state)
-	canonical, err := json.MarshalIndent(state, "", "  ")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(canonical)
+	return canonical.String()
+}
+
+// finalizeTwinTimestamp matches a createdAt or updatedAt member of the store.
+var finalizeTwinTimestamp = regexp.MustCompile(`"(createdAt|updatedAt)":\s*"[^"]*"`)
+
+// finalizeTwinWorkspace is the putnami.workspace.json of a twin.
+type finalizeTwinWorkspace struct {
+	Name       string   `json:"name"`
+	Extensions []string `json:"extensions"`
+	Includes   []string `json:"includes"`
+	Options    struct {
+		Collaboration collab.Bindings `json:"collaboration"`
+		Contributor   json.RawMessage `json:"@putnami/contributor"`
+	} `json:"options"`
 }
