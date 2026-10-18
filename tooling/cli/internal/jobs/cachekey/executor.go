@@ -893,10 +893,10 @@ func ComputeJobCacheHashWith(
 
 	// A task that keys on the Git candidate cut judges the workspace, and it
 	// reads the membership from its context: which projects there are, their
-	// names, paths, configs, extensions and edges. User config or an ignored
-	// scope manifest can change that membership without changing one candidate
-	// file, so the cut alone would replay a verdict about another set of
-	// projects.
+	// names, paths, configs, extensions, types and edges. User config or an
+	// ignored scope manifest can change that membership without changing one
+	// candidate file, so the cut alone would replay a verdict about another set
+	// of projects.
 	if KeysOnCandidateCut(job) {
 		digest, err := workspaceMembershipDigest(ws)
 		if err != nil {

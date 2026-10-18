@@ -160,6 +160,10 @@
     {
       "id": "planned-write-reach",
       "text": "Before any task runs, a planned write moves a key only when it can reach a file the key selects: not when the key's exclusions cover the written tree, its patterns do not match the written file, or, for a Go embed selector, the write lies beside every Go source and embedded path while no planned write changes those sources. A path a task reports is written anywhere under its declared within bound, or its whole root without one. A write the key may read under another name reaches it."
+    },
+    {
+      "id": "job-context-names-member-types",
+      "text": "Every job context the core writes lists the complete workspace membership in workspaceProjects, and each entry names the project's resolved type: the type its putnami.json authors, else the type its provider reported, else application. An entry without a type comes from a CLI that predates the member. selectedProjects and dependencyClosure carry no type."
     }
   ],
   "decisions": [

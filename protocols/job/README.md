@@ -47,7 +47,7 @@ both, and the v1 corpus is unchanged.
 | Version | Members | Corpus |
 | --- | --- | --- |
 | 1 | everything above | `fixtures/{valid,invalid}` |
-| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `project.tags`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `ProjectRef.config` and `ProjectRef.extensions` | `fixtures/v2/{valid,invalid}` |
+| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `project.tags`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `ProjectRef.config`, `ProjectRef.extensions` and `ProjectRef.type` | `fixtures/v2/{valid,invalid}` |
 
 **Putnami's orchestrator produces v2 only.** The CLI requires an extension
 contract whose SDK reads v2, so a subprocess that reaches this context is
@@ -263,7 +263,7 @@ consumer would ignore exactly the members a v2 consumer would trust.
 ## Project references
 
 `selectedProjects[]`, `project.dependencyClosure[]` and `workspaceProjects[]`
-share one shape. Beyond `id`, `name`, `path` and `fullPath`, five optional
+share one shape. Beyond `id`, `name`, `path` and `fullPath`, seven optional
 members carry facts the orchestrator already owns, so a task never re-derives
 them:
 
@@ -336,7 +336,24 @@ them:
   workspace task needs to know which extension's option blocks apply to a
   sibling: a block keyed by `@putnami/go` applies to Go projects only.
 
-All six are omitempty, so a producer that has nothing to say emits none.
+- **`type`** (v2 only) — the project's **resolved** classification: the
+  authored `putnami.json` type, else the one the owning provider's workspace
+  probe reported, else `"application"`, the workspace default. It is populated
+  inside `workspaceProjects`, where a task that acts on deployable workloads
+  tells them from libraries. `config` holds only the authored type, and a
+  provider classifies projects whose `putnami.json` authors none (the Go
+  extension classifies every Go module it can read), so a task reads `type`,
+  not `config`. A v1 document carrying it is rejected (`job.unexpected_field`).
+
+  Absence is read from the **containing** member. Inside `workspaceProjects`,
+  whose producer resolves every classification, an entry without `type` comes
+  from a producer that predates the member, and a consumer that acts on
+  workloads declines rather than reading it as `"application"`. The job's own
+  `project.type` keeps `""` for an unclassified project; the two agree once
+  the default is applied.
+
+All seven are omitempty, so a producer that has nothing to say emits none,
+except that a `workspaceProjects` entry always carries `type`.
 
 ## Environment variable mirror
 

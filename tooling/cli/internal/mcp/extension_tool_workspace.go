@@ -217,13 +217,19 @@ func catalogSelectionIn(
 // because a job acts on its own project, and a workspace-answering tool always
 // does, because it reports ON other projects.
 //
-// The one member the two wires answer differently is Version, deliberately. A
-// job carries the version of its project's LINE, derived from the git tags the
-// run resolved; this tool describes a workspace without running anything, so it
-// reports the package version the probe read from the project's own manifest.
+// Two members differ between the two wires, deliberately. The first is
+// Version. A job carries the version of its project's LINE, derived from the
+// git tags the run resolved; this tool describes a workspace without running
+// anything, so it reports the package version the probe read from the
+// project's own manifest.
 // Reporting a line version here would mean resolving git per call, and reading
 // a run's stamp out of a read-only description is exactly the kind of answer
 // that goes stale between two calls.
+//
+// The second is Type. This tool describes, so it leaves an unclassified
+// project's type empty and a consumer applies the workspace default. A job acts
+// on the membership, so its wire always names the type and an absent one means
+// an older producer the job must decline.
 func toolWorkspaceProjects(ws *workspace.Workspace) []proto.ToolProjectRef {
 	if ws == nil {
 		return nil
