@@ -13,7 +13,7 @@ import (
 )
 
 // neverNarrowedCommands are the commands whose jobs a task scope never narrows
-// by name (ADR 0068). `validate` and `validate-workspace` check what the
+// by name (ADR 0070). `validate` and `validate-workspace` check what the
 // session verified, including the spec gate's criteria projection on every
 // project that runs `test`. A scope names the tasks a change's declared inputs
 // reach, and no declaration names the tasks these two follow, so their names

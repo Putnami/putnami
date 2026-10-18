@@ -1,7 +1,7 @@
 # ADR 0044 — Selection is task-level
 
 - **Status**: accepted;
-  [ADR 0068](0068-a-task-scope-keeps-a-job-by-its-declared-side-effects.md)
+  [ADR 0070](0070-a-task-scope-keeps-a-job-by-its-declared-side-effects.md)
   (proposed) supersedes the `publish` and `deploy` part of decision 5
 - **Scope**: `@putnami/cli-model` (`workspace.TraceChangeImpact`,
   `TaskImpactIndex`), `@putnami/cli` (`internal/workspace.NewTaskIndex`,

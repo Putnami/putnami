@@ -1,4 +1,4 @@
-# ADR 0068 — A task scope keeps a job by its declared side effects
+# ADR 0070 — A task scope keeps a job by its declared side effects
 
 - **Status**: proposed
 - **Scope**: `@putnami/cli` (`internal/engine` plan narrowing)

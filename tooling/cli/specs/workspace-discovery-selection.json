@@ -74,6 +74,6 @@
     "tooling/cli/doc/adr/0045-a-project-declares-who-may-import-it.md",
     "tooling/cli/doc/adr/0046-a-declared-edge-no-import-backs-is-a-finding.md",
     "tooling/cli/doc/adr/0053-a-registry-pin-wins-over-a-same-name-project-manifest.md",
-    "tooling/cli/doc/adr/0068-a-task-scope-keeps-a-job-by-its-declared-side-effects.md"
+    "tooling/cli/doc/adr/0070-a-task-scope-keeps-a-job-by-its-declared-side-effects.md"
   ]
 }
