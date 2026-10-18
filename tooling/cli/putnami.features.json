@@ -1896,6 +1896,22 @@
           }
         },
         {
+          "id": "deps-edit-reads-no-replaced-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "deps-add-and-remove-edit-a-module-that-requires-an-unserved-version",
+              "deps-add-refuses-the-version-none-naming-deps-remove",
+              "deps-add-reports-a-failed-go-list-without-a-suggested-command",
+              "deps-add-keeps-a-required-version-newer-than-the-latest"
+            ]
+          }
+        },
+        {
           "id": "deps-report-a-failed-install",
           "stage": "coded",
           "evidenceKinds": [
