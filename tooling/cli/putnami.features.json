@@ -1654,7 +1654,7 @@
           }
         },
         {
-          "id": "starter-opts-into-contributor",
+          "id": "starter-agent-content-opt-in",
           "stage": "coded",
           "evidenceKinds": [
             "attestation"
@@ -1662,7 +1662,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "every-built-in-starter-opts-into-the-contributor-extension",
+              "no-built-in-starter-opts-into-agent-content",
               "init-installs-the-extension-and-its-content",
               "a-failed-starter-install-points-at-install"
             ]

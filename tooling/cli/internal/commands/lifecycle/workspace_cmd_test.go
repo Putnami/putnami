@@ -98,11 +98,11 @@ func TestWorkspaceInitCreatesConfig(t *testing.T) {
 	if cfg.Name != "test-ws" {
 		t.Errorf("workspace name = %q, want %q", cfg.Name, "test-ws")
 	}
-	if strings.Join(cfg.Extensions, ",") != "@putnami/go,@putnami/contributor" {
-		t.Errorf("extensions = %v, want the language extension and the starter's agent-content extension", cfg.Extensions)
+	if strings.Join(cfg.Extensions, ",") != "@putnami/go" {
+		t.Errorf("extensions = %v, want only the language extension", cfg.Extensions)
 	}
-	if strings.Join(cfg.AgentArtifacts, ",") != "extension:@putnami/contributor" {
-		t.Errorf("agentArtifacts = %v, want the starter's opt-in", cfg.AgentArtifacts)
+	if len(cfg.AgentArtifacts) != 0 {
+		t.Errorf("agentArtifacts = %v, want none: init opts into no agent content", cfg.AgentArtifacts)
 	}
 	if strings.Contains(string(data), "@putnami/cloud") {
 		t.Fatalf("core workspace init added the optional cloud extension:\n%s", data)
@@ -345,10 +345,10 @@ func TestWorkspaceInitWritesAnEmptyWorkspacesList(t *testing.T) {
 
 func stubWorkspaceInitStages(t *testing.T, failingStage string, failingDependencyCall int) error {
 	t.Helper()
-	// Every built-in starter opts into the contributor extension's agent
-	// content, and installing it needs a registry. A stage test never does, so
-	// the starters opt into nothing here; a test about agent content opts one
-	// back in with starterOptsInto after this call.
+	// No built-in starter opts into agent content, and installing content
+	// needs a registry. The starters opt into nothing here explicitly, so a
+	// stage test stays correct if the table changes; a test about agent
+	// content opts one in with starterOptsInto after this call.
 	for starter := range initExtensions {
 		starterOptsInto(t, starter, "")
 	}

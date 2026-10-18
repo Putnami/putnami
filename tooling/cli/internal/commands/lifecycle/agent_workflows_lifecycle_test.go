@@ -358,19 +358,22 @@ func TestAgentWorkflows_InstallWithoutDeclarationIsANoOp(t *testing.T) {
 	assertNoAgentSurface(t, root)
 }
 
-// The production starter table, unstubbed: every built-in starter opts into
-// the contributor extension's agent content.
-func TestBuiltInStartersOptIntoTheContributorExtension(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "starter-opts-into-contributor", "every-built-in-starter-opts-into-the-contributor-extension")
+// The production starter table, unstubbed: no built-in starter opts into agent
+// content, so a new workspace holds none until someone asks for it.
+func TestBuiltInStartersOptIntoNoAgentContent(t *testing.T) {
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "starter-agent-content-opt-in", "no-built-in-starter-opts-into-agent-content")
 	if len(initExtensions) == 0 {
 		t.Fatal("no built-in starters, so this check proves nothing")
 	}
 	for name, starter := range initExtensions {
-		if starter.agentContent != "@putnami/contributor" {
-			t.Errorf("starter %q opts into %q, want @putnami/contributor", name, starter.agentContent)
+		if starter.agentContent != "" {
+			t.Errorf("starter %q opts into %q, want no agent content", name, starter.agentContent)
 		}
-		if got := initDeclaredExtensions(starter); strings.Join(got, ",") != starter.packageName+",@putnami/contributor" {
-			t.Errorf("starter %q declares extensions %v", name, got)
+		if got := initDeclaredExtensions(starter); strings.Join(got, ",") != starter.packageName {
+			t.Errorf("starter %q declares extensions %v, want only %s", name, got, starter.packageName)
+		}
+		if got := initAgentArtifacts(t.TempDir(), starter); len(got) != 0 {
+			t.Errorf("starter %q declares agentArtifacts %v, want none", name, got)
 		}
 	}
 }
@@ -378,7 +381,7 @@ func TestBuiltInStartersOptIntoTheContributorExtension(t *testing.T) {
 // init declares the starter's extension and opts into its content, installs
 // that extension, and materializes the content at the release it pinned.
 func TestAgentWorkflows_InitInstallsTheStarterContent(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "starter-opts-into-contributor", "init-installs-the-extension-and-its-content")
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "starter-agent-content-opt-in", "init-installs-the-extension-and-its-content")
 	registry := newContentRegistry(t)
 	pkg := packageContentExtension(t, contentExtensionName, "r1", "1.0.0", false)
 	registry.publish(pkg)
@@ -413,7 +416,7 @@ func TestAgentWorkflows_InitInstallsTheStarterContent(t *testing.T) {
 // writes no agent file, reports the failure, and still finishes: dependencies
 // and the project matter more than workflow files the user can install later.
 func TestAgentWorkflows_InitWithUninstallableStarterContentPointsAtInstall(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "starter-opts-into-contributor", "a-failed-starter-install-points-at-install")
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "starter-agent-content-opt-in", "a-failed-starter-install-points-at-install")
 	root := t.TempDir()
 	t.Chdir(root)
 	hometest.Temp(t)
@@ -442,13 +445,13 @@ func TestAgentWorkflows_InitWithUninstallableStarterContentPointsAtInstall(t *te
 // next command refuses it instead of orphaning its files.
 func TestAgentWorkflows_InitPreservesAnExistingOptIn(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "reinit-preserves-optin", "init-force-unions-the-declaration")
-	root := agentWorkspaceDeclaring(t, "extension:@acme/other", testAgentArtifact+":1.4.x", "extension:"+starterAgentContent)
-	got := initAgentArtifacts(root, initExtensionConfig{packageName: "@putnami/go", agentContent: starterAgentContent})
-	want := []string{"extension:@acme/other", testAgentArtifact + ":1.4.x", "extension:" + starterAgentContent}
+	root := agentWorkspaceDeclaring(t, "extension:@acme/other", testAgentArtifact+":1.4.x", "extension:"+contentExtensionName)
+	got := initAgentArtifacts(root, initExtensionConfig{packageName: "@putnami/go", agentContent: contentExtensionName})
+	want := []string{"extension:@acme/other", testAgentArtifact + ":1.4.x", "extension:" + contentExtensionName}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("initAgentArtifacts = %v, want %v", got, want)
 	}
-	if got := initAgentArtifacts(t.TempDir(), initExtensionConfig{packageName: "@putnami/go", agentContent: starterAgentContent}); strings.Join(got, ",") != "extension:"+starterAgentContent {
+	if got := initAgentArtifacts(t.TempDir(), initExtensionConfig{packageName: "@putnami/go", agentContent: contentExtensionName}); strings.Join(got, ",") != "extension:"+contentExtensionName {
 		t.Fatalf("a fresh directory declares %v, want only the starter's opt-in", got)
 	}
 }

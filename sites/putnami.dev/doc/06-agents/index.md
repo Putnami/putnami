@@ -20,12 +20,11 @@ see [Develop with AI assistants](/docs/how-to/develop-with-ai).
 ## Orientation: read the system, not the files
 
 When you run `putnami init`, the workspace gets one short Putnami block in
-`AGENTS.md` (which a new `CLAUDE.md` imports), the declarations of the
-`@putnami/contributor` extension's agent content (its skills and agents land
-once the extension is published and installed; see
-[Develop with AI assistants](/docs/how-to/develop-with-ai#install-and-update-agent-workflows)),
-and a `.mcp.json` entry that registers the Putnami MCP server. That is the whole
-of what Putnami writes. Your own durable rules go in `.agents/constraints.md`, a
+`AGENTS.md` (which a new `CLAUDE.md` imports), and a `.mcp.json` entry that
+registers the Putnami MCP server. That is the whole of what Putnami writes. Agent
+skills come only when you ask for them with
+`putnami extensions install @putnami/contributor` (see
+[Develop with AI assistants](/docs/how-to/develop-with-ai#install-and-update-agent-workflows)). Your own durable rules go in `.agents/constraints.md`, a
 file you create yourself — the block tells an
 assistant to read it when it exists, and Putnami never writes it. Adding an
 extension later? `putnami context generate` refreshes the block and the skills.

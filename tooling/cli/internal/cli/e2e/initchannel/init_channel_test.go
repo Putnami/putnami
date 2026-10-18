@@ -24,7 +24,6 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	wsproto "go.putnami.dev/protocol/workspace"
-	sdkagentartifact "go.putnami.dev/sdk/extension/agentartifact"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
@@ -42,7 +41,6 @@ const (
 
 	goExtensionPath = "/putnami/go/download"
 	templatePath    = "/putnami/go-server/download"
-	contentPath     = "/putnami/contributor/download"
 
 	typeScriptExtensionPath = "/putnami/typescript/download"
 	typeScriptTemplatePath  = "/putnami/typescript-web/download"
@@ -53,28 +51,26 @@ const (
 )
 
 // releaseSet is one release of every artifact a starter resolves: its language
-// extension, its template, the agent-content extension and, for the Go
-// starter, go.putnami.dev/app. The lines do not share a version, as the
-// published lines do not.
+// extension, its template and, for the Go starter, go.putnami.dev/app. The
+// lines do not share a version, as the published lines do not.
 type releaseSet struct {
 	extension string
 	template  string
-	content   string
 	// framework is the version of go.putnami.dev/app.
 	framework string
 }
 
 var (
 	// olderSet is the release set `latest` names in these scenarios.
-	olderSet = releaseSet{extension: "0.3.0", template: "0.3.1", content: "0.1.0", framework: "v0.3.0"}
+	olderSet = releaseSet{extension: "0.3.0", template: "0.3.1", framework: "v0.3.0"}
 	// candidateSet is the release set candidateChannel names.
-	candidateSet = releaseSet{extension: "0.4.0", template: "0.4.1", content: "0.2.0", framework: "v0.4.0"}
+	candidateSet = releaseSet{extension: "0.4.0", template: "0.4.1", framework: "v0.4.0"}
 	// newerSet is a release set `latest` moves to after the candidate.
-	newerSet = releaseSet{extension: "0.5.0", template: "0.5.1", content: "0.3.0", framework: "v0.5.0"}
+	newerSet = releaseSet{extension: "0.5.0", template: "0.5.1", framework: "v0.5.0"}
 )
 
 // A smoke against a candidate channel, while `latest` names an older release
-// set: init resolves the extension, the agent-content extension, the template
+// set: init resolves the extension, the template
 // and the Go framework version of the candidate set only. The channel reaches
 // init the way the release smokes hand it: PUTNAMI_CHANNEL, with the public
 // command line. The lock records exact versions and the workspace names no
@@ -157,7 +153,7 @@ func TestInit_WithoutAChannelChoiceResolvesOnLatest(t *testing.T) {
 	h.assertResolved(t, olderSet, output)
 	h.assertAskedOnly(t, "latest", olderSet)
 	if got, want := h.registry.channelRequests(), []string{
-		goExtensionPath + " latest", contentPath + " latest", templatePath + " latest",
+		goExtensionPath + " latest", templatePath + " latest",
 	}; !slices.Equal(got, want) {
 		t.Errorf("channel requests = %v, want %v", got, want)
 	}
@@ -189,7 +185,7 @@ func TestInit_OnACandidateChannelLeavesUpgradeOnLatest(t *testing.T) {
 		t.Fatalf("putnami upgrade --extensions exited %d:\n%s", code, output)
 	}
 	asked := h.registry.asked()[before:]
-	for _, want := range []string{goExtensionPath + " latest", contentPath + " latest", templatePath + " latest"} {
+	for _, want := range []string{goExtensionPath + " latest", templatePath + " latest"} {
 		if !slices.Contains(asked, want) {
 			t.Errorf("upgrade asked %v, want it to ask %q", asked, want)
 		}
@@ -224,7 +220,6 @@ func TestInit_OnACandidateChannelHandsTheTypeScriptInstallerTheChannelAndItsRegi
 			archive: extensionArchive(t, h.records, "@putnami/typescript", candidateSet.extension),
 		},
 		typeScriptTemplatePath: {version: candidateSet.template, archive: typeScriptTemplateArchive(t, candidateSet.template)},
-		contentPath:            contentRelease(t, candidateSet.content),
 	})
 	t.Setenv("PUTNAMI_CHANNEL", candidateChannel)
 
@@ -355,7 +350,6 @@ func (h *harness) releases(t *testing.T, set releaseSet) map[string]release {
 	built := map[string]release{
 		goExtensionPath: {version: set.extension, archive: extensionArchive(t, h.records, "@putnami/go", set.extension)},
 		templatePath:    {version: set.template, archive: templateArchive(t, set.template)},
-		contentPath:     contentRelease(t, set.content),
 	}
 	h.archives[set] = built
 	return built
@@ -373,7 +367,7 @@ func (h *harness) lock(t *testing.T) *lockfile.LockFile {
 
 // assertResolved fails unless the lock pins set's exact versions with the
 // digests of set's archives, the project renders set's framework version, and
-// the agent content comes from set's release.
+// no agent content is installed.
 func (h *harness) assertResolved(t *testing.T, set releaseSet, transcript string) {
 	t.Helper()
 	lock := h.lock(t)
@@ -384,11 +378,6 @@ func (h *harness) assertResolved(t *testing.T, set releaseSet, transcript string
 	if !ok || extensionPin.Version != set.extension || extensionPin.Integrities[platform] != sha256Hex(archives[goExtensionPath].archive) {
 		t.Errorf("extensions.@putnami/go = %+v (present %v), want %s with the digest of that release\n%s",
 			extensionPin, ok, set.extension, transcript)
-	}
-	contentPin, ok := lock.GetExtension("@putnami/contributor")
-	if !ok || contentPin.Version != set.content || contentPin.Integrities[platform] != sha256Hex(archives[contentPath].archive) {
-		t.Errorf("extensions.@putnami/contributor = %+v (present %v), want %s with the digest of that release\n%s",
-			contentPin, ok, set.content, transcript)
 	}
 	templatePin, ok := lock.GetTemplate("go-server")
 	// A template archive serves every platform, so its digest is not keyed by
@@ -403,10 +392,6 @@ func (h *harness) assertResolved(t *testing.T, set releaseSet, transcript string
 	if data, err := os.ReadFile(filepath.Join(h.root, "webapp", "template.txt")); err != nil || string(data) != "template "+set.template+"\n" {
 		t.Errorf("webapp/template.txt = %q, %v; want the template release %s", data, err, set.template)
 	}
-	skill := filepath.Join(h.root, ".claude", "skills", "fixture-review", "SKILL.md")
-	if data, err := os.ReadFile(skill); err != nil || !strings.Contains(string(data), "Review release "+set.content+".") {
-		t.Errorf("%s = %q, %v; want the agent content of release %s", skill, data, err, set.content)
-	}
 }
 
 // assertAskedOnly fails when the registry or the module proxy was asked for
@@ -416,7 +401,6 @@ func (h *harness) assertAskedOnly(t *testing.T, channel string, set releaseSet) 
 	allowed := map[string][]string{
 		goExtensionPath: {channel, set.extension},
 		templatePath:    {channel, set.template},
-		contentPath:     {channel, set.content},
 	}
 	asked := h.registry.asked()
 	if len(asked) == 0 {
@@ -428,7 +412,7 @@ func (h *harness) assertAskedOnly(t *testing.T, channel string, set releaseSet) 
 			t.Errorf("the registry was asked %q, want only %s and the exact versions it names", request, channel)
 		}
 	}
-	for _, path := range []string{goExtensionPath, templatePath, contentPath} {
+	for _, path := range []string{goExtensionPath, templatePath} {
 		if !slices.Contains(asked, path+" "+channel) {
 			t.Errorf("the registry was asked %v, want %s on %s", asked, path, channel)
 		}
@@ -502,8 +486,8 @@ func (h *harness) assertPinsNoChannel(t *testing.T, set releaseSet) {
 	if err := json.Unmarshal(data, &config); err != nil {
 		t.Fatalf("the workspace config does not declare its artifacts as bare names: %v\n%s", err, data)
 	}
-	if !slices.Equal(config.Extensions, []string{"@putnami/go", "@putnami/contributor"}) {
-		t.Errorf("workspace extensions = %v, want the two bare names", config.Extensions)
+	if !slices.Equal(config.Extensions, []string{"@putnami/go"}) {
+		t.Errorf("workspace extensions = %v, want the one bare name", config.Extensions)
 	}
 	for _, name := range config.Templates {
 		if strings.Contains(name, "@") {
@@ -516,14 +500,11 @@ func (h *harness) assertPinsNoChannel(t *testing.T, set releaseSet) {
 	if pin, ok := lock.GetExtension("@putnami/go"); ok {
 		sources[pin.Source] = h.registry.URL + goExtensionPath + "?channel=" + set.extension
 	}
-	if pin, ok := lock.GetExtension("@putnami/contributor"); ok {
-		sources[pin.Source] = h.registry.URL + contentPath + "?channel=" + set.content
-	}
 	if pin, ok := lock.GetTemplate("go-server"); ok {
 		sources[pin.Source] = h.registry.URL + templatePath + "?channel=" + set.template
 	}
-	if len(sources) != 3 {
-		t.Errorf("the lock pins %d of the three artifacts", len(sources))
+	if len(sources) != 2 {
+		t.Errorf("the lock pins %d of the two artifacts", len(sources))
 	}
 	for got, want := range sources {
 		if got != want {
@@ -741,27 +722,6 @@ func typeScriptTemplateArchive(t *testing.T, version string) []byte {
 		{name: "putnami.template.json", mode: 0o644,
 			content: `{"name":"typescript-web","description":"TypeScript web","extension":"@putnami/typescript","version":"` + version + `"}`},
 	})
-}
-
-// contentRelease packages the fixture @putnami/contributor at version with the
-// SDK's package step: one skill that names the release it ships in.
-func contentRelease(t *testing.T, version string) release {
-	t.Helper()
-	source := t.TempDir()
-	files := map[string]string{
-		"putnami.extension.json": `{"name":"@putnami/contributor","agentContent":{"path":"agent-content","source":"agent-src"}}`,
-		"putnami.json":           `{"name":"@putnami/contributor","options":{"agent-artifact":{"forbiddenContent":[],"requiredSkills":["fixture-review"]}}}`,
-		"agent-src/skills/fixture-review/SKILL.md": "---\nname: fixture-review\ndescription: Review a change\n---\n\n" +
-			"# fixture-review\n\nReview release " + version + ".\n",
-	}
-	for name, content := range files {
-		clitest.WriteFile(t, filepath.Join(source, filepath.FromSlash(name)), content)
-	}
-	pkg, err := sdkagentartifact.PackageExtension(source, version)
-	if err != nil {
-		t.Fatalf("package @putnami/contributor@%s: %v", version, err)
-	}
-	return release{version: version, archive: pkg.Archive}
 }
 
 type tarEntry struct {

@@ -15,7 +15,7 @@
     "cli/agent-workflow-lifecycle#record-last",
     "cli/agent-workflow-lifecycle#reinit-preserves-optin",
     "cli/agent-workflow-lifecycle#session-start-reconcile",
-    "cli/agent-workflow-lifecycle#starter-opts-into-contributor",
+    "cli/agent-workflow-lifecycle#starter-agent-content-opt-in",
     "cli/agent-workflow-lifecycle#superseded-owners-refused",
     "cli/agent-workflow-lifecycle#undeclared-artifact-retired",
     "cli/canonical-workspace-guidance#experimental-python",

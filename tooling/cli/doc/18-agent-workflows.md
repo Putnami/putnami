@@ -4,8 +4,10 @@ Agent workflows reach a workspace in one way: as the **agent content** of an
 extension the workspace declares and opts into. The CLI materializes that
 content **without ever overwriting a file you own**. Putnami's own workflows
 ship as the agent content of one extension,
-[`@putnami/contributor`](../../contributor/README.md); every built-in starter
-declares it and opts into its content, and this repository opts into it too.
+[`@putnami/contributor`](../../contributor/README.md); no built-in starter
+declares it, so a workspace asks for it with
+`putnami extensions install @putnami/contributor`, and this repository opts into
+it too.
 
 Workflows declared as separate artifacts — a registry reference such as
 `@putnami/agent-workflows:stable` or an in-tree project path such as
@@ -236,8 +238,10 @@ reads and hashes them.
 
 ### `putnami init`
 
-Every built-in starter (`--extension ts|go|py`) declares the
-`@putnami/contributor` extension and opts into its content. `init` writes both
+No built-in starter (`--extension ts|go|py`) opts into agent content, so `init`
+does not install `@putnami/contributor` and writes no agent-content declaration.
+To ask for it, run `putnami extensions install @putnami/contributor` after
+`init`. When a starter does name an agent-content extension, `init` writes both
 declarations into the new `putnami.workspace.json`, installs the extension —
 which pins it — and materializes its content. If the extension cannot be
 installed, both declarations stay, no agent file is written, and `init` reports
