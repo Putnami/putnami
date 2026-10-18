@@ -14,12 +14,12 @@ import (
 	"sort"
 	"strings"
 
+	"go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
 	agentcontext "go.putnami.dev/protocol/agentcontext"
 	cache "go.putnami.dev/protocol/cache"
 	extensionproto "go.putnami.dev/protocol/extension"
 	infra "go.putnami.dev/protocol/infra"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 )

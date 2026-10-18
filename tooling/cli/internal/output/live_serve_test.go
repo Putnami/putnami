@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/cli/model/jobs"
 )
 
 // logEvent builds a serve log event with the given level/message and optional

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/cli/model/jobs"
 )
 
 // ref renders the test fixture's artifact coordinate. Production consumes the

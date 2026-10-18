@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
+	"go.putnami.dev/cli/model/jobs"
 	qualifyproto "go.putnami.dev/protocol/qualify"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/compose"
 	"go.putnami.dev/tooling/cli/internal/git"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 

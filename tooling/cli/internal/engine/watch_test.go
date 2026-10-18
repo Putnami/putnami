@@ -5,12 +5,12 @@ import (
 	"reflect"
 	"testing"
 
+	"go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
 	extproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/watch"
 	"go.putnami.dev/tooling/cli/internal/workspace"

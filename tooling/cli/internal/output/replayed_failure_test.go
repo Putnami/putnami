@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/protocol/features/spectest"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 )
 
 // replayedFailedResult is one failed result served from the failure cache,

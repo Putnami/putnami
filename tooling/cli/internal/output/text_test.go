@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/cli/model/jobs"
 )
 
 func TestNewTextRenderer(t *testing.T) {

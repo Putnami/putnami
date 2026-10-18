@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/cli/model/jobs"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/machine"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/workspace"

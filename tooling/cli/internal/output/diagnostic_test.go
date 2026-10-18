@@ -9,7 +9,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/cli/model/jobs"
 )
 
 func TestRenderDiagnosticEvent(t *testing.T) {

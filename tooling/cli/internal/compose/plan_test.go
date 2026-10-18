@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 

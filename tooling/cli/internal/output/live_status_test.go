@@ -3,7 +3,7 @@ package output
 import (
 	"testing"
 
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/cli/model/jobs"
 )
 
 // The live view's status vocabulary.

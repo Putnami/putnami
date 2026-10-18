@@ -5,8 +5,8 @@ import (
 	"slices"
 	"testing"
 
+	"go.putnami.dev/cli/model/jobs"
 	runtimeproto "go.putnami.dev/protocol/runtime"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 )
 
 func TestReadyClaim_ThePortIsTheFirstHTTPEndpoint(t *testing.T) {

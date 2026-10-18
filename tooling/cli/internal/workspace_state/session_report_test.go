@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )

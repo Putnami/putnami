@@ -17,12 +17,12 @@ import (
 	"strings"
 	"time"
 
+	"go.putnami.dev/cli/model/jobs"
 	qualifyproto "go.putnami.dev/protocol/qualify"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/qualify"
 	"go.putnami.dev/tooling/cli/internal/workspace"

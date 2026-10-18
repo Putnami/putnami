@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
+	"go.putnami.dev/cli/model/jobs"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dbtestenv"
 	"go.putnami.dev/tooling/cli/internal/commands/doctor"
 	"go.putnami.dev/tooling/cli/internal/engine"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/workspace"

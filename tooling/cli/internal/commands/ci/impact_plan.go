@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"go.putnami.dev/cli/model/jobs"
 	ciproto "go.putnami.dev/protocol/ci"
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/changeplan"
@@ -18,7 +19,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"

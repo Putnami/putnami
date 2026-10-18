@@ -12,11 +12,11 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"go.putnami.dev/cli/model/jobs"
 	pdb "go.putnami.dev/protocol/database"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 

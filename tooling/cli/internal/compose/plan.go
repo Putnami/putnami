@@ -19,10 +19,10 @@ import (
 	"slices"
 	"strings"
 
+	"go.putnami.dev/cli/model/jobs"
 	pdb "go.putnami.dev/protocol/database"
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/infra"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
