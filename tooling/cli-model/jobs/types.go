@@ -23,6 +23,15 @@ type JobResult struct {
 	// envelope so a pre-fix hit is executed again rather than leaving another
 	// worktree unfixed.
 	SourceMutated bool `json:"-"`
+	// SourceBinding is the source binding of the job's own project that the
+	// execution was stamped with, for a task that declares cache.sourceBound.
+	// An unmanaged workspace is stamped with the empty binding. It lives in
+	// memory only: the store key of the task's entry is derived from the cache
+	// key and this binding, and a follower of a shared execution adopts its
+	// leader's. SourceBindingStamped tells the empty binding from an execution
+	// whose stamp named no usable binding, which stores no entry.
+	SourceBinding        string `json:"-"`
+	SourceBindingStamped bool   `json:"-"`
 	// SpawnToFirstEvent is the wall latency from immediately before cmd.Start
 	// until the first valid runtime JSONL event is received. FirstEventObserved
 	// distinguishes an event arriving within the clock's zero bucket from a job

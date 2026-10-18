@@ -105,6 +105,8 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	default:
 		reason := ""
 		switch {
+		case required == protocolcli.SourceBoundCacheContract:
+			reason = " for its source-bound cache policy"
 		case required == protocolcli.VerbVocabularyContract && m.DeclaresVerbs():
 			reason = " for its verb vocabulary"
 		case m.DeclaresAgentContent():

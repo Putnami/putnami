@@ -45,6 +45,14 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	10: ADDITIVE — the source-bound cache policy (`cache.sourceBound`). From
+//	   10 on, the CLI stores and looks up the task's entry at a key derived
+//	   from its cache key and the source binding of the task's own project,
+//	   so an entry serves only at the binding its outputs embed. The binding
+//	   is not a key input. An older reader stores the entry at the cache key
+//	   alone and would replay outputs that embed a stale binding, so it must
+//	   refuse the stamp. Only a manifest with a task that declares
+//	   the field is stamped 10, and the floor binds it from every origin.
 //	9: ADDITIVE — the verb vocabulary (`verbs`): the verbs an extension
 //	   declares, in order, with their description, aliases, default traits
 //	   and related commands. From 9 on, help, completion and alias resolution
@@ -145,7 +153,14 @@ const ExtensionDependenciesContract = 8
 // planning those jobs with other traits.
 const VerbVocabularyContract = 9
 
+// SourceBoundCacheContract is required by a manifest with a task that declares
+// `cache.sourceBound`. A reader at this contract stores and looks up the
+// task's entry at a key that also binds the project's source binding, so an
+// older reader refuses the stamp instead of replaying outputs that embed a
+// stale binding.
+const SourceBoundCacheContract = 10
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = VerbVocabularyContract
+const LatestContract = SourceBoundCacheContract

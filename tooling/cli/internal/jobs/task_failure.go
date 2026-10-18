@@ -47,6 +47,12 @@ import (
 //     on an invocation-scoped artifact's path and bytes, and on the process
 //     capabilities a run provisions — per-run values the key does not describe,
 //     which is the same reason the timeout is refused.
+//   - THE TASK IS NOT SOURCE-BOUND (cache.sourceBound). Its verdict reads the
+//     project's whole source tree through its source binding, tests and specs
+//     included, which the key leaves out on purpose. Its entry's store key
+//     binds that binding (source_bound.go), but this record lives at the cache
+//     key alone, so a failure caused by a file outside the key would replay
+//     after that file is fixed.
 //
 // # What invalidates it
 //
@@ -72,6 +78,12 @@ import (
 // non-zero exit — carrying only the provenance renderers annotate it with.
 func (s *Scheduler) replayFailedEntry(job *ScheduledJob, hash string) *JobResult {
 	if s.cache == nil || hash == "" || s.cfg.RetryFailed || s.cfg.NoCache {
+		return nil
+	}
+	// recordableFailure never records a source-bound verdict. Refusing one here
+	// too keeps a record from any other writer from replaying, and leaves its
+	// attempt counter alone.
+	if cachekey.TaskIsSourceBound(job) {
 		return nil
 	}
 	record := s.replayRecordOnce(hash)
@@ -231,6 +243,12 @@ func recordableFailure(job *ScheduledJob, result *JobResult) bool {
 	// scheduler judges drift after this record is written (closeTask), so this
 	// arm is the guard for any other path that hands a drift failure here.
 	if result.Error != nil && result.Error.Code == extensionproto.OutputDriftDiagnosticCode {
+		return false
+	}
+	// A source-bound task reads files its key leaves out on purpose, tests and
+	// specs among them, so a failure they cause is not explained by the cache
+	// key this record is stored at.
+	if cachekey.TaskIsSourceBound(job) {
 		return false
 	}
 	if !cachekey.ResultEmittedMeta(result) {

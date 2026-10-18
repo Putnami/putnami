@@ -231,6 +231,52 @@ func TaskIsVersionAware(job *jobmodel.ScheduledJob) bool {
 	return job.JobDef.TaskCachePolicy != nil && job.JobDef.TaskCachePolicy.VersionAware
 }
 
+// TaskIsSourceBound reports whether the job's task declares that its outputs
+// embed the source binding of its own project (cache.sourceBound). The binding
+// is NOT a key input: it is part of the entry's store key instead
+// (SourceBoundEntryKey, jobs/source_bound.go). Folding it into the key
+// would move the key of every dependent on an edit, a test file for one, that
+// none of them reads.
+func TaskIsSourceBound(job *jobmodel.ScheduledJob) bool {
+	return job != nil && job.JobDef != nil && job.JobDef.TaskCachePolicy != nil && job.JobDef.TaskCachePolicy.SourceBound
+}
+
+// sourceBoundEntryDomain namespaces the store key of a source-bound task's
+// entry, so it never equals a cache key or any other derived digest.
+const sourceBoundEntryDomain = "putnami/cachekey/source-bound-entry/v1"
+
+// SourceBoundEntryKey returns the store key that a source-bound task's entry
+// (cache.sourceBound) is stored, leased and looked up under: its cache key
+// bound to a source binding of its project. The store takes it as an opaque
+// key, so the local address (store.TaskEntryAddress), the lease, the
+// descriptor's recorded key and the remote key (store.RemoteTaskEntryKey) all
+// follow from it unchanged.
+//
+// A writer passes the binding its execution was stamped with, and a reader
+// passes the project's current binding. An entry is therefore found only at
+// the binding its outputs embed. The empty binding is a value: an unmanaged
+// workspace uses it. The cache key itself does not change, so the key a
+// dependent folds stays the same.
+func SourceBoundEntryKey(key, binding string) string {
+	sum := sha256.Sum256([]byte(sourceBoundEntryDomain + "\x00" + key + "\x00" + binding))
+	return hex.EncodeToString(sum[:])
+}
+
+// ExecutedEntryKey returns the store key of the entry an execution of job at
+// cache key key publishes. It is key itself for a task that is not
+// source-bound. For a source-bound task it is key bound to the binding the
+// execution was stamped with, or "" when the stamp named no usable binding:
+// that execution stores no entry.
+func ExecutedEntryKey(job *jobmodel.ScheduledJob, key string, result *jobmodel.JobResult) string {
+	if key == "" || !TaskIsSourceBound(job) {
+		return key
+	}
+	if result == nil || !result.SourceBindingStamped {
+		return ""
+	}
+	return SourceBoundEntryKey(key, result.SourceBinding)
+}
+
 // KeyEmbedsVersion reports whether a job's cache key carries its line's full
 // version. versionVarSet tells whether the job's resolved cache-key parameters
 // set version-var. Only such a job reads a version in its context when the

@@ -43,6 +43,11 @@ type RemoteCache interface {
 	CacheStats() *CacheStats
 	// SetCacheStats makes stats that accumulator.
 	SetCacheStats(stats *CacheStats)
+	// SetSourceBoundEntryKey gives negotiation the resolver of the store key
+	// a source-bound task is looked up at: its cache key bound to the
+	// project's current source binding (SourceBoundEntryKey). The second
+	// result is false when that binding cannot be computed.
+	SetSourceBoundEntryKey(resolve func(job *jobmodel.ScheduledJob, key string) (string, bool))
 	// DrainUploads waits for the background uploads at the end of the run.
 	DrainUploads()
 	// Stop is the scheduler's end-of-run hook.

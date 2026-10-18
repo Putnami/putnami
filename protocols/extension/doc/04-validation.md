@@ -152,14 +152,16 @@ the lowest contract whose vocabulary covers the manifest
 `protocols/cli.ReleaseBaselineInputContract` (7) for a task that declares the
 `releaseBaseline` runtime input, `protocols/cli.ExtensionDependenciesContract`
 (8) for `extensionDependencies` that name a registry extension (`@scope/name`),
-or `protocols/cli.VerbVocabularyContract` (9) for a `verbs` vocabulary.
+`protocols/cli.VerbVocabularyContract` (9) for a `verbs` vocabulary, or
+`protocols/cli.SourceBoundCacheContract` (10) for a task that declares
+`cache.sourceBound`.
 `protocols/cli.GitInputModeContract` names the same rung 7 for a task whose
 input port or cache-key files select a `git:` pattern. The gate applies to every non-empty command, command-group, MCP
 tool, or agent-content surface, and to a verb vocabulary. A non-conforming manifest — for example one
 that shadows a reserved global flag — fails packaging and never reaches a
 registry. A manifest without the field is contract `0` (pre-registry).
 
-Contracts 5, 6, 7, 8 and 9 are **additive**. They add vocabulary a manifest opts into
+Contracts 5, 6, 7, 8, 9 and 10 are **additive**. They add vocabulary a manifest opts into
 and change nothing a manifest without that vocabulary means. An extension without
 agent content, Go embed inputs, a `releaseBaseline` input or a `git:` input keeps
 its contract-4 stamp; one with agent content but no Go embed inputs requires
@@ -177,9 +179,14 @@ which leaves the dependency rung out, so a manifest loaded from
 `node_modules` loads unstamped. A manifest that declares `verbs` requires
 contract 9 wherever it loads from, `node_modules` included: its default traits
 change how the jobs of other extensions are planned, and an older reader would
-plan them with other traits. `RequiredLoadContract` includes that rung. The
-reader loads every stamp from the one the manifest's vocabulary requires up to
-`protocols/cli.LatestContract` (9):
+plan them with other traits. `RequiredLoadContract` includes that rung. A
+manifest with a task that declares `cache.sourceBound` requires contract 10
+wherever it loads from: a reader at 10 stores and looks up the task's entry at
+a key that also binds the project's source binding, and an older reader would
+replay outputs that embed a stale binding.
+`RequiredLoadContract` includes that rung too. The reader loads every stamp
+from the one the manifest's vocabulary requires up to
+`protocols/cli.LatestContract` (10):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|

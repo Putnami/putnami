@@ -22,8 +22,8 @@
     "cliContract": {
       "type": "integer",
       "minimum": 4,
-      "maximum": 9,
-      "description": "CLI ↔ extension contract version this manifest was validated against: the lowest contract whose vocabulary covers it. Contract 4 adds same-session prerequisites; older readers must reject rather than silently omit their gates. Contract 5 is additive and is stamped only on a manifest that declares agentContent, so a contract-4 reader refuses that manifest instead of dropping its agent content. Contract 6 covers Go embed inputs, contract 7 the releaseBaseline runtime input and git: file patterns, contract 8 a registry-named extensionDependencies entry, and contract 9 a verbs vocabulary. Earned, not claimed: the package job stamps it after strict validation. Absent means contract 0 (pre-registry); loaders reject a stamp below what the manifest's vocabulary requires, or above the latest contract they read."
+      "maximum": 10,
+      "description": "CLI ↔ extension contract version this manifest was validated against: the lowest contract whose vocabulary covers it. Contract 4 adds same-session prerequisites; older readers must reject rather than silently omit their gates. Contract 5 is additive and is stamped only on a manifest that declares agentContent, so a contract-4 reader refuses that manifest instead of dropping its agent content. Contract 6 covers Go embed inputs, contract 7 the releaseBaseline runtime input and git: file patterns, contract 8 a registry-named extensionDependencies entry, contract 9 a verbs vocabulary, and contract 10 a task that declares cache.sourceBound. Earned, not claimed: the package job stamps it after strict validation. Absent means contract 0 (pre-registry); loaders reject a stamp below what the manifest's vocabulary requires, or above the latest contract they read."
     },
     "extensionDependencies": {
       "description": "Other extensions this extension needs: a list of names, or a map from name to version constraint. The CLI installs, pins and loads each registry name (@scope/name) for an extension installed from the artifact store or declared by path, and leaves any other name, and the dependencies of an extension loaded from node_modules, to the package manager. A manifest that names a registry dependency requires cliContract 8 when it loads from the artifact store or a declared path.",
@@ -1753,6 +1753,10 @@
         "atomicWrite": {
           "type": "boolean",
           "description": "Write outputs to temp location then atomic rename."
+        },
+        "sourceBound": {
+          "type": "boolean",
+          "description": "Whether the task output embeds the source binding of its own project (the source-v1 digest stamped into .gen/version.json). The binding is not a cache-key input: the CLI stores and looks up the task's entry at a key derived from the cache key and the binding, so an entry serves only at the binding its outputs embed. Requires cliContract 10."
         }
       }
     },

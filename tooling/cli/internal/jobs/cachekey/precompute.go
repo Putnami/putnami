@@ -19,11 +19,16 @@ import (
 // job would actually consume. Declared-capture entries and legacy entries use
 // different, format-qualified addresses; keeping this projection here prevents
 // plan emitters from treating a legacy blob as a hit for a declared task.
+//
+// A source-bound task's entry is never reported present. Its store key also
+// binds the project's current source binding (SourceBoundEntryKey), which
+// this projection does not compute, so the honest answer is absent: a reader
+// then plans an execution, never a hit the lookup could not serve.
 func CacheEntryPresent(cache *store.CacheManager, job *jobmodel.ScheduledJob, hash string) (bool, error) {
 	if cache == nil {
 		return false, fmt.Errorf("cache manager is nil")
 	}
-	if hash == "" {
+	if hash == "" || TaskIsSourceBound(job) {
 		return false, nil
 	}
 	if jobmodel.UsesDeclaredCapture(job) {

@@ -470,6 +470,9 @@ func (s *Scheduler) setRemoteCache(remote cachekey.RemoteCache) {
 	if remote == nil || s.cfg.NoCache {
 		return
 	}
+	// Negotiation asks whether a source-bound task hits locally at the store
+	// key this run's lookup will use (source_bound.go).
+	remote.SetSourceBoundEntryKey(s.lookupEntryKey)
 	// Preserve setup time recorded while the engine resolved the provider before
 	// constructing the scheduler. Tests may hand-build a remote without stats;
 	// in that case give it the local accumulator rather than leaving a nil trap.

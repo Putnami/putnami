@@ -386,6 +386,12 @@ func (r ownerRow) String() string {
 //   - The committed `schema/config.json` pair has three writers (build-generate,
 //     build-describe, config-extract-exec). Resolved by SINGLE DECLARED OWNER:
 //     config-extract-exec, the one task whose cache hit must reproduce it.
+//   - The committed `schema/feature-evidence/go-framework.json` has ONE writer,
+//     build-describe, for every project kind: only an app's describe binary
+//     produces feature evidence. Describe declares the file, not the
+//     directory, because other frameworks' evidence files may share the
+//     directory. A hit then restores the evidence of the binding its store
+//     key binds (cache.sourceBound, CLI ADR 0069).
 //   - build-describe's `.gen/schema` and `.gen/clientgen` are the only
 //     optional project outputs that declare `emptied`. No committed file lives
 //     in either: a provider slice commits its generation contract as
@@ -416,6 +422,10 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 		{task: "build-describe", id: "client", kind: "directory", root: "project", path: "clientOutputs", optionalEmpty: true, drift: "fail"},
 		{task: "build-describe", id: "clientgen", kind: "directory", root: "project", path: ".gen/clientgen", optionalEmpty: true, emptied: true},
 		{task: "build-describe", id: "design", kind: "directory", root: "project", path: ".gen/design", optionalEmpty: true},
+		// The committed feature evidence. It names the project's source
+		// binding, and a describe hit must restore the evidence its store
+		// key binds. No drift: the file moves with every binding move.
+		{task: "build-describe", id: "featureEvidence", kind: "file", root: "project", path: "schema/feature-evidence/go-framework.json", optionalEmpty: true},
 		{task: "build-describe", id: "migrationBundle", kind: "directory", root: "project", path: ".gen/migration-bundle", optionalEmpty: true},
 		{task: "build-describe", id: "migrations", kind: "file", root: "project", path: ".gen/migrations.json", optionalEmpty: true},
 		{task: "build-describe", id: "schema", kind: "directory", root: "project", path: ".gen/schema", optionalEmpty: true, emptied: true},
@@ -1165,6 +1175,9 @@ func TestTheArchivePackagerOwnsTheArchivePublicationManifest(t *testing.T) {
 	}
 }
 
+// committedFeatureEvidence is the tracked feature evidence of the Go framework.
+const committedFeatureEvidence = "schema/feature-evidence/go-framework.json"
+
 // TestCommittedSidecarsAreDeliberatelyUnclaimed pins the second footprint no
 // task owns: the tracked schema/infra sidecars the build pipeline reconciles.
 //
@@ -1179,6 +1192,10 @@ func TestTheArchivePackagerOwnsTheArchivePublicationManifest(t *testing.T) {
 // `schema/config.json` is the exception and is asserted the other way: it has a
 // declared owner (config-extract-exec), and the two pipeline writers must keep
 // their hands off the declaration.
+//
+// The committed feature evidence is the one schema file a pipeline writer
+// does claim: build-describe is its only writer for every project kind, and a
+// describe hit has to restore the evidence of the binding its store key binds.
 func TestCommittedSidecarsAreDeliberatelyUnclaimed(t *testing.T) {
 	m := loadExtensionManifest(t)
 
@@ -1205,6 +1222,11 @@ func TestCommittedSidecarsAreDeliberatelyUnclaimed(t *testing.T) {
 			t.Fatalf("manifest task %q is missing", name)
 		}
 		for id, output := range task.Declares.Outputs {
+			if name == "build-describe" && id == "featureEvidence" && output.Path == committedFeatureEvidence {
+				// The committed evidence has one writer, describe, and is
+				// declared on purpose (TestDeclaredOutputOwnerTable).
+				continue
+			}
 			if strings.HasPrefix(output.Path, "schema/") {
 				t.Errorf("task %q claims %q as output %q; the committed config schema is owned by config-extract-exec",
 					name, output.Path, id)

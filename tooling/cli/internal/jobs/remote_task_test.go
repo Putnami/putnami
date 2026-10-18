@@ -1099,6 +1099,7 @@ func TestDeclaredCoalescerServesTheWinnersEntry(t *testing.T) {
 		inner: declaredCoalescer{
 			scheduler: f.sched,
 			job:       job,
+			key:       hash,
 			mu:        &mu,
 			hashes:    hashes,
 		},

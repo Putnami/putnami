@@ -207,8 +207,11 @@ func analyzeTaskKeysAndArtifacts(
 		return
 	}
 	opts, _ := overridesFor(job.Project)
-	ad, aok, aerr := artifactDigest(firstStore, a.CacheKey, contract, opts)
-	bd, bok, berr := artifactDigest(secondStore, b.CacheKey, contract, opts)
+	// Each run's entry is read where that run stored it: at its cache key, or
+	// for a source-bound task at the key bound to the binding it was stamped
+	// with. A run that stored nothing gives no key and reads as unpublished.
+	ad, aok, aerr := artifactDigest(firstStore, cachekey.ExecutedEntryKey(job, a.CacheKey, a), contract, opts)
+	bd, bok, berr := artifactDigest(secondStore, cachekey.ExecutedEntryKey(job, b.CacheKey, b), contract, opts)
 	if aerr != nil || berr != nil || !aok || !bok {
 		addFinding(report, Finding{Check: "double-run-artifact", Project: job.Project.ID, Task: key,
 			Severity: "error", Message: "one or both live runs did not publish a readable task entry"})
@@ -296,6 +299,9 @@ func artifactDigest(
 	contract cachekey.VerificationContract,
 	opts overrides,
 ) (string, bool, error) {
+	if key == "" {
+		return "", false, nil
+	}
 	entry, err := local.LookupTaskEntry(key)
 	if err != nil || entry == nil || entry.Result == nil {
 		return "", false, err

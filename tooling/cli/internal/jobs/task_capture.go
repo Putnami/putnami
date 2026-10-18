@@ -507,6 +507,10 @@ func copyDeclaredFile(src, dst string, mode os.FileMode) error {
 // restore writes the recorded outputs and reads no resource another task
 // writes. A lock it cannot take (the session is canceled) is a restore failure
 // like any other.
+//
+// hash is the cache key the hit publishes for the task's dependents. The entry
+// was looked up at the task's entry key, which for a source-bound task also
+// binds the project's source binding (lookupDeclaredEntry).
 func (s *Scheduler) restoreDeclaredCacheHit(
 	ctx context.Context,
 	job *ScheduledJob,
@@ -798,8 +802,19 @@ func (s *Scheduler) lookupDeclaredEntry(
 		return "", nil, noop
 	}
 
+	// Every store operation below addresses the entry key; hash stays the key
+	// the task publishes for its dependents. The two differ only for a
+	// source-bound task, whose entry key also binds the project's current
+	// source binding (source_bound.go). Without a binding there is no key to
+	// look up or lease, so the task executes, and its stamp names no binding
+	// either, so it stores nothing.
+	entryKey, ok := s.lookupEntryKey(job, hash)
+	if !ok {
+		return hash, nil, noop
+	}
+
 	restoreStarted := time.Now()
-	entry, err := s.cache.LookupTaskEntry(hash)
+	entry, err := s.cache.LookupTaskEntry(entryKey)
 	if err == nil && entry != nil {
 		if result := s.restoreDeclaredCacheHit(ctx, job, hash, entry, mu, hashes); result != nil {
 			s.cacheStats.RecordLocalRestoreVerify(restoreStarted, time.Now())
@@ -815,7 +830,7 @@ func (s *Scheduler) lookupDeclaredEntry(
 	// tree is rewritten by the provider's restore or by the execution.
 	resultOnly := err == nil && entry == nil && s.remote != nil && !s.remote.TaskFilesNeeded(job)
 	if resultOnly {
-		if recorded := s.cache.LookupResultOnlyTaskEntry(hash); recorded != nil {
+		if recorded := s.cache.LookupResultOnlyTaskEntry(entryKey); recorded != nil {
 			if result := s.serveStatusOnlyHit(job, hash, recorded, ReuseLocalCache, mu, hashes); result != nil {
 				s.cacheStats.RecordLocalRestoreVerify(restoreStarted, time.Now())
 				s.cacheStats.RecordLocalHit()
@@ -827,13 +842,13 @@ func (s *Scheduler) lookupDeclaredEntry(
 	s.cacheStats.RecordLocalMiss()
 
 	if resultOnly {
-		if recorded, reuse := s.remote.RestoreTaskResult(ctx, hash, job, s.cache); recorded != nil {
+		if recorded, reuse := s.remote.RestoreTaskResult(ctx, entryKey, job, s.cache); recorded != nil {
 			if result := s.serveStatusOnlyHit(job, hash, recorded, reuse, mu, hashes); result != nil {
 				return hash, result, noop
 			}
 		}
 	} else if s.remote != nil {
-		if remoteEntry, reuse := s.remote.RestoreTaskEntry(ctx, hash, job, s.cache); remoteEntry != nil {
+		if remoteEntry, reuse := s.remote.RestoreTaskEntry(ctx, entryKey, job, s.cache); remoteEntry != nil {
 			// The provider publishes into the local store, so what comes back here
 			// is an ordinary task-owned entry: recency is already stamped on its
 			// address by the materialize, and the restore below is the same one a
@@ -858,16 +873,20 @@ func (s *Scheduler) lookupDeclaredEntry(
 		return hash, replayed, noop
 	}
 
-	result, release := s.coalesceMiss(ctx, job, hash, declaredCoalescer{scheduler: s, job: job, mu: mu, hashes: hashes})
+	result, release := s.coalesceMiss(ctx, job, entryKey, declaredCoalescer{scheduler: s, job: job, key: hash, mu: mu, hashes: hashes})
 	return hash, result, release
 }
 
 // declaredCoalescer routes the shared claim-or-wait loop at the task-owned
 // address. Leasing on the derived address (rather than the raw key) keeps a
 // task-owned artifact distinct from any other data that shares its cache key.
+// The loop leases and waits on the entry key; key is the cache key a hit
+// publishes for dependents. A source-bound waiter therefore waits only on a
+// lease at its own binding, and is served only an entry stored at it.
 type declaredCoalescer struct {
 	scheduler *Scheduler
 	job       *ScheduledJob
+	key       string
 	mu        *sync.Mutex
 	hashes    map[string]string
 }
@@ -885,5 +904,5 @@ func (c declaredCoalescer) restore(ctx context.Context, hash string) *JobResult 
 	if err != nil || entry == nil {
 		return nil
 	}
-	return c.scheduler.restoreDeclaredCacheHit(ctx, c.job, hash, entry, c.mu, c.hashes)
+	return c.scheduler.restoreDeclaredCacheHit(ctx, c.job, c.key, entry, c.mu, c.hashes)
 }
