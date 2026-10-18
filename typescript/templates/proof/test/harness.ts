@@ -139,7 +139,7 @@ export function discoverTemplates(templatesDir: string, extension: string): Temp
 }
 
 /**
- * The variables `putnami dev template test` renders with: DefaultTestVars, with
+ * The variables `putnami templates test` renders with: DefaultTestVars, with
  * the manifest's `testVariables` overriding `projectName` and `projectModule`
  * only (tooling/cli/internal/commands/extensions/templates.go).
  */
@@ -221,7 +221,7 @@ export function evalTemplate(content: string, vars: RenderVars): string {
  * Renders `template` into a new throwaway workspace and wires it the way a
  * consumer workspace is wired after `putnami install`:
  *
- * - putnami.workspace.json is the one `putnami dev template test` writes;
+ * - putnami.workspace.json is the one `putnami templates test` writes;
  * - .gitignore is the one `putnami init` writes, which Biome reads;
  * - tsconfig.json extends the TypeScript extension's config, as
  *   ensureWorkspaceTsConfig writes it;

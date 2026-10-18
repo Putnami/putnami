@@ -12,7 +12,7 @@ Every `putnami.extension.json` must conform to the extension JSON Schema. This c
 - Invalid enum values (e.g., invalid visibility, or the deprecated, ignored `cache.restoreMode`, which is still validated against its enum so a manifest that carries it loads)
 
 ```bash
-putnami dev extension validate [path]
+putnami extensions validate [path]
 ```
 
 Without a path, validates the extension in the current directory. With a path, validates the extension at that path.

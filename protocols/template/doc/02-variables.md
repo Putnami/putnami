@@ -28,7 +28,7 @@ visible in the rendered output instead of silently vanishing.
 
 The engine provides six variables:
 
-| Variable | Meaning | Value under `dev template test` |
+| Variable | Meaning | Value under `templates test` |
 |----------|---------|---------------------------------|
 | `<%= projectName %>` | The new project's name | `test-project` |
 | `<%= projectPath %>` | The project's workspace-relative path | `test-project` |
@@ -74,7 +74,7 @@ Rendered for a project named `my-app`:
 
 ## Overriding values when testing
 
-`dev template test` renders with the defaults in the table above. A template
+`templates test` renders with the defaults in the table above. A template
 whose scaffolding cannot build under those defaults overrides them through
 `testVariables` in its manifest. Only two keys are honoured — `projectName` and
 `projectModule`:

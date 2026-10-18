@@ -67,7 +67,7 @@ directory with a `putnami.template.json` next to a `putnami.json` declaring
 | Consumer | Use |
 |----------|-----|
 | `tooling/cli/internal/template` | Discovery, rendering, packaging, install |
-| `tooling/cli/internal/commands` | `templates install/list/update/remove`, `dev template validate/test/package`, `projects create` |
+| `tooling/cli/internal/commands` | `templates install/list/update/remove`, `templates validate/test/package`, `projects create` |
 
 There is no TypeScript twin: nothing outside the CLI reads a template manifest,
 so a second implementation would be a second thing to keep in sync for no

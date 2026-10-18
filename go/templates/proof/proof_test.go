@@ -230,7 +230,7 @@ func declaredPatterns(t *testing.T, proofDir string) map[string]bool {
 	return patterns
 }
 
-// testVars returns the variables `putnami dev template test` renders with:
+// testVars returns the variables `putnami templates test` renders with:
 // DefaultTestVars, with the manifest's testVariables overriding projectName and
 // projectModule only (tooling/cli/internal/commands/extensions/templates.go).
 func testVars(tpl committedTemplate) renderVars {

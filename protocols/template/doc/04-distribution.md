@@ -10,8 +10,8 @@ define → test → package → publish → install → create
 ```
 
 1. **Define** — template files plus a `putnami.template.json` manifest;
-2. **Test** — `putnami dev template test` renders and builds the template;
-3. **Package** — `putnami dev template package` creates a `.tar.gz` archive;
+2. **Test** — `putnami templates test` renders and builds the template;
+3. **Package** — `putnami templates package` creates a `.tar.gz` archive;
 4. **Publish** — `putnami publish` uploads the archive on the
    `template-archives` channel;
 5. **Install** — `putnami templates install` downloads, verifies and extracts
@@ -21,7 +21,7 @@ define → test → package → publish → install → create
 ## Packaging
 
 ```bash
-putnami dev template package [path] [--version <ver>] [--stable] [--output <dir>]
+putnami templates package [path] [--version <ver>] [--stable]
 ```
 
 The archive is a single platform-independent `<name>-<version>.tar.gz`
@@ -36,7 +36,6 @@ The version is resolved as `--version`, else the manifest's `version`, else
 |------|---------|
 | `--version <ver>` | Version stamped into the packaged manifest |
 | `--stable` | Record the archive as a stable release in the metadata |
-| `--output <dir>` | Override the archive output directory |
 
 Default output, relative to the template directory:
 
@@ -156,7 +155,7 @@ putnami templates list                 # list configured and discovered template
 putnami templates update [name]        # update to the latest compatible version
 putnami templates remove <name>        # remove an installed template
 
-putnami dev template validate [path]   # validate a manifest
-putnami dev template test [path]       # render, build and test a template
-putnami dev template package [path]    # package for distribution
+putnami templates validate [path]   # validate a manifest
+putnami templates test [path]       # render, build and test a template
+putnami templates package [path]    # package for distribution
 ```

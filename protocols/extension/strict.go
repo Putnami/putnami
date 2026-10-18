@@ -1018,7 +1018,7 @@ func isExternalRef(ref string) bool {
 // structural validation, the v3 task contract (ValidateTaskContracts, run as
 // part of ValidateManifest), pipeline DAG checks, and schema reference checks.
 // This is the comprehensive protocol-level validation entry point — the
-// authoring surface (`putnami dev extension validate`, the extension SDK's
+// authoring surface (`putnami extensions validate`, the extension SDK's
 // build-time gate) and the package-time gate, not the tolerant load path.
 func FullValidateManifest(m *Manifest) []diag.Diagnostic {
 	diags := ValidateManifest(m)
