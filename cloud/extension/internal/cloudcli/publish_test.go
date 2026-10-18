@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// The publish-config command tests live with their source in
+// The `config publish` command tests live with their source in
 // internal/configcli. What remains here are the findAppDir
 // resolution tests: they cover clicore.FindAppDir (aliased here as findAppDir),
 // the shared workspace/app discovery used by every command, not config logic.
