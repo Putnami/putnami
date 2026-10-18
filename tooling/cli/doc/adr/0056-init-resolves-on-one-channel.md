@@ -86,7 +86,8 @@ No record means `latest`.
 ### 3. Put artifacts
 
 On a channel other than `latest`, `init` installs the language extension, the
-agent-content extension and the template as `<name>@<channel>`, the form
+agent-content extension a starter names (none of the built-in ones do) and
+the template as `<name>@<channel>`, the form
 `putnami extensions install <name>@<channel>` takes. The install the project
 creation falls back to when the template is not in the workspace uses the same
 form. The steps that follow read the lock: materializing the agent content,

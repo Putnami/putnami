@@ -1,7 +1,9 @@
 # ADR 0047 — An extension is the only way agent content is installed, and the extension's pin is its pin
 
-- **Status**: accepted, amended by decision D-013 in the root
-  `decisions.json`: `putnami migrate agent-content` is deleted, so the
+- **Status**: accepted, amended by decisions D-012 and D-013 in the root
+  `decisions.json`. D-012: no built-in starter declares
+  `@putnami/contributor`, so `init` installs no agent content unless a starter
+  names an extension. D-013: `putnami migrate agent-content` is deleted, so the
   refusals in §2 name no command. They say which entry to replace or which
   ownership record to delete, and `putnami install` drops every pin under
   `agentArtifacts`.
@@ -138,14 +140,16 @@ extension, its installers fail, and its content would never install.
 | `install` | Reads the release the committed lock pins, or the installed npm package; resolves nothing, writes no lock entry. Repeated, it changes no byte. |
 | `upgrade` | Follows the extension its extensions phase moved; retires undeclared owners (section 6). `--dry-run` reports the opt-ins and the owners it would retire, and resolves and downloads nothing. |
 | `context generate` | Builds only local extensions' content. |
-| `init` | Installs the starter's extension, then its content. `--force` merges the existing `agentArtifacts` by the name each entry resolves to; the committed entry wins, and old-form entries are kept. |
+| `init` | Installs the extension the starter names, then its content; no built-in starter names one. `--force` merges the existing `agentArtifacts` by the name each entry resolves to; the committed entry wins, and old-form entries are kept. |
 | First-run ensure pass | Materializes content of a lock-pinned extension or an installed npm package before a job command; skips local, unpinned, and uninstalled ones; never writes the lock; never retires. Warm path: the record names the pin and every recorded file still has its digest. Files that match with no record get a record and nothing else. |
 | Session-start reconcile | See [ADR 0040](0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md). |
 
-Every built-in starter declares `@putnami/contributor` in `extensions` and
-opts into its content. A failure in `init`'s agent step is reported, not
-fatal: both declarations stay, no agent file is written, and `putnami install`
-is the next step.
+No built-in starter declares `@putnami/contributor` (decision D-012): a
+workspace gets its content only by declaring the extension in `extensions` and
+`extension:@putnami/contributor` in `agentArtifacts`, then running
+`putnami install`. When a starter does name an extension, a failure in
+`init`'s agent step is reported, not fatal: both declarations stay, no agent
+file is written, and `putnami install` is the next step.
 
 ### 6. Only `upgrade` retires, and only from this clone's record
 

@@ -307,22 +307,15 @@ type fixtureRegistry struct {
 	other []string
 }
 
-// optionalArtifacts are the registry paths a request may miss without the
-// test failing: init installs the starter's agent content and goes on when it
-// does not resolve.
-var optionalArtifacts = []string{"/putnami/contributor/download"}
-
 func newFixtureRegistry(t *testing.T, archives map[string][]byte) *fixtureRegistry {
 	t.Helper()
 	registry := &fixtureRegistry{}
 	registry.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		archive, ok := archives[r.URL.Path]
 		if !ok {
-			if !slices.Contains(optionalArtifacts, r.URL.Path) {
-				registry.mu.Lock()
-				registry.other = append(registry.other, r.URL.String())
-				registry.mu.Unlock()
-			}
+			registry.mu.Lock()
+			registry.other = append(registry.other, r.URL.String())
+			registry.mu.Unlock()
 			http.NotFound(w, r)
 			return
 		}

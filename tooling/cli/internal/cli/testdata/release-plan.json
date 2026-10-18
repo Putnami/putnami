@@ -196,7 +196,7 @@
         "@putnami/memory-store"
       ],
       "rollbackPoint": "the previous contributor and collaboration-provider archive channel pointers",
-      "reversal": "Repoint the contributor and provider archive channels at the previous version. An installed workspace is unaffected because its lock pins a resolved version and archive digest, so the rollback only changes what a fresh resolve returns. These extensions publish after the CLI because agent content needs extension contract 5, which the CLI reads, and before templates because every starter declares @putnami/contributor."
+      "reversal": "Repoint the contributor and provider archive channels at the previous version. An installed workspace is unaffected because its lock pins a resolved version and archive digest, so the rollback only changes what a fresh resolve returns. These extensions publish after the CLI because agent content needs extension contract 5, which the CLI reads, and before templates because a template or starter may name an agent-content extension."
     },
     {
       "id": "templates",

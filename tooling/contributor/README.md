@@ -101,13 +101,15 @@ dossier can compute `Putnami verified` for the declared local scope.
 ## Publication
 
 No built-in starter declares this extension: `putnami init` installs nothing of
-it, and `putnami extensions install @putnami/contributor` asks for it. The
+it. A workspace asks for it by declaring it in `extensions` and
+`extension:@putnami/contributor` in `agentArtifacts`, then running
+`putnami install`. The
 extension is published with the framework release set (`preview`), packaged by
 `@putnami/go` into one archive per platform that carries the content and the
 executable. It reaches `canary` first,
 and `stable` and `latest` at the next promotion. Until the channel a workspace
 resolves serves it, `putnami extensions install @putnami/contributor` and
-`putnami install` fail in a workspace that declares it; the
+`putnami install` fail, declared or not; the
 [compatibility window](doc/03-entry-point-migration.md#publication-and-compatibility-window)
 states what works before publication and which CLI reads the content. The two
 superseded artifacts are deleted, and no CLI from this release on installs them

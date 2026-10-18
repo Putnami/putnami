@@ -371,6 +371,7 @@ func (h *harness) lock(t *testing.T) *lockfile.LockFile {
 func (h *harness) assertResolved(t *testing.T, set releaseSet, transcript string) {
 	t.Helper()
 	lock := h.lock(t)
+	h.assertNoAgentContent(t, lock)
 	archives := h.releases(t, set)
 	platform := lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH)
 
@@ -391,6 +392,27 @@ func (h *harness) assertResolved(t *testing.T, set releaseSet, transcript string
 	}
 	if data, err := os.ReadFile(filepath.Join(h.root, "webapp", "template.txt")); err != nil || string(data) != "template "+set.template+"\n" {
 		t.Errorf("webapp/template.txt = %q, %v; want the template release %s", data, err, set.template)
+	}
+}
+
+// assertNoAgentContent fails when init left the contributor extension in the
+// lock, an agentArtifacts declaration in the config, or an agent directory.
+func (h *harness) assertNoAgentContent(t *testing.T, lock *lockfile.LockFile) {
+	t.Helper()
+	if pin, ok := lock.GetExtension("@putnami/contributor"); ok {
+		t.Errorf("the lock pins @putnami/contributor: %+v", pin)
+	}
+	data, err := os.ReadFile(filepath.Join(h.root, wsproto.WorkspaceConfigFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "agentArtifacts") || strings.Contains(string(data), "@putnami/contributor") {
+		t.Errorf("the workspace config declares agent content:\n%s", data)
+	}
+	for _, dir := range []string{".claude", ".agents", ".codex"} {
+		if _, err := os.Stat(filepath.Join(h.root, dir)); err == nil {
+			t.Errorf("init created %s, want no agent content", dir)
+		}
 	}
 }
 
