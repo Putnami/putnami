@@ -185,6 +185,43 @@
       "positionals": []
     },
     {
+      "path": "cli",
+      "flags": [],
+      "positionals": [
+        {
+          "name": "list|use",
+          "required": true
+        }
+      ]
+    },
+    {
+      "path": "cli list",
+      "flags": [
+        {
+          "long": "--global",
+          "short": "-g",
+          "type": "bool"
+        }
+      ],
+      "positionals": []
+    },
+    {
+      "path": "cli use",
+      "flags": [
+        {
+          "long": "--global",
+          "short": "-g",
+          "type": "bool"
+        }
+      ],
+      "positionals": [
+        {
+          "name": "name",
+          "required": true
+        }
+      ]
+    },
+    {
       "path": "completion",
       "flags": [],
       "positionals": [
@@ -1059,7 +1096,7 @@
       "flags": [],
       "positionals": [
         {
-          "name": "get|tag|list|use",
+          "name": "get|tag",
           "required": true
         }
       ]
@@ -1070,17 +1107,6 @@
         {
           "long": "--scope",
           "type": "value"
-        }
-      ],
-      "positionals": []
-    },
-    {
-      "path": "version list",
-      "flags": [
-        {
-          "long": "--global",
-          "short": "-g",
-          "type": "bool"
         }
       ],
       "positionals": []
@@ -1109,22 +1135,6 @@
         {
           "name": "tag",
           "required": false
-        }
-      ]
-    },
-    {
-      "path": "version use",
-      "flags": [
-        {
-          "long": "--global",
-          "short": "-g",
-          "type": "bool"
-        }
-      ],
-      "positionals": [
-        {
-          "name": "name",
-          "required": true
         }
       ]
     },

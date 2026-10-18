@@ -8,6 +8,25 @@ Global Options:
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
+═══ cli ═══
+putnami cli
+
+List the installed putnami CLI binaries (list) and switch the active one (use)
+
+Usage:
+  putnami cli <list|use>
+
+Examples:
+  putnami cli list --global
+  putnami cli use go-dev
+
+Global Options:
+  Common: --verbose, --debug, --watch, --plan, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
+  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Output: --output, --json, --quiet, --color, --no-color
+  Advanced: --trace-profile
+
 ═══ completion ═══
 putnami completion
 
@@ -525,17 +544,15 @@ Related Commands:
 ═══ version ═══
 putnami version
 
-Show the version each line is at (get), release a line (tag), and manage the installed CLI binaries (list/use)
+Show the version each line is at (get) and release a line (tag)
 
 Usage:
-  putnami version <get|tag|list|use>
+  putnami version <get|tag>
 
 Examples:
   putnami version get
   putnami version tag --scope typescript --dry-run
   putnami version tag --scope tooling --yes --push
-  putnami version list --global
-  putnami version use go-dev
 
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
@@ -649,6 +666,50 @@ Related Commands:
   putnami build
   putnami test
   putnami lint
+
+═══ cli list ═══
+putnami cli list
+
+List the installed putnami CLI binaries in .putnami/bin (or ~/.putnami/bin with --global) and mark the active one
+
+Usage:
+  putnami cli list [--global]
+
+Command Flags:
+  --global                     List binaries in ~/.putnami/bin instead of the workspace (alias: -g)
+
+Examples:
+  putnami cli list
+  putnami cli list --global
+
+Global Options:
+  Common: --verbose, --debug, --watch, --plan, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
+  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Output: --output, --json, --quiet, --color, --no-color
+  Advanced: --trace-profile
+
+═══ cli use ═══
+putnami cli use
+
+Switch the active putnami CLI binary to an installed putnami-<name> (e.g. one built by `upgrade --from-source`)
+
+Usage:
+  putnami cli use <name> [--global]
+
+Command Flags:
+  --global                     Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)
+
+Examples:
+  putnami cli use go-dev
+  putnami cli use go-source-1a2b3c4 --global
+
+Global Options:
+  Common: --verbose, --debug, --watch, --plan, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
+  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Output: --output, --json, --quiet, --color, --no-color
+  Advanced: --trace-profile
 
 ═══ config set ═══
 putnami config set
@@ -1530,28 +1591,6 @@ Global Options:
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
-═══ version list ═══
-putnami version list
-
-List the installed putnami CLI binaries in .putnami/bin (or ~/.putnami/bin with --global) and mark the active one
-
-Usage:
-  putnami version list [--global]
-
-Command Flags:
-  --global                     List binaries in ~/.putnami/bin instead of the workspace (alias: -g)
-
-Examples:
-  putnami version list
-  putnami version list --global
-
-Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
-  Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
-
 ═══ version tag ═══
 putnami version tag
 
@@ -1570,28 +1609,6 @@ Examples:
   putnami version tag --scope typescript --dry-run
   putnami version tag --scope tooling --yes --push
   putnami version tag tooling/v0.3.0 --scope tooling --yes
-
-Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
-  Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
-
-═══ version use ═══
-putnami version use
-
-Switch the active putnami CLI binary to an installed putnami-<name> (e.g. one built by `upgrade --from-source`)
-
-Usage:
-  putnami version use <name> [--global]
-
-Command Flags:
-  --global                     Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)
-
-Examples:
-  putnami version use go-dev
-  putnami version use go-source-1a2b3c4 --global
 
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help

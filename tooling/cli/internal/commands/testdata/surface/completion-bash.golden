@@ -5,6 +5,7 @@
 _putnami_subcommands_for() {
     case "$1" in
         'cache') printf '%s\n' 'clean gc verify' ;;
+        'cli') printf '%s\n' 'list use' ;;
         'completion') printf '%s\n' 'bash fish zsh' ;;
         'config') printf '%s\n' 'set show' ;;
         'context') printf '%s\n' 'generate map pack' ;;
@@ -21,7 +22,7 @@ _putnami_subcommands_for() {
         'telemetry') printf '%s\n' 'off on show status' ;;
         'templates') printf '%s\n' 'install list remove update' ;;
         'tree') printf '%s\n' 'fingerprint verify' ;;
-        'version') printf '%s\n' 'get list tag use' ;;
+        'version') printf '%s\n' 'get tag' ;;
         'workspace') printf '%s\n' 'describe init' ;;
     esac
 }
@@ -32,6 +33,9 @@ _putnami_path_known() {
         'cache clean') return 0 ;;
         'cache gc') return 0 ;;
         'cache verify') return 0 ;;
+        'cli') return 0 ;;
+        'cli list') return 0 ;;
+        'cli use') return 0 ;;
         'completion') return 0 ;;
         'completion bash') return 0 ;;
         'completion fish') return 0 ;;
@@ -104,9 +108,7 @@ _putnami_path_known() {
         'upgrade') return 0 ;;
         'version') return 0 ;;
         'version get') return 0 ;;
-        'version list') return 0 ;;
         'version tag') return 0 ;;
-        'version use') return 0 ;;
         'workspace') return 0 ;;
         'workspace describe') return 0 ;;
         'workspace init') return 0 ;;
@@ -116,6 +118,8 @@ _putnami_path_known() {
 
 _putnami_flags_for() {
     case "$1" in
+        'cli list') printf '%s\n' '--global' ;;
+        'cli use') printf '%s\n' '--global' ;;
         'compose') printf '%s\n' '--no-watch --port --ready-timeout' ;;
         'context generate') printf '%s\n' '--force' ;;
         'context map') printf '%s\n' '--print' ;;
@@ -146,9 +150,7 @@ _putnami_flags_for() {
         'tree verify') printf '%s\n' '--base --gate --record --ref --report --snapshot --workflow' ;;
         'upgrade') printf '%s\n' '--channel --cli --deps --dry-run --extensions --from-source --global --namespace --release --version' ;;
         'version get') printf '%s\n' '--scope' ;;
-        'version list') printf '%s\n' '--global' ;;
         'version tag') printf '%s\n' '--dry-run --push --scope --yes' ;;
-        'version use') printf '%s\n' '--global' ;;
         'workspace init') printf '%s\n' '--channel --extension --force --project --project-path --workspace' ;;
     esac
 }
@@ -157,8 +159,8 @@ _putnami_completions() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="D P b build cache completion compose config context contributor d deploy deps dev doctor extensions f format generate help impact-plan infra init install l lint mcp migrate p package pin projects publish qualify report run s scopes serve sessions t telemetry templates test tree upgrade validate version workspace"
-    local structured="cache completion compose config context contributor deps dev doctor extensions help impact-plan infra init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade version workspace"
+    local commands="D P b build cache cli completion compose config context contributor d deploy deps dev doctor extensions f format generate help impact-plan infra init install l lint mcp migrate p package pin projects publish qualify report run s scopes serve sessions t telemetry templates test tree upgrade validate version workspace"
+    local structured="cache cli completion compose config context contributor deps dev doctor extensions help impact-plan infra init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade version workspace"
     local global_flags="--verbose --debug --watch --plan --help --all --impacted --projects --tag --exclude-tag --exclude --baseline --impacted-strict --where --providers --credential-fd --no-cache --no-cache-projects --cache-trust --continue-on-error --max-parallel --resource --cpu-policy --retry --retry-failed --profile --dry-run --output --json --quiet --color --no-color --trace-profile --version"
     local projects=""
     local project_ids=""

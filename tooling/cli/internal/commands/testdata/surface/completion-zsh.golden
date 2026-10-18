@@ -18,6 +18,12 @@ _putnami_subcommands_for() {
                 'verify'
             )
             ;;
+        'cli')
+            reply=(
+                'list'
+                'use'
+            )
+            ;;
         'completion')
             reply=(
                 'bash'
@@ -129,9 +135,7 @@ _putnami_subcommands_for() {
         'version')
             reply=(
                 'get'
-                'list'
                 'tag'
-                'use'
             )
             ;;
         'workspace')
@@ -149,6 +153,9 @@ _putnami_path_known() {
         'cache clean') return 0 ;;
         'cache gc') return 0 ;;
         'cache verify') return 0 ;;
+        'cli') return 0 ;;
+        'cli list') return 0 ;;
+        'cli use') return 0 ;;
         'completion') return 0 ;;
         'completion bash') return 0 ;;
         'completion fish') return 0 ;;
@@ -221,9 +228,7 @@ _putnami_path_known() {
         'upgrade') return 0 ;;
         'version') return 0 ;;
         'version get') return 0 ;;
-        'version list') return 0 ;;
         'version tag') return 0 ;;
-        'version use') return 0 ;;
         'workspace') return 0 ;;
         'workspace describe') return 0 ;;
         'workspace init') return 0 ;;
@@ -234,6 +239,16 @@ _putnami_path_known() {
 _putnami_flags_for() {
     reply=()
     case "$1" in
+        'cli list')
+            reply=(
+                '--global[List binaries in ~/.putnami/bin instead of the workspace (alias: -g)]'
+            )
+            ;;
+        'cli use')
+            reply=(
+                '--global[Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)]'
+            )
+            ;;
         'compose')
             reply=(
                 '--no-watch[Run the target production-mode without watch, like its dependencies]'
@@ -430,22 +445,12 @@ _putnami_flags_for() {
                 '--scope[Report only this version line, by its scope path]:line:'
             )
             ;;
-        'version list')
-            reply=(
-                '--global[List binaries in ~/.putnami/bin instead of the workspace (alias: -g)]'
-            )
-            ;;
         'version tag')
             reply=(
                 '--dry-run[Print the proposed tag and changelog without writing anything]'
                 '--push[Push the release commit and the tag to origin]'
                 '--scope[The version line to release, by its scope path (required when the workspace declares several)]:line:'
                 '--yes[Skip the confirmation and create the release commit and tag]'
-            )
-            ;;
-        'version use')
-            reply=(
-                '--global[Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)]'
             )
             ;;
         'workspace init')
@@ -489,6 +494,7 @@ _putnami() {
 
     structured_commands=(
         'cache:Manage cache'
+        'cli:Installed CLI binaries'
         'completion:Generate shell completions (bash, zsh, fish)'
         'compose:Serve a workload with the workloads it runs with'
         'config:Manage configuration'
@@ -515,7 +521,7 @@ _putnami() {
         'templates:Manage templates'
         'tree:Identify the worktree the CLI runs in and check evidence against it'
         'upgrade:Upgrade CLI, extensions, and dependencies'
-        'version:Versions derived from git, release tags, and installed CLI binaries'
+        'version:Versions derived from git and release tags'
         'workspace:Manage workspace'
     )
 

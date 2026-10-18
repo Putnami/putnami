@@ -12,6 +12,23 @@ description: Run lint, test, and build twice in isolated worktrees, compare cach
 usage: putnami cache verify [--projects <selector> | --impacted | --all] [--output <format>]
 example: putnami cache verify --projects /my/project
 example: putnami cache verify --all --output=jsonl
+═══ cli ═══
+description: List the installed putnami CLI binaries (list) and switch the active one (use)
+usage: putnami cli <list|use>
+example: putnami cli list --global
+example: putnami cli use go-dev
+═══ cli list ═══
+description: List the installed putnami CLI binaries in .putnami/bin (or ~/.putnami/bin with --global) and mark the active one
+usage: putnami cli list [--global]
+flag: --global |  | List binaries in ~/.putnami/bin instead of the workspace (alias: -g)
+example: putnami cli list
+example: putnami cli list --global
+═══ cli use ═══
+description: Switch the active putnami CLI binary to an installed putnami-<name> (e.g. one built by `upgrade --from-source`)
+usage: putnami cli use <name> [--global]
+flag: --global |  | Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)
+example: putnami cli use go-dev
+example: putnami cli use go-source-1a2b3c4 --global
 ═══ completion ═══
 description: Generate a shell completion script for bash, zsh, or fish; source it or install it where the shell looks for completions
 usage: putnami completion <bash|zsh|fish>
@@ -377,13 +394,11 @@ example: putnami upgrade --release rs_<64-lowercase-hex> --namespace putnami
 example: putnami upgrade --deps --version 1.2.3
 example: putnami upgrade --from-source --global
 ═══ version ═══
-description: Show the version each line is at (get), release a line (tag), and manage the installed CLI binaries (list/use)
-usage: putnami version <get|tag|list|use>
+description: Show the version each line is at (get) and release a line (tag)
+usage: putnami version <get|tag>
 example: putnami version get
 example: putnami version tag --scope typescript --dry-run
 example: putnami version tag --scope tooling --yes --push
-example: putnami version list --global
-example: putnami version use go-dev
 ═══ version get ═══
 description: Show the version every version line is at, derived from its git tags
 usage: putnami version get [--scope <line>] [--output <format>]
@@ -391,12 +406,6 @@ flag: --scope | <line> | Report only this version line, by its scope path
 example: putnami version get
 example: putnami version get --scope typescript
 example: putnami version get --output=jsonl
-═══ version list ═══
-description: List the installed putnami CLI binaries in .putnami/bin (or ~/.putnami/bin with --global) and mark the active one
-usage: putnami version list [--global]
-flag: --global |  | List binaries in ~/.putnami/bin instead of the workspace (alias: -g)
-example: putnami version list
-example: putnami version list --global
 ═══ version tag ═══
 description: Release a version line: regenerate its changelog, create the release commit, then the annotated tag on it
 usage: putnami version tag [<tag>] [--scope <line>] [--push] [--dry-run] [--yes]
@@ -407,12 +416,6 @@ flag: --yes |  | Skip the confirmation and create the release commit and tag
 example: putnami version tag --scope typescript --dry-run
 example: putnami version tag --scope tooling --yes --push
 example: putnami version tag tooling/v0.3.0 --scope tooling --yes
-═══ version use ═══
-description: Switch the active putnami CLI binary to an installed putnami-<name> (e.g. one built by `upgrade --from-source`)
-usage: putnami version use <name> [--global]
-flag: --global |  | Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)
-example: putnami version use go-dev
-example: putnami version use go-source-1a2b3c4 --global
 ═══ workspace describe ═══
 description: Confirm the active workspace and show its name, version, project count, extension count, and configuration summary before selecting work
 usage: putnami workspace describe [--output <format>]
