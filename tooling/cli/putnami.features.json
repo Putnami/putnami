@@ -2895,6 +2895,20 @@
           }
         },
         {
+          "id": "change-language-parity",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "change-language-reports-what-contributor-language-reports",
+              "tasks-reach-the-provider-through-the-host-channel",
+              "other-modes-never-dial-the-host",
+              "tasks-without-a-channel-exit-2"
+            ]
+          }
+        },
+        {
           "id": "canonical-consumer-migration",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

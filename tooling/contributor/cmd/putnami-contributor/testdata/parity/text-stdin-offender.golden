@@ -1,0 +1,6 @@
+exit 1
+-- stdout --
+proposal: non-English signals: avec, fichier, le, nous
+proposal:1:Nous corrigeons le code avec le fichier
+-- stderr --
+contributor language: 1 of 1 scanned unit(s) are not in English

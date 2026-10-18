@@ -55,12 +55,90 @@
       "inputs": [
         "bin/prepare",
         "cmd/**",
+        "internal/**",
         "go.mod",
         "go.sum"
       ],
       "toolchains": [
         "runtimeCompiler"
       ]
+    }
+  },
+  "commandGroups": {
+    "change": {
+      "description": "The change workflow: checks of the material a change carries.",
+      "subcommands": {
+        "language": {
+          "description": "Check English-language signals in contributor material.",
+          "command": "change-language",
+          "interactive": true,
+          "positionals": [
+            {
+              "name": "text|files|commits|tasks",
+              "required": true
+            }
+          ],
+          "examples": [
+            {
+              "command": "putnami change language text --label proposal - < body.md",
+              "description": "Check a proposal body read from standard input"
+            },
+            {
+              "command": "putnami change language files --diff origin/main..HEAD",
+              "description": "Check the tracked files a revision range changes"
+            },
+            {
+              "command": "putnami change language commits origin/main..HEAD",
+              "description": "Check the commit messages of a revision range"
+            },
+            {
+              "command": "putnami change language tasks --limit 100",
+              "description": "Check open task titles and bodies"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "commands": {
+    "change-language": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Inspect text or stdin, tracked workspace files, commit messages, or task titles and bodies using the repository's bounded English-language rule. The tasks mode reads the configured tasks provider. Findings exit 1; invalid input or an unavailable provider exits 2.",
+      "flags": {
+        "label": {
+          "type": "string",
+          "description": "With text: label the input in findings."
+        },
+        "diff": {
+          "type": "string",
+          "description": "With files: inspect tracked files changed in a revision range."
+        },
+        "limit": {
+          "type": "number",
+          "description": "With tasks: maximum number of task records to inspect."
+        }
+      },
+      "run": [
+        {
+          "id": "language",
+          "task": "change-language"
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "change-language": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "language"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Check English-language signals in contributor material.",
+      "timeoutMs": 600000
     }
   },
   "agentContent": {

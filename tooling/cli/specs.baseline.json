@@ -51,6 +51,7 @@
     "cli/context-mcp-discovery#workspace-map",
     "cli/contributor-workflows#canonical-consumer-migration",
     "cli/contributor-workflows#canonical-entry-points",
+    "cli/contributor-workflows#change-language-parity",
     "cli/contributor-workflows#explicit-only-invocation",
     "cli/contributor-workflows#native-workflow-validation",
     "cli/contributor-workflows#one-contributor-extension",

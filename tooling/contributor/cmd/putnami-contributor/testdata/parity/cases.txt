@@ -1,0 +1,20 @@
+# One case per line: name|standard input|arguments of the language command.
+# Arguments split on spaces. An empty standard input field means no input.
+text-stdin-offender|Nous corrigeons le code avec le fichier|text --label proposal -
+text-stdin-clean|The proposal is written in English.|text -
+text-stdin-default|Nous corrigeons le code avec le fichier|text
+text-file-offender||text docs/francais.md
+text-file-clean||text README.md docs/clean.md
+text-file-missing||text docs/absent.md
+files-all||files
+files-pathspec||files -- README.md docs/clean.md
+files-diff||files --diff HEAD~1..HEAD
+files-diff-invalid||files --diff nosuch..HEAD
+files-diff-missing-range||files --diff
+commits-offender||commits HEAD~1..HEAD
+commits-clean||commits HEAD~1
+commits-invalid||commits nosuch..HEAD
+commits-missing-range||commits
+tasks-invalid-limit||tasks --limit 0
+tasks-extra-argument||tasks extra
+unknown-mode||bogus

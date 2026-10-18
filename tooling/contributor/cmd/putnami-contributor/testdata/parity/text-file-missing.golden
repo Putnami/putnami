@@ -1,0 +1,5 @@
+exit 2
+-- stdout --
+-- stderr --
+contributor language: open docs/absent.md: no such file or directory
+putnami: contributor language failed

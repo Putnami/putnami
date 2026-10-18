@@ -162,8 +162,8 @@ no language rule, report it as not configured. The detector checks everything
 this change publishes:
 
 ```bash
-"$PUTNAMI_CLI" contributor language commits origin/<base>..HEAD
-"$PUTNAMI_CLI" contributor language files --diff origin/<base>...HEAD
+"$PUTNAMI_CLI" change language commits origin/<base>..HEAD
+"$PUTNAMI_CLI" change language files --diff origin/<base>...HEAD
 ```
 
 The proposal text is checked only when the proposals contract answers `ok`
@@ -178,7 +178,7 @@ outcome="$(jq -j '.outcome // "no envelope"' <<<"$envelope" 2>/dev/null || echo 
 found="$(jq -j '.result.items // [] | length' <<<"$envelope" 2>/dev/null || echo 0)"
 if [ "$outcome" = ok ] && [ "$found" -gt 0 ]; then
   jq -r '.result.items[0] | .title + "\n\n" + (.body // "")' <<<"$envelope" |
-    "$PUTNAMI_CLI" contributor language text --label "proposal title and body"
+    "$PUTNAMI_CLI" change language text --label "proposal title and body"
 else
   echo "proposal title and body: NOT CHECKED (outcome $outcome, $found proposal(s))"
 fi

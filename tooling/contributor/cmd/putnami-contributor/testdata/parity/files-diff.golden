@@ -1,0 +1,6 @@
+exit 1
+-- stdout --
+docs/nouveau.md: non-English signals: cette, est, il faut, le, nous, parce que, que, écrivions
+docs/nouveau.md:1:Il faut que nous écrivions cette page, parce que le texte est utile.
+-- stderr --
+contributor language: 1 of 2 scanned unit(s) are not in English
