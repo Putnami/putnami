@@ -23,7 +23,6 @@ import (
 	put "go.putnami.dev/protocol/put"
 	runner "go.putnami.dev/protocol/runner"
 	runtimeproto "go.putnami.dev/protocol/runtime"
-	"go.putnami.dev/sdk/extension/envkeys"
 	"go.putnami.dev/sdk/extension/gomodpublish"
 	"go.putnami.dev/sdk/extension/npmpublish"
 	"go.putnami.dev/sdk/extension/oci"
@@ -41,54 +40,12 @@ const publicationOpenKey = "putnami:publish~open"
 // publicationUploadStep is the step id of every upload node.
 const publicationUploadStep = "upload"
 
-// A native publication run exports one loopback registry route per registry
-// kind, named PUTNAMI_REGISTRY_<KIND>_URL (the extension SDK's privatebroker),
-// which a publication job uses when it uploads itself. A job that packs into
-// an outbox receives none of them, whatever the kind. PUTNAMI_REGISTRY_URL,
-// which names no kind, is the download mirror and is not a route.
-const (
-	registryRouteEnvPrefix = "PUTNAMI_REGISTRY_"
-	registryRouteEnvSuffix = "_URL"
-)
-
-// outboxJobWithheldEnv is every other variable through which a publication
-// job could reach a registry or cloud credential. A job that packs into an
-// outbox receives none of them.
-var outboxJobWithheldEnv = []string{
-	extproto.CloudTokenEnv,
-	extproto.JobCredentialFDEnv,
-	extproto.CloudCapabilityAfterEnv,
-	InternalReleasePlanCallbackEnv,
-	InternalReleaseSetProviderCapabilityEnv,
-	runtimeproto.ReleaseSetPublishedImagesFileEnv,
-	runtimeproto.ReleaseSetMembersFileEnv,
-}
-
-// withheldFromOutboxJob reports whether a job that packs into an outbox is
-// denied the variable name: a registry route of any kind, or a variable
-// outboxJobWithheldEnv lists. Names compare the way the platform's process
-// environment compares them.
-func withheldFromOutboxJob(name string) bool {
-	canonical := envkeys.Host.Canonical(name)
-	if len(canonical) > len(registryRouteEnvPrefix)+len(registryRouteEnvSuffix) &&
-		strings.HasPrefix(canonical, registryRouteEnvPrefix) && strings.HasSuffix(canonical, registryRouteEnvSuffix) {
-		return true
-	}
-	return slices.ContainsFunc(outboxJobWithheldEnv, func(key string) bool {
-		return envkeys.Host.Canonical(key) == canonical
-	})
-}
-
-// publicationRunContextKey carries the run whose publication jobs pack into
-// outboxes (PublicationContext).
-type publicationRunContextKey struct{}
-
 // PublicationContext gives every selected publication job of a publication-v1
 // run a private outbox directory, mode 0700, and returns ctx carrying them
-// with the function that removes them. The job finds its directory in
-// PUTNAMI_PUBLICATION_OUTBOX and no credential in its environment
-// (scopeProcessCapabilities). A run without a publication provider returns
-// ctx unchanged.
+// (WithPublicationOutboxes) with the function that removes them. The job
+// finds its directory in PUTNAMI_PUBLICATION_OUTBOX and no credential in its
+// environment (scopeProcessCapabilities). A run without a publication
+// provider returns ctx unchanged.
 func (run *ReleaseSetRun) PublicationContext(ctx context.Context) (context.Context, func(), error) {
 	if !run.Publication() || len(run.publishJobKeys) == 0 {
 		return ctx, func() {}, nil
@@ -111,32 +68,7 @@ func (run *ReleaseSetRun) PublicationContext(ctx context.Context) (context.Conte
 		outboxes[key] = dir
 	}
 	run.outboxes = outboxes
-	return context.WithValue(ctx, publicationRunContextKey{}, run), cleanup, nil
-}
-
-// publicationOutboxFor is the outbox job packs into, "" when it packs into
-// none.
-func publicationOutboxFor(ctx context.Context, job *ScheduledJob) string {
-	if ctx == nil || job == nil || job.JobDef == nil || job.Project == nil {
-		return ""
-	}
-	run, _ := ctx.Value(publicationRunContextKey{}).(*ReleaseSetRun)
-	if run == nil {
-		return ""
-	}
-	return run.outboxes[job.Key()]
-}
-
-// publicationOutboxEnv is env without any credential or registry route, and
-// with the outbox the job packs into as its only PUTNAMI_PUBLICATION_OUTBOX.
-func publicationOutboxEnv(env []string, outbox string) []string {
-	kept := make([]string, 0, len(env)+1)
-	for _, entry := range env {
-		if name, _, _ := strings.Cut(entry, "="); !withheldFromOutboxJob(name) {
-			kept = append(kept, entry)
-		}
-	}
-	return envkeys.Host.Set(kept, extproto.PublicationOutboxEnv, outbox)
+	return WithPublicationOutboxes(ctx, outboxes), cleanup, nil
 }
 
 // attachPublication adds the publication-v1 nodes to the plan. One open node
