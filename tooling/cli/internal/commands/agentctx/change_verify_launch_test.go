@@ -18,8 +18,9 @@ import (
 // @putnami/contributor serves through an interactive launch. For one invocation
 // in one workspace, the command prints the same stdout and exits with the same
 // code as the contributor executable run directly in the workspace root with
-// the arguments putnami hands it and no host channel. The cases pin what only the launch
-// decides: an inline `--flag=value` reaches the executable, the executable
+// the arguments putnami hands it and no host channel. The cases pin what only
+// the launch decides: an inline `--flag=value` reaches the executable, a
+// global output flag does not and leaves the document as it is, the executable
 // starts in the workspace root whatever directory the user runs putnami from,
 // and its exit code is the command's.
 func TestChangeVerifyThroughPutnamiRunsTheContributorExecutable(t *testing.T) {
@@ -97,7 +98,8 @@ func TestChangeVerifyThroughPutnamiRunsTheContributorExecutable(t *testing.T) {
 	}
 	// received is what the executable gets when it differs from what the user
 	// types: putnami splits an inline `--flag=value` into the flag and its value,
-	// and the executable reads only the split form.
+	// keeps a global output flag for itself, and the executable reads only the
+	// split form.
 	for _, tc := range []struct {
 		dir      string
 		args     []string
@@ -109,6 +111,9 @@ func TestChangeVerifyThroughPutnamiRunsTheContributorExecutable(t *testing.T) {
 		{"docs", []string{"--ref", "docs/guide.md"}, nil, 0},
 		{".", []string{"--ref", "absent.md"}, nil, 1},
 		{".", []string{"--snapshot", "--base=main"}, []string{"--snapshot", "--base", "main"}, 0},
+		{".", []string{"--ref", "README.md", "--output=json"}, []string{"--ref", "README.md"}, 0},
+		{".", []string{"--output", "jsonl", "--ref", "README.md"}, []string{"--ref", "README.md"}, 0},
+		{".", []string{"--json", "--ref", "absent.md"}, []string{"--ref", "absent.md"}, 1},
 	} {
 		name := tc.dir + " " + strings.Join(tc.args, " ")
 		received := tc.received

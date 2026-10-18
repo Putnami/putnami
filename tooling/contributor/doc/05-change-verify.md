@@ -19,7 +19,8 @@ acceptance evidence, and fails if the dossier changes while it reads it.
 An optional `workflow: {"path":".context/workflow.json","sha256":"..."}`
 in a v2 dossier also checks the separate v1 workflow record. Existing v2
 dossiers without this member keep their earlier meaning. Check `change verify
-ignore an extra dossier member.
+--help` for `--workflow` before relying on the optional member: an older
+verifier ignores an extra dossier member.
 
 The v1 workflow record uses `version: 1`, a stable `outcome`, a `mandate`
 reference, `sources`, `requirements`, `units`, `artifacts`, `experiments`,

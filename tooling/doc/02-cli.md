@@ -221,8 +221,8 @@ because the core still serves `tree`. The refusal of `putnami dev …` names the
 `extensions` and `templates` spellings, and the refusal of `putnami contributor
 …` names `putnami doctor --machine`. The refusal of `putnami tree verify …`
 names no successor. A run of a moved SDD command that plans no job prints a
-hint. Both messages link to this section, and so does the `impact-plan` refusal
-of a command that no installed extension declares.
+hint. The refusals and the hint link to this section, and so does the
+`impact-plan` refusal of a command that no installed extension declares.
 
 ## Project targeting
 

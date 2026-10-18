@@ -30,10 +30,11 @@ const (
 
 	// recordVerifyEnv names the command a recording run takes the goldens
 	// from. The current core refuses `tree verify`, so the command is a putnami
-	// release that still serves it. When it is set,
+	// built from a commit before the core deleted it. When it is set,
 	// TestChangeVerifyMatchesTheCoreCommand runs `<command> tree verify
 	// <arguments>` for every case and writes testdata/verify/<case>.golden
-	// instead of comparing.
+	// instead of comparing. No case exits 2, so a recording run fails on an
+	// exit 2, which is how a putnami that refuses `tree verify` answers.
 	recordVerifyEnv = "PUTNAMI_CONTRIBUTOR_RECORD_VERIFY"
 
 	// restoredCase is the one case whose workflow proof restores a report,
@@ -611,6 +612,9 @@ func TestChangeVerifyMatchesTheCoreCommand(t *testing.T) {
 				// it built there.
 				recorded := repo.launch(t, repo.dir(t, c), slices.Concat([]string{core, "tree", "verify"}, c.args),
 					"PUTNAMI_HOME="+putnamiHome(t), "PUTNAMI_NO_RELAUNCH=1")
+				if recorded.code == 2 {
+					t.Fatalf("%s tree verify exited 2, so it does not serve the command; record with a putnami built before the core deleted it:\n%s", core, recorded.stderr)
+				}
 				if err := os.WriteFile(filepath.Join("testdata", "verify", c.name+".golden"), []byte(renderVerdict(recorded)), 0o644); err != nil {
 					t.Fatal(err)
 				}

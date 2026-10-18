@@ -34,7 +34,7 @@ later rung.
 The `change-language` task runs in the workspace root. `verify` declares
 `workspace: optional` and its task declares no `cwd`: putnami starts it in the
 workspace root inside a workspace, and in the caller's directory outside one.
-The core's `tree verify` runs in any Git repository, so `change verify` must
+The core's `tree verify` ran in any Git repository, so `change verify` does
 too.
 
 ### 2. The subcommands are interactive
@@ -78,7 +78,7 @@ The executable runs the check in its working directory, which is the workspace
 root, and reads Git state with the same read-only operations as the core. Those
 operations run without the host channel variables in their environment.
 
-Known differences from `putnami contributor language`:
+Known differences from `putnami contributor language`, as the core served it:
 
 - **(a) Trailing line.** The core prints a final `putnami: contributor language
   failed` line when the command exits 2. The executable does not.
@@ -129,7 +129,7 @@ The core marks repository code as started before it runs that plan, which
 guards the core's run credential. The executable holds no run credential, so it
 marks nothing.
 
-Known differences from `putnami tree verify`:
+Known differences from `putnami tree verify`, as the core served it:
 
 - **(a) Help.** `--help` prints the help putnami builds from the manifest,
   where the core prints its catalog help. Run without putnami, the executable

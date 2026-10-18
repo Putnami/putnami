@@ -161,16 +161,16 @@ func TestCmdTreeRejectsWhatItDoesNotAccept(t *testing.T) {
 	}
 }
 
-// TestCmdTreeNamesVerifyAmongItsSubcommands keeps the usage error of an unknown
+// TestCmdTreeNamesItsSubcommands keeps the usage error of an unknown
 // subcommand in step with the subcommands cmdTree dispatches.
-func TestCmdTreeNamesVerifyAmongItsSubcommands(t *testing.T) {
+func TestCmdTreeNamesItsSubcommands(t *testing.T) {
 	t.Parallel()
 	command, ok := lookupCommand("tree")
 	if !ok {
 		t.Fatal("tree command is not registered")
 	}
 	err := command.run(&CommandEnv{Ctx: context.Background(), Cfg: &wsproto.Config{}, Sub: "digest"})
-	if !errors.Is(err, cmderr.ErrUsage) || !strings.Contains(err.Error(), "Available: fingerprint, verify") {
-		t.Fatalf("err = %v, want a usage error naming fingerprint and verify", err)
+	if !errors.Is(err, cmderr.ErrUsage) || !strings.Contains(err.Error(), "Available: fingerprint") || strings.Contains(err.Error(), "verify") {
+		t.Fatalf("err = %v, want a usage error naming fingerprint alone", err)
 	}
 }
