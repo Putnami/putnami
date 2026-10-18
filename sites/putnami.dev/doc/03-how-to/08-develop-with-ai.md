@@ -70,15 +70,15 @@ remains incomplete. A first export release with a size limit keeps the
 large-data requirement pending unless the mandate actually changes it.
 
 Specs, designs, experiments, decisions and original reviews have canonical
-references and exact examined inputs. `putnami tree verify --workflow <file>`
+references and exact examined inputs. `putnami change verify --workflow <file>`
 checks the versioned local record and native requirement coverage; it reports
 planning progress. Candidate readiness separately requires the execution
 dossier's independent review, gate and applicable qualification. Ready, merged,
 published, deployed and adopted each need their actual evidence.
 
-New workflows require a CLI that supports `tree verify --workflow`; an older
-v2 dossier reader can ignore the added reference, so the workflow checks this
-capability explicitly. Framework recipes are generated in the `build` skill's
+New workflows require a `@putnami/contributor` whose `change verify` supports
+`--workflow`; an older v2 dossier reader can ignore the added reference, so the
+workflow checks this capability explicitly. Framework recipes are generated in the `build` skill's
 reference. `putnami change language` checks English-language signals in
 text, tracked files, commits and task records; `putnami doctor --machine`
 reports local check capacity. `putnami tree fingerprint` supplies the native

@@ -231,7 +231,7 @@ materialized, so the reverse means two different accountings got mixed.
 not given the flag, and when the value is any other spelling, such as
 `--fix=0`, which a lint job and its pipeline condition could read differently.
 The producer reads the command line, so a consumer compares a boolean and never
-a string. `putnami tree verify` reads `fix: false` as the proof that a gate ran
+a string. `putnami change verify` reads `fix: false` as the proof that a gate ran
 with the `--fix=false` its CI policy appends.
 
 ### `git` — report-owned
