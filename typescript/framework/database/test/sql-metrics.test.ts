@@ -10,6 +10,7 @@ import {
   recordSlowQuery,
   recordTransaction,
 } from '../src/observability';
+import { drainMerged } from './utils/drain-merged';
 
 describe('SQL Metrics', () => {
   let collector: TelemetryCollector;
@@ -34,10 +35,7 @@ describe('SQL Metrics', () => {
 
       recordQuery(metrics);
 
-      const buckets = collector.drainAll();
-      expect(buckets.length).toBe(1);
-
-      const bucket = buckets[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['sql.find.users']).toBe(1);
       expect(bucket.histograms['sql.find.users.duration']).toBeDefined();
       expect(bucket.histograms['sql.find.users.duration'].count).toBe(1);
@@ -51,8 +49,7 @@ describe('SQL Metrics', () => {
         recordQuery({ operation: 'save', table: 'orders', duration: 10 + i });
       }
 
-      const buckets = collector.drainAll();
-      const bucket = buckets[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['sql.save.orders']).toBe(5);
       expect(bucket.histograms['sql.save.orders.duration'].count).toBe(5);
       expect(bucket.histograms['sql.save.orders.duration'].min).toBe(10);
@@ -64,8 +61,7 @@ describe('SQL Metrics', () => {
       recordQuery({ operation: 'save', table: 'users', duration: 15, rowCount: 1 });
       recordQuery({ operation: 'delete', table: 'users', duration: 8, rowCount: 1 });
 
-      const buckets = collector.drainAll();
-      const bucket = buckets[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['sql.find.users']).toBe(1);
       expect(bucket.counters['sql.save.users']).toBe(1);
       expect(bucket.counters['sql.delete.users']).toBe(1);
@@ -77,8 +73,7 @@ describe('SQL Metrics', () => {
     it('should emit error counter and duration histogram', () => {
       recordQueryError('save', 'users', 100, new Error('connection refused'));
 
-      const buckets = collector.drainAll();
-      const bucket = buckets[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['sql.save.users.error']).toBe(1);
       expect(bucket.counters['sql.query.error']).toBe(1);
       expect(bucket.histograms['sql.query.duration'].sum).toBe(100);
@@ -87,8 +82,7 @@ describe('SQL Metrics', () => {
     it('should handle non-Error objects', () => {
       recordQueryError('find', 'orders', 50, 'string error');
 
-      const buckets = collector.drainAll();
-      const bucket = buckets[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['sql.find.orders.error']).toBe(1);
       expect(bucket.counters['sql.query.error']).toBe(1);
     });
@@ -104,8 +98,7 @@ describe('SQL Metrics', () => {
 
       recordSlowQuery(metrics, 200);
 
-      const buckets = collector.drainAll();
-      const bucket = buckets[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['sql.query.slow']).toBe(1);
     });
 
@@ -130,8 +123,7 @@ describe('SQL Metrics', () => {
 
       recordSlowQuery(metrics, 200);
 
-      const buckets = collector.drainAll();
-      const bucket = buckets[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['sql.query.slow']).toBe(1);
     });
   });
@@ -140,24 +132,21 @@ describe('SQL Metrics', () => {
     it('should emit pool created counter', () => {
       recordPoolCreated('auth');
 
-      const buckets = collector.drainAll();
-      const bucket = buckets[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['sql.pool.created']).toBe(1);
     });
 
     it('should emit pool closed counter', () => {
       recordPoolClosed('auth');
 
-      const buckets = collector.drainAll();
-      const bucket = buckets[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['sql.pool.closed']).toBe(1);
     });
 
     it('should set pool count gauge', () => {
       recordPoolCount(3);
 
-      const buckets = collector.drainAll();
-      const bucket = buckets[0];
+      const bucket = drainMerged(collector);
       expect(bucket.gauges['sql.pool.count']).toBe(3);
     });
 
@@ -165,8 +154,7 @@ describe('SQL Metrics', () => {
       recordPoolCount(3);
       recordPoolCount(0);
 
-      const buckets = collector.drainAll();
-      const bucket = buckets[0];
+      const bucket = drainMerged(collector);
       expect(bucket.gauges['sql.pool.count']).toBe(0);
     });
   });
@@ -175,7 +163,7 @@ describe('SQL Metrics', () => {
     it('emits duration, retries and outcome metrics on commit', () => {
       recordTransaction({ datasource: 'orders', outcome: 'committed', duration: 12 });
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMerged(collector);
       expect(bucket.histograms['sql.tx.duration'].sum).toBe(12);
       expect(bucket.histograms['sql.tx.retries'].sum).toBe(0);
       expect(bucket.counters['sql.tx.outcome.committed']).toBe(1);
@@ -186,7 +174,7 @@ describe('SQL Metrics', () => {
     it('emits the rollback cause counter on rollback', () => {
       recordTransaction({ datasource: 'orders', outcome: 'rolled-back', duration: 5, cause: '40001' });
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['sql.tx.outcome.rolled-back']).toBe(1);
       expect(bucket.counters['sql.tx.rollback.40001']).toBe(1);
       expect(bucket.histograms['sql.tx.duration'].sum).toBe(5);
@@ -195,7 +183,7 @@ describe('SQL Metrics', () => {
     it('defaults a missing rollback cause to "unknown"', () => {
       recordTransaction({ outcome: 'rolled-back', duration: 1 });
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['sql.tx.rollback.unknown']).toBe(1);
     });
   });

@@ -6,6 +6,7 @@ import { Collection, DocumentId, Field } from '../src/collection';
 import { TransactionNotSupported } from '../src/errors';
 import { closeAllBackends } from '../src/factory';
 import { Repository } from '../src/repository/repository';
+import { drainMerged } from './drain-merged';
 import { runInTransaction } from '../src/transaction';
 
 describe('document transactions', () => {
@@ -71,7 +72,7 @@ describe('document transactions', () => {
         });
       });
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['document.transaction.started']).toBe(1);
       expect(bucket.counters['document.transaction.committed']).toBe(1);
       expect(bucket.histograms['document.transaction.duration']).toBeDefined();
@@ -103,7 +104,7 @@ describe('document transactions', () => {
         expect((error as Error).message).toBe('boom');
       }
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['document.transaction.started']).toBe(1);
       expect(bucket.counters['document.transaction.rolled_back']).toBe(1);
       expect(bucket.counters['document.transaction.committed']).toBeUndefined();

@@ -16,6 +16,7 @@ import {
   recordTransactionStarted,
 } from '../src/observability';
 import { Repository } from '../src/repository/repository';
+import { drainMerged } from './drain-merged';
 
 function configureMemory(overrides: Record<string, unknown> = {}) {
   resetConfigLoader();
@@ -62,7 +63,7 @@ describe('document observability', () => {
         rowCount: 3,
       });
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['document.find.users']).toBe(1);
       expect(bucket.histograms['document.find.users.duration']).toBeDefined();
       expect(bucket.histograms['document.find.users.duration'].sum).toBe(42);
@@ -80,7 +81,7 @@ describe('document observability', () => {
     () => {
       recordDocumentError('save', 'users', 17, new Error('boom'));
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['document.save.users.error']).toBe(1);
       expect(bucket.counters['document.operation.error']).toBe(1);
       expect(bucket.histograms['document.save.users.duration']).toBeDefined();
@@ -106,7 +107,7 @@ describe('document observability', () => {
         200,
       );
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['document.operation.slow']).toBe(1);
     },
   );
@@ -124,7 +125,7 @@ describe('document observability', () => {
 
       await closeAllBackends();
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['document.backend.created']).toBe(2);
       expect(bucket.counters['document.backend.closed']).toBe(2);
       expect(bucket.gauges['document.backend.count']).toBe(0);
@@ -141,13 +142,13 @@ describe('document observability', () => {
     () => {
       recordTransactionStarted('default');
 
-      let bucket = collector.drainAll()[0];
+      let bucket = drainMerged(collector);
       expect(bucket.counters['document.transaction.started']).toBe(1);
       expect(bucket.gauges['document.transaction.active']).toBe(1);
 
       recordTransactionCommitted('default', 12);
 
-      bucket = collector.drainAll()[0];
+      bucket = drainMerged(collector);
       expect(bucket.counters['document.transaction.committed']).toBe(1);
       expect(bucket.histograms['document.transaction.duration']).toBeDefined();
       expect(bucket.histograms['document.transaction.duration'].sum).toBe(12);
@@ -168,7 +169,7 @@ describe('document observability', () => {
 
       recordTransactionRolledBack('default', 7, new Error('boom'));
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['document.transaction.rolled_back']).toBe(1);
       expect(bucket.histograms['document.transaction.duration']).toBeDefined();
       expect(bucket.histograms['document.transaction.duration'].sum).toBe(7);
@@ -206,7 +207,7 @@ describe('document observability', () => {
         Date.now = originalDateNow;
       }
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMerged(collector);
       expect(bucket.counters['document.operation.slow']).toBe(1);
       expect(bucket.counters['document.operation.error']).toBe(1);
       expect(bucket.counters['document.save.users_observability.error']).toBe(1);

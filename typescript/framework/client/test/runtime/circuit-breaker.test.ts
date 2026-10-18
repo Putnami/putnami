@@ -4,6 +4,7 @@ import { specTest } from '@putnami/runtime/spectest';
 import { CircuitBreaker, CircuitOpenError, circuitBreakerInterceptor } from '../../src/runtime/circuit-breaker';
 import type { ClientRequest, ClientResponse } from '../../src/runtime/transport.type';
 import { isDisposableInterceptor } from '../../src/runtime/transport.type';
+import { drainMerged } from './drain-merged';
 
 function makeRequest(): ClientRequest {
   return { method: 'GET', path: '/test', headers: new Headers() };
@@ -452,7 +453,7 @@ describe('CircuitBreaker telemetry', () => {
       breaker.onSuccess(); // half-open → closed (successThreshold 1)
       breaker.dispose();
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMerged(collector);
       // Gauge is last-write-wins within the second → final state is closed (0).
       expect(bucket.gauges['client.users.circuit.state']).toBe(0);
       // One counter per transition we drove.
@@ -475,7 +476,7 @@ describe('CircuitBreaker telemetry', () => {
       breaker.onFailure(); // closed → open
       breaker.dispose();
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMerged(collector);
       expect(bucket.gauges['client.orders.circuit.state']).toBe(1);
       expect(bucket.counters['client.orders.circuit.transition.open']).toBe(1);
     },
@@ -494,7 +495,7 @@ describe('CircuitBreaker telemetry', () => {
       breaker.onFailure(); // closed → open
       breaker.dispose();
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMerged(collector);
       expect(bucket.gauges['client.circuit.state']).toBe(1);
       expect(bucket.counters['client.circuit.transition.open']).toBe(1);
     },
