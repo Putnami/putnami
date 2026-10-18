@@ -97,8 +97,9 @@ func printableASCII(value string, maximum int) bool {
 // arguments are agent-authored JSON, not file payloads. 4 MiB leaves roughly
 // three orders of magnitude of headroom over that while keeping the worst case
 // a single-digit-MiB allocation. It is deliberately tighter than the 16 MiB the
-// CLI allows for machine-generated JSONL job events (internal/jobs), which
-// carry whole asset manifests; nothing on the MCP request path does.
+// CLI allows for machine-generated JSONL job events
+// (go.putnami.dev/cli/model/jobs), which carry whole asset manifests; nothing
+// on the MCP request path does.
 const maxFrameBytes = 4 << 20
 
 // errFrameTooLarge rejects a frame that crossed maxFrameBytes. It is a

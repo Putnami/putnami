@@ -151,7 +151,7 @@ type wireFixtureError struct {
 	Code    string `json:"code"`
 }
 
-// wireFixtureEvent is one runtime event AFTER jobs.parseRawEvent has folded the
+// wireFixtureEvent is one runtime event AFTER scheduler.parseRawEvent has folded the
 // flat top-level fields into Data. parseRawEvent is unexported, so the fixture
 // reproduces its output shape (type/time/level/message are present both at the
 // top level and inside data, exactly as the parser leaves them).
@@ -174,7 +174,7 @@ type wireFixtureEvent struct {
 
 // wireFixtureSessionEvent is one recorded session event. Its Data mirrors
 // scheduler.Scheduler.emitSessionJobEnd key-for-key; that method is unexported in
-// internal/jobs, so this corpus pins the session WRITER, not the producer.
+// internal/jobs/scheduler, so this corpus pins the session WRITER, not the producer.
 type wireFixtureSessionEvent struct {
 	Time string          `json:"time"`
 	Type string          `json:"type"`

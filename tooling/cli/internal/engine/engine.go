@@ -173,7 +173,7 @@ type Request struct {
 	// WorkspaceLifecycle marks a WORKSPACE LIFECYCLE run — `putnami install`'s
 	// workspace-install pass and `putnami upgrade`'s deps-upgrade pass — rather
 	// than a user build. It was added when the private composition
-	// in internal/commands/deps.go (its own jobs.Plan + jobs.NewScheduler, its own
+	// in internal/commands/deps.go (its own planner call and scheduler, its own
 	// dedup filter, no cache, no session) became an adapter over this engine; the
 	// lifecycle adapter in internal/cli is the only caller.
 	//

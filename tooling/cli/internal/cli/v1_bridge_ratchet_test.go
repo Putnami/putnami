@@ -390,7 +390,7 @@ var jobsPackageNames = []string{"jobs", "scheduler", "publication"}
 // rather than searched for, so a move stays a REVIEWED event: the pin fails,
 // and re-keying it is the review. An earlier change moved it from internal/jobs to
 // go.putnami.dev/cli/model/jobs (where the parser is exported as ParseRawEvent
-// and internal/jobs keeps the parseRawEvent spelling as an alias).
+// and internal/jobs/scheduler keeps the parseRawEvent spelling as an alias).
 const eventParserFile = "cli-model/jobs/events.go"
 
 // loosenedRuntimeVersionSymbols are protocols/runtime helpers whose whole

@@ -636,9 +636,9 @@ func resolveGoDepsProject(wsRoot string, ws *workspace.Workspace, selector strin
 // hands the run to the injected engine-backed runner.
 //
 // Before slice A5a this function WAS a private lifecycle: its own
-// workspace load, its own extension discovery, its own jobs.Plan, its own
+// workspace load, its own extension discovery, its own planner call, its own
 // dedup-by-extension filter, its own SchedulerConfig and its own
-// jobs.NewScheduler — the third of the five hand-assembled copies ADR 0001 §3
+// scheduler — the third of the five hand-assembled copies ADR 0001 §3
 // collapses. All of it now lives behind LifecycleEnv.RunJob, over Engine.Run.
 func runWorkspaceJob(ctx context.Context, env LifecycleEnv, req WorkspaceJobRequest) (WorkspaceJobResult, error) {
 	// Structured commands (deps install, upgrade) skip App.Run's pre-discovery

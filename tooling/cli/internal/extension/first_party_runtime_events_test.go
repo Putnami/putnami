@@ -12,7 +12,7 @@ import (
 // First-party conformance for the runtime-event stream version.
 //
 // Since CLI contract 3 the CLI accepts EXACTLY the runtime-event version it
-// advertises (`PUTNAMI_RUNTIME_EVENTS=2`), so jobs.parseRawEvent drops a `"v":1`
+// advertises (`PUTNAMI_RUNTIME_EVENTS=2`), so scheduler.parseRawEvent drops a `"v":1`
 // line instead of adapting it. For a hand-written shell job that is worse than
 // noisy: a script whose only output is a dropped `{"type":"result"}` line still
 // exits 0, the runner synthesizes success from the exit code, and a cacheable

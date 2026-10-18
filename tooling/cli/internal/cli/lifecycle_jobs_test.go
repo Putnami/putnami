@@ -87,7 +87,7 @@ func TestRunWorkspaceJob_VerboseAndFailureKeepDiagnostics(t *testing.T) {
 }
 
 // Workspace-level lifecycle jobs run through
-// Engine.Run instead of a private jobs.Plan + jobs.NewScheduler composition in
+// Engine.Run instead of a private planner and scheduler composition in
 // internal/commands/deps.go. These tests pin what that has to mean and, more
 // importantly, what it must NOT change:
 //

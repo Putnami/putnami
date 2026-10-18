@@ -21,7 +21,7 @@ import (
 // through Engine.Run for the same planning, contract validation,
 // missing-extension guards, cache setup, scheduling, session recording and exit
 // code as any other run. Before A5b, internal/watch/session_iteration.go called
-// jobs.Plan and jobs.NewScheduler itself — the last of the five hand-assembled
+// the planner and built a scheduler itself — the last of the five hand-assembled
 // lifecycles ADR 0001 §3 collapses.
 //
 // The dependency stays engine → watch. Pointing it the other way (watch calling

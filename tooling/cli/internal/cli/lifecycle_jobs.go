@@ -59,8 +59,8 @@ func lifecycleEnv(env *CommandEnv) lifecycle.LifecycleEnv {
 //
 // Before A5a those ran on a private composition in internal/commands/deps.go: a
 // second workspace load, a second (non-Detailed) extension discovery, a direct
-// jobs.Plan, a hand-rolled dedup-by-extension filter, a fixed SchedulerConfig
-// and a direct jobs.NewScheduler. That was the third of the five hand-assembled
+// planner call, a hand-rolled dedup-by-extension filter, a fixed SchedulerConfig
+// and a scheduler of its own. That was the third of the five hand-assembled
 // lifecycles ADR 0001 §3 collapses; all of it is gone.
 //
 // It lives in internal/cli, beside the terminal and extension-alias adapters,

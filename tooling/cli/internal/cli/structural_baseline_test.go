@@ -399,7 +399,7 @@ var structuralPins = []structuralPin{
 			"third is publication.BuildDeployOptions, which reads --env and --release out of the ONE " +
 			"command params map, exactly as the release-set option builder beside it does. Another change " +
 			"raises 246→248, and both lines are the SAME two parameters this pin already names as " +
-			"untypable, on one more hop of the path they already travel: jobs.runJob is RunJob plus " +
+			"untypable, on one more hop of the path they already travel: scheduler.runJob is RunJob plus " +
 			"the run-level process environment the scheduler owns (the cache provider's object-cache " +
 			"socket), so the two exported call sites keep their signature and the scheduler reaches " +
 			"the seam directly. Nothing decodes, stores or forwards a new untyped document, and the " +
@@ -410,7 +410,7 @@ var structuralPins = []structuralPin{
 			"engine's own diagnostic has to take the exact shape a subprocess diagnostic has so " +
 			"every consumer reads it through the one existing path (the batch projection in " +
 			"scheduler_batch_exec.go builds the same object the same way). Another change (ADR 0037) " +
-			"raises 249→250 for jobs.PortableInputs, and the line is the ONE payload this pin " +
+			"raises 249→250 for cachekey.PortableInputs, and the line is the ONE payload this pin " +
 			"already names as untypable on one more hop of the path it already travels: the " +
 			"portable admission hands the command params map to keyFilePatterns, exactly as " +
 			"the cache key and the mutation detector do, so the files it binds are the files " +
@@ -629,7 +629,7 @@ var structuralPins = []structuralPin{
 			"the drift diagnostic's wire projection, its one port-value fixture and the restored " +
 			"failure's one diagnostic fixture, itemized on the two scoped pins above" +
 			" Another change raises 870→872 for the two portable-projection test lines itemized on the test pin above; production adds none." +
-			" That same change also raises 872→873 = 250 production + 623 test for jobs.PortableInputs, itemized on the production pin above; tests add none. " +
+			" That same change also raises 872→873 = 250 production + 623 test for cachekey.PortableInputs, itemized on the production pin above; tests add none. " +
 			"A later change raises 873→874 = 250 production + 624 test for the mixed gate+publish session fixture, itemized on the test pin above; production adds none. " +
 			"Another change raises 874→875 = 250 production + 625 test for the one publish-params line itemized on the same pin; production adds none. " +
 			"A later change raises 875→883 = 253 production + 630 test for the composition lines itemized on the two scoped pins above. " +

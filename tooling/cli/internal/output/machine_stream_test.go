@@ -275,7 +275,7 @@ func TestMachineStreamReservesNormalizedFailedResultAfterOrdinaryExhaustion(t *t
 // TestMachineStreamReservesABuiltFailedResultAfterOrdinaryExhaustion is the
 // same guarantee for a failed result the CLI builds itself, which names its
 // type on the event only: a batched member's projected result
-// (jobs.canonicalTaskEvents). The live stream classifies a record by its event's
+// (scheduler.canonicalTaskEvents). The live stream classifies a record by its event's
 // type, so a record written without it was elided like ordinary detail.
 func TestMachineStreamReservesABuiltFailedResultAfterOrdinaryExhaustion(t *testing.T) {
 	spectest.Proves(t, "cli/diagnostics-results", "bounded-machine-detail", "failure-capacity-is-reserved-after-exhaustion")

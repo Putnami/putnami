@@ -65,7 +65,7 @@
 // reads the declaration. It empties an optionalEmpty directory under the
 // command-output root, where the plan gives each output one owner, with the
 // same EmptyTaskOutput an execution uses, and leaves every other empty output
-// as it stands (jobs.materializeDeclaredOutputs, CLI ADR 0065).
+// as it stands (scheduler.Scheduler.materializeDeclaredOutputs, CLI ADR 0065).
 //
 // # Merge points: the model deliberately cannot express them (finding from B3c)
 //

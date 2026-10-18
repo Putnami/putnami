@@ -1,6 +1,6 @@
 // Package cachecmd evaluates cache determinism from ordinary engine runs.
 // It owns report policy only; cache keys, captures, restores, and task execution
-// remain in internal/jobs and internal/engine.
+// remain in internal/jobs/cachekey, internal/jobs/scheduler and internal/engine.
 package cachecmd
 
 import (

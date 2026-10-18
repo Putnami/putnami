@@ -309,7 +309,7 @@ type coordinatorWaitResult struct {
 // so a caller cannot assemble a run that is missing one of them. Every direct
 // construction left in the tree is in this package's own tests, which is where
 // the scheduler is legitimately exercised as a unit; the seam is a package-
-// private function, so no production package outside internal/jobs can reach it
+// private function, so no production package outside this one can reach it
 // even by accident. internal/cli/engine_boundary_test.go pins the rest.
 func newScheduler(
 	ws *workspace.Workspace,

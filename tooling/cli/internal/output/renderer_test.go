@@ -407,7 +407,7 @@ func TestJSONLRenderer_TaskEndCarriesTheTasksDiagnostics(t *testing.T) {
 
 	job := makeRendererTestJob()
 	// The event is decoded from its wire bytes rather than spelled as a literal
-	// payload: this is the shape jobs.parseRawEvent leaves behind, and the
+	// payload: this is the shape scheduler.parseRawEvent leaves behind, and the
 	// record extraction under test reads exactly that.
 	event := scheduler.RawJobEvent{Version: 2, Type: "diagnostic", Time: "2026-01-01T00:00:05Z"}
 	if err := json.Unmarshal([]byte(`{

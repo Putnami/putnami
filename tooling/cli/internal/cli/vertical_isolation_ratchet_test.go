@@ -263,7 +263,7 @@ var verticalCrossImportExceptions = []verticalCrossImportException{
 // subpackage of internal/commands imports a sibling vertical's package,
 // unless the file is on the exception list above. Allowed imports —
 // internal/commands/shared, internal/commands/sharedtest, everything under
-// go.putnami.dev/cli/model/, and CLI support packages (internal/jobs,
+// go.putnami.dev/cli/model/, and CLI support packages (internal/jobs/*,
 // internal/workspace, internal/output, …) — are never matched by this scan,
 // because none of them is a sibling vertical's import path; they need no
 // allowlist of their own.
@@ -310,7 +310,7 @@ func TestStructuralBaseline_VerticalsStayIsolated(t *testing.T) {
 			}
 			t.Errorf("%s imports %s — a command vertical must not import a sibling vertical directly "+
 				"(the vertical-isolation ratchet). Allowed imports are internal/commands/shared, "+
-				"go.putnami.dev/cli/model/*, and CLI support packages (internal/jobs, internal/workspace, "+
+				"go.putnami.dev/cli/model/*, and CLI support packages (internal/jobs/*, internal/workspace, "+
 				"internal/output, …).\n"+
 				"  If %s genuinely needs to call into %s's command flow, add a verticalCrossImportException "+
 				"naming why. If it just needs a helper, that helper belongs in internal/commands/shared "+
