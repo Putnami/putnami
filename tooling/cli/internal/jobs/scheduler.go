@@ -1,3 +1,6 @@
+// Package jobs schedules and runs the jobs of a plan, and caches their results.
+// It reads the plan the planner package builds and never plans itself: the
+// engine is the only package that calls both.
 package jobs
 
 import (
@@ -597,7 +600,7 @@ func (s *Scheduler) prepareScheduling(decision ParallelDecision) {
 	// A `runOn: finally` node is planned but never DISPATCHED: its trigger is
 	// producer start and its frontier is the consumers' terminal states, neither
 	// of which a dependency DAG can express. The coordinator runs over the
-	// schedulable plan (schedulableJobs) and this runtime owns the finalizers.
+	// schedulable plan (planner.SchedulableJobs) and this runtime owns the finalizers.
 	s.invocations = newInvocationRuntime(s.ws, s.planned)
 	// Negotiate the finalizes relations' consumer frontiers BEFORE any producer
 	// can materialize a resource: an all-hit frontier prunes the producer and

@@ -194,7 +194,7 @@ func buildPlan(
 // dedupePlanByExtension keeps the FIRST scheduled job of each extension and
 // drops the rest, which is what makes a workspace-level lifecycle job run once
 // per provider instead of once per project (Request.WorkspaceLifecycle note 1).
-// jobs.Plan is deterministic, so "first" is a stable choice.
+// planner.Plan is deterministic, so "first" is a stable choice.
 //
 // It allocates a new slice rather than filtering in place: the pre-A5a
 // composition reused the planned slice's backing array (planned[:0]), which is

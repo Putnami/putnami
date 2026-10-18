@@ -69,8 +69,8 @@ func (s *Scheduler) readyBatch(job *ScheduledJob) (string, int) {
 	// the policy names. The key folds the resolved cap in the static cap's
 	// place, so an unset option keeps today's key byte for byte and two caps
 	// never share a batch. A cap of 1, or a value the plan refuses, keeps
-	// singleton dispatch. validateBatchProjectLimits reads the same bag
-	// (deliveredJobParams, which BuildJobContext assigns to jobCtx.Params).
+	// singleton dispatch. planner.ValidateBatchProjectLimits reads the same bag
+	// (cachekey.DeliveredJobParams, which BuildJobContext assigns to jobCtx.Params).
 	maxProjects, batches, err := cachekey.BatchProjectLimit(job.JobDef.Batchable, jobCtx.Params)
 	if err != nil || !batches {
 		return "", 0
@@ -307,8 +307,9 @@ func projectPathsOverlap(a, b string) bool {
 // silently run the provisioned project's tests against nothing.
 //
 // The producer's plan key is the discriminator because it is stamped at PLAN
-// time (resolveInvocationRelations), long before the locator exists: a batch key
-// computed at dispatch must not depend on whether the producer has already run.
+// time (planner.ResolveInvocationRelations), long before the locator exists: a
+// batch key computed at dispatch must not depend on whether the producer has
+// already run.
 //
 // This is also what the deleted extraEnv term used to do by accident — the
 // synthesized DATABASE_TEST_BINDINGS differed per project, so a provisioned test

@@ -78,7 +78,7 @@ func requireOrder(t *testing.T, pos map[string]int, earlier, later string) {
 }
 
 // TestPlanSchedule_EndToEnd is the integration test the audit asked for:
-// jobs.Plan generates the ScheduledJobs from a workspace +
+// planner.Plan generates the ScheduledJobs from a workspace +
 // extension; newScheduler(...).Run consumes them; we assert the
 // dependency hand-off is intact (pipeline order and cross-project order)
 // and that every planned job actually executes.

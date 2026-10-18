@@ -1,4 +1,7 @@
-// Package jobs handles job planning, scheduling, execution, and caching.
+// Package planner turns a selection of projects and commands into the typed plan
+// of a run, from the workspace and extension models, the job model and the task
+// cache key package. It never imports the scheduler or the runner: the scheduler
+// reads the plan, and the engine is the only package that calls Plan.
 package planner
 
 import (
@@ -48,7 +51,7 @@ func Plan(
 	// conditions are independent of command order. Scope the facts by provider
 	// and selected project: a disabled or unmatched test, another provider's
 	// test, and an unselected dependency are not replacement evidence.
-	workspaceProject := workspaceOnceProject(ws)
+	workspaceProject := WorkspaceOnceProject(ws)
 	for _, cmdName := range commands {
 		for _, jobDef := range matchWorkspaceOnceJobs(cmdName, jobMap, disabledJobSet, disabledExtSet) {
 			ext := extension.FindExtensionByName(extensions, jobDef.ExtensionName)
@@ -85,7 +88,7 @@ func Plan(
 			if ext == nil {
 				continue
 			}
-			proj := workspaceOnceProject(ws)
+			proj := WorkspaceOnceProject(ws)
 			planned, err := expandJob(ws, proj, ext, cmdName, jobDef, commandParams, len(workspaceJobs) > 1, cache)
 			if err != nil {
 				return nil, err
@@ -325,7 +328,9 @@ func cloneJobDefinition(jobDef *extension.JobDefinition) *extension.JobDefinitio
 	return &clone
 }
 
-func workspaceOnceProject(ws *workspace.Workspace) *workspace.Project {
+// WorkspaceOnceProject is the synthetic project a workspace-once job runs
+// under: the workspace itself, rooted at ".".
+func WorkspaceOnceProject(ws *workspace.Workspace) *workspace.Project {
 	name := ws.Name
 	if name == "" {
 		name = "workspace"

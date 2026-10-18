@@ -90,8 +90,8 @@ const sharedExecutionPrefix = "shared-"
 //
 // It runs after every edge is resolved and after the invocation relations are
 // attached (a node that participates in one is never shared), and BEFORE
-// attachIdentities, so a node's typed identity is stamped on the same value the
-// scheduler later reads. It adds no edge and rewrites no dependency: the DAG,
+// jobmodel.AttachIdentities, so a node's typed identity is stamped on the same
+// value the scheduler later reads. It adds no edge and rewrites no dependency: the DAG,
 // every cache key and every artifact owner are exactly what they were without
 // it. The only thing it changes is how many subprocesses the scheduler spawns.
 func attachSharedExecutions(ws *workspace.Workspace, jobs []*jobmodel.ScheduledJob, commandParams map[string]any) {

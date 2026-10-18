@@ -16,6 +16,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 )
 
 // The deploy side of distribution v2: an environment follows a channel, the
@@ -133,16 +134,6 @@ func deployJobsFor(ws *workspace.Workspace, ids ...string) []*ScheduledJob {
 // ws.Projects and no selector can name it — carrying the real workloads in
 // SelectedProjects. It sits beside deployJobsFor rather than replacing it:
 // both shapes are legitimate and both must bind.
-// workspaceOnceProject is the synthetic project a workspace-once job runs
-// under: the workspace itself, rooted at ".".
-func workspaceOnceProject(ws *workspace.Workspace) *workspace.Project {
-	name := ws.Name
-	if name == "" {
-		name = "workspace"
-	}
-	return &workspace.Project{ID: name, Name: name, Path: "."}
-}
-
 func deployWorkspaceJobFor(ws *workspace.Workspace, ids ...string) *ScheduledJob {
 	ext := &modelextension.ExtensionDescription{Name: "@putnami/cloud"}
 	selected := make([]*workspace.Project, 0, len(ids))
@@ -154,7 +145,7 @@ func deployWorkspaceJobFor(ws *workspace.Workspace, ids ...string) *ScheduledJob
 		}
 	}
 	return &ScheduledJob{
-		Project: workspaceOnceProject(ws), Extension: ext, SelectedProjects: selected,
+		Project: planner.WorkspaceOnceProject(ws), Extension: ext, SelectedProjects: selected,
 		JobDef: &modelextension.JobDefinition{
 			Name: "deploy~cloud-release", CommandName: "deploy", ExtensionName: ext.Name,
 			Kind: "cloud-deploy", Activation: "workspace-once", Cache: true,

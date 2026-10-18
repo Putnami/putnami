@@ -175,10 +175,10 @@ The coordinator avoids deadlock by using non-blocking sends with a pending queue
 
 ### DAG State Machine
 
-Job readiness is tracked with dependency counters:
+Job readiness is tracked with dependency counters. The type lives in the planner package (`internal/jobs/planner/dag_state.go`), because the planner walks it to prove a plan can be scheduled and the scheduler walks the same state to dispatch the plan:
 
 ```go
-type dagState struct {
+type DAGState struct {
     remaining  map[string]int              // jobKey → unresolved dependency count
     dependents map[string][]string         // jobKey → dependent job keys
     jobs       map[string]*ScheduledJob    // jobKey → job

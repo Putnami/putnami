@@ -1,17 +1,20 @@
-package jobs
+package planner
 
 import (
+	"maps"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
-	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -52,6 +55,39 @@ func pinInstalledTree(t *testing.T, ext *extension.ExtensionDescription) {
 	writeTestFile(t, filepath.Join(ext.Path, extension.ManifestFilename), string(manifest))
 }
 
+// isolateTreeKeyedGit keeps the machine's Git configuration and repository
+// variables away from every git process of the test, its own and the ones the
+// code under test starts: no global or system config, and no GIT_DIR,
+// GIT_WORK_TREE or GIT_INDEX_FILE.
+func isolateTreeKeyedGit(t *testing.T) {
+	t.Helper()
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	for _, name := range []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"} {
+		t.Setenv(name, "")
+		if err := os.Unsetenv(name); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// treeKeyedGit runs git in dir with a fixed identity and fixed dates, and
+// returns its trimmed output.
+func treeKeyedGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{
+		"-c", "user.name=T", "-c", "user.email=t@t.com",
+		"-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false",
+	}, args...)...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z", "GIT_AUTHOR_DATE=2026-01-02T03:04:05Z")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
 // clientgenKeyFixture is a Git work tree that ignores .gen, as this
 // repository does, with one provider project at provider/.
 type clientgenKeyFixture struct {
@@ -88,7 +124,7 @@ func (f *clientgenKeyFixture) key(t *testing.T, clientgen *extension.ExtensionDe
 	if !ok || definition.Cache == nil || definition.Cache.Key == nil {
 		t.Fatalf("real clientgen manifest has no keyed %s task", task)
 	}
-	job := &ScheduledJob{
+	job := &jobmodel.ScheduledJob{
 		Project:   f.ws.Projects[0],
 		Extension: clientgen,
 		Step:      &extension.PipelineStep{Task: task},
@@ -147,7 +183,7 @@ func TestClientgenKeyIgnoresTheDescribeOwnedTrees(t *testing.T) {
 	// they fold: the Go build-describe empties both before it executes and on
 	// a restore of an entry that records them empty.
 	goExtension := loadShippedExtension(t, "go/extension", "@putnami/go")
-	describe := &ScheduledJob{
+	describe := &jobmodel.ScheduledJob{
 		Project:   &workspace.Project{ID: "/provider", Name: "provider", Path: "provider"},
 		Extension: goExtension,
 		Step:      &extension.PipelineStep{Task: "build-describe"},
@@ -165,7 +201,7 @@ func TestClientgenKeyIgnoresTheDescribeOwnedTrees(t *testing.T) {
 	// neither tree to another task. An optional .gen, or a cede of either tree,
 	// would leave bytes there that no folded key fixes.
 	typescript := loadShippedExtension(t, "typescript/extension", "@putnami/typescript")
-	generate := &ScheduledJob{
+	generate := &jobmodel.ScheduledJob{
 		Project:   &workspace.Project{ID: "/provider", Name: "provider", Path: "provider"},
 		Extension: typescript,
 		Step:      &extension.PipelineStep{Task: "build-generate"},
@@ -183,9 +219,10 @@ func TestClientgenKeyIgnoresTheDescribeOwnedTrees(t *testing.T) {
 	if gen.Output.OptionalEmpty {
 		t.Errorf("the TypeScript build-generate .gen output %q is optional: a run that writes nothing there would keep an earlier run's trees", gen.ID)
 	}
+	atOrUnder := func(rel, root string) bool { return rel == root || strings.HasPrefix(rel, root+"/") }
 	for _, kept := range cachekey.OutputSkippedSubpaths(gen.Rel, gen.Output) {
 		for _, tree := range []string{"schema", "clientgen"} {
-			if pathAtOrUnder(tree, kept) || pathAtOrUnder(kept, tree) {
+			if atOrUnder(tree, kept) || atOrUnder(kept, tree) {
 				t.Errorf("the TypeScript build-generate .gen output keeps %q, which overlaps .gen/%s: the engine would leave bytes there that no folded key fixes", kept, tree)
 			}
 		}
@@ -236,7 +273,7 @@ func TestClientgenKeyReadsAContractTheProjectCommitsUnderGen(t *testing.T) {
 type clientgenPlan struct {
 	ws      *workspace.Workspace
 	dir     string
-	planned []*ScheduledJob
+	planned []*jobmodel.ScheduledJob
 }
 
 func planClientgenOnAGoProvider(t *testing.T) *clientgenPlan {
@@ -262,7 +299,7 @@ func planClientgenOnAGoProvider(t *testing.T) *clientgenPlan {
 		loadShippedExtension(t, "go/extension", "@putnami/go"),
 		loadShippedExtension(t, "tooling/clientgen-extension", "@putnami/clientgen"),
 	}
-	planned, err := planner.Plan(ws, []string{"clientgen"}, ws.Projects, exts, nil, nil, nil)
+	planned, err := Plan(ws, []string{"clientgen"}, ws.Projects, exts, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan clientgen: %v", err)
 	}
@@ -270,7 +307,7 @@ func planClientgenOnAGoProvider(t *testing.T) *clientgenPlan {
 }
 
 // job returns the planned job of the given name.
-func (p *clientgenPlan) job(t *testing.T, name string) *ScheduledJob {
+func (p *clientgenPlan) job(t *testing.T, name string) *jobmodel.ScheduledJob {
 	t.Helper()
 	for _, job := range p.planned {
 		if job.JobDef.Name == name {
@@ -290,7 +327,7 @@ func (p *clientgenPlan) job(t *testing.T, name string) *ScheduledJob {
 // dependency order, each cacheable job on the tree its dependencies left, then
 // after(job, keys) stands for what the job writes. A fresh cache manager
 // stands for the run's own process.
-func (p *clientgenPlan) startKeys(t *testing.T, after func(job *ScheduledJob, keys map[string]string)) map[string]string {
+func (p *clientgenPlan) startKeys(t *testing.T, after func(job *jobmodel.ScheduledJob, keys map[string]string)) map[string]string {
 	t.Helper()
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(p.ws.Root, ".putnami", "start")))
 	byKey, indegree, dependents := cachekey.FunctionalDegrees(p.planned)
@@ -357,7 +394,7 @@ func TestClientgenKeyFoldsDescribesKeyInARealPlan(t *testing.T) {
 	}
 
 	unmoved := plan.startKeys(t, nil)
-	moved := plan.startKeys(t, func(job *ScheduledJob, keys map[string]string) {
+	moved := plan.startKeys(t, func(job *jobmodel.ScheduledJob, keys map[string]string) {
 		if job.Key() == describe.Key() {
 			keys[job.Key()] = "a describe key that moved"
 		}
@@ -387,7 +424,7 @@ func TestClientgenStartKeyEqualsThePrecomputedKeyWhenDescribeWrites(t *testing.T
 	precomputed := plan.precomputedKeys(t)
 
 	wrote := false
-	started := plan.startKeys(t, func(job *ScheduledJob, _ map[string]string) {
+	started := plan.startKeys(t, func(job *jobmodel.ScheduledJob, _ map[string]string) {
 		if job.Key() != describe.Key() {
 			return
 		}
@@ -402,7 +439,7 @@ func TestClientgenStartKeyEqualsThePrecomputedKeyWhenDescribeWrites(t *testing.T
 	for _, task := range clientgenTasks {
 		key := plan.job(t, task.job).Key()
 		if precomputed[key] == "" {
-			t.Fatalf("the run precomputed no key for %s; it keyed %v", key, sortedKeyNames(precomputed))
+			t.Fatalf("the run precomputed no key for %s; it keyed %v", key, slices.Sorted(maps.Keys(precomputed)))
 		}
 		if started[key] != precomputed[key] {
 			t.Errorf("%s starts with key %s, but the run looked up %s: a file written between the two computations reached the key", key, started[key], precomputed[key])

@@ -22,6 +22,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -487,7 +488,7 @@ func TestNarrowToTaskScopes_FollowsTheDeclaredSideEffectsNotTheCommandName(t *te
 	lib := &workspace.Project{ID: "/lib", Name: "lib", Path: "lib", Extensions: []string{"@fixture/release"}, Config: &wsproto.ProjectConfig{}}
 	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "scope"}, []*workspace.Project{lib})
 	ws.Graph = workspace.BuildGraph(ws.Projects)
-	planned, err := jobs.Plan(ws, []string{"build", "ship", "publish", "deploy", "docs"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
+	planned, err := planner.Plan(ws, []string{"build", "ship", "publish", "deploy", "docs"}, ws.Projects, []*extension.ExtensionDescription{ext}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan: %v", err)
 	}

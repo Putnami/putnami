@@ -24,11 +24,16 @@ func testWorkspace(root string, projects ...*workspace.Project) *workspace.Works
 
 func writeProjectFile(t *testing.T, root, projPath, rel, content string) {
 	t.Helper()
-	full := filepath.Join(root, projPath, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+	writeTestFile(t, filepath.Join(root, projPath, filepath.FromSlash(rel)), content)
+}
+
+// writeTestFile writes contents to path, creating its directories.
+func writeTestFile(t *testing.T, path, contents string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }

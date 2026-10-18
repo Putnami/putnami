@@ -1244,7 +1244,7 @@ func TestReadyBatchKeyIsolatesInvocationConsumers(t *testing.T) {
 	}
 
 	// Stamp the first job as the consumer of a relation, exactly as
-	// resolveInvocationRelations does.
+	// planner.ResolveInvocationRelations does.
 	producer := &ScheduledJob{
 		Project:   jobs[0].Project,
 		Extension: jobs[0].Extension,

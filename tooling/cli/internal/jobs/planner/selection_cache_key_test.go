@@ -1,4 +1,4 @@
-package jobs
+package planner
 
 import (
 	"path/filepath"
@@ -7,7 +7,6 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
-	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -83,7 +82,7 @@ func TestCacheKeyIsTheSameUnderEverySelectionThatPlansTheTask(t *testing.T) {
 
 	keysFor := func(name string, selected ...*workspace.Project) map[string]string {
 		t.Helper()
-		planned, err := planner.Plan(ws, []string{"build"}, selected, exts, nil, nil, nil)
+		planned, err := Plan(ws, []string{"build"}, selected, exts, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("%s: plan: %v", name, err)
 		}

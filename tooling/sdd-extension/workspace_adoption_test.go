@@ -26,7 +26,7 @@ const extensionProjectID = "/tooling/sdd-extension"
 // Activation is TWO conditions, and both are necessary: the command's
 // activationFiles must match the project's tree, AND the project must name the
 // providing extension in its `extensions` array (isProjectExtensionDep,
-// tooling/cli/internal/jobs/planner_match.go). The second is the workspace's
+// tooling/cli/internal/jobs/planner/planner_match.go). The second is the workspace's
 // opt-in and it is right that it exists — an optional DX vertical must cost
 // nothing in a workspace that does not use it.
 //

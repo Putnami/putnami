@@ -4,7 +4,9 @@
 // runtime toolchains, the host platform and the release baseline. It also
 // holds what reads the same declarations: key movement, the key precompute of
 // a whole plan, the portable inputs a remote run binds, and the cache
-// verification contract.
+// verification contract. It also resolves the parameter bag a task receives
+// (DeliveredJobParams, JobConfigDefaults, BatchProjectLimit), because the key
+// folds that bag and the task must read the same values.
 //
 // It imports neither the scheduler nor the runner, so a change there does not
 // rerun its tests, and the bytes a key hashes stay checkable in one package.

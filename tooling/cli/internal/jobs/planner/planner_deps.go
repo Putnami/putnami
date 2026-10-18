@@ -357,7 +357,7 @@ func emitSessionCommandDeps(
 			if ext == nil {
 				continue
 			}
-			planned, err := expandJob(ws, workspaceOnceProject(ws), ext, depCmd, jobDef, commandParams, len(workspaceJobs) > 1, cache)
+			planned, err := expandJob(ws, WorkspaceOnceProject(ws), ext, depCmd, jobDef, commandParams, len(workspaceJobs) > 1, cache)
 			if err != nil {
 				return err
 			}
@@ -741,14 +741,14 @@ func emitCommandForSelection(
 		if ext == nil {
 			continue
 		}
-		planned, err := expandJob(ws, workspaceOnceProject(ws), ext, command, jobDef, workspaceParams, len(workspaceJobs) > 1, cache)
+		planned, err := expandJob(ws, WorkspaceOnceProject(ws), ext, command, jobDef, workspaceParams, len(workspaceJobs) > 1, cache)
 		if err != nil {
 			return false, err
 		}
 		workspaceCandidates = append(workspaceCandidates, planned...)
 	}
 	if len(workspaceJobs) > 0 {
-		workspaceChanged, err := mergeSessionPrerequisiteCandidates(allJobs, command, workspaceOnceProject(ws).ID,
+		workspaceChanged, err := mergeSessionPrerequisiteCandidates(allJobs, command, WorkspaceOnceProject(ws).ID,
 			workspaceCandidates, workspaceOverrides, projects)
 		if err != nil {
 			return false, err
@@ -970,7 +970,7 @@ func resolveSessionPrerequisites(
 		return err
 	}
 	leaves := computeCommandLeaves(jobs)
-	workspaceID := workspaceOnceProject(ws).ID
+	workspaceID := WorkspaceOnceProject(ws).ID
 	gatePolicyByJob := make(map[string][]string)
 	noopGatesByJob := make(map[string]map[string]bool)
 	gatePolicyProjectsByJob := make(map[string]map[string]bool)

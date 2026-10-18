@@ -1,4 +1,4 @@
-package jobs
+package planner
 
 import (
 	"os"
@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	jobmodel "go.putnami.dev/cli/model/jobs"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
-	"go.putnami.dev/tooling/cli/internal/jobs/planner"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -48,22 +48,6 @@ import (
 
 const clientgenExtensionName = "@putnami/clientgen"
 
-// workspaceOnceActivation is the activation the clientgen guard declares: one
-// node per run, whatever the selection holds.
-const workspaceOnceActivation = "workspace-once"
-
-// loadGoPlannerExtension loads the real first-party Go extension, so the plan
-// under test carries its real validate pipeline.
-func loadGoPlannerExtension(t *testing.T) *extension.ExtensionDescription {
-	t.Helper()
-	root := findJobsRepoRoot(t)
-	ext := extension.LoadExtensionFromDir(filepath.Join(root, "go", "extension"), "@putnami/go")
-	if ext == nil {
-		t.Fatal("load real @putnami/go extension")
-	}
-	return ext
-}
-
 func loadClientgenExtension(t *testing.T) *extension.ExtensionDescription {
 	t.Helper()
 	root := findJobsRepoRoot(t)
@@ -97,11 +81,11 @@ func clientgenConsumerWorkspace(t *testing.T, projects int) (*workspace.Workspac
 	return &workspace.Workspace{Root: root, Name: "consumers", Projects: selected}, selected
 }
 
-func planValidate(t *testing.T, projects int) []*ScheduledJob {
+func planValidate(t *testing.T, projects int) []*jobmodel.ScheduledJob {
 	t.Helper()
 	description := loadClientgenExtension(t)
 	ws, selected := clientgenConsumerWorkspace(t, projects)
-	planned, err := planner.Plan(ws, []string{"validate"}, selected,
+	planned, err := Plan(ws, []string{"validate"}, selected,
 		[]*extension.ExtensionDescription{description}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan validate: %v", err)
@@ -109,8 +93,8 @@ func planValidate(t *testing.T, projects int) []*ScheduledJob {
 	return planned
 }
 
-func clientgenNodes(planned []*ScheduledJob) []*ScheduledJob {
-	var nodes []*ScheduledJob
+func clientgenNodes(planned []*jobmodel.ScheduledJob) []*jobmodel.ScheduledJob {
+	var nodes []*jobmodel.ScheduledJob
 	for _, node := range planned {
 		if node.JobDef != nil && node.JobDef.ExtensionName == clientgenExtensionName {
 			nodes = append(nodes, node)
@@ -189,7 +173,7 @@ func TestNativeValidateGuardWaitsForTheSelectedProvidersGeneration(t *testing.T)
 		Extensions: []string{"@putnami/go"},
 	}
 	ws := &workspace.Workspace{Root: root, Name: "mixed", Projects: []*workspace.Project{provider, consumer}}
-	planned, err := planner.Plan(ws, []string{"validate"}, []*workspace.Project{provider, consumer},
+	planned, err := Plan(ws, []string{"validate"}, []*workspace.Project{provider, consumer},
 		[]*extension.ExtensionDescription{description}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan validate with a provider: %v", err)
@@ -231,7 +215,7 @@ func TestNativeValidateGuardIsNotPlannedForAnotherCommand(t *testing.T) {
 	description := loadClientgenExtension(t)
 	ws, selected := clientgenConsumerWorkspace(t, 3)
 	for _, command := range []string{"build", "lint", "test"} {
-		planned, err := planner.Plan(ws, []string{command}, selected,
+		planned, err := Plan(ws, []string{command}, selected,
 			[]*extension.ExtensionDescription{description}, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("plan %s: %v", command, err)
@@ -248,7 +232,7 @@ func TestNativeValidateGuardIsNotPlannedForAnotherCommand(t *testing.T) {
 func TestNativeValidateGuardIsDisableable(t *testing.T) {
 	description := loadClientgenExtension(t)
 	ws, selected := clientgenConsumerWorkspace(t, 3)
-	planned, err := planner.Plan(ws, []string{"validate"}, selected,
+	planned, err := Plan(ws, []string{"validate"}, selected,
 		[]*extension.ExtensionDescription{description}, nil, nil, []string{clientgenExtensionName})
 	if err != nil {
 		t.Fatalf("plan validate with the extension disabled: %v", err)
@@ -277,7 +261,7 @@ func TestProviderGenerationNeverOverlapsAGeneratedTreeRewrite(t *testing.T) {
 		Extensions: []string{"@putnami/go", clientgenExtensionName},
 		Config:     wsproto.LoadProjectConfig(filepath.Join(root, "provider")),
 	}
-	planned, err := planner.Plan(testWorkspace(root, provider), []string{"package", "clientgen", "validate"},
+	planned, err := Plan(testWorkspace(root, provider), []string{"package", "clientgen", "validate"},
 		[]*workspace.Project{provider},
 		[]*extension.ExtensionDescription{loadGoPlannerExtension(t), loadClientgenExtension(t)}, nil, nil, nil)
 	if err != nil {

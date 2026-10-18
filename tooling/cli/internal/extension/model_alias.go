@@ -35,7 +35,7 @@ const (
 )
 
 // Re-exported task input sources. `task` is the typed producer/consumer edge
-// the planner enforces (jobs/plan_producers.go); the rest are cache-key
+// the planner enforces (jobs/planner/plan_producers.go); the rest are cache-key
 // contributions.
 const (
 	TaskInputFromProject   = model.TaskInputFromProject
