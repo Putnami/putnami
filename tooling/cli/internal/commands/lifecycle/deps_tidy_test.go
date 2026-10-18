@@ -290,7 +290,10 @@ func TestDepsRemoveTidiesThroughAGoWorkDirectoryReplace(t *testing.T) {
 // example.com/lib v0.3.0 only, and the workspace has a go.work, where an
 // @upgrade query would otherwise read the build list.
 func TestDepsAddAndRemoveEditAModuleThatRequiresAnUnservedVersion(t *testing.T) {
-	requireRealGo(t, writeModuleProxy(t, "example.com/lib", "v0.3.0", "package lib\n\nconst Name = \"lib\"\n"))
+	spectest.Proves(t, "cli/toolchain-lock", "deps-edit-reads-no-replaced-version",
+		"deps-add-and-remove-edit-a-module-that-requires-an-unserved-version")
+	requireRealGo(t, writeModuleProxy(t, "example.com/lib", "v0.3.0", "package lib\n\nconst Name = \"lib\"\n")+","+
+		writeModuleProxy(t, "example.com/dep", "v1.0.0", "package dep\n\nconst Name = \"dep\"\n"))
 	root := t.TempDir()
 	moduleDir := filepath.Join(root, "api")
 	writeRawFile(t, filepath.Join(root, wsproto.WorkspaceConfigFilename), `{"name":"api-ws","includes":["api"]}`)
@@ -328,6 +331,9 @@ func TestDepsAddAndRemoveEditAModuleThatRequiresAnUnservedVersion(t *testing.T) 
 		if sum := readFile(t, filepath.Join(moduleDir, "go.sum")); !strings.Contains(sum, "example.com/lib v0.3.0") {
 			t.Errorf("deps add %s: go.sum = %q, want the checksum of v0.3.0", spec, sum)
 		}
+		if _, err := os.Stat(filepath.Join(root, "go.work.sum")); !os.IsNotExist(err) {
+			t.Errorf("deps add %s wrote go.work.sum: %v", spec, err)
+		}
 	}
 
 	reset("package main\n\nfunc main() {}\n")
@@ -339,6 +345,31 @@ func TestDepsAddAndRemoveEditAModuleThatRequiresAnUnservedVersion(t *testing.T) 
 	}
 	if requires(readModFile(t, goMod), "example.com/lib") {
 		t.Errorf("deps remove: go.mod still requires example.com/lib:\n%s", readFile(t, goMod))
+	}
+	if _, err := os.Stat(filepath.Join(root, "go.work.sum")); !os.IsNotExist(err) {
+		t.Errorf("deps remove wrote go.work.sum: %v", err)
+	}
+
+	// A bare spec of a module go.mod does not require yet asks for @latest: an
+	// @upgrade query would load the module graph, where example.com/lib v0.0.0
+	// is unserved. go.work replaces lib with a directory so the tidy resolves it.
+	writeRawFile(t, filepath.Join(root, "lib", "go.mod"), "module example.com/lib\n\ngo 1.22\n")
+	writeRawFile(t, filepath.Join(root, "lib", "lib.go"), "package lib\n\nconst Name = \"lib\"\n")
+	writeRawFile(t, filepath.Join(root, "go.work"), "go 1.22\n\nuse ./api\n\nreplace example.com/lib => ./lib\n")
+	reset("package main\n\nimport (\n\t\"example.com/dep\"\n\t\"example.com/lib\"\n)\n\nfunc main() { _, _ = lib.Name, dep.Name }\n")
+	output, err = captureStdout(t, func() error {
+		return DepsAdd(context.Background(), root, []string{"example.com/dep"}, "", LifecycleEnv{})
+	})
+	if err != nil {
+		t.Fatalf("deps add example.com/dep: %v\n%s", err, output)
+	}
+	for _, require := range readModFile(t, goMod).Require {
+		if require.Mod.Path == "example.com/dep" && require.Mod.Version != "v1.0.0" {
+			t.Errorf("deps add example.com/dep: go.mod requires %s, want v1.0.0", require.Mod.Version)
+		}
+	}
+	if !requires(readModFile(t, goMod), "example.com/dep") {
+		t.Errorf("deps add example.com/dep: go.mod lacks the requirement:\n%s", readFile(t, goMod))
 	}
 }
 

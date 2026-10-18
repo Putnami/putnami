@@ -745,13 +745,12 @@ putnami deps prune --projects api          # Narrow to one project
 ```
 
 `add`/`remove` currently support Go modules. The target module is the workspace's
-sole Go module, or the one named by `--projects <name>`; the go commands run
-with `GOWORK` pointed at the workspace file so `replace` directives resolve.
-`add` resolves each module with `go list -m`, then writes the versions with `go
-mod edit -require`; `remove` runs `go mod edit -droprequire`. Neither runs `go
-get`, which loads the module graph and fails on a `go.mod` that requires a
-version no module proxy serves, such as `v0.0.0`. `add` takes module paths, not
-package paths. Both run
+sole Go module, or the one named by `--projects <name>`. `add` resolves each
+module with `go list -m` (with `GOWORK=off`, so the query reads no workspace
+build list), then writes the versions with `go mod edit -require`; `remove` runs
+`go mod edit -droprequire`. Neither runs `go get`, which loads the module graph
+and fails on a `go.mod` that requires a version no module proxy serves, such as
+`v0.0.0`. `add` takes module paths, not package paths. Both run
 the go command the Go extension's tasks run: the release the lock pins, or else
 a `go` on PATH. On a host with neither, they first pin and install the pinned Go,
 as `projects create` does. When the workspace installers fail but still leave a
@@ -770,7 +769,7 @@ release `putnami upgrade` pins in place of a generated client's
 directives. A `go.work` `use` line is not copied: a module requires a sibling
 workspace module through its own `replace` directive, which `putnami projects
 sync` writes. When a Go step fails, the command leaves every `putnami.json`,
-`go.mod`, `go.sum` and `go.work.sum` it edits as it was.
+`go.mod` and `go.sum` it edits as it was.
 
 `prune` reads the provider view that the last install or build recorded. When a
 file that view was recorded from changed since, such as a hand-edited `go.mod`,

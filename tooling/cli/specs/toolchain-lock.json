@@ -62,7 +62,11 @@
     },
     {
       "id": "deps-run-the-pinned-go",
-      "text": "putnami deps add and deps remove run go list, go mod edit and go mod tidy with the go command the Go extension's tasks resolve: the release the lock pins, else a go on PATH. On a host with neither, they pin and install the Go the lock pins the way projects create does, and fail naming putnami install when no go results. A go whose version probe times out is not missing: deps add, remove and prune install nothing, edit no go.mod or putnami.json, and fail naming the timeout and the same deps command."
+      "text": "putnami deps add (go list -m, go mod edit, go mod tidy) and deps remove (go mod edit, go mod tidy) run with the go command the Go extension's tasks resolve: the release the lock pins, else a go on PATH. On a host with neither, they pin and install the Go the lock pins the way projects create does, and fail naming putnami install when no go results. A go whose version probe times out is not missing: deps add, remove and prune install nothing, edit no go.mod or putnami.json, and fail naming the timeout and the same deps command."
+    },
+    {
+      "id": "deps-edit-reads-no-replaced-version",
+      "text": "putnami deps add resolves each module with go list -m and requires it with go mod edit; deps remove drops it with go mod edit -droprequire. Neither runs go get, so a go.mod that requires a version no proxy serves is edited. A spec names a module path."
     },
     {
       "id": "deps-report-a-failed-install",
@@ -70,7 +74,7 @@
     },
     {
       "id": "deps-tidy-resolves-as-the-workspace-does",
-      "text": "putnami deps add, deps remove and deps prune run go mod tidy on a copy of go.mod that also states each go.work replace directive for a module version the module does not replace itself, such as the release go.work pins for a generated client's placeholder. go.mod and go.sum take the tidied copy without those directives. A failed go step leaves every putnami.json, go.mod, go.sum and go.work.sum the command edits as it was."
+      "text": "putnami deps add, deps remove and deps prune run go mod tidy on a copy of go.mod that also states each go.work replace directive for a module version the module does not replace itself, such as the release go.work pins for a generated client's placeholder. go.mod and go.sum take the tidied copy without those directives. A failed go step leaves every putnami.json, go.mod and go.sum the command edits as it was."
     },
     {
       "id": "go-pin-reuses-the-machine-record",

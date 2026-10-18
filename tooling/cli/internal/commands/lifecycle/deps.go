@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 
 	"go.putnami.dev/cli/model/extension"
@@ -405,7 +406,9 @@ func editGoModule(ctx context.Context, wsRoot string, proj *workspace.Project, g
 	if action == "add" {
 		var err error
 		if resolved, err = resolveGoModules(ctx, goCmd.path, moduleDir, env, modules); err != nil {
-			return fmt.Errorf("go list -m: %w", err)
+			return protocolcli.WithNext(
+				fmt.Errorf("go list -m: %w\n  a spec names a module path, not a package path; `putnami deps remove <module>` drops a module", err),
+				"putnami deps remove <module>")
 		}
 	}
 	if err := runGoInModule(ctx, goCmd.path, moduleDir, env, goDepsEdit(action, modules, resolved)); err != nil {
@@ -416,6 +419,25 @@ func editGoModule(ctx context.Context, wsRoot string, proj *workspace.Project, g
 	}
 	iox.Fprintf(os.Stdout, "  ✓ updated %s\n", filepath.Join(proj.Path, "go.mod"))
 	return nil
+}
+
+// requiredGoModules returns the module paths the go.mod in dir requires. A
+// go.mod that is missing or does not parse requires none: go reports it.
+func requiredGoModules(dir string) map[string]bool {
+	required := map[string]bool{}
+	goModPath := filepath.Join(dir, "go.mod")
+	data, err := os.ReadFile(goModPath)
+	if err != nil {
+		return required
+	}
+	file, err := modfile.Parse(goModPath, data, nil)
+	if err != nil {
+		return required
+	}
+	for _, require := range file.Require {
+		required[require.Mod.Path] = true
+	}
+	return required
 }
 
 // goDepsEdit returns the arguments of the `go mod edit` that edits the module's
@@ -449,10 +471,22 @@ func goDepsEdit(action string, modules []string, resolved []module.Version) []st
 }
 
 // resolveGoModules returns the module version each spec names, from one `go
-// list -m` in moduleDir. A spec without a version asks for @upgrade, as `go
-// get` does. `go list -m` reads the module's go.mod but loads no module graph
-// for a version query, so it resolves a spec in a module that requires a
-// version no proxy serves (goDepsEdit). Two flags keep that true:
+// list -m` in moduleDir. A spec without a version asks for what `go get` asks
+// for: @upgrade for a module go.mod already requires, and @latest, the same
+// answer, for one it does not.
+//
+// A query that `go list -m` answers without loading the module graph resolves
+// a spec in a module that requires a version no proxy serves (goDepsEdit).
+// @latest and an exact version are such queries. @upgrade and @patch read the
+// version go.mod requires, so they load no graph only for a path that is a root
+// requirement of a pruned go.mod, and they need the go.sum entries of that
+// version; for any other path they load the whole graph, as `go get` does. That
+// is why a module not yet required asks for @latest. A go.mod that declares
+// go 1.16 or older is not pruned, so @upgrade of a module it requires loads the
+// graph and fails on an unserved version; it stays @upgrade, because @latest
+// would downgrade a module required at a newer version than the proxy's latest.
+//
+// Two flags keep the query away from the graph:
 //
 //   - GOWORK=off. In workspace mode @upgrade reads the workspace build list,
 //     which resolves the unserved version and fails. A version query reads no
@@ -464,10 +498,15 @@ func goDepsEdit(action string, modules []string, resolved []module.Version) []st
 // go's error output streams to the terminal, as for the other go runs. A
 // package path that is not a module path fails with go's error.
 func resolveGoModules(ctx context.Context, goPath, moduleDir string, env, specs []string) ([]module.Version, error) {
+	required := requiredGoModules(moduleDir)
 	args := []string{"list", "-m", "-json", "-mod=readonly"}
 	for _, spec := range specs {
 		if !strings.Contains(spec, "@") {
-			spec += "@upgrade"
+			if required[spec] {
+				spec += "@upgrade"
+			} else {
+				spec += "@latest"
+			}
 		}
 		args = append(args, spec)
 	}

@@ -1,6 +1,7 @@
 # ADR 0046 — A declared edge no import backs is a finding
 
-- **Status**: accepted
+- **Status**: accepted, amended in decision 5: `deps remove` drops a
+  requirement with `go mod edit -droprequire` too (#362)
 - **Scope**: `@putnami/cli` (`internal/workspace` declared-edge check,
   `putnami deps prune`), the Go and TypeScript workspace probes
 

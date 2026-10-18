@@ -171,14 +171,11 @@ func goModulePath(dir string) string {
 }
 
 // goModuleFiles are the files a Go dependency edit of the module in dir
-// writes: its go.mod and go.sum, and the go.work.sum beside the go.work that
-// governs it, which `go get` writes in workspace mode.
+// writes: its go.mod and go.sum. None of the go commands the edit runs writes
+// the go.work.sum beside a go.work: `go list -m` runs with GOWORK=off, `go mod
+// edit` writes go.mod only, and `go mod tidy` reads no go.work.
 func goModuleFiles(dir string) []string {
-	files := []string{filepath.Join(dir, "go.mod"), filepath.Join(dir, "go.sum")}
-	if goWork := shared.FindGoWork(dir); goWork != "" {
-		files = append(files, filepath.Join(filepath.Dir(goWork), "go.work.sum"))
-	}
-	return files
+	return []string{filepath.Join(dir, "go.mod"), filepath.Join(dir, "go.sum")}
 }
 
 // writeFileKeepingMode writes data to path with the permissions path has, or
