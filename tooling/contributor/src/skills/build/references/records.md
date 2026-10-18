@@ -42,7 +42,7 @@ Create the ignored run directory first. Paths are absolute or relative to the
 workspace root. `--snapshot` emits a **pending** index; never report it as verified.
 `--ref` emits `{path, sha256}` for existing bytes. `change verify --gate` is a
 read-only standalone check of one session and report without a dossier; it
-does not supply an alternate input to `proposals finalize`. The verifier
+does not supply an alternate input to `change finalize`. The verifier
 ignores the baseline the session recorded: the native plan against the base
 decides the selection.
 It requires the CI policy's commands and the canonical four (`lint`,

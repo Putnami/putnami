@@ -18,28 +18,28 @@ import (
 var restoredRef = features.VerificationReportRef{Project: "/application", Task: "/application:test",
 	Path: ".context/verification-report.json", Digest: "sha256:" + strings.Repeat("a", 64), Restored: true}
 
-// reportsFor returns a Reports on socket with token that counts its dials.
-func reportsFor(socket, token string, dials *atomic.Int32) *Reports {
-	return &Reports{socket: socket, token: token, connect: func(socket, token string) (*hostrpc.Client, error) {
+// reportsFor returns a Channel on socket with token that counts its dials.
+func reportsFor(socket, token string, dials *atomic.Int32) *Channel {
+	return &Channel{socket: socket, token: token, remedy: testRemedy, connect: func(socket, token string) (*hostrpc.Client, error) {
 		dials.Add(1)
 		return hostrpc.Connect(socket, token)
 	}}
 }
 
-// TestTakeReportsRemovesTheChannelFromTheEnvironment pins that the channel
-// leaves the process environment before the verifier starts any process,
-// and that the Reports keeps it.
-func TestTakeReportsRemovesTheChannelFromTheEnvironment(t *testing.T) {
+// TestTakeRemovesTheChannelFromTheEnvironment pins that the channel leaves
+// the process environment before the command starts any process, and that
+// the Channel keeps it.
+func TestTakeRemovesTheChannelFromTheEnvironment(t *testing.T) {
 	t.Setenv(wire.SocketEnv, "/tmp/host.sock")
 	t.Setenv(wire.TokenEnv, "launch-token")
-	reports := TakeReports()
+	reports := Take(testRemedy)
 	for _, name := range []string{wire.SocketEnv, wire.TokenEnv} {
 		if value, set := os.LookupEnv(name); set {
 			t.Errorf("%s is still set to %q", name, value)
 		}
 	}
-	if reports.socket != "/tmp/host.sock" || reports.token != "launch-token" {
-		t.Errorf("Reports holds %q and %q, want the channel the environment named", reports.socket, reports.token)
+	if reports.socket != "/tmp/host.sock" || reports.token != "launch-token" || reports.remedy != testRemedy {
+		t.Errorf("Channel holds %q, %q and %q, want the channel the environment named", reports.socket, reports.token, reports.remedy)
 	}
 }
 

@@ -118,11 +118,11 @@ How the pieces combine for one delivery:
   title and message, the merge button included. `bodyMaxBytes: 1500` keeps
   that body a commit message; native finalization posts the verification record as
   a proposal comment instead of appending it.
-- Every authorized proposal opens as a draft when work starts (`putnami proposals finalize --draft`).
+- Every authorized proposal opens as a draft when work starts (`putnami change finalize --draft`).
   Putnami CI holds runs on a draft, so checkpoint pushes cost no runner time.
 - `verification.ciGate` names `Putnami CI` as the hosted check that stands for
   the gate. When the machine's load ratio exceeds `0.7`, build selects
-  `proposals finalize --gate ci` instead of running a local impacted gate;
+  `change finalize --gate ci` instead of running a local impacted gate;
   a parent task requires `--workflow-file` and native completion eligibility before publication,
   except a partial delivery whose changed paths all belong to projects that declare
   `featureAuthority.none` and author no feature;

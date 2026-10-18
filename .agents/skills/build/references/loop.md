@@ -32,7 +32,7 @@ inventory or impose a document count.
 Publication is the default. Unless the run is local (`--local`, a mandate
 that says to stay local, `--dry-run`, or no bound proposals provider), open the
 proposal as a draft once the plan is settled, before the first edit: run
-`"$PUTNAMI_CLI" proposals finalize --draft` with the planned
+`"$PUTNAMI_CLI" change finalize --draft` with the planned
 title, a body that states the intended change, and the task reference. The
 command adds an empty commit carrying the title when the branch has none; the
 squash removes it. Readers see the work from its start, and a draft starts no
@@ -40,7 +40,7 @@ hosted run.
 
 Push a checkpoint at each milestone: a delivery unit, a phase, or a repair
 round whose `--projects` gate passes. Commit the finished edits, then run
-`proposals finalize --draft` again; it pushes the committed HEAD and refreshes
+`change finalize --draft` again; it pushes the committed HEAD and refreshes
 the title and body, so rewrite the body when the net change moved. Do not push
 a failing or half-edited tree as a milestone. The draft stays a draft until
 the ready finalization below.
@@ -104,7 +104,7 @@ no other gate:
    again only after a new edit.
 2. One final impacted gate on the accepted candidate, or the explicitly
    selected hosted gate when policy and load require it.
-3. For local ready, `proposals finalize --verification-file` verifies the
+3. For local ready, `change finalize --verification-file` verifies the
    dossier that references that exact gate; for hosted ready, use `--gate ci`.
    Native finalization never launches another local gate.
 
@@ -141,7 +141,7 @@ from `putnami.ci.json` and repository constraints. Measure the machine first
 with `"$PUTNAMI_CLI" doctor --machine`. When the ratio exceeds
 the policy's `verification.ciGate.load` (default 0.7) and the policy names
 `verification.ciGate.checks`, run no local impacted gate: commit the
-checkpoint and call `proposals finalize --gate ci`. It pushes, marks the
+checkpoint and call `change finalize --gate ci`. It pushes, marks the
 proposal ready, which starts the hosted checks, waits for every named check on
 the pushed commit, and returns the proposal to draft when one fails. It can
 wait up to `verification.ciGate.timeoutMinutes`, so run it in the background
@@ -202,7 +202,7 @@ cannot validate the workflow. The referenced workflow needs producer-backed
 complete current native requirements for final ready status; a planning
 record may remain pending without that proof.
 
-Publish with `"$PUTNAMI_CLI" proposals finalize` and
+Publish with `"$PUTNAMI_CLI" change finalize` and
 **`--verification-file <dossier.json>`** for local ready. It requires a clean
 checkpointed tree and rechecks the dossier and its referenced gate. Without a
 current dossier, local ready is blocked; `--gate ci` is the separate explicit

@@ -10,9 +10,11 @@ each repository configures.
 The manifest declares an `agentContent` contribution, which the CLI builds
 and materializes for Claude Code (`.claude/skills`, `.claude/agents`) and Codex
 (`.agents/skills`, `.codex/agents`) under the extension's own version. It also
-declares a compiled runtime, `compiled/putnami-contributor`, which answers only
-the runtime handshake for now
-([ADR 0004](doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md)).
+declares a compiled runtime, `compiled/putnami-contributor`, which serves
+`putnami change language`, `change verify` and `change finalize`
+([ADR 0004](doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md),
+[ADR 0005](doc/adr/0005-the-contributor-executable-serves-the-change-noun.md),
+[ADR 0006](doc/adr/0006-the-contributor-executable-serves-change-finalize.md)).
 For a path declaration, the host builds the runtime from `cmd/` with the Go
 release `putnami.lock.json` pins, the first time a command needs it.
 
@@ -58,12 +60,14 @@ it does not select backlog work. It publishes its own proposal by default
 Worker profiles: `fix-light`, `fix-standard`, `fix-heavy` and `epic-analyst`,
 each one body for both hosts with host metadata beside it.
 
-The portable helpers are native CLI commands, validated with the CLI's Go
-suite: `putnami proposals finalize` publishes a draft or a verified ready
-proposal, reads it back, and applies the named task's delivered transition. A partial delivery uses `--partial-delivery` to keep a non-closing
+The portable helpers are commands, not scripts. `putnami change finalize`,
+which this extension's executable serves, publishes a draft or a verified
+ready proposal, reads it back, and applies the named task's delivered
+transition. A partial delivery uses `--partial-delivery` to keep a non-closing
 parent reference and skip that transition. It consumes current producer proof
 and never runs or retries a local gate; `--gate ci` explicitly selects hosted
-checks. `putnami change language text|files|commits|tasks`, which this
+checks ([Publish a proposal](doc/06-change-finalize.md)).
+`putnami change language text|files|commits|tasks`, which this
 extension's executable serves, enforces the configured language rule, the
 core's `putnami doctor --machine` reports load for hosted-gate admission, and
 `putnami tree fingerprint` supplies tree identity.
@@ -95,9 +99,11 @@ dossier can compute `Putnami verified` for the declared local scope.
   configuration as a reference
 - [Entry-point migration and evidence limits](doc/03-entry-point-migration.md)
 - [Workflow records and handoffs](doc/04-workflow-contract.md)
+- [Publish a proposal](doc/06-change-finalize.md)
 - [ADR 0001](doc/adr/0001-one-contributor-extension.md)
 - [ADR 0002](doc/adr/0002-build-and-versioned-workflow-record.md)
 - [ADR 0004](doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md)
+- [ADR 0006](doc/adr/0006-the-contributor-executable-serves-change-finalize.md)
 
 ## Publication
 

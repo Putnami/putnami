@@ -11,21 +11,6 @@ import (
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 )
 
-// TestEnvironmentsDropTheHostChannel pins that neither environment the
-// verifier gives a process carries the host channel or its token, and that
-// both keep everything else they kept before.
-func TestEnvironmentsDropTheHostChannel(t *testing.T) {
-	t.Parallel()
-	environ := []string{"PATH=/bin", wire.SocketEnv + "=/tmp/host.sock", "GIT_DIR=/elsewhere",
-		wire.TokenEnv + "=launch-token", "GIT_SSH_COMMAND=ssh"}
-	if got, want := withoutHostChannel(environ), []string{"PATH=/bin", "GIT_DIR=/elsewhere", "GIT_SSH_COMMAND=ssh"}; !slices.Equal(got, want) {
-		t.Errorf("withoutHostChannel = %q, want %q", got, want)
-	}
-	if got, want := repositoryEnvironment(environ), []string{"PATH=/bin", "GIT_SSH_COMMAND=ssh"}; !slices.Equal(got, want) {
-		t.Errorf("repositoryEnvironment = %q, want %q", got, want)
-	}
-}
-
 // TestThePlanSubprocessReceivesNoHostChannel runs the default plan with the
 // channel in the process environment: the workspace CLI it starts sees
 // neither variable.

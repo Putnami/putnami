@@ -60,6 +60,10 @@
       "text": "putnami change verify, served by the @putnami/contributor executable, prints the same verdict document and exit code as goldens recorded from putnami tree verify, the core command it replaces, in every mode, with or without a workspace. It reads a restored verification report through the host RPC channel putnami opens for the launch; without that channel only such a report is not verified, with a reason naming the channel. No process the verifier starts receives the channel."
     },
     {
+      "id": "change-finalize-parity",
+      "text": "putnami change finalize, served by the @putnami/contributor executable, exits, prints, pushes and writes the same proposal and task records as putnami proposals finalize, the core command it replaces, for a draft seed, a hosted gate and a usage error. It reaches the providers, the owners of changed paths and restored verification reports through the one host RPC channel putnami opens for the launch. A usage error never opens it, and no git command it starts receives it."
+    },
+    {
       "id": "canonical-consumer-migration",
       "text": "Both hosts install canonical source/package content with exact resource links, one build recipe index, repeat-install idempotence and edited-file protection. Legacy workflows and shell implementations are deleted; the active audit language relay only calls the native evaluator. Workflow records require advertised native support. Stage changes, reviews, adapters and publication rechecks never execute another gate; actual released adoption is distinct."
     }
@@ -67,6 +71,7 @@
   "decisions": [
     "tooling/contributor/doc/adr/0001-one-contributor-extension.md",
     "tooling/contributor/doc/adr/0002-build-and-versioned-workflow-record.md",
-    "tooling/contributor/doc/adr/0005-the-contributor-executable-serves-the-change-noun.md"
+    "tooling/contributor/doc/adr/0005-the-contributor-executable-serves-the-change-noun.md",
+    "tooling/contributor/doc/adr/0006-the-contributor-executable-serves-change-finalize.md"
   ]
 }

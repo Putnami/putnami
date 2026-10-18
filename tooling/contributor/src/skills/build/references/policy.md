@@ -21,18 +21,18 @@ jq '.options["@putnami/contributor"] // {}' putnami.workspace.json
 | `tasks.tiers` | `{}` | build | Keys `light`, `standard` and `heavy`, each naming a label: a named task carrying the label declares that tier. |
 | `tasks.claimAssignees` | `[]` | build | Assignees set for a named task claim when the mandate authorizes claim and the provider offers `assign`. |
 | `states.claimed` | `in_progress` | build | Semantic state an explicitly authorized task claim moves to. |
-| `states.delivered` | `in_progress` | proposals finalize | Semantic state a task moves to once its complete-outcome proposal is published. |
+| `states.delivered` | `in_progress` | change finalize | Semantic state a task moves to once its complete-outcome proposal is published. |
 | `workers.light`, `workers.standard`, `workers.heavy` | `fix-light`, `fix-standard`, `fix-heavy` | build | Worker profile delegated for each tier. |
 | `workers.analyst` | `epic-analyst` | build | Read-only analyst profile for coordinated work. |
-| `verification.language` | none | check, proposals finalize | `en` runs the English-only detector on everything a change publishes; absent, no language rule is enforced. |
+| `verification.language` | none | check, change finalize | `en` runs the English-only detector on everything a change publishes; absent, no language rule is enforced. |
 | `verification.documentation` | `[]` | check | Documentation roots a user-facing change must update, besides each project's `doc/`. |
-| `verification.ciGate.checks` | `[]` | build, proposals finalize | Names of the hosted checks that stand for the gate. Empty, build runs the gate locally before finalization. |
+| `verification.ciGate.checks` | `[]` | build, change finalize | Names of the hosted checks that stand for the gate. Empty, build runs the gate locally before finalization. |
 | `verification.ciGate.load` | `0.7` | build | Load ratio (one-minute load average divided by CPUs) above which build selects the hosted gate. |
-| `verification.ciGate.timeoutMinutes` | `60` | proposals finalize | How long the command waits for the hosted checks before it stops; invoking it again keeps waiting. |
-| `verification.ciGate.pollSeconds` | `30` | proposals finalize | Interval between two reads of the hosted checks. |
-| `publication.draft` | `false` | proposals finalize | Keep proposals as drafts at finalization. Every proposal opens as a draft (`--draft`) whatever this says. |
-| `publication.bodyMaxBytes` | none | proposals finalize | Largest proposal body the command publishes; the body becomes the squash commit message. Absent, only the contract's 65536 bytes apply. |
-| `publication.taskReference` | none | proposals finalize | Line that links a complete outcome's proposal to its task, with `{id}` replaced by the task reference id (for example a closing keyword the provider understands). The command adds it to the commit message and proposal body only for normal delivery; `--partial-delivery` uses a non-closing parent reference and skips the delivered transition. |
+| `verification.ciGate.timeoutMinutes` | `60` | change finalize | How long the command waits for the hosted checks before it stops; invoking it again keeps waiting. |
+| `verification.ciGate.pollSeconds` | `30` | change finalize | Interval between two reads of the hosted checks. |
+| `publication.draft` | `false` | change finalize | Keep proposals as drafts at finalization. Every proposal opens as a draft (`--draft`) whatever this says. |
+| `publication.bodyMaxBytes` | none | change finalize | Largest proposal body the command publishes; the body becomes the squash commit message. Absent, only the contract's 65536 bytes apply. |
+| `publication.taskReference` | none | change finalize | Line that links a complete outcome's proposal to its task, with `{id}` replaced by the task reference id (for example a closing keyword the provider understands). The command adds it to the commit message and proposal body only for normal delivery; `--partial-delivery` uses a non-closing parent reference and skips the delivered transition. |
 | `integrations.contentBump` | none | content-bump | `{"lock", "command", "projects", "reference"}` of a pinned-content lock the `content-bump` workflow refreshes. Without it, that workflow reports that it is not configured. |
 
 Stored `tasks.backlog`, `tasks.filters`, `tasks.rank` and `tasks.planLabels`

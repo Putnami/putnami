@@ -81,7 +81,7 @@ remain incomplete. A source-level candidate result does not establish merge,
 package publication, deployment or adoption; each later stage needs its own
 actual receipt.
 
-`putnami proposals finalize --partial-delivery` publishes a partial unit with
+`putnami change finalize --partial-delivery` publishes a partial unit with
 a non-closing parent reference. It rejects closing directives in caller
 title, the fully normalized proposal body and branch commits before a write,
 and skips the parent task's delivered transition.
