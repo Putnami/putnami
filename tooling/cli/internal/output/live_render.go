@@ -334,7 +334,7 @@ func (r *LiveRenderer) activeCommand(row *projectRow) string {
 	bestRank := 1 << 30
 	for name, cmd := range row.commands {
 		if cmd.status == statusRunning {
-			if rk := commandRank(name); rk < bestRank {
+			if rk := commandRank(r.verbOrder, name); rk < bestRank {
 				bestRank, best = rk, name
 			}
 		}
