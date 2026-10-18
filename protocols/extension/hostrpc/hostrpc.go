@@ -63,11 +63,11 @@ const (
 	MethodVerificationReport = "verification.report"
 	// MethodWorkspaceOwners answers which workspace projects own each path.
 	// A project owns a path when impact analysis treats it as an owner: the
-	// nearest project whose directory holds the path, every project that claims
-	// the path as an asset, and, for a file at the workspace root, every project
-	// whose provider lists that file as watched. The CLI applies this rule to a changed file
-	// before it follows the dependency graph.
-	// Params: WorkspaceOwnersParams. Result: WorkspaceOwnersResult.
+	// nearest project whose directory holds the path, every project that
+	// claims the path as an asset, and, for a file at the workspace root, every
+	// project whose provider lists that file as watched. The CLI applies this
+	// rule to a changed file before it follows the dependency graph. Params:
+	// WorkspaceOwnersParams. Result: WorkspaceOwnersResult.
 	MethodWorkspaceOwners = "workspace.owners"
 )
 
@@ -200,8 +200,8 @@ type PathOwners struct {
 	// Path repeats the requested path.
 	Path string `json:"path"`
 	// Projects are the owners of Path under the rule OwningProject states,
-	// sorted by ID. It is an empty array, never
-	// null, when no project owns the path.
+	// sorted by ID. It is an empty array, never null, when no project owns the
+	// path.
 	Projects []OwningProject `json:"projects"`
 }
 
