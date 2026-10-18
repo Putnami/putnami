@@ -66,7 +66,7 @@
     },
     {
       "id": "deps-edit-reads-no-replaced-version",
-      "text": "putnami deps add resolves each module with go list -m and requires it with go mod edit; deps remove drops it with go mod edit -droprequire. Neither runs go get, so a go.mod that requires a version no proxy serves is edited. A spec names a module path."
+      "text": "putnami deps add resolves each module with go list -m and requires it with go mod edit; deps remove drops it with go mod edit -droprequire. Neither runs go get, so a go.mod that requires a version no proxy serves is edited. A spec names a module path. A spec without a version takes the latest version, or keeps the version go.mod requires when it is newer, and deps add refuses the version none, naming the deps remove command."
     },
     {
       "id": "deps-report-a-failed-install",

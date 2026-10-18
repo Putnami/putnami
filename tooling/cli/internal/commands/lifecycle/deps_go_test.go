@@ -196,6 +196,7 @@ func TestDepsCommandIsTheCommandTheUserRan(t *testing.T) {
 // it before any go command runs, edits nothing, and suggests the exact deps
 // remove command.
 func TestDepsAddRefusesTheVersionNoneAndSuggestsDepsRemove(t *testing.T) {
+	spectest.Proves(t, "cli/toolchain-lock", "deps-edit-reads-no-replaced-version", "deps-add-refuses-the-version-none-naming-deps-remove")
 	f := newGoCreateFixture(t)
 	f.withGoProject(t)
 	f.pin(t)
@@ -227,6 +228,7 @@ func TestDepsAddRefusesTheVersionNoneAndSuggestsDepsRemove(t *testing.T) {
 // suggests no command: the failure may be the network or an unknown version,
 // not a spec.
 func TestDepsAddReportsAFailedGoListWithoutASuggestedCommand(t *testing.T) {
+	spectest.Proves(t, "cli/toolchain-lock", "deps-edit-reads-no-replaced-version", "deps-add-reports-a-failed-go-list-without-a-suggested-command")
 	f := newGoCreateFixture(t)
 	f.withGoProject(t)
 	f.pin(t)
@@ -255,6 +257,35 @@ func TestDepsAddReportsAFailedGoListWithoutASuggestedCommand(t *testing.T) {
 	}
 	if after := readFile(t, filepath.Join(f.root, "app", "go.mod")); after != goMod {
 		t.Errorf("a failed deps add changed go.mod:\n%s", after)
+	}
+}
+
+// A bare spec takes the latest version the proxy answers, unless go.mod requires
+// a newer one: `go get` never downgrades a module the way a plain @latest would.
+func TestDepsAddKeepsARequiredVersionNewerThanTheLatest(t *testing.T) {
+	spectest.Proves(t, "cli/toolchain-lock", "deps-edit-reads-no-replaced-version", "deps-add-keeps-a-required-version-newer-than-the-latest")
+	f := newGoCreateFixture(t)
+	f.withGoProject(t)
+	writeRawFile(t, filepath.Join(f.root, "app", "go.mod"),
+		"module example.com/app\n\ngo "+goFixtureVersion+"\n\nrequire example.com/lib v0.4.0\n")
+	f.pin(t)
+	f.writeGoAnswering(t, f.pinned, goFixtureVersion, map[string]fixtureproc.Outcome{
+		"list -m -json -mod=readonly example.com/lib@latest": {Stdout: `{"Path":"example.com/lib","Version":"v0.3.0"}` + "\n"},
+	})
+
+	output, err := captureStdout(t, func() error {
+		return DepsAdd(context.Background(), f.root, []string{"example.com/lib"}, "", f.refusingGoInstall(t))
+	})
+	if err != nil {
+		t.Fatalf("deps add example.com/lib: %v\n%s", err, output)
+	}
+	want := []string{
+		"list -m -json -mod=readonly example.com/lib@latest|" + f.pinned,
+		"mod edit -require=example.com/lib@v0.4.0|" + f.pinned,
+		"mod tidy -modfile=<copy>|" + f.pinned,
+	}
+	if got := f.depsCalls(t); strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("go calls =\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }
 

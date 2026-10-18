@@ -750,7 +750,10 @@ module with `go list -m` (with `GOWORK=off`, so the query reads no workspace
 build list), then writes the versions with `go mod edit -require`; `remove` runs
 `go mod edit -droprequire`. Neither runs `go get`, which loads the module graph
 and fails on a `go.mod` that requires a version no module proxy serves, such as
-`v0.0.0`. `add` takes module paths, not package paths. Both run
+`v0.0.0`. `add` takes module paths, not package paths. A module without a version
+resolves to the latest version, or to the version `go.mod` already requires when
+that is newer; `add <module>@none` is refused, and the error names `putnami deps
+remove`. Both run
 the go command the Go extension's tasks run: the release the lock pins, or else
 a `go` on PATH. On a host with neither, they first pin and install the pinned Go,
 as `projects create` does. When the workspace installers fail but still leave a
