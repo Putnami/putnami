@@ -174,6 +174,10 @@
       "text": "The channel speaks JSON-RPC 2.0, one request per line of at most 32 MiB; a larger frame is refused. A request without the launch token is refused, compared in constant time, and its connection closed. An unknown method is method-not-found. Calls run one at a time, and stopping the channel cancels the call in flight. host.hello returns the protocol version and methods, collaboration.call the envelope putnami <contract> <operation> --output=json prints, and verification.report what the cache corroborates."
     },
     {
+      "id": "host-rpc-workspace-owners",
+      "text": "workspace.owners takes workspace-relative paths in io/fs form and answers one entry per path, in request order. A path's owners are its nearest project and every project that claims it as an asset, sorted by ID; none gives an empty list. An empty list of paths, or a path outside io/fs form, is invalid params. Outside a workspace the method is unavailable."
+    },
+    {
       "id": "source-bound-cache",
       "text": "A task that declares cache.sourceBound stores and looks up its entry, locally and remotely, at a key derived from its cache key and its project's source binding: the stamped binding when storing, the current one when looking up, the empty one in an unmanaged workspace. A binding the CLI cannot compute inside a repository gives no hit and no store. Dependents fold the unchanged cache key, so a test-only edit keeps every key. A source-bound failure is never replayed, and its entry prunes no producer."
     }

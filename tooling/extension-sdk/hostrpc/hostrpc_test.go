@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -20,7 +21,9 @@ import (
 const (
 	feature     = "tooling/extension-authoring"
 	requirement = "host-rpc-client"
-	testToken   = "test-token"
+	// ownersRequirement is the requirement of the workspace.owners client.
+	ownersRequirement = "host-rpc-workspace-owners-client"
+	testToken         = "test-token"
 )
 
 // fakeHost serves one end of a pipe: answer receives each request and returns
@@ -120,7 +123,7 @@ func TestEveryRequestCarriesTheTokenAndAFreshID(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if hello.Protocol != wire.ProtocolVersion || len(hello.Methods) != 3 {
+		if hello.Protocol != wire.ProtocolVersion || !slices.Equal(hello.Methods, wire.Methods()) {
 			t.Fatalf("Hello = %+v", hello)
 		}
 	}
@@ -172,6 +175,85 @@ func TestVerificationReportDecodesTheReportBytes(t *testing.T) {
 	report, err := client.VerificationReport(t.Context(), ref)
 	if err != nil || string(report) != "<report/>" {
 		t.Fatalf("VerificationReport = %q, %v", report, err)
+	}
+}
+
+func TestWorkspaceOwnersReturnsTheHostsEntriesInRequestOrder(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, feature, ownersRequirement, "workspace-owners-returns-the-hosts-entries-in-request-order")
+	paths := []string{"b/x.go", "a.go", "b/x.go"}
+	app := wire.OwningProject{ID: "/app", Path: "app"}
+	client := fakeHost(t, func(request wire.Request) []byte {
+		var params wire.WorkspaceOwnersParams
+		if err := wire.DecodeStrict(request.Params, &params); err != nil || request.Method != wire.MethodWorkspaceOwners ||
+			!slices.Equal(params.Paths, paths) {
+			t.Errorf("%s params %s, %v", request.Method, request.Params, err)
+		}
+		return result(t, request, wire.WorkspaceOwnersResult{Owners: []wire.PathOwners{
+			{Path: "b/x.go", Projects: []wire.OwningProject{app}},
+			{Path: "a.go", Projects: []wire.OwningProject{}},
+			{Path: "b/x.go", Projects: []wire.OwningProject{app}},
+		}})
+	})
+	owners, err := client.WorkspaceOwners(t.Context(), paths)
+	if err != nil || len(owners) != 3 {
+		t.Fatalf("WorkspaceOwners = %+v, %v, want three entries", owners, err)
+	}
+	for i, path := range paths {
+		if owners[i].Path != path {
+			t.Errorf("entry %d is for %q, want %q", i, owners[i].Path, path)
+		}
+	}
+	if len(owners[0].Projects) != 1 || owners[0].Projects[0] != app || len(owners[1].Projects) != 0 {
+		t.Errorf("owners = %+v", owners)
+	}
+}
+
+func TestWorkspaceOwnersRefusesWhatTheHostWouldRefuseWithoutSendingAnything(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, feature, ownersRequirement, "workspace-owners-refuses-what-the-host-would-refuse-without-sending")
+	received := make(chan wire.Request, 2)
+	client := fakeHost(t, func(request wire.Request) []byte {
+		received <- request
+		return result(t, request, wire.HelloResult{Protocol: wire.ProtocolVersion, Methods: wire.Methods()})
+	})
+	for _, paths := range [][]string{nil, {}, {"a.go", "../a"}, {"."}, {"/a"}, {"a/"}} {
+		if owners, err := client.WorkspaceOwners(t.Context(), paths); err == nil {
+			t.Errorf("WorkspaceOwners(%q) = %+v, want a refusal", paths, owners)
+		}
+	}
+	if _, err := client.Hello(t.Context()); err != nil {
+		t.Fatalf("a refusal before sending broke the client: %v", err)
+	}
+	if request := <-received; request.Method != wire.MethodHello || string(request.ID) != "1" || len(received) != 0 {
+		t.Fatalf("the host received %s as request %s and %d more, want only host.hello as request 1", request.Method, request.ID, len(received))
+	}
+}
+
+func TestWorkspaceOwnersRejectsAnAnswerForOtherPathsAndStaysUsable(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, feature, ownersRequirement, "workspace-owners-rejects-an-answer-for-other-paths-and-stays-usable")
+	for name, owners := range map[string][]wire.PathOwners{
+		"too few entries":  {{Path: "a.go", Projects: []wire.OwningProject{}}},
+		"too many entries": {{Path: "a.go"}, {Path: "b.go"}, {Path: "c.go"}},
+		"another path":     {{Path: "a.go"}, {Path: "c.go"}},
+		"swapped paths":    {{Path: "b.go"}, {Path: "a.go"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			client := fakeHost(t, func(request wire.Request) []byte {
+				if request.Method == wire.MethodHello {
+					return result(t, request, wire.HelloResult{Protocol: wire.ProtocolVersion, Methods: wire.Methods()})
+				}
+				return result(t, request, wire.WorkspaceOwnersResult{Owners: owners})
+			})
+			if got, err := client.WorkspaceOwners(t.Context(), []string{"a.go", "b.go"}); err == nil {
+				t.Fatalf("WorkspaceOwners accepted %+v", got)
+			}
+			if _, err := client.Hello(t.Context()); err != nil {
+				t.Fatalf("the call after the rejected answer = %v, want the client usable", err)
+			}
+		})
 	}
 }
 

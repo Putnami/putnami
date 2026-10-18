@@ -11,6 +11,7 @@ a Unix socket. It does not start `putnami` again.
 | `host.hello` | `Hello(ctx)` | The protocol version and the methods the host serves. |
 | `collaboration.call` | `CallCollaboration(ctx, contract, operation, input)` | The envelope `putnami <contract> <operation> --output=json` prints for the same input, byte for byte. |
 | `verification.report` | `VerificationReport(ctx, ref)` | The bytes of a verification report a successful cached test run produced, once the host's cache corroborates them. |
+| `workspace.owners` | `WorkspaceOwners(ctx, paths)` | One entry for each path, in the order you gave, with the projects that own it. |
 
 That is the whole list. The host answers any other method with
 method-not-found (`-32601`). `Hello` tells you what a given host serves, so
@@ -21,6 +22,22 @@ CLI command, so the answer matches what the user sees. An operation that fails
 at the provider is not an error: the envelope reports it. The host refuses a
 contract name that is not a collaboration contract, and `proposals finalize`,
 which is a command, not an operation, with `-32602`.
+
+`workspace.owners` takes workspace-relative paths in `io/fs` form, such as
+`tooling/cli/main.go`: no leading or trailing slash, no `.` or `..` element,
+and not `.` itself. `WorkspaceOwners` refuses an empty list and the first path
+that is not in that form (`wire.ValidWorkspacePath`) before it sends anything,
+and the client stays usable. A project owns a path when it is the nearest
+project whose directory holds the path, or when it claims the path as an
+asset. Each entry holds the path and its owners, sorted by project ID, each
+with its canonical `ID` and its workspace-relative `Path`. A path no project
+owns gets an empty list. Outside a workspace the host answers `-32002`. If the
+host answers other entries than the paths you asked for, `WorkspaceOwners`
+returns an error and the client stays usable.
+
+```go
+owners, err := client.WorkspaceOwners(ctx, []string{"tooling/cli/main.go", "README.md"})
+```
 
 ## Who receives a channel
 

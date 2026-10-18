@@ -53,7 +53,7 @@ the channel, the child receives no variable and the host prints a warning.
 
 ```json
 {"jsonrpc":"2.0","id":1,"method":"host.hello","token":"<64 hex characters>"}
-{"jsonrpc":"2.0","id":1,"result":{"protocol":1,"methods":["collaboration.call","host.hello","verification.report"]}}
+{"jsonrpc":"2.0","id":1,"result":{"protocol":1,"methods":["collaboration.call","host.hello","verification.report","workspace.owners"]}}
 ```
 
 ## Methods
@@ -63,11 +63,28 @@ the channel, the child receives no variable and the host prints a warning.
 | `host.hello` | none | `{"protocol": 1, "methods": [...]}` (`HelloResult`) |
 | `collaboration.call` | `{"contract", "operation", "input"}` (`CollaborationCallParams`) | The envelope `putnami <contract> <operation> --output=json` prints for the same request, byte for byte. |
 | `verification.report` | `{"project", "task", "path", "digest"}` (`VerificationReportParams`) | `{"report": "<base64>"}` (`VerificationReportResult`): the bytes a successful cached test run produced, after the cache corroborated them. |
+| `workspace.owners` | `{"paths": [...]}` (`WorkspaceOwnersParams`) | `{"owners": [{"path", "projects": [{"id", "path"}]}]}` (`WorkspaceOwnersResult`): the projects that own each path. |
 
 Params are strict: an unknown member is `-32602`. `collaboration.call` routes
 contract operations only. A `contract` that is not a collaboration contract,
 and `proposals finalize`, which is a command, not an operation, are refused
 with `-32602`.
+
+`workspace.owners` answers which workspace projects own each path. Each path
+is workspace-relative and in `io/fs` form (`ValidWorkspacePath`): no leading
+or trailing slash, no empty, `.` or `..` element, and not `.` itself. The
+result holds one entry for each requested path, in request order, and a path
+that repeats gets an entry each time. A project owns a path when it is the
+nearest project whose directory holds the path, or when it claims the path as
+an asset. This is the rule the CLI applies to a changed file before it follows
+the dependency graph. An entry lists its owners sorted by project ID, with the
+project's canonical ID and its workspace-relative directory. A path that no
+project owns gets an empty `projects` array. An empty `paths` array, or a path
+that is not in `io/fs` form, is `-32602`. Outside a workspace the method
+answers `-32002`.
+
+The method is additive, so the protocol version stays 1. A client finds it in
+the methods `host.hello` lists.
 
 ## Errors
 
@@ -79,7 +96,7 @@ with `-32602`.
 | `-32602` | The params are not the method's. |
 | `-32603` | The host failed. |
 | `-32001` | The token is not this launch's. |
-| `-32002` | This launch cannot serve the method, for example `collaboration.call` outside a workspace that declares `options.collaboration`. |
+| `-32002` | This launch cannot serve the method, for example `collaboration.call` outside a workspace that declares `options.collaboration`, or `workspace.owners` outside any workspace. |
 | `-32003` | The cache does not corroborate the requested verification report. |
 
 An operation that fails at the provider is not an error: the envelope reports

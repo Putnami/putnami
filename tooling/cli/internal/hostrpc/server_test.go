@@ -27,6 +27,7 @@ const (
 	feature   = "cli/job-planning-execution"
 	lifecycle = "extension-command-host-rpc"
 	calls     = "host-rpc-core-calls"
+	owners    = "host-rpc-workspace-owners"
 )
 
 // startServer opens a channel that Stop closes when the test ends.
@@ -292,6 +293,9 @@ func TestParamsAreStrict(t *testing.T) {
 		VerificationReport: func(context.Context, wire.VerificationReportParams) ([]byte, error) {
 			return []byte("r"), nil
 		},
+		WorkspaceOwners: func(context.Context, wire.WorkspaceOwnersParams) (wire.WorkspaceOwnersResult, error) {
+			return wire.WorkspaceOwnersResult{}, nil
+		},
 	})
 	right := token(t, server)
 	conn := dialRaw(t, server)
@@ -304,6 +308,9 @@ func TestParamsAreStrict(t *testing.T) {
 		{wire.MethodCollaborationCall, `{"contract":"tasks","operation":"find","inputs":{}}`},
 		{wire.MethodVerificationReport, `{"project":"p","task":"t","path":"x"}`},
 		{wire.MethodVerificationReport, `[]`},
+		{wire.MethodWorkspaceOwners, ``},
+		{wire.MethodWorkspaceOwners, `{"paths":["a.go"],"extra":1}`},
+		{wire.MethodWorkspaceOwners, `{"paths":"a.go"}`},
 	} {
 		id := strconv.Quote("p" + strconv.Itoa(i))
 		conn.send(t, request(id, tc.method, right, tc.params))
@@ -322,6 +329,10 @@ func TestAMethodTheLaunchDoesNotServeIsUnavailable(t *testing.T) {
 	_, err = c.VerificationReport(t.Context(), wire.VerificationReportParams{Project: "p", Task: "t", Path: "x", Digest: "d"})
 	if !errors.As(err, &refusal) || refusal.Code != wire.CodeUnavailable {
 		t.Fatalf("verification.report = %v, want %d", err, wire.CodeUnavailable)
+	}
+	_, err = c.WorkspaceOwners(t.Context(), []string{"a.go"})
+	if !errors.As(err, &refusal) || refusal.Code != wire.CodeUnavailable {
+		t.Fatalf("workspace.owners = %v, want %d", err, wire.CodeUnavailable)
 	}
 }
 
@@ -379,6 +390,87 @@ func TestVerificationReportReturnsTheMethodsBytesAndRefusal(t *testing.T) {
 	if _, err := c.VerificationReport(t.Context(), other); !errors.As(err, &refusal) ||
 		refusal.Code != wire.CodeInternalError || refusal.Message != "disk on fire" {
 		t.Fatalf("a failing method = %v, want an internal error", err)
+	}
+}
+
+func TestWorkspaceOwnersReturnsTheMethodsAnswerInRequestOrder(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, feature, owners, "workspace-owners-answers-one-entry-per-path-in-request-order")
+	app := wire.OwningProject{ID: "/app", Path: "app"}
+	var received wire.WorkspaceOwnersParams
+	c := client(t, startServer(t, Methods{
+		WorkspaceOwners: func(_ context.Context, params wire.WorkspaceOwnersParams) (wire.WorkspaceOwnersResult, error) {
+			received = params
+			if params.Paths[0] == "plain.go" {
+				return wire.WorkspaceOwnersResult{}, errors.New("workspace on fire")
+			}
+			var result wire.WorkspaceOwnersResult
+			for _, path := range params.Paths {
+				result.Owners = append(result.Owners, wire.PathOwners{Path: path, Projects: []wire.OwningProject{app}})
+			}
+			return result, nil
+		},
+	}))
+	paths := []string{"b/x.go", "a.go", "b/x.go"}
+	got, err := c.WorkspaceOwners(t.Context(), paths)
+	if err != nil || len(got) != len(paths) {
+		t.Fatalf("WorkspaceOwners = %+v, %v, want one entry for each path", got, err)
+	}
+	for i, path := range paths {
+		if got[i].Path != path || len(got[i].Projects) != 1 || got[i].Projects[0] != app {
+			t.Errorf("entry %d = %+v, want %s owned by %+v", i, got[i], path, app)
+		}
+	}
+	if strings.Join(received.Paths, ",") != strings.Join(paths, ",") {
+		t.Errorf("the method received %v, want %v", received.Paths, paths)
+	}
+	var refusal *wire.Error
+	if _, err := c.WorkspaceOwners(t.Context(), []string{"plain.go"}); !errors.As(err, &refusal) ||
+		refusal.Code != wire.CodeInternalError || refusal.Message != "workspace on fire" {
+		t.Fatalf("a failing method = %v, want an internal error with its message", err)
+	}
+}
+
+func TestWorkspaceOwnersRefusesAnEmptyListAndAPathOutsideIOFSForm(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, feature, owners, "workspace-owners-refuses-an-empty-list-and-a-path-outside-io-fs-form")
+	var ran atomic.Int32
+	server := startServer(t, Methods{
+		WorkspaceOwners: func(context.Context, wire.WorkspaceOwnersParams) (wire.WorkspaceOwnersResult, error) {
+			ran.Add(1)
+			return wire.WorkspaceOwnersResult{}, nil
+		},
+	})
+	right := token(t, server)
+	conn := dialRaw(t, server)
+	for i, tc := range []struct {
+		params, message string
+	}{
+		{`{"paths":[]}`, "workspace.owners needs one or more paths"},
+		{`{"paths":null}`, "workspace.owners needs one or more paths"},
+		{`{}`, "workspace.owners needs one or more paths"},
+		{`{"paths":["a.go",""]}`, `""`},
+		{`{"paths":["a.go","."]}`, `"."`},
+		{`{"paths":["a.go","../a"]}`, `"../a"`},
+		{`{"paths":["/a","../b"]}`, `"/a"`},
+		{`{"paths":["a/"]}`, `"a/"`},
+		{`{"paths":["a//b"]}`, `"a//b"`},
+		{`{"paths":["a/./b"]}`, `"a/./b"`},
+	} {
+		id := strconv.Quote("o" + strconv.Itoa(i))
+		conn.send(t, request(id, wire.MethodWorkspaceOwners, right, tc.params))
+		response := conn.answer(t)
+		wantError(t, response, id, wire.CodeInvalidParams)
+		if !strings.Contains(response.Error.Message, tc.message) {
+			t.Errorf("%s: the refusal %q does not say %s", tc.params, response.Error.Message, tc.message)
+		}
+	}
+	if ran.Load() != 0 {
+		t.Errorf("the method ran %d times for params the server refuses", ran.Load())
+	}
+	conn.send(t, request(`"ok"`, wire.MethodWorkspaceOwners, right, `{"paths":["dir/a.go"]}`))
+	if response := conn.answer(t); response.Error != nil || ran.Load() != 1 {
+		t.Fatalf("a valid path got %+v after %d calls", response, ran.Load())
 	}
 }
 

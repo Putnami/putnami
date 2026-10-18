@@ -419,6 +419,21 @@
               "an-answer-the-client-cannot-trust-breaks-it"
             ]
           }
+        },
+        {
+          "id": "host-rpc-workspace-owners-client",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-owners-returns-the-hosts-entries-in-request-order",
+              "workspace-owners-refuses-what-the-host-would-refuse-without-sending",
+              "workspace-owners-rejects-an-answer-for-other-paths-and-stays-usable"
+            ]
+          }
         }
       ]
     }

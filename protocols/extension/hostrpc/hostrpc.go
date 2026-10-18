@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"slices"
 )
 
@@ -60,11 +61,20 @@ const (
 	// that a successful cached test run of the workspace produced. Params:
 	// VerificationReportParams. Result: VerificationReportResult.
 	MethodVerificationReport = "verification.report"
+	// MethodWorkspaceOwners answers which workspace projects own each path.
+	// A project owns a path when it is the nearest project whose directory
+	// holds the path, or when it claims the path as an asset: the rule the
+	// CLI applies to a changed file before it follows the dependency graph.
+	// Params: WorkspaceOwnersParams. Result: WorkspaceOwnersResult.
+	//
+	// The method is additive, so ProtocolVersion stays 1. A client finds it
+	// in the methods host.hello lists.
+	MethodWorkspaceOwners = "workspace.owners"
 )
 
 // Methods lists every method the host serves, sorted.
 func Methods() []string {
-	methods := []string{MethodHello, MethodCollaborationCall, MethodVerificationReport}
+	methods := []string{MethodHello, MethodCollaborationCall, MethodVerificationReport, MethodWorkspaceOwners}
 	slices.Sort(methods)
 	return methods
 }
@@ -170,6 +180,48 @@ type VerificationReportParams struct {
 type VerificationReportResult struct {
 	// Report holds the report bytes, base64-encoded on the wire.
 	Report []byte `json:"report"`
+}
+
+// WorkspaceOwnersParams are the params of workspace.owners.
+type WorkspaceOwnersParams struct {
+	// Paths are workspace-relative paths in io/fs form (ValidWorkspacePath),
+	// for example "tooling/cli/main.go". A path may repeat.
+	Paths []string `json:"paths"`
+}
+
+// WorkspaceOwnersResult is the result of workspace.owners.
+type WorkspaceOwnersResult struct {
+	// Owners holds exactly one entry for each requested path, in request
+	// order.
+	Owners []PathOwners `json:"owners"`
+}
+
+// PathOwners lists the projects that own one requested path.
+type PathOwners struct {
+	// Path repeats the requested path.
+	Path string `json:"path"`
+	// Projects are the owners, sorted by ID. It is an empty array, never
+	// null, when no project owns the path.
+	Projects []OwningProject `json:"projects"`
+}
+
+// OwningProject names one project that owns a path. A project owns a path
+// when it is the nearest project whose directory holds the path, or when it
+// claims the path as an asset.
+type OwningProject struct {
+	// ID is the project's canonical ID, as the workspace model holds it.
+	ID string `json:"id"`
+	// Path is the project's workspace-relative directory, as the workspace
+	// model holds it.
+	Path string `json:"path"`
+}
+
+// ValidWorkspacePath reports whether p is a workspace-relative path in io/fs
+// form that names something below the workspace root. It refuses ".", the
+// root itself. The host and the client both apply it to the paths of
+// workspace.owners.
+func ValidWorkspacePath(p string) bool {
+	return fs.ValidPath(p) && p != "."
 }
 
 // ErrFrameTooLarge is the error ReadFrame returns for a frame longer than its

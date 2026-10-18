@@ -131,10 +131,38 @@ func TestMethodsAreSortedAndComplete(t *testing.T) {
 	if !slices.IsSorted(methods) {
 		t.Errorf("Methods() = %v, not sorted", methods)
 	}
-	for _, method := range []string{MethodHello, MethodCollaborationCall, MethodVerificationReport} {
-		if !slices.Contains(methods, method) {
-			t.Errorf("Methods() = %v, missing %s", methods, method)
+	want := []string{"collaboration.call", "host.hello", "verification.report", "workspace.owners"}
+	if !slices.Equal(methods, want) {
+		t.Errorf("Methods() = %v, want %v", methods, want)
+	}
+}
+
+func TestValidWorkspacePathIsAnIOFSPathBelowTheRoot(t *testing.T) {
+	for path, want := range map[string]bool{
+		"a.go":     true,
+		"dir/a.go": true,
+		"":         false,
+		".":        false,
+		"..":       false,
+		"../a":     false,
+		"/a":       false,
+		"a/":       false,
+		"a//b":     false,
+		"a/./b":    false,
+	} {
+		if got := ValidWorkspacePath(path); got != want {
+			t.Errorf("ValidWorkspacePath(%q) = %t, want %t", path, got, want)
 		}
+	}
+}
+
+func TestAPathWithoutOwnersTravelsAsAnEmptyArray(t *testing.T) {
+	encoded, err := json.Marshal(WorkspaceOwnersResult{Owners: []PathOwners{{Path: "a.go", Projects: []OwningProject{}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"owners":[{"path":"a.go","projects":[]}]}`; string(encoded) != want {
+		t.Fatalf("encoded %s, want %s", encoded, want)
 	}
 }
 

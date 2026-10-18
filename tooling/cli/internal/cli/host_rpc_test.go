@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -39,6 +40,7 @@ const (
 	hostRPCFeature       = "cli/job-planning-execution"
 	hostRPCLifecycle     = "extension-command-host-rpc"
 	hostRPCCalls         = "host-rpc-core-calls"
+	hostRPCOwners        = "host-rpc-workspace-owners"
 )
 
 // TestHostRPCExtensionHelperProcess is the fixture subcommand. It prints the
@@ -376,6 +378,78 @@ func TestHostRPC_VerificationReportAnswersWhatTheEngineAnswers(t *testing.T) {
 	outside := dialHostRPC(t, hostRPCBinding{})
 	if _, err := outside.VerificationReport(t.Context(), ref); !errors.As(err, &refusal) || refusal.Code != hostrpcproto.CodeUnavailable {
 		t.Fatalf("verification.report outside a workspace = %v, want %d", err, hostrpcproto.CodeUnavailable)
+	}
+}
+
+// hostRPCOwnersWorkspace writes a workspace of four projects: outer holds
+// inner, claimant claims the directory of schema as an asset, and no project
+// is rooted at the workspace root.
+func hostRPCOwnersWorkspace(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	writeParityFile(t, root, wsproto.WorkspaceConfigFilename,
+		`{"name":"owners","includes":["packages/outer","packages/outer/inner","packages/claimant","packages/schema"]}`)
+	writeParityFile(t, root, "packages/outer/putnami.json", `{"name":"outer"}`)
+	writeParityFile(t, root, "packages/outer/inner/putnami.json", `{"name":"inner"}`)
+	writeParityFile(t, root, "packages/claimant/putnami.json", `{"name":"claimant","build":{"assets":[{"from":"/packages/schema"}]}}`)
+	writeParityFile(t, root, "packages/schema/putnami.json", `{"name":"schema"}`)
+	for _, file := range []string{"outer/a.go", "outer/inner/b.go", "claimant/c.go", "schema/d.json"} {
+		writeParityFile(t, root, "packages/"+file, "x\n")
+	}
+	writeParityFile(t, root, "README.md", "x\n")
+	return root
+}
+
+func TestHostRPC_WorkspaceOwnersAnswersWhatTheWorkspaceModelOwns(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, hostRPCFeature, hostRPCOwners, "workspace-owners-answers-one-entry-per-path-in-request-order")
+	spectest.Proves(t, hostRPCFeature, hostRPCOwners, "workspace-owners-are-the-nearest-project-and-every-asset-claimant")
+	spectest.Proves(t, hostRPCFeature, hostRPCOwners, "workspace-owners-are-sorted-by-id-and-empty-when-none-owns-the-path")
+	root := hostRPCOwnersWorkspace(t)
+	client := dialHostRPC(t, hostRPCBinding{root: root, config: wsproto.Load(root)})
+
+	outer := hostrpcproto.OwningProject{ID: "/packages/outer", Path: "packages/outer"}
+	inner := hostrpcproto.OwningProject{ID: "/packages/outer/inner", Path: "packages/outer/inner"}
+	claimant := hostrpcproto.OwningProject{ID: "/packages/claimant", Path: "packages/claimant"}
+	schema := hostrpcproto.OwningProject{ID: "/packages/schema", Path: "packages/schema"}
+	for _, tc := range []struct {
+		name  string
+		paths []string
+		want  [][]hostrpcproto.OwningProject
+	}{
+		{"the deeper project owns its files, not the outer one", []string{"packages/outer/inner/b.go"}, [][]hostrpcproto.OwningProject{{inner}}},
+		{"the outer project owns the rest of its directory", []string{"packages/outer/a.go"}, [][]hostrpcproto.OwningProject{{outer}}},
+		{"an asset claimant owns the file with its project, sorted by ID", []string{"packages/schema/d.json"}, [][]hostrpcproto.OwningProject{{claimant, schema}}},
+		{"no project owns a file outside every project", []string{"README.md", "packages/other/e.go"}, [][]hostrpcproto.OwningProject{{}, {}}},
+		{"the answer keeps the request order and repeats a duplicate",
+			[]string{"packages/schema/d.json", "README.md", "packages/outer/inner/b.go", "packages/schema/d.json"},
+			[][]hostrpcproto.OwningProject{{claimant, schema}, {}, {inner}, {claimant, schema}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			owners, err := client.WorkspaceOwners(t.Context(), tc.paths)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(owners) != len(tc.paths) {
+				t.Fatalf("WorkspaceOwners = %+v, want one entry for each of %v", owners, tc.paths)
+			}
+			for i, entry := range owners {
+				if entry.Path != tc.paths[i] || entry.Projects == nil || !slices.Equal(entry.Projects, tc.want[i]) {
+					t.Errorf("entry %d = %+v, want %s owned by %+v", i, entry, tc.paths[i], tc.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestHostRPC_WorkspaceOwnersIsUnavailableOutsideAWorkspace(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, hostRPCFeature, hostRPCOwners, "workspace-owners-is-unavailable-outside-a-workspace")
+	_, err := dialHostRPC(t, hostRPCBinding{}).WorkspaceOwners(t.Context(), []string{"a.go"})
+	var refusal *hostrpcproto.Error
+	if !errors.As(err, &refusal) || refusal.Code != hostrpcproto.CodeUnavailable ||
+		refusal.Message != "this command runs outside any workspace, so no project owns a path" {
+		t.Fatalf("workspace.owners outside a workspace = %v, want %d", err, hostrpcproto.CodeUnavailable)
 	}
 }
 
