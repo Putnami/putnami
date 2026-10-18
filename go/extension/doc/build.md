@@ -66,7 +66,7 @@ What the classification changes:
 - library projects plan no `serve` and no `run` — the verbs that require a
   runnable entrypoint;
 - library projects are not deployable workloads, so they are excluded from infra
-  aggregation and from `putnami infra plan`;
+  aggregation and from `putnami cloud infra plan`;
 - standalone ordinary `build` compiles a library with `go build ./...` and emits
   no binary, instead of linking the root package; a combined validation run can
   use its same-invocation test and lint evidence instead (see
@@ -643,7 +643,7 @@ nothing because the task declared no output:
 | `.gen/migrations.json` | `build-describe` | none; ceded so a project that stops contributing migrations cannot have a stale dump resurrected |
 | `.gen/migration-bundle/` | `build-describe` | release-set migration publication, deploy, `database.ApplyBundle`, the database test provider |
 | `.gen/deployment.json` | `package-deployment` | the publication of the workload's release-set member of kind `deployment` |
-| `.gen/requirements.json` | `build-infra` | deployers and `putnami infra` read the workload's aggregated manifest |
+| `.gen/requirements.json` | `build-infra` | deployers and `putnami cloud infra plan` read the workload's aggregated manifest |
 | `.gen/infra/runtime.json` | `build-infra` | none: it shows operators the runtime defaults. Ceded so that a `build-infra` cache hit restores it after `build-generate` deleted it |
 | `.gen/layers/` | `cloud-image-layers` of `@putnami/cloud` | the Cloud image-layer check and the image packaging step read the produced layers |
 | `.gen/conf/` | `config-merge-test-exec` (`.gen/conf/.env.test.yaml`) and `config-merge-exec` (`.gen/conf/.env.<APP_ENV or local>.yaml`, via the `mergedConfig` port) | `test-exec`'s database binding fallback reads `.gen/conf/.env.test.yaml`; every dependent's `config-merge` reads its dependencies' merged file. The `.manifest.json` sidecar beside them is claimed by nobody: it carries a `generatedAt` timestamp and no consumer reads it |

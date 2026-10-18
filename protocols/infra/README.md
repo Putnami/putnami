@@ -349,19 +349,19 @@ rules above.
 
 ### Inspecting the manifest
 
-A reference consumer ships with the CLI:
+A reference consumer ships with the Cloud extension, `@putnami/cloud`:
 
 ```
-putnami infra plan              # human-readable plan for every workload
-putnami infra plan <workload>   # plan for one named workload
-putnami infra plan --output jsonl
+putnami cloud infra plan              # human-readable plan for every workload
+putnami cloud infra plan <workload>   # plan for one named workload
+putnami cloud infra plan --output jsonl
 ```
 
 The command loads `<workload>/.gen/requirements.json` via `LoadAggregatedManifest`, validates it through the same diagnostic pipeline a deployer would use, and renders every resource kind plus runtime block. It is useful as a build-time sanity check and as a worked example for downstream deployer adapters. Run `putnami build` first to regenerate the ephemeral artifact from committed `infra/` markers.
 
 ### What's next (out of scope for this package)
 
-- Deployer adapters (`putnami cloud deploy`, Pulumi, k8s operators) that consume `.gen/requirements.json`. The bundled `putnami infra plan` consumer is a worked reference; real deployers fan out from there.
+- Deployer adapters (`putnami cloud deploy`, Pulumi, k8s operators) that consume `.gen/requirements.json`. The `putnami cloud infra plan` consumer is a worked reference; real deployers fan out from there.
 - Payload-schema attachments on event topics (deferred to a future protocol version).
 - `scheduler` framework module that emits `.gen/infra/scheduler.json` for cron jobs declared in code (today `scheduledJobs` is developer-authored only).
 
@@ -397,8 +397,8 @@ restating them.
 - **Evidence:** producers in both languages emit it in shipped code
   (`go.putnami.dev/app`, `database`, `events`, `migration`, `storage`, the Go
   extension's codegen, and the TypeScript extension's `cmd/putnami-ts`), the
-  build aggregator (`go.putnami.dev/sdk/extension/infraagg`) and the CLI's
-  `putnami infra plan` consume it, committed `infra/requirements.json` markers
+  build aggregator (`go.putnami.dev/sdk/extension/infraagg`) and the Cloud extension's
+  `putnami cloud infra plan` consume it, committed `infra/requirements.json` markers
   live in the repository today, and the version guard, drift test, determinism
   test, and cross-language equivalence goldens pin the contract on every run.
 - **Why not `stable`:** every deployer that reads the manifest today is
