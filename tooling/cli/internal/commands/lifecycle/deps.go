@@ -1,7 +1,9 @@
 package lifecycle
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +12,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"golang.org/x/mod/module"
 
 	"go.putnami.dev/cli/model/extension"
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -284,9 +288,10 @@ func depsFetch(ctx context.Context, wsRoot string, cfg *wsproto.Config, filterTa
 // DepsAdd adds one or more dependencies to a project's manifest via the owning
 // ecosystem's tooling, then reconciles the dependency closure so the standing
 // "run `putnami deps …` instead of a package manager" rule has a real path for
-// adding, not just installing. Only Go modules are wired today (`go get` +
-// `go mod tidy`); a TypeScript target reports an actionable message rather than
-// silently doing nothing. env runs the workspace installers when the host has
+// adding, not just installing. Only Go modules are wired today (`go list -m`,
+// `go mod edit -require`, then `go mod tidy`; goDepsEdit says why not `go
+// get`); a TypeScript target reports an actionable message rather than silently
+// doing nothing. env runs the workspace installers when the host has
 // no go command yet. When those installers fail but still leave a go, the
 // module is edited with it and the command exits non-zero naming the command
 // that finishes the install, as `projects create` does.
@@ -295,9 +300,9 @@ func DepsAdd(ctx context.Context, wsRoot string, modules []string, projectSelect
 	return goDepsResult("add", installErr, err)
 }
 
-// DepsRemove drops one or more dependencies from a Go module (`go get mod@none`)
-// and tidies the closure. See DepsAdd for the ecosystem/selection rules and
-// the failed-install report.
+// DepsRemove drops one or more dependencies from a Go module (`go mod edit
+// -droprequire`) and tidies the closure. See DepsAdd for the
+// ecosystem/selection rules and the failed-install report.
 func DepsRemove(ctx context.Context, wsRoot string, modules []string, projectSelector string, env LifecycleEnv) error {
 	installErr, err := runGoDeps(ctx, wsRoot, "remove", modules, projectSelector, depsCommand("remove", modules, projectSelector), env)
 	return goDepsResult("remove", installErr, err)
@@ -384,10 +389,11 @@ func goDepsCommand(ctx context.Context, wsRoot, projectPath, action, rerun strin
 
 // editGoModule edits the requirements of proj's Go module with goCmd, then
 // tidies it (tidyGoModule), both in the module directory with GOWORK pointed
-// at the workspace file. add runs `go get` with the module specs as given;
-// remove runs `go get <module>@none`; prune runs `go mod edit
-// -droprequire=<module>` (goDepsEdit says why). The caller puts the files back
-// when it fails (goModuleFiles).
+// at the workspace file. add resolves the module specs with `go list -m`
+// (resolveGoModules) and requires what that returns with `go mod edit
+// -require`; remove and prune run `go mod edit -droprequire=<module>`.
+// goDepsEdit says why none of them runs `go get`. The caller puts the files
+// back when it fails (goModuleFiles).
 func editGoModule(ctx context.Context, wsRoot string, proj *workspace.Project, goCmd goCommand, action string, modules []string) error {
 	moduleDir := filepath.Join(wsRoot, proj.Path)
 	env := shared.GoCommandEnvFrom(goCmd.env, moduleDir)
@@ -395,9 +401,15 @@ func editGoModule(ctx context.Context, wsRoot string, proj *workspace.Project, g
 	verb := map[string]string{"add": "Adding", "remove": "Removing", "prune": "Removing"}[action]
 	iox.Fprintf(os.Stdout, "  %s %s in %s...\n", verb, strings.Join(modules, " "), proj.Name)
 
-	edit, name := goDepsEdit(action, modules)
-	if err := runGoInModule(ctx, goCmd.path, moduleDir, env, edit); err != nil {
-		return fmt.Errorf("%s: %w", name, err)
+	var resolved []module.Version
+	if action == "add" {
+		var err error
+		if resolved, err = resolveGoModules(ctx, goCmd.path, moduleDir, env, modules); err != nil {
+			return fmt.Errorf("go list -m: %w", err)
+		}
+	}
+	if err := runGoInModule(ctx, goCmd.path, moduleDir, env, goDepsEdit(action, modules, resolved)); err != nil {
+		return fmt.Errorf("go mod edit: %w", err)
 	}
 	if err := tidyGoModule(ctx, goCmd.path, moduleDir, env); err != nil {
 		return fmt.Errorf("go mod tidy: %w", err)
@@ -406,34 +418,80 @@ func editGoModule(ctx context.Context, wsRoot string, proj *workspace.Project, g
 	return nil
 }
 
-// goDepsEdit returns the go arguments that edit the module's requirements for
-// action, and the command's name for an error.
+// goDepsEdit returns the arguments of the `go mod edit` that edits the module's
+// requirements for action. resolved is what resolveGoModules returned for the
+// modules of an add.
 //
-// prune drops each requirement from go.mod without resolving it. `go get
-// <module>@none` loads the module graph, which resolves every required version
-// through the module proxy even when go.work uses that module. A requirement
-// that only go.work satisfies, such as `require example.com/lib v0.0.0` of a
-// workspace module no proxy serves, then fails the very prune that removes it.
-// The `go mod tidy` that follows resolves the rest of the graph with the
+// None of the edits runs `go get`. `go get` loads the module graph, which
+// resolves every version go.mod requires through the module proxy, whatever
+// the edit is. A requirement no proxy serves, such as `require example.com/lib
+// v0.0.0`, the placeholder a workspace module keeps after its local `replace`
+// is gone or that only go.work satisfies, then fails the very add or remove
+// that would fix it.
+//
+// add requires the versions `go list -m` resolved, which does not load the
+// graph. remove and prune drop each requirement from go.mod without resolving
+// it. The `go mod tidy` that follows resolves the rest of the graph with the
 // replace directives of go.work (tidyGoModule).
-func goDepsEdit(action string, modules []string) (args []string, name string) {
-	switch action {
-	case "prune":
-		args = []string{"mod", "edit"}
-		for _, m := range modules {
-			args = append(args, "-droprequire="+strings.SplitN(m, "@", 2)[0])
+func goDepsEdit(action string, modules []string, resolved []module.Version) []string {
+	args := []string{"mod", "edit"}
+	if action == "add" {
+		for _, m := range resolved {
+			args = append(args, "-require="+m.Path+"@"+m.Version)
 		}
-		return args, "go mod edit"
-	case "remove":
-		// `go get <mod>@none` drops a requirement; strip any version the caller gave.
-		args = []string{"get"}
-		for _, m := range modules {
-			args = append(args, strings.SplitN(m, "@", 2)[0]+"@none")
-		}
-		return args, "go get"
-	default:
-		return append([]string{"get"}, modules...), "go get"
+		return args
 	}
+	for _, m := range modules {
+		// A version the caller gave is not part of the requirement to drop.
+		args = append(args, "-droprequire="+strings.SplitN(m, "@", 2)[0])
+	}
+	return args
+}
+
+// resolveGoModules returns the module version each spec names, from one `go
+// list -m` in moduleDir. A spec without a version asks for @upgrade, as `go
+// get` does. `go list -m` reads the module's go.mod but loads no module graph
+// for a version query, so it resolves a spec in a module that requires a
+// version no proxy serves (goDepsEdit). Two flags keep that true:
+//
+//   - GOWORK=off. In workspace mode @upgrade reads the workspace build list,
+//     which resolves the unserved version and fails. A version query reads no
+//     replace directive, so go.work changes no answer.
+//   - -mod=readonly. It keeps go list from writing go.mod or go.sum, and in a
+//     module with a vendor directory it lets the query reach the proxy: the
+//     default, -mod=vendor, refuses to query.
+//
+// go's error output streams to the terminal, as for the other go runs. A
+// package path that is not a module path fails with go's error.
+func resolveGoModules(ctx context.Context, goPath, moduleDir string, env, specs []string) ([]module.Version, error) {
+	args := []string{"list", "-m", "-json", "-mod=readonly"}
+	for _, spec := range specs {
+		if !strings.Contains(spec, "@") {
+			spec += "@upgrade"
+		}
+		args = append(args, spec)
+	}
+	var out bytes.Buffer
+	if err := runGoWithStdout(ctx, goPath, moduleDir, append(env[:len(env):len(env)], "GOWORK=off"), &out, args); err != nil {
+		return nil, err
+	}
+	var resolved []module.Version
+	for decoder := json.NewDecoder(&out); ; {
+		var listed struct{ Path, Version string }
+		if err := decoder.Decode(&listed); errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			return nil, fmt.Errorf("read the go list output: %w", err)
+		}
+		if listed.Path == "" || listed.Version == "" {
+			return nil, fmt.Errorf("go list gave no version for %q", listed.Path)
+		}
+		resolved = append(resolved, module.Version{Path: listed.Path, Version: listed.Version})
+	}
+	if len(resolved) != len(specs) {
+		return nil, fmt.Errorf("go list resolved %d of %d modules", len(resolved), len(specs))
+	}
+	return resolved, nil
 }
 
 // runGoInModule runs the go command at goPath with args in dir with the given
@@ -442,11 +500,16 @@ func goDepsEdit(action string, modules []string) (args []string, name string) {
 // selects another go), so this process records repository code before it
 // starts it (runcredential.MarkRepositoryCodeStarted).
 func runGoInModule(ctx context.Context, goPath, dir string, env, args []string) error {
+	return runGoWithStdout(ctx, goPath, dir, env, os.Stdout, args)
+}
+
+// runGoWithStdout is runGoInModule with the standard output going to stdout.
+func runGoWithStdout(ctx context.Context, goPath, dir string, env []string, stdout io.Writer, args []string) error {
 	runcredential.MarkRepositoryCodeStarted("go " + strings.Join(args, " "))
 	cmd := exec.CommandContext(ctx, goPath, args...)
 	cmd.Dir = dir
 	cmd.Env = env
-	cmd.Stdout = os.Stdout
+	cmd.Stdout = stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -27,6 +29,16 @@ func (f goCreateFixture) withGoProject(t *testing.T) {
 	writeRawFile(t, filepath.Join(f.root, "app", "go.mod"), "module example.com/app\n\ngo "+goFixtureVersion+"\n")
 	writeRawFile(t, filepath.Join(f.root, "go.work"), "go "+goFixtureVersion+"\n\nuse ./app\n")
 	workspace.InvalidateLoadCache(f.root)
+}
+
+// writeGoResolvingLib places a go command like writeGo that answers the `go
+// list -m` of `deps add example.com/lib@v1.0.0` with the module version it
+// resolves.
+func (f goCreateFixture) writeGoResolvingLib(t *testing.T, path string) {
+	t.Helper()
+	f.writeGoAnswering(t, path, goFixtureVersion, map[string]fixtureproc.Outcome{
+		"list -m -json -mod=readonly example.com/lib@v1.0.0": {Stdout: `{"Path":"example.com/lib","Version":"v1.0.0"}` + "\n"},
+	})
 }
 
 // depsCalls returns the go invocations as "<args>|<binary>", with the
@@ -56,7 +68,7 @@ func TestDepsAddAndRemoveRunThePinnedGo(t *testing.T) {
 	f := newGoCreateFixture(t)
 	f.withGoProject(t)
 	f.pin(t)
-	f.writeGo(t, f.pinned, goFixtureVersion)
+	f.writeGoResolvingLib(t, f.pinned)
 	env := LifecycleEnv{RunJob: func(context.Context, WorkspaceJobRequest) (WorkspaceJobResult, error) {
 		t.Error("deps ran the workspace installers although the pinned go is installed")
 		return WorkspaceJobResult{Outcome: WorkspaceJobFailed}, nil
@@ -73,9 +85,10 @@ func TestDepsAddAndRemoveRunThePinnedGo(t *testing.T) {
 		t.Fatalf("deps remove on a host without go: %v\n%s", err, output)
 	}
 	want := []string{
-		"get example.com/lib@v1.0.0|" + f.pinned,
+		"list -m -json -mod=readonly example.com/lib@v1.0.0|" + f.pinned,
+		"mod edit -require=example.com/lib@v1.0.0|" + f.pinned,
 		"mod tidy -modfile=<copy>|" + f.pinned,
-		"get example.com/lib@none|" + f.pinned,
+		"mod edit -droprequire=example.com/lib|" + f.pinned,
 		"mod tidy -modfile=<copy>|" + f.pinned,
 	}
 	if got := f.depsCalls(t); strings.Join(got, "\n") != strings.Join(want, "\n") {
@@ -103,7 +116,7 @@ func TestDepsAddInstallsThePinnedGoOnAHostWithoutGo(t *testing.T) {
 	}
 	env := LifecycleEnv{RunJob: func(_ context.Context, req WorkspaceJobRequest) (WorkspaceJobResult, error) {
 		steps = append(steps, req.Job)
-		f.writeGo(t, f.pinned, goFixtureVersion)
+		f.writeGoResolvingLib(t, f.pinned)
 		return WorkspaceJobResult{Outcome: WorkspaceJobOK}, nil
 	}}
 
@@ -116,7 +129,11 @@ func TestDepsAddInstallsThePinnedGoOnAHostWithoutGo(t *testing.T) {
 	if got := strings.Join(steps, ","); got != "pin,workspace-install" {
 		t.Fatalf("steps = %s, want the pin, then the installers", got)
 	}
-	want := []string{"get example.com/lib@v1.0.0|" + f.pinned, "mod tidy -modfile=<copy>|" + f.pinned}
+	want := []string{
+		"list -m -json -mod=readonly example.com/lib@v1.0.0|" + f.pinned,
+		"mod edit -require=example.com/lib@v1.0.0|" + f.pinned,
+		"mod tidy -modfile=<copy>|" + f.pinned,
+	}
 	if got := f.depsCalls(t); strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("go calls =\n%s\nwant, with the installed go:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
@@ -186,7 +203,7 @@ func (f goCreateFixture) failingGoInstall(t *testing.T, jobs *[]string) Lifecycl
 	}
 	return LifecycleEnv{RunJob: func(_ context.Context, req WorkspaceJobRequest) (WorkspaceJobResult, error) {
 		*jobs = append(*jobs, req.Job)
-		f.writeGo(t, f.pinned, goFixtureVersion)
+		f.writeGoResolvingLib(t, f.pinned)
 		return WorkspaceJobResult{Outcome: WorkspaceJobFailed}, nil
 	}}
 }
@@ -201,21 +218,24 @@ func TestDepsAddAndRemoveNameDepsInstallWhenTheGoInstallFails(t *testing.T) {
 	for _, tc := range []struct {
 		action string
 		run    func(root string, env LifecycleEnv) error
-		get    string
+		edit   []string
 	}{
 		{
 			action: "add",
 			run: func(root string, env LifecycleEnv) error {
 				return DepsAdd(context.Background(), root, []string{"example.com/lib@v1.0.0"}, "", env)
 			},
-			get: "get example.com/lib@v1.0.0",
+			edit: []string{
+				"list -m -json -mod=readonly example.com/lib@v1.0.0|%s",
+				"mod edit -require=example.com/lib@v1.0.0|%s",
+			},
 		},
 		{
 			action: "remove",
 			run: func(root string, env LifecycleEnv) error {
 				return DepsRemove(context.Background(), root, []string{"example.com/lib"}, "app", env)
 			},
-			get: "get example.com/lib@none",
+			edit: []string{"mod edit -droprequire=example.com/lib|%s"},
 		},
 	} {
 		t.Run(tc.action, func(t *testing.T) {
@@ -237,7 +257,11 @@ func TestDepsAddAndRemoveNameDepsInstallWhenTheGoInstallFails(t *testing.T) {
 			if got := strings.Join(jobs, ","); got != "workspace-install" {
 				t.Fatalf("workspace jobs = %s, want the one install that installed go", got)
 			}
-			want := []string{tc.get + "|" + f.pinned, "mod tidy -modfile=<copy>|" + f.pinned}
+			var want []string
+			for _, call := range tc.edit {
+				want = append(want, fmt.Sprintf(call, f.pinned))
+			}
+			want = append(want, "mod tidy -modfile=<copy>|"+f.pinned)
 			if got := f.depsCalls(t); strings.Join(got, "\n") != strings.Join(want, "\n") {
 				t.Fatalf("go calls =\n%s\nwant the edit with the installed go:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 			}
@@ -393,7 +417,7 @@ func TestDepsPruneEditDropsARequirementOnlyGoWorkSatisfies(t *testing.T) {
 	moduleDir := filepath.Join(root, "api")
 	env := shared.GoCommandEnvFrom(append(os.Environ(), "GOPROXY=off", "GOFLAGS=", "GOTOOLCHAIN=local"), moduleDir)
 
-	edit, _ := goDepsEdit("prune", []string{"example.com/lib"})
+	edit := goDepsEdit("prune", []string{"example.com/lib"}, nil)
 	for _, args := range [][]string{edit, {"mod", "tidy"}} {
 		cmd := exec.Command(goBinary, args...)
 		cmd.Dir = moduleDir

@@ -745,8 +745,13 @@ putnami deps prune --projects api          # Narrow to one project
 ```
 
 `add`/`remove` currently support Go modules. The target module is the workspace's
-sole Go module, or the one named by `--projects <name>`; `go get` runs with
-`GOWORK` pointed at the workspace file so `replace` directives resolve. Both run
+sole Go module, or the one named by `--projects <name>`; the go commands run
+with `GOWORK` pointed at the workspace file so `replace` directives resolve.
+`add` resolves each module with `go list -m`, then writes the versions with `go
+mod edit -require`; `remove` runs `go mod edit -droprequire`. Neither runs `go
+get`, which loads the module graph and fails on a `go.mod` that requires a
+version no module proxy serves, such as `v0.0.0`. `add` takes module paths, not
+package paths. Both run
 the go command the Go extension's tasks run: the release the lock pins, or else
 a `go` on PATH. On a host with neither, they first pin and install the pinned Go,
 as `projects create` does. When the workspace installers fail but still leave a

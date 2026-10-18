@@ -27,9 +27,9 @@ import (
 //     the module path the target's go.mod declares, and the module tidied with
 //     `go mod tidy` as go.work resolves it (tidyGoModule), through the go
 //     command `deps remove` runs, so the module graph and go.sum stay
-//     consistent. It is not `deps remove`'s `go get <module>@none`: that
-//     resolves the requirement it removes, and a workspace module no proxy
-//     serves cannot be resolved (goDepsEdit);
+//     consistent. `deps remove` drops a requirement the same way, and neither
+//     runs `go get <module>@none`: that resolves the requirement it removes,
+//     and a workspace module no proxy serves cannot be resolved (goDepsEdit);
 //   - a TypeScript package dependency has no removal path in this CLI yet —
 //     `deps remove` refuses a TypeScript target for the same reason — so it is
 //     reported with the edit to make, never half-applied: remove it from the
