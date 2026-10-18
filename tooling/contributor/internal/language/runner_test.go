@@ -22,9 +22,8 @@ func TestLanguageFileExclusions(t *testing.T) {
 			t.Errorf("fixture %s was not excluded", path)
 		}
 	}
-	if !ExcludedLanguagePath("tooling/cli/internal/commands/shared/language.go") ||
-		!ExcludedLanguagePath(`tooling\cli\internal\commands\shared\language.go`) ||
-		!ExcludedLanguagePath("tooling/contributor/internal/language/evaluate.go") {
+	if !ExcludedLanguagePath("tooling/contributor/internal/language/evaluate.go") ||
+		!ExcludedLanguagePath(`tooling\contributor\internal\language\evaluate.go`) {
 		t.Fatal("the native detector's signal vocabulary was scanned as public prose")
 	}
 	for _, path := range []string{"tooling/contributor/internal/language/runner.go", "somewhere/else/language.go"} {
