@@ -15,6 +15,7 @@ import (
 	cache "go.putnami.dev/protocol/cache"
 	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
+	hostrpcproto "go.putnami.dev/protocol/extension/hostrpc"
 	registryproto "go.putnami.dev/protocol/registry"
 	runner "go.putnami.dev/protocol/runner"
 	runtimeproto "go.putnami.dev/protocol/runtime"
@@ -333,6 +334,17 @@ func buildJobInvocation(
 	if envHasKey(extraEnv, protocolcli.ParentSessionEnv) {
 		env = setEnv(env, protocolcli.ParentSessionEnv, envLastValue(extraEnv, protocolcli.ParentSessionEnv))
 	}
+	// The host RPC channel is a fact about the spawn too: only the launch that
+	// opened one names it, in extraEnv. A planned job never receives one, so
+	// its result cannot depend on a call its cache key does not cover. An
+	// inherited value would name the channel of an outer launch, and a
+	// manifest's names none, so both go before this launch's is restated.
+	for _, key := range []string{hostrpcproto.SocketEnv, hostrpcproto.TokenEnv} {
+		env = removeEnvKey(env, key)
+		if envHasKey(extraEnv, key) {
+			env = append(env, key+"="+envLastValue(extraEnv, key))
+		}
+	}
 	// The credential descriptor names a descriptor of the process that
 	// received it, and only the spawn that hands one sets it
 	// (attachJobCredential). An inherited or declared value names nothing.
@@ -361,10 +373,10 @@ func buildJobInvocation(
 // contextFile when done and defer cancel.
 //
 // extraEnv carries ONLY facts about how the CLI is spawning the process:
-// RunJobInteractive's PUTNAMI_INTERACTIVE=1 and the scheduler's object-cache
-// socket + trust policy (remotecache/remote_provider.go). Neither describes the work, so
-// neither belongs in a cache key. The one entry that DID describe the work is
-// gone: a cleanup deleted the synthesized DATABASE_TEST_BINDINGS the
+// RunJobInteractive's PUTNAMI_INTERACTIVE=1 and host RPC channel, and the
+// scheduler's object-cache socket + trust policy (remotecache/remote_provider.go).
+// None describes the work, so none belongs in a cache key. The one entry that
+// DID describe the work is gone: a cleanup deleted the synthesized DATABASE_TEST_BINDINGS the
 // test-infra planner injected here. Its whole purpose
 // was to reach a task with a value the task's own declared inputs could not see,
 // which is exactly why the cache key had to be patched separately to notice it.

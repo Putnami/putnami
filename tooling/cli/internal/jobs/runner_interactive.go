@@ -39,6 +39,11 @@ func RunJobInteractive(
 // streams. Production callers pass the terminal streams through
 // RunJobInteractive; in-process adapters and tests can keep independent output
 // without swapping the process-wide os.Stdout/os.Stderr variables.
+//
+// processEnv states facts about this spawn that the process receives on top
+// of its environment, such as the host RPC channel the caller opened for it
+// (go.putnami.dev/protocol/extension/hostrpc). They describe no work, so no
+// cache key reads them, and the job's own Env cannot restate the channel.
 func RunJobInteractiveWithStreams(
 	ctx context.Context,
 	ws *workspace.Workspace,
@@ -47,11 +52,13 @@ func RunJobInteractiveWithStreams(
 	versions cachekey.RunVersions,
 	stdin io.Reader,
 	stdout, stderr io.Writer,
+	processEnv ...string,
 ) (*JobResult, error) {
 	ctx = CaptureProcessCapabilities(ctx)
 	start := time.Now()
 
-	ctx, cancel, inv, err := prepareJobInvocation(ctx, ws, job, commandParams, configDefaults, versions, []string{"PUTNAMI_INTERACTIVE=1"})
+	extraEnv := append([]string{"PUTNAMI_INTERACTIVE=1"}, processEnv...)
+	ctx, cancel, inv, err := prepareJobInvocation(ctx, ws, job, commandParams, configDefaults, versions, extraEnv)
 	if err != nil {
 		return nil, err
 	}

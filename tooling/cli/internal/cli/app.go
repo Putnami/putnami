@@ -536,7 +536,12 @@ func resolveCommandCacheTrust(global *GlobalFlags, cfg *wsproto.Config, commands
 // A CLI started inside the workspace-fetch of a hosted run runs beside the job
 // credential, so it refuses first, before it reads a workspace, discovers an
 // extension or starts anything (runcredential.HostedFetchEnv).
+//
+// The host RPC channel of an extension command that started this process is
+// dropped first: it belongs to that command, and nothing this process starts
+// may call it (dropInheritedHostRPC).
 func enterProcess(args []string) error {
+	dropInheritedHostRPC()
 	if err := runcredential.RefuseInHostedFetch(os.Getenv); err != nil {
 		return err
 	}

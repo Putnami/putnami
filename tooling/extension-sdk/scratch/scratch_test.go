@@ -19,6 +19,9 @@ import (
 // directory with that prefix, prints its path and waits to be killed.
 const childPrefixEnv = "PUTNAMI_SCRATCH_TEST_CHILD_PREFIX"
 
+// creatorPrefix is the prefix of the directory startCreator's creator makes.
+const creatorPrefix = "putnami-scratch-test-"
+
 func TestMain(m *testing.M) {
 	if prefix := os.Getenv(childPrefixEnv); prefix != "" {
 		dir, err := New(prefix)
@@ -46,11 +49,12 @@ func isolateTempDir(t *testing.T) string {
 }
 
 // startCreator runs a creator process and returns it with the directory it
-// created. The process holds the directory's owner lock until it is killed.
-func startCreator(t *testing.T, prefix string) (*exec.Cmd, string) {
+// created with creatorPrefix. The process holds the directory's owner lock
+// until it is killed.
+func startCreator(t *testing.T) (*exec.Cmd, string) {
 	t.Helper()
 	cmd := exec.Command(os.Args[0], "-test.run=^$")
-	cmd.Env = append(os.Environ(), childPrefixEnv+"="+prefix)
+	cmd.Env = append(os.Environ(), childPrefixEnv+"="+creatorPrefix)
 	cmd.Stderr = os.Stderr
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -99,9 +103,8 @@ func awaitLockRelease(t *testing.T, dir string) {
 
 func TestNewRemovesTheScratchOfAKilledRun(t *testing.T) {
 	isolateTempDir(t)
-	const prefix = "putnami-scratch-test-"
 
-	cmd, leaked := startCreator(t, prefix)
+	cmd, leaked := startCreator(t)
 	if err := os.WriteFile(filepath.Join(leaked, "payload"), []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -133,9 +136,9 @@ func TestNewRemovesTheScratchOfAKilledRun(t *testing.T) {
 
 func TestSweepKeepsACopyOfADeadCreatorsScratch(t *testing.T) {
 	root := isolateTempDir(t)
-	const prefix = "putnami-scratch-test-"
+	const prefix = creatorPrefix
 
-	cmd, leaked := startCreator(t, prefix)
+	cmd, leaked := startCreator(t)
 	if err := cmd.Process.Signal(syscall.SIGKILL); err != nil {
 		t.Fatal(err)
 	}
@@ -191,9 +194,9 @@ func TestSweepRemovesAnOldDirectoryWithAForeignLock(t *testing.T) {
 
 func TestSweepKeepsTheScratchOfALiveCreator(t *testing.T) {
 	isolateTempDir(t)
-	const prefix = "putnami-scratch-test-"
+	const prefix = creatorPrefix
 
-	_, live := startCreator(t, prefix)
+	_, live := startCreator(t)
 	if err := Sweep(prefix); err != nil {
 		t.Fatal(err)
 	}
@@ -310,5 +313,51 @@ func TestNewRefusesAPatternPrefix(t *testing.T) {
 		if _, err := New(prefix); err == nil {
 			t.Errorf("New(%q) must be refused", prefix)
 		}
+	}
+}
+
+func TestNewInCreatesAndSweepsUnderItsRoot(t *testing.T) {
+	tempDir := isolateTempDir(t)
+	root := t.TempDir()
+
+	// A creator killed under root, as a process whose temporary directory was
+	// root would leave it.
+	t.Setenv("TMPDIR", root)
+	cmd, leaked := startCreator(t)
+	t.Setenv("TMPDIR", tempDir)
+	if err := cmd.Process.Signal(syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	_ = cmd.Wait()
+	awaitLockRelease(t, leaked)
+
+	dir, err := NewIn(root, "putnami-scratch-other-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dir.Remove() })
+	sweeping.Wait()
+
+	if parent := filepath.Dir(dir.Path()); parent != root {
+		t.Fatalf("NewIn created %s, want a directory directly under %s", dir.Path(), root)
+	}
+	info, err := os.Stat(dir.Path())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode := info.Mode().Perm(); mode != 0o700 {
+		t.Errorf("NewIn created mode %04o, want 0700", mode)
+	}
+	if _, err := os.Stat(filepath.Join(dir.Path(), OwnerLockName)); err != nil {
+		t.Fatalf("the directory must hold its owner lock: %v", err)
+	}
+	if _, err := os.Stat(leaked); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("NewIn must sweep its own root and remove %s, stat: %v", leaked, err)
+	}
+}
+
+func TestNewInRefusesAnEmptyRoot(t *testing.T) {
+	if _, err := NewIn("", "putnami-scratch-test-"); err == nil {
+		t.Fatal("NewIn with an empty root must be refused")
 	}
 }

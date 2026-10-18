@@ -1116,6 +1116,41 @@
               "each-workspace-member-names-its-resolved-type"
             ]
           }
+        },
+        {
+          "id": "extension-command-host-rpc",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-launched-process-receives-the-socket-and-token",
+              "the-channel-closes-when-the-process-exits-whatever-its-exit",
+              "a-planned-job-and-a-provider-tool-receive-no-channel",
+              "a-hosted-run-opens-no-channel"
+            ]
+          }
+        },
+        {
+          "id": "host-rpc-core-calls",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-request-without-the-token-is-refused",
+              "an-unknown-method-is-method-not-found",
+              "a-frame-over-the-limit-is-refused",
+              "calls-are-served-one-at-a-time",
+              "stopping-cancels-the-call-in-flight",
+              "collaboration-call-returns-the-cli-envelope",
+              "verification-report-returns-what-the-cache-corroborates"
+            ]
+          }
         }
       ]
     },

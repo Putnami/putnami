@@ -480,7 +480,17 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // job model, the workspace and extension models and the cache key package, and
 // never imports the scheduler or the runner. It adds no vertical and no engine
 // stage.
-const internalPackageCountCeiling = 76
+//
+// RAISED 76 → 77 (ADR 0071): internal/hostrpc serves the host RPC channel of
+// one interactive extension command launch: the socket in its private
+// directory, the token check, the frames and the one-call-at-a-time lock.
+// Only internal/cli starts it, and it could live there, but its tests open
+// real sockets and one of them installs the run credential for the whole
+// process; in internal/cli they would join the test binary the serial-test
+// ceiling keeps lean. It imports only the wire contract, the SDK's scratch and
+// ownerperm packages and internal/runcredential, a leaf. It adds no vertical
+// and no engine stage.
+const internalPackageCountCeiling = 77
 
 func TestInternalPackageCountCeiling(t *testing.T) {
 	t.Parallel()

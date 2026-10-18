@@ -164,6 +164,14 @@
     {
       "id": "job-context-names-member-types",
       "text": "Every job context the core writes lists the complete workspace membership in workspaceProjects, and each entry names the project's resolved type: the type its putnami.json authors, else the type its provider reported, else application. An entry without a type comes from a CLI that predates the member. selectedProjects and dependencyClosure carry no type."
+    },
+    {
+      "id": "extension-command-host-rpc",
+      "text": "An interactive extension subcommand launch opens one host RPC channel: a fresh Unix socket in a directory only the user can open, named by PUTNAMI_HOST_RPC, with 32 random bytes hex-encoded in PUTNAMI_HOST_RPC_TOKEN. The channel closes and its directory is removed when the process exits, whatever its exit. A planned job, a provider tool and a hosted run receive neither variable, and a process drops the pair it inherited."
+    },
+    {
+      "id": "host-rpc-core-calls",
+      "text": "The channel speaks JSON-RPC 2.0, one request per line of at most 32 MiB; a larger frame is refused. A request without the launch token is refused, compared in constant time, and its connection closed. An unknown method is method-not-found. Calls run one at a time, and stopping the channel cancels the call in flight. host.hello returns the protocol version and methods, collaboration.call the envelope putnami <contract> <operation> --output=json prints, and verification.report what the cache corroborates."
     }
   ],
   "decisions": [
@@ -184,6 +192,7 @@
     "tooling/cli/doc/adr/0064-an-executing-task-starts-from-an-empty-owned-directory.md",
     "tooling/cli/doc/adr/0065-an-optional-command-output-directory-is-emptied-on-execution-and-on-an-empty-restore.md",
     "tooling/cli/doc/adr/0066-a-main-publication-releases-what-its-pull-request-published.md",
-    "tooling/cli/doc/adr/0067-putnami-dev-declares-the-development-verbs.md"
+    "tooling/cli/doc/adr/0067-putnami-dev-declares-the-development-verbs.md",
+    "tooling/cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md"
   ]
 }

@@ -107,6 +107,10 @@
     {
       "id": "tree-fingerprint",
       "text": "The treefingerprint package computes the tree fingerprint the CLI prints and records. One SHA-256 covers HEAD, the bytes on disk at every tracked path that differs from it, recursing through checked-out submodules, and every untracked non-ignored file, in the versioned stream the CLI protocol documents. Git display settings and variables that select another repository or inject configuration do not change it. Outside a worktree or before the first commit it returns an error."
+    },
+    {
+      "id": "host-rpc-client",
+      "text": "The Go client Dial reads PUTNAMI_HOST_RPC and PUTNAMI_HOST_RPC_TOKEN; without them it returns a NoHostError that names putnami and the missing variables. Every request carries the token and a fresh id. A host refusal is a typed error with its code, and the client stays usable. An answer to another id, a frame over 32 MiB, a broken connection or a context that ends before the whole answer arrives breaks the client; an answer that arrived whole stands."
     }
   ],
   "decisions": [
@@ -114,6 +118,7 @@
     "tooling/extension-sdk/doc/adr/0002-a-secret-lives-in-one-artifact.md",
     "protocols/extension/doc/adr/0006-agent-content-is-an-additive-contract.md",
     "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md",
-    "tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md"
+    "tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md",
+    "tooling/cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md"
   ]
 }
