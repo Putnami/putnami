@@ -146,8 +146,6 @@ var spawnSites = map[string]spawnSite{
 		why: "zsh runs a fixed script"},
 	"commands/lifecycle/workspace_init.go:WorkspaceInit": {spawns: 1, verdict: noRepositoryCode,
 		why: "git init in a directory without a repository"},
-	"commands/contributor/language_modes.go:LanguageRunner.git": {spawns: 1, verdict: noRepositoryCode,
-		why: "fixed read-only git diff, ls-files, rev-list and log; ranges reject option-like input before spawn, diff disables external helpers and fsmonitor is disabled"},
 	"commands/doctor/machine.go:NativeLoadReader": {spawns: 1, verdict: noRepositoryCode,
 		why: "fixed /usr/sbin/sysctl load probe on Darwin; unsupported systems return unknown and no PATH-selected command is run"},
 	"commands/proposals/git.go:NativeGit.run": {spawns: 1, verdict: noRepositoryCode,

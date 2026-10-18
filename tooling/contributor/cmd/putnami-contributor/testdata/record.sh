@@ -5,6 +5,9 @@
 #
 # Usage: record.sh <putnami-binary> <out-directory>
 #
+# <putnami-binary> must serve `putnami contributor language`. The current core
+# refuses that root, so the binary is a putnami release that still serves it.
+#
 # The script builds the fixture repository with fixture.sh, adds a minimal
 # workspace file because the core command needs one, runs
 # `putnami contributor language <arguments>` for every line of

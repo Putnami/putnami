@@ -95,30 +95,6 @@ Global Options:
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
-═══ contributor ═══
-putnami contributor
-
-Run the local contributor helpers used by the build workflow. Language checks read text, tracked files, commit messages, or tasks through the configured collaboration provider; machine-load reads local resource capacity. Neither command runs the project gate
-
-Usage:
-  putnami contributor <language|machine-load> [arguments]
-
-Examples:
-  putnami contributor language files --diff origin/main..HEAD
-  putnami contributor machine-load --output=json
-
-Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
-  Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
-
-Related Commands:
-  putnami contributor language
-  putnami contributor machine-load
-  putnami tree verify
-
 ═══ deps ═══
 putnami deps
 

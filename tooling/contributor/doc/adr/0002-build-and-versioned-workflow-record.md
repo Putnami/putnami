@@ -24,8 +24,8 @@ change in this pull request. `content-bump` remains an active explicit-only
 repository integration. Build neither selects backlog work nor inherits
 external action authority from a removed entry. A named task claim requires
 explicit authorization.
-Publication and language/load helpers move to native CLI commands:
-`proposals finalize`, `contributor language` and `contributor machine-load`.
+Publication and language/load helpers move to native commands:
+`proposals finalize`, `change language` and `doctor --machine`.
 The direct `tree fingerprint` command remains the tree producer. Native
 finalization consumes an exact current dossier or explicit hosted check mode;
 it never runs or retries a local gate. The finalization, load and fingerprint

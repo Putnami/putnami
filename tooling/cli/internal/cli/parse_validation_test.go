@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -111,17 +112,8 @@ func TestValidateStructuredFlags_LeavesUnknownPathsAlone(t *testing.T) {
 	}
 }
 
-// TestValidateStructuredFlags_PassthroughIsNeverValidated pins the one rule that
-// holds on every surface: after a bare "--" the tokens belong to the user.
-func TestValidateStructuredFlags_PassthroughIsNeverValidated(t *testing.T) {
-	t.Parallel()
-	if err := validateStructuredFlags("contributor", "language", []string{"files", "--", "--not-a-flag", "-x"}); err != nil {
-		t.Errorf("passthrough must never be validated: %v", err)
-	}
-}
-
-// TestParseArgs_BuiltInRejectsUnreadPassthrough pins that a built-in command
-// that reads no passthrough rejects a "--", so no payload token reaches a
+// TestParseArgs_BuiltInRejectsUnreadPassthrough pins that a built-in command,
+// which reads no passthrough, rejects a "--", so no payload token reaches a
 // handler that would read it as one of its own flags (`version tag -- --push`
 // pushed the tag, `tree verify -- --help` printed the usage).
 func TestParseArgs_BuiltInRejectsUnreadPassthrough(t *testing.T) {
@@ -142,8 +134,10 @@ func TestParseArgs_BuiltInRejectsUnreadPassthrough(t *testing.T) {
 			t.Errorf("ParseArgs(%q).Err = %v, want the passthrough usage error", args, parsed.Err)
 		}
 	}
-	if parsed := ParseArgs([]string{"contributor", "language", "files", "--", "a.go"}, nil, nil); parsed.Err != nil {
-		t.Errorf("contributor language reads its passthrough paths: %v", parsed.Err)
+	extension := []string{"change", "language", "files", "--", "--not-a-flag"}
+	parsed := ParseArgs(extension, nil, map[string]bool{"change": true})
+	if parsed.Err != nil || !slices.Equal(parsed.RawJobArgs, []string{"files", "--", "--not-a-flag"}) {
+		t.Errorf("ParseArgs(%q) = %q, %v; an extension command keeps its passthrough", extension, parsed.RawJobArgs, parsed.Err)
 	}
 }
 

@@ -18,8 +18,6 @@ import (
 	collab "go.putnami.dev/protocol/collaboration"
 	featureproto "go.putnami.dev/protocol/features"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/commands/contributor"
-	"go.putnami.dev/tooling/cli/internal/commands/doctor"
 	"go.putnami.dev/tooling/cli/internal/commands/proposals"
 	"go.putnami.dev/tooling/cli/internal/commands/treecmd"
 	"go.putnami.dev/tooling/cli/internal/engine"
@@ -30,42 +28,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
-
-// cmdContributor is the native helper namespace registered by the command
-// catalog. It owns no contributor workflow or publication state.
-func cmdContributor(env *CommandEnv) error {
-	if err := env.requireWorkspace(); err != nil {
-		return err
-	}
-	switch env.Sub {
-	case "machine-load":
-		if len(env.Args) != 0 {
-			return usageErrorf("contributor machine-load takes no arguments")
-		}
-		return doctor.MachineCommand(env.OutputFormat, doctor.NativeLoadReader())
-	case "language":
-		if len(env.Args) == 0 {
-			return usageErrorf("contributor language needs text, files, commits or tasks")
-		}
-		discovered, _ := extension.DiscoverExtensions(env.WsRoot, env.Cfg, projectPathsForRoot(env.WsRoot))
-		providers, unavailable := collaborationProviders(env.Ctx, env.WsRoot, env.Cfg, discovered)
-		runner := contributor.LanguageRunner{Root: env.WsRoot, Stdin: os.Stdin, Out: iox.Stdout(), Err: os.Stderr,
-			Call: func(ctx context.Context, contract, operation string, input json.RawMessage) collab.Envelope {
-				return mcp.CallProviderOperation(ctx, mcp.ProviderEnvironment{WorkspaceRoot: env.WsRoot,
-					Extensions: providers, Unavailable: unavailable, AttachView: cliWorkspaceView(env.WsRoot)}, contract, operation, input)
-			}}
-		switch status := runner.RunLanguage(env.Ctx, env.Args[0], env.Args[1:]); status {
-		case 0:
-			return nil
-		case 1:
-			return reportedFailure{err: errors.New("non-English signals found")}
-		default:
-			return usageErrorf("contributor language failed")
-		}
-	default:
-		return usageErrorf("unknown subcommand: contributor %s", env.Sub)
-	}
-}
 
 func finalizeOptions(args []string) (proposals.Options, error) {
 	var options proposals.Options

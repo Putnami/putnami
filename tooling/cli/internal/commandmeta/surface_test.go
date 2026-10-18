@@ -2,6 +2,7 @@ package commandmeta
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -49,22 +50,18 @@ func TestSurface_ListsEveryCommandUsersType(t *testing.T) {
 	}
 }
 
-func TestSurface_ContributorHelpersAreNativeAndProviderFinalizerIsLocal(t *testing.T) {
+// The core serves no contributor root, and proposals finalize stays a local
+// command rather than a provider wire operation.
+func TestSurface_NoContributorRootAndProviderFinalizerIsLocal(t *testing.T) {
 	t.Parallel()
 	surface, err := Surface()
 	if err != nil {
 		t.Fatalf("Surface: %v", err)
 	}
-	for _, path := range []string{"contributor", "contributor language", "contributor machine-load"} {
-		surfaceEntry(t, surface, path)
-	}
-	language := surfaceEntry(t, surface, "contributor language")
-	for _, want := range []string{"--label", "--diff", "--limit"} {
-		if !slices.ContainsFunc(language.Flags, func(flag protocolcli.CommandSurfaceFlag) bool { return flag.Long == want }) {
-			t.Errorf("contributor language is missing %s", want)
-		}
-	}
 	for _, command := range surface.Commands {
+		if command.Path == "contributor" || strings.HasPrefix(command.Path, "contributor ") {
+			t.Errorf("the surface lists %q, a root the core no longer serves", command.Path)
+		}
 		if command.Path == "proposals finalize" {
 			t.Fatal("local proposals finalize was exposed as a provider wire operation")
 		}

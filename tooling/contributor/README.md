@@ -63,9 +63,10 @@ suite: `putnami proposals finalize` publishes a draft or a verified ready
 proposal, reads it back, and applies the named task's delivered transition. A partial delivery uses `--partial-delivery` to keep a non-closing
 parent reference and skip that transition. It consumes current producer proof
 and never runs or retries a local gate; `--gate ci` explicitly selects hosted
-checks. `putnami contributor language text|files|commits|tasks` enforces the
-configured language rule, `putnami contributor machine-load` reports load for
-hosted-gate admission, and `putnami tree fingerprint` supplies tree identity.
+checks. `putnami change language text|files|commits|tasks`, which this
+extension's executable serves, enforces the configured language rule, the
+core's `putnami doctor --machine` reports load for hosted-gate admission, and
+`putnami tree fingerprint` supplies tree identity.
 Host session limits remain the host runtime's responsibility.
 The active audit integration retains `check/scripts/english-only.sh` as a
 thin relay to the native language command; it carries no separate evaluator.

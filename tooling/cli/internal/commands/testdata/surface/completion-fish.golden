@@ -69,7 +69,6 @@ complete -c putnami -n '__fish_use_subcommand' -a 'completion' -d 'Generate shel
 complete -c putnami -n '__fish_use_subcommand' -a 'compose' -d 'Serve a workload with the workloads it runs with'
 complete -c putnami -n '__fish_use_subcommand' -a 'config' -d 'Manage configuration'
 complete -c putnami -n '__fish_use_subcommand' -a 'context' -d 'Manage AI context'
-complete -c putnami -n '__fish_use_subcommand' -a 'contributor' -d 'Run native contributor checks and inspect machine load'
 complete -c putnami -n '__fish_use_subcommand' -a 'deps' -d 'Manage dependencies'
 complete -c putnami -n '__fish_use_subcommand' -a 'doctor' -d 'Preflight production readiness under a deployment profile'
 complete -c putnami -n '__fish_use_subcommand' -a 'extensions' -d 'Manage extensions'
@@ -106,8 +105,6 @@ complete -c putnami -n '__putnami_complete_children config' -a 'show'
 complete -c putnami -n '__putnami_complete_children context' -a 'generate'
 complete -c putnami -n '__putnami_complete_children context' -a 'map'
 complete -c putnami -n '__putnami_complete_children context' -a 'pack'
-complete -c putnami -n '__putnami_complete_children contributor' -a 'language'
-complete -c putnami -n '__putnami_complete_children contributor' -a 'machine-load'
 complete -c putnami -n '__putnami_complete_children deps' -a 'add'
 complete -c putnami -n '__putnami_complete_children deps' -a 'install'
 complete -c putnami -n '__putnami_complete_children deps' -a 'remove'
@@ -194,9 +191,6 @@ complete -c putnami -n '__putnami_seen_path context generate' -l 'force' -d 'Rew
 complete -c putnami -n '__putnami_seen_path context map' -l 'print' -d 'Render the map to stdout (md by default, or json) and write nothing'
 complete -c putnami -n '__putnami_seen_path context pack' -l 'check' -d 'Re-derive the documents, write nothing, and fail on drift'
 complete -c putnami -n '__putnami_seen_path context pack' -l 'project' -d 'Project ID, path, or name; default is every workspace project' -r
-complete -c putnami -n '__putnami_seen_path contributor language' -l 'diff' -d 'With files: inspect tracked files changed in a Git revision range' -r
-complete -c putnami -n '__putnami_seen_path contributor language' -l 'label' -d 'With text: label the input in findings' -r
-complete -c putnami -n '__putnami_seen_path contributor language' -l 'limit' -d 'With tasks: maximum number of task records to inspect' -r
 complete -c putnami -n '__putnami_seen_path doctor' -l 'machine' -d 'Report the one-minute load per logical CPU, or unknown, instead of the readiness preflight; takes neither --profile nor --project'
 complete -c putnami -n '__putnami_seen_path doctor' -l 'profile' -d 'Deployment profile to evaluate under (dev|test|production); production is strictest' -r
 complete -c putnami -n '__putnami_seen_path doctor' -l 'project' -d 'Project ID, path, or name (comma-separated); default is every workspace project' -r

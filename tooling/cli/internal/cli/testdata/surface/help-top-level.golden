@@ -74,9 +74,6 @@ Migration:
   migrate vnext                Migrate putnami.lock.json to the current format
 
 Agents:
-  contributor                  Run native contributor checks and inspect machine load
-  contributor language         Check English-language signals in contributor material
-  contributor machine-load     Report available local CPU and memory for check admission
   mcp                          Run the MCP server over stdio for AI agent harnesses
   mcp install                  Register the MCP server in .mcp.json for Claude Code
 

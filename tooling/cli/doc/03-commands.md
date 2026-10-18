@@ -936,7 +936,7 @@ Three codes are repository hygiene rather than production readiness and never bl
 
 `putnami doctor` also checks the workstation the workspace is checked out on. These findings are scoped to the workspace root (`/`), never block a profile, and are waivable. `doctor.crlf_checkout` reports tracked text files that the working tree holds with CRLF endings while the commit has LF, or `core.autocrlf=true` with no `.gitattributes` rule that sets `eol=lf`. On Windows only, `doctor.long_paths_disabled` reports that the `LongPathsEnabled` registry value (`HKLM\SYSTEM\CurrentControlSet\Control\FileSystem`) is not 1, `doctor.git_long_paths_disabled` reports that Git does not set `core.longpaths`, and `doctor.vc_runtime_missing` reports that `vcruntime140.dll` is not in the Windows system directory, so Biome, which `@putnami/typescript` runs to lint and format TypeScript, cannot start. The human report prints each finding's fix. The production gate inside job commands does not run these checks.
 
-`putnami doctor --machine` skips the preflight and reports the machine load: the one-minute load average divided by the logical CPU count, printed as a ratio such as `0.50`, or `unknown` when the host cannot report it. With `--output=json` it prints `{"known":true,"oneMinute":2,"cpus":4,"ratio":0.5}`, or `{"known":false}`. It prints exactly what `putnami contributor machine-load` prints. Passing `--profile` or `--project` with `--machine` is a usage error.
+`putnami doctor --machine` skips the preflight and reports the machine load: the one-minute load average divided by the logical CPU count, printed as a ratio such as `0.50`, or `unknown` when the host cannot report it. With `--output=json` it prints `{"known":true,"oneMinute":2,"cpus":4,"ratio":0.5}`, or `{"known":false}`. Passing `--profile` or `--project` with `--machine` is a usage error.
 
 The same gate runs inside a job command: `putnami <jobs> --profile production` aborts between plan and execution on an unwaived high/critical finding, so nothing runs against a workspace that would fail the preflight.
 
@@ -1162,25 +1162,11 @@ review or an access boundary. An unknown flag or a `--` is a usage error
 instead: the parser rejects it before the verifier runs, and the command exits
 2.
 
-### `contributor`
+### Contributor checks
 
-Run the native local helpers that contributor workflows use:
+The core CLI has no `contributor` command. `putnami contributor …` exits with a usage error unless an installed extension declares that root. `putnami doctor --machine` reports the machine load, and `putnami change language <mode>` from `@putnami/contributor` checks English-language signals; [Commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli) lists the move.
 
-```bash
-putnami contributor language text --label proposal - < body.md
-putnami contributor language files --diff origin/main..HEAD
-putnami contributor language commits origin/main..HEAD
-putnami contributor language tasks --limit 100
-putnami contributor machine-load --output=json
-```
-
-`language` inspects English-language signals in text, tracked files, commit
-messages, or task titles and bodies. The tasks mode reads the configured tasks
-provider; findings exit 1 and invalid input or an unavailable provider exits 2.
-`machine-load` reports the one-minute load average, the logical CPU count and
-their ratio for check admission; it does not read memory. These
-commands do not run or schedule a gate. `--output=json` on `machine-load`
-returns the shared CLI result envelope with the capacity sample in `data`.
+### `proposals finalize`
 
 When a proposals provider is configured, `putnami proposals finalize --help`
 shows the local publication command's flags. `--verification-file` reads the
@@ -1509,8 +1495,7 @@ written and sets no global flag, so `putnami run my-job -- --verbose` passes
 
 A built-in command that runs no job reads no arguments after `--`, so it
 rejects a `--` with a usage error: `putnami version tag -- --push` stops
-before it tags anything. `contributor language` is the exception: it reads the
-paths after `--`.
+before it tags anything.
 
 ### Credential provider: `--providers`
 

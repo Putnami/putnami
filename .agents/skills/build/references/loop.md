@@ -138,7 +138,7 @@ Use records.md for the verifier inputs. This projection is not a second plan.
 
 Once no finding needs an edit, derive blocking command roots and flags
 from `putnami.ci.json` and repository constraints. Measure the machine first
-with `"$PUTNAMI_CLI" contributor machine-load`. When the ratio exceeds
+with `"$PUTNAMI_CLI" doctor --machine`. When the ratio exceeds
 the policy's `verification.ciGate.load` (default 0.7) and the policy names
 `verification.ciGate.checks`, run no local impacted gate: commit the
 checkpoint and call `proposals finalize --gate ci`. It pushes, marks the

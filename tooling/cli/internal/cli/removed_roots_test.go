@@ -88,6 +88,29 @@ func TestRefuseRemovedDevRootNamesTheNewSpellings(t *testing.T) {
 	}
 }
 
+// TestRefuseRemovedContributorRootNamesDoctorMachine pins the words a user who
+// types the deleted contributor root reads: the core successor of
+// machine-load, and the extension hint for the language check, which the core
+// no longer serves under any spelling.
+func TestRefuseRemovedContributorRootNamesDoctorMachine(t *testing.T) {
+	t.Parallel()
+	err := refuseRemovedCoreRoot("contributor", nil, nil)
+	if err == nil {
+		t.Fatal("`putnami contributor` is not refused")
+	}
+	for _, want := range []string{"`putnami doctor --machine`", "an extension may provide the language check"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("message = %q, want %q", err.Error(), want)
+		}
+	}
+	if strings.Contains(err.Error(), "change language") {
+		t.Errorf("message = %q names a command only an extension serves", err.Error())
+	}
+	if parsed := ParseArgs([]string{"doctor", "--machine"}, nil, nil); parsed.Err != nil || parsed.Commands[0] != "doctor" {
+		t.Errorf("ParseArgs(doctor --machine) = %v, %v", parsed.Commands, parsed.Err)
+	}
+}
+
 // TestRemovedCoreRootIsReadAfterAliases keeps a workspace alias named like a
 // removed root working: the refusal reads the command the alias resolves to.
 func TestRemovedCoreRootIsReadAfterAliases(t *testing.T) {

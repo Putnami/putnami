@@ -2883,8 +2883,7 @@
               "the-finalizer-publishes-through-the-contracts",
               "partial-delivery-never-closes-parent",
               "the-read-back-carries-what-the-upsert-answered",
-              "an-unresolved-write-stops-without-a-retry",
-              "the-language-rule-reads-tasks-through-the-contract"
+              "an-unresolved-write-stops-without-a-retry"
             ]
           }
         },

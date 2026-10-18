@@ -68,8 +68,8 @@ without changing old dossiers or closed hosted review reports. The
 stages, materialization and review responsibilities.
 
 Framework recipes reach `build/references/recipes.md` from the committed sample
-indexes. The native `putnami contributor language` and
-`putnami contributor machine-load` helpers replace workflow-owned shell
+indexes. `putnami change language`, which `@putnami/contributor` serves, and
+the core's `putnami doctor --machine` replace workflow-owned shell
 implementations; `putnami tree fingerprint` supplies the native tree binding.
 `putnami proposals finalize` is a local publication command when a proposals
 provider is configured, not an operation added to the provider contract. It

@@ -38,7 +38,7 @@
     },
     {
       "id": "doctor-machine",
-      "text": "Doctor --machine prints the one-minute load per logical CPU as a ratio, or unknown when the host cannot report it, and prints exactly what contributor machine-load prints. It takes neither --profile nor --project."
+      "text": "Doctor --machine prints the one-minute load per logical CPU as a ratio, or unknown when the host cannot report it. It takes neither --profile nor --project."
     },
     {
       "id": "doctor-names-a-missing-readme",

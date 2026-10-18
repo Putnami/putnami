@@ -12,15 +12,18 @@ import (
 // names no destination: the refusal cites the published reference that does.
 // The exception is a root whose successors the core serves itself
 // (removedRootSuccessors): its refusal names them.
-var removedCoreRoots = []string{"channel", "ci", "change-plan", "infra", "dev"}
+var removedCoreRoots = []string{"channel", "ci", "change-plan", "infra", "dev", "contributor"}
 
 // removedRootSuccessors names, for a removed root whose commands the core still
 // serves under another spelling, where they went. The core serves them in any
 // workspace and outside one, so the refusal can name them without assuming
-// either.
+// either. A root whose commands went partly to an extension names only the core
+// successors, and says an extension may provide the rest.
 var removedRootSuccessors = map[string]string{
 	"dev": "use `putnami extensions validate [path]` to validate an extension manifest, " +
 		"and `putnami templates validate|test|package [path]` to validate, test or package a template",
+	"contributor": "use `putnami doctor --machine` to read the machine load, " +
+		"and an extension may provide the language check under its own command group",
 }
 
 // refuseRemovedCoreRoot returns a usage error when command is a removed core
