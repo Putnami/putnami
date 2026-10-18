@@ -1040,7 +1040,7 @@ func TestRunJob_ExportsCPUBudgetAndCapturesCPUTime(t *testing.T) {
 }
 
 // testRevision is a full commit hash fixture, the same as the release-set
-// tests of package jobs use.
+// tests of package publication use.
 const testRevision = "8d5edb7513d93b9165ba2a7cb48466d022fc3f63"
 
 // PUTNAMI_SOURCE_REVISION and PUTNAMI_SOURCE_COMMIT_TIME are this run's input:

@@ -722,8 +722,8 @@ func (s *Server) runThroughEngine(ctx context.Context, a runJobsArgs, planOnly b
 		Config:        s.opts.Config,
 		Commands:      a.Commands,
 		Global:        global,
-		// Empty, non-nil, exactly as the pre-A4 code passed to jobs.Plan and
-		// jobs.NewScheduler. A param value's Go type is part of every cache key
+		// Empty, non-nil, exactly as the pre-A4 code passed to the planner and
+		// the scheduler. A param value's Go type is part of every cache key
 		// (store.hashParams) and of every run-marker key
 		// (workspace_state.LastBuildParamsHash), so MCP-initiated runs keep
 		// producing byte-identical keys to the ones they produced before.

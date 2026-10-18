@@ -1394,8 +1394,8 @@ func TestExecute_WatchWithoutSignalKeepsOwnExitCode(t *testing.T) {
 //
 // TestSelectProjects_BareMainRemoteMarkerRequiresProvider is the behavioral half
 // (no extensions ⇒ no remote lookup). This is the structural half: standing up a
-// live provider means a subprocess speaking the cache RPC, which internal/jobs
-// already owns and this package should not fork.
+// live provider means a subprocess speaking the cache RPC, which
+// internal/jobs/remotecache already owns and this package should not fork.
 func TestRun_SelectionReceivesTheResolvedExtensions(t *testing.T) {
 	t.Parallel()
 	data, err := os.ReadFile("engine.go")

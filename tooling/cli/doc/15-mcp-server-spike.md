@@ -11,7 +11,8 @@ The CLI already has strong agent affordances: `--output=jsonl` structured
 events, `file:line:col` diagnostics, and an exit-code taxonomy
 (`internal/cmderr`). So the bar for an MCP server is **measurable
 improvement, not novelty**. An MCP server is an adapter over the same
-internals (`internal/workspace`, `internal/jobs`, `internal/output`) speaking
+internals (`internal/workspace`, `internal/jobs/planner`,
+`internal/jobs/scheduler`, `internal/output`) speaking
 JSON-RPC 2.0 over stdio — spawned by the client, no hosting, no auth, dies
 with the session.
 
@@ -71,7 +72,7 @@ below):
 | `why_impacted` | Shortest path explaining why A impacts B, over the same dependency, contract and extension-consumer edges `impacted` widens through, each hop with its kind and the target's task scope | `workspace.ImpactPath` |
 | `topo_sort` | All projects in dependency-first topological order | `DependencyGraph.TopologicalOrder` |
 | `impacted` | Projects affected by git changes vs a baseline, with a reason per project (the changed file that claimed it, or the edge that reached it) | `workspace.ImpactedSelectionForBaseline` |
-| `run_jobs` | Run build/test/lint; return **summary + failures-with-diagnostics only**; `dryRun` returns the planned DAG without executing | `jobs.Plan` + `scheduler.Scheduler` |
+| `run_jobs` | Run build/test/lint; return **summary + failures-with-diagnostics only**; `dryRun` returns the planned DAG without executing | `planner.Plan` + `scheduler.RunPlan` |
 | `get_diagnostics` | Re-read the last run's diagnostics without re-running | cached run result |
 
 Every tool advertises read-only/mutating metadata through MCP annotations and
@@ -85,7 +86,7 @@ The resource surface is intentionally narrow:
 | `workspace://context` | Live workspace layout, graph, topological order, publish channels, warnings, and pinned lockfile versions | `workspace.Load` + `putnami.lock.json` |
 
 `run_jobs` reuses the exact CLI building blocks (`extension.DiscoverExtensions`
-→ project selection → `jobs.Plan` → `jobs.NewScheduler` → `scheduler.Run`) with
+→ project selection → `planner.Plan` → `scheduler.RunPlan`) with
 a **no-op renderer**, so job output never touches stdout (the JSON-RPC channel)
 and tool results stay consistent with the CLI. Diagnostics are extracted from
 each job's result events, mirroring `output.RenderDiagnosticEvent`'s location

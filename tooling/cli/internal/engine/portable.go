@@ -26,8 +26,8 @@ import (
 	internalextension "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	"go.putnami.dev/tooling/cli/internal/jobs/publication"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
@@ -161,9 +161,10 @@ const remoteDeadline = 4 * time.Hour
 // it returns (result, true) exactly when the run must not execute here.
 //
 // The executing side compares the expected plan with the graph without the
-// nodes a publication-v1 provider adds (jobs.ReleaseSetRun.WithoutPublicationNodes),
-// so the submitter plans the same graph whether or not the provider echoes
-// the capability. The publication and admission checks read the whole graph.
+// nodes a publication-v1 provider adds
+// (publication.ReleaseSetRun.WithoutPublicationNodes), so the submitter plans
+// the same graph whether or not the provider echoes the capability. The
+// publication and admission checks read the whole graph.
 // A version 2 request carries no expected plan and captured no input, and no
 // CLI submitter ran rejectUnsupportedRemoteShape on it: the protocol refuses
 // its unportable commands (runner.UnportableCommands), and its executing side
@@ -178,7 +179,7 @@ const remoteDeadline = 4 * time.Hour
 // env-keyed task before anything is captured. The executing side re-derives
 // the same decision on the materialized tree and refuses a divergence exactly
 // as it refuses a divergent plan.
-func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.Workspace, discovered *internalextension.DiscoveryResult, planned []*scheduler.ScheduledJob, releaseSetRun *jobs.ReleaseSetRun) (SessionResult, bool) {
+func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.Workspace, discovered *internalextension.DiscoveryResult, planned []*scheduler.ScheduledJob, releaseSetRun *publication.ReleaseSetRun) (SessionResult, bool) {
 	if req.Portable != nil && !req.Portable.frozen() {
 		for _, job := range planned {
 			if err := outsideWorkspace(req.WorkspaceRoot, job); err != nil {

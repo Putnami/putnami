@@ -193,7 +193,7 @@ func reportCommands(tasks []Task, enforced bool) []protocolcli.ReportCommand {
 		} else {
 			row.FreshWallMs += millis(task.Result.Timing.Duration)
 			// A fresh task's CPUTime is already its SHARE of its execution's
-			// measured total (jobs.executionShare), and a shared node's adopting
+			// measured total (scheduler.executionShare), and a shared node's adopting
 			// follower carries none, so each physical execution is counted once
 			// and the sum stays at or below the run's actual CPU. Truncating per
 			// task can only lower it further, never raise it.

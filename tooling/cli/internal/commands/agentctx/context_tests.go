@@ -3,7 +3,7 @@
 // buildTestsSection populates every project's agentcontext.TestsSection from
 // the committed conformance-pack metadata — AGGREGATION ONLY: it never spawns
 // a subprocess, provisions runtime infra, reads a live database, or synthesizes a
-// runtime test binding (that is internal/jobs' runtime concern). It reads only
+// runtime test binding (that is internal/jobs/scheduler's runtime concern). It reads only
 // committed facts: each pack's <project>/conformance/pack.json, the project's
 // committed schema/capabilities.json, the project's committed test sources, and a
 // pack's committed corpus file (referenced by digest, never embedded).
@@ -37,7 +37,6 @@ import (
 
 // conformancePackRelPath is the committed pack-manifest location convention:
 // each conformance pack lives at <project>/conformance/pack.json.
-// It mirrors internal/jobs' constant of the same value.
 const conformancePackRelPath = "conformance/pack.json"
 
 // The committed test policy lives in the workspace config at options.test.infra.
@@ -52,7 +51,6 @@ const (
 // certify a conformance pack: the Go conformance.Run(t) runner and the TypeScript
 // registerConformanceTests() / registerHealthConformanceTests() runners. A test
 // source referencing any of them — or the pack id itself — counts as an opt-in.
-// This mirrors internal/jobs' identical token set.
 var conformanceRunnerTokens = []string{
 	"conformance.Run",
 	"registerConformanceTests",

@@ -502,6 +502,11 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // the @putnami/contributor executable, and `putnami doctor --machine` reads the
 // machine load. The pure evaluator that proposals finalize applies stays in
 // internal/commands/shared. The ceiling follows the tree down.
+//
+// MOVED, the count unchanged: the release-set, publication and deploy-target
+// code leaves internal/jobs for internal/jobs/publication. internal/jobs keeps
+// no Go file of its own, so it stops counting when internal/jobs/publication
+// starts. TestJobsSplitLeavesNoJobsPackage keeps it that way.
 const internalPackageCountCeiling = 77
 
 func TestInternalPackageCountCeiling(t *testing.T) {

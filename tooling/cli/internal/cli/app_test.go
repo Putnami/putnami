@@ -636,7 +636,7 @@ func TestResolveProfile_InvalidEnvNoTraceHint(t *testing.T) {
 
 // The buildSessionStats unit tests lived here until an earlier change deleted the
 // helper with the v1 session writer it fed. The buckets they asserted are the
-// canonical reducer's, pinned at the source in internal/jobs (result_reduce)
+// canonical reducer's, pinned at the source in go.putnami.dev/cli/model/jobs (result_reduce)
 // and on the wire by internal/cli's v2 session-file golden.
 
 // --- App.Run simple paths ---

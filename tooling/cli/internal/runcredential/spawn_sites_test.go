@@ -99,7 +99,7 @@ var spawnSites = map[string]spawnSite{
 		why: "the prepare command of an extension not installed from the artifact store"},
 	"jobs/scheduler/extension_runtime.go:startRuntimeHandshake": {spawns: 1, verdict: marked, by: "jobs/scheduler/extension_runtime.go:prepareOrLoadExtensionRuntimeWithDigestAndEnv",
 		why: "the runtime of an extension not installed from the artifact store"},
-	"jobs/release_set.go:newReleaseSetProvider": {spawns: 1, verdict: marked, by: "jobs/release_set.go:newReleaseSetProvider",
+	"jobs/publication/release_set.go:newReleaseSetProvider": {spawns: 1, verdict: marked, by: "jobs/publication/release_set.go:newReleaseSetProvider",
 		why: "putnami cloud release-set, a CLI without the run credential that loads the workspace's extensions"},
 	"jobs/scheduler/runner.go:(*jobInvocation).execCommand": {spawns: 1, verdict: marked, by: "jobs/scheduler/runner.go:(*jobInvocation).startJob",
 		why: "a job; a job that receives the credential starts as a holder in the same function"},

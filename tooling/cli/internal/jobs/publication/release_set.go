@@ -1,7 +1,7 @@
-// Package jobs prepares the release set, publication and deploy targets of a
-// run: it adds the internal jobs and targets they need to a plan, and the
-// scheduler package runs that plan.
-package jobs
+// Package publication prepares the release set, publication and deploy
+// targets of a run: it adds the internal jobs and targets they need to a plan,
+// and the scheduler package runs that plan.
+package publication
 
 import (
 	"context"

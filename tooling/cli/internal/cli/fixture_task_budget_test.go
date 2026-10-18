@@ -13,7 +13,7 @@ import (
 
 // A fixture task that declares a budget, in this package, in the e2e packages
 // or in their clitest helpers, declares "timeoutMs": -1, the manifest's
-// unbounded sentinel, the rule internal/jobs pins with
+// unbounded sentinel, the rule internal/jobs/scheduler pins with
 // TestFixtureJobsCarryNoIncidentalWallClockBudget. A task that portable
 // execution or `ci change-plan` plans needs a hard deadline and declares
 // clitest.PortableTaskDeadlineMs.

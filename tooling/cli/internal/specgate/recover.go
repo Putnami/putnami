@@ -36,7 +36,7 @@ import (
 //     published last time is the entry for exactly these inputs → restoring
 //     the observation states the same fact the run would have re-derived.
 //
-// It is also not a new trust assumption. jobs.restoreReservedDeclaredArtifactEvents
+// It is also not a new trust assumption. cachekey.RestoreReservedDeclaredArtifactEvents
 // already reconstructs this exact artifact from a warm hit when the project
 // happens to be selected, on the stated grounds that "losing either on a warm
 // hit can fail closed on valid evidence". This extends the same admission to a

@@ -149,7 +149,7 @@ var complexityCeilings = []complexityCeiling{
 			"holds attachReleaseSet, which binds the open operation's plan tuple and barrier before the " +
 			"barrier nodes attach, and releaseSetExecution, which appends the release finalizer and gives " +
 			"each publication job its private outbox; both keep Engine.run inside its statement budget. " +
-			"The upload and session logic lives in internal/jobs, not here. " +
+			"The upload and session logic lives in internal/jobs/publication, not here. " +
 			"RAISED 23/149→24/158 (cli/provider-publication): a run that may publish reads its " +
 			"bound commit's ancestry before the first hook, because repository code can rewrite refs, " +
 			"replace refs and grafts afterwards. ancestry.go holds AncestrySnapshot (five nil-safe " +

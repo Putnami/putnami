@@ -17,7 +17,7 @@ import (
 	protocoljob "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/publication"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -418,7 +418,7 @@ func TestRun_MixedSessionSelectionReportsBothSets(t *testing.T) {
 		t.Fatalf("selection = %+v, want the caller's impacted projection", selection)
 	}
 	if selection.Baseline == "" || selection.BaselineSource == "" ||
-		selection.BaselineSource == jobs.ReleaseSetHeadBaselineSource {
+		selection.BaselineSource == publication.ReleaseSetHeadBaselineSource {
 		t.Fatalf("selection baseline = %q/%q, want the git tier the gate resolved",
 			selection.Baseline, selection.BaselineSource)
 	}
@@ -446,7 +446,7 @@ func TestRun_PublishOnlyChannelSessionIsUnchanged(t *testing.T) {
 	assertNotPlanned(t, keys, "/lib:test~test", "/lib:publish~artifact", "/lib:package~artifact")
 
 	selection := plannedSelection(t, result.Plan)
-	if selection.BaselineSource != jobs.ReleaseSetHeadBaselineSource {
+	if selection.BaselineSource != publication.ReleaseSetHeadBaselineSource {
 		t.Fatalf("publish-only baselineSource = %q, want the head-measured tier", selection.BaselineSource)
 	}
 	if !slices.Equal(selection.ProjectIDs, selection.ReleaseSetProjects) {
@@ -568,7 +568,7 @@ func useUnchangedReleaseSetHead(t *testing.T, root string, req Request) {
 	if code != ExitSuccess {
 		t.Fatalf("build keying plan = exit %d", code)
 	}
-	preparation, err := jobs.PrepareReleaseSetRun(ctx, options, ws, selected, verification, extensions, discovered,
+	preparation, err := publication.PrepareReleaseSetRun(ctx, options, ws, selected, verification, extensions, discovered,
 		keying, probe.CommandParams, scheduler.NewRunCacheManager(root, ""), probe.selection, false)
 	if err != nil || preparation.Run == nil || preparation.Run.Plan() == nil {
 		t.Fatalf("prepare fixture release set = %+v, %v", preparation, err)

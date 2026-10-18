@@ -1,4 +1,4 @@
-package jobs
+package publication
 
 import distribution "go.putnami.dev/protocol/distribution"
 

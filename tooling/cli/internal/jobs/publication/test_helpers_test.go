@@ -1,4 +1,4 @@
-package jobs
+package publication
 
 // The release-set and publication tests keep their own copies of the scheduler
 // package's test helpers: a test package cannot import another one's. Each
@@ -40,8 +40,8 @@ func TestMain(m *testing.M) {
 // executable mode elsewhere reopens the "text file busy" race that helper
 // closes. A mode the guard cannot read is refused too, except in a helper
 // listed here that sends every executable mode to writeExecutable itself.
-// The guard reads the tests of the packages split out of internal/jobs too,
-// and each package's own copy of writeExecutable must take the lock.
+// The guard reads the tests of every package under internal/jobs, this one
+// included, and each package's own copy of writeExecutable must take the lock.
 func TestExecutableFixturesAreWrittenUnderTheForkLock(t *testing.T) {
 	t.Parallel()
 
@@ -49,15 +49,16 @@ func TestExecutableFixturesAreWrittenUnderTheForkLock(t *testing.T) {
 		"mustWriteRuntimeFile": true,
 	}
 
-	files, err := filepath.Glob("*_test.go")
-	if err != nil || len(files) == 0 {
-		t.Fatalf("glob package test files: %v (%d files)", err, len(files))
+	own, err := filepath.Glob("*_test.go")
+	if err != nil || len(own) == 0 {
+		t.Fatalf("glob package test files: %v (%d files)", err, len(own))
 	}
-	splitFiles, err := filepath.Glob(filepath.Join("*", "*_test.go"))
-	if err != nil {
-		t.Fatalf("glob split package test files: %v", err)
+	// This package sits beside the others under internal/jobs, so one glob of
+	// the parent reads its own tests and theirs.
+	files, err := filepath.Glob(filepath.Join("..", "*", "*_test.go"))
+	if err != nil || len(files) <= len(own) {
+		t.Fatalf("glob internal/jobs test files: %v (%d files, %d of them this package's)", err, len(files), len(own))
 	}
-	files = append(files, splitFiles...)
 	fset := token.NewFileSet()
 	helperTakesTheLock := false
 	routesToTheHelper := map[string]bool{}
