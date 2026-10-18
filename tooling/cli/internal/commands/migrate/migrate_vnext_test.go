@@ -379,7 +379,7 @@ func TestMigrateVNext_IsLauncherExempt(t *testing.T) {
 		t.Error("`migrate vnext` must not relaunch: it is the recovery path for an unreadable lock")
 	}
 	if !launch.IsExemptInvocation([]string{"migrate", "--json", "vnext"}) {
-		t.Error("the exemption must survive a leading boolean flag, like `version use`'s does")
+		t.Error("the exemption must survive a leading boolean flag, like `cli use`'s does")
 	}
 	if launch.IsExemptInvocation([]string{"migrate", "something-else"}) {
 		t.Error("only `migrate vnext` is exempt; another migration has no claim on the escape hatch")

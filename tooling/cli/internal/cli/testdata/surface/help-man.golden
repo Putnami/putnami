@@ -204,8 +204,11 @@ Pin the CLI version this workspace uses.
 .B workspace describe
 Describe the active workspace.
 .TP
-.B version get|tag|list|use
-Versions derived from git, release tags, and installed CLI binaries.
+.B version get|tag
+Versions derived from git and release tags.
+.TP
+.B cli list|use
+Installed CLI binaries.
 .TP
 .B infra plan
 Plan workspace infra (--output=jsonl).
@@ -490,11 +493,11 @@ Confirm the active workspace and show its name, version, project count, extensio
 .br
 putnami workspace describe [--output <format>]
 .SS version
-Show the version each line is at (get), release a line (tag), and manage the installed CLI binaries (list/use).
+Show the version each line is at (get) and release a line (tag).
 .PP
 .B Usage:
 .br
-putnami version <get|tag|list|use>
+putnami version <get|tag>
 .SS version get
 Show the version every version line is at, derived from its git tags.
 .PP
@@ -522,21 +525,27 @@ Print the proposed tag and changelog without writing anything.
 .TP
 .B --yes
 Skip the confirmation and create the release commit and tag.
-.SS version list
+.SS cli
+List the installed putnami CLI binaries (list) and switch the active one (use).
+.PP
+.B Usage:
+.br
+putnami cli <list|use>
+.SS cli list
 List the installed putnami CLI binaries in .putnami/bin (or ~/.putnami/bin with --global) and mark the active one.
 .PP
 .B Usage:
 .br
-putnami version list [--global]
+putnami cli list [--global]
 .TP
 .B --global
 List binaries in ~/.putnami/bin instead of the workspace (alias: -g).
-.SS version use
+.SS cli use
 Switch the active putnami CLI binary to an installed putnami-<name> (e.g. one built by `upgrade --from-source`).
 .PP
 .B Usage:
 .br
-putnami version use <name> [--global]
+putnami cli use <name> [--global]
 .TP
 .B --global
 Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g).

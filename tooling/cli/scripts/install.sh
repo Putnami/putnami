@@ -619,7 +619,7 @@ place_symlink() {
 }
 
 # Install binary with a versioned name and point the `putnami` symlink at it.
-# This is the layout `putnami version use` and `putnami upgrade --global`
+# This is the layout `putnami cli use` and `putnami upgrade --global`
 # manage, so an install and an upgrade land in the same shape.
 install_versioned_binary() {
     local source_binary="$1"
@@ -1381,7 +1381,7 @@ main() {
     # Checked after parsing so PUTNAMI_VARIANT is held to the same rule as
     # --variant. The variant becomes part of the installed filename
     # (putnami-<variant>-<tag>), so an unchecked typo installs a binary under a
-    # name neither the symlink nor `putnami version use` resolves.
+    # name neither the symlink nor `putnami cli use` resolves.
     case "$VARIANT" in
         go | ts) ;;
         *)
@@ -1411,7 +1411,7 @@ main() {
 
     # An explicit --install-dir installs under the plain name, for callers that
     # manage the directory themselves. Otherwise the versioned ~/.putnami/bin
-    # layout is used, so `putnami version use` and `upgrade` can switch between
+    # layout is used, so `putnami cli use` and `upgrade` can switch between
     # installs later.
     local USE_VERSIONED=true
     if [[ -n "$INSTALL_DIR" ]]; then

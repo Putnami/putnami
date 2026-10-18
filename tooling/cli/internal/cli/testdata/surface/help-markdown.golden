@@ -120,7 +120,8 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 | `putnami upgrade` | Upgrade CLI, extensions, and dependencies |
 | `putnami pin` | Pin the CLI version this workspace uses |
 | `putnami workspace describe` | Describe the active workspace |
-| `putnami version get|tag|list|use` | Versions derived from git, release tags, and installed CLI binaries |
+| `putnami version get|tag` | Versions derived from git and release tags |
+| `putnami cli list|use` | Installed CLI binaries |
 | `putnami infra plan` | Plan workspace infra (--output=jsonl) |
 
 ## Extensions & Templates
@@ -463,12 +464,12 @@ putnami workspace describe [--output <format>]
 
 ### `putnami version`
 
-Show the version each line is at (get), release a line (tag), and manage the installed CLI binaries (list/use)
+Show the version each line is at (get) and release a line (tag)
 
 **Usage**
 
 ```
-putnami version <get|tag|list|use>
+putnami version <get|tag>
 ```
 
 **Examples**
@@ -476,8 +477,6 @@ putnami version <get|tag|list|use>
 - `putnami version get`
 - `putnami version tag --scope typescript --dry-run`
 - `putnami version tag --scope tooling --yes --push`
-- `putnami version list --global`
-- `putnami version use go-dev`
 
 ### `putnami version get`
 
@@ -526,14 +525,29 @@ putnami version tag [<tag>] [--scope <line>] [--push] [--dry-run] [--yes]
 - `putnami version tag --scope tooling --yes --push`
 - `putnami version tag tooling/v0.3.0 --scope tooling --yes`
 
-### `putnami version list`
+### `putnami cli`
+
+List the installed putnami CLI binaries (list) and switch the active one (use)
+
+**Usage**
+
+```
+putnami cli <list|use>
+```
+
+**Examples**
+
+- `putnami cli list --global`
+- `putnami cli use go-dev`
+
+### `putnami cli list`
 
 List the installed putnami CLI binaries in .putnami/bin (or ~/.putnami/bin with --global) and mark the active one
 
 **Usage**
 
 ```
-putnami version list [--global]
+putnami cli list [--global]
 ```
 
 **Flags**
@@ -544,17 +558,17 @@ putnami version list [--global]
 
 **Examples**
 
-- `putnami version list`
-- `putnami version list --global`
+- `putnami cli list`
+- `putnami cli list --global`
 
-### `putnami version use`
+### `putnami cli use`
 
 Switch the active putnami CLI binary to an installed putnami-<name> (e.g. one built by `upgrade --from-source`)
 
 **Usage**
 
 ```
-putnami version use <name> [--global]
+putnami cli use <name> [--global]
 ```
 
 **Flags**
@@ -565,8 +579,8 @@ putnami version use <name> [--global]
 
 **Examples**
 
-- `putnami version use go-dev`
-- `putnami version use go-source-1a2b3c4 --global`
+- `putnami cli use go-dev`
+- `putnami cli use go-source-1a2b3c4 --global`
 
 ### `putnami infra plan`
 

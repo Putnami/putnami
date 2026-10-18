@@ -38,7 +38,7 @@ func assertInstalledBinaryMode(t *testing.T, info os.FileInfo) {
 	}
 }
 
-// On Windows `version use` makes putnami.exe a copy of the named version and
+// On Windows `cli use` makes putnami.exe a copy of the named version and
 // leaves the version in place.
 func TestVersionUse_CopiesTheVersionToPutnamiExe(t *testing.T) {
 	dir := t.TempDir()

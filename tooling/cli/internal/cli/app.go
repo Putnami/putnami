@@ -134,7 +134,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// error naming `./putnamiw <this command>`. A Go test binary is accepted,
 	// because `go test` produced it from that same tree.
 	//
-	// CLI-management invocations (`pin`, `version list/use`, `upgrade
+	// CLI-management invocations (`pin`, `cli list/use`, `upgrade
 	// --from-source`) are exempt: they must run as the invoked binary so the
 	// pinned engine can be changed or self-hosted from source even when it is
 	// broken or predates the command/flag. That exemption is the way out of

@@ -245,7 +245,7 @@ func assertNoLeftovers(t *testing.T, home, tmp string) {
 //
 // These exercise the fast-path rule that a from-source workspace must never run
 // a binary older than its tooling/cli sources — even when that binary is reached
-// through a `version use`/`upgrade` symlink, which previously bypassed the
+// through a `cli use`/`upgrade` symlink, which previously bypassed the
 // staleness check and silently shadowed merged fixes (the stale-binary trap).
 
 // sourceRepo builds an isolated from-source workspace that drives the staleness
@@ -302,7 +302,7 @@ exit 0
 }
 
 // installPin writes a sibling pinned CLI printing "RAN_PINNED" and symlinks
-// .putnami/bin/putnami at it — the relative-sibling form `version use` creates.
+// .putnami/bin/putnami at it — the relative-sibling form `cli use` creates.
 // It returns the symlink path and the target binary path.
 func installPin(t *testing.T, repo string) (link, target string) {
 	t.Helper()
@@ -955,7 +955,7 @@ func assertNotAGitWorkTree(t *testing.T, dir string) {
 	}
 }
 
-// The marker alone does not vouch for a binary. `putnami version use` and
+// The marker alone does not vouch for a binary. `putnami cli use` and
 // `upgrade --from-source` both re-point .putnami/bin/putnami without touching
 // the marker, so the fast path also checks that the link resolves to THIS key's
 // blob. Without that check the wrapper would run a binary the marker never
@@ -970,7 +970,7 @@ func TestPutnamiwSourceKey_RepointedLinkIsNotTrusted(t *testing.T) {
 		t.Fatalf("want one blob after the first run, got %v", blobs)
 	}
 
-	// Re-point the CLI at a foreign binary, exactly as `version use` would,
+	// Re-point the CLI at a foreign binary, exactly as `cli use` would,
 	// leaving the marker's key untouched.
 	binDir := filepath.Join(repo, ".putnami", "bin")
 	foreign := filepath.Join(binDir, "putnami-go-0.1.0-elsewhere")

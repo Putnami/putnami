@@ -75,7 +75,7 @@ func TestCommandRegistryCoversStructuredCommands(t *testing.T) {
 		"cache", "config", "context", "migrate", "sessions", "completion",
 		"install", "telemetry", "upgrade", "help", "init", "dev", "infra", "scopes",
 		"mcp", "pin", "doctor", "impact-plan", "report", "tree",
-		"compose", "qualify", "contributor",
+		"compose", "qualify", "contributor", "cli",
 	}
 	for _, name := range want {
 		if _, ok := lookupCommand(name); !ok {

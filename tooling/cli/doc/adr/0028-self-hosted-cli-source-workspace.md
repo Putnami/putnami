@@ -32,7 +32,7 @@ This section binds every workspace that pins a published CLI.
   stops the run. Each error names its recovery: `putnami pin <version>` or
   `PUTNAMI_NO_RELAUNCH=1 putnami …`. Without a pin, the launcher runs the
   current binary: there is no pin to betray.
-- The launcher-exempt invocations (`pin`, `version list/use`,
+- The launcher-exempt invocations (`pin`, `cli list/use`,
   `upgrade --from-source`, `migrate vnext`, `extensions … --user`) never enter
   the launcher, so a broken pin is always repairable.
 - An ordinary install or context generation never promotes the lock format

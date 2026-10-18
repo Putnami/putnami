@@ -33,7 +33,7 @@
 // The recovery story sits OUTSIDE that decision, so it survives a pinned engine
 // that is broken, missing, or older than the command you need:
 //
-//   - IsExemptInvocation (`pin`, `version list/use`, `upgrade --from-source`)
+//   - IsExemptInvocation (`pin`, `cli list/use`, `upgrade --from-source`)
 //     never enters the launcher at all;
 //   - NoRelaunchEnv covers PUBLISHED pins only: it suppresses the launcher for
 //     any pinned version and survives an unreadable lock, but it is NOT an
@@ -149,7 +149,7 @@ func IsExemptCommand(name string) bool {
 // always-exempt commands (IsExemptCommand), it covers the CLI-binary management
 // paths that exist precisely to recover from a broken or outdated pinned engine:
 //
-//   - `version list` / `version use`     — inspect or switch installed binaries
+//   - `cli list` / `cli use`     — inspect or switch installed binaries
 //   - `upgrade --from-source`            — build and adopt a local CLI
 //   - `migrate vnext`                    — convert a lock this engine cannot read
 //   - `extensions … --user`              — manage the user scope, not the workspace
@@ -176,7 +176,7 @@ func IsExemptInvocation(args []string) bool {
 		return true
 	}
 	switch args[0] {
-	case "version":
+	case "cli":
 		switch firstNonFlag(args[1:]) {
 		case "list", "use":
 			return true

@@ -80,7 +80,7 @@ in-process equivalent. Do not delete them as recursion.
 | Site | Why it stays |
 | --- | --- |
 | `launch.Relaunch` | Re-execs into the workspace-pinned binary; the point is to run different code. `PUTNAMI_LAUNCHED` guards loops, `PUTNAMI_NO_RELAUNCH` opts out. |
-| `launch.IsExemptCommand` / `IsExemptInvocation` | Recovery paths (`pin`, `version list`/`use`, `upgrade --from-source`, `migrate vnext`, `extensions … --user`) run as the invoked binary, because the pinned one may be broken or predate the flag. |
+| `launch.IsExemptCommand` / `IsExemptInvocation` | Recovery paths (`pin`, `cli list`/`use`, `upgrade --from-source`, `migrate vnext`, `extensions … --user`) run as the invoked binary, because the pinned one may be broken or predate the flag. |
 | `extensions.TemplatesTest` | Runs `putnami install` and `build,test` against another, rendered workspace. The nested run is the test subject. |
 | `PUTNAMI_WORKSPACE_BOOTSTRAPPED` (`lifecycle/bootstrap.go`) | Install jobs may spawn `putnami`; only an environment variable reaches a grandchild. Bootstrap itself calls install in-process (`installRunner`). |
 | `PUTNAMI_ARTIFACTS_ENSURED` (`lifecycle/ensure.go`) | `ensuredWorkspaces` dedupes within a process; the variable dedupes across a nested `putnami` an extension job spawns. |

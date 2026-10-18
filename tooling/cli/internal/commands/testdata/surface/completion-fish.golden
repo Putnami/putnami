@@ -64,6 +64,7 @@ complete -c putnami -n '__fish_use_subcommand' -a 'validate' -d 'Check the proje
 
 # Structured commands
 complete -c putnami -n '__fish_use_subcommand' -a 'cache' -d 'Manage cache'
+complete -c putnami -n '__fish_use_subcommand' -a 'cli' -d 'Installed CLI binaries'
 complete -c putnami -n '__fish_use_subcommand' -a 'completion' -d 'Generate shell completions (bash, zsh, fish)'
 complete -c putnami -n '__fish_use_subcommand' -a 'compose' -d 'Serve a workload with the workloads it runs with'
 complete -c putnami -n '__fish_use_subcommand' -a 'config' -d 'Manage configuration'
@@ -90,13 +91,15 @@ complete -c putnami -n '__fish_use_subcommand' -a 'telemetry' -d 'Manage anonymo
 complete -c putnami -n '__fish_use_subcommand' -a 'templates' -d 'Manage templates'
 complete -c putnami -n '__fish_use_subcommand' -a 'tree' -d 'Identify the worktree the CLI runs in and check evidence against it'
 complete -c putnami -n '__fish_use_subcommand' -a 'upgrade' -d 'Upgrade CLI, extensions, and dependencies'
-complete -c putnami -n '__fish_use_subcommand' -a 'version' -d 'Versions derived from git, release tags, and installed CLI binaries'
+complete -c putnami -n '__fish_use_subcommand' -a 'version' -d 'Versions derived from git and release tags'
 complete -c putnami -n '__fish_use_subcommand' -a 'workspace' -d 'Manage workspace'
 
 # Subcommands
 complete -c putnami -n '__putnami_complete_children cache' -a 'clean'
 complete -c putnami -n '__putnami_complete_children cache' -a 'gc'
 complete -c putnami -n '__putnami_complete_children cache' -a 'verify'
+complete -c putnami -n '__putnami_complete_children cli' -a 'list'
+complete -c putnami -n '__putnami_complete_children cli' -a 'use'
 complete -c putnami -n '__putnami_complete_children completion' -a 'bash'
 complete -c putnami -n '__putnami_complete_children completion' -a 'fish'
 complete -c putnami -n '__putnami_complete_children completion' -a 'zsh'
@@ -142,9 +145,7 @@ complete -c putnami -n '__putnami_complete_children templates' -a 'update'
 complete -c putnami -n '__putnami_complete_children tree' -a 'fingerprint'
 complete -c putnami -n '__putnami_complete_children tree' -a 'verify'
 complete -c putnami -n '__putnami_complete_children version' -a 'get'
-complete -c putnami -n '__putnami_complete_children version' -a 'list'
 complete -c putnami -n '__putnami_complete_children version' -a 'tag'
-complete -c putnami -n '__putnami_complete_children version' -a 'use'
 complete -c putnami -n '__putnami_complete_children workspace' -a 'describe'
 complete -c putnami -n '__putnami_complete_children workspace' -a 'init'
 
@@ -185,6 +186,8 @@ complete -c putnami -l 'trace-profile' -d 'Collect trace events (Chrome trace fo
 complete -c putnami -l 'version' -d 'Show version'
 
 # Structured command flags
+complete -c putnami -n '__putnami_seen_path cli list' -l 'global' -d 'List binaries in ~/.putnami/bin instead of the workspace (alias: -g)'
+complete -c putnami -n '__putnami_seen_path cli use' -l 'global' -d 'Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)'
 complete -c putnami -n '__putnami_seen_path compose' -l 'no-watch' -d 'Run the target production-mode without watch, like its dependencies'
 complete -c putnami -n '__putnami_seen_path compose' -l 'port' -d 'Proxy port of the target; default options.serve.port then 3000; 0 picks an ephemeral port' -r
 complete -c putnami -n '__putnami_seen_path compose' -l 'ready-timeout' -d 'Deadline for each member\'s typed ready event; default 60s' -r
@@ -261,12 +264,10 @@ complete -c putnami -n '__putnami_seen_path upgrade' -l 'namespace' -d 'Release-
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'release' -d 'Use one immutable release-set snapshot for npm and Go dependencies (needs --namespace)' -r
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'version' -d 'Use an exact Putnami release version' -r
 complete -c putnami -n '__putnami_seen_path version get' -l 'scope' -d 'Report only this version line, by its scope path' -r
-complete -c putnami -n '__putnami_seen_path version list' -l 'global' -d 'List binaries in ~/.putnami/bin instead of the workspace (alias: -g)'
 complete -c putnami -n '__putnami_seen_path version tag' -l 'dry-run' -d 'Print the proposed tag and changelog without writing anything'
 complete -c putnami -n '__putnami_seen_path version tag' -l 'push' -d 'Push the release commit and the tag to origin'
 complete -c putnami -n '__putnami_seen_path version tag' -l 'scope' -d 'The version line to release, by its scope path (required when the workspace declares several)' -r
 complete -c putnami -n '__putnami_seen_path version tag' -l 'yes' -d 'Skip the confirmation and create the release commit and tag'
-complete -c putnami -n '__putnami_seen_path version use' -l 'global' -d 'Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g)'
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'channel' -d 'Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -r
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'extension' -d 'Default extension to install' -a 'go py ts' -r
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'force' -d 'Reinitialize an existing workspace'

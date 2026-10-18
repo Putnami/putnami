@@ -114,7 +114,7 @@ func VersionList(ctx context.Context, binDir string) error {
 // putnami-<name> binary in the same directory.
 func VersionUse(ctx context.Context, binDir string, name string, global bool) error {
 	if name == "" {
-		return fmt.Errorf("usage: putnami version use <name>  (e.g., go-dev, ts-dev)")
+		return fmt.Errorf("usage: putnami cli use <name>  (e.g., go-dev, ts-dev)")
 	}
 
 	targetName := pkgmeta.ExecutableName(runtime.GOOS, "putnami-"+name)

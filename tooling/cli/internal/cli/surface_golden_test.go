@@ -167,6 +167,8 @@ var structuredHelpSubcommands = []string{
 	"cache clean",
 	"cache gc",
 	"cache verify",
+	"cli list",
+	"cli use",
 	"config set",
 	"config show",
 	"contracts check",
@@ -209,9 +211,7 @@ var structuredHelpSubcommands = []string{
 	"templates remove",
 	"templates update",
 	"version get",
-	"version list",
 	"version tag",
-	"version use",
 	"workspace describe",
 	"workspace init",
 }

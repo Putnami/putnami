@@ -25,7 +25,7 @@
     },
     {
       "id": "one-binary-switch-on-windows",
-      "text": "On Windows, install.ps1, putnami upgrade and putnami version use make putnami.exe a copy of the versioned binary, under an exclusive lock on .putnami-switch.lock in the same directory. A running putnami.exe is renamed aside to a .old- name that starts with a dot, and a later switch deletes it once it no longer runs. When the new binary cannot move in, the old one moves back; when that fails too, the old one stays aside and the error names its path."
+      "text": "On Windows, install.ps1, putnami upgrade and putnami cli use make putnami.exe a copy of the versioned binary, under an exclusive lock on .putnami-switch.lock in the same directory. A running putnami.exe is renamed aside to a .old- name that starts with a dot, and a later switch deletes it once it no longer runs. When the new binary cannot move in, the old one moves back; when that fails too, the old one stays aside and the error names its path."
     },
     {
       "id": "windows-executables-by-name",

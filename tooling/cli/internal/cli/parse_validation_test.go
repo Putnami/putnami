@@ -59,7 +59,7 @@ func TestValidateStructuredFlags_AcceptsDeclaredAndGlobalFlags(t *testing.T) {
 		{"extensions", "install", []string{"--platform=linux/amd64", "--dest=./.gen/warm"}},
 		{"dev", "template", []string{"test", "--keep", "--skip-build"}},
 		{"dev", "template", []string{"package", "--version", "1.2.3", "--stable"}},
-		{"version", "use", []string{"0.1.0", "-g"}},
+		{"cli", "use", []string{"0.1.0", "-g"}},
 		{"doctor", "", []string{"--project", "@putnami/cli"}},
 		// Globals are always accepted alongside a command's own flags.
 		{"projects", "list", []string{"--output=jsonl", "--quiet"}},
