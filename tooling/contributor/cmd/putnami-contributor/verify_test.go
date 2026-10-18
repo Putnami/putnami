@@ -456,13 +456,14 @@ func (r *verifyRepo) dir(t *testing.T, c verifyCase) string {
 }
 
 // launch runs command in dir with the environment putnami gives a launch
-// on this machine: PATH, a HOME of the fixture's own, and the C locale.
-// extraEnv adds or overrides entries.
+// on this machine: PATH, a HOME of the fixture's own, the C locale, and no
+// system Git configuration, as when the fixture was built. extraEnv adds or
+// overrides entries.
 func (r *verifyRepo) launch(t *testing.T, dir string, command []string, extraEnv ...string) languageResult {
 	t.Helper()
 	process := exec.Command(command[0], command[1:]...)
 	process.Dir = dir
-	process.Env = append([]string{"PATH=" + os.Getenv("PATH"), "HOME=" + r.home, "LC_ALL=C"}, extraEnv...)
+	process.Env = append([]string{"PATH=" + os.Getenv("PATH"), "HOME=" + r.home, "LC_ALL=C", "GIT_CONFIG_NOSYSTEM=1"}, extraEnv...)
 	var stdout, stderr bytes.Buffer
 	process.Stdout, process.Stderr = &stdout, &stderr
 	err := process.Run()

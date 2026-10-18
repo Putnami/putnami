@@ -150,11 +150,16 @@ Known differences from `putnami tree verify`:
   none.
 - **(g) Run credential.** The executable marks no repository code as started.
 - **(h) Child environment.** Git and the workspace CLI run without the host
-  channel variables. The core passes its whole environment to the workspace
-  CLI.
+  channel variables. The workspace CLI also inherits the environment putnami
+  gives an interactive launch, such as `PUTNAMI_INTERACTIVE` and
+  `PUTNAMI_WORKSPACE_ROOT`, where the core passes the user's environment
+  unchanged.
 - **(i) Internal errors.** An error that is not a verdict, such as a failed
   write to standard output, prints `change verify: <error>` where the core
   prints `putnami: <error>`. Both exit 1.
+- **(j) Outside a workspace.** The command runs only when @putnami/contributor
+  is installed in user scope and the global `putnami` launches it. The core
+  command needs no extension.
 
 ## Invariants
 

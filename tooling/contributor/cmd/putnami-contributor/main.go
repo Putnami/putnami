@@ -5,7 +5,7 @@
 //
 //	putnami-contributor __putnami runtime-info    (the runtime handshake)
 //	putnami-contributor language <mode> [flags]   (putnami change language)
-//	putnami-contributor verify <mode> [flags]     (putnami change verify)
+//	putnami-contributor verify [flags]            (putnami change verify)
 //
 // It answers the runtime handshake, serves the change commands that moved
 // here, and refuses every other invocation. putnami launches a change command
