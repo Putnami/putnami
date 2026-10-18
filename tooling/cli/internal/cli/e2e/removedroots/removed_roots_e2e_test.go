@@ -34,7 +34,9 @@ func TestMain(m *testing.M) {
 
 // TestRemovedRootsAreRefusedBeforeTheWorkspaceBootstrap holds every former
 // spelling of the removed roots, and `putnami help` of each, to one usage
-// error, raised before the implicit install and before any planning. The job
+// error, raised before the implicit install and before any planning.
+// `proposals finalize` is refused the same way where the workspace binds a
+// collaboration contract, which makes proposals a command group. The job
 // command run last proves the bootstrap does start in the same fixture, so its
 // absence is evidence.
 func TestRemovedRootsAreRefusedBeforeTheWorkspaceBootstrap(t *testing.T) {
@@ -66,28 +68,26 @@ func TestRemovedRootsAreRefusedBeforeTheWorkspaceBootstrap(t *testing.T) {
 		{"tree", "verify", "--record", ".context/dossier.json"},
 		{"tree", "verify", "--help"},
 		{"help", "tree", "verify"},
+		{"proposals", "finalize"},
+		{"proposals", "finalize", "--draft", "--base", "main"},
+		{"proposals", "finalize", "--help"},
+		{"help", "proposals", "finalize"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
-			t.Setenv(bootstrappedEnv, "")
-			t.Setenv(noAutoInstallEnv, "")
+			requireRefusedBeforeBootstrap(t, clitest.WhereFixture(t, false, false), args)
+		})
+	}
+	for _, args := range [][]string{
+		{"proposals", "finalize"},
+		{"proposals", "finalize", "--gate", "ci", "--output=json"},
+		{"proposals", "finalize", "--help"},
+		{"help", "proposals", "finalize"},
+	} {
+		t.Run(strings.Join(args, " ")+" with a collaboration binding", func(t *testing.T) {
 			root := clitest.WhereFixture(t, false, false)
-			code, output := clitest.RunGateArgs(t, root, args...)
-			if code != 2 {
-				t.Fatalf("exit = %d, want 2:\n%s", code, output)
-			}
-			requireRefusal(t, removedPath(args), output)
-			if strings.Contains(output, "no project matched") || strings.Contains(output, "no job matched") {
-				t.Fatalf("the root reached selection or planning:\n%s", output)
-			}
-			if got := os.Getenv(bootstrappedEnv); got != "" {
-				t.Fatalf("%s = %q: the workspace bootstrap started", bootstrappedEnv, got)
-			}
-			if _, err := os.Stat(filepath.Join(root, ".putnami", "install-state.json")); !os.IsNotExist(err) {
-				t.Fatalf("the implicit install recorded its state: %v", err)
-			}
-			if _, err := os.Stat(filepath.Join(root, "app", "calls")); !os.IsNotExist(err) {
-				t.Fatalf("a task ran: %v", err)
-			}
+			clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name":"placement-fixture","includes":["extension","app"],`+
+				`"options":{"collaboration":{"proposals":{"provider":"@fixture/absent","version":1}}}}`)
+			requireRefusedBeforeBootstrap(t, root, args)
 		})
 	}
 
@@ -102,6 +102,32 @@ func TestRemovedRootsAreRefusedBeforeTheWorkspaceBootstrap(t *testing.T) {
 			t.Fatalf("%s is unset after a job command: the refusal's evidence is vacuous", bootstrappedEnv)
 		}
 	})
+}
+
+// requireRefusedBeforeBootstrap runs args in the workspace at root and fails
+// unless the CLI refuses them before selection, planning and the implicit
+// install.
+func requireRefusedBeforeBootstrap(t *testing.T, root string, args []string) {
+	t.Helper()
+	t.Setenv(bootstrappedEnv, "")
+	t.Setenv(noAutoInstallEnv, "")
+	code, output := clitest.RunGateArgs(t, root, args...)
+	if code != 2 {
+		t.Fatalf("exit = %d, want 2:\n%s", code, output)
+	}
+	requireRefusal(t, removedPath(args), output)
+	if strings.Contains(output, "no project matched") || strings.Contains(output, "no job matched") {
+		t.Fatalf("the root reached selection or planning:\n%s", output)
+	}
+	if got := os.Getenv(bootstrappedEnv); got != "" {
+		t.Fatalf("%s = %q: the workspace bootstrap started", bootstrappedEnv, got)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".putnami", "install-state.json")); !os.IsNotExist(err) {
+		t.Fatalf("the implicit install recorded its state: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "app", "calls")); !os.IsNotExist(err) {
+		t.Fatalf("a task ran: %v", err)
+	}
 }
 
 // TestRemovedRootsAreRefusedOutsideAWorkspace holds the refusal, and the
@@ -130,6 +156,9 @@ func TestRemovedRootsAreRefusedOutsideAWorkspace(t *testing.T) {
 		{"tree", "verify", "--snapshot"},
 		{"tree", "verify", "--help"},
 		{"help", "tree", "verify"},
+		{"proposals", "finalize", "--draft"},
+		{"proposals", "finalize", "--help"},
+		{"help", "proposals", "finalize"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			code, output := clitest.RunGateArgs(t, t.TempDir(), args...)
@@ -142,14 +171,15 @@ func TestRemovedRootsAreRefusedOutsideAWorkspace(t *testing.T) {
 }
 
 // removedPath is the command path an invocation names: the root, which is the
-// first argument or the command `putnami help` is asked about, or `tree verify`,
-// the one subcommand of a served root that left the core.
+// first argument or the command `putnami help` is asked about, or `tree verify`
+// or `proposals finalize`, the subcommands that left a command word the core
+// still answers.
 func removedPath(args []string) string {
 	if args[0] == "help" {
 		args = args[1:]
 	}
-	if args[0] == "tree" {
-		return "tree verify"
+	if args[0] == "tree" || args[0] == "proposals" {
+		return args[0] + " " + args[1]
 	}
 	return args[0]
 }
@@ -171,7 +201,9 @@ func requireRefusal(t *testing.T, path, output string) {
 
 // TestAnExtensionThatDeclaresARemovedRootServesIt keeps dispatch unchanged for
 // a workspace whose extension declares the exact root: a job named ci runs as
-// a job, and a command group named channel runs its subcommand.
+// a job, and a command group named channel runs its subcommand. A removed
+// subcommand stays refused although the extension declares it: a command group
+// named proposals does not run finalize.
 func TestAnExtensionThatDeclaresARemovedRootServesIt(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "command-catalog", "a-root-that-left-the-core-is-refused-unless-an-extension-declares-it")
 	clitest.RequireShell(t)
@@ -188,8 +220,10 @@ func TestAnExtensionThatDeclaresARemovedRootServesIt(t *testing.T) {
 	run := []extensionproto.PipelineStep{{ID: "check", Task: "check"}}
 	manifest.Commands["ci"] = extensionproto.CommandDefinition{ActivationFiles: []string{"gate.project"}, Run: run}
 	manifest.Commands["channel-status"] = extensionproto.CommandDefinition{ActivationFiles: []string{"gate.project"}, Run: run}
+	manifest.Commands["proposals-finalize"] = extensionproto.CommandDefinition{ActivationFiles: []string{"gate.project"}, Run: run}
 	manifest.CommandGroups = map[string]extensionproto.CommandGroupDefinition{
-		"channel": {Subcommands: map[string]extensionproto.SubcommandDefinition{"status": {Command: "channel-status"}}},
+		"channel":   {Subcommands: map[string]extensionproto.SubcommandDefinition{"status": {Command: "channel-status"}}},
+		"proposals": {Subcommands: map[string]extensionproto.SubcommandDefinition{"finalize": {Command: "proposals-finalize"}}},
 	}
 	data, err = json.Marshal(manifest)
 	if err != nil {
@@ -219,5 +253,16 @@ func TestAnExtensionThatDeclaresARemovedRootServesIt(t *testing.T) {
 		if code != 0 || strings.Contains(output, "is no longer a core command") {
 			t.Fatalf("%s exit = %d, want 0 and no refusal, because the extension declares the root:\n%s", strings.Join(args, " "), code, output)
 		}
+	}
+
+	for _, args := range [][]string{{"proposals", "finalize", "--projects", "app", "--no-cache"}, {"help", "proposals", "finalize"}} {
+		code, output := clitest.RunGateArgs(t, root, args...)
+		if code != 2 {
+			t.Fatalf("%s exit = %d, want 2 although the extension declares it:\n%s", strings.Join(args, " "), code, output)
+		}
+		requireRefusal(t, "proposals finalize", output)
+	}
+	if calls, err := os.ReadFile(filepath.Join(root, "app", "calls")); err != nil || strings.Count(string(calls), "ran\n") != 2 {
+		t.Fatalf("calls = %q (%v): the refused proposals finalize ran a task", calls, err)
 	}
 }

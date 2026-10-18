@@ -25,7 +25,7 @@ repository integration. Build neither selects backlog work nor inherits
 external action authority from a removed entry. A named task claim requires
 explicit authorization.
 Publication and language/load helpers move to native commands:
-`proposals finalize`, `change language` and `doctor --machine`.
+`change finalize`, `change language` and `doctor --machine`.
 The direct `tree fingerprint` command remains the tree producer. Native
 finalization consumes an exact current dossier or explicit hosted check mode;
 it never runs or retries a local gate. The finalization, load and fingerprint
@@ -61,7 +61,7 @@ for same-path changes. Changing an index digest does not renew them. The
 whole-tree candidate binding remains stricter. Handoffs name available
 versioned inputs and explicitly identify local assets that cannot travel.
 
-Native `putnami proposals finalize` accepts `--partial-delivery` for an intermediate unit.
+Native `putnami change finalize` accepts `--partial-delivery` for an intermediate unit.
 It keeps a non-closing parent reference, rejects caller closing directives in
 title, the fully normalized proposal body and branch commits before a write,
 and skips the parent task transition. When a

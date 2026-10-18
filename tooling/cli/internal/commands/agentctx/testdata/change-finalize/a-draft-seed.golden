@@ -1,0 +1,62 @@
+exit 0
+-- stdout --
+PROPOSAL_REF={"source":"local:<store>","id":"P-1"}
+-- message --
+
+-- head --
+d040924fcec823734e2224f75f11bbe5c900eb79
+-- pushed --
+refs/heads/main c9e033e47051a43f9aced9969d99f9a6d74d39d8
+refs/heads/topic d040924fcec823734e2224f75f11bbe5c900eb79
+-- store --
+{
+  "version": 1,
+  "storeId": "<store>",
+  "next": {
+    "task": 1,
+    "proposal": 1,
+    "review": 0
+  },
+  "tasks": [
+    {
+      "ref": {
+        "source": "local:<store>",
+        "id": "T-1"
+      },
+      "key": "T-1",
+      "revision": "r1",
+      "title": "Read the second line",
+      "state": "open",
+      "createdAt": "<timestamp>",
+      "updatedAt": "<timestamp>"
+    }
+  ],
+  "proposals": [
+    {
+      "ref": {
+        "source": "local:<store>",
+        "id": "P-1"
+      },
+      "revision": "r1",
+      "change": {
+        "repository": "acme/app",
+        "base": "main",
+        "head": "topic",
+        "headCommit": "d040924fcec823734e2224f75f11bbe5c900eb79"
+      },
+      "title": "feat(lib): read the second line",
+      "body": "Read the second line of the fixture.",
+      "state": "draft",
+      "updatedAt": "<timestamp>"
+    }
+  ],
+  "reviews": null,
+  "keys": {
+    "48c44d00882e8f8669be55ca3c74d0740d33e73f93286553d84f81ccdbf0614c": {
+      "kind": "task",
+      "id": "T-1",
+      "digest": "fed8e8d37781ab28bfdfefbc59be9306125d157e665ba9ec1f43a7e123b810af"
+    }
+  }
+}
+

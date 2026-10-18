@@ -228,13 +228,13 @@ func (a *App) Run(ctx context.Context, args []string) int {
 
 	// A root that left the core is refused here, before help, the workspace
 	// bootstrap and planning, unless an extension declares it. So is a
-	// subcommand that left a root the core still serves.
+	// subcommand that left a command word the core still answers.
 	if len(parsed.Commands) > 0 {
 		if err := refuseRemovedCoreRoot(parsed.Commands[0], extensionGroups, extensions); err != nil {
 			printCommandError(os.Stderr, err)
 			return exitCodeForError(err)
 		}
-		if err := refuseRemovedCoreSubcommand(parsed.Commands[0], parsed.Subcommand); err != nil {
+		if err := refuseRemovedCoreSubcommand(parsed.Commands[0], typedSubcommand(parsed)); err != nil {
 			printCommandError(os.Stderr, err)
 			return exitCodeForError(err)
 		}

@@ -1,7 +1,7 @@
 // Package verify is `putnami change verify`: it checks the evidence the build
 // skill records against the worktree it runs in. It is a copy of the verifier
-// the core keeps for `putnami proposals finalize`, with the same verdicts and
-// output bytes as the goldens recorded from `putnami tree verify`. For a gate
+// of `putnami tree verify`, the core command it replaced, with the same
+// verdicts and output bytes as the goldens recorded from that command. For a gate
 // record it also asks the workspace CLI for a dry-run plan, and it reads a
 // restored verification report through the putnami host channel. It writes
 // nothing: no session record, no workspace state, no file.
@@ -118,7 +118,7 @@ func (v Verifier) WriteVerdict(args []string) error {
 }
 
 // The checks run in a fixed order, and each failure names a fixed reason:
-// `change finalize`, `proposals finalize` and the build skill read those
+// `change finalize` and the build skill read those
 // reasons. The evidence is read with JavaScript semantics (see
 // verify_json.go), the semantics its producers and the skill's earlier
 // JavaScript verifier share. A failed check, and a read that JavaScript

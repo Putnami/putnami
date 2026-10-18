@@ -1,8 +1,8 @@
 // Package finalize is `putnami change finalize`: it publishes a draft, or a
 // clean committed candidate with current proof, through the collaboration
-// contracts, and runs no local gate. It is a copy of the finalizer the core
-// keeps for `putnami proposals finalize`, with the same checks, order and
-// messages. It reaches the providers, the workspace graph and the task cache
+// contracts, and runs no local gate. It is a copy of the finalizer of
+// `putnami proposals finalize`, the core command it replaced, with the same
+// checks, order and messages. It reaches the providers, the workspace graph and the task cache
 // through the host RPC channel putnami opens for the launch.
 package finalize
 

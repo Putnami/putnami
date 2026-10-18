@@ -84,9 +84,9 @@ The `@putnami/contributor` extension supplies the `build`, `spec`, `design`,
 `content-bump` utility. Its `putnami change language` checks repository
 prose and task records; the core's `putnami doctor --machine` reports local check
 capacity. Its `putnami change verify --workflow FILE` checks a separately
-versioned local workflow record. A configured proposals provider also enables the local
-`putnami proposals finalize` command, which consumes current verification and
-does not rerun the gate.
+versioned local workflow record. With a configured proposals provider, its
+`putnami change finalize` publishes the branch: it consumes current
+verification and does not rerun the gate.
 
 ## Documentation
 

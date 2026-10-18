@@ -67,15 +67,8 @@ func commandGroupsFor(extensions []*extension.ExtensionDescription, wsRoot strin
 // subcommands.
 func printCommandGroupHelp(ctx context.Context, w io.Writer, wsRoot string, cfg *wsproto.Config, extensions []*extension.ExtensionDescription, group, sub, outputMode string) {
 	if isCollaborationCommand(wsRoot, group) {
-		if group == collab.ContractProposals && sub == "finalize" {
-			printFinalizeHelp(w)
-			return
-		}
 		providers, unavailable := collaborationProviders(ctx, wsRoot, cfg, extensions)
 		printCollaborationContractHelp(w, wsRoot, group, providers, unavailable)
-		if group == collab.ContractProposals {
-			printFinalizeHelp(w)
-		}
 		return
 	}
 	printExtensionGroupOrSubcommandHelp(extensions, group, sub, outputMode)
@@ -124,20 +117,10 @@ func (a *App) runCollaborationCommand(
 		iox.Fprintf(stderr, "  Rename the extension command, or remove options.collaboration from putnami.workspace.json.\n")
 		return ExitUsage
 	}
-	if contract == collab.ContractProposals && parsed.Subcommand == "finalize" && parsed.Global.Help {
-		printFinalizeHelp(stdout)
-		return ExitSuccess
-	}
 	if parsed.Subcommand == "" || parsed.Subcommand == "help" || parsed.Global.Help {
 		providers, unavailable := collaborationProviders(ctx, wsRoot, cfg, extensions)
 		printCollaborationContractHelp(stdout, wsRoot, contract, providers, unavailable)
-		if contract == collab.ContractProposals {
-			printFinalizeHelp(stdout)
-		}
 		return ExitSuccess
-	}
-	if contract == collab.ContractProposals && parsed.Subcommand == "finalize" {
-		return a.runFinalizeCommand(ctx, parsed, cfg, wsRoot, extensions, stdout, stderr)
 	}
 	if selection := collaborationSelectionFlags(parsed.Global); selection != "" {
 		iox.Fprintf(stderr, "putnami: %s %s takes no %s flag; pass projects, impacted and baseline inside --input\n",

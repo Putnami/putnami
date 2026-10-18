@@ -1,0 +1,42 @@
+exit 1
+-- stdout --
+-- message --
+native dossier verification: {"verdict":"not-verified","reason":"Cannot read properties of undefined (reading 'fingerprint')"}
+-- head --
+f39bad2964b1bba96d66bbc8d4b5f94b7bbc53c9
+-- pushed --
+refs/heads/main c9e033e47051a43f9aced9969d99f9a6d74d39d8
+-- store --
+{
+  "version": 1,
+  "storeId": "<store>",
+  "next": {
+    "task": 1,
+    "proposal": 0,
+    "review": 0
+  },
+  "tasks": [
+    {
+      "ref": {
+        "source": "local:<store>",
+        "id": "T-1"
+      },
+      "key": "T-1",
+      "revision": "r1",
+      "title": "Read the second line",
+      "state": "open",
+      "createdAt": "<timestamp>",
+      "updatedAt": "<timestamp>"
+    }
+  ],
+  "proposals": null,
+  "reviews": null,
+  "keys": {
+    "48c44d00882e8f8669be55ca3c74d0740d33e73f93286553d84f81ccdbf0614c": {
+      "kind": "task",
+      "id": "T-1",
+      "digest": "fed8e8d37781ab28bfdfefbc59be9306125d157e665ba9ec1f43a7e123b810af"
+    }
+  }
+}
+

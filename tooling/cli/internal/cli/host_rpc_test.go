@@ -526,7 +526,6 @@ func TestHostRPC_CollaborationCallRefusesWhatTheCommandPrintsNoEnvelopeFor(t *te
 		{"outside any workspace", hostRPCBinding{}, "tasks", "find", hostrpcproto.CodeUnavailable},
 		{"no collaboration binding", binding(unbound), "tasks", "find", hostrpcproto.CodeUnavailable},
 		{"a word that is not a contract", binding(bound), "foo", "find", hostrpcproto.CodeInvalidParams},
-		{"proposals finalize is a command", binding(bound), "proposals", "finalize", hostrpcproto.CodeInvalidParams},
 		{"a command group owns the contract word", binding(conflicting), "tasks", "find", hostrpcproto.CodeUnavailable},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -539,5 +538,32 @@ func TestHostRPC_CollaborationCallRefusesWhatTheCommandPrintsNoEnvelopeFor(t *te
 	}
 	if isCollaborationCommand(bound, "foo") {
 		t.Fatal("the CLI routes foo to the collaboration command, so collaboration.call must too")
+	}
+}
+
+// TestHostRPC_CollaborationCallRoutesProposalsFinalizeAsAnyOperation pins that
+// collaboration.call names no command: proposals finalize reaches the route
+// `putnami <contract> <operation>` takes, which answers that the contract
+// defines no such operation.
+func TestHostRPC_CollaborationCallRoutesProposalsFinalizeAsAnyOperation(t *testing.T) {
+	t.Parallel()
+	root := collabCommandWorkspace(t, `{"proposals":{"provider":"@test/cli-collab","version":1}}`, func(manifest *extproto.Manifest) {
+		spec, _ := collab.Lookup(collab.ContractProposals, 1)
+		for _, name := range spec.RequiredOperations() {
+			manifest.Tools["fixture.proposals."+name] = collabCommandTool(t, collab.ContractProposals, name)
+		}
+	})
+	binding := hostRPCBinding{root: root, config: wsproto.Load(root), extensions: collabCommandExtensions(t, root)}
+	answer, err := dialHostRPC(t, binding).CallCollaboration(t.Context(), collab.ContractProposals, "finalize", nil)
+	if err != nil {
+		t.Fatalf("collaboration.call proposals finalize = %v, want the route's envelope", err)
+	}
+	var envelope collab.Envelope
+	if err := json.Unmarshal(answer, &envelope); err != nil {
+		t.Fatalf("collaboration.call proposals finalize answered %s: %v", answer, err)
+	}
+	if envelope.Outcome != collab.OutcomeInvalid || envelope.Error == nil || envelope.Error.Reason != collab.ReasonRequestInvalid ||
+		!strings.Contains(envelope.Error.Message, `proposals version 1 has no operation "finalize"`) {
+		t.Fatalf("collaboration.call proposals finalize = %s, want the route's answer to an operation the contract does not define", answer)
 	}
 }

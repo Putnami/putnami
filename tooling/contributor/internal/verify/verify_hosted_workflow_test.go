@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func hostedWorkflowFixture(t *testing.T) (*verifyFixture, fxObj, HostedWorkflowRequest) {
@@ -44,6 +45,8 @@ func hostedPassingStatus(head string) *collab.ProposalStatusResult {
 }
 
 func TestHostedWorkflowPromotesOnlyWithNativeStatus(t *testing.T) {
+	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "delivery-receipts-and-parent-completeness")
+	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "hosted-workflow-readiness-bound-to-required-checks")
 	t.Parallel()
 	f, workflow, request := hostedWorkflowFixture(t)
 	wantDigest := request.SHA256
@@ -72,6 +75,8 @@ func TestHostedWorkflowPromotesOnlyWithNativeStatus(t *testing.T) {
 }
 
 func TestHostedWorkflowRejectsStaleAndAmbiguousStatus(t *testing.T) {
+	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "delivery-receipts-and-parent-completeness")
+	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "hosted-workflow-readiness-bound-to-required-checks")
 	t.Parallel()
 	f, _, request := hostedWorkflowFixture(t)
 	request.Status = hostedPassingStatus(request.HeadSHA)
@@ -116,6 +121,8 @@ func TestHostedWorkflowRejectsStaleAndAmbiguousStatus(t *testing.T) {
 }
 
 func TestHostedWorkflowDoesNotPromoteBlockedCurrentUnit(t *testing.T) {
+	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "delivery-receipts-and-parent-completeness")
+	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "hosted-workflow-readiness-bound-to-required-checks")
 	t.Parallel()
 	for _, tc := range []struct {
 		name, reason string
@@ -159,6 +166,8 @@ func TestHostedWorkflowDoesNotPromoteBlockedCurrentUnit(t *testing.T) {
 }
 
 func TestHostedWorkflowPreservesLaterOutcomeScope(t *testing.T) {
+	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "delivery-receipts-and-parent-completeness")
+	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "hosted-workflow-readiness-bound-to-required-checks")
 	t.Parallel()
 	f, workflow, request := hostedWorkflowFixture(t)
 	manifest := f.readJSON(".context/putnami.features.json")
@@ -231,6 +240,7 @@ func TestHostedWorkflowPreservesLaterOutcomeScope(t *testing.T) {
 }
 
 func TestHostedWorkflowReadyReceiptReplaysOriginalEvidence(t *testing.T) {
+	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "hosted-workflow-readiness-bound-to-required-checks")
 	t.Parallel()
 	f, workflow, request := hostedWorkflowFixture(t)
 	request.Status = hostedPassingStatus(request.HeadSHA)

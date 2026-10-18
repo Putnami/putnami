@@ -2,10 +2,8 @@
 //
 // It is deliberately workspace-free: `putnami tree fingerprint` is a pure git
 // operation, and the build skill runs it inside throwaway repositories that carry
-// no putnami.json. Verifier checks the evidence the build skill records against
-// that same identity, for `putnami proposals finalize`; for a gate record it
-// also asks the workspace CLI for a dry-run plan. Neither writes anything
-// itself — no session record, no workspace state, no file.
+// no putnami.json. It writes nothing itself — no session record, no workspace
+// state, no file.
 package treecmd
 
 import (
