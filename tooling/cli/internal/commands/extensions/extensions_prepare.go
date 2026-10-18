@@ -37,7 +37,7 @@ type preparedRuntimeEntry struct {
 // ExtensionsPrepare prepares, into the artifact store, the runtime of every
 // extension of wsRoot that the source build prepares
 // (extension.PreparedBySourceBuild), with its prepare toolchains resolved
-// strictly (jobs.PrepareSourceBuiltRuntimes). `./putnamiw --print-engine` runs
+// strictly (scheduler.PrepareSourceBuiltRuntimes). `./putnamiw --print-engine` runs
 // it with the engine it built, so a hosted run of the same tree loads these
 // runtimes from the store and prepares none itself. A workspace whose lock pins
 // a published CLI has no such extension, and the command prepares nothing. A

@@ -24,7 +24,7 @@ func (b *Broker) ReadCredential(ctx context.Context) (*registry.Credential, erro
 }
 
 // InstallJobRead makes the broker's read credential the one a hosted run hands
-// its fetch job (jobs.InstallJobReadCredential), and returns the function that
+// its fetch job (scheduler.InstallJobReadCredential), and returns the function that
 // restores the previous source. A broker that does not serve the read purpose
 // installs nothing: the job then receives absence.
 func (b *Broker) InstallJobRead() (restore func()) {

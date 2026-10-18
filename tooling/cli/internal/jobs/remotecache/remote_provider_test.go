@@ -417,7 +417,7 @@ func fakeProviderExtension(t *testing.T, env map[string]string) *extension.Exten
 }
 
 // fakeProviderLaunch stands in for the runner's provider launch
-// (jobs.PrepareProviderLaunch): it expands the provider command's templates,
+// (scheduler.PrepareProviderLaunch): it expands the provider command's templates,
 // working directory and environment the same way, and prepares no runtime.
 // The tests of the launch itself pass the runner's launch instead.
 func fakeProviderLaunch(_ context.Context, workspaceRoot string, ext *extension.ExtensionDescription, command string) (cacheprovider.LaunchSpec, error) {

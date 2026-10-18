@@ -196,11 +196,11 @@ func (e LifecycleEnv) out() io.Writer {
 // follow. It runs, each to completion:
 //
 //  1. the workspace-fetch of every extension installed from the artifact
-//     store, which receives the job credential (jobs.WithDependencyFetch);
+//     store, which receives the job credential (scheduler.WithDependencyFetch);
 //  2. BeforeRepositoryCode, which hands the run credential to the remote cache
 //     provider;
 //  3. the workspace-fetch of every path extension, which is repository code
-//     and receives nothing (jobs.WithPathExtensionFetch).
+//     and receives nothing (scheduler.WithPathExtensionFetch).
 //
 // A hosted run hands its credential to no process that starts after
 // repository code, so the path extensions' fetch runs last. It does nothing

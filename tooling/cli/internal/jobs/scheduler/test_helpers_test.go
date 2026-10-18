@@ -104,9 +104,9 @@ const burnCPUDuration = 60 * time.Millisecond
 // TestFixtureJobsCarryNoIncidentalWallClockBudget pins the two halves of
 // this rule together, the way TestCapabilityProbesKeepHostLoadOutOfTheSecurityVerdict
 // pins a related one: the sentinel really is unbounded on every path that applies a
-// budget, and no fixture job in this package carries a literal budget unless
-// its test is ABOUT that budget. The second half reads this package's own
-// test sources with go/ast (the idiom internal/cli's ratchets use), because a
+// budget, and no fixture job in this package or in internal/jobs carries a literal budget
+// unless its test is ABOUT that budget. The second half reads both
+// directories' test sources with go/ast (the idiom internal/cli's ratchets use), because a
 // budget is reintroduced one "TimeoutMs: 5000" at a time and nothing else
 // would notice until a loaded gate did.
 //
@@ -148,6 +148,11 @@ func TestFixtureJobsCarryNoIncidentalWallClockBudget(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Fatalf("glob package test files: %v (%d files)", err, len(files))
 	}
+	parentFiles, err := filepath.Glob(filepath.Join("..", "*_test.go"))
+	if err != nil || len(parentFiles) == 0 {
+		t.Fatalf("glob internal/jobs test files: %v (%d files)", err, len(parentFiles))
+	}
+	files = append(files, parentFiles...)
 	fset := token.NewFileSet()
 	seen := map[string]bool{}
 	for _, file := range files {
@@ -280,10 +285,6 @@ func runFixtureScript(encoded string, args []string) int {
 			fmt.Println(ops[1])
 		case "print-env": // print-env TEXT: print with TEXT expanded (expandFixture).
 			fmt.Println(expandFixture(ops[1], args))
-		case "print-if": // print-if TEXT CONDITION...: print-env when every condition holds.
-			if fixtureConditionsHold(ops[2:], args) {
-				fmt.Println(expandFixture(ops[1], args))
-			}
 		case "cat": // cat PATH: copies a file to stdout.
 			data, err := os.ReadFile(ops[1])
 			if err != nil {
@@ -352,22 +353,6 @@ func runFixtureScript(encoded string, args []string) int {
 			if err := os.WriteFile(ops[2], []byte(os.Getenv(ops[1])), 0o644); err != nil {
 				return fail(step, err)
 			}
-		case "copy-tree": // copy-tree SOURCE TARGET: copies the tree SOURCE into TARGET, both expanded (expandFixture).
-			if err := copyFixtureTree(expandFixture(ops[1], args), expandFixture(ops[2], args)); err != nil {
-				return fail(step, err)
-			}
-		case "write-environ": // write-environ PATH: writes the environment, one variable a line.
-			if err := os.WriteFile(ops[1], []byte(strings.Join(os.Environ(), "\n")), 0o644); err != nil {
-				return fail(step, err)
-			}
-		case "write-mode": // write-mode NAME PATH: writes the permission bits of the path the variable names.
-			info, err := os.Stat(os.Getenv(ops[1]))
-			if err == nil {
-				err = os.WriteFile(ops[2], []byte(fmt.Sprintf("%#o", info.Mode().Perm())), 0o644)
-			}
-			if err != nil {
-				return fail(step, err)
-			}
 		case "write-pid": // write-pid PATH
 			if err := os.WriteFile(ops[1], []byte(strconv.Itoa(os.Getpid())), 0o644); err != nil {
 				return fail(step, err)
@@ -433,11 +418,6 @@ func runFixtureScript(encoded string, args []string) int {
 				status, _ := strconv.Atoi(ops[1])
 				return status
 			}
-		case "exit-if": // exit-if STATUS CONDITION...: exits with STATUS when every condition holds.
-			if fixtureConditionsHold(ops[2:], args) {
-				status, _ := strconv.Atoi(ops[1])
-				return status
-			}
 		case "fail-once": // fail-once MARKER TEXT STATUS: without MARKER, creates it, prints TEXT and exits with STATUS.
 			if _, err := os.Stat(ops[1]); err == nil {
 				continue
@@ -462,32 +442,6 @@ func runFixtureScript(encoded string, args []string) int {
 		}
 	}
 	return 0
-}
-
-// copyFixtureTree copies the directories and regular files under source into
-// target, which may exist.
-func copyFixtureTree(source, target string) error {
-	if source == "" || target == "" {
-		return errors.New("copy-tree needs a source and a target")
-	}
-	return filepath.WalkDir(source, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(source, path)
-		if err != nil {
-			return err
-		}
-		destination := filepath.Join(target, rel)
-		if entry.IsDir() {
-			return os.MkdirAll(destination, 0o700)
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(destination, data, 0o600)
-	})
 }
 
 // expandFixture expands text as a shell does: $NAME and ${NAME} from the
@@ -519,8 +473,7 @@ func expandFixture(text string, args []string) string {
 // started with args: "unset:NAME" (NAME is absent from the environment),
 // "equal:NAME=VALUE" (NAME's value, empty when absent, is VALUE),
 // "same:NAME=OTHER" (the two variables' values are equal, each empty when
-// absent), "nonempty:PATH" (PATH is a file with content) or "arg:N=VALUE"
-// (argument N is VALUE). A leading "!" negates a condition.
+// absent) or "arg:N=VALUE" (argument N is VALUE). A leading "!" negates a condition.
 func fixtureConditionsHold(conditions []string, args []string) bool {
 	for _, condition := range conditions {
 		negated := strings.HasPrefix(condition, "!")
@@ -535,9 +488,6 @@ func fixtureConditionsHold(conditions []string, args []string) bool {
 			holds = os.Getenv(name) == value
 		case "same":
 			holds = os.Getenv(name) == os.Getenv(value)
-		case "nonempty":
-			info, err := os.Stat(operand)
-			holds = err == nil && info.Size() > 0
 		case "arg":
 			index, _ := strconv.Atoi(name)
 			holds = index >= 1 && index <= len(args) && args[index-1] == value

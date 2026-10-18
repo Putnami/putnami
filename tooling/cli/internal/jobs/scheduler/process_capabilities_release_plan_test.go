@@ -140,7 +140,7 @@ func TestReleasePlanCallbackAuthorizesOnlyAWellFormedCapability(t *testing.T) {
 	if got := request.Header.Get("Authorization"); got != "Bearer opaque-local-client-token-keep-private" {
 		t.Fatalf("Authorization = %q", got)
 	}
-	for _, rendered := range []string{fmt.Sprint(callback), fmt.Sprintf("%+v", callback), fmt.Sprintf("%#v", *callback)} {
+	for _, rendered := range []string{fmt.Sprint(callback), fmt.Sprintf("%+v", callback), fmt.Sprintf("%#v", *callback), fmt.Sprintf("<%s>", *callback), fmt.Sprintf("%q", *callback)} {
 		if strings.Contains(rendered, "opaque-local") {
 			t.Fatalf("the callback rendered its bearer: %s", rendered)
 		}

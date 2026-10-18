@@ -24,7 +24,7 @@ func BuildVersionInfo(ws *workspace.Workspace) (cachekey.RunVersions, error) {
 		return nil, err
 	}
 	// A line git cannot read degrades rather than failing the command: an
-	// extension command is not a release (jobs.BuildRunVersions).
+	// extension command is not a release (scheduler.BuildRunVersions).
 	versions, _ := scheduler.BuildRunVersions(ws, snapshot)
 	return versions, nil
 }

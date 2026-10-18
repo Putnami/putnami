@@ -173,7 +173,7 @@ type wireFixtureEvent struct {
 }
 
 // wireFixtureSessionEvent is one recorded session event. Its Data mirrors
-// jobs.Scheduler.emitSessionJobEnd key-for-key; that method is unexported in
+// scheduler.Scheduler.emitSessionJobEnd key-for-key; that method is unexported in
 // internal/jobs, so this corpus pins the session WRITER, not the producer.
 type wireFixtureSessionEvent struct {
 	Time string          `json:"time"`
@@ -335,7 +335,7 @@ func decodeFixtureEvents(t *testing.T, task wireFixtureTask) []scheduler.RawJobE
 	return decoded
 }
 
-// drive replays the run through a renderer in the same order jobs.Scheduler
+// drive replays the run through a renderer in the same order scheduler.Scheduler
 // does: Start once, then per task JobStart → JobEvent* → JobComplete, then one
 // Finish with the whole result map and the session outcome.
 func (r *wireRun) drive(renderer scheduler.Renderer) {

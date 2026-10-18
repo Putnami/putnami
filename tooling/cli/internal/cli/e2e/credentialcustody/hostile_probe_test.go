@@ -23,7 +23,7 @@ import (
 )
 
 // workspaceRootEnv is the variable the CLI sets to the workspace root for every
-// job (jobs.BuildEnvVars) and every workspace hook (cli_hooks): the root a
+// job (scheduler.BuildEnvVars) and every workspace hook (cli_hooks): the root a
 // probe walks. The CLI owns the literal; there is no exported constant.
 const workspaceRootEnv = "PUTNAMI_WORKSPACE_ROOT"
 

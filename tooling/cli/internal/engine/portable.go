@@ -128,7 +128,7 @@ type selectionEvidence struct {
 // registry or cloud effects, is held to both version 1 checks over the plan
 // without the nodes a publication-v1 provider adds: the protocol's, which
 // classifies by command name and which a version 1 request passes when it is
-// parsed, and the executing engine's (jobs.ValidatePortablePublication). It
+// parsed, and the executing engine's (scheduler.ValidatePortablePublication). It
 // needs invocation.publication, and every publication task waits for every
 // task of the barrier commands. A plan with no publication task passes, the
 // block or not: the caller authorized publication before any plan existed,

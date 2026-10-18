@@ -304,7 +304,7 @@ type coordinatorWaitResult struct {
 // newScheduler creates a DAG scheduler for the given execution plan.
 //
 // It is UNEXPORTED on purpose. ADR 0001 §3 says no adapter
-// constructs or configures a jobs.Scheduler: construction, remote-cache wiring
+// constructs or configures a scheduler.Scheduler: construction, remote-cache wiring
 // and session-event wiring are one indivisible step that only RunPlan performs,
 // so a caller cannot assemble a run that is missing one of them. Every direct
 // construction left in the tree is in this package's own tests, which is where

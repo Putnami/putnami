@@ -17,7 +17,7 @@ type ReleasePlanCallback struct {
 
 // String keeps an accidental diagnostic from rendering the callback or its
 // capability.
-func (*ReleasePlanCallback) String() string { return "<redacted release plan callback>" }
+func (ReleasePlanCallback) String() string { return "<redacted release plan callback>" }
 
 // ReleasePlanCallbackFrom is the release plan callback ctx carries, nil when
 // the process captured none.

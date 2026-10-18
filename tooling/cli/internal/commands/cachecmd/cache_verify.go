@@ -20,7 +20,7 @@ import (
 )
 
 // CacheVerifyEngineResult is the engine-owned evidence returned through the
-// CLI adapter. commands never constructs a scheduler or calls jobs.RunPlan.
+// CLI adapter. commands never constructs a scheduler or calls scheduler.RunPlan.
 type CacheVerifyEngineResult struct {
 	ExitCode int
 	Plan     []*jobs.ScheduledJob

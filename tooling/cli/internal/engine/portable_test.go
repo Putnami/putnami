@@ -251,7 +251,7 @@ func declareTaskEffect(job *scheduler.ScheduledJob, effect string) {
 }
 
 // TestValidatePortablePublicationClassifiesByDeclaredEffects pins the
-// executing side's publication check (jobs.ValidatePortablePublication, which
+// executing side's publication check (scheduler.ValidatePortablePublication, which
 // the portable seam runs after validateExpectedPlan): it classifies a task by its traits and
 // manifest effects, not by its command name, and admits it only under a
 // publication block whose barrier tasks it waits for.

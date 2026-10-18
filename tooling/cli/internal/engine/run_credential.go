@@ -36,7 +36,7 @@ func remoteCacheOptions() []remotecache.RemoteCacheOption {
 }
 
 // launchCacheProvider starts the cache provider the way the CLI starts every
-// provider it owns (jobs.PrepareProviderLaunch). The engine hands it to the
+// provider it owns (scheduler.PrepareProviderLaunch). The engine hands it to the
 // remote cache loader, so the remote cache client never imports the runner.
 func launchCacheProvider(ctx context.Context, workspaceRoot string, ext *extension.ExtensionDescription, command string) (cacheprovider.LaunchSpec, error) {
 	launch, err := scheduler.PrepareProviderLaunch(ctx, workspaceRoot, ext, command)

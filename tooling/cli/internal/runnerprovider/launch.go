@@ -16,7 +16,7 @@ import (
 // same rule the cache provider follows: no product name, no version floor.
 //
 // The provider command gets the runtime preparation a task gets (see
-// jobs.PrepareProviderLaunch). A runtime that cannot be prepared is an error,
+// scheduler.PrepareProviderLaunch). A runtime that cannot be prepared is an error,
 // so a remote run stops before it submits anything.
 func LaunchSpecFor(ctx context.Context, wsRoot string, extensions []*extension.ExtensionDescription, provider *extension.ResolvedProvider) (LaunchSpec, error) {
 	if provider == nil {

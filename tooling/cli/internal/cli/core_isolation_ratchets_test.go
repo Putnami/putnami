@@ -412,7 +412,7 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // extension declaring the reserved command, supervises that process over its
 // RPC, and caches one answer per purpose until its refresh instant. It cannot
 // live in internal/extension, which its first consumer (registry downloads)
-// sits in: it launches the provider through jobs.PrepareProviderLaunch, and
+// sits in: it launches the provider through scheduler.PrepareProviderLaunch, and
 // internal/jobs imports internal/extension. It cannot live in internal/jobs
 // either, whose providers run a task graph; this one only answers bearers. It
 // adds no vertical and no engine stage.

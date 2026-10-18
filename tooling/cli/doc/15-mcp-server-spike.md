@@ -71,7 +71,7 @@ below):
 | `why_impacted` | Shortest path explaining why A impacts B, over the same dependency, contract and extension-consumer edges `impacted` widens through, each hop with its kind and the target's task scope | `workspace.ImpactPath` |
 | `topo_sort` | All projects in dependency-first topological order | `DependencyGraph.TopologicalOrder` |
 | `impacted` | Projects affected by git changes vs a baseline, with a reason per project (the changed file that claimed it, or the edge that reached it) | `workspace.ImpactedSelectionForBaseline` |
-| `run_jobs` | Run build/test/lint; return **summary + failures-with-diagnostics only**; `dryRun` returns the planned DAG without executing | `jobs.Plan` + `jobs.Scheduler` |
+| `run_jobs` | Run build/test/lint; return **summary + failures-with-diagnostics only**; `dryRun` returns the planned DAG without executing | `jobs.Plan` + `scheduler.Scheduler` |
 | `get_diagnostics` | Re-read the last run's diagnostics without re-running | cached run result |
 
 Every tool advertises read-only/mutating metadata through MCP annotations and

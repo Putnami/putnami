@@ -49,7 +49,7 @@ func repositoryRoot(t *testing.T) string {
 }
 
 // TestTheHostPreparesTheContributorRuntimeWithTheLockedGo runs the real
-// bin/prepare of @putnami/contributor through jobs.SynchronizeExtensionRuntimes.
+// bin/prepare of @putnami/contributor through scheduler.SynchronizeExtensionRuntimes.
 // The host resolves the prepare toolchain from putnami.lock.json against this
 // process's environment, where the Go extension's test task sets GOROOT to the
 // pinned Go release. It runs bin/prepare in an isolated source view, stores

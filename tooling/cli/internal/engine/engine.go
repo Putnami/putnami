@@ -261,7 +261,7 @@ type Request struct {
 	// long-running is left in the run.
 	//
 	// The composition adapter (internal/compose) is the only caller. It executes
-	// the withheld steps with jobs.RunJobWithProcessEnv, which keeps the
+	// the withheld steps with scheduler.RunJobWithProcessEnv, which keeps the
 	// injected environment out of every cache key: the steps that DO run here
 	// never see it.
 	WithholdServeSteps bool
@@ -400,7 +400,7 @@ type Request struct {
 	// and evidence recovery. Each run, including a watch iteration, owns it.
 	versions cachekey.RunVersions
 	// versionsErr is why versions could not read a line from git, or nil. The
-	// run proceeds either way (jobs.BuildRunVersions); --debug prints it, so a
+	// run proceeds either way (scheduler.BuildRunVersions); --debug prints it, so a
 	// 0.0.0 stamp can be told apart from a line that is really untagged.
 	versionsErr error
 	// ancestry is the bound commit's ancestry, read before the first hook by a

@@ -341,7 +341,7 @@ var complexityCeilings = []complexityCeiling{
 			"to 19/112: session_baseline.go — the seventh raise's stage — is deleted. " +
 			"Its only consumer, the clientgen guard's render comparison, no longer exists: the " +
 			"question it captured evidence for is answered by the scheduler on each generator " +
-			"task's declared output (jobs/task_drift.go, protocols/extension ADR 0004), at the " +
+			"task's declared output (jobs/scheduler/task_drift.go, protocols/extension ADR 0004), at the " +
 			"one moment the pre-write bytes are still there. ADR 0034 records the decision. " +
 			"RAISED A TWELFTH TIME, from 19/112 to 20/124 (ADR 0032): portable.go is the " +
 			"portable-execution SEAM, and it is named here because it is one. Between the " +

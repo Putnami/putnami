@@ -34,7 +34,7 @@ import (
 //
 //	manifest (contract 3, loaded by the real loader)
 //	  → extension.Resolve / ExpandPipeline
-//	  → jobs.RunJob (advertises PUTNAMI_RUNTIME_EVENTS, spawns, parses)
+//	  → scheduler.RunJob (advertises PUTNAMI_RUNTIME_EVENTS, spawns, parses)
 //	  → WatchRenderer.JobEvent
 //	  → serveReadySignal → the serve loop arms → restart → arms again
 //
