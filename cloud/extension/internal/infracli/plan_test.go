@@ -136,8 +136,10 @@ func newWorkspace(t *testing.T) workspace {
 }
 
 // plan runs the command and returns what it printed: one Stdout call is one
-// line, as it is under the extension runtime.
+// line, as it is under the extension runtime. The runtime names the command in
+// the result envelope through the command param.
 func plan(params map[string]any, args []string, projects []job.ProjectRef) (string, error) {
+	params = clicore.MergeParams(params, map[string]any{"command": "cloud infra"})
 	var out strings.Builder
 	err := Plan(params, args, projects, clicore.IO{
 		Stdout: func(line string) { out.WriteString(line + "\n") },

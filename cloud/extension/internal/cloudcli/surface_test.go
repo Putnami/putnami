@@ -298,10 +298,10 @@ func TestInfraPlanIsDeclaredAndRouted(t *testing.T) {
 			} `json:"run"`
 		} `json:"commands"`
 		Tasks map[string]struct {
-			Kind    string   `json:"kind"`
-			Command string   `json:"command"`
-			Args    []string `json:"args"`
-			Cache   *bool    `json:"cache"`
+			Kind    string          `json:"kind"`
+			Command string          `json:"command"`
+			Args    []string        `json:"args"`
+			Cache   json.RawMessage `json:"cache"`
 		} `json:"tasks"`
 	}
 	if err := json.Unmarshal(data, &manifest); err != nil {
@@ -327,8 +327,8 @@ func TestInfraPlanIsDeclaredAndRouted(t *testing.T) {
 	if !ok || task.Kind != "command" || task.Command != "{extensionRuntime}" || !slices.Equal(task.Args, []string{"infra"}) {
 		t.Fatalf("cloud-infra task = %+v (declared %t), want a runtime command with the infra verb", task, ok)
 	}
-	if task.Cache == nil || *task.Cache {
-		t.Fatalf("cloud-infra task cache = %v, want false: the plan reads files no cache key covers", task.Cache)
+	if string(task.Cache) != "false" {
+		t.Fatalf("cloud-infra task cache = %s, want false: the plan reads files no cache key covers", task.Cache)
 	}
 	if !slices.Contains(wantPublicRoot, "infra") {
 		t.Fatal("infra is not in the public root")
