@@ -17,9 +17,9 @@ import (
 // moment, until its child calls exec; while that copy of the write descriptor
 // lives, starting the script fails with "text file busy".
 // Go takes syscall.ForkLock for writing around each fork, so holding it for
-// reading from open to close keeps the descriptor out of every child. The jobs
-// package's TestExecutableFixturesAreWrittenUnderTheForkLock scans this
-// package's tests too.
+// reading from open to close keeps the descriptor out of every child. The
+// publication package's TestExecutableFixturesAreWrittenUnderTheForkLock scans
+// this package's tests too.
 func writeExecutable(t *testing.T, path, contents string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

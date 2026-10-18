@@ -310,7 +310,7 @@ and ADR [0034](adr/0034-a-declared-output-polices-its-own-drift.md).
 
 ## Scheduling
 
-The scheduler (`internal/jobs/scheduler/scheduler.go`) executes the planned DAG using a goroutine worker pool. The release-set, publication and deploy jobs come from `internal/jobs`, which adds them to the plan with the in-process runners of its internal jobs; the scheduler runs the plan and never imports that package.
+The scheduler (`internal/jobs/scheduler/scheduler.go`) executes the planned DAG using a goroutine worker pool. The release-set, publication and deploy jobs come from `internal/jobs/publication`, which adds them to the plan with the in-process runners of its internal jobs; the scheduler runs the plan and never imports that package.
 
 ### DAG State Machine
 

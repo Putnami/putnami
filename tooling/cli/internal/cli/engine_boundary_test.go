@@ -74,10 +74,10 @@ const plannerImportPath = "go.putnami.dev/tooling/cli/internal/jobs/planner"
 // scheduler reaches the client only through the cachekey.RemoteCache interface.
 const schedulerTestDir = "internal/jobs/scheduler"
 
-// releaseSetTestDir holds the release-set and publication tests. They stayed in
-// internal/jobs when the scheduler left it, and some of them plan or run a
-// fixture the way the scheduler's own tests do.
-const releaseSetTestDir = "internal/jobs"
+// releaseSetTestDir holds the release-set and publication tests. They moved
+// with their package from internal/jobs to internal/jobs/publication, and some
+// of them plan or run a fixture the way the scheduler's own tests do.
+const releaseSetTestDir = "internal/jobs/publication"
 
 // plannerPlanTestException is one scheduler or release-set test that plans a
 // fixture with planner.Plan so the scheduler can run the plan. It is a named
@@ -110,7 +110,7 @@ var plannerPlanTestExceptions = []plannerPlanTestException{
 	{
 		dir:  releaseSetTestDir,
 		file: "release_set_deployment_test.go",
-		why:  "plans a package step, then reads release-set fixtures and helpers that live in the jobs package",
+		why:  "plans a package step, then reads release-set fixtures and helpers that live in the publication package",
 	},
 	{
 		dir:  schedulerTestDir,
@@ -141,11 +141,11 @@ var schedulerRunSymbols = map[string]bool{"RunPlan": true, "RunRequest": true, "
 // scheduler.RunPlan fails, so the entry is deleted.
 var schedulerRunTestExceptions = []schedulerRunTestException{
 	{
-		file: "internal/jobs/publication_test.go",
+		file: "internal/jobs/publication/publication_test.go",
 		why:  "runs a publication plan through the scheduler, so the engine-side uploads and the outbox seam run as they do in a release",
 	},
 	{
-		file: "internal/jobs/release_set_e2e_test.go",
+		file: "internal/jobs/publication/release_set_e2e_test.go",
 		why:  "runs a release-set plan end to end through the scheduler: the barrier, the publish jobs, the finalizer and a deploy",
 	},
 }
@@ -272,19 +272,21 @@ func TestEngineBoundary_OnlySchedulerTestsNameTheRemoteCacheClientOrPlan(t *test
 	}{
 		{jobSymbolReference{file: "internal/jobs/scheduler/remote_task_test.go", pkg: remoteCacheImportPath, symbol: "LoadRemoteCache"}, true},
 		{jobSymbolReference{file: "internal/jobs/scheduler/scheduler.go", pkg: remoteCacheImportPath, symbol: "RemoteCache"}, false},
-		{jobSymbolReference{file: "internal/jobs/release_set_test.go", pkg: remoteCacheImportPath, symbol: "RemoteCache"}, false},
+		{jobSymbolReference{file: "internal/jobs/publication/release_set_test.go", pkg: remoteCacheImportPath, symbol: "RemoteCache"}, false},
 		{jobSymbolReference{file: "internal/jobs/toolchain/toolchain_test.go", pkg: remoteCacheImportPath, symbol: "RemoteCache"}, false},
 		{jobSymbolReference{file: "internal/commands/sessions/sessions_run_test.go", pkg: remoteCacheImportPath, symbol: "LoadRemoteCache"}, false},
 		{jobSymbolReference{file: "internal/jobs/scheduler/run_plan_test.go", pkg: schedulerImportPath, symbol: "RunPlan"}, false},
-		{jobSymbolReference{file: "internal/jobs/release_set_e2e_test.go", pkg: schedulerImportPath, symbol: "RunPlan"}, true},
-		{jobSymbolReference{file: "internal/jobs/publication_test.go", pkg: schedulerImportPath, symbol: "SchedulerConfig"}, true},
-		{jobSymbolReference{file: "internal/jobs/release_set_e2e_test.go", pkg: schedulerImportPath, symbol: "Scheduler"}, false},
-		{jobSymbolReference{file: "internal/jobs/unlisted_test.go", pkg: schedulerImportPath, symbol: "RunPlan"}, false},
-		{jobSymbolReference{file: "internal/jobs/release_set.go", pkg: schedulerImportPath, symbol: "RunPlan"}, false},
+		{jobSymbolReference{file: "internal/jobs/publication/release_set_e2e_test.go", pkg: schedulerImportPath, symbol: "RunPlan"}, true},
+		{jobSymbolReference{file: "internal/jobs/publication/publication_test.go", pkg: schedulerImportPath, symbol: "SchedulerConfig"}, true},
+		{jobSymbolReference{file: "internal/jobs/publication/release_set_e2e_test.go", pkg: schedulerImportPath, symbol: "Scheduler"}, false},
+		{jobSymbolReference{file: "internal/jobs/publication/unlisted_test.go", pkg: schedulerImportPath, symbol: "RunPlan"}, false},
+		{jobSymbolReference{file: "internal/jobs/publication/release_set.go", pkg: schedulerImportPath, symbol: "RunPlan"}, false},
+		{jobSymbolReference{file: "internal/jobs/release_set_e2e_test.go", pkg: schedulerImportPath, symbol: "RunPlan"}, false},
 		{jobSymbolReference{file: "internal/jobs/scheduler/integration_test.go", pkg: plannerImportPath, symbol: "Plan"}, true},
-		{jobSymbolReference{file: "internal/jobs/release_set_deployment_test.go", pkg: plannerImportPath, symbol: "Plan"}, true},
+		{jobSymbolReference{file: "internal/jobs/publication/release_set_deployment_test.go", pkg: plannerImportPath, symbol: "Plan"}, true},
+		{jobSymbolReference{file: "internal/jobs/release_set_deployment_test.go", pkg: plannerImportPath, symbol: "Plan"}, false},
 		{jobSymbolReference{file: "internal/jobs/scheduler/unlisted_test.go", pkg: plannerImportPath, symbol: "Plan"}, false},
-		{jobSymbolReference{file: "internal/jobs/integration_test.go", pkg: plannerImportPath, symbol: "Plan"}, false},
+		{jobSymbolReference{file: "internal/jobs/publication/integration_test.go", pkg: plannerImportPath, symbol: "Plan"}, false},
 		{jobSymbolReference{file: "internal/jobs/scheduler/scheduler.go", pkg: plannerImportPath, symbol: "Plan"}, false},
 		{jobSymbolReference{file: "internal/commands/lifecycle/deps_test.go", pkg: plannerImportPath, symbol: "Plan"}, false},
 	} {

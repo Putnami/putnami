@@ -55,9 +55,9 @@ import (
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/hooks"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
+	"go.putnami.dev/tooling/cli/internal/jobs/publication"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
@@ -765,7 +765,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// channel's CAS expectation, the first one is the plan's baseline, and an
 	// empty channel is a null head. Every later stage retains that immutable
 	// answer and never resolves a channel again.
-	preparation, err := jobs.PrepareReleaseSetRun(
+	preparation, err := publication.PrepareReleaseSetRun(
 		ctx, releaseSetOptions, ws, selectedProjects, verification, planningExtensions, discovered,
 		planned, req.CommandParams, cacheManager, req.selection, slices.Contains(req.Commands, "deploy"),
 	)
@@ -808,8 +808,8 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// of the set each of them owns. A session that also publishes leaves the
 	// set to the barrier below, which completes every contract from the
 	// snapshot it has just released.
-	releaseSetRun, err = jobs.PrepareDependentRun(ctx, releaseSetRun, preparation.Options,
-		jobs.BuildDeployOptions(req.Commands, req.WorkspaceRoot, req.CommandParams), ws, planned, discovered)
+	releaseSetRun, err = publication.PrepareDependentRun(ctx, releaseSetRun, preparation.Options,
+		publication.BuildDeployOptions(req.Commands, req.WorkspaceRoot, req.CommandParams), ws, planned, discovered)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
 		return SessionResult{ExitCode: protocolcli.ExitCodeForError(err), Plan: planned, Projects: selectedProjects}, nil
@@ -892,7 +892,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	}
 
 	// Arm publication only after final plan authorization and production checks.
-	if err := jobs.HandoffReleaseSetPlan(ctx, releaseSetRun, planned, !req.previewsOnly()); err != nil {
+	if err := publication.HandoffReleaseSetPlan(ctx, releaseSetRun, planned, !req.previewsOnly()); err != nil {
 		iox.Fprintf(os.Stderr, "putnami: release plan capability handoff: %v\n", err)
 		return SessionResult{ExitCode: ExitError, Plan: planned, Projects: selectedProjects}, nil
 	}
@@ -951,7 +951,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 // and returns the context that carries the private outboxes of a
 // publication-v1 run's publication jobs, and the function that removes them
 // when the run ends.
-func releaseSetExecution(ctx context.Context, req *Request, run *jobs.ReleaseSetRun, finalizers []func(map[string]*scheduler.JobResult)) (context.Context, []func(map[string]*scheduler.JobResult), func(), error) {
+func releaseSetExecution(ctx context.Context, req *Request, run *publication.ReleaseSetRun, finalizers []func(map[string]*scheduler.JobResult)) (context.Context, []func(map[string]*scheduler.JobResult), func(), error) {
 	finalizers = append(finalizers, publishFinalizers(ctx, req, run)...)
 	ctx, closeOutboxes, err := run.PublicationContext(ctx)
 	return ctx, finalizers, closeOutboxes, err
@@ -961,12 +961,12 @@ func releaseSetExecution(ctx context.Context, req *Request, run *jobs.ReleaseSet
 // plan with the in-process runners of those nodes. A run that publishes
 // through a publication-v1 provider first binds what open sends: its plan
 // tuple and the ancestry snapshot the run read before any repository code ran.
-func attachReleaseSet(req *Request, run *jobs.ReleaseSetRun, planned []*scheduler.ScheduledJob) ([]*scheduler.ScheduledJob, map[string]scheduler.InternalJobRunner, error) {
+func attachReleaseSet(req *Request, run *publication.ReleaseSetRun, planned []*scheduler.ScheduledJob) ([]*scheduler.ScheduledJob, map[string]scheduler.InternalJobRunner, error) {
 	planned, err := run.AttachPlan(planned)
 	if err != nil {
 		return planned, nil, err
 	}
-	var ancestry jobs.AncestryReader
+	var ancestry publication.AncestryReader
 	if req.ancestry != nil {
 		ancestry = req.ancestry
 	}
@@ -992,9 +992,9 @@ func attachReleaseSet(req *Request, run *jobs.ReleaseSetRun, planned []*schedule
 // session gate or of the probe report, and publishes no successful outcome
 // after one. A run whose deploy barrier releases the set has no release
 // finalizer.
-func publishFinalizers(ctx context.Context, req *Request, releaseSetRun *jobs.ReleaseSetRun) []func(map[string]*scheduler.JobResult) {
+func publishFinalizers(ctx context.Context, req *Request, releaseSetRun *publication.ReleaseSetRun) []func(map[string]*scheduler.JobResult) {
 	dryRun, _ := req.CommandParams["dry-run"].(bool)
-	finalizers := []func(map[string]*scheduler.JobResult){jobs.MemberProbeReport{
+	finalizers := []func(map[string]*scheduler.JobResult){publication.MemberProbeReport{
 		Run: releaseSetRun, Commands: req.Commands, DryRun: dryRun, Quiet: req.Global.Quiet, Out: os.Stderr,
 	}.Finalizer()}
 	if release := releaseSetRun.Finalizer(ctx); release != nil {
@@ -1007,7 +1007,7 @@ func publishFinalizers(ctx context.Context, req *Request, releaseSetRun *jobs.Re
 // invoked with and resolves the release-set mode from them. The parameters are
 // only ever read here, so nothing downstream re-derives a channel or a
 // visibility from the raw map.
-func buildReleaseSetOptions(req *Request, ws *workspace.Workspace) (jobs.ReleaseSetOptions, error) {
+func buildReleaseSetOptions(req *Request, ws *workspace.Workspace) (publication.ReleaseSetOptions, error) {
 	channel, _ := req.CommandParams["channel"].(string)
 	baselineChannel, _ := req.CommandParams["baseline-channel"].(string)
 	reuseChannel, _ := req.CommandParams["reuse-channel"].(string)
@@ -1015,7 +1015,7 @@ func buildReleaseSetOptions(req *Request, ws *workspace.Workspace) (jobs.Release
 	visibility, _ := req.CommandParams["visibility"].(string)
 	scope, _ := req.CommandParams["scope"].(string)
 	dryRun, _ := req.CommandParams["dry-run"].(bool)
-	return jobs.BuildReleaseSetOptions(jobs.ReleaseSetRequest{
+	return publication.BuildReleaseSetOptions(publication.ReleaseSetRequest{
 		Commands: req.Commands, WorkspaceRoot: req.WorkspaceRoot,
 		Channel: channel, BaselineChannel: baselineChannel,
 		ReuseChannel: reuseChannel, ReuseSourceRevision: reuseSourceRevision,
@@ -1034,7 +1034,7 @@ func keyingPlan(
 	selectedProjects []*workspace.Project,
 	planningExtensions []*extension.ExtensionDescription,
 	discovered *extension.DiscoveryResult,
-	options jobs.ReleaseSetOptions,
+	options publication.ReleaseSetOptions,
 ) ([]*scheduler.ScheduledJob, int) {
 	planned, code := buildPlan(req, ws, selectedProjects, planningExtensions, discovered)
 	if code == ExitSuccess && refusesUnauthorizedPublication(req, options, planned) {
@@ -1049,7 +1049,7 @@ func keyingPlan(
 // release-set publication the request enables. It runs before the release-set
 // preparation and every later stage that can start a provider, so a gate-only
 // request starts none. It prints the refusal and reports whether it refused.
-func refusesUnauthorizedPublication(req *Request, options jobs.ReleaseSetOptions, planned []*scheduler.ScheduledJob) bool {
+func refusesUnauthorizedPublication(req *Request, options publication.ReleaseSetOptions, planned []*scheduler.ScheduledJob) bool {
 	if invocation := req.Portable.invocation(); invocation == nil || invocation.Publication != nil {
 		return false
 	}
@@ -1060,7 +1060,7 @@ func refusesUnauthorizedPublication(req *Request, options jobs.ReleaseSetOptions
 			break
 		}
 	}
-	if err == nil && jobs.RequestedReleaseSetMode(options) != jobs.ReleaseSetDisabled {
+	if err == nil && publication.RequestedReleaseSetMode(options) != publication.ReleaseSetDisabled {
 		err = errors.New("runner: the request starts a release-set publication, but carries no invocation.publication")
 	}
 	if err == nil {
@@ -1074,7 +1074,7 @@ func refusesUnauthorizedPublication(req *Request, options jobs.ReleaseSetOptions
 // resolve STRICTLY. A channel-backed deploy names the members it deploys, so
 // the ordinary convenience fallback to every project would deploy workloads the
 // channel never released.
-func deployNarrowsToChannelMembers(req *Request, options jobs.ReleaseSetOptions) bool {
+func deployNarrowsToChannelMembers(req *Request, options publication.ReleaseSetOptions) bool {
 	return req.Global.Impacted && len(options.Channels) > 0 && slices.Contains(req.Commands, "deploy")
 }
 

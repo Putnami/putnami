@@ -375,13 +375,16 @@ func TestV1Ratchet_NoManifestAdaptation(t *testing.T) {
 // forbidden-symbol scan below is scoped by PACKAGE rather than by directory
 // because the job layer is split across two modules — the pure model,
 // ParseRawEvent included, into go.putnami.dev/cli/model/jobs; the scheduler,
-// executor and cache into tooling/cli's internal/jobs/scheduler — and both
-// halves are the same package to a reader of the acceptance rule. A package
-// name follows the code through a move between directories; a directory prefix
+// executor and cache into tooling/cli's internal/jobs/scheduler; the
+// release-set and publication code, which reads the publish jobs' runtime
+// events and emits its own, into internal/jobs/publication — and all of them
+// are the same package to a reader of the acceptance rule. A package name
+// follows the code through a move between directories; a directory prefix
 // would have to be re-listed after each one, and would quietly scan nothing in
-// between. The scheduler's move out of internal/jobs also renamed its package,
-// so it is listed by its own name, and each name must match a file.
-var jobsPackageNames = []string{"jobs", "scheduler"}
+// between. The moves out of internal/jobs also renamed the scheduler and
+// publication packages, so each is listed by its own name, and each name must
+// match a file.
+var jobsPackageNames = []string{"jobs", "scheduler", "publication"}
 
 // eventParserFile is the file whose acceptance rule is pinned. It is named
 // rather than searched for, so a move stays a REVIEWED event: the pin fails,

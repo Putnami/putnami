@@ -385,9 +385,9 @@ var structuralPins = []structuralPin{
 			"of the existing key derivation (computeJobCacheHashWith, taskCacheParamsWith, and the " +
 			"producer recursion between them) — the same map taskCacheParams already reads, for " +
 			"the same reason it cannot be typed: the values' Go TYPES separate an int 1 from a " +
-			"string \"1\". The fourth is jobs.SelectionFingerprints, which hands that same map to " +
+			"string \"1\". The fourth is cachekey.SelectionFingerprints, which hands that same map to " +
 			"that derivation once per run. The last two are the release-set seam the engine calls " +
-			"between selection and planning (jobs.PrepareReleaseSetRun and the fingerprint " +
+			"between selection and planning (publication.PrepareReleaseSetRun and the fingerprint " +
 			"resolution inside it), which forward that same map one hop further so the engine " +
 			"holds no release-set policy. No new payload boundary appears: nothing decodes, " +
 			"stores or forwards a new untyped document. That same change also raises 243→246 for the DEPLOY " +
@@ -396,7 +396,7 @@ var structuralPins = []structuralPin{
 			"ciproto.Environment.Constraints verbatim — the CI document declares `approval: " +
 			"manual` and leaves the rest open, so the protocol itself types the block as an open " +
 			"object and the CLI forwards it to the backend without enumerating its keys. The " +
-			"third is jobs.BuildDeployOptions, which reads --env and --release out of the ONE " +
+			"third is publication.BuildDeployOptions, which reads --env and --release out of the ONE " +
 			"command params map, exactly as the release-set option builder beside it does. Another change " +
 			"raises 246→248, and both lines are the SAME two parameters this pin already names as " +
 			"untypable, on one more hop of the path they already travel: jobs.runJob is RunJob plus " +

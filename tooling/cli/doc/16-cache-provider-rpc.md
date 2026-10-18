@@ -340,7 +340,7 @@ conformance corpus for every provider message.
 The object cache is tested against a **real socket**, not a simulation:
 `protocol/cache/objectcachetest` ships a fake provider-side server (in-memory
 store, configurable trust channel, real concurrent connections) that both this
-repository and a provider implementation can drive. `internal/jobs` wires it into
-the fake provider and runs a real job subprocess that dials the socket it was
-handed, so the negotiation, the exported variables and the round trip are proved
-end to end — including that the two variables never move a cache key.
+repository and a provider implementation can drive. `internal/jobs/scheduler`
+wires it into the fake provider and runs a real job subprocess that dials the
+socket it was handed, so the negotiation, the exported variables and the round
+trip are proved end to end — including that the two variables never move a cache key.

@@ -15,7 +15,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	protocoljob "go.putnami.dev/protocol/job"
 	runner "go.putnami.dev/protocol/runner"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/publication"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 )
 
@@ -126,7 +126,7 @@ func TestRefusesUnauthorizedPublicationClassifiesByEffects(t *testing.T) {
 	modeljobs.AttachIdentities(pushing)
 	publishing := []*scheduler.ScheduledJob{portableJob(app, "publish")}
 	modeljobs.AttachIdentities(publishing)
-	tagged := jobs.ReleaseSetOptions{Commands: []string{"publish"}, Tagged: true}
+	tagged := publication.ReleaseSetOptions{Commands: []string{"publish"}, Tagged: true}
 
 	request := func(publication *runner.PublicationBlock) *Request {
 		return &Request{Portable: &PortableExecution{Request: runner.ExecutionRequest{
@@ -136,14 +136,14 @@ func TestRefusesUnauthorizedPublicationClassifiesByEffects(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		req     *Request
-		options jobs.ReleaseSetOptions
+		options publication.ReleaseSetOptions
 		planned []*scheduler.ScheduledJob
 		names   string
 	}{
-		{"a gate plan", request(nil), jobs.ReleaseSetOptions{}, plain, ""},
-		{"a publish task", request(nil), jobs.ReleaseSetOptions{}, publishing, "plan task /app:publish publishes"},
-		{"a cloud task under another command", request(nil), jobs.ReleaseSetOptions{}, shipping, "plan task /app:ship publishes"},
-		{"a registry write under build", request(nil), jobs.ReleaseSetOptions{}, pushing, "plan task /app:build publishes"},
+		{"a gate plan", request(nil), publication.ReleaseSetOptions{}, plain, ""},
+		{"a publish task", request(nil), publication.ReleaseSetOptions{}, publishing, "plan task /app:publish publishes"},
+		{"a cloud task under another command", request(nil), publication.ReleaseSetOptions{}, shipping, "plan task /app:ship publishes"},
+		{"a registry write under build", request(nil), publication.ReleaseSetOptions{}, pushing, "plan task /app:build publishes"},
 		{"a release-set publication", request(nil), tagged, plain, "release-set publication"},
 		{"the block", request(&runner.PublicationBlock{Barrier: []string{"build"}}), tagged, shipping, ""},
 		{"a local run", &Request{}, tagged, shipping, ""},

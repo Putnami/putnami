@@ -14,14 +14,17 @@ import (
 
 // The internal/jobs split.
 //
-// internal/jobs is being split into packages so that a change in one part
-// stops recompiling and rerunning the tests of another. Go reruns a package's
-// tests when anything they import changes, so the split holds only while each
-// package imports what its entry below allows. The compiler already refuses an
-// import of internal/jobs from a package internal/jobs imports, because that
-// is a cycle; it does not refuse an import of any other CLI package, which
-// would pull that package's changes back into the split-out tests. This test
-// does.
+// internal/jobs was split into packages so that a change in one part stops
+// recompiling and rerunning the tests of another. Go reruns a package's tests
+// when anything they import changes, so the split holds only while each
+// package imports what its entry below allows. The compiler refuses an import
+// that closes a cycle between two of them; it does not refuse an import of
+// any other CLI package, which would pull that package's changes back into
+// the split-out tests. This test does.
+//
+// The last code left in internal/jobs moved to internal/jobs/publication, so
+// the directory holds the split-out packages and no Go file of its own.
+// TestJobsSplitLeavesNoJobsPackage keeps it that way.
 //
 // Test files count: a test binary is rebuilt when its test files' imports
 // change, so an allowance that held only for production files would not hold
@@ -229,10 +232,98 @@ var jobsSplitPackages = []jobsSplitPackage{
 		why: "the scheduler, the runner and the cache use: it runs the jobs of the plan the planner " +
 			"builds, restores and stores their task cache entries, and starts extension runtimes, " +
 			"providers and host RPC under the run credential and the process capabilities. The " +
-			"release-set and publication code in internal/jobs imports it, so it never imports " +
-			"internal/jobs. Its tests wire in a remote cache client and a fake cache provider, and " +
-			"read the publish and registry fixtures of the SDK",
+			"release-set and publication code in internal/jobs/publication imports it, so it never " +
+			"imports internal/jobs/publication. Its tests wire in a remote cache client and a fake " +
+			"cache provider, and read the publish and registry fixtures of the SDK",
 	},
+	{
+		dir: "internal/jobs/publication",
+		allowed: []string{
+			"github.com/google/go-containerregistry/pkg/name",
+			"go.putnami.dev/cli/model/jobs",
+			"go.putnami.dev/cli/model/workspace",
+			"go.putnami.dev/protocol/ci",
+			"go.putnami.dev/protocol/diagnostic",
+			"go.putnami.dev/protocol/distribution",
+			"go.putnami.dev/protocol/extension",
+			"go.putnami.dev/protocol/job",
+			"go.putnami.dev/protocol/put",
+			"go.putnami.dev/protocol/registry",
+			"go.putnami.dev/protocol/runner",
+			"go.putnami.dev/protocol/runtime",
+			"go.putnami.dev/protocol/workspace",
+			"go.putnami.dev/sdk/extension/gomodpublish",
+			"go.putnami.dev/sdk/extension/memberprobe",
+			"go.putnami.dev/sdk/extension/npmpublish",
+			"go.putnami.dev/sdk/extension/oci",
+			"go.putnami.dev/sdk/extension/pkgmeta",
+			"go.putnami.dev/sdk/extension/publicationoutbox",
+			"go.putnami.dev/sdk/extension/putpublish",
+			"go.putnami.dev/sdk/extension/releaseset",
+			"go.putnami.dev/tooling/cli/internal/cmderr",
+			"go.putnami.dev/tooling/cli/internal/extension",
+			"go.putnami.dev/tooling/cli/internal/git",
+			"go.putnami.dev/tooling/cli/internal/jobs/cachekey",
+			"go.putnami.dev/tooling/cli/internal/jobs/planner",
+			"go.putnami.dev/tooling/cli/internal/jobs/scheduler",
+			"go.putnami.dev/tooling/cli/internal/runcredential",
+			"go.putnami.dev/tooling/cli/internal/store",
+		},
+		testOnly: []string{
+			"github.com/google/go-containerregistry/pkg/registry",
+			"github.com/google/go-containerregistry/pkg/v1/random",
+			"go.putnami.dev/cli/model/extension",
+			"go.putnami.dev/protocol/cli",
+			"go.putnami.dev/protocol/features/spectest",
+			"go.putnami.dev/sdk/extension/context",
+			"go.putnami.dev/sdk/extension/dockerpublish",
+			"go.putnami.dev/sdk/extension/jsonl",
+			"go.putnami.dev/sdk/extension/profiles",
+			"go.putnami.dev/sdk/extension/registrycred",
+			"go.putnami.dev/tooling/cli/internal/credentialprovider/providertest",
+			"go.putnami.dev/tooling/cli/internal/workspace",
+		},
+		why: "the release-set, publication and deploy-target preparation of a run: it adds the " +
+			"release-set, publication and deploy jobs and targets to the plan the planner builds, " +
+			"and the scheduler runs that plan without importing it. It reads the CI document, the " +
+			"release-set, registry and publication protocols and the SDK's publish formats, reads " +
+			"the git history, and starts the release-set provider under the run credential. Its " +
+			"tests run publication plans through the scheduler against a test credential provider " +
+			"and an in-process OCI registry",
+	},
+}
+
+// jobsParentDir is the directory the split emptied. It holds the split-out
+// packages and no Go file of its own.
+const jobsParentDir = "internal/jobs"
+
+// TestJobsSplitLeavesNoJobsPackage fails when internal/jobs holds a Go file.
+// The last of its code moved to internal/jobs/publication, so the package
+// go.putnami.dev/tooling/cli/internal/jobs no longer exists. A file there
+// would start it again: a package every split-out one sits under, whose
+// imports no entry above bounds.
+func TestJobsSplitLeavesNoJobsPackage(t *testing.T) {
+	t.Parallel()
+	root := moduleRoot(t)
+	entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(jobsParentDir)))
+	if err != nil {
+		t.Fatalf("%s: %v", jobsParentDir, err)
+	}
+	packages := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			packages++
+			continue
+		}
+		if strings.HasSuffix(entry.Name(), ".go") {
+			t.Errorf("%s/%s puts a Go file in %s, which holds packages only. Move it to the package "+
+				"under %s that owns it, or to a new package with its own entry in jobsSplitPackages.",
+				jobsParentDir, entry.Name(), jobsParentDir, jobsParentDir)
+		}
+	}
+	if packages == 0 {
+		t.Fatalf("%s holds no package directory — the split moved; move this check with it", jobsParentDir)
+	}
 }
 
 func TestJobsSplitPackagesImportOnlyTheirAllowance(t *testing.T) {

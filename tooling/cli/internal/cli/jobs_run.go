@@ -79,7 +79,7 @@ func terminalRequest(parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc 
 // strictly more informative than the DAG preview — with zero registry side
 // effects. A dry run only reads: each publisher asks its registry whether the
 // member already exists at the planned version, and the engine fails the run
-// on the answers once every job has ended (jobs.MemberProbeReport).
+// on the answers once every job has ended (publication.MemberProbeReport).
 //
 // Three deliberate scope decisions:
 //   - Exactly the single-command form. A mixed list (`build,publish`) keeps

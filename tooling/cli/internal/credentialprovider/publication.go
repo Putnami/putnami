@@ -9,7 +9,7 @@ import (
 
 	distribution "go.putnami.dev/protocol/distribution"
 	registry "go.putnami.dev/protocol/registry"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/publication"
 )
 
 // DefaultReleaseTimeout bounds one release exchange. A release stores the set
@@ -167,18 +167,18 @@ func planDigestOf(params *registry.OpenParams) string {
 }
 
 // InstallPublication makes the broker's publication surface the one the
-// release-set path asks for (jobs.InstallPublicationProvider), and returns the
-// function that restores the previous source. A broker that does not serve
-// the publish purpose installs nothing.
+// release-set path asks for (publication.InstallPublicationProvider), and
+// returns the function that restores the previous source. A broker that does
+// not serve the publish purpose installs nothing.
 func (b *Broker) InstallPublication() (restore func()) {
 	if !b.Enabled(registry.PurposePublish) {
 		return func() {}
 	}
-	return jobs.InstallPublicationProvider(func(ctx context.Context) (jobs.PublicationProvider, error) {
-		publication, err := b.Publication(ctx)
-		if err != nil || publication == nil {
+	return publication.InstallPublicationProvider(func(ctx context.Context) (publication.PublicationProvider, error) {
+		surface, err := b.Publication(ctx)
+		if err != nil || surface == nil {
 			return nil, err
 		}
-		return publication, nil
+		return surface, nil
 	})
 }

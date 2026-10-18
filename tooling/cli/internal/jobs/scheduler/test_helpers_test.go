@@ -60,9 +60,9 @@ const answerWaitBudget = 60 * time.Second
 // lives, starting the script fails with "text file busy".
 // Go takes syscall.ForkLock for writing around each fork, so holding it for
 // reading from open to close keeps the descriptor out of every child. Every
-// test that writes a program it starts goes through this helper. The jobs
-// package's TestExecutableFixturesAreWrittenUnderTheForkLock scans this
-// package's tests and enforces it.
+// test that writes a program it starts goes through this helper. The
+// publication package's TestExecutableFixturesAreWrittenUnderTheForkLock scans
+// this package's tests and enforces it.
 func writeExecutable(t *testing.T, path, contents string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -104,11 +104,12 @@ const burnCPUDuration = 60 * time.Millisecond
 // TestFixtureJobsCarryNoIncidentalWallClockBudget pins the two halves of
 // this rule together, the way TestCapabilityProbesKeepHostLoadOutOfTheSecurityVerdict
 // pins a related one: the sentinel really is unbounded on every path that applies a
-// budget, and no fixture job in this package or in internal/jobs carries a literal budget
-// unless its test is ABOUT that budget. The second half reads both
-// directories' test sources with go/ast (the idiom internal/cli's ratchets use), because a
-// budget is reintroduced one "TimeoutMs: 5000" at a time and nothing else
-// would notice until a loaded gate did.
+// budget, and no fixture job in this package or in internal/jobs/publication
+// carries a literal budget unless its test is ABOUT that budget. The second
+// half reads both directories' test sources with go/ast (the idiom
+// internal/cli's ratchets use), because a budget is reintroduced one
+// "TimeoutMs: 5000" at a time and nothing else would notice until a loaded
+// gate did.
 //
 // The exception list is a census, not an allowlist: every name must still
 // carry a literal budget, so a test that stops needing one leaves the list.
@@ -148,11 +149,11 @@ func TestFixtureJobsCarryNoIncidentalWallClockBudget(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Fatalf("glob package test files: %v (%d files)", err, len(files))
 	}
-	parentFiles, err := filepath.Glob(filepath.Join("..", "*_test.go"))
-	if err != nil || len(parentFiles) == 0 {
-		t.Fatalf("glob internal/jobs test files: %v (%d files)", err, len(parentFiles))
+	publicationFiles, err := filepath.Glob(filepath.Join("..", "publication", "*_test.go"))
+	if err != nil || len(publicationFiles) == 0 {
+		t.Fatalf("glob internal/jobs/publication test files: %v (%d files)", err, len(publicationFiles))
 	}
-	files = append(files, parentFiles...)
+	files = append(files, publicationFiles...)
 	fset := token.NewFileSet()
 	seen := map[string]bool{}
 	for _, file := range files {

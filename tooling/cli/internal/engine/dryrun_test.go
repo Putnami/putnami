@@ -16,7 +16,7 @@ import (
 
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
-	"go.putnami.dev/tooling/cli/internal/jobs"
+	"go.putnami.dev/tooling/cli/internal/jobs/publication"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -252,7 +252,7 @@ func TestExecute_DryRunPublishFailsOnAConflictProbe(t *testing.T) {
 	if failure == nil || failure.Error == nil || !strings.Contains(failure.Error.Message, "conflict go go.putnami.dev/mod@v1.2.3 at https://go.putnami.dev") {
 		t.Fatalf("failed task = %+v, want the member-probe row naming the conflict\noutput:\n%s", failure, out)
 	}
-	if len(failure.Diagnostics) != 1 || failure.Diagnostics[0].Code != jobs.MemberProbeConflictCode ||
+	if len(failure.Diagnostics) != 1 || failure.Diagnostics[0].Code != publication.MemberProbeConflictCode ||
 		!strings.Contains(failure.Diagnostics[0].Message, "another zip digest") {
 		t.Fatalf("diagnostics = %+v, want one conflict diagnostic with the reason", failure.Diagnostics)
 	}

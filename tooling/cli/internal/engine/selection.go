@@ -14,8 +14,8 @@ import (
 	"go.putnami.dev/tooling/cli/internal/agentartifacts"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
+	"go.putnami.dev/tooling/cli/internal/jobs/publication"
 	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -261,7 +261,7 @@ func resolveReleaseSetSelections(
 	req *Request,
 	ws *workspace.Workspace,
 	extensions ...*extension.ExtensionDescription,
-) (jobs.ReleaseSetOptions, *jobs.ReleaseSetVerification, selectionEvidence, int) {
+) (publication.ReleaseSetOptions, *publication.ReleaseSetVerification, selectionEvidence, int) {
 	// The release-set mode is what decides whether there are two selections at
 	// all, so it is resolved here rather than beside the caller: a channel a
 	// repository protects, or a tag this run cannot attribute to one line, is
@@ -271,10 +271,10 @@ func resolveReleaseSetSelections(
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
 		return options, nil, selectionEvidence{}, protocolcli.ExitCodeForError(err)
 	}
-	if notice := jobs.ReleaseSetReuseNotice(options); notice != "" {
+	if notice := publication.ReleaseSetReuseNotice(options); notice != "" {
 		iox.Fprintf(os.Stderr, "putnami: %s\n", notice)
 	}
-	if req == nil || !jobs.ReleaseSetPlansEveryProject(options) {
+	if req == nil || !publication.ReleaseSetPlansEveryProject(options) {
 		return options, nil, selectionEvidence{}, ExitSuccess
 	}
 	verification, evidence, code := verificationSelection(req, ws, extensions...)
@@ -298,7 +298,7 @@ func resolveReleaseSetSelections(
 // resolution's, never the coordinator's whole-workspace view — and the recorded
 // session's git block names the ref that resolution measured against, which is
 // the ref the reported selection tier describes.
-func adoptVerificationEvidence(req *Request, preparation *jobs.ReleaseSetPreparation, evidence selectionEvidence) {
+func adoptVerificationEvidence(req *Request, preparation *publication.ReleaseSetPreparation, evidence selectionEvidence) {
 	if req == nil || preparation == nil || preparation.Verification == nil {
 		return
 	}
@@ -316,7 +316,7 @@ func verificationSelection(
 	req *Request,
 	ws *workspace.Workspace,
 	extensions ...*extension.ExtensionDescription,
-) (*jobs.ReleaseSetVerification, selectionEvidence, int) {
+) (*publication.ReleaseSetVerification, selectionEvidence, int) {
 	if req.Portable.frozen() {
 		return nil, selectionEvidence{}, ExitSuccess
 	}
@@ -348,7 +348,7 @@ func verificationSelection(
 	// An `--impacted` run over an unchanged tree selects no project and records
 	// the impacted no-op. That is a real answer: verify nothing, publish what
 	// the head requires.
-	return &jobs.ReleaseSetVerification{
+	return &publication.ReleaseSetVerification{
 		Projects: projects, Selection: gate.selection,
 	}, gate.selectionEvidence, ExitSuccess
 }

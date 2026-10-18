@@ -48,17 +48,17 @@ import (
 // origin packages the model was lifted out of. The third, internal/jobs, was
 // split: the scheduler, which now holds its alias layer, is already spelled by
 // engine_boundary_test.go as schedulerImportPath and is reused here rather than
-// written twice, and internalJobsImportPath is the release-set and publication
-// code that stayed. internalCacheKeyImportPath is the part of internal/jobs
-// split out of it with the job-context version block, so a consumer that
-// reaches it reaches the same execution half; so is the remote cache client,
-// spelled there as remoteCacheImportPath, and the planner, spelled there as
-// plannerImportPath.
+// written twice, and internalPublicationImportPath is the release-set and
+// publication code, which left internal/jobs last.
+// internalCacheKeyImportPath is the part of internal/jobs split out of it with
+// the job-context version block, so a consumer that reaches it reaches the same
+// execution half; so is the remote cache client, spelled there as
+// remoteCacheImportPath, and the planner, spelled there as plannerImportPath.
 const (
-	internalWorkspaceImportPath = "go.putnami.dev/tooling/cli/internal/workspace"
-	internalExtensionImportPath = "go.putnami.dev/tooling/cli/internal/extension"
-	internalJobsImportPath      = "go.putnami.dev/tooling/cli/internal/jobs"
-	internalCacheKeyImportPath  = "go.putnami.dev/tooling/cli/internal/jobs/cachekey"
+	internalWorkspaceImportPath   = "go.putnami.dev/tooling/cli/internal/workspace"
+	internalExtensionImportPath   = "go.putnami.dev/tooling/cli/internal/extension"
+	internalPublicationImportPath = "go.putnami.dev/tooling/cli/internal/jobs/publication"
+	internalCacheKeyImportPath    = "go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
 // modelOrigin is one internal package the pure model was lifted out of.
@@ -75,7 +75,7 @@ type modelOrigin struct {
 
 var modelOrigins = []modelOrigin{
 	{schedulerImportPath, "scheduler", "the scheduler, executor, cache use and job-context writer"},
-	{internalJobsImportPath, "jobs", "the release-set, publication and deploy-target preparation of a run"},
+	{internalPublicationImportPath, "publication", "the release-set, publication and deploy-target preparation of a run"},
 	{internalWorkspaceImportPath, "workspace", "workspace discovery, loading, probing, syncing and snapshotting"},
 	{internalExtensionImportPath, "extension", "extension discovery, install, integrity, registry and lockfile I/O"},
 	{internalCacheKeyImportPath, "cachekey", "the task cache key and the job-context inputs it hashes"},

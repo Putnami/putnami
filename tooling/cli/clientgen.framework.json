@@ -82,29 +82,29 @@
     {
       "runtime": "@putnami/cli",
       "status": "pending-provider-contract",
-      "adapter": "tooling/cli/internal/jobs/release_plan_handoff.go",
+      "adapter": "tooling/cli/internal/jobs/publication/release_plan_handoff.go",
       "callsites": [
         {
-          "path": "tooling/cli/internal/jobs/release_plan_handoff.go",
+          "path": "tooling/cli/internal/jobs/publication/release_plan_handoff.go",
           "transport": "http",
           "symbol": "http.Client",
           "fingerprint": "5ecc94783d17b655f8dadea64b2dc7d359c449bc3157da0d53df852c98734b3f"
         },
         {
-          "path": "tooling/cli/internal/jobs/release_plan_handoff.go",
+          "path": "tooling/cli/internal/jobs/publication/release_plan_handoff.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
           "fingerprint": "0ff2f8401cb977dd4dc7e0e68c731ac68ea0afa351fae274ae6c896805c73bbd"
         },
         {
-          "path": "tooling/cli/internal/jobs/release_plan_handoff.go",
+          "path": "tooling/cli/internal/jobs/publication/release_plan_handoff.go",
           "transport": "http",
           "symbol": "http.Transport",
           "fingerprint": "ea318cdf21778bd73a97bbcf976b1ed45a002eb399923366643f30245fb5ab47"
         }
       ],
       "owner": "@putnami/cli",
-      "tests": ["tooling/cli/internal/jobs/release_plan_handoff_test.go"],
+      "tests": ["tooling/cli/internal/jobs/publication/release_plan_handoff_test.go"],
       "reason": "Posts the release plan back to the Putnami Cloud native runner capability endpoint. First-party service, provider declaration owned by Putnami Cloud.",
       "operations": ["runner.release-plan-handoff"],
       "pendingWork": "Putnami Cloud provider-side client declaration"
