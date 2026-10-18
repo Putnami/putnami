@@ -71,7 +71,6 @@ complete -c putnami -n '__fish_use_subcommand' -a 'config' -d 'Manage configurat
 complete -c putnami -n '__fish_use_subcommand' -a 'context' -d 'Manage AI context'
 complete -c putnami -n '__fish_use_subcommand' -a 'contributor' -d 'Run native contributor checks and inspect machine load'
 complete -c putnami -n '__fish_use_subcommand' -a 'deps' -d 'Manage dependencies'
-complete -c putnami -n '__fish_use_subcommand' -a 'dev' -d 'Author extensions and templates'
 complete -c putnami -n '__fish_use_subcommand' -a 'doctor' -d 'Preflight production readiness under a deployment profile'
 complete -c putnami -n '__fish_use_subcommand' -a 'extensions' -d 'Manage extensions'
 complete -c putnami -n '__fish_use_subcommand' -a 'help' -d 'Show help for a command'
@@ -112,13 +111,12 @@ complete -c putnami -n '__putnami_complete_children contributor' -a 'machine-loa
 complete -c putnami -n '__putnami_complete_children deps' -a 'add'
 complete -c putnami -n '__putnami_complete_children deps' -a 'install'
 complete -c putnami -n '__putnami_complete_children deps' -a 'remove'
-complete -c putnami -n '__putnami_complete_children dev' -a 'extension'
-complete -c putnami -n '__putnami_complete_children dev' -a 'template'
 complete -c putnami -n '__putnami_complete_children extensions' -a 'install'
 complete -c putnami -n '__putnami_complete_children extensions' -a 'list'
 complete -c putnami -n '__putnami_complete_children extensions' -a 'prepare'
 complete -c putnami -n '__putnami_complete_children extensions' -a 'remove'
 complete -c putnami -n '__putnami_complete_children extensions' -a 'update'
+complete -c putnami -n '__putnami_complete_children extensions' -a 'validate'
 complete -c putnami -n '__putnami_complete_children mcp' -a 'install'
 complete -c putnami -n '__putnami_complete_children migrate' -a 'vnext'
 complete -c putnami -n '__putnami_complete_children projects' -a 'create'
@@ -138,8 +136,11 @@ complete -c putnami -n '__putnami_complete_children telemetry' -a 'show'
 complete -c putnami -n '__putnami_complete_children telemetry' -a 'status'
 complete -c putnami -n '__putnami_complete_children templates' -a 'install'
 complete -c putnami -n '__putnami_complete_children templates' -a 'list'
+complete -c putnami -n '__putnami_complete_children templates' -a 'package'
 complete -c putnami -n '__putnami_complete_children templates' -a 'remove'
+complete -c putnami -n '__putnami_complete_children templates' -a 'test'
 complete -c putnami -n '__putnami_complete_children templates' -a 'update'
+complete -c putnami -n '__putnami_complete_children templates' -a 'validate'
 complete -c putnami -n '__putnami_complete_children tree' -a 'fingerprint'
 complete -c putnami -n '__putnami_complete_children tree' -a 'verify'
 complete -c putnami -n '__putnami_complete_children version' -a 'get'
@@ -196,10 +197,6 @@ complete -c putnami -n '__putnami_seen_path context pack' -l 'project' -d 'Proje
 complete -c putnami -n '__putnami_seen_path contributor language' -l 'diff' -d 'With files: inspect tracked files changed in a Git revision range' -r
 complete -c putnami -n '__putnami_seen_path contributor language' -l 'label' -d 'With text: label the input in findings' -r
 complete -c putnami -n '__putnami_seen_path contributor language' -l 'limit' -d 'With tasks: maximum number of task records to inspect' -r
-complete -c putnami -n '__putnami_seen_path dev template' -l 'keep' -d 'With test: keep the rendered temporary workspace for inspection'
-complete -c putnami -n '__putnami_seen_path dev template' -l 'skip-build' -d 'With test: render the template without running build and test on it'
-complete -c putnami -n '__putnami_seen_path dev template' -l 'stable' -d 'With package: publish under a stable version instead of a prerelease'
-complete -c putnami -n '__putnami_seen_path dev template' -l 'version' -d 'With package: version to stamp on the produced archive' -r
 complete -c putnami -n '__putnami_seen_path doctor' -l 'machine' -d 'Report the one-minute load per logical CPU, or unknown, instead of the readiness preflight; takes neither --profile nor --project'
 complete -c putnami -n '__putnami_seen_path doctor' -l 'profile' -d 'Deployment profile to evaluate under (dev|test|production); production is strictest' -r
 complete -c putnami -n '__putnami_seen_path doctor' -l 'project' -d 'Project ID, path, or name (comma-separated); default is every workspace project' -r
@@ -245,6 +242,10 @@ complete -c putnami -n '__putnami_seen_path sessions summary' -l 'by-digest' -d 
 complete -c putnami -n '__putnami_seen_path sessions summary' -l 'command' -d 'Keep only top-level sessions whose recorded command set is exactly this comma-separated list, in any order; a nested run never matches' -r
 complete -c putnami -n '__putnami_seen_path sessions summary' -l 'since' -d 'Keep only records whose recorded start time is at or after this RFC 3339 timestamp; a record with no readable start time is not listed' -r
 complete -c putnami -n '__putnami_seen_path templates install' -l 'latest' -d 'Ignore the lock file and resolve the latest versions'
+complete -c putnami -n '__putnami_seen_path templates package' -l 'stable' -d 'Publish under a stable version instead of a prerelease'
+complete -c putnami -n '__putnami_seen_path templates package' -l 'version' -d 'Version to stamp on the produced archive' -r
+complete -c putnami -n '__putnami_seen_path templates test' -l 'keep' -d 'Keep the rendered temporary workspace for inspection'
+complete -c putnami -n '__putnami_seen_path templates test' -l 'skip-build' -d 'Render the template without running build and test on it'
 complete -c putnami -n '__putnami_seen_path tree verify' -l 'base' -d 'Base revision; default origin/main for --snapshot and --gate, and for --record the base the dossier must name' -r
 complete -c putnami -n '__putnami_seen_path tree verify' -l 'gate' -d 'Check that the recorded gate session can replace the finalizer\'s gate' -r
 complete -c putnami -n '__putnami_seen_path tree verify' -l 'record' -d 'Verify the dossier this file holds and print the verified verdict' -r

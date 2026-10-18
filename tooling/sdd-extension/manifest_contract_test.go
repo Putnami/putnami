@@ -17,7 +17,7 @@ import (
 )
 
 // This file is @putnami/sdd's manifest conformance harness. It runs the SAME
-// predicates the CLI, the SDK and `putnami dev extension validate` run
+// predicates the CLI, the SDK and `putnami extensions validate` run
 // (proto.FullValidateManifest, which carries the v3 task-contract rules)
 // against the REAL committed manifest, so a declaration a consumer's workspace
 // would reject is rejected in this project's own test run first.
@@ -497,7 +497,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 }
 
 // committedManifest parses the shipped putnami.extension.json exactly as
-// `putnami dev extension validate` and the package-time gate do.
+// `putnami extensions validate` and the package-time gate do.
 func committedManifest(t *testing.T) *proto.Manifest {
 	t.Helper()
 	data, err := os.ReadFile(manifestPath)
@@ -581,7 +581,7 @@ func TestHarnessRejectsAHandEditedManifest(t *testing.T) {
 	}
 }
 
-// TestExtensionManifestPassesFullValidation is the `putnami dev extension
+// TestExtensionManifestPassesFullValidation is the `putnami extensions
 // validate` gate as a unit test: the real manifest must produce ZERO
 // diagnostics under the comprehensive protocol entry point, which includes the
 // v3 task-contract harness (exactness, one owner per output, honest effects).

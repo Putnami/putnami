@@ -68,7 +68,6 @@ func init() {
 	registerCommand("telemetry", cmdTelemetry)
 	registerCommand("help", cmdHelp)
 	registerCommand("upgrade", cmdUpgrade)
-	registerCommand("dev", cmdDev)
 	registerCommand("mcp", cmdMcp)
 	registerCommand("pin", cmdPin)
 	registerCommand("doctor", cmdDoctor)
@@ -307,6 +306,9 @@ func cmdExtensions(env *CommandEnv) error {
 			return err
 		}
 		return extensions.ExtensionsPrepare(env.Ctx, env.WsRoot, env.Cfg, env.OutputFormat)
+	case "validate":
+		// Validates an authored manifest from a path, so it needs no workspace.
+		return extensions.ExtensionsValidate(env.Args)
 	default:
 		return usageErrorf("unknown subcommand: extensions %s", env.Sub)
 	}
@@ -369,6 +371,14 @@ func cmdTemplates(env *CommandEnv) error {
 			return err
 		}
 		return extensions.TemplatesRemove(env.WsRoot, env.Cfg, env.Args)
+	case "validate":
+		// validate, test and package work on an authored template from a path,
+		// so they need no workspace.
+		return extensions.TemplatesValidate(env.Args)
+	case "test":
+		return extensions.TemplatesTest(env.Ctx, env.Args)
+	case "package":
+		return extensions.TemplatesPackage(env.Ctx, env.Args)
 	default:
 		return usageErrorf("unknown subcommand: templates %s", env.Sub)
 	}
@@ -1026,38 +1036,6 @@ func cmdUpgrade(env *CommandEnv) error {
 		iox.Fprintln(os.Stdout, "  No workspace here, so only the global CLI was upgraded. Run putnami upgrade inside a workspace to update extensions and dependencies.")
 	}
 	return err
-}
-
-func cmdDev(env *CommandEnv) error {
-	kind := env.Sub // "extension" or "template"
-	action := ""
-	args := env.Args
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		action = args[0]
-		args = args[1:]
-	}
-	switch kind {
-	case "extension":
-		switch action {
-		case "validate":
-			return extensions.ExtensionsValidate(args)
-		default:
-			return usageErrorf("unknown action: dev extension %s\n  Available: validate", action)
-		}
-	case "template":
-		switch action {
-		case "validate":
-			return extensions.TemplatesValidate(args)
-		case "test":
-			return extensions.TemplatesTest(env.Ctx, args)
-		case "package":
-			return extensions.TemplatesPackage(env.Ctx, args)
-		default:
-			return usageErrorf("unknown action: dev template %s\n  Available: validate, test, package", action)
-		}
-	default:
-		return usageErrorf("unknown subcommand: dev %s\n  Available: extension, template", kind)
-	}
 }
 
 // cmdMcp serves the MCP server over stdio (the bare form MCP clients spawn)

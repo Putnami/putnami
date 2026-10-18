@@ -25,7 +25,7 @@ import (
 const clientgenFeature = "tooling/cross-language-rest-clients"
 
 // loadExtensionManifest parses the shipped putnami.extension.json exactly as
-// `putnami dev extension validate` and the package-time gate do.
+// `putnami extensions validate` and the package-time gate do.
 func loadExtensionManifest(t *testing.T) *proto.Manifest {
 	t.Helper()
 	data, err := os.ReadFile("putnami.extension.json")
@@ -50,7 +50,7 @@ func formatDiagnostics(diags []diag.Diagnostic) string {
 	return strings.Join(messages, "\n  ")
 }
 
-// TestExtensionManifestPassesFullValidation is the `putnami dev extension
+// TestExtensionManifestPassesFullValidation is the `putnami extensions
 // validate` gate as a unit test: the real manifest must produce ZERO
 // diagnostics under the comprehensive protocol entry point, which includes the
 // v3 task-contract harness (exactness, one owner per output, honest effects).

@@ -57,12 +57,6 @@ _putnami_subcommands_for() {
                 'remove'
             )
             ;;
-        'dev')
-            reply=(
-                'extension'
-                'template'
-            )
-            ;;
         'extensions')
             reply=(
                 'install'
@@ -70,6 +64,7 @@ _putnami_subcommands_for() {
                 'prepare'
                 'remove'
                 'update'
+                'validate'
             )
             ;;
         'mcp')
@@ -117,8 +112,11 @@ _putnami_subcommands_for() {
             reply=(
                 'install'
                 'list'
+                'package'
                 'remove'
+                'test'
                 'update'
+                'validate'
             )
             ;;
         'tree')
@@ -170,9 +168,6 @@ _putnami_path_known() {
         'deps add') return 0 ;;
         'deps install') return 0 ;;
         'deps remove') return 0 ;;
-        'dev') return 0 ;;
-        'dev extension') return 0 ;;
-        'dev template') return 0 ;;
         'doctor') return 0 ;;
         'extensions') return 0 ;;
         'extensions install') return 0 ;;
@@ -180,6 +175,7 @@ _putnami_path_known() {
         'extensions prepare') return 0 ;;
         'extensions remove') return 0 ;;
         'extensions update') return 0 ;;
+        'extensions validate') return 0 ;;
         'help') return 0 ;;
         'impact-plan') return 0 ;;
         'init') return 0 ;;
@@ -213,8 +209,11 @@ _putnami_path_known() {
         'templates') return 0 ;;
         'templates install') return 0 ;;
         'templates list') return 0 ;;
+        'templates package') return 0 ;;
         'templates remove') return 0 ;;
+        'templates test') return 0 ;;
         'templates update') return 0 ;;
+        'templates validate') return 0 ;;
         'tree') return 0 ;;
         'tree fingerprint') return 0 ;;
         'tree verify') return 0 ;;
@@ -270,14 +269,6 @@ _putnami_flags_for() {
                 '--diff[With files: inspect tracked files changed in a Git revision range]:range:'
                 '--label[With text: label the input in findings]:name:'
                 '--limit[With tasks: maximum number of task records to inspect]:n:'
-            )
-            ;;
-        'dev template')
-            reply=(
-                '--keep[With test: keep the rendered temporary workspace for inspection]'
-                '--skip-build[With test: render the template without running build and test on it]'
-                '--stable[With package: publish under a stable version instead of a prerelease]'
-                '--version[With package: version to stamp on the produced archive]:version:'
             )
             ;;
         'doctor')
@@ -409,6 +400,18 @@ _putnami_flags_for() {
                 '--latest[Ignore the lock file and resolve the latest versions]'
             )
             ;;
+        'templates package')
+            reply=(
+                '--stable[Publish under a stable version instead of a prerelease]'
+                '--version[Version to stamp on the produced archive]:version:'
+            )
+            ;;
+        'templates test')
+            reply=(
+                '--keep[Keep the rendered temporary workspace for inspection]'
+                '--skip-build[Render the template without running build and test on it]'
+            )
+            ;;
         'tree verify')
             reply=(
                 '--base[Base revision; default origin/main for --snapshot and --gate, and for --record the base the dossier must name]:rev:'
@@ -495,7 +498,6 @@ _putnami() {
         'context:Manage AI context'
         'contributor:Run native contributor checks and inspect machine load'
         'deps:Manage dependencies'
-        'dev:Author extensions and templates'
         'doctor:Preflight production readiness under a deployment profile'
         'extensions:Manage extensions'
         'help:Show help for a command'

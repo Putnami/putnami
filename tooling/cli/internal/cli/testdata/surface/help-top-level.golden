@@ -33,10 +33,12 @@ Extensions & Templates:
   extensions update            Update extensions
   extensions remove            Remove an extension
   extensions prepare           Prepare the provider runtimes of a source workspace
+  extensions validate          Validate an extension manifest
   templates install            Install templates from config
   templates list               List installed templates
   templates update             Update templates
   templates remove             Remove a template
+  templates validate|test|package Validate, test, or package a template
 
 Dependencies:
   deps install                 Install project dependencies
@@ -68,10 +70,6 @@ Execution:
 
 Migration:
   migrate vnext                Migrate putnami.lock.json to the current format
-
-Authoring:
-  dev extension validate       Validate an extension manifest
-  dev template <action>        Validate, test, or package a template
 
 Agents:
   contributor                  Run native contributor checks and inspect machine load

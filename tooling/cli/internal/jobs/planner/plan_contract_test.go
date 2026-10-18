@@ -191,7 +191,7 @@ func TestPlan_CommandOutputOwnershipIsScopedToTheCommand(t *testing.T) {
 // TestPlan_RejectsExternalEffectOnCacheableTask pins HONEST EFFECTS on the
 // PLAN node: a task whose consequences a cache hit cannot reproduce may not be
 // cacheable. The plan is where the effective answer lives — an installed
-// extension's manifest never travels through `dev extension validate` in the
+// extension's manifest never travels through `extensions validate` in the
 // consuming workspace.
 func TestPlan_RejectsExternalEffectOnCacheableTask(t *testing.T) {
 	t.Parallel()

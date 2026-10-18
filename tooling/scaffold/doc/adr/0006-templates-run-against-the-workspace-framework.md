@@ -21,7 +21,7 @@ Each language that ships templates has one **template proof** beside them:
 project of its language. For every template in the same directory whose
 `putnami.template.json` names the language's extension, its test:
 
-1. renders the template with the variables `putnami dev template test` uses;
+1. renders the template with the variables `putnami templates test` uses;
 2. writes the result into a new temporary workspace wired to this repository's
    framework sources, not to a registry;
 3. runs what `putnami lint`, `putnami build` and `putnami test` run on a freshly
@@ -103,7 +103,7 @@ under `--impacted`.
 
 ## Rejected alternatives
 
-- **Run `putnami dev template test` or a nested `putnami build`.** Both install
+- **Run `putnami templates test` or a nested `putnami build`.** Both install
   extensions from the registry: a network, credentials and a nested CLI session.
 - **Put the proof in `@putnami/scaffold`.** Its Go tests would need bun and tsc,
   and every framework edit would rerun the packaging tests.

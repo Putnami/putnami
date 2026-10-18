@@ -127,12 +127,12 @@ putnami templates update             # Update to latest compatible versions
 putnami templates remove <name>      # Remove an installed template
 ```
 
-Authoring a template uses the `dev template` group:
+Authoring a template uses `templates validate`, `templates test` and `templates package`:
 
 ```bash
-putnami dev template validate [path] # Validate a template manifest
-putnami dev template test [path]     # Render the template and check the result
-putnami dev template package [path]  # Package for distribution
+putnami templates validate [path] # Validate a template manifest
+putnami templates test [path]     # Render the template and check the result
+putnami templates package [path]  # Package for distribution
 ```
 
 ## Publishing templates
@@ -156,5 +156,5 @@ Packaging is provided by the `@putnami/scaffold` extension, which activates on
 `putnami.template.json`. It produces `<name>-<version>.tar.gz` with the template
 manifest stamped to the packaged version, and records the `template-archives`
 channel in the project's shared package metadata index for `publish` to read
-back. `putnami dev template package` is the one-off equivalent for a template
+back. `putnami templates package` is the one-off equivalent for a template
 that is not a workspace project.

@@ -581,6 +581,7 @@ putnami extensions list             # List extensions with their constraint, ins
 putnami extensions update           # Update extension versions (lock and exact pins)
 putnami extensions remove <name>    # Remove an extension
 putnami extensions prepare          # Prepare the provider runtimes of a source workspace
+putnami extensions validate [path]  # Validate an extension manifest (for authors; needs no workspace)
 ```
 
 `extensions update`, with or without a name, resolves each extension and each
@@ -712,9 +713,21 @@ putnami templates install <name>       # Install a specific template
 putnami templates update               # Update to latest compatible versions (lock and exact pins)
 putnami templates list                 # List configured and discovered templates
 putnami templates remove <name>        # Remove an installed template
+putnami templates validate [path]      # Validate a template manifest (for authors; needs no workspace)
+putnami templates test [path]          # Test by rendering and validating output (needs no workspace)
+putnami templates package [path]       # Package for distribution (needs no workspace)
 ```
 
 `templates list` shows each template's name, constraint, installed version, and source (config or workspace). Use `--output=jsonl` for machine-readable output.
+
+Template archives contain `putnami.template.json` plus the renderable/static
+template content. Source-workspace declarations at the template root
+(`putnami.json`, `putnami.features.json`, and `specs/`) and root-local state such
+as `node_modules/` are excluded so a generated project does not inherit the
+template project's root SDD identity. Nested directories are ordinary template
+content and are copied as authored. `README.md` and `LICENSE.md` are ordinary
+optional template content:
+they are included when present and are not required to package a template.
 
 ### `deps`
 
@@ -1308,27 +1321,6 @@ Since 0.3.0 every other command **refuses** a v1 lock, so this is the command th
 - `--check` (the default) writes nothing. It exits `0` when the lock is already migrated and `2` when a migration is pending, so CI can gate on it. `--output=json` emits the plan in the standard result envelope.
 - `--apply` performs the conversion atomically (temp file + rename) and is idempotent — running it twice leaves identical bytes.
 - A pinned extension that is not installed cannot have its contract read, so it is reported under "Not recorded" and left alone rather than guessed at. Install it and re-run to record it.
-
-### `dev`
-
-Develop extensions and templates. These commands are for **extension/template authors**, not end users.
-
-```bash
-putnami dev extension validate [path]   # Validate extension manifest
-
-putnami dev template validate [path]    # Validate template manifest
-putnami dev template test [path]        # Test by rendering and validating output
-putnami dev template package [path]     # Package for distribution
-```
-
-Template archives contain `putnami.template.json` plus the renderable/static
-template content. Source-workspace declarations at the template root
-(`putnami.json`, `putnami.features.json`, and `specs/`) and root-local state such
-as `node_modules/` are excluded so a generated project does not inherit the
-template project's root SDD identity. Nested directories are ordinary template
-content and are copied as authored. `README.md` and `LICENSE.md` are ordinary
-optional template content:
-they are included when present and are not required to package a template.
 
 ### `telemetry`
 

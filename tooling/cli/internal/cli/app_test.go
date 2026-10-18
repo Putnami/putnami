@@ -853,15 +853,18 @@ func TestAppRun_TelemetryUnknownSub(t *testing.T) {
 	}
 }
 
-func TestAppRun_DevUnknownSub(t *testing.T) {
+// TestAppRun_RemovedDevRootIsRefused keeps the dev root refused as a usage
+// error whatever follows it, so a script that still types it fails loudly.
+func TestAppRun_RemovedDevRootIsRefused(t *testing.T) {
 	t.Parallel()
 	app, err := NewApp()
 	if err != nil {
 		t.Fatalf("NewApp: %v", err)
 	}
-	code := app.Run(context.Background(), []string{"dev", "unknown-sub"})
-	if code != ExitUsage {
-		t.Errorf("dev unknown-sub exit code = %d, want %d", code, ExitUsage)
+	for _, args := range [][]string{{"dev", "unknown-sub"}, {"dev", "extension", "validate"}, {"dev", "template", "test"}} {
+		if code := app.Run(context.Background(), args); code != ExitUsage {
+			t.Errorf("%v exit code = %d, want %d", args, code, ExitUsage)
+		}
 	}
 }
 

@@ -99,22 +99,6 @@ description: Install project dependencies by delegating to extension-provided in
 usage: putnami deps install [--tag <tags>] [--exclude-tag <tags>]
 example: putnami deps install
 example: putnami deps install --tag go
-═══ dev extension ═══
-description: Develop extensions: validate manifests against the protocol
-usage: putnami dev extension validate [path]
-example: putnami dev extension validate
-example: putnami dev extension validate ./my-extension/
-═══ dev template ═══
-description: Develop and package templates: validate manifests, test rendering output, or package for distribution
-usage: putnami dev template <validate|test|package> [path] [--skip-build] [--keep] [--version <version>] [--stable]
-flag: --skip-build |  | With test: render the template without running build and test on it
-flag: --keep |  | With test: keep the rendered temporary workspace for inspection
-flag: --version | <version> | With package: version to stamp on the produced archive
-flag: --stable |  | With package: publish under a stable version instead of a prerelease
-example: putnami dev template validate
-example: putnami dev template validate ./my-template/
-example: putnami dev template test
-example: putnami dev template package
 ═══ doctor ═══
 description: Run a read-only production-readiness preflight over the selected projects: derives production-safety findings (incomplete capabilities, missing required config, invalid committed schemas, config shadowing) from committed manifests and grades them by deployment profile. Under --profile production a high/critical finding fails with exit 2; dev/test stay advisory. Config values are never read or emitted
 usage: putnami doctor [--profile <dev|test|production>] [--project <selector>] [--machine] [--output <format>]
@@ -160,6 +144,11 @@ description: Update extensions to latest compatible versions
 usage: putnami extensions update [name] [--output <format>]
 example: putnami extensions update
 example: putnami extensions update --output=jsonl
+═══ extensions validate ═══
+description: Develop extensions: validate manifests against the protocol
+usage: putnami extensions validate [path]
+example: putnami extensions validate
+example: putnami extensions validate ./my-extension/
 ═══ help ═══
 description: Show help for putnami, for one command, or for the whole CLI in man or Markdown format
 usage: putnami help [<command>] [<subcommand>] [--man] [--markdown]
@@ -338,15 +327,34 @@ description: List configured and discovered templates
 usage: putnami templates list [--output <format>]
 example: putnami templates list
 example: putnami templates list --output=jsonl
+═══ templates package ═══
+description: Package a template into a distributable archive
+usage: putnami templates package [path] [--version <version>] [--stable]
+flag: --version | <version> | Version to stamp on the produced archive
+flag: --stable |  | Publish under a stable version instead of a prerelease
+example: putnami templates package
+example: putnami templates package ./my-template/ --version 1.2.3 --stable
 ═══ templates remove ═══
 description: Remove an installed template
 usage: putnami templates remove <name>
 example: putnami templates remove go-server
+═══ templates test ═══
+description: Test a template by rendering it into a temporary workspace and running build and test on the result
+usage: putnami templates test [path] [--skip-build] [--keep]
+flag: --skip-build |  | Render the template without running build and test on it
+flag: --keep |  | Keep the rendered temporary workspace for inspection
+example: putnami templates test
+example: putnami templates test ./my-template/ --skip-build
 ═══ templates update ═══
 description: Update templates to latest compatible versions
 usage: putnami templates update [name] [--output <format>]
 example: putnami templates update
 example: putnami templates update --output=jsonl
+═══ templates validate ═══
+description: Validate a template manifest against the protocol
+usage: putnami templates validate [path]
+example: putnami templates validate
+example: putnami templates validate ./my-template/
 ═══ tree fingerprint ═══
 description: Print one digest covering HEAD, the tracked diff against it, and the content of every untracked non-ignored file. It exists because "the same files are dirty" is not "the same bytes are on disk": git status reports paths and status codes, so an agent that gates a tree and then edits a file it had already dirtied leaves that output identical. Human output is the bare digest; --output=json adds dirty and headSHA, the same members a recorded session's tree block carries. Reads the repository and writes nothing, and needs no workspace
 usage: putnami tree fingerprint [--output <format>]

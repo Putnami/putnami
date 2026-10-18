@@ -1,6 +1,6 @@
 # Manifest Authoring
 
-The `manifest` package builds an extension's `putnami.extension.json` in Go and refuses to emit one that violates the extension protocol. It is the authoring-time counterpart of `putnami dev extension validate`: both run `extension.FullValidateManifest`, so a manifest that builds here is a manifest the CLI accepts.
+The `manifest` package builds an extension's `putnami.extension.json` in Go and refuses to emit one that violates the extension protocol. It is the authoring-time counterpart of `putnami extensions validate`: both run `extension.FullValidateManifest`, so a manifest that builds here is a manifest the CLI accepts.
 
 ## Overview
 
