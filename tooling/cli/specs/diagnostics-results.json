@@ -78,7 +78,7 @@
     },
     {
       "id": "local-evidence-verification",
-      "text": "The evidence verifier that putnami proposals finalize applies checks an execute run's local evidence against the worktree it runs in, without a workspace, and writes one JSON verdict. A failure, a call with no mode included, writes {\"verdict\":\"not-verified\",\"reason\":...} on one line. Evidence is read as fatal UTF-8, an object that repeats a member is refused, and every path resolves against the Git top level."
+      "text": "The evidence verifier that putnami change finalize applies checks an execute run's local evidence against the worktree it runs in, without a workspace, and writes one JSON verdict. A failure, a call with no mode included, writes {\"verdict\":\"not-verified\",\"reason\":...} on one line. Evidence is read as fatal UTF-8, an object that repeats a member is refused, and every path resolves against the Git top level."
     },
     {
       "id": "session-summary-view",

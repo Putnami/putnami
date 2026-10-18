@@ -99,5 +99,5 @@ channel, so the command fails there and names the launch it needs. No Git
 command it starts receives the channel.
 
 [ADR 0006](adr/0006-the-contributor-executable-serves-change-finalize.md)
-records how the executable serves the command and where it differs from the
-core's `putnami proposals finalize`.
+records how the executable serves the command and where it differs from
+`putnami proposals finalize`, the core command it replaced.

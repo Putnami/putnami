@@ -20,8 +20,9 @@ check it before you call a method a later protocol version adds.
 `collaboration.call` routes contract operations through the same code as the
 CLI command, so the answer matches what the user sees. An operation that fails
 at the provider is not an error: the envelope reports it. The host refuses a
-contract name that is not a collaboration contract, and `proposals finalize`,
-which is a command, not an operation, with `-32602`.
+contract name that is not a collaboration contract with `-32602`. An operation
+the contract does not define, such as `finalize` on `proposals`, gets an
+envelope whose outcome is `invalid`, with the reason `request.invalid`.
 
 `workspace.owners` takes workspace-relative paths in `io/fs` form, such as
 `tooling/cli/main.go`: no leading or trailing slash, no `.` or `..` element,

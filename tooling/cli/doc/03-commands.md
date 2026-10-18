@@ -989,28 +989,15 @@ recorded session carries the same digest for the tree it opened on, under
 the calculation, the SDK package `go.putnami.dev/sdk/extension/treefingerprint`.
 See [11-session-recording.md](11-session-recording.md#the-gated-tree).
 
-The core CLI has no `tree verify` command: `putnami tree verify …` exits with a usage error. `putnami change verify` from `@putnami/contributor` checks the local evidence of an execute run; [Verify local evidence](../../contributor/doc/05-change-verify.md) describes its modes and the dossier and workflow records it reads. `putnami proposals finalize` verifies the dossier it publishes in-process. [Commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli) lists the move.
+The core CLI has no `tree verify` command: `putnami tree verify …` exits with a usage error. `putnami change verify` from `@putnami/contributor` checks the local evidence of an execute run; [Verify local evidence](../../contributor/doc/05-change-verify.md) describes its modes and the dossier and workflow records it reads. `putnami change finalize` verifies the dossier it publishes in-process. [Commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli) lists the move.
 
 ### Contributor checks
 
 The core CLI has no `contributor` command. `putnami contributor …` exits with a usage error unless an installed extension declares that root. `putnami doctor --machine` reports the machine load, and `putnami change language <mode>` from `@putnami/contributor` checks English-language signals; [Commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli) lists the move.
 
-### `proposals finalize`
+### Proposal publication
 
-When a proposals provider is configured, `putnami proposals finalize --help`
-shows the local publication command's flags. `--verification-file` reads the
-current dossier, `--gate ci` waits for policy-named hosted checks, and
-`--workflow-file` supplies an immutable native workflow and is required for
-hosted publication naming a parent task. Native eligibility is checked before
-publication, and exact required checks can advance eligible current units.
-A partial delivery whose changed paths all belong to projects that declare
-`featureAuthority.none` and author no feature, at base and on the branch,
-needs no workflow: the hosted checks on its head are its evidence. Pass
-`--workflow-file` to advance a workflow unit that names such projects.
-`--partial-delivery` preserves an incomplete parent task. The command does not
-add a provider operation or run another local gate. It pushes the branch to the
-`origin` remote and resolves the base from `origin/<base>`, so `origin` must be
-the repository the proposals provider manages.
+The core CLI has no `proposals finalize` command: `putnami proposals finalize …` exits with a usage error. `putnami change finalize` from `@putnami/contributor` publishes the current branch as a proposal; [Publish a proposal](../../contributor/doc/06-change-finalize.md) describes its flags and the evidence it consumes. [Commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli) lists the move.
 
 ### `compose`
 

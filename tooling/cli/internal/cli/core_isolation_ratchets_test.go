@@ -315,10 +315,9 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // calculation itself is NOT here — it lives in the SDK's treefingerprint
 // package, which internal/git, the git boundary, exposes to core and which the
 // session recorder reads too; this package holds the choice
-// between the two output shapes, which is what a vertical is for. It also holds
-// Verifier, which `proposals finalize` applies to an agent's recorded evidence
-// against that same identity and which needs no workspace either; it adds no
-// package.
+// between the two output shapes, which is what a vertical is for. It held the
+// evidence verifier of `proposals finalize` too, until that command left the
+// core with it.
 // RAISED to 53: internal/runnersource owns the effectful immutable
 // source boundary (bounded worktree capture, private CAS publication and safe
 // materialization). It cannot live in protocols/runner, whose wire types must
@@ -501,14 +500,19 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // LOWERED 78 → 77: internal/commands/contributor is deleted with the
 // `contributor` root. Its language check runs as `putnami change language` in
 // the @putnami/contributor executable, and `putnami doctor --machine` reads the
-// machine load. The pure evaluator that proposals finalize applies stays in
-// internal/commands/shared. The ceiling follows the tree down.
+// machine load. The pure evaluator that proposals finalize applied stayed in
+// internal/commands/shared until that command left too. The ceiling follows the
+// tree down.
 //
 // MOVED, the count unchanged: the release-set, publication and deploy-target
 // code leaves internal/jobs for internal/jobs/publication. internal/jobs keeps
 // no Go file of its own, so it stops counting when internal/jobs/publication
 // starts. TestJobsSplitLeavesNoJobsPackage keeps it that way.
-const internalPackageCountCeiling = 77
+//
+// LOWERED 77 → 76: internal/commands/proposals is deleted with `proposals
+// finalize`, which runs as `putnami change finalize` in the
+// @putnami/contributor executable. The ceiling follows the tree down.
+const internalPackageCountCeiling = 76
 
 func TestInternalPackageCountCeiling(t *testing.T) {
 	t.Parallel()

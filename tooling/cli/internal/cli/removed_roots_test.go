@@ -146,6 +146,50 @@ func TestRefuseRemovedCoreSubcommandRefusesTreeVerify(t *testing.T) {
 	}
 }
 
+// TestRefuseRemovedCoreSubcommandRefusesProposalsFinalize pins the refusal of
+// the deleted `proposals finalize`: the same words as a removed root, no
+// extension named, no workspace assumed, and the other proposals operations
+// untouched. The parser reads proposals as a command group where the
+// workspace binds a collaboration contract and as a job command where it does
+// not; the refusal reads the same subcommand from both.
+func TestRefuseRemovedCoreSubcommandRefusesProposalsFinalize(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "command-catalog", "a-root-that-left-the-core-is-refused-unless-an-extension-declares-it")
+	t.Parallel()
+	err := refuseRemovedCoreSubcommand("proposals", "finalize")
+	if protocolcli.ExitCodeForError(err) != protocolcli.ExitUsage {
+		t.Fatalf("error = %v, want a usage error", err)
+	}
+	message := err.Error()
+	for _, want := range []string{"`putnami proposals finalize` is no longer a core command", "an extension may provide it", commandmeta.CommandsThatLeftTheCoreURL} {
+		if !strings.Contains(message, want) {
+			t.Errorf("message = %q, want %q", message, want)
+		}
+	}
+	if strings.Contains(message, "@putnami/") || strings.Contains(message, "change finalize") || strings.Contains(message, "extensions list") {
+		t.Errorf("message = %q names an extension or assumes a workspace", message)
+	}
+	for _, path := range [][2]string{{"proposals", "upsert"}, {"proposals", ""}, {"tasks", "finalize"}, {"change", "finalize"}} {
+		if err := refuseRemovedCoreSubcommand(path[0], path[1]); err != nil {
+			t.Errorf("%s %s is refused as a removed subcommand: %v", path[0], path[1], err)
+		}
+	}
+	contracts := map[string]bool{"proposals": true}
+	for _, args := range [][]string{{"proposals", "finalize"}, {"proposals", "finalize", "--help"}, {"proposals", "finalize", "--draft", "--base", "main"}} {
+		for _, groups := range []map[string]bool{contracts, nil} {
+			parsed := ParseArgs(args, nil, groups)
+			if parsed.Commands[0] != "proposals" || typedSubcommand(parsed) != "finalize" {
+				t.Errorf("ParseArgs(%v) with groups %v = %v, %q; the refusal reads the command and its subcommand",
+					args, groups, parsed.Commands, typedSubcommand(parsed))
+			}
+		}
+	}
+	for _, args := range [][]string{{"proposals", "--help"}, {"proposals"}, {"lint,proposals", "finalize"}} {
+		if sub := typedSubcommand(ParseArgs(args, nil, nil)); sub == "finalize" {
+			t.Errorf("ParseArgs(%v) names the subcommand %q", args, sub)
+		}
+	}
+}
+
 // TestRemovedCoreRootIsReadAfterAliases keeps a workspace alias named like a
 // removed root working: the refusal reads the command the alias resolves to.
 func TestRemovedCoreRootIsReadAfterAliases(t *testing.T) {

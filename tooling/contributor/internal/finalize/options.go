@@ -7,8 +7,8 @@ import (
 )
 
 // ParseOptions reads the flags after `change finalize`. It is a copy of the
-// core's parser for `proposals finalize`, with the same messages. Every
-// error is a usage error.
+// parser of `proposals finalize`, the core command it replaced, with the same
+// messages. Every error is a usage error.
 func ParseOptions(args []string) (Options, error) {
 	var options Options
 	seen := map[string]bool{}

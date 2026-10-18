@@ -92,10 +92,11 @@ Known differences from `putnami contributor language`, as the core served it:
 
 The core no longer serves `contributor language` or `tree verify`:
 `putnami contributor …` and `putnami tree verify …` are usage errors that link
-the reference of moved commands. The core keeps `treecmd.Verifier`, because
-`proposals finalize` verifies the dossier in-process. It keeps its
-French-signal evaluator in `internal/commands/shared`, because
-`proposals finalize` applies it to the proposal it publishes.
+the reference of moved commands. The core kept `treecmd.Verifier`, because
+`proposals finalize` verified the dossier in-process, and its French-signal
+evaluator in `internal/commands/shared`, because `proposals finalize` applied
+it to the proposal it published. Both left the core with `proposals finalize`
+([ADR 0006](0006-the-contributor-executable-serves-change-finalize.md)).
 
 ### 7. `change verify` reads restored reports over the host channel
 
@@ -195,9 +196,9 @@ Known differences from `putnami tree verify`, as the core served it:
 - The build skill and its references call `putnami change verify`. A consumer
   needs @putnami/contributor with the command; outside a workspace, it needs
   the extension installed in user scope.
-- The core keeps a copy of the verifier and a copy of the evaluator, which
-  `proposals finalize` uses. A behavior change to a core copy needs the same
-  change in the executable's copy.
+- The core kept a copy of the verifier and a copy of the evaluator for
+  `proposals finalize` until it deleted that command (ADR 0006). The
+  executable's copies are the only ones.
 - `change finalize` follows the same pattern: a subcommand in the `change`
   group, an interactive launch, and the host channel for anything that needs
   the core.

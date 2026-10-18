@@ -77,10 +77,11 @@ command.
      command prints under `--output=json`, byte for byte. Where the command
      prints no envelope, the method refuses with the reason: `-32602` for a
      word that is not a collaboration contract, which the CLI does not route
-     to that command, and for `proposals finalize`, which is a command and
-     not a contract operation; `-32002` outside a workspace, without
+     to that command; `-32002` outside a workspace, without
      `options.collaboration`, or when an extension command owns the contract
-     word.
+     word. An operation the contract does not define, such as `finalize` on
+     `proposals`, is answered like any other: an envelope whose outcome is
+     `invalid`.
    - `verification.report` returns what `engine.VerifyCachedVerificationReport`
      returns, as base64 bytes, and its refusal as `-32003` with the engine's
      message. Outside a workspace it answers `-32002`.

@@ -216,6 +216,7 @@ func projectOwners() map[string][]wire.OwningProject {
 // base, or new on the branch.
 func TestOwnersComeFromTheHostAndFeaturelessnessFromBothRevisions(t *testing.T) {
 	spectest.Proves(t, "cli/contributor-workflows", "change-finalize-parity", "ownership-comes-from-the-host-channel")
+	spectest.Proves(t, "cli/contributor-workflows", "squash-ready-publication", "a-featureless-partial-needs-no-workflow")
 	repo := newOwnersRepo(t)
 	for _, tc := range []struct {
 		name     string

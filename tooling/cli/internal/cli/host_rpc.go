@@ -91,9 +91,6 @@ func (b hostRPCBinding) collaborationCall(ctx context.Context, call hostrpcproto
 	case !mcp.CollaborationDeclared(b.root):
 		return nil, &hostrpcproto.Error{Code: hostrpcproto.CodeUnavailable,
 			Message: "this workspace declares no options.collaboration in putnami.workspace.json, so no collaboration contract is bound"}
-	case call.Contract == collab.ContractProposals && call.Operation == "finalize":
-		return nil, &hostrpcproto.Error{Code: hostrpcproto.CodeInvalidParams,
-			Message: "proposals finalize is a command, not a contract operation"}
 	}
 	if owners := collaborationCommandOwners(b.extensions, call.Contract); len(owners) > 0 {
 		return nil, &hostrpcproto.Error{Code: hostrpcproto.CodeUnavailable,

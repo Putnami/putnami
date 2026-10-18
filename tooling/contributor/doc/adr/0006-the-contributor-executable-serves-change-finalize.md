@@ -37,12 +37,12 @@ the command runs no local gate. The manifest keeps `cliContract` 5.
 
 ### 2. A copy of the finalizer, with the same behavior
 
-`internal/finalize` holds a copy of the core's finalizer: the option parser,
-the publication flow, the policy and text rules, and the Git operations with
-their read-only allowlist and their two writes, `commit` and `push`. It prints
-the same result and exits with the same code: 2 for a usage error, 1 for a
-failure and 0 for a published proposal. A failure prints `change finalize:
-<error>` on stderr.
+`internal/finalize` holds a copy of the finalizer the core served: the option
+parser, the publication flow, the policy and text rules, and the Git
+operations with their read-only allowlist and their two writes, `commit` and
+`push`. It prints the same result and exits with the same code: 2 for a usage
+error, 1 for a failure and 0 for a published proposal. A failure prints
+`change finalize: <error>` on stderr.
 
 The output mode comes from `params.output` in the job context putnami hands
 the executable. `json`, `jsonl` and `cloud-logging` print the result document
@@ -113,7 +113,17 @@ redirect a command away from its working directory. `change language`,
 as started before a commit or a push, which guards its run credential. The
 executable holds no run credential, so it marks nothing.
 
-### Known differences from `putnami proposals finalize`
+### 6. The core deletes `proposals finalize`
+
+The core no longer serves `proposals finalize`. `putnami proposals finalize …`
+and `putnami help proposals finalize` are usage errors that link the reference
+of moved commands, whether or not the workspace binds a collaboration
+contract. The core deletes its copies of the finalizer, the verifier and the
+evaluator. `collaboration.call` answers `proposals finalize` like any
+operation the contract does not define: an envelope whose outcome is
+`invalid`.
+
+### Known differences from `putnami proposals finalize`, as the core served it
 
 - **(a) Help.** `putnami change finalize --help` prints the help putnami builds
   from the manifest. The core prints its own finalize help.
@@ -191,8 +201,9 @@ executable holds no run credential, so it marks nothing.
   dossier that does not verify, a usage error and an undeclared flag, `change
   finalize` exits with the same code, prints the same stdout and the same
   message, leaves the same branch head, pushes the same refs and writes the
-  same proposal and task records as `proposals finalize`. A core test runs
-  both commands through putnami in twin workspaces and compares them.
+  same proposal and task records as goldens recorded from `proposals
+  finalize`, the core command it replaced. A core test runs `change finalize`
+  through putnami in twin workspaces and compares it with the goldens.
 - The owners of a changed path come from the host's `workspace.owners`. The
   executable loads no workspace.
 - One run opens at most one connection, and a run that makes no call opens
@@ -219,8 +230,8 @@ executable holds no run credential, so it marks nothing.
 
 - The build skill, its references and the `fix-heavy` worker call `putnami
   change finalize`. A consumer needs @putnami/contributor with the command.
-- The core keeps `proposals finalize` and its copies of the finalizer, the
-  verifier and the evaluator until a later change deletes them. A behavior
-  change to a core copy needs the same change in the executable's copy.
+- The core deletes `proposals finalize` and its copies of the finalizer, the
+  verifier and the evaluator (section 6). The executable's copies are the only
+  ones.
 - The requirement `change-finalize-parity` lists the checks the twin test and
   the executable's tests prove.

@@ -16,7 +16,7 @@ so.
 ## Decision
 
 A request to build an outcome authorizes the publication of the run's own
-proposal through `putnami proposals finalize`:
+proposal through `putnami change finalize`:
 
 1. Once the plan is settled, before the first edit, open it as a draft with
    `--draft`.

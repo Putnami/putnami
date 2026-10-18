@@ -2,6 +2,7 @@ package cli
 
 import (
 	"slices"
+	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -27,11 +28,13 @@ var removedRootSuccessors = map[string]string{
 }
 
 // removedCoreSubcommands are the subcommands the core no longer serves under a
-// command root it still serves, as the command path a user types. The core
-// owns the root, so no extension serves the path itself; an extension may serve
-// the command under its own command group. The refusal names no destination
-// and cites the published reference that does.
-var removedCoreSubcommands = []string{"tree verify"}
+// command word it still answers, as the command path a user types: tree, and
+// proposals, the collaboration contract a workspace binds in
+// options.collaboration. The path is refused whatever extensions are
+// installed; an extension may serve the command under its own command group.
+// The refusal names no destination and cites the published reference that
+// does.
+var removedCoreSubcommands = []string{"tree verify", "proposals finalize"}
 
 // refuseRemovedCoreRoot returns a usage error when command is a removed core
 // root that no extension declares, as a command group or as a job, and nil
@@ -62,15 +65,30 @@ func removedWithoutSuccessor(path string) error {
 // refuseRemovedCoreSubcommand returns a usage error when command and sub name a
 // removed core subcommand, and nil otherwise. App.Run calls it beside
 // refuseRemovedCoreRoot, and cmdHelp for `putnami help <command> <sub>`, so
-// `putnami tree verify`, `putnami tree verify --help` and `putnami help tree
-// verify` give the same answer before the workspace bootstrap, in a workspace
-// and outside one.
+// `putnami proposals finalize`, `putnami proposals finalize --help` and
+// `putnami help proposals finalize` give the same answer before the workspace
+// bootstrap, in a workspace and outside one.
 func refuseRemovedCoreSubcommand(command, sub string) error {
 	path := command + " " + sub
 	if !slices.Contains(removedCoreSubcommands, path) {
 		return nil
 	}
 	return removedWithoutSuccessor(path)
+}
+
+// typedSubcommand is the subcommand an invocation names: the one the parser
+// read, or the second argument when it is no flag and the parser read the
+// first as a job command, as it reads proposals in a workspace that binds no
+// collaboration contract. App.Run refuses a removed subcommand from it, so the
+// refusal does not depend on how the command word dispatches.
+func typedSubcommand(parsed *ParsedArgs) string {
+	if parsed.Subcommand != "" || len(parsed.Commands) != 1 || len(parsed.OriginalArgs) < 2 {
+		return parsed.Subcommand
+	}
+	if next := parsed.OriginalArgs[1]; !strings.HasPrefix(next, "-") {
+		return next
+	}
+	return ""
 }
 
 // refuseHelpOfRemovedCoreRoot applies refuseRemovedCoreRoot to `putnami help

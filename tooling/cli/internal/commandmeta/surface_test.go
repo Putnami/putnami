@@ -50,9 +50,9 @@ func TestSurface_ListsEveryCommandUsersType(t *testing.T) {
 	}
 }
 
-// The core serves no contributor root, and proposals finalize stays a local
-// command rather than a provider wire operation.
-func TestSurface_NoContributorRootAndProviderFinalizerIsLocal(t *testing.T) {
+// The core serves no contributor root and no proposals finalize: both left the
+// core for @putnami/contributor.
+func TestSurface_NoContributorRootAndNoProposalsFinalize(t *testing.T) {
 	t.Parallel()
 	surface, err := Surface()
 	if err != nil {
@@ -63,7 +63,7 @@ func TestSurface_NoContributorRootAndProviderFinalizerIsLocal(t *testing.T) {
 			t.Errorf("the surface lists %q, a root the core no longer serves", command.Path)
 		}
 		if command.Path == "proposals finalize" {
-			t.Fatal("local proposals finalize was exposed as a provider wire operation")
+			t.Errorf("the surface lists %q, a command the core no longer serves", command.Path)
 		}
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,16 +17,25 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 )
 
+// recordFinalizeEnv names the putnami binary a recording run takes the
+// goldens from. The current core refuses `proposals finalize`, so the binary
+// is a putnami built from a commit before the core deleted it. When it is set,
+// TestChangeFinalizeMatchesProposalsFinalize runs `<binary> proposals
+// finalize` for every case and writes testdata/change-finalize/<case>.golden
+// instead of comparing. A binary that refuses the command fails the run.
+const recordFinalizeEnv = "PUTNAMI_CLI_RECORD_PROPOSALS_FINALIZE"
+
 // The build skill publishes with `putnami change finalize`, which the
-// installed @putnami/contributor serves through an interactive launch, where
-// it used to run the core's `putnami proposals finalize`. Each case runs the
-// core command in one workspace and the extension command in a twin built
-// the same way: the local provider bound, a local bare repository as origin,
-// and the same task in the same store. The two runs exit with the same code,
-// print the same stdout and the same message, leave the same branch head,
-// push the same refs, and write the same proposal and task records. A run that
-// pushes nothing writes no record. Only the message prefix, putnami's warning
-// about an undeclared flag and the store's timestamps differ.
+// installed @putnami/contributor serves through an interactive launch. Each
+// case runs it in a workspace with the local provider bound, a local bare
+// repository as origin and the task T-1 in the store, and compares what the
+// run leaves with testdata/change-finalize/<case>.golden: the exit code,
+// stdout, the message, the branch head, the refs the origin holds and the
+// proposal and task records. The goldens hold what `putnami proposals
+// finalize`, the core command change finalize replaces, left in the same
+// workspace. Only the message prefix, putnami's warning about an undeclared
+// flag, the store's timestamps and random identity, and the run's own paths
+// in the message are not compared. A run that pushes nothing writes no record.
 func TestChangeFinalizeMatchesProposalsFinalize(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the harness launcher requires bash")
@@ -35,6 +45,10 @@ func TestChangeFinalizeMatchesProposalsFinalize(t *testing.T) {
 	}
 	spectest.Proves(t, "cli/contributor-workflows", "change-finalize-parity", "change-finalize-matches-the-core-command")
 	harness := collaborationHarness(t)
+	recorder := ""
+	if binary := os.Getenv(recordFinalizeEnv); binary != "" {
+		recorder = finalizeRecorder(t, harness, binary)
+	}
 	publish := []string{"--base", "main", "--branch", "topic", "--title", "feat(lib): read the second line",
 		"--body-file", "{body}", "--task-source", "{source}", "--task-id", "T-1"}
 	for _, tc := range []struct {
@@ -50,7 +64,7 @@ func TestChangeFinalizeMatchesProposalsFinalize(t *testing.T) {
 		prefix  bool
 		pushed  bool
 		// undeclared is a flag the manifest does not declare: putnami warns
-		// about it before it launches the executable, and the core does not.
+		// about it before it launches the executable, and the core did not.
 		undeclared string
 	}{
 		{name: "a draft seed", args: append(publish[:len(publish):len(publish)], "--draft"), pushed: true},
@@ -65,68 +79,86 @@ func TestChangeFinalizeMatchesProposalsFinalize(t *testing.T) {
 			exit: 2, message: "--gate accepts only ci; local proof uses --verification-file"},
 		{name: "an undeclared flag", change: "lib/source.txt", args: append(publish[:len(publish):len(publish)], "--squash"),
 			exit: 2, message: `unexpected finalize argument "--squash"`, undeclared: "--squash"},
-		// The dossier is JSON but no dossier: the verifier of each command
-		// refuses it with the same not-verified document, which both quote.
+		// The dossier is JSON but no dossier: the verifier refuses it with a
+		// not-verified document, which the message quotes.
 		{name: "a dossier that does not verify", change: "lib/source.txt",
 			args: append(publish[:len(publish):len(publish)], "--verification-file", finalizeTwinDossier),
 			exit: 1, message: `native dossier verification: {"verdict":"not-verified","reason":`, prefix: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			core := newFinalizeTwin(t, harness, tc.change)
-			source := core.createTask(t)
-			native := newFinalizeTwin(t, harness, tc.change)
-			native.adoptStore(t, core)
-			seeded := core.store(t)
+			twin := newFinalizeTwin(t, harness, tc.change)
+			source := twin.createTask(t)
+			args := twin.expand(tc.args, source)
+			seeded := twin.store(t)
+			golden := filepath.Join("testdata", "change-finalize", strings.ReplaceAll(tc.name, " ", "-")+".golden")
 
-			coreRun := core.putnami(t, append([]string{"proposals", "finalize"}, core.expand(tc.args, source)...)...)
-			nativeRun := native.putnami(t, append([]string{"change", "finalize"}, native.expand(tc.args, source)...)...)
-			coreMessage := core.message(t, coreRun.stderr, "putnami: proposals finalize: ")
-			nativeStderr := nativeRun.stderr
-			if tc.undeclared != "" {
-				warning := "putnami: flag " + tc.undeclared + " is not declared by `change finalize`; "
-				line, rest, _ := strings.Cut(nativeStderr, "\n")
-				if !strings.HasPrefix(line, warning) {
-					t.Fatalf("change finalize wrote %q to stderr, want a first line starting with %q", nativeStderr, warning)
+			var got finalizeOutcome
+			if recorder != "" {
+				run := twin.launch(t, recorder, append([]string{"proposals", "finalize"}, args...)...)
+				if strings.Contains(run.stderr, "`putnami proposals finalize` is no longer a core command") {
+					t.Fatalf("%s refuses proposals finalize; record with a putnami built before the core deleted it:\n%s",
+						os.Getenv(recordFinalizeEnv), run.stderr)
 				}
-				nativeStderr = rest
+				got = twin.outcome(t, run, run.stderr, "putnami: proposals finalize: ")
+			} else {
+				run := twin.launch(t, filepath.Join(harness, "putnami"), append([]string{"change", "finalize"}, args...)...)
+				stderr := run.stderr
+				if tc.undeclared != "" {
+					warning := "putnami: flag " + tc.undeclared + " is not declared by `change finalize`; "
+					line, rest, _ := strings.Cut(stderr, "\n")
+					if !strings.HasPrefix(line, warning) {
+						t.Fatalf("change finalize wrote %q to stderr, want a first line starting with %q", stderr, warning)
+					}
+					stderr = rest
+				}
+				got = twin.outcome(t, run, stderr, "change finalize: ")
 			}
-			nativeMessage := native.message(t, nativeStderr, "change finalize: ")
-			if coreRun.code != tc.exit || !tc.prefix && coreMessage != tc.message || tc.prefix && !strings.HasPrefix(coreMessage, tc.message) {
-				t.Fatalf("proposals finalize exited %d with stderr %q; the case expects %d and %q",
-					coreRun.code, coreRun.stderr, tc.exit, tc.message)
+
+			if got.exit != tc.exit || !tc.prefix && got.message != tc.message || tc.prefix && !strings.HasPrefix(got.message, tc.message) {
+				t.Fatalf("the run exited %d with message %q; the case expects %d and %q", got.exit, got.message, tc.exit, tc.message)
 			}
-			if nativeRun.code != coreRun.code || nativeRun.stdout != coreRun.stdout || nativeMessage != coreMessage {
-				t.Errorf("change finalize exited %d with stdout %q and stderr %q;\nproposals finalize exited %d with stdout %q and stderr %q",
-					nativeRun.code, nativeRun.stdout, nativeRun.stderr, coreRun.code, coreRun.stdout, coreRun.stderr)
+			if tc.exit == 0 && !strings.HasPrefix(got.stdout, "PROPOSAL_REF=") && !strings.HasPrefix(got.stdout, "{") {
+				t.Errorf("the run printed %q, want the proposal reference", got.stdout)
 			}
-			if tc.exit == 0 && !strings.HasPrefix(coreRun.stdout, "PROPOSAL_REF=") && !strings.HasPrefix(coreRun.stdout, "{") {
-				t.Errorf("proposals finalize printed %q, want the proposal reference", coreRun.stdout)
+			if pushed := strings.Contains(got.pushed, "refs/heads/topic "); pushed != tc.pushed {
+				t.Errorf("the run pushed topic: %t, the case expects %t:\n%s", pushed, tc.pushed, got.pushed)
 			}
-			coreRefs, nativeRefs := core.pushed(t), native.pushed(t)
-			if nativeRefs != coreRefs {
-				t.Errorf("change finalize pushed\n%s\nproposals finalize pushed\n%s", nativeRefs, coreRefs)
+			if !tc.pushed && got.store != seeded {
+				t.Errorf("the run pushed nothing and still wrote the store:\n%s", got.store)
 			}
-			if got := strings.Contains(coreRefs, "refs/heads/topic "); got != tc.pushed {
-				t.Errorf("proposals finalize pushed topic: %t, the case expects %t:\n%s", got, tc.pushed, coreRefs)
+			if recorder != "" {
+				writePathFile(t, ".", golden, got.render(source))
+				return
 			}
-			if coreHead, nativeHead := core.git(t, "rev-parse", "HEAD"), native.git(t, "rev-parse", "HEAD"); nativeHead != coreHead {
-				t.Errorf("change finalize left HEAD at %s, proposals finalize at %s", nativeHead, coreHead)
+			want, err := os.ReadFile(golden)
+			if err != nil {
+				t.Fatalf("read the golden of proposals finalize: %v", err)
 			}
-			coreStore, nativeStore := core.store(t), native.store(t)
-			if nativeStore != coreStore {
-				t.Errorf("change finalize stored\n%s\nproposals finalize stored\n%s", nativeStore, coreStore)
-			}
-			if !tc.pushed && coreStore != seeded {
-				t.Errorf("proposals finalize pushed nothing and still wrote the store:\n%s", coreStore)
+			if rendered := got.render(source); rendered != string(want) {
+				t.Errorf("change finalize differs from the golden of proposals finalize\n--- got\n%s\n--- want\n%s", rendered, want)
 			}
 		})
 	}
 }
 
+// finalizeRecorder writes the harness launcher around binary, so a recording
+// run starts it as the harness starts its own CLI.
+func finalizeRecorder(t *testing.T, harness, binary string) string {
+	t.Helper()
+	launcher := strings.ReplaceAll(collaborationLauncher, "@HOME@", shellQuote(filepath.Join(harness, "home")))
+	launcher = strings.ReplaceAll(launcher, "@BINARY@", shellQuote(binary))
+	path := filepath.Join(t.TempDir(), "putnami")
+	if err := os.WriteFile(path, []byte(launcher), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 // finalizeTwin is a workspace on the branch topic, with the local provider
-// and the contributor installed from the harness and a local bare
-// repository as origin. Its main branch holds a featureless project, lib,
-// and a project that holds requirements, app.
+// and the contributor installed from the harness and a local bare repository
+// as origin. Its main branch holds a featureless project, lib, and a project
+// that holds requirements, app. Every committed file has the same bytes on
+// every machine, so every run pushes the same objects.
 type finalizeTwin struct {
 	harness, root, origin, body string
 	env                         []string
@@ -139,6 +171,10 @@ const finalizeTwinStore = ".putnami/collaboration/local/state.json"
 // ignored directory of the workspace, so the tree stays clean.
 const finalizeTwinDossier = ".context/dossier.json"
 
+// finalizeTwinExtensions is the ignored directory that holds the harness
+// manifests, so the committed workspace file names no path of the machine.
+const finalizeTwinExtensions = ".harness"
+
 func newFinalizeTwin(t *testing.T, harness, change string) finalizeTwin {
 	t.Helper()
 	dir := t.TempDir()
@@ -149,8 +185,8 @@ func newFinalizeTwin(t *testing.T, harness, change string) finalizeTwin {
 		t.Fatal(err)
 	}
 	// Every commit, the draft seed included, has the same identity and date in
-	// both twins, so both push the same objects. The empty home keeps the
-	// user's Git configuration, such as commit signing, out of the run.
+	// every run, so every run pushes the same objects. The empty home keeps
+	// the user's Git configuration, such as commit signing, out of the run.
 	twin.env = append(os.Environ(), "PATH="+harness+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"HOME="+home, "XDG_CONFIG_HOME="+filepath.Join(home, ".config"), "GIT_CONFIG_NOSYSTEM=1",
 		"GIT_AUTHOR_NAME=Finalize Test", "GIT_AUTHOR_EMAIL=finalize-test@example.com",
@@ -158,10 +194,16 @@ func newFinalizeTwin(t *testing.T, harness, change string) finalizeTwin {
 		"GIT_AUTHOR_DATE=2026-01-02T03:04:05Z", "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z")
 	binding := collab.Binding{Provider: "@putnami/local-collaboration", Version: 1,
 		Settings: json.RawMessage(`{"repository":"acme/app"}`)}
-	workspace := finalizeTwinWorkspace{Name: "finalize-fixture",
-		Extensions: []string{filepath.ToSlash(filepath.Join(harness, "local-collaboration")),
-			filepath.ToSlash(filepath.Join(harness, "contributor"))},
-		Includes: []string{"lib", "app"}}
+	var extensions []string
+	for _, name := range []string{"local-collaboration", "contributor"} {
+		manifest, err := os.ReadFile(filepath.Join(harness, name, "putnami.extension.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		writePathFile(t, twin.root, finalizeTwinExtensions+"/"+name+"/putnami.extension.json", string(manifest))
+		extensions = append(extensions, "/"+finalizeTwinExtensions+"/"+name)
+	}
+	workspace := finalizeTwinWorkspace{Name: "finalize-fixture", Extensions: extensions, Includes: []string{"lib", "app"}}
 	workspace.Options.Collaboration = collab.Bindings{collab.ContractTasks: binding, collab.ContractProposals: binding}
 	workspace.Options.Contributor = json.RawMessage(`{"version":1,` +
 		`"verification":{"ciGate":{"checks":["Putnami CI"],"pollSeconds":1}},"publication":{"draft":false}}`)
@@ -170,7 +212,7 @@ func newFinalizeTwin(t *testing.T, harness, change string) finalizeTwin {
 		t.Fatal(err)
 	}
 	writePathFile(t, twin.root, "putnami.workspace.json", string(config)+"\n")
-	writePathFile(t, twin.root, ".gitignore", ".putnami/\n.context/\n")
+	writePathFile(t, twin.root, ".gitignore", ".putnami/\n.context/\n"+finalizeTwinExtensions+"/\n")
 	writePathFile(t, twin.root, finalizeTwinDossier, `{"version":2}`+"\n")
 	writePathFile(t, twin.root, "lib/putnami.json", `{"name":"lib","featureAuthority":{"none":"Fixture plumbing with no user-facing feature."}}`+"\n")
 	writePathFile(t, twin.root, "lib/source.txt", "first\n")
@@ -229,17 +271,6 @@ func (w finalizeTwin) createTask(t *testing.T) string {
 	return envelope.Result.Task.Ref.Source
 }
 
-// adoptStore copies the store of other, so both stores issue the same
-// references.
-func (w finalizeTwin) adoptStore(t *testing.T, other finalizeTwin) {
-	t.Helper()
-	state, err := os.ReadFile(filepath.Join(other.root, filepath.FromSlash(finalizeTwinStore)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	writePathFile(t, w.root, finalizeTwinStore, string(state))
-}
-
 // expand replaces the {body} and {source} placeholders of args.
 func (w finalizeTwin) expand(args []string, source string) []string {
 	expanded := make([]string, len(args))
@@ -254,9 +285,10 @@ type finalizeRun struct {
 	code           int
 }
 
-func (w finalizeTwin) putnami(t *testing.T, args ...string) finalizeRun {
+// launch runs the putnami program in the workspace root.
+func (w finalizeTwin) launch(t *testing.T, program string, args ...string) finalizeRun {
 	t.Helper()
-	command := exec.Command(filepath.Join(w.harness, "putnami"), args...)
+	command := exec.Command(program, args...)
 	command.Dir = w.root
 	command.Env = w.env
 	var stdout, stderr bytes.Buffer
@@ -268,9 +300,34 @@ func (w finalizeTwin) putnami(t *testing.T, args ...string) finalizeRun {
 	case errors.As(err, &exit):
 		run.code = exit.ExitCode()
 	case err != nil:
-		t.Fatalf("putnami %v did not run: %v", args, err)
+		t.Fatalf("%s %v did not run: %v", program, args, err)
 	}
 	return run
+}
+
+// finalizeOutcome is what a finalize run leaves behind, as a golden holds it.
+type finalizeOutcome struct {
+	exit                                 int
+	stdout, message, head, pushed, store string
+}
+
+// outcome reads what run left in the twin. stderr is the run's stderr
+// without any line putnami writes before the launch, and prefix the
+// command's message prefix.
+func (w finalizeTwin) outcome(t *testing.T, run finalizeRun, stderr, prefix string) finalizeOutcome {
+	t.Helper()
+	return finalizeOutcome{exit: run.code, stdout: run.stdout, message: w.message(t, stderr, prefix),
+		head: w.git(t, "rev-parse", "HEAD"), pushed: w.pushed(t), store: w.store(t)}
+}
+
+// render is the golden text of the outcome. The store draws its identity at
+// random when it is created, and every reference it issues carries it in its
+// source, local:<identity>; render names it <store>.
+func (o finalizeOutcome) render(source string) string {
+	identity := strings.TrimPrefix(source, "local:")
+	return strings.NewReplacer(source, "local:<store>", `"storeId": "`+identity+`"`, `"storeId": "<store>"`).Replace(
+		fmt.Sprintf("exit %d\n-- stdout --\n%s-- message --\n%s\n-- head --\n%s\n-- pushed --\n%s\n-- store --\n%s\n",
+			o.exit, o.stdout, o.message, o.head, o.pushed, o.store))
 }
 
 // message is stderr without the command's prefix, with the twin's own paths

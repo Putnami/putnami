@@ -37,7 +37,7 @@
     },
     {
       "id": "provider-neutral-publication",
-      "text": "Native proposals finalize consumes a current native dossier or explicitly waits for named hosted checks; it executes no local gate. It pushes and publishes through bound contracts with exact readback and checked preconditions. Partial delivery preserves the opaque parent identity without closing or delivered transition. Draft seeds carry no closing directive. Unresolved writes stop without retry."
+      "text": "putnami change finalize consumes a current native dossier or explicitly waits for named hosted checks; it executes no local gate. It pushes and publishes through bound contracts with exact readback and checked preconditions. Partial delivery preserves the opaque parent identity without closing or delivered transition. Draft seeds carry no closing directive. Unresolved writes stop without retry."
     },
     {
       "id": "repository-policy",
@@ -61,7 +61,7 @@
     },
     {
       "id": "change-finalize-parity",
-      "text": "putnami change finalize, served by the @putnami/contributor executable, exits, prints, pushes and writes the same proposal and task records as putnami proposals finalize, the core command it replaces, for a draft seed, a hosted gate and a usage error. It reaches the providers, the owners of changed paths and restored verification reports through the one host RPC channel putnami opens for the launch. A usage error never opens it, and no git command it starts receives it."
+      "text": "putnami change finalize, served by the @putnami/contributor executable, exits, prints, pushes and writes the same proposal and task records as goldens recorded from putnami proposals finalize, the core command it replaced, for a draft seed, a hosted gate and a usage error. It reaches the providers, the owners of changed paths and restored verification reports through the one host RPC channel putnami opens for the launch. A usage error never opens it, and no git command it starts receives it."
     },
     {
       "id": "canonical-consumer-migration",
