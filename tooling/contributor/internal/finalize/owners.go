@@ -15,7 +15,6 @@ import (
 	"slices"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	features "go.putnami.dev/protocol/features"
@@ -46,7 +45,8 @@ func HostOwners(root string, owners WorkspaceOwners) RequirementOwners {
 				unowned[candidate] = true
 				continue
 			}
-			if !utf8.ValidString(relative) || !wire.ValidWorkspacePath(relative) {
+			// ValidWorkspacePath rejects a path that is not valid UTF-8.
+			if !wire.ValidWorkspacePath(relative) {
 				return ownership, fmt.Errorf("resolve changed project ownership: changed path %q is not a valid UTF-8 workspace path, so the putnami host cannot name its owners", candidate)
 			}
 			changed = append(changed, candidate)

@@ -80,11 +80,14 @@ assignees read back, and for a hosted workflow, its digest, ready units and
 receipt.
 
 It exits 0 when the proposal is published, 1 when the run fails, and 2 for a
-usage error. A failure prints `change finalize: <error>` on stderr. A provider
-write whose outcome is unknown stops the run with the provider's reconcile
-hint, and the command never retries it. The command takes no project
-selection, and refuses `--projects`, `--all`, `--impacted`, `--baseline`,
-`--tag`, `--exclude-tag` and `--exclude`.
+usage error. A failure prints `change finalize: <error>` on stderr. `Ctrl-C`
+stops the run, and putnami exits 130. The run has a 90-minute deadline: when
+it passes, the run fails with `context canceled`, a proposal that waits for
+hosted checks stays open and ready, and running the command again resumes the
+wait. A provider write whose outcome is unknown stops the run with the
+provider's reconcile hint, and the command never retries it. The command takes
+no project selection, and refuses `--projects`, `--all`, `--impacted`,
+`--baseline`, `--tag`, `--exclude-tag` and `--exclude`.
 
 ## Launch
 

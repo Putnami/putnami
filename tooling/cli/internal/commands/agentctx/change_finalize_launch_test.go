@@ -22,9 +22,9 @@ import (
 // the same way: the local provider bound, a local bare repository as origin,
 // and the same task in the same store. The two runs exit with the same code,
 // print the same stdout and the same message, leave the same branch head,
-// push the same refs, and write the same proposal and task records. Only the
-// message prefix, putnami's warning about an undeclared flag and the store's
-// timestamps differ.
+// push the same refs, and write the same proposal and task records. A run that
+// pushes nothing writes no record. Only the message prefix, putnami's warning
+// about an undeclared flag and the store's timestamps differ.
 func TestChangeFinalizeMatchesProposalsFinalize(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the harness launcher requires bash")
@@ -40,10 +40,13 @@ func TestChangeFinalizeMatchesProposalsFinalize(t *testing.T) {
 		name string
 		// change is the file the branch commit edits; without one, the branch
 		// has no commit ahead of main.
-		change  string
-		args    []string
-		exit    int
+		change string
+		args   []string
+		exit   int
+		// message is the core's message without its prefix. With prefix, the
+		// message starts with it.
 		message string
+		prefix  bool
 		pushed  bool
 		// undeclared is a flag the manifest does not declare: putnami warns
 		// about it before it launches the executable, and the core does not.
@@ -61,12 +64,18 @@ func TestChangeFinalizeMatchesProposalsFinalize(t *testing.T) {
 			exit: 2, message: "--gate accepts only ci; local proof uses --verification-file"},
 		{name: "an undeclared flag", change: "lib/source.txt", args: append(publish[:len(publish):len(publish)], "--squash"),
 			exit: 2, message: `unexpected finalize argument "--squash"`, undeclared: "--squash"},
+		// The dossier is JSON but no dossier: the verifier of each command
+		// refuses it with the same not-verified document, which both quote.
+		{name: "a dossier that does not verify", change: "lib/source.txt",
+			args: append(publish[:len(publish):len(publish)], "--verification-file", finalizeTwinDossier),
+			exit: 1, message: `native dossier verification: {"verdict":"not-verified","reason":`, prefix: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			core := newFinalizeTwin(t, harness, tc.change)
 			source := core.createTask(t)
 			native := newFinalizeTwin(t, harness, tc.change)
 			native.adoptStore(t, core)
+			seeded := core.store(t)
 
 			coreRun := core.putnami(t, append([]string{"proposals", "finalize"}, core.expand(tc.args, source)...)...)
 			nativeRun := native.putnami(t, append([]string{"change", "finalize"}, native.expand(tc.args, source)...)...)
@@ -81,7 +90,7 @@ func TestChangeFinalizeMatchesProposalsFinalize(t *testing.T) {
 				nativeStderr = rest
 			}
 			nativeMessage := native.message(t, nativeStderr, "change finalize: ")
-			if coreRun.code != tc.exit || coreMessage != tc.message {
+			if coreRun.code != tc.exit || !tc.prefix && coreMessage != tc.message || tc.prefix && !strings.HasPrefix(coreMessage, tc.message) {
 				t.Fatalf("proposals finalize exited %d with stderr %q; the case expects %d and %q",
 					coreRun.code, coreRun.stderr, tc.exit, tc.message)
 			}
@@ -102,8 +111,12 @@ func TestChangeFinalizeMatchesProposalsFinalize(t *testing.T) {
 			if coreHead, nativeHead := core.git(t, "rev-parse", "HEAD"), native.git(t, "rev-parse", "HEAD"); nativeHead != coreHead {
 				t.Errorf("change finalize left HEAD at %s, proposals finalize at %s", nativeHead, coreHead)
 			}
-			if coreStore, nativeStore := core.store(t), native.store(t); nativeStore != coreStore {
+			coreStore, nativeStore := core.store(t), native.store(t)
+			if nativeStore != coreStore {
 				t.Errorf("change finalize stored\n%s\nproposals finalize stored\n%s", nativeStore, coreStore)
+			}
+			if !tc.pushed && coreStore != seeded {
+				t.Errorf("proposals finalize pushed nothing and still wrote the store:\n%s", coreStore)
 			}
 		})
 	}
@@ -120,6 +133,10 @@ type finalizeTwin struct {
 
 // finalizeTwinStore is the local provider's store below the workspace root.
 const finalizeTwinStore = ".putnami/collaboration/local/state.json"
+
+// finalizeTwinDossier is a JSON document that is not a dossier, in an
+// ignored directory of the workspace, so the tree stays clean.
+const finalizeTwinDossier = ".context/dossier.json"
 
 func newFinalizeTwin(t *testing.T, harness, change string) finalizeTwin {
 	t.Helper()
@@ -156,7 +173,8 @@ func newFinalizeTwin(t *testing.T, harness, change string) finalizeTwin {
 		t.Fatal(err)
 	}
 	writePathFile(t, twin.root, "putnami.workspace.json", string(config)+"\n")
-	writePathFile(t, twin.root, ".gitignore", ".putnami/\n")
+	writePathFile(t, twin.root, ".gitignore", ".putnami/\n.context/\n")
+	writePathFile(t, twin.root, finalizeTwinDossier, `{"version":2}`+"\n")
 	writePathFile(t, twin.root, "lib/putnami.json", `{"name":"lib","featureAuthority":{"none":"Fixture plumbing with no user-facing feature."}}`+"\n")
 	writePathFile(t, twin.root, "lib/source.txt", "first\n")
 	writePathFile(t, twin.root, "app/putnami.json", `{"name":"app"}`+"\n")

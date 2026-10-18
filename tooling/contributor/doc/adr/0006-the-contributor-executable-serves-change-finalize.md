@@ -108,10 +108,10 @@ The executable keeps the rest of the check:
 
 `internal/childenv` builds the environment of every child process. It removes
 the channel variables, and for Git it also removes the variables that could
-redirect a command away from its working directory. `change verify` and
-`change finalize` share it. The core marks repository code as started before a
-commit or a push, which guards its run credential. The executable holds no run
-credential, so it marks nothing.
+redirect a command away from its working directory. `change language`,
+`change verify` and `change finalize` share it. The core marks repository code
+as started before a commit or a push, which guards its run credential. The
+executable holds no run credential, so it marks nothing.
 
 ### Known differences from `putnami proposals finalize`
 
@@ -129,10 +129,19 @@ credential, so it marks nothing.
   Such a run fails at its first provider call with exit 1, before it writes
   anything, and the message names `putnami change finalize`. The core needs no
   channel.
-- **(e) Deadline.** The task has a 90-minute deadline, and putnami stops the
-  executable when it passes. The core command has none. A policy whose
-  `verification.ciGate.timeoutMinutes` is above about 85 can reach the
-  deadline before the hosted wait ends.
+- **(e) Deadline.** The task has a 90-minute deadline. The core command has
+  none. A policy whose `verification.ciGate.timeoutMinutes` is above about 85
+  can reach the deadline before the hosted wait ends. When the deadline
+  passes:
+  - putnami sends `SIGTERM` to the executable, and the run's context cancels.
+  - The hosted wait returns `context canceled`. The command prints `change
+    finalize: context canceled` and exits 1.
+  - The proposal stays open and ready, the state a policy timeout leaves.
+  - putnami kills the executable if it still runs 5 seconds later.
+  - A `git push` in flight is its own process, which putnami does not signal,
+    so it completes.
+
+  To resume, run the command again.
 - **(f) Run credential.** The executable marks no repository code as started.
 - **(g) Undeclared collaboration.** Without `options.collaboration`, putnami
   does not route `proposals` to the core command. `change finalize` runs, and
@@ -159,15 +168,31 @@ credential, so it marks nothing.
 - **(m) Unreachable host.** A provider call that does not reach the host is an
   error that names its cause. The core calls the provider in-process and
   always has an envelope.
+- **(n) Restored reports.** A dossier or a hosted workflow record can name a
+  report that a gate restored from the task cache. The executable reads it
+  with `verification.report`, from the cache of the workspace putnami loaded.
+  The core reads the cache under the Git top level, as ADR 0005 records in its
+  difference (d). Where the two caches differ, the verdicts differ. A failed
+  `verification.report` call gives the core's reason, `workflow proof restored
+  report has no matching native cache producer: <task>`, without the host's
+  message. The no-channel reason of ADR 0005, difference (e), never appears:
+  without a channel the run stops at its first provider call (d), before it
+  reads the dossier.
+- **(o) Interrupt.** A first `Ctrl-C` cancels both commands. The core prints
+  `putnami: proposals finalize: <error>`, such as `context canceled`, and
+  exits 1. For `change finalize`, the executable prints `change finalize:
+  <error>`, and putnami exits 130, the code it gives every interactive command
+  it cancels. A second `Ctrl-C`, or 10 seconds without an exit, makes both
+  exit 130.
 
 ## Invariants
 
 - For a draft seed, a hosted partial delivery, a refused partial delivery, a
-  usage error and an undeclared flag, `change finalize` exits with the same
-  code, prints the same stdout and the same message, leaves the same branch
-  head, pushes the same refs and writes the same proposal and task records as
-  `proposals finalize`. A core test runs both commands through putnami in twin
-  workspaces and compares them.
+  dossier that does not verify, a usage error and an undeclared flag, `change
+  finalize` exits with the same code, prints the same stdout and the same
+  message, leaves the same branch head, pushes the same refs and writes the
+  same proposal and task records as `proposals finalize`. A core test runs
+  both commands through putnami in twin workspaces and compares them.
 - The owners of a changed path come from the host's `workspace.owners`. The
   executable loads no workspace.
 - One run opens at most one connection, and a run that makes no call opens

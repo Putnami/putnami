@@ -108,13 +108,18 @@ func (c *Channel) dial() (*hostrpc.Client, error) {
 }
 
 // launchError turns a missing channel into the remedy and the missing
-// variables. Any other error is returned unchanged.
+// variables. A channel without a remedy names only the missing variables.
+// Any other error is returned unchanged.
 func (c *Channel) launchError(err error) error {
 	var noHost *hostrpc.NoHostError
-	if errors.As(err, &noHost) {
-		return fmt.Errorf("%s (a hosted run opens no channel; %s not set)", c.remedy, strings.Join(noHost.Missing, " and "))
+	if !errors.As(err, &noHost) {
+		return err
 	}
-	return err
+	missing := fmt.Sprintf("a hosted run opens no channel; %s not set", strings.Join(noHost.Missing, " and "))
+	if c.remedy == "" {
+		return errors.New(missing)
+	}
+	return fmt.Errorf("%s (%s)", c.remedy, missing)
 }
 
 var _ language.CallProvider = (*Channel)(nil).Call

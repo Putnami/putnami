@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	collab "go.putnami.dev/protocol/collaboration"
-	wire "go.putnami.dev/protocol/extension/hostrpc"
 )
 
 // TestTasksReportsACallThatNeverReachedAProvider covers the one seam this
@@ -36,14 +35,5 @@ func TestTasksReportsAProviderFailureWithTheCoresWording(t *testing.T) {
 	if status := runner.RunLanguage(context.Background(), "tasks", nil); status != 2 ||
 		!strings.HasPrefix(errors.String(), "change language: tasks find answered unsupported: ") {
 		t.Fatalf("status=%d error=%q", status, errors.String())
-	}
-}
-
-func TestRepositoryEnvironmentDropsWhatRedirectsTheRepositoryReaderAndTheHostChannel(t *testing.T) {
-	t.Parallel()
-	got := repositoryEnvironment([]string{"PATH=/bin", "GIT_DIR=/elsewhere", "GIT_CONFIG_COUNT=1", "GIT_WORK_TREE=/w", "HOME=/h",
-		wire.SocketEnv + "=/tmp/host.sock", wire.TokenEnv + "=secret"})
-	if strings.Join(got, " ") != "PATH=/bin HOME=/h" {
-		t.Fatalf("kept %v", got)
 	}
 }
