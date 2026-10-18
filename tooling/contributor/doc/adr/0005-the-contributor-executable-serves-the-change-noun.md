@@ -88,11 +88,13 @@ Known differences from `putnami contributor language`:
 - **(c) Messages.** Every message names `change language`, the command the user
   typed, where the core's name `contributor language`.
 
-### 6. The core copies stay for now
+### 6. The core deletes `contributor language`
 
-The core's `contributor language` and `tree verify` keep working. A later
-slice deletes them, with their copies of the check and the verifier, once
-`change finalize` has moved.
+The core no longer serves `contributor language`: `putnami contributor …` is a
+usage error that links the reference of moved commands. The core keeps its
+French-signal evaluator in `internal/commands/shared`, because
+`proposals finalize` applies it to the proposal it publishes. The core's
+`tree verify` keeps working until a later slice deletes it.
 
 ### 7. `change verify` reads restored reports over the host channel
 
@@ -182,7 +184,7 @@ Known differences from `putnami tree verify`:
 - **Run `putnami tasks find` as a subprocess.** D-014 settles an RPC call, and
   a subprocess starts a second putnami with its own provider resolution.
 - **Import the core's packages.** The module may never import
-  `tooling/cli/internal`, and the core's copy is about to be deleted.
+  `tooling/cli/internal`, and the core no longer has the four modes.
 - **A job-runner command instead of an interactive one.** The job renderer
   would capture the findings and the host opens no channel for a job.
 
@@ -192,9 +194,10 @@ Known differences from `putnami tree verify`:
 - The build skill and its references call `putnami change verify`. A consumer
   needs @putnami/contributor with the command; outside a workspace, it needs
   the extension installed in user scope.
-- Until the core deletion slice, two copies of the check and two copies of
-  the verifier exist. A behavior change to one needs the same change in the
-  other.
+- The core keeps a copy of the verifier, which `tree verify` and
+  `proposals finalize` use, and a copy of the evaluator, which
+  `proposals finalize` uses. A behavior change to a core copy needs the same
+  change in the executable's copy.
 - `change finalize` follows the same pattern: a subcommand in the `change`
   group, an interactive launch, and the host channel for anything that needs
   the core.

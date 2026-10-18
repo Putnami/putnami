@@ -52,7 +52,6 @@ func init() {
 	registerCommand("cache", cmdCache)
 	registerCommand("config", cmdConfig)
 	registerCommand("context", cmdContext)
-	registerCommand("contributor", cmdContributor)
 	registerCommand("migrate", cmdMigrate)
 	registerCommand("sessions", cmdSessions)
 	registerCommand("tree", cmdTree)

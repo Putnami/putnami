@@ -124,7 +124,7 @@ its own setting must be caught by its own suite.
 
 ### 6. The language rule is policy
 
-`putnami contributor language` runs in `check` and native finalization only
+`putnami change language` runs in `check` and native finalization only
 when `verification.language` is `en`. Its `tasks` mode pages through `tasks find`.
 The
 proposals contract finds proposals by base and head only, so no mode lists

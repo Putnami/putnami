@@ -44,12 +44,6 @@ _putnami_subcommands_for() {
                 'pack'
             )
             ;;
-        'contributor')
-            reply=(
-                'language'
-                'machine-load'
-            )
-            ;;
         'deps')
             reply=(
                 'add'
@@ -161,9 +155,6 @@ _putnami_path_known() {
         'context generate') return 0 ;;
         'context map') return 0 ;;
         'context pack') return 0 ;;
-        'contributor') return 0 ;;
-        'contributor language') return 0 ;;
-        'contributor machine-load') return 0 ;;
         'deps') return 0 ;;
         'deps add') return 0 ;;
         'deps install') return 0 ;;
@@ -262,13 +253,6 @@ _putnami_flags_for() {
             reply=(
                 '--check[Re-derive the documents, write nothing, and fail on drift]'
                 '--project[Project ID, path, or name; default is every workspace project]:selector:'
-            )
-            ;;
-        'contributor language')
-            reply=(
-                '--diff[With files: inspect tracked files changed in a Git revision range]:range:'
-                '--label[With text: label the input in findings]:name:'
-                '--limit[With tasks: maximum number of task records to inspect]:n:'
             )
             ;;
         'doctor')
@@ -496,7 +480,6 @@ _putnami() {
         'compose:Serve a workload with the workloads it runs with'
         'config:Manage configuration'
         'context:Manage AI context'
-        'contributor:Run native contributor checks and inspect machine load'
         'deps:Manage dependencies'
         'doctor:Preflight production readiness under a deployment profile'
         'extensions:Manage extensions'

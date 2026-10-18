@@ -319,15 +319,6 @@ Run a workload's derived smoke contract against a target and emit one verdict.
 Migrate putnami.lock.json to the current format.
 .SS Agents
 .TP
-.B contributor
-Run native contributor checks and inspect machine load.
-.TP
-.B contributor language
-Check English-language signals in contributor material.
-.TP
-.B contributor machine-load
-Report available local CPU and memory for check admission.
-.TP
 .B mcp
 Run the MCP server over stdio for AI agent harnesses.
 .TP
@@ -887,33 +878,6 @@ Report the pending migration without writing (default); exits non-zero when a mi
 .TP
 .B --apply
 Perform the migration, atomically and idempotently.
-.SS contributor
-Run the local contributor helpers used by the build workflow. Language checks read text, tracked files, commit messages, or tasks through the configured collaboration provider; machine-load reads local resource capacity. Neither command runs the project gate.
-.PP
-.B Usage:
-.br
-putnami contributor <language|machine-load> [arguments]
-.SS contributor language
-Inspect text or stdin, tracked workspace files, commit messages, or task titles and bodies using the repository's bounded English-language rule. The tasks mode reads the configured tasks provider. Findings exit 1; invalid input or an unavailable provider exits 2.
-.PP
-.B Usage:
-.br
-putnami contributor language <text|files|commits|tasks> [--label <name> | --diff <range> | --limit <n>] [arguments]
-.TP
-.B --label
-With text: label the input in findings.
-.TP
-.B --diff
-With files: inspect tracked files changed in a Git revision range.
-.TP
-.B --limit
-With tasks: maximum number of task records to inspect.
-.SS contributor machine-load
-Read local machine load and capacity to guide when to start a costly check. This is advisory and does not execute or schedule a gate.
-.PP
-.B Usage:
-.br
-putnami contributor machine-load [--output <format>]
 .SS mcp
 Run the Model Context Protocol server over stdio so an AI agent harness can discover projects, context, ownership, impact, plans, and diagnostics through 11 typed core tools (list_projects, describe_project, agent_context, workspace_map, deps, find_owner, why_impacted, topo_sort, impacted, run_jobs, get_diagnostics) and the workspace://context resource. All except run_jobs are read-only; run_jobs is the only mutating core tool, supports dry-run planning, and refuses long-lived or externally mutating execution. Spawned by the client; speaks JSON-RPC 2.0 on stdin/stdout and exits with the session. Before it serves, it brings the workspace's agent workflows to the version the lock pins, from the local artifact store only, and reports what it cannot reconcile as a warning on stderr. Optional request provenance is disabled by default; set PUTNAMI_AGENT_IDENTITY=1 and explicitly set PUTNAMI_AGENT_MODEL in the MCP server environment to propagate bounded harness/model headers.
 .PP

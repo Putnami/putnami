@@ -191,9 +191,6 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 
 | Command | Description |
 |---------|-------------|
-| `putnami contributor` | Run native contributor checks and inspect machine load |
-| `putnami contributor language` | Check English-language signals in contributor material |
-| `putnami contributor machine-load` | Report available local CPU and memory for check admission |
 | `putnami mcp` | Run the MCP server over stdio for AI agent harnesses |
 | `putnami mcp install` | Register the MCP server in .mcp.json for Claude Code |
 
@@ -1247,61 +1244,6 @@ putnami migrate vnext [--check] [--apply] [--output <format>]
 - `putnami migrate vnext --check`
 - `putnami migrate vnext --check --output=json`
 - `putnami migrate vnext --apply`
-
-### `putnami contributor`
-
-Run the local contributor helpers used by the build workflow. Language checks read text, tracked files, commit messages, or tasks through the configured collaboration provider; machine-load reads local resource capacity. Neither command runs the project gate
-
-**Usage**
-
-```
-putnami contributor <language|machine-load> [arguments]
-```
-
-**Examples**
-
-- `putnami contributor language files --diff origin/main..HEAD`
-- `putnami contributor machine-load --output=json`
-
-### `putnami contributor language`
-
-Inspect text or stdin, tracked workspace files, commit messages, or task titles and bodies using the repository's bounded English-language rule. The tasks mode reads the configured tasks provider. Findings exit 1; invalid input or an unavailable provider exits 2
-
-**Usage**
-
-```
-putnami contributor language <text|files|commits|tasks> [--label <name> | --diff <range> | --limit <n>] [arguments]
-```
-
-**Flags**
-
-| Flag | Description |
-|------|-------------|
-| `--label` <name> | With text: label the input in findings |
-| `--diff` <range> | With files: inspect tracked files changed in a Git revision range |
-| `--limit` <n> | With tasks: maximum number of task records to inspect |
-
-**Examples**
-
-- `putnami contributor language text --label proposal - < body.md`
-- `putnami contributor language files --diff origin/main..HEAD`
-- `putnami contributor language commits origin/main..HEAD`
-- `putnami contributor language tasks --limit 100`
-
-### `putnami contributor machine-load`
-
-Read local machine load and capacity to guide when to start a costly check. This is advisory and does not execute or schedule a gate
-
-**Usage**
-
-```
-putnami contributor machine-load [--output <format>]
-```
-
-**Examples**
-
-- `putnami contributor machine-load`
-- `putnami contributor machine-load --output=json`
 
 ### `putnami mcp`
 

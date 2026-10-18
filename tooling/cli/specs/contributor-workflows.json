@@ -37,7 +37,7 @@
     },
     {
       "id": "provider-neutral-publication",
-      "text": "Native proposals finalize consumes a current native dossier or explicitly waits for named hosted checks; it executes no local gate. It pushes and publishes through bound contracts with exact readback and checked preconditions. Partial delivery preserves the opaque parent identity without closing or delivered transition. Draft seeds carry no closing directive. Unresolved writes stop without retry. Native language task scanning uses the tasks contract."
+      "text": "Native proposals finalize consumes a current native dossier or explicitly waits for named hosted checks; it executes no local gate. It pushes and publishes through bound contracts with exact readback and checked preconditions. Partial delivery preserves the opaque parent identity without closing or delivered transition. Draft seeds carry no closing directive. Unresolved writes stop without retry."
     },
     {
       "id": "repository-policy",
@@ -53,7 +53,7 @@
     },
     {
       "id": "change-language-parity",
-      "text": "putnami change language, served by the @putnami/contributor executable, reports the same findings and exit codes as putnami contributor language. The tasks mode reads the tasks provider through the host RPC channel putnami opens for the launch, and the other modes never open it. A run with no channel exits 2 and names the interactive launch."
+      "text": "putnami change language, served by the @putnami/contributor executable, reports the same findings and exit codes as goldens recorded from putnami contributor language, the core command it replaces. The tasks mode reads the tasks provider through the host RPC channel putnami opens for the launch, and the other modes never open it. A run with no channel exits 2 and names the interactive launch."
     },
     {
       "id": "change-verify-parity",

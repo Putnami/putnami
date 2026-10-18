@@ -333,39 +333,6 @@
       "positionals": []
     },
     {
-      "path": "contributor",
-      "flags": [],
-      "positionals": []
-    },
-    {
-      "path": "contributor language",
-      "flags": [
-        {
-          "long": "--diff",
-          "type": "value"
-        },
-        {
-          "long": "--label",
-          "type": "value"
-        },
-        {
-          "long": "--limit",
-          "type": "value"
-        }
-      ],
-      "positionals": [
-        {
-          "name": "text|files|commits|tasks",
-          "required": true
-        }
-      ]
-    },
-    {
-      "path": "contributor machine-load",
-      "flags": [],
-      "positionals": []
-    },
-    {
       "path": "d",
       "flags": [],
       "positionals": []

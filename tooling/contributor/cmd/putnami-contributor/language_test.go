@@ -27,13 +27,13 @@ const (
 	languageFeature     = "cli/contributor-workflows"
 	languageRequirement = "change-language-parity"
 
-	// coreFailureLine is the line the core prints after a language failure
-	// that exits 2. The core's command dispatcher adds it, not the language
-	// check, so the executable does not print it.
+	// coreFailureLine ends a golden whose run exits 2. The core's command
+	// dispatcher wrote it, not the language check, so the executable does not
+	// print it.
 	coreFailureLine = "putnami: contributor language failed\n"
 	// coreName and changeName are the one substitution applied to a golden
 	// before the comparison: the executable's messages name the command the
-	// user typed, and the core's name its own.
+	// user typed, and the goldens name the core command.
 	coreName   = "contributor language"
 	changeName = "change language"
 )
@@ -138,13 +138,12 @@ func launchLanguage(t *testing.T, executable, dir, stdin string, args []string, 
 
 // TestChangeLanguageMatchesTheCoreCommand runs the built executable on the
 // fixture repository for every mode and compares its exit code and both
-// output streams with testdata/parity/*.golden. The goldens come from the
-// core command: testdata/record.sh recorded them by running
-// `putnami contributor language` on the same fixture. The test never reads
-// that command's files, so a change to the core cannot change what this
-// test compares against. Two documented differences apply to a golden before
-// the comparison: the core's trailing coreFailureLine on an exit 2 is
-// removed, and coreName becomes changeName.
+// output streams with testdata/parity/*.golden. The goldens hold what
+// `putnami contributor language`, the core command change language replaces,
+// answered on the same fixture: testdata/record.sh recorded them. Two
+// documented differences apply to a golden before the comparison: the core's
+// trailing coreFailureLine on an exit 2 is removed, and coreName becomes
+// changeName.
 func TestChangeLanguageMatchesTheCoreCommand(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, languageFeature, languageRequirement, "change-language-reports-what-contributor-language-reports")

@@ -496,7 +496,13 @@ func TestNoNewProviderSpecificCorePackage(t *testing.T) {
 // internal/jobs imports it, and it never imports internal/jobs, so a change to
 // a release set no longer reruns the scheduler's tests. It adds no vertical
 // and no engine stage.
-const internalPackageCountCeiling = 78
+//
+// LOWERED 78 → 77: internal/commands/contributor is deleted with the
+// `contributor` root. Its language check runs as `putnami change language` in
+// the @putnami/contributor executable, and `putnami doctor --machine` reads the
+// machine load. The pure evaluator that proposals finalize applies stays in
+// internal/commands/shared. The ceiling follows the tree down.
+const internalPackageCountCeiling = 77
 
 func TestInternalPackageCountCeiling(t *testing.T) {
 	t.Parallel()

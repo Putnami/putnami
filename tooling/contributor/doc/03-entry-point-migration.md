@@ -35,14 +35,15 @@ candidate. Re-express a former `plan --scope` or label filter as explicit
 native project scope and acceptance, rather than relying on a removed skill
 to select work. A former `fix --group` or backlog loop has no automatic
 successor; select and authorize each task through the provider before asking
-build to deliver it. Native `proposals finalize` and `contributor language`
-interfaces are documented in the [CLI commands](../../cli/doc/03-commands.md).
+build to deliver it. Native `proposals finalize` is documented in the
+[CLI commands](../../cli/doc/03-commands.md), and `change language` in the
+[extension README](../README.md).
 The former `fix/scripts/finalize-pr.sh`, `machine-load.sh`,
 `tree-fingerprint.sh` and `session-cap.sh` are removed from installed content.
-Use `proposals finalize`, `contributor machine-load` and `tree fingerprint`;
+Use `proposals finalize`, `doctor --machine` and `tree fingerprint`;
 the host runtime handles session limits. The active audit integration still
 calls `check/scripts/english-only.sh`: that path remains as a thin relay to
-`contributor language`, with no separate language heuristic.
+`change language`, with no separate language heuristic.
 
 ## Workspace declarations
 

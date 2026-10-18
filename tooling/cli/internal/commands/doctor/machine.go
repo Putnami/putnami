@@ -90,7 +90,7 @@ func (s LoadSample) String() string {
 
 // MachineCommand is `putnami doctor --machine`: it samples the machine load and
 // prints it, as JSON under structured output and as the bare ratio (or
-// "unknown") otherwise. `putnami contributor machine-load` calls it too.
+// "unknown") otherwise.
 func MachineCommand(outputFormat string, reader LoadReader) error {
 	return WriteMachineLoad(iox.Stdout(), outputFormat, MachineLoad(reader))
 }
