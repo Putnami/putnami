@@ -38,7 +38,9 @@ Extensions & Templates:
   templates list               List installed templates
   templates update             Update templates
   templates remove             Remove a template
-  templates validate|test|package Validate, test, or package a template
+  templates validate           Validate a template manifest
+  templates test               Test a template in a temporary workspace
+  templates package            Package a template into an archive
 
 Dependencies:
   deps install                 Install project dependencies

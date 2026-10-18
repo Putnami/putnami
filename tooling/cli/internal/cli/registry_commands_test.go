@@ -615,3 +615,67 @@ func TestCmdSessionsSummary_FlagWiring(t *testing.T) {
 		}
 	})
 }
+
+// TestAuthoringRoutesReachTheirHandlers proves each authoring subcommand
+// reaches its own handler. Every case runs through the registry on a path that
+// needs no workspace, and expects a line only that handler prints, so swapping
+// two case labels in cmdTemplates fails the test.
+func TestAuthoringRoutesReachTheirHandlers(t *testing.T) {
+	templateDir := t.TempDir()
+	for name, content := range map[string]string{
+		"putnami.template.json": `{"name":"route-template","version":"1.0.0","description":"route proof"}`,
+		"putnami.json.template": `{"name":"{{.ProjectName}}"}`,
+		"README.md":             "# readme",
+		"LICENSE.md":            "MIT",
+	} {
+		if err := os.WriteFile(filepath.Join(templateDir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	extensionDir := t.TempDir()
+	const extensionManifest = `{
+  "name": "@putnami/route-ext",
+  "version": "1.0.0",
+  "cliContract": 4,
+  "commands": {"build": {"run": [{"id": "build", "task": "build-exec"}]}},
+  "tasks": {"build-exec": {"kind": "command", "command": "echo", "cache": false}}
+}`
+	if err := os.WriteFile(filepath.Join(extensionDir, "putnami.extension.json"), []byte(extensionManifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		root, sub string
+		args      []string
+		want      string
+		notWant   []string
+	}{
+		{"extensions", "validate", []string{extensionDir}, "Extension is valid.", nil},
+		{"templates", "validate", []string{templateDir}, "Template is valid.", []string{"Skipping build+test", "Archive:"}},
+		{"templates", "test", []string{templateDir, "--skip-build"}, "Skipping build+test", []string{"Archive:"}},
+		{"templates", "package", []string{templateDir}, "Archive:", []string{"Skipping build+test", "Template is valid."}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.root+" "+tc.sub, func(t *testing.T) {
+			cmd, ok := lookupCommand(tc.root)
+			if !ok {
+				t.Fatalf("command %q is not registered", tc.root)
+			}
+			var runErr error
+			out := captureStdout(t, func() {
+				runErr = cmd.run(&CommandEnv{Ctx: context.Background(), Sub: tc.sub, Args: tc.args})
+			})
+			if runErr != nil {
+				t.Fatalf("%s %s: %v\noutput:\n%s", tc.root, tc.sub, runErr, out)
+			}
+			if !strings.Contains(out, tc.want) {
+				t.Errorf("output = %q, want it to contain %q", out, tc.want)
+			}
+			for _, absent := range tc.notWant {
+				if strings.Contains(out, absent) {
+					t.Errorf("output = %q, must not contain %q (another handler ran)", out, absent)
+				}
+			}
+		})
+	}
+}

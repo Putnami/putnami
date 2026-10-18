@@ -241,8 +241,14 @@ Update templates.
 .B templates remove
 Remove a template.
 .TP
-.B templates validate|test|package
-Validate, test, or package a template.
+.B templates validate
+Validate a template manifest.
+.TP
+.B templates test
+Test a template in a temporary workspace.
+.TP
+.B templates package
+Package a template into an archive.
 .SS Dependencies
 .TP
 .B deps install

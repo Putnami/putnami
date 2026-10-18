@@ -349,11 +349,6 @@ func TemplatesPackage(ctx context.Context, args []string) error {
 				opts.Version = args[i+1]
 				i++
 			}
-		case "--output":
-			if i+1 < len(args) {
-				opts.OutputDir = args[i+1]
-				i++
-			}
 		case "--stable":
 			opts.Stable = true
 		default:

@@ -686,8 +686,7 @@ var catalog = []Command{
 		Path:        "templates validate",
 		Kind:        KindStructured,
 		Category:    "Extensions & Templates",
-		Label:       "templates validate|test|package",
-		Summary:     "Validate, test, or package a template",
+		Summary:     "Validate a template manifest",
 		Description: "Validate a template manifest against the protocol",
 		Usage:       "putnami templates validate [path]",
 		Positionals: []Positional{{Name: "path"}},
@@ -703,6 +702,8 @@ var catalog = []Command{
 	{
 		Path:        "templates test",
 		Kind:        KindStructured,
+		Category:    "Extensions & Templates",
+		Summary:     "Test a template in a temporary workspace",
 		Description: "Test a template by rendering it into a temporary workspace and running build and test on the result",
 		Usage:       "putnami templates test [path] [--skip-build] [--keep]",
 		Flags: []Flag{
@@ -722,6 +723,8 @@ var catalog = []Command{
 	{
 		Path:        "templates package",
 		Kind:        KindStructured,
+		Category:    "Extensions & Templates",
+		Summary:     "Package a template into an archive",
 		Description: "Package a template into a distributable archive",
 		Usage:       "putnami templates package [path] [--version <version>] [--stable]",
 		Flags: []Flag{

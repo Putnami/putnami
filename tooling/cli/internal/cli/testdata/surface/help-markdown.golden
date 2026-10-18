@@ -137,7 +137,9 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 | `putnami templates list` | List installed templates |
 | `putnami templates update` | Update templates |
 | `putnami templates remove` | Remove a template |
-| `putnami templates validate|test|package` | Validate, test, or package a template |
+| `putnami templates validate` | Validate a template manifest |
+| `putnami templates test` | Test a template in a temporary workspace |
+| `putnami templates package` | Package a template into an archive |
 
 ## Dependencies
 
