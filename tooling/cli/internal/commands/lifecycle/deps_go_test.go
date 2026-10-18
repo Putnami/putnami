@@ -4,16 +4,20 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"golang.org/x/mod/module"
+
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
+	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -27,6 +31,16 @@ func (f goCreateFixture) withGoProject(t *testing.T) {
 	writeRawFile(t, filepath.Join(f.root, "app", "go.mod"), "module example.com/app\n\ngo "+goFixtureVersion+"\n")
 	writeRawFile(t, filepath.Join(f.root, "go.work"), "go "+goFixtureVersion+"\n\nuse ./app\n")
 	workspace.InvalidateLoadCache(f.root)
+}
+
+// writeGoResolvingLib places a go command like writeGo that answers the `go
+// list -m` of `deps add example.com/lib@v1.0.0` with the module version it
+// resolves.
+func (f goCreateFixture) writeGoResolvingLib(t *testing.T, path string) {
+	t.Helper()
+	f.writeGoAnswering(t, path, goFixtureVersion, map[string]fixtureproc.Outcome{
+		"list -m -json -mod=readonly example.com/lib@v1.0.0": {Stdout: `{"Path":"example.com/lib","Version":"v1.0.0"}` + "\n"},
+	})
 }
 
 // depsCalls returns the go invocations as "<args>|<binary>", with the
@@ -56,7 +70,7 @@ func TestDepsAddAndRemoveRunThePinnedGo(t *testing.T) {
 	f := newGoCreateFixture(t)
 	f.withGoProject(t)
 	f.pin(t)
-	f.writeGo(t, f.pinned, goFixtureVersion)
+	f.writeGoResolvingLib(t, f.pinned)
 	env := LifecycleEnv{RunJob: func(context.Context, WorkspaceJobRequest) (WorkspaceJobResult, error) {
 		t.Error("deps ran the workspace installers although the pinned go is installed")
 		return WorkspaceJobResult{Outcome: WorkspaceJobFailed}, nil
@@ -73,9 +87,10 @@ func TestDepsAddAndRemoveRunThePinnedGo(t *testing.T) {
 		t.Fatalf("deps remove on a host without go: %v\n%s", err, output)
 	}
 	want := []string{
-		"get example.com/lib@v1.0.0|" + f.pinned,
+		"list -m -json -mod=readonly example.com/lib@v1.0.0|" + f.pinned,
+		"mod edit -require=example.com/lib@v1.0.0|" + f.pinned,
 		"mod tidy -modfile=<copy>|" + f.pinned,
-		"get example.com/lib@none|" + f.pinned,
+		"mod edit -droprequire=example.com/lib|" + f.pinned,
 		"mod tidy -modfile=<copy>|" + f.pinned,
 	}
 	if got := f.depsCalls(t); strings.Join(got, "\n") != strings.Join(want, "\n") {
@@ -103,7 +118,7 @@ func TestDepsAddInstallsThePinnedGoOnAHostWithoutGo(t *testing.T) {
 	}
 	env := LifecycleEnv{RunJob: func(_ context.Context, req WorkspaceJobRequest) (WorkspaceJobResult, error) {
 		steps = append(steps, req.Job)
-		f.writeGo(t, f.pinned, goFixtureVersion)
+		f.writeGoResolvingLib(t, f.pinned)
 		return WorkspaceJobResult{Outcome: WorkspaceJobOK}, nil
 	}}
 
@@ -116,7 +131,11 @@ func TestDepsAddInstallsThePinnedGoOnAHostWithoutGo(t *testing.T) {
 	if got := strings.Join(steps, ","); got != "pin,workspace-install" {
 		t.Fatalf("steps = %s, want the pin, then the installers", got)
 	}
-	want := []string{"get example.com/lib@v1.0.0|" + f.pinned, "mod tidy -modfile=<copy>|" + f.pinned}
+	want := []string{
+		"list -m -json -mod=readonly example.com/lib@v1.0.0|" + f.pinned,
+		"mod edit -require=example.com/lib@v1.0.0|" + f.pinned,
+		"mod tidy -modfile=<copy>|" + f.pinned,
+	}
 	if got := f.depsCalls(t); strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("go calls =\n%s\nwant, with the installed go:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
@@ -173,6 +192,134 @@ func TestDepsCommandIsTheCommandTheUserRan(t *testing.T) {
 	}
 }
 
+// A spec whose version is none asks `go get` to drop a module. deps add refuses
+// it before any go command runs, edits nothing, and suggests the exact deps
+// remove command.
+func TestDepsAddRefusesTheVersionNoneAndSuggestsDepsRemove(t *testing.T) {
+	spectest.Proves(t, "cli/toolchain-lock", "deps-edit-reads-no-replaced-version", "deps-add-refuses-the-version-none-naming-deps-remove")
+	f := newGoCreateFixture(t)
+	f.withGoProject(t)
+	f.pin(t)
+	f.writeGoResolvingLib(t, f.pinned)
+	goMod := readFile(t, filepath.Join(f.root, "app", "go.mod"))
+
+	output, err := captureStdout(t, func() error {
+		return DepsAdd(context.Background(), f.root, []string{"example.com/lib@none", "example.com/other@v1.0.0"}, "app", f.refusingGoInstall(t))
+	})
+	if err == nil {
+		t.Fatalf("deps add example.com/lib@none succeeded:\n%s", output)
+	}
+	if got, want := protocolcli.SuggestedNext(err), "putnami deps remove example.com/lib --projects app"; got != want {
+		t.Fatalf("next command = %q, want %q (error %v)", got, want, err)
+	}
+	if !strings.Contains(err.Error(), "deps add does not drop a module") {
+		t.Errorf("error = %v, want it to say deps add does not drop a module", err)
+	}
+	if calls := f.depsCalls(t); len(calls) != 0 {
+		t.Errorf("deps add ran go before it refused the spec: %v", calls)
+	}
+	if after := readFile(t, filepath.Join(f.root, "app", "go.mod")); after != goMod {
+		t.Errorf("deps add edited go.mod:\n%s", after)
+	}
+}
+
+// A go list -m that fails stops deps add before any edit and leaves go.mod as
+// it was. The error carries go's output and names the rule a spec follows, and
+// suggests no command: the failure may be the network or an unknown version,
+// not a spec.
+func TestDepsAddReportsAFailedGoListWithoutASuggestedCommand(t *testing.T) {
+	spectest.Proves(t, "cli/toolchain-lock", "deps-edit-reads-no-replaced-version", "deps-add-reports-a-failed-go-list-without-a-suggested-command")
+	f := newGoCreateFixture(t)
+	f.withGoProject(t)
+	f.pin(t)
+	f.writeGoAnswering(t, f.pinned, goFixtureVersion, map[string]fixtureproc.Outcome{
+		"list -m -json -mod=readonly example.com/lib@v1.0.0": {Stderr: "go: module example.com/lib: reading proxy: 404 Not Found\n", Exit: 1},
+	})
+	goMod := readFile(t, filepath.Join(f.root, "app", "go.mod"))
+
+	output, err := captureStdout(t, func() error {
+		return DepsAdd(context.Background(), f.root, []string{"example.com/lib@v1.0.0"}, "", f.refusingGoInstall(t))
+	})
+	if err == nil {
+		t.Fatalf("deps add succeeded although go list -m failed:\n%s", output)
+	}
+	if next := protocolcli.SuggestedNext(err); next != "" {
+		t.Errorf("next command = %q, want none (error %v)", next, err)
+	}
+	for _, want := range []string{"go list -m", "a spec names a module path, not a package path"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %v, want it to contain %q", err, want)
+		}
+	}
+	want := []string{"list -m -json -mod=readonly example.com/lib@v1.0.0|" + f.pinned}
+	if got := f.depsCalls(t); strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("go calls =\n%s\nwant only the failed go list:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	if after := readFile(t, filepath.Join(f.root, "app", "go.mod")); after != goMod {
+		t.Errorf("a failed deps add changed go.mod:\n%s", after)
+	}
+}
+
+// A bare spec takes the latest version the proxy answers, unless go.mod requires
+// a newer one: `go get` never downgrades a module the way a plain @latest would.
+func TestDepsAddKeepsARequiredVersionNewerThanTheLatest(t *testing.T) {
+	spectest.Proves(t, "cli/toolchain-lock", "deps-edit-reads-no-replaced-version", "deps-add-keeps-a-required-version-newer-than-the-latest")
+	f := newGoCreateFixture(t)
+	f.withGoProject(t)
+	writeRawFile(t, filepath.Join(f.root, "app", "go.mod"),
+		"module example.com/app\n\ngo "+goFixtureVersion+"\n\nrequire example.com/lib v0.4.0\n")
+	f.pin(t)
+	f.writeGoAnswering(t, f.pinned, goFixtureVersion, map[string]fixtureproc.Outcome{
+		"list -m -json -mod=readonly example.com/lib@latest": {Stdout: `{"Path":"example.com/lib","Version":"v0.3.0"}` + "\n"},
+	})
+
+	output, err := captureStdout(t, func() error {
+		return DepsAdd(context.Background(), f.root, []string{"example.com/lib"}, "", f.refusingGoInstall(t))
+	})
+	if err != nil {
+		t.Fatalf("deps add example.com/lib: %v\n%s", err, output)
+	}
+	want := []string{
+		"list -m -json -mod=readonly example.com/lib@latest|" + f.pinned,
+		"mod edit -require=example.com/lib@v0.4.0|" + f.pinned,
+		"mod tidy -modfile=<copy>|" + f.pinned,
+	}
+	if got := f.depsCalls(t); strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("go calls =\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// A bare spec means @upgrade: the latest version, unless go.mod requires a
+// newer one, which stays. An exact version or a module go.mod does not require
+// is taken as it was resolved.
+func TestKeepNewerRequiredNeverDowngradesABareSpec(t *testing.T) {
+	resolved := []module.Version{
+		{Path: "example.com/newer", Version: "v0.3.0"},
+		{Path: "example.com/older", Version: "v0.3.0"},
+		{Path: "example.com/same", Version: "v0.3.0"},
+		{Path: "example.com/placeholder", Version: "v0.3.0"},
+		{Path: "example.com/pinned", Version: "v0.3.0"},
+		{Path: "example.com/new", Version: "v0.3.0"},
+		{Path: "example.com/pseudo", Version: "v0.3.0"},
+	}
+	bare := []bool{true, true, true, true, false, true, true}
+	required := map[string]string{
+		"example.com/newer":       "v0.4.0",
+		"example.com/older":       "v0.2.0",
+		"example.com/same":        "v0.3.0",
+		"example.com/placeholder": "v0.0.0",
+		"example.com/pinned":      "v0.4.0",
+		"example.com/pseudo":      "v0.3.1-0.20260101000000-abcdefabcdef",
+	}
+	want := []string{"v0.4.0", "v0.3.0", "v0.3.0", "v0.3.0", "v0.3.0", "v0.3.0", "v0.3.1-0.20260101000000-abcdefabcdef"}
+	got := keepNewerRequired(resolved, bare, required)
+	for i, m := range got {
+		if m.Version != want[i] {
+			t.Errorf("%s = %s, want %s", m.Path, m.Version, want[i])
+		}
+	}
+}
+
 // failingGoInstall is the workspace installers of a host without go that
 // install the pinned Go and then fail on another dependency. jobs records the
 // workspace jobs they run.
@@ -186,7 +333,7 @@ func (f goCreateFixture) failingGoInstall(t *testing.T, jobs *[]string) Lifecycl
 	}
 	return LifecycleEnv{RunJob: func(_ context.Context, req WorkspaceJobRequest) (WorkspaceJobResult, error) {
 		*jobs = append(*jobs, req.Job)
-		f.writeGo(t, f.pinned, goFixtureVersion)
+		f.writeGoResolvingLib(t, f.pinned)
 		return WorkspaceJobResult{Outcome: WorkspaceJobFailed}, nil
 	}}
 }
@@ -201,21 +348,24 @@ func TestDepsAddAndRemoveNameDepsInstallWhenTheGoInstallFails(t *testing.T) {
 	for _, tc := range []struct {
 		action string
 		run    func(root string, env LifecycleEnv) error
-		get    string
+		edit   []string
 	}{
 		{
 			action: "add",
 			run: func(root string, env LifecycleEnv) error {
 				return DepsAdd(context.Background(), root, []string{"example.com/lib@v1.0.0"}, "", env)
 			},
-			get: "get example.com/lib@v1.0.0",
+			edit: []string{
+				"list -m -json -mod=readonly example.com/lib@v1.0.0|%s",
+				"mod edit -require=example.com/lib@v1.0.0|%s",
+			},
 		},
 		{
 			action: "remove",
 			run: func(root string, env LifecycleEnv) error {
 				return DepsRemove(context.Background(), root, []string{"example.com/lib"}, "app", env)
 			},
-			get: "get example.com/lib@none",
+			edit: []string{"mod edit -droprequire=example.com/lib|%s"},
 		},
 	} {
 		t.Run(tc.action, func(t *testing.T) {
@@ -237,7 +387,11 @@ func TestDepsAddAndRemoveNameDepsInstallWhenTheGoInstallFails(t *testing.T) {
 			if got := strings.Join(jobs, ","); got != "workspace-install" {
 				t.Fatalf("workspace jobs = %s, want the one install that installed go", got)
 			}
-			want := []string{tc.get + "|" + f.pinned, "mod tidy -modfile=<copy>|" + f.pinned}
+			var want []string
+			for _, call := range tc.edit {
+				want = append(want, fmt.Sprintf(call, f.pinned))
+			}
+			want = append(want, "mod tidy -modfile=<copy>|"+f.pinned)
 			if got := f.depsCalls(t); strings.Join(got, "\n") != strings.Join(want, "\n") {
 				t.Fatalf("go calls =\n%s\nwant the edit with the installed go:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 			}
@@ -393,7 +547,7 @@ func TestDepsPruneEditDropsARequirementOnlyGoWorkSatisfies(t *testing.T) {
 	moduleDir := filepath.Join(root, "api")
 	env := shared.GoCommandEnvFrom(append(os.Environ(), "GOPROXY=off", "GOFLAGS=", "GOTOOLCHAIN=local"), moduleDir)
 
-	edit, _ := goDepsEdit("prune", []string{"example.com/lib"})
+	edit := goDepsEdit("prune", []string{"example.com/lib"}, nil)
 	for _, args := range [][]string{edit, {"mod", "tidy"}} {
 		cmd := exec.Command(goBinary, args...)
 		cmd.Dir = moduleDir

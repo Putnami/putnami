@@ -46,17 +46,24 @@ func requireRealGo(t *testing.T, proxy string) {
 // go.putnami.dev/client at placeholderClientVersion only, and returns its URL.
 func writeClientModuleProxy(t *testing.T) string {
 	t.Helper()
+	return writeModuleProxy(t, "go.putnami.dev/client", placeholderClientVersion, "package client\n")
+}
+
+// writeModuleProxy writes a file module proxy that serves the module path at
+// version only, as one package file, and returns its URL.
+func writeModuleProxy(t *testing.T, path, version, source string) string {
+	t.Helper()
 	root := t.TempDir()
-	versions := filepath.Join(root, "go.putnami.dev", "client", "@v")
-	goMod := "module go.putnami.dev/client\n\ngo 1.22\n"
-	writeRawFile(t, filepath.Join(versions, "list"), placeholderClientVersion+"\n")
-	writeRawFile(t, filepath.Join(versions, placeholderClientVersion+".info"),
-		`{"Version":"`+placeholderClientVersion+`","Time":"2026-01-01T00:00:00Z"}`)
-	writeRawFile(t, filepath.Join(versions, placeholderClientVersion+".mod"), goMod)
+	versions := filepath.Join(root, filepath.FromSlash(path), "@v")
+	goMod := "module " + path + "\n\ngo 1.22\n"
+	writeRawFile(t, filepath.Join(versions, "list"), version+"\n")
+	writeRawFile(t, filepath.Join(versions, version+".info"),
+		`{"Version":"`+version+`","Time":"2026-01-01T00:00:00Z"}`)
+	writeRawFile(t, filepath.Join(versions, version+".mod"), goMod)
 	var archive bytes.Buffer
 	writer := zip.NewWriter(&archive)
-	prefix := "go.putnami.dev/client@" + placeholderClientVersion + "/"
-	for name, content := range map[string]string{"go.mod": goMod, "client.go": "package client\n"} {
+	prefix := path + "@" + version + "/"
+	for name, content := range map[string]string{"go.mod": goMod, "lib.go": source} {
 		entry, err := writer.Create(prefix + name)
 		if err != nil {
 			t.Fatal(err)
@@ -68,7 +75,7 @@ func writeClientModuleProxy(t *testing.T) string {
 	if err := writer.Close(); err != nil {
 		t.Fatal(err)
 	}
-	writeRawFile(t, filepath.Join(versions, placeholderClientVersion+".zip"), archive.String())
+	writeRawFile(t, filepath.Join(versions, version+".zip"), archive.String())
 	return "file:///" + strings.TrimPrefix(filepath.ToSlash(root), "/")
 }
 
@@ -272,6 +279,98 @@ func TestDepsRemoveTidiesThroughAGoWorkDirectoryReplace(t *testing.T) {
 	}
 	if replaces(goMod, "go.putnami.dev/client") {
 		t.Errorf("deps remove wrote go.work's replace directive into apps/c/go.mod")
+	}
+}
+
+// `go get` loads the module graph, so it resolves a go.mod requirement of
+// `example.com/lib v0.0.0` through the module proxy and fails when none serves
+// it: the placeholder a workspace module keeps after its local replace is gone.
+// deps add resolves the module with `go list -m`, which loads no graph, and
+// deps remove drops the requirement without resolving it. The proxy here serves
+// example.com/lib v0.3.0 only, and the workspace has a go.work, where an
+// @upgrade query would otherwise read the build list.
+func TestDepsAddAndRemoveEditAModuleThatRequiresAnUnservedVersion(t *testing.T) {
+	spectest.Proves(t, "cli/toolchain-lock", "deps-edit-reads-no-replaced-version",
+		"deps-add-and-remove-edit-a-module-that-requires-an-unserved-version")
+	requireRealGo(t, writeModuleProxy(t, "example.com/lib", "v0.3.0", "package lib\n\nconst Name = \"lib\"\n")+","+
+		writeModuleProxy(t, "example.com/dep", "v1.0.0", "package dep\n\nconst Name = \"dep\"\n"))
+	root := t.TempDir()
+	moduleDir := filepath.Join(root, "api")
+	writeRawFile(t, filepath.Join(root, wsproto.WorkspaceConfigFilename), `{"name":"api-ws","includes":["api"]}`)
+	writeRawFile(t, filepath.Join(moduleDir, "putnami.json"), `{"name":"api"}`)
+	writeRawFile(t, filepath.Join(root, "go.work"), "go 1.22\n\nuse ./api\n")
+	workspace.InvalidateLoadCache(root)
+	t.Cleanup(func() { workspace.InvalidateLoadCache(root) })
+	unserved := "module example.com/api\n\ngo 1.22\n\nrequire example.com/lib v0.0.0\n"
+	reset := func(source string) {
+		writeRawFile(t, filepath.Join(moduleDir, "go.mod"), unserved)
+		writeRawFile(t, filepath.Join(moduleDir, "main.go"), source)
+		if err := os.Remove(filepath.Join(moduleDir, "go.sum")); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
+	importsLib := "package main\n\nimport \"example.com/lib\"\n\nfunc main() { _ = lib.Name }\n"
+	goMod := filepath.Join(moduleDir, "go.mod")
+
+	for _, spec := range []string{"example.com/lib@v0.3.0", "example.com/lib@latest", "example.com/lib"} {
+		reset(importsLib)
+		output, err := captureStdout(t, func() error {
+			return DepsAdd(context.Background(), root, []string{spec}, "", LifecycleEnv{})
+		})
+		if err != nil {
+			t.Fatalf("deps add %s: %v\n%s", spec, err, output)
+		}
+		for _, require := range readModFile(t, goMod).Require {
+			if require.Mod.Path == "example.com/lib" && require.Mod.Version != "v0.3.0" {
+				t.Errorf("deps add %s: go.mod requires example.com/lib %s, want v0.3.0", spec, require.Mod.Version)
+			}
+		}
+		if !requires(readModFile(t, goMod), "example.com/lib") {
+			t.Errorf("deps add %s: go.mod lost the requirement:\n%s", spec, readFile(t, goMod))
+		}
+		if sum := readFile(t, filepath.Join(moduleDir, "go.sum")); !strings.Contains(sum, "example.com/lib v0.3.0") {
+			t.Errorf("deps add %s: go.sum = %q, want the checksum of v0.3.0", spec, sum)
+		}
+		if _, err := os.Stat(filepath.Join(root, "go.work.sum")); !os.IsNotExist(err) {
+			t.Errorf("deps add %s wrote go.work.sum: %v", spec, err)
+		}
+	}
+
+	reset("package main\n\nfunc main() {}\n")
+	output, err := captureStdout(t, func() error {
+		return DepsRemove(context.Background(), root, []string{"example.com/lib"}, "", LifecycleEnv{})
+	})
+	if err != nil {
+		t.Fatalf("deps remove: %v\n%s", err, output)
+	}
+	if requires(readModFile(t, goMod), "example.com/lib") {
+		t.Errorf("deps remove: go.mod still requires example.com/lib:\n%s", readFile(t, goMod))
+	}
+	if _, err := os.Stat(filepath.Join(root, "go.work.sum")); !os.IsNotExist(err) {
+		t.Errorf("deps remove wrote go.work.sum: %v", err)
+	}
+
+	// A bare spec queries @latest, which loads no module graph. An @upgrade
+	// query would load it for a module go.mod does not require, where
+	// example.com/lib v0.0.0 is unserved. go.work replaces lib with a directory
+	// so the tidy resolves it.
+	writeRawFile(t, filepath.Join(root, "lib", "go.mod"), "module example.com/lib\n\ngo 1.22\n")
+	writeRawFile(t, filepath.Join(root, "lib", "lib.go"), "package lib\n\nconst Name = \"lib\"\n")
+	writeRawFile(t, filepath.Join(root, "go.work"), "go 1.22\n\nuse ./api\n\nreplace example.com/lib => ./lib\n")
+	reset("package main\n\nimport (\n\t\"example.com/dep\"\n\t\"example.com/lib\"\n)\n\nfunc main() { _, _ = lib.Name, dep.Name }\n")
+	output, err = captureStdout(t, func() error {
+		return DepsAdd(context.Background(), root, []string{"example.com/dep"}, "", LifecycleEnv{})
+	})
+	if err != nil {
+		t.Fatalf("deps add example.com/dep: %v\n%s", err, output)
+	}
+	for _, require := range readModFile(t, goMod).Require {
+		if require.Mod.Path == "example.com/dep" && require.Mod.Version != "v1.0.0" {
+			t.Errorf("deps add example.com/dep: go.mod requires %s, want v1.0.0", require.Mod.Version)
+		}
+	}
+	if !requires(readModFile(t, goMod), "example.com/dep") {
+		t.Errorf("deps add example.com/dep: go.mod lacks the requirement:\n%s", readFile(t, goMod))
 	}
 }
 

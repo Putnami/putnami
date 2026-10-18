@@ -1,6 +1,7 @@
 # ADR 0046 — A declared edge no import backs is a finding
 
-- **Status**: accepted
+- **Status**: accepted, amended in decision 5: `deps remove` drops a
+  requirement with `go mod edit -droprequire` too
 - **Scope**: `@putnami/cli` (`internal/workspace` declared-edge check,
   `putnami deps prune`), the Go and TypeScript workspace probes
 
@@ -82,7 +83,7 @@ prunes edges.
 - A `go.mod` require is dropped with `go mod edit -droprequire=<module>`,
   then `go mod tidy`. `go get <module>@none` would resolve the module through
   the proxy, and a workspace module no proxy serves is exactly the phantom
-  being removed. `deps remove` keeps `go get`.
+  being removed. `deps remove` drops a requirement the same way.
 - A `package.json` dependency has no removal path in this CLI, and an orphan
   client manifest is a deletion. Both are reported with the exact edit, and
   the run fails. A prune that cannot repair everything never reports success.

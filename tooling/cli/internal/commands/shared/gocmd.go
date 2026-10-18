@@ -7,9 +7,9 @@ import (
 )
 
 // GoCommandEnv returns os.Environ with any inherited GOWORK dropped and, when a
-// go.work governs moduleDir, GOWORK pointed explicitly at it — so `go get`
-// resolves the workspace's `replace` directives (and a leaked GOWORK=off cannot
-// force single-module resolution).
+// go.work governs moduleDir, GOWORK pointed explicitly at it — so a go command
+// that reads go.work resolves the workspace's `use` and `replace` directives
+// (and a leaked GOWORK=off cannot force single-module resolution).
 func GoCommandEnv(moduleDir string) []string {
 	return GoCommandEnvFrom(os.Environ(), moduleDir)
 }
