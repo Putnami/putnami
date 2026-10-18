@@ -64,6 +64,16 @@ func runGit(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
+func write(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
 func addOriginMainRef(t *testing.T, dir string) {
 	t.Helper()
 	runGit(t, dir, "update-ref", "refs/remotes/origin/main", "HEAD")

@@ -21,6 +21,7 @@
     "tooling/extension-authoring#release-plan-compatibility",
     "tooling/extension-authoring#shared-package-metadata-writer",
     "tooling/extension-authoring#subprocess-control",
-    "tooling/extension-authoring#test-environment-policy"
+    "tooling/extension-authoring#test-environment-policy",
+    "tooling/extension-authoring#tree-fingerprint"
   ]
 }

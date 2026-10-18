@@ -371,10 +371,11 @@ file therefore records the tree as it went IN — which is what makes the record
 useful: compare it with the tree in front of you and you learn either that they
 match or that the run changed it.
 
-`putnami tree fingerprint` prints the same digest for the worktree it runs in and
-is the only implementation of the calculation; two parties comparing
-fingerprints produced two ways compare nothing. It needs no workspace and writes
-nothing:
+`putnami tree fingerprint` prints the same digest for the worktree it runs in.
+The command, the session and an extension that links the SDK package
+`go.putnami.dev/sdk/extension/treefingerprint` run the only implementation of
+the calculation; two parties comparing fingerprints produced two ways compare
+nothing. The command needs no workspace and writes nothing:
 
 ```bash
 putnami tree fingerprint

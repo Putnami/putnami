@@ -103,6 +103,10 @@
     {
       "id": "publication-outbox",
       "text": "A publication job packs its managed artifacts into PUTNAMI_PUBLICATION_OUTBOX, writes outbox.json last, and uploads nothing. The descriptor is strict and bounded; every path stays in the outbox. The engine reads each artifact once, refuses a size or digest the descriptor does not state, and uploads the verified bytes, retrying a transient upload failure up to 3 times. A version at the same digest is reused. Each uploader takes the bearer as an argument and sends it only to its registry; no error carries it."
+    },
+    {
+      "id": "tree-fingerprint",
+      "text": "The treefingerprint package computes the tree fingerprint the CLI prints and records. One SHA-256 covers HEAD, the bytes on disk at every tracked path that differs from it, recursing through checked-out submodules, and every untracked non-ignored file, in the versioned stream the CLI protocol documents. Git display settings and variables that select another repository or inject configuration do not change it. Outside a worktree or before the first commit it returns an error."
     }
   ],
   "decisions": [
