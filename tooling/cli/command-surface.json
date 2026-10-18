@@ -579,16 +579,6 @@
       ]
     },
     {
-      "path": "infra",
-      "flags": [],
-      "positionals": []
-    },
-    {
-      "path": "infra plan",
-      "flags": [],
-      "positionals": []
-    },
-    {
       "path": "init",
       "flags": [
         {

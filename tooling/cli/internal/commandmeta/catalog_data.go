@@ -483,30 +483,6 @@ var catalog = []Command{
 			Note:        "cmdCLI/cliBinDir: --global switches the binary in ~/.putnami/bin, which exists outside any workspace",
 		},
 	},
-	{
-		Path:       "infra",
-		Kind:       KindStructured,
-		Summary:    "Plan workspace infrastructure",
-		DefaultSub: "plan",
-		DetailFrom: "infra plan",
-		Related:    []string{"infra plan", "workspace describe", "projects list"},
-		Workspace:  requiredWorkspace(),
-	},
-	{
-		Path:        "infra plan",
-		Kind:        KindStructured,
-		Category:    "Workspace",
-		Summary:     "Plan workspace infra (--output=jsonl)",
-		Description: "Show the aggregated infrastructure plan inferred from project descriptors",
-		Usage:       "putnami infra plan [--output <format>]",
-		Examples: []string{
-			"putnami infra plan",
-			"putnami infra plan --output=jsonl",
-		},
-		Related:          []string{"workspace describe", "projects list"},
-		StructuredOutput: true,
-		Workspace:        requiredWorkspace(),
-	},
 
 	// ── Extensions & Templates ───────────────────────────────────────────
 	{
@@ -914,7 +890,7 @@ var catalog = []Command{
 			"putnami doctor --profile production --project /tooling/cli",
 			"putnami doctor --profile production --output=jsonl",
 		},
-		Related:          []string{"infra plan", "config show", "workspace describe"},
+		Related:          []string{"config show", "workspace describe"},
 		StructuredOutput: true,
 		Workspace:        requiredWorkspace(),
 	},

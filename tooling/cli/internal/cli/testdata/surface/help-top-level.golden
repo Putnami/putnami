@@ -26,7 +26,6 @@ Workspace:
   workspace describe           Describe the active workspace
   version get|tag              Versions derived from git and release tags
   cli list|use                 Installed CLI binaries
-  infra plan                   Plan workspace infra (--output=jsonl)
 
 Extensions & Templates:
   extensions install           Install extensions from config

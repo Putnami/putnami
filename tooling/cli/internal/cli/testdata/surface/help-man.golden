@@ -209,9 +209,6 @@ Versions derived from git and release tags.
 .TP
 .B cli list|use
 Installed CLI binaries.
-.TP
-.B infra plan
-Plan workspace infra (--output=jsonl).
 .SS Extensions & Templates
 .TP
 .B extensions install
@@ -549,12 +546,6 @@ putnami cli use <name> [--global]
 .TP
 .B --global
 Switch the binary in ~/.putnami/bin instead of the workspace (alias: -g).
-.SS infra plan
-Show the aggregated infrastructure plan inferred from project descriptors.
-.PP
-.B Usage:
-.br
-putnami infra plan [--output <format>]
 .SS extensions install
 Install extensions from workspace configuration and run extension install hooks.
 .PP

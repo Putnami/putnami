@@ -167,7 +167,6 @@ Global Options:
   Advanced: --trace-profile
 
 Related Commands:
-  putnami infra plan
   putnami config show
   putnami workspace describe
 
@@ -232,30 +231,6 @@ Global Options:
 Related Commands:
   putnami projects list
   putnami sessions inspect
-
-═══ infra ═══
-putnami infra
-
-Show the aggregated infrastructure plan inferred from project descriptors
-
-Usage:
-  putnami infra plan [--output <format>]
-
-Examples:
-  putnami infra plan
-  putnami infra plan --output=jsonl
-
-Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
-  Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
-
-Related Commands:
-  putnami infra plan
-  putnami workspace describe
-  putnami projects list
 
 ═══ init ═══
 putnami init
@@ -1056,29 +1031,6 @@ Global Options:
   Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
-
-═══ infra plan ═══
-putnami infra plan
-
-Show the aggregated infrastructure plan inferred from project descriptors
-
-Usage:
-  putnami infra plan [--output <format>]
-
-Examples:
-  putnami infra plan
-  putnami infra plan --output=jsonl
-
-Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
-  Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
-
-Related Commands:
-  putnami workspace describe
-  putnami projects list
 
 ═══ mcp install ═══
 putnami mcp install
