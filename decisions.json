@@ -84,15 +84,15 @@
     },
     {
       "id": "D-011",
-      "statement": "@putnami/contributor ships a compiled executable and owns tree verify, proposals finalize, contributor language|machine-load and sessions export|summary",
-      "settled": "2026-10-14",
+      "statement": "@putnami/contributor ships a compiled executable and owns change verify|finalize|language",
+      "settled": "2026-10-18",
       "settledBy": "fdumay",
       "reviewOnly": true
     },
     {
       "id": "D-012",
-      "statement": "@putnami/dev depends on @putnami/contributor, so only a development workspace receives the contributor skills",
-      "settled": "2026-10-14",
+      "statement": "@putnami/dev does not depend on @putnami/contributor, which installs only on explicit request: a workspace receives the contributor skills and agents only when someone asks for @putnami/contributor",
+      "settled": "2026-10-18",
       "settledBy": "fdumay",
       "reviewOnly": true
     },
@@ -100,6 +100,76 @@
       "id": "D-013",
       "statement": "putnami migrate agent-content is deleted in the next minor release, with no transition window",
       "settled": "2026-10-14",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-014",
+      "statement": "an extension command calls the collaboration providers through an RPC call to the core, made with an SDK client",
+      "settled": "2026-10-16",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-015",
+      "statement": "the planner and the scheduler are packages, and import paths set the engine boundary: only internal/engine names planner.Plan and scheduler.RunPlan",
+      "settled": "2026-10-16",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-016",
+      "statement": "the change noun carries the change workflow: change verify, change finalize and change language replace tree verify, proposals finalize and contributor language",
+      "settled": "2026-10-18",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-017",
+      "statement": "sessions export and sessions summary stay in the core, because they read the host's session store",
+      "settled": "2026-10-18",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-018",
+      "statement": "@putnami/dev owns the version noun; version list|use, which list and switch the installed CLI binaries, become cli list|use",
+      "settled": "2026-10-18",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-019",
+      "statement": "contributor machine-load becomes doctor --machine, in the core",
+      "settled": "2026-10-18",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-020",
+      "statement": "the core's dev noun is deleted: dev extension validate becomes extensions validate <path>, and dev template <action> becomes templates validate|test|package <path>",
+      "settled": "2026-10-18",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-021",
+      "statement": "an extension manifest declares the kind of each command it adds, in an additive contract rung that ships with the traits that replace verb-name checks",
+      "settled": "2026-10-18",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-022",
+      "statement": "a feature declaration may list the commands and MCP tools that carry the feature",
+      "settled": "2026-10-18",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-023",
+      "statement": "Cloud deletes its nine alias subcommands (tokens, distribution, oci, publish-archives, track, report, validate-config, publish-config, publish-migration) in a dedicated Cloud pull request that ships as a breaking Cloud release",
+      "settled": "2026-10-18",
       "settledBy": "fdumay",
       "reviewOnly": true
     }

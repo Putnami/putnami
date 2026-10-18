@@ -184,7 +184,8 @@
               "changed-files-select-owners-and-transitive-dependents",
               "renames-and-assets-select-every-owner",
               "the-selection-explains-every-project-it-holds",
-              "why-impacted-walks-the-edges-impacted-widens-through"
+              "why-impacted-walks-the-edges-impacted-widens-through",
+              "a-task-scope-keeps-every-job-that-declares-side-effects"
             ]
           }
         },

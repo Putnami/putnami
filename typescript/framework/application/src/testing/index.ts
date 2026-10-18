@@ -9,3 +9,4 @@ export type {
   GrpcCallOptions,
   GrpcTestClientOptions,
 } from '../grpc/grpc-testing';
+export { drainMetrics } from './drain-metrics';

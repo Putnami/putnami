@@ -76,3 +76,16 @@ expect(user).toBeDefined();
 | `fn` | `() => Promise<T \| undefined>` | — | Async function to poll. Return a value to resolve, or `undefined` to keep polling. |
 | `timeoutMs` | `number` | `4000` | Maximum time to wait before returning `undefined`. |
 | `intervalMs` | `number` | `100` | Polling interval. |
+
+## `drainMetrics`
+
+Drain a `TelemetryCollector` and return its metrics as one merged bucket.
+The collector buckets metrics per Unix second, so a test that reads only `drainAll()[0]` fails when the code under test crosses a second boundary.
+`drainMetrics` sums counters, keeps the last gauge value in time order, and combines histograms and attributed series across every bucket.
+
+```typescript
+import { drainMetrics } from '@putnami/application/testing';
+
+const bucket = drainMetrics(collector);
+expect(bucket.counters['http.GET./api.200']).toBe(1);
+```

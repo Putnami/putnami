@@ -1,21 +1,30 @@
-package git
+// Package treefingerprint computes the tree fingerprint: one digest of a
+// worktree's exact state, which `putnami tree fingerprint` prints and a
+// recorded session carries (protocol cli.SessionTree). The CLI and the
+// extensions that compare a fingerprint read it here, because two parties
+// comparing fingerprints computed by two implementations compare nothing.
+package treefingerprint
 
 import (
+	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"go.putnami.dev/sdk/extension/sourcebinding"
 )
 
-// TreeFingerprint identifies one worktree's exact state: the commit it sits on,
-// the bytes at every tracked path that differs from that commit — recursively,
-// through submodules — and the content of every untracked, non-ignored file.
+// Tree identifies one worktree's exact state: the commit it sits on, the bytes
+// at every tracked path that differs from that commit — recursively, through
+// submodules — and the content of every untracked, non-ignored file.
 //
 // It exists because "the same files are dirty" is not "the same bytes are on
 // disk". `git status --porcelain` reports paths and status codes, so an agent
@@ -29,11 +38,10 @@ import (
 // different tree instead of canceling out against a coincidentally identical
 // set of changes.
 //
-// This is the ONE implementation. `putnami tree fingerprint` prints it and
-// recorded sessions carry it (protocol cli.SessionTree); skills call that
-// command rather than keep a second copy of the calculation, because two agents
-// comparing fingerprints computed by two implementations compare nothing.
-type TreeFingerprint struct {
+// This is the ONE implementation. `putnami tree fingerprint` prints it,
+// recorded sessions carry it, and an extension links this package; skills call
+// that command rather than keep a second copy of the calculation.
+type Tree struct {
 	// Fingerprint is the lowercase hex sha256 of the canonical stream below.
 	Fingerprint string
 	// Dirty reports whether the worktree differed from HeadSHA. It is derived
@@ -112,14 +120,14 @@ const hostStatsExecBit = sourcebinding.HostStatsExecBit
 // gives out.
 const maxSubmoduleDepth = 10
 
-// FingerprintTree computes the fingerprint of the worktree containing dir.
+// Compute computes the fingerprint of the worktree containing dir.
 //
 // It reads the repository and writes nothing: no session record, no workspace
 // state, no file. dir may be any directory inside the worktree — the repository
 // root is resolved here, so two callers in different directories agree.
 //
-// The canonical preimage, which doc/02-result-v2.md § Gated tree fingerprint
-// states for non-Go consumers:
+// The canonical preimage, which the CLI protocol's doc/02-result-v2.md § Gated
+// tree fingerprint states for non-Go consumers:
 //
 //	putnami-tree-fingerprint/2\n
 //	head <headSHA>\n
@@ -140,34 +148,34 @@ const maxSubmoduleDepth = 10
 // The tracked section lists exactly the paths that differ from HEAD, and hashes
 // the bytes ON DISK at each of them. It never hashes git's rendering of that
 // difference: see treeFingerprintPreimageVersion for the two defects that cost.
-func FingerprintTree(dir string) (TreeFingerprint, error) {
-	return fingerprintTree(dir, 0)
+func Compute(dir string) (Tree, error) {
+	return compute(dir, 0)
 }
 
-func fingerprintTree(dir string, depth int) (TreeFingerprint, error) {
+func compute(dir string, depth int) (Tree, error) {
 	if depth > maxSubmoduleDepth {
-		return TreeFingerprint{}, fmt.Errorf("submodules nest more than %d deep at %s", maxSubmoduleDepth, dir)
+		return Tree{}, fmt.Errorf("submodules nest more than %d deep at %s", maxSubmoduleDepth, dir)
 	}
 	root, err := worktreeRoot(dir)
 	if err != nil {
-		return TreeFingerprint{}, err
+		return Tree{}, err
 	}
 	head, err := run(root, "rev-parse", "HEAD")
 	if err != nil {
-		return TreeFingerprint{}, fmt.Errorf("the repository has no commit, so there is no tree to fingerprint")
+		return Tree{}, fmt.Errorf("the repository has no commit, so there is no tree to fingerprint")
 	}
 	head = strings.TrimSpace(head)
 
 	tracked, err := trackedChanges(root, depth, hostStatsExecBit)
 	if err != nil {
-		return TreeFingerprint{}, err
+		return Tree{}, err
 	}
 
 	// `git ls-files --others` emits its entries in sorted order, so the untracked
 	// section is stable across machines without a sort of its own.
 	listing, err := run(root, "ls-files", "--others", "--exclude-standard", "-z")
 	if err != nil {
-		return TreeFingerprint{}, fmt.Errorf("list untracked files: %w", err)
+		return Tree{}, fmt.Errorf("list untracked files: %w", err)
 	}
 	untracked := splitNUL(listing)
 
@@ -182,12 +190,12 @@ func fingerprintTree(dir string, depth int) (TreeFingerprint, error) {
 	for _, path := range untracked {
 		kind, content, err := hashUntracked(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			return TreeFingerprint{}, err
+			return Tree{}, err
 		}
 		fmt.Fprintf(digest, "%s %s %d\n%s\n", kind, content, len(path), path)
 	}
 
-	return TreeFingerprint{
+	return Tree{
 		Fingerprint: hex.EncodeToString(digest.Sum(nil)),
 		Dirty:       len(tracked) > 0 || len(untracked) > 0,
 		HeadSHA:     head,
@@ -311,7 +319,7 @@ func trackedEntry(root, path, worktreeMode, objectID string, depth int, statsExe
 			// gitlink object id is all this tree holds for it.
 			return treeEntry{kind: treeEntrySubmoduleAbsent, content: hashBytes([]byte(objectID)), path: path}, nil
 		}
-		nested, err := fingerprintTree(absolute, depth+1)
+		nested, err := compute(absolute, depth+1)
 		if err != nil {
 			return treeEntry{}, fmt.Errorf("fingerprint submodule %s: %w", path, err)
 		}
@@ -408,4 +416,63 @@ func hashUntracked(path string) (kind string, content string, err error) {
 func hashBytes(data []byte) string {
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
+}
+
+// gitTimeout bounds one git call.
+const gitTimeout = 30 * time.Second
+
+// run runs git with args in repoRoot and returns its standard output. git
+// inherits this process's environment without the variables
+// repositoryEnvironment removes, so it reads the repository at repoRoot and
+// no other.
+func run(repoRoot string, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = repoRoot
+	cmd.Env = repositoryEnvironment(os.Environ())
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			err = fmt.Errorf("timed out after %s", gitTimeout)
+		}
+		return "", fmt.Errorf("git %s (in %s): %w: %s", args[0], repoRoot, err, strings.TrimSpace(stderr.String()))
+	}
+	return stdout.String(), nil
+}
+
+// repositoryEnvironment removes from environ the variables that could
+// redirect a git command away from its working directory: every GIT_CONFIG*
+// variable and the repository, worktree, index, object and discovery
+// selectors. Transport credentials and tracing (including GIT_SSH_COMMAND and
+// GIT_ASKPASS) pass through unchanged. The CLI's own git calls apply the same
+// rule.
+func repositoryEnvironment(environ []string) []string {
+	cleaned := make([]string, 0, len(environ))
+	for _, entry := range environ {
+		name, _, _ := strings.Cut(entry, "=")
+		if strings.HasPrefix(name, "GIT_CONFIG") {
+			continue
+		}
+		switch name {
+		case "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
+			"GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_PREFIX", "GIT_CEILING_DIRECTORIES",
+			"GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_NAMESPACE":
+			continue
+		}
+		cleaned = append(cleaned, entry)
+	}
+	return cleaned
+}
+
+// splitNUL splits git's NUL-terminated output into its records.
+func splitNUL(output string) []string {
+	parts := strings.Split(output, "\x00")
+	if len(parts) > 0 && parts[len(parts)-1] == "" {
+		parts = parts[:len(parts)-1]
+	}
+	return parts
 }

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-<!-- putnami:guidance v2 begin sha256:bd5988dfc14b197d3cc3a1821d038e9bd081c89d057bf6c03f496ebd0b85c9b0 -->
+<!-- putnami:guidance v2 begin sha256:0bfc6f8f7879e914d3959f1307c0ed3d0274d06a03ab7cd423ae573a180e9237 -->
 This is a Putnami workspace.
 - Build, test, lint, install, add dependencies, and generate with `./putnamiw` when present, otherwise `putnami`. Never call npm, bun, go, pip, or cargo directly for those.
 - While iterating, select the projects you changed with `--projects <a>,<b>`; unlike `--impacted`, it skips every project that depends on them. Before declaring work complete, run `putnami lint,test,build,validate --impacted --enforce-coverage` once, when feasible.
@@ -18,8 +18,18 @@ This is a Putnami workspace.
   - D-008 — putnami init --extension <language> installs that language extension, and its dependencies bring the rest (settled 2026-10-14, review-only, held by a human reviewer)
   - D-009 — anonymous usage telemetry stays in the core CLI (settled 2026-10-14, review-only, held by a human reviewer)
   - D-010 — the core CLI computes a tree's version before any cache key; the version get|tag and changelog commands belong to @putnami/dev (settled 2026-10-14, review-only, held by a human reviewer)
-  - D-011 — @putnami/contributor ships a compiled executable and owns tree verify, proposals finalize, contributor language|machine-load and sessions export|summary (settled 2026-10-14, review-only, held by a human reviewer)
-  - D-012 — @putnami/dev depends on @putnami/contributor, so only a development workspace receives the contributor skills (settled 2026-10-14, review-only, held by a human reviewer)
+  - D-011 — @putnami/contributor ships a compiled executable and owns change verify|finalize|language (settled 2026-10-18, review-only, held by a human reviewer)
+  - D-012 — @putnami/dev does not depend on @putnami/contributor, which installs only on explicit request: a workspace receives the contributor skills and agents only when someone asks for @putnami/contributor (settled 2026-10-18, review-only, held by a human reviewer)
   - D-013 — putnami migrate agent-content is deleted in the next minor release, with no transition window (settled 2026-10-14, review-only, held by a human reviewer)
+  - D-014 — an extension command calls the collaboration providers through an RPC call to the core, made with an SDK client (settled 2026-10-16, review-only, held by a human reviewer)
+  - D-015 — the planner and the scheduler are packages, and import paths set the engine boundary: only internal/engine names planner.Plan and scheduler.RunPlan (settled 2026-10-16, review-only, held by a human reviewer)
+  - D-016 — the change noun carries the change workflow: change verify, change finalize and change language replace tree verify, proposals finalize and contributor language (settled 2026-10-18, review-only, held by a human reviewer)
+  - D-017 — sessions export and sessions summary stay in the core, because they read the host's session store (settled 2026-10-18, review-only, held by a human reviewer)
+  - D-018 — @putnami/dev owns the version noun; version list|use, which list and switch the installed CLI binaries, become cli list|use (settled 2026-10-18, review-only, held by a human reviewer)
+  - D-019 — contributor machine-load becomes doctor --machine, in the core (settled 2026-10-18, review-only, held by a human reviewer)
+  - D-020 — the core's dev noun is deleted: dev extension validate becomes extensions validate <path>, and dev template <action> becomes templates validate|test|package <path> (settled 2026-10-18, review-only, held by a human reviewer)
+  - D-021 — an extension manifest declares the kind of each command it adds, in an additive contract rung that ships with the traits that replace verb-name checks (settled 2026-10-18, review-only, held by a human reviewer)
+  - D-022 — a feature declaration may list the commands and MCP tools that carry the feature (settled 2026-10-18, review-only, held by a human reviewer)
+  - D-023 — Cloud deletes its nine alias subcommands (tokens, distribution, oci, publish-archives, track, report, validate-config, publish-config, publish-migration) in a dedicated Cloud pull request that ships as a breaking Cloud release (settled 2026-10-18, review-only, held by a human reviewer)
   - Project decisions, returned by `putnami.context` with their project: `tooling/cli/decisions.json` (12).
 <!-- putnami:guidance v2 end -->

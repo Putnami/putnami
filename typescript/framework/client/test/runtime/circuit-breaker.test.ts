@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { setCollector, TelemetryCollector } from '@putnami/application';
+import { drainMetrics } from '@putnami/application/testing';
 import { specTest } from '@putnami/runtime/spectest';
 import { CircuitBreaker, CircuitOpenError, circuitBreakerInterceptor } from '../../src/runtime/circuit-breaker';
 import type { ClientRequest, ClientResponse } from '../../src/runtime/transport.type';
@@ -452,8 +453,8 @@ describe('CircuitBreaker telemetry', () => {
       breaker.onSuccess(); // half-open → closed (successThreshold 1)
       breaker.dispose();
 
-      const bucket = collector.drainAll()[0];
-      // Gauge is last-write-wins within the second → final state is closed (0).
+      const bucket = drainMetrics(collector);
+      // A gauge keeps its latest value across buckets → final state is closed (0).
       expect(bucket.gauges['client.users.circuit.state']).toBe(0);
       // One counter per transition we drove.
       expect(bucket.counters['client.users.circuit.transition.open']).toBe(1);
@@ -475,7 +476,7 @@ describe('CircuitBreaker telemetry', () => {
       breaker.onFailure(); // closed → open
       breaker.dispose();
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMetrics(collector);
       expect(bucket.gauges['client.orders.circuit.state']).toBe(1);
       expect(bucket.counters['client.orders.circuit.transition.open']).toBe(1);
     },
@@ -494,7 +495,7 @@ describe('CircuitBreaker telemetry', () => {
       breaker.onFailure(); // closed → open
       breaker.dispose();
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMetrics(collector);
       expect(bucket.gauges['client.circuit.state']).toBe(1);
       expect(bucket.counters['client.circuit.transition.open']).toBe(1);
     },

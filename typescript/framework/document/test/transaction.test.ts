@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect } from 'bun:test';
 import { setCollector, TelemetryCollector } from '@putnami/application';
+import { drainMetrics } from '@putnami/application/testing';
 import { Int, resetConfigLoader, runInContext } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
 import { Collection, DocumentId, Field } from '../src/collection';
@@ -71,7 +72,7 @@ describe('document transactions', () => {
         });
       });
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMetrics(collector);
       expect(bucket.counters['document.transaction.started']).toBe(1);
       expect(bucket.counters['document.transaction.committed']).toBe(1);
       expect(bucket.histograms['document.transaction.duration']).toBeDefined();
@@ -103,7 +104,7 @@ describe('document transactions', () => {
         expect((error as Error).message).toBe('boom');
       }
 
-      const bucket = collector.drainAll()[0];
+      const bucket = drainMetrics(collector);
       expect(bucket.counters['document.transaction.started']).toBe(1);
       expect(bucket.counters['document.transaction.rolled_back']).toBe(1);
       expect(bucket.counters['document.transaction.committed']).toBeUndefined();

@@ -41,6 +41,15 @@ function decodeSalt(b64: string): Uint8Array {
   return new Uint8Array(Buffer.from(b64, 'base64'));
 }
 
+// Every case that derives a PBKDF2 key does it at a real work factor (the
+// 210k-iteration floor or the 600k preset), often several times. That is the
+// point — a reduced cost would not exercise the shipped parameters — but it
+// also means the default per-test budget is not the right one: on a machine
+// running the rest of the suite in parallel these are CPU-bound for seconds.
+// State the real budget rather than let contention decide whether the suite is
+// green.
+const HASHING_TIMEOUT_MS = 60_000;
+
 describe('secret-digest cross-language vectors', () => {
   const vectors = loadSecretVectors();
 
@@ -58,45 +67,49 @@ describe('secret-digest cross-language vectors', () => {
         expect(parsed?.algorithm).toBe(v.algorithm);
       });
 
-      it('every valid secret verifies true with the pinned rehashRequired flag', async () => {
-        for (const secret of v.valid) {
-          const res = await verifySecret(secret, v.digest);
-          expect(res.valid).toBe(true);
-          expect(res.rehashRequired).toBe(v.rehashRequired);
-        }
-      });
+      it(
+        'every valid secret verifies true with the pinned rehashRequired flag',
+        async () => {
+          for (const secret of v.valid) {
+            const res = await verifySecret(secret, v.digest);
+            expect(res.valid).toBe(true);
+            expect(res.rehashRequired).toBe(v.rehashRequired);
+          }
+        },
+        HASHING_TIMEOUT_MS,
+      );
 
-      it('every invalid secret fails closed', async () => {
-        for (const secret of v.invalid) {
-          const res = await verifySecret(secret, v.digest);
-          expect(res.valid).toBe(false);
-          expect(res.rehashRequired).toBe(false);
-        }
-      });
+      it(
+        'every invalid secret fails closed',
+        async () => {
+          for (const secret of v.invalid) {
+            const res = await verifySecret(secret, v.digest);
+            expect(res.valid).toBe(false);
+            expect(res.rehashRequired).toBe(false);
+          }
+        },
+        HASHING_TIMEOUT_MS,
+      );
 
-      it('re-hashing the secret with the pinned salt reproduces the EXACT digest (byte-identical to Go)', async () => {
-        const salt = decodeSalt(v.salt);
-        const opts =
-          v.algorithm === 'pbkdf2-sha256'
-            ? { algorithm: v.algorithm, iterations: v.iterations }
-            : { algorithm: v.algorithm };
-        const got = await _hashWithSalt(v.secret, salt, opts);
-        expect(got).toBe(v.digest);
-      });
+      it(
+        're-hashing the secret with the pinned salt reproduces the EXACT digest (byte-identical to Go)',
+        async () => {
+          const salt = decodeSalt(v.salt);
+          const opts =
+            v.algorithm === 'pbkdf2-sha256'
+              ? { algorithm: v.algorithm, iterations: v.iterations }
+              : { algorithm: v.algorithm };
+          const got = await _hashWithSalt(v.secret, salt, opts);
+          expect(got).toBe(v.digest);
+        },
+        HASHING_TIMEOUT_MS,
+      );
     });
   }
 });
 
 describe('secret-digest round-trip', () => {
   const algorithms: DigestAlgorithm[] = ['pbkdf2-sha256', 'hmac-sha256'];
-
-  // These cases hash at the real default work factor (600k PBKDF2 iterations),
-  // several times per case. That is the point — a round trip at a reduced cost
-  // would not exercise the shipped parameters — but it also means the default
-  // per-test budget is not the right one: on a machine running the rest of the
-  // suite in parallel these are CPU-bound for seconds. State the real budget
-  // rather than let contention decide whether the suite is green.
-  const ROUND_TRIP_TIMEOUT_MS = 60_000;
 
   for (const algorithm of algorithms) {
     describe(algorithm, () => {
@@ -116,7 +129,7 @@ describe('secret-digest round-trip', () => {
           expect(wrong.valid).toBe(false);
           expect(wrong.rehashRequired).toBe(false);
         },
-        ROUND_TRIP_TIMEOUT_MS,
+        HASHING_TIMEOUT_MS,
       );
 
       it(
@@ -128,7 +141,7 @@ describe('secret-digest round-trip', () => {
           expect((await verifySecret(secret, a)).valid).toBe(true);
           expect((await verifySecret(secret, b)).valid).toBe(true);
         },
-        ROUND_TRIP_TIMEOUT_MS,
+        HASHING_TIMEOUT_MS,
       );
     });
   }
@@ -137,32 +150,42 @@ describe('secret-digest round-trip', () => {
 describe('secret-digest policy', () => {
   const secret = 'correct horse';
 
-  it('a below-preset pbkdf2 digest reports rehashRequired on a successful verify', async () => {
-    const weak = await _hashWithSalt(secret, decodeSalt('MDEyMzQ1Njc4OWFiY2RlZg'), {
-      algorithm: 'pbkdf2-sha256',
-      iterations: ITERATION_FLOOR,
-    });
-    const res = await verifySecret(secret, weak);
-    expect(res.valid).toBe(true);
-    expect(res.rehashRequired).toBe(true);
-  });
+  it(
+    'a below-preset pbkdf2 digest reports rehashRequired on a successful verify',
+    async () => {
+      const weak = await _hashWithSalt(secret, decodeSalt('MDEyMzQ1Njc4OWFiY2RlZg'), {
+        algorithm: 'pbkdf2-sha256',
+        iterations: ITERATION_FLOOR,
+      });
+      const res = await verifySecret(secret, weak);
+      expect(res.valid).toBe(true);
+      expect(res.rehashRequired).toBe(true);
+    },
+    HASHING_TIMEOUT_MS,
+  );
 
-  // Hashes and verifies at the shipped 600k-iteration preset, so it carries the
-  // same explicit budget as the round-trip cases above rather than the default.
-  it('a preset pbkdf2 digest does not require a rehash', async () => {
-    const strong = await hashSecret(secret); // default preset
-    const res = await verifySecret(secret, strong);
-    expect(res.valid).toBe(true);
-    expect(res.rehashRequired).toBe(false);
-  }, 60_000);
+  it(
+    'a preset pbkdf2 digest does not require a rehash',
+    async () => {
+      const strong = await hashSecret(secret); // default preset
+      const res = await verifySecret(secret, strong);
+      expect(res.valid).toBe(true);
+      expect(res.rehashRequired).toBe(false);
+    },
+    HASHING_TIMEOUT_MS,
+  );
 
-  it('the iteration floor cannot be undercut', async () => {
-    const floored = await hashSecret(secret, { iterations: 1 });
-    const parsed = parseDigest(floored);
-    expect(parsed?.iterations).toBe(ITERATION_FLOOR);
-    // The floor must sit below the preset so there is tuning room above it.
-    expect(ITERATION_FLOOR).toBeLessThan(DEFAULT_PBKDF2_ITERATIONS);
-  });
+  it(
+    'the iteration floor cannot be undercut',
+    async () => {
+      const floored = await hashSecret(secret, { iterations: 1 });
+      const parsed = parseDigest(floored);
+      expect(parsed?.iterations).toBe(ITERATION_FLOOR);
+      // The floor must sit below the preset so there is tuning room above it.
+      expect(ITERATION_FLOOR).toBeLessThan(DEFAULT_PBKDF2_ITERATIONS);
+    },
+    HASHING_TIMEOUT_MS,
+  );
 });
 
 describe('secret-digest fail-closed parsing', () => {

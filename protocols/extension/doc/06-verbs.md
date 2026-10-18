@@ -75,7 +75,7 @@ A declared `sideEffects` still replaces the verb's. Per-step heaviness uses
 | `heavy` | Worker tuning leaves the command's jobs CPU/memory headroom. |
 | `requiresRunnable` | The command is skipped for `library` projects. |
 | `injectPublishChannels` | The project's `publish: [...]` channels are auto-activated as boolean params. |
-| `sideEffects` | `registry` or `cloud`; documents what the command mutates outside the workspace. |
+| `sideEffects` | `registry` or `cloud`; documents what the command mutates outside the workspace, and keeps the command's jobs on a task-scoped `--impacted` project. `publish` and `deploy` keep theirs whatever a declaration says. |
 
 ### Gated capability transport is not server authorization
 

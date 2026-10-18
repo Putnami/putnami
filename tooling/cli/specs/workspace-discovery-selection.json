@@ -28,7 +28,7 @@
     },
     {
       "id": "impacted-closure",
-      "text": "Impacted selection maps changed files to their direct owners and includes the full transitive dependent closure, reaching an in-workspace extension's consumers for that extension's tasks only, so a plan keeps a task-scoped project's jobs of those extensions and their predecessors, and a project's kept spec gate keeps that project's tests, whose verification reports it judges. A run that executes the selection records its complete trace, the diff base and the uncommitted changed files as a session event."
+      "text": "Impacted selection maps changed files to their direct owners and includes the full transitive dependent closure, reaching an in-workspace extension's consumers for that extension's tasks only. A task-scoped project keeps those extensions' jobs, every job whose command traits declare side effects whatever its name, the tests its kept spec gate judges, and their predecessors. A run that executes the selection records its complete trace, the diff base and the uncommitted changed files as a session event."
     },
     {
       "id": "safe-baseline",
@@ -73,6 +73,7 @@
     "tooling/cli/doc/adr/0042-impacted-plans-from-the-commit-and-records-why.md",
     "tooling/cli/doc/adr/0045-a-project-declares-who-may-import-it.md",
     "tooling/cli/doc/adr/0046-a-declared-edge-no-import-backs-is-a-finding.md",
-    "tooling/cli/doc/adr/0053-a-registry-pin-wins-over-a-same-name-project-manifest.md"
+    "tooling/cli/doc/adr/0053-a-registry-pin-wins-over-a-same-name-project-manifest.md",
+    "tooling/cli/doc/adr/0070-a-task-scope-keeps-a-job-by-its-declared-side-effects.md"
   ]
 }
