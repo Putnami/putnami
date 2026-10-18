@@ -28,10 +28,10 @@ func TestChangeVerifyThroughPutnamiMatchesTreeVerify(t *testing.T) {
 	}
 	harness := collaborationHarness(t)
 	root := t.TempDir()
-	config, err := json.Marshal(map[string]any{
-		"name":       "change-verify-fixture",
-		"extensions": []string{filepath.ToSlash(filepath.Join(harness, "contributor"))},
-	})
+	config, err := json.Marshal(struct {
+		Name       string   `json:"name"`
+		Extensions []string `json:"extensions"`
+	}{"change-verify-fixture", []string{filepath.ToSlash(filepath.Join(harness, "contributor"))}})
 	if err != nil {
 		t.Fatal(err)
 	}
