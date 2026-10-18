@@ -79,8 +79,8 @@ published, deployed and adopted each need their actual evidence.
 New workflows require a CLI that supports `tree verify --workflow`; an older
 v2 dossier reader can ignore the added reference, so the workflow checks this
 capability explicitly. Framework recipes are generated in the `build` skill's
-reference. `putnami contributor language` checks English-language signals in
-text, tracked files, commits and task records; `putnami contributor machine-load`
+reference. `putnami change language` checks English-language signals in
+text, tracked files, commits and task records; `putnami doctor --machine`
 reports local check capacity. `putnami tree fingerprint` supplies the native
 tree binding, and `putnami proposals finalize` publishes through the configured
 proposals provider without running another local gate. Configured content
