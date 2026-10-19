@@ -700,6 +700,8 @@ func TestAppRun_NoArgs(t *testing.T) {
 	}
 }
 
+// TestAppRun_HelpForCommand pins that the help of a job command outside a
+// workspace fails as a run of it does: no workspace was found.
 func TestAppRun_HelpForCommand(t *testing.T) {
 	t.Chdir(t.TempDir())
 	app, err := NewApp()
@@ -707,8 +709,8 @@ func TestAppRun_HelpForCommand(t *testing.T) {
 		t.Fatalf("NewApp: %v", err)
 	}
 	code := app.Run(context.Background(), []string{"build", "--help"})
-	if code != ExitSuccess {
-		t.Errorf("build --help exit code = %d, want %d", code, ExitSuccess)
+	if code != ExitError {
+		t.Errorf("build --help exit code = %d, want %d", code, ExitError)
 	}
 }
 

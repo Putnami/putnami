@@ -42,16 +42,16 @@ import (
 //     dispatch changes WHEN the error fires relative to subcommand
 //     validation, which is a behavior change that belongs on its own.
 
-// Kind separates the two command vocabularies the CLI dispatches.
+// Kind classifies a catalog command. The catalog declares only structured
+// commands: a job command, such as build, exists only where a loaded extension
+// declares it, so no catalog entry names one.
 type Kind int
 
 const (
-	// KindJob is an extension-provided job command ("build", "test"): it runs
-	// through the scheduler and accepts comma-composition.
-	KindJob Kind = iota
 	// KindStructured is a built-in structured command ("projects list") with a
-	// registered handler.
-	KindStructured
+	// registered handler. The zero Kind is no kind, so an entry that omits it
+	// fails the catalog checks.
+	KindStructured Kind = iota + 1
 )
 
 // FlagType is the argument shape of a command flag.
@@ -204,7 +204,7 @@ type Command struct {
 	// It is the key every derived table uses, so it must be what the dispatcher
 	// resolves — not a display spelling.
 	Path string
-	// Kind separates job commands from built-in structured commands.
+	// Kind is KindStructured for every entry.
 	Kind Kind
 	// Category names the group this command heads in the categorized help
 	// listing, or "" when the command is reachable but not its own listing row
@@ -331,8 +331,8 @@ func StructuredRoots() []Command {
 }
 
 // IsStructuredRoot reports whether name is the bare root of a built-in
-// structured command ("projects", not the job command "build" and not the child
-// path "projects list").
+// structured command ("projects", not an extension's job command and not the
+// child path "projects list").
 //
 // This is the CLI's answer to "does this word take a subcommand", asked on the
 // argument-parsing path. It moved here from internal/cli.commandRegistry so

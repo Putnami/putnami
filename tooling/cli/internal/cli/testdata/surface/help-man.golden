@@ -16,41 +16,9 @@ It reads extension manifests, resolves a dependency DAG, and executes
 tasks in parallel via subprocesses.
 .PP
 Multiple commands can be chained with commas:
-.B putnami lint,test,build --impacted
+.B putnami <command>,<command> --impacted
 .SH JOB COMMANDS
-.TP
-.B build
-Compile or transpile project sources into runnable or distributable outputs.
-.TP
-.B test
-Run the project's tests, emitting test counts and coverage metrics.
-.TP
-.B lint
-Check code for style and correctness findings, emitting per-issue diagnostics.
-.TP
-.B serve
-Run the project's dev server until interrupted.
-.TP
-.B run
-Execute the project once and exit.
-.TP
-.B format
-Rewrite sources into canonical formatting.
-.TP
-.B package
-Assemble distributable artifacts for the project's publish channels.
-.TP
-.B publish
-Push packaged artifacts to registries.
-.TP
-.B deploy
-Converge a cloud environment on the workload's aggregated infra manifest.
-.TP
-.B generate
-Run code generators.
-.TP
-.B validate
-Check the project against its declared specs, contracts and compatibility rules.
+No extension is loaded. Name a language extension in putnami.workspace.json, then run: putnami extensions install
 .SH COMMON OPTIONS
 .TP
 .BR -v " , " --verbose
@@ -669,7 +637,7 @@ Garbage-collect the machine-global build, Go, Bun, and binary stores down to the
 .br
 putnami cache gc
 .SS cache verify
-Run lint, test, and build twice in isolated worktrees, compare cache keys and captured artifacts, restore the first run into a pristine tree, and fail on undeclared writes or live-versus-hit differences; declared ambient key inputs are reported without failing.
+Run the workspace gate tasks (the blocking commands of putnami.ci.json; lint, test and build without one) twice in isolated worktrees, compare cache keys and captured artifacts, restore the first run into a pristine tree, and fail on undeclared writes or live-versus-hit differences; declared ambient key inputs are reported without failing.
 .PP
 .B Usage:
 .br
@@ -902,8 +870,6 @@ Render the full reference as a man page.
 .TP
 .B --markdown
 Render the full reference as Markdown.
-.SH ALIASES
-b=build, t=test, l=lint, s=serve, f=format, p=publish, P=publish, d=deploy, D=deploy
 .SH EXIT CODES
 .TP
 .B 0

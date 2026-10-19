@@ -40,41 +40,36 @@ func TestParseArgs_MultiCommand(t *testing.T) {
 
 func TestParseArgs_Aliases(t *testing.T) {
 	t.Parallel()
+	vocabulary := map[string]string{"b": "build", "t": "test", "l": "lint", "p": "publish", "P": "publish"}
 	tests := []struct {
-		name     string
-		args     []string
-		aliases  map[string]string
-		wantCmds []string
+		name       string
+		args       []string
+		vocabulary map[string]string
+		aliases    map[string]string
+		wantCmds   []string
 	}{
 		{
-			name:     "single builtin alias",
+			name:       "single vocabulary alias",
+			args:       []string{"b", "--all"},
+			vocabulary: vocabulary,
+			wantCmds:   []string{"build"},
+		},
+		{
+			name:       "multi vocabulary aliases",
+			args:       []string{"l,t,b", "--all"},
+			vocabulary: vocabulary,
+			wantCmds:   []string{"lint", "test", "build"},
+		},
+		{
+			name:       "uppercase vocabulary alias",
+			args:       []string{"P", "--all"},
+			vocabulary: vocabulary,
+			wantCmds:   []string{"publish"},
+		},
+		{
+			name:     "no alias without a vocabulary: the core declares none",
 			args:     []string{"b", "--all"},
-			wantCmds: []string{"build"},
-		},
-		{
-			name:     "multi builtin aliases",
-			args:     []string{"l,t,b", "--all"},
-			wantCmds: []string{"lint", "test", "build"},
-		},
-		{
-			name:     "publish alias remains available",
-			args:     []string{"p", "--all"},
-			wantCmds: []string{"publish"},
-		},
-		{
-			name:     "uppercase publish alias",
-			args:     []string{"P", "--all"},
-			wantCmds: []string{"publish"},
-		},
-		{
-			name:     "deploy alias",
-			args:     []string{"d", "--all"},
-			wantCmds: []string{"deploy"},
-		},
-		{
-			name:     "uppercase deploy alias",
-			args:     []string{"D", "--all"},
-			wantCmds: []string{"deploy"},
+			wantCmds: []string{"b"},
 		},
 		{
 			name:     "user alias",
@@ -82,11 +77,17 @@ func TestParseArgs_Aliases(t *testing.T) {
 			aliases:  map[string]string{"check": "lint,test"},
 			wantCmds: []string{"lint,test"}, // resolveAlias doesn't split further
 		},
+		{
+			name:     "user alias named like a vocabulary alias",
+			args:     []string{"b", "--all"},
+			aliases:  map[string]string{"b": "lint"},
+			wantCmds: []string{"lint"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			parsed := ParseArgs(tt.args, tt.aliases, nil)
+			parsed := parseArgs(tt.args, commandAliases{vocabulary: tt.vocabulary, user: tt.aliases}, nil)
 			if len(parsed.Commands) != len(tt.wantCmds) {
 				t.Fatalf("commands = %v, want %v", parsed.Commands, tt.wantCmds)
 			}

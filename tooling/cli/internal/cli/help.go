@@ -68,22 +68,29 @@ type CommandInfo struct {
 	Description string
 }
 
-// jobCommands are the extension-provided job commands.
-var jobCommands = CommandCategory{
-	Name:     "Build",
-	Commands: publicJobCommandInfos(),
+// The help of a scope that lists no job command says why and how to add an
+// extension that declares one, wrapped for the text help.
+const (
+	noExtensionLoaded = `No extension is loaded. Name a language extension in
+  putnami.workspace.json, then run: putnami extensions install`
+	noJobCommandDeclared = `No extension of this workspace declares a job command. Name a language
+  extension in putnami.workspace.json, then run: putnami extensions install`
+)
+
+// noJobCommandHelp returns what help says when scope lists no job command:
+// outside a workspace no extension is loaded, and inside one none declares a
+// job command.
+func noJobCommandHelp(scope *helpScope) string {
+	if scope == nil {
+		return noExtensionLoaded
+	}
+	return noJobCommandDeclared
 }
 
-func publicJobCommandInfos() []CommandInfo {
-	commands := commandmeta.PublicJobCommands()
-	out := make([]CommandInfo, 0, len(commands))
-	for _, command := range commands {
-		out = append(out, CommandInfo{
-			Name:        command.Name,
-			Description: strings.TrimSuffix(command.Description, "."),
-		})
-	}
-	return out
+// oneLine joins wrapped help text into one line, for the man page and the
+// Markdown reference, which wrap on their own.
+func oneLine(text string) string {
+	return strings.Join(strings.Fields(text), " ")
 }
 
 // structuredCommandCategories is the categorized command listing the text, man,
@@ -136,14 +143,15 @@ func relatedCommandsFromCatalog() map[string][]string {
 	return out
 }
 
-// PrintHelp prints the complete top-level help message with categorized flags.
+// PrintHelp prints the top-level help with no extension loaded: the core's
+// commands and flags, and how to add an extension.
 func PrintHelp() {
 	printHelp(nil)
 }
 
 // printHelp prints the top-level help of scope: the job commands, aliases and
-// global flags a workspace's extensions give meaning, or all of them for a nil
-// scope.
+// global flags the loaded extensions give meaning. A nil scope loads no
+// extension, so it lists none of them.
 func printHelp(scope *helpScope) {
 	iox.Fprintf(os.Stdout, `putnami %s — polyglot build orchestrator
 
@@ -154,15 +162,14 @@ Usage:
 	if names := jobCommandNames(scope); names != "" {
 		iox.Fprintf(os.Stdout, `Build (from extensions):
   %s
-  Multi-command: putnami lint,test,build --impacted
+  Multi-command: putnami <command>,<command> --impacted
 
 `, names)
 	} else {
-		iox.Fprint(os.Stdout, `Build (from extensions):
-  No extension of this workspace declares a job command. Name a language
-  extension in putnami.workspace.json, then run: putnami extensions install
+		iox.Fprintf(os.Stdout, `Build (from extensions):
+  %s
 
-`)
+`, noJobCommandHelp(scope))
 	}
 
 	for _, cat := range structuredCommandCategories {
@@ -188,7 +195,7 @@ Positional:
   .                    Current directory scope (project or subtree)
 
 `)
-	if aliases := builtinAliasSummary(scope); aliases != "" {
+	if aliases := aliasSummary(scope); aliases != "" {
 		iox.Fprintf(os.Stdout, `Aliases:
   %s
 
@@ -222,12 +229,6 @@ func extensionFlagHelpLine(name string, flag extension.FlagDefinition) string {
 		desc = name
 	}
 	return fmt.Sprintf("  %s  %s%s", spelling, desc, def)
-}
-
-// PrintCommandHelp prints help for a specific command with categorized flags
-// and related commands suggestions.
-func PrintCommandHelp(command string, flags map[string]extension.FlagDefinition) {
-	printCommandHelp(command, flags, nil)
 }
 
 // printCommandHelp prints the help of a job command, listing the global flags
@@ -354,7 +355,8 @@ func SortedExtensionFlags(flags map[string]extension.FlagDefinition) []string {
 	return names
 }
 
-func builtinAliasSummary(scope *helpScope) string {
+// aliasSummary returns the aliases scope lists, as name=command pairs.
+func aliasSummary(scope *helpScope) string {
 	aliases := scope.aliases()
 	parts := make([]string, 0, len(aliases))
 	for _, alias := range aliases {

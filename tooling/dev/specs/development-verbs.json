@@ -5,21 +5,20 @@
   "outcomes": [
     "A workspace that loads @putnami/dev reads the order, descriptions, aliases, related commands and default traits of the development verbs from that one extension",
     "Installing the Go, TypeScript or Python extension installs @putnami/dev with it, because each of them names it as an extension dependency",
-    "Loading the vocabulary changes nothing help prints for a verb, and keeps each verb's core default traits while adding the kind, workload and effects the verb declares"
+    "The core CLI declares no development verb, alias or default trait: a workspace without @putnami/dev shows none, and one that loads it reads them all from this extension"
   ],
   "nonGoals": [
     "Running a verb: the language extensions declare and run the jobs of every development verb",
-    "Removing the development verbs, their aliases or their default traits from the core CLI",
     "Serving a command: the extension declares no command, so its runtime answers only the handshake"
   ],
   "requirements": [
     {
       "id": "eleven-ordered-verbs",
-      "text": "The manifest declares build, test, lint, serve, run, format, package, publish, deploy, generate and validate in that order, each with the description, aliases and related commands the core shows for it. It declares no command, command group, task, tool, hook, agent content or runtime, claims CLI contract 11 and passes the strict validation of the package-time gate."
+      "text": "The manifest declares build, test, lint, serve, run, format, package, publish, deploy, generate and validate in that order, each with the description, aliases and related commands help shows for it. It declares no command, command group, task, tool, hook, agent content or runtime, claims CLI contract 11 and passes the strict validation of the package-time gate."
     },
     {
-      "id": "core-default-traits",
-      "text": "Serve and run require a runnable project, package injects the project's publish channels, publish injects them and changes a registry, and deploy changes a cloud, as the core defaults do. Build declares the files kind, test verification, lint diagnostics and validate criteria. Serve declares the serve workload and run the once workload. Format rewrites sources and deploy consumes the release set. Package, publish and generate declare nothing beyond the core defaults."
+      "id": "dev-is-the-sole-declarer",
+      "text": "The core CLI gives no command a default trait, so the verbs' defaults are the ones declared here. Serve and run require a runnable project, package injects the project's publish channels, publish injects them and changes a registry, and deploy changes a cloud. Build declares the files kind, test verification, lint diagnostics and validate criteria. Serve declares the serve workload and run the once workload. Format rewrites sources and deploy consumes the release set. Generate declares none."
     },
     {
       "id": "language-extensions-depend",
@@ -33,6 +32,7 @@
   "decisions": [
     "tooling/dev/doc/adr/0001-the-dev-extension-declares-the-development-verbs.md",
     "tooling/cli/doc/adr/0067-putnami-dev-declares-the-development-verbs.md",
-    "tooling/cli/doc/adr/0066-an-extension-installs-and-loads-its-extension-dependencies.md"
+    "tooling/cli/doc/adr/0066-an-extension-installs-and-loads-its-extension-dependencies.md",
+    "tooling/cli/doc/adr/0073-the-core-declares-no-development-verb.md"
   ]
 }

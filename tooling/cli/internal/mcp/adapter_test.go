@@ -838,10 +838,10 @@ func TestRunJobsDryRunSummarizesPlanWithoutStoringDiagnostics(t *testing.T) {
 const workspaceSyncLockFilenameForTest = "workspace-index.lock"
 
 // sideEffectFixture writes a workspace whose extension declares one command of
-// every classification the side-effect gate has to tell apart: a well-known verb
-// carrying none (lint), the two whose verb defaults carry one (publish →
-// registry, deploy → cloud), a CUSTOM verb that declares `sideEffects` in its
-// own manifest traits (release), and a custom verb that declares none (ship).
+// every classification the side-effect gate has to tell apart: a command
+// carrying none (lint), two that declare one (publish → registry, deploy →
+// cloud), a custom verb that declares `sideEffects` in its own manifest traits
+// (release), and a custom verb that declares none (ship).
 //
 // Every command runs the same script, which writes "<command>.ran" into the
 // project directory. That marker is what makes a refusal observable as an
@@ -886,12 +886,12 @@ func sideEffectFixture(t *testing.T) string {
 			`"args":["{extensionRoot}/mark.sh","` + name + `"],"cache":false,"timeoutMs":30000}`
 	}
 	names := []string{"lint", "publish", "deploy", "release", "ship"}
+	// Only declared traits classify a command: the core gives none to any
+	// name, publish and deploy included.
 	commands := []string{
 		command("lint", ""),
-		command("publish", ""),
-		command("deploy", ""),
-		// The custom verb the well-known table knows nothing about: only its
-		// declared traits classify it.
+		command("publish", `"traits":{"sideEffects":"registry"},`),
+		command("deploy", `"traits":{"sideEffects":"cloud"},`),
 		command("release", `"traits":{"sideEffects":"registry"},`),
 		command("ship", ""),
 	}
@@ -928,10 +928,9 @@ func ranMarker(t *testing.T, dir, command string) bool {
 }
 
 // TestRejectSideEffectingCommands_ReadsTheDeclaredTrait pins that the gate is
-// the protocol's CommandTraits.SideEffects, not a list of names: `release` is a
-// verb the well-known table has never heard of and is refused purely because its
-// manifest declares the trait, while `ship` — a custom verb declaring none — is
-// accepted.
+// the protocol's CommandTraits.SideEffects, not a list of names: publish,
+// deploy and the custom `release` are refused because their manifest declares
+// the trait, while `ship`, which declares none, is accepted.
 func TestRejectSideEffectingCommands_ReadsTheDeclaredTrait(t *testing.T) {
 	t.Parallel()
 	srv, _ := sideEffectFixtureServer(t)
@@ -978,21 +977,30 @@ func TestRejectSideEffectingCommands_ReadsTheDeclaredTrait(t *testing.T) {
 	}
 }
 
-// TestRejectSideEffectingCommands_FallsBackToTheWellKnownVerbs pins the closed
-// side of resolution: a workspace where nothing declares `deploy` still refuses
-// it, because the verb's own default traits classify it. Otherwise the gate
-// would depend on which extensions happen to be installed.
-func TestRejectSideEffectingCommands_FallsBackToTheWellKnownVerbs(t *testing.T) {
+// TestRejectSideEffectingCommands_ReadsOnlyLoadedJobs pins that the core keeps
+// no side-effect floor: in a workspace where nothing declares deploy or
+// publish, the gate has no trait to read and lets them through, and the run
+// itself refuses them, before any job, as commands no extension declares. When
+// the extensions cannot be read, what a command mutates is unknown, so the
+// gate refuses every command.
+func TestRejectSideEffectingCommands_ReadsOnlyLoadedJobs(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "side-effects-come-only-from-loaded-jobs")
 	srv := newFixtureServer(t) // no extensions at all
-	if err := srv.rejectSideEffectingCommands([]string{"deploy"}); err == nil {
-		t.Fatal("deploy accepted in a workspace with no extension declaring it")
+	for _, commands := range [][]string{{"deploy"}, {"publish"}, {"lint", "test", "build"}} {
+		if err := srv.rejectSideEffectingCommands(commands); err != nil {
+			t.Errorf("%v refused by its side effects with no extension declaring it: %v", commands, err)
+		}
 	}
-	if err := srv.rejectSideEffectingCommands([]string{"publish"}); err == nil {
-		t.Fatal("publish accepted in a workspace with no extension declaring it")
+	_, err := srv.toolRunJobs(context.Background(), json.RawMessage(`{"commands":["deploy"],"projects":["app"]}`))
+	if err == nil || err.Error() != "no extension of this workspace declares deploy; name a language extension in putnami.workspace.json, then run: putnami extensions install" {
+		t.Fatalf("run_jobs deploy = %v, want the refusal of an undeclared command", err)
 	}
-	if err := srv.rejectSideEffectingCommands([]string{"lint", "test", "build"}); err != nil {
-		t.Fatalf("ordinary commands refused: %v", err)
+
+	unreadable := NewServer(Options{ServerVersion: "test"}) // no workspace root
+	err = unreadable.rejectSideEffectingCommands([]string{"lint"})
+	if err == nil || !strings.Contains(err.Error(), "the workspace's extensions cannot be read") {
+		t.Fatalf("lint with unreadable extensions = %v, want a refusal", err)
 	}
 }
 

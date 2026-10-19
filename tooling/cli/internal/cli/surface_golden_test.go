@@ -150,8 +150,18 @@ func TestGoldenJobCommandHelp(t *testing.T) {
 		"replicas":     {Type: "number", Description: "Replica count", Default: 3},
 		"undocumented": {Type: "boolean"},
 	}
+	dev := &extension.ExtensionDescription{Name: "@acme/dev", Verbs: []extension.VerbDefinition{
+		{Name: "build", Description: "Build the project."},
+		{Name: "package", Description: "Package the project."},
+		{Name: "publish", Description: "Publish the project."},
+		{Name: "deploy", Description: "Deploy the project.", Related: []string{"build", "package", "publish"}},
+	}}
+	lang := &extension.ExtensionDescription{Name: "@acme/lang", Commands: map[string]string{
+		"build": "", "package": "", "publish": "", "deploy": "",
+	}}
+	scope := helpScopeOf(&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{lang, dev}}, nil)
 	assertGolden(t, "help-command-deploy", captureStructuredHelp(t, func() {
-		PrintCommandHelp("deploy", flags)
+		printCommandHelp("deploy", flags, scope)
 	}))
 }
 

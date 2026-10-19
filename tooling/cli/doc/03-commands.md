@@ -24,9 +24,13 @@ Job commands are provided by extensions and operate on workspace projects: an
 extension's manifest declares which commands it serves, so the set a workspace
 has depends on the extensions it installs. `build`, `test`, `lint`, `serve`,
 `run`, `format`, `package`, `publish`, `deploy`, `generate` and `validate` are
-the conventional ones. Inside a workspace, `putnami help` lists the ones the
-workspace's extensions actually provide, and the built-in aliases of those
-only. Outside a workspace it lists every conventional one.
+the development verbs: `@putnami/dev` declares them, and the language
+extensions, which depend on it, run them. The core CLI declares none of them.
+Inside a workspace, `putnami help` lists the commands the workspace's loaded
+extensions declare, with the aliases of their verb vocabulary. Outside a
+workspace it lists none, and says how to add an extension. A command that no
+loaded extension declares is a usage error (exit code 2) in every entry point,
+help included.
 
 Job commands support the full set of project selection and execution flags described below.
 
@@ -809,7 +813,8 @@ putnami cache verify --impacted     # Audit deterministic keys, artifacts, write
 
 Build-cache data lives in the machine-global per-repo store at `~/.putnami/store/<repo-id>/`, shared across all worktrees of the repo (override with `PUTNAMI_STORE_DIR`). Go compiler/modules at `~/.putnami/cache/go` and Bun downloads at `~/.bun/install/cache` (for a Bun that Putnami installed, `install/cache` under `~/.putnami/toolchains/bun/bun-<version>`) are shared across **all repositories and worktrees**. `cache clean` therefore clears the build cache for every worktree of the current repo; `cache gc` enforces the separate build, Go, Bun, and artifact-store budgets. Running with `--no-cache` skips Putnami action-cache lookups but still uses the native Go and Bun caches; `--no-cache-projects <selector>` skips them for the named projects and their planned dependents only, so the rest of the selection’s dependency closure keeps its cache. A task that failed is cached too: a re-run with unchanged inputs replays the same failure, with its original output, instead of executing it again — `--retry-failed` forces that one task to run while every other cache hit is kept, and `--no-cache` suppresses the replay without removing the record: only a run in which the task passes at the same key does that, whatever its cache policy or selection. See [Caching](10-caching.md) for the full model.
 
-`cache verify` runs the selected projects' `lint`, `test`, and `build` tasks in
+`cache verify` runs the selected projects' gate tasks, the blocking commands
+of `putnami.ci.json` or `lint`, `test` and `build` without one, in
 detached temporary worktrees and isolated stores. It requires a clean worktree
 and supports the ordinary project-selection flags plus structured output. See
 [Cache Determinism Verification](10-caching.md#cache-determinism-verification)
@@ -1305,12 +1310,13 @@ putnami help                 # categorized global flags
 putnami help --markdown      # the same, plus per-command flags
 ```
 
-Inside a workspace, `putnami help` leaves out a flag that only an absent
-provider gives meaning: `--where` without a runner provider, `--providers`
-without a credential provider, and `--cache-trust` without a cache provider.
-It hides nothing when an extension of the workspace does not load. The parser
-still accepts these flags, and help outside a workspace, the man page, the
-Markdown reference and shell completion still list them. `--credential-fd` is
+`putnami help` leaves out a flag that only an absent provider gives meaning:
+`--where` without a runner provider, `--providers` without a credential
+provider, and `--cache-trust` without a cache provider. Outside a workspace no
+provider is loaded, so it lists none of them. It hides nothing when an
+extension of the workspace does not load. The parser still accepts these
+flags, and the man page, the Markdown reference and shell completion still
+list them. `--credential-fd` is
 always listed, because a hosted launcher reads it from the help of the pinned
 CLI.
 
@@ -1699,21 +1705,15 @@ Unknown flags are passed through to job processes. The CLI provides typo suggest
 
 ## Command Aliases
 
-### Built-in Aliases
-
-Single-letter shortcuts for the conventional job commands. They are catalog
-data, so the current set is printed by `putnami help --markdown` (the "Aliases"
-block) rather than listed here.
-
 ### Vocabulary Aliases
 
-An extension's
+The core CLI declares no alias. An extension's
 [verb vocabulary](../../../protocols/extension/doc/06-verbs.md#declaring-a-verb-vocabulary)
-can declare aliases for its verbs. A vocabulary alias never takes the name of
-a verb, an extension command or command group, or a command of the core
-catalog. A workspace alias of the same name hides it, with a warning. A
-workspace alias named like a built-in alias never applies, so it hides
-nothing.
+can declare aliases for its verbs: `@putnami/dev` declares the single-letter
+ones, and `putnami help --markdown` prints the loaded set (the "Aliases"
+block). A vocabulary alias never takes the name of a verb, an extension
+command or command group, or a command of the core catalog. A workspace alias
+of the same name hides it, with a warning.
 
 ### User-Defined Aliases
 
@@ -1729,4 +1729,4 @@ Define custom aliases in `putnami.workspace.json`:
 }
 ```
 
-Alias resolution chains are supported (up to 10 levels to prevent infinite loops). Vocabulary aliases apply first, except one a user alias hides; then built-in aliases; then user aliases. `putnami impact-plan` resolves aliases in the same order.
+Alias resolution chains are supported (up to 10 levels to prevent infinite loops). Vocabulary aliases apply first, except one a user alias hides; then user aliases. `putnami impact-plan` resolves aliases in the same order.

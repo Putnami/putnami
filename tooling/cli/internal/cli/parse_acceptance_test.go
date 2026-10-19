@@ -87,25 +87,29 @@ func TestParseAcceptance_ValidInvocations(t *testing.T) {
 		},
 
 		// ── Single-letter aliases ─────────────────────────────────────
+		// The core declares no alias: without a vocabulary, a single letter
+		// is a command name unless the workspace names it.
 		{
-			name:         "builtin alias b",
+			name:         "no alias without a vocabulary or a workspace alias",
 			args:         []string{"b"},
-			wantCommands: []string{"build"},
+			wantCommands: []string{"b"},
 		},
 		{
-			name:         "builtin alias t",
+			name:         "workspace alias t",
 			args:         []string{"t"},
+			userAliases:  map[string]string{"t": "test"},
 			wantCommands: []string{"test"},
 		},
 		{
-			name:         "builtin uppercase alias D",
+			name:         "workspace uppercase alias D",
 			args:         []string{"D"},
+			userAliases:  map[string]string{"D": "deploy"},
 			wantCommands: []string{"deploy"},
 		},
 		{
-			name:         "user alias resolves through a builtin alias",
+			name:         "workspace alias resolves through another workspace alias",
 			args:         []string{"ci"},
-			userAliases:  map[string]string{"ci": "b"},
+			userAliases:  map[string]string{"ci": "b", "b": "build"},
 			wantCommands: []string{"build"},
 		},
 
@@ -118,6 +122,7 @@ func TestParseAcceptance_ValidInvocations(t *testing.T) {
 		{
 			name:         "comma commands with aliases and --impacted",
 			args:         []string{"l,t,b", "--impacted"},
+			userAliases:  map[string]string{"l": "lint", "t": "test", "b": "build"},
 			wantCommands: []string{"lint", "test", "build"},
 			wantProjects: "[impacted]",
 			wantImpacted: true,

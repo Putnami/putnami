@@ -37,9 +37,10 @@ func failBootstrapInstall(t *testing.T, bearer string, install func(context.Cont
 // A hosted run whose first-use install fails exits before the engine plans:
 // its gate would otherwise run every task on a workspace without
 // dependencies, and their failures would hide the install's. A local run
-// keeps going, and its engine reports the empty workspace.
+// keeps going, and its engine refuses build, which no extension of the empty
+// workspace declares.
 func TestAFailedBootstrapInstallStopsOnlyAHostedRun(t *testing.T) {
-	const engineReached = "no project matched the default selection"
+	const engineReached = "no extension of this workspace declares build"
 	for name, tc := range map[string]struct {
 		bearer string
 		code   int

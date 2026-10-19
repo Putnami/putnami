@@ -9,9 +9,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/engine"
 )
 
-// BuiltinAliases maps single-letter shortcuts to command names.
-var BuiltinAliases = commandmeta.BuiltinAliases()
-
 // GlobalFlags that the CLI handles before routing to jobs.
 //
 // The struct itself is declared once, by the engine that consumes it
@@ -59,8 +56,8 @@ func ParseArgs(args []string, userAliases map[string]string, extensionGroups map
 }
 
 // commandAliases are the alias tables a command name resolves through, in
-// precedence order: the verb vocabulary of the loaded extensions, the built-in
-// aliases, then the workspace's own.
+// precedence order: the verb vocabulary of the loaded extensions, then the
+// workspace's own. The core declares no alias.
 type commandAliases struct {
 	vocabulary map[string]string
 	user       map[string]string
@@ -69,9 +66,6 @@ type commandAliases struct {
 // lookup returns the command alias name stands for.
 func (a commandAliases) lookup(name string) (string, bool) {
 	if target, ok := a.vocabulary[name]; ok {
-		return target, true
-	}
-	if target, ok := BuiltinAliases[name]; ok {
 		return target, true
 	}
 	target, ok := a.user[name]

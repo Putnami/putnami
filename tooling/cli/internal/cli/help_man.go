@@ -8,8 +8,14 @@ import (
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
 
-// PrintHelpMan prints the full help as a man page.
+// PrintHelpMan prints the full help as a man page, with no extension loaded.
 func PrintHelpMan() {
+	printHelpMan(nil)
+}
+
+// printHelpMan prints the full help of scope as a man page: the job commands
+// and aliases the loaded extensions declare, and every core command and flag.
+func printHelpMan(scope *helpScope) {
 	iox.Fprintf(os.Stdout, `.TH PUTNAMI 1 "" "putnami %s" "User Commands"
 .SH NAME
 putnami \- polyglot build orchestrator
@@ -28,12 +34,16 @@ It reads extension manifests, resolves a dependency DAG, and executes
 tasks in parallel via subprocesses.
 .PP
 Multiple commands can be chained with commas:
-.B putnami lint,test,build --impacted
+.B putnami <command>,<command> --impacted
 .SH JOB COMMANDS
 `, Version)
 
-	for _, c := range jobCommands.Commands {
+	commands := scope.jobCommands()
+	for _, c := range commands {
 		iox.Fprintf(os.Stdout, ".TP\n.B %s\n%s.\n", c.Name, c.Description)
+	}
+	if len(commands) == 0 {
+		iox.Fprintf(os.Stdout, "%s\n", oneLine(noJobCommandHelp(scope)))
 	}
 
 	for _, cat := range allFlagCategories {
@@ -78,10 +88,14 @@ Current directory scope (project or subtree).
 		printCommandReferenceMan(command)
 	}
 
-	iox.Fprint(os.Stdout, ".SH ALIASES\n")
-	iox.Fprint(os.Stdout, builtinAliasMan())
-	iox.Fprint(os.Stdout, `
-.SH EXIT CODES
+	if aliases := scope.aliases(); len(aliases) > 0 {
+		parts := make([]string, 0, len(aliases))
+		for _, alias := range aliases {
+			parts = append(parts, alias.Name+"="+alias.Command)
+		}
+		iox.Fprintf(os.Stdout, ".SH ALIASES\n%s\n", strings.Join(parts, ", "))
+	}
+	iox.Fprint(os.Stdout, `.SH EXIT CODES
 .TP
 .B 0
 Success.
@@ -149,13 +163,4 @@ func manSentence(text string) string {
 		return text
 	}
 	return text + "."
-}
-
-func builtinAliasMan() string {
-	aliases := commandmeta.BuiltinAliasList()
-	parts := make([]string, 0, len(aliases))
-	for _, alias := range aliases {
-		parts = append(parts, alias.Name+"="+alias.Command)
-	}
-	return strings.Join(parts, ", ")
 }

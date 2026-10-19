@@ -438,26 +438,6 @@ _putnami() {
     local -a commands structured_commands global_flags projects project_basenames
 
     commands=(
-        'D:Alias for deploy'
-        'P:Alias for publish'
-        'b:Alias for build'
-        'build:Compile or transpile project sources into runnable or distributable outputs.'
-        'd:Alias for deploy'
-        'deploy:Converge a cloud environment on the workload'\''s aggregated infra manifest.'
-        'f:Alias for format'
-        'format:Rewrite sources into canonical formatting.'
-        'generate:Run code generators.'
-        'l:Alias for lint'
-        'lint:Check code for style and correctness findings, emitting per-issue diagnostics.'
-        'p:Alias for publish'
-        'package:Assemble distributable artifacts for the project'\''s publish channels.'
-        'publish:Push packaged artifacts to registries.'
-        'run:Execute the project once and exit.'
-        's:Alias for serve'
-        'serve:Run the project'\''s dev server until interrupted.'
-        't:Alias for test'
-        'test:Run the project'\''s tests, emitting test counts and coverage metrics.'
-        'validate:Check the project against its declared specs, contracts and compatibility rules.'
     )
 
     structured_commands=(

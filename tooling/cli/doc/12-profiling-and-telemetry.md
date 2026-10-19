@@ -350,7 +350,7 @@ a monthly-rotating random device ID. Every attribute is checked against a
 compiled-in closed vocabulary before it is written or exported.
 
 The command vocabulary (`cliusage.Commands` in `protocols/telemetry`) lists the
-eleven original job commands of the CLI catalog and every public command that
+eleven development verbs `@putnami/dev` declares and every public command that
 an extension of the `@putnami` scope declares. The CLI records a requested
 command only when it is in that vocabulary and a loaded `@putnami` extension
 declares it public, as a command or as a verb. A command that only an

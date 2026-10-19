@@ -1,0 +1,97 @@
+package engine
+
+import (
+	"errors"
+	"testing"
+
+	protocolcli "go.putnami.dev/protocol/cli"
+	"go.putnami.dev/protocol/features/spectest"
+	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/extension"
+)
+
+// declaringDiscovery is a discovery that loaded one extension declaring
+// commands as jobs.
+func declaringDiscovery(commands ...string) *extension.DiscoveryResult {
+	jobs := make(map[string]*extension.JobDefinition, len(commands))
+	for _, command := range commands {
+		jobs[command] = &extension.JobDefinition{Name: command}
+	}
+	return &extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{
+		{Name: "@acme/lang", Jobs: jobs},
+	}}
+}
+
+// A run that names a command no loaded extension declares as a job is a usage
+// error that names every such command once, in the order the run names them,
+// and says how to add an extension. When an extension did not load, the error
+// names it and why instead. Nothing is refused for a workspace lifecycle run,
+// or when a configured extension or a dependency is missing, which planning
+// reports.
+func TestRefuseUndeclaredCommands(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/impact-plan", "named-commands", "an-undeclared-command-is-refused")
+	spectest.Proves(t, "cli/job-planning-execution", "no-core-development-verb", "an-undeclared-job-command-is-refused-once-in-every-entry-point")
+
+	err := refuseUndeclaredCommands(&Request{Commands: []string{"build", "lint", "bundle", "build"}}, declaringDiscovery("lint"))
+	const want = "no extension of this workspace declares build, bundle; name a language extension in putnami.workspace.json, then run: putnami extensions install"
+	if err == nil || err.Error() != want {
+		t.Fatalf("refusal = %v, want %q", err, want)
+	}
+	if !errors.Is(err, protocolcli.ErrUsage) || protocolcli.ExitCodeForError(err) != ExitUsage {
+		t.Errorf("refusal %v exits %d, want a usage error that exits %d", err, protocolcli.ExitCodeForError(err), ExitUsage)
+	}
+	if got := UndeclaredCommandsError([]string{"build", "bundle"}); got.Error() != want {
+		t.Errorf("help's refusal = %q, want the run's %q", got, want)
+	}
+
+	// Control: a run of declared commands passes.
+	if err := refuseUndeclaredCommands(&Request{Commands: []string{"lint"}}, declaringDiscovery("lint")); err != nil {
+		t.Errorf("declared lint refused: %v", err)
+	}
+
+	unknown := map[string]struct {
+		req        *Request
+		discovered *extension.DiscoveryResult
+	}{
+		"a workspace lifecycle run": {
+			&Request{Commands: []string{"build"}, WorkspaceLifecycle: true}, declaringDiscovery(),
+		},
+		"no discovery": {&Request{Commands: []string{"build"}}, nil},
+		"a configured extension that is missing": {
+			&Request{Commands: []string{"build"}, Config: &wsproto.Config{
+				Extensions: wsproto.ExtensionsConfig{List: map[string]string{"@acme/lang": "", "@acme/go": "1.0.0"}},
+			}},
+			declaringDiscovery("lint"),
+		},
+		"a dependency that is missing": {
+			&Request{Commands: []string{"build"}, Config: &wsproto.Config{}},
+			&extension.DiscoveryResult{
+				Extensions:   declaringDiscovery("lint").Extensions,
+				Dependencies: []extension.GraphDependency{{Name: "@acme/dev", RequiredBy: []string{"@acme/lang"}}},
+			},
+		},
+	}
+	for name, test := range unknown {
+		if err := refuseUndeclaredCommands(test.req, test.discovered); err != nil {
+			t.Errorf("%s: refused %v: %v", name, test.req.Commands, err)
+		}
+	}
+
+	// An extension that did not load may be the one that declares the command:
+	// the refusal names it and its reason, as a failed run rather than a usage
+	// error, and only for a command the loaded extensions do not declare.
+	skipped := declaringDiscovery("lint")
+	skipped.Skipped = []extension.SkippedExtension{{Ref: "./tools/acme", Reason: errors.New("bad manifest")}}
+	err = refuseUndeclaredCommands(&Request{Commands: []string{"lint", "build"}}, skipped)
+	const wantSkipped = "no loaded extension declares build; extension ./tools/acme did not load: bad manifest"
+	if err == nil || err.Error() != wantSkipped {
+		t.Fatalf("refusal with a skipped extension = %v, want %q", err, wantSkipped)
+	}
+	if code := protocolcli.ExitCodeForError(err); code != ExitError {
+		t.Errorf("refusal with a skipped extension exits %d, want %d", code, ExitError)
+	}
+	if err := refuseUndeclaredCommands(&Request{Commands: []string{"lint"}}, skipped); err != nil {
+		t.Errorf("declared lint refused beside a skipped extension: %v", err)
+	}
+}

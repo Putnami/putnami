@@ -39,7 +39,8 @@ func TestHelpListsWhatTheWorkspaceExtensionsProvide(t *testing.T) {
 		})
 	}
 	code, output := clitest.RunGateArgs(t, clitest.WhereFixture(t, false, false), "--help")
-	if code != 0 || !strings.Contains(output, "build, test, lint, format, validate") {
+	// The fixture declares no vocabulary, so help lists its commands by name.
+	if code != 0 || !strings.Contains(output, "build, format, lint, test, validate") {
 		t.Errorf("help must list the fixture's job commands (exit %d):\n%s", code, output)
 	}
 	code, output = clitest.RunGateArgs(t, clitest.WhereFixture(t, false, true), "--help")

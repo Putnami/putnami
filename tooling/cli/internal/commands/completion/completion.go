@@ -65,11 +65,9 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config) completionConte
 		commandDesc: map[string]string{},
 	}
 	addCatalogCompletions(&ctx)
-	for _, command := range commandmeta.PublicJobCommands() {
-		addCompletionCommand(&ctx, command.Name, command.Description)
-	}
 
-	// Add dynamic commands from extensions
+	// Add the job commands and aliases, which only the loaded extensions
+	// declare: the core declares none.
 	var vocabulary extension.Vocabulary
 	var workspaceAliases map[string]string
 	if cfg != nil {
@@ -123,10 +121,10 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config) completionConte
 		}
 
 		extensions, _ := extension.DiscoverExtensions(wsRoot, cfg, projectPaths)
-		// The loaded vocabulary describes its verbs ahead of the catalog and of
-		// the commands that serve them. The CLI's own alias tables reserve the
-		// same names: a vocabulary alias never takes a catalog command, and a
-		// workspace alias of the same name that applies hides it.
+		// The loaded vocabulary describes its verbs ahead of the commands that
+		// serve them. The CLI's own alias tables reserve the same names: a
+		// vocabulary alias never takes a catalog command, and a workspace alias
+		// of the same name hides it.
 		vocabulary = extension.MergeVocabulary(extensions, func(name string) bool {
 			return commandmeta.ReservesVocabularyAlias(name, workspaceAliases)
 		})
@@ -243,23 +241,15 @@ func addCompletionCommand(ctx *completionContext, name, description string) {
 }
 
 // addCommandAliasCompletions offers every alias: those of the loaded
-// vocabulary, the built-in ones whose name the vocabulary leaves free, then
-// the workspace's that apply and name no catalog command, in name order.
+// vocabulary, then the workspace's that name no catalog command, in name
+// order. The core declares no alias.
 func addCommandAliasCompletions(ctx *completionContext, vocabulary []extension.VerbAlias, workspace map[string]string) {
-	builtin := commandmeta.BuiltinAliasList()
-	aliases := make([]commandmeta.Alias, 0, len(vocabulary)+len(builtin)+len(workspace))
-	claimed := make(map[string]bool, len(vocabulary))
+	aliases := make([]commandmeta.Alias, 0, len(vocabulary)+len(workspace))
 	for _, alias := range vocabulary {
-		claimed[alias.Name] = true
 		aliases = append(aliases, commandmeta.Alias{Name: alias.Name, Command: alias.Verb})
 	}
-	for _, alias := range builtin {
-		if !claimed[alias.Name] {
-			aliases = append(aliases, alias)
-		}
-	}
 	for _, name := range slices.Sorted(maps.Keys(workspace)) {
-		if _, catalog := commandmeta.Lookup(name); !catalog && commandmeta.WorkspaceAliasApplies(name, workspace) {
+		if _, catalog := commandmeta.Lookup(name); !catalog {
 			aliases = append(aliases, commandmeta.Alias{Name: name, Command: workspace[name]})
 		}
 	}

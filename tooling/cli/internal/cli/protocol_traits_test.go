@@ -185,7 +185,7 @@ func countFieldReads(t *testing.T, root string, files, fields []string, throughT
 // readsATraitsValue reports whether a selector's operand is a traits value:
 // a Traits field (`job.Traits`), a variable whose name ends in traits
 // (`traits`, `declaredTraits`), or a call whose function name ends in Traits
-// (`EffectiveTraits(...)`).
+// (`vocabulary.DefaultTraits(...)`).
 func readsATraitsValue(operand ast.Expr) bool {
 	switch typed := operand.(type) {
 	case *ast.ParenExpr:
@@ -275,7 +275,7 @@ func TestCountFieldReads_ReadsAnAmbiguousFieldOnlyThroughTraits(t *testing.T) {
 		"func other(task proto.TaskDefinition) string { return task.Kind }\n" +
 		"func field(job model.Job) string { return job.Traits.Kind }\n" +
 		"func variable(traits proto.CommandTraits) string { return traits.Kind }\n" +
-		"func call(job model.Job) string { return proto.EffectiveTraits(job.Name, job.Traits).Kind }\n"
+		"func call(vocabulary model.Vocabulary, job model.Job) string { return vocabulary.DefaultTraits(job.Name).Kind }\n"
 	if err := os.WriteFile(filepath.Join(dir, "kind.go"), []byte(src), 0o600); err != nil {
 		t.Fatalf("write fixture: %v", err)
 	}

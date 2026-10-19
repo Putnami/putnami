@@ -6,9 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
-
-	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
@@ -118,14 +117,17 @@ func TestAllFlagCategories_NotEmpty(t *testing.T) {
 	}
 }
 
-func TestRelatedCommands_BuildHasRelated(t *testing.T) {
+func TestRelatedCommands_CacheVerifyHasRelated(t *testing.T) {
 	t.Parallel()
-	related, ok := relatedCommands["build"]
+	related, ok := relatedCommands["cache verify"]
 	if !ok {
-		t.Fatal("build should have related commands")
+		t.Fatal("cache verify should have related commands")
 	}
 	if len(related) == 0 {
-		t.Error("build should have at least one related command")
+		t.Error("cache verify should have at least one related command")
+	}
+	if _, ok := relatedCommands["build"]; ok {
+		t.Error("build has related commands in the catalog, want only a vocabulary to relate a job command")
 	}
 }
 
@@ -187,9 +189,13 @@ func TestPrintJobCommandHelpForWorkspace_IncludesMergedExtensionFlags(t *testing
 		},
 	}
 
+	var err error
 	output := captureStructuredHelp(t, func() {
-		printJobCommandHelp("deploy", "/workspace", &wsproto.Config{}, exts)
+		err = printDeclaredJobCommandHelp("deploy", exts, scopeOf("deploy"))
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !strings.Contains(output, "putnami deploy") {
 		t.Fatal("expected deploy header")
@@ -199,6 +205,28 @@ func TestPrintJobCommandHelpForWorkspace_IncludesMergedExtensionFlags(t *testing
 	}
 	if !strings.Contains(output, "--confirm") || !strings.Contains(output, "Confirm deployment") {
 		t.Error("expected merged boolean flag in job help")
+	}
+}
+
+// TestJobCommandHelpRefusesAnUndeclaredCommand pins that the help of a
+// command no loaded extension declares is the usage error a run of it ends
+// with, an alias expansion of several commands included.
+func TestJobCommandHelpRefusesAnUndeclaredCommand(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		command string
+		scope   *helpScope
+		want    string
+	}{
+		{"build", nil, "no extension of this workspace declares build;"},
+		{"build", scopeOf("lint"), "no extension of this workspace declares build;"},
+		{"lint,test,build", scopeOf("lint"), "no extension of this workspace declares test, build;"},
+	} {
+		err := printDeclaredJobCommandHelp(tc.command, nil, tc.scope)
+		if protocolcli.ExitCodeForError(err) != protocolcli.ExitUsage || !strings.Contains(err.Error(), tc.want) ||
+			!strings.Contains(err.Error(), "putnami extensions install") {
+			t.Errorf("help of %s = %v, want a usage error containing %q", tc.command, err, tc.want)
+		}
 	}
 }
 
@@ -225,9 +253,20 @@ func TestPrintSubcommandHelp_IncludesRootStructuredCommandHelp(t *testing.T) {
 	}
 }
 
+// deployVocabularyScope is the help scope of a workspace whose vocabulary
+// declares deploy with the aliases d and D, and whose language extension
+// declares deploy.
+func deployVocabularyScope() *helpScope {
+	dev := &extension.ExtensionDescription{Name: "@acme/dev", Verbs: []extension.VerbDefinition{
+		{Name: "deploy", Description: "Deploy the project.", Aliases: []string{"d", "D"}},
+	}}
+	lang := &extension.ExtensionDescription{Name: "@acme/lang", Commands: map[string]string{"deploy": ""}}
+	return helpScopeOf(&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{lang, dev}}, nil)
+}
+
 func TestPrintHelpMarkdown_IncludesStructuredCommandDetails(t *testing.T) {
 	output := captureStructuredHelp(t, func() {
-		PrintHelpMarkdown()
+		printHelpMarkdown(deployVocabularyScope())
 	})
 
 	if !strings.Contains(output, "### `putnami workspace init`") {
@@ -240,7 +279,14 @@ func TestPrintHelpMarkdown_IncludesStructuredCommandDetails(t *testing.T) {
 		t.Error("expected projects create markdown section")
 	}
 	if !strings.Contains(output, "`d`=deploy") || !strings.Contains(output, "`D`=deploy") {
-		t.Error("expected deploy aliases in markdown help")
+		t.Error("expected the vocabulary's deploy aliases in markdown help")
+	}
+	if !strings.Contains(output, "| `putnami deploy` | Deploy the project |") {
+		t.Error("expected the vocabulary's deploy verb in markdown help")
+	}
+	bare := captureStructuredHelp(t, PrintHelpMarkdown)
+	if strings.Contains(bare, "## Aliases") || strings.Contains(bare, "`putnami deploy`") || !strings.Contains(bare, "No extension is loaded.") {
+		t.Errorf("markdown help without an extension lists a job command or an alias:\n%s", bare)
 	}
 }
 

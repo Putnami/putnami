@@ -19,19 +19,23 @@
     },
     {
       "id": "command-catalog",
-      "text": "One command catalog defines public command paths, aliases, flags, help, completion, structured output and workspace requirements. A root that left the core (channel, ci, change-plan, infra, dev, contributor) is a usage error unless an installed extension declares it as a command group or job; tree verify and proposals finalize always are. So is putnami help of each. The error precedes workspace bootstrap and links the moved-commands reference. It names no extension; dev and contributor name core successors."
+      "text": "One catalog defines core command paths, flags, help, completion, structured output and workspace requirements; it has no job or alias. A root that left the core (channel, ci, change-plan, infra, dev, contributor) is a usage error unless an installed extension declares it as a group or job; tree verify and proposals finalize always are. So is putnami help of each. The error precedes workspace bootstrap and links the moved-commands reference. It names no extension; dev and contributor name core successors."
     },
     {
       "id": "workspace-scoped-help",
-      "text": "Inside a workspace, help lists only the job commands, built-in aliases and provider-bound global flags that a loaded extension gives meaning; the parser still accepts them all. Outside a workspace, or when an extension does not load, help lists everything. --credential-fd is always listed, because a hosted launcher reads it from help."
+      "text": "Help lists the public commands the loaded extensions declare: the vocabulary's verbs first, in vocabulary order, then the other declared commands by name, with the vocabulary's aliases and the provider-bound global flags a loaded extension gives meaning. Outside a workspace, help says no extension is loaded and how to add one, and reads no user-scope extension. When an extension did not load, help keeps the vocabulary of those that did. --credential-fd is always listed."
     },
     {
       "id": "extension-verb-vocabulary",
-      "text": "An extension manifest may declare a verb vocabulary: an ordered list of verbs, each with a description, aliases, default traits and related commands. The CLI merges the loaded vocabularies in extension-name order; the first declaration of a verb wins, and a second warns. Help, completion, impact-plan and the live view read the result. Its aliases resolve before the built-in ones, a workspace alias that applies hides one with a warning, and an alias never takes a verb, command, command group or core root."
+      "text": "An extension manifest may declare a verb vocabulary: an ordered list of verbs, each with a description, aliases, default traits and related commands. The CLI merges the loaded vocabularies in extension-name order; the first declaration of a verb wins, and a second warns. Help, completion, impact-plan and the live view read the result. Its aliases are the only short command names; a same-named workspace alias hides one with a warning, and an alias never takes a verb, command, command group or core root."
     },
     {
       "id": "vocabulary-default-traits",
-      "text": "After discovery loads every extension, a job whose manifest declares no traits takes the default traits of its verb in the merged vocabulary. A verb without traits keeps the well-known defaults. Declared traits win, but keep a well-known verb's side effects when they name none, and a vocabulary never changes them. A manifest that declares a vocabulary requires CLI contract 9 wherever it loads from, and the packagers validate and stamp it, so an older CLI refuses it."
+      "text": "After discovery loads every extension, a job whose manifest declares no traits takes the default traits of its verb in the merged vocabulary; a job of a verb no vocabulary names takes none. Declared traits replace them wholesale. The core keeps no side-effect floor: a command's side effects are the traits its loaded jobs declare, which the git requirement, the cache trust floor, the task scope and MCP run_jobs read. A manifest that declares a vocabulary requires CLI contract 9 wherever it loads from."
+    },
+    {
+      "id": "no-core-development-verb",
+      "text": "The core declares no job command, alias or default trait of build, test, lint, serve, run, format, package, publish, deploy, generate or validate. Help, completion, MCP run_jobs and dispatch read the loaded extensions' vocabulary and commands. Every entry point refuses once, after extension discovery, a command no loaded extension declares as a job: a usage error saying how to add an extension, or an error naming each extension that did not load. A workspace with no development extension shows none."
     },
     {
       "id": "selection-before-plan",
@@ -218,6 +222,7 @@
     "tooling/cli/doc/adr/0065-an-optional-command-output-directory-is-emptied-on-execution-and-on-an-empty-restore.md",
     "tooling/cli/doc/adr/0066-a-main-publication-releases-what-its-pull-request-published.md",
     "tooling/cli/doc/adr/0067-putnami-dev-declares-the-development-verbs.md",
+    "tooling/cli/doc/adr/0073-the-core-declares-no-development-verb.md",
     "tooling/cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md",
     "tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md"
   ]

@@ -28,9 +28,9 @@ what this extension declares is [ADR 0001](doc/adr/0001-the-dev-extension-declar
 | `generate` | none | none | none |
 | `validate` | none | none | `criteria` kind |
 
-Each description, alias list and related-command list equals the one the core
-shows for the verb, and each verb's default traits equal the core's defaults.
-Loading the vocabulary therefore changes no help text. The kind, workload and
+The core CLI declares none of these verbs. Help and completion take each
+verb's description, aliases and related commands from this vocabulary, and the
+CLI runs a verb where a loaded extension declares its command. The kind, workload and
 effects need CLI contract 11, and the manifest claims it. A job takes them from
 its verb unless its command declares its own `traits`, which replace the
 verb's wholesale. The CLI reads none of them yet; the [verbs

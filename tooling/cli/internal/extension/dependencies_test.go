@@ -17,7 +17,6 @@ import (
 	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -596,8 +595,9 @@ func copyFirstPartyProject(t *testing.T, repoRoot, ws, rel string) {
 
 // The Go extension names @putnami/dev as a dependency, and the shipped
 // @putnami/dev declared by path satisfies it: discovery loads it once, from
-// that path, and its vocabulary merges as the eleven verbs in order, with the
-// core's descriptions, aliases, related commands and default traits.
+// that path, and its vocabulary merges as the eleven development verbs in
+// order, with their aliases, related commands and default traits. The core
+// declares none of them, so the table below is the whole expectation.
 func TestTheShippedDevExtensionSatisfiesALanguageDependencyByPath(t *testing.T) {
 	f := newGraphFixture(t)
 	repoRoot := findRepoRoot(t)
@@ -626,52 +626,48 @@ func TestTheShippedDevExtensionSatisfiesALanguageDependencyByPath(t *testing.T) 
 		t.Errorf("@putnami/dev declares jobs %v; a vocabulary runs nothing", slices.Sorted(maps.Keys(loaded.Jobs)))
 	}
 
-	// The core's help lists its job commands in catalog order, and the
-	// vocabulary order is the help order: the two must be the same list.
-	var developmentVerbs []string
-	descriptions := map[string]string{}
-	for _, command := range commandmeta.PublicJobCommands() {
-		developmentVerbs = append(developmentVerbs, command.Name)
-		descriptions[command.Name] = command.Description
+	type verb struct {
+		name    string
+		aliases []string
+		related []string
+		traits  extproto.CommandTraits
+	}
+	want := []verb{
+		{"build", []string{"b"}, []string{"test", "lint", "serve"}, extproto.CommandTraits{Kind: extproto.CommandKindFiles}},
+		{"test", []string{"t"}, []string{"build", "lint"}, extproto.CommandTraits{Kind: extproto.CommandKindVerification}},
+		{"lint", []string{"l"}, []string{"build", "test", "format"}, extproto.CommandTraits{Kind: extproto.CommandKindDiagnostics}},
+		{"serve", []string{"s"}, []string{"build", "run"}, extproto.CommandTraits{RequiresRunnable: true, Workload: extproto.WorkloadServe}},
+		{"run", nil, []string{"build", "serve"}, extproto.CommandTraits{RequiresRunnable: true, Workload: extproto.WorkloadOnce}},
+		{"format", []string{"f"}, []string{"lint"}, extproto.CommandTraits{RewritesSources: true}},
+		{"package", nil, []string{"build", "publish"}, extproto.CommandTraits{InjectPublishChannels: true}},
+		{"publish", []string{"p", "P"}, []string{"build", "test", "package"}, extproto.CommandTraits{InjectPublishChannels: true, SideEffects: extproto.SideEffectsRegistry}},
+		{"deploy", []string{"d", "D"}, []string{"build", "package", "publish"}, extproto.CommandTraits{SideEffects: extproto.SideEffectsCloud, ConsumesReleaseSet: true}},
+		{"generate", nil, []string{"build"}, extproto.CommandTraits{}},
+		{"validate", nil, []string{"lint", "test", "build"}, extproto.CommandTraits{Kind: extproto.CommandKindCriteria}},
 	}
 	vocabulary := MergeVocabulary(result.Extensions, nil)
-	if !slices.Equal(vocabulary.VerbNames(), developmentVerbs) || len(vocabulary.Warnings) != 0 {
-		t.Fatalf("merged verbs %v with warnings %v, want the core's help order %v", vocabulary.VerbNames(), vocabulary.Warnings, developmentVerbs)
-	}
-	aliases := map[string][]string{}
-	for _, alias := range commandmeta.BuiltinAliasList() {
-		aliases[alias.Command] = append(aliases[alias.Command], alias.Name)
-	}
-	for _, name := range developmentVerbs {
-		verb, _ := vocabulary.Verb(name)
-		core, ok := commandmeta.Lookup(name)
-		if !ok {
-			t.Fatalf("the core catalog has no %s", name)
-		}
-		if verb.Description != descriptions[name] || !slices.Equal(verb.Related, core.Related) || !slices.Equal(verb.Aliases, aliases[name]) {
-			t.Errorf("%s = %q aliases %v related %v; the core shows %q aliases %v related %v",
-				name, verb.Description, verb.Aliases, verb.Related, descriptions[name], aliases[name], core.Related)
-		}
-		// The fields the core declares keep its defaults. The kind, workload and
-		// effects are the vocabulary's own; the dev manifest test pins them.
-		got := vocabulary.DefaultTraits(name)
-		coreFields := extproto.CommandTraits{
-			Heavy:                 got.Heavy,
-			RequiresRunnable:      got.RequiresRunnable,
-			InjectPublishChannels: got.InjectPublishChannels,
-			SideEffects:           got.SideEffects,
-		}
-		if want := extproto.EffectiveTraits(name, nil); coreFields != want {
-			t.Errorf("%s default traits = %+v, want the core defaults %+v", name, coreFields, want)
-		}
-	}
+	names := make([]string, 0, len(want))
 	wantAliases := map[string]string{}
-	for verb, names := range aliases {
-		for _, name := range names {
-			wantAliases[name] = verb
+	for _, w := range want {
+		names = append(names, w.name)
+		for _, alias := range w.aliases {
+			wantAliases[alias] = w.name
+		}
+	}
+	if !slices.Equal(vocabulary.VerbNames(), names) || len(vocabulary.Warnings) != 0 {
+		t.Fatalf("merged verbs %v with warnings %v, want %v", vocabulary.VerbNames(), vocabulary.Warnings, names)
+	}
+	for _, w := range want {
+		got, _ := vocabulary.Verb(w.name)
+		if got.Description == "" || !slices.Equal(got.Aliases, w.aliases) || !slices.Equal(got.Related, w.related) {
+			t.Errorf("%s = %q aliases %v related %v, want a description, aliases %v and related %v",
+				w.name, got.Description, got.Aliases, got.Related, w.aliases, w.related)
+		}
+		if traits := vocabulary.DefaultTraits(w.name); traits != w.traits {
+			t.Errorf("%s default traits = %+v, want %+v", w.name, traits, w.traits)
 		}
 	}
 	if got := vocabulary.AliasMap(); !maps.Equal(got, wantAliases) {
-		t.Errorf("merged aliases = %v, want the core's %v", got, wantAliases)
+		t.Errorf("merged aliases = %v, want %v", got, wantAliases)
 	}
 }

@@ -55,8 +55,8 @@ func captureVersionSnapshot(wsRoot string) (*git.VersionInfo, error) {
 // requireRepository returns the one-line refusal when the run includes a
 // command that ships a commit and Git does not manage the workspace root. A
 // command ships a commit when its jobs declare a side effect outside the
-// workspace (internalextension.CommandSideEffects): publish and deploy
-// always, plus any command whose manifest declares sideEffects.
+// workspace (internalextension.CommandSideEffects): a command one of whose
+// loaded jobs declares sideEffects.
 //
 // It reads the extensions only when the tree-state capture found no commit,
 // and asks git only when the run also includes such a command, so a run inside
@@ -108,7 +108,6 @@ func reportRepositoryRefusal(req *Request, discovered *internalextension.Discove
 		missing := missingRegistryExtensions(req.Config, discovered.Extensions, discovered.MissingDependencies()...)
 		if len(missing) > 0 && len(selectedCommandsWithoutJobs(req.Commands, nil, discovered.Extensions)) > 0 {
 			reportMissingExtensions(missing, discovered.Skipped, "")
-			reportUnservedSDDCommands(req.Commands, discovered.Extensions)
 			return nil
 		}
 	}
@@ -118,8 +117,8 @@ func reportRepositoryRefusal(req *Request, discovered *internalextension.Discove
 
 // discoverDeclaredExtensions resolves the extensions of the workspace before
 // any hook runs. It returns nil when the request carries no workspace config,
-// and when the workspace or its extensions cannot be read: a command is then
-// classified by its well-known verb, and a refusal stands.
+// and when the workspace or its extensions cannot be read: no command then has
+// a side effect, and the run's own workspace load reports what failed.
 func discoverDeclaredExtensions(req *Request) *internalextension.DiscoveryResult {
 	if req.Config == nil {
 		return nil

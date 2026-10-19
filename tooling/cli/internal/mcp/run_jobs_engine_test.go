@@ -477,22 +477,20 @@ func assertDemoDiagnostic(t *testing.T, d toolDiagnost) {
 // adapter (R3). A workspace where nothing serves the requested command used to
 // answer {"success":true,"total":0} — a green summary for a build that never
 // ran, which is the same green-on-broken failure class the engine's guards
-// exist to stop. It is now the engine's exit-2 refusal, surfaced with the
-// reason the engine printed on the stream MCP captures.
+// exist to stop. It is now the engine's usage error for a command no loaded
+// extension declares, returned as the tool's error.
 func TestRunJobs_NoJobsMatchedIsAnExplicitError(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "dependency-plan", "a-missing-selected-command-is-rejected")
 	srv := newFixtureServer(t) // no extensions: nothing can serve "build"
-
-	text := refuseRunJobs(t, srv, `{"commands":["build"]}`)
-	for _, want := range []string{"no jobs ran", "exit 2", "No jobs matched"} {
-		if !strings.Contains(text, want) {
-			t.Errorf("error %q does not mention %q", text, want)
-		}
-	}
+	const want = "no extension of this workspace declares build; name a language extension in putnami.workspace.json, then run: putnami extensions install"
 
 	// The dry-run shape refuses identically: a plan of nothing is not a plan.
-	refuseRunJobs(t, srv, `{"commands":["build"],"dryRun":true}`)
+	for _, args := range []string{`{"commands":["build"]}`, `{"commands":["build"],"dryRun":true}`} {
+		if text := refuseRunJobs(t, srv, args); text != want {
+			t.Errorf("run_jobs %s error = %q, want %q", args, text, want)
+		}
+	}
 }
 
 // TestRunJobs_UnknownProjectIsRejectedBeforeAnythingRuns keeps the earlier

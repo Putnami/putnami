@@ -48,6 +48,17 @@ func discoverFirstPartyJobTraits(t *testing.T, repoRoot, vocabulary string) map[
 // projects.
 func discoverJobTraits(t *testing.T, repoRoot string, projects []string, vocabulary string) map[string]CommandTraits {
 	t.Helper()
+	traits := make(map[string]CommandTraits)
+	for key, job := range discoverJobs(t, repoRoot, projects, vocabulary) {
+		traits[key] = job.Traits
+	}
+	return traits
+}
+
+// discoverJobs is discoverJobTraits with the whole job definitions, so a test
+// can tell a job whose manifest declares traits from one that declares none.
+func discoverJobs(t *testing.T, repoRoot string, projects []string, vocabulary string) map[string]*JobDefinition {
+	t.Helper()
 	dir := t.TempDir()
 	paths := slices.Clone(projects)
 	for _, rel := range projects {
@@ -77,22 +88,22 @@ func discoverJobTraits(t *testing.T, repoRoot string, projects []string, vocabul
 	if len(result.Extensions) != len(paths) {
 		t.Fatalf("loaded %d extensions, want %d (skipped %v)", len(result.Extensions), len(paths), result.Skipped)
 	}
-	traits := make(map[string]CommandTraits)
+	jobs := make(map[string]*JobDefinition)
 	for _, ext := range result.Extensions {
 		for name, job := range ext.Jobs {
-			traits[ext.Name+" "+name] = job.Traits
+			jobs[ext.Name+" "+name] = job
 		}
 	}
-	return traits
+	return jobs
 }
 
 // devVocabulary is a vocabulary that declares every verb the first-party jobs
-// use, in the shape the development-tooling extension will ship: without
-// traits, or with the well-known verb's traits spelled out.
-func devVocabulary(t *testing.T, jobs map[string]CommandTraits, withTraits bool) string {
+// use, in the shape a development-tooling extension ships: each verb without
+// traits, or with traits when traits is not nil.
+func devVocabulary(t *testing.T, jobs map[string]CommandTraits, traits *CommandTraits) string {
 	t.Helper()
 	verbFormat := regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
-	names := make([]string, 0, len(jobs)+len(proto.WellKnownVerbs))
+	names := make([]string, 0, len(jobs))
 	for key := range jobs {
 		_, job, _ := strings.Cut(key, " ")
 		name := proto.BaseCommandName(job)
@@ -100,20 +111,10 @@ func devVocabulary(t *testing.T, jobs map[string]CommandTraits, withTraits bool)
 			names = append(names, name)
 		}
 	}
-	for name := range proto.WellKnownVerbs {
-		if !slices.Contains(names, name) {
-			names = append(names, name)
-		}
-	}
 	slices.Sort(names)
 	verbs := make([]proto.VerbDefinition, 0, len(names))
 	for _, name := range names {
-		verb := proto.VerbDefinition{Name: name, Description: "The " + name + " verb."}
-		if withTraits {
-			traits := proto.WellKnownVerbs[name].Traits
-			verb.Traits = &traits
-		}
-		verbs = append(verbs, verb)
+		verbs = append(verbs, proto.VerbDefinition{Name: name, Description: "The " + name + " verb.", Traits: traits})
 	}
 	type vocabularyManifest struct {
 		Name        string                 `json:"name"`
@@ -150,46 +151,69 @@ func kindTraits(traits CommandTraits) CommandTraits {
 	}
 }
 
-// A development vocabulary that declares the verbs of the first-party jobs,
-// without traits or with the well-known ones, changes the traits of none of
-// them: every job keeps the traits Resolve gives it without a vocabulary. The
-// vocabulary the repository ships in tooling/dev changes none of the traits
-// the core reads either; the kinds it adds are pinned by
+// A development vocabulary gives its verbs' traits only to the first-party
+// jobs whose manifest declares none: a vocabulary without traits changes no
+// job, and one whose every verb is heavy makes exactly the undeclared jobs
+// heavy. The vocabulary the repository ships in tooling/dev changes none of
+// the traits the core reads; the kinds it adds are pinned by
 // TestTheDevVocabularyDeclaresEveryFirstPartyKind.
 func TestFirstPartyJobsKeepTheirTraitsUnderADevelopmentVocabulary(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "first-party-jobs-keep-their-traits")
 	repoRoot := findRepoRoot(t)
-	baseline := discoverFirstPartyJobTraits(t, repoRoot, "")
-
-	// Control: the baseline is not vacuous, and it carries the traits a
-	// vocabulary could change.
-	withEffects := 0
-	for _, traits := range baseline {
-		if traits != (CommandTraits{}) {
+	jobs := discoverJobs(t, repoRoot, firstPartyVocabularyProjects, "")
+	baseline := make(map[string]CommandTraits, len(jobs))
+	declared, withEffects := 0, 0
+	for key, job := range jobs {
+		baseline[key] = job.Traits
+		if job.TraitsDeclared {
+			declared++
+		}
+		if job.Traits != (CommandTraits{}) {
 			withEffects++
 		}
 	}
-	if len(baseline) < 20 || withEffects == 0 {
-		t.Fatalf("baseline has %d jobs, %d with traits; the first-party manifests did not load", len(baseline), withEffects)
+	// Control: the baseline is not vacuous: it has jobs that declare traits,
+	// some of them not empty, and jobs that declare none.
+	if len(baseline) < 20 || withEffects == 0 || declared == 0 || declared == len(baseline) {
+		t.Fatalf("baseline has %d jobs, %d declaring traits, %d with traits; the first-party manifests did not load", len(baseline), declared, withEffects)
 	}
 
 	shipped, err := os.ReadFile(filepath.Join(repoRoot, "tooling", "dev", ManifestFilename))
 	if err != nil {
 		t.Fatal(err)
 	}
+	heavy := CommandTraits{Heavy: true}
 	for name, test := range map[string]struct {
 		vocabulary string
+		want       func(job *JobDefinition) CommandTraits
 		compare    func(CommandTraits) CommandTraits
 	}{
-		"without traits":             {devVocabulary(t, baseline, false), func(traits CommandTraits) CommandTraits { return traits }},
-		"with the well-known traits": {devVocabulary(t, baseline, true), func(traits CommandTraits) CommandTraits { return traits }},
-		"the shipped vocabulary":     {string(shipped), coreTraits},
+		"without traits": {
+			devVocabulary(t, baseline, nil),
+			func(job *JobDefinition) CommandTraits { return job.Traits },
+			func(traits CommandTraits) CommandTraits { return traits },
+		},
+		"with heavy verbs": {
+			devVocabulary(t, baseline, &heavy),
+			func(job *JobDefinition) CommandTraits {
+				if job.TraitsDeclared {
+					return job.Traits
+				}
+				return heavy
+			},
+			func(traits CommandTraits) CommandTraits { return traits },
+		},
+		"the shipped vocabulary": {
+			string(shipped),
+			func(job *JobDefinition) CommandTraits { return job.Traits },
+			coreTraits,
+		},
 	} {
 		got := discoverFirstPartyJobTraits(t, repoRoot, test.vocabulary)
-		for job, want := range baseline {
-			if test.compare(got[job]) != test.compare(want) {
-				t.Errorf("%s: %s traits = %+v, want %+v", name, job, got[job], want)
+		for key, job := range jobs {
+			if want := test.want(job); test.compare(got[key]) != test.compare(want) {
+				t.Errorf("%s: %s traits = %+v, want %+v", name, key, got[key], want)
 			}
 		}
 		if len(got) != len(baseline) {

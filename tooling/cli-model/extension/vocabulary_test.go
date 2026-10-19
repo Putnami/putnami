@@ -64,9 +64,13 @@ func TestMergeVocabulary_WarnsWhenTwoVocabulariesDeclareOneVerb(t *testing.T) {
 	}
 }
 
-func TestMergeVocabulary_AVocabularyNeverChangesTheSideEffectsOfAWellKnownVerb(t *testing.T) {
+// TestApplyVocabularyTraits_AVocabularyGivesItsVerbsSideEffects pins that the
+// core keeps no side-effect floor: a job without declared traits takes its
+// verb's default traits whole, side effects included, and a vocabulary that
+// gives publish none leaves it with none.
+func TestApplyVocabularyTraits_AVocabularyGivesItsVerbsSideEffects(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "a-vocabulary-never-changes-a-well-known-verbs-side-effects")
+	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "traits-alone-give-a-job-its-side-effects")
 	manifest := &Manifest{Name: "@acme/go", Commands: map[string]CommandDefinition{"deploy": {}, "publish": {}, "package": {}}}
 	jobs := Resolve(manifest, "/ext")
 	harmless := proto.CommandTraits{InjectPublishChannels: true}
@@ -79,28 +83,28 @@ func TestMergeVocabulary_AVocabularyNeverChangesTheSideEffectsOfAWellKnownVerb(t
 	warnings := ApplyVocabularyTraits([]*ExtensionDescription{jobs, dev})
 
 	cases := map[string]CommandTraits{
-		"publish": proto.WellKnownVerbs["publish"].Traits, // the lowered traits are ignored
-		"deploy":  cloud,                                  // the same side effects apply
-		"package": cloud,                                  // package has no side effects to keep
+		"publish": harmless,
+		"deploy":  cloud,
+		"package": cloud,
 	}
 	for name, want := range cases {
 		if got := jobs.Jobs[name].Traits; got != want {
 			t.Errorf("%s traits = %+v, want %+v", name, got, want)
 		}
 	}
-	want := []string{`the vocabulary of @acme/dev gives the verb "publish" the side effects "" instead of "registry"; its default traits are ignored`}
-	if !reflect.DeepEqual(warnings, want) {
-		t.Fatalf("warnings = %q, want %q", warnings, want)
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %q, want none", warnings)
 	}
 }
 
-// TestResolve_DeclaredTraitsKeepAWellKnownVerbsSideEffects pins the one
-// resolution every gate reads: a command whose declared traits name no side
-// effects keeps its well-known verb's, and a vocabulary does not reach a job
-// whose manifest declared traits.
-func TestResolve_DeclaredTraitsKeepAWellKnownVerbsSideEffects(t *testing.T) {
+// TestResolve_DeclaredTraitsReplaceTheVerbsSideEffects pins the resolution
+// every gate reads: declared traits are the job's traits whole, so a command
+// that declares no side effect has none, whatever its name or its verb's
+// default, and a vocabulary does not reach a job whose manifest declared
+// traits.
+func TestResolve_DeclaredTraitsReplaceTheVerbsSideEffects(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "declared-traits-keep-a-well-known-verbs-side-effects")
+	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "traits-alone-give-a-job-its-side-effects")
 	channels := proto.CommandTraits{InjectPublishChannels: true}
 	heavy := proto.CommandTraits{Heavy: true}
 	jobs := Resolve(&Manifest{Name: "@acme/release", Commands: map[string]CommandDefinition{
@@ -108,14 +112,16 @@ func TestResolve_DeclaredTraitsKeepAWellKnownVerbsSideEffects(t *testing.T) {
 		"deploy":  {Traits: &heavy},
 		"release": {Traits: &channels},
 	}}, "/ext")
-	dev := vocabularyExtension("@acme/dev", VerbDefinition{Name: "release", Description: "Release.",
-		Traits: &proto.CommandTraits{SideEffects: proto.SideEffectsRegistry}})
+	dev := vocabularyExtension("@acme/dev",
+		VerbDefinition{Name: "release", Description: "Release.", Traits: &proto.CommandTraits{SideEffects: proto.SideEffectsRegistry}},
+		VerbDefinition{Name: "deploy", Description: "Deploy.", Traits: &proto.CommandTraits{SideEffects: proto.SideEffectsCloud}},
+	)
 	ApplyVocabularyTraits([]*ExtensionDescription{jobs, dev})
 
 	cases := map[string]CommandTraits{
-		"publish": {InjectPublishChannels: true, SideEffects: proto.SideEffectsRegistry},
-		"deploy":  {Heavy: true, SideEffects: proto.SideEffectsCloud},
-		"release": channels, // no well-known side effects, and the declaration wins over the vocabulary
+		"publish": channels,
+		"deploy":  heavy,
+		"release": channels,
 	}
 	for name, want := range cases {
 		if got := jobs.Jobs[name].Traits; got != want {
@@ -125,8 +131,7 @@ func TestResolve_DeclaredTraitsKeepAWellKnownVerbsSideEffects(t *testing.T) {
 }
 
 // A job whose manifest declares no traits takes its verb's whole default
-// traits, kind and workload included, and a verb's traits set aside for its
-// side effects take their kind with them.
+// traits, kind and workload included.
 func TestApplyVocabularyTraits_AJobWithoutDeclaredTraitsTakesItsVerbsKindAndWorkload(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "command-kinds-and-traits", "a-job-without-declared-traits-takes-its-verbs-kind-and-workload")
@@ -150,9 +155,7 @@ func TestApplyVocabularyTraits_AJobWithoutDeclaredTraitsTakesItsVerbsKindAndWork
 		"check":   check,
 		"serve":   serve,
 		"release": release,
-		// The vocabulary would lower publish's side effects, so its traits,
-		// kind included, are set aside for the well-known defaults.
-		"publish": proto.WellKnownVerbs["publish"].Traits,
+		"publish": lowered,
 		"bundle":  {RewritesSources: true},
 	}
 	for name, want := range cases {
@@ -243,11 +246,10 @@ func TestApplyVocabularyTraits_DefaultsOnlyUndeclaredTraits(t *testing.T) {
 	ApplyVocabularyTraits([]*ExtensionDescription{jobs, dev})
 
 	cases := map[string]CommandTraits{
-		"bundle": cloud, // the vocabulary's default
-		"check":  {},    // no verb, no default
-		// declared traits win, and keep the verb's side effects
-		"publish": {Heavy: true, SideEffects: proto.SideEffectsRegistry},
-		"serve":   proto.WellKnownVerbs["serve"].Traits, // a verb without traits keeps the fallback
+		"bundle":  cloud,         // the vocabulary's default
+		"check":   {},            // no verb, no default
+		"publish": {Heavy: true}, // declared traits win whole
+		"serve":   {},            // a verb without traits gives none
 	}
 	for name, want := range cases {
 		if got := jobs.Jobs[name].Traits; got != want {
@@ -266,8 +268,8 @@ func TestApplyVocabularyTraits_WithoutAVocabularyChangesNothing(t *testing.T) {
 	t.Parallel()
 	jobs := Resolve(&Manifest{Name: "@acme/go", Commands: map[string]CommandDefinition{"publish": {}}}, "/ext")
 	ApplyVocabularyTraits([]*ExtensionDescription{jobs, nil})
-	if got, want := jobs.Jobs["publish"].Traits, proto.WellKnownVerbs["publish"].Traits; got != want {
-		t.Fatalf("publish traits = %+v, want the well-known defaults %+v", got, want)
+	if got := jobs.Jobs["publish"].Traits; got != (CommandTraits{}) {
+		t.Fatalf("publish traits = %+v, want none: the core gives a verb no trait of its own", got)
 	}
 }
 

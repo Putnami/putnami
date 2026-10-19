@@ -18,8 +18,7 @@ type Vocabulary struct {
 	// verb of Verbs.
 	Aliases []VerbAlias
 	// Warnings name, in merge order, each declaration the merge set aside: a
-	// verb another vocabulary declared first, and default traits that would
-	// change the side effects of a well-known verb.
+	// verb another vocabulary declared first.
 	Warnings []string
 }
 
@@ -35,10 +34,8 @@ type VerbAlias struct {
 //
 //   - A verb that an earlier vocabulary declared is set aside, with a warning
 //     naming both extensions.
-//   - Default traits that would change the side effects WellKnownVerbs gives a
-//     verb are set aside, with a warning: the verb keeps its well-known
-//     defaults. A vocabulary never makes publish or deploy look harmless to the
-//     gates that read side effects.
+//   - A verb's default traits are the ones its vocabulary declares, side
+//     effects included: the core gives no verb a trait of its own.
 //   - An alias applies when no earlier alias claimed its name and it names no
 //     verb, no command or command group of a loaded extension, and no name
 //     reserved reports: the caller's own commands and aliases. reserved may be
@@ -68,13 +65,6 @@ func MergeVocabulary(extensions []*ExtensionDescription, reserved func(string) b
 				continue
 			}
 			owners[verb.Name] = ext.Name
-			if wellKnown := proto.WellKnownVerbs[verb.Name].Traits.SideEffects; verb.Traits != nil &&
-				wellKnown != proto.SideEffectsNone && verb.Traits.SideEffects != wellKnown {
-				vocabulary.Warnings = append(vocabulary.Warnings, fmt.Sprintf(
-					"the vocabulary of %s gives the verb %q the side effects %q instead of %q; its default traits are ignored",
-					ext.Name, verb.Name, verb.Traits.SideEffects, wellKnown))
-				verb.Traits = nil
-			}
 			vocabulary.Verbs = append(vocabulary.Verbs, verb)
 		}
 	}
@@ -139,13 +129,13 @@ func (v Vocabulary) AliasMap() map[string]string {
 }
 
 // DefaultTraits returns the traits a job of command takes when its manifest
-// declares none: the default traits of its verb in the vocabulary, or, for a
-// verb the vocabulary does not give traits, the well-known verb's defaults.
+// declares none: the default traits of its verb in the vocabulary, or no trait
+// when the vocabulary does not name the verb or gives it none.
 func (v Vocabulary) DefaultTraits(command string) CommandTraits {
 	if verb, ok := v.Verb(proto.BaseCommandName(command)); ok && verb.Traits != nil {
 		return *verb.Traits
 	}
-	return proto.EffectiveTraits(command, nil)
+	return CommandTraits{}
 }
 
 // ApplyVocabularyTraits gives every job of extensions whose manifest declared

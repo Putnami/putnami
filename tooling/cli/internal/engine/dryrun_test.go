@@ -107,24 +107,32 @@ func TestDropUndryableSideEffectJobs_ExcludesUndeclaredSideEffects(t *testing.T)
 	}
 }
 
-// TestDropUndryableSideEffectJobs_ExcludesAPublishWhoseTraitsNameNoSideEffects
-// pins the filter on a job resolved from a manifest: a publish whose declared
-// traits name no side effects keeps the verb's registry side effect, so
-// `publish --dry-run` excludes it instead of running it for real.
-func TestDropUndryableSideEffectJobs_ExcludesAPublishWhoseTraitsNameNoSideEffects(t *testing.T) {
+// TestDropUndryableSideEffectJobs_ReadsTheSideEffectsAManifestDeclares pins
+// the filter on jobs resolved from a manifest: a publish that declares
+// registry side effects without the dry-run flag is excluded from an executing
+// dry run, while one whose traits name no side effect has none, whatever its
+// name, and runs.
+func TestDropUndryableSideEffectJobs_ReadsTheSideEffectsAManifestDeclares(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "preview-no-effects", "only-declared-dry-run-simulations-survive")
-	ext := extension.Resolve(&extension.Manifest{Name: "@acme/release", Commands: map[string]extension.CommandDefinition{
-		"publish": {Traits: &extension.CommandTraits{InjectPublishChannels: true}},
-	}}, "/ext")
-	publisher := &scheduler.ScheduledJob{
-		Project:   &workspace.Project{ID: "/p", Name: "p", Path: "p"},
-		Extension: ext,
-		JobDef:    ext.Jobs["publish"],
+	resolved := func(traits extension.CommandTraits) *scheduler.ScheduledJob {
+		ext := extension.Resolve(&extension.Manifest{Name: "@acme/release", Commands: map[string]extension.CommandDefinition{
+			"publish": {Traits: &traits},
+		}}, "/ext")
+		return &scheduler.ScheduledJob{
+			Project:   &workspace.Project{ID: "/p", Name: "p", Path: "p"},
+			Extension: ext,
+			JobDef:    ext.Jobs["publish"],
+		}
 	}
 
-	if kept := dropUndryableSideEffectJobs(executingDryRunRequest(), []*scheduler.ScheduledJob{publisher}); len(kept) != 0 {
-		t.Fatalf("kept = %v, want the publish excluded from an executing dry-run", kept)
+	shipping := resolved(extension.CommandTraits{InjectPublishChannels: true, SideEffects: extension.SideEffectsRegistry})
+	if kept := dropUndryableSideEffectJobs(executingDryRunRequest(), []*scheduler.ScheduledJob{shipping}); len(kept) != 0 {
+		t.Fatalf("kept = %v, want the publish that declares registry side effects excluded from an executing dry-run", kept)
+	}
+	harmless := resolved(extension.CommandTraits{InjectPublishChannels: true})
+	if kept := dropUndryableSideEffectJobs(executingDryRunRequest(), []*scheduler.ScheduledJob{harmless}); len(kept) != 1 {
+		t.Fatalf("kept = %v, want the publish that declares no side effect kept", kept)
 	}
 }
 

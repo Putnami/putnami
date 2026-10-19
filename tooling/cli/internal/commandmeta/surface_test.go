@@ -20,8 +20,7 @@ func surfaceEntry(t *testing.T, surface protocolcli.CommandSurface, path string)
 }
 
 // Every spelling a user can type is a command of the surface: each catalog
-// path, the alternate spellings and the job commands included, and each
-// built-in alias.
+// path, the alternate spellings included, and nothing else.
 func TestSurface_ListsEveryCommandUsersType(t *testing.T) {
 	t.Parallel()
 	surface, err := Surface()
@@ -37,12 +36,7 @@ func TestSurface_ListsEveryCommandUsersType(t *testing.T) {
 			t.Errorf("catalog path %q is missing from the surface", command.Path)
 		}
 	}
-	for _, alias := range builtinAliases {
-		if !slices.Contains(paths, alias.Name) {
-			t.Errorf("built-in alias %q is missing from the surface", alias.Name)
-		}
-	}
-	if want := len(catalog) + len(builtinAliases); len(paths) != want {
+	if want := len(catalog); len(paths) != want {
 		t.Errorf("the surface lists %d commands, want %d", len(paths), want)
 	}
 	if len(surface.GlobalFlags) != len(globalFlags) {
@@ -68,8 +62,7 @@ func TestSurface_NoContributorRootAndNoProposalsFinalize(t *testing.T) {
 	}
 }
 
-// An alternate spelling accepts what its canonical path accepts, and an alias
-// runs its command.
+// An alternate spelling accepts what its canonical path accepts.
 func TestSurface_AnAlternateSpellingSharesItsCommandsSurface(t *testing.T) {
 	t.Parallel()
 	surface, err := Surface()
@@ -83,12 +76,6 @@ func TestSurface_AnAlternateSpellingSharesItsCommandsSurface(t *testing.T) {
 		alternate, canonical := surfaceEntry(t, surface, command.Path), surfaceEntry(t, surface, command.DetailFrom)
 		if !slices.EqualFunc(alternate.Flags, canonical.Flags, flagsEqual) || !slices.Equal(alternate.Positionals, canonical.Positionals) {
 			t.Errorf("%q does not carry the flags and positionals of %q", command.Path, command.DetailFrom)
-		}
-	}
-	for _, alias := range builtinAliases {
-		short, full := surfaceEntry(t, surface, alias.Name), surfaceEntry(t, surface, alias.Command)
-		if !slices.EqualFunc(short.Flags, full.Flags, flagsEqual) || !slices.Equal(short.Positionals, full.Positionals) {
-			t.Errorf("alias %q does not carry the surface of %q", alias.Name, alias.Command)
 		}
 	}
 }

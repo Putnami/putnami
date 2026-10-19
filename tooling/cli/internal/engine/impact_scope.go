@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	modelext "go.putnami.dev/cli/model/extension"
-	modeljobs "go.putnami.dev/cli/model/jobs"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -24,10 +23,9 @@ const extensionScopeSeparator = "#"
 //   - its project is not task-scoped: it runs every task, as before;
 //   - the scope names its task — `<command>~<step>`, or the command alone for a
 //     job with no pipeline step;
-//   - its command's traits declare side effects, or its well-known verb
-//     has a default one that a declaration never removes: the
-//     release-set coordinator decides which members a session releases, and a
-//     scope narrows what the diff VERIFIES, never what the session RELEASES;
+//   - its resolved traits declare side effects: the release-set coordinator
+//     decides which members a session releases, and a scope narrows what the
+//     diff VERIFIES, never what the session RELEASES;
 //   - its command's resolved traits declare the criteria kind (ADR 0072): such
 //     a command checks what the session verified, including the spec gate's
 //     criteria projection. A scope names the tasks a change's declared inputs
@@ -64,15 +62,10 @@ func narrowToTaskScopes(ws *workspace.Workspace, planned []*scheduler.ScheduledJ
 			continue
 		}
 		scope, scoped := scopes[job.Project.ID]
-		// This rule also counts the well-known verb's default side effect when
-		// a declaration replaces it, so `publish` and `deploy` keep their jobs
-		// whatever their manifest declares. extension.CommandSideEffects holds
-		// the same rule for the git requirement, the remote cache trust floor
-		// and the MCP run_jobs refusal. Every other reader of a command's side
-		// effects takes the declared traits as resolved.
-		command := modeljobs.JobCommandName(job)
-		sideEffects := job.JobDef.Traits.SideEffects != extensionproto.SideEffectsNone ||
-			extensionproto.EffectiveTraits(command, nil).SideEffects != extensionproto.SideEffectsNone
+		// The side effects are the job's resolved traits: the ones its manifest
+		// declares, or its verb's default traits when it declares none. The core
+		// adds none of its own.
+		sideEffects := job.JobDef.Traits.SideEffects != extensionproto.SideEffectsNone
 		criteria := job.JobDef.Traits.Kind == extensionproto.CommandKindCriteria
 		if !scoped || sideEffects || criteria || jobInScope(ws, job, scope) {
 			kept[job.Key()] = true

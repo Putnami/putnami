@@ -27,14 +27,13 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// scopedJob is a planned job whose command declares no traits, so it carries
-// the traits the manifest loader resolves for that command: the well-known
-// verb's defaults, or none.
+// scopedJob is a planned job whose command declares no traits and takes none
+// from a vocabulary: the core gives no command a trait, whatever its name.
 func scopedJob(project *workspace.Project, extRelPath, name string, predecessors ...string) *scheduler.ScheduledJob {
 	return &scheduler.ScheduledJob{
 		Project:   project,
 		Extension: &extension.ExtensionDescription{Name: "@fixture/" + filepath.Base(extRelPath), RelPath: extRelPath},
-		JobDef:    &extension.JobDefinition{Name: name, Traits: extensionproto.EffectiveTraits(name, nil)},
+		JobDef:    &extension.JobDefinition{Name: name},
 		DependsOn: predecessors,
 	}
 }
@@ -43,6 +42,13 @@ func scopedJob(project *workspace.Project, extRelPath, name string, predecessors
 // declare.
 func ofKind(kind string, job *scheduler.ScheduledJob) *scheduler.ScheduledJob {
 	job.JobDef.Traits.Kind = kind
+	return job
+}
+
+// withSideEffects gives job the side effects its command declares.
+func withSideEffects(job *scheduler.ScheduledJob, sideEffects string) *scheduler.ScheduledJob {
+	job.JobDef.Traits.SideEffects = sideEffects
+	job.JobDef.TraitsDeclared = true
 	return job
 }
 
@@ -69,11 +75,13 @@ func TestNarrowToTaskScopes_KeepsTheScopedExtensionsJobsAndTheirPredecessors(t *
 		scopedJob(lib, "typescript/extension", "check"),
 		// app: scoped to the TS extension; its publish declares registry side
 		// effects and keeps the Go build it depends on, while the Go test is
-		// dropped.
+		// dropped, and so is a deploy that declares no side effect: its name
+		// gives it none.
 		scopedJob(app, "go/extension", "build"),
 		scopedJob(app, "typescript/extension", "bundle"),
 		scopedJob(app, "go/extension", "test", "/app:build"),
-		scopedJob(app, "go/extension", "publish", "/app:build"),
+		withSideEffects(scopedJob(app, "go/extension", "publish", "/app:build"), extensionproto.SideEffectsRegistry),
+		scopedJob(app, "go/extension", "deploy", "/app:build"),
 		// full: not in the scope map, everything runs.
 		scopedJob(full, "go/extension", "build"),
 		scopedJob(full, "typescript/extension", "lint"),
@@ -460,12 +468,12 @@ func TestRunKeepsTheTestsOfAConsumerReachedThroughItsSpecGate(t *testing.T) {
 }
 
 // A task scope keeps a job by what its command declares, never by the command's
-// name alone. A command named `ship` that declares registry side effects
-// survives a scope that does not name it, a `publish` and a `deploy` whose
-// manifest declares traits without side effects keep their well-known verb's
-// default, and a command that declares none is narrowed. The manifest
-// goes through the loader and the planner a run uses, so the traits are the
-// ones a run resolves.
+// name. A command named `ship` that declares registry side effects survives a
+// scope that does not name it, while a `publish` and a `deploy` whose manifest
+// declares traits without side effects are narrowed like any command that
+// declares none: the core gives no name a side effect. The manifest goes
+// through the loader and the planner a run uses, so the traits are the ones a
+// run resolves.
 func TestNarrowToTaskScopes_FollowsTheDeclaredSideEffectsNotTheCommandName(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-task-scope-keeps-every-job-that-declares-side-effects")
@@ -510,8 +518,8 @@ func TestNarrowToTaskScopes_FollowsTheDeclaredSideEffectsNotTheCommandName(t *te
 
 	narrowed := narrowToTaskScopes(ws, planned, map[string][]string{"/lib": {"build~compile"}})
 
-	if got, want := sortedJobKeys(narrowed), []string{"/lib:build~compile", "/lib:deploy~roll", "/lib:publish~notes", "/lib:ship~upload"}; !slices.Equal(got, want) {
-		t.Errorf("narrowed = %v, want %v: ship declares registry side effects, publish and deploy keep their defaults, docs declares none", got, want)
+	if got, want := sortedJobKeys(narrowed), []string{"/lib:build~compile", "/lib:ship~upload"}; !slices.Equal(got, want) {
+		t.Errorf("narrowed = %v, want %v: ship declares registry side effects, publish, deploy and docs declare none", got, want)
 	}
 }
 

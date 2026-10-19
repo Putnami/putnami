@@ -430,9 +430,9 @@ func printRequestedHelp(
 ) int {
 	switch {
 	case parsed.Global.HelpMan:
-		PrintHelpMan()
+		printHelpMan(newHelpScope(wsRoot, cfg))
 	case parsed.Global.HelpMD:
-		PrintHelpMarkdown()
+		printHelpMarkdown(newHelpScope(wsRoot, cfg))
 	case len(parsed.Commands) == 0 || parsed.Commands[0] == "help":
 		printHelp(newHelpScope(wsRoot, cfg))
 	case extensionGroups[parsed.Commands[0]]:
@@ -636,10 +636,11 @@ func shouldDiscoverExtensions(args []string, wsRoot string) bool {
 	if first == "" || strings.HasPrefix(first, "-") {
 		return false
 	}
-	// Built-in structured commands and aliases never compete with extension
-	// groups, so we skip discovery for them. Flat job commands (build, test,
-	// etc.) still trigger discovery — the cost is paid once per CLI run and
-	// the extension list is needed by the job pipeline anyway.
+	// Built-in structured commands never compete with extension groups, so we
+	// skip discovery for them. Job commands and their aliases, which only a
+	// loaded extension declares, still trigger discovery: the cost is paid
+	// once per CLI run and the extension list is needed by the job pipeline
+	// anyway.
 	if isStructuredCommand(first) {
 		return false
 	}

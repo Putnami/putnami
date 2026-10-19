@@ -8,7 +8,7 @@ description: Garbage-collect the machine-global build, Go, Bun, and binary store
 usage: putnami cache gc
 example: putnami cache gc
 ═══ cache verify ═══
-description: Run lint, test, and build twice in isolated worktrees, compare cache keys and captured artifacts, restore the first run into a pristine tree, and fail on undeclared writes or live-versus-hit differences; declared ambient key inputs are reported without failing
+description: Run the workspace gate tasks (the blocking commands of putnami.ci.json; lint, test and build without one) twice in isolated worktrees, compare cache keys and captured artifacts, restore the first run into a pristine tree, and fail on undeclared writes or live-versus-hit differences; declared ambient key inputs are reported without failing
 usage: putnami cache verify [--projects <selector> | --impacted | --all] [--output <format>]
 example: putnami cache verify --projects /my/project
 example: putnami cache verify --all --output=jsonl

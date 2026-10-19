@@ -22,12 +22,12 @@
             "checks": [
               "the-manifest-declares-the-eleven-verbs-in-order",
               "the-manifest-passes-strict-validation-at-contract-11",
-              "each-verb-keeps-the-core-presentation"
+              "each-verb-declares-its-presentation"
             ]
           }
         },
         {
-          "id": "core-default-traits",
+          "id": "dev-is-the-sole-declarer",
           "stage": "coded",
           "evidenceKinds": [
             "attestation"
@@ -35,7 +35,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "each-verb-keeps-the-core-defaults-and-declares-its-kind"
+              "each-verb-declares-its-default-traits"
             ]
           }
         },

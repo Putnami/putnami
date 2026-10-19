@@ -4,7 +4,7 @@ putnami cache
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -23,7 +23,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -43,7 +43,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -67,12 +67,11 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
 Related Commands:
-  putnami serve
   putnami qualify
 
 ═══ config ═══
@@ -81,7 +80,7 @@ putnami config
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -91,7 +90,7 @@ putnami context
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -101,7 +100,7 @@ putnami deps
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -128,7 +127,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -142,7 +141,7 @@ putnami extensions
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -167,7 +166,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -190,7 +189,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -223,7 +222,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -244,7 +243,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -267,7 +266,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -281,7 +280,7 @@ putnami migrate
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -304,7 +303,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -318,7 +317,7 @@ putnami projects
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -346,7 +345,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -373,7 +372,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -396,7 +395,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -411,7 +410,7 @@ putnami sessions
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -421,7 +420,7 @@ putnami telemetry
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -431,7 +430,7 @@ putnami templates
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -441,7 +440,7 @@ putnami tree
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -476,7 +475,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -500,7 +499,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -510,7 +509,7 @@ putnami workspace
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -520,7 +519,7 @@ putnami architecture inspect
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -530,7 +529,7 @@ putnami architecture snapshot
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -540,7 +539,7 @@ putnami architecture validate
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -559,13 +558,9 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
-
-Related Commands:
-  putnami build
-  putnami test
 
 ═══ cache gc ═══
 putnami cache gc
@@ -581,14 +576,14 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
 ═══ cache verify ═══
 putnami cache verify
 
-Run lint, test, and build twice in isolated worktrees, compare cache keys and captured artifacts, restore the first run into a pristine tree, and fail on undeclared writes or live-versus-hit differences; declared ambient key inputs are reported without failing
+Run the workspace gate tasks (the blocking commands of putnami.ci.json; lint, test and build without one) twice in isolated worktrees, compare cache keys and captured artifacts, restore the first run into a pristine tree, and fail on undeclared writes or live-versus-hit differences; declared ambient key inputs are reported without failing
 
 Usage:
   putnami cache verify [--projects <selector> | --impacted | --all] [--output <format>]
@@ -600,15 +595,12 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
 Related Commands:
   putnami cache clean
-  putnami build
-  putnami test
-  putnami lint
 
 ═══ cli list ═══
 putnami cli list
@@ -628,7 +620,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -650,7 +642,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -668,7 +660,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -690,7 +682,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -704,7 +696,7 @@ putnami contracts check
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -714,7 +706,7 @@ putnami contracts generate
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -736,7 +728,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -764,7 +756,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -787,7 +779,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -818,7 +810,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -846,7 +838,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -873,7 +865,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -896,7 +888,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -919,7 +911,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -933,7 +925,7 @@ putnami features diff
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -943,7 +935,7 @@ putnami features inspect
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -953,7 +945,7 @@ putnami features snapshot
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -963,7 +955,7 @@ putnami features validate
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -981,7 +973,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1009,7 +1001,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1037,7 +1029,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1060,7 +1052,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1083,7 +1075,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1111,7 +1103,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1137,7 +1129,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1160,7 +1152,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1187,7 +1179,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1213,7 +1205,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1237,7 +1229,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1251,7 +1243,7 @@ putnami specs init
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1261,7 +1253,7 @@ putnami specs inspect
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1271,7 +1263,7 @@ putnami specs list
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1281,7 +1273,7 @@ putnami specs validate
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1296,7 +1288,7 @@ Usage:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1315,7 +1307,7 @@ Usage:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1334,7 +1326,7 @@ Usage:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1352,7 +1344,7 @@ Usage:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1380,7 +1372,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1404,7 +1396,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1431,7 +1423,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1453,7 +1445,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1480,7 +1472,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1503,7 +1495,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1526,7 +1518,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1555,7 +1547,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1581,7 +1573,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1600,7 +1592,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
@@ -1634,7 +1626,7 @@ Examples:
 Global Options:
   Common: --verbose, --debug, --watch, --plan, --help
   Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --where, --providers, --credential-fd, --no-cache, --no-cache-projects, --cache-trust, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
   Advanced: --trace-profile
 
