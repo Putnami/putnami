@@ -67,7 +67,22 @@
             ]
           }
         }
-      ]
+      ],
+      "surface": {
+        "commands": [
+          "build",
+          "deploy",
+          "format",
+          "generate",
+          "lint",
+          "package",
+          "publish",
+          "run",
+          "serve",
+          "test",
+          "validate"
+        ]
+      }
     }
   ]
 }

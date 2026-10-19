@@ -292,8 +292,54 @@
               "a-feature-text-finding-states-its-bound"
             ]
           }
+        },
+        {
+          "id": "features-name-their-surface",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-project-without-a-manifest-resolves-nothing",
+              "an-unserved-surface-name-fails-features-validate",
+              "feature-context-returns-the-declared-surface"
+            ]
+          }
         }
-      ]
+      ],
+      "surface": {
+        "commands": [
+          "architecture init",
+          "architecture inspect",
+          "architecture snapshot",
+          "architecture sync",
+          "architecture validate",
+          "contracts check",
+          "contracts generate",
+          "features diff",
+          "features inspect",
+          "features list",
+          "features snapshot",
+          "features validate",
+          "specs baseline",
+          "specs init",
+          "specs inspect",
+          "specs list",
+          "specs validate",
+          "specs verify",
+          "validate",
+          "validate-workspace"
+        ],
+        "tools": [
+          "sdd.architecture_context",
+          "sdd.feature_context",
+          "sdd.list_features",
+          "sdd.list_specs",
+          "sdd.spec_context"
+        ]
+      }
     }
   ]
 }

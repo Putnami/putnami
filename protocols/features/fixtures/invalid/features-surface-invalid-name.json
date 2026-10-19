@@ -1,0 +1,19 @@
+{
+  "protocolVersion": 2,
+  "namespace": "billing",
+  "features": [
+    {
+      "id": "billing/invoice-export",
+      "type": "feature",
+      "name": "Invoice export",
+      "outcome": "Customers can export issued invoices",
+      "owner": "billing",
+      "target": "modeled",
+      "surface": {
+        "commands": [
+          "Invoices Export"
+        ]
+      }
+    }
+  ]
+}

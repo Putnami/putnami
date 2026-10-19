@@ -95,7 +95,9 @@ A wrong answer an agent cannot tell from a right one is worse than an error.
 `sdd.list_features` answers one page of short entries, ordered by feature id.
 An entry tells an agent which feature to read next; `sdd.feature_context`
 returns that feature's declarations, requirements, relations, and
-implementations.
+implementations. A manifest declaration carries its `surface` when it lists
+one: the command paths and MCP tool names that carry the feature, sorted and
+exactly as declared. The page itself is unchanged.
 
 | Entry member | Content |
 |---|---|

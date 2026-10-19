@@ -8,7 +8,7 @@
   "properties": {
     "$schema": { "type": "string" },
     "protocolVersion": {
-      "$comment": "Readers require an exact JSON integer token, 1 or 2; 1.0 and 1e0 are invalid. Only version 2 may carry a requirement verification criterion.",
+      "$comment": "Readers require an exact JSON integer token, 1 or 2; 1.0 and 1e0 are invalid. Only version 2 may carry a requirement verification criterion or a feature surface.",
       "type": "integer",
       "enum": [1, 2]
     },
@@ -17,7 +17,7 @@
   },
   "allOf": [
     {
-      "$comment": "A version 1 manifest cannot carry the version 2 verification criterion.",
+      "$comment": "A version 1 manifest cannot carry the version 2 verification criterion or feature surface.",
       "if": {
         "required": ["protocolVersion"],
         "properties": { "protocolVersion": { "const": 1 } }
@@ -26,6 +26,7 @@
         "properties": {
           "features": {
             "items": {
+              "not": { "required": ["surface"] },
               "properties": {
                 "requirements": {
                   "items": { "not": { "required": ["verification"] } }
@@ -64,6 +65,38 @@
     "requirementStage": {
       "type": "string",
       "enum": ["coded", "wired", "default-on", "live-verified", "design-partner-proven", "ga"]
+    },
+    "surfaceCommand": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$"
+    },
+    "surfaceTool": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+    },
+    "surface": {
+      "$comment": "The command paths and MCP tool names that carry one feature. The protocol checks the shape; whether a name is served is decided against the declaring project.",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "commands": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/surfaceCommand" }
+        },
+        "tools": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/surfaceTool" }
+        }
+      }
     },
     "relation": {
       "type": "object",
@@ -218,7 +251,8 @@
         "owner": { "type": "string", "minLength": 1, "maxLength": 512 },
         "target": { "$ref": "#/$defs/maturityStage" },
         "relations": { "type": "array", "items": { "$ref": "#/$defs/relation" } },
-        "requirements": { "type": "array", "items": { "$ref": "#/$defs/requirement" } }
+        "requirements": { "type": "array", "items": { "$ref": "#/$defs/requirement" } },
+        "surface": { "$ref": "#/$defs/surface" }
       }
     }
   }

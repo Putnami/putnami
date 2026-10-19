@@ -20,6 +20,11 @@ type Request struct {
 	// Scope narrows evaluation to a selected projection. Nil is the historical
 	// whole-workspace meaning; see scope.go for the two-tier contract.
 	Scope *Scope
+	// ResolveSurfaces makes the evaluation check every command path and tool
+	// name a feature lists against the extension manifest of its own project.
+	// Only validation sets it: a stale claim fails validation, and never
+	// withholds a snapshot, an inspection or a listing.
+	ResolveSurfaces bool
 }
 
 type discoveryRoot struct {
@@ -59,6 +64,17 @@ type AuthoredManifestResult struct {
 // allowing it to influence evidence freshness. A nil scope evaluates the whole
 // workspace, which is what every unscoped command asks for.
 func EvaluateWorkspace(ws *workspace.Workspace, revision Revision, scope *Scope) Result {
+	return evaluateWorkspace(ws, revision, scope, false)
+}
+
+// ValidateWorkspace is EvaluateWorkspace for validation: it also resolves the
+// surface every feature lists against the extension manifest of its own
+// project (features.unresolved_surface).
+func ValidateWorkspace(ws *workspace.Workspace, revision Revision, scope *Scope) Result {
+	return evaluateWorkspace(ws, revision, scope, true)
+}
+
+func evaluateWorkspace(ws *workspace.Workspace, revision Revision, scope *Scope, resolveSurfaces bool) Result {
 	if ws == nil {
 		return Result{Diagnostics: []diag.Diagnostic{diag.Errorf(featureproto.ErrorCodeParseError, "workspace", "workspace is required")}}
 	}
@@ -66,7 +82,7 @@ func EvaluateWorkspace(ws *workspace.Workspace, revision Revision, scope *Scope)
 	if err != nil {
 		return Result{Diagnostics: []diag.Diagnostic{diag.Errorf(featureproto.ErrorCodeParseError, "workspace", "workspace root is unavailable")}}
 	}
-	return Aggregate(Request{Workspace: ws, Reader: reader, Revision: revision, Scope: scope})
+	return Aggregate(Request{Workspace: ws, Reader: reader, Revision: revision, Scope: scope, ResolveSurfaces: resolveSurfaces})
 }
 
 // DiscoverAuthoredManifests reads only putnami.features.json at the workspace

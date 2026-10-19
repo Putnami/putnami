@@ -24,6 +24,10 @@ const (
 	checkIDMaxLength = 128
 	// semanticCodeMaxLength bounds metric, unit, and environment codes.
 	semanticCodeMaxLength = 128
+	// surfaceMaxEntries bounds one list of command paths or tool names.
+	surfaceMaxEntries = 64
+	// surfaceNameMaxLength bounds one command path or tool name in bytes.
+	surfaceNameMaxLength = 128
 	// rollingWindowMaxSeconds bounds a rolling duration and its freshness bound
 	// at ten years, so an authored objective stays a reviewable period rather
 	// than an unbounded integer.
@@ -35,9 +39,16 @@ const (
 )
 
 var (
-	featureIDPattern     = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)+$`)
-	segmentIDPattern     = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
-	claimPattern         = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
+	featureIDPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)+$`)
+	segmentIDPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+	claimPattern     = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
+	// surfaceCommandPattern is a command path as typed after the executable
+	// name. It is kept byte-identical to the related-command form of the
+	// extension verb vocabulary and to the surface definition in
+	// schemas/putnami-features.json.
+	surfaceCommandPattern = regexp.MustCompile(`^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$`)
+	// surfaceToolPattern is an MCP tool name as the tool listing advertises it.
+	surfaceToolPattern   = regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*$`)
 	sourceBindingPattern = regexp.MustCompile(`^source-v1:sha256:[0-9a-f]{64}$`)
 	sha256Pattern        = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 	revisionPattern      = regexp.MustCompile(`^git:(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
@@ -181,6 +192,7 @@ func validateFeature(field, namespace string, version int, feature Feature) []di
 			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidID, field+"."+name, "%s must be non-blank, at most %d bytes, without control characters", name, featureTextMaxLength))
 		}
 	}
+	diagnostics = append(diagnostics, validateFeatureSurface(field+".surface", version, feature.Surface)...)
 	targetRank, validTarget := StageRank(feature.Target)
 	if !validTarget {
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidStage, field+".target", "target %q is not in the maturity ladder", feature.Target))
@@ -245,6 +257,50 @@ func validateFeature(field, namespace string, version int, feature Feature) []di
 				diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidRequirement, field+".requirements", "feature %q must declare at least one requirement at stage %q", feature.ID, stage))
 			}
 		}
+	}
+	return diagnostics
+}
+
+// validateFeatureSurface validates the shape of one optional surface. Whether
+// a name is served is a fact of the declaring project and is decided outside
+// the protocol.
+func validateFeatureSurface(field string, version int, surface *FeatureSurface) []diag.Diagnostic {
+	if surface == nil {
+		return nil
+	}
+	if version < ManifestProtocolVersion {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeUnknownField, field, "surface requires feature manifest protocolVersion %d", ManifestProtocolVersion)}
+	}
+	if len(surface.Commands) == 0 && len(surface.Tools) == 0 {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidSurface, field, "a surface must list at least one command or tool")}
+	}
+	commands := validateSurfaceNames(field+".commands", "command", surface.Commands, surfaceCommandPattern, "a command path of lower-case words separated by one space")
+	return append(commands, validateSurfaceNames(field+".tools", "tool", surface.Tools, surfaceToolPattern, "a lower-case tool name")...)
+}
+
+// validateSurfaceNames checks one surface list. A list that is present must be
+// non-empty, unique, bounded in count, and every name bounded in size and form.
+func validateSurfaceNames(field, noun string, names []string, pattern *regexp.Regexp, form string) []diag.Diagnostic {
+	if names == nil {
+		return nil
+	}
+	if len(names) == 0 {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidSurface, field, "a surface list must be omitted or list at least one %s", noun)}
+	}
+	var diagnostics []diag.Diagnostic
+	if len(names) > surfaceMaxEntries {
+		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidSurface, field, "a surface lists at most %d %ss", surfaceMaxEntries, noun))
+	}
+	seen := make(map[string]bool, len(names))
+	for i, name := range names {
+		nameField := fmt.Sprintf("%s[%d]", field, i)
+		if len(name) > surfaceNameMaxLength || !pattern.MatchString(name) {
+			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidSurface, nameField, "%s name must be %s of at most %d bytes", noun, form, surfaceNameMaxLength))
+		}
+		if seen[name] {
+			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidSurface, nameField, "%s %q is duplicated", noun, name))
+		}
+		seen[name] = true
 	}
 	return diagnostics
 }

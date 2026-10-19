@@ -12,8 +12,8 @@ byte-for-byte: declared field order, two-space indentation, UTF-8-compatible
 JSON escaping, and one trailing newline.
 
 `human-authored-features-v2.golden.json` pins the current manifest wire, the one
-that may carry an executable `verification` criterion. The version 1 vector is
-kept beside it unchanged, because manifest readers must keep accepting both and
+that may carry an executable `verification` criterion and a feature `surface`.
+The version 1 vector is kept beside it unchanged, because manifest readers must keep accepting both and
 the repository has not migrated a single committed manifest.
 
 `go-typescript-verification.golden.json` is a run-scoped result envelope rather

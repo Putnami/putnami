@@ -91,6 +91,10 @@
     {
       "id": "feature-findings-name-file-positions",
       "text": "A feature manifest, evidence or verification report finding names a feature, relation, requirement, evidence kind, check, evidence record or observation by its position in the file, never by its position in the canonical order, so features validate points at the entry an author finds at that index. A feature name, outcome or owner finding states the 512-byte bound."
+    },
+    {
+      "id": "features-name-their-surface",
+      "text": "A feature declaration may name, under surface, the command paths and MCP tool names that carry it. features-validate reports a listed name that the declaring project's own extension manifest does not serve as features.unresolved_surface; a project without a manifest is not resolved. feature_context and features inspect return the surface as declared."
     }
   ],
   "decisions": [
@@ -100,6 +104,7 @@
     "tooling/cli/doc/adr/0015-specs-ratchet-keeps-its-own-discovery.md",
     "tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md",
     "tooling/sdd-extension/doc/adr/0001-the-squash-commit-keeps-the-breaking-marker.md",
-    "tooling/sdd-extension/doc/adr/0002-the-squash-commit-names-no-agent.md"
+    "tooling/sdd-extension/doc/adr/0002-the-squash-commit-names-no-agent.md",
+    "protocols/features/doc/adr/0005-a-feature-declaration-names-its-surface.md"
   ]
 }
