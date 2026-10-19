@@ -261,13 +261,13 @@ type releaseMemberRoute struct {
 }
 
 // ReleaseSetMeasuresAgainstHead reports whether the engine must hand the
-// whole workspace to the coordinator instead of resolving a git baseline: a
-// publish-only --impacted release-set transaction measures impact against
-// the channel head's recorded fingerprints, so a diff that may be stale after
-// a CI gap must not narrow the candidates first.
+// whole workspace to the coordinator instead of resolving a git baseline: an
+// --impacted release-set transaction that consumes no release set measures
+// impact against the channel head's recorded fingerprints, so a diff that may
+// be stale after a CI gap must not narrow the candidates first.
 func ReleaseSetMeasuresAgainstHead(options ReleaseSetOptions) bool {
 	return RequestedReleaseSetMode(options) == ReleaseSetImpacted &&
-		!options.PlannedPublish && !slices.Contains(options.Commands, "deploy")
+		!options.PlannedPublish && !options.ConsumesReleaseSet
 }
 
 // ReleaseSetMode describes whether a publish participates in release-set
@@ -292,6 +292,11 @@ const (
 // boundary while preserving the exact terminal dry-run value.
 type ReleaseSetOptions struct {
 	Commands []string
+	// ConsumesReleaseSet reports that the run names a command whose loaded
+	// jobs declare the consumesReleaseSet trait
+	// (extension.CommandConsumesReleaseSet): it binds the set and an
+	// environment rather than publishing one.
+	ConsumesReleaseSet bool
 	// Channels are the channels this publication advances, in the order the
 	// caller named them. The FIRST is the baseline when it has a head: impact
 	// is measured against it and unchanged members inherit from it. Every
@@ -367,6 +372,9 @@ type ReleaseSetOptions struct {
 type ReleaseSetRequest struct {
 	// Commands is the run's command list.
 	Commands []string
+	// ConsumesReleaseSet reports that one of Commands binds the release set
+	// (ReleaseSetOptions.ConsumesReleaseSet).
+	ConsumesReleaseSet bool
 	// WorkspaceRoot is where putnami.ci.json is read from.
 	WorkspaceRoot string
 	// Channel is the raw `--channel a,b` value.
@@ -419,7 +427,7 @@ func BuildReleaseSetOptions(request ReleaseSetRequest) (ReleaseSetOptions, error
 	// alone. An invalid CI document fails every publish, not the
 	// lint/test/build gate that never consults it.
 	var policy *ciproto.Distribution
-	if distributingRun(request.Commands) {
+	if distributingRun(request) {
 		if policy, err = LoadDistributionPolicy(request.WorkspaceRoot); err != nil {
 			return ReleaseSetOptions{}, err
 		}
@@ -433,7 +441,8 @@ func BuildReleaseSetOptions(request ReleaseSetRequest) (ReleaseSetOptions, error
 		ignoredReuseChannel, reuseChannel, reuseSourceRevision = reuseChannel, "", ""
 	}
 	return ReleaseSetOptions{
-		Commands: request.Commands, Channels: channels, BaselineChannel: baselineChannel,
+		Commands: request.Commands, ConsumesReleaseSet: request.ConsumesReleaseSet,
+		Channels: channels, BaselineChannel: baselineChannel,
 		ReuseChannel: reuseChannel, ReuseSourceRevision: reuseSourceRevision, IgnoredReuseChannel: ignoredReuseChannel,
 		Impacted: request.Impacted, All: request.All, DryRun: request.DryRun,
 		Versions: request.Versions, Tagged: tagged, Line: line,
@@ -454,9 +463,10 @@ func ReleaseSetReuseNotice(options ReleaseSetOptions) string {
 }
 
 // distributingRun reports a run that can consult the repository's distribution
-// policy: a publish, or a deploy whose environment follows a channel.
-func distributingRun(commands []string) bool {
-	return slices.Contains(commands, "publish") || slices.Contains(commands, "deploy")
+// policy: a publish, or a release-set consumer whose environment follows a
+// channel.
+func distributingRun(request ReleaseSetRequest) bool {
+	return slices.Contains(request.Commands, "publish") || request.ConsumesReleaseSet
 }
 
 // taggedRunLine names the version line HEAD's tag releases.
@@ -886,13 +896,14 @@ func taggedReleaseChannel(options ReleaseSetOptions) (string, error) {
 }
 
 // PlannedCommandProjects returns the deterministic project selection actually
-// represented by one expanded command. It is used only after planning, so a
-// dependent command's local apps/projectIf policy — not the outer CLI's wider
-// selection — defines the publish jobs the release set may rely on.
-func PlannedCommandProjects(planned []*jobmodel.ScheduledJob, command string) []*workspace.Project {
+// represented by the planned jobs include accepts. It is used only after
+// planning, so a dependent command's local apps/projectIf policy — not the
+// outer CLI's wider selection — defines the publish jobs the release set may
+// rely on. include is never called with a job that has no definition.
+func PlannedCommandProjects(planned []*jobmodel.ScheduledJob, include func(*jobmodel.ScheduledJob) bool) []*workspace.Project {
 	byID := make(map[string]*workspace.Project)
 	for _, job := range planner.SchedulableJobs(planned) {
-		if job == nil || job.JobDef == nil || job.CommandName() != command {
+		if job == nil || job.JobDef == nil || !include(job) {
 			continue
 		}
 		if job.Project != nil {
@@ -956,7 +967,7 @@ func prepareDependentReleaseSet(
 	if prepared != nil || (len(options.Channels) == 0 && !options.Tagged) {
 		return prepared, nil
 	}
-	projects := PlannedCommandProjects(planned, "publish")
+	projects := PlannedCommandProjects(planned, func(job *jobmodel.ScheduledJob) bool { return job.CommandName() == "publish" })
 	if len(projects) == 0 {
 		return nil, nil
 	}
@@ -988,8 +999,9 @@ func (run *ReleaseSetRun) AttachBarrier(planned []*jobmodel.ScheduledJob) ([]*jo
 	return run.attachDeployBarrier(planned)
 }
 
-// attachDeployBarrier adds the release node every deploy waits for, when the
-// plan holds a deploy.
+// attachDeployBarrier adds the release node every release-set consumer waits
+// for, when the plan holds a job whose command traits declare
+// consumesReleaseSet.
 func (run *ReleaseSetRun) attachDeployBarrier(planned []*jobmodel.ScheduledJob) ([]*jobmodel.ScheduledJob, map[string]scheduler.InternalJobRunner, error) {
 	var publishKeys []string
 	var deployJobs []*jobmodel.ScheduledJob
@@ -998,10 +1010,10 @@ func (run *ReleaseSetRun) attachDeployBarrier(planned []*jobmodel.ScheduledJob) 
 		if job == nil || job.JobDef == nil || job.Project == nil {
 			continue
 		}
-		switch job.CommandName() {
-		case "publish":
+		switch {
+		case job.CommandName() == "publish":
 			publishKeys = append(publishKeys, job.Key())
-		case "deploy":
+		case consumesReleaseSet(job):
 			deployJobs = append(deployJobs, job)
 			for _, project := range job.SelectedProjects {
 				if project != nil {

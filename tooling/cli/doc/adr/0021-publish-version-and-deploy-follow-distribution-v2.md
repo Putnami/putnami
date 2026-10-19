@@ -1,6 +1,10 @@
 # ADR 0021 — Publish, version, and deploy follow the distribution v2 model
 
-- **Status**: accepted, superseded in part by [ADR 0061](0061-channel-and-ci-commands-leave-the-core-cli.md)
+- **Status**: accepted, superseded in part by [ADR 0061](0061-channel-and-ci-commands-leave-the-core-cli.md).
+  Decisions 13 and 14 are amended by
+  [ADR 0074](0074-deployment-follows-the-declared-release-set-trait.md)
+  (proposed): they hold for every command whose traits declare
+  `consumesReleaseSet`, and for no other
 - **Scope**: `@putnami/cli` (`tooling/cli`), `@putnami/extension-sdk`
   (`tooling/extension-sdk`), and the publishers of `@putnami/typescript`,
   `@putnami/go`, `@putnami/cloud`

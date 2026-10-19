@@ -251,11 +251,13 @@ exit 2
 
 // releaseSetFixtureManifest declares one provider that both verifies and
 // publishes: the shape a mixed session has in a real workspace, where the
-// extension serving `test` is also the extension serving `publish`.
+// extension serving `test` is also the extension serving `publish`. Its
+// `rollout` declares the consumesReleaseSet trait and its `deploy` declares no
+// trait, so a test tells the trait from the name.
 const releaseSetFixtureManifest = `{
   "name": "@fixture/provider",
   "version": "1.0.0",
-  "cliContract": 4,
+  "cliContract": 11,
   "runtime": {"executable": "runtime"},
   "workspace": {"markers": ["marker.txt"], "inputs": ["marker.txt"]},
   "ecosystems": [
@@ -276,6 +278,7 @@ const releaseSetFixtureManifest = `{
     "package": {"run": [{"id": "artifact", "task": "noop"}]},
     "publish": {"dependsOn": ["package"], "run": [{"id": "artifact", "task": "noop"}]},
     "deploy": {"run": [{"id": "rollout", "task": "noop"}]},
+    "rollout": {"traits": {"sideEffects": "cloud", "consumesReleaseSet": true}, "run": [{"id": "apply", "task": "noop"}]},
     "cloud-release-set": {"visibility": "internal", "run": [{"id": "provider", "task": "noop"}]}
   },
   "tasks": {
@@ -382,23 +385,56 @@ func TestRun_ChannelPublishWithABaselineAloneIsImpacted(t *testing.T) {
 	}
 }
 
-// A channel deploy given a baseline alone resolves it strictly, as an impacted
-// channel deploy does: a ref git cannot resolve must not widen the deploy to
-// every project the channel never released.
-func TestRun_ChannelDeployWithAnUnresolvedBaselineAloneRefuses(t *testing.T) {
+// A channel release-set consumer given a baseline alone resolves it strictly,
+// as an impacted one does: a ref git cannot resolve must not widen the deploy
+// to every project the channel never released.
+func TestRun_ChannelReleaseSetConsumerWithAnUnresolvedBaselineAloneRefuses(t *testing.T) {
 	root, req := releaseSetSessionFixture(t)
 	touchFixtureProject(t, root, "lib")
-	req.Commands = []string{"deploy"}
+	req.Commands = []string{"rollout"}
 	req.Global.Impacted, req.Global.Projects, req.Global.Baseline = false, "", "refs/heads/no-such-ref"
 
 	var result SessionResult
 	var err error
 	stderr := captureStderr(t, func() { result, err = New().Run(context.Background(), req, discardEvents{}) })
 	if result.ExitCode == ExitSuccess {
-		t.Fatalf("baseline-only channel deploy = exit %d, err %v, want a refusal", result.ExitCode, err)
+		t.Fatalf("baseline-only channel rollout = exit %d, err %v, want a refusal", result.ExitCode, err)
 	}
 	if !strings.Contains(stderr, "--impacted failed") {
 		t.Fatalf("stderr = %q, want the strict impacted refusal", stderr)
+	}
+}
+
+// An --impacted channel run narrows strictly when one of its commands declares
+// the consumesReleaseSet trait, whatever its name: a baseline git cannot
+// resolve refuses it. A deploy that declares no such trait keeps the ordinary
+// fallback to every project.
+func TestRun_AnImpactedReleaseSetConsumerNarrowsToChannelMembers(t *testing.T) {
+	spectest.Proves(t, "cli/deploy-environments", "deploy-follows-the-environment-channel", "a-release-set-consumer-narrows-to-channel-members")
+	for _, tc := range []struct {
+		command string
+		strict  bool
+	}{
+		{command: "rollout", strict: true},
+		{command: "deploy", strict: false},
+	} {
+		t.Run(tc.command, func(t *testing.T) {
+			root, req := releaseSetSessionFixture(t)
+			touchFixtureProject(t, root, "lib")
+			req.Commands = []string{tc.command}
+			req.Global.Projects, req.Global.Baseline = "", "refs/heads/no-such-ref"
+
+			var result SessionResult
+			stderr := captureStderr(t, func() { result, _ = New().Run(context.Background(), req, discardEvents{}) })
+			refused, widened := strings.Contains(stderr, "--impacted failed"), strings.Contains(stderr, "selecting EVERY project")
+			if refused != tc.strict || widened == tc.strict {
+				t.Fatalf("%s --impacted --channel: strict refusal %v, fallback to every project %v, want strict %v; stderr: %q",
+					tc.command, refused, widened, tc.strict, stderr)
+			}
+			if tc.strict && result.ExitCode == ExitSuccess {
+				t.Fatalf("%s = exit %d, want a refusal", tc.command, result.ExitCode)
+			}
+		})
 	}
 }
 

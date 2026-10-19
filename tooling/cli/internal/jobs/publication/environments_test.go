@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -109,6 +110,11 @@ func deployHead(t *testing.T) map[string]*distribution.ChannelHead {
 	return map[string]*distribution.ChannelHead{"canary": head}
 }
 
+// releaseSetConsumer is the traits of every deploy job below: the
+// @putnami/dev vocabulary gives deploy a cloud side effect and the
+// consumesReleaseSet trait, which is what binds a job to an environment.
+var releaseSetConsumer = modelextension.CommandTraits{SideEffects: modelextension.SideEffectsCloud, ConsumesReleaseSet: true}
+
 // deployJobsFor plans one deploy task per named project.
 func deployJobsFor(ws *workspace.Workspace, ids ...string) []*jobmodel.ScheduledJob {
 	ext := &modelextension.ExtensionDescription{Name: "@putnami/cloud"}
@@ -122,6 +128,7 @@ func deployJobsFor(ws *workspace.Workspace, ids ...string) []*jobmodel.Scheduled
 				Project: project, Extension: ext,
 				JobDef: &modelextension.JobDefinition{
 					Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name, Cache: true,
+					Traits: releaseSetConsumer,
 				},
 			})
 		}
@@ -149,7 +156,7 @@ func deployWorkspaceJobFor(ws *workspace.Workspace, ids ...string) *jobmodel.Sch
 		Project: planner.WorkspaceOnceProject(ws), Extension: ext, SelectedProjects: selected,
 		JobDef: &modelextension.JobDefinition{
 			Name: "deploy~cloud-release", CommandName: "deploy", ExtensionName: ext.Name,
-			Kind: "cloud-deploy", Activation: "workspace-once", Cache: true,
+			Kind: "cloud-deploy", Activation: "workspace-once", Cache: true, Traits: releaseSetConsumer,
 		},
 	}
 }
@@ -188,7 +195,7 @@ func deployWorkloadIDs(job *jobmodel.ScheduledJob) []string {
 
 func deployOptions(environment, release string) DeployOptions {
 	return DeployOptions{
-		Commands: []string{"deploy"}, Environment: environment, Release: release,
+		ConsumesReleaseSet: true, Environment: environment, Release: release,
 	}
 }
 
@@ -222,6 +229,84 @@ func TestDeployEnvResolvesTheChannelOnce(t *testing.T) {
 		if workload := deployWorkloadOf(t, job, job.Project.ID); workload.ReleaseSet != provider.heads["canary"].Ref {
 			t.Fatalf("deploy target of %s = %+v", job.Project.ID, workload)
 		}
+	}
+}
+
+// TestAReleaseSetConsumerOfAnyNameBindsTheEnvironment pins that the
+// consumesReleaseSet trait, not the command name, binds a job to an
+// environment: a command of another name that declares it receives its
+// workload contract, a deploy that does not is left alone, and a run whose
+// commands declare no such trait binds nothing.
+func TestAReleaseSetConsumerOfAnyNameBindsTheEnvironment(t *testing.T) {
+	spectest.Proves(t, "cli/deploy-environments", "deploy-follows-the-environment-channel", "a-consumes-release-set-command-binds-the-environment")
+
+	ws := deployWorkspace(t, deployEnvironmentDocument)
+	provider := &fakeReleaseSetProvider{heads: deployHead(t)}
+	useReleaseSetProviderFake(t, provider)
+
+	options := deployOptions("prod", "")
+	options.WorkspaceRoot = ws.Root
+	planned := deployJobsFor(ws, "/api", "/worker")
+	planned[0].JobDef.Name, planned[0].JobDef.CommandName = "rollout~cloud", "rollout"
+	planned[1].JobDef.Traits = modelextension.CommandTraits{SideEffects: modelextension.SideEffectsCloud}
+	if err := PrepareDeployTargets(context.Background(), options, ws, providerDiscovery(), planned, false); err != nil {
+		t.Fatalf("prepare deploy targets: %v", err)
+	}
+	if api := deployWorkloadOf(t, planned[0], "/api"); api.ReleaseSet != provider.heads["canary"].Ref {
+		t.Fatalf("rollout contract = %+v, want the resolved head", api)
+	}
+	if _, bound := deployTargetOf(planned[1]); bound {
+		t.Fatal("a deploy that declares no consumesReleaseSet received a workload contract")
+	}
+
+	options.ConsumesReleaseSet = false
+	unbound := deployJobsFor(ws, "/api")
+	if err := PrepareDeployTargets(context.Background(), options, ws, providerDiscovery(), unbound, false); err != nil {
+		t.Fatalf("prepare deploy targets of a run that consumes no release set: %v", err)
+	}
+	if _, bound := deployTargetOf(unbound[0]); bound || provider.resolveCalls != 1 {
+		t.Fatalf("a run that consumes no release set bound=%v after %d resolve calls, want no contract and no call", bound, provider.resolveCalls)
+	}
+}
+
+// TestReleaseSetBarrierWaitsForReleaseSetConsumersOnly pins the barrier's
+// side of the trait: the release node is added for a job that declares
+// consumesReleaseSet, whatever its command name, and a deploy that declares no
+// such trait neither waits for it nor makes a plan attach one.
+func TestReleaseSetBarrierWaitsForReleaseSetConsumersOnly(t *testing.T) {
+	spectest.Proves(t, "cli/deploy-environments", "deploy-follows-the-environment-channel", "a-consumes-release-set-command-binds-the-environment")
+
+	project := &workspace.Project{ID: "/svc/alpha", Name: "svc/alpha", Path: "svc/alpha"}
+	ext := &modelextension.ExtensionDescription{Name: "@acme/platform"}
+	job := func(command string, traits modelextension.CommandTraits, dependsOn ...string) *jobmodel.ScheduledJob {
+		return &jobmodel.ScheduledJob{Project: project, Extension: ext, DependsOn: dependsOn, JobDef: &modelextension.JobDefinition{
+			Name: command + "~cloud", CommandName: command, ExtensionName: ext.Name, Traits: traits,
+		}}
+	}
+	registry := modelextension.CommandTraits{SideEffects: modelextension.SideEffectsRegistry}
+	cloud := modelextension.CommandTraits{SideEffects: modelextension.SideEffectsCloud}
+	run := func() *ReleaseSetRun {
+		return &ReleaseSetRun{provider: &fakeReleaseSetProvider{releaseOutcome: distribution.ReleaseOutcomeAlreadyCurrent}, plan: releaseSetE2ENoImpactOCIPlan(t)}
+	}
+
+	publish := job("publish", registry)
+	rollout := job("rollout", releaseSetConsumer, publish.Key())
+	deploy := job("deploy", cloud, publish.Key())
+	planned, internal, err := run().AttachBarrier([]*jobmodel.ScheduledJob{publish, rollout, deploy})
+	if err != nil || len(planned) != 4 || internal[releaseSetResultKey] == nil {
+		t.Fatalf("AttachBarrier = %d jobs, %d runners, err=%v; want the release node", len(planned), len(internal), err)
+	}
+	if !slices.Contains(rollout.DependsOn, releaseSetResultKey) {
+		t.Fatalf("rollout dependencies = %v, want the release node", rollout.DependsOn)
+	}
+	if slices.Contains(deploy.DependsOn, releaseSetResultKey) {
+		t.Fatalf("deploy dependencies = %v, want no release node", deploy.DependsOn)
+	}
+
+	publish = job("publish", registry)
+	planned, internal, err = run().AttachBarrier([]*jobmodel.ScheduledJob{publish, job("deploy", cloud, publish.Key())})
+	if err != nil || len(planned) != 2 || internal != nil {
+		t.Fatalf("AttachBarrier without a consumer = %d jobs, %d runners, err=%v; want the plan unchanged", len(planned), len(internal), err)
 	}
 }
 
@@ -448,14 +533,14 @@ func TestDeployWorkloadWithoutOciImageIsRefused(t *testing.T) {
 // TestDeployBuildOptionsReadsTheCoreFlags pins where --env and --release come
 // from: the run's parameter bag, because no manifest declares either.
 func TestDeployBuildOptionsReadsTheCoreFlags(t *testing.T) {
-	options := BuildDeployOptions([]string{"deploy"}, "/ws", map[string]any{
+	options := BuildDeployOptions(true, "/ws", map[string]any{
 		"env": "prod", "release": "rs_" + strings.Repeat("0", 64), "dry-run": true,
 	})
-	if options.Environment != "prod" || !strings.HasPrefix(options.Release, "rs_") || options.WorkspaceRoot != "/ws" {
+	if !options.ConsumesReleaseSet || options.Environment != "prod" || !strings.HasPrefix(options.Release, "rs_") || options.WorkspaceRoot != "/ws" {
 		t.Fatalf("built deploy options = %+v", options)
 	}
-	if requestedDeployEnvironment(BuildDeployOptions([]string{"build"}, "/ws", map[string]any{"env": "prod"})) {
-		t.Fatal("a run that does not deploy asked for an environment")
+	if requestedDeployEnvironment(BuildDeployOptions(false, "/ws", map[string]any{"env": "prod"})) {
+		t.Fatal("a run that consumes no release set asked for an environment")
 	}
 }
 
@@ -543,7 +628,7 @@ func TestSelectWorkloadsExcludesTheWorkspaceOnceProject(t *testing.T) {
 			t.Fatalf("load environment: %v", err)
 		}
 		planned := []*jobmodel.ScheduledJob{deployWorkspaceJobFor(ws, "/api", "/worker")}
-		candidates := PlannedCommandProjects(planned, "deploy")
+		candidates := PlannedCommandProjects(planned, consumesReleaseSet)
 		if got := projectIDs(candidates); strings.Join(got, ",") != "/api,/worker,putnami" {
 			t.Fatalf("planned deploy projects = %v, want the synthetic project among them", got)
 		}

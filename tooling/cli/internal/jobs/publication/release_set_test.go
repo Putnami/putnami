@@ -102,6 +102,34 @@ func TestRequestedReleaseSetModeRequiresExplicitOrPlannedPublish(t *testing.T) {
 	}
 }
 
+// TestAReleaseSetConsumerIsNotMeasuredAgainstTheHead pins the run-level reads
+// of the consumesReleaseSet trait: a run that names a consumer keeps its own
+// selection rather than handing the workspace to the head, and reads the
+// distribution policy, whatever the consumer is named. A deploy that declares
+// no such trait is neither.
+func TestAReleaseSetConsumerIsNotMeasuredAgainstTheHead(t *testing.T) {
+	spectest.Proves(t, "cli/deploy-environments", "deploy-follows-the-environment-channel", "a-release-set-consumer-narrows-to-channel-members")
+	options := ReleaseSetOptions{Commands: []string{"publish", "deploy"}, Impacted: true, Channels: []string{"canary"}}
+	if !ReleaseSetMeasuresAgainstHead(options) {
+		t.Fatal("a publish beside a deploy that consumes no release set is not measured against the head")
+	}
+	options.Commands, options.ConsumesReleaseSet = []string{"publish", "rollout"}, true
+	if ReleaseSetMeasuresAgainstHead(options) {
+		t.Fatal("a publish beside a release-set consumer is measured against the head")
+	}
+
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "putnami.ci.json"), []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := BuildReleaseSetOptions(ReleaseSetRequest{Commands: []string{"deploy"}, WorkspaceRoot: root}); err != nil {
+		t.Fatalf("a deploy that consumes no release set read the distribution policy: %v", err)
+	}
+	if _, err := BuildReleaseSetOptions(ReleaseSetRequest{Commands: []string{"rollout"}, ConsumesReleaseSet: true, WorkspaceRoot: root}); err == nil {
+		t.Fatal("a release-set consumer did not read the distribution policy")
+	}
+}
+
 func TestReleaseSetPlanSelectsChangedMembersAndTheirDependents(t *testing.T) {
 	ws, upstream, downstream := releaseSetWorkspace(t)
 	head := releaseSetHead(t)

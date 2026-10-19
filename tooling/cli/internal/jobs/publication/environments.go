@@ -87,8 +87,10 @@ type DeployWorkloadTarget struct {
 // line for a deploy. It exists for the same reason ReleaseSetOptions does: the
 // engine assembles runs and owns no environment policy (ADR 0001 §3).
 type DeployOptions struct {
-	// Commands is the run's command list.
-	Commands []string
+	// ConsumesReleaseSet reports that the run names a command whose loaded
+	// jobs declare the consumesReleaseSet trait
+	// (extension.CommandConsumesReleaseSet).
+	ConsumesReleaseSet bool
 	// WorkspaceRoot is where putnami.ci.json is read from.
 	WorkspaceRoot string
 	// Environment is the `--env <name>` value: which declared environment this
@@ -102,21 +104,30 @@ type DeployOptions struct {
 // BuildDeployOptions reads the two job flags a deploy takes out of the run's
 // parameter bag. `--env` and `--release` are core flags: no manifest declares
 // them, because the environment and the set are decided by the CLI from the
-// repository's CI document and the release-set provider.
-func BuildDeployOptions(commands []string, workspaceRoot string, params map[string]any) DeployOptions {
+// repository's CI document and the release-set provider. consumesReleaseSet is
+// the run's resolved trait (ReleaseSetOptions.ConsumesReleaseSet).
+func BuildDeployOptions(consumesReleaseSet bool, workspaceRoot string, params map[string]any) DeployOptions {
 	environment, _ := params["env"].(string)
 	release, _ := params["release"].(string)
 	return DeployOptions{
-		Commands: commands, WorkspaceRoot: workspaceRoot,
+		ConsumesReleaseSet: consumesReleaseSet, WorkspaceRoot: workspaceRoot,
 		Environment: environment, Release: release,
 	}
 }
 
-// requestedDeployEnvironment reports a deploy that names the environment it
-// synchronizes. A deploy without `--env` keeps its previous behavior: the run
-// plans deploy jobs and hands them no workload contract.
+// requestedDeployEnvironment reports a release-set consumer that names the
+// environment it synchronizes. A consumer without `--env` keeps its previous
+// behavior: the run plans its jobs and hands them no workload contract. A
+// command whose traits do not declare consumesReleaseSet binds no
+// environment, whatever its name.
 func requestedDeployEnvironment(options DeployOptions) bool {
-	return slices.Contains(options.Commands, "deploy") && strings.TrimSpace(options.Environment) != ""
+	return options.ConsumesReleaseSet && strings.TrimSpace(options.Environment) != ""
+}
+
+// consumesReleaseSet reports a planned job whose command traits declare
+// consumesReleaseSet: a job that binds the release set and an environment.
+func consumesReleaseSet(job *jobmodel.ScheduledJob) bool {
+	return job.JobDef.Traits.ConsumesReleaseSet
 }
 
 // loadEnvironment reads one declared environment from the repository's CI
@@ -285,7 +296,7 @@ func PrepareDeployTargets(
 	if err := requireReleaseSetProvider(discovered, name); err != nil {
 		return err
 	}
-	workloads, err := selectWorkloads(ws, name, environment, PlannedCommandProjects(planned, "deploy"))
+	workloads, err := selectWorkloads(ws, name, environment, PlannedCommandProjects(planned, consumesReleaseSet))
 	if err != nil {
 		return err
 	}
@@ -497,7 +508,7 @@ func deployMemberKeys(project *workspace.Project) (map[string]struct{}, error) {
 func bindDeployTargets(planned []*jobmodel.ScheduledJob, environment string, targets map[string]*DeployWorkloadTarget, releasing bool) error {
 	bound := make(map[string]struct{}, len(targets))
 	for _, job := range planner.SchedulableJobs(planned) {
-		if job == nil || job.JobDef == nil || job.Project == nil || job.CommandName() != "deploy" {
+		if job == nil || job.JobDef == nil || job.Project == nil || !consumesReleaseSet(job) {
 			continue
 		}
 		covered := deployJobWorkloads(job, targets)

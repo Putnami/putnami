@@ -317,11 +317,11 @@ func acceptedFlagHint(declared []commandmeta.Flag) string {
 // publish measures against without advancing it, the channel whose published
 // members a publication may release instead of building them and the commit
 // whose records alone it may release from that channel, the visibility a
-// publication confers, the version line a tagged publish releases, the environment a deploy
-// synchronizes, and the immutable release an upgrade or a deploy names. They are
-// not global flags — they mean nothing outside publish, upgrade and deploy —
-// and no manifest declares them, because the coordinator that reads them is the
-// CLI itself. Without this exemption every release-set publish would warn about
+// publication confers, the version line a tagged publish releases, and the
+// releaseSetFlags. They are not global flags — they mean nothing outside a
+// publication or a release-set consumer — and the core reads them without a
+// manifest declaring them, because the coordinator that reads them is the CLI
+// itself. Without this exemption every release-set publish would warn about
 // the exact flag it requires.
 //
 // `baseline-channel` is deliberately its own name: the global `--baseline` is
@@ -332,18 +332,27 @@ var coreJobFlags = map[string]bool{
 	"visibility": true, "scope": true, "release": true, "env": true,
 }
 
+// releaseSetFlags are the core job flags only a command whose traits declare
+// consumesReleaseSet reads: the environment it synchronizes and the immutable
+// release it names. A run of no such command reports them as undeclared, as it
+// reports any flag nothing reads, unless one of its tasks declares the flag.
+var releaseSetFlags = map[string]bool{"env": true, "release": true}
+
 // undeclaredFlagWarnings is the warning-window half of the policy: one notice
-// per supplied flag that neither the CLI globals nor the manifest-declared
-// surface knows. scope names the command in the message ("build", "cloud
-// deploy"). Order is deterministic and each flag is reported once.
-func undeclaredFlagWarnings(scope string, rawArgs []string, declared map[string]extension.FlagDefinition) []string {
+// per supplied flag that neither the CLI globals, the core job flags nor the
+// manifest-declared surface knows. scope names the command in the message
+// ("build", "cloud deploy"). consumesReleaseSet reports a run of a command
+// whose traits declare consumesReleaseSet, the only one that reads the
+// releaseSetFlags. Order is deterministic and each flag is reported once.
+func undeclaredFlagWarnings(scope string, rawArgs []string, declared map[string]extension.FlagDefinition, consumesReleaseSet bool) []string {
 	var (
 		seen     = map[string]bool{}
 		reported []string
 	)
 	for _, arg := range jobFlagTokens(rawArgs) {
-		spelling := flagSpelling(arg)
-		if isGlobalFlag(spelling) || coreJobFlags[flagBaseName(arg)] || seen[spelling] {
+		spelling, base := flagSpelling(arg), flagBaseName(arg)
+		coreFlag := coreJobFlags[base] && (consumesReleaseSet || !releaseSetFlags[base])
+		if isGlobalFlag(spelling) || coreFlag || seen[spelling] {
 			continue
 		}
 		if isDeclaredExtensionFlag(arg, declared) {

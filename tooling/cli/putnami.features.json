@@ -2385,7 +2385,10 @@
               "env-channel-is-resolved-once",
               "workload-rules-select-first-match",
               "deploy-jobs-receive-the-members",
-              "one-deploy-task-carries-every-workload-it-covers"
+              "one-deploy-task-carries-every-workload-it-covers",
+              "a-consumes-release-set-command-binds-the-environment",
+              "a-release-set-consumer-narrows-to-channel-members",
+              "release-set-flags-warn-without-a-consumer"
             ]
           }
         }

@@ -68,8 +68,11 @@ func (a *App) runUserScopeSubcommand(
 
 	engine.ApplyEnvOverrides(&parsed.Global, cfg)
 	effectiveFlags := resolved.EffectiveFlags()
+	// Outside a workspace no run binds a release set, so the core reads neither
+	// --env nor --release: they are undeclared unless the subcommand declares
+	// them.
 	printParseWarnings(stderr, parsed.Global,
-		undeclaredFlagWarnings(group+" "+sub, parsed.RawJobArgs, effectiveFlags))
+		undeclaredFlagWarnings(group+" "+sub, parsed.RawJobArgs, effectiveFlags, false))
 	commandParams := buildExtensionCommandParams(parsed, effectiveFlags)
 	if parsed.Global.MaxParallel > 0 {
 		commandParams["max-parallel"] = strconv.Itoa(parsed.Global.MaxParallel)

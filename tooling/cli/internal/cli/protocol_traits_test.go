@@ -30,14 +30,13 @@ import (
 // consumers while avoiding package loading across the workspace's modules.
 const traitsDeclaringDir = "protocols/extension"
 
-// traitsAwaitingAReader are the CommandTraits fields CLI contract 11 declares
+// traitsAwaitingAReader are the CommandTraits fields a CLI contract declares
 // before any consumer reads them: the manifests declare them, validation and
 // the contract floor govern them, and the changes that move each name check
 // onto its field add the readers. The list only shrinks: a field listed here
-// that gains a read site fails the guard until its entry is deleted.
-var traitsAwaitingAReader = map[string]bool{
-	"ConsumesReleaseSet": true,
-}
+// that gains a read site fails the guard until its entry is deleted. Every
+// field of contract 11 has its reader, so the list is empty.
+var traitsAwaitingAReader = map[string]bool{}
 
 // traitsReadThroughTraits are the CommandTraits fields whose names other types
 // declare too: a task has a Kind, a composition a Workload. A selector of one

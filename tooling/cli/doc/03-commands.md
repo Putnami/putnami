@@ -184,6 +184,8 @@ A deploy that shares a session with a publish keeps the release barrier: every p
 
 An environment is a state a channel is followed into, so `deploy --env` needs a release-set provider. Without one it is refused rather than deploying whatever the last build left behind.
 
+The command's declared traits decide all of this, not its name. A command binds the release set when its loaded jobs declare the `consumesReleaseSet` trait, which `@putnami/dev` gives to `deploy`. Only such a command takes the environment, narrows strictly under `--impacted` with a `--channel`, and waits for the release barrier beside a publish. A `deploy` whose traits do not declare it runs as an ordinary command, and warns that `--env` and `--release` are undeclared unless one of its tasks declares them ([ADR 0074](adr/0074-deployment-follows-the-declared-release-set-trait.md)).
+
 ## Structured Commands
 
 Usage lines, subcommands, flags and examples for each command below are

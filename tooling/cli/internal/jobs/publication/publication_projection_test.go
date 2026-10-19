@@ -52,7 +52,7 @@ func TestWithoutPublicationNodesIsTheLegacyPlan(t *testing.T) {
 			deploy := &jobmodel.ScheduledJob{
 				Project: web.Project, Extension: h.publisher, SelectedProjects: []*workspace.Project{web.Project, mod.Project},
 				DependsOn: []string{gate.Key()},
-				JobDef:    &modelextension.JobDefinition{Name: "deploy~ship", CommandName: "deploy", StepID: "ship", ExtensionName: h.publisher.Name},
+				JobDef:    &modelextension.JobDefinition{Name: "deploy~ship", CommandName: "deploy", StepID: "ship", ExtensionName: h.publisher.Name, Traits: releaseSetConsumer},
 			}
 			h.jobs = append(h.jobs, deploy)
 			legacyJobs := cloneJobs(h.jobs)
