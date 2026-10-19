@@ -30,6 +30,7 @@ func CanonicalManifest(input *Manifest) *Manifest {
 			})
 			out.Features[i].Requirements[j].Verification = canonicalVerificationCriterion(out.Features[i].Requirements[j].Verification)
 		}
+		out.Features[i].Surface = canonicalFeatureSurface(out.Features[i].Surface)
 		sort.Slice(out.Features[i].Requirements, func(a, b int) bool {
 			left, lok := StageRank(out.Features[i].Requirements[a].Stage)
 			right, rok := StageRank(out.Features[i].Requirements[b].Stage)
@@ -43,6 +44,19 @@ func CanonicalManifest(input *Manifest) *Manifest {
 		})
 	}
 	sort.Slice(out.Features, func(i, j int) bool { return out.Features[i].ID < out.Features[j].ID })
+	return &out
+}
+
+// canonicalFeatureSurface deep-copies one surface and sorts both name lists.
+// Names are unordered sets of keyed identities, so sorting normalizes them; the
+// pointer is copied so canonicalization never reorders a caller-owned surface.
+func canonicalFeatureSurface(input *FeatureSurface) *FeatureSurface {
+	if input == nil {
+		return nil
+	}
+	out := FeatureSurface{Commands: cloneStrings(input.Commands), Tools: cloneStrings(input.Tools)}
+	sort.Strings(out.Commands)
+	sort.Strings(out.Tools)
 	return &out
 }
 

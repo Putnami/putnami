@@ -519,3 +519,124 @@ func TestSchemasAreStrictDocumentsWithoutDerivedState(t *testing.T) {
 		}
 	}
 }
+
+func surfaceManifest(surface *FeatureSurface) *Manifest {
+	manifest := basicManifest("billing", "billing/feature")
+	manifest.ProtocolVersion = ManifestProtocolVersion
+	manifest.Features[0].Surface = surface
+	return manifest
+}
+
+func TestFeatureSurfaceShapeIsClosed(t *testing.T) {
+	tooMany := make([]string, surfaceMaxEntries+1)
+	for i := range tooMany {
+		tooMany[i] = strings.Repeat("a", i+1)
+	}
+	for _, test := range []struct {
+		name    string
+		surface *FeatureSurface
+		wantErr bool
+	}{
+		{name: "commands and tools", surface: &FeatureSurface{Commands: []string{"features validate", "validate"}, Tools: []string{"sdd.feature_context", "list_projects"}}},
+		{name: "commands only", surface: &FeatureSurface{Commands: []string{"cloud config list"}}},
+		{name: "tools only", surface: &FeatureSurface{Tools: []string{"impacted"}}},
+		{name: "empty object", surface: &FeatureSurface{}, wantErr: true},
+		{name: "empty command list", surface: &FeatureSurface{Commands: []string{}, Tools: []string{"impacted"}}, wantErr: true},
+		{name: "upper-case command", surface: &FeatureSurface{Commands: []string{"Features validate"}}, wantErr: true},
+		{name: "double space", surface: &FeatureSurface{Commands: []string{"features  validate"}}, wantErr: true},
+		{name: "flat manifest key as a tool", surface: &FeatureSurface{Tools: []string{"sdd feature"}}, wantErr: true},
+		{name: "duplicate command", surface: &FeatureSurface{Commands: []string{"validate", "validate"}}, wantErr: true},
+		{name: "duplicate tool", surface: &FeatureSurface{Tools: []string{"impacted", "impacted"}}, wantErr: true},
+		{name: "unbounded name", surface: &FeatureSurface{Commands: []string{strings.Repeat("a", surfaceNameMaxLength+1)}}, wantErr: true},
+		{name: "bounded name", surface: &FeatureSurface{Commands: []string{strings.Repeat("a", surfaceNameMaxLength)}}},
+		{name: "too many commands", surface: &FeatureSurface{Commands: tooMany}, wantErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			findings := ValidateManifest(surfaceManifest(test.surface))
+			if got := hasCode(findings, ErrorCodeInvalidSurface); got != test.wantErr {
+				t.Fatalf("invalid surface = %v, want %v; findings: %v", got, test.wantErr, findings)
+			}
+		})
+	}
+}
+
+func TestFeatureSurfaceRidesOnTheCurrentManifestVersion(t *testing.T) {
+	feature := `{"id":"billing/feature","type":"feature","name":"F","outcome":"F","owner":"billing","target":"modeled","surface":{"commands":["invoices export"]}}`
+
+	current := `{"protocolVersion":2,"namespace":"billing","features":[` + feature + `]}`
+	manifest, findings := ParseAndValidateManifest([]byte(current))
+	if manifest == nil || diag.HasErrors(findings) {
+		t.Fatalf("current manifest rejected the surface: %#v %v", manifest, findings)
+	}
+	if manifest.Features[0].Surface == nil {
+		t.Fatal("surface was dropped instead of parsed")
+	}
+
+	legacy := `{"protocolVersion":1,"namespace":"billing","features":[` + feature + `]}`
+	parsed, legacyFindings := ParseManifest([]byte(legacy))
+	if parsed != nil || !hasCode(legacyFindings, ErrorCodeUnknownField) {
+		t.Fatalf("legacy manifest accepted the forward field: %#v %v", parsed, legacyFindings)
+	}
+
+	direct := surfaceManifest(&FeatureSurface{Commands: []string{"invoices export"}})
+	direct.ProtocolVersion = MinimumManifestProtocolVersion
+	if findings := ValidateManifest(direct); !hasCode(findings, ErrorCodeUnknownField) {
+		t.Fatalf("legacy struct accepted the forward field: %v", findings)
+	}
+
+	nullSurface := `{"protocolVersion":2,"namespace":"billing","features":[{"id":"billing/feature","type":"feature","name":"F","outcome":"F","owner":"billing","target":"modeled","surface":null}]}`
+	if parsed, findings := ParseManifest([]byte(nullSurface)); parsed != nil || len(findings) == 0 {
+		t.Fatalf("null surface accepted: %#v %v", parsed, findings)
+	}
+	for _, code := range []string{ErrorCodeInvalidSurface, ErrorCodeUnresolvedSurface} {
+		if !ValidDiagnosticCodes[code] || !strings.HasPrefix(code, "features.") {
+			t.Fatalf("diagnostic code %q is not in the reserved features vocabulary", code)
+		}
+	}
+}
+
+func TestFeatureSurfaceCanonicalizationSortsAndDoesNotMutate(t *testing.T) {
+	surface := &FeatureSurface{Commands: []string{"validate", "features validate"}, Tools: []string{"sdd.list_specs", "sdd.feature_context"}}
+	manifest := surfaceManifest(surface)
+	canonical := CanonicalManifest(manifest)
+	if want := []string{"features validate", "validate"}; !slices.Equal(canonical.Features[0].Surface.Commands, want) {
+		t.Fatalf("commands = %v, want %v", canonical.Features[0].Surface.Commands, want)
+	}
+	if want := []string{"sdd.feature_context", "sdd.list_specs"}; !slices.Equal(canonical.Features[0].Surface.Tools, want) {
+		t.Fatalf("tools = %v, want %v", canonical.Features[0].Surface.Tools, want)
+	}
+	if surface.Commands[0] != "validate" || surface.Tools[0] != "sdd.list_specs" {
+		t.Fatalf("canonicalization reordered a caller-owned surface: %#v", surface)
+	}
+	if canonical.Features[0].Surface == surface {
+		t.Fatal("canonical surface aliases the caller-owned surface")
+	}
+}
+
+func TestFeatureSurfaceSchemaMatchesTheGoWire(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("schemas", "putnami-features.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var schema struct {
+		Defs map[string]struct {
+			AdditionalProperties bool                       `json:"additionalProperties"`
+			Properties           map[string]json.RawMessage `json:"properties"`
+			Pattern              string                     `json:"pattern"`
+			MaxLength            int                        `json:"maxLength"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatal(err)
+	}
+	surface := schema.Defs["surface"]
+	if surface.AdditionalProperties || len(surface.Properties) != 2 || surface.Properties["commands"] == nil || surface.Properties["tools"] == nil {
+		t.Fatalf("surface schema drifted from FeatureSurface: %#v", surface)
+	}
+	if schema.Defs["surfaceCommand"].Pattern != surfaceCommandPattern.String() || schema.Defs["surfaceTool"].Pattern != surfaceToolPattern.String() {
+		t.Fatal("surface name patterns drifted between the schema and the validator")
+	}
+	if schema.Defs["surfaceCommand"].MaxLength != surfaceNameMaxLength || schema.Defs["surfaceTool"].MaxLength != surfaceNameMaxLength {
+		t.Fatal("surface name bound drifted between the schema and the validator")
+	}
+}

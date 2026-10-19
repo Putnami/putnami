@@ -37,7 +37,17 @@ putnami lint,test,build,validate --impacted --enforce-coverage
   Capability Manifests, coalesces identical dependency copies by semantic owner,
   and reports sorted diagnostics. Missing, stale, contradicted, and unclassified
   evidence are assessment *warnings*; malformed documents, conflicting copies,
-  and broken or ambiguous contribution references *fail*.
+  and broken or ambiguous contribution references *fail*. A feature may list
+  the command paths and MCP tool names that carry it under `surface`. The step
+  resolves each name against the `putnami.extension.json` at the same project
+  root as the declaring manifest: a command key that is not internal, the path
+  of a command-group subcommand, a verb name, or a tool key. It reads only
+  those members, so a field a newer extension protocol adds does not fail it.
+  A name that file does not serve fails as `features.unresolved_surface`. A
+  project root without an extension manifest is not resolved, and no other
+  extension, lock or installed state is read. `putnami features validate`
+  resolves the same way; `features inspect` and `features list` report the
+  surface as declared, and `features snapshot` does not resolve it.
 - **`specs-validate`** — runs the spec protocol's own parser and repository
   validator. It fails on an invalid document, an unresolvable or duplicated
   feature reference, an unsafe decision path, or two specs for one feature. It
@@ -456,6 +466,11 @@ and re-keys the task.
   "manifest": { "from": "project", "files": ["putnami.features.json"] }
 }
 ```
+
+The extension manifest that resolves a surface is a file of the cut, so
+`git:**` already holds it. A `putnami.extension.json` that git ignores is
+outside the cut: the step treats its project as having no extension manifest,
+while `putnami features validate` reads it from disk.
 
 Its verdict depends on evidence **source bindings**, which is what the
 `source-binding-unavailable` and `source-binding-mismatch` stale reasons

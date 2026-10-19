@@ -122,6 +122,9 @@ type FeatureInspectionReport struct {
 	CandidateCount      int                                    `json:"candidateCount,omitempty"`
 	Diagnostics         []diag.Diagnostic                      `json:"diagnostics"`
 	Design              *FeatureDesignInspection               `json:"design,omitempty"`
+	// Surface is the command and tool surface the feature's manifest
+	// declaration lists, as declared and never resolved.
+	Surface *featureproto.FeatureSurface `json:"surface,omitempty"`
 }
 
 // FeatureDesignInspection is the scoped, disposable design projection for one
@@ -213,6 +216,7 @@ type FeatureAuthorityDeclaration struct {
 	Target       featureproto.MaturityStage     `json:"target,omitempty"`
 	Relations    []featureproto.Relation        `json:"relations,omitempty"`
 	Requirements []featureproto.Requirement     `json:"requirements,omitempty"`
+	Surface      *featureproto.FeatureSurface   `json:"surface,omitempty"`
 	Provenance   *featureproto.DesignProvenance `json:"provenance,omitempty"`
 }
 
@@ -291,10 +295,14 @@ type AgentFeatureContextFact struct {
 // renderer. The split is the engine/command seam: what the run DECIDED lives
 // here, how it is shown is the command group's.
 func BuildFeatureValidationResult(ws *workspace.Workspace, selection Selection) (FeatureValidationReport, error) {
-	result, revision, err := evaluateWorkspaceFeatures(ws, selection)
-	if err != nil {
-		return FeatureValidationReport{}, err
+	if ws == nil {
+		return FeatureValidationReport{}, protocolcli.Classify(
+			errors.New("workspace is required to evaluate features"),
+			protocolcli.ErrInvalidConfig,
+		)
 	}
+	revision := worktreeFeatureRevision(ws.Root)
+	result := featureengine.ValidateWorkspace(ws, revision, selectedScope(ws, selection))
 	return featureValidationResult(selection, result, revision)
 }
 
@@ -332,10 +340,11 @@ func BuildFeatureTaskValidationResult(ws *workspace.Workspace, selection Selecti
 	ws = atTreeBaseVersion(ws)
 	revision := featureengine.Revision{Kind: featureengine.RevisionKindWorktree}
 	result := featureengine.Aggregate(featureengine.Request{
-		Workspace: ws,
-		Reader:    reader,
-		Revision:  revision,
-		Scope:     selectedScope(ws, selection),
+		Workspace:       ws,
+		Reader:          reader,
+		Revision:        revision,
+		Scope:           selectedScope(ws, selection),
+		ResolveSurfaces: true,
 	})
 	return featureValidationResult(selection, result, revision)
 }
@@ -517,8 +526,23 @@ func BuildFeatureContextResult(ws *workspace.Workspace, selector string) (Featur
 
 	feature := *selected
 	report.Feature = &feature
+	report.Surface = declaredFeatureSurface(ws, feature.ID)
 	report.RelatedUnclassified = relatedUnclassified(ws, feature, result.Snapshot.Unclassified)
 	return report, nil
+}
+
+// declaredFeatureSurface returns the canonical surface the authored manifest
+// declaration of one feature lists, or nil when it lists none.
+func declaredFeatureSurface(ws *workspace.Workspace, id string) *featureproto.FeatureSurface {
+	for _, source := range featureengine.DiscoverAuthoredManifests(ws).Manifests {
+		for _, authored := range source.Manifest.Features {
+			if authored.ID != id || authored.Surface == nil {
+				continue
+			}
+			return featureproto.CanonicalManifest(&featureproto.Manifest{Features: []featureproto.Feature{authored}}).Features[0].Surface
+		}
+	}
+	return nil
 }
 
 // BuildAgentFeatureContextResult returns the compact projection used by MCP.
@@ -1152,6 +1176,7 @@ func collectFeatureAuthorityDeclarations(ws *workspace.Workspace, graphs []nativ
 				Outcome: canonical.Outcome, Owner: canonical.Owner,
 				Type: canonical.Type, Target: canonical.Target,
 				Relations: canonical.Relations, Requirements: canonical.Requirements,
+				Surface: canonical.Surface,
 				Provenance: &featureproto.DesignProvenance{
 					Path: source.Path, Symbol: fmt.Sprintf("features[%d]", index),
 				},

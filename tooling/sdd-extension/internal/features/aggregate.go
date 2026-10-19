@@ -62,6 +62,9 @@ func Aggregate(request Request) Result {
 	diagnostics := append([]diag.Diagnostic(nil), discovered.diagnostics...)
 	diagnostics = append(diagnostics, validateRevision(request.Revision)...)
 	diagnostics = append(diagnostics, featureproto.ValidateRepository(discovered.manifests, discovered.evidence)...)
+	if request.ResolveSurfaces {
+		diagnostics = append(diagnostics, resolveFeatureSurfaces(request.Reader, discovered.manifests)...)
+	}
 	diagnostics = append(diagnostics, validateSnapshotMetadataBounds(discovered.manifests, discovered.evidence)...)
 
 	catalog := buildContributionCatalog(discovered.capabilities)

@@ -102,6 +102,14 @@ least one requirement. Requirements above the target are valid: their evidence
 is reported as unclaimed by assessment tooling and cannot raise maturity past
 the authored target.
 
+A feature may carry an optional `surface` object that lists the command paths
+and MCP tool names that carry it, for example
+`"surface": {"commands": ["features validate"], "tools": ["sdd.feature_context"]}`.
+It needs manifest `protocolVersion: 2`; a version 1 document that carries it is
+refused with `features.unknown_field`. The protocol checks the shape and reports
+`features.invalid_surface`; whether a project serves a name is checked by the
+tool that reads the project. See ADR 0005.
+
 ## Executable requirements
 
 A textual spec requirement becomes executable when the same feature declares a

@@ -31,6 +31,8 @@ const (
 	ErrorCodeDuplicateEvidence            = "features.duplicate_evidence"
 	ErrorCodeDuplicateSpec                = "features.duplicate_spec"
 	ErrorCodeInvalidVerification          = "features.invalid_verification"
+	ErrorCodeInvalidSurface               = "features.invalid_surface"
+	ErrorCodeUnresolvedSurface            = "features.unresolved_surface"
 	ErrorCodeInvalidObservation           = "features.invalid_observation"
 	ErrorCodeDuplicateObservation         = "features.duplicate_observation"
 	ErrorCodeUnknownFeature               = "features.unknown_feature"
@@ -69,7 +71,7 @@ var ValidDiagnosticCodes = map[string]bool{
 	ErrorCodeInvalidStage: true, ErrorCodeInvalidRelation: true, ErrorCodeDanglingRelation: true,
 	ErrorCodeRelationCycle: true, ErrorCodeInvalidRequirement: true, ErrorCodeInvalidDecision: true,
 	ErrorCodeDuplicateEvidence: true, ErrorCodeDuplicateSpec: true,
-	ErrorCodeInvalidVerification: true, ErrorCodeInvalidObservation: true,
+	ErrorCodeInvalidVerification: true, ErrorCodeInvalidSurface: true, ErrorCodeUnresolvedSurface: true, ErrorCodeInvalidObservation: true,
 	ErrorCodeDuplicateObservation: true,
 	ErrorCodeUnknownFeature:       true, ErrorCodeUnknownRequirement: true, ErrorCodeStageMismatch: true,
 	ErrorCodeInvalidSubject: true, ErrorCodeInvalidAuthority: true, ErrorCodeInvalidSourceBinding: true,
@@ -163,6 +165,11 @@ func rejectForwardManifestFields(manifest *Manifest) *diag.Diagnostic {
 		return nil
 	}
 	for i, feature := range manifest.Features {
+		if feature.Surface != nil {
+			finding := diag.Errorf(ErrorCodeUnknownField, fmt.Sprintf("features[%d].surface", i),
+				"surface requires feature manifest protocolVersion %d", ManifestProtocolVersion)
+			return &finding
+		}
 		for j, requirement := range feature.Requirements {
 			if requirement.Verification == nil {
 				continue

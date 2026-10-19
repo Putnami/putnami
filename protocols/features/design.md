@@ -791,6 +791,13 @@ stage from `coded` through `target` must declare at least one requirement.
 Requirements at later stages may cite earlier evidence as an additional input,
 but the resolver never infers a requirement from prose or a contribution name.
 
+A feature may also carry `surface`, an object with optional `commands` (command
+paths as typed after the executable, such as `features validate`) and `tools`
+(MCP tool names as the tool listing advertises them). It needs manifest
+`protocolVersion: 2`, validates as `features.invalid_surface`, and sorts in
+canonical form. A feature lists only the surface its own project serves; see
+ADR 0005.
+
 The manifest declares intent and a target. It never authors `current`, health,
 activation, rollout, experiment, or completion-percentage fields.
 
@@ -971,7 +978,8 @@ The feature protocol/engine reserves these families:
 - identity/model errors: `features.invalid_id`, `features.duplicate_feature`,
   `features.invalid_type`, `features.invalid_stage`,
   `features.invalid_relation`, `features.dangling_relation`,
-  `features.relation_cycle`, `features.invalid_requirement`;
+  `features.relation_cycle`, `features.invalid_requirement`,
+  `features.invalid_surface`, `features.unresolved_surface`;
 - evidence errors: `features.duplicate_evidence`,
   `features.unknown_feature`, `features.unknown_requirement`,
   `features.stage_mismatch`, `features.invalid_subject`,

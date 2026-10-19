@@ -71,6 +71,7 @@ func printFeatureCatalogHuman(w io.Writer, report sdd.FeatureCatalogReport) {
 		}
 		for _, declaration := range feature.Declarations {
 			fmt.Fprintf(w, "    [%s] %s\n", declaration.Kind, declaration.Source)
+			printFeatureSurfaceHuman(w, declaration.Surface, "      ")
 		}
 		if len(feature.ConflictingSources) > 0 {
 			fmt.Fprintf(w, "    conflicting declarations: %s\n", strings.Join(feature.ConflictingSources, ", "))
@@ -165,6 +166,7 @@ func printFeatureInspectionHuman(w io.Writer, report sdd.FeatureInspectionReport
 	fmt.Fprintf(w, "  Source: %s\n", feature.Source)
 	fmt.Fprintf(w, "  Revision: %s\n", featureRevisionLabel(report.Revision))
 	fmt.Fprintf(w, "  Maturity: %s → %s\n", feature.Current, feature.Target)
+	printFeatureSurfaceHuman(w, report.Surface, "  ")
 	if len(feature.Relations) > 0 {
 		fmt.Fprintln(w, "  Relations:")
 		for _, relation := range feature.Relations {
@@ -199,6 +201,20 @@ func printFeatureInspectionHuman(w io.Writer, report sdd.FeatureInspectionReport
 	}
 	printFeatureDiagnostics(w, report.Diagnostics)
 	fmt.Fprintln(w)
+}
+
+// printFeatureSurfaceHuman prints the commands and MCP tools a declaration
+// lists, as declared.
+func printFeatureSurfaceHuman(w io.Writer, surface *featureproto.FeatureSurface, indent string) {
+	if surface == nil {
+		return
+	}
+	if len(surface.Commands) > 0 {
+		fmt.Fprintf(w, "%scommands: %s\n", indent, strings.Join(surface.Commands, ", "))
+	}
+	if len(surface.Tools) > 0 {
+		fmt.Fprintf(w, "%stools: %s\n", indent, strings.Join(surface.Tools, ", "))
+	}
 }
 
 func printFeatureDesignHuman(w io.Writer, report sdd.FeatureInspectionReport) {
