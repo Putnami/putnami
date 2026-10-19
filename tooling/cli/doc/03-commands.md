@@ -224,6 +224,18 @@ putnami projects tag <name> <tag>           # Manage project tags
 
 `projects list` and `projects describe` support `--output=jsonl` for structured output.
 
+On a workspace with no index (`.putnami/workspace-index.json`, which is not
+committed), a project without a `putnami.json` takes its name from authored
+config alone, so `projects list` and `projects describe` can show a different
+name than they show once the index exists. Both commands write the warning that
+the engine commands write (`putnami: warning: no workspace provider view ...`) to
+stderr, so stdout and the `--output` document stay unchanged. `--quiet` hides it.
+Run `putnami projects sync` to build the index.
+
+`projects tag`, `scopes list` and `workspace describe` write the same warning
+under the same rules. `projects sync` reports the state itself and writes no
+separate warning.
+
 `projects create <name> --template <template>` renders the template and lists
 the project in the workspace config. On a host without Go, a Go project first
 installs the Go the workspace lock pins through the workspace installers. When
@@ -1296,6 +1308,10 @@ putnami completion fish
 ```
 
 Pipe the output to the appropriate completion file for your shell.
+
+The script embeds the project names the workspace resolves. On a workspace with
+no index, `completion` writes the same provider-view warning as `projects list`
+to stderr, and the script on stdout is unchanged. `--quiet` hides the warning.
 
 ### `help`
 

@@ -19,7 +19,7 @@ import (
 
 // completionGenerators are the three scripts, rendered with no workspace so only
 // the catalog-derived half is exercised.
-var completionGenerators = map[string]func(io.Writer, string, *wsproto.Config){
+var completionGenerators = map[string]func(io.Writer, string, *wsproto.Config, io.Writer){
 	"bash": CompletionBash,
 	"zsh":  CompletionZsh,
 	"fish": CompletionFish,
@@ -32,7 +32,7 @@ func renderCompletion(t *testing.T, shell string) string {
 		t.Fatalf("no %s generator", shell)
 	}
 	var buf bytes.Buffer
-	generate(&buf, "", &wsproto.Config{})
+	generate(&buf, "", &wsproto.Config{}, nil)
 	return buf.String()
 }
 
@@ -41,7 +41,7 @@ func renderCompletion(t *testing.T, shell string) string {
 // documented subcommands were missing from every shell because nothing compared
 // the two.
 func TestCompletionProjectsEveryCatalogPath(t *testing.T) {
-	ctx := gatherCompletionContext("", &wsproto.Config{})
+	ctx := gatherCompletionContext("", &wsproto.Config{}, nil)
 
 	offered := map[string]bool{}
 	for _, name := range ctx.structured {
@@ -96,7 +96,7 @@ func TestCompletionDoesNotMutateStructuredHelp(t *testing.T) {
 	for shell := range completionGenerators {
 		renderCompletion(t, shell)
 	}
-	gatherCompletionContext("", &wsproto.Config{})
+	gatherCompletionContext("", &wsproto.Config{}, nil)
 
 	checked := 0
 	for _, command := range commandmeta.StructuredCommands() {

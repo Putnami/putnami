@@ -10,8 +10,8 @@ import (
 )
 
 // CompletionBash generates a bash completion script.
-func CompletionBash(w io.Writer, wsRoot string, cfg *wsproto.Config) {
-	ctx := gatherCompletionContext(wsRoot, cfg)
+func CompletionBash(w io.Writer, wsRoot string, cfg *wsproto.Config, warnings io.Writer) {
+	ctx := gatherCompletionContext(wsRoot, cfg, warnings)
 
 	allCommands := make([]string, 0, len(ctx.commands)+len(ctx.structured))
 	allCommands = append(allCommands, ctx.commands...)

@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -27,11 +28,13 @@ type ScopeInfo struct {
 }
 
 // ScopesList lists all scopes in the workspace with their paths, project counts, groups, and tags.
-func ScopesList(wsRoot string, cfg *wsproto.Config, outputFormat string) error {
+// The warnings workspace.Load recorded go to warnings (nil writes none).
+func ScopesList(wsRoot string, cfg *wsproto.Config, outputFormat string, warnings io.Writer) error {
 	ws, err := workspace.Load(wsRoot)
 	if err != nil {
 		return fmt.Errorf("load workspace: %w", err)
 	}
+	workspace.WriteWarnings(warnings, ws)
 
 	scopes := collectScopeInfos(wsRoot, cfg, ws)
 

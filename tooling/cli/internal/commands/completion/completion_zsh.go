@@ -10,8 +10,8 @@ import (
 )
 
 // CompletionZsh generates a zsh completion script.
-func CompletionZsh(w io.Writer, wsRoot string, cfg *wsproto.Config) {
-	ctx := gatherCompletionContext(wsRoot, cfg)
+func CompletionZsh(w io.Writer, wsRoot string, cfg *wsproto.Config, warnings io.Writer) {
+	ctx := gatherCompletionContext(wsRoot, cfg, warnings)
 
 	iox.Fprintf(w, `#compdef putnami
 # zsh completion for putnami

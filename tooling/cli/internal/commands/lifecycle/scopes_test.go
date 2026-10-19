@@ -42,7 +42,7 @@ func TestScopesList_Empty(t *testing.T) {
 	})
 
 	out, err := captureStdout(t, func() error {
-		return ScopesList(dir, wsproto.Load(dir), "")
+		return ScopesList(dir, wsproto.Load(dir), "", nil)
 	})
 	if err != nil {
 		t.Fatalf("ScopesList: %v", err)
@@ -56,7 +56,7 @@ func TestScopesList_Text(t *testing.T) {
 	dir := writeScopeWorkspace(t)
 	cfg := wsproto.Load(dir)
 
-	out, err := captureStdout(t, func() error { return ScopesList(dir, cfg, "") })
+	out, err := captureStdout(t, func() error { return ScopesList(dir, cfg, "", nil) })
 	if err != nil {
 		t.Fatalf("ScopesList: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestScopesList_JSONL(t *testing.T) {
 	dir := writeScopeWorkspace(t)
 	cfg := wsproto.Load(dir)
 
-	out, err := captureStdout(t, func() error { return ScopesList(dir, cfg, "jsonl") })
+	out, err := captureStdout(t, func() error { return ScopesList(dir, cfg, "jsonl", nil) })
 	if err != nil {
 		t.Fatalf("ScopesList: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestScopesList_ReportsLine(t *testing.T) {
 	writeConfigJSON(t, filepath.Join(dir, "backend", "api", wsproto.ConfigFilename), `{"name":"api"}`)
 
 	cfg := wsproto.Load(dir)
-	out, err := captureStdout(t, func() error { return ScopesList(dir, cfg, "") })
+	out, err := captureStdout(t, func() error { return ScopesList(dir, cfg, "", nil) })
 	if err != nil {
 		t.Fatalf("ScopesList: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestScopesList_ReportsLine(t *testing.T) {
 		t.Errorf("output = %q, want the declared tag pattern", out)
 	}
 
-	jsonl, err := captureStdout(t, func() error { return ScopesList(dir, cfg, "jsonl") })
+	jsonl, err := captureStdout(t, func() error { return ScopesList(dir, cfg, "jsonl", nil) })
 	if err != nil {
 		t.Fatalf("ScopesList jsonl: %v", err)
 	}
