@@ -2631,7 +2631,8 @@
             "kind": "acceptance",
             "checks": [
               "a-cold-mcp-start-answers-initialize-and-hands-the-session-to-the-built-server",
-              "a-failed-cold-mcp-build-ends-the-session-with-its-error"
+              "a-failed-cold-mcp-build-ends-the-session-with-its-error",
+              "the-built-server-receives-the-signals-the-client-sends"
             ]
           }
         },

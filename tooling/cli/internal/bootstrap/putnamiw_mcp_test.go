@@ -9,14 +9,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
 )
 
-// frameTimeout bounds each wait on the wrapper. It is generous because the gate
-// runs these tests next to the rest of the suite on a loaded machine.
+// frameTimeout bounds each wait on the wrapper.
 const frameTimeout = 60 * time.Second
 
 // mcpSession is one `./putnamiw mcp` process driven over its stdio.
@@ -25,7 +26,25 @@ type mcpSession struct {
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
 	frames chan string
-	stderr *strings.Builder
+	stderr *lockedBuffer
+}
+
+// lockedBuffer is a stderr sink that the test reads while the process writes.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }
 
 // startMCP starts `./putnamiw mcp` in repo and reads its stdout frame by frame.
@@ -42,7 +61,7 @@ func startMCP(t *testing.T, repo string, env []string) *mcpSession {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stderr := &strings.Builder{}
+	stderr := &lockedBuffer{}
 	cmd.Stderr = stderr
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
@@ -186,7 +205,8 @@ func TestPutnamiwMCP_ColdStartAnswersWhileTheCLIBuilds(t *testing.T) {
 	env, gate, log, tmp := mcpEnv(t, baseEnv)
 
 	s := startMCP(t, repo, env)
-	s.send(`{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"experimental":{"id":9}},"clientInfo":{"name":"probe","version":"1.0"}},"id":1}`)
+	initialize := `{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"experimental":{"id":9}},"clientInfo":{"name":"pro{be","version":"1.0","icons":[{"src":"x]"}]}},"id":1}`
+	s.send(initialize)
 	reply := s.next()
 	if reply.ID != float64(1) {
 		t.Fatalf("initialize reply id = %v, want 1: %+v", reply.ID, reply)
@@ -205,6 +225,10 @@ func TestPutnamiwMCP_ColdStartAnswersWhileTheCLIBuilds(t *testing.T) {
 	s.send(`{"jsonrpc":"2.0","method":"tools/list","id":2}`)
 	if reply = s.next(); reply.ID != float64(2) || reply.Result.Tools == nil || len(reply.Result.Tools) != 0 {
 		t.Fatalf("tools/list while building = %+v, want no tools for id 2", reply)
+	}
+	s.send(`{"jsonrpc":"2.0","method":"ping","params":{"note":"a}b[\"c"},"id":"ping-6"}`)
+	if reply = s.next(); reply.ID != "ping-6" {
+		t.Fatalf("ping while building = %+v, want the answer for ping-6", reply)
 	}
 	s.send(`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"x","arguments":{"id":7,"method":"y"}},"id":"call-3"}`)
 	s.send(`{"jsonrpc":"2.0","method":"prompts/list","id":4}`)
@@ -245,7 +269,7 @@ func TestPutnamiwMCP_ColdStartAnswersWhileTheCLIBuilds(t *testing.T) {
 	}
 	received := strings.Split(strings.TrimSpace(string(data)), "\n")
 	want := []string{
-		`{"jsonrpc":"2.0","id":"putnamiw-prepare","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"probe","version":"1.0"}}}`,
+		strings.Replace(initialize, `"id":1}`, `"id":"putnamiw-prepare"}`, 1),
 		`{"jsonrpc":"2.0","method":"notifications/initialized"}`,
 		`{"jsonrpc":"2.0","method":"tools/call","params":{"name":"x","arguments":{"id":7,"method":"y"}},"id":"call-3"}`,
 		`{"jsonrpc":"2.0","method":"tools/list","id":5}`,
@@ -296,4 +320,50 @@ func TestPutnamiwMCP_FailedBuildEndsTheSession(t *testing.T) {
 	assertEmptyDir(t, tmp)
 	spectest.Proves(t, "cli/engine-provenance", "cold-mcp-start",
 		"a-failed-cold-mcp-build-ends-the-session-with-its-error")
+}
+
+// Once the CLI runs, it is the process the client started: a signal the client
+// sends to that process ends it with the client's stdin still open. The relay
+// ends when the client closes stdin.
+func TestPutnamiwMCP_TheBuiltServerReceivesTheClientsSignals(t *testing.T) {
+	repo, _, baseEnv := gitSourceRepo(t)
+	env, gate, _, tmp := mcpEnv(t, baseEnv)
+
+	s := startMCP(t, repo, env)
+	s.send(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`)
+	if reply := s.next(); reply.Result.ServerInfo.Version != "preparing" {
+		t.Fatalf("initialize reply = %+v, want the preparing server", reply)
+	}
+	if err := os.WriteFile(gate, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.next().Method; got != "notifications/tools/list_changed" {
+		t.Fatalf("first frame after the build = %v, want notifications/tools/list_changed", got)
+	}
+	s.next()
+	s.send(`{"jsonrpc":"2.0","id":2,"method":"tools/list"}`)
+	if reply := s.next(); reply.Result.From != "built" {
+		t.Fatalf("tools/list after the build = %+v, want the built server's answer", reply)
+	}
+
+	if err := s.cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	exited := make(chan *os.ProcessState, 1)
+	go func() {
+		state, _ := s.cmd.Process.Wait()
+		exited <- state
+	}()
+	select {
+	case state := <-exited:
+		status, ok := state.Sys().(syscall.WaitStatus)
+		if !ok || !status.Signaled() || status.Signal() != syscall.SIGTERM {
+			t.Errorf("process state %v, want the built server ended by SIGTERM", state)
+		}
+	case <-time.After(frameTimeout):
+		t.Fatalf("./putnamiw mcp did not exit within %s of SIGTERM; stderr:\n%s", frameTimeout, s.stderr.String())
+	}
+	assertEmptyDir(t, tmp)
+	spectest.Proves(t, "cli/engine-provenance", "cold-mcp-start",
+		"the-built-server-receives-the-signals-the-client-sends")
 }

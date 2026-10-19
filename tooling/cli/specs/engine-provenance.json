@@ -39,7 +39,7 @@
     },
     {
       "id": "cold-mcp-start",
-      "text": "While it downloads or builds the CLI, `./putnamiw mcp` answers initialize as a server still preparing, with no tools or resources and both lists announced as changing, and queues tool calls, resource reads and notifications. The CLI then receives the client's initialize, whose reply the client never sees, and the queued frames in order; the client receives both list_changed notifications. A failed build ends the session with its error on stderr. A run that reuses the CLI starts it directly."
+      "text": "While it downloads or builds the CLI, `./putnamiw mcp` answers initialize as a server still preparing, with no tools or resources, and queues tool calls, resource reads and notifications. The CLI then reads the client's initialize under another id, whose reply stays hidden, and the queued frames in order. The client receives both list_changed notifications, and the CLI's instructions on reconnect. The CLI replaces the wrapper process. A failed build ends the session. A warm run starts the CLI directly."
     },
     {
       "id": "build-toolchain-stays-in-the-build",
