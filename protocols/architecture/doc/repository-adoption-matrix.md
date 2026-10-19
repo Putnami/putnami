@@ -1,10 +1,11 @@
 # Repository adoption matrix
 
-This repository maps **94 of its 149 projects** to **10 architecture domains**.
-The other **55 are excluded on purpose**: 28 samples, 7 templates, 2 template
+This repository maps **94 of its 150 projects** to **10 architecture domains**.
+The other **56 are excluded on purpose**: 28 samples, 7 templates, 2 template
 proofs, the standalone area detector, the 2 Cloud runtime destinations,
-and the Cloud CLI extension with its 14 generated clients. Every one of the 149
-appears in a table below, mapped or excluded, with a reason.
+the Cloud CLI extension with its 14 generated clients, and the new development
+verb vocabulary. Every one of the 150 appears in a table below, mapped or
+excluded, with a reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
 `putnami architecture validate` proves that every mapped project's cross-domain
@@ -306,6 +307,21 @@ to the frontier.
 | `/cloud/clients/put-server` | Generated client | `cloud` |
 | `/cloud/clients/runtime-api` | Generated client | `cloud` |
 | `/cloud/clients/source-api` | Generated client | `cloud` |
+
+### Development verb vocabulary — 1 project
+
+**Why excluded:** `@putnami/dev` is a new project. Its manifest declares the
+development verbs that the language extensions run, and its executable answers
+only the runtime handshake. A new project starts excluded (rule 4), and no
+review has yet named the domain that owns the vocabulary.
+
+**What would change it:** a review that states which domain carries the
+vocabulary, with the exact cross-domain permissions its imports of the
+protocols and the extension SDK need.
+
+| Project | Class | Owner |
+|---|---|---|
+| `/tooling/dev` | Development verb vocabulary | `tooling` |
 
 ### Samples — 28 projects
 

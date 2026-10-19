@@ -1,0 +1,73 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "tooling",
+  "features": [
+    {
+      "id": "tooling/development-verbs",
+      "type": "feature",
+      "name": "Development verb vocabulary",
+      "outcome": "A workspace that installs a language extension also loads @putnami/dev, and reads from it the order, descriptions, aliases, related commands and default traits of the eleven development verbs, which the language extensions keep running",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "eleven-ordered-verbs",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-declares-the-eleven-verbs-in-order",
+              "the-manifest-passes-strict-validation-at-contract-9",
+              "each-verb-keeps-the-core-presentation"
+            ]
+          }
+        },
+        {
+          "id": "core-default-traits",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-declared-traits-equal-the-core-defaults"
+            ]
+          }
+        },
+        {
+          "id": "language-extensions-depend",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-language-extension-names-the-dev-extension"
+            ]
+          }
+        },
+        {
+          "id": "handshake-only-runtime",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-runtime-answers-the-handshake",
+              "every-other-invocation-is-refused",
+              "a-handshake-it-cannot-write-fails"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

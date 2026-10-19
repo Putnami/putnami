@@ -60,6 +60,11 @@
       "status": "stable"
     },
     {
+      "id": "@putnami/dev",
+      "kind": "package",
+      "status": "preview"
+    },
+    {
       "id": "@putnami/document",
       "kind": "package",
       "status": "stable"

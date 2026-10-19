@@ -196,6 +196,10 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		// publication in the verification block.
 		filepath.Join("cloud", "extension", ManifestFilename): true,
 
+		// The development verb vocabulary names the acceptance checks of its
+		// manifest and its runtime in the verification block.
+		filepath.Join("tooling", "dev", ManifestFilename): true,
+
 		// The two client-matrix samples author their checks in the verification
 		// block, which only exists from version 2.
 		filepath.Join("go", "samples", "service-to-service", ManifestFilename):            true,

@@ -26,7 +26,9 @@ var firstPartyVocabularyProjects = []string{
 
 // discoverFirstPartyJobTraits copies the real first-party manifests, and
 // vocabulary when it is not empty, into a workspace, and returns the traits
-// discovery gives each job, keyed by extension and job name.
+// discovery gives each job, keyed by extension and job name. The workspace
+// declares vocabulary by path, which satisfies the dependency the language
+// extensions name on @putnami/dev.
 func discoverFirstPartyJobTraits(t *testing.T, repoRoot, vocabulary string) map[string]CommandTraits {
 	t.Helper()
 	dir := t.TempDir()
@@ -45,11 +47,13 @@ func discoverFirstPartyJobTraits(t *testing.T, repoRoot, vocabulary string) map[
 			}
 		}
 	}
+	cfg := &wsproto.Config{}
 	if vocabulary != "" {
 		writeExtensionManifest(t, filepath.Join(dir, "dev"), vocabulary)
 		paths = append(paths, "dev")
+		cfg.Extensions = wsproto.ExtensionsConfig{List: map[string]string{"/dev": ""}}
 	}
-	result, err := DiscoverExtensionsDetailed(dir, &wsproto.Config{}, paths)
+	result, err := DiscoverExtensionsDetailed(dir, cfg, paths)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +112,8 @@ func devVocabulary(t *testing.T, jobs map[string]CommandTraits, withTraits bool)
 
 // A development vocabulary that declares the verbs of the first-party jobs,
 // without traits or with the well-known ones, changes the traits of none of
-// them: every job keeps the traits Resolve gives it without a vocabulary.
+// them: every job keeps the traits Resolve gives it without a vocabulary. The
+// vocabulary the repository ships in tooling/dev changes none either.
 func TestFirstPartyJobsKeepTheirTraitsUnderADevelopmentVocabulary(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "first-party-jobs-keep-their-traits")
@@ -127,8 +132,16 @@ func TestFirstPartyJobsKeepTheirTraitsUnderADevelopmentVocabulary(t *testing.T) 
 		t.Fatalf("baseline has %d jobs, %d with traits; the first-party manifests did not load", len(baseline), withEffects)
 	}
 
-	for name, withTraits := range map[string]bool{"without traits": false, "with the well-known traits": true} {
-		got := discoverFirstPartyJobTraits(t, repoRoot, devVocabulary(t, baseline, withTraits))
+	shipped, err := os.ReadFile(filepath.Join(repoRoot, "tooling", "dev", ManifestFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, vocabulary := range map[string]string{
+		"without traits":             devVocabulary(t, baseline, false),
+		"with the well-known traits": devVocabulary(t, baseline, true),
+		"the shipped vocabulary":     string(shipped),
+	} {
+		got := discoverFirstPartyJobTraits(t, repoRoot, vocabulary)
 		for job, want := range baseline {
 			if got[job] != want {
 				t.Errorf("%s: %s traits = %+v, want %+v", name, job, got[job], want)

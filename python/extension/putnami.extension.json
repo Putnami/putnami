@@ -1,6 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 7,
+  "cliContract": 8,
+  "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-python",
     "toolchains": {

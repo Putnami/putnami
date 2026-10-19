@@ -1,0 +1,38 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/development-verbs",
+  "outcomes": [
+    "A workspace that loads @putnami/dev reads the order, descriptions, aliases, related commands and default traits of the development verbs from that one extension",
+    "Installing the Go, TypeScript or Python extension installs @putnami/dev with it, because each of them names it as an extension dependency",
+    "Loading the vocabulary changes neither what help prints for a verb nor the traits of any job"
+  ],
+  "nonGoals": [
+    "Running a verb: the language extensions declare and run the jobs of every development verb",
+    "Removing the development verbs, their aliases or their default traits from the core CLI",
+    "Serving a command: the extension declares no command, so its runtime answers only the handshake"
+  ],
+  "requirements": [
+    {
+      "id": "eleven-ordered-verbs",
+      "text": "The manifest declares build, test, lint, serve, run, format, package, publish, deploy, generate and validate in that order, each with the description, aliases and related commands the core shows for it. It declares no command, command group, task, tool, hook, agent content or runtime, claims CLI contract 9 and passes the strict validation of the package-time gate."
+    },
+    {
+      "id": "core-default-traits",
+      "text": "Serve and run require a runnable project, package injects the project's publish channels, publish injects them and changes a registry, and deploy changes a cloud. The other verbs declare no traits. Each verb's traits equal the core defaults for it, so the vocabulary changes the traits of no job."
+    },
+    {
+      "id": "language-extensions-depend",
+      "text": "The Go, TypeScript and Python extension manifests name @putnami/dev in extensionDependencies with an empty constraint and claim at least CLI contract 8, the contract that covers an extension dependency."
+    },
+    {
+      "id": "handshake-only-runtime",
+      "text": "The executable answers the runtime handshake with the extension's name, its stamped version, its platform and the contracts it was built against. It refuses every other invocation with exit status 2 and nothing on standard output, and a handshake it cannot write exits 1."
+    }
+  ],
+  "decisions": [
+    "tooling/dev/doc/adr/0001-the-dev-extension-declares-the-development-verbs.md",
+    "tooling/cli/doc/adr/0067-putnami-dev-declares-the-development-verbs.md",
+    "tooling/cli/doc/adr/0066-an-extension-installs-and-loads-its-extension-dependencies.md"
+  ]
+}

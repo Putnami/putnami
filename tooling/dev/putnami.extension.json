@@ -1,0 +1,74 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/dev",
+  "cliContract": 9,
+  "verbs": [
+    {
+      "name": "build",
+      "description": "Compile or transpile project sources into runnable or distributable outputs.",
+      "aliases": ["b"],
+      "related": ["test", "lint", "serve"]
+    },
+    {
+      "name": "test",
+      "description": "Run the project's tests, emitting test counts and coverage metrics.",
+      "aliases": ["t"],
+      "related": ["build", "lint"]
+    },
+    {
+      "name": "lint",
+      "description": "Check code for style and correctness findings, emitting per-issue diagnostics.",
+      "aliases": ["l"],
+      "related": ["build", "test", "format"]
+    },
+    {
+      "name": "serve",
+      "description": "Run the project's dev server until interrupted.",
+      "aliases": ["s"],
+      "traits": {"requiresRunnable": true},
+      "related": ["build", "run"]
+    },
+    {
+      "name": "run",
+      "description": "Execute the project once and exit.",
+      "traits": {"requiresRunnable": true},
+      "related": ["build", "serve"]
+    },
+    {
+      "name": "format",
+      "description": "Rewrite sources into canonical formatting.",
+      "aliases": ["f"],
+      "related": ["lint"]
+    },
+    {
+      "name": "package",
+      "description": "Assemble distributable artifacts for the project's publish channels.",
+      "traits": {"injectPublishChannels": true},
+      "related": ["build", "publish"]
+    },
+    {
+      "name": "publish",
+      "description": "Push packaged artifacts to registries.",
+      "aliases": ["p", "P"],
+      "traits": {"injectPublishChannels": true, "sideEffects": "registry"},
+      "related": ["build", "test", "package"]
+    },
+    {
+      "name": "deploy",
+      "description": "Converge a cloud environment on the workload's aggregated infra manifest.",
+      "aliases": ["d", "D"],
+      "traits": {"sideEffects": "cloud"},
+      "related": ["build", "package", "publish"]
+    },
+    {
+      "name": "generate",
+      "description": "Run code generators.",
+      "related": ["build"]
+    },
+    {
+      "name": "validate",
+      "description": "Check the project against its declared specs, contracts and compatibility rules.",
+      "related": ["lint", "test", "build"]
+    }
+  ]
+}
