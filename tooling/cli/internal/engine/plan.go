@@ -366,25 +366,18 @@ func refuseUndeclaredCommands(req *Request, discovered *internalextension.Discov
 	if len(missingRegistryExtensions(req.Config, discovered.Extensions, discovered.MissingDependencies()...)) > 0 {
 		return nil
 	}
-	if len(discovered.Skipped) > 0 {
-		return skippedExtensionsError(undeclared, discovered.Skipped)
+	if len(discovered.Skipped) == 0 {
+		return UndeclaredCommandsError(undeclared)
 	}
-	return UndeclaredCommandsError(undeclared)
-}
-
-// skippedExtensionsError is the error of a run whose commands no loaded
-// extension declares while some extensions did not load: it names the
-// commands, then each extension that did not load and why.
-func skippedExtensionsError(commands []string, skipped []extension.SkippedExtension) error {
-	reasons := make([]string, 0, len(skipped))
-	for _, skip := range skipped {
+	reasons := make([]string, 0, len(discovered.Skipped))
+	for _, skip := range discovered.Skipped {
 		name := skip.Name
 		if name == "" {
 			name = skip.Ref
 		}
 		reasons = append(reasons, fmt.Sprintf("extension %s did not load: %v", name, skip.Reason))
 	}
-	return fmt.Errorf("no loaded extension declares %s; %s", strings.Join(commands, ", "), strings.Join(reasons, "; "))
+	return fmt.Errorf("no loaded extension declares %s; %s", strings.Join(undeclared, ", "), strings.Join(reasons, "; "))
 }
 
 // selectedCommandsWithoutJobs returns the selected commands that contributed no

@@ -85,12 +85,15 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  25,
-		funcs:  184,
-		why: "RAISED 183→184 (cli/job-planning-execution, no-core-development-verb): " +
+		funcs:  185,
+		why: "RAISED 183→185 (cli/job-planning-execution, no-core-development-verb): " +
 			"the core declares no development verb, so the engine refuses a command no loaded extension " +
 			"declares once, after the run's one discovery, for every entry point. refuseUndeclaredCommands " +
 			"replaces reportUnservedSDDCommands, and UndeclaredCommandsError is its message, which help " +
-			"returns too; both live in plan.go, so files stay at 25. " +
+			"returns too; both live in plan.go. The core also keeps no side-effect floor, so the CLI, " +
+			"which resolves the release cache trust before the first-use bootstrap, can miss a registry " +
+			"extension the bootstrap installs: raiseReleaseCacheTrust, in workspace.go, reapplies the " +
+			"floor from the run's own discovery. Files stay at 25. " +
 			"RAISED 181→183 (cli/credential-custody, needed-provider-only-on-a-path-extension): " +
 			"a hosted run whose CI configuration needs a provider that only a path extension declares " +
 			"fails before any job, so its pull request fails instead of the publish on main. " +
