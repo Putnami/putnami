@@ -2,6 +2,8 @@ package telemetry
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/telemetry/cliusage"
@@ -28,15 +30,53 @@ type FlagPresence struct {
 	Watch    bool
 }
 
+// FirstPartyScope is the extension-name scope of Putnami's own extensions.
+const FirstPartyScope = "@putnami/"
+
 // SessionStart contains the closed-vocabulary dimensions of a session-start
-// event. Commands not in the public job-command registry are omitted, and a
-// repeated command is recorded once.
+// event. A command is recorded only when it is in the shared command
+// vocabulary and an extension of FirstPartyScope declares it public; every
+// other command is omitted, and a repeated command is recorded once.
 type SessionStart struct {
-	Commands    []string
+	Commands []string
+	// Declarers maps a command to the names of the loaded extensions that
+	// declare it public. It decides which commands are recorded and is never
+	// recorded itself.
+	Declarers   map[string][]string
 	Projects    int
 	Jobs        int
 	Flags       FlagPresence
 	Interactive bool
+}
+
+// recordedCommands returns the commands of session that a session-start
+// event records, in request order, each once and at most cliusage.MaxCommands
+// of them: the receiver drops a record that repeats a command or names more.
+func recordedCommands(session SessionStart) []string {
+	commands := make([]string, 0, min(len(session.Commands), cliusage.MaxCommands))
+	for _, command := range session.Commands {
+		if len(commands) == cliusage.MaxCommands {
+			break
+		}
+		if _, allowed := allowedCommands[command]; !allowed || slices.Contains(commands, command) {
+			continue
+		}
+		if declaredByFirstParty(session.Declarers[command]) {
+			commands = append(commands, command)
+		}
+	}
+	return commands
+}
+
+// declaredByFirstParty reports whether an extension of FirstPartyScope is
+// among declarers.
+func declaredByFirstParty(declarers []string) bool {
+	for _, name := range declarers {
+		if strings.HasPrefix(name, FirstPartyScope) {
+			return true
+		}
+	}
+	return false
 }
 
 // SessionEnd contains the closed-vocabulary dimensions of a session-end event.
@@ -49,23 +89,10 @@ type SessionEnd struct {
 
 // TrackSessionStart records the fixed session-start telemetry shape.
 func (c *Client) TrackSessionStart(session SessionStart) {
-	commands := make([]string, 0, len(session.Commands))
-	seen := make(map[string]struct{}, len(session.Commands))
-	for _, command := range session.Commands {
-		if _, allowed := allowedCommands[command]; !allowed {
-			continue
-		}
-		if _, duplicate := seen[command]; duplicate {
-			continue
-		}
-		seen[command] = struct{}{}
-		commands = append(commands, command)
-	}
-
 	c.track(Event{
 		Name: cliusage.EventSessionStart,
 		Data: map[string]any{
-			cliusage.AttrCommands:     commands,
+			cliusage.AttrCommands:     recordedCommands(session),
 			cliusage.AttrProjects:     session.Projects,
 			cliusage.AttrJobs:         session.Jobs,
 			cliusage.AttrInteractive:  session.Interactive,

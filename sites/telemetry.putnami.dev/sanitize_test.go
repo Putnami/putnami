@@ -147,6 +147,27 @@ func TestSanitizeKeepsStartWithoutRecordableCommand(t *testing.T) {
 	}
 }
 
+// An extension command of the vocabulary passes like a catalog command: the
+// record survives with its command list unchanged.
+func TestSanitizeKeepsExtensionCommands(t *testing.T) {
+	spectest.Proves(t, "telemetry-putnami-dev/cli-usage-receiver", "fields-are-allowlisted", "an-extension-command-of-the-vocabulary-is-kept")
+	const commands = "clientgen,cloud-deploy,validate-workspace"
+	rec := validStartRecord()
+	rec.Attributes[5] = telemetry.Attr(cliusage.AttrCommands, telemetry.StringVal(commands))
+
+	got := soleRecord(t, sanitizeLogs(logsReq(cliResource(), rec)))
+	for _, kv := range got.Attributes {
+		if kv.Key != cliusage.AttrCommands {
+			continue
+		}
+		if kv.Value.StringValue == nil || *kv.Value.StringValue != commands {
+			t.Fatalf("commands = %+v, want %q", kv.Value, commands)
+		}
+		return
+	}
+	t.Fatalf("sanitized record lost its commands: %+v", got.Attributes)
+}
+
 // TestSanitizeStampsOriginUnspoofable proves a caller cannot set origin, whether
 // supplied at the resource level or as a record attribute.
 func TestSanitizeStampsOriginUnspoofable(t *testing.T) {

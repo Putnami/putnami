@@ -5,9 +5,11 @@
 // data-minimization guard) and the consumer (the anonymous telemetry receiver's
 // sanitizer) enforce identical rules and cannot drift.
 //
-// Public job-command names are part of this shared contract too. Keeping the
-// receiver's aggregate-key vocabulary closed prevents syntactically valid,
-// attacker-chosen command names from consuming its bounded cardinality budget.
+// Command names are part of this shared contract too: names that Putnami's own
+// CLI and extensions declare, never a name a user or another extension chose.
+// Keeping the receiver's aggregate-key vocabulary closed prevents syntactically
+// valid, attacker-chosen command names from consuming its bounded cardinality
+// budget.
 package cliusage
 
 import (
@@ -78,9 +80,13 @@ var (
 	cliVersionPattern = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z][0-9A-Za-z.-]{0,63})?(?:\+[0-9A-Za-z][0-9A-Za-z.-]{0,63})?$`)
 )
 
-// Commands is the ordered receiver-known command vocabulary. It mirrors the
-// CLI's public job-command catalog; a conformance test in the CLI pins the two
-// lists together so adding a command requires an explicit wire-contract update.
+// Commands is the ordered receiver-known command vocabulary: the eleven job
+// commands the CLI catalog listed when the vocabulary first shipped, in catalog
+// order, then every public command that an extension of the @putnami scope
+// declares, sorted. A conformance test in the CLI fails while such a command is
+// missing, so adding one requires an explicit wire-contract update. A name that
+// a released CLI sends never leaves: the receiver would drop that CLI's records,
+// and a protocol test fails. A name that no released CLI sends may leave.
 var Commands = []string{
 	"build",
 	"test",
@@ -93,6 +99,47 @@ var Commands = []string{
 	"deploy",
 	"generate",
 	"validate",
+	"cache-provider",
+	"change-finalize",
+	"change-language",
+	"change-verify",
+	"clientgen",
+	"clientgen-adopt",
+	"clientgen-check",
+	"clientgen-sync",
+	"cloud-cache",
+	"cloud-channels",
+	"cloud-ci",
+	"cloud-config",
+	"cloud-db",
+	"cloud-deploy",
+	"cloud-env",
+	"cloud-image-layers",
+	"cloud-infra",
+	"cloud-login",
+	"cloud-logout",
+	"cloud-logs",
+	"cloud-metrics",
+	"cloud-packages",
+	"cloud-registries",
+	"cloud-registry-token",
+	"cloud-release-set",
+	"cloud-secrets",
+	"cloud-setup",
+	"cloud-source",
+	"cloud-status",
+	"cloud-token",
+	"cloud-traces",
+	"cloud-whoami",
+	"config-extract",
+	"config-merge",
+	"credential-provider",
+	"log-reporter",
+	"session-reporter",
+	"validate-workspace",
+	"version",
+	"workspace-fetch",
+	"workspace-install",
 }
 
 var commandSet = stringSet(Commands...)
@@ -249,7 +296,7 @@ func IsArch(value string) bool {
 	return ok
 }
 
-// IsCommand reports whether a command is in the receiver-known public job
+// IsCommand reports whether a command is in the receiver-known command
 // vocabulary.
 func IsCommand(command string) bool {
 	_, ok := commandSet[command]

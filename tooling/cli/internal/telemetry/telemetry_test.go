@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -484,7 +486,12 @@ func TestEnableStampsCurrentDeviceIDMonth(t *testing.T) {
 func TestSessionEventVocabularyGuard(t *testing.T) {
 	c := &Client{config: &Config{Enabled: boolPtr(true)}}
 	c.TrackSessionStart(SessionStart{
-		Commands:    []string{"build", "test", "unregistered-command", "build"},
+		Commands: []string{"build", "test", "unregistered-command", "build"},
+		Declarers: map[string][]string{
+			"build":                {"@putnami/go"},
+			"test":                 {"@acme/rust", "@putnami/go"},
+			"unregistered-command": {"@putnami/go"},
+		},
 		Projects:    2,
 		Jobs:        3,
 		Flags:       FlagPresence{Impacted: true, Coverage: true, Output: true, NoCache: true, Projects: true, Watch: true},
@@ -556,6 +563,80 @@ func TestSessionStartWithoutRecordableCommandConformsOnTheWire(t *testing.T) {
 	}
 	if diags := cliusage.ValidateLogs(*request); diag.HasErrors(diags) {
 		t.Fatalf("session:start without a recordable command fails the receiver vocabulary: %v", diags)
+	}
+}
+
+// A session-start records a command only when it is in the shared vocabulary
+// and an extension of the @putnami scope declares it public, in request order.
+func TestSessionStartRecordsOnlyFirstPartyCommands(t *testing.T) {
+	t.Parallel()
+	// Past the cap: one more first-party command than a record may name,
+	// after a third-party command and a repeat that must not use up the budget.
+	var firstParty []string
+	for _, command := range cliusage.Commands {
+		if command != "clientgen" && len(firstParty) <= cliusage.MaxCommands {
+			firstParty = append(firstParty, command)
+		}
+	}
+	overCap := append([]string{"clientgen", firstParty[0]}, firstParty...)
+	overCapDeclarers := map[string][]string{"clientgen": {"@acme/clientgen"}}
+	for _, command := range firstParty {
+		overCapDeclarers[command] = []string{"@putnami/go"}
+	}
+
+	tests := []struct {
+		name      string
+		commands  []string
+		declarers map[string][]string
+		want      []string
+	}{
+		{
+			name: "third-party, undeclared and unknown commands are omitted",
+			commands: []string{
+				"validate-workspace", "clientgen", "build", "deploy", "private-command", "cloud-deploy",
+			},
+			declarers: map[string][]string{
+				"validate-workspace": {"@putnami/sdd"},
+				"clientgen":          {"@acme/clientgen"},
+				"build":              {"@acme/rust", "@putnami/go"},
+				"private-command":    {"@putnami/go"},
+				"cloud-deploy":       {"@putnami-fork/cloud"},
+			},
+			want: []string{"validate-workspace", "build"},
+		},
+		{
+			name:      "a repeated command is recorded once",
+			commands:  []string{"build", "test", "build"},
+			declarers: map[string][]string{"build": {"@putnami/go"}, "test": {"@putnami/go"}},
+			want:      []string{"build", "test"},
+		},
+		{
+			name:      "at most MaxCommands commands are recorded",
+			commands:  overCap,
+			declarers: overCapDeclarers,
+			want:      firstParty[:cliusage.MaxCommands],
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			c := &Client{config: &Config{Enabled: boolPtr(true)}}
+			c.TrackSessionStart(SessionStart{Commands: tt.commands, Declarers: tt.declarers})
+
+			if len(c.events) != 1 {
+				t.Fatalf("recorded events = %d, want 1", len(c.events))
+			}
+			if err := validateEventVocabulary(c.events[0]); err != nil {
+				t.Fatalf("session:start escaped the vocabulary: %v", err)
+			}
+			got, _ := c.events[0].Data[cliusage.AttrCommands].([]string)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("recorded commands = %v, want %v", got, tt.want)
+			}
+			if !cliusage.IsCommands(strings.Join(got, ",")) {
+				t.Fatalf("the receiver would drop recorded commands %v", got)
+			}
+		})
 	}
 }
 

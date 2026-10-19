@@ -48,15 +48,18 @@ const (
 // one process can never turn a single flush into unbounded memory or DB work.
 const (
 	maxAccumulatorDeviceDays   = 10_000
-	maxAccumulatorCounters     = 2_004
+	maxAccumulatorCounters     = 2_052
 	maxAccumulatorContributors = 74_000
 	retentionPastDays          = 34
 	retentionFutureDays        = 0
 	maxAccumulatorOverflows    = (retentionPastDays + retentionFutureDays + 1) * 7
 )
 
+// counterDimensionCaps bound the distinct keys of each dimension per UTC day.
+// The command cap admits the whole cliusage.Commands vocabulary, so a day of
+// valid traffic never overflows it.
 var counterDimensionCaps = map[string]int{
-	DimCommand: 16, DimOutcome: 8, DimCLIVersion: 1_880,
+	DimCommand: 64, DimOutcome: 8, DimCLIVersion: 1_880,
 	DimOS: 32, DimArch: 32, DimInteractive: 4,
 	DimProjects: 8, DimJobs: 8, DimDuration: 8, DimFlag: 8,
 }
