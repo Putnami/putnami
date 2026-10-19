@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"go.putnami.dev/cli/model/jobs"
+	extensionproto "go.putnami.dev/protocol/extension"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
@@ -190,13 +191,13 @@ func (r *LiveRenderer) printTasksBlock() {
 	r.heading("Tasks:")
 	for _, c := range cmds {
 		label := c + strings.Repeat(" ", labelW-len(c))
-		detail := r.taskLine(c, aggs[c])
+		detail := r.taskLine(aggs[c])
 		iox.Fprintf(r.errOut, "%s  %s\n", colorize(label, Bold), detail)
 	}
 }
 
-// taskLine formats the aggregated detail for one task type.
-func (r *LiveRenderer) taskLine(cmd string, a *taskAgg) string {
+// taskLine formats the aggregated detail for one task type, by its kind.
+func (r *LiveRenderer) taskLine(a *taskAgg) string {
 	if a == nil || (a.passed == 0 && a.failed == 0) {
 		// A task with nothing to report is only "skipped" if it was never cut
 		// off. Saying skipped for a task the user killed would suggest it was
@@ -214,13 +215,13 @@ func (r *LiveRenderer) taskLine(cmd string, a *taskAgg) string {
 	if a.aborted > 0 {
 		parts = append(parts, colorize(fmt.Sprintf("%d aborted", a.aborted), Yellow))
 	}
-	switch cmd {
-	case "lint":
+	switch a.kind {
+	case extensionproto.CommandKindDiagnostics:
 		parts = append(parts,
 			fmt.Sprintf("%d errors", a.lintErrors),
 			fmt.Sprintf("%d warnings", a.lintWarnings),
 		)
-	case "test":
+	case extensionproto.CommandKindVerification:
 		if a.testsTotal > 0 {
 			parts = append(parts, fmt.Sprintf("%s tests", formatThousands(a.testsTotal)))
 		}
@@ -230,7 +231,7 @@ func (r *LiveRenderer) taskLine(cmd string, a *taskAgg) string {
 		if pct, annotation, ok := a.coverage(); ok {
 			parts = append(parts, fmt.Sprintf("coverage %.1f%%%s", pct, annotation))
 		}
-	case "build":
+	case extensionproto.CommandKindFiles:
 		if a.filesBuilt > 0 {
 			parts = append(parts, fmt.Sprintf("%s files built", formatThousands(a.filesBuilt)))
 		}
@@ -238,7 +239,7 @@ func (r *LiveRenderer) taskLine(cmd string, a *taskAgg) string {
 			parts = append(parts, fmt.Sprintf("%d artifacts", a.artifacts))
 		}
 	default:
-		// deploy/publish/etc. carry no metrics; surface skipped work instead.
+		// A command without a metric-bearing kind surfaces skipped work instead.
 		if a.skipped > 0 {
 			parts = append(parts, fmt.Sprintf("%d skipped", a.skipped))
 		}
@@ -369,12 +370,12 @@ func firstLine(s string) string {
 
 // failureCause summarizes why a command failed, preferring structured metrics.
 func (r *LiveRenderer) failureCause(cmd *commandState) string {
-	switch cmd.name {
-	case "test":
+	switch cmd.kind {
+	case extensionproto.CommandKindVerification:
 		if f := r.metric(cmd, "tests-failed"); f > 0 {
 			return fmt.Sprintf("%d failing tests", f)
 		}
-	case "lint":
+	case extensionproto.CommandKindDiagnostics:
 		if e := r.errorCount(cmd); e > 0 {
 			return fmt.Sprintf("%d errors", e)
 		}
@@ -488,6 +489,8 @@ type taskAgg struct {
 	// liveTally supplies passed/failed/skipped/aborted and the one bucketing
 	// rule the Projects block also uses.
 	liveTally
+	// kind is the command's kind, taken from its first project.
+	kind                     string
 	lintErrors, lintWarnings int
 	testsTotal, testsFailed  int
 	coverageSamples          []coverageSample
@@ -569,7 +572,7 @@ func (r *LiveRenderer) aggregateTasks() map[string]*taskAgg {
 		for name, cmd := range row.commands {
 			a := aggs[name]
 			if a == nil {
-				a = &taskAgg{}
+				a = &taskAgg{kind: cmd.kind}
 				aggs[name] = a
 			}
 			a.add(cmd.status)
@@ -612,17 +615,17 @@ func (r *LiveRenderer) aggregateTasks() map[string]*taskAgg {
 	return aggs
 }
 
-// errorCount0/warnings0 return lint counts only for lint commands (avoids
-// counting unrelated diagnostics from other commands).
+// errorCount0/warnings0 return lint counts only for diagnostics commands
+// (avoids counting unrelated diagnostics from other commands).
 func (r *LiveRenderer) errorCount0(cmd *commandState) int {
-	if cmd.name != "lint" {
+	if cmd.kind != extensionproto.CommandKindDiagnostics {
 		return 0
 	}
 	return r.errorCount(cmd)
 }
 
 func (r *LiveRenderer) warnings0(cmd *commandState) int {
-	if cmd.name != "lint" {
+	if cmd.kind != extensionproto.CommandKindDiagnostics {
 		return 0
 	}
 	return r.warningCount(cmd)

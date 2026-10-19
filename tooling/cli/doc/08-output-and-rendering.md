@@ -164,29 +164,29 @@ One row per project, in stable plan order:
 **Summary cells** — one fixed-width cell per command, aligned across rows. The
 cells follow the verb order of the loaded vocabularies, merged as
 [Declaring a verb vocabulary](../../../protocols/extension/doc/06-verbs.md#declaring-a-verb-vocabulary)
-describes (extension-name order, first declaration wins). The verbs no vocabulary
-names follow in the order `generate`, `lint`, `format`, `test`, `build`,
-`package`, `publish`, `deploy`, `serve`, and any other command comes last,
-alphabetically:
+describes (extension-name order, first declaration wins). Any command no
+vocabulary names comes last, alphabetically:
 
 ```
-  lint ✓ ok · test ✓ 42/45 · cov 84.0% · build ✓ 3 files
+  lint ✓ ok · test ✓ 42/45 84.0% · build ✓ 3 files
 ```
 
 Each cell shows the command label, a status glyph (`✓` fresh success, dim `↻`
-cached, `✗` failed) or the dim `coalesced` outcome, and a compact value: lint
-warnings/errors, `passed/total` tests,
-coverage percent (its own `cov` column, inserted after `test`), files built. A
+cached, `✗` failed) or the dim `coalesced` outcome, and a compact value that
+the command's kind selects: warnings or errors for `diagnostics`, `passed/total`
+tests and the coverage percent for `verification`, files built for `files`. A
+command of the `criteria` kind, or without a kind, shows its status only. A
 cached cell keeps its restored value (for example `test ↻ 42/45`); the distinct
 text glyph preserves cache provenance when terminal output is copied without
 ANSI styling. When every cacheable step is restored but a sub-second always-run
 tail still executes, the cell stays dimmed and identifies that tail (for example
 `build ↻ 38 files (+infra 10ms)`). A running cell shows live progress (`4/9`),
 the current phase, or `…`. When the terminal is too narrow, lower-priority
-cells are hidden while the remaining cells stay in canonical order. `package`
-is hidden first, then
-secondary detail such as `cov`, then `lint`, `test`, `build`, `publish`, and
-finally `deploy`, with a dim `+N` marking how many cells are hidden.
+cells are hidden while the remaining cells stay in canonical order. The cell of
+a command that declares no kind, side effect or workload is hidden first, then a
+`diagnostics` or `criteria` cell, then `verification`, `files`, a command with
+registry side effects, and finally a command with cloud side effects or a
+workload, with a dim `+N` marking how many cells are hidden.
 
 ### Overflow & Done-Row Retention
 
@@ -283,7 +283,8 @@ Failures:
 ```
 
 `Projects:` counts projects; `Tasks:` rolls up per-command metrics across all
-projects. `Failures:` (above) and, for publish runs, the `Published:` recap
+projects, and the command's kind selects them as it selects a cell's value.
+`Failures:` (above) and, for publish runs, the `Published:` recap
 follow.
 
 #### Coverage on the test line

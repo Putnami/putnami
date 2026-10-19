@@ -7,6 +7,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
 
@@ -439,7 +440,7 @@ func (r *LiveRenderer) visibleColumnsForBudget(budget int) (columnFit, int) {
 		if used <= budget {
 			return columnFit{names: candidates, hidden: hidden}, used
 		}
-		candidates = dropNextSummaryColumn(candidates)
+		candidates = dropNextSummaryColumn(candidates, r.colHideRank)
 	}
 
 	hidden := len(r.colOrder)
@@ -461,14 +462,14 @@ func (r *LiveRenderer) columnsWidth(cols []string) int {
 	return total
 }
 
-func dropNextSummaryColumn(cols []string) []string {
+func dropNextSummaryColumn(cols []string, hideRank map[string]int) []string {
 	if len(cols) == 0 {
 		return cols
 	}
 	dropIdx := 0
-	dropRank := summaryColumnHideRank(cols[0])
+	dropRank := hideRank[cols[0]]
 	for i := 1; i < len(cols); i++ {
-		if rank := summaryColumnHideRank(cols[i]); rank < dropRank {
+		if rank := hideRank[cols[i]]; rank < dropRank {
 			dropIdx, dropRank = i, rank
 		}
 	}
@@ -575,16 +576,17 @@ func (r *LiveRenderer) cachedValue(cmd *commandState) string {
 	return statusCached
 }
 
-// successValue builds the compact summary for a completed command from its
-// metrics, falling back to a simple marker when no metric is available.
+// successValue builds the compact summary for a completed command from the
+// metrics its kind reads, falling back to a simple marker when no metric is
+// available or the command declares no kind.
 func (r *LiveRenderer) successValue(cmd *commandState) string {
-	switch cmd.name {
-	case "lint":
+	switch cmd.kind {
+	case extensionproto.CommandKindDiagnostics:
 		if w := r.warningCount(cmd); w > 0 {
 			return fmt.Sprintf("%d warn", w)
 		}
 		return "ok"
-	case "test":
+	case extensionproto.CommandKindVerification:
 		value := "ok"
 		if total := r.metric(cmd, "tests-total"); total > 0 {
 			value = fmt.Sprintf("%d/%d", r.metric(cmd, "tests-passed"), total)
@@ -596,7 +598,7 @@ func (r *LiveRenderer) successValue(cmd *commandState) string {
 			value += fmt.Sprintf(" %.1f%%", pct)
 		}
 		return value
-	case "build":
+	case extensionproto.CommandKindFiles:
 		if files := r.filesBuilt(cmd); files > 0 {
 			return fmt.Sprintf("%d files", files)
 		}
@@ -608,13 +610,13 @@ func (r *LiveRenderer) successValue(cmd *commandState) string {
 
 // failedValue builds the compact summary for a failed command.
 func (r *LiveRenderer) failedValue(cmd *commandState) string {
-	switch cmd.name {
-	case "lint":
+	switch cmd.kind {
+	case extensionproto.CommandKindDiagnostics:
 		if e := r.errorCount(cmd); e > 0 {
 			return fmt.Sprintf("%d err", e)
 		}
 		return "failed"
-	case "test":
+	case extensionproto.CommandKindVerification:
 		if f := r.metric(cmd, "tests-failed"); f > 0 {
 			return fmt.Sprintf("%d failed", f)
 		}

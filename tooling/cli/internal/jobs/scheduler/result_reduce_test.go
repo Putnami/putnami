@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -100,9 +101,9 @@ func tallyLegacyBuckets(results map[string]*JobResult) legacyBuckets {
 func TestBatchWire_CanonicalMatchesSyntheticEvents(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "canonical-result", "machine-surfaces-reduce-through-the-canonical-model")
 	lintJob := canonicalTestJob("a", "lint~check", "lint")
-	lintJob.JobDef.Args = []string{"lint"}
+	lintJob.JobDef.Batchable = &extension.TaskBatchPolicy{Tool: "biome", Kind: extensionproto.CommandKindDiagnostics}
 	testJob := canonicalTestJob("b", "test~test", "test")
-	testJob.JobDef.Args = []string{"test"}
+	testJob.JobDef.Batchable = &extension.TaskBatchPolicy{Tool: "go-test", Kind: extensionproto.CommandKindVerification}
 	buildJob := canonicalTestJob("c", "build~compile", "build-compile")
 	buildJob.JobDef.Args = []string{"build-compile"}
 

@@ -6,25 +6,9 @@ import (
 	"time"
 
 	"go.putnami.dev/cli/model/jobs"
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
-
-// reserved summary-cell widths per command, including the command label and a
-// status glyph. Fixed widths keep columns aligned and prevent jitter as
-// counters update; longer content is truncated to fit.
-var commandCellWidth = map[string]int{
-	"generate": 14,
-	"lint":     15,
-	"format":   15,
-	// test carries the coverage percentage alongside the pass counts
-	// ("test ✓ 285/285 80.8%"), so it reserves more room than the other cells.
-	"test":    22,
-	"build":   16,
-	"package": 15,
-	"deploy":  13,
-	"publish": 15,
-	"serve":   18,
-}
 
 const defaultCellWidth = 14
 const minProjectNameWidth = 6
@@ -47,9 +31,10 @@ func (r *LiveRenderer) Start(planned []*jobs.ScheduledJob) {
 	r.stopped = false
 	r.reset()
 
-	// Build rows and commands in first-seen plan order.
+	// Build rows and commands in first-seen plan order. A command's first job
+	// gives it its traits.
 	colorIdx := 0
-	cmdSeen := make(map[string]bool)
+	cmdTraits := make(map[string]extensionproto.CommandTraits)
 	for _, job := range planned {
 		r.jobToProj[job.Key()] = job.Project.ID
 		cacheable := jobs.CanUseCache(job)
@@ -73,7 +58,7 @@ func (r *LiveRenderer) Start(planned []*jobs.ScheduledJob) {
 		cmd := commandName(job)
 		cs := row.commands[cmd]
 		if cs == nil {
-			cs = &commandState{name: cmd, metrics: make(map[string]float64)}
+			cs = &commandState{name: cmd, kind: job.JobDef.Traits.Kind, metrics: make(map[string]float64)}
 			row.commands[cmd] = cs
 			row.commandOrder = append(row.commandOrder, cmd)
 		}
@@ -86,7 +71,9 @@ func (r *LiveRenderer) Start(planned []*jobs.ScheduledJob) {
 				cs.alwaysRunStep = stepName(job.JobDef.Name)
 			}
 		}
-		cmdSeen[cmd] = true
+		if _, seen := cmdTraits[cmd]; !seen {
+			cmdTraits[cmd] = job.JobDef.Traits
+		}
 	}
 	for projectID, replay := range r.coverageReplay {
 		row := r.rowByID[projectID]
@@ -104,7 +91,7 @@ func (r *LiveRenderer) Start(planned []*jobs.ScheduledJob) {
 
 	r.sortCommandOrders()
 	r.buildDependencyGraph(planned)
-	r.computeLayout(cmdSeen)
+	r.computeLayout(cmdTraits)
 	r.initProgress(planned)
 
 	iox.Fprint(r.errOut, HideCursor)
@@ -156,8 +143,9 @@ func (r *LiveRenderer) buildDependencyGraph(planned []*jobs.ScheduledJob) {
 	}
 }
 
-// computeLayout fixes the column widths and summary column order for the run.
-func (r *LiveRenderer) computeLayout(cmdSeen map[string]bool) {
+// computeLayout fixes the column widths, hide ranks and summary column order
+// for the run from the commands it plans and their traits.
+func (r *LiveRenderer) computeLayout(cmdTraits map[string]extensionproto.CommandTraits) {
 	// Project-name column: widest name, later constrained by terminal width.
 	nameW := minProjectNameWidth
 	for _, row := range r.rows {
@@ -168,7 +156,7 @@ func (r *LiveRenderer) computeLayout(cmdSeen map[string]bool) {
 
 	// Status/phase column: widest of the status words and command names.
 	statusW := len(statusCoalesced)
-	for cmd := range cmdSeen {
+	for cmd := range cmdTraits {
 		if l := len(cmd); l > statusW {
 			statusW = l
 		}
@@ -181,8 +169,8 @@ func (r *LiveRenderer) computeLayout(cmdSeen map[string]bool) {
 	// Summary columns: one per command in canonical order. Coverage has no column
 	// of its own — it renders inside the test cell (see successValue) so it cannot
 	// be dropped while the test counts survive.
-	cmds := make([]string, 0, len(cmdSeen))
-	for cmd := range cmdSeen {
+	cmds := make([]string, 0, len(cmdTraits))
+	for cmd := range cmdTraits {
 		cmds = append(cmds, cmd)
 	}
 	sort.SliceStable(cmds, func(i, j int) bool {
@@ -196,7 +184,8 @@ func (r *LiveRenderer) computeLayout(cmdSeen map[string]bool) {
 	r.colOrder = nil
 	for _, cmd := range cmds {
 		r.colOrder = append(r.colOrder, cmd)
-		r.colWidth[cmd] = cellWidth(cmd)
+		r.colWidth[cmd] = cellWidth(cmd, cmdTraits[cmd])
+		r.colHideRank[cmd] = summaryColumnHideRank(cmdTraits[cmd])
 		extraWidth := 0
 		for _, row := range r.rows {
 			state := row.commands[cmd]
@@ -220,15 +209,23 @@ func (r *LiveRenderer) computeLayout(cmdSeen map[string]bool) {
 	r.nameWidth = r.adaptiveNameWidth(nameW)
 }
 
-func cellWidth(cmd string) int {
-	if w, ok := commandCellWidth[cmd]; ok {
+// cellWidth reserves a command's summary cell, including its label and a
+// status glyph, by the value its kind renders. Fixed widths keep columns
+// aligned and prevent jitter as counters update; longer content is truncated
+// to fit. A verification cell carries the coverage percentage alongside the
+// pass counts ("test ✓ 285/285 80.8%"), so it reserves the most room.
+func cellWidth(cmd string, traits extensionproto.CommandTraits) int {
+	w := max(defaultCellWidth, len(cmd)+1+9)
+	switch traits.Kind {
+	case extensionproto.CommandKindDiagnostics:
+		return max(w, 15)
+	case extensionproto.CommandKindVerification:
+		return max(w, 22)
+	case extensionproto.CommandKindFiles:
+		return max(w, 16)
+	default:
 		return w
 	}
-	w := len(cmd) + 1 + 9
-	if w < defaultCellWidth {
-		w = defaultCellWidth
-	}
-	return w
 }
 
 func (r *LiveRenderer) adaptiveNameWidth(natural int) int {

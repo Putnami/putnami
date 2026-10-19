@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -471,7 +472,9 @@ func TestBatchWithoutRetryBudgetNeverReExecutesAMember(t *testing.T) {
 // through both answer shapes: as a streamed diagnostic event when it runs for
 // one project, and as a batch wire slice when it runs for the group. Whatever
 // the dispatch shape, the canonical task result a consumer reads must be the
-// same records.
+// same records. Run for one project, the tool opens its stream with the meta
+// event the extension SDK writes, naming the job it was told it runs; its task
+// arguments name a different step, as the TypeScript lint-check task's do.
 func equivalenceFixture(t *testing.T, logPath string) (*workspace.Workspace, []*ScheduledJob) {
 	t.Helper()
 	ws, planned := makeBatchSchedulerFixture(t, "")
@@ -486,25 +489,53 @@ func equivalenceFixture(t *testing.T, logPath string) (*workspace.Workspace, []*
 		"{\"projectId\":\"/b\",\"status\":\"FAILED\",\"diagnostics\":[{\"category\":\"lint/x\",\"severity\":\"error\","+
 		"\"description\":\"broken\",\"file\":\"src.txt\",\"line\":3,\"column\":4}]}]}}}'\n"+
 		"else\n"+
+		"  printf '{\"v\":2,\"type\":\"meta\",\"level\":\"info\",\"message\":\"Starting %s\","+
+		"\"data\":{\"extension\":\"%s\",\"job\":\"%s\"}}\\n' "+
+		"\"$PUTNAMI_JOB_NAME\" \"$PUTNAMI_EXTENSION_NAME\" \"$PUTNAMI_JOB_NAME\"\n"+
 		"  printf '%s\\n' "+shellQuote(diagnostic)+"\n"+
 		"  printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"FAILED\"}}'\n"+
 		"fi\n")
 	for _, job := range planned {
 		job.JobDef.Command = command
+		job.JobDef.Args = []string{"lint-check"}
 	}
 	return ws, planned
 }
 
+// metaLine is what a meta event says: its message and the extension and job
+// it names.
+type metaLine struct {
+	message, extension, job string
+}
+
+// metaLinesOf returns the meta events of a member's stream.
+func metaLinesOf(events []RawJobEvent) []metaLine {
+	var lines []metaLine
+	for _, event := range events {
+		if event.Type != EventTypeMeta {
+			continue
+		}
+		ext, _ := event.Data["extension"].(string)
+		job, _ := event.Data["job"].(string)
+		lines = append(lines, metaLine{message: event.Message, extension: ext, job: job})
+	}
+	return lines
+}
+
 // Solo and batched dispatch of the same plan produce the same canonical task
-// results: same verdict, same diagnostics, same identity on each record.
+// results: same verdict, same diagnostics, same identity on each record. Each
+// member's meta event names its command as the solo subprocess does.
 func TestSoloAndBatchDispatchProduceEqualCanonicalResults(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "batch-parity-and-live-cells-follow-declared-kinds",
+		"a-batch-member-meta-names-its-command-as-a-solo-run-does")
 	if _, err := os.Stat("/bin/sh"); err != nil {
 		t.Skip("/bin/sh unavailable")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), batchLifecycleHangBound)
 	defer cancel()
 
+	metas := map[bool]map[string][]metaLine{}
 	run := func(solo bool) map[string]TaskResult {
 		logPath := filepath.Join(t.TempDir(), "invocations")
 		ws, planned := equivalenceFixture(t, logPath)
@@ -522,8 +553,10 @@ func TestSoloAndBatchDispatchProduceEqualCanonicalResults(t *testing.T) {
 			t.Fatalf("solo=%v invocations = %v, want %d", solo, got, wantInvocations)
 		}
 		tasks := make(map[string]TaskResult, len(planned))
+		metas[solo] = make(map[string][]metaLine, len(planned))
 		for _, job := range planned {
 			tasks[job.Key()] = TaskResultOf(job, result.Results[job.Key()])
+			metas[solo][job.Key()] = metaLinesOf(result.Results[job.Key()].Events)
 		}
 		return tasks
 	}
@@ -545,6 +578,10 @@ func TestSoloAndBatchDispatchProduceEqualCanonicalResults(t *testing.T) {
 		}
 		if got.Project != want.Project || got.Job != want.Job || got.TaskKind != want.TaskKind {
 			t.Errorf("%s identity: batch %+v, solo %+v", key, got, want)
+		}
+		if batchMeta, soloMeta := metas[false][key], metas[true][key]; len(soloMeta) != 1 ||
+			!reflect.DeepEqual(batchMeta, soloMeta) {
+			t.Errorf("%s meta: batch %+v, solo %+v", key, batchMeta, soloMeta)
 		}
 	}
 }

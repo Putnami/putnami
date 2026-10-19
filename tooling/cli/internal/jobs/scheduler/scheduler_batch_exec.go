@@ -23,6 +23,7 @@ import (
 	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	extensionproto "go.putnami.dev/protocol/extension"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -571,12 +572,13 @@ func batchWireArtifacts(wire batchWireResult) []TaskArtifact {
 }
 
 // batchWireMetrics derives the per-project metrics a solo run would have
-// emitted: the lint summary counters or the test/coverage counters, followed by
-// any explicit metrics the extension put on the wire.
+// emitted, by the task's batch kind: the lint summary counters for
+// diagnostics, the test/coverage counters for verification, none without a
+// kind. The explicit metrics the extension put on the wire follow.
 func batchWireMetrics(job *ScheduledJob, wire batchWireResult) []TaskMetric {
 	var metrics []TaskMetric
-	switch batchExtensionJobName(job) {
-	case "lint":
+	switch batchKind(job) {
+	case extensionproto.CommandKindDiagnostics:
 		for _, metric := range []TaskMetric{
 			{Name: "lint-errors", Value: float64(wire.Summary.Errors), Unit: "count"},
 			{Name: "lint-warnings", Value: float64(wire.Summary.Warnings), Unit: "count"},
@@ -587,7 +589,7 @@ func batchWireMetrics(job *ScheduledJob, wire batchWireResult) []TaskMetric {
 			}
 			metrics = append(metrics, metric)
 		}
-	case "test":
+	case extensionproto.CommandKindVerification:
 		metrics = append(metrics, testBatchMetrics(wire.Data)...)
 	}
 	// Replay any explicit per-project metrics (e.g. the build producers'
@@ -615,8 +617,11 @@ func batchWireMetrics(job *ScheduledJob, wire batchWireResult) []TaskMetric {
 // data is the member's own extension result payload (the same map that reaches
 // the renderers as JobResult.Data), which the test/summary lines and the
 // terminal result event report verbatim.
-// canonicalTaskEvents projects a member's canonical result onto the runtime
-// event shapes.
+//
+// The meta event names the member's command, which is what a solo subprocess
+// is told as its job name. The progress, log and summary events follow the
+// task's batch kind: diagnostics projects the lint lines, verification the
+// test lines, and a task without a kind projects neither.
 //
 // All twelve projections stamp MaxKnownProtocolVersion — the version the CLI
 // advertises to every subprocess (runner.go) and the only one it accepts back
@@ -630,18 +635,19 @@ func batchWireMetrics(job *ScheduledJob, wire batchWireResult) []TaskMetric {
 func canonicalTaskEvents(job *ScheduledJob, task TaskResult, data map[string]any) []RawJobEvent {
 	status := task.Status
 	phaseName := batchPhaseName(job)
-	jobName := batchExtensionJobName(job)
+	kind := batchKind(job)
+	command := jobCommandName(job)
 	events := []RawJobEvent{{
 		Version: runtimeproto.MaxKnownProtocolVersion,
 		Type:    EventTypeMeta,
 		Level:   "info",
-		Message: "Starting " + jobName,
+		Message: "Starting " + command,
 		Data: map[string]any{
 			"extension": job.Extension.Name,
-			"job":       jobName,
+			"job":       command,
 		},
 	}}
-	if jobName == "lint" {
+	if kind == extensionproto.CommandKindDiagnostics {
 		events = append(events, RawJobEvent{
 			Version: runtimeproto.MaxKnownProtocolVersion,
 			Type:    EventTypeProgress,
@@ -651,7 +657,7 @@ func canonicalTaskEvents(job *ScheduledJob, task TaskResult, data map[string]any
 				"total":   float64(1),
 			},
 		})
-	} else if jobName == "test" {
+	} else if kind == extensionproto.CommandKindVerification {
 		events = append(events, RawJobEvent{
 			Version: runtimeproto.MaxKnownProtocolVersion,
 			Type:    EventTypeProgress,
@@ -725,7 +731,7 @@ func canonicalTaskEvents(job *ScheduledJob, task TaskResult, data map[string]any
 			"status": phaseStatus,
 		},
 	})
-	if jobName == "lint" && status == TaskStatusSuccess {
+	if kind == extensionproto.CommandKindDiagnostics && status == TaskStatusSuccess {
 		events = append(events, RawJobEvent{
 			Version: runtimeproto.MaxKnownProtocolVersion,
 			Type:    EventTypeLog,
@@ -739,7 +745,7 @@ func canonicalTaskEvents(job *ScheduledJob, task TaskResult, data map[string]any
 				Message: summary,
 			})
 		}
-	} else if jobName == "test" {
+	} else if kind == extensionproto.CommandKindVerification {
 		if summary := testBatchSummary(data, status == TaskStatusFailed); summary != "" {
 			events = append(events, RawJobEvent{
 				Version: runtimeproto.MaxKnownProtocolVersion,
@@ -847,16 +853,13 @@ func testBatchSummary(data map[string]any, testFailed bool) string {
 	return strings.Join(parts, ", ")
 }
 
-func batchExtensionJobName(job *ScheduledJob) string {
-	if job != nil && job.JobDef != nil {
-		for _, arg := range job.JobDef.Args {
-			switch arg {
-			case "lint", "lint-format", "lint-check", "test":
-				return arg
-			}
-		}
+// batchKind is the tally a batch member's task declares, one of
+// extensionproto.ValidBatchKinds, or empty.
+func batchKind(job *ScheduledJob) string {
+	if job == nil || job.JobDef == nil || job.JobDef.Batchable == nil {
+		return ""
 	}
-	return jobCommandName(job)
+	return job.JobDef.Batchable.Kind
 }
 
 // lintSummaryText renders the lint summary line from the CANONICAL metrics
@@ -895,30 +898,17 @@ func taskMetricValue(metrics []TaskMetric, name string) float64 {
 	return 0
 }
 
+// batchPhaseName names a batch member's reconstructed phase: the phase its
+// task declares, else its step id, else "batch".
 func batchPhaseName(job *ScheduledJob) string {
-	if job != nil && job.JobDef != nil {
-		for _, arg := range job.JobDef.Args {
-			switch arg {
-			case "lint-format":
-				return "format"
-			case "lint", "lint-check":
-				return "lint"
-			// Build producers name their solo phase after the build kind, not the
-			// pipeline step id; derive it from the task arg so the reconstructed
-			// phase name matches the solo emit.PhaseStart/PhaseEnd exactly.
-			case "build-generate":
-				return "generate"
-			case "build-transpile":
-				return "transpile"
-			case "build-types":
-				return "types"
-			case "build-compile":
-				return "compile"
-			}
-		}
+	if job == nil || job.JobDef == nil {
+		return "batch"
 	}
-	if job != nil && job.StepID() != "" {
-		return job.StepID()
+	if policy := job.JobDef.Batchable; policy != nil && policy.Phase != "" {
+		return policy.Phase
+	}
+	if step := job.StepID(); step != "" {
+		return step
 	}
 	return "batch"
 }

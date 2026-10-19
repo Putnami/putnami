@@ -78,6 +78,7 @@ type LiveRenderer struct {
 	statusWidth int      // status/phase column width
 	colOrder    []string // summary command columns, in display order
 	colWidth    map[string]int
+	colHideRank map[string]int // summaryColumnHideRank of each column
 
 	// summaryFit memoizes the per-row column fit. Its inputs (width, leading
 	// width, colOrder, colWidth) are all run-fixed, so the fit is identical for
@@ -139,7 +140,10 @@ type projectRow struct {
 // commandState tracks a single project+command (e.g. core-api:test), folding
 // any pipeline steps into one logical task.
 type commandState struct {
-	name       string
+	name string
+	// kind is the command's declared kind, which says what its cell, its Tasks
+	// line and its failure cause read from its results.
+	kind       string
 	totalSteps int
 	doneSteps  int
 	startTime  time.Time
@@ -247,6 +251,7 @@ func (r *LiveRenderer) reset() {
 	r.jobCacheable = make(map[string]bool)
 	r.colOrder = nil
 	r.colWidth = make(map[string]int)
+	r.colHideRank = make(map[string]int)
 	r.summaryFit = nil
 	r.summaryFitWidth = 0
 	r.prevFrame = nil
