@@ -16,6 +16,10 @@
 #   ./putnamiw --download build --all  # consumer workspaces only: fetch a
 #                                      # pre-built binary instead of compiling.
 #                                      # Refused where tooling/cli is present.
+#   ./putnamiw mcp                     # serve MCP; on a cold machine the
+#                                      # wrapper answers the client while it
+#                                      # prepares the CLI (see "MCP server
+#                                      # start while the CLI is prepared")
 #   ./putnamiw --print-engine          # build or reuse the from-source CLI, run
 #                                      # only `putnami extensions prepare` with
 #                                      # it, and print one JSON line:
@@ -177,6 +181,9 @@ _CLEANUP_PATHS=()
 register_cleanup() { _CLEANUP_PATHS+=("$1"); }
 cleanup() {
   local p
+  if [ -n "${MCP_RELAY_PID:-}" ]; then
+    kill "$MCP_RELAY_PID" 2>/dev/null || true
+  fi
   if [ "${#_CLEANUP_PATHS[@]}" -gt 0 ]; then
     for p in "${_CLEANUP_PATHS[@]}"; do
       [ -n "$p" ] && rm -rf "$p" 2>/dev/null
@@ -1246,18 +1253,171 @@ fi
 
 # --- Main ---
 
-if [ "$DOWNLOAD" = "true" ]; then
-  download_cli
-else
-  resolve_go
-  build_cli
-  # A keyed build published a store blob, so run it through its immutable path.
-  # Without a key (no git, or no sha256sum or shasum) build_cli wrote a regular file into
-  # $CLI_BINARY and there is no blob to exec; fall through to the identity check.
-  if [ -n "$SOURCE_KEY" ]; then
-    exec_source_blob "$SOURCE_KEY" "${PASSTHROUGH_ARGS[@]}"
+# prepare_cli downloads or builds the CLI that run_prepared_cli then starts.
+prepare_cli() {
+  if [ "$DOWNLOAD" = "true" ]; then
+    download_cli
+  else
+    resolve_go
+    build_cli
   fi
-  SUPPRESS_RELAUNCH="true" # ran a from-source build; it is authoritative
-  FROM_SOURCE_ROOT="$SCRIPT_DIR" # ...and it came from THIS tree; see run_cli
+}
+
+# run_prepared_cli execs the CLI that prepare_cli produced. A keyed build runs
+# through its immutable store path. A keyless build (no git, or no sha256sum or
+# shasum) is the regular file at $CLI_BINARY, run with the from-source proof of
+# this tree.
+run_prepared_cli() {
+  if [ "$DOWNLOAD" = "false" ]; then
+    if [ -n "$SOURCE_KEY" ]; then
+      exec_source_blob "$SOURCE_KEY" "${PASSTHROUGH_ARGS[@]}"
+    fi
+    SUPPRESS_RELAUNCH="true"
+    FROM_SOURCE_ROOT="$SCRIPT_DIR"
+  fi
+  run_cli "$CLI_BINARY" "${PASSTHROUGH_ARGS[@]}"
+}
+
+# --- MCP server start while the CLI is prepared ---
+#
+# An MCP client gives up on a server that does not answer `initialize` within
+# its connect timeout, and preparing the CLI on a cold machine takes longer.
+# `./putnamiw mcp` on this path therefore answers the client itself until the
+# CLI is ready, then hands the session to the CLI's own server:
+#
+#   - `initialize` gets the reply of a server that is still preparing: no
+#     tools, no resources, and both lists announced as changing.
+#   - `ping`, `tools/list` and `resources/list` get their empty answers.
+#   - `tools/call`, `resources/read`, every notification and every frame it
+#     cannot read are queued for the CLI.
+#   - Any other request gets the JSON-RPC "method not found" error the CLI's
+#     server gives it.
+#
+# The queue is a FIFO that the CLI reads as its stdin. Its first frame is an
+# `initialize` carrying the client's protocol version and clientInfo under the
+# id "putnamiw-prepare". The CLI's reply to it is dropped, and in its place the
+# client receives `notifications/tools/list_changed` and
+# `notifications/resources/list_changed`. Once the CLI runs, every client frame
+# goes to it unread. A failed preparation ends the session with its error on
+# stderr.
+
+MCP_PREPARE_ID='"putnamiw-prepare"'
+
+# mcp_frame_fields sets MCP_METHOD and MCP_ID to the top-level method and raw id
+# of the JSON-RPC frame $1, or to empty strings when the frame has none. Nested
+# objects and arrays are reduced to 0 first, so a member of params is never
+# read as a top-level one.
+mcp_frame_fields() {
+  local frame="$1" nested='^(.+)(\{[^{}]*\}|\[[^][]*\])(.*)$'
+  local method_re='"method"[[:space:]]*:[[:space:]]*"([^"\\]*)"'
+  local id_re='"id"[[:space:]]*:[[:space:]]*("([^"\\]|\\.)*"|-?[0-9]+)'
+  MCP_METHOD=""
+  MCP_ID=""
+  frame="${frame#"${frame%%[![:space:]]*}"}"
+  case "$frame" in
+    "{"*) ;;
+    *) return 0 ;;
+  esac
+  while [[ $frame =~ $nested ]]; do
+    frame="${BASH_REMATCH[1]}0${BASH_REMATCH[3]}"
+  done
+  if [[ $frame =~ $method_re ]]; then
+    MCP_METHOD="${BASH_REMATCH[1]}"
+  fi
+  if [[ $frame =~ $id_re ]]; then
+    MCP_ID="${BASH_REMATCH[1]}"
+  fi
+  return 0
+}
+
+# mcp_reply writes the JSON-RPC result $2 for the request id $1 to stdout.
+mcp_reply() {
+  printf '{"jsonrpc":"2.0","id":%s,"result":%s}\n' "$1" "$2"
+}
+
+# mcp_relay_while_preparing reads the client's frames from stdin, answers them
+# while the file $1/ready is absent, and writes the frames the CLI must see to
+# fd 4. Once $1/ready exists it copies the rest of stdin to fd 4 unread.
+mcp_relay_while_preparing() {
+  local dir="$1" line version client replayed="false"
+  local version_re='"protocolVersion"[[:space:]]*:[[:space:]]*"([^"\\]*)"'
+  local client_re='"clientInfo"[[:space:]]*:[[:space:]]*(\{[^{}]*\})'
+  local instructions="Putnami is building its CLI from the sources of this workspace. Its tools and resources appear when the build finishes, announced by notifications/tools/list_changed and notifications/resources/list_changed."
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [ -f "$dir/ready" ]; then
+      printf '%s\n' "$line" >&4
+      exec cat >&4
+    fi
+    mcp_frame_fields "${line%$'\r'}"
+    case "$MCP_METHOD" in
+      initialize)
+        version="2025-06-18"
+        if [[ $line =~ $version_re ]]; then
+          version="${BASH_REMATCH[1]}"
+        fi
+        client='{}'
+        if [[ $line =~ $client_re ]]; then
+          client="${BASH_REMATCH[1]}"
+        fi
+        if [ -n "$MCP_ID" ]; then
+          mcp_reply "$MCP_ID" "{\"protocolVersion\":\"$version\",\"capabilities\":{\"tools\":{\"listChanged\":true},\"resources\":{\"subscribe\":false,\"listChanged\":true}},\"serverInfo\":{\"name\":\"putnami\",\"version\":\"preparing\"},\"instructions\":\"$instructions\"}"
+        fi
+        if [ "$replayed" = "false" ]; then
+          printf '{"jsonrpc":"2.0","id":%s,"method":"initialize","params":{"protocolVersion":"%s","capabilities":{},"clientInfo":%s}}\n' \
+            "$MCP_PREPARE_ID" "$version" "$client" >&4
+          replayed="true"
+        fi
+        ;;
+      ping) [ -z "$MCP_ID" ] || mcp_reply "$MCP_ID" '{}' ;;
+      tools/list) [ -z "$MCP_ID" ] || mcp_reply "$MCP_ID" '{"tools":[]}' ;;
+      resources/list) [ -z "$MCP_ID" ] || mcp_reply "$MCP_ID" '{"resources":[]}' ;;
+      tools/call | resources/read | "") printf '%s\n' "$line" >&4 ;;
+      *)
+        if [ -n "$MCP_ID" ]; then
+          printf '{"jsonrpc":"2.0","id":%s,"error":{"code":-32601,"message":"method not found: %s"}}\n' "$MCP_ID" "$MCP_METHOD"
+        else
+          printf '%s\n' "$line" >&4
+        fi
+        ;;
+    esac
+  done
+}
+
+# mcp_announce_ready copies the CLI's stdout to the client. When its first frame
+# is the reply to the replayed initialize, it writes the two list_changed
+# notifications in its place.
+mcp_announce_ready() {
+  local line
+  if IFS= read -r line || [ -n "$line" ]; then
+    case "$line" in
+      *"\"id\":$MCP_PREPARE_ID"*)
+        printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/tools/list_changed"}' \
+          '{"jsonrpc":"2.0","method":"notifications/resources/list_changed"}'
+        ;;
+      *) printf '%s\n' "$line" ;;
+    esac
+  fi
+  exec cat
+}
+
+# serve_mcp_while_preparing prepares the CLI and serves the MCP session as the
+# section above states. It never returns.
+serve_mcp_while_preparing() {
+  local dir status=0
+  dir="$(mktemp -d "${TMPDIR:-/tmp}/putnamiw-mcp.XXXXXX")" || fail "Cannot create a directory for the MCP session"
+  register_cleanup "$dir"
+  mkfifo "$dir/frames" || fail "Cannot create the MCP frame queue at $dir/frames"
+  mcp_relay_while_preparing "$dir" <&0 4>"$dir/frames" &
+  MCP_RELAY_PID=$!
+  exec <"$dir/frames"
+  prepare_cli </dev/null >&2
+  : >"$dir/ready"
+  run_prepared_cli | mcp_announce_ready || status=$?
+  exit "$status"
+}
+
+if [ "${#PASSTHROUGH_ARGS[@]}" -eq 1 ] && [ "${PASSTHROUGH_ARGS[0]}" = "mcp" ]; then
+  serve_mcp_while_preparing
 fi
-run_cli "$CLI_BINARY" "${PASSTHROUGH_ARGS[@]}"
+prepare_cli
+run_prepared_cli
