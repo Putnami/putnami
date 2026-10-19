@@ -1,6 +1,8 @@
 # ADR 0070 — A task scope keeps a job by its declared side effects
 
-- **Status**: proposed
+- **Status**: proposed. Decision 2 is superseded by
+  [ADR 0072](0072-the-spec-gate-and-task-scopes-follow-declared-outputs-and-command-kinds.md)
+  (proposed): a task scope never narrows a command of the criteria kind.
 - **Scope**: `@putnami/cli` (`internal/engine` plan narrowing)
 - **Supersedes in part**: [ADR 0044](0044-selection-is-task-level.md),
   decision 5, the bullet "`publish`, `deploy`, `validate` and

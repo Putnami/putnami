@@ -185,7 +185,8 @@
               "renames-and-assets-select-every-owner",
               "the-selection-explains-every-project-it-holds",
               "why-impacted-walks-the-edges-impacted-widens-through",
-              "a-task-scope-keeps-every-job-that-declares-side-effects"
+              "a-task-scope-keeps-every-job-that-declares-side-effects",
+              "a-criteria-kind-command-is-never-narrowed"
             ]
           }
         },
@@ -838,6 +839,25 @@
               "an-exhausted-evidence-scope-blocks-and-says-so",
               "unresolvable-evidence-warns-with-the-attesting-projects-named",
               "a-resolved-session-consults-no-cache"
+            ]
+          }
+        },
+        {
+          "id": "declared-verification-producers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-producer-is-a-declaring-task-of-a-command-of-its-kind",
+              "a-verification-kind-command-carries-the-gate",
+              "projection-applicability-plans-the-declaring-commands",
+              "cache-recovery-plans-the-verification-kind-commands",
+              "a-warm-hit-restores-the-declared-artifact-by-kind",
+              "coverage-is-recorded-and-replayed-under-the-command-that-measured-it",
+              "a-third-party-producer-command-gates-the-run"
             ]
           }
         },

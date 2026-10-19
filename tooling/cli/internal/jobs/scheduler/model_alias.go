@@ -34,6 +34,14 @@ var ProducesVerificationReport = model.ProducesVerificationReport
 // project's criteria-projection producer.
 var ProducesSpecCriteriaProjection = model.ProducesSpecCriteriaProjection
 
+// CommandsOfKind returns the loaded commands whose resolved traits declare a
+// command kind.
+var CommandsOfKind = model.CommandsOfKind
+
+// SpecCriteriaProjectionCommands returns the criteria commands whose jobs
+// include a criteria-projection producer.
+var SpecCriteriaProjectionCommands = model.SpecCriteriaProjectionCommands
+
 // --- Typed identity ---
 
 // TaskIdentityOfKey is the fallback for a result the plan does not name.

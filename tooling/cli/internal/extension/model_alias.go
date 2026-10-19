@@ -97,6 +97,13 @@ const (
 	ResourceIDSources       = model.ResourceIDSources
 )
 
+// The command kinds the spec gate, the task-scope narrowing and the session
+// report read from a job's resolved traits.
+const (
+	CommandKindVerification = model.CommandKindVerification
+	CommandKindCriteria     = model.CommandKindCriteria
+)
+
 // Declared-output drift policies and the diagnostic code the engine reports a
 // difference under (protocol ADR 0004).
 const (

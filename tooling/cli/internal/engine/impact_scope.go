@@ -12,20 +12,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// neverNarrowedCommands are the commands whose jobs a task scope never narrows
-// by name (ADR 0070). `validate` and `validate-workspace` check what the
-// session verified, including the spec gate's criteria projection on every
-// project that runs `test`. A scope names the tasks a change's declared inputs
-// reach, and no declaration names the tasks these two follow, so their names
-// stand in for that declaration. A kept `validate~specs` keeps in turn the
-// `test` command whose reports it judges (narrowToTaskScopes).
-//
-// Every other command is kept or dropped by its declarations alone: see
-// narrowToTaskScopes.
-var neverNarrowedCommands = map[string]bool{
-	"validate": true, "validate-workspace": true,
-}
-
 // extensionScopeSeparator joins an extension project id to a task scope inside
 // one scope entry (workspace.TaskIndex owns the spelling).
 const extensionScopeSeparator = "#"
@@ -42,12 +28,15 @@ const extensionScopeSeparator = "#"
 //     has a default one that a declaration never removes: the
 //     release-set coordinator decides which members a session releases, and a
 //     scope narrows what the diff VERIFIES, never what the session RELEASES;
-//   - its command is `validate` or `validate-workspace`
-//     (neverNarrowedCommands);
-//   - it is a `test` job, and a kept job of the same project projects the
-//     spec criteria judged against that command's verification reports: the
-//     spec gate reads the reports a full plan gives it, and an unchanged test
-//     is a cache hit;
+//   - its command's resolved traits declare the criteria kind (ADR 0072): such
+//     a command checks what the session verified, including the spec gate's
+//     criteria projection. A scope names the tasks a change's declared inputs
+//     reach, and no declaration names the session results these commands
+//     follow, so the kind stands in for that declaration;
+//   - its command's resolved traits declare the verification kind, and a kept
+//     job of the same project projects the spec criteria judged against that
+//     command's verification reports: the spec gate reads the reports a full
+//     plan gives it, and an unchanged test is a cache hit;
 //   - a kept job depends on it or is serialized after it, transitively: the
 //     kept plan stays a closed graph, the rule serve_withhold.go applies to
 //     the jobs it hands a supervisor. A scoped `test` keeps the `build` it
@@ -84,7 +73,8 @@ func narrowToTaskScopes(ws *workspace.Workspace, planned []*scheduler.ScheduledJ
 		command := modeljobs.JobCommandName(job)
 		sideEffects := job.JobDef.Traits.SideEffects != extensionproto.SideEffectsNone ||
 			extensionproto.EffectiveTraits(command, nil).SideEffects != extensionproto.SideEffectsNone
-		if !scoped || sideEffects || neverNarrowedCommands[command] || jobInScope(ws, job, scope) {
+		criteria := job.JobDef.Traits.Kind == extensionproto.CommandKindCriteria
+		if !scoped || sideEffects || criteria || jobInScope(ws, job, scope) {
 			kept[job.Key()] = true
 			frontier = append(frontier, job)
 			if scoped && scheduler.ProducesSpecCriteriaProjection(job) {
@@ -93,11 +83,11 @@ func narrowToTaskScopes(ws *workspace.Workspace, planned []*scheduler.ScheduledJ
 		}
 	}
 	// A kept criteria projection is judged against the verification reports of
-	// its project's `test` command, so that command stays whole: the steps that
+	// its project's verification commands, so each stays whole: the steps that
 	// write the reports, and the finalizers that tear down what they ran on.
 	for _, job := range planned {
 		if job != nil && job.Project != nil && job.JobDef != nil && judged[job.Project.ID] &&
-			!kept[job.Key()] && modeljobs.JobCommandName(job) == "test" {
+			!kept[job.Key()] && job.JobDef.Traits.Kind == extensionproto.CommandKindVerification {
 			kept[job.Key()] = true
 			frontier = append(frontier, job)
 		}

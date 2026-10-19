@@ -209,10 +209,13 @@ func rawEventsFromCache(events []cache.ActionEvent) []jobmodel.RawJobEvent {
 //
 // Most artifacts cannot be reconstructed from a filesystem declaration alone:
 // its output id, display name and kind are runtime result data. These two are
-// different because protocols/features reserves their identity, filename and
-// command. They are also correctness inputs: the spec gate reads them after the
-// scheduler finishes, and losing either on a warm hit can fail closed on valid
-// evidence (or silently omit the criteria to enforce).
+// different because protocols/features reserves their identity and filename,
+// and the producer rule (jobmodel.ProducesVerificationReport,
+// jobmodel.ProducesSpecCriteriaProjection) names the task that writes each: a
+// task of a verification or criteria command that declares the file. They are
+// also correctness inputs: the spec gate reads them after the scheduler
+// finishes, and losing either on a warm hit can fail closed on valid evidence
+// (or silently omit the criteria to enforce).
 func RestoreReservedDeclaredArtifactEvents(job *jobmodel.ScheduledJob, entry *store.TaskEntry, result *jobmodel.JobResult) {
 	if job == nil || entry == nil || result == nil {
 		return
@@ -225,10 +228,10 @@ func RestoreReservedDeclaredArtifactEvents(job *jobmodel.ScheduledJob, entry *st
 
 		var id, name string
 		switch {
-		case job.CommandName() == "test" && output.Path == features.VerificationReportFilename:
+		case output.Path == features.VerificationReportFilename && jobmodel.ProducesVerificationReport(job):
 			id = features.VerificationReportArtifactID
 			name = "Feature Verification Report"
-		case job.CommandName() == "validate" && output.Path == features.SpecCriteriaProjectionFilename:
+		case output.Path == features.SpecCriteriaProjectionFilename && jobmodel.ProducesSpecCriteriaProjection(job):
 			id = features.SpecCriteriaProjectionArtifactID
 			name = "Executable criteria projection"
 		default:

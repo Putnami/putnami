@@ -145,17 +145,22 @@ func (s *Session) FinalizeV2WithCoverage(
 	})
 }
 
+// validationCoverageEntries records, per project and verification command, the
+// first planned job whose completed result carries a valid coverage summary.
+// The command's resolved kind, not its name, makes its jobs coverage sources.
 func validationCoverageEntries(
 	planned []*jobs.ScheduledJob,
 	results map[string]*jobs.JobResult,
 ) []SessionCoverageEntry {
 	coverage := make([]SessionCoverageEntry, 0)
-	seenProjects := make(map[string]struct{})
+	seen := make(map[string]struct{})
 	for _, job := range planned {
-		if job == nil || job.Project == nil || job.CommandName() != "test" {
+		if job == nil || job.Project == nil || job.JobDef == nil ||
+			job.JobDef.Traits.Kind != extension.CommandKindVerification {
 			continue
 		}
-		if _, seen := seenProjects[job.Project.ID]; seen {
+		key := job.Project.ID + "\x00" + job.CommandName()
+		if _, recorded := seen[key]; recorded {
 			continue
 		}
 		result := results[job.Key()]
@@ -178,7 +183,7 @@ func validationCoverageEntries(
 			Provider: identity.Provider.Extension,
 			Summary:  *summary,
 		})
-		seenProjects[job.Project.ID] = struct{}{}
+		seen[key] = struct{}{}
 	}
 	return coverage
 }
@@ -202,11 +207,13 @@ func validationCadenceRequested(params extension.ParamMap) bool {
 }
 
 // LatestValidationCoverage scans completed reports newest-first and returns
-// the newest trustworthy validation fact for each requested project. Sessions
-// without a report are deliberately skipped, so ordinary inner-loop runs do
-// not erase the last validation measurement merely by becoming `latest`.
+// the newest trustworthy validation fact for each requested project, among the
+// facts recorded under one of commands: the verification commands a session
+// names. Sessions without a report are deliberately skipped, so ordinary
+// inner-loop runs do not erase the last validation measurement merely by
+// becoming `latest`.
 func (ss *SessionStore) LatestValidationCoverage(commands, projectIDs []string) map[string]ValidationCoverage {
-	if !slices.Contains(commands, "test") {
+	if len(commands) == 0 {
 		return nil
 	}
 	wanted := make(map[string]struct{}, len(projectIDs))
@@ -225,11 +232,14 @@ func (ss *SessionStore) LatestValidationCoverage(commands, projectIDs []string) 
 		if len(wanted) > 0 && len(coverage) == len(wanted) {
 			break
 		}
-		report, ok := ss.readTrustedValidationReport(id)
+		report, ok := ss.readTrustedValidationReport(id, commands)
 		if !ok {
 			continue
 		}
 		for _, entry := range report.Coverage {
+			if !slices.Contains(commands, entry.Command) {
+				continue
+			}
 			projectID := entry.Project.ID
 			if len(wanted) > 0 {
 				if _, ok := wanted[projectID]; !ok {
@@ -250,19 +260,13 @@ func (ss *SessionStore) LatestValidationCoverage(commands, projectIDs []string) 
 	return coverage
 }
 
-func (ss *SessionStore) readTrustedValidationReport(sessionID string) (*SessionReport, bool) {
+// readTrustedValidationReport returns a session's report when it holds a fact
+// recorded under one of commands and both the report and its completed,
+// non-aborted session pass their strict readers. The report is read first, so
+// a session without one, or with no fact for these commands, costs no session
+// validation.
+func (ss *SessionStore) readTrustedValidationReport(sessionID string, commands []string) (*SessionReport, bool) {
 	dir := filepath.Join(ss.root, sessionID)
-	sessionData, err := os.ReadFile(filepath.Join(dir, "session.json"))
-	if err != nil || len(protocolcli.ValidateDocument(protocolcli.DocumentSessionFile, sessionData)) > 0 {
-		return nil, false
-	}
-	var session protocolcli.SessionFile
-	if err := json.Unmarshal(sessionData, &session); err != nil ||
-		session.SessionID != sessionID || session.EndTime == "" ||
-		session.Run.Outcome == protocolcli.RunOutcomeAborted {
-		return nil, false
-	}
-
 	reportData, err := os.ReadFile(filepath.Join(dir, reportFileName))
 	if err != nil {
 		return nil, false
@@ -271,7 +275,23 @@ func (ss *SessionStore) readTrustedValidationReport(sessionID string) (*SessionR
 	if err := json.Unmarshal(reportData, &report); err != nil {
 		return nil, false
 	}
+	if !slices.ContainsFunc(report.Coverage, func(entry SessionCoverageEntry) bool {
+		return slices.Contains(commands, entry.Command)
+	}) {
+		return nil, false
+	}
 	if err := validateSessionReport(&report, sessionID); err != nil {
+		return nil, false
+	}
+
+	sessionData, err := os.ReadFile(filepath.Join(dir, "session.json"))
+	if err != nil || len(protocolcli.ValidateDocument(protocolcli.DocumentSessionFile, sessionData)) > 0 {
+		return nil, false
+	}
+	var session protocolcli.SessionFile
+	if err := json.Unmarshal(sessionData, &session); err != nil ||
+		session.SessionID != sessionID || session.EndTime == "" ||
+		session.Run.Outcome == protocolcli.RunOutcomeAborted {
 		return nil, false
 	}
 	return &report, true
@@ -299,7 +319,7 @@ func validateSessionReport(report *SessionReport, sessionID string) error {
 	seen := make(map[string]struct{}, len(report.Coverage))
 	for i := range report.Coverage {
 		entry := &report.Coverage[i]
-		if entry.Project.ID == "" || entry.Project.Name == "" || entry.TaskKey == "" || entry.Command != "test" {
+		if entry.Project.ID == "" || entry.Project.Name == "" || entry.TaskKey == "" || entry.Command == "" {
 			return fmt.Errorf("validate session report: coverage[%d] has incomplete identity", i)
 		}
 		key := entry.Project.ID + "\x00" + entry.Command

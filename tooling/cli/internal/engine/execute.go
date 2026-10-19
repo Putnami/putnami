@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -49,6 +50,12 @@ func executionRenderer(
 		return sink
 	}
 	noColor := req.Global.Color != nil && !*req.Global.Color
+	// The live view replays the last coverage measured under a command of the
+	// verification kind that the session names.
+	verification := scheduler.CommandsOfKind(extensions, extension.CommandKindVerification)
+	replayed := slices.DeleteFunc(slices.Clone(req.Commands), func(command string) bool {
+		return !slices.Contains(verification, command)
+	})
 	return output.NewRenderer(output.Config{
 		Output:  req.Global.Output,
 		Command: strings.Join(req.Commands, ","),
@@ -59,7 +66,7 @@ func executionRenderer(
 		// serve and run both stream the child workload's output live; run differs
 		// only in that it is one-shot (no forced watch — see below).
 		ServeMode:      isServeMode || isRunMode,
-		CoverageReplay: sessStore.LatestValidationCoverage(req.Commands, nil),
+		CoverageReplay: sessStore.LatestValidationCoverage(replayed, nil),
 		// The live view orders its command columns by the merged vocabulary.
 		VerbOrder: extension.MergeVocabulary(extensions, nil).VerbNames(),
 	})

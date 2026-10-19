@@ -279,12 +279,13 @@ the **selected** publishable projects and authored features, while duplicate
 detection stays workspace-wide.
 
 `verify` is the audit surface of the executable-spec gate (decision 9, fixed).
-Core's post-session finalizer — attached to every real engine
-session containing `test` — joins the criteria projection `specs-validate`
-emits with the observation reports the test jobs declared, decides each
-textual requirement (`verified`, `unmapped`, `unexecutable`, `missing`,
-`stale`, or `contradicted`) through the protocol's one pure evaluator, and
-persists the verdict record beside the session. `specs verify` **reproduces**
+Core's post-session finalizer — attached to every real engine session that
+names a command of the verification kind, such as `test` — joins the criteria
+projection `specs-validate` emits with the observation reports that the tasks
+of those commands declare, decides each textual requirement (`verified`,
+`unmapped`, `unexecutable`, `missing`, `stale`, or `contradicted`) through
+the protocol's one pure evaluator, and persists the verdict record beside the
+session. `specs verify` **reproduces**
 that decision: per spec-owning project, the effective
 `enforce | report | off` mode with its provenance (project override,
 workspace policy, or the built-in `report`), every requirement's state with
@@ -300,7 +301,8 @@ records that verdict when every selected project that `specs-validate` applies
 to ran it successfully. The gate reads a project that `specs-validate` does
 not apply to, because it holds no `putnami.features.json` or `specs/*.json` or
 does not attach this extension, as stating no requirement. A session without
-a record evaluated nothing: it ran no `test`, its policy is `off` everywhere,
+a record evaluated nothing: it named no command of the verification kind, its
+policy is `off` everywhere,
 or a selected project's `specs-validate` did not run or did not succeed, as in
 a `test` run without `validate`. Under an effective `off` policy the group
 reports `automaticEvaluation: false` and succeeds; structural spec errors keep

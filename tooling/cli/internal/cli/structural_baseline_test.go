@@ -218,13 +218,15 @@ var structuralPins = []structuralPin{
 			"A later change froze it there: engine_boundary_test.go now rejects a planner.Plan " +
 			"reference from any package but internal/engine, so this pin only has to hold the count. " +
 			"An earlier change raises 1\u21922, and the second site is deliberately NOT a fork of the run's plan: " +
-			"spec_gate_cache.go plans `test` over the spec gate's candidate attesters purely to " +
+			"spec_gate_cache.go plans the verification-kind commands (first-party: `test`) over the spec " +
+			"gate's candidate attesters purely to " +
 			"DERIVE THEIR CACHE KEYS. Nothing it produces is scheduled, executed, rendered or " +
 			"attached — planner.Plan is pure, and the plan is discarded the moment PrecomputeKeys has " +
-			"read it. It is the only way to ask \"what key would this project's test task have?\" " +
+			"read it. It is the only way to ask \"what key would this project's report task have?\" " +
 			"without duplicating the planner, and it stays inside internal/engine so the boundary " +
 			"test above is untouched. A later change raises 2\u21923 for the same kind of site: " +
-			"spec_gate.go's validateProducerPlan plans `validate` over the session's selected projects " +
+			"spec_gate.go's projectionProducerPlan plans the criteria-kind commands that declare the " +
+			"projection (first-party: `validate`) over the session's selected projects " +
 			"only to ASK which of them a criteria-projection producer applies to, so the spec gate can " +
 			"tell \"no selected project states a requirement\" from \"a producer never answered\". " +
 			"Nothing it produces is scheduled, executed, rendered or attached, and the plan is discarded " +
