@@ -91,6 +91,30 @@ such as `-v` are reserved for the framework CLI contract.
 ### Activation Pattern Validity
 `activationFiles` patterns must be valid glob expressions.
 
+### Command Kinds and Batch Policy
+
+A command's `traits`, a verb's `traits` and a task's `batchable` policy name
+their values from closed vocabularies ([Verbs](06-verbs.md#command-kinds)):
+
+| Rule | Code |
+|------|------|
+| `traits.kind` is `verification`, `criteria`, `diagnostics` or `files` | `invalid-enum` |
+| `traits.workload` is `serve` or `once` | `invalid-enum` |
+| `batchable.kind` is `verification` or `diagnostics` | `invalid-enum` |
+| `batchable.phase` is lowercase letters, digits and hyphens, starting with a letter | `invalid-value` |
+
+```json
+// INVALID: "report" is not a command kind, and "Lint" is not a phase name
+{
+  "commands": {
+    "check": { "traits": { "kind": "report" }, "run": [{ "id": "a", "task": "a" }] }
+  },
+  "tasks": {
+    "a": { "kind": "command", "command": "echo", "batchable": { "tool": "lint", "phase": "Lint" } }
+  }
+}
+```
+
 ### Task Contract (`declares`)
 
 Every rule below fires only on a task that carries a `declares` block, so a
@@ -152,16 +176,17 @@ the lowest contract whose vocabulary covers the manifest
 `protocols/cli.ReleaseBaselineInputContract` (7) for a task that declares the
 `releaseBaseline` runtime input, `protocols/cli.ExtensionDependenciesContract`
 (8) for `extensionDependencies` that name a registry extension (`@scope/name`),
-`protocols/cli.VerbVocabularyContract` (9) for a `verbs` vocabulary, or
+`protocols/cli.VerbVocabularyContract` (9) for a `verbs` vocabulary,
 `protocols/cli.SourceBoundCacheContract` (10) for a task that declares
-`cache.sourceBound`.
+`cache.sourceBound`, or `protocols/cli.CommandKindContract` (11) for a command
+kind, workload or effect, or a batchable kind or phase.
 `protocols/cli.GitInputModeContract` names the same rung 7 for a task whose
 input port or cache-key files select a `git:` pattern. The gate applies to every non-empty command, command-group, MCP
 tool, or agent-content surface, and to a verb vocabulary. A non-conforming manifest — for example one
 that shadows a reserved global flag — fails packaging and never reaches a
 registry. A manifest without the field is contract `0` (pre-registry).
 
-Contracts 5, 6, 7, 8, 9 and 10 are **additive**. They add vocabulary a manifest opts into
+Contracts 5, 6, 7, 8, 9, 10 and 11 are **additive**. They add vocabulary a manifest opts into
 and change nothing a manifest without that vocabulary means. An extension without
 agent content, Go embed inputs, a `releaseBaseline` input or a `git:` input keeps
 its contract-4 stamp; one with agent content but no Go embed inputs requires
@@ -184,9 +209,13 @@ manifest with a task that declares `cache.sourceBound` requires contract 10
 wherever it loads from: a reader at 10 stores and looks up the task's entry at
 a key that also binds the project's source binding, and an older reader would
 replay outputs that embed a stale binding.
-`RequiredLoadContract` includes that rung too. The reader loads every stamp
-from the one the manifest's vocabulary requires up to
-`protocols/cli.LatestContract` (10):
+`RequiredLoadContract` includes that rung too. A manifest whose command or
+verb traits declare `kind`, `workload`, `rewritesSources` or
+`consumesReleaseSet`, or whose task's `batchable` policy declares `kind` or
+`phase`, requires contract 11 wherever it loads from: an older reader would
+plan a declared kind or workload as a plain command. `RequiredLoadContract`
+includes that rung as well. The reader loads every stamp from the one the
+manifest's vocabulary requires up to `protocols/cli.LatestContract` (11):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|

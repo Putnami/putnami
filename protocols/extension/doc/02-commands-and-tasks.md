@@ -34,6 +34,7 @@ A command is a user-facing operation invoked via `putnami <command>`:
 | `run` | **yes** | Pipeline step DAG |
 | `description` | no | Human-readable description |
 | `activationFiles` | no | File patterns that must exist for the command to activate |
+| `traits` | no | Orchestration hints that replace the verb's default traits: `heavy`, `requiresRunnable`, `injectPublishChannels`, `sideEffects`, and from contract 11 `kind`, `workload`, `rewritesSources` and `consumesReleaseSet` ([traits](06-verbs.md#declaring-traits)) |
 | `flags` | no | CLI flags the command accepts |
 | `defaults` | no | Default parameter values |
 | `dependsOn` | no | Command prerequisites. Bare names are same-project prerequisites; `!command` is a session barrier across the current project selection |
@@ -683,6 +684,14 @@ The parameter only groups jobs, so it must never key a task. Manifest
 validation refuses a task that declares it as an input or a cache key param, a
 command that runs the task and declares it as a flag, and a step that binds it,
 in either spelling.
+
+From contract 11, `kind` and `phase` describe the shared invocation.
+`kind` is `verification` or `diagnostics`: the per-project tally the
+scheduler rebuilds from the shared result. `phase` names the phase of each
+project's rebuilt run, in lowercase letters, digits and hyphens. The CLI reads
+neither field yet ([command kinds](06-verbs.md#command-kinds)). A manifest that
+declares one requires CLI contract 11. Both fields enter the task contract
+digest, so a task that declares them gets a new cache key once.
 
 Omitting `configFiles` opts into the **extension-loop** form: the shared
 invocation runs each selected project's own tool pass (its own config discovery)

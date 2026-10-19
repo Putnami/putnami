@@ -14,23 +14,27 @@ what this extension declares is [ADR 0001](doc/adr/0001-the-dev-extension-declar
 
 ## The verbs
 
-| Verb | Aliases | Default traits |
-|---|---|---|
-| `build` | `b` | none |
-| `test` | `t` | none |
-| `lint` | `l` | none |
-| `serve` | `s` | requires a runnable project |
-| `run` | none | requires a runnable project |
-| `format` | `f` | none |
-| `package` | none | injects the project's publish channels |
-| `publish` | `p`, `P` | injects the publish channels; changes a registry |
-| `deploy` | `d`, `D` | changes a cloud |
-| `generate` | none | none |
-| `validate` | none | none |
+| Verb | Aliases | Default traits | Kind, workload and effects |
+|---|---|---|---|
+| `build` | `b` | none | `files` kind |
+| `test` | `t` | none | `verification` kind |
+| `lint` | `l` | none | `diagnostics` kind |
+| `serve` | `s` | requires a runnable project | `serve` workload |
+| `run` | none | requires a runnable project | `once` workload |
+| `format` | `f` | none | rewrites sources |
+| `package` | none | injects the project's publish channels | none |
+| `publish` | `p`, `P` | injects the publish channels; changes a registry | none |
+| `deploy` | `d`, `D` | changes a cloud | consumes the release set |
+| `generate` | none | none | none |
+| `validate` | none | none | `criteria` kind |
 
 Each description, alias list and related-command list equals the one the core
-shows for the verb, and each verb's traits equal the core's defaults. Loading
-the vocabulary therefore changes no help text and no job's traits.
+shows for the verb, and each verb's default traits equal the core's defaults.
+Loading the vocabulary therefore changes no help text. The kind, workload and
+effects need CLI contract 11, and the manifest claims it. A job takes them from
+its verb unless its command declares its own `traits`, which replace the
+verb's wholesale. The CLI reads none of them yet; the [verbs
+reference](../../protocols/extension/doc/06-verbs.md) defines each value.
 
 ## Use it
 

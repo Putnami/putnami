@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 8,
+  "cliContract": 11,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-ts",
@@ -417,7 +417,8 @@
     "serve": {
       "description": "Serve an application with hot-reload.",
       "traits": {
-        "requiresRunnable": true
+        "requiresRunnable": true,
+        "workload": "serve"
       },
       "flags": {
         "entrypoint": {
@@ -477,7 +478,8 @@
     "run": {
       "description": "Run a workload once for the host and forward its exit code.",
       "traits": {
-        "requiresRunnable": true
+        "requiresRunnable": true,
+        "workload": "once"
       },
       "activationFiles": [
         "package.json",

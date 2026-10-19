@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 )
 
@@ -154,6 +155,49 @@ func TestExtensionsValidate_ReservedGlobalFlagFailure(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}
+	}
+}
+
+// `putnami extensions validate` refuses a command kind, a workload or a batch
+// phase outside its closed vocabulary, and names each offending field, so a
+// manifest that uses one never earns a contract 11 stamp.
+func TestExtensionsValidate_AnUnknownKindWorkloadOrPhaseIsRefused(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "command-kinds-and-traits", "an-unknown-kind-workload-or-phase-is-refused")
+	manifest := `{
+  "name": "@putnami/test-ext",
+  "cliContract": 11,
+  "commands": {
+    "test": {"traits": {"kind": "report"}, "run": [{"id": "test", "task": "test-exec"}]},
+    "serve": {"traits": {"workload": "daemon"}, "run": [{"id": "serve", "task": "test-exec"}]}
+  },
+  "tasks": {
+    "test-exec": {"kind": "command", "command": "echo", "timeoutMs": -1, "batchable": {"tool": "echo", "kind": "files", "phase": "Test"}}
+  }
+}`
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) })
+	if err == nil {
+		t.Fatalf("an unknown kind, workload or phase validated:\n%s", out)
+	}
+	for _, want := range []string{
+		"commands.test.traits.kind", "commands.serve.traits.workload",
+		"tasks.test-exec.batchable.kind", "tasks.test-exec.batchable.phase",
+		"invalid-enum", "invalid-value",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+
+	valid := strings.NewReplacer(`"report"`, `"verification"`, `"daemon"`, `"serve"`, `"files"`, `"diagnostics"`, `"Test"`, `"test"`).Replace(manifest)
+	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(valid), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) }); err != nil {
+		t.Fatalf("the same manifest with known values must validate: %v\n%s", err, out)
 	}
 }
 

@@ -21,12 +21,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 )
+
+// batchPhaseFormat is the grammar of TaskBatchPolicy.Phase.
+var batchPhaseFormat = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
 // ParseManifest decodes JSON data into a Manifest using strict mode.
 // Unknown fields are rejected and structured diagnostics are returned.
@@ -147,6 +152,7 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 				}
 			}
 		}
+		diags = append(diags, ValidateTraits(cmd.Traits, fmt.Sprintf("commands.%s.traits", name))...)
 		if len(cmd.Run) == 0 {
 			diags = append(diags, diag.Errorf("empty-pipeline", fmt.Sprintf("commands.%s.run", name), "command must have at least one pipeline step"))
 		}
@@ -296,6 +302,14 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 						"batchable config candidate cannot be empty",
 					))
 				}
+			}
+			if kind := task.Batchable.Kind; kind != "" && !slices.Contains(ValidBatchKinds, kind) {
+				diags = append(diags, diag.Errorf("invalid-enum", field+".batchable.kind",
+					"invalid batchable kind %q; must be one of: %s", kind, strings.Join(ValidBatchKinds, ", ")))
+			}
+			if phase := task.Batchable.Phase; phase != "" && !batchPhaseFormat.MatchString(phase) {
+				diags = append(diags, diag.Errorf("invalid-value", field+".batchable.phase",
+					"batchable phase %q must be lowercase letters, digits and hyphens, starting with a letter", phase))
 			}
 		}
 		inputNames := sortedKeys(task.Inputs)

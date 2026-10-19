@@ -21,8 +21,14 @@ func TestOrdinaryValidateSiteContentPlanHasOnlySourceChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 	command := manifest["commands"].(map[string]any)["validate"].(map[string]any)
-	if !reflect.DeepEqual(command["traits"], map[string]any{"injectPublishChannels": true}) {
-		t.Fatalf("site selection must use project publication declarations: %v", command)
+	// Site selection uses project publication declarations, and the command
+	// declares the criteria kind: it checks the project against its criteria.
+	traits, err := json.Marshal(command["traits"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(traits), `{"injectPublishChannels":true,"kind":"criteria"}`; got != want {
+		t.Fatalf("validate traits = %s, want %s", got, want)
 	}
 	for _, field := range []string{"dependsOn", "sessionPrerequisites", "alsoRuns"} {
 		if value, found := command[field]; found {

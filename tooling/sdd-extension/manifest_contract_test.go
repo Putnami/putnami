@@ -72,6 +72,10 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			// plan time rather than skipped at run time.
 			ActivationFiles: []string{"putnami.features.json", "specs/*.json"},
 			AlsoRuns:        []string{"validate-workspace"},
+			// Both validation commands check their subject against its
+			// criteria, and declare it, so a workspace without @putnami/dev
+			// keeps the kind.
+			Traits: &proto.CommandTraits{Kind: proto.CommandKindCriteria},
 			Run: []proto.PipelineStep{
 				{ID: "features", Task: "features-validate"},
 				// No dependsOn orders the two steps. specs-validate reads the
@@ -85,6 +89,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 		Command("validate-workspace", proto.CommandDefinition{
 			Description: "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare, and, when the workspace forbids it, that the proposed squash commit names no agent.",
 			Activation:  "workspace-once",
+			Traits:      &proto.CommandTraits{Kind: proto.CommandKindCriteria},
 			// The eight steps are independent workspace-wide steps; none reads
 			// another's answer, so no dependsOn orders them.
 			Run: []proto.PipelineStep{
@@ -480,7 +485,9 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 		},
 	}
 	// The stamp the packager earns for this vocabulary: the `git:` inputs of
-	// the workspace checks need the contract that keys the executable bit.
+	// the workspace checks need the contract that keys the executable bit, and
+	// the criteria kind of the validation commands needs the command kind
+	// contract above it.
 	built.CLIContract = proto.RequiredCLIContract(built)
 	// The bare `options.<name>` blocks this extension reads for itself, beyond
 	// the ones keyed by its own name or path reference. Declaring them never
@@ -616,9 +623,10 @@ func TestScaffoldStampsItsContractExplicitly(t *testing.T) {
 	// features-validate compares evidence source bindings, which record each
 	// bound file's executable bit, and keys on `git:**`. A CLI below the
 	// contract that keys the bit would replay its verdict across a chmod, so
-	// the stamp must make that CLI refuse the extension.
-	if m.CLIContract != protocolcli.GitInputModeContract {
-		t.Fatalf("cliContract = %d, want %d, the contract whose `git:` key holds the executable bit",
+	// the stamp must make that CLI refuse the extension. A later additive
+	// contract the manifest's vocabulary requires keeps that refusal.
+	if m.CLIContract < protocolcli.GitInputModeContract {
+		t.Fatalf("cliContract = %d, want at least %d, the contract whose `git:` key holds the executable bit",
 			m.CLIContract, protocolcli.GitInputModeContract)
 	}
 }

@@ -34,10 +34,11 @@ func TestAdditiveContractsAreOrdered(t *testing.T) {
 	if GoEmbedInputsContract != AgentContentContract+1 || ReleaseBaselineInputContract != GoEmbedInputsContract+1 ||
 		ExtensionDependenciesContract != ReleaseBaselineInputContract+1 ||
 		VerbVocabularyContract != ExtensionDependenciesContract+1 ||
-		SourceBoundCacheContract != VerbVocabularyContract+1 || LatestContract != SourceBoundCacheContract {
-		t.Fatalf("additive contract ladder = base %d, agent %d, embed %d, release baseline %d, dependencies %d, verbs %d, source-bound cache %d, latest %d",
+		SourceBoundCacheContract != VerbVocabularyContract+1 ||
+		CommandKindContract != SourceBoundCacheContract+1 || LatestContract != CommandKindContract {
+		t.Fatalf("additive contract ladder = base %d, agent %d, embed %d, release baseline %d, dependencies %d, verbs %d, source-bound cache %d, command kinds %d, latest %d",
 			CurrentContract, AgentContentContract, GoEmbedInputsContract, ReleaseBaselineInputContract,
-			ExtensionDependenciesContract, VerbVocabularyContract, SourceBoundCacheContract, LatestContract)
+			ExtensionDependenciesContract, VerbVocabularyContract, SourceBoundCacheContract, CommandKindContract, LatestContract)
 	}
 	// Rung 7 names two meanings that one CLI release added together.
 	if GitInputModeContract != ReleaseBaselineInputContract {

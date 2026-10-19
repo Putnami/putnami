@@ -5,7 +5,7 @@
   "outcomes": [
     "A workspace that loads @putnami/dev reads the order, descriptions, aliases, related commands and default traits of the development verbs from that one extension",
     "Installing the Go, TypeScript or Python extension installs @putnami/dev with it, because each of them names it as an extension dependency",
-    "Loading the vocabulary changes neither what help prints for a verb nor the traits of any job"
+    "Loading the vocabulary changes nothing help prints for a verb, and keeps each verb's core default traits while adding the kind, workload and effects the verb declares"
   ],
   "nonGoals": [
     "Running a verb: the language extensions declare and run the jobs of every development verb",
@@ -15,11 +15,11 @@
   "requirements": [
     {
       "id": "eleven-ordered-verbs",
-      "text": "The manifest declares build, test, lint, serve, run, format, package, publish, deploy, generate and validate in that order, each with the description, aliases and related commands the core shows for it. It declares no command, command group, task, tool, hook, agent content or runtime, claims CLI contract 9 and passes the strict validation of the package-time gate."
+      "text": "The manifest declares build, test, lint, serve, run, format, package, publish, deploy, generate and validate in that order, each with the description, aliases and related commands the core shows for it. It declares no command, command group, task, tool, hook, agent content or runtime, claims CLI contract 11 and passes the strict validation of the package-time gate."
     },
     {
       "id": "core-default-traits",
-      "text": "Serve and run require a runnable project, package injects the project's publish channels, publish injects them and changes a registry, and deploy changes a cloud. The other verbs declare no traits. Each verb's traits equal the core defaults for it, so the vocabulary changes the traits of no job."
+      "text": "Serve and run require a runnable project, package injects the project's publish channels, publish injects them and changes a registry, and deploy changes a cloud, as the core defaults do. Build declares the files kind, test verification, lint diagnostics and validate criteria. Serve declares the serve workload and run the once workload. Format rewrites sources and deploy consumes the release set. Package, publish and generate declare nothing beyond the core defaults."
     },
     {
       "id": "language-extensions-depend",

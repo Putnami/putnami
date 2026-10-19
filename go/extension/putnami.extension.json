@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 10,
+  "cliContract": 11,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-go",
@@ -268,7 +268,7 @@
     },
     "serve": {
       "description": "Run Go application with hot-reload. Build-and-exec: the served process is compiled and run in one step, and no binary is emitted.",
-      "traits": { "requiresRunnable": true },
+      "traits": { "requiresRunnable": true, "workload": "serve" },
       "activationFiles": ["**/*.go", "go.mod"],
       "flags": {
         "entrypoint": { "type": "string", "description": "Entry point to serve (main.go file or package path)" },
@@ -303,7 +303,7 @@
     },
     "run": {
       "description": "Build a Go workload for the host, run it once, and forward its exit code.",
-      "traits": { "requiresRunnable": true },
+      "traits": { "requiresRunnable": true, "workload": "once" },
       "activationFiles": ["**/*.go", "go.mod"],
       "flags": {
         "entrypoint": { "type": "string", "description": "Entry point to run (main.go file or package path)" },

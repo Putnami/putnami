@@ -21,7 +21,7 @@
             "kind": "acceptance",
             "checks": [
               "the-manifest-declares-the-eleven-verbs-in-order",
-              "the-manifest-passes-strict-validation-at-contract-9",
+              "the-manifest-passes-strict-validation-at-contract-11",
               "each-verb-keeps-the-core-presentation"
             ]
           }
@@ -35,7 +35,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-declared-traits-equal-the-core-defaults"
+              "each-verb-keeps-the-core-defaults-and-declares-its-kind"
             ]
           }
         },

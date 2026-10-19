@@ -66,7 +66,9 @@ the verb's. A `publish` that declares only `injectPublishChannels` still has
 A declared `sideEffects` replaces the verb's for most readers. The git
 requirement, the `run_jobs` refusal, the remote cache trust floor and the task
 scope add declared traits to a well-known verb's side effects and never remove
-them. Per-step heaviness uses
+them. The replacement covers the [command kind](#command-kinds) fields too: a
+`serve` command that declares `requiresRunnable` must also declare
+`"workload": "serve"`, or it has no workload. Per-step heaviness uses
 `heavy` on the pipeline step:
 
 ```json
@@ -79,6 +81,64 @@ them. Per-step heaviness uses
 | `requiresRunnable` | The command is skipped for `library` projects. |
 | `injectPublishChannels` | The project's `publish: [...]` channels are auto-activated as boolean params. |
 | `sideEffects` | `registry` or `cloud`: what the command mutates outside the workspace. Any side effect refuses a root Git does not manage, makes MCP `run_jobs` refuse the command, and keeps the command's jobs on a task-scoped `--impacted` project; `registry` raises remote cache trust to at least `ci`. Declared traits add to a well-known verb's side effects and never remove them. |
+
+### Command kinds
+
+Contract 11 adds four traits that say what the host reads from a command's
+results and how the command runs, and two fields of a task's `batchable`
+policy. The CLI reads none of them yet. The orchestrator still decides these
+questions by command name, and each later change that moves one decision to a
+field reads that field. The table gives the meaning those readers take.
+
+| Trait | Value | Meaning |
+| --- | --- | --- |
+| `kind` | `verification` | The command runs the project's verification. Its jobs produce the verification report and coverage, and a session that names it carries the spec gate. |
+| `kind` | `criteria` | The command checks the project or the workspace against its criteria. A task scope never narrows it, and its declared `spec-criteria.json` output is the criteria projection. |
+| `kind` | `diagnostics` | The command's result is a tally of errors and warnings. |
+| `kind` | `files` | The command's result is a count of produced files. |
+| `workload` | `serve` | The command streams a workload until it is interrupted. |
+| `workload` | `once` | The command streams a workload once and forwards its exit code. |
+| `rewritesSources` | `true` | The command rewrites the source tree. A task's `declares.mutatesSources` is a different field and keeps its cache meaning. |
+| `consumesReleaseSet` | `true` | The command binds a release set and an environment. |
+
+A command without `kind` reports its status only. A command may declare a kind
+and a workload together. No verb in the [verb registry](#the-verb-registry)
+gives a kind, a workload or an effect: a [verb
+vocabulary](#declaring-a-verb-vocabulary) declares them, and `@putnami/dev`
+declares them for the development verbs.
+
+A batchable task may describe its shared invocation
+([batchable tasks](02-commands-and-tasks.md#batchable-tasks)):
+
+| Field | Value | Meaning |
+| --- | --- | --- |
+| `batchable.kind` | `verification` or `diagnostics` | The per-project tally the batch scheduler rebuilds from the shared invocation's result. |
+| `batchable.phase` | Lowercase letters, digits and hyphens, starting with a letter | The phase name of each project's rebuilt run. |
+
+```json
+{
+  "commands": {
+    "check": {
+      "traits": { "kind": "diagnostics" },
+      "run": [{ "id": "check", "task": "check" }]
+    }
+  },
+  "tasks": {
+    "check": {
+      "kind": "command",
+      "command": "acme-check",
+      "batchable": { "tool": "acme-check", "kind": "diagnostics", "phase": "check" }
+    }
+  }
+}
+```
+
+Strict validation refuses a value outside each vocabulary (see
+[validation](04-validation.md#command-kinds-and-batch-policy)). A manifest that
+declares any of the six fields requires CLI contract 11
+(`CommandKindContract`) wherever it loads from, and the Go archive and npm
+packagers stamp it 11. A CLI below 11 refuses it with "requires a newer
+putnami" instead of planning a declared kind or workload as a plain command.
 
 ### Gated capability transport is not server authorization
 
@@ -249,6 +309,7 @@ Strict validation checks the section when it is present:
 | An alias is letters, digits and hyphens, starting with a letter. | `invalid-verb-alias` |
 | An alias appears once, and names no verb, command or command group of the manifest. | `duplicate-verb-alias` |
 | `traits.sideEffects` is `registry` or `cloud`. | `invalid-enum` |
+| `traits.kind` is `verification`, `criteria`, `diagnostics` or `files`, and `traits.workload` is `serve` or `once`. | `invalid-enum` |
 | `traits.sideEffects` keeps the side effects the verb registry gives the verb. | `invalid-verb-traits` |
 | A related command is a path of lowercase words, other than the verb itself, and appears once. | `invalid-verb-related` |
 
@@ -258,7 +319,9 @@ MCP tool or agent content. Declaring `verbs` requires CLI contract 9
 default traits change how other extensions' jobs are planned. A CLI below 9
 refuses the manifest with "requires a newer putnami". The Go archive and npm
 packagers validate the vocabulary and stamp the manifest 9, a vocabulary-only
-manifest included (see [validation](04-validation.md)).
+manifest included (see [validation](04-validation.md)). A vocabulary whose
+traits declare a [command kind](#command-kinds), a workload or an effect
+requires contract 11 instead, and the packagers stamp 11.
 
 ## Typed producer requirements
 

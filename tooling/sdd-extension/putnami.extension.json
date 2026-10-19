@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/sdd",
-  "cliContract": 7,
+  "cliContract": 11,
   "optionNamespaces": ["sdd", "publish"],
   "extensionDependencies": {},
   "runtime": {
@@ -256,6 +256,7 @@
     },
     "validate": {
       "description": "Validate a project's specification-driven declarations: its features and the specs that detail them.",
+      "traits": {"kind": "criteria"},
       "activationFiles": [
         "putnami.features.json",
         "specs/*.json"
@@ -277,6 +278,7 @@
     "validate-workspace": {
       "description": "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare, and, when the workspace forbids it, that the proposed squash commit names no agent.",
       "activation": "workspace-once",
+      "traits": {"kind": "criteria"},
       "run": [
         {
           "id": "architecture",

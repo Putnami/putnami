@@ -1210,6 +1210,25 @@
               "an-execution-after-an-in-run-rewrite-reads-the-current-binding"
             ]
           }
+        },
+        {
+          "id": "command-kinds-and-traits",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-manifest-declaring-a-kind-or-new-trait-requires-contract-11",
+              "a-job-without-declared-traits-takes-its-verbs-kind-and-workload",
+              "declared-traits-replace-the-verbs-kind-wholesale",
+              "an-unknown-kind-workload-or-phase-is-refused",
+              "the-dev-vocabulary-declares-every-first-party-kind",
+              "the-go-packager-stamps-command-kinds",
+              "the-npm-packager-stamps-command-kinds"
+            ]
+          }
         }
       ]
     },
