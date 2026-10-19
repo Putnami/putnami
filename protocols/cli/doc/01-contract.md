@@ -217,11 +217,10 @@ the host reads from the command's results (`verification`, `criteria`,
 `once`); `rewritesSources`; and `consumesReleaseSet`. A batchable task may
 declare `batchable.kind` (`verification` or `diagnostics`) and
 `batchable.phase`, the tally and the phase name of its shared invocation. Strict
-validation refuses a value outside each vocabulary. The CLI reads none of the
-fields yet: the change that moves a decision from a command's name to a field
-reads it. A reader below 11 would plan a declared kind or workload as a plain
-command, so it refuses the stamp. The floor binds a manifest wherever it loads
-from. Only a manifest that declares one of the fields is stamped 11.
+validation refuses a value outside each vocabulary. A reader below 11 would
+plan a declared kind or workload as a plain command, so it refuses the stamp.
+The floor binds a manifest wherever it loads from. Only a manifest that
+declares one of the fields is stamped 11.
 Contract `6` is additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs. A reader limited to contract 5 refuses that
 manifest before interpreting its inputs; unrelated manifests retain their

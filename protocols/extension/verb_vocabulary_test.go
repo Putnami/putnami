@@ -95,23 +95,23 @@ func TestVerbs_AnAliasNamesNoCommandOrGroupOfTheManifest(t *testing.T) {
 	}
 }
 
-// While the well-known verb table gives a verb side effects, a vocabulary's
-// default traits for that verb keep them: no vocabulary makes publish or
-// deploy look harmless.
-func TestVerbs_DefaultTraitsKeepAWellKnownVerbsSideEffects(t *testing.T) {
+// A vocabulary gives a verb the side effects it chooses: the registry lists no
+// development verb, so publish and deploy may declare any valid side effect or
+// none, and an unknown side effect stays an invalid-enum.
+func TestVerbs_AVocabularyGivesAVerbAnyValidSideEffect(t *testing.T) {
 	t.Parallel()
 	m := &Manifest{Verbs: []VerbDefinition{
 		{Name: "publish", Description: "Publish.", Traits: &CommandTraits{InjectPublishChannels: true}},
 		{Name: "deploy", Description: "Deploy.", Traits: &CommandTraits{SideEffects: SideEffectsRegistry}},
-		{Name: "release", Description: "Release.", Traits: &CommandTraits{}},
+		{Name: "release", Description: "Release.", Traits: &CommandTraits{SideEffects: SideEffectsCloud}},
 		{Name: "package", Description: "Package.", Traits: &CommandTraits{SideEffects: SideEffectsCloud}},
 	}}
-	diags := ValidateVerbs(m)
-	if got, want := diagCodes(diags), []string{"invalid-verb-traits", "invalid-verb-traits"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("codes = %v, want %v (%v)", got, want, diags)
+	if diags := ValidateVerbs(m); len(diags) != 0 {
+		t.Fatalf("diagnostics = %v, want none", diags)
 	}
-	if !strings.Contains(diags[0].String(), `"registry"`) || !strings.Contains(diags[1].String(), `"cloud"`) {
-		t.Fatalf("diagnostics = %v, want the side effects each verb keeps", diags)
+	m = &Manifest{Verbs: []VerbDefinition{{Name: "publish", Description: "Publish.", Traits: &CommandTraits{SideEffects: "mars"}}}}
+	if got, want := diagCodes(ValidateVerbs(m)), []string{"invalid-enum"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("codes = %v, want %v", got, want)
 	}
 }
 

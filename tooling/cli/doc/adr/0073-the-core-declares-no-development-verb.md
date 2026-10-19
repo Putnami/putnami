@@ -85,8 +85,9 @@ one breaking change that meets D2. This is that change.
 - The first-use bootstrap and the workspace before hooks run before the
   refusal, which needs the run's discovery: in a fresh checkout, a mistyped
   command installs the workspace, then exits 2.
-- `protocols/` keeps `WellKnownVerbs` and the strict `invalid-verb-traits`
-  check; no core reader of side effects consults them.
+- `protocols/` keeps only the five lifecycle rows of `WellKnownVerbs` and no
+  `invalid-verb-traits` floor: a vocabulary gives a verb any valid side
+  effect, or none.
 - The workload and source-rewriting traits, not the names `serve`, `run`
   and `format`, decide watch mode, the hosted and `run_jobs` refusals,
   composition, exit-code forwarding and the portable refusal. The `compose`

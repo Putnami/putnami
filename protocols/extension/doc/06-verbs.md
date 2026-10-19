@@ -1,10 +1,12 @@
 # Well-Known Verbs and Command Traits
 
-Command names in `putnami.extension.json` are free-form, but Putnami
-ships a canonical verb vocabulary. A command using a well-known name
-inherits its documented semantics and default **traits** — the
-machine-readable orchestration hints the CLI consults instead of
-matching command names.
+Command names in `putnami.extension.json` are free-form. A command carries
+**traits** — the machine-readable orchestration hints the CLI consults instead
+of matching command names — that it declares itself, or that the verb it runs
+under takes from a [verb vocabulary](#declaring-a-verb-vocabulary). The
+extension that declares a verb owns its default traits: `@putnami/dev`
+declares the development verbs, such as `build`, `test` and `publish`. The
+protocol keeps a registry of the lifecycle verbs only.
 
 ## Why traits exist
 
@@ -24,25 +26,20 @@ instead — see [Typed producer requirements](#typed-producer-requirements).
 
 ## The verb registry
 
+The registry lists the lifecycle verbs, the commands a language extension
+declares to prepare a workspace or a project's config. It lists no development
+verb and carries no default trait.
+
 | Verb | Semantics | Default traits |
 | --- | --- | --- |
-| `build` | Compile/transpile sources into runnable or distributable outputs. | — |
-| `test` | Run tests; emit test counts and coverage metrics. Declare `heavy` on the runner step. | — |
-| `lint` | Check code; emit per-issue diagnostics. | — |
-| `format` | Rewrite sources into canonical formatting. | — |
-| `serve` | Run the dev server until interrupted. Long-running workloads only. | `requiresRunnable` |
-| `run` | Execute the project once and exit. | `requiresRunnable` |
-| `package` | Assemble distributable artifacts per publish channel. | `injectPublishChannels` |
-| `publish` | Push packaged artifacts to registries. | `injectPublishChannels`, `sideEffects: registry` |
-| `deploy` | Converge a cloud environment on the workload's aggregated infra manifest. | `sideEffects: cloud` |
 | `workspace-fetch` | Download ecosystem dependencies for the workspace without running any of their code. Runs before every `workspace-install` on a hosted run. | — |
 | `workspace-install` | Install ecosystem dependencies for the workspace. | — |
 | `deps-upgrade` | Upgrade framework and tooling dependencies. | — |
 | `config-extract` | Extract the project's config schema manifest. | — |
 | `config-merge` | Merge config defaults from workspace dependencies. | — |
 
-Custom verbs remain allowed; they carry zero traits unless the manifest, or a
-loaded [verb vocabulary](#declaring-a-verb-vocabulary), declares them.
+Every other verb carries zero traits unless the manifest, or a loaded [verb
+vocabulary](#declaring-a-verb-vocabulary), declares them.
 
 ## Declaring traits
 
@@ -58,17 +55,12 @@ loaded [verb vocabulary](#declaring-a-verb-vocabulary), declares them.
 }
 ```
 
-A declared `traits` object **replaces the verb's defaults**; fields are not
-merged, with one exception: a declaration that names no `sideEffects` keeps
-the verb's. A `publish` that declares only `injectPublishChannels` still has
-`registry` side effects, and a `deploy` that declares only `heavy` still has
-`cloud` ones, so every gate that reads the trait treats them as side-effecting.
-A declared `sideEffects` replaces the verb's for most readers. The git
-requirement, the `run_jobs` refusal, the remote cache trust floor and the task
-scope add declared traits to a well-known verb's side effects and never remove
-them. The replacement covers the [command kind](#command-kinds) fields too: a
-`serve` command that declares `requiresRunnable` must also declare
-`"workload": "serve"`, or it has no workload. Per-step heaviness uses
+A declared `traits` object **replaces the verb's default traits**
+wholesale. Fields are not merged, and `sideEffects` is no exception: a
+declaration that names none declares none. The replacement covers the [command
+kind](#command-kinds) fields too: a `serve` command that declares
+`requiresRunnable` must also declare `"workload": "serve"`, or it has no
+workload. Per-step heaviness uses
 `heavy` on the pipeline step:
 
 ```json
@@ -80,15 +72,13 @@ them. The replacement covers the [command kind](#command-kinds) fields too: a
 | `heavy` | Worker tuning leaves the command's jobs CPU/memory headroom. |
 | `requiresRunnable` | The command is skipped for `library` projects. |
 | `injectPublishChannels` | The project's `publish: [...]` channels are auto-activated as boolean params. |
-| `sideEffects` | `registry` or `cloud`: what the command mutates outside the workspace. Any side effect refuses a root Git does not manage, makes MCP `run_jobs` refuse the command, and keeps the command's jobs on a task-scoped `--impacted` project; `registry` raises remote cache trust to at least `ci`. Declared traits add to a well-known verb's side effects and never remove them. |
+| `sideEffects` | `registry` or `cloud`: what the command mutates outside the workspace. Any side effect refuses a root Git does not manage, makes MCP `run_jobs` refuse the command, and keeps the command's jobs on a task-scoped `--impacted` project; `registry` raises remote cache trust to at least `ci`. A command that declares no `sideEffects` has none. |
 
 ### Command kinds
 
 Contract 11 adds four traits that say what the host reads from a command's
 results and how the command runs, and two fields of a task's `batchable`
-policy. The CLI reads none of them yet. The orchestrator still decides these
-questions by command name, and each later change that moves one decision to a
-field reads that field. The table gives the meaning those readers take.
+policy. The table gives the meaning each takes.
 
 | Trait | Value | Meaning |
 | --- | --- | --- |
@@ -104,8 +94,8 @@ field reads that field. The table gives the meaning those readers take.
 A command without `kind` reports its status only. A command may declare a kind
 and a workload together. No verb in the [verb registry](#the-verb-registry)
 gives a kind, a workload or an effect: a [verb
-vocabulary](#declaring-a-verb-vocabulary) declares them, and `@putnami/dev`
-declares them for the development verbs.
+vocabulary](#declaring-a-verb-vocabulary) declares them, as `@putnami/dev`
+does for the development verbs.
 
 A batchable task may describe its shared invocation
 ([batchable tasks](02-commands-and-tasks.md#batchable-tasks)):
@@ -287,13 +277,11 @@ The CLI reads the vocabularies of the loaded extensions:
 - **Completion.** Completion offers the merged verbs with their
   descriptions, and their aliases.
 - **Default traits.** A job whose command declares no `traits` takes its
-  verb's `traits`. When the verb declares none, the job keeps the defaults of
-  the [verb registry](#the-verb-registry). A command's own `traits` replace
-  both, but a declaration without `sideEffects` keeps the verb registry's
-  side effects. A vocabulary never changes the side effects the registry
-  gives a verb: `publish` keeps `registry` and `deploy` keeps `cloud`. When a
-  loaded vocabulary's traits would change them, the CLI sets those traits
-  aside with a warning, and the verb keeps the registry's defaults.
+  verb's `traits`. When the verb declares none, the job has zero traits. A
+  command's own `traits` replace the verb's wholesale, side effects included.
+  A vocabulary gives a verb any valid side effect, or none: the
+  [verb registry](#the-verb-registry) lists no development verb, so it
+  constrains none.
 
 Without a loaded vocabulary, help, aliases, completion and traits come from
 the core alone, as before.
@@ -310,7 +298,6 @@ Strict validation checks the section when it is present:
 | An alias appears once, and names no verb, command or command group of the manifest. | `duplicate-verb-alias` |
 | `traits.sideEffects` is `registry` or `cloud`. | `invalid-enum` |
 | `traits.kind` is `verification`, `criteria`, `diagnostics` or `files`, and `traits.workload` is `serve` or `once`. | `invalid-enum` |
-| `traits.sideEffects` keeps the side effects the verb registry gives the verb. | `invalid-verb-traits` |
 | A related command is a path of lowercase words, other than the verb itself, and appears once. | `invalid-verb-related` |
 
 A manifest that declares only a vocabulary is complete: it needs no command,

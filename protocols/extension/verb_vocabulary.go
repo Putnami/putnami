@@ -16,8 +16,7 @@ import (
 // order, and the first declaration of a verb wins whole. Help lists the verbs
 // in that order, completion offers them, and alias resolution reads their
 // aliases before the core's. A job whose manifest declares no traits takes the
-// verb's default traits; a verb that declares none leaves the well-known
-// verb's defaults (WellKnownVerbs) in place.
+// verb's default traits.
 type VerbDefinition struct {
 	// Name is the command name the verb gives meaning to.
 	Name string `json:"name"`
@@ -28,8 +27,8 @@ type VerbDefinition struct {
 	// would.
 	Aliases []string `json:"aliases,omitempty"`
 	// Traits are the default traits of every job of the verb whose manifest
-	// declares none. A declared object replaces the defaults wholesale; it may
-	// not change the side effects WellKnownVerbs gives the verb.
+	// declares none. A declared object replaces the defaults wholesale, side
+	// effects included.
 	Traits *CommandTraits `json:"traits,omitempty"`
 	// Related are the commands `putnami help <verb>` suggests, in order.
 	Related []string `json:"related,omitempty"`
@@ -51,10 +50,9 @@ var (
 // ValidateVerbs checks the verb vocabulary of one manifest: a non-empty list
 // of uniquely named, described verbs, whose aliases are unique and name no verb
 // or command of the manifest, whose traits use the kind, workload and
-// side-effect vocabularies (ValidateTraits) and keep the side effects
-// WellKnownVerbs gives a verb, and whose related commands are command paths
-// other than the verb itself. It is inert for a manifest that declares no
-// vocabulary.
+// side-effect vocabularies (ValidateTraits), and whose related commands are
+// command paths other than the verb itself. It is inert for a manifest that
+// declares no vocabulary.
 func ValidateVerbs(m *Manifest) []diag.Diagnostic {
 	if !m.DeclaresVerbs() {
 		return nil
@@ -106,12 +104,8 @@ func ValidateVerbs(m *Manifest) []diag.Diagnostic {
 		}
 		diags = append(diags, ValidateTraits(verb.Traits, field+".traits")...)
 		if verb.Traits != nil {
-			switch wellKnown := WellKnownVerbs[verb.Name].Traits.SideEffects; verb.Traits.SideEffects {
+			switch verb.Traits.SideEffects {
 			case SideEffectsNone, SideEffectsRegistry, SideEffectsCloud:
-				if wellKnown != SideEffectsNone && verb.Traits.SideEffects != wellKnown {
-					diags = append(diags, diag.Errorf("invalid-verb-traits", field+".traits.sideEffects",
-						"verb %q must keep the side effects %q the core gives it", verb.Name, wellKnown))
-				}
 			default:
 				diags = append(diags, diag.Errorf("invalid-enum", field+".traits.sideEffects",
 					"sideEffects %q must be %q or %q", verb.Traits.SideEffects, SideEffectsRegistry, SideEffectsCloud))

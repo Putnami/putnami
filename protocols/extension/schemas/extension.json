@@ -762,7 +762,7 @@
         },
         "traits": {
           "$ref": "#/$defs/commandTraits",
-          "description": "Orchestration traits; replaces the well-known verb's defaults when declared, except that traits declared without sideEffects keep the verb's."
+          "description": "Orchestration traits; replace the verb's default traits wholesale when declared, side effects included."
         }
       }
     },
@@ -1897,7 +1897,7 @@
         },
         "traits": {
           "$ref": "#/$defs/commandTraits",
-          "description": "Default traits of every job of the verb whose manifest declares none; replaces the well-known verb's defaults wholesale."
+          "description": "Default traits of every job of the verb whose manifest declares none; a declared traits object on a command replaces them wholesale, side effects included."
         },
         "related": {
           "type": "array",
