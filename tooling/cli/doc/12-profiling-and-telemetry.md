@@ -353,9 +353,10 @@ The command vocabulary (`cliusage.Commands` in `protocols/telemetry`) lists the
 eleven original job commands of the CLI catalog and every public command that
 an extension of the `@putnami` scope declares. The CLI records a requested
 command only when it is in that vocabulary and a loaded `@putnami` extension
-declares it public. A command that only another extension declares is omitted,
-even when its name matches one in the vocabulary, so no name a user or a third
-party chose leaves the machine. A structured subcommand
+declares it public, as a command or as a verb. A command that only an
+extension whose name is outside the `@putnami` scope declares is omitted, even
+when its name matches one in the vocabulary. Only a name in the closed
+vocabulary can leave the machine. A structured subcommand
 (`putnami <group> <sub>`, such as `putnami cloud deploy`) runs without an
 observer and records nothing; only a flat command, such as
 `putnami cloud-deploy`, is recorded. The receiver drops a record that names a

@@ -43,12 +43,14 @@ rotates every UTC month. The command vocabulary holds only names that Putnami
 chose: the eleven original job commands of the CLI catalog and the public
 commands that extensions of the `@putnami` scope declare. The CLI sends a
 command only when a loaded `@putnami` extension declares it, so a command that
-only another extension declares is never sent, even when its name matches. A
-structured subcommand (`putnami <group> <sub>`) runs without an observer and
-records nothing; only a flat command is recorded. The device ID and local buffer are deleted by `putnami
-telemetry off`; `DO_NOT_TRACK=1`, `PUTNAMI_TELEMETRY=off`, and CI provide further
-opt-outs or safeguards. A visible interactive notice is persisted before a
-previous buffer can be sent, and non-TTY runs are silent until that notice exists
+only an extension whose name is outside the `@putnami` scope declares is never
+sent, even when its name matches. Only a name in the closed list can leave the
+machine. A structured subcommand (`putnami <group> <sub>`) runs without an
+observer and records nothing; only a flat command is recorded. The device ID and
+local buffer are deleted by `putnami telemetry off`; `DO_NOT_TRACK=1`,
+`PUTNAMI_TELEMETRY=off`, and CI provide further opt-outs or safeguards. A visible
+interactive notice is persisted before a previous buffer can be sent, and non-TTY
+runs are silent until that notice exists
 on the machine.
 
 The managed receiver is hosted in `europe-west1` (Belgium). Sanitized raw

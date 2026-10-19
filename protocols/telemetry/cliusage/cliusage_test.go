@@ -217,22 +217,14 @@ func TestValidateRecordAcceptsExtensionCommands(t *testing.T) {
 	}
 }
 
-// releasedCommands are names the CLI sends. The receiver accepts each of
-// them, or it drops every record of that CLI that names one. The list is a
-// frozen copy of Commands: a name is added here when it is added there. Once a
-// CLI release sends a name, the name is never removed.
+// releasedCommands are the names a released CLI sends. The receiver accepts
+// each of them, or it drops every record of that CLI that names one. A name
+// that no released CLI sends is absent: it may leave Commands. Add a name here
+// in the pull request that releases the first CLI sending it. A released name
+// never leaves.
 var releasedCommands = []string{
 	"build", "test", "lint", "serve", "run", "format",
 	"package", "publish", "deploy", "generate", "validate",
-	"cache-provider", "change-finalize", "change-language", "change-verify", "clientgen",
-	"clientgen-adopt", "clientgen-check", "clientgen-sync", "cloud-cache", "cloud-channels",
-	"cloud-ci", "cloud-config", "cloud-db", "cloud-deploy", "cloud-env",
-	"cloud-image-layers", "cloud-infra", "cloud-login", "cloud-logout", "cloud-logs",
-	"cloud-metrics", "cloud-packages", "cloud-registries", "cloud-registry-token", "cloud-release-set",
-	"cloud-secrets", "cloud-setup", "cloud-source", "cloud-status", "cloud-token",
-	"cloud-traces", "cloud-whoami", "config-extract", "config-merge", "credential-provider",
-	"log-reporter", "session-reporter", "validate-workspace", "version", "workspace-fetch",
-	"workspace-install",
 }
 
 func TestCommandVocabularyKeepsEveryReleasedName(t *testing.T) {
@@ -241,9 +233,6 @@ func TestCommandVocabularyKeepsEveryReleasedName(t *testing.T) {
 		if !IsCommand(command) {
 			t.Errorf("released command %q left the vocabulary: the receiver drops the records of CLIs that send it", command)
 		}
-	}
-	if len(Commands) != len(releasedCommands) {
-		t.Errorf("Commands has %d names and the frozen copy %d: add each new name to releasedCommands too", len(Commands), len(releasedCommands))
 	}
 }
 

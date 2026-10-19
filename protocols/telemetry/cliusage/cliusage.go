@@ -84,10 +84,9 @@ var (
 // commands the CLI catalog listed when the vocabulary first shipped, in catalog
 // order, then every public command that an extension of the @putnami scope
 // declares, sorted. A conformance test in the CLI fails while such a command is
-// missing, so adding one requires an explicit wire-contract update. Once a CLI
-// release sends a name listed here, the name is never removed: the receiver would
-// drop that CLI's records, and a protocol test fails. Until the first such
-// release, a name that no first-party manifest declares may go.
+// missing, so adding one requires an explicit wire-contract update. A name that
+// a released CLI sends never leaves: the receiver would drop that CLI's records,
+// and a protocol test fails. A name that no released CLI sends may leave.
 var Commands = []string{
 	"build",
 	"test",
