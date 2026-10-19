@@ -61,6 +61,11 @@ const (
 	// that a successful cached test run of the workspace produced. Params:
 	// VerificationReportParams. Result: VerificationReportResult.
 	MethodVerificationReport = "verification.report"
+	// MethodVersionLines reports the workspace's version lines as the core
+	// computes them: for each line, the version `putnami version get` prints,
+	// and what `putnami version tag` needs to release it. Params:
+	// VersionLinesParams. Result: VersionLinesResult.
+	MethodVersionLines = "version.lines"
 	// MethodWorkspaceOwners answers which workspace projects own each path.
 	// A project owns a path when impact analysis treats it as an owner: the
 	// nearest project whose directory holds the path, every project that
@@ -73,7 +78,7 @@ const (
 
 // Methods lists every method the host serves, sorted.
 func Methods() []string {
-	methods := []string{MethodHello, MethodCollaborationCall, MethodVerificationReport, MethodWorkspaceOwners}
+	methods := []string{MethodHello, MethodCollaborationCall, MethodVerificationReport, MethodVersionLines, MethodWorkspaceOwners}
 	slices.Sort(methods)
 	return methods
 }
@@ -99,6 +104,12 @@ const (
 	// CodeNotVerified answers a verification report the cache does not
 	// corroborate.
 	CodeNotVerified = -32003
+	// CodeInvalidConfig answers a request the host refuses because the
+	// workspace's configuration or the host's environment is invalid, such as
+	// an unparsable support catalog or a malformed PUTNAMI_SOURCE_REVISION.
+	// The core exits 2 for the same refusal, where it exits 1 for a failure
+	// of the host (CodeInternalError). Its message is the one the core prints.
+	CodeInvalidConfig = -32004
 )
 
 // Request is one JSON-RPC request frame.
@@ -179,6 +190,82 @@ type VerificationReportParams struct {
 type VerificationReportResult struct {
 	// Report holds the report bytes, base64-encoded on the wire.
 	Report []byte `json:"report"`
+}
+
+// VersionLinesParams are the params of version.lines. The empty object asks
+// for every line.
+type VersionLinesParams struct {
+	// Scope names one version line by its scope path, as the --scope flag of
+	// `putnami version get` does, for example "tooling". Leading and trailing
+	// slashes are ignored. Absent or empty asks for every line.
+	Scope string `json:"scope,omitempty"`
+}
+
+// VersionLinesResult is the result of version.lines.
+type VersionLinesResult struct {
+	// SourceRevision is the full commit ID the host's run is bound to: the
+	// value of PUTNAMI_SOURCE_REVISION when the host's environment sets it,
+	// else HEAD's. A release commit and its tag go on HEAD, so a caller that
+	// releases refuses when SourceRevision is not HEAD.
+	SourceRevision string `json:"sourceRevision"`
+	// RecordedGraph is present when the host computed the versions from a
+	// dependency graph it recorded earlier, because it could not refresh the
+	// graph a support catalog reads. A caller that releases refuses then.
+	RecordedGraph *RecordedGraph `json:"recordedGraph,omitempty"`
+	// Lines holds one entry for each version line, sorted by Line, or only
+	// the line Scope names.
+	Lines []VersionLine `json:"lines"`
+}
+
+// RecordedGraph names the recorded dependency graph a version was computed
+// from after a refresh failed.
+type RecordedGraph struct {
+	// ObservedAt is when the host recorded the graph, in RFC 3339.
+	ObservedAt string `json:"observedAt"`
+	// RefreshError says why the refresh failed.
+	RefreshError string `json:"refreshError"`
+}
+
+// VersionLine is one version line at HEAD.
+type VersionLine struct {
+	// Line is the line's scope path, slash-separated. "" is the root line.
+	Line string `json:"line"`
+	// TagPattern spells the line's release tags: it carries one {version}
+	// placeholder, for example "tooling/v{version}".
+	TagPattern string `json:"tagPattern"`
+	// Version is the version `putnami version get` prints for the line: the
+	// release tag's version when Tagged, else the next version followed by the
+	// build suffix.
+	Version string `json:"version"`
+	// Tagged reports whether HEAD carries one of the line's release tags.
+	Tagged bool `json:"tagged"`
+	// Tag is that release tag when Tagged, else empty.
+	Tag string `json:"tag,omitempty"`
+	// Release is the version and tag the line's next release takes when the
+	// caller names no tag. It is absent when Tagged: HEAD is a release already.
+	Release *LineRelease `json:"release,omitempty"`
+	// Commits are the commits that touch the line since its last release, or
+	// since the first commit when it has none, newest first: the commits a
+	// release's changelog lists. It is an empty array, never null.
+	Commits []LineCommit `json:"commits"`
+}
+
+// LineRelease is the release the host proposes for a line.
+type LineRelease struct {
+	// Version is the release's MAJOR.MINOR.PATCH version.
+	Version string `json:"version"`
+	// Tag is the line's tag pattern rendered with Version.
+	Tag string `json:"tag"`
+}
+
+// LineCommit is one commit of a line's history.
+type LineCommit struct {
+	// SHA is the commit's full ID.
+	SHA string `json:"sha"`
+	// Subject is the first line of the commit message.
+	Subject string `json:"subject"`
+	// Body is the rest of the commit message, without trailing newlines.
+	Body string `json:"body"`
 }
 
 // WorkspaceOwnersParams are the params of workspace.owners.

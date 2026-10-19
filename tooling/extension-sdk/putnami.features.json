@@ -434,6 +434,20 @@
               "workspace-owners-rejects-an-answer-for-other-paths-and-stays-usable"
             ]
           }
+        },
+        {
+          "id": "host-rpc-version-lines-client",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "version-lines-sends-the-scope-and-returns-the-hosts-lines",
+              "version-lines-rejects-an-answer-it-cannot-use-and-stays-usable"
+            ]
+          }
         }
       ]
     }

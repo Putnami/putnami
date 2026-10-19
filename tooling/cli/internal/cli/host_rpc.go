@@ -14,6 +14,7 @@ import (
 	hostrpcproto "go.putnami.dev/protocol/extension/hostrpc"
 	features "go.putnami.dev/protocol/features"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commands/versioncmd"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hostrpc"
@@ -45,6 +46,7 @@ func startHostRPC(ctx context.Context, binding hostRPCBinding, stderr io.Writer)
 	server, err := hostrpc.Start(ctx, hostrpc.Methods{
 		Collaboration:      binding.collaborationCall,
 		VerificationReport: binding.verificationReport,
+		VersionLines:       binding.versionLines,
 		WorkspaceOwners:    binding.workspaceOwners,
 	})
 	return hostRPCLaunch(server, err, stderr)
@@ -146,6 +148,62 @@ func (b hostRPCBinding) workspaceOwners(_ context.Context, params hostrpcproto.W
 		}
 		slices.SortFunc(projects, func(a, b hostrpcproto.OwningProject) int { return strings.Compare(a.ID, b.ID) })
 		result.Owners = append(result.Owners, hostrpcproto.PathOwners{Path: path, Projects: projects})
+	}
+	return result, nil
+}
+
+// versionLines answers version.lines with what `putnami version get` and
+// `putnami version tag` compute for the launch's workspace, through the same
+// functions. Like them, it first refreshes the dependency graph a support
+// catalog reads. When the refresh fails it answers from the recorded view and
+// names it in RecordedGraph, so a caller that releases can refuse as
+// `version tag` does; without a usable view it fails, as both commands do. A
+// scope that names no line is invalid params, and any other failure, such as
+// a shallow clone, is the host's.
+func (b hostRPCBinding) versionLines(ctx context.Context, params hostrpcproto.VersionLinesParams) (hostrpcproto.VersionLinesResult, error) {
+	if b.root == "" {
+		return hostrpcproto.VersionLinesResult{}, &hostrpcproto.Error{Code: hostrpcproto.CodeUnavailable,
+			Message: "this command runs outside any workspace, so there is no version line"}
+	}
+	var result hostrpcproto.VersionLinesResult
+	if refresh := refreshVersionGraph(ctx, b.root, b.config); refresh.err != nil {
+		if !refresh.recorded.Usable() {
+			return hostrpcproto.VersionLinesResult{}, refresh.refusal()
+		}
+		result.RecordedGraph = &hostrpcproto.RecordedGraph{ObservedAt: refresh.recorded.ObservedAt, RefreshError: refresh.err.Error()}
+	}
+	specs, err := versioncmd.LineSpecs(b.root)
+	if err != nil {
+		return hostrpcproto.VersionLinesResult{}, err
+	}
+	selected, err := versioncmd.SelectLines(specs, params.Scope)
+	if err != nil {
+		return hostrpcproto.VersionLinesResult{}, &hostrpcproto.Error{Code: hostrpcproto.CodeInvalidParams, Message: err.Error()}
+	}
+	if result.SourceRevision, err = versioncmd.BoundRevision(b.root); err != nil {
+		return hostrpcproto.VersionLinesResult{}, err
+	}
+	result.Lines = make([]hostrpcproto.VersionLine, 0, len(selected))
+	for _, spec := range selected {
+		report, err := versioncmd.ReportLine(b.root, spec)
+		if err != nil {
+			return hostrpcproto.VersionLinesResult{}, err
+		}
+		line := hostrpcproto.VersionLine{
+			Line:       spec.ScopePath,
+			TagPattern: spec.TagPattern,
+			Version:    report.Info.Full,
+			Tagged:     report.Info.Tagged,
+			Tag:        report.Info.Tag,
+			Commits:    make([]hostrpcproto.LineCommit, 0, len(report.Commits)),
+		}
+		if report.Release != nil {
+			line.Release = &hostrpcproto.LineRelease{Version: report.Release.Version, Tag: report.Release.Tag}
+		}
+		for _, commit := range report.Commits {
+			line.Commits = append(line.Commits, hostrpcproto.LineCommit{SHA: commit.SHA, Subject: commit.Subject, Body: commit.Body})
+		}
+		result.Lines = append(result.Lines, line)
 	}
 	return result, nil
 }

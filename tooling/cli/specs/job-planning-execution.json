@@ -178,6 +178,10 @@
       "text": "workspace.owners takes workspace-relative paths in io/fs form and answers one entry per path, in request order. A path's owners are the projects impact analysis treats as owners: its nearest project, every project that claims it as an asset, and, for a workspace-root file, every project whose provider watches it. They are sorted by ID; none gives an empty list. An empty list of paths, or a path outside io/fs form, is invalid params. Outside a workspace the method is unavailable."
     },
     {
+      "id": "host-rpc-version-lines",
+      "text": "version.lines answers the bound source revision and, for each version line or the one its scope names, the version putnami version get prints, whether HEAD carries the line's tag, the release putnami version tag proposes and the commits since the last release. After a failed graph refresh it names the recorded graph it used. A scope naming no line is invalid params, an invalid catalog or source revision is an invalid configuration, outside a workspace it is unavailable, and a git failure is a host error."
+    },
+    {
       "id": "source-bound-cache",
       "text": "A task that declares cache.sourceBound stores and looks up its entry, locally and remotely, at a key derived from its cache key and its project's source binding: the stamped binding when storing, the current one when looking up, the empty one in an unmanaged workspace. A binding the CLI cannot compute inside a repository gives no hit and no store. Dependents fold the unchanged cache key, so a test-only edit keeps every key. A source-bound failure is never replayed, and its entry prunes no producer."
     }

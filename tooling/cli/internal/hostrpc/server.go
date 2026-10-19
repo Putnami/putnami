@@ -30,6 +30,7 @@ import (
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/sdk/extension/ownerperm"
 	"go.putnami.dev/sdk/extension/scratch"
+	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -63,6 +64,9 @@ type Methods struct {
 	Collaboration func(context.Context, wire.CollaborationCallParams) (json.RawMessage, error)
 	// VerificationReport answers verification.report with the report bytes.
 	VerificationReport func(context.Context, wire.VerificationReportParams) ([]byte, error)
+	// VersionLines answers version.lines with the workspace's version lines.
+	// It refuses a scope that names no line with wire.CodeInvalidParams.
+	VersionLines func(context.Context, wire.VersionLinesParams) (wire.VersionLinesResult, error)
 	// WorkspaceOwners answers workspace.owners with the projects that own
 	// each path. The server has already checked that the paths are not empty
 	// and are valid workspace paths.
@@ -338,7 +342,13 @@ func (s *Server) handle(frame []byte) (*wire.Response, bool) {
 	if err != nil {
 		var refusal *wire.Error
 		if !errors.As(err, &refusal) {
-			refusal = &wire.Error{Code: wire.CodeInternalError, Message: err.Error()}
+			// The core exits 2 for an invalid configuration and 1 for any
+			// other failure, so the two keep their own codes on the wire.
+			code := wire.CodeInternalError
+			if errors.Is(err, cmderr.ErrInvalidConfig) {
+				code = wire.CodeInvalidConfig
+			}
+			refusal = &wire.Error{Code: code, Message: err.Error()}
 		}
 		return &wire.Response{JSONRPC: wire.JSONRPCVersion, ID: id, Error: refusal}, true
 	}
@@ -395,6 +405,21 @@ func (s *Server) dispatch(method string, params json.RawMessage) (json.RawMessag
 				return nil, err
 			}
 			return json.Marshal(wire.VerificationReportResult{Report: data})
+		})
+	case wire.MethodVersionLines:
+		var lines wire.VersionLinesParams
+		if err := decodeParams(params, &lines); err != nil {
+			return nil, err
+		}
+		if s.methods.VersionLines == nil {
+			return nil, unavailable(method)
+		}
+		return s.call(func(ctx context.Context) (json.RawMessage, error) {
+			result, err := s.methods.VersionLines(ctx, lines)
+			if err != nil {
+				return nil, err
+			}
+			return json.Marshal(result)
 		})
 	case wire.MethodWorkspaceOwners:
 		var owners wire.WorkspaceOwnersParams

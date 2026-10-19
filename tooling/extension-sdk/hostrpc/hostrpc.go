@@ -128,6 +128,53 @@ func (c *Client) VerificationReport(ctx context.Context, ref wire.VerificationRe
 	return report.Report, nil
 }
 
+// VersionLines returns the workspace's version lines as the host computes
+// them: for each line, the version `putnami version get` prints and what
+// `putnami version tag` needs to release it, with the commit the host's run is
+// bound to. An empty scope asks for every line. Otherwise scope names one line
+// by its scope path, leading and trailing slashes ignored, and a scope that
+// names no line is a *wire.Error with wire.CodeInvalidParams. A support
+// catalog the host cannot parse, and a malformed PUTNAMI_SOURCE_REVISION in the
+// host's environment, are a *wire.Error with wire.CodeInvalidConfig, whose
+// message is the one the core prints. A line without commits has an empty
+// list. The client returns an error, leaving the client usable, when the answer names no source revision or no line, holds another
+// line than the scope names, or holds a tagged line without its tag or with a
+// release, or an untagged line without a release.
+func (c *Client) VersionLines(ctx context.Context, scope string) (wire.VersionLinesResult, error) {
+	var result wire.VersionLinesResult
+	if err := c.call(ctx, wire.MethodVersionLines, wire.VersionLinesParams{Scope: scope}, &result); err != nil {
+		return wire.VersionLinesResult{}, err
+	}
+	if result.SourceRevision == "" {
+		return wire.VersionLinesResult{}, errors.New("putnami host RPC version.lines answered no source revision")
+	}
+	if len(result.Lines) == 0 {
+		return wire.VersionLinesResult{}, errors.New("putnami host RPC version.lines answered no line")
+	}
+	if named := strings.Trim(scope, "/"); named != "" {
+		if len(result.Lines) != 1 {
+			return wire.VersionLinesResult{}, fmt.Errorf("putnami host RPC version.lines answered %d lines for the line %q", len(result.Lines), named)
+		}
+		if result.Lines[0].Line != named {
+			return wire.VersionLinesResult{}, fmt.Errorf("putnami host RPC version.lines answered the line %q for the line %q", result.Lines[0].Line, named)
+		}
+	}
+	for i, line := range result.Lines {
+		switch {
+		case line.Tagged && line.Tag == "":
+			return wire.VersionLinesResult{}, fmt.Errorf("putnami host RPC version.lines answered the line %q as tagged without its tag", line.Line)
+		case line.Tagged && line.Release != nil:
+			return wire.VersionLinesResult{}, fmt.Errorf("putnami host RPC version.lines answered a release for the line %q, which HEAD already releases", line.Line)
+		case !line.Tagged && line.Release == nil:
+			return wire.VersionLinesResult{}, fmt.Errorf("putnami host RPC version.lines answered no release for the untagged line %q", line.Line)
+		}
+		if line.Commits == nil {
+			result.Lines[i].Commits = []wire.LineCommit{}
+		}
+	}
+	return result, nil
+}
+
 // WorkspaceOwners returns which workspace projects own each path: one entry
 // for each path, in the order given, with the owners sorted by project ID.
 // A path is workspace-relative and in io/fs form (wire.ValidWorkspacePath). A
