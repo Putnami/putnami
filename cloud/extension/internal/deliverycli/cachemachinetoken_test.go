@@ -386,8 +386,14 @@ func TestCacheMachineTokenNeedsEveryCondition(t *testing.T) {
 			if cfg.SendsMachineToken() != test.want {
 				t.Fatalf("SendsMachineToken = %t, want %t", cfg.SendsMachineToken(), test.want)
 			}
-			if logw.Len() != 0 {
-				t.Fatalf("the provider logged %q; a valid session logs nothing here", logw.String())
+			if s.readOnly != test.want {
+				t.Fatalf("readOnly = %t, want %t: a session sends the machine token and no write, or neither", s.readOnly, test.want)
+			}
+			if !test.want && logw.Len() != 0 {
+				t.Fatalf("the provider logged %q; a session with another credential logs nothing here", logw.String())
+			}
+			if test.want && strings.Count(logw.String(), "\n") != 1 {
+				t.Fatalf("the provider logged %q; the read-only state is stated in exactly one line", logw.String())
 			}
 		})
 	}
@@ -514,10 +520,10 @@ func TestRefusedCloudTokenIsNotReMinted(t *testing.T) {
 }
 
 // A member's machine token reads the shared cache and writes nothing: the
-// server refuses its first write. The session then behaves as it does with
-// PUTNAMI_CACHE_TOKEN: the write path closes, no further write is sent, and
-// the summary says so plainly instead of warning about a cold cache.
-func TestCloudTokenWriteRefusalLatchesReadOnlyAndSaysSoPlainly(t *testing.T) {
+// cache server stores only a hosted CI run's results. The session knows that
+// before the first write, so it opens read-only: no write request reaches the
+// server, the run prints one info line saying so, and no refusal line.
+func TestCloudTokenSessionIsReadOnlyBeforeTheFirstWrite(t *testing.T) {
 	machineTokenSession(t, testMachineToken)
 	srv, writes := writeRefusingCacheServer(t)
 	t.Setenv(remotecache.URLEnv, srv.URL)
@@ -527,34 +533,32 @@ func TestCloudTokenWriteRefusalLatchesReadOnlyAndSaysSoPlainly(t *testing.T) {
 	defer s.close()
 	mustInit(t, s, &cache.InitializeParams{ProtocolVersion: cache.ProviderProtocolMinVersion, BlobExchangeDir: t.TempDir()})
 
-	first := s.upload(&cache.ProviderRequest{ProtocolVersion: cache.ProviderProtocolVersion, ID: 2, Op: cache.OpUpload},
-		latchTestUpload(strings.Repeat("a", cache.KeyLength)))
-	if result, _ := cache.ParseAndValidateUploadResult(first.Payload); result == nil || !result.Accepted {
-		t.Fatalf("first upload = %+v; the write path is open until the server refuses a write", first)
+	for i, key := range []string{strings.Repeat("a", cache.KeyLength), strings.Repeat("b", cache.KeyLength)} {
+		upload := s.upload(&cache.ProviderRequest{ProtocolVersion: cache.ProviderProtocolVersion, ID: int64(2 + i), Op: cache.OpUpload},
+			latchTestUpload(key))
+		if result, _ := cache.ParseAndValidateUploadResult(upload.Payload); result == nil || result.Accepted {
+			t.Fatalf("upload %d = %+v, want Accepted=false: a machine token never writes", i, upload)
+		}
+	}
+	marker := s.markerWrite(&cache.ProviderRequest{ProtocolVersion: cache.ProviderProtocolVersion, ID: 5, Op: cache.OpMarkerWrite},
+		&cache.MarkerWriteParams{Workspace: "w", Branch: "main", Commands: []string{"build"}, SHA: strings.Repeat("c", 40)})
+	if result, _ := cache.ParseAndValidateMarkerWriteResult(marker.Payload); result == nil || result.Published {
+		t.Fatalf("marker write = %+v, want Published=false", marker)
 	}
 	mustSummary(t, s)
-	if !s.writesLatched() {
-		t.Fatal("a 403 on a write did not latch the write path")
-	}
-	second := s.upload(&cache.ProviderRequest{ProtocolVersion: cache.ProviderProtocolVersion, ID: 4, Op: cache.OpUpload},
-		latchTestUpload(strings.Repeat("b", cache.KeyLength)))
-	if result, _ := cache.ParseAndValidateUploadResult(second.Payload); result == nil || result.Accepted {
-		t.Fatalf("upload after the latch = %+v, want Accepted=false", second)
-	}
 	s.bg.Wait()
-	if got := writes.Load(); got != 1 {
-		t.Fatalf("write requests = %d, want exactly the one refused write", got)
+	if got := writes.Load(); got != 0 {
+		t.Fatalf("write requests = %d, want none: the upload path never starts", got)
 	}
 
 	log := logw.String()
-	if !strings.Contains(log, "source="+string(remotecache.TokenClassCloudEnv)) {
-		t.Fatalf("the refusal must name the machine token as its source, got %q", log)
+	if got := strings.Count(log, "the remote cache is read-only for this run"); got != 1 {
+		t.Fatalf("read-only info lines = %d, want exactly one, got %q", got, log)
 	}
-	if !strings.Contains(log, "this credential reads the shared cache and writes nothing to it: only hosted CI runs write") {
-		t.Fatalf("the summary must say plainly that this credential only reads, got %q", log)
-	}
-	if strings.Contains(log, "WARNING") || strings.Contains(log, "next run starts cold") {
-		t.Fatalf("an expected machine token refusal must not raise the cold-cache warning, got %q", log)
+	for _, banned := range []string{"auth refused", "refused a find-missing", "writes nothing to it: only hosted CI runs write, so", "WARNING"} {
+		if strings.Contains(log, banned) {
+			t.Fatalf("the log carries %q for a read-only token: %q", banned, log)
+		}
 	}
 	if strings.Contains(log, testMachineToken) {
 		t.Fatal("the provider log carries the machine token")

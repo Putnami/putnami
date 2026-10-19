@@ -94,6 +94,7 @@ func runWorkspaceFetch(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (stri
 	emit.PhaseStart("fetch")
 	if err := fetchWorkspaceDependencies(stopped, ctx.WorkspaceRoot, bunBin, credential, emit); err != nil {
 		emit.PhaseEnd("fetch", "failed")
+		reportRegistryRefusal(emit, err.Error())
 		return "FAILED", nil, err
 	}
 	emit.PhaseEnd("fetch", "success")

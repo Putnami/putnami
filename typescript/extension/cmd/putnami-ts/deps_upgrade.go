@@ -91,6 +91,7 @@ func runDepsUpgrade(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (stri
 
 	resolvedVersions, releaseRef, setMode, err := resolveUpgradeNPMVersions(ctx, wsRoot, packages, target, emit)
 	if err != nil {
+		reportRegistryRefusal(emit, err.Error())
 		emit.Diagnostic("error", "failed to resolve @putnami/* version: "+err.Error(), "", 0)
 		return "FAILED", nil, nil
 	}
@@ -138,6 +139,7 @@ func runDepsUpgrade(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (stri
 
 	if !result.Success {
 		emit.PhaseEnd("install", "failed")
+		reportRegistryRefusal(emit, result.Stderr)
 		emit.Log("error", "bun install failed: "+result.Stderr)
 		if rollbackErr := rollbackNPMUpgrade(transaction, nil); rollbackErr != nil {
 			return "FAILED", nil, rollbackErr

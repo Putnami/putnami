@@ -1055,7 +1055,15 @@ only when all of these hold:
 
 The token reads the shared cache only. It is not written to
 `.putnami/cache.json` or to a log. The provider cannot re-mint it, so a request
-the cache server refuses is not retried. `putnami cloud cache status` names the
+the cache server refuses is not retried.
+
+The token is opaque, so the provider cannot read its scopes. It relies on the
+server rule above instead: a machine token never writes, whether it carries
+`cache.write` or not. A session that sends `PUTNAMI_CLOUD_TOKEN` therefore opens
+read-only. It sends no write request and prints one line, `the remote cache is
+read-only for this run`, in place of an `auth refused` warning.
+
+`putnami cloud cache status` names the
 variable on its identity line and does not read the last CI run, which needs a
 signed-in user.
 

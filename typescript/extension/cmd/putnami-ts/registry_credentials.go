@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -165,8 +166,11 @@ var ensureNpmRegistryCredential = registrycred.EnsureNativeCredential
 // the `//<host>/:_authToken=` line itself; this extension only names the host.
 //
 // It never fails the install. Every failure mode — no cloud, no session, a cloud
-// that does not implement the shape yet — logs one line and lets bun run with
-// whatever credential the machine already has.
+// that does not implement the shape yet — lets bun run with whatever credential
+// the machine already has. A missing credential matters only when the registry
+// then refuses a package, and most installs fetch public packages only. So the
+// warning for it is held, not logged: reportRegistryRefusal logs it once a
+// request the install needs answers 401 or 403.
 func refreshPutnamiNpmCredential(ctx *pctx.Context, emit *jsonl.Emitter) {
 	declared, err := npmRegistriesFrom(ctx.Params)
 	if err != nil {
@@ -175,9 +179,64 @@ func refreshPutnamiNpmCredential(ctx *pctx.Context, emit *jsonl.Emitter) {
 	}
 	for _, host := range putnamiScopeRegistryHost(declared) {
 		outcome := ensureNpmRegistryCredential(context.Background(), ctx.WorkspaceRoot, host)
-		if outcome.Message != "" {
-			emit.Log(outcome.Level, outcome.Message)
+		if outcome.Message == "" {
+			continue
 		}
+		if outcome.Level == "warn" {
+			heldCredentialWarnings.hold(outcome.Message)
+			continue
+		}
+		emit.Log(outcome.Level, outcome.Message)
+	}
+}
+
+// heldCredentialWarnings keeps the credential warnings of this process until a
+// registry refusal makes them relevant. The credential seam reports each host
+// once per process, and several steps of one install refresh it, so the held
+// lines live here rather than with one caller.
+var heldCredentialWarnings credentialWarnings
+
+type credentialWarnings struct {
+	mu    sync.Mutex
+	lines []string
+}
+
+func (w *credentialWarnings) hold(line string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for _, held := range w.lines {
+		if held == line {
+			return
+		}
+	}
+	w.lines = append(w.lines, line)
+}
+
+// take returns the held lines and forgets them, so each is logged once.
+func (w *credentialWarnings) take() []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	lines := w.lines
+	w.lines = nil
+	return lines
+}
+
+// registryRefusal matches the way a registry says no to a request: HTTP 401 or
+// 403 as a status word of its own, or the reason phrase. A version such as
+// 1.4.401 does not match.
+var registryRefusal = regexp.MustCompile(`(?i)(?:^|[\s(:])(?:401|403)(?:[\s:,)]|$)|\bunauthori[sz]ed\b|\bforbidden\b`)
+
+// reportRegistryRefusal logs the held credential warnings when evidence — the
+// error text of a failed registry request or of a failed package manager run —
+// shows the registry answered 401 or 403. Any other evidence leaves them held:
+// an install that fetched public packages, or failed for another reason, has
+// nothing to say about a credential.
+func reportRegistryRefusal(emit *jsonl.Emitter, evidence string) {
+	if !registryRefusal.MatchString(evidence) {
+		return
+	}
+	for _, line := range heldCredentialWarnings.take() {
+		emit.Log("warn", "the registry refused a request (HTTP 401 or 403); "+line)
 	}
 }
 

@@ -112,7 +112,10 @@ func TestPutnamiScopeRegistryHost(t *testing.T) {
 func stubNpmCredential(t *testing.T, outcome registrycred.Outcome) *[]string {
 	t.Helper()
 	original := ensureNpmRegistryCredential
-	t.Cleanup(func() { ensureNpmRegistryCredential = original })
+	t.Cleanup(func() {
+		ensureNpmRegistryCredential = original
+		heldCredentialWarnings.take()
+	})
 	var hosts []string
 	ensureNpmRegistryCredential = func(_ context.Context, _ string, host string) registrycred.Outcome {
 		hosts = append(hosts, host)
@@ -121,7 +124,7 @@ func stubNpmCredential(t *testing.T, outcome registrycred.Outcome) *[]string {
 	return &hosts
 }
 
-func TestRefreshPutnamiNpmCredential_AsksForTheScopeHostAndLogsTheOutcome(t *testing.T) {
+func TestRefreshPutnamiNpmCredential_AsksForTheScopeHostAndHoldsTheWarning(t *testing.T) {
 	ctx, _ := makeTestCtx(t)
 	withRegistries(t, ctx, `{"npm":{"scopes":{"@putnami":"https://npm.putnami.dev"}}}`)
 	hosts := stubNpmCredential(t, registrycred.Outcome{
@@ -134,12 +137,61 @@ func TestRefreshPutnamiNpmCredential_AsksForTheScopeHostAndLogsTheOutcome(t *tes
 	if len(*hosts) != 1 || (*hosts)[0] != "npm.putnami.dev" {
 		t.Fatalf("hosts = %v, want [npm.putnami.dev]", *hosts)
 	}
-	logged := findEvent(events, func(e map[string]any) bool { return e["level"] == "warn" })
-	if logged == nil {
-		t.Fatalf("no warning emitted: %#v", events)
+	// An install that fetched public packages only has no use for the
+	// credential: the warning waits for a registry refusal.
+	if logged := findEvent(events, func(e map[string]any) bool { return e["level"] == "warn" }); logged != nil {
+		t.Fatalf("a missing credential warned before any registry refusal: %#v", logged)
 	}
-	if msg, _ := logged["message"].(string); !strings.Contains(msg, "run putnami cloud login") {
-		t.Errorf("warning = %q, want the exact sign-in hint", logged["message"])
+}
+
+func TestRefreshPutnamiNpmCredential_DebugOutcomeLogsAtOnce(t *testing.T) {
+	ctx, _ := makeTestCtx(t)
+	withRegistries(t, ctx, `{"npm":{"scopes":{"@putnami":"https://npm.putnami.dev"}}}`)
+	stubNpmCredential(t, registrycred.Outcome{Kind: registrycred.KindMaterialized, Level: "debug", Message: "refreshed the registry credential for npm.putnami.dev"})
+
+	events := captureEvents(t, func() { refreshPutnamiNpmCredential(ctx, jsonl.New()) })
+	if findEvent(events, func(e map[string]any) bool { return e["level"] == "debug" }) == nil {
+		t.Fatalf("the debug line was held back: %#v", events)
+	}
+}
+
+func TestReportRegistryRefusal_LogsTheHeldWarningOnlyOnA401Or403(t *testing.T) {
+	const missing = "no registry credential for npm.putnami.dev: needs a signed-in user; PUTNAMI_CLOUD_TOKEN cannot read it; continuing with the existing credential"
+	for _, tc := range []struct {
+		name     string
+		evidence string
+		want     bool
+	}{
+		{name: "bun 401", evidence: "error: GET https://npm.putnami.dev/@putnami%2fcore - 401", want: true},
+		{name: "bun 403 with a reason", evidence: "error: 403 Forbidden", want: true},
+		{name: "a metadata lookup", evidence: "dist-tag \"next\" for @putnami/cli: packument request failed (registry npm.putnami.dev, HTTP 401, no credential sent)", want: true},
+		{name: "unauthorized word", evidence: "error: Unauthorized", want: true},
+		{name: "not found", evidence: "error: GET https://npm.putnami.dev/@putnami%2fcore - 404"},
+		{name: "a version ending in 401", evidence: "error: no matching version 1.4.401"},
+		{name: "a timeout", evidence: "timed out after 2m0s"},
+		{name: "empty", evidence: ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Cleanup(func() { heldCredentialWarnings.take() })
+			heldCredentialWarnings.hold(missing)
+
+			events := captureEvents(t, func() { reportRegistryRefusal(jsonl.New(), tc.evidence) })
+
+			logged := findEvent(events, func(e map[string]any) bool { return e["level"] == "warn" })
+			if (logged != nil) != tc.want {
+				t.Fatalf("warning logged = %t, want %t: %#v", logged != nil, tc.want, events)
+			}
+			if tc.want {
+				if msg, _ := logged["message"].(string); !strings.Contains(msg, "no registry credential for npm.putnami.dev") {
+					t.Errorf("warning = %q, want it to name the missing credential", msg)
+				}
+				// Reported once: the next refusal has nothing left to say.
+				again := captureEvents(t, func() { reportRegistryRefusal(jsonl.New(), tc.evidence) })
+				if findEvent(again, func(e map[string]any) bool { return e["level"] == "warn" }) != nil {
+					t.Error("the warning was logged twice")
+				}
+			}
+		})
 	}
 }
 
