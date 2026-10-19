@@ -3,6 +3,13 @@
   "protocolVersion": 1,
   "decisions": [
     {
+      "id": "D-C1",
+      "statement": "the remote cache trust floor rises to ci only for a command that publishes to a registry or creates a release tag; a deploy, whose side effects are cloud, raises none",
+      "settled": "2026-10-19",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
       "id": "D-W1",
       "statement": "Windows support targets windows/amd64 on Windows 10 1803 or later and Windows 11; windows/arm64 is added only when a host can prove it",
       "settled": "2026-09-26",
@@ -27,13 +34,6 @@
       "id": "D-W12",
       "statement": "on Windows, the Microsoft Visual C++ runtime (vcruntime140.dll) that Biome needs is a documented prerequisite that doctor checks; Putnami neither bundles nor installs it",
       "settled": "2026-09-28",
-      "settledBy": "fdumay",
-      "reviewOnly": true
-    },
-    {
-      "id": "D-W13",
-      "statement": "the remote cache trust floor rises to ci only for a command that publishes to a registry or creates a release tag; a deploy, whose side effects are cloud, raises none",
-      "settled": "2026-10-19",
       "settledBy": "fdumay",
       "reviewOnly": true
     },
