@@ -13,6 +13,7 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
@@ -24,9 +25,14 @@ const (
 
 // servePinnedExtensions starts a registry that serves every extension at the
 // release its download channel names, advertising the archive's digest, and
-// points the installer at it.
+// points the installer at it. The registry is anonymous: without a stubbed
+// credential seam, each download starts a `putnami cloud registry-token`
+// child, and the test waits on it.
 func servePinnedExtensions(t *testing.T) {
 	t.Helper()
+	resolveToken := extension.ResolveRegistryToken
+	extension.ResolveRegistryToken = func(string) (string, string) { return "", "" }
+	t.Cleanup(func() { extension.ResolveRegistryToken = resolveToken })
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", t.TempDir())
 	t.Setenv(artifactsEnsuredEnv, "")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
