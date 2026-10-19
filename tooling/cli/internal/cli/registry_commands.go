@@ -489,20 +489,46 @@ func cmdVersion(env *CommandEnv) error {
 // says so, because it is a recovery command that must work offline or with a
 // broken provider. `version tag` writes a release and refuses.
 func synchronizeVersionGraph(env *CommandEnv) error {
-	if _, err := os.Stat(filepath.Join(env.WsRoot, supportproto.CatalogFilename)); err != nil {
+	refresh := refreshVersionGraph(env.Ctx, env.WsRoot, env.Cfg)
+	if refresh.err == nil {
 		return nil
 	}
-	err := synchronizeWorkspaceGraph(env.Ctx, env.WsRoot, env.Cfg)
-	if err == nil {
-		return nil
-	}
-	if view := workspace.RecordedIndexView(env.WsRoot, time.Now()); env.Sub != "tag" && view.Usable() {
+	if env.Sub != "tag" && refresh.recorded.Usable() {
 		iox.Fprintf(os.Stderr, "putnami: version: the dependency graph could not be refreshed (%v); "+
-			"answering from the recorded view observed at %s\n", err, view.ObservedAt)
+			"answering from the recorded view observed at %s\n", refresh.err, refresh.recorded.ObservedAt)
 		return nil
 	}
+	return refresh.refusal()
+}
+
+// versionGraphRefresh is the outcome of refreshVersionGraph: err is why the
+// refresh failed, nil when it succeeded or was not needed, and recorded is the
+// view a version can still be read from after a failure.
+type versionGraphRefresh struct {
+	err      error
+	recorded workspace.RecordedView
+}
+
+// refreshVersionGraph refreshes the recorded dependency graph when the
+// workspace has a support catalog (synchronizeVersionGraph says why), and
+// reads the recorded view when the refresh fails. The version.lines host RPC
+// method calls it too, so both read a version from the same graph.
+func refreshVersionGraph(ctx context.Context, wsRoot string, cfg *wsproto.Config) versionGraphRefresh {
+	if _, err := os.Stat(filepath.Join(wsRoot, supportproto.CatalogFilename)); err != nil {
+		return versionGraphRefresh{}
+	}
+	err := synchronizeWorkspaceGraph(ctx, wsRoot, cfg)
+	if err == nil {
+		return versionGraphRefresh{}
+	}
+	return versionGraphRefresh{err: err, recorded: workspace.RecordedIndexView(wsRoot, time.Now())}
+}
+
+// refusal is the error of a version that must not be read from the recorded
+// view after the refresh failed.
+func (r versionGraphRefresh) refusal() error {
 	return fmt.Errorf("version: %s reads the dependency graph, which could not be refreshed: %w",
-		supportproto.CatalogFilename, err)
+		supportproto.CatalogFilename, r.err)
 }
 
 // cliBinDir resolves the directory holding the installed putnami CLI binaries:

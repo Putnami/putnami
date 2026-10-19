@@ -63,6 +63,9 @@ type Methods struct {
 	Collaboration func(context.Context, wire.CollaborationCallParams) (json.RawMessage, error)
 	// VerificationReport answers verification.report with the report bytes.
 	VerificationReport func(context.Context, wire.VerificationReportParams) ([]byte, error)
+	// VersionLines answers version.lines with the workspace's version lines.
+	// It refuses a scope that names no line with wire.CodeInvalidParams.
+	VersionLines func(context.Context, wire.VersionLinesParams) (wire.VersionLinesResult, error)
 	// WorkspaceOwners answers workspace.owners with the projects that own
 	// each path. The server has already checked that the paths are not empty
 	// and are valid workspace paths.
@@ -395,6 +398,21 @@ func (s *Server) dispatch(method string, params json.RawMessage) (json.RawMessag
 				return nil, err
 			}
 			return json.Marshal(wire.VerificationReportResult{Report: data})
+		})
+	case wire.MethodVersionLines:
+		var lines wire.VersionLinesParams
+		if err := decodeParams(params, &lines); err != nil {
+			return nil, err
+		}
+		if s.methods.VersionLines == nil {
+			return nil, unavailable(method)
+		}
+		return s.call(func(ctx context.Context) (json.RawMessage, error) {
+			result, err := s.methods.VersionLines(ctx, lines)
+			if err != nil {
+				return nil, err
+			}
+			return json.Marshal(result)
 		})
 	case wire.MethodWorkspaceOwners:
 		var owners wire.WorkspaceOwnersParams

@@ -131,7 +131,7 @@ func TestMethodsAreSortedAndComplete(t *testing.T) {
 	if !slices.IsSorted(methods) {
 		t.Errorf("Methods() = %v, not sorted", methods)
 	}
-	want := []string{"collaboration.call", "host.hello", "verification.report", "workspace.owners"}
+	want := []string{"collaboration.call", "host.hello", "verification.report", "version.lines", "workspace.owners"}
 	if !slices.Equal(methods, want) {
 		t.Errorf("Methods() = %v, want %v", methods, want)
 	}
@@ -163,6 +163,36 @@ func TestAPathWithoutOwnersTravelsAsAnEmptyArray(t *testing.T) {
 	}
 	if want := `{"owners":[{"path":"a.go","projects":[]}]}`; string(encoded) != want {
 		t.Fatalf("encoded %s, want %s", encoded, want)
+	}
+}
+
+func TestAVersionLineTravelsWithItsWireNames(t *testing.T) {
+	encoded, err := json.Marshal(VersionLinesResult{
+		SourceRevision: "abc",
+		Lines: []VersionLine{
+			{Line: "", TagPattern: "v{version}", Version: "1.0.0", Tagged: true, Tag: "v1.0.0", Commits: []LineCommit{}},
+			{Line: "tooling", TagPattern: "tooling/v{version}", Version: "0.2.0-20261019000000-abc",
+				Release: &LineRelease{Version: "0.2.0", Tag: "tooling/v0.2.0"},
+				Commits: []LineCommit{{SHA: "abc", Subject: "feat!: x", Body: "y"}}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"sourceRevision":"abc","lines":[` +
+		`{"line":"","tagPattern":"v{version}","version":"1.0.0","tagged":true,"tag":"v1.0.0","commits":[]},` +
+		`{"line":"tooling","tagPattern":"tooling/v{version}","version":"0.2.0-20261019000000-abc","tagged":false,` +
+		`"release":{"version":"0.2.0","tag":"tooling/v0.2.0"},"commits":[{"sha":"abc","subject":"feat!: x","body":"y"}]}]}`
+	if string(encoded) != want {
+		t.Fatalf("encoded %s\nwant    %s", encoded, want)
+	}
+	recorded, err := json.Marshal(VersionLinesResult{SourceRevision: "abc", Lines: []VersionLine{},
+		RecordedGraph: &RecordedGraph{ObservedAt: "2026-10-19T00:00:00Z", RefreshError: "offline"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"sourceRevision":"abc","recordedGraph":{"observedAt":"2026-10-19T00:00:00Z","refreshError":"offline"},"lines":[]}`; string(recorded) != want {
+		t.Fatalf("encoded %s\nwant    %s", recorded, want)
 	}
 }
 

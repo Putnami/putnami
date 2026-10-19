@@ -296,6 +296,9 @@ func TestParamsAreStrict(t *testing.T) {
 		WorkspaceOwners: func(context.Context, wire.WorkspaceOwnersParams) (wire.WorkspaceOwnersResult, error) {
 			return wire.WorkspaceOwnersResult{}, nil
 		},
+		VersionLines: func(context.Context, wire.VersionLinesParams) (wire.VersionLinesResult, error) {
+			return wire.VersionLinesResult{}, nil
+		},
 	})
 	right := token(t, server)
 	conn := dialRaw(t, server)
@@ -311,6 +314,9 @@ func TestParamsAreStrict(t *testing.T) {
 		{wire.MethodWorkspaceOwners, ``},
 		{wire.MethodWorkspaceOwners, `{"paths":["a.go"],"extra":1}`},
 		{wire.MethodWorkspaceOwners, `{"paths":"a.go"}`},
+		{wire.MethodVersionLines, ``},
+		{wire.MethodVersionLines, `{"scope":"a","extra":1}`},
+		{wire.MethodVersionLines, `{"scope":1}`},
 	} {
 		id := strconv.Quote("p" + strconv.Itoa(i))
 		conn.send(t, request(id, tc.method, right, tc.params))
@@ -333,6 +339,10 @@ func TestAMethodTheLaunchDoesNotServeIsUnavailable(t *testing.T) {
 	_, err = c.WorkspaceOwners(t.Context(), []string{"a.go"})
 	if !errors.As(err, &refusal) || refusal.Code != wire.CodeUnavailable {
 		t.Fatalf("workspace.owners = %v, want %d", err, wire.CodeUnavailable)
+	}
+	_, err = c.VersionLines(t.Context(), "")
+	if !errors.As(err, &refusal) || refusal.Code != wire.CodeUnavailable {
+		t.Fatalf("version.lines = %v, want %d", err, wire.CodeUnavailable)
 	}
 }
 
@@ -471,6 +481,44 @@ func TestWorkspaceOwnersRefusesAnEmptyListAndAPathOutsideIOFSForm(t *testing.T) 
 	conn.send(t, request(`"ok"`, wire.MethodWorkspaceOwners, right, `{"paths":["dir/a.go"]}`))
 	if response := conn.answer(t); response.Error != nil || ran.Load() != 1 {
 		t.Fatalf("a valid path got %+v after %d calls", response, ran.Load())
+	}
+}
+
+func TestVersionLinesReturnsTheMethodsAnswerAndRefusal(t *testing.T) {
+	t.Parallel()
+	answer := wire.VersionLinesResult{
+		SourceRevision: "0123456789abcdef0123456789abcdef01234567",
+		Lines: []wire.VersionLine{{Line: "tooling", TagPattern: "tooling/v{version}", Version: "0.1.1-x",
+			Release: &wire.LineRelease{Version: "0.1.1", Tag: "tooling/v0.1.1"}, Commits: []wire.LineCommit{}}},
+	}
+	var received []string
+	c := client(t, startServer(t, Methods{
+		VersionLines: func(_ context.Context, params wire.VersionLinesParams) (wire.VersionLinesResult, error) {
+			received = append(received, params.Scope)
+			switch params.Scope {
+			case "nowhere":
+				return wire.VersionLinesResult{}, &wire.Error{Code: wire.CodeInvalidParams, Message: "no version line"}
+			case "shallow":
+				return wire.VersionLinesResult{}, errors.New("need a full clone")
+			}
+			return answer, nil
+		},
+	}))
+	got, err := c.VersionLines(t.Context(), "tooling")
+	if err != nil || got.SourceRevision != answer.SourceRevision || len(got.Lines) != 1 || got.Lines[0].Release.Tag != "tooling/v0.1.1" {
+		t.Fatalf("VersionLines = %+v, %v, want the method's answer", got, err)
+	}
+	var refusal *wire.Error
+	if _, err := c.VersionLines(t.Context(), "nowhere"); !errors.As(err, &refusal) ||
+		refusal.Code != wire.CodeInvalidParams || refusal.Message != "no version line" {
+		t.Fatalf("an unknown scope = %v, want the method's refusal", err)
+	}
+	if _, err := c.VersionLines(t.Context(), "shallow"); !errors.As(err, &refusal) ||
+		refusal.Code != wire.CodeInternalError || refusal.Message != "need a full clone" {
+		t.Fatalf("a failing method = %v, want an internal error with its message", err)
+	}
+	if strings.Join(received, ",") != "tooling,nowhere,shallow" {
+		t.Errorf("the method received the scopes %v", received)
 	}
 }
 

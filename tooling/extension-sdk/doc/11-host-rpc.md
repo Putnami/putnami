@@ -12,6 +12,7 @@ a Unix socket. It does not start `putnami` again.
 | `collaboration.call` | `CallCollaboration(ctx, contract, operation, input)` | The envelope `putnami <contract> <operation> --output=json` prints for the same input, byte for byte. |
 | `verification.report` | `VerificationReport(ctx, ref)` | The bytes of a verification report a successful cached test run produced, once the host's cache corroborates them. |
 | `workspace.owners` | `WorkspaceOwners(ctx, paths)` | One entry for each path, in the order you gave, with the projects that own it. |
+| `version.lines` | `VersionLines(ctx, scope)` | The workspace's version lines as the core computes them, and the commit the run is bound to. |
 
 That is the whole list. The host answers any other method with
 method-not-found (`-32601`). `Hello` tells you what a given host serves, so
@@ -41,6 +42,38 @@ returns an error and the client stays usable.
 
 ```go
 owners, err := client.WorkspaceOwners(ctx, []string{"tooling/cli/main.go", "README.md"})
+```
+
+`version.lines` gives an extension the versions the core computes, so it never
+repeats the core's version rules. An empty scope asks for every line, sorted
+by scope path. A scope such as `tooling` asks for that line alone, as
+`putnami version get --scope tooling` does. Each `wire.VersionLine` holds:
+
+- `Line` and `TagPattern`, such as `tooling` and `tooling/v{version}`;
+- `Version`, what `putnami version get` prints for the line;
+- `Tagged` and `Tag`: whether HEAD carries one of the line's release tags,
+  and which;
+- `Release`, the version and tag of the line's next release when you name no
+  tag, or nil when `Tagged` is true;
+- `Commits`, the commits that touch the line since its last release, newest
+  first, which that release's changelog lists.
+
+`SourceRevision` is the full commit ID the run is bound to:
+`PUTNAMI_SOURCE_REVISION` when the host's environment sets it, else HEAD's.
+Refuse to release when it is not HEAD. `RecordedGraph` is set when the host
+could not refresh the dependency graph its support catalog reads and computed
+the versions from the graph it recorded earlier. Report it to the user, and
+refuse to release from it.
+
+A scope that names no line is `-32602`, with a message that lists the lines.
+Outside a workspace the host answers `-32002`, and a Git failure, such as a
+shallow clone, is `-32603`. If the host's answer names no source revision or
+no line, holds another line than your scope names, or holds a line whose
+`Release` contradicts `Tagged`, `VersionLines` returns an error and the client
+stays usable.
+
+```go
+lines, err := client.VersionLines(ctx, "tooling")
 ```
 
 ## Who receives a channel

@@ -23,7 +23,9 @@ const (
 	requirement = "host-rpc-client"
 	// ownersRequirement is the requirement of the workspace.owners client.
 	ownersRequirement = "host-rpc-workspace-owners-client"
-	testToken         = "test-token"
+	// versionRequirement is the requirement of the version.lines client.
+	versionRequirement = "host-rpc-version-lines-client"
+	testToken          = "test-token"
 )
 
 // fakeHost serves one end of a pipe: answer receives each request and returns
@@ -249,6 +251,98 @@ func TestWorkspaceOwnersRejectsAnAnswerForOtherPathsAndStaysUsable(t *testing.T)
 			})
 			if got, err := client.WorkspaceOwners(t.Context(), []string{"a.go", "b.go"}); err == nil {
 				t.Fatalf("WorkspaceOwners accepted %+v", got)
+			}
+			if _, err := client.Hello(t.Context()); err != nil {
+				t.Fatalf("the call after the rejected answer = %v, want the client usable", err)
+			}
+		})
+	}
+}
+
+func TestVersionLinesSendsTheScopeAndReturnsTheHostsLines(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, feature, versionRequirement, "version-lines-sends-the-scope-and-returns-the-hosts-lines")
+	release := &wire.LineRelease{Version: "0.2.0", Tag: "tooling/v0.2.0"}
+	commit := wire.LineCommit{SHA: "c1", Subject: "feat!: break", Body: "why"}
+	answer := wire.VersionLinesResult{
+		SourceRevision: "0123456789abcdef0123456789abcdef01234567",
+		RecordedGraph:  &wire.RecordedGraph{ObservedAt: "2026-10-19T00:00:00Z", RefreshError: "offline"},
+		Lines: []wire.VersionLine{
+			{Line: "go", TagPattern: "go/v{version}", Version: "0.0.1", Tagged: true, Tag: "go/v0.0.1"}, // encodes "commits": null
+			{Line: "tooling", TagPattern: "tooling/v{version}", Version: "0.2.0-x", Release: release, Commits: []wire.LineCommit{commit}},
+		},
+	}
+	scopes := make(chan string, 2)
+	client := fakeHost(t, func(request wire.Request) []byte {
+		var params wire.VersionLinesParams
+		if err := wire.DecodeStrict(request.Params, &params); err != nil || request.Method != wire.MethodVersionLines {
+			t.Errorf("%s params %s, %v", request.Method, request.Params, err)
+		}
+		scopes <- params.Scope
+		if params.Scope != "" {
+			scoped := answer
+			scoped.Lines = answer.Lines[1:]
+			return result(t, request, scoped)
+		}
+		return result(t, request, answer)
+	})
+	every, err := client.VersionLines(t.Context(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scope := <-scopes; scope != "" {
+		t.Errorf("the host received the scope %q for every line", scope)
+	}
+	if every.SourceRevision != answer.SourceRevision || every.RecordedGraph == nil || *every.RecordedGraph != *answer.RecordedGraph ||
+		len(every.Lines) != 2 {
+		t.Fatalf("VersionLines = %+v, want the host's answer", every)
+	}
+	if tagged := every.Lines[0]; tagged.Line != "go" || tagged.Tag != "go/v0.0.1" || tagged.Release != nil || tagged.Commits == nil || len(tagged.Commits) != 0 {
+		t.Errorf("the tagged line = %+v, want its tag, no release and an empty commit list", tagged)
+	}
+	if tooling := every.Lines[1]; tooling.Release == nil || *tooling.Release != *release || !slices.Equal(tooling.Commits, []wire.LineCommit{commit}) {
+		t.Errorf("the untagged line = %+v, want its release and commits", tooling)
+	}
+	scoped, err := client.VersionLines(t.Context(), "/tooling/")
+	if err != nil || len(scoped.Lines) != 1 || scoped.Lines[0].Line != "tooling" {
+		t.Fatalf("VersionLines(/tooling/) = %+v, %v, want the tooling line", scoped, err)
+	}
+	if scope := <-scopes; scope != "/tooling/" {
+		t.Errorf("the host received the scope %q, want it as given", scope)
+	}
+}
+
+func TestVersionLinesRejectsAnAnswerItCannotUseAndStaysUsable(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, feature, versionRequirement, "version-lines-rejects-an-answer-it-cannot-use-and-stays-usable")
+	revision := "0123456789abcdef0123456789abcdef01234567"
+	release := &wire.LineRelease{Version: "0.0.1", Tag: "a/v0.0.1"}
+	untagged := wire.VersionLine{Line: "a", TagPattern: "a/v{version}", Version: "0.0.1-x", Release: release}
+	for _, tc := range []struct {
+		name, scope string
+		answer      wire.VersionLinesResult
+	}{
+		{"no source revision", "", wire.VersionLinesResult{Lines: []wire.VersionLine{untagged}}},
+		{"no line", "", wire.VersionLinesResult{SourceRevision: revision}},
+		{"two lines for a scope", "a", wire.VersionLinesResult{SourceRevision: revision, Lines: []wire.VersionLine{untagged, untagged}}},
+		{"another line than the scope", "b", wire.VersionLinesResult{SourceRevision: revision, Lines: []wire.VersionLine{untagged}}},
+		{"a tagged line without its tag", "", wire.VersionLinesResult{SourceRevision: revision,
+			Lines: []wire.VersionLine{{Line: "a", Version: "0.0.1", Tagged: true}}}},
+		{"a tagged line with a release", "", wire.VersionLinesResult{SourceRevision: revision,
+			Lines: []wire.VersionLine{{Line: "a", Version: "0.0.1", Tagged: true, Tag: "a/v0.0.1", Release: release}}}},
+		{"an untagged line without a release", "", wire.VersionLinesResult{SourceRevision: revision,
+			Lines: []wire.VersionLine{{Line: "a", Version: "0.0.1-x"}}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			client := fakeHost(t, func(request wire.Request) []byte {
+				if request.Method == wire.MethodHello {
+					return result(t, request, wire.HelloResult{Protocol: wire.ProtocolVersion, Methods: wire.Methods()})
+				}
+				return result(t, request, tc.answer)
+			})
+			if got, err := client.VersionLines(t.Context(), tc.scope); err == nil {
+				t.Fatalf("VersionLines accepted %+v", got)
 			}
 			if _, err := client.Hello(t.Context()); err != nil {
 				t.Fatalf("the call after the rejected answer = %v, want the client usable", err)

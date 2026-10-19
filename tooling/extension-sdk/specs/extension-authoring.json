@@ -115,6 +115,10 @@
     {
       "id": "host-rpc-workspace-owners-client",
       "text": "The Go client's WorkspaceOwners sends the paths and returns one entry per path, in request order, each with its owners. It refuses an empty list and a path outside io/fs form before it sends anything. An answer with another count of entries, or an entry for another path, is an error that leaves the client usable."
+    },
+    {
+      "id": "host-rpc-version-lines-client",
+      "text": "The Go client's VersionLines sends the scope and returns the host's answer, with an empty commit list for a line without commits. An answer without a source revision or a line, with another line than the scope names, or with a tagged line that lacks its tag or has a release, or an untagged line without one, is an error that leaves the client usable."
     }
   ],
   "decisions": [

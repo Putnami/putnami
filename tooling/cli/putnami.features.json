@@ -1171,6 +1171,24 @@
           }
         },
         {
+          "id": "host-rpc-version-lines",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "version-lines-answers-what-the-core-computes-for-each-line",
+              "version-lines-selects-the-line-its-scope-names",
+              "version-lines-refuses-a-scope-that-names-no-line",
+              "version-lines-names-the-recorded-graph-after-a-failed-refresh",
+              "version-lines-is-unavailable-outside-a-workspace",
+              "version-lines-reports-a-git-failure-as-the-hosts"
+            ]
+          }
+        },
+        {
           "id": "source-bound-cache",
           "stage": "coded",
           "evidenceKinds": [
