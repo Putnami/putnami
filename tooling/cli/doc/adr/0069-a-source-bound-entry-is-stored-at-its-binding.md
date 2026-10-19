@@ -30,6 +30,11 @@ describe wrote it, so a hit restored `.gen/schema/feature-evidence` and left
 the committed copy as it stood. The binding leaves `schema/feature-evidence/**`
 out, so it cannot see a stale committed copy either.
 
+Describe also rewrites committed sidecars that the binding covers. An
+execution that changes one read the binding before that write, so its
+evidence names a tree the run has already left, and the next run misses and
+executes again.
+
 ## Decision
 
 1. **A task declares that its outputs embed its project's binding.** The task
@@ -97,6 +102,21 @@ out, so it cannot see a stale committed copy either.
 9. **A manifest that declares the field requires CLI contract 10**
    (`protocols/cli.SourceBoundCacheContract`) wherever it loads from. An older
    CLI stores the entry at its cache key alone, so it refuses the manifest.
+10. **An execution that moves its own binding settles.** A task can rewrite
+    files the binding covers: Go describe converges committed sidecars such as
+    `schema/http-routes.json` and `infra/requirements.json`. After a
+    successful execution, and after its retries, the scheduler brings the
+    stamp to the tree the execution left. When the stamp names another
+    binding, the task executes once more from emptied owned outputs, like a
+    retry, and the entry is stored at the binding that execution read. The
+    evidence, the stamp, the entry and the tree then name one binding. A task
+    settles at most once per run: when the binding moves again, the entry is
+    stored at the binding the last execution read, which its outputs embed,
+    and the run warns. A binding the CLI cannot compute after the execution
+    gives no store key. A skipped execution writes nothing and is not
+    checked. The settling also runs without the cache, so a `--no-cache` run
+    leaves evidence that names its tree. `source-v1` coverage does not
+    change.
 
 ## Rejected alternatives
 
@@ -129,6 +149,16 @@ out, so it cannot see a stale committed copy either.
 - **Rewrite the binding inside a restored output.** The CLI would have to
   parse an extension's evidence format, and the evidence would claim a tree its
   producer never described.
+- **Leave the sidecars describe converges out of `source-v1`**, like
+  `schema/capabilities.json` and `schema/feature-evidence/`. The exclusions
+  are path-based and shared by every runtime and by history readers, so the
+  binding of every project with one of those paths would change, and
+  evidence recomputed at an earlier revision would stop matching. A hand edit
+  of a committed sidecar would no longer move the binding, so describe would
+  hit and never converge it again.
+- **Store the entry at the binding the execution left, without executing
+  again.** The entry would embed the earlier binding, and a hit would restore
+  evidence that names a tree the project no longer has.
 
 ## Consequences
 
@@ -145,10 +175,10 @@ out, so it cannot see a stale committed copy either.
 - `featureEvidence` declares no drift. The evidence moves with every binding
   move, so a comparison would fail or warn on the first run after every test
   edit. The clean-tree check of CI catches evidence left uncommitted.
-- Describe itself rewrites committed sidecars that `source-v1` covers, such
-  as `schema/http-routes.json` and `infra/requirements.json`. When an
-  execution changes one, its evidence names the binding before that write,
-  and the next run misses once and converges. This ADR does not change it.
+- A describe that converges a committed sidecar executes twice in that run,
+  and the next run at the same tree hits. The settling check computes the
+  project's binding once after each successful source-bound execution, and
+  never on a hit.
 - Describe removes the committed evidence when its run wrote none. An app
   that loses its last feature loses the file, and its entry records the file
   absent. Restoring that entry leaves a file already in the tree as it stands,

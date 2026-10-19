@@ -253,7 +253,11 @@ the first run after the edit executes the owning project's describe and stores
 a second entry, and a later run at either tree hits its own entry. Its
 dependents keep their keys and their hits. Describe declares the committed
 `schema/feature-evidence/go-framework.json` as an output, so a hit also
-restores the committed evidence of the binding it was stored at. See [Source-Bound Tasks](../../../tooling/cli/doc/10-caching.md#source-bound-tasks).
+restores the committed evidence of the binding it was stored at. The binding
+also covers the committed sidecars describe converges (`schema/openapi.json`,
+`schema/http-routes.json`, `schema/config.json`, `infra/requirements.json`).
+When describe changes one, the CLI executes it once more at the binding of the
+converged tree, so the evidence a run leaves names the tree it leaves. See [Source-Bound Tasks](../../../tooling/cli/doc/10-caching.md#source-bound-tasks).
 
 `test-exec` declares `**/*_test.go`, because it runs those files: excluding them
 there would serve a stored verdict for a test the run never executed.
