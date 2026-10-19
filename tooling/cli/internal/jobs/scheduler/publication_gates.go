@@ -40,7 +40,7 @@ func PlanProcessCapabilityGates(ctx context.Context, planned []*ScheduledJob) er
 	for index, job := range planned {
 		copy := *job
 		copy.DependsOn = append([]string(nil), job.DependsOn...)
-		if HasCloudCapabilitySideEffects(job) && !isFinalizerJob(job) && !isReleaseSetMemberPublication(job) {
+		if HasExternalEffects(job) && !isFinalizerJob(job) && !isReleaseSetMemberPublication(job) {
 			copy.DependsOn = dedupeSorted(append(copy.DependsOn, required...))
 		}
 		candidate[index] = &copy
@@ -54,8 +54,9 @@ func PlanProcessCapabilityGates(ctx context.Context, planned []*ScheduledJob) er
 	return nil
 }
 
-// isReleaseSetMemberPublication reports whether a job is a publish of a
-// release-set member: attachReleaseSetContext bound the immutable plan to it.
+// isReleaseSetMemberPublication reports whether a job is a registry
+// publication (PublishesToRegistry) of a release-set member:
+// attachReleaseSetContext bound the immutable plan to it.
 // Such a job is admitted on its own functional ancestors; the AFTER gate
 // applies to the release-set stamp instead (ADR 0023).
 //
@@ -65,7 +66,7 @@ func PlanProcessCapabilityGates(ctx context.Context, planned []*ScheduledJob) er
 // as a member — otherwise a repository could exempt an arbitrary publish from
 // the gate by spelling the key.
 func isReleaseSetMemberPublication(job *ScheduledJob) bool {
-	if job == nil || job.JobDef == nil || job.Project == nil || job.CommandName() != "publish" {
+	if job == nil || job.Project == nil || !PublishesToRegistry(job) {
 		return false
 	}
 	plan, ok := job.JobDef.BoundParams[releaseset.ContextParamName].(*releaseset.Plan)
@@ -78,14 +79,6 @@ func isReleaseSetMemberPublication(job *ScheduledJob) bool {
 		}
 	}
 	return false
-}
-
-// HasExternalEffects reports whether job writes outside the workspace: its
-// command's traits declare registry or cloud side effects, or its manifest
-// task declares a registry or cloud effect. It is the classification the
-// capability gates above apply.
-func HasExternalEffects(job *ScheduledJob) bool {
-	return HasCloudCapabilitySideEffects(job)
 }
 
 // ValidatePortablePublication is the executing side's publication check of a

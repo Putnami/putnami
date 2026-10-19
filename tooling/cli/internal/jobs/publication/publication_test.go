@@ -229,14 +229,14 @@ func (h *publicationHarness) addMember(ecosystem, coordinate, version, path stri
 	h.members = append(h.members, member)
 	h.routes[releaseset.MemberKey(member.Ecosystem, coordinate)] = releaseMemberRoute{
 		projectID: project.ID, publisher: h.publisher.Name, packagePublisher: h.publisher.Name,
-		packageStep: ecosystem, publishCommand: "publish", publishStep: ecosystem,
+		packageCommand: "package", packageStep: ecosystem, publishCommand: "publish", publishStep: ecosystem,
 	}
 	packageJob := &jobmodel.ScheduledJob{Project: project, Extension: h.publisher, JobDef: &modelextension.JobDefinition{
 		Name: "package~" + ecosystem, CommandName: "package", StepID: ecosystem, ExtensionName: h.publisher.Name,
 	}}
 	fixtureTask(h.t, packageJob.JobDef, fixtureScript{{"print", releaseSetSuccessLine}})
 	publishJob := &jobmodel.ScheduledJob{Project: project, Extension: h.publisher, JobDef: &modelextension.JobDefinition{
-		Name: "publish~" + ecosystem, CommandName: "publish", StepID: ecosystem, ExtensionName: h.publisher.Name,
+		Name: "publish~" + ecosystem, CommandName: "publish", StepID: ecosystem, ExtensionName: h.publisher.Name, Traits: registryPublication,
 	}, DependsOn: []string{packageJob.Key()}}
 	fixtureTask(h.t, publishJob.JobDef, script.then(fixtureScript{{"print", releaseSetSuccessLine}}))
 	h.jobs = append(h.jobs, packageJob, publishJob)
@@ -1371,7 +1371,7 @@ func TestLegacyPathIsUnchangedWhenTheCapabilityIsNotEchoed(t *testing.T) {
 	}}
 	fixtureTask(t, packageJob.JobDef, fixtureScript{{"print", releaseSetSuccessLine}})
 	publish := &jobmodel.ScheduledJob{Project: project, Extension: owner, JobDef: &modelextension.JobDefinition{
-		Name: "publish~npm", CommandName: "publish", StepID: "npm", ExtensionName: owner.Name,
+		Name: "publish~npm", CommandName: "publish", StepID: "npm", ExtensionName: owner.Name, Traits: registryPublication,
 	}, DependsOn: []string{packageJob.Key()}}
 	fixtureTask(t, publish.JobDef, fixtureScript{
 		{"write-environ", environ},

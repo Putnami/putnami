@@ -900,6 +900,22 @@
           }
         },
         {
+          "id": "publication-follows-declared-effects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-side-effecting-job-is-never-shared-by-trait",
+              "a-registry-publisher-of-any-name-joins-the-release-set",
+              "a-registry-command-alone-executes-under-dry-run",
+              "a-member-package-job-is-found-by-its-declared-route"
+            ]
+          }
+        },
+        {
           "id": "scoped-cache-bypass",
           "stage": "coded",
           "evidenceKinds": [

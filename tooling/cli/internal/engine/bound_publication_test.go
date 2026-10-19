@@ -48,9 +48,16 @@ func boundFixtureRequest(t *testing.T, commands []string, publication *runner.Pu
 // runBound runs req and returns its result and what it wrote on stderr.
 func runBound(t *testing.T, req Request) (SessionResult, string) {
 	t.Helper()
+	return runBoundIn(t, context.Background(), req)
+}
+
+// runBoundIn is runBound under ctx, which may carry the ancestry an adapter
+// captured at process start (CaptureAncestry).
+func runBoundIn(t *testing.T, ctx context.Context, req Request) (SessionResult, string) {
+	t.Helper()
 	var result SessionResult
 	stderr := captureStderr(t, func() {
-		result, _ = New().Run(context.Background(), req, discardEvents{})
+		result, _ = New().Run(ctx, req, discardEvents{})
 	})
 	return result, stderr
 }
@@ -111,9 +118,9 @@ func TestGateOnlyRequestPlansNoPublishJob(t *testing.T) {
 	}
 }
 
-// The refusal classifies a task by its command and by its declared effects,
-// and a request whose versions start a release-set publication needs the
-// block even before any task publishes. Only a bound request is checked.
+// The refusal classifies a task by its declared effects, never by its command
+// name, and a request whose versions start a release-set publication needs
+// the block even before any task publishes. Only a bound request is checked.
 func TestRefusesUnauthorizedPublicationClassifiesByEffects(t *testing.T) {
 	plain := portablePlan()
 	app := plain[0].Project
@@ -125,8 +132,11 @@ func TestRefusesUnauthorizedPublicationClassifiesByEffects(t *testing.T) {
 	pushing := []*scheduler.ScheduledJob{push}
 	modeljobs.AttachIdentities(pushing)
 	publishing := []*scheduler.ScheduledJob{portableJob(app, "publish")}
+	publishing[0].JobDef.Traits.SideEffects = extensionproto.SideEffectsRegistry
 	modeljobs.AttachIdentities(publishing)
-	tagged := publication.ReleaseSetOptions{Commands: []string{"publish"}, Tagged: true}
+	named := []*scheduler.ScheduledJob{portableJob(app, "publish")}
+	modeljobs.AttachIdentities(named)
+	tagged := publication.ReleaseSetOptions{Commands: []string{"publish"}, Publishes: true, Tagged: true}
 
 	request := func(publication *runner.PublicationBlock) *Request {
 		return &Request{Portable: &PortableExecution{Request: runner.ExecutionRequest{
@@ -142,6 +152,7 @@ func TestRefusesUnauthorizedPublicationClassifiesByEffects(t *testing.T) {
 	}{
 		{"a gate plan", request(nil), publication.ReleaseSetOptions{}, plain, ""},
 		{"a publish task", request(nil), publication.ReleaseSetOptions{}, publishing, "plan task /app:publish publishes"},
+		{"a publish task without a side effect", request(nil), publication.ReleaseSetOptions{}, named, ""},
 		{"a cloud task under another command", request(nil), publication.ReleaseSetOptions{}, shipping, "plan task /app:ship publishes"},
 		{"a registry write under build", request(nil), publication.ReleaseSetOptions{}, pushing, "plan task /app:build publishes"},
 		{"a release-set publication", request(nil), tagged, plain, "release-set publication"},

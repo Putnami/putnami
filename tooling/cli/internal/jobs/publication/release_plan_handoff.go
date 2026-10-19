@@ -90,7 +90,7 @@ func HandoffReleaseSetPlan(ctx context.Context, run *ReleaseSetRun, planned []*j
 	// armed, or the head-confirming release is refused as an unarmed write.
 	hasPublish := run.NoImpact()
 	for _, job := range planned {
-		if scheduler.HasCloudCapabilitySideEffects(job) {
+		if scheduler.HasExternalEffects(job) {
 			hasPublish = true
 			break
 		}

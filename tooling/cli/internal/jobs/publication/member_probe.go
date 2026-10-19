@@ -3,7 +3,6 @@ package publication
 import (
 	"fmt"
 	"io"
-	"slices"
 	"sort"
 	"strings"
 
@@ -30,8 +29,9 @@ type MemberProbeReport struct {
 	// Run is the release-set coordination of this session, or nil for a publish
 	// without a plan.
 	Run *ReleaseSetRun
-	// Commands are the commands the session runs.
-	Commands []string
+	// Publishes is true when a command the session runs declares the registry
+	// side effect (ReleaseSetOptions.Publishes).
+	Publishes bool
 	// DryRun is true when the session executes its jobs under --dry-run.
 	DryRun bool
 	// Quiet suppresses the lines that report nothing to act on.
@@ -45,7 +45,7 @@ type MemberProbeReport struct {
 // names every one and which carries one error diagnostic per verdict, so the
 // machine output lists them.
 func (report MemberProbeReport) Finalizer() func(map[string]*jobmodel.JobResult) {
-	if !report.DryRun || !slices.Contains(report.Commands, "publish") {
+	if !report.DryRun || !report.Publishes {
 		return nil
 	}
 	return func(results map[string]*jobmodel.JobResult) {

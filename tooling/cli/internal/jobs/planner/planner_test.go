@@ -380,12 +380,16 @@ func TestMatchJob_PathEntryMatchesThePinnedBuildOfThatProject(t *testing.T) {
 
 func TestMatchJob_SelfPublish(t *testing.T) {
 	t.Parallel()
-	// Extension projects can publish themselves without declaring the extension as a dependency
-	extPublish := &extension.JobDefinition{ExtensionName: "@putnami/python", Name: "publish"}
-	tsPublish := &extension.JobDefinition{ExtensionName: "@putnami/typescript", Name: "publish"}
+	// An extension project runs its own extension's commands that receive
+	// publish channels without declaring the extension as a dependency.
+	channels := extension.CommandTraits{InjectPublishChannels: true}
+	extPublish := &extension.JobDefinition{ExtensionName: "@putnami/python", Name: "publish", Traits: channels}
+	tsPublish := &extension.JobDefinition{ExtensionName: "@putnami/typescript", Name: "publish", Traits: channels}
+	extLint := &extension.JobDefinition{ExtensionName: "@putnami/python", Name: "lint"}
 
 	jobMap := map[string][]*extension.JobDefinition{
 		"publish": {tsPublish, extPublish},
+		"lint":    {extLint},
 	}
 
 	proj := &workspace.Project{Name: "@putnami/python"}
@@ -395,6 +399,9 @@ func TestMatchJob_SelfPublish(t *testing.T) {
 	}
 	if result.ExtensionName != "@putnami/python" {
 		t.Errorf("expected @putnami/python (self-publish), got %s", result.ExtensionName)
+	}
+	if got := firstMatch("lint", proj, jobMap); got != nil {
+		t.Errorf("a command without injectPublishChannels matched its own extension project: %#v", got)
 	}
 }
 

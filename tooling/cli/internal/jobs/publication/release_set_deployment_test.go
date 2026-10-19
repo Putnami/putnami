@@ -270,6 +270,11 @@ func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing
 	ws.Graph = workspace.BuildGraph(ws.Projects)
 	memberKey := releaseset.MemberKey("put", "putnami/app-deployment")
 	members := map[string]*workspace.Project{memberKey: app}
+	// The member's publisher runs package first, and the Go extension's
+	// package carries the deployment step (extension.MemberPackageCommand).
+	routes := []*extension.ExtensionDescription{{Name: "test-provider", Jobs: map[string]*extension.JobDefinition{
+		"publish": {Name: "publish", CommandDependsOn: []string{"package"}, Traits: extension.CommandTraits{SideEffects: extension.SideEffectsRegistry}},
+	}}, goExtension}
 
 	plan := func(params extension.ParamMap) []*jobmodel.ScheduledJob {
 		t.Helper()
@@ -297,7 +302,7 @@ func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing
 		// A fresh manager each time: the memoized file hashes would otherwise
 		// hide the content change the key is supposed to see.
 		cache := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
-		got, err := cachekey.SelectionFingerprints(ws, planned, params, cache, deploymentProfiles(t), members)
+		got, err := cachekey.SelectionFingerprints(ws, planned, params, cache, deploymentProfiles(t), routes, members)
 		if err != nil {
 			t.Fatalf("SelectionFingerprints: %v", err)
 		}
@@ -343,7 +348,7 @@ func TestTheDeploymentSelectionFingerprintFollowsTheDeclarationInputs(t *testing
 		}
 	}
 	cache := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
-	_, err := cachekey.SelectionFingerprints(ws, unplanned, nil, cache, deploymentProfiles(t), members)
+	_, err := cachekey.SelectionFingerprints(ws, unplanned, nil, cache, deploymentProfiles(t), routes, members)
 	if err == nil || !strings.Contains(err.Error(), `package step "deployment"`) {
 		t.Fatalf("keying the member without its package step = %v, want a refusal naming the step", err)
 	}

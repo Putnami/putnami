@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/engine"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/telemetry"
 )
@@ -232,21 +235,65 @@ func TestNilObserver_RecordsNothing(t *testing.T) {
 	}
 }
 
+// dryRunCommands declares, under names the core gives no meaning, a command
+// that publishes to a registry (ship) and one that publishes nothing (publish).
+var dryRunCommands = []*extension.ExtensionDescription{{Name: "@acme/release", Jobs: map[string]*extension.JobDefinition{
+	"ship":    {Name: "ship", Traits: extension.CommandTraits{SideEffects: extension.SideEffectsRegistry}},
+	"publish": {Name: "publish"},
+}}}
+
+// TestAncestryCommandsReadAGroupThroughItsFlatCommand pins that an extension
+// group routed to a registry publisher reads the ancestry its flat command's
+// traits ask for, by subcommand or through the group's default.
+func TestAncestryCommandsReadAGroupThroughItsFlatCommand(t *testing.T) {
+	t.Parallel()
+	extensions := []*extension.ExtensionDescription{{
+		Name: "@acme/release",
+		Jobs: map[string]*extension.JobDefinition{
+			"ship": {Name: "ship", Traits: extension.CommandTraits{SideEffects: extension.SideEffectsRegistry}},
+		},
+		CommandGroups: map[string]extension.CommandGroupDefinition{"release": {
+			Default:     "now",
+			Subcommands: map[string]extension.SubcommandDefinition{"now": {Command: "ship"}},
+		}},
+	}}
+	groups := extension.CommandGroupNames(extensions)
+	cases := []struct {
+		name   string
+		parsed *ParsedArgs
+		want   []string
+	}{
+		{"subcommand", &ParsedArgs{Commands: []string{"release"}, Subcommand: "now"}, []string{"ship"}},
+		{"default subcommand", &ParsedArgs{Commands: []string{"release"}}, []string{"ship"}},
+		{"unknown subcommand", &ParsedArgs{Commands: []string{"release"}, Subcommand: "later"}, []string{"release"}},
+		{"job commands", &ParsedArgs{Commands: []string{"ship", "lint"}}, []string{"ship", "lint"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := ancestryCommands(c.parsed, extensions, groups); !slices.Equal(got, c.want) {
+				t.Fatalf("ancestryCommands = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
 // TestApplyPublishDryRun_SingleCommandOptsIntoExecution pins the one
-// deliberate CommandParams synthesis on the terminal path: exactly
-// `publish --dry-run` executes with a synthesized dry-run param — and keys its
-// own cache/marker space with it, so RunMarkerParams stays untouched (a
-// dry-run publish must never satisfy the marker a real publish would write).
+// deliberate CommandParams synthesis on the terminal path: exactly one
+// command whose traits declare the registry side effect, under --dry-run,
+// executes with a synthesized dry-run param — and keys its own cache/marker
+// space with it, so RunMarkerParams stays untouched (a dry run must never
+// satisfy the marker a real publication would write).
 func TestApplyPublishDryRun_SingleCommandOptsIntoExecution(t *testing.T) {
 	t.Parallel()
-	parsed := &ParsedArgs{Commands: []string{"publish"}}
+	spectest.Proves(t, "cli/job-planning-execution", "publication-follows-declared-effects", "a-registry-command-alone-executes-under-dry-run")
+	parsed := &ParsedArgs{Commands: []string{"ship"}}
 	parsed.Global.DryRun = true
 	req := engine.Request{CommandParams: map[string]any{"docker": true}}
 
-	applyPublishDryRun(&req, parsed)
+	applyPublishDryRun(&req, parsed, dryRunCommands)
 
 	if !req.ExecutesUnderDryRun {
-		t.Fatal("ExecutesUnderDryRun = false, want the publish dry-run to execute")
+		t.Fatal("ExecutesUnderDryRun = false, want the registry command's dry run to execute")
 	}
 	if req.CommandParams["dry-run"] != true {
 		t.Fatalf("CommandParams[dry-run] = %v, want true", req.CommandParams["dry-run"])
@@ -266,9 +313,10 @@ func TestApplyPublishDryRun_OtherShapesKeepThePreview(t *testing.T) {
 		commands []string
 		dryRun   bool
 	}{
-		{"publish without dry-run", []string{"publish"}, false},
-		{"mixed command list", []string{"package", "publish"}, true},
-		{"other command", []string{"build"}, true},
+		{"registry command without dry-run", []string{"ship"}, false},
+		{"mixed command list", []string{"package", "ship"}, true},
+		{"publish without the registry trait", []string{"publish"}, true},
+		{"command no extension declares", []string{"build"}, true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -276,13 +324,13 @@ func TestApplyPublishDryRun_OtherShapesKeepThePreview(t *testing.T) {
 			parsed.Global.DryRun = c.dryRun
 			req := engine.Request{}
 
-			applyPublishDryRun(&req, parsed)
+			applyPublishDryRun(&req, parsed, dryRunCommands)
 
 			if req.ExecutesUnderDryRun {
 				t.Fatal("ExecutesUnderDryRun = true, want the plan-only preview preserved")
 			}
 			if _, synthesized := req.CommandParams["dry-run"]; synthesized {
-				t.Fatal("dry-run param synthesized outside the exact publish form")
+				t.Fatal("dry-run param synthesized outside the single registry command form")
 			}
 		})
 	}

@@ -252,6 +252,7 @@ exit 2
 // releaseSetFixtureManifest declares one provider that both verifies and
 // publishes: the shape a mixed session has in a real workspace, where the
 // extension serving `test` is also the extension serving `publish`. Its
+// package and publish declare the traits the first-party ones do. Its
 // `rollout` declares the consumesReleaseSet trait and its `deploy` declares no
 // trait, so a test tells the trait from the name.
 const releaseSetFixtureManifest = `{
@@ -275,8 +276,8 @@ const releaseSetFixtureManifest = `{
     "test": {"run": [{"id": "test", "task": "noop"}]},
     "build": {"run": [{"id": "compile", "task": "noop"}]},
     "validate": {"run": [{"id": "rules", "task": "noop"}]},
-    "package": {"run": [{"id": "artifact", "task": "noop"}]},
-    "publish": {"dependsOn": ["package"], "run": [{"id": "artifact", "task": "noop"}]},
+    "package": {"traits": {"injectPublishChannels": true}, "run": [{"id": "artifact", "task": "noop"}]},
+    "publish": {"dependsOn": ["package"], "traits": {"injectPublishChannels": true, "sideEffects": "registry"}, "run": [{"id": "artifact", "task": "noop"}]},
     "deploy": {"run": [{"id": "rollout", "task": "noop"}]},
     "rollout": {"traits": {"sideEffects": "cloud", "consumesReleaseSet": true}, "run": [{"id": "apply", "task": "noop"}]},
     "cloud-release-set": {"visibility": "internal", "run": [{"id": "provider", "task": "noop"}]}

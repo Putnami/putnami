@@ -1343,9 +1343,9 @@ records the design.
 
 ### What is and isn't cached remotely
 
-The remote cache admits every entry a task's run publishes to the local cache, whatever its build duration or output size, unless the task is side-effecting. A failure record is never shared (see [Failure replay](#failure-replay-negative-entries)).
+The remote cache admits every entry a task's run publishes to the local cache, whatever its build duration or output size, unless the task has external effects. A failure record is never shared (see [Failure replay](#failure-replay-negative-entries)).
 
-- **Side-effecting tasks are never remote-cached** (e.g. `publish`) — their effect must always run.
+- **Tasks with external effects are never remote-cached**: their command's traits declare the registry or cloud side effect, or the task declares a registry or cloud effect, whatever the command is named. Their effect must always run.
 - No duration or size rule leaves a result out: a 50 ms generation step that writes files is uploaded like a 5-minute build.
 - All transfers are content-addressed and **digest-verified**; bytes that do not match their digest are rejected.
 

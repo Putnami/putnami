@@ -22,7 +22,6 @@ import (
 	distribution "go.putnami.dev/protocol/distribution"
 	extproto "go.putnami.dev/protocol/extension"
 	put "go.putnami.dev/protocol/put"
-	runner "go.putnami.dev/protocol/runner"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/sdk/extension/gomodpublish"
 	"go.putnami.dev/sdk/extension/npmpublish"
@@ -207,7 +206,7 @@ func (run *ReleaseSetRun) openDependencies(planned []*jobmodel.ScheduledJob) []s
 			return false
 		}
 		visiting[key] = true
-		result := slices.Contains(runner.PublicationCommands, job.CommandName()) || scheduler.HasCloudCapabilitySideEffects(job)
+		result := scheduler.HasExternalEffects(job)
 		for _, dependency := range job.DependsOn {
 			if result {
 				break

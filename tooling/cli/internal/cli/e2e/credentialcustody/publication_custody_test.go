@@ -349,8 +349,8 @@ func writePublicationFixture(t *testing.T, self, endpoint, gate string) publicat
     }
   ],
   "commands": {
-    "package": { "run": [{ "id": "artifact", "task": "noop" }] },
-    "publish": { "dependsOn": ["package"], "run": [{ "id": "artifact", "task": "publication" }%s] },
+    "package": { "traits": { "injectPublishChannels": true }, "run": [{ "id": "artifact", "task": "noop" }] },
+    "publish": { "dependsOn": ["package"], "traits": { "injectPublishChannels": true, "sideEffects": "registry" }, "run": [{ "id": "artifact", "task": "publication" }%s] },
     %s: { "description": "Serve credentials.", "run": [{ "id": "serve", "task": "credential-provider" }] }
   },
   "tasks": {

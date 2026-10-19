@@ -164,7 +164,7 @@ var complexityCeilings = []complexityCeiling{
 			"RAISED 23/149→24/158 (cli/provider-publication): a run that may publish reads its " +
 			"bound commit's ancestry before the first hook, because repository code can rewrite refs, " +
 			"replace refs and grafts afterwards. ancestry.go holds AncestrySnapshot (five nil-safe " +
-			"readers), captureAncestrySnapshot and readsAncestry; only Engine.Run sees the point before " +
+			"readers), captureAncestrySnapshot and runAncestry; only Engine.Run sees the point before " +
 			"the hooks. engine.go holds keyingPlan and refusesUnauthorizedPublication, which refuse a " +
 			"bound request without invocation.publication on its keying plan, before the release-set " +
 			"preparation can start a provider; only this unit holds that plan, and keyingPlan keeps " +

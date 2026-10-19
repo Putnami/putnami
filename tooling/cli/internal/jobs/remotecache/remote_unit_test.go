@@ -8,6 +8,9 @@ import (
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	cache "go.putnami.dev/protocol/cache"
+	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -106,21 +109,36 @@ func TestPrepareUpload_StatusOnlyResultGetsEmptyManifest(t *testing.T) {
 	}
 }
 
-func TestPrepareUpload_SkipsSideEffectingTask(t *testing.T) {
+func TestPrepareUpload_SkipsAJobWithExternalEffectsByTrait(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "publication-follows-declared-effects",
+		"a-side-effecting-job-is-never-shared-by-trait")
 	ws := makeExecutorTestWorkspace(t)
 	cm := store.NewCacheManager(store.NewLocalStore(filepath.Join(ws.Root, ".putnami", "store")))
-	job := cacheableJob("publish", "/proj", "proj", "proj")
 	hash := "ab" + strings.Repeat("0", cache.KeyLength-2)
-
-	meta := &store.EntryMetadata{Extension: "@test/ext", Task: "publish", Project: "proj", DurationMs: 1500}
+	meta := &store.EntryMetadata{Extension: "@test/ext", Task: "ship", Project: "proj", DurationMs: 1500}
 	if err := cm.Save(hash, &store.EntryResult{Status: "success"}, meta, ""); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 
+	registry := cacheableJob("ship", "/proj", "proj", "proj")
+	registry.JobDef.Traits.SideEffects = extensionproto.SideEffectsRegistry
+	declared := cacheableJob("ship", "/proj", "proj", "proj")
+	declared.Extension.Tasks["cacheable"] = extension.TaskDefinition{
+		Declares: &extension.TaskDeclaration{Effects: []string{extensionproto.EffectCloud}},
+	}
+	// The command name decides nothing: a publish job with no declared effect
+	// is an ordinary cacheable job.
+	named := cacheableJob("publish", "/proj", "proj", "proj")
+
 	r := newUploadTestCache()
-	if _, ok := r.prepareUpload(hash, job, cm); ok {
-		t.Fatalf("a side-effecting task must never be eligible for remote upload")
+	for label, job := range map[string]*jobmodel.ScheduledJob{"registry trait": registry, "declared cloud effect": declared} {
+		if _, ok := r.prepareUpload(hash, job, cm); ok {
+			t.Fatalf("a job with a %s must never be eligible for remote upload", label)
+		}
+	}
+	if _, ok := r.prepareUpload(hash, named, cm); !ok {
+		t.Fatalf("a publish job without declared effects must be eligible for remote upload")
 	}
 }
 

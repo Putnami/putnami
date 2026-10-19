@@ -414,6 +414,13 @@ func TestSummary_DockerPublicationFactsPreserveColdWarmDigestProvenance(t *testi
 		t.Errorf("concurrency = %+v, want configured 100 and observed 2", got)
 	}
 
+	// The task that built the image is the project's Docker task whose result
+	// carries no publication, whatever its command is named.
+	run.Tasks[0].Identity = identityOfKey("/services/cold:bake~docker")
+	if rebuilt := run.Summary(200).Publications[0]; rebuilt.Timings.BuildMs != 125 {
+		t.Errorf("cold build under another command name = %d ms, want 125", rebuilt.Timings.BuildMs)
+	}
+
 	for kind, document := range map[protocolcli.DocumentKind]any{
 		protocolcli.DocumentResultEnvelope:      run.Envelope("publish", 200),
 		protocolcli.DocumentSessionStreamRecord: run.SessionEnd(time.Now(), 200),

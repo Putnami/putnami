@@ -32,9 +32,9 @@ var drainTelemetry = telemetry.DrainContext
 // runJobCommands runs the selected job commands through the engine. A hosted
 // run reads the remote cache through hostedCache, and its session adopts
 // hostedReporters, which the first-use bootstrap may have started before its
-// first repository code.
-func (a *App) runJobCommands(ctx context.Context, parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc *telemetry.Client, interactive bool, hostedCache *engine.HostedRemoteCache, hostedReporters *engine.HostedReporters) int {
-	req := terminalRequest(parsed, cfg, wsRoot, tc, interactive)
+// first repository code. extensions are the dispatch extensions.
+func (a *App) runJobCommands(ctx context.Context, parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc *telemetry.Client, interactive bool, hostedCache *engine.HostedRemoteCache, hostedReporters *engine.HostedReporters, extensions ...*extension.ExtensionDescription) int {
+	req := terminalRequest(parsed, cfg, wsRoot, tc, interactive, extensions...)
 	req.HostedRemoteCache = hostedCache
 	req.HostedReporters = hostedReporters
 	result, _ := engine.New().Run(ctx, req, nil)
@@ -46,7 +46,7 @@ func (a *App) runJobCommands(ctx context.Context, parsed *ParsedArgs, cfg *wspro
 // copy. An earlier change pulled it out of runJobCommands for exactly that: the
 // MCP equivalence test builds its terminal side here, so "terminal and MCP agree"
 // is a claim about the shipping mapping and not about a restatement of it.
-func terminalRequest(parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc *telemetry.Client, interactive bool) engine.Request {
+func terminalRequest(parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc *telemetry.Client, interactive bool, extensions ...*extension.ExtensionDescription) engine.Request {
 	req := engine.Request{
 		WorkspaceRoot: wsRoot,
 		Config:        cfg,
@@ -70,12 +70,14 @@ func terminalRequest(parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc 
 		// a nil gate fails a production run closed.
 		Preflight: doctor.DoctorPreflight,
 	}
-	applyPublishDryRun(&req, parsed)
+	applyPublishDryRun(&req, parsed, extensions)
 	return req
 }
 
-// applyPublishDryRun opts `putnami publish --dry-run` out of the plan-only
-// preview so the publish jobs execute in their own declared dry-run mode:
+// applyPublishDryRun opts `putnami publish --dry-run`, or any command whose
+// traits in extensions declare the registry side effect
+// (extension.CommandPublishes), out of the plan-only preview so the publish
+// jobs execute in their own declared dry-run mode:
 // every publisher prints the artifact set it WOULD push (npm, Go module,
 // docker) and the published-artifacts summary renders it, so executing is
 // strictly more informative than the DAG preview — with zero registry side
@@ -97,8 +99,8 @@ func terminalRequest(parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc 
 //     interpret the param; the engine excludes side-effecting jobs without
 //     the declaration from the plan (dropUndryableSideEffectJobs), so nothing
 //     publishes for real under --dry-run.
-func applyPublishDryRun(req *engine.Request, parsed *ParsedArgs) {
-	if !parsed.Global.DryRun || len(parsed.Commands) != 1 || parsed.Commands[0] != "publish" {
+func applyPublishDryRun(req *engine.Request, parsed *ParsedArgs, extensions []*extension.ExtensionDescription) {
+	if !parsed.Global.DryRun || len(parsed.Commands) != 1 || !extension.CommandPublishes(extensions, parsed.Commands[0]) {
 		return
 	}
 	params := maps.Clone(req.CommandParams)

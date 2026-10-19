@@ -367,7 +367,7 @@ func (r *RemoteCache) Negotiate(
 			executesLocally = true
 			continue
 		}
-		if cache.SideEffectingTask(job.JobDef.Name) {
+		if jobmodel.HasExternalEffects(job) {
 			executesLocally = true
 			continue
 		}
@@ -870,14 +870,14 @@ func (r *RemoteCache) DrainUploads() {
 
 // prepareUpload turns a freshly built local entry into the input to share with
 // the provider. Every entry is shared whatever its build duration or size,
-// except a side-effecting task's (cache.SideEffectingTask). It returns ok=false
-// when the entry should not be uploaded.
+// except the entry of a job with external effects (jobmodel.HasExternalEffects).
+// It returns ok=false when the entry should not be uploaded.
 func (r *RemoteCache) prepareUpload(hash string, job *jobmodel.ScheduledJob, cm *store.CacheManager) (uploadInput, bool) {
 	entry, err := cm.Lookup(hash)
 	if err != nil || entry == nil || entry.Result == nil {
 		return uploadInput{}, false
 	}
-	if cache.SideEffectingTask(job.JobDef.Name) {
+	if jobmodel.HasExternalEffects(job) {
 		return uploadInput{}, false
 	}
 

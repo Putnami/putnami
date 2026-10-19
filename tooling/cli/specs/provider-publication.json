@@ -14,7 +14,7 @@
   "requirements": [
     {
       "id": "ancestry-is-read-before-repository-code",
-      "text": "A run naming publish or deploy, or a bound request with invocation.publication, reads the ancestry of its bound commit (PUTNAMI_SOURCE_REVISION, else HEAD) at process start, before the bootstrap, an install or a hook, ignoring replace refs, grafts and the commit-graph; the run reuses it. It names a shallow clone and holds an error above 1,000,000 commits. Other runs read none. With publish enabled, the credential provider starts before the first hook, locally as on a hosted run."
+      "text": "A run naming a registry publisher or a release-set consumer, or a bound request with invocation.publication, reads the ancestry of its bound commit (PUTNAMI_SOURCE_REVISION, else HEAD) at process start, before the bootstrap, an install or a hook, ignoring replace refs, grafts and the commit-graph; the run reuses it. It names a shallow clone and holds an error above 1,000,000 commits. Other runs read none. With publish enabled, the credential provider starts before the first hook, locally as on a hosted run."
     },
     {
       "id": "gate-only-launches-no-publication",

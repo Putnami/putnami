@@ -11,8 +11,18 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	runner "go.putnami.dev/protocol/runner"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
 )
+
+// ancestryCommands declares, under names the core gives no meaning, a command
+// that publishes to a registry (ship), one that consumes the release set
+// (roll), and one that publishes and consumes nothing (publish).
+var ancestryCommands = []*extension.ExtensionDescription{{Name: "@acme/release", Jobs: map[string]*extension.JobDefinition{
+	"ship":    {Name: "ship", Traits: extension.CommandTraits{SideEffects: extension.SideEffectsRegistry}},
+	"roll":    {Name: "roll", Traits: extension.CommandTraits{ConsumesReleaseSet: true}},
+	"publish": {Name: "publish"},
+}}}
 
 // The ancestry snapshot tests run git in real repositories and set
 // PUTNAMI_SOURCE_REVISION, so none of them is parallel.
@@ -93,13 +103,13 @@ func TestAncestryIsCapturedBeforeTheInstallRunsRepositoryCode(t *testing.T) {
 	spectest.Proves(t, "cli/provider-publication", "ancestry-is-read-before-repository-code", "the-snapshot-precedes-the-install")
 	t.Setenv(git.SourceRevisionEnv, "")
 	root, first, head, orphan := ancestryRepo(t)
-	ctx := CaptureAncestry(context.Background(), root, []string{"build", "publish"}, nil)
+	ctx := CaptureAncestry(context.Background(), root, []string{"build", "ship"}, nil, ancestryCommands...)
 
 	runCLISelectionGit(t, root, "replace", "--graft", "HEAD", orphan)
 	runCLISelectionGit(t, root, "commit", "-q", "--allow-empty", "-m", "installed")
 	installed := gitLine(t, root, "rev-parse", "HEAD")
 
-	result := runQuietlyIn(t, ctx, Request{WorkspaceRoot: root, Config: &wsproto.Config{}, Commands: []string{"build", "publish"}})
+	result := runQuietlyIn(t, ctx, Request{WorkspaceRoot: root, Config: &wsproto.Config{}, Commands: []string{"build", "ship"}})
 	assertAncestry(t, result.ancestry, head, []string{head, first}, []string{orphan, installed})
 	if result.ancestry != capturedAncestry(ctx, root) {
 		t.Fatal("the run read its own snapshot instead of the one taken at process start")
@@ -120,7 +130,7 @@ func TestAncestryIsCapturedBeforeTheInstallRunsRepositoryCode(t *testing.T) {
 		t.Fatal("a context without a capture carries a snapshot")
 	}
 	gate := []string{"lint", "test", "build"}
-	if capturedAncestry(CaptureAncestry(context.Background(), root, gate, nil), root) != nil {
+	if capturedAncestry(CaptureAncestry(context.Background(), root, gate, nil, ancestryCommands...), root) != nil {
 		t.Fatal("a gate-only invocation read the ancestry")
 	}
 	bound := &runner.InvocationBlock{Commands: gate, Publication: &runner.PublicationBlock{Barrier: []string{"test"}}}
@@ -139,8 +149,14 @@ func TestAncestrySnapshotIsTakenBeforeTheFirstHook(t *testing.T) {
 	root, first, head, orphan := ancestryRepo(t)
 	hook := "git replace --graft HEAD " + orphan + " && git commit -q --allow-empty -m moved"
 
+	// A bound request that carries invocation.publication reads it itself; a
+	// terminal run reuses its adapter's capture (CaptureAncestry).
+	commands := []string{"build"}
 	result := runQuietly(t, Request{
-		WorkspaceRoot: root, Config: &wsproto.Config{}, Commands: []string{"publish"},
+		WorkspaceRoot: root, Config: &wsproto.Config{}, Commands: commands,
+		Portable: &PortableExecution{Request: runner.ExecutionRequest{Invocation: runner.InvocationBlock{
+			Commands: commands, Publication: &runner.PublicationBlock{Barrier: commands},
+		}}},
 		Hooks: &wsproto.HooksConfig{CLI: &wsproto.HookPhaseConfig{Before: []string{hook}}},
 	})
 
@@ -230,8 +246,10 @@ func TestAncestrySnapshotHoldsNothingAboveTheLimit(t *testing.T) {
 	}
 }
 
-// Only a run that may publish reads the ancestry: one that names publish or
-// deploy, or a bound request carrying invocation.publication.
+// Only a run that may publish reads the ancestry: its adapter captures it for a
+// command whose traits declare the registry side effect or consume the release
+// set, whatever the command's name, and the engine reads it for a bound
+// request carrying invocation.publication.
 func TestAncestrySnapshotIsNotTakenForAGateOnlyRun(t *testing.T) {
 	spectest.Proves(t, "cli/provider-publication", "ancestry-is-read-before-repository-code", "a-gate-only-run-reads-no-ancestry")
 	t.Setenv(git.SourceRevisionEnv, "")
@@ -257,14 +275,17 @@ func TestAncestrySnapshotIsNotTakenForAGateOnlyRun(t *testing.T) {
 	}{
 		{"gate", gate, nil, false},
 		{"bound gate without the block", gate, bound(nil), false},
-		{"publish", []string{"build", "publish"}, nil, true},
-		{"deploy", []string{"deploy"}, nil, true},
+		{"a registry publisher", []string{"build", "ship"}, nil, true},
+		{"a release-set consumer", []string{"roll"}, nil, true},
+		{"publish without a side effect", []string{"build", "publish"}, nil, false},
+		{"deploy no extension declares", []string{"deploy"}, nil, false},
 		{"bound request with the block", gate, bound(&runner.PublicationBlock{Barrier: []string{"test"}}), true},
 		{"commit request without the block", gate, commit(nil), false},
 		{"commit request with the block", gate, commit(&runner.PublicationBlock{Barrier: []string{"test"}}), true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			result := runQuietly(t, Request{WorkspaceRoot: root, Config: &wsproto.Config{}, Commands: tc.commands, Portable: tc.portable})
+			ctx := CaptureAncestry(context.Background(), root, tc.commands, nil, ancestryCommands...)
+			result := runQuietlyIn(t, ctx, Request{WorkspaceRoot: root, Config: &wsproto.Config{}, Commands: tc.commands, Portable: tc.portable})
 			if got := result.ancestry != nil; got != tc.reads {
 				t.Fatalf("read the ancestry = %v, want %v", got, tc.reads)
 			}
@@ -274,7 +295,8 @@ func TestAncestrySnapshotIsNotTakenForAGateOnlyRun(t *testing.T) {
 		})
 	}
 	// A watch iteration follows repository code its session already ran.
-	if readsAncestry(&Request{Commands: []string{"publish"}, watchIteration: true}) {
+	watch := &Request{WorkspaceRoot: root, Commands: []string{"build"}, Portable: bound(&runner.PublicationBlock{Barrier: []string{"test"}}), watchIteration: true}
+	if runAncestry(CaptureAncestry(context.Background(), root, []string{"ship"}, nil, ancestryCommands...), watch) != nil {
 		t.Fatal("a watch iteration reads the ancestry")
 	}
 }

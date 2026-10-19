@@ -11,6 +11,7 @@ import (
 	distribution "go.putnami.dev/protocol/distribution"
 	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/releaseset"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -143,9 +144,11 @@ func PrecomputeKeys(
 // The package job of a member is the one named by PackagePublisherFor. It
 // defaults to the extension metadata block that declared the member, while an
 // explicit route lets a publisher consume another installed extension's real
-// package step. The ecosystem profile owner supplies validation and registry
-// semantics. A project publishing to two ecosystems has two package jobs and
-// two fingerprints, which is what makes one project able to yield several
+// package step. Its command is the one extensions declare for that route
+// (extension.MemberPackageCommand), never a command name the core knows. The
+// ecosystem profile owner supplies validation and registry semantics. A
+// project publishing to two ecosystems has two package jobs and two
+// fingerprints, which is what makes one project able to yield several
 // independently-selected members.
 func SelectionFingerprints(
 	ws *workspace.Workspace,
@@ -153,6 +156,7 @@ func SelectionFingerprints(
 	commandParams map[string]any,
 	cache *store.CacheManager,
 	profiles *extproto.ProfileRegistry,
+	extensions []*extension.ExtensionDescription,
 	members map[string]*workspace.Project,
 ) (map[string]string, error) {
 	if profiles == nil {
@@ -180,7 +184,7 @@ func SelectionFingerprints(
 	for _, key := range slices.Sorted(maps.Keys(members)) {
 		project := members[key]
 		ecosystem, coordinate, _ := strings.Cut(key, "\x00")
-		_, _, known := profiles.Profile(ecosystem)
+		profile, _, known := profiles.Profile(ecosystem)
 		if !known {
 			return nil, fmt.Errorf("release-set member %s of project %q names ecosystem %q, which no installed extension declares",
 				PrintableMemberKey(key), projectID(project), ecosystem)
@@ -190,16 +194,22 @@ func SelectionFingerprints(
 			return nil, fmt.Errorf("release-set member %s of project %q has invalid metadata: %w", PrintableMemberKey(key), projectID(project), err)
 		}
 		publisher, declared := metadata.PackagePublisherFor(distribution.Ecosystem(ecosystem), coordinate)
-		if !found || !declared {
+		owner, published := metadata.PublisherFor(distribution.Ecosystem(ecosystem), coordinate)
+		if !found || !declared || !published {
 			return nil, fmt.Errorf("release-set member %s of project %q has no declaring extension", PrintableMemberKey(key), projectID(project))
 		}
 		packageStep, routed := metadata.PackageStepFor(distribution.Ecosystem(ecosystem), coordinate)
 		if !routed {
 			return nil, fmt.Errorf("release-set member %s of project %q has no declared package step", PrintableMemberKey(key), projectID(project))
 		}
+		command := extension.MemberPackageCommand(extensions, owner, publisher, profile.Publish, packageStep)
+		if command == "" {
+			return nil, fmt.Errorf("release-set member %s of project %q has no package command: %q declares no single command that %q's %s runs first with the injectPublishChannels trait and step %q",
+				PrintableMemberKey(key), projectID(project), publisher, owner, profile.Publish, packageStep)
+		}
 		var packageJob *jobmodel.ScheduledJob
 		for _, job := range order {
-			if job.CommandName() != "package" || job.Project == nil || job.Extension == nil {
+			if job.CommandName() != command || job.Project == nil || job.Extension == nil {
 				continue
 			}
 			if job.Project.ID != projectID(project) || job.Extension.Name != publisher || job.StepID() != packageStep {

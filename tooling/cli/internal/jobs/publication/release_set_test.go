@@ -109,7 +109,7 @@ func TestRequestedReleaseSetModeRequiresExplicitOrPlannedPublish(t *testing.T) {
 // no such trait is neither.
 func TestAReleaseSetConsumerIsNotMeasuredAgainstTheHead(t *testing.T) {
 	spectest.Proves(t, "cli/deploy-environments", "deploy-follows-the-environment-channel", "a-release-set-consumer-narrows-to-channel-members")
-	options := ReleaseSetOptions{Commands: []string{"publish", "deploy"}, Impacted: true, Channels: []string{"canary"}}
+	options := ReleaseSetOptions{Commands: []string{"publish", "deploy"}, Publishes: true, Impacted: true, Channels: []string{"canary"}}
 	if !ReleaseSetMeasuresAgainstHead(options) {
 		t.Fatal("a publish beside a deploy that consumes no release set is not measured against the head")
 	}
@@ -127,6 +127,53 @@ func TestAReleaseSetConsumerIsNotMeasuredAgainstTheHead(t *testing.T) {
 	}
 	if _, err := BuildReleaseSetOptions(ReleaseSetRequest{Commands: []string{"rollout"}, ConsumesReleaseSet: true, WorkspaceRoot: root}); err == nil {
 		t.Fatal("a release-set consumer did not read the distribution policy")
+	}
+}
+
+// A command whose traits declare the registry side effect publishes a release
+// set whatever its name, and a publish that declares none does not: the run's
+// release-set mode, its distribution policy read and the release node every
+// consumer waits for follow the trait.
+func TestARegistryPublisherOfAnyNameJoinsTheReleaseSet(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "publication-follows-declared-effects", "a-registry-publisher-of-any-name-joins-the-release-set")
+	ship := ReleaseSetOptions{Commands: []string{"ship"}, Publishes: true, All: true, Channels: []string{"canary"}}
+	if got := RequestedReleaseSetMode(ship); got != ReleaseSetAll {
+		t.Fatalf("a registry publisher named ship has mode %v, want all", got)
+	}
+	unpublished := ReleaseSetOptions{Commands: []string{"publish"}, All: true, Channels: []string{"canary"}}
+	if got := RequestedReleaseSetMode(unpublished); got != ReleaseSetDisabled {
+		t.Fatalf("a publish without the registry trait has mode %v, want disabled", got)
+	}
+
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "putnami.ci.json"), []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := BuildReleaseSetOptions(ReleaseSetRequest{Commands: []string{"ship"}, Publishes: true, WorkspaceRoot: root}); err == nil {
+		t.Fatal("a registry publisher named ship did not read the distribution policy")
+	}
+	if _, err := BuildReleaseSetOptions(ReleaseSetRequest{Commands: []string{"publish"}, WorkspaceRoot: root}); err != nil {
+		t.Fatalf("a publish without the registry trait read the distribution policy: %v", err)
+	}
+
+	project := &workspace.Project{ID: "/svc/alpha", Name: "svc/alpha", Path: "svc/alpha"}
+	ext := &modelextension.ExtensionDescription{Name: "@acme/platform"}
+	job := func(command string, traits modelextension.CommandTraits, dependsOn ...string) *jobmodel.ScheduledJob {
+		return &jobmodel.ScheduledJob{Project: project, Extension: ext, DependsOn: dependsOn, JobDef: &modelextension.JobDefinition{
+			Name: command + "~cloud", CommandName: command, ExtensionName: ext.Name, Traits: traits,
+		}}
+	}
+	shipJob := job("ship", modelextension.CommandTraits{SideEffects: modelextension.SideEffectsRegistry})
+	publishJob := job("publish", modelextension.CommandTraits{})
+	rollout := job("rollout", releaseSetConsumer, shipJob.Key(), publishJob.Key())
+	run := &ReleaseSetRun{provider: &fakeReleaseSetProvider{releaseOutcome: distribution.ReleaseOutcomeAlreadyCurrent}, plan: releaseSetE2ENoImpactOCIPlan(t)}
+	planned, _, err := run.AttachBarrier([]*jobmodel.ScheduledJob{shipJob, publishJob, rollout})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := slices.IndexFunc(planned, func(job *jobmodel.ScheduledJob) bool { return job.Key() == releaseSetResultKey })
+	if index < 0 || !slices.Equal(planned[index].DependsOn, []string{shipJob.Key()}) {
+		t.Fatalf("release node = %v, want it to wait for the registry publisher alone", planned)
 	}
 }
 
@@ -185,7 +232,7 @@ func TestReleaseSetPlanSelectsChangedMembersAndTheirDependents(t *testing.T) {
 		// coordinator accounts for, so the session's archive check skips them.
 		verifier := &extension.ExtensionDescription{Name: "@putnami/verifier", Jobs: map[string]*extension.JobDefinition{
 			"test":    {Name: "test"},
-			"publish": {Name: "publish"},
+			"publish": {Name: "publish", Traits: registryPublication},
 		}}
 		selected := []*workspace.Project{upstream, downstream}
 		projects, extensions, err = run.ScopePlanning(selected, nil, []*extension.ExtensionDescription{verifier}, testProfiles(), "test", "publish")
@@ -563,7 +610,7 @@ func TestReleaseSetScopePlanningKeepsOnlyMembersAndTheirPublishers(t *testing.T)
 		"publish": {Flags: map[string]modelextension.FlagDefinition{"npm": {}}},
 	}}
 	_, _, err = run.ScopePlanning([]*workspace.Project{downstream}, nil, []*extension.ExtensionDescription{incomplete}, testProfiles())
-	if err == nil || !strings.Contains(err.Error(), "does not declare package") {
+	if err == nil || !strings.Contains(err.Error(), "declares no command that publish runs first") {
 		t.Fatalf("incomplete publisher error = %v", err)
 	}
 }
@@ -582,10 +629,10 @@ func TestReleaseSetScopePlanningRetainsVerificationProviders(t *testing.T) {
 			publisher := releaseSetPublisherExtension("test-provider", "npm")
 			validationJob := &modelextension.JobDefinition{}
 			validator := &extension.ExtensionDescription{Name: "validator", Jobs: map[string]*modelextension.JobDefinition{
-				"validate": validationJob, "publish": {},
+				"validate": validationJob, "publish": {Traits: registryPublication},
 			}}
 			unrequested := &extension.ExtensionDescription{Name: "unrequested", Jobs: map[string]*modelextension.JobDefinition{
-				"publish": {},
+				"publish": {Traits: registryPublication},
 			}}
 			// The session verifies a project that owns no member, which is
 			// what a gate command sharing the publish selects: it survives
@@ -633,7 +680,7 @@ func TestReleaseSetScopePlanningKeepsVerificationProjectsBesideMembers(t *testin
 	publisher := releaseSetPublisherExtension("test-provider", "npm")
 	verifierJob := &modelextension.JobDefinition{}
 	verifier := &extension.ExtensionDescription{Name: "verifier", Jobs: map[string]*modelextension.JobDefinition{
-		"test": verifierJob, "publish": {},
+		"test": verifierJob, "publish": {Traits: registryPublication},
 	}}
 
 	projects, extensions, err := run.ScopePlanning(
@@ -749,7 +796,7 @@ func TestReleaseSetAttachPlanDropsNonMemberPublishNodes(t *testing.T) {
 		}}},
 		routes: map[string]releaseMemberRoute{memberKey: {
 			projectID: downstream.ID, publisher: publisher.Name, packagePublisher: publisher.Name,
-			packageStep: "npm", publishCommand: "publish", publishStep: "npm",
+			packageCommand: "package", packageStep: "npm", publishCommand: "publish", publishStep: "npm",
 		}},
 		verification: &releaseVerificationScope{commands: []string{"test", "publish"}},
 	}
@@ -993,7 +1040,7 @@ func TestBuildReleaseSetPlanExcludesReplaceOnlyImpactEdges(t *testing.T) {
 func TestReleaseProjectsReadsOnlyDeclaredMembers(t *testing.T) {
 	silent := &workspace.Project{ID: "/library", Name: "@putnami/library", Type: "library"}
 	ws := workspace.NewWorkspace(t.TempDir(), &wsproto.Config{Name: "putnami"}, []*workspace.Project{silent})
-	candidates, err := releaseProjects(ws.Projects, testProfiles())
+	candidates, err := releaseProjects(ws.Projects, testProfiles(), nil)
 	if err != nil || len(candidates) != 0 {
 		t.Fatalf("candidates = %+v, %v; want no member for a project that declares none", candidates, err)
 	}
@@ -1002,7 +1049,7 @@ func TestReleaseProjectsReadsOnlyDeclaredMembers(t *testing.T) {
 		ID: "/py", Name: "putnami-py", Type: "library",
 		Metadata: releaseSetProjectMetadata(t, "pypi", "putnami-py"),
 	}
-	_, err = releaseProjects([]*workspace.Project{unknown}, testProfiles())
+	_, err = releaseProjects([]*workspace.Project{unknown}, testProfiles(), nil)
 	if err == nil || !strings.Contains(err.Error(), `"/py"`) || !strings.Contains(err.Error(), `"pypi"`) {
 		t.Fatalf("unknown ecosystem error = %v, want it to name the project and the ecosystem", err)
 	}
@@ -1177,18 +1224,39 @@ func mustReadFile(t *testing.T, path string) []byte {
 	return data
 }
 
+// registryPublication and injectPublishChannels are the resolved traits of a
+// first-party publish and package command.
+var (
+	registryPublication   = modelextension.CommandTraits{InjectPublishChannels: true, SideEffects: modelextension.SideEffectsRegistry}
+	injectPublishChannels = modelextension.CommandTraits{InjectPublishChannels: true}
+)
+
 func releaseSetOwnerExtension(name string, ecosystem distribution.Ecosystem) *modelextension.ExtensionDescription {
 	flags := map[string]modelextension.FlagDefinition{string(ecosystem): {}}
 	return &modelextension.ExtensionDescription{Name: name, Jobs: map[string]*modelextension.JobDefinition{
-		"package": {Flags: flags},
-		"publish": {Flags: flags},
+		"package": {Flags: flags, Traits: injectPublishChannels},
+		"publish": {Flags: flags, CommandDependsOn: []string{"package"}, Traits: registryPublication},
 	}}
 }
 
 func releaseSetPublisherExtension(name string, ecosystems ...string) *modelextension.ExtensionDescription {
 	return &modelextension.ExtensionDescription{Name: name, Uses: ecosystems, Jobs: map[string]*modelextension.JobDefinition{
-		"package": {},
-		"publish": {},
+		"package": {Traits: injectPublishChannels},
+		"publish": {CommandDependsOn: []string{"package"}, Traits: registryPublication},
+	}}
+}
+
+// releaseSetRoute declares the route a member's package job follows
+// (extension.MemberPackageCommand): name's publish runs package first, and its
+// package carries the injectPublishChannels trait and runs steps.
+func releaseSetRoute(name string, steps ...string) *modelextension.ExtensionDescription {
+	pipeline := make([]modelextension.PipelineStep, 0, len(steps))
+	for _, step := range steps {
+		pipeline = append(pipeline, modelextension.PipelineStep{ID: step})
+	}
+	return &modelextension.ExtensionDescription{Name: name, Jobs: map[string]*modelextension.JobDefinition{
+		"package": {Name: "package", Traits: injectPublishChannels, PipelineSteps: pipeline},
+		"publish": {Name: "publish", CommandDependsOn: []string{"package"}, Traits: registryPublication},
 	}}
 }
 
@@ -1540,7 +1608,7 @@ func TestReleaseProjectsIgnoresAuthoredPublishForms(t *testing.T) {
 		Publish: []string{"npm"},
 		Config:  &wsproto.ProjectConfig{Options: map[string]modelextension.ParamMap{"publish": {"npm": true}}},
 	}
-	candidates, err := releaseProjects([]*workspace.Project{authored}, testProfiles())
+	candidates, err := releaseProjects([]*workspace.Project{authored}, testProfiles(), nil)
 	if err != nil || len(candidates) != 0 {
 		t.Fatalf("authored publish forms produced %+v, %v; want no member", candidates, err)
 	}
@@ -1560,7 +1628,7 @@ func TestReleaseProjectsIgnoresAuthoredPublishForms(t *testing.T) {
 	}
 }
 
-func TestAttachReleaseSetPlanUsesOneSDKOwnedContextOnPackageAndPublish(t *testing.T) {
+func TestAttachReleaseSetContextUsesOneSDKOwnedContextOnPackageAndPublish(t *testing.T) {
 	ws, upstream, downstream := releaseSetWorkspace(t)
 	useReleaseSetProvenance(t, map[string]string{downstream.ID: digestFor('9')})
 	plan := prepareReleaseSetWithHead(t, releaseSetRequest(), ws, releaseSetHead(t)).plan
@@ -1576,9 +1644,7 @@ func TestAttachReleaseSetPlanUsesOneSDKOwnedContextOnPackageAndPublish(t *testin
 	planned[1].JobDef.Name = "package~npm"
 	// The package job is a transitive pipeline dependency and therefore relies
 	// on its `package~npm` plan name fallback rather than a stamped CommandName.
-	if err := AttachReleaseSetPlan(planned, plan); err != nil {
-		t.Fatal(err)
-	}
+	attachReleaseSetContext(planned, plan, map[string]struct{}{"package": {}, "publish": {}})
 	for _, job := range planned {
 		raw, err := json.Marshal(job.JobDef.BoundParams[releaseset.ContextParamName])
 		if err != nil {
@@ -1599,9 +1665,6 @@ func TestAttachReleaseSetPlanUsesOneSDKOwnedContextOnPackageAndPublish(t *testin
 	if _, mutated := shared.BoundParams[releaseset.ContextParamName]; mutated {
 		t.Fatal("attachment mutated the shared discovered job definition")
 	}
-	if err := AttachReleaseSetPlan(planned[:1], plan); err == nil || !strings.Contains(err.Error(), "both package and publish") {
-		t.Fatalf("missing publish job error = %v", err)
-	}
 }
 
 func TestReleaseSetAttachPlanRoutesOneProjectToExactSelectedArtifactSteps(t *testing.T) {
@@ -1617,11 +1680,11 @@ func TestReleaseSetAttachPlanRoutesOneProjectToExactSelectedArtifactSteps(t *tes
 		routes: map[string]releaseMemberRoute{
 			releaseset.MemberKey("npm", "@putnami/service"): {
 				projectID: project.ID, publisher: publisher.Name, packagePublisher: publisher.Name,
-				packageStep: "npm", publishCommand: "publish", publishStep: "npm",
+				packageCommand: "package", packageStep: "npm", publishCommand: "publish", publishStep: "npm",
 			},
 			releaseset.MemberKey("oci", "putnami/service"): {
 				projectID: project.ID, publisher: publisher.Name, packagePublisher: publisher.Name,
-				packageStep: "docker", publishCommand: "publish", publishStep: "docker",
+				packageCommand: "package", packageStep: "docker", publishCommand: "publish", publishStep: "docker",
 			},
 		},
 	}
@@ -1703,11 +1766,11 @@ func TestReleaseSetAttachPlanKeepsUnselectedPackageStepAKeptJobNeeds(t *testing.
 		routes: map[string]releaseMemberRoute{
 			releaseset.MemberKey("oci", "putnami/service"): {
 				projectID: project.ID, publisher: publisher.Name, packagePublisher: publisher.Name,
-				packageStep: "docker", publishCommand: "publish", publishStep: "docker",
+				packageCommand: "package", packageStep: "docker", publishCommand: "publish", publishStep: "docker",
 			},
 			releaseset.MemberKey("put", "putnami/service-migration"): {
 				projectID: project.ID, publisher: publisher.Name, packagePublisher: publisher.Name,
-				packageStep: "generate", publishCommand: "publish", publishStep: "migration",
+				packageCommand: "package", packageStep: "generate", publishCommand: "publish", publishStep: "migration",
 			},
 		},
 	}
@@ -1797,7 +1860,7 @@ func TestReleaseSetAttachPlanRoutesPackageAndPublicationToDistinctProviders(t *t
 		}}},
 		routes: map[string]releaseMemberRoute{memberKey: {
 			projectID: project.ID, publisher: publisher.Name,
-			packagePublisher: packager.Name, packageStep: "archives",
+			packagePublisher: packager.Name, packageCommand: "package", packageStep: "archives",
 			publishCommand: "cloud-publish-archives", publishStep: "cloud-publish-archives",
 		}},
 	}
@@ -1994,8 +2057,8 @@ func TestReleaseSetModePreservesCloudlessAllAndFailsClosedOnlyForImpactedChannel
 		options ReleaseSetOptions
 		want    ReleaseSetMode
 	}{
-		{"provider-capable all", ReleaseSetOptions{Commands: []string{"publish"}, All: true, Channels: []string{"canary"}}, ReleaseSetAll},
-		{"legacy impacted", ReleaseSetOptions{Commands: []string{"publish"}, Impacted: true}, ReleaseSetDisabled},
+		{"provider-capable all", ReleaseSetOptions{Commands: []string{"publish"}, Publishes: true, All: true, Channels: []string{"canary"}}, ReleaseSetAll},
+		{"legacy impacted", ReleaseSetOptions{Commands: []string{"publish"}, Publishes: true, Impacted: true}, ReleaseSetDisabled},
 		{"impacted channel", releaseSetRequest(), ReleaseSetImpacted},
 		{"non publish", ReleaseSetOptions{Commands: []string{"build"}, Impacted: true, Channels: []string{"canary"}}, ReleaseSetDisabled},
 	}
@@ -2299,10 +2362,21 @@ func releaseSetTestFingerprints(t *testing.T, ws *workspace.Workspace) map[strin
 	return fingerprints
 }
 
+// providerDiscovery is a run's discovery: the release-set provider, and the
+// fixture routes.
 func providerDiscovery() *extension.DiscoveryResult {
-	return &extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{{
+	return &extension.DiscoveryResult{Extensions: append([]*extension.ExtensionDescription{{
 		Name: "provider", Commands: map[string]string{distribution.ProviderCommandName: "release sets"},
-	}}}
+	}}, fixtureRoutes()...)}
+}
+
+// fixtureRoutes are the routes of every fixture member's publisher and
+// package publisher.
+func fixtureRoutes() []*extension.ExtensionDescription {
+	return []*extension.ExtensionDescription{
+		releaseSetRoute("test-provider", "npm", "npm-client", "oci", "docker", "image", "put", "go", "archive"),
+		releaseSetRoute("go-packager", "archive"),
+	}
 }
 
 // prepareReleaseSet is the one call site tests use: it supplies the workspace
@@ -2347,7 +2421,7 @@ func prepareReleaseSetWithHead(t *testing.T, options ReleaseSetOptions, ws *work
 func buildTestPlan(t *testing.T, options ReleaseSetOptions, ws *workspace.Workspace, heads map[string]*distribution.ChannelHead) *releaseset.Plan {
 	t.Helper()
 	useReleaseSetProvenance(t, releaseSetTestOverrides)
-	candidates, err := releaseProjects(ws.Projects, testProfiles())
+	candidates, err := releaseProjects(ws.Projects, testProfiles(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2450,11 +2524,11 @@ func refreshHeadRef(t *testing.T, head *distribution.ChannelHead) {
 }
 
 func releaseSetRequest() ReleaseSetOptions {
-	return ReleaseSetOptions{Commands: []string{"publish"}, Impacted: true, Channels: []string{"canary"}, Profiles: testProfiles()}
+	return ReleaseSetOptions{Commands: []string{"publish"}, Publishes: true, Impacted: true, Channels: []string{"canary"}, Profiles: testProfiles()}
 }
 
 func releaseSetAllOptions() ReleaseSetOptions {
-	return ReleaseSetOptions{Commands: []string{"publish"}, All: true, Channels: []string{"canary"}, Profiles: testProfiles()}
+	return ReleaseSetOptions{Commands: []string{"publish"}, Publishes: true, All: true, Channels: []string{"canary"}, Profiles: testProfiles()}
 }
 
 // publishedResults is what a publish job emits per member it actually
@@ -2533,7 +2607,7 @@ func digestFor(char byte) string { return "sha256:" + strings.Repeat(string(char
 // leaving the version published but unreferenced.
 func TestValidateReleaseSetSelectionRejectsChannelWithoutReleaseSetSelection(t *testing.T) {
 	err := ValidateReleaseSetSelection(ReleaseSetOptions{
-		Commands: []string{"publish"},
+		Commands: []string{"publish"}, Publishes: true,
 		Channels: []string{"canary"},
 	})
 	if err == nil {
@@ -2554,7 +2628,7 @@ func TestValidateReleaseSetSelectionRejectsChannelWithoutReleaseSetSelection(t *
 // an invalid selection cannot be masked by an unrelated missing package route.
 func TestPrepareReleaseSetRunRejectsUnsupportedSelectionBeforeFingerprinting(t *testing.T) {
 	_, err := PrepareReleaseSetRun(context.Background(), ReleaseSetOptions{
-		Commands: []string{"publish"},
+		Commands: []string{"publish"}, Publishes: true,
 		Channels: []string{"canary"},
 	}, nil, nil, nil, nil, nil, nil, nil, nil, nil, false)
 	if err == nil || !errors.Is(err, protocolcli.ErrUsage) {
@@ -2569,9 +2643,9 @@ func TestPrepareReleaseSetRunRejectsUnsupportedSelectionBeforeFingerprinting(t *
 
 func TestValidateReleaseSetSelectionAllowsServableSelections(t *testing.T) {
 	for name, options := range map[string]ReleaseSetOptions{
-		"all":        {Commands: []string{"publish"}, Channels: []string{"canary"}, All: true},
-		"impacted":   {Commands: []string{"publish"}, Channels: []string{"canary"}, Impacted: true},
-		"no channel": {Commands: []string{"publish"}},
+		"all":        {Commands: []string{"publish"}, Publishes: true, Channels: []string{"canary"}, All: true},
+		"impacted":   {Commands: []string{"publish"}, Publishes: true, Channels: []string{"canary"}, Impacted: true},
+		"no channel": {Commands: []string{"publish"}, Publishes: true},
 
 		"not a publish":  {Commands: []string{"build"}, Channels: []string{"canary"}},
 		"planned expand": {Commands: []string{"deploy"}, Channels: []string{"canary"}, PlannedPublish: true, All: true},
@@ -2628,14 +2702,14 @@ func taggedLineVersions() cachekey.RunVersions {
 
 func taggedPublishOptions() ReleaseSetOptions {
 	return ReleaseSetOptions{
-		Commands: []string{"publish"}, Channels: []string{"canary"}, Profiles: testProfiles(),
+		Commands: []string{"publish"}, Publishes: true, Channels: []string{"canary"}, Profiles: testProfiles(),
 		Tagged: true, Line: "typescript", Versions: taggedLineVersions(),
 	}
 }
 
 func TestFullReleaseSetPlansEveryWorkspaceMember(t *testing.T) {
 	options := ReleaseSetOptions{
-		Commands: []string{"publish"}, Channels: []string{"canary"}, All: true,
+		Commands: []string{"publish"}, Publishes: true, Channels: []string{"canary"}, All: true,
 	}
 	if !ReleaseSetPlansEveryProject(options) {
 		t.Fatal("publish --all --channel must plan every workspace member, including members hidden by default tag exclusions")
@@ -2797,7 +2871,7 @@ func TestBuildReleaseSetOptionsReadsTheTagAndThePolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	options, err := BuildReleaseSetOptions(ReleaseSetRequest{
-		Commands: []string{"publish"}, WorkspaceRoot: root, Channel: "canary",
+		Commands: []string{"publish"}, Publishes: true, WorkspaceRoot: root, Channel: "canary",
 		Visibility: "public", Versions: taggedLineVersions(),
 	})
 	if err != nil {
@@ -2828,18 +2902,18 @@ func TestBuildReleaseSetOptionsReadsTheTagAndThePolicy(t *testing.T) {
 	versions := taggedLineVersions()
 	versions["tooling"] = &cachekey.JobContextVersion{Base: "0.3.0", Full: "0.3.0", Tag: "tooling/v0.3.0", Tagged: true, Line: "tooling"}
 	if _, err := BuildReleaseSetOptions(ReleaseSetRequest{
-		Commands: []string{"publish"}, WorkspaceRoot: root, Versions: versions,
+		Commands: []string{"publish"}, Publishes: true, WorkspaceRoot: root, Versions: versions,
 	}); err == nil || !errors.Is(err, protocolcli.ErrUsage) {
 		t.Fatalf("two tagged lines = %v, want a usage refusal", err)
 	}
 	scoped, err := BuildReleaseSetOptions(ReleaseSetRequest{
-		Commands: []string{"publish"}, WorkspaceRoot: root, Scope: "tooling", Versions: versions,
+		Commands: []string{"publish"}, Publishes: true, WorkspaceRoot: root, Scope: "tooling", Versions: versions,
 	})
 	if err != nil || !scoped.Tagged || scoped.Line != "tooling" {
 		t.Fatalf("--scope tooling = %+v, %v; want that line's cohort", scoped, err)
 	}
 	if _, err := BuildReleaseSetOptions(ReleaseSetRequest{
-		Commands: []string{"publish"}, WorkspaceRoot: root, Scope: "toolng", Versions: versions,
+		Commands: []string{"publish"}, Publishes: true, WorkspaceRoot: root, Scope: "toolng", Versions: versions,
 	}); err == nil || !errors.Is(err, protocolcli.ErrUsage) || !strings.Contains(err.Error(), "toolng") {
 		t.Fatalf("unknown --scope = %v, want a usage refusal naming the invalid line", err)
 	}
@@ -3065,12 +3139,12 @@ func TestReleaseSetBaselineChannelIsRefusedWhereItCannotBeRead(t *testing.T) {
 	// The flag is bound through the one request builder, so the usage error
 	// arrives from the same place the channels are parsed.
 	if _, err := BuildReleaseSetOptions(ReleaseSetRequest{
-		Commands: []string{"publish"}, Channel: "canary", BaselineChannel: "canary", Impacted: true,
+		Commands: []string{"publish"}, Publishes: true, Channel: "canary", BaselineChannel: "canary", Impacted: true,
 	}); !errors.Is(err, cmderr.ErrUsage) {
 		t.Fatalf("BuildReleaseSetOptions = %v, want a usage error", err)
 	}
 
-	base := ReleaseSetOptions{Commands: []string{"publish"}, Channels: []string{"pr-7"}, BaselineChannel: "canary"}
+	base := ReleaseSetOptions{Commands: []string{"publish"}, Publishes: true, Channels: []string{"pr-7"}, BaselineChannel: "canary"}
 	cases := []struct {
 		name    string
 		options ReleaseSetOptions
@@ -3411,7 +3485,7 @@ func TestReleaseSetReuseBuildsWhatTheReuseHeadCannotVouchFor(t *testing.T) {
 		options.ReuseChannel, options.ReuseSourceRevision = "pr-7", reuseTestRevision
 		options.Fingerprints = releaseSetTestFingerprints(t, ws)
 		options.Versions = testRunVersions(ws)
-		candidates, err := releaseProjects(ws.Projects, testProfiles())
+		candidates, err := releaseProjects(ws.Projects, testProfiles(), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3580,7 +3654,7 @@ func TestReleaseSetTaggedPublicationIgnoresTheReuseChannel(t *testing.T) {
 	tagged := cachekey.RunVersions{"": &cachekey.JobContextVersion{Base: "1.0.0", Full: "1.0.0", Tagged: true, Tag: "v1.0.0"}}
 	for _, channel := range []string{"canary", ""} {
 		options, err := BuildReleaseSetOptions(ReleaseSetRequest{
-			Commands: []string{"publish"}, WorkspaceRoot: t.TempDir(), Channel: channel,
+			Commands: []string{"publish"}, Publishes: true, WorkspaceRoot: t.TempDir(), Channel: channel,
 			ReuseChannel: "pr-7", ReuseSourceRevision: reuseTestRevision, Impacted: true, Versions: tagged,
 		})
 		if err != nil {
@@ -3603,14 +3677,14 @@ func TestReleaseSetTaggedPublicationIgnoresTheReuseChannel(t *testing.T) {
 
 	// Options built some other way are answered tagged-first as well.
 	direct := ReleaseSetOptions{
-		Commands: []string{"publish"}, ReuseChannel: "pr-7", ReuseSourceRevision: reuseTestRevision, Tagged: true, Versions: tagged,
+		Commands: []string{"publish"}, Publishes: true, ReuseChannel: "pr-7", ReuseSourceRevision: reuseTestRevision, Tagged: true, Versions: tagged,
 	}
 	if err := ValidateReleaseSetSelection(direct); err != nil {
 		t.Fatalf("a tagged publish without --channel = %v, want no refusal for the reuse channel", err)
 	}
 
 	untagged, err := BuildReleaseSetOptions(ReleaseSetRequest{
-		Commands: []string{"publish"}, WorkspaceRoot: t.TempDir(), Channel: "canary",
+		Commands: []string{"publish"}, Publishes: true, WorkspaceRoot: t.TempDir(), Channel: "canary",
 		ReuseChannel: "pr-7", ReuseSourceRevision: reuseTestRevision, Impacted: true,
 	})
 	if err != nil || untagged.ReuseChannel != "pr-7" || untagged.ReuseSourceRevision != reuseTestRevision || untagged.IgnoredReuseChannel != "" || ReleaseSetReuseNotice(untagged) != "" {
@@ -3650,7 +3724,7 @@ func TestReleaseSetReuseSourceRevisionGoesWithItsChannel(t *testing.T) {
 				t.Fatalf("ParseReleaseSetReuseSourceRevision(%q, %q) = %v, want %q", tc.raw, tc.channel, err, tc.message)
 			}
 			if _, err := BuildReleaseSetOptions(ReleaseSetRequest{
-				Commands: []string{"publish"}, WorkspaceRoot: t.TempDir(), Channel: "canary",
+				Commands: []string{"publish"}, Publishes: true, WorkspaceRoot: t.TempDir(), Channel: "canary",
 				ReuseChannel: tc.channel, ReuseSourceRevision: tc.raw, Impacted: true,
 			}); !errors.Is(err, cmderr.ErrUsage) || !strings.Contains(err.Error(), tc.message) {
 				t.Fatalf("BuildReleaseSetOptions = %v, want a usage error naming %q", err, tc.message)
@@ -3718,13 +3792,13 @@ func TestReleaseSetReuseChannelIsRefusedWhereItCannotApply(t *testing.T) {
 	}
 
 	if _, err := BuildReleaseSetOptions(ReleaseSetRequest{
-		Commands: []string{"publish"}, Channel: "pr-7", BaselineChannel: "canary",
+		Commands: []string{"publish"}, Publishes: true, Channel: "pr-7", BaselineChannel: "canary",
 		ReuseChannel: "canary", ReuseSourceRevision: reuseTestRevision, Impacted: true,
 	}); !errors.Is(err, cmderr.ErrUsage) {
 		t.Fatalf("BuildReleaseSetOptions = %v, want a usage error", err)
 	}
 
-	base := ReleaseSetOptions{Commands: []string{"publish"}, Channels: []string{"canary"}, ReuseChannel: "pr-7", ReuseSourceRevision: reuseTestRevision}
+	base := ReleaseSetOptions{Commands: []string{"publish"}, Publishes: true, Channels: []string{"canary"}, ReuseChannel: "pr-7", ReuseSourceRevision: reuseTestRevision}
 	cases := []struct {
 		name    string
 		options ReleaseSetOptions

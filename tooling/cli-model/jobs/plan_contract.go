@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"go.putnami.dev/cli/model/extension"
+	extensionproto "go.putnami.dev/protocol/extension"
 	features "go.putnami.dev/protocol/features"
 )
 
@@ -209,4 +210,47 @@ func TaskDeclarationOf(job *ScheduledJob) *extension.TaskDeclaration {
 		return nil
 	}
 	return task.Declares
+}
+
+// HasExternalEffects reports whether job writes outside the workspace: its
+// command's resolved traits declare registry or cloud side effects, or the
+// manifest task it runs declares a registry or cloud effect. The capability
+// gates, the publication paths and the remote cache classify a job by it,
+// never by its command name.
+func HasExternalEffects(job *ScheduledJob) bool {
+	if job == nil || job.JobDef == nil {
+		return false
+	}
+	switch job.JobDef.Traits.SideEffects {
+	case extensionproto.SideEffectsRegistry, extensionproto.SideEffectsCloud:
+		return true
+	}
+	return len(DeclaredExternalEffects(job)) > 0
+}
+
+// PublishesToRegistry reports whether job is a registry publication: its
+// command's resolved traits declare the registry side effect. The release set,
+// its barrier, the publication gates and the archive accounting take a job of
+// any command name with that trait as a publish job, and no other.
+func PublishesToRegistry(job *ScheduledJob) bool {
+	return job != nil && job.JobDef != nil && job.JobDef.Traits.SideEffects == extensionproto.SideEffectsRegistry
+}
+
+// DeclaredExternalEffects returns the registry and cloud effects that the
+// manifest task job runs declares, sorted. Command traits describe a whole
+// command and cannot stand in for a nested task's effects: an unclassified
+// task would otherwise escape every gate.
+func DeclaredExternalEffects(job *ScheduledJob) []string {
+	declaration := TaskDeclarationOf(job)
+	if declaration == nil {
+		return nil
+	}
+	effects := make([]string, 0, 2)
+	for _, effect := range declaration.Effects {
+		switch effect {
+		case extensionproto.EffectRegistry, extensionproto.EffectCloud:
+			effects = append(effects, effect)
+		}
+	}
+	return DedupeSorted(effects)
 }

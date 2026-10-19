@@ -1016,6 +1016,7 @@ func TestPrepareTaskUpload_AppliesTheSameGatesAsTheLegacyPath(t *testing.T) {
 			"coverage": fileDeclaration(extension.OutputRootProject, "coverage.json", true),
 		},
 	})
+	publish.JobDef.Traits.SideEffects = extension.SideEffectsRegistry
 	if _, ok := r.PrepareTaskUpload(captureHashA, publish, f.cache); ok {
 		t.Fatal("a side-effecting task must never be shared with the provider")
 	}
@@ -1025,7 +1026,7 @@ func TestPrepareTaskUpload_AppliesTheSameGatesAsTheLegacyPath(t *testing.T) {
 // on the task-owned path: a 5 ms task whose declared outputs carry bytes is
 // shared with its payload, because no duration or size rule leaves a
 // non-side-effecting result out of the remote cache. The same entry under a
-// side-effecting task name is never shared.
+// task whose traits declare a registry effect is never shared.
 func TestPrepareTaskUpload_SharesACheapEntryWithItsBytes(t *testing.T) {
 	job := matrixJob()
 	f := newCaptureFixture(t, job)
@@ -1055,6 +1056,7 @@ func TestPrepareTaskUpload_SharesACheapEntryWithItsBytes(t *testing.T) {
 
 	publish := matrixJob()
 	publish.JobDef.Name = "publish~emit"
+	publish.JobDef.Traits.SideEffects = extension.SideEffectsRegistry
 	if _, ok := r.PrepareTaskUpload(captureHashA, publish, f.cache); ok {
 		t.Fatal("a side-effecting task must never be shared with the provider")
 	}
