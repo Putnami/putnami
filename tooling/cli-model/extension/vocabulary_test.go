@@ -70,7 +70,7 @@ func TestMergeVocabulary_WarnsWhenTwoVocabulariesDeclareOneVerb(t *testing.T) {
 // gives publish none leaves it with none.
 func TestApplyVocabularyTraits_AVocabularyGivesItsVerbsSideEffects(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "side-effects-come-only-from-loaded-jobs")
+	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "traits-alone-give-a-job-its-side-effects")
 	manifest := &Manifest{Name: "@acme/go", Commands: map[string]CommandDefinition{"deploy": {}, "publish": {}, "package": {}}}
 	jobs := Resolve(manifest, "/ext")
 	harmless := proto.CommandTraits{InjectPublishChannels: true}
@@ -104,7 +104,7 @@ func TestApplyVocabularyTraits_AVocabularyGivesItsVerbsSideEffects(t *testing.T)
 // traits.
 func TestResolve_DeclaredTraitsReplaceTheVerbsSideEffects(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "side-effects-come-only-from-loaded-jobs")
+	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "traits-alone-give-a-job-its-side-effects")
 	channels := proto.CommandTraits{InjectPublishChannels: true}
 	heavy := proto.CommandTraits{Heavy: true}
 	jobs := Resolve(&Manifest{Name: "@acme/release", Commands: map[string]CommandDefinition{

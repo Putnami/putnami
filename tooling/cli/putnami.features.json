@@ -561,6 +561,7 @@
               "an-undeclared-job-takes-its-verbs-default-traits",
               "a-vocabulary-requires-contract-9",
               "side-effects-come-only-from-loaded-jobs",
+              "traits-alone-give-a-job-its-side-effects",
               "first-party-jobs-keep-their-traits",
               "the-go-packager-stamps-a-vocabulary-only-manifest",
               "the-go-packager-validates-a-vocabulary-next-to-a-dependency",
