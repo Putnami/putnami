@@ -7,16 +7,20 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	hostrpcproto "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/protocol/features/spectest"
 	supportproto "go.putnami.dev/protocol/support"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/versioncmd"
 	"go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -159,11 +163,14 @@ func TestHostRPC_VersionLinesAnswersWhatTheCoreComputesForEachLine(t *testing.T)
 		scoped.Lines[0].Version != answer.Lines[1].Version {
 		t.Fatalf("VersionLines(/tooling/) = %+v, %v, want the tooling line alone", scoped, err)
 	}
-	_, err = client.VersionLines(t.Context(), "tooling/cli")
 	var refusal *hostrpcproto.Error
-	if !errors.As(err, &refusal) || refusal.Code != hostrpcproto.CodeInvalidParams ||
-		refusal.Message != `no version line "tooling/cli"; this workspace declares go, tooling` {
-		t.Fatalf("a scope that names no line = %v, want %d listing the lines", err, hostrpcproto.CodeInvalidParams)
+	for _, tc := range []struct{ scope, named string }{{"tooling/cli", "tooling/cli"}, {"/nope/", "nope"}} {
+		_, err = client.VersionLines(t.Context(), tc.scope)
+		if !errors.As(err, &refusal) || refusal.Code != hostrpcproto.CodeInvalidParams ||
+			refusal.Message != `no version line "`+tc.named+`"; this workspace declares go, tooling` {
+			t.Fatalf("VersionLines(%q) = %v, want %d naming %q, as `version get --scope` does, and listing the lines",
+				tc.scope, err, hostrpcproto.CodeInvalidParams, tc.named)
+		}
 	}
 
 	hostRPCGit(t, root, "tag", "go/v0.0.1")
@@ -184,6 +191,7 @@ func TestHostRPC_VersionLinesNamesTheRecordedGraphAfterAFailedRefresh(t *testing
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
 
+	// The binding is called directly, not through the client: only a canceled context fails the refresh.
 	if _, err := binding.versionLines(canceled, hostrpcproto.VersionLinesParams{}); err == nil ||
 		!strings.Contains(err.Error(), supportproto.CatalogFilename) {
 		t.Fatalf("a failed refresh without a recorded graph = %v, want a refusal naming %s", err, supportproto.CatalogFilename)
@@ -204,6 +212,61 @@ func TestHostRPC_VersionLinesNamesTheRecordedGraphAfterAFailedRefresh(t *testing
 	if recorded.Lines[0].Version != fresh.Lines[0].Version {
 		t.Errorf("version %q from the recorded graph, want %q", recorded.Lines[0].Version, fresh.Lines[0].Version)
 	}
+}
+
+func TestHostRPC_VersionLinesReportsAnInvalidConfigurationWithItsOwnCode(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, hostRPCFeature, hostRPCVersionLines, "version-lines-reports-an-invalid-configuration-with-its-own-code")
+	root := versionGraphRepo(t, false)
+	writeParityFile(t, root, supportproto.CatalogFilename, `{"protocolVersion": 1, "entries": [{"id": "@putnami/cli"}]}`)
+	_, want := versioncmd.LineSpecs(root)
+	if !errors.Is(want, cmderr.ErrInvalidConfig) || protocolcli.ExitCodeForError(want) != protocolcli.ExitUsage {
+		t.Fatalf("the core's refusal of an invalid catalog = %v, want an invalid configuration that exits %d", want, protocolcli.ExitUsage)
+	}
+	_, err := dialHostRPC(t, hostRPCBinding{root: root, config: wsproto.Load(root)}).VersionLines(t.Context(), "")
+	var refusal *hostrpcproto.Error
+	if !errors.As(err, &refusal) || refusal.Code != hostrpcproto.CodeInvalidConfig || refusal.Message != want.Error() {
+		t.Fatalf("version.lines with an invalid catalog = %v, want %d with the message %q", err, hostrpcproto.CodeInvalidConfig, want)
+	}
+
+	// The environment is process-wide, so a child of this test binary holds the malformed binding.
+	repo, _ := hostRPCVersionRepo(t)
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.CommandContext(t.Context(), executable, "-test.run=^TestHostRPCVersionLinesHelperProcess$")
+	cmd.Env = append(os.Environ(), hostRPCVersionRootEnv+"="+repo, git.SourceRevisionEnv+"=NOT-A-COMMIT")
+	stdout, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("the helper process failed: %v\n%s", err, stdout)
+	}
+	report := hostRPCReport(string(stdout))
+	wantMessage := "version tag: " + git.SourceRevisionEnv + `="NOT-A-COMMIT" is not a full lowercase hex commit id (40 or 64 characters)`
+	if report["code"] != strconv.Itoa(hostrpcproto.CodeInvalidConfig) || report["message"] != wantMessage {
+		t.Fatalf("version.lines with a malformed %s = %v, want %d with the message %q", git.SourceRevisionEnv, report, hostrpcproto.CodeInvalidConfig, wantMessage)
+	}
+}
+
+// hostRPCVersionRootEnv names the workspace of TestHostRPCVersionLinesHelperProcess.
+const hostRPCVersionRootEnv = "PUTNAMI_CLI_HOSTRPC_VERSION_ROOT"
+
+// TestHostRPCVersionLinesHelperProcess is the child of the test above: it asks
+// version.lines of the workspace in hostRPCVersionRootEnv and prints the code
+// and the message of the refusal, one key=value line each.
+func TestHostRPCVersionLinesHelperProcess(t *testing.T) {
+	t.Parallel()
+	root := os.Getenv(hostRPCVersionRootEnv)
+	if root == "" {
+		t.Skip("helper process: not invoked as a version.lines client")
+	}
+	_, err := dialHostRPC(t, hostRPCBinding{root: root, config: wsproto.Load(root)}).VersionLines(t.Context(), "")
+	var refusal *hostrpcproto.Error
+	if !errors.As(err, &refusal) {
+		iox.Fprintf(os.Stdout, "error=%v\n", err)
+		return
+	}
+	iox.Fprintf(os.Stdout, "code=%d\nmessage=%s\n", refusal.Code, refusal.Message)
 }
 
 func TestHostRPC_VersionLinesIsUnavailableOutsideAWorkspace(t *testing.T) {

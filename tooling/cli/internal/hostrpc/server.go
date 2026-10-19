@@ -30,6 +30,7 @@ import (
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/sdk/extension/ownerperm"
 	"go.putnami.dev/sdk/extension/scratch"
+	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -341,7 +342,13 @@ func (s *Server) handle(frame []byte) (*wire.Response, bool) {
 	if err != nil {
 		var refusal *wire.Error
 		if !errors.As(err, &refusal) {
-			refusal = &wire.Error{Code: wire.CodeInternalError, Message: err.Error()}
+			// The core exits 2 for an invalid configuration and 1 for any
+			// other failure, so the two keep their own codes on the wire.
+			code := wire.CodeInternalError
+			if errors.Is(err, cmderr.ErrInvalidConfig) {
+				code = wire.CodeInvalidConfig
+			}
+			refusal = &wire.Error{Code: code, Message: err.Error()}
 		}
 		return &wire.Response{JSONRPC: wire.JSONRPCVersion, ID: id, Error: refusal}, true
 	}

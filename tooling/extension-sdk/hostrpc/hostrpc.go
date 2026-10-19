@@ -133,9 +133,11 @@ func (c *Client) VerificationReport(ctx context.Context, ref wire.VerificationRe
 // `putnami version tag` needs to release it, with the commit the host's run is
 // bound to. An empty scope asks for every line. Otherwise scope names one line
 // by its scope path, leading and trailing slashes ignored, and a scope that
-// names no line is a *wire.Error with wire.CodeInvalidParams. A line without
-// commits has an empty list. The client returns an error, leaving the client
-// usable, when the answer names no source revision or no line, holds another
+// names no line is a *wire.Error with wire.CodeInvalidParams. A support
+// catalog the host cannot parse, and a malformed PUTNAMI_SOURCE_REVISION in the
+// host's environment, are a *wire.Error with wire.CodeInvalidConfig, whose
+// message is the one the core prints. A line without commits has an empty
+// list. The client returns an error, leaving the client usable, when the answer names no source revision or no line, holds another
 // line than the scope names, or holds a tagged line without its tag or with a
 // release, or an untagged line without a release.
 func (c *Client) VersionLines(ctx context.Context, scope string) (wire.VersionLinesResult, error) {

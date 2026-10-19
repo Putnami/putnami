@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -39,9 +40,11 @@ func LineSpecs(wsRoot string) ([]git.LineSpec, error) {
 // SelectLines picks the lines a --scope value names, as `version get` does:
 // every line when the scope is empty once its leading and trailing slashes are
 // trimmed, else the one line whose scope path it is. A scope that names no line
-// is the ErrNotFound error that lists the declared lines.
+// is the ErrNotFound error that lists the declared lines by the trimmed scope,
+// as `version get --scope` reports it.
 func SelectLines(specs []git.LineSpec, scope string) ([]git.LineSpec, error) {
-	if strings.Trim(scope, "/") == "" {
+	scope = strings.Trim(scope, "/")
+	if scope == "" {
 		return specs, nil
 	}
 	spec, err := selectLine(specs, scope)
@@ -75,11 +78,12 @@ func ReportLine(wsRoot string, spec git.LineSpec) (LineReport, error) {
 
 // BoundRevision is the full commit ID requireSourceRevisionAtHead compares
 // with HEAD: the commit PUTNAMI_SOURCE_REVISION binds the run to when it is
-// set, else HEAD's, in lower case.
+// set, else HEAD's, in lower case. A malformed PUTNAMI_SOURCE_REVISION is the
+// ErrInvalidConfig error `version tag` reports, with its message.
 func BoundRevision(wsRoot string) (string, error) {
 	revision, set, err := git.SourceRevisionOverride()
 	if err != nil {
-		return "", err
+		return "", cmderr.InvalidConfigf("version tag: %v", err)
 	}
 	if set {
 		return revision, nil

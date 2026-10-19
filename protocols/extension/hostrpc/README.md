@@ -64,7 +64,7 @@ the channel, the child receives no variable and the host prints a warning.
 | `collaboration.call` | `{"contract", "operation", "input"}` (`CollaborationCallParams`) | The envelope `putnami <contract> <operation> --output=json` prints for the same request, byte for byte. |
 | `verification.report` | `{"project", "task", "path", "digest"}` (`VerificationReportParams`) | `{"report": "<base64>"}` (`VerificationReportResult`): the bytes a successful cached test run produced, after the cache corroborated them. |
 | `workspace.owners` | `{"paths": [...]}` (`WorkspaceOwnersParams`) | `{"owners": [{"path", "projects": [{"id", "path"}]}]}` (`WorkspaceOwnersResult`): the projects that own each path. |
-| `version.lines` | `{"scope"}` (`VersionLinesParams`), `scope` optional | `{"sourceRevision", "recordedGraph", "lines": [{"line", "tagPattern", "version", "tagged", "tag", "release": {"version", "tag"}, "commits": [{"sha", "subject", "body"}]}]}` (`VersionLinesResult`): each version line as the core computes it. |
+| `version.lines` | `{"scope"}` (`VersionLinesParams`), `scope` optional | `{"sourceRevision", "recordedGraph" (optional), "lines": [{"line", "tagPattern", "version", "tagged", "tag", "release": {"version", "tag"}, "commits": [{"sha", "subject", "body"}]}]}` (`VersionLinesResult`): each version line as the core computes it. |
 
 Params are strict: an unknown member is `-32602`. `collaboration.call` routes
 contract operations only. A `contract` that is not a collaboration contract is
@@ -118,12 +118,14 @@ the refresh failed. A caller that releases refuses then. With no recorded
 graph either, the method answers `-32603`.
 
 A scope that names no line is `-32602`, and its message lists the lines.
-Outside a workspace the method answers `-32002`. A Git failure, such as a
-shallow clone, which holds too little history to compute a version, is
-`-32603`.
+Outside a workspace the method answers `-32002`. A support catalog the host
+cannot parse, and a `PUTNAMI_SOURCE_REVISION` that is not a full lowercase
+commit ID, are `-32004`. A Git failure, such as a shallow clone, which holds
+too little history to compute a version, is `-32603`.
 
-`workspace.owners` and `version.lines` are additive, so the protocol version
-stays 1. A client finds them in the methods `host.hello` lists.
+`workspace.owners`, `version.lines` and the code `-32004` are additive, so the
+protocol version stays 1. A client finds the methods in the list `host.hello`
+returns.
 
 ## Errors
 
@@ -137,6 +139,7 @@ stays 1. A client finds them in the methods `host.hello` lists.
 | `-32001` | The token is not this launch's. |
 | `-32002` | This launch cannot serve the method, for example `collaboration.call` outside a workspace that declares `options.collaboration`, or `workspace.owners` and `version.lines` outside any workspace. |
 | `-32003` | The cache does not corroborate the requested verification report. |
+| `-32004` | The workspace's configuration or the host's environment is invalid, for example `version.lines` with an unparsable `putnami.support.json` or a malformed `PUTNAMI_SOURCE_REVISION`. The message is the one the core prints, and the core exits 2 for it where it exits 1 for `-32603`. |
 
 An operation that fails at the provider is not an error: the envelope reports
 it, exactly as the CLI prints it.

@@ -179,7 +179,7 @@
     },
     {
       "id": "host-rpc-version-lines",
-      "text": "version.lines answers the bound source revision and, for each version line or the one its scope names, the version putnami version get prints, whether HEAD carries the line's tag, the release putnami version tag proposes and the commits since the last release, all computed by the core. After a failed graph refresh it names the recorded graph it used. A scope naming no line is invalid params, outside a workspace the method is unavailable, and a git failure such as a shallow clone is a host error."
+      "text": "version.lines answers the bound source revision and, for each version line or the one its scope names, the version putnami version get prints, whether HEAD carries the line's tag, the release putnami version tag proposes and the commits since the last release. After a failed graph refresh it names the recorded graph it used. A scope naming no line is invalid params, an invalid catalog or source revision is an invalid configuration, outside a workspace it is unavailable, and a git failure is a host error."
     },
     {
       "id": "source-bound-cache",

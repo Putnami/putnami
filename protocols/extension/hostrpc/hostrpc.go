@@ -104,6 +104,12 @@ const (
 	// CodeNotVerified answers a verification report the cache does not
 	// corroborate.
 	CodeNotVerified = -32003
+	// CodeInvalidConfig answers a request the host refuses because the
+	// workspace's configuration or the host's environment is invalid, such as
+	// an unparsable support catalog or a malformed PUTNAMI_SOURCE_REVISION.
+	// The core exits 2 for the same refusal, where it exits 1 for a failure
+	// of the host (CodeInternalError). Its message is the one the core prints.
+	CodeInvalidConfig = -32004
 )
 
 // Request is one JSON-RPC request frame.

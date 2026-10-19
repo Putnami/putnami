@@ -66,8 +66,13 @@ the versions from the graph it recorded earlier. Report it to the user, and
 refuse to release from it.
 
 A scope that names no line is `-32602`, with a message that lists the lines.
-Outside a workspace the host answers `-32002`, and a Git failure, such as a
-shallow clone, is `-32603`. If the host's answer names no source revision or
+Outside a workspace the host answers `-32002`. A support catalog the host
+cannot parse, and a `PUTNAMI_SOURCE_REVISION` that is not a full lowercase
+commit ID, are `-32004` (`wire.CodeInvalidConfig`), with the message the core
+prints. The core exits 2 for them, so an extension command that reproduces
+`putnami version tag` exits 2 too. A Git failure, such as a shallow clone, is
+`-32603`, which exits 1.
+If the host's answer names no source revision or
 no line, holds another line than your scope names, or holds a line whose
 `Release` contradicts `Tagged`, `VersionLines` returns an error and the client
 stays usable.
@@ -136,7 +141,7 @@ in a test that starts its own host.
 | Error | Meaning | The client stays usable |
 |---|---|---|
 | `*hostrpc.NoHostError` | The process received no channel. | No client exists. |
-| `*Error` of the protocol package `go.putnami.dev/protocol/extension/hostrpc` | The host refused the call. `Code` says why, for example `-32002` when this launch cannot serve the method, or `-32003` when the cache does not corroborate a report. | Yes. |
+| `*Error` of the protocol package `go.putnami.dev/protocol/extension/hostrpc` | The host refused the call. `Code` says why, for example `-32002` when this launch cannot serve the method, `-32003` when the cache does not corroborate a report, or `-32004` when the workspace's configuration is invalid. | Yes. |
 | Any other error | The connection broke, the answer was not one the client can trust (another id, a frame over 32 MiB, not JSON), or the context ended before the whole answer arrived. An answer that arrived whole is returned even when the context ends right after. | No. Every later call returns the same error. Dial again. |
 
 ## Concurrency

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -20,6 +21,7 @@ import (
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/protocol/features/spectest"
 	sdkhostrpc "go.putnami.dev/sdk/extension/hostrpc"
+	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
@@ -500,6 +502,8 @@ func TestVersionLinesReturnsTheMethodsAnswerAndRefusal(t *testing.T) {
 				return wire.VersionLinesResult{}, &wire.Error{Code: wire.CodeInvalidParams, Message: "no version line"}
 			case "shallow":
 				return wire.VersionLinesResult{}, errors.New("need a full clone")
+			case "catalog":
+				return wire.VersionLinesResult{}, fmt.Errorf("outer: %w", cmderr.InvalidConfigf("version: the catalog is invalid"))
 			}
 			return answer, nil
 		},
@@ -517,7 +521,11 @@ func TestVersionLinesReturnsTheMethodsAnswerAndRefusal(t *testing.T) {
 		refusal.Code != wire.CodeInternalError || refusal.Message != "need a full clone" {
 		t.Fatalf("a failing method = %v, want an internal error with its message", err)
 	}
-	if strings.Join(received, ",") != "tooling,nowhere,shallow" {
+	if _, err := c.VersionLines(t.Context(), "catalog"); !errors.As(err, &refusal) ||
+		refusal.Code != wire.CodeInvalidConfig || refusal.Message != "outer: version: the catalog is invalid" {
+		t.Fatalf("an invalid configuration = %v, want %d with the message the core prints", err, wire.CodeInvalidConfig)
+	}
+	if strings.Join(received, ",") != "tooling,nowhere,shallow,catalog" {
 		t.Errorf("the method received the scopes %v", received)
 	}
 }

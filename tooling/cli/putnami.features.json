@@ -1184,6 +1184,7 @@
               "version-lines-refuses-a-scope-that-names-no-line",
               "version-lines-names-the-recorded-graph-after-a-failed-refresh",
               "version-lines-is-unavailable-outside-a-workspace",
+              "version-lines-reports-an-invalid-configuration-with-its-own-code",
               "version-lines-reports-a-git-failure-as-the-hosts"
             ]
           }
