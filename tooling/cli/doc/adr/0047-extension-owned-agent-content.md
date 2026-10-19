@@ -145,9 +145,10 @@ extension, its installers fail, and its content would never install.
 | Session-start reconcile | See [ADR 0040](0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md). |
 
 No built-in starter declares `@putnami/contributor` (decision D-012): a
-workspace gets its content only by declaring the extension in `extensions` and
-`extension:@putnami/contributor` in `agentArtifacts`, then running
-`putnami install`. When a starter does name an extension, a failure in
+workspace gets its content only when someone asks for it: naming the extension
+on `putnami extensions install` declares it in `extensions`, opts into it with
+`extension:@putnami/contributor` in `agentArtifacts` and materializes it. An
+extension installed only as a dependency gets no opt-in. When a starter does name an extension, a failure in
 `init`'s agent step is reported, not fatal: both declarations stay, no agent
 file is written, and `putnami install` is the next step.
 

@@ -30,7 +30,7 @@ type initExtensionConfig struct {
 	template    string
 	// agentContent is the extension whose agent content this starter opts
 	// into. No built-in starter names one: a workspace asks for
-	// @putnami/contributor by declaring it, then running `putnami install`. It is DATA,
+	// @putnami/contributor with `putnami extensions install @putnami/contributor`. It is DATA,
 	// not policy: init declares exactly that extension in
 	// `extensions`, opts into its content with `extension:<name>` in
 	// `agentArtifacts`, and materializes exactly that. Empty opts into nothing.
@@ -408,7 +408,7 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	iox.Fprintf(os.Stdout, "  ✓ Workspace ready: %s\n", name)
 	iox.Fprintf(os.Stdout, "    Path: %s\n", cwd)
 	iox.Fprintf(os.Stdout, "    Extension: %s\n", extConfig.packageName)
-	iox.Fprintln(os.Stdout, "    Agent skills: not installed. To add them, declare @putnami/contributor in\n    extensions and extension:@putnami/contributor in agentArtifacts, then run putnami install")
+	iox.Fprintln(os.Stdout, "    Agent skills: not installed. To add them, run putnami extensions install @putnami/contributor")
 	iox.Fprintln(os.Stdout)
 
 	iox.Fprintln(os.Stdout, "  Next:")

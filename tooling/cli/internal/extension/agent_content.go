@@ -171,9 +171,27 @@ func graphDependent(wsRoot string, cfg *wsproto.Config, name string) string {
 }
 
 func undeclaredExtension(name string) error {
-	return fmt.Errorf("%s declares no extension %s; add it to extensions before opting into its agent content",
-		wsproto.WorkspaceConfigFilename, name)
+	return undeclaredExtensionError{name: name}
 }
+
+// undeclaredExtensionError reports an extension the workspace does not declare.
+type undeclaredExtensionError struct{ name string }
+
+func (e undeclaredExtensionError) Error() string {
+	return fmt.Sprintf("%s declares no extension %s; add it to extensions before opting into its agent content",
+		wsproto.WorkspaceConfigFilename, e.name)
+}
+
+// IsUndeclaredExtension reports whether err says the workspace declares no
+// such extension, as opposed to a declaration that cannot be used.
+func IsUndeclaredExtension(err error) bool {
+	var undeclared undeclaredExtensionError
+	return errors.As(err, &undeclared)
+}
+
+// ErrNoAgentContent is wrapped by the error LocateAgentContent returns for an
+// extension whose manifest declares no agent content.
+var ErrNoAgentContent = errors.New("declares no agent content")
 
 // packageNameFormat is the package-name grammar a declared dependency key must
 // follow before it becomes a path under the package manager's install
@@ -489,7 +507,7 @@ func readInstalledManifest(wsRoot, name, version string) (root, display string, 
 // protocol's own rules accept it.
 func validatedContribution(name string, m *extproto.Manifest) (extproto.AgentContentContribution, error) {
 	if !m.DeclaresAgentContent() {
-		return extproto.AgentContentContribution{}, fmt.Errorf("extension %s declares no agent content", name)
+		return extproto.AgentContentContribution{}, fmt.Errorf("extension %s %w", name, ErrNoAgentContent)
 	}
 	if errs := diag.Errors(extproto.ValidateAgentContent(m)); len(errs) > 0 {
 		messages := make([]string, 0, len(errs))

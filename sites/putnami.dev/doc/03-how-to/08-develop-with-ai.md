@@ -105,9 +105,10 @@ Declaring an extension without the opt-in activates none of its content.
 
 `@putnami/contributor` is published on the `canary` channel first, and on
 `stable` and `latest` at the next promotion. `putnami init` writes neither
-declaration and installs no workflow files. To ask for them, add both
-declarations shown above to `putnami.workspace.json` and run `putnami install`;
-`putnami extensions install` alone writes only the lock. Until the
+declaration and installs no workflow files. To ask for them, run
+`putnami extensions install @putnami/contributor`: it writes both declarations
+shown above to `putnami.workspace.json` and installs the workflow files.
+Running it again, or running `putnami install`, changes nothing. Until the
 channel your workspace resolves serves the extension, `putnami install` fails at
 its extensions phase in a workspace that declares it. To install the rest of the
 workspace now, remove both entries, or resolve `canary`, and add them back once

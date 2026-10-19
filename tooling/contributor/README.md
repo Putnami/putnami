@@ -20,8 +20,9 @@ release `putnami.lock.json` pins, the first time a command needs it.
 
 ## Use it
 
-Declare the extension and opt into its content in `putnami.workspace.json`.
-Declaring the extension alone activates nothing:
+`putnami extensions install @putnami/contributor` declares the extension and
+opts into its content in `putnami.workspace.json`. Declaring the extension
+alone activates nothing:
 
 ```json
 {
@@ -108,9 +109,10 @@ dossier can compute `Putnami verified` for the declared local scope.
 ## Publication
 
 No built-in starter declares this extension: `putnami init` installs nothing of
-it. A workspace asks for it by declaring it in `extensions` and
-`extension:@putnami/contributor` in `agentArtifacts`, then running
-`putnami install`. The
+it. A workspace asks for it with
+`putnami extensions install @putnami/contributor`, which declares it in
+`extensions`, opts into it with `extension:@putnami/contributor` in
+`agentArtifacts` and installs its content. The
 extension is published with the framework release set (`preview`), packaged by
 `@putnami/go` into one archive per platform that carries the content and the
 executable. It reaches `canary` first,
