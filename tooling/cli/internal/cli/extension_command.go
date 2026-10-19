@@ -131,7 +131,8 @@ func (a *App) runExtensionStructuredCommand(
 	// version rather than a hard rejection. The tokens
 	// themselves are untouched: they still reach commandParams exactly as before.
 	printParseWarnings(stderr, parsed.Global,
-		undeclaredFlagWarnings(group+" "+sub, parsed.RawJobArgs, effectiveFlags))
+		undeclaredFlagWarnings(group+" "+sub, parsed.RawJobArgs, effectiveFlags,
+			extension.CommandConsumesReleaseSet(extensions, resolved.CommandName)))
 
 	commandParams := buildExtensionCommandParams(parsed, effectiveFlags)
 

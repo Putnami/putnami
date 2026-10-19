@@ -151,7 +151,7 @@ func TestReleaseSetE2EArchiveRoutesItsPackageProviderBeforeCoordinatorCommit(t *
 		{"print", releaseSetSuccessLine},
 	})
 	deployJob := &jobmodel.ScheduledJob{Project: project, Extension: publisher, JobDef: &modelextension.JobDefinition{
-		Name: "deploy~cloud", CommandName: "deploy", StepID: "cloud", ExtensionName: publisher.Name,
+		Name: "deploy~cloud", CommandName: "deploy", StepID: "cloud", ExtensionName: publisher.Name, Traits: releaseSetConsumer,
 	}, DependsOn: []string{publishJob.Key()}}
 	fixtureTask(t, deployJob.JobDef, fixtureScript{{"exit-unless", "1", "nonempty:" + releaseMarker}, {"print", releaseSetSuccessLine}})
 
@@ -198,7 +198,7 @@ func TestReleaseSetE2ESameSessionCommitsBeforeDependentDeploy(t *testing.T) {
 	useReleaseSetProvenance(t, nil)
 
 	run, err := PrepareReleaseSet(ctx, ReleaseSetOptions{
-		Commands: []string{"publish", "deploy"}, All: true, Channels: []string{"canary"}, Profiles: testProfiles(),
+		Commands: []string{"publish", "deploy"}, ConsumesReleaseSet: true, All: true, Channels: []string{"canary"}, Profiles: testProfiles(),
 	}, ws, []*workspace.Project{project}, releaseSetE2EDiscovery(), releaseSetTestFingerprints(t, ws))
 	if err != nil || run == nil || run.Plan() == nil {
 		t.Fatalf("prepare same-session release set = %+v, %v", run, err)
@@ -219,7 +219,7 @@ func TestReleaseSetE2ESameSessionCommitsBeforeDependentDeploy(t *testing.T) {
 	deploy := &jobmodel.ScheduledJob{
 		Project: project, Extension: ext,
 		JobDef: &modelextension.JobDefinition{
-			Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name,
+			Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name, Traits: releaseSetConsumer,
 		},
 		DependsOn: []string{publish.Key()},
 	}
@@ -269,7 +269,7 @@ func TestReleaseSetBarrierCompletesTheDeployContractFromTheReleasedSet(t *testin
 		Name: "publish~docker", CommandName: "publish", ExtensionName: ext.Name, Kind: "docker-publish",
 	}}
 	deploy := &jobmodel.ScheduledJob{Project: workload, Extension: ext, JobDef: &modelextension.JobDefinition{
-		Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name,
+		Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name, Traits: releaseSetConsumer,
 		BoundParams: modelextension.ParamMap{DeployTargetParamName: &DeployTarget{
 			Environment: "prod",
 			Workloads:   []DeployWorkloadTarget{{Project: workload.ID}},
@@ -315,7 +315,7 @@ func TestReleaseSetBarrierFailsWhenAWorkloadIsNotInTheReleasedSet(t *testing.T) 
 		Name: "publish~docker", CommandName: "publish", ExtensionName: ext.Name, Kind: "docker-publish",
 	}}
 	deploy := &jobmodel.ScheduledJob{Project: workload, Extension: ext, JobDef: &modelextension.JobDefinition{
-		Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name,
+		Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name, Traits: releaseSetConsumer,
 		BoundParams: modelextension.ParamMap{DeployTargetParamName: &DeployTarget{
 			Environment: "prod",
 			Workloads:   []DeployWorkloadTarget{{Project: workload.ID}},
@@ -356,7 +356,7 @@ func TestReleaseSetE2ESameSessionNoImpactConfirmsExactHeadBeforeDeploy(t *testin
 	}}
 	fixtureTask(t, publish.JobDef, fixtureScript{{"print", releaseSetSuccessLine}})
 	deploy := &jobmodel.ScheduledJob{Project: upstream, Extension: ext, JobDef: &modelextension.JobDefinition{
-		Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name,
+		Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name, Traits: releaseSetConsumer,
 	}, DependsOn: []string{publish.Key()}}
 	fixtureTask(t, deploy.JobDef, fixtureScript{{"exit-unless", "1", "nonempty:" + marker}, {"print", releaseSetSuccessLine}})
 	planned, internalJobs, err := run.AttachBarrier([]*jobmodel.ScheduledJob{publish, deploy})

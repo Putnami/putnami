@@ -2,8 +2,10 @@ package cli
 
 import (
 	"context"
+	"io"
 	"maps"
 	"os"
+	"slices"
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -60,7 +62,7 @@ func terminalRequest(parsed *ParsedArgs, cfg *wsproto.Config, wsRoot string, tc 
 		// observer does: a later adapter must opt in deliberately.
 		Hooks:                cfg.Hooks,
 		Observer:             newSessionObserver(tc, parsed.OriginalArgs, interactive),
-		ValidateCommandFlags: commandFlagValidator(parsed),
+		ValidateCommandFlags: commandFlagValidator(parsed, os.Stderr),
 		// The production doctor gate. Unlike the two seams above it is NOT
 		// terminal-only: every adapter wires the same evaluator, because a build
 		// that executes jobs must be gated whichever surface asked for it. It is
@@ -118,19 +120,23 @@ func applyPublishDryRun(req *engine.Request, parsed *ParsedArgs) {
 //     known ecosystem-break class.
 //
 // Neither verdict rewrites RawJobArgs, so commandParams — and every cache key
-// and run marker derived from it — is unchanged.
-func commandFlagValidator(parsed *ParsedArgs) func(*extension.DiscoveryResult, GlobalFlags) error {
+// and run marker derived from it — is unchanged. Both verdicts print to stderr.
+func commandFlagValidator(parsed *ParsedArgs, stderr io.Writer) func(*extension.DiscoveryResult, GlobalFlags) error {
 	return func(discovered *extension.DiscoveryResult, resolved GlobalFlags) error {
 		jobMap := extension.BuildJobMap(discovered.Extensions)
 		if err := conflictingTaskFlags(parsed.Commands, jobMap, parsed.RawJobArgs); err != nil {
-			printCommandError(os.Stderr, err)
+			printCommandError(stderr, err)
 			return err
 		}
 		// The resolved flags, not the parsed ones: PUTNAMI_QUIET must suppress
 		// these notices exactly as it did when this ran inline after
-		// applyEnvOverrides.
-		printParseWarnings(os.Stderr, resolved,
-			undeclaredFlagWarnings(strings.Join(parsed.Commands, ","), parsed.RawJobArgs, declaredTaskFlags(parsed.Commands, jobMap)))
+		// applyEnvOverrides. The run consumes the release set when one of its
+		// commands does, as the engine decides it (buildReleaseSetOptions).
+		consumesReleaseSet := slices.ContainsFunc(parsed.Commands, func(command string) bool {
+			return extension.CommandConsumesReleaseSet(discovered.Extensions, command)
+		})
+		printParseWarnings(stderr, resolved,
+			undeclaredFlagWarnings(strings.Join(parsed.Commands, ","), parsed.RawJobArgs, declaredTaskFlags(parsed.Commands, jobMap), consumesReleaseSet))
 		return nil
 	}
 }

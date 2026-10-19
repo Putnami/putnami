@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -252,11 +253,11 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 // its flags are the session's, not this projection's.
 //
 // The verification half is nil for a session the coordinator does not decide,
-// for a publish-only session and for a deploy session: the second verifies
-// nothing beside its members, and the third keeps its own selection and WIDENS
-// to the members instead (ADR 0017 §2). An empty selection is not nil:
-// `--impacted` over a tree where nothing changed verifies nothing and still
-// publishes what the head requires.
+// for a publish-only session and for a session that consumes the release set:
+// the second verifies nothing beside its members, and the third keeps its own
+// selection and WIDENS to the members instead (ADR 0017 §2). An empty
+// selection is not nil: `--impacted` over a tree where nothing changed
+// verifies nothing and still publishes what the head requires.
 func resolveReleaseSetSelections(
 	req *Request,
 	ws *workspace.Workspace,
@@ -266,7 +267,7 @@ func resolveReleaseSetSelections(
 	// all, so it is resolved here rather than beside the caller: a channel a
 	// repository protects, or a tag this run cannot attribute to one line, is
 	// refused before any selection resolves.
-	options, err := buildReleaseSetOptions(req, ws)
+	options, err := buildReleaseSetOptions(req, ws, extensions...)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
 		return options, nil, selectionEvidence{}, protocolcli.ExitCodeForError(err)
@@ -277,7 +278,7 @@ func resolveReleaseSetSelections(
 	if req == nil || !publication.ReleaseSetPlansEveryProject(options) {
 		return options, nil, selectionEvidence{}, ExitSuccess
 	}
-	verification, evidence, code := verificationSelection(req, ws, extensions...)
+	verification, evidence, code := verificationSelection(req, ws, options.ConsumesReleaseSet, extensions...)
 	if code != ExitSuccess {
 		return options, nil, selectionEvidence{}, code
 	}
@@ -311,25 +312,18 @@ func adoptVerificationEvidence(req *Request, preparation *publication.ReleaseSet
 // verificationSelection is the projection of the caller's own flags a mixed
 // session verifies over. resolveReleaseSetSelections is its only caller and
 // states why it exists; this half answers WHICH projects, and refuses the two
-// session shapes that have no verification half at all.
+// session shapes that have no verification half at all. consumesReleaseSet is
+// the run's resolved trait (ReleaseSetOptions.ConsumesReleaseSet).
 func verificationSelection(
 	req *Request,
 	ws *workspace.Workspace,
+	consumesReleaseSet bool,
 	extensions ...*extension.ExtensionDescription,
 ) (*publication.ReleaseSetVerification, selectionEvidence, int) {
-	if req.Portable.frozen() {
+	if req.Portable.frozen() || consumesReleaseSet {
 		return nil, selectionEvidence{}, ExitSuccess
 	}
-	verifies := false
-	for _, command := range req.Commands {
-		if command == "deploy" {
-			return nil, selectionEvidence{}, ExitSuccess
-		}
-		if command != "publish" {
-			verifies = true
-		}
-	}
-	if !verifies {
+	if !slices.ContainsFunc(req.Commands, func(command string) bool { return command != "publish" }) {
 		return nil, selectionEvidence{}, ExitSuccess
 	}
 	gate := *req

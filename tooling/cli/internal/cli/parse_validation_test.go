@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	proto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
@@ -208,7 +209,7 @@ func valueFlagDef() extension.FlagDefinition { return proto.FlagDefinition{Type:
 func TestUndeclaredFlagWarnings_WarnsInsteadOfFailing(t *testing.T) {
 	t.Parallel()
 	declared := map[string]extension.FlagDefinition{"minify": boolFlagDef()}
-	warnings := undeclaredFlagWarnings("build", []string{"--minify", "--mnify"}, declared)
+	warnings := undeclaredFlagWarnings("build", []string{"--minify", "--mnify"}, declared, false)
 	if len(warnings) != 1 {
 		t.Fatalf("warnings = %v, want exactly one", warnings)
 	}
@@ -244,18 +245,18 @@ func TestUndeclaredFlagWarnings_QuietForKnownShapes(t *testing.T) {
 		{"@putnami/cli"},
 	}
 	for _, args := range cases {
-		if warnings := undeclaredFlagWarnings("build", args, declared); len(warnings) != 0 {
+		if warnings := undeclaredFlagWarnings("build", args, declared, false); len(warnings) != 0 {
 			t.Errorf("undeclaredFlagWarnings(%v) = %v, want none", args, warnings)
 		}
 	}
 }
 
 // The core reads --channel, --baseline-channel, --reuse-channel,
-// --reuse-source-revision, --visibility and --release from a job-running
-// command itself: no manifest declares them,
-// because the coordinator that consumes them is the CLI. Without this
-// exemption every release-set publish would warn about the exact flag it
-// requires.
+// --reuse-source-revision, --visibility and --scope from a publication, and
+// --env and --release from a command whose traits declare consumesReleaseSet:
+// it reads them without a manifest declaring them, because the coordinator that
+// consumes them is the CLI. Without this exemption every release-set publish
+// would warn about the exact flag it requires.
 func TestUndeclaredFlagWarningsExemptCoreJobFlags(t *testing.T) {
 	t.Parallel()
 	cases := [][]string{
@@ -269,22 +270,70 @@ func TestUndeclaredFlagWarningsExemptCoreJobFlags(t *testing.T) {
 		{"--reuse-source-revision=" + strings.Repeat("a", 40)},
 		{"--visibility", "public"},
 		{"--scope", "typescript"},
-		{"--release", "rs_" + strings.Repeat("a", 64)},
 	}
 	for _, args := range cases {
-		if warnings := undeclaredFlagWarnings("publish", args, nil); len(warnings) != 0 {
+		if warnings := undeclaredFlagWarnings("publish", args, nil, false); len(warnings) != 0 {
 			t.Errorf("undeclaredFlagWarnings(%v) = %v, want none", args, warnings)
 		}
 	}
+	// --env and --release are exempt only for a release-set consumer, or for a
+	// task that declares the flag and reads it itself.
+	for _, args := range [][]string{{"--env", "production"}, {"--env=production"}, {"--release", "rs_" + strings.Repeat("a", 64)}} {
+		if warnings := undeclaredFlagWarnings("deploy", args, nil, true); len(warnings) != 0 {
+			t.Errorf("a release-set consumer: undeclaredFlagWarnings(%v) = %v, want none", args, warnings)
+		}
+		if warnings := undeclaredFlagWarnings("deploy", args, nil, false); len(warnings) != 1 {
+			t.Errorf("no release-set consumer: undeclaredFlagWarnings(%v) = %v, want one warning", args, warnings)
+		}
+		declared := map[string]extension.FlagDefinition{flagBaseName(args[0]): valueFlagDef()}
+		if warnings := undeclaredFlagWarnings("package", args, declared, false); len(warnings) != 0 {
+			t.Errorf("a task that declares it: undeclaredFlagWarnings(%v) = %v, want none", args, warnings)
+		}
+	}
 	// The exemption is exact: a neighboring spelling is still undeclared.
-	if warnings := undeclaredFlagWarnings("publish", []string{"--channels", "canary"}, nil); len(warnings) != 1 {
+	if warnings := undeclaredFlagWarnings("publish", []string{"--channels", "canary"}, nil, true); len(warnings) != 1 {
 		t.Errorf("undeclaredFlagWarnings(--channels) = %v, want one warning", warnings)
+	}
+}
+
+// A run reads --env and --release only when one of its commands declares the
+// consumesReleaseSet trait in the extensions that discovery loaded. The flag
+// validator reads that trait, never the command's name: a deploy without it
+// warns that --env is undeclared, so a deployment that would ignore the flag
+// does not pass in silence.
+func TestARunWithoutAReleaseSetConsumerWarnsOnTheReleaseSetFlags(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/deploy-environments", "deploy-follows-the-environment-channel", "release-set-flags-warn-without-a-consumer")
+	discovered := func(traits extension.CommandTraits) *extension.DiscoveryResult {
+		return &extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{{
+			Name: "@test/rollout", Jobs: map[string]*extension.JobDefinition{"deploy": {Traits: traits}},
+		}}}
+	}
+	parsed := ParseArgs([]string{"deploy", "--env", "production"}, nil, nil)
+	if parsed.Err != nil {
+		t.Fatal(parsed.Err)
+	}
+	for _, tc := range []struct {
+		name   string
+		traits extension.CommandTraits
+		warn   bool
+	}{
+		{name: "a deploy that consumes the release set", traits: extension.CommandTraits{ConsumesReleaseSet: true}},
+		{name: "a deploy that declares only a cloud side effect", traits: extension.CommandTraits{SideEffects: extension.SideEffectsCloud}, warn: true},
+	} {
+		var stderr strings.Builder
+		if err := commandFlagValidator(parsed, &stderr)(discovered(tc.traits), parsed.Global); err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if warned := strings.Contains(stderr.String(), "flag --env is not declared by `deploy`"); warned != tc.warn {
+			t.Errorf("%s: stderr = %q, want the --env warning: %v", tc.name, stderr.String(), tc.warn)
+		}
 	}
 }
 
 func TestUndeclaredFlagWarnings_ReportsEachFlagOnce(t *testing.T) {
 	t.Parallel()
-	warnings := undeclaredFlagWarnings("build", []string{"--a", "--b", "--a"}, nil)
+	warnings := undeclaredFlagWarnings("build", []string{"--a", "--b", "--a"}, nil, false)
 	if len(warnings) != 2 {
 		t.Fatalf("warnings = %v, want one per distinct flag", warnings)
 	}
@@ -521,7 +570,7 @@ func TestParseArgs_HyphenValueSpellingsBindAndWarn(t *testing.T) {
 			if got := renderParams(parsed.RawJobArgs); got != tc.wantParams {
 				t.Errorf("params = %s, want %s", got, tc.wantParams)
 			}
-			warnings := undeclaredFlagWarnings("run", parsed.RawJobArgs, declared)
+			warnings := undeclaredFlagWarnings("run", parsed.RawJobArgs, declared, false)
 			if len(warnings) != len(tc.wantWarned) {
 				t.Fatalf("warnings = %q, want one each for %q", warnings, tc.wantWarned)
 			}

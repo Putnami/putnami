@@ -773,7 +773,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// answer and never resolves a channel again.
 	preparation, err := publication.PrepareReleaseSetRun(
 		ctx, releaseSetOptions, ws, selectedProjects, verification, planningExtensions, discovered,
-		planned, req.CommandParams, cacheManager, req.selection, slices.Contains(req.Commands, "deploy"),
+		planned, req.CommandParams, cacheManager, req.selection, releaseSetOptions.ConsumesReleaseSet,
 	)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: release-set publish: %v\n", err)
@@ -815,7 +815,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// set to the barrier below, which completes every contract from the
 	// snapshot it has just released.
 	releaseSetRun, err = publication.PrepareDependentRun(ctx, releaseSetRun, preparation.Options,
-		publication.BuildDeployOptions(req.Commands, req.WorkspaceRoot, req.CommandParams), ws, planned, discovered)
+		publication.BuildDeployOptions(releaseSetOptions.ConsumesReleaseSet, req.WorkspaceRoot, req.CommandParams), ws, planned, discovered)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
 		return SessionResult{ExitCode: protocolcli.ExitCodeForError(err), Plan: planned, Projects: selectedProjects}, nil
@@ -1020,8 +1020,11 @@ func publishFinalizers(ctx context.Context, req *Request, releaseSetRun *publica
 // buildReleaseSetOptions reads the publication-shaping parameters this run was
 // invoked with and resolves the release-set mode from them. The parameters are
 // only ever read here, so nothing downstream re-derives a channel or a
-// visibility from the raw map.
-func buildReleaseSetOptions(req *Request, ws *workspace.Workspace) (publication.ReleaseSetOptions, error) {
+// visibility from the raw map. The run consumes the release set when one of its
+// commands does in extensions (extension.CommandConsumesReleaseSet).
+func buildReleaseSetOptions(
+	req *Request, ws *workspace.Workspace, extensions ...*extension.ExtensionDescription,
+) (publication.ReleaseSetOptions, error) {
 	channel, _ := req.CommandParams["channel"].(string)
 	baselineChannel, _ := req.CommandParams["baseline-channel"].(string)
 	reuseChannel, _ := req.CommandParams["reuse-channel"].(string)
@@ -1031,6 +1034,9 @@ func buildReleaseSetOptions(req *Request, ws *workspace.Workspace) (publication.
 	dryRun, _ := req.CommandParams["dry-run"].(bool)
 	return publication.BuildReleaseSetOptions(publication.ReleaseSetRequest{
 		Commands: req.Commands, WorkspaceRoot: req.WorkspaceRoot,
+		ConsumesReleaseSet: slices.ContainsFunc(req.Commands, func(command string) bool {
+			return extension.CommandConsumesReleaseSet(extensions, command)
+		}),
 		Channel: channel, BaselineChannel: baselineChannel,
 		ReuseChannel: reuseChannel, ReuseSourceRevision: reuseSourceRevision,
 		Visibility: visibility, Scope: scope, DryRun: dryRun,
@@ -1084,12 +1090,12 @@ func refusesUnauthorizedPublication(req *Request, options publication.ReleaseSet
 	return true
 }
 
-// deployNarrowsToChannelMembers reports whether an --impacted deploy must
-// resolve STRICTLY. A channel-backed deploy names the members it deploys, so
-// the ordinary convenience fallback to every project would deploy workloads the
-// channel never released.
+// deployNarrowsToChannelMembers reports whether an --impacted run of a
+// release-set consumer must resolve STRICTLY. A channel-backed consumer names
+// the members it deploys, so the ordinary convenience fallback to every project
+// would deploy workloads the channel never released.
 func deployNarrowsToChannelMembers(req *Request, options publication.ReleaseSetOptions) bool {
-	return req.Global.Impacted && len(options.Channels) > 0 && slices.Contains(req.Commands, "deploy")
+	return req.Global.Impacted && len(options.Channels) > 0 && options.ConsumesReleaseSet
 }
 
 // runBeforeHooks runs the CLI and command "before" lifecycle hooks. A failure

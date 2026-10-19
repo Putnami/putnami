@@ -5,7 +5,11 @@
   (decisions 1, 3 and 4: the reuse channel). A run whose credential provider negotiates
   `publication-v1` resolves and releases through that session instead of a
   release-set provider process
-  ([ADR 0057](0057-publication-authority-stays-in-the-engine.md)).
+  ([ADR 0057](0057-publication-authority-stays-in-the-engine.md)). Decision
+  2 is amended by
+  [ADR 0074](0074-deployment-follows-the-declared-release-set-trait.md)
+  (proposed): the combined session is a publish beside any command whose
+  traits declare `consumesReleaseSet`.
 - **Scope**: `@putnami/cli` (`tooling/cli/internal/jobs/release_set.go`,
   `tooling/cli/internal/engine`) and `@putnami/extension-sdk`
   (`tooling/extension-sdk/releaseset`)

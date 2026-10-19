@@ -16,10 +16,11 @@
   "requirements": [
     {
       "id": "deploy-follows-the-environment-channel",
-      "text": "deploy --env resolves the environment's channel or takes --release, selects the workloads its rules name, and hands each deploy job the set ref and the members of every workload that job covers, whether it deploys one workload or the whole workspace."
+      "text": "A command whose traits declare consumesReleaseSet binds the release set: with --env it resolves the environment's channel or takes --release, selects the workloads the rules name, and hands each of its jobs the set ref and the members of every workload the job covers; with --impacted and a channel it narrows strictly to channel members; beside a publish it waits for the release. A run of no such command warns that --env and --release are undeclared unless a task declares them."
     }
   ],
   "decisions": [
-    "tooling/cli/doc/adr/0021-publish-version-and-deploy-follow-distribution-v2.md"
+    "tooling/cli/doc/adr/0021-publish-version-and-deploy-follow-distribution-v2.md",
+    "tooling/cli/doc/adr/0074-deployment-follows-the-declared-release-set-trait.md"
   ]
 }
