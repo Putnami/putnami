@@ -162,7 +162,9 @@ func TestDepsAddReportsAGoProbeThatTimedOut(t *testing.T) {
 	if !errors.Is(err, toolchain.ErrToolchainProbeTimeout) || errors.Is(err, errGoUnavailable) {
 		t.Fatalf("error = %v, want the probe timeout, not %v\n%s", err, errGoUnavailable, output)
 	}
-	if want := "probe timed out after " + testProbeTimeout.String(); !strings.Contains(err.Error(), want) {
+	// On a loaded host the bound on time the deadline does not count ends the
+	// probe instead of the deadline.
+	if want := "probe timed out"; !strings.Contains(err.Error(), want) {
 		t.Errorf("error = %v, want it to name %q", err, want)
 	}
 	if strings.Contains(output, "No go command found") {

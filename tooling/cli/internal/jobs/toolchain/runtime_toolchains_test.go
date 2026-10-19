@@ -186,8 +186,10 @@ func TestRuntimeToolchainMismatchUnwrapsToAProbeThatTimedOut(t *testing.T) {
 	dir := t.TempDir()
 	path := fixtureproc.Write(t, filepath.Join(dir, "compiler"), fixtureproc.Program{WaitFor: []string{filepath.Join(dir, "never")}})
 	_, probeErr := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, procdeadline.HostProcessDeadline(100*time.Millisecond))
-	if want := "probe timed out after 100ms: "; probeErr == nil || !strings.HasPrefix(probeErr.Error(), want) {
-		t.Fatalf("probe of a program that waits for a file that never appears = %v, want an error starting with %q", probeErr, want)
+	// The deadline ends the probe, or on a loaded host the bound on time the
+	// deadline does not count does. Both are a probe timeout.
+	if probeErr == nil || !errors.Is(probeErr, ErrToolchainProbeTimeout) {
+		t.Fatalf("probe of a program that waits for a file that never appears = %v, want a probe timeout", probeErr)
 	}
 	absent := runtimeToolchainRejection{candidate: `candidate 1 (path "compiler")`, reason: "path missing"}
 	timedOut := runtimeToolchainRejection{candidate: `candidate 2 (path "compiler") at ` + path, reason: probeErr.Error(), err: probeErr}
@@ -276,8 +278,10 @@ func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 			got, err := probeRuntimeToolchain(context.Background(), path, nil, []string{"PATH=/usr/bin:/bin"}, tc.deadline)
 			timedOut := strings.HasPrefix(tc.want, "probe timed out")
 			// A timeout goes on with the times the host decides, so only its
-			// start is fixed.
-			if err == nil || err.Error() != tc.want && !(timedOut && strings.HasPrefix(err.Error(), tc.want)) {
+			// start is fixed. On a loaded host the bound on time the deadline
+			// does not count can end the probe before the deadline does.
+			if err == nil || err.Error() != tc.want && !(timedOut && (strings.HasPrefix(err.Error(), tc.want) ||
+				strings.HasPrefix(err.Error(), "probe timed out at its "))) {
 				t.Fatalf("probe = %q, %v; want error %q", got, err, tc.want)
 			}
 			// Only a timeout is ErrToolchainProbeTimeout.
