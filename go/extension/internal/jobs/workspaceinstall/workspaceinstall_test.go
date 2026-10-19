@@ -752,20 +752,21 @@ func TestToolVersionMatchesAsksEachToolItsOwnWay(t *testing.T) {
 	t.Parallel()
 	workspace := jobtest.RealTempDir(t)
 	w, i := resolvedTools(t, workspace)
+	// expect fails with the error and output of the call, so a wrong argument
+	// list reads differently from a fake that did not run.
+	expect := func(want bool, tool, binary, version, message string) {
+		t.Helper()
+		got, output, err := w.askToolVersion(tool, binary, version)
+		if got != want {
+			t.Fatalf("%s: matched = %v, want %v; error = %v; output = %q", message, got, want, err, output)
+		}
+	}
 	lint := i.fakes.ToolAt(t, filepath.Join(t.TempDir(), pkgmeta.ExecutableName(runtime.GOOS, "golangci-lint")), "2.10.1", "version", "--short")
-	if !w.toolVersionMatches("golangci-lint", lint, "v2.10.1") {
-		t.Fatal("golangci-lint v2 was not asked `version --short`")
-	}
-	if w.toolVersionMatches("staticcheck", lint, "v2.10.1") {
-		t.Fatal("a tool that answers only `version --short` matched on `-version`")
-	}
+	expect(true, "golangci-lint", lint, "v2.10.1", "golangci-lint v2 was not asked `version --short`")
+	expect(false, "staticcheck", lint, "v2.10.1", "a tool that answers only `version --short` matched on `-version`")
 	check := i.fakes.ToolAt(t, filepath.Join(t.TempDir(), pkgmeta.ExecutableName(runtime.GOOS, "staticcheck")), "v0.7.0", "-version")
-	if !w.toolVersionMatches("staticcheck", check, "v0.7.0") {
-		t.Fatal("staticcheck was not asked -version")
-	}
-	if w.toolVersionMatches("staticcheck", check, "v0.7.1") {
-		t.Fatal("another version matched")
-	}
+	expect(true, "staticcheck", check, "v0.7.0", "staticcheck was not asked -version")
+	expect(false, "staticcheck", check, "v0.7.1", "another version matched")
 }
 
 func TestVersionReported(t *testing.T) {
