@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path"
@@ -558,11 +559,11 @@ func ServeFake() {
 	}
 	name := strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe")
 	args := os.Args[1:]
-	if release, err := os.ReadFile(os.Args[0] + ".goversion"); err == nil {
+	if release, ok := readFakeFile(".goversion"); ok {
 		serveGoRelease(strings.TrimSpace(string(release)), args)
 	}
-	if version, err := os.ReadFile(os.Args[0] + ".version"); err == nil {
-		if want, err := os.ReadFile(os.Args[0] + ".args"); err == nil && string(want) != strings.Join(args, " ") {
+	if version, ok := readFakeFile(".version"); ok {
+		if want, ok := readFakeFile(".args"); ok && string(want) != strings.Join(args, " ") {
 			fmt.Fprintln(os.Stderr, "unsupported arguments: "+strings.Join(args, " ")) //nolint:gosec // G705: a test fake reports its argv to the test
 			os.Exit(3)
 		}
@@ -588,6 +589,22 @@ func ServeFake() {
 			}
 		}
 	}
+}
+
+// readFakeFile reads the file next to the fake that ends in suffix. An absent
+// file reports false. Any other read error ends the fake with exit status 3,
+// so a fake that cannot read its answer fails instead of answering as
+// another fake or running the test suite.
+func readFakeFile(suffix string) ([]byte, bool) {
+	content, err := os.ReadFile(os.Args[0] + suffix)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, false
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "fake cannot read its answer: "+err.Error()) //nolint:gosec // G705: a test fake reports its own read error to the test
+		os.Exit(3)
+	}
+	return content, true
 }
 
 func envName(tool string) string {
