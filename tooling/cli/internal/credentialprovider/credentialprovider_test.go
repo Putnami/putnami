@@ -856,7 +856,7 @@ func TestAProviderExitIsSeenWhileItsChildHoldsItsOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	holder := fixtureproc.Holder(t, release)
-	// A copy that outlived a failed test lets go instead of waiting a minute.
+	// A copy that outlived a failed test lets go instead of waiting 3 minutes.
 	t.Cleanup(func() { _ = os.WriteFile(release, nil, 0o644) })
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

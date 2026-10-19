@@ -281,7 +281,7 @@ func TestRuntimeToolchainProbeNamesWhyTheOutputIsNoVersion(t *testing.T) {
 			// start is fixed. On a loaded host the bound on time the deadline
 			// does not count can end the probe before the deadline does.
 			if err == nil || err.Error() != tc.want && !(timedOut && (strings.HasPrefix(err.Error(), tc.want) ||
-				strings.HasPrefix(err.Error(), "probe timed out at its "))) {
+				strings.HasPrefix(err.Error(), "probe timed out at its "+procdeadline.UncountedTimeBound.String()+" bound on time not counted: the host held it "))) {
 				t.Fatalf("probe = %q, %v; want error %q", got, err, tc.want)
 			}
 			// Only a timeout is ErrToolchainProbeTimeout.

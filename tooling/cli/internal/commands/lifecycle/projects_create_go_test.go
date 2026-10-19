@@ -134,7 +134,7 @@ func (f goCreateFixture) writeGoAnswering(t *testing.T, path, version string, on
 // deadline. It polls for a file that never appears, so its counters move
 // after the first sample whenever that sample was taken, and its deadline
 // counts from then. A run the deadline does not stop exits with status 124
-// after a minute, which fails the probe.
+// after 3 minutes, which fails the probe.
 func (f goCreateFixture) writeSlowGo(t *testing.T) {
 	t.Helper()
 	fixtureproc.Write(t, f.pinned, fixtureproc.Program{

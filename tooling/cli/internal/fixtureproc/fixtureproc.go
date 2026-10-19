@@ -113,8 +113,9 @@ const descriptionSuffix = ".fixture.json"
 
 // waitForBound is a hang detector, not a latency budget: a program still
 // waiting after it failed to see the file it was held for. It exceeds
-// procdeadline.UncountedTimeBound (2 minutes), so a test that times a held
-// program out ends by the test's deadline or by that bound, never by this one.
+// procdeadline.UncountedTimeBound, which TestWaitForBoundOutlastsTheUncountedTimeBound
+// pins, so a test that times a held program out ends by the test's deadline or
+// by that bound, never by this one.
 const waitForBound = 3 * time.Minute
 
 // holdOutputEnv names, in the environment of the copy a program starts for
