@@ -570,12 +570,13 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 		}
 		req.VersionSnapshot = snapshot
 	}
-	// A publish or a deploy states which commit it ships. Where Git does not
-	// manage the workspace root there is none, so a run that executes stops
-	// here, before any hook, job or remote call. A selected command whose
-	// extension is not installed is reported instead (reportRepositoryRefusal).
-	if err := requireRepository(req); err != nil {
-		return SessionResult{ExitCode: ExitError}, reportRepositoryRefusal(req, err)
+	// A command whose jobs declare side effects, such as a publish or a
+	// deploy, states which commit it ships. Where Git does not manage the
+	// workspace root there is none, so a run that executes stops here, before
+	// any hook, job or remote call. A selected command whose extension is not
+	// installed is reported instead (reportRepositoryRefusal).
+	if discovered, err := requireRepository(req); err != nil {
+		return SessionResult{ExitCode: ExitError}, reportRepositoryRefusal(req, discovered, err)
 	}
 
 	// A run that may publish reads its bound commit's ancestry here, before

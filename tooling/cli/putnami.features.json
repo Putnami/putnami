@@ -3630,6 +3630,7 @@
             "checks": [
               "impacted-and-baseline-outside-a-repository-name-git",
               "publish-and-deploy-outside-a-repository-name-git",
+              "a-declared-side-effect-outside-a-repository-names-git",
               "version-outside-a-repository-names-git",
               "a-missing-repository-and-a-missing-program-are-told-apart",
               "another-git-failure-keeps-its-detail"

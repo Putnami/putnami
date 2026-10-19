@@ -92,13 +92,19 @@ plan holds, so each needs the owner's decision.
 - A command with any name that declares side effects keeps its jobs on a
   task-scoped project. `--impacted` plans, and the `impact-plan` output
   built from them, follow the declaration.
-- The well-known verb floor of decision 1 is local to the narrowing. Every
-  other reader of a command's side effects follows the declared traits as
-  resolved, where a declared `traits` object replaces the verb's defaults
-  wholesale: the dry-run exclusion, the remote-shape refusal, the capability
-  and publication gates, the task cache key and the batch key. A `publish`
-  whose manifest declares traits without `sideEffects` is kept by a task
-  scope, but none of those readers counts the `registry` default for it.
+- Four readers count the well-known verb's default side effect together with
+  the declared traits, so a manifest never removes it: the task-scope
+  narrowing, the git requirement outside a repository, the remote cache trust
+  floor and the MCP `run_jobs` refusal. The last three read it through
+  `extension.CommandSideEffects`. A `publish` that declares
+  `sideEffects: "cloud"` is therefore still kept by a task scope, still needs
+  git history, still raises the cache trust to `ci` and is still refused by
+  `run_jobs`.
+- Every other reader takes the declared traits as resolved, where a declared
+  `sideEffects` replaces the verb's default and a `traits` object without
+  `sideEffects` keeps it: the dry-run exclusion, the remote-shape refusal, the
+  capability and publication gates, the task cache key and the batch key. For
+  the `publish` above, those readers see `cloud` only.
 - A version 1 (frozen) portable request carries its task scopes and its
   expected plan, and the executing side re-plans with its own rule to prove
   the graph equal. A submitter and an executor on the two sides of this

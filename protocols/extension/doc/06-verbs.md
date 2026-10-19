@@ -63,7 +63,10 @@ merged, with one exception: a declaration that names no `sideEffects` keeps
 the verb's. A `publish` that declares only `injectPublishChannels` still has
 `registry` side effects, and a `deploy` that declares only `heavy` still has
 `cloud` ones, so every gate that reads the trait treats them as side-effecting.
-A declared `sideEffects` still replaces the verb's. Per-step heaviness uses
+A declared `sideEffects` replaces the verb's for most readers. The git
+requirement, the `run_jobs` refusal, the remote cache trust floor and the task
+scope add declared traits to a well-known verb's side effects and never remove
+them. Per-step heaviness uses
 `heavy` on the pipeline step:
 
 ```json
@@ -75,7 +78,7 @@ A declared `sideEffects` still replaces the verb's. Per-step heaviness uses
 | `heavy` | Worker tuning leaves the command's jobs CPU/memory headroom. |
 | `requiresRunnable` | The command is skipped for `library` projects. |
 | `injectPublishChannels` | The project's `publish: [...]` channels are auto-activated as boolean params. |
-| `sideEffects` | `registry` or `cloud`; documents what the command mutates outside the workspace, and keeps the command's jobs on a task-scoped `--impacted` project. `publish` and `deploy` keep theirs whatever a declaration says. |
+| `sideEffects` | `registry` or `cloud`: what the command mutates outside the workspace. Any side effect refuses a root Git does not manage, makes MCP `run_jobs` refuse the command, and keeps the command's jobs on a task-scoped `--impacted` project; `registry` raises remote cache trust to at least `ci`. Declared traits add to a well-known verb's side effects and never remove them. |
 
 ### Gated capability transport is not server authorization
 

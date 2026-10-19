@@ -3,10 +3,12 @@ package cli
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/env"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
 
@@ -14,10 +16,12 @@ const cacheTrustOption = "cache-trust"
 
 // resolveCacheTrust applies one explicit precedence chain exactly once on a
 // command path: CLI flag > PUTNAMI_CACHE_TRUST > per-command workspace option
-// > environment default (ci in CI, any locally). Publish and tag paths raise
-// the result to at least ci so an explicit/configured "any" can never let a
+// > environment default (ci in CI, any locally). A release path raises the
+// result to at least ci so an explicit/configured "any" can never let a
 // developer hint gate a release; "none" remains stricter and stays disabled.
-func resolveCacheTrust(g *GlobalFlags, cfg *wsproto.Config, commands []string, subcommand string) error {
+// extensions are the loaded extensions whose declared traits decide which
+// command is a release (releaseCacheTrustRequired).
+func resolveCacheTrust(g *GlobalFlags, cfg *wsproto.Config, extensions []*extension.ExtensionDescription, commands []string, subcommand string) error {
 	if g == nil {
 		return nil
 	}
@@ -49,7 +53,7 @@ func resolveCacheTrust(g *GlobalFlags, cfg *wsproto.Config, commands []string, s
 	if !trust.Valid() {
 		return fmt.Errorf("invalid %s value %q: must be one of ci, any, none", source, trust)
 	}
-	if releaseCacheTrustRequired(commands, subcommand) && trust == store.CacheTrustAny {
+	if releaseCacheTrustRequired(extensions, commands, subcommand) && trust == store.CacheTrustAny {
 		trust = store.CacheTrustCI
 	}
 	g.CacheTrust = string(trust)
@@ -107,10 +111,18 @@ func stricterCacheTrust(left, right store.CacheTrust) bool {
 	return rank(left) > rank(right)
 }
 
-func releaseCacheTrustRequired(commands []string, subcommand string) bool {
+// releaseCacheTrustRequired reports whether a run ships a release: a command
+// whose jobs declare registry side effects (extension.CommandSideEffects),
+// which publish always has, or a release tag. A cloud side effect alone, such
+// as deploy's, does not raise the trust. The tag arms read names: `version tag`
+// is a core command, which declares no traits.
+func releaseCacheTrustRequired(extensions []*extension.ExtensionDescription, commands []string, subcommand string) bool {
 	for _, command := range commands {
+		if slices.Contains(extension.CommandSideEffects(extensions, command), extension.SideEffectsRegistry) {
+			return true
+		}
 		switch command {
-		case "publish", "tag":
+		case "tag":
 			return true
 		case "version":
 			if subcommand == "tag" {
