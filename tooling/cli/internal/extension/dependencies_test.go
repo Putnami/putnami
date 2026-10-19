@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -16,6 +17,7 @@ import (
 	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
@@ -571,5 +573,96 @@ func TestDependencyPath(t *testing.T) {
 	}
 	if got := DependencyPath(deps, "@acme/z"); got != nil {
 		t.Errorf("an absent name has path %v", got)
+	}
+}
+
+// copyFirstPartyProject copies the extension manifest of the repository
+// project rel, and its putnami.json when it has one, to the same path in ws.
+func copyFirstPartyProject(t *testing.T, repoRoot, ws, rel string) {
+	t.Helper()
+	for _, name := range []string{ManifestFilename, "putnami.json"} {
+		data, err := os.ReadFile(filepath.Join(repoRoot, rel, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(filepath.Join(ws, rel), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(ws, rel, name), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// The Go extension names @putnami/dev as a dependency, and the shipped
+// @putnami/dev declared by path satisfies it: discovery loads it once, from
+// that path, and its vocabulary merges as the eleven verbs in order, with the
+// core's descriptions, aliases, related commands and default traits.
+func TestTheShippedDevExtensionSatisfiesALanguageDependencyByPath(t *testing.T) {
+	f := newGraphFixture(t)
+	repoRoot := findRepoRoot(t)
+	goExtension, dev := filepath.Join("go", "extension"), filepath.Join("tooling", "dev")
+	copyFirstPartyProject(t, repoRoot, f.ws, goExtension)
+	copyFirstPartyProject(t, repoRoot, f.ws, dev)
+
+	// Control: without the path declaration, the dependency is missing.
+	without := discover(t, f, f.config(t, "/go/extension"))
+	if got := without.MissingDependencies(); !slices.Equal(got, []string{"@putnami/dev"}) {
+		t.Fatalf("missing dependencies without /tooling/dev = %v, want [@putnami/dev]", got)
+	}
+
+	result := discover(t, f, f.config(t, "/go/extension", "/tooling/dev"))
+	if FindExtensionByName(result.Extensions, "@putnami/go") == nil {
+		t.Fatalf("@putnami/go did not load: skipped %v", result.Skipped)
+	}
+	loaded := FindExtensionByName(result.Extensions, "@putnami/dev")
+	if loaded == nil || !loaded.LocalSource || loaded.RelPath != filepath.ToSlash(dev) {
+		t.Fatalf("@putnami/dev = %+v, want the project the workspace declares by path", loaded)
+	}
+	if len(result.Dependencies) != 0 || len(result.MissingDependencies()) != 0 || skipFor(result, "@putnami/dev") != nil {
+		t.Fatalf("the path declaration did not satisfy the dependency: dependencies %+v, skipped %v", result.Dependencies, result.Skipped)
+	}
+	if len(loaded.Jobs) != 0 {
+		t.Errorf("@putnami/dev declares jobs %v; a vocabulary runs nothing", slices.Sorted(maps.Keys(loaded.Jobs)))
+	}
+
+	// The core's help lists its job commands in catalog order, and the
+	// vocabulary order is the help order: the two must be the same list.
+	var developmentVerbs []string
+	descriptions := map[string]string{}
+	for _, command := range commandmeta.PublicJobCommands() {
+		developmentVerbs = append(developmentVerbs, command.Name)
+		descriptions[command.Name] = command.Description
+	}
+	vocabulary := MergeVocabulary(result.Extensions, nil)
+	if !slices.Equal(vocabulary.VerbNames(), developmentVerbs) || len(vocabulary.Warnings) != 0 {
+		t.Fatalf("merged verbs %v with warnings %v, want the core's help order %v", vocabulary.VerbNames(), vocabulary.Warnings, developmentVerbs)
+	}
+	aliases := map[string][]string{}
+	for _, alias := range commandmeta.BuiltinAliasList() {
+		aliases[alias.Command] = append(aliases[alias.Command], alias.Name)
+	}
+	for _, name := range developmentVerbs {
+		verb, _ := vocabulary.Verb(name)
+		core, ok := commandmeta.Lookup(name)
+		if !ok {
+			t.Fatalf("the core catalog has no %s", name)
+		}
+		if verb.Description != descriptions[name] || !slices.Equal(verb.Related, core.Related) || !slices.Equal(verb.Aliases, aliases[name]) {
+			t.Errorf("%s = %q aliases %v related %v; the core shows %q aliases %v related %v",
+				name, verb.Description, verb.Aliases, verb.Related, descriptions[name], aliases[name], core.Related)
+		}
+		if got, want := vocabulary.DefaultTraits(name), extproto.EffectiveTraits(name, nil); got != want {
+			t.Errorf("%s default traits = %+v, want the core defaults %+v", name, got, want)
+		}
+	}
+	wantAliases := map[string]string{}
+	for verb, names := range aliases {
+		for _, name := range names {
+			wantAliases[name] = verb
+		}
+	}
+	if got := vocabulary.AliasMap(); !maps.Equal(got, wantAliases) {
+		t.Errorf("merged aliases = %v, want the core's %v", got, wantAliases)
 	}
 }

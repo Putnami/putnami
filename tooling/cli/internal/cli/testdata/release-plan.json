@@ -147,6 +147,17 @@
       "reversal": "Release a superseding patch version and deprecate the bad version so installers stop resolving it. Full removal is only available inside the registry's 72-hour unpublish window and is never the primary plan."
     },
     {
+      "id": "dev-extension",
+      "channels": [
+        "archives"
+      ],
+      "artifacts": [
+        "@putnami/dev"
+      ],
+      "rollbackPoint": "the previous @putnami/dev archive channel pointer",
+      "reversal": "Repoint the @putnami/dev archive channel at the previous version. It publishes before the language extensions because each of them names it as an extension dependency, so a fresh resolve of a language extension always finds it. Installed workspaces are unaffected because the lock pins a resolved version, so the rollback only changes what a new resolve returns."
+    },
+    {
       "id": "language-extensions",
       "channels": [
         "archives"

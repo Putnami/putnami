@@ -6,6 +6,7 @@
     "cli-model",
     "clientgen-extension",
     "contributor",
+    "dev",
     "extension-sdk",
     "github-collaboration",
     "local-collaboration",

@@ -66,7 +66,9 @@ var declaredDomains = []string{
 // foreign repository manifests. The Cloud runtime destination is
 // excluded the same way: no repository project links it from the workspace,
 // and no existing domain owns the hosted platform's wire contracts. The Cloud
-// CLI extension and its generated service clients follow the same rule.
+// CLI extension and its generated service clients follow the same rule. The
+// development verb vocabulary is a new project, and a new project starts
+// excluded until a review names the domain that owns its authority.
 var excludedProjects = map[string]string{
 	"/cloud/extension":                                     reasonCloudCLIExtension,
 	"/cloud/clients/auth-server":                           reasonCloudCLIClient,
@@ -103,6 +105,7 @@ var excludedProjects = map[string]string{
 	"/python/samples/library":                              reasonSample,
 	"/python/templates/python-library":                     reasonTemplate,
 	"/python/templates/python-server":                      reasonTemplate,
+	"/tooling/dev":                                         reasonDevelopmentVocabulary,
 	"/typescript/samples/01-hello-world":                   reasonSample,
 	"/typescript/samples/02-rest-api":                      reasonSample,
 	"/typescript/samples/03-web":                           reasonSample,
@@ -134,6 +137,7 @@ const (
 	reasonCloudRuntimeDestination = "Cloud runtime destination: a client library of the hosted platform that no repository project links from the workspace, whose wire contracts no existing domain owns, owned by cloud"
 	reasonCloudCLIExtension       = "Cloud CLI extension: the @putnami/cloud extension binary, a client of the hosted platform that no repository project links from the workspace, whose wire contracts no existing domain owns, owned by cloud"
 	reasonCloudCLIClient          = "generated client: produced by @putnami/clientgen from the published Cloud CLI schema, consumed only by the Cloud CLI extension, owned by cloud"
+	reasonDevelopmentVocabulary   = "development verb vocabulary: the @putnami/dev extension, a new project that stays outside the frontier until a review names the domain that owns the vocabulary, owned by tooling"
 )
 
 // expectedEvidenceRows is every DARC evidence row this repository commits, as the

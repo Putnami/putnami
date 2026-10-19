@@ -15,6 +15,7 @@
     "/tooling/scaffold",
     "/tooling/sdd-extension",
     "/tooling/contributor",
+    "/tooling/dev",
     "/tooling/github-collaboration",
     "/cloud/extension",
     "@putnami/intelligence"

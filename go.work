@@ -99,6 +99,7 @@ use (
 	./tooling/cli-model
 	./tooling/clientgen-extension
 	./tooling/contributor
+	./tooling/dev
 	./tooling/extension-sdk
 	./tooling/github-collaboration
 	./tooling/local-collaboration
