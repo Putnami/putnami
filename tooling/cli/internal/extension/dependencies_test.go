@@ -652,8 +652,17 @@ func TestTheShippedDevExtensionSatisfiesALanguageDependencyByPath(t *testing.T) 
 			t.Errorf("%s = %q aliases %v related %v; the core shows %q aliases %v related %v",
 				name, verb.Description, verb.Aliases, verb.Related, descriptions[name], aliases[name], core.Related)
 		}
-		if got, want := vocabulary.DefaultTraits(name), extproto.EffectiveTraits(name, nil); got != want {
-			t.Errorf("%s default traits = %+v, want the core defaults %+v", name, got, want)
+		// The fields the core declares keep its defaults. The kind, workload and
+		// effects are the vocabulary's own; the dev manifest test pins them.
+		got := vocabulary.DefaultTraits(name)
+		coreFields := extproto.CommandTraits{
+			Heavy:                 got.Heavy,
+			RequiresRunnable:      got.RequiresRunnable,
+			InjectPublishChannels: got.InjectPublishChannels,
+			SideEffects:           got.SideEffects,
+		}
+		if want := extproto.EffectiveTraits(name, nil); coreFields != want {
+			t.Errorf("%s default traits = %+v, want the core defaults %+v", name, coreFields, want)
 		}
 	}
 	wantAliases := map[string]string{}

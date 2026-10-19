@@ -109,12 +109,13 @@ func TestTheManifestDeclaresTheElevenVerbsInOrder(t *testing.T) {
 	}
 }
 
-// TestTheManifestPassesStrictValidationAtContract9 runs the verdict of the
+// TestTheManifestPassesStrictValidationAtContract11 runs the verdict of the
 // package-time gate on the source manifest, and holds its claimed contract to
-// the one the packager stamps: the verb vocabulary contract.
-func TestTheManifestPassesStrictValidationAtContract9(t *testing.T) {
+// the one the packager stamps: the command kind contract, which the declared
+// kinds, workloads and effects require.
+func TestTheManifestPassesStrictValidationAtContract11(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, feature, "eleven-ordered-verbs", "the-manifest-passes-strict-validation-at-contract-9")
+	spectest.Proves(t, feature, "eleven-ordered-verbs", "the-manifest-passes-strict-validation-at-contract-11")
 	manifest := readManifest(t)
 	if errs := diag.Errors(extension.FullValidateManifest(manifest)); len(errs) > 0 {
 		t.Fatalf("the manifest fails the package-time validation: %v", errs)
@@ -122,9 +123,9 @@ func TestTheManifestPassesStrictValidationAtContract9(t *testing.T) {
 	if !extension.DeclaresContractSurface(manifest) {
 		t.Fatal("the vocabulary does not count as contract surface")
 	}
-	if got, want := manifest.CLIContract, extension.RequiredCLIContract(manifest); got != want || got != protocolcli.VerbVocabularyContract {
-		t.Errorf("cliContract %d, want %d, the verb vocabulary contract the packager stamps (%d)",
-			got, protocolcli.VerbVocabularyContract, want)
+	if got, want := manifest.CLIContract, extension.RequiredCLIContract(manifest); got != want || got != protocolcli.CommandKindContract {
+		t.Errorf("cliContract %d, want %d, the command kind contract the packager stamps (%d)",
+			got, protocolcli.CommandKindContract, want)
 	}
 }
 
@@ -155,34 +156,57 @@ func TestEachVerbKeepsTheCorePresentation(t *testing.T) {
 	}
 }
 
-// TestTheDeclaredTraitsEqualTheCoreDefaults pins that the vocabulary changes
-// the traits of no job: each verb's default traits are the ones
-// WellKnownVerbs gives it, and none for generate and validate.
-func TestTheDeclaredTraitsEqualTheCoreDefaults(t *testing.T) {
+// declaredKinds is what each verb declares beyond the core defaults: the kind
+// of result the host reads from its jobs, its workload, and its effects.
+// Package, publish and generate declare none of them.
+var declaredKinds = map[string]extension.CommandTraits{
+	"build":    {Kind: extension.CommandKindFiles},
+	"test":     {Kind: extension.CommandKindVerification},
+	"lint":     {Kind: extension.CommandKindDiagnostics},
+	"serve":    {Workload: extension.WorkloadServe},
+	"run":      {Workload: extension.WorkloadOnce},
+	"format":   {RewritesSources: true},
+	"deploy":   {ConsumesReleaseSet: true},
+	"validate": {Kind: extension.CommandKindCriteria},
+}
+
+// TestEachVerbKeepsTheCoreDefaultsAndDeclaresItsKind pins each verb's default
+// traits in two parts. The four core fields equal the ones WellKnownVerbs gives
+// the verb, none for generate and validate, so they move no job. The kind,
+// workload and effects equal declaredKinds. A verb with neither declares no
+// traits object.
+func TestEachVerbKeepsTheCoreDefaultsAndDeclaresItsKind(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, feature, "core-default-traits", "the-declared-traits-equal-the-core-defaults")
-	explicit := map[string]extension.CommandTraits{
-		"serve":   {RequiresRunnable: true},
-		"run":     {RequiresRunnable: true},
-		"package": {InjectPublishChannels: true},
-		"publish": {InjectPublishChannels: true, SideEffects: extension.SideEffectsRegistry},
-		"deploy":  {SideEffects: extension.SideEffectsCloud},
+	spectest.Proves(t, feature, "core-default-traits", "each-verb-keeps-the-core-defaults-and-declares-its-kind")
+	verbs := readManifest(t).Verbs
+	if len(verbs) != len(corePresentation) {
+		t.Fatalf("%d verbs, want %d", len(verbs), len(corePresentation))
 	}
-	for _, verb := range readManifest(t).Verbs {
-		want, declared := explicit[verb.Name]
-		if declared != (verb.Traits != nil) {
-			t.Errorf("%s declares traits %+v; want traits declared only for %v", verb.Name, verb.Traits, []string{"serve", "run", "package", "publish", "deploy"})
-			continue
-		}
+	for _, verb := range verbs {
 		var got extension.CommandTraits
 		if verb.Traits != nil {
 			got = *verb.Traits
 		}
-		if got != want {
-			t.Errorf("%s traits %+v, want %+v", verb.Name, got, want)
+		core := extension.CommandTraits{
+			Heavy:                 got.Heavy,
+			RequiresRunnable:      got.RequiresRunnable,
+			InjectPublishChannels: got.InjectPublishChannels,
+			SideEffects:           got.SideEffects,
 		}
-		if core := extension.WellKnownVerbs[verb.Name].Traits; got != core {
-			t.Errorf("%s traits %+v differ from the core defaults %+v", verb.Name, got, core)
+		if want := extension.WellKnownVerbs[verb.Name].Traits; core != want {
+			t.Errorf("%s core traits %+v differ from the core defaults %+v", verb.Name, core, want)
+		}
+		kinds := extension.CommandTraits{
+			Kind:               got.Kind,
+			Workload:           got.Workload,
+			RewritesSources:    got.RewritesSources,
+			ConsumesReleaseSet: got.ConsumesReleaseSet,
+		}
+		if want := declaredKinds[verb.Name]; kinds != want {
+			t.Errorf("%s declares kind, workload and effects %+v, want %+v", verb.Name, kinds, want)
+		}
+		if declares := got != (extension.CommandTraits{}); declares != (verb.Traits != nil) {
+			t.Errorf("%s declares an empty traits object", verb.Name)
 		}
 	}
 }

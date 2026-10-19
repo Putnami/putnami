@@ -50,10 +50,11 @@ var (
 
 // ValidateVerbs checks the verb vocabulary of one manifest: a non-empty list
 // of uniquely named, described verbs, whose aliases are unique and name no verb
-// or command of the manifest, whose traits use the side-effect vocabulary and
-// keep the side effects WellKnownVerbs gives a verb, and whose related commands
-// are command paths other than the verb itself. It is inert for a manifest that
-// declares no vocabulary.
+// or command of the manifest, whose traits use the kind, workload and
+// side-effect vocabularies (ValidateTraits) and keep the side effects
+// WellKnownVerbs gives a verb, and whose related commands are command paths
+// other than the verb itself. It is inert for a manifest that declares no
+// vocabulary.
 func ValidateVerbs(m *Manifest) []diag.Diagnostic {
 	if !m.DeclaresVerbs() {
 		return nil
@@ -103,6 +104,7 @@ func ValidateVerbs(m *Manifest) []diag.Diagnostic {
 				aliases[alias] = aliasField
 			}
 		}
+		diags = append(diags, ValidateTraits(verb.Traits, field+".traits")...)
 		if verb.Traits != nil {
 			switch wellKnown := WellKnownVerbs[verb.Name].Traits.SideEffects; verb.Traits.SideEffects {
 			case SideEffectsNone, SideEffectsRegistry, SideEffectsCloud:

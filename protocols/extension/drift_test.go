@@ -522,6 +522,24 @@ func TestDrift_TaskBatchPolicy(t *testing.T) {
 	schemaFields := schemaDefProperties(t, "taskBatchPolicy")
 	goFields := goTypeJSONFields(t, TaskBatchPolicy{})
 	assertFieldParity(t, "TaskBatchPolicy", schemaFields, goFields)
+	if got := schemaDefEnum(t, "taskBatchPolicy", "kind"); !reflect.DeepEqual(got, ValidBatchKinds) {
+		t.Errorf("batchable kind drift: schema %v, Go %v", got, ValidBatchKinds)
+	}
+}
+
+// TestDrift_CommandTraits pins the traits object and its closed vocabularies
+// against the schema, so a kind or a workload one side accepts is never one
+// the other refuses.
+func TestDrift_CommandTraits(t *testing.T) {
+	schemaFields := schemaDefProperties(t, "commandTraits")
+	goFields := goTypeJSONFields(t, CommandTraits{})
+	assertFieldParity(t, "CommandTraits", schemaFields, goFields)
+	if got := schemaDefEnum(t, "commandTraits", "kind"); !reflect.DeepEqual(got, ValidCommandKinds) {
+		t.Errorf("command kind drift: schema %v, Go %v", got, ValidCommandKinds)
+	}
+	if got := schemaDefEnum(t, "commandTraits", "workload"); !reflect.DeepEqual(got, ValidWorkloads) {
+		t.Errorf("workload drift: schema %v, Go %v", got, ValidWorkloads)
+	}
 }
 
 func TestDrift_StepCacheOverride(t *testing.T) {

@@ -27,16 +27,19 @@ takes over that presentation, so the first vocabulary must repeat it exactly.
    eleven verbs in help order: build, test, lint, serve, run, format,
    package, publish, deploy, generate, validate. It declares no command,
    command group, task, tool, hook, agent content or runtime, and it claims
-   CLI contract 9, the contract a vocabulary requires.
+   CLI contract 11, the contract its command kinds require.
 2. **The core's presentation, copied.** Each verb carries the description,
    aliases and related commands the core shows for it today. A verb that
    `WellKnownVerbs` describes takes that description; `generate` and
    `validate` take the core catalog's.
-3. **Explicit traits that equal the core defaults.** `serve` and `run`
+3. **Explicit traits.** They keep the core defaults: `serve` and `run`
    require a runnable project, `package` injects the publish channels,
    `publish` injects them and changes a registry, and `deploy` changes a
-   cloud. The other verbs declare no traits. `serve` stays long-running
-   through `WellKnownVerbs`: a vocabulary has no long-running trait.
+   cloud. From contract 11 they also declare what the core reads without a
+   verb name: `build`, `test`, `lint` and `validate` their kind, `serve` and
+   `run` their workload, `format` that it rewrites sources, and `deploy` that
+   it consumes the release set. `generate` declares no traits. Until the core
+   reads `workload`, `serve` stays long-running through `WellKnownVerbs`.
 4. **A handshake-only executable.** `cmd/putnami-dev` answers
    `__putnami runtime-info` and refuses every other invocation. `@putnami/go`
    builds and packages it into the extension archive, as it does for

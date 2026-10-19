@@ -987,11 +987,13 @@ func TestLintDocsIsKeyedOnTheCandidateCut(t *testing.T) {
 // after serve, run, package, publish or deploy declares itself. The expected
 // values are written here, not read from the core's verb table, so the plan and
 // its cache keys keep them when that table no longer gives these verbs
-// defaults. A command named after another verb is not checked.
+// defaults. Declared traits replace the verb's wholesale, so serve and run
+// also declare the workload the vocabulary gives them. A command named after
+// another verb is not checked.
 func TestCommandsDeclareTheTraitsOfTheirVerb(t *testing.T) {
 	verbTraits := map[string]proto.CommandTraits{
-		"serve":   {RequiresRunnable: true},
-		"run":     {RequiresRunnable: true},
+		"serve":   {RequiresRunnable: true, Workload: proto.WorkloadServe},
+		"run":     {RequiresRunnable: true, Workload: proto.WorkloadOnce},
 		"package": {InjectPublishChannels: true},
 		"publish": {InjectPublishChannels: true, SideEffects: proto.SideEffectsRegistry},
 		"deploy":  {SideEffects: proto.SideEffectsCloud},

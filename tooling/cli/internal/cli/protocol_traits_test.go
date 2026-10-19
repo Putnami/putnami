@@ -30,6 +30,27 @@ import (
 // consumers while avoiding package loading across the workspace's modules.
 const traitsDeclaringDir = "protocols/extension"
 
+// traitsAwaitingAReader are the CommandTraits fields CLI contract 11 declares
+// before any consumer reads them: the manifests declare them, validation and
+// the contract floor govern them, and the changes that move each name check
+// onto its field add the readers. The list only shrinks: a field listed here
+// that gains a read site fails the guard until its entry is deleted.
+var traitsAwaitingAReader = map[string]bool{
+	"Kind":               true,
+	"Workload":           true,
+	"RewritesSources":    true,
+	"ConsumesReleaseSet": true,
+}
+
+// traitsReadThroughTraits are the CommandTraits fields whose names other types
+// declare too: a task has a Kind, a composition a Workload. A selector of one
+// counts as a read only through a traits value, so another type's field can
+// neither keep a dead trait alive nor fail the list above.
+var traitsReadThroughTraits = map[string]bool{
+	"Kind":     true,
+	"Workload": true,
+}
+
 // TestCommandTraits_EveryFieldHasANonTestReadSite fails when a CommandTraits
 // field is declared, serialized, and schema-advertised but read by nothing.
 //
@@ -64,10 +85,22 @@ func TestCommandTraits_EveryFieldHasANonTestReadSite(t *testing.T) {
 	for i := range traits.NumField() {
 		fields = append(fields, traits.Field(i).Name)
 	}
-	reads := countFieldReads(t, root, consumers, fields)
+	reads := countFieldReads(t, root, consumers, fields, traitsReadThroughTraits)
+	for name := range traitsAwaitingAReader {
+		if _, ok := traits.FieldByName(name); !ok {
+			t.Errorf("traitsAwaitingAReader names %s, which CommandTraits does not declare; delete the entry", name)
+		}
+	}
 	for i := range traits.NumField() {
 		field := traits.Field(i)
 		read := reads[field.Name]
+		if traitsAwaitingAReader[field.Name] {
+			if read.count > 0 {
+				t.Errorf("CommandTraits.%s now has a read site; delete it from traitsAwaitingAReader\n%s",
+					field.Name, indentSites(read.sites))
+			}
+			continue
+		}
 		if read.count > 0 {
 			continue
 		}
@@ -93,8 +126,9 @@ type fieldReads struct {
 // `proto.SideEffectsRegistry`, comments, and string literals. Any of those
 // would report a dead field as live. A simple assignment is excluded too:
 // populating a trait is not a consumer honoring it. Compound assignments still
-// count because they read the previous value.
-func countFieldReads(t *testing.T, root string, files, fields []string) map[string]fieldReads {
+// count because they read the previous value. A field in throughTraits counts
+// only when its selector reads a traits value (see readsATraitsValue).
+func countFieldReads(t *testing.T, root string, files, fields []string, throughTraits map[string]bool) map[string]fieldReads {
 	t.Helper()
 	const maxReportedSites = 12
 
@@ -136,7 +170,7 @@ func countFieldReads(t *testing.T, root string, files, fields []string) map[stri
 				return true
 			}
 			read, tracked := reads[selector.Sel.Name]
-			if !tracked {
+			if !tracked || (throughTraits[selector.Sel.Name] && !readsATraitsValue(selector.X)) {
 				return true
 			}
 			read.count++
@@ -148,6 +182,31 @@ func countFieldReads(t *testing.T, root string, files, fields []string) map[stri
 		})
 	}
 	return reads
+}
+
+// readsATraitsValue reports whether a selector's operand is a traits value:
+// a Traits field (`job.Traits`), a variable whose name ends in traits
+// (`traits`, `declaredTraits`), or a call whose function name ends in Traits
+// (`EffectiveTraits(...)`).
+func readsATraitsValue(operand ast.Expr) bool {
+	switch typed := operand.(type) {
+	case *ast.ParenExpr:
+		return readsATraitsValue(typed.X)
+	case *ast.StarExpr:
+		return readsATraitsValue(typed.X)
+	case *ast.Ident:
+		return strings.HasSuffix(strings.ToLower(typed.Name), "traits")
+	case *ast.SelectorExpr:
+		return strings.HasSuffix(typed.Sel.Name, "Traits")
+	case *ast.CallExpr:
+		switch function := typed.Fun.(type) {
+		case *ast.Ident:
+			return strings.HasSuffix(function.Name, "Traits")
+		case *ast.SelectorExpr:
+			return strings.HasSuffix(function.Sel.Name, "Traits")
+		}
+	}
+	return false
 }
 
 // workspaceRoot walks up to the directory holding putnami.workspace.json.
@@ -183,7 +242,7 @@ func TestCountFieldReads_RejectsAPrefixMatch(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "prefix.go"), []byte(src), 0o600); err != nil {
 		t.Fatalf("write fixture: %v", err)
 	}
-	reads := countFieldReads(t, dir, []string{"prefix.go"}, []string{"SideEffects", "Enabled"})
+	reads := countFieldReads(t, dir, []string{"prefix.go"}, []string{"SideEffects", "Enabled"}, nil)
 	if len(reads) != 2 {
 		t.Fatalf("field result count = %d, want one non-vacuous result per requested field", len(reads))
 	}
@@ -196,7 +255,7 @@ func TestCountFieldReads_RejectsAPrefixMatch(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "real.go"), []byte(real), 0o600); err != nil {
 		t.Fatalf("write fixture: %v", err)
 	}
-	reads = countFieldReads(t, dir, []string{"real.go"}, []string{"SideEffects", "Enabled"})
+	reads = countFieldReads(t, dir, []string{"real.go"}, []string{"SideEffects", "Enabled"}, nil)
 	for _, field := range []string{"SideEffects", "Enabled"} {
 		read := reads[field]
 		if read.count != 1 {
@@ -205,5 +264,26 @@ func TestCountFieldReads_RejectsAPrefixMatch(t *testing.T) {
 		if want := "real.go:2"; len(read.sites) != 1 || read.sites[0] != want {
 			t.Errorf("%s sites = %v, want [%s]", field, read.sites, want)
 		}
+	}
+}
+
+// TestCountFieldReads_ReadsAnAmbiguousFieldOnlyThroughTraits pins that a field
+// another type also declares counts only when read through a traits value, so
+// a task's Kind never stands in for a command's.
+func TestCountFieldReads_ReadsAnAmbiguousFieldOnlyThroughTraits(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	const src = "package p\n" +
+		"func other(task proto.TaskDefinition) string { return task.Kind }\n" +
+		"func field(job model.Job) string { return job.Traits.Kind }\n" +
+		"func variable(traits proto.CommandTraits) string { return traits.Kind }\n" +
+		"func call(job model.Job) string { return proto.EffectiveTraits(job.Name, job.Traits).Kind }\n"
+	if err := os.WriteFile(filepath.Join(dir, "kind.go"), []byte(src), 0o600); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	reads := countFieldReads(t, dir, []string{"kind.go"}, []string{"Kind"}, map[string]bool{"Kind": true})
+	want := []string{"kind.go:3", "kind.go:4", "kind.go:5"}
+	if read := reads["Kind"]; read.count != len(want) || strings.Join(read.sites, " ") != strings.Join(want, " ") {
+		t.Errorf("Kind reads = %d at %v, want %v", read.count, read.sites, want)
 	}
 }

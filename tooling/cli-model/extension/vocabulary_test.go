@@ -124,6 +124,76 @@ func TestResolve_DeclaredTraitsKeepAWellKnownVerbsSideEffects(t *testing.T) {
 	}
 }
 
+// A job whose manifest declares no traits takes its verb's whole default
+// traits, kind and workload included, and a verb's traits set aside for its
+// side effects take their kind with them.
+func TestApplyVocabularyTraits_AJobWithoutDeclaredTraitsTakesItsVerbsKindAndWorkload(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "command-kinds-and-traits", "a-job-without-declared-traits-takes-its-verbs-kind-and-workload")
+	jobs := Resolve(&Manifest{Name: "@acme/go", Commands: map[string]CommandDefinition{
+		"check": {}, "serve": {}, "release": {}, "publish": {}, "bundle": {},
+	}}, "/ext")
+	check := proto.CommandTraits{Kind: proto.CommandKindVerification}
+	serve := proto.CommandTraits{RequiresRunnable: true, Workload: proto.WorkloadServe}
+	release := proto.CommandTraits{SideEffects: proto.SideEffectsCloud, ConsumesReleaseSet: true}
+	lowered := proto.CommandTraits{InjectPublishChannels: true, Kind: proto.CommandKindFiles}
+	dev := vocabularyExtension("@acme/dev",
+		VerbDefinition{Name: "check", Description: "Check.", Traits: &check},
+		VerbDefinition{Name: "serve", Description: "Serve.", Traits: &serve},
+		VerbDefinition{Name: "release", Description: "Release.", Traits: &release},
+		VerbDefinition{Name: "publish", Description: "Publish.", Traits: &lowered},
+		VerbDefinition{Name: "bundle", Description: "Bundle.", Traits: &proto.CommandTraits{RewritesSources: true}},
+	)
+	ApplyVocabularyTraits([]*ExtensionDescription{jobs, dev})
+
+	cases := map[string]CommandTraits{
+		"check":   check,
+		"serve":   serve,
+		"release": release,
+		// The vocabulary would lower publish's side effects, so its traits,
+		// kind included, are set aside for the well-known defaults.
+		"publish": proto.WellKnownVerbs["publish"].Traits,
+		"bundle":  {RewritesSources: true},
+	}
+	for name, want := range cases {
+		if got := jobs.Jobs[name].Traits; got != want {
+			t.Errorf("%s traits = %+v, want %+v", name, got, want)
+		}
+	}
+}
+
+// Declared traits replace the verb's defaults wholesale: a command that
+// declares traits without a kind or a workload has none, whatever its verb
+// declares, and a command that declares its own keeps it.
+func TestResolve_DeclaredTraitsReplaceTheVerbsKindWholesale(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "command-kinds-and-traits", "declared-traits-replace-the-verbs-kind-wholesale")
+	runnable := proto.CommandTraits{RequiresRunnable: true}
+	files := proto.CommandTraits{Heavy: true, Kind: proto.CommandKindFiles}
+	jobs := Resolve(&Manifest{Name: "@acme/go", Commands: map[string]CommandDefinition{
+		"check": {Traits: &proto.CommandTraits{Heavy: true}},
+		"serve": {Traits: &runnable},
+		"build": {Traits: &files},
+	}}, "/ext")
+	dev := vocabularyExtension("@acme/dev",
+		VerbDefinition{Name: "check", Description: "Check.", Traits: &proto.CommandTraits{Kind: proto.CommandKindCriteria}},
+		VerbDefinition{Name: "serve", Description: "Serve.", Traits: &proto.CommandTraits{RequiresRunnable: true, Workload: proto.WorkloadServe}},
+		VerbDefinition{Name: "build", Description: "Build.", Traits: &proto.CommandTraits{Kind: proto.CommandKindVerification}},
+	)
+	ApplyVocabularyTraits([]*ExtensionDescription{jobs, dev})
+
+	cases := map[string]CommandTraits{
+		"check": {Heavy: true},
+		"serve": runnable,
+		"build": files,
+	}
+	for name, want := range cases {
+		if got := jobs.Jobs[name].Traits; got != want {
+			t.Errorf("%s traits = %+v, want %+v", name, got, want)
+		}
+	}
+}
+
 func TestMergeVocabulary_AnAliasNeverShadowsAVerbCommandGroupOrReservedName(t *testing.T) {
 	t.Parallel()
 	vocabulary := vocabularyExtension("@acme/dev", VerbDefinition{

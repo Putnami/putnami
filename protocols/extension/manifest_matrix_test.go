@@ -21,13 +21,14 @@ import (
 //
 // So this is the full cross product of {absent, one behind, current, latest,
 // one ahead of latest} × {commands, command groups, tools, agent content,
-// verbs, none},
+// verbs, command kinds, none},
 // in one table, next to the doc it mirrors. Ratcheting a row means editing this
 // table and that table together.
 //
 // The additive contracts above the base are opted into: a manifest needs one
-// only when it declares agent content or a verb vocabulary, so the floor a
-// stamp must reach depends on the surface, while the ceiling does not.
+// only when it declares agent content, a verb vocabulary or command kinds, so
+// the floor a stamp must reach depends on the surface, while the ceiling does
+// not.
 
 // matrixManifest renders a manifest carrying exactly one kind of contract
 // surface at a given declared contract. Contract 0 is written as an ABSENT
@@ -70,6 +71,9 @@ const (
   }`
 
 	verbsSurface = `"verbs": [{"name": "build", "description": "Build the project.", "aliases": ["b"]}]`
+
+	commandKindsSurface = `"commands": {"check": {"traits": {"kind": "criteria"}, "run": [{"id": "c", "task": "t"}]}},
+  "tasks": {"t": {"kind": "command", "command": "echo", "timeoutMs": -1}}`
 )
 
 func writeMatrixManifest(t *testing.T, body string) string {
@@ -109,6 +113,7 @@ func TestLoadManifest_CompatibilityMatrix(t *testing.T) {
 		{name: "tools", body: toolsSurface, governs: true, required: current},
 		{name: "agentContent", body: agentContentSurface, governs: true, required: protocolcli.AgentContentContract},
 		{name: "verbs", body: verbsSurface, governs: true, required: protocolcli.VerbVocabularyContract},
+		{name: "command kinds", body: commandKindsSurface, governs: true, required: protocolcli.CommandKindContract},
 		{name: "hook-only", body: hookOnlySurface, governs: false, required: current},
 	}
 	contracts := []struct {
@@ -193,6 +198,7 @@ func TestDeclaresContractSurface_CountsEverySurfaceKind(t *testing.T) {
 		toolsSurface:         true,
 		agentContentSurface:  true,
 		verbsSurface:         true,
+		commandKindsSurface:  true,
 		hookOnlySurface:      false,
 	}
 	for surface, want := range cases {

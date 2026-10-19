@@ -81,10 +81,12 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: SourceBoundCacheContract for a task that declares
-// cache.sourceBound, VerbVocabularyContract for a verb vocabulary,
-// ExtensionDependenciesContract for extensionDependencies that
-// name a registry extension, ReleaseBaselineInputContract for a task that
+// the manifest: CommandKindContract for command or verb traits that declare a
+// kind, a workload, rewritesSources or consumesReleaseSet, or a task's
+// batchable policy that declares a kind or a phase, SourceBoundCacheContract
+// for a task that declares cache.sourceBound, VerbVocabularyContract for a
+// verb vocabulary, ExtensionDependenciesContract for extensionDependencies
+// that name a registry extension, ReleaseBaselineInputContract for a task that
 // declares the releaseBaseline runtime input, GitInputModeContract (the same
 // rung) for a task that declares a `git:` file pattern, GoEmbedInputsContract
 // for Go embed task inputs/cache-key files, AgentContentContract for an
@@ -135,7 +137,36 @@ func RequiredLoadContract(m *Manifest) int {
 	if m.DeclaresVerbs() {
 		required = max(required, protocolcli.VerbVocabularyContract)
 	}
+	if DeclaresCommandKinds(m) {
+		required = max(required, protocolcli.CommandKindContract)
+	}
 	return required
+}
+
+// DeclaresCommandKinds reports whether the manifest uses the vocabulary of
+// protocolcli.CommandKindContract: command or verb traits that declare a
+// kind, a workload, rewritesSources or consumesReleaseSet, or a task's
+// batchable policy that declares a kind or a phase.
+func DeclaresCommandKinds(m *Manifest) bool {
+	if m == nil {
+		return false
+	}
+	for _, command := range m.Commands {
+		if command.Traits.DeclaresCommandKind() {
+			return true
+		}
+	}
+	for _, verb := range m.Verbs {
+		if verb.Traits.DeclaresCommandKind() {
+			return true
+		}
+	}
+	for _, task := range m.Tasks {
+		if task.Batchable.DeclaresCommandKind() {
+			return true
+		}
+	}
+	return false
 }
 
 // declaresSourceBound reports whether a task declares the source-bound cache

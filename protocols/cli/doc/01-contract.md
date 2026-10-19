@@ -210,6 +210,18 @@ task's own project, so an entry serves only at the binding its outputs embed.
 A reader below 10 stores the entry at the cache key alone and would replay
 outputs that embed a stale binding, so it refuses the stamp. The floor binds a manifest wherever it loads from. Only a manifest
 with a task that declares the field is stamped 10.
+Contract `11` (`CommandKindContract`) is additive for four command traits and
+two batch policy fields. A command's or a verb's traits may declare `kind`, what
+the host reads from the command's results (`verification`, `criteria`,
+`diagnostics` or `files`); `workload`, how the command runs (`serve` or
+`once`); `rewritesSources`; and `consumesReleaseSet`. A batchable task may
+declare `batchable.kind` (`verification` or `diagnostics`) and
+`batchable.phase`, the tally and the phase name of its shared invocation. Strict
+validation refuses a value outside each vocabulary. The CLI reads none of the
+fields yet: the change that moves a decision from a command's name to a field
+reads it. A reader below 11 would plan a declared kind or workload as a plain
+command, so it refuses the stamp. The floor binds a manifest wherever it loads
+from. Only a manifest that declares one of the fields is stamped 11.
 Contract `6` is additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs. A reader limited to contract 5 refuses that
 manifest before interpreting its inputs; unrelated manifests retain their

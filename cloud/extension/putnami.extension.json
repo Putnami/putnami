@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 7,
+  "cliContract": 11,
   "name": "@putnami/cloud",
   "version": "0.1.0",
   "ecosystems": [
@@ -1481,7 +1481,7 @@
     "validate": {
       "activation": "workspace",
       "activationFiles": ["putnami.json"],
-      "traits": {"injectPublishChannels": true},
+      "traits": {"injectPublishChannels": true, "kind": "criteria"},
       "description": "Validate existing authored production Config inputs and declared site-content source metadata without packaging.",
       "run": [
         {
@@ -1540,6 +1540,7 @@
       ]
     },
     "test": {
+      "traits": {"kind": "verification"},
       "activationFiles": [
         "tests/run.sh"
       ],

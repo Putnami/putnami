@@ -684,6 +684,28 @@ type TaskBatchPolicy struct {
 	// MaxWorkers disables batching above this resolved scheduler concurrency.
 	// Zero enables batching at every worker count.
 	MaxWorkers int `json:"maxWorkers,omitempty"`
+	// Kind names the per-project tally the batch scheduler reconstructs from
+	// the shared invocation's result, one of ValidBatchKinds:
+	// CommandKindVerification or CommandKindDiagnostics. Empty means only the
+	// result's metrics are replayed. Like every field of the task, it enters
+	// the task's contract digest. A task that declares it requires CLI
+	// contract protocolcli.CommandKindContract.
+	Kind string `json:"kind,omitempty"`
+	// Phase is the phase name of each project's reconstructed run: lowercase
+	// letters, digits and hyphens, starting with a letter. Empty means the
+	// step id names it. A task that declares it requires CLI contract
+	// protocolcli.CommandKindContract.
+	Phase string `json:"phase,omitempty"`
+}
+
+// ValidBatchKinds is the TaskBatchPolicy.Kind vocabulary in canonical order:
+// the command kinds whose per-project tally a batch reconstructs.
+var ValidBatchKinds = []string{CommandKindDiagnostics, CommandKindVerification}
+
+// DeclaresCommandKind reports whether the policy declares a kind or a phase,
+// the fields protocolcli.CommandKindContract adds.
+func (p *TaskBatchPolicy) DeclaresCommandKind() bool {
+	return p != nil && (p.Kind != "" || p.Phase != "")
 }
 
 // Resource scope values for ResourceRef.Scope.

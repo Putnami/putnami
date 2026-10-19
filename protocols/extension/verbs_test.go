@@ -12,9 +12,14 @@ import (
 // and infra markers to decide whether an artifact core does not own had to
 // exist before the job ran — and contract 3 deleted it. A new
 // field here is a protocol decision; a field that asks core to inspect a
-// workload is the regression this pin exists to catch.
+// workload is the regression this pin exists to catch. Workload is not one: it
+// names how the command runs (serve or once), and core reads nothing of the
+// workload's sources to answer it.
 func TestConformance_CommandTraitsVocabulary(t *testing.T) {
-	want := []string{"Heavy", "RequiresRunnable", "InjectPublishChannels", "SideEffects"}
+	want := []string{
+		"Heavy", "RequiresRunnable", "InjectPublishChannels", "SideEffects",
+		"Kind", "Workload", "RewritesSources", "ConsumesReleaseSet",
+	}
 	typ := reflect.TypeOf(CommandTraits{})
 	got := make([]string, 0, typ.NumField())
 	for i := 0; i < typ.NumField(); i++ {

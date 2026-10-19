@@ -45,6 +45,16 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	11: ADDITIVE — command kinds and traits. A command's traits may declare
+//	   its kind (`kind`: verification, criteria, diagnostics or files), its
+//	   workload (`workload`: serve or once), that it rewrites the source tree
+//	   (`rewritesSources`) and that it binds a release set
+//	   (`consumesReleaseSet`); a batchable task may declare the kind and
+//	   phase of its shared invocation (`batchable.kind`, `batchable.phase`).
+//	   An older reader would plan a declared kind or workload as a plain
+//	   command, so it must refuse the stamp. Only a manifest whose command
+//	   or verb traits, or whose task's batchable policy, declare one of them
+//	   is stamped 11, and the floor binds it from every origin.
 //	10: ADDITIVE — the source-bound cache policy (`cache.sourceBound`). From
 //	   10 on, the CLI stores and looks up the task's entry at a key derived
 //	   from its cache key and the source binding of the task's own project,
@@ -160,7 +170,14 @@ const VerbVocabularyContract = 9
 // stale binding.
 const SourceBoundCacheContract = 10
 
+// CommandKindContract is required by a manifest whose command or verb traits
+// declare a kind, a workload, rewritesSources or consumesReleaseSet, or whose
+// task's batchable policy declares a kind or a phase. Each one tells the host
+// what a command's results are or how it runs, so an older reader refuses the
+// stamp instead of planning such a command as a plain one.
+const CommandKindContract = 11
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = SourceBoundCacheContract
+const LatestContract = CommandKindContract

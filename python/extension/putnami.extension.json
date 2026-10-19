@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 8,
+  "cliContract": 11,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-python",
@@ -107,7 +107,7 @@
     },
     "serve": {
       "description": "Serve a Python application with hot-reload.",
-      "traits": { "requiresRunnable": true },
+      "traits": { "requiresRunnable": true, "workload": "serve" },
       "flags": {
         "entrypoint": {
           "type": "string",
@@ -129,7 +129,7 @@
     },
     "run": {
       "description": "Run a Python workload once for the host and forward its exit code.",
-      "traits": { "requiresRunnable": true },
+      "traits": { "requiresRunnable": true, "workload": "once" },
       "activationFiles": ["pyproject.toml", "src/**/*.py"],
       "flags": {
         "entrypoint": {

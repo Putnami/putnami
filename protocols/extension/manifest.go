@@ -63,11 +63,10 @@ func LoadManifest(path string) (*Manifest, error) {
 //     manifest relies on — the four that move together at 3 (task contract
 //     v3, job context v2, runtime event protocol v2, lock format v2), the
 //     session prerequisites of 4, and, for a manifest that declares agent
-//     content or a verb vocabulary, the additive contract 5 or 9. Loading a
-//     manifest stamped below that
-//     would run a task whose outputs the scheduler cannot capture from a
-//     declaration, or accept agent content a reader of its stamp never had
-//     to represent.
+//     content, a verb vocabulary or command kinds, the additive contract 5, 9
+//     or 11. Loading a manifest stamped below that would run a task whose
+//     outputs the scheduler cannot capture from a declaration, or accept
+//     agent content a reader of its stamp never had to represent.
 //
 // A manifest that declares no contract surface at all is outside the ladder
 // (DeclaresContractSurface): the packager never stamps one, so requiring a
@@ -105,6 +104,8 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	default:
 		reason := ""
 		switch {
+		case required == protocolcli.CommandKindContract:
+			reason = " for its command kinds"
 		case required == protocolcli.SourceBoundCacheContract:
 			reason = " for its source-bound cache policy"
 		case required == protocolcli.VerbVocabularyContract && m.DeclaresVerbs():

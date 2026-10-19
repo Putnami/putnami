@@ -1,43 +1,47 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/dev",
-  "cliContract": 9,
+  "cliContract": 11,
   "verbs": [
     {
       "name": "build",
       "description": "Compile or transpile project sources into runnable or distributable outputs.",
       "aliases": ["b"],
+      "traits": {"kind": "files"},
       "related": ["test", "lint", "serve"]
     },
     {
       "name": "test",
       "description": "Run the project's tests, emitting test counts and coverage metrics.",
       "aliases": ["t"],
+      "traits": {"kind": "verification"},
       "related": ["build", "lint"]
     },
     {
       "name": "lint",
       "description": "Check code for style and correctness findings, emitting per-issue diagnostics.",
       "aliases": ["l"],
+      "traits": {"kind": "diagnostics"},
       "related": ["build", "test", "format"]
     },
     {
       "name": "serve",
       "description": "Run the project's dev server until interrupted.",
       "aliases": ["s"],
-      "traits": {"requiresRunnable": true},
+      "traits": {"requiresRunnable": true, "workload": "serve"},
       "related": ["build", "run"]
     },
     {
       "name": "run",
       "description": "Execute the project once and exit.",
-      "traits": {"requiresRunnable": true},
+      "traits": {"requiresRunnable": true, "workload": "once"},
       "related": ["build", "serve"]
     },
     {
       "name": "format",
       "description": "Rewrite sources into canonical formatting.",
       "aliases": ["f"],
+      "traits": {"rewritesSources": true},
       "related": ["lint"]
     },
     {
@@ -57,7 +61,7 @@
       "name": "deploy",
       "description": "Converge a cloud environment on the workload's aggregated infra manifest.",
       "aliases": ["d", "D"],
-      "traits": {"sideEffects": "cloud"},
+      "traits": {"sideEffects": "cloud", "consumesReleaseSet": true},
       "related": ["build", "package", "publish"]
     },
     {
@@ -68,6 +72,7 @@
     {
       "name": "validate",
       "description": "Check the project against its declared specs, contracts and compatibility rules.",
+      "traits": {"kind": "criteria"},
       "related": ["lint", "test", "build"]
     }
   ]
