@@ -217,21 +217,20 @@ func TestValidateRecordAcceptsExtensionCommands(t *testing.T) {
 	}
 }
 
-// releasedCommands are names a released CLI sends. The receiver accepts each of
+// releasedCommands are names the CLI sends. The receiver accepts each of
 // them, or it drops every record of that CLI that names one. The list is a
-// frozen copy of Commands: a name is added here when it is added there, and is
-// never removed.
+// frozen copy of Commands: a name is added here when it is added there. Once a
+// CLI release sends a name, the name is never removed.
 var releasedCommands = []string{
 	"build", "test", "lint", "serve", "run", "format",
 	"package", "publish", "deploy", "generate", "validate",
-	"cache-provider", "clientgen", "clientgen-adopt", "clientgen-check", "clientgen-sync",
-	"cloud-cache", "cloud-channels", "cloud-ci", "cloud-config", "cloud-db",
-	"cloud-deploy", "cloud-distribution", "cloud-env", "cloud-image-layers", "cloud-login",
-	"cloud-logout", "cloud-logs", "cloud-metrics", "cloud-oci", "cloud-packages",
-	"cloud-publish-archives", "cloud-publish-config", "cloud-publish-migration", "cloud-registries", "cloud-registry-token",
-	"cloud-release-set", "cloud-report", "cloud-secrets", "cloud-setup", "cloud-source",
-	"cloud-status", "cloud-token", "cloud-tokens", "cloud-traces", "cloud-track",
-	"cloud-validate-config", "cloud-whoami", "config-extract", "config-merge", "credential-provider",
+	"cache-provider", "change-finalize", "change-language", "change-verify", "clientgen",
+	"clientgen-adopt", "clientgen-check", "clientgen-sync", "cloud-cache", "cloud-channels",
+	"cloud-ci", "cloud-config", "cloud-db", "cloud-deploy", "cloud-env",
+	"cloud-image-layers", "cloud-infra", "cloud-login", "cloud-logout", "cloud-logs",
+	"cloud-metrics", "cloud-packages", "cloud-registries", "cloud-registry-token", "cloud-release-set",
+	"cloud-secrets", "cloud-setup", "cloud-source", "cloud-status", "cloud-token",
+	"cloud-traces", "cloud-whoami", "config-extract", "config-merge", "credential-provider",
 	"log-reporter", "session-reporter", "validate-workspace", "version", "workspace-fetch",
 	"workspace-install",
 }

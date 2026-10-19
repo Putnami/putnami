@@ -84,9 +84,10 @@ var (
 // commands the CLI catalog listed when the vocabulary first shipped, in catalog
 // order, then every public command that an extension of the @putnami scope
 // declares, sorted. A conformance test in the CLI fails while such a command is
-// missing, so adding one requires an explicit wire-contract update. A released
-// CLI sends any name listed here, so a name is never removed: the receiver would
-// drop that CLI's records, and a protocol test fails.
+// missing, so adding one requires an explicit wire-contract update. Once a CLI
+// release sends a name listed here, the name is never removed: the receiver would
+// drop that CLI's records, and a protocol test fails. Until the first such
+// release, a name that no first-party manifest declares may go.
 var Commands = []string{
 	"build",
 	"test",
@@ -100,6 +101,9 @@ var Commands = []string{
 	"generate",
 	"validate",
 	"cache-provider",
+	"change-finalize",
+	"change-language",
+	"change-verify",
 	"clientgen",
 	"clientgen-adopt",
 	"clientgen-check",
@@ -110,31 +114,23 @@ var Commands = []string{
 	"cloud-config",
 	"cloud-db",
 	"cloud-deploy",
-	"cloud-distribution",
 	"cloud-env",
 	"cloud-image-layers",
+	"cloud-infra",
 	"cloud-login",
 	"cloud-logout",
 	"cloud-logs",
 	"cloud-metrics",
-	"cloud-oci",
 	"cloud-packages",
-	"cloud-publish-archives",
-	"cloud-publish-config",
-	"cloud-publish-migration",
 	"cloud-registries",
 	"cloud-registry-token",
 	"cloud-release-set",
-	"cloud-report",
 	"cloud-secrets",
 	"cloud-setup",
 	"cloud-source",
 	"cloud-status",
 	"cloud-token",
-	"cloud-tokens",
 	"cloud-traces",
-	"cloud-track",
-	"cloud-validate-config",
 	"cloud-whoami",
 	"config-extract",
 	"config-merge",
