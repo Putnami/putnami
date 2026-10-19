@@ -121,6 +121,33 @@ type CIRunResponse struct {
 	// Session is the delivery account of the run's session record,
 	// served for a terminal run only.
 	Session *CIRunSession `json:"session,omitempty"`
+	// Reuse is the release-set members the run reused from its reuse channel
+	// instead of rebuilding them, enriched by the server on the single-run get
+	// only when the request asks for it with `reuse=true`. Absent on a run that
+	// reused nothing, and on a host that predates the query.
+	Reuse *CIRunReuse `json:"reuse,omitempty"`
+}
+
+// CIRunReuse mirrors apis.CIRunReuseResponse: where a run's reused members came
+// from. Channel is the channel that held them (for example `pr-<n>`),
+// SourceRevision the revision they were released from, and Head the id of the
+// release-set head the publication resolved for that channel (`rs_` and 64
+// hex), which the view prints whole so it can be passed to `channels set`.
+type CIRunReuse struct {
+	Channel        string              `json:"channel,omitempty"`
+	Head           string              `json:"head,omitempty"`
+	SourceRevision string              `json:"sourceRevision,omitempty"`
+	Members        []CIRunReusedMember `json:"members,omitempty"`
+	// MembersOmitted counts the reused members past the listed ones.
+	MembersOmitted int `json:"membersOmitted,omitempty"`
+}
+
+// CIRunReusedMember mirrors apis.CIRunReusedMemberResponse: one reused
+// release-set member, by ecosystem, coordinate and version.
+type CIRunReusedMember struct {
+	Ecosystem  string `json:"ecosystem,omitempty"`
+	Coordinate string `json:"coordinate,omitempty"`
+	Version    string `json:"version,omitempty"`
 }
 
 // CIRunFailure mirrors apis.CIRunFailureResponse: the failing step and its
@@ -512,7 +539,7 @@ func ciHelp(params map[string]any, ioctx clicore.IO) error {
 		{"command": "cloud ci enable|disable|subscription", "description": "manage the live CI subscription; enable accepts --runner-channel stable|canary"},
 		{"command": "cloud channels follow <namespace> stable|canary", "description": "change a producer track; an rs_ id pins an exact release and --runner-channel changes the runner atomically"},
 		{"command": "cloud ci list", "description": "list workspace CI runs, newest first (--limit N, default 20, 0 for the whole window; filtered by the server with --repo/--branch/--sha/--ref/--pr/--status/--phase/--age)"},
-		{"command": "cloud ci view <run>", "description": "show one run with its per-phase attempts, and — when it failed — the failing step, the failing tasks, and their file:line diagnostics"},
+		{"command": "cloud ci view <run>", "description": "show one run with its per-phase attempts, and — when it failed — the failing step, the failing tasks, and their file:line diagnostics; for a run that reused release-set members, the channel, source revision and members it reused"},
 		{"command": "cloud ci start --repo <o/r> --sha <sha> --reason <why>", "description": "manually start a run for a pushed SHA (--ref/--branch/--pr/--phases/--size/--max-parallel/--no-cache optional)"},
 		{"command": "cloud ci cancel <run> --reason <why>", "description": "idempotently cancel a run"},
 		{"command": "cloud ci retry <run> --reason <why>", "description": "retry a run (whole run, or --phase <p>, with --size/--no-cache/--max-parallel)"},
@@ -544,6 +571,7 @@ func ciHelp(params map[string]any, ioctx clicore.IO) error {
 	ioctx.Stdout("`logs --level` matches each entry's OWN findings, not the severity of the pipe that carried them.")
 	ioctx.Stdout("`view <run>` on a failed run lists each failed task with its error, diagnostics and last output lines, derived by the control plane from the")
 	ioctx.Stdout("run's session record; its `Session:` line says whether that record arrived. `timings <run>` lists every task. A run whose record never arrived has no digest.")
+	ioctx.Stdout("`view <run>` on a run that reused release-set members adds a `Reused:` section: the channel, the source revision, the head and each member; a run that reused nothing prints none.")
 	ioctx.Stdout("Every verb drives the control-plane API with workspace auth (no direct Cloud Run, database, or registry access).")
 	ioctx.Stdout("list sends its filters to the server; against an older server that ignores them, it filters the fetched history itself.")
 	ioctx.Stdout("start/cancel/retry/repair/pause/drain/resume require --reason and prompt for confirmation (bypass with --yes).")
@@ -917,7 +945,7 @@ func ciFilterByPhase(reqCtx context.Context, ctx *clicore.WorkspaceContext, runs
 		if i >= ciListPhaseFetchCap {
 			break
 		}
-		detail, err := ciGetRun(reqCtx, ctx, "list", runs[i].ID, false)
+		detail, err := ciGetRun(reqCtx, ctx, "list", runs[i].ID)
 		if err != nil {
 			return nil, false, err
 		}
@@ -947,7 +975,7 @@ func ciView(params map[string]any, args []string, workspaceRoot string, env map[
 	// The resolved id is discarded: everything below keys off resp.ID, which is the
 	// server's own answer and therefore the authoritative one.
 	resp, _, err := ciRunRequest(reqCtx, ctx, run, func(id string) (*CIRunResponse, error) {
-		return ciGetRun(reqCtx, ctx, "view", id, true)
+		return ciGetRunQuery(reqCtx, ctx, "view", id, ciViewRunQuery())
 	})
 	if err != nil {
 		return err
@@ -1856,7 +1884,7 @@ func ciInsights(params map[string]any, args []string, workspaceRoot string, env 
 	reqCtx, stop := ciRequestContext(ioctx)
 	defer stop()
 	runResp, resolved, err := ciRunRequest(reqCtx, ctx, run, func(id string) (*CIRunResponse, error) {
-		return ciGetRun(reqCtx, ctx, "insights", id, false)
+		return ciGetRun(reqCtx, ctx, "insights", id)
 	})
 	if err != nil {
 		return err
@@ -2132,7 +2160,7 @@ func ciTimings(params map[string]any, args []string, workspaceRoot string, env m
 // exists, which is what makes the table's own 404 unambiguous.
 func ciLoadTimings(reqCtx context.Context, ctx *clicore.WorkspaceContext, run string) (*CIRunResponse, *CIRunTimingsResponse, error) {
 	runResp, resolved, err := ciRunRequest(reqCtx, ctx, run, func(id string) (*CIRunResponse, error) {
-		return ciGetRun(reqCtx, ctx, "timings", id, false)
+		return ciGetRun(reqCtx, ctx, "timings", id)
 	})
 	if err != nil {
 		return nil, nil, err
@@ -2557,15 +2585,24 @@ func ciRunsQueryValues(query deliveryapiclient.GetV1WorkspacesRunsQuery) url.Val
 	return q
 }
 
-// ciGetRun reads one run by id. detail asks for the members only `view`
-// renders: each failed task's error and output, and the session record's
-// delivery account. A host older than them declares no query and
-// answers without them, which `view` renders as before.
-func ciGetRun(reqCtx context.Context, ctx *clicore.WorkspaceContext, verb, id string, detail bool) (*CIRunResponse, error) {
-	var query deliveryapiclient.GetV1WorkspacesWorkspaceRunsRunQuery
-	if detail {
-		query.Detail = &detail
-	}
+// ciGetRun reads one run by id with none of the optional members. A reader that
+// renders them, such as `view`, builds its own query for ciGetRunQuery.
+func ciGetRun(reqCtx context.Context, ctx *clicore.WorkspaceContext, verb, id string) (*CIRunResponse, error) {
+	return ciGetRunQuery(reqCtx, ctx, verb, id, deliveryapiclient.GetV1WorkspacesWorkspaceRunsRunQuery{})
+}
+
+// ciViewRunQuery is the single-run read `view` sends. detail asks for the
+// members only `view` renders: each failed task's error and output, and the
+// session record's delivery account. reuse asks for the release-set members the
+// run reused. A host older than them declares no query and answers without
+// them, which `view` renders as before.
+func ciViewRunQuery() deliveryapiclient.GetV1WorkspacesWorkspaceRunsRunQuery {
+	on := true
+	return deliveryapiclient.GetV1WorkspacesWorkspaceRunsRunQuery{Detail: &on, Reuse: &on}
+}
+
+// ciGetRunQuery reads one run by id with the query the caller built.
+func ciGetRunQuery(reqCtx context.Context, ctx *clicore.WorkspaceContext, verb, id string, query deliveryapiclient.GetV1WorkspacesWorkspaceRunsRunQuery) (*CIRunResponse, error) {
 	return ciCall[CIRunResponse](reqCtx, ctx, verb, ctx.WorkspaceURL("/runs/"+url.PathEscape(id)),
 		func(callCtx context.Context, api *deliveryapiclient.DeliveryClient) (*deliveryapiclient.CIRunResponse, error) {
 			return api.GetV1WorkspacesWorkspaceRunsRun(callCtx, deliveryapiclient.GetV1WorkspacesWorkspaceRunsRunInput{
@@ -2985,6 +3022,7 @@ func ciRenderRunDetail(ioctx clicore.IO, run *CIRunResponse) {
 	if line := ciSessionLine(run.Session); line != "" {
 		ioctx.Stdout("Session:    " + line)
 	}
+	ciRenderReuse(ioctx, run.Reuse)
 	if len(run.Phases) == 0 {
 		ciRenderFailedTasks(ioctx, run.FailedTasks, run.FailedTasksOmitted)
 		return
@@ -3002,6 +3040,33 @@ func ciRenderRunDetail(ioctx clicore.IO, run *CIRunResponse) {
 	}
 	ciRenderTable(ioctx, headers, rows)
 	ciRenderFailedTasks(ioctx, run.FailedTasks, run.FailedTasksOmitted)
+}
+
+// ciRenderReuse prints the members a run reused from its reuse channel: where
+// they came from, then each one as `coordinate version (ecosystem)`. A run that
+// reused nothing carries no reuse, and prints nothing.
+func ciRenderReuse(ioctx clicore.IO, reuse *CIRunReuse) {
+	if reuse == nil {
+		return
+	}
+	ioctx.Stdout("")
+	ioctx.Stdout("Reused:")
+	if reuse.Channel != "" {
+		ioctx.Stdout("  Channel:  " + reuse.Channel)
+	}
+	if reuse.SourceRevision != "" {
+		ioctx.Stdout("  Source:   " + shortSHA(reuse.SourceRevision))
+	}
+	if reuse.Head != "" {
+		ioctx.Stdout("  Head:     " + reuse.Head)
+	}
+	for i := range reuse.Members {
+		m := reuse.Members[i]
+		ioctx.Stdout("  " + strings.TrimSpace(m.Coordinate+" "+m.Version) + " (" + dash(m.Ecosystem) + ")")
+	}
+	if reuse.MembersOmitted > 0 {
+		ioctx.Stdout(fmt.Sprintf("  … and %d more not listed", reuse.MembersOmitted))
+	}
 }
 
 // Run-annotation keys this surface reads out of the run's `checks` map. They are

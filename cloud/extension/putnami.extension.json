@@ -301,7 +301,7 @@
             },
             {
               "command": "putnami cloud ci view 3cb50fe5ff0e",
-              "description": "One run: timing, cache, phases, and — when it failed — the failing tasks and their file:line diagnostics"
+              "description": "One run: timing, cache, phases, the release-set members it reused, and — when it failed — the failing tasks and their file:line diagnostics"
             },
             {
               "command": "putnami cloud ci logs 3cb50fe5ff0e --level error",

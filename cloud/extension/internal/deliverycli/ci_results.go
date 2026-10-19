@@ -137,7 +137,7 @@ func ciResults(params map[string]any, args []string, workspaceRoot string, env m
 	reqCtx, stop := ciRequestContext(ioctx)
 	defer stop()
 	runResp, resolved, err := ciRunRequest(reqCtx, ctx, run, func(id string) (*CIRunResponse, error) {
-		return ciGetRun(reqCtx, ctx, "results", id, false)
+		return ciGetRun(reqCtx, ctx, "results", id)
 	})
 	if err != nil {
 		return err

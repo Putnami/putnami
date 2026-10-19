@@ -603,6 +603,10 @@
           "repo": {
             "type": "string"
           },
+          "reuse": {
+            "$ref": "#/components/schemas/CIRunReuseResponse",
+            "nullable": true
+          },
           "session": {
             "$ref": "#/components/schemas/CIRunSessionResponse",
             "nullable": true
@@ -738,6 +742,48 @@
         "required": [
           "reason"
         ],
+        "type": "object"
+      },
+      "CIRunReuseResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "head": {
+            "type": "string"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/CIRunReusedMemberResponse"
+            },
+            "type": "array"
+          },
+          "membersOmitted": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "sourceRevision": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CIRunReusedMemberResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "coordinate": {
+            "type": "string"
+          },
+          "ecosystem": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "CIRunSessionPartResponse": {
@@ -1189,6 +1235,63 @@
         },
         "type": "object"
       },
+      "CIUsageDeployDay": {
+        "additionalProperties": false,
+        "properties": {
+          "day": {
+            "type": "string"
+          },
+          "failed": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "opened": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "ready": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CIUsageDeploys": {
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/CIUsageDeployDay"
+            },
+            "type": "array"
+          },
+          "failed": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "opened": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "ready": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "CIUsageEfficacy": {
         "additionalProperties": false,
         "properties": {
@@ -1419,12 +1522,58 @@
         },
         "type": "object"
       },
+      "CIUsageMerges": {
+        "additionalProperties": false,
+        "properties": {
+          "approved": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "lowerBound": {
+            "type": "boolean"
+          },
+          "merged": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "neededPerson": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "repository": {
+            "type": "string"
+          },
+          "verdicts": {
+            "additionalProperties": {
+              "format": "int64",
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775808,
+              "type": "integer"
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
       "CIUsageResponse": {
         "additionalProperties": false,
         "properties": {
           "billed": {
             "$ref": "#/components/schemas/CIUsageBilled",
             "nullable": true
+          },
+          "deploys": {
+            "$ref": "#/components/schemas/CIUsageDeploys",
+            "nullable": true
+          },
+          "deploysUnavailable": {
+            "type": "boolean"
           },
           "efficacy": {
             "$ref": "#/components/schemas/CIUsageEfficacy",
@@ -1438,6 +1587,13 @@
               "$ref": "#/components/schemas/CIUsageWallSummary"
             },
             "type": "object"
+          },
+          "merges": {
+            "$ref": "#/components/schemas/CIUsageMerges",
+            "nullable": true
+          },
+          "mergesUnavailable": {
+            "type": "boolean"
           },
           "outcomes": {
             "additionalProperties": {
@@ -3656,7 +3812,7 @@
             "description": "Run credential missing, invalid or expired"
           },
           "403": {
-            "description": "Host-purpose alias required, or machine or workspace differs from the credential"
+            "description": "Final refusal: a host-purpose alias is required, the machine or workspace differs from the credential, or the machine cannot take a job. The host stops polling"
           },
           "500": {
             "content": {
@@ -3685,11 +3841,8 @@
             },
             "description": "Internal Server Error"
           },
-          "502": {
-            "description": "Runner assignment failed"
-          },
           "503": {
-            "description": "Runner reuse is not configured"
+            "description": "Runner reuse is not configured, or the assignment failed for a reason a later poll can pass"
           }
         },
         "security": [
@@ -3714,10 +3867,6 @@
             {
               "code": "http.internal_server",
               "status": 500
-            },
-            {
-              "code": "http.bad_gateway",
-              "status": 502
             },
             {
               "code": "http.service_unavailable",
@@ -5423,13 +5572,21 @@
     },
     "/v1/workspaces/{workspace}/ci/usage": {
       "get": {
-        "description": "Aggregate a workspace's CI runs over a reporting window (default 7d, `window` a Go duration) into counts by substrate outcome, profile, and resolution source, a gate wall-time summary per substrate, a terminal-outcome taxonomy, and an estimated spend. When the daily billing read has run, `billed` adds the cost the GCP billing export charged per UTC day, from the day the window starts in to yesterday (seven days for the default window), split into compute, egress, gateway, cache, and logs. Each day is a whole UTC day with its own run count, so `billed.runs` is the sum over the listed days, not the window's run count. The gateway figure is an upper bound because the gateway also serves the console and the APIs. When the daily efficacy job has run, `efficacy` adds, over the same UTC days and oldest first, the outcome of the pull requests merged into the workspace's repository: merged, reverted, fixed, strict fix pairs, merged without a green hosted gate, their rates over merged pull requests, the median days to fix, and the escape rate of the pull requests merged 14 days earlier, split by green gate. When the efficacy store cannot be read, `efficacy` is absent and `efficacyUnavailable` is true. Requires delivery.run.read at the path workspace; workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
+        "description": "Aggregate a workspace's CI runs over a reporting window (default 7d, `window` a Go duration) into counts by substrate outcome, profile, and resolution source, a gate wall-time summary per substrate, a terminal-outcome taxonomy, and an estimated spend. When the daily billing read has run, `billed` adds the cost the GCP billing export charged per UTC day, from the day the window starts in to yesterday (seven days for the default window), split into compute, egress, gateway, cache, and logs. Each day is a whole UTC day with its own run count, so `billed.runs` is the sum over the listed days, not the window's run count. The gateway figure is an upper bound because the gateway also serves the console and the APIs. When the daily efficacy job has run, `efficacy` adds, over the same UTC days and oldest first, the outcome of the pull requests merged into the workspace's repository: merged, reverted, fixed, strict fix pairs, merged without a green hosted gate, their rates over merged pull requests, the median days to fix, and the escape rate of the pull requests merged 14 days earlier, split by green gate. When the efficacy store cannot be read, `efficacy` is absent and `efficacyUnavailable` is true. Over the window itself, `merges` counts the pull requests merged into the workspace's repository since 2026-10-14, how many needed a person (the newest CI run on the head is Putnami checked, or the head holds an approval), how many merged with a head that holds an approval, and each merge by the level of that run's verdict: verified, checked, the answer of a verdict that did not pass, canceled for a run still going at the merge or one that ended canceled without a verdict, or none for a head without a run or a verdict. `merges.lowerBound` is true when the window holds more than 1,000 merges, or starts before 2026-10-14 21:00 UTC, when merges began to be recorded. `deploys` counts the deployment runs opened in every environment, per UTC day the window touches, with the ones that settled ready and the ones that failed. When a read either section needs fails, the section is absent and `mergesUnavailable` or `deploysUnavailable` is true. `only=merges,deploys` answers those sections alone and skips the run scan. Requires delivery.run.read at the path workspace; workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
         "operationId": "getV1_Workspaces_Workspace_Ci_Usage",
         "parameters": [
           {
             "in": "path",
             "name": "workspace",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "only",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -5865,7 +6022,7 @@
             "description": "No run opened — the pipeline is paused or the change was gated"
           },
           "412": {
-            "description": "The request cannot open a run and no retry of it will: the trusted putnami.ci.json declares something this Delivery cannot read, the request names no branch, the sha is not the current head of the branch or pull request, or the trusted revision has no putnami.ci.json"
+            "description": "The request cannot open a run and no retry of it will: the trusted putnami.ci.json declares something this Delivery cannot read, the request names no branch, the sha is not the current head of the branch or pull request, or the trusted revision has no putnami.ci.json or Source cannot serve it"
           },
           "500": {
             "description": "Delivery operations backend unavailable"
@@ -5951,7 +6108,7 @@
     },
     "/v1/workspaces/{workspace}/runs/{run}": {
       "get": {
-        "description": "Get one workspace CI run with its immutable subject reference and per-phase attempts. With detail=true it also carries each failed task's error, diagnostics and last output lines from the derived failure digest, and, on a finished run, the session record's delivery account. With verdict=true it carries the run's stored verdict in brief: answer, mark, gap count and revision. Requires delivery.run.read at the path workspace; a run from another workspace remains not found and workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
+        "description": "Get one workspace CI run with its immutable subject reference and per-phase attempts. With detail=true it also carries each failed task's error, diagnostics and last output lines from the derived failure digest, and, on a finished run, the session record's delivery account. With verdict=true it carries the run's stored verdict in brief: answer, mark, gap count and revision. With reuse=true a run that took release-set members from its reuse channel carries the channel, the head id, the source revision and each reused member's ecosystem, coordinate and version; a run that reused nothing carries none. Requires delivery.run.read at the path workspace; a run from another workspace remains not found and workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
         "operationId": "getV1_Workspaces_Workspace_Runs_Run",
         "parameters": [
           {
@@ -5973,6 +6130,14 @@
           {
             "in": "query",
             "name": "detail",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "reuse",
             "required": false,
             "schema": {
               "type": "boolean"

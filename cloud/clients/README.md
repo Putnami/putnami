@@ -23,7 +23,7 @@ oci-server, put-server, runtime-api and source-api.
 | --- | --- |
 | Put package | `cloud/doc-contents-cloud-cli-schema` |
 | Channel | `canary` |
-| Version | `0.0.0-20261014111756-10ec53b5f`, published on 2026-10-14, archive digest `sha256:81201d632697918965f36aadd602534526f2b44d74f886c5331c4725f8dbcccb` |
+| Version | `0.0.0-20261019101219-1963566e9`, published on 2026-10-19, archive digest `sha256:40ed37e5959a9da97ad06dd5da33c354db005e4c13770dd6645f6b40f8cdb923` |
 | File layout | `docs/cloud-cli-schema/services/<service>/openapi.json` |
 
 Each `<service>/schema/openapi.json` is a byte-for-byte copy of the package
@@ -32,6 +32,11 @@ file.
 ## Update the schemas
 
 1. Fetch a newer version of `cloud/doc-contents-cloud-cli-schema`.
+   Read the version's manifest at
+   `https://put.putnami.dev/cloud/doc-contents-cloud-cli-schema/versions/<version>/manifest`
+   with the bearer from `putnami cloud token put`. Its `payload.artifact.blob`
+   is the archive digest. Download the archive from `.../blobs/<digest>`, check
+   its SHA-256 equals that digest, and unpack it.
 2. Copy each `services/<service>/openapi.json` over
    `<service>/schema/openapi.json`.
 3. Run `./putnamiw clientgen --projects <the client projects>`, for example

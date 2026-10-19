@@ -229,6 +229,17 @@ func (typed *CreateV1WorkspacesDataMigrationsPublishHttpBadRequestError) Unwrap(
 	return typed.Remote
 }
 
+// CreateV1WorkspacesDataMigrationsPublishUnauthorizedError is the "unauthorized" error declared by postV1_Workspaces_Workspace_Data_Migrations_Publish. It carries no details body, so
+// the stable code and the HTTP status are read from Remote.
+type CreateV1WorkspacesDataMigrationsPublishUnauthorizedError struct{ Remote *client.RemoteError }
+
+func (typed *CreateV1WorkspacesDataMigrationsPublishUnauthorizedError) Error() string {
+	return typed.Remote.Error()
+}
+func (typed *CreateV1WorkspacesDataMigrationsPublishUnauthorizedError) Unwrap() error {
+	return typed.Remote
+}
+
 // CreateV1WorkspacesDataMigrationsPublishForbiddenError is the "forbidden" error declared by postV1_Workspaces_Workspace_Data_Migrations_Publish. It carries no details body, so
 // the stable code and the HTTP status are read from Remote.
 type CreateV1WorkspacesDataMigrationsPublishForbiddenError struct{ Remote *client.RemoteError }
@@ -248,6 +259,17 @@ func (typed *CreateV1WorkspacesDataMigrationsPublishConflictError) Error() strin
 	return typed.Remote.Error()
 }
 func (typed *CreateV1WorkspacesDataMigrationsPublishConflictError) Unwrap() error {
+	return typed.Remote
+}
+
+// CreateV1WorkspacesDataMigrationsPublishHttpPayloadTooLargeError is the "http.payload_too_large" error declared by postV1_Workspaces_Workspace_Data_Migrations_Publish. It carries no details body, so
+// the stable code and the HTTP status are read from Remote.
+type CreateV1WorkspacesDataMigrationsPublishHttpPayloadTooLargeError struct{ Remote *client.RemoteError }
+
+func (typed *CreateV1WorkspacesDataMigrationsPublishHttpPayloadTooLargeError) Error() string {
+	return typed.Remote.Error()
+}
+func (typed *CreateV1WorkspacesDataMigrationsPublishHttpPayloadTooLargeError) Unwrap() error {
 	return typed.Remote
 }
 
@@ -281,10 +303,14 @@ func decodeCreateV1WorkspacesDataMigrationsPublishError(err error) error {
 	switch remote.Code() {
 	case "http.bad_request":
 		return &CreateV1WorkspacesDataMigrationsPublishHttpBadRequestError{Remote: remote}
+	case "unauthorized":
+		return &CreateV1WorkspacesDataMigrationsPublishUnauthorizedError{Remote: remote}
 	case "forbidden":
 		return &CreateV1WorkspacesDataMigrationsPublishForbiddenError{Remote: remote}
 	case "conflict":
 		return &CreateV1WorkspacesDataMigrationsPublishConflictError{Remote: remote}
+	case "http.payload_too_large":
+		return &CreateV1WorkspacesDataMigrationsPublishHttpPayloadTooLargeError{Remote: remote}
 	case "http.internal_server":
 		return &CreateV1WorkspacesDataMigrationsPublishHttpInternalServerError{Remote: remote}
 	case "http.service_unavailable":
@@ -600,6 +626,17 @@ func (typed *CreateV1WorkspacesDatabasesGrantsConflictError) Error() string {
 }
 func (typed *CreateV1WorkspacesDatabasesGrantsConflictError) Unwrap() error { return typed.Remote }
 
+// CreateV1WorkspacesDatabasesGrantsHttpPayloadTooLargeError is the "http.payload_too_large" error declared by postV1_Workspaces_Workspace_Databases_Database_Grants. It carries no details body, so
+// the stable code and the HTTP status are read from Remote.
+type CreateV1WorkspacesDatabasesGrantsHttpPayloadTooLargeError struct{ Remote *client.RemoteError }
+
+func (typed *CreateV1WorkspacesDatabasesGrantsHttpPayloadTooLargeError) Error() string {
+	return typed.Remote.Error()
+}
+func (typed *CreateV1WorkspacesDatabasesGrantsHttpPayloadTooLargeError) Unwrap() error {
+	return typed.Remote
+}
+
 // CreateV1WorkspacesDatabasesGrantsHttpInternalServerError is the "http.internal_server" error declared by postV1_Workspaces_Workspace_Databases_Database_Grants. It carries no details body, so
 // the stable code and the HTTP status are read from Remote.
 type CreateV1WorkspacesDatabasesGrantsHttpInternalServerError struct{ Remote *client.RemoteError }
@@ -627,6 +664,8 @@ func decodeCreateV1WorkspacesDatabasesGrantsError(err error) error {
 		return &CreateV1WorkspacesDatabasesGrantsNotFoundError{Remote: remote}
 	case "conflict":
 		return &CreateV1WorkspacesDatabasesGrantsConflictError{Remote: remote}
+	case "http.payload_too_large":
+		return &CreateV1WorkspacesDatabasesGrantsHttpPayloadTooLargeError{Remote: remote}
 	case "http.internal_server":
 		return &CreateV1WorkspacesDatabasesGrantsHttpInternalServerError{Remote: remote}
 	default:
@@ -780,6 +819,17 @@ func (typed *CreateV1WorkspacesDatabasesQueryNotFoundError) Error() string {
 }
 func (typed *CreateV1WorkspacesDatabasesQueryNotFoundError) Unwrap() error { return typed.Remote }
 
+// CreateV1WorkspacesDatabasesQueryHttpPayloadTooLargeError is the "http.payload_too_large" error declared by postV1_Workspaces_Workspace_Databases_Database_Query. It carries no details body, so
+// the stable code and the HTTP status are read from Remote.
+type CreateV1WorkspacesDatabasesQueryHttpPayloadTooLargeError struct{ Remote *client.RemoteError }
+
+func (typed *CreateV1WorkspacesDatabasesQueryHttpPayloadTooLargeError) Error() string {
+	return typed.Remote.Error()
+}
+func (typed *CreateV1WorkspacesDatabasesQueryHttpPayloadTooLargeError) Unwrap() error {
+	return typed.Remote
+}
+
 // CreateV1WorkspacesDatabasesQueryHttpTooManyRequestsError is the "http.too_many_requests" error declared by postV1_Workspaces_Workspace_Databases_Database_Query. It carries no details body, so
 // the stable code and the HTTP status are read from Remote.
 type CreateV1WorkspacesDatabasesQueryHttpTooManyRequestsError struct{ Remote *client.RemoteError }
@@ -827,6 +877,8 @@ func decodeCreateV1WorkspacesDatabasesQueryError(err error) error {
 		return &CreateV1WorkspacesDatabasesQueryForbiddenError{Remote: remote}
 	case "not_found":
 		return &CreateV1WorkspacesDatabasesQueryNotFoundError{Remote: remote}
+	case "http.payload_too_large":
+		return &CreateV1WorkspacesDatabasesQueryHttpPayloadTooLargeError{Remote: remote}
 	case "http.too_many_requests":
 		return &CreateV1WorkspacesDatabasesQueryHttpTooManyRequestsError{Remote: remote}
 	case "http.internal_server":
@@ -838,7 +890,7 @@ func decodeCreateV1WorkspacesDatabasesQueryError(err error) error {
 	}
 }
 
-var createV1WorkspacesDataMigrationsPublishOperation = client.MustOperation("postV1_Workspaces_Workspace_Data_Migrations_Publish", "{\"stream\":\"unary\",\"transports\":[{\"protocol\":\"rest-json\",\"path\":\"/v1/workspaces/{workspace}/data/migrations/publish\",\"encoding\":\"json\"}],\"security\":{\"alternatives\":[{\"allOf\":[{\"profile\":\"user\",\"scopes\":[\"platform.workspace.manage\"]},{\"profile\":\"migrationRegistry\",\"scopes\":[\"platform.workspace.manage\"]}]}]},\"errors\":[{\"status\":400,\"code\":\"http.bad_request\"},{\"status\":403,\"code\":\"forbidden\"},{\"status\":409,\"code\":\"conflict\"},{\"status\":500,\"code\":\"http.internal_server\"},{\"status\":503,\"code\":\"http.service_unavailable\"}],\"idempotency\":{\"kind\":\"non-idempotent\"}}", "[{\"status\":200,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/AcceptedMigration\"}}]}]", "{\"required\":true,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/PublishRequest\"}}]}")
+var createV1WorkspacesDataMigrationsPublishOperation = client.MustOperation("postV1_Workspaces_Workspace_Data_Migrations_Publish", "{\"stream\":\"unary\",\"transports\":[{\"protocol\":\"rest-json\",\"path\":\"/v1/workspaces/{workspace}/data/migrations/publish\",\"encoding\":\"json\"}],\"security\":{\"alternatives\":[{\"allOf\":[{\"profile\":\"user\",\"scopes\":[\"platform.workspace.manage\"]},{\"profile\":\"migrationRegistry\",\"scopes\":[\"platform.workspace.manage\"]}]}]},\"errors\":[{\"status\":400,\"code\":\"http.bad_request\"},{\"status\":401,\"code\":\"unauthorized\"},{\"status\":403,\"code\":\"forbidden\"},{\"status\":409,\"code\":\"conflict\"},{\"status\":413,\"code\":\"http.payload_too_large\"},{\"status\":500,\"code\":\"http.internal_server\"},{\"status\":503,\"code\":\"http.service_unavailable\"}],\"idempotency\":{\"kind\":\"non-idempotent\"}}", "[{\"status\":200,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/AcceptedMigration\"}}]}]", "{\"required\":true,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/PublishRequest\"}}]}")
 
 // CreateV1WorkspacesDataMigrationsPublish calls postV1_Workspaces_Workspace_Data_Migrations_Publish through its generated service binding.
 func (c *DataClient) CreateV1WorkspacesDataMigrationsPublish(ctx context.Context, in CreateV1WorkspacesDataMigrationsPublishInput) (*AcceptedMigration, error) {
@@ -931,7 +983,7 @@ func (c *DataClient) GetV1WorkspacesDatabasesGrants(ctx context.Context, in GetV
 	return &result, nil
 }
 
-var createV1WorkspacesDatabasesGrantsOperation = client.MustOperation("postV1_Workspaces_Workspace_Databases_Database_Grants", "{\"stream\":\"unary\",\"transports\":[{\"protocol\":\"rest-json\",\"path\":\"/v1/workspaces/{workspace}/databases/{database}/grants\",\"encoding\":\"json\"}],\"security\":{\"alternatives\":[{\"allOf\":[{\"profile\":\"user\",\"scopes\":[\"platform.database.grant\"]}]}]},\"errors\":[{\"status\":400,\"code\":\"http.bad_request\"},{\"status\":401,\"code\":\"unauthorized\"},{\"status\":403,\"code\":\"forbidden\"},{\"status\":404,\"code\":\"not_found\"},{\"status\":409,\"code\":\"conflict\"},{\"status\":500,\"code\":\"http.internal_server\"}],\"idempotency\":{\"kind\":\"non-idempotent\"}}", "[{\"status\":200,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/GrantCredentials\"}}]},{\"status\":201,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/GrantCredentials\"}}]}]", "{\"required\":true,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/DatabaseGrantRequest\"}}]}")
+var createV1WorkspacesDatabasesGrantsOperation = client.MustOperation("postV1_Workspaces_Workspace_Databases_Database_Grants", "{\"stream\":\"unary\",\"transports\":[{\"protocol\":\"rest-json\",\"path\":\"/v1/workspaces/{workspace}/databases/{database}/grants\",\"encoding\":\"json\"}],\"security\":{\"alternatives\":[{\"allOf\":[{\"profile\":\"user\",\"scopes\":[\"platform.database.grant\"]}]}]},\"errors\":[{\"status\":400,\"code\":\"http.bad_request\"},{\"status\":401,\"code\":\"unauthorized\"},{\"status\":403,\"code\":\"forbidden\"},{\"status\":404,\"code\":\"not_found\"},{\"status\":409,\"code\":\"conflict\"},{\"status\":413,\"code\":\"http.payload_too_large\"},{\"status\":500,\"code\":\"http.internal_server\"}],\"idempotency\":{\"kind\":\"non-idempotent\"}}", "[{\"status\":200,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/GrantCredentials\"}}]},{\"status\":201,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/GrantCredentials\"}}]}]", "{\"required\":true,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/DatabaseGrantRequest\"}}]}")
 
 // CreateV1WorkspacesDatabasesGrants calls postV1_Workspaces_Workspace_Databases_Database_Grants through its generated service binding.
 func (c *DataClient) CreateV1WorkspacesDatabasesGrants(ctx context.Context, in CreateV1WorkspacesDatabasesGrantsInput) (*CreateV1WorkspacesDatabasesGrantsResult, error) {
@@ -994,7 +1046,7 @@ func (c *DataClient) DeleteV1WorkspacesDatabasesGrants(ctx context.Context, in D
 	return result, nil
 }
 
-var createV1WorkspacesDatabasesQueryOperation = client.MustOperation("postV1_Workspaces_Workspace_Databases_Database_Query", "{\"stream\":\"unary\",\"transports\":[{\"protocol\":\"rest-json\",\"path\":\"/v1/workspaces/{workspace}/databases/{database}/query\",\"encoding\":\"json\"}],\"security\":{\"alternatives\":[{\"allOf\":[{\"profile\":\"user\",\"scopes\":[\"platform.database.read\"]}]}]},\"errors\":[{\"status\":400,\"code\":\"http.bad_request\"},{\"status\":401,\"code\":\"unauthorized\"},{\"status\":403,\"code\":\"forbidden\"},{\"status\":404,\"code\":\"not_found\"},{\"status\":429,\"code\":\"http.too_many_requests\"},{\"status\":500,\"code\":\"http.internal_server\"},{\"status\":503,\"code\":\"http.service_unavailable\"}],\"idempotency\":{\"kind\":\"non-idempotent\"}}", "[{\"status\":200,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/QueryResult\"}}]}]", "{\"required\":true,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/QueryRequest\"}}]}")
+var createV1WorkspacesDatabasesQueryOperation = client.MustOperation("postV1_Workspaces_Workspace_Databases_Database_Query", "{\"stream\":\"unary\",\"transports\":[{\"protocol\":\"rest-json\",\"path\":\"/v1/workspaces/{workspace}/databases/{database}/query\",\"encoding\":\"json\"}],\"security\":{\"alternatives\":[{\"allOf\":[{\"profile\":\"user\",\"scopes\":[\"platform.database.read\"]}]}]},\"errors\":[{\"status\":400,\"code\":\"http.bad_request\"},{\"status\":401,\"code\":\"unauthorized\"},{\"status\":403,\"code\":\"forbidden\"},{\"status\":404,\"code\":\"not_found\"},{\"status\":413,\"code\":\"http.payload_too_large\"},{\"status\":429,\"code\":\"http.too_many_requests\"},{\"status\":500,\"code\":\"http.internal_server\"},{\"status\":503,\"code\":\"http.service_unavailable\"}],\"idempotency\":{\"kind\":\"non-idempotent\"}}", "[{\"status\":200,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/QueryResult\"}}]}]", "{\"required\":true,\"content\":[{\"mediaType\":\"application/json\",\"schema\":{\"$ref\":\"#/components/schemas/QueryRequest\"}}]}")
 
 // CreateV1WorkspacesDatabasesQuery calls postV1_Workspaces_Workspace_Databases_Database_Query through its generated service binding.
 func (c *DataClient) CreateV1WorkspacesDatabasesQuery(ctx context.Context, in CreateV1WorkspacesDatabasesQueryInput) (*QueryResult, error) {

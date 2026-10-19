@@ -97,6 +97,112 @@ func TestCIViewSurvivesAnUnreadableLogSurface(t *testing.T) {
 	}
 }
 
+// A main run that reused its pull request's members says where they came from
+// and lists each one, and `view` asks the server for them with `reuse=true`.
+func TestCIViewRendersTheMembersARunReused(t *testing.T) {
+	fake := &ciFakeServer{responses: map[string]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/runs/run-1": {status: 200, body: CIRunResponse{
+			ID: "run-1", Status: "completed", Conclusion: "success",
+			Reuse: &CIRunReuse{
+				Channel:        "pr-4361",
+				SourceRevision: "0123456789abcdef0123456789abcdef01234567",
+				Head:           "rs_9a0364b9e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c",
+				Members: []CIRunReusedMember{
+					{Ecosystem: "archive", Coordinate: "acme/app", Version: "1.2.3-pr.4361"},
+					{Ecosystem: "put", Coordinate: "acme/doc-contents-app", Version: "0.0.0-20261019-abc"},
+				},
+				MembersOmitted: 3,
+			},
+		}},
+	}}
+	lines, err := captureCI(t, fake, []string{"view", "run-1"})
+	if err != nil {
+		t.Fatalf("view: %v", err)
+	}
+	out := strings.Join(lines, "\n")
+	for _, want := range []string{
+		"Reused:",
+		"  Channel:  pr-4361",
+		"  Source:   0123456789ab\n",
+		"  Head:     rs_9a0364b9e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c\n",
+		"  acme/app 1.2.3-pr.4361 (archive)",
+		"  acme/doc-contents-app 0.0.0-20261019-abc (put)",
+		"  … and 3 more not listed",
+	} {
+		if !strings.Contains(out+"\n", want) {
+			t.Fatalf("view output never showed %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "0123456789abc") || strings.Contains(out, "fedcba9876543") {
+		t.Fatalf("view printed a revision in full:\n%s", out)
+	}
+	asked := false
+	for _, req := range fake.requests {
+		if req.Path == "/v1/workspaces/ws-acme/runs/run-1" && strings.Contains("&"+req.Query+"&", "&reuse=true&") {
+			asked = true
+		}
+	}
+	if !asked {
+		t.Fatalf("view never asked for the reuse (reuse=true): %+v", fake.requests)
+	}
+}
+
+// A run that reused nothing prints nothing about reuse, and an omitted count of
+// zero adds no line.
+func TestCIViewPrintsNoReusedSectionForARunThatReusedNothing(t *testing.T) {
+	fake := &ciFakeServer{responses: map[string]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/runs/run-1": {status: 200, body: CIRunResponse{
+			ID: "run-1", Status: "completed", Conclusion: "success",
+		}},
+	}}
+	lines, err := captureCI(t, fake, []string{"view", "run-1"})
+	if err != nil {
+		t.Fatalf("view: %v", err)
+	}
+	if out := strings.Join(lines, "\n"); strings.Contains(out, "Reused") {
+		t.Fatalf("a run that reused nothing printed a reuse section:\n%s", out)
+	}
+
+	fake = &ciFakeServer{responses: map[string]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/runs/run-1": {status: 200, body: CIRunResponse{
+			ID: "run-1", Status: "completed", Conclusion: "success",
+			Reuse: &CIRunReuse{Channel: "pr-7", Members: []CIRunReusedMember{{Ecosystem: "put", Coordinate: "a/b", Version: "1"}}},
+		}},
+	}}
+	lines, err = captureCI(t, fake, []string{"view", "run-1"})
+	if err != nil {
+		t.Fatalf("view: %v", err)
+	}
+	if out := strings.Join(lines, "\n"); strings.Contains(out, "not listed") {
+		t.Fatalf("a reuse with every member listed printed an omitted count:\n%s", out)
+	}
+}
+
+// `--output=json` carries the reuse member as the server sent it.
+func TestCIViewJSONCarriesTheReuse(t *testing.T) {
+	fake := &ciFakeServer{responses: map[string]ciStubResponse{
+		"GET /v1/workspaces/ws-acme/runs/run-1": {status: 200, body: CIRunResponse{
+			ID: "run-1", Status: "completed", Conclusion: "success",
+			Reuse: &CIRunReuse{
+				Channel: "pr-4361", SourceRevision: "0123456789abcdef", Head: "rs_9a0364b9e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c",
+				Members:        []CIRunReusedMember{{Ecosystem: "archive", Coordinate: "acme/app", Version: "1.2.3"}},
+				MembersOmitted: 2,
+			},
+		}},
+	}}
+	lines, err := captureCI(t, fake, []string{"view", "run-1", "--output", "json"})
+	if err != nil || len(lines) != 1 {
+		t.Fatalf("view --output=json: %v, %d lines", err, len(lines))
+	}
+	var doc map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &doc); err != nil {
+		t.Fatalf("decode %s: %v", lines[0], err)
+	}
+	assertExactKeys(t, "run reuse", doc["reuse"], []string{"channel", "head", "sourceRevision", "members", "membersOmitted"})
+	members, _ := doc["reuse"].(map[string]any)["members"].([]any)
+	assertExactKeys(t, "run reused member", members[0], []string{"ecosystem", "coordinate", "version"})
+}
+
 func TestCILogsRendersProtocolRecordsForHumans(t *testing.T) {
 	fake := &ciFakeServer{responses: map[string]ciStubResponse{
 		"GET /v1/workspaces/ws-acme/runs/run-1/logs": {status: 200, body: CIRunLogsResponse{

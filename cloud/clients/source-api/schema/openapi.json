@@ -255,6 +255,15 @@
             "format": "date-time",
             "type": "string"
           },
+          "closing_issues": {
+            "items": {
+              "format": "int64",
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775808,
+              "type": "integer"
+            },
+            "type": "array"
+          },
           "created_at": {
             "format": "date-time",
             "type": "string"
@@ -266,6 +275,9 @@
             "type": "string"
           },
           "head_sha": {
+            "type": "string"
+          },
+          "merge_commit_sha": {
             "type": "string"
           },
           "merge_state": {
@@ -830,7 +842,7 @@
             }
           },
           {
-            "description": "Origin the GitHub return pages link back to, such as https://app.putnami.xyz. Empty means the console. Any origin Source does not list answers 422.",
+            "description": "Origin the GitHub return pages link back to, such as https://putnami.app. Empty or the console URL's origin means the console. Any other origin that Source does not list answers 422.",
             "in": "query",
             "name": "return_origin",
             "required": false,
