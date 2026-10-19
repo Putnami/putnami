@@ -2,6 +2,187 @@
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/dev",
   "cliContract": 11,
+  "runtime": {
+    "executable": "compiled/putnami-dev",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "PUTNAMI_DEV_GO": {
+            "from": "executable"
+          },
+          "PUTNAMI_DEV_GO_VERSION": {
+            "from": "literal",
+            "value": "go{version}"
+          }
+        }
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "internal/**",
+        "go.mod",
+        "go.sum"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    }
+  },
+  "commandGroups": {
+    "version": {
+      "description": "The release version of each version line: read it, or release a line.",
+      "default": "get",
+      "subcommands": {
+        "get": {
+          "description": "Print the version every version line is at.",
+          "command": "version-get",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami version get",
+              "description": "Print the version of every line"
+            },
+            {
+              "command": "putnami version get --scope tooling --output=json",
+              "description": "Print one line's version and tag as a result envelope"
+            }
+          ]
+        },
+        "tag": {
+          "description": "Release one version line: its changelog, its release commit and its tag.",
+          "command": "version-tag",
+          "interactive": true,
+          "positionals": [
+            {
+              "name": "tag"
+            }
+          ],
+          "examples": [
+            {
+              "command": "putnami version tag --scope tooling --dry-run",
+              "description": "Print the proposed tag and changelog, and write nothing"
+            },
+            {
+              "command": "putnami version tag --scope tooling --yes --push",
+              "description": "Release the line and push the commit and the tag to origin"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "commands": {
+    "version-get": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Print the version every version line is at, one line each: the version of its release tag when HEAD carries one, else the next version followed by the build suffix. The putnami process that launched the command computes the versions from git. --output=json or jsonl prints one result envelope. A line --scope does not name exits 2.",
+      "flags": {
+        "scope": {
+          "type": "string",
+          "description": "Report only this version line, by its scope path."
+        }
+      },
+      "run": [
+        {
+          "id": "get",
+          "task": "version-get"
+        }
+      ]
+    },
+    "version-tag": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Release one version line: prepend its changelog to the line's CHANGELOG.md, commit it, then create the annotated tag on that commit. Without --yes it writes nothing: it prints the release it proposes, and with --dry-run the changelog too. It exits 2 and writes nothing for several lines without --scope, a tagged HEAD, a dirty tree, an existing tag, an off-pattern tag or a run bound to another commit; it exits 1 for a dependency graph that could not be refreshed and for a failure of git. It prints text only.",
+      "flags": {
+        "scope": {
+          "type": "string",
+          "description": "The version line to release, by its scope path (required when the workspace declares several)."
+        },
+        "push": {
+          "type": "boolean",
+          "description": "Push the release commit and the tag to origin."
+        },
+        "dry-run": {
+          "type": "boolean",
+          "description": "Print the proposed tag and changelog, and write nothing."
+        },
+        "yes": {
+          "type": "boolean",
+          "description": "Skip the confirmation and create the release commit and tag."
+        }
+      },
+      "run": [
+        {
+          "id": "tag",
+          "task": "version-tag"
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "version-get": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "version",
+        "get"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Print the version every version line is at.",
+      "timeoutMs": 600000
+    },
+    "version-tag": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "version",
+        "tag"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Release one version line.",
+      "timeoutMs": 600000
+    }
+  },
   "verbs": [
     {
       "name": "build",

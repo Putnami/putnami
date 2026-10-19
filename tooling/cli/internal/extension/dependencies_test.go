@@ -622,8 +622,8 @@ func TestTheShippedDevExtensionSatisfiesALanguageDependencyByPath(t *testing.T) 
 	if len(result.Dependencies) != 0 || len(result.MissingDependencies()) != 0 || skipFor(result, "@putnami/dev") != nil {
 		t.Fatalf("the path declaration did not satisfy the dependency: dependencies %+v, skipped %v", result.Dependencies, result.Skipped)
 	}
-	if len(loaded.Jobs) != 0 {
-		t.Errorf("@putnami/dev declares jobs %v; a vocabulary runs nothing", slices.Sorted(maps.Keys(loaded.Jobs)))
+	if jobs := slices.Sorted(maps.Keys(loaded.Jobs)); !slices.Equal(jobs, []string{"version-get", "version-tag"}) {
+		t.Errorf("@putnami/dev declares jobs %v, want only the version commands: a vocabulary runs no verb", jobs)
 	}
 
 	type verb struct {

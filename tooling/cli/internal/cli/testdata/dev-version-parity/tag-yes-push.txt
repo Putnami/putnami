@@ -1,0 +1,37 @@
+exit 0
+--- stdout ---
+[main {{RELEASE_COMMIT}}] chore(release): tooling 0.0.1
+ 1 file changed, 9 insertions(+)
+ create mode 100644 tooling/CHANGELOG.md
+  Created tooling/v0.0.1 on the release commit
+  Pushed HEAD and tooling/v0.0.1
+--- stderr ---
+--- repository ---
+status: clean
+head:
+chore(release): tooling 0.0.1
+
+Co-Authored-By: Release Fixture <release@example.invalid>
+tags at head: tooling/v0.0.1
+tag tooling/v0.0.1:
+## 0.0.1 — {{DATE}}
+
+### Features
+
+- feat: the workspace (9c7dcf7)
+
+### Fixes
+
+- fix(cli): stop the leak (9f0a77a)
+file tooling/CHANGELOG.md:
+## 0.0.1 — {{DATE}}
+
+### Features
+
+- feat: the workspace (9c7dcf7)
+
+### Fixes
+
+- fix(cli): stop the leak (9f0a77a)
+origin main is HEAD: true
+origin tags at HEAD: tooling/v0.0.1

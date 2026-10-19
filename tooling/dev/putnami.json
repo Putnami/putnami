@@ -19,6 +19,7 @@
     "test": {
       "filePatterns": [
         "putnami.extension.json",
+        "bin/prepare",
         "../../go/extension/putnami.extension.json",
         "../../typescript/extension/putnami.extension.json",
         "../../python/extension/putnami.extension.json"

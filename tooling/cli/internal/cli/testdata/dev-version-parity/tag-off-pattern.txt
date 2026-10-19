@@ -1,0 +1,9 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: tag "v9" is not a release tag of line typescript: the pattern "ts/v{version}" with a MAJOR.MINOR.PATCH version
+--- repository ---
+status: clean
+head:
+docs: the readme
+tags at head: none

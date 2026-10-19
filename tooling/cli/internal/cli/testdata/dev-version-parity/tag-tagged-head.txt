@@ -1,0 +1,11 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: HEAD is already tagged ts/v0.5.0
+--- repository ---
+status: clean
+head:
+docs: the readme
+tags at head: ts/v0.5.0
+tag ts/v0.5.0:
+docs: the readme

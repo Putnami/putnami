@@ -1,0 +1,12 @@
+exit 0
+--- stdout ---
+  tooling 0.0.0-20260106000000-832b9a3
+  typescript 0.5.0
+--- stderr ---
+--- repository ---
+status: clean
+head:
+docs: the readme
+tags at head: ts/v0.5.0
+tag ts/v0.5.0:
+docs: the readme

@@ -1,9 +1,11 @@
 # `@putnami/dev`
 
-The development verb vocabulary. The extension's manifest declares the eleven
-development verbs, in the order help lists them, with the description,
-aliases, related commands and default traits of each. It runs none of them:
-the language extensions declare and run the jobs of every verb.
+The development verb vocabulary and the version commands. The extension's
+manifest declares the eleven development verbs, in the order help lists them,
+with the description, aliases, related commands and default traits of each.
+It runs none of them: the language extensions declare and run the jobs of
+every verb. Its executable serves `putnami version get` and
+`putnami version tag`.
 
 The Go, TypeScript and Python extensions name `@putnami/dev` in their
 `extensionDependencies`, so installing any of them installs this extension
@@ -11,6 +13,8 @@ too ([ADR 0066](../cli/doc/adr/0066-an-extension-installs-and-loads-its-extensio
 How a loaded vocabulary drives help, aliases, completion and default traits is
 [ADR 0067](../cli/doc/adr/0067-putnami-dev-declares-the-development-verbs.md);
 what this extension declares is [ADR 0001](doc/adr/0001-the-dev-extension-declares-the-development-verbs.md).
+How it serves the version commands is
+[ADR 0002](doc/adr/0002-the-dev-extension-serves-version-get-and-tag.md).
 
 ## The verbs
 
@@ -51,12 +55,41 @@ it directly:
 This repository declares it by path (`/tooling/dev`), which satisfies the
 dependency of every language extension the repository loads by path.
 
+## The version commands
+
+| Command | What it does |
+|---|---|
+| `putnami version get [--scope <line>]` | Prints each version line with the version HEAD has on it, or only the line `--scope` names. `--output=json` and `--output=jsonl` print one result envelope. |
+| `putnami version tag [<tag>] [--scope <line>] [--push] [--dry-run] [--yes]` | Releases one line: writes the line's `CHANGELOG.md`, commits it, and puts an annotated tag on that commit. `--push` pushes HEAD and the tag. Without `--yes`, it only proposes the release. |
+
+`putnami version` runs `get`. A workspace with more than one line names the
+line to release with `--scope`. A `<tag>` replaces the proposed release when
+it matches the line's tag pattern.
+
+Both are interactive subcommands. putnami launches the executable in the
+workspace root and opens a host RPC channel, through which the command asks
+the core for the version lines (`version.lines`). The core computes every
+version; the executable prints it, and `version tag` runs git to commit, tag
+and push. A hosted run (`--credential-fd`) opens no channel, so neither
+command runs there.
+
+A usage error exits 2. `version tag` refuses with exit status 2 when the
+workspace has several lines and no `--scope`, when HEAD is already tagged,
+when the tree is not clean, when the tag exists, when the tag does not match
+the line's pattern, when `PUTNAMI_SOURCE_REVISION` binds the run to a commit
+other than HEAD, and under `--output=json` or `--output=jsonl`. A failure of
+git or of the host exits 1, and so does a dependency graph the host could not
+refresh.
+
 ## Runtime
 
 `cmd/putnami-dev` answers the runtime handshake
-(`putnami-dev __putnami runtime-info`) and refuses every other invocation.
-`@putnami/go` builds it and packages it into the extension archive. The
-manifest declares no `runtime`, so no host starts it.
+(`putnami-dev __putnami runtime-info`), serves the version commands, and
+refuses every other invocation with exit status 2. The manifest declares it as
+the extension's `runtime`. In a workspace that loads the extension by path,
+`bin/prepare` builds it with the Go release `putnami.lock.json` pins.
+`@putnami/go` builds it and packages it into the extension archive that a
+workspace installs by name.
 
 ## Support status
 
@@ -64,5 +97,6 @@ manifest declares no `runtime`, so no host starts it.
   [`putnami.support.json`](../../putnami.support.json).
 - **What may still change**: the verbs this extension declares, their
   presentation, and the commands it adds.
-- **Evidence**: the [development verbs specification](specs/development-verbs.json)
-  and the tests under `cmd/putnami-dev`.
+- **Evidence**: the [development verbs specification](specs/development-verbs.json),
+  the [version commands specification](specs/version-commands.json), and the
+  tests under `cmd/putnami-dev` and `internal`.

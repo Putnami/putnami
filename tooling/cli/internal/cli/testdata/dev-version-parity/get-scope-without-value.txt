@@ -1,0 +1,9 @@
+exit 1
+--- stdout ---
+--- stderr ---
+putnami: --scope requires a value
+--- repository ---
+status: clean
+head:
+docs: the readme
+tags at head: none

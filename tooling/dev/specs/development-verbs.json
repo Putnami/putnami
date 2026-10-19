@@ -9,12 +9,12 @@
   ],
   "nonGoals": [
     "Running a verb: the language extensions declare and run the jobs of every development verb",
-    "Serving a command: the extension declares no command, so its runtime answers only the handshake"
+    "Serving a development verb: the runtime answers the handshake and serves the version commands, never a verb"
   ],
   "requirements": [
     {
       "id": "eleven-ordered-verbs",
-      "text": "The manifest declares build, test, lint, serve, run, format, package, publish, deploy, generate and validate in that order, each with the description, aliases and related commands help shows for it. It declares no command, command group, task, tool, hook, agent content or runtime, claims CLI contract 11 and passes the strict validation of the package-time gate."
+      "text": "The manifest declares build, test, lint, serve, run, format, package, publish, deploy, generate and validate in that order, each with the description, aliases and related commands help shows for it. It declares no tool, hook or agent content, and no command, command group or task beyond the version commands, claims CLI contract 11 and passes the strict validation of the package-time gate."
     },
     {
       "id": "dev-is-the-sole-declarer",
@@ -26,7 +26,7 @@
     },
     {
       "id": "handshake-only-runtime",
-      "text": "The executable answers the runtime handshake with the extension's name, its stamped version, its platform and the contracts it was built against. It refuses every other invocation with exit status 2 and nothing on standard output, and a handshake it cannot write exits 1."
+      "text": "The executable answers the runtime handshake with the extension's name, its stamped version, its platform and the contracts it was built against. It refuses every invocation other than the handshake and the version commands with exit status 2 and nothing on standard output, and a handshake it cannot write exits 1."
     }
   ],
   "decisions": [

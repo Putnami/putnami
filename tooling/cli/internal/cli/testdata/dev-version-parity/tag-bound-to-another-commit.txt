@@ -1,0 +1,9 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: version tag releases the checked-out commit 832b9a32b668b44a316917bffb78ab7314f83795, but PUTNAMI_SOURCE_REVISION binds this run to 9f0a77ac79b3e5fbd8f011cc0c23e9e2fa9cb703; unset it to tag HEAD
+--- repository ---
+status: clean
+head:
+docs: the readme
+tags at head: none

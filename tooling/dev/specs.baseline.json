@@ -5,6 +5,13 @@
     "tooling/development-verbs#dev-is-the-sole-declarer",
     "tooling/development-verbs#eleven-ordered-verbs",
     "tooling/development-verbs#handshake-only-runtime",
-    "tooling/development-verbs#language-extensions-depend"
+    "tooling/development-verbs#language-extensions-depend",
+    "tooling/version-commands#get-prints-every-line",
+    "tooling/version-commands#recorded-graph-reads-only",
+    "tooling/version-commands#release-commit-then-tag",
+    "tooling/version-commands#release-is-reviewable-first",
+    "tooling/version-commands#release-refusals",
+    "tooling/version-commands#usage-and-host-errors",
+    "tooling/version-commands#version-group-runs-the-executable"
   ]
 }

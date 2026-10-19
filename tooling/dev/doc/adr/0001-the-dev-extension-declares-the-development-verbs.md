@@ -5,6 +5,10 @@
   the core presents no verb and gives none a default, so this vocabulary is
   the only presentation and the only source of default traits, and `serve`
   is long-running through the `workload` it declares, not `WellKnownVerbs`.
+  Decisions 1 and 4 are amended by
+  [ADR 0002](0002-the-dev-extension-serves-version-get-and-tag.md): the
+  manifest declares a runtime and the `version` command group, and the
+  executable serves `version get` and `version tag`.
 - **Scope**: `@putnami/dev` (`tooling/dev`), the manifests of `@putnami/go`,
   `@putnami/typescript` and `@putnami/python`, and this repository's
   `putnami.workspace.json`

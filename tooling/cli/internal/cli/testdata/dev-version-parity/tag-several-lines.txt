@@ -1,0 +1,9 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: this workspace declares 2 version lines (tooling, typescript); name one with --scope
+--- repository ---
+status: clean
+head:
+docs: the readme
+tags at head: none

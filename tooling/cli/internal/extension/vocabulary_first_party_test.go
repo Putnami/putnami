@@ -216,8 +216,16 @@ func TestFirstPartyJobsKeepTheirTraitsUnderADevelopmentVocabulary(t *testing.T) 
 				t.Errorf("%s: %s traits = %+v, want %+v", name, key, got[key], want)
 			}
 		}
-		if len(got) != len(baseline) {
-			t.Errorf("%s: %d jobs, want %d", name, len(got), len(baseline))
+		// The shipped manifest also declares the version commands, which
+		// are its own jobs, not first-party jobs its vocabulary changes.
+		others := 0
+		for key := range got {
+			if !strings.HasPrefix(key, "@putnami/dev ") {
+				others++
+			}
+		}
+		if others != len(baseline) {
+			t.Errorf("%s: %d jobs, want %d", name, others, len(baseline))
 		}
 	}
 }

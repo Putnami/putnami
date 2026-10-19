@@ -1,0 +1,9 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: git tag already exists: ts/v0.4.0
+--- repository ---
+status: clean
+head:
+docs: the readme
+tags at head: none
