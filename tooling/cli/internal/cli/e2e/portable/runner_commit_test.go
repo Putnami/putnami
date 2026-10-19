@@ -156,14 +156,21 @@ func TestPortableExecutingEngineRefusesACommitRequestOnAnotherCheckout(t *testin
 	if code != cli.ExitUsage || !strings.Contains(output, "carries no plan") {
 		t.Fatalf("a version 2 request with a plan: exit %d: %s", code, output)
 	}
-	// So is one that names a command no portable run carries: no CLI
-	// submitter refused it, so the protocol does.
-	serve := strings.Replace(string(clitest.CommitFixtureRequest(t, second, "", all)), `"commands":["build"]`, `"commands":["serve"]`, 1)
-	code, output = runBoundRequest(t, root, []byte(serve))
-	if code != cli.ExitUsage || !strings.Contains(output, `invocation.commands names "serve", which no portable run carries`) {
-		t.Fatalf("a version 2 serve request: exit %d: %s", code, output)
-	}
-	if _, err := os.Stat(filepath.Join(root, ".putnami", "sessions")); !os.IsNotExist(err) {
-		t.Fatalf("a refused request recorded a session: %v", err)
+	// So is one that names a core command no portable run carries: no CLI
+	// submitter refused it, so the protocol does. An extension command is
+	// refused by its declared traits, not its name: the fixture's format
+	// rewrites sources, and the engine refuses it from the manifest it loads.
+	for command, want := range map[string]string{
+		"compose": `invocation.commands names "compose", which no portable run carries`,
+		"format":  `portable execution refused: "format" rewrites source and is not portable`,
+	} {
+		request := strings.Replace(string(clitest.CommitFixtureRequest(t, second, "", all)), `"commands":["build"]`, `"commands":["`+command+`"]`, 1)
+		code, output = runBoundRequest(t, root, []byte(request))
+		if code != cli.ExitUsage || !strings.Contains(output, want) {
+			t.Fatalf("a version 2 %s request: exit %d, want %d and %q: %s", command, code, cli.ExitUsage, want, output)
+		}
+		if _, err := os.Stat(filepath.Join(root, ".putnami", "sessions")); !os.IsNotExist(err) {
+			t.Fatalf("a refused %s request recorded a session: %v", command, err)
+		}
 	}
 }

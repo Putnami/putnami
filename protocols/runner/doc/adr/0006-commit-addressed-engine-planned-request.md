@@ -1,6 +1,8 @@
 # ADR 0006: A commit-addressed request is engine-planned
 
-- **Status**: accepted
+- **Status**: accepted. Decision 3 is amended in place: the protocol refuses
+  `compose` and `qualify` by name, and the executing engine refuses an
+  extension command by its declared workload or `rewritesSources`
 - **Scope**: `go.putnami.dev/protocol/runner` execution request and the
   bound-request channel
 
@@ -46,13 +48,14 @@ Selectors are sorted and unique, one selector per entry. An explicit empty
 
 A version 1 request comes from a CLI submitter, which refuses the commands no
 portable run carries before it freezes a plan. A version 2 request has no such
-submitter, so `ValidateCommitRequest` refuses them: `serve`, `run` and
-`compose` stream a live workload until the deadline, `qualify` reaches one
-from the executing machine, and `format` rewrites a source that never returns
-to the caller. `UnportableCommands` names them, and the submitting side
-refuses every one of them. Version 1 validation does not change. Declared
-side effects are not refused: `invocation.publication` authorizes them, as on
-the version 1 executing side.
+submitter, so `ValidateCommitRequest` refuses the core ones: `compose` streams
+live workloads until the deadline, and `qualify` reaches one from the
+executing machine. `UnportableCommands` names them, and the submitting side
+refuses both. An extension command is refused by its declared traits, not its
+name: the executing engine refuses one whose traits declare a workload or
+`rewritesSources`, in both versions. Version 1 validation does not change.
+Declared side effects are not refused: `invocation.publication` authorizes
+them, as on the version 1 executing side.
 
 ### 4. Its own digest domain
 

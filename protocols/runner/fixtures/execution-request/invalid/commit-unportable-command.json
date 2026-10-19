@@ -13,7 +13,7 @@
   "invocation": {
     "commands": [
       "build",
-      "serve"
+      "compose"
     ],
     "params": {},
     "flags": {
