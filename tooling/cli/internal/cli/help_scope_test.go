@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	cache "go.putnami.dev/protocol/cache"
@@ -47,36 +48,52 @@ func flagNames(scope *helpScope) []string {
 
 var providerFlags = []string{"--where", "--providers", "--cache-trust"}
 
-// TestHelpOutsideAWorkspaceListsEverything pins the nil scope, which is also
-// the help of a workspace where an extension did not load.
-func TestHelpOutsideAWorkspaceListsEverything(t *testing.T) {
+// TestHelpOutsideAWorkspaceListsNoExtension pins the nil scope: outside a
+// workspace no extension is loaded, so help lists no job command, no alias
+// and no provider-bound flag, and says how to add an extension.
+func TestHelpOutsideAWorkspaceListsNoExtension(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "workspace-scoped-help", "help-lists-what-the-workspace-extensions-provide")
+	spectest.Proves(t, "cli/job-planning-execution", "workspace-scoped-help", "help-outside-a-workspace-says-no-extension-is-loaded")
 	if newHelpScope("", nil) != nil {
 		t.Fatal("outside a workspace the scope must be nil")
 	}
-	if got := jobNames(nil); !slices.Contains(got, "deploy") || !slices.Contains(got, "validate") {
-		t.Errorf("job commands = %v, want every conventional one", got)
+	if got := jobNames(nil); len(got) != 0 {
+		t.Errorf("job commands = %v, want none: the core declares no job command", got)
 	}
-	if got := aliasNames(nil); !slices.Contains(got, "d=deploy") {
-		t.Errorf("aliases = %v, want every built-in one", got)
+	if got := aliasNames(nil); len(got) != 0 {
+		t.Errorf("aliases = %v, want none: the core declares no alias", got)
 	}
 	flags := flagNames(nil)
 	for _, flag := range providerFlags {
-		if !slices.Contains(flags, flag) {
-			t.Errorf("help outside a workspace misses %s", flag)
+		if slices.Contains(flags, flag) {
+			t.Errorf("help outside a workspace lists %s, which no loaded extension provides", flag)
 		}
+	}
+	if !slices.Contains(flags, "--credential-fd") {
+		t.Error("help must always list --credential-fd")
+	}
+	text := oneLine(noJobCommandHelp(nil))
+	for _, want := range []string{"No extension is loaded.", "putnami.workspace.json", "putnami extensions install"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("help outside a workspace says %q, want it to contain %q", text, want)
+		}
+	}
+	if oneLine(noJobCommandHelp(scopeOf())) == text {
+		t.Error("a workspace whose extensions declare no job command must not say that no extension is loaded")
 	}
 }
 
 func TestHelpInAWorkspaceListsWhatItsExtensionsDeclare(t *testing.T) {
 	t.Parallel()
-	scope := scopeOf("build", "test", "lint", "validate")
-	if got, want := jobNames(scope), []string{"build", "test", "lint", "validate"}; !slices.Equal(got, want) {
+	spectest.Proves(t, "cli/job-planning-execution", "workspace-scoped-help", "help-lists-what-the-workspace-extensions-provide")
+	scope := helpScopeOf(&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{
+		{Name: "@acme/go", Commands: map[string]string{"validate": "", "build": "", "test": "", "lint": ""}},
+	}}, nil)
+	if got, want := jobNames(scope), []string{"build", "lint", "test", "validate"}; !slices.Equal(got, want) {
 		t.Errorf("job commands = %v, want %v", got, want)
 	}
-	if got, want := aliasNames(scope), []string{"b=build", "t=test", "l=lint"}; !slices.Equal(got, want) {
-		t.Errorf("aliases = %v, want %v", got, want)
+	if got := aliasNames(scope); len(got) != 0 {
+		t.Errorf("aliases = %v, want none without a vocabulary", got)
 	}
 	flags := flagNames(scope)
 	for _, flag := range providerFlags {
@@ -90,6 +107,29 @@ func TestHelpInAWorkspaceListsWhatItsExtensionsDeclare(t *testing.T) {
 		if !slices.Contains(flags, listed) {
 			t.Errorf("help must always list %s", listed)
 		}
+	}
+}
+
+// TestHelpListsOnlyTheCommandsAUserTypes pins what help lists after the
+// vocabulary's verbs: a public command by name, with the description of the
+// first extension that gives one, and no internal command, provider command or
+// command a command group carries.
+func TestHelpListsOnlyTheCommandsAUserTypes(t *testing.T) {
+	t.Parallel()
+	zeta := &extension.ExtensionDescription{
+		Name:              "@acme/zeta",
+		Commands:          map[string]string{"build": "Zeta build.", "workspace-install": "", cache.ProviderCommandName: "", "zeta-login": "", "zeta-logs": ""},
+		CommandVisibility: map[string]string{"workspace-install": "internal"},
+		CommandGroups: map[string]extension.CommandGroupDefinition{"zeta": {Subcommands: map[string]extension.SubcommandDefinition{
+			"login": {Command: "zeta-login"},
+			"ops":   {Subcommands: map[string]extension.SubcommandDefinition{"logs": {Command: "zeta-logs"}}},
+		}}},
+	}
+	alpha := &extension.ExtensionDescription{Name: "@acme/alpha", Commands: map[string]string{"build": "", "check": "Check."}}
+	scope := helpScopeOf(&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{zeta, nil, alpha}}, nil)
+	want := []CommandInfo{{Name: "build", Description: "Zeta build"}, {Name: "check", Description: "Check"}}
+	if got := scope.jobCommands(); !slices.Equal(got, want) {
+		t.Errorf("job commands = %v, want %v", got, want)
 	}
 }
 
@@ -135,8 +175,8 @@ func TestHelpScopeHidesNothingWhenAnExtensionDidNotLoad(t *testing.T) {
 		Extensions: []*extension.ExtensionDescription{loaded},
 		Skipped:    []extension.SkippedExtension{{Ref: "@acme/deploy", Reason: errors.New("manifest unreadable")}},
 	}
-	if scope := helpScopeOf(result, nil); !scope.declares("deploy") || !slices.Equal(jobNames(scope), jobNames(nil)) {
-		t.Fatalf("an extension did not load: scope = %v, want one that hides nothing", scope)
+	if scope := helpScopeOf(result, nil); !scope.declares("deploy") || !slices.Equal(jobNames(scope), []string{"build"}) {
+		t.Fatalf("an extension did not load: scope = %v, want one that hides nothing and lists what loaded", scope)
 	}
 }
 
@@ -158,11 +198,11 @@ func TestHelpReadsTheLoadedVocabularyFirst(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "extension-verb-vocabulary", "help-lists-the-loaded-vocabulary-first")
 	scope := helpScopeOf(vocabularyDiscovery(), nil)
 	if got, want := jobNames(scope), []string{"bundle", "build", "test"}; !slices.Equal(got, want) {
-		t.Errorf("job commands = %v, want the vocabulary's declared verbs, then the catalog's: %v", got, want)
+		t.Errorf("job commands = %v, want the vocabulary's declared verbs, then the other commands by name: %v", got, want)
 	}
-	// The vocabulary claims b; ship and its alias are not listed, because no
-	// loaded extension declares ship.
-	if got, want := aliasNames(scope), []string{"x=bundle", "b=bundle", "t=test"}; !slices.Equal(got, want) {
+	// ship and its alias are not listed, because no loaded extension declares
+	// ship, and the core declares no alias of test.
+	if got, want := aliasNames(scope), []string{"x=bundle", "b=bundle"}; !slices.Equal(got, want) {
 		t.Errorf("aliases = %v, want %v", got, want)
 	}
 	if scope.listsJobCommand("ship") || scope.listsJobCommand("check") {
@@ -177,8 +217,11 @@ func TestHelpReadsTheLoadedVocabularyFirst(t *testing.T) {
 	if got := scope.related("build"); got != nil {
 		t.Errorf("related(build) = %v: the vocabulary's verb wins whole", got)
 	}
-	if got, want := scope.related("test"), relatedCommands["test"]; !slices.Equal(got, want) {
-		t.Errorf("related(test) = %v, want the catalog's %v", got, want)
+	if got := scope.related("test"); got != nil {
+		t.Errorf("related(test) = %v: a command no vocabulary names relates to nothing", got)
+	}
+	if got, want := scope.related("cache verify"), relatedCommands["cache verify"]; len(want) == 0 || !slices.Equal(got, want) {
+		t.Errorf("related(cache verify) = %v, want the catalog's %v", got, want)
 	}
 	if got := scope.commandAliases(map[string]string{"u": "test"}); got.vocabulary["x"] != "bundle" || got.user["u"] != "test" {
 		t.Errorf("alias tables = %+v", got)
@@ -190,26 +233,22 @@ func TestHelpKeepsTheVocabularyWhenAnExtensionDidNotLoad(t *testing.T) {
 	result := vocabularyDiscovery()
 	result.Skipped = []extension.SkippedExtension{{Ref: "@acme/deploy", Reason: errors.New("manifest unreadable")}}
 	scope := helpScopeOf(result, nil)
-	names := jobNames(scope)
-	if want := []string{"bundle", "build", "ship", "test"}; len(names) < len(want) || !slices.Equal(names[:len(want)], want) {
-		t.Fatalf("job commands = %v, want %v first", names, want)
+	if got, want := jobNames(scope), []string{"bundle", "build", "ship", "test"}; !slices.Equal(got, want) {
+		t.Fatalf("job commands = %v, want the vocabulary's verbs, then the loaded commands: %v", got, want)
 	}
-	if !slices.Contains(names, "deploy") || slices.Contains(names[2:], "build") {
-		t.Errorf("job commands = %v, want every catalog verb once", names)
-	}
-	if got := aliasNames(scope); !slices.Contains(got, "S=ship") || slices.Contains(got, "b=build") {
-		t.Errorf("aliases = %v, want the vocabulary's, and no built-in it claims", got)
+	if got, want := aliasNames(scope), []string{"x=bundle", "b=bundle", "S=ship"}; !slices.Equal(got, want) {
+		t.Errorf("aliases = %v, want the vocabulary's %v", got, want)
 	}
 }
 
-func TestHelpWithoutAVocabularyIsUnchanged(t *testing.T) {
+func TestHelpWithoutAVocabularyListsNoAlias(t *testing.T) {
 	t.Parallel()
 	var nilScope *helpScope
 	if aliases := nilScope.commandAliases(nil); aliases.vocabulary != nil {
 		t.Errorf("outside a workspace no vocabulary alias applies: %v", aliases.vocabulary)
 	}
-	if got, want := nilScope.related("deploy"), relatedCommands["deploy"]; !slices.Equal(got, want) {
-		t.Errorf("related(deploy) = %v, want the catalog's %v", got, want)
+	if got, want := nilScope.related("cache verify"), relatedCommands["cache verify"]; !slices.Equal(got, want) {
+		t.Errorf("related(cache verify) = %v, want the catalog's %v", got, want)
 	}
 	scope := helpScopeOf(&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{
 		{Name: "@acme/go", Commands: map[string]string{"build": "", "test": ""}},
@@ -217,7 +256,7 @@ func TestHelpWithoutAVocabularyIsUnchanged(t *testing.T) {
 	if got, want := jobNames(scope), []string{"build", "test"}; !slices.Equal(got, want) {
 		t.Errorf("job commands = %v, want %v", got, want)
 	}
-	if got, want := aliasNames(scope), []string{"b=build", "t=test"}; !slices.Equal(got, want) {
-		t.Errorf("aliases = %v, want %v", got, want)
+	if got := aliasNames(scope); len(got) != 0 {
+		t.Errorf("aliases = %v, want none: the core declares no alias", got)
 	}
 }

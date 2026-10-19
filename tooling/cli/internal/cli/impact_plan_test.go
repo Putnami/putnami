@@ -11,9 +11,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/engine"
-	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -74,12 +72,13 @@ func TestImpactPlanCommandsResolveEachAliasToOneCommand(t *testing.T) {
 	spectest.Proves(t, "cli/impact-plan", "named-commands", "aliases-resolve-to-one-command-each")
 	t.Parallel()
 	cfg := &wsproto.Config{Aliases: map[string]string{"check": "lint", "gate": "lint,test", "verify": "check"}}
+	vocabulary := map[string]string{"t": "test", "l": "lint", "b": "build"}
 
-	got, err := impactPlanCommands("t, l ,b", commandAliases{user: cfg.Aliases})
+	got, err := impactPlanCommands("t, l ,b", commandAliases{vocabulary: vocabulary, user: cfg.Aliases})
 	if err != nil || !reflect.DeepEqual(got, []string{"test", "lint", "build"}) {
 		t.Fatalf("impactPlanCommands = %v, %v; want [test lint build]", got, err)
 	}
-	got, err = impactPlanCommands("verify,test,b", commandAliases{user: cfg.Aliases})
+	got, err = impactPlanCommands("verify,test,b", commandAliases{vocabulary: vocabulary, user: cfg.Aliases})
 	if err != nil || !reflect.DeepEqual(got, []string{"lint", "test", "build"}) {
 		t.Fatalf("impactPlanCommands = %v, %v; want [lint test build] in the order named", got, err)
 	}
@@ -87,7 +86,7 @@ func TestImpactPlanCommandsResolveEachAliasToOneCommand(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(got, []string{"validate", "lint"}) {
 		t.Fatalf("impactPlanCommands without a workspace config = %v, %v", got, err)
 	}
-	_, err = impactPlanCommands("l,check", commandAliases{user: cfg.Aliases})
+	_, err = impactPlanCommands("l,check", commandAliases{vocabulary: vocabulary, user: cfg.Aliases})
 	if protocolcli.ExitCodeForError(err) != protocolcli.ExitUsage || !strings.Contains(err.Error(), `impact-plan names lint twice in "l,check"`) {
 		t.Fatalf("two names of one command: %v, want a usage error naming lint", err)
 	}
@@ -157,78 +156,5 @@ func TestImpactPlanPlannerRoutesThroughEngine(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result.Projects, []*workspace.Project{project}) || !reflect.DeepEqual(result.Jobs, planned) {
 		t.Fatalf("result projects = %v, jobs = %v; want the engine's plan", result.Projects, result.Jobs)
-	}
-}
-
-// TestImpactPlanRefusesACommandNoExtensionDeclares holds the run impact-plan
-// plans with to the job map of the discovered extensions: a command none of
-// them declares is a usage error naming it, before selection, and a declared
-// command reaches the engine unchanged.
-func TestImpactPlanRefusesACommandNoExtensionDeclares(t *testing.T) {
-	spectest.Proves(t, "cli/impact-plan", "named-commands", "an-undeclared-command-is-refused")
-	t.Parallel()
-	discovered := &extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{{
-		Name: "@example/quality",
-		Jobs: map[string]*extension.JobDefinition{
-			"lint": {Name: "lint", ExtensionName: "@example/quality"},
-			"test": {Name: "test", ExtensionName: "@example/quality"},
-		},
-	}}}
-	validate := func(commands []string, discovered *extension.DiscoveryResult) error {
-		t.Helper()
-		var validator func(*extension.DiscoveryResult, GlobalFlags) error
-		run := refuseUndeclaredCommands(commands, func(_ context.Context, request engine.Request, _ engine.EventSink) (engine.SessionResult, error) {
-			if !reflect.DeepEqual(request.Commands, []string{"planned"}) || !request.Global.Plan {
-				t.Fatalf("request = %#v, want the request of the planner unchanged", request)
-			}
-			validator = request.ValidateCommandFlags
-			return engine.SessionResult{ExitCode: engine.ExitSuccess}, nil
-		})
-		if _, err := run(context.Background(), engine.Request{Commands: []string{"planned"}, Global: GlobalFlags{Plan: true}}, nil); err != nil {
-			t.Fatalf("run: %v", err)
-		}
-		if validator == nil {
-			t.Fatal("the impact-plan run sets no command validator")
-		}
-		return validator(discovered, GlobalFlags{})
-	}
-
-	for _, commands := range [][]string{{"lint"}, {"test", "lint"}} {
-		if err := validate(commands, discovered); err != nil {
-			t.Errorf("%v: %v, want the declared commands accepted", commands, err)
-		}
-	}
-	for _, tc := range []struct {
-		commands   []string
-		discovered *extension.DiscoveryResult
-		want       string
-	}{
-		{[]string{"typo"}, discovered, "no extension of this workspace declares typo,"},
-		{[]string{"lint", "typo", "test", "build"}, discovered, "no extension of this workspace declares typo, build,"},
-		{[]string{"lint"}, &extension.DiscoveryResult{}, "no extension of this workspace declares lint,"},
-		{[]string{"lint"}, nil, "no extension of this workspace declares lint,"},
-	} {
-		err := validate(tc.commands, tc.discovered)
-		if protocolcli.ExitCodeForError(err) != protocolcli.ExitUsage || !strings.Contains(err.Error(), tc.want) ||
-			strings.Contains(err.Error(), "extensions list") ||
-			!strings.Contains(err.Error(), commandmeta.CommandsThatLeftTheCoreURL) {
-			t.Errorf("%v: error = %v, want a usage error containing %q and the reference of the moved commands, without a false pointer to extensions list", tc.commands, err, tc.want)
-		}
-	}
-
-	// The commands are copied when the run is built: a later change to the
-	// caller's slice does not change what is checked.
-	commands := []string{"lint"}
-	var validator func(*extension.DiscoveryResult, GlobalFlags) error
-	run := refuseUndeclaredCommands(commands, func(_ context.Context, request engine.Request, _ engine.EventSink) (engine.SessionResult, error) {
-		validator = request.ValidateCommandFlags
-		return engine.SessionResult{}, nil
-	})
-	commands[0] = "typo"
-	if _, err := run(context.Background(), engine.Request{}, nil); err != nil {
-		t.Fatal(err)
-	}
-	if err := validator(discovered, GlobalFlags{}); err != nil {
-		t.Fatalf("the validator read the caller's slice after the run was built: %v", err)
 	}
 }

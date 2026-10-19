@@ -7,20 +7,16 @@ import protocolcli "go.putnami.dev/protocol/cli"
 // positionals the catalog declares for it, and the global flags.
 //
 // A command is every catalog path, an alternate spelling (DetailFrom)
-// included, and every built-in alias ("b" for "build"). A path that shares
-// another path's help also shares its flags and positionals, as ResolveFlags
-// and Detail resolve them. Job commands declare no catalog flags: the flags
-// they accept come from extensions, so the core surface lists the commands
-// alone. A command flag carries its values only when the parser enforces them
+// included. A path that shares another path's help also shares its flags and
+// positionals, as ResolveFlags and Detail resolve them. The surface lists no
+// job command and no alias: those exist only where a loaded extension declares
+// them. A command flag carries its values only when the parser enforces them
 // (Flag.Values). A global flag carries none, because GlobalFlag.Values lists
 // the candidates completion offers, not a closed set.
 func Surface() (protocolcli.CommandSurface, error) {
-	commands := make([]protocolcli.CommandSurfaceCommand, 0, len(catalog)+len(builtinAliases))
+	commands := make([]protocolcli.CommandSurfaceCommand, 0, len(catalog))
 	for _, command := range catalog {
-		commands = append(commands, surfaceCommand(command.Path, command.Path))
-	}
-	for _, alias := range builtinAliases {
-		commands = append(commands, surfaceCommand(alias.Name, alias.Command))
+		commands = append(commands, surfaceCommand(command.Path))
 	}
 	globals := make([]protocolcli.CommandSurfaceFlag, 0, len(globalFlags))
 	for _, flag := range globalFlags {
@@ -29,15 +25,14 @@ func Surface() (protocolcli.CommandSurface, error) {
 	return protocolcli.NewCommandSurface(globals, commands)
 }
 
-// surfaceCommand is the surface entry typed as path, for the catalog entry
-// target it runs.
-func surfaceCommand(path, target string) protocolcli.CommandSurfaceCommand {
+// surfaceCommand is the surface entry of the catalog path path.
+func surfaceCommand(path string) protocolcli.CommandSurfaceCommand {
 	entry := protocolcli.CommandSurfaceCommand{Path: path}
-	command, ok := Lookup(target)
+	command, ok := Lookup(path)
 	if !ok {
 		return entry
 	}
-	flags, _ := ResolveFlags(target)
+	flags, _ := ResolveFlags(path)
 	for _, flag := range flags {
 		entry.Flags = append(entry.Flags, protocolcli.CommandSurfaceFlag{
 			Long:   flag.Long,

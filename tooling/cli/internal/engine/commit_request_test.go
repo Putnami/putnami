@@ -169,7 +169,9 @@ func TestCommitPublicationHoldsAPublishingPlanToTheBarrier(t *testing.T) {
 // a frozen request exempts from Git read it like a local run's.
 func TestCommitRequestReadsItsCheckoutLikeALocalRun(t *testing.T) {
 	t.Parallel()
-	commit := &Request{Commands: []string{"publish"}, WorkspaceRoot: t.TempDir(), Portable: commitExecution(runner.RequestedSelection{Mode: runner.SelectionModeAll}, "", nil)}
+	root := t.TempDir()
+	cfg := declaringWorkspace(t, root)
+	commit := &Request{Commands: []string{"publish"}, WorkspaceRoot: root, Config: cfg, Portable: commitExecution(runner.RequestedSelection{Mode: runner.SelectionModeAll}, "", nil)}
 	if _, err := requireRepository(commit); err == nil {
 		t.Fatal("a version 2 publish outside a repository was not refused")
 	}

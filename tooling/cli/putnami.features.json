@@ -524,7 +524,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "help-lists-what-the-workspace-extensions-provide"
+              "help-lists-what-the-workspace-extensions-provide",
+              "help-outside-a-workspace-says-no-extension-is-loaded"
             ]
           }
         },
@@ -559,12 +560,26 @@
             "checks": [
               "an-undeclared-job-takes-its-verbs-default-traits",
               "a-vocabulary-requires-contract-9",
-              "a-vocabulary-never-changes-a-well-known-verbs-side-effects",
-              "declared-traits-keep-a-well-known-verbs-side-effects",
+              "side-effects-come-only-from-loaded-jobs",
               "first-party-jobs-keep-their-traits",
               "the-go-packager-stamps-a-vocabulary-only-manifest",
               "the-go-packager-validates-a-vocabulary-next-to-a-dependency",
               "the-npm-packager-validates-and-stamps-a-vocabulary"
+            ]
+          }
+        },
+        {
+          "id": "no-core-development-verb",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-catalog-declares-no-job-command",
+              "a-workspace-without-a-development-extension-shows-no-verb-alias-or-flag",
+              "an-undeclared-job-command-is-refused-once-in-every-entry-point"
             ]
           }
         },

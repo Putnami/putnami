@@ -58,7 +58,7 @@ func Resolve(manifest *Manifest, extPath string) *ExtensionDescription {
 			Flags:                cmd.Flags,
 			Priority:             cmd.Priority,
 			Quiet:                cmd.Quiet,
-			Traits:               proto.EffectiveTraits(cmdName, cmd.Traits),
+			Traits:               declaredTraits(cmd.Traits),
 			TraitsDeclared:       cmd.Traits != nil,
 			PipelineSteps:        cmd.Run,
 			PipelineOutputs:      cmd.Outputs,
@@ -142,4 +142,15 @@ func ExpandTemplateVars(s string, vars map[string]string) string {
 // BuildTemplateVars builds the standard template variable map.
 func BuildTemplateVars(workspaceRoot, projectRoot, extensionRoot, outputRoot string) map[string]string {
 	return proto.BuildTemplateVars(workspaceRoot, projectRoot, extensionRoot, outputRoot)
+}
+
+// declaredTraits returns the traits a manifest declares for a command, or no
+// trait when it declares none. A job without declared traits takes its verb's
+// default traits once discovery has merged the vocabularies
+// (ApplyVocabularyTraits); the core gives no command a trait of its own.
+func declaredTraits(traits *CommandTraits) CommandTraits {
+	if traits == nil {
+		return CommandTraits{}
+	}
+	return *traits
 }

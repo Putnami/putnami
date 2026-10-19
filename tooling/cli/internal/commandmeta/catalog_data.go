@@ -26,81 +26,6 @@ import (
 //   - Entries are grouped by Category in listing order, with each group's bare
 //     root and non-listed subcommands adjacent to it.
 var catalog = []Command{
-	// ── Job commands ─────────────────────────────────────────────────────
-	// Extension-provided verbs. Summary is only a fallback description for a
-	// verb the protocol does not describe (proto.WellKnownVerbs wins), and job
-	// commands are listed by PrintHelp's "Build (from extensions)" block rather
-	// than by a catalog Category. A workspace is unconditional for all of them
-	// (internal/cli/app.go).
-	{
-		Path:      "build",
-		Kind:      KindJob,
-		Related:   []string{"test", "lint", "serve"},
-		Workspace: requiredWorkspace(),
-	},
-	{
-		Path:      "test",
-		Kind:      KindJob,
-		Related:   []string{"build", "lint"},
-		Workspace: requiredWorkspace(),
-	},
-	{
-		Path:      "lint",
-		Kind:      KindJob,
-		Related:   []string{"build", "test", "format"},
-		Workspace: requiredWorkspace(),
-	},
-	{
-		Path:      "serve",
-		Kind:      KindJob,
-		Related:   []string{"build", "run"},
-		Workspace: requiredWorkspace(),
-	},
-	{
-		Path:      "run",
-		Kind:      KindJob,
-		Related:   []string{"build", "serve"},
-		Workspace: requiredWorkspace(),
-	},
-	{
-		Path:      "format",
-		Kind:      KindJob,
-		Related:   []string{"lint"},
-		Workspace: requiredWorkspace(),
-	},
-	{
-		Path:      "package",
-		Kind:      KindJob,
-		Related:   []string{"build", "publish"},
-		Workspace: requiredWorkspace(),
-	},
-	{
-		Path:      "publish",
-		Kind:      KindJob,
-		Related:   []string{"build", "test", "package"},
-		Workspace: requiredWorkspace(),
-	},
-	{
-		Path:      "deploy",
-		Kind:      KindJob,
-		Related:   []string{"build", "package", "publish"},
-		Workspace: requiredWorkspace(),
-	},
-	{
-		Path:      "generate",
-		Kind:      KindJob,
-		Summary:   "Run code generators.",
-		Related:   []string{"build"},
-		Workspace: requiredWorkspace(),
-	},
-	{
-		Path:      "validate",
-		Kind:      KindJob,
-		Summary:   "Check the project against its declared specs, contracts and compatibility rules.",
-		Related:   []string{"lint", "test", "build"},
-		Workspace: requiredWorkspace(),
-	},
-
 	// ── CI ───────────────────────────────────────────────────────────────
 	{
 		Path:        "impact-plan",
@@ -804,7 +729,6 @@ var catalog = []Command{
 			"putnami cache clean",
 			"putnami cache clean --all",
 		},
-		Related: []string{"build", "test"},
 		Workspace: WorkspaceNeed{
 			Required:    true,
 			ExemptFlags: []string{"--all"},
@@ -830,13 +754,13 @@ var catalog = []Command{
 		Kind:        KindStructured,
 		Category:    "Dependencies",
 		Summary:     "Verify cache determinism and restore equivalence",
-		Description: "Run lint, test, and build twice in isolated worktrees, compare cache keys and captured artifacts, restore the first run into a pristine tree, and fail on undeclared writes or live-versus-hit differences; declared ambient key inputs are reported without failing",
+		Description: "Run the workspace gate tasks (the blocking commands of putnami.ci.json; lint, test and build without one) twice in isolated worktrees, compare cache keys and captured artifacts, restore the first run into a pristine tree, and fail on undeclared writes or live-versus-hit differences; declared ambient key inputs are reported without failing",
 		Usage:       "putnami cache verify [--projects <selector> | --impacted | --all] [--output <format>]",
 		Examples: []string{
 			"putnami cache verify --projects /my/project",
 			"putnami cache verify --all --output=jsonl",
 		},
-		Related:          []string{"cache clean", "build", "test", "lint"},
+		Related:          []string{"cache clean"},
 		StructuredOutput: true,
 		Workspace:        requiredWorkspace(),
 	},
@@ -1016,7 +940,7 @@ var catalog = []Command{
 			{Long: "--ready-timeout", Type: FlagValue, ValueName: "<duration>", Description: "Deadline for each member's typed ready event; default 60s"},
 		},
 		Examples:         []string{"putnami compose @example/go-items-consumer", "putnami compose /typescript/samples/06-database --port 0 --output=json"},
-		Related:          []string{"serve", "qualify"},
+		Related:          []string{"qualify"},
 		StructuredOutput: true,
 		Workspace:        requiredWorkspace(),
 	},

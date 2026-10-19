@@ -1,0 +1,81 @@
+# ADR 0073 — The core declares no development verb
+
+- **Status**: accepted
+- **Scope**: `@putnami/cli` (`internal/commandmeta`, `internal/cli`,
+  `internal/commands/completion`, `internal/engine`, `internal/extension`,
+  `internal/mcp`), `@putnami/cli-model` (`extension`) and `@putnami/dev`
+- **Amends**: [ADR 0067](0067-putnami-dev-declares-the-development-verbs.md)
+  decisions 3, 4 and 5, D2, D4 and its consequences;
+  [ADR 0070](0070-a-task-scope-keeps-a-job-by-its-declared-side-effects.md)
+  decision 1 and its consequence on the four readers
+- **Decisions**: D-006 of the root `decisions.json`
+
+## Context
+
+ADR 0067 let `@putnami/dev` declare the development verbs as a vocabulary,
+and kept the core's job commands, built-in aliases and `WellKnownVerbs`
+defaults as a fallback. ADR 0070 kept the default side effects of `publish`
+and `deploy` as a floor that no manifest removes. Both left the removal to
+one breaking change that meets D2. This is that change.
+
+## Decision
+
+1. **The catalog declares no job command and no alias.** The eleven job
+   entries (`build`, `test`, `lint`, `serve`, `run`, `format`, `package`,
+   `publish`, `deploy`, `generate`, `validate`) and the nine built-in
+   aliases (`b`, `t`, `l`, `s`, `f`, `p`, `P`, `d`, `D`) leave the catalog.
+   Help, completion, the command surface and MCP `run_jobs` read the
+   vocabulary and commands of the loaded extensions: the vocabulary's verbs
+   first, in vocabulary order, then the other public commands by name (D2).
+   Outside a workspace, help lists no job command, alias or provider-bound
+   flag, says that no extension is loaded and how to add one, and reads no
+   user-scope extension (D4). A command name resolves through the
+   vocabulary's aliases, then the workspace's. A workspace alias of the same
+   name hides a vocabulary alias with a warning, one named like a former
+   built-in alias included.
+2. **One refusal in the engine covers every entry point.** After the run's
+   one extension discovery, and before flags, policy or selection, the
+   engine refuses the commands that no loaded extension declares as a job.
+   The usage error exits 2 and reads: `no extension of this workspace
+   declares <commands>; name a language extension in
+   putnami.workspace.json, then run: putnami extensions install`. A terminal
+   run, a comma list, an alias, `impact-plan`, `cache verify`, `compose` and
+   MCP `run_jobs` all reach it through `engine.Run`; `putnami help
+   <command>` and `<command> --help` return the same error. The refusal
+   steps aside for a workspace lifecycle run, and when an extension was
+   skipped or a configured extension is missing, so the missing-extension
+   guidance comes first. `cache verify` runs the agent gate tasks
+   (`agentctx.GateTasks`). The engine's `@putnami/sdd` hint is deleted.
+3. **The core keeps no side-effect floor.** A command's side effects are
+   the traits its loaded jobs declare. The git requirement, the cache trust
+   floor, the task-scope narrowing and the MCP `run_jobs` refusal read
+   `extension.CommandSideEffects` with no `WellKnownVerbs` fallback. A job
+   that declares no traits takes its vocabulary verb's defaults, or none.
+   Every first-party `publish` declares `sideEffects: "registry"`, so
+   first-party plans keep what they kept.
+
+## What this amends
+
+- ADR 0067 decision 3: the core falls back to no job command and no
+  built-in alias, so an output without a loaded vocabulary changes.
+- ADR 0067 decision 4: a verb without default traits leaves none, and a
+  command's own traits no longer keep a well-known side effect.
+- ADR 0067 decision 5: every catalog command is a structured command.
+- ADR 0067 D2 and D4: decision 1 meets both. ADR 0067 consequences: this
+  is the removal, and `run_jobs` fails closed when extensions cannot load.
+- ADR 0070 decision 1 and the consequence on the four readers: no reader
+  counts a well-known default; each reads the declared traits.
+
+## Consequences
+
+- A workspace without a development extension shows no development verb
+  and refuses each with exit 2. Installing `@putnami/dev` through a
+  language extension restores the verbs, aliases and help it had.
+- A `publish` or `deploy` whose traits name no side effect is planned, kept
+  and gated like any command: it narrows by task scope, needs no git
+  history and keeps the requested cache trust.
+- Workspace before hooks run before the refusal: hooks run before discovery.
+- `protocols/` keeps `WellKnownVerbs` and the strict `invalid-verb-traits`
+  check; no core reader of side effects consults them. The `serve`, `run`,
+  `compose` and `qualify` literals of watch mode and the long-lived
+  refusals stay until declared traits replace them.

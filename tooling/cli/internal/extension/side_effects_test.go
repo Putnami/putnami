@@ -3,14 +3,16 @@ package extension
 import (
 	"slices"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestCommandSideEffects pins that a command's side effects are the traits its
-// loaded jobs declare plus the well-known verb's default: a verb of an
-// extension's own is classified by its declaration, and declared traits add
-// side effects to a well-known verb but never remove its default.
+// loaded jobs declare and nothing else: the core gives publish and deploy no
+// side effect of their own.
 func TestCommandSideEffects(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "side-effects-come-only-from-loaded-jobs")
 	job := func(effects string) *JobDefinition {
 		return &JobDefinition{Traits: CommandTraits{SideEffects: effects}}
 	}
@@ -39,14 +41,14 @@ func TestCommandSideEffects(t *testing.T) {
 		{name: "a verb of its own declaring registry", extensions: []*ExtensionDescription{release}, command: "release", want: []string{SideEffectsRegistry}},
 		{name: "a verb of its own declaring cloud", extensions: loaded, command: "converge", want: []string{SideEffectsCloud}},
 		{name: "a step of that verb", extensions: []*ExtensionDescription{release}, command: "release~upload", want: []string{SideEffectsRegistry}},
-		{name: "publish declared with no side effect keeps registry", extensions: loaded, command: "publish", want: []string{SideEffectsRegistry}},
-		{name: "deploy declared with registry adds it to cloud", extensions: loaded, command: "deploy", want: []string{SideEffectsCloud, SideEffectsRegistry}},
+		{name: "publish declared with no side effect has none", extensions: loaded, command: "publish"},
+		{name: "deploy declared with registry has registry only", extensions: loaded, command: "deploy", want: []string{SideEffectsRegistry}},
 		{name: "every extension that declares the command counts", extensions: loaded, command: "release", want: []string{SideEffectsCloud, SideEffectsRegistry}},
 		{name: "one side effect among declarations of none", extensions: loaded, command: "ship", want: []string{SideEffectsRegistry}},
-		{name: "publish declaring its own default counts it once", extensions: []*ExtensionDescription{again}, command: "publish", want: []string{SideEffectsRegistry}},
+		{name: "publish declaring registry counts it once", extensions: []*ExtensionDescription{again}, command: "publish", want: []string{SideEffectsRegistry}},
 		{name: "two extensions declaring one side effect count it once", extensions: []*ExtensionDescription{mirror, again}, command: "ship", want: []string{SideEffectsRegistry}},
-		{name: "publish no extension declares", extensions: []*ExtensionDescription{mirror}, command: "publish", want: []string{SideEffectsRegistry}},
-		{name: "deploy with no extension loaded", command: "deploy", want: []string{SideEffectsCloud}},
+		{name: "publish no extension declares", extensions: []*ExtensionDescription{mirror}, command: "publish"},
+		{name: "deploy with no extension loaded", command: "deploy"},
 		{name: "build with no extension loaded", command: "build"},
 		{name: "an unknown verb with no extension loaded", command: "release"},
 	} {

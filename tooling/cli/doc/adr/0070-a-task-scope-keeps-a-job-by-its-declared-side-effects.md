@@ -1,6 +1,8 @@
 # ADR 0070 — A task scope keeps a job by its declared side effects
 
-- **Status**: proposed. Decision 2 is superseded by
+- **Status**: proposed. Decision 1 is amended by
+  [ADR 0073](0073-the-core-declares-no-development-verb.md): no reader
+  counts a well-known verb's default side effect. Decision 2 is superseded by
   [ADR 0072](0072-the-spec-gate-and-task-scopes-follow-declared-outputs-and-command-kinds.md)
   (proposed): a task scope never narrows a command of the criteria kind.
 - **Scope**: `@putnami/cli` (`internal/engine` plan narrowing)

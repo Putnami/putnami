@@ -1,86 +1,19 @@
 package commandmeta
 
-import proto "go.putnami.dev/protocol/extension"
-
-// Alias describes a built-in command shortcut.
+// Alias describes a command shortcut that help and completion present: a
+// vocabulary alias of a loaded extension, or a workspace alias.
 type Alias struct {
 	Name    string
 	Command string
 }
 
-// JobCommand describes a public job command shown in help and completion.
-type JobCommand struct {
-	Name        string
-	Description string
-}
-
-var builtinAliases = []Alias{
-	{Name: "b", Command: "build"},
-	{Name: "t", Command: "test"},
-	{Name: "l", Command: "lint"},
-	{Name: "s", Command: "serve"},
-	{Name: "f", Command: "format"},
-	{Name: "p", Command: "publish"},
-	{Name: "P", Command: "publish"},
-	{Name: "d", Command: "deploy"},
-	{Name: "D", Command: "deploy"},
-}
-
-// BuiltinAliases returns a copy of the built-in alias map.
-func BuiltinAliases() map[string]string {
-	aliases := make(map[string]string, len(builtinAliases))
-	for _, alias := range builtinAliases {
-		aliases[alias.Name] = alias.Command
-	}
-	return aliases
-}
-
-// WorkspaceAliasApplies reports whether workspace declares an alias named name
-// that a command name can resolve through. The built-in aliases resolve before
-// the workspace's, so a workspace alias named like a built-in one never applies.
-func WorkspaceAliasApplies(name string, workspace map[string]string) bool {
-	if _, mine := workspace[name]; !mine {
-		return false
-	}
-	for _, alias := range builtinAliases {
-		if alias.Name == name {
-			return false
-		}
-	}
-	return true
-}
-
 // ReservesVocabularyAlias reports whether a vocabulary alias may not take name
 // in a workspace whose aliases are workspace: a command path of the catalog
-// has it, or a workspace alias that applies does.
+// has it, or a workspace alias does. The core declares no alias of its own.
 func ReservesVocabularyAlias(name string, workspace map[string]string) bool {
 	if _, ok := Lookup(name); ok {
 		return true
 	}
-	return WorkspaceAliasApplies(name, workspace)
-}
-
-// BuiltinAliasList returns built-in aliases in display order.
-func BuiltinAliasList() []Alias {
-	return append([]Alias(nil), builtinAliases...)
-}
-
-// PublicJobCommands returns the protocol-level public job vocabulary in catalog
-// order, described by the protocol where it describes the verb and by the
-// catalog Summary otherwise. Internal orchestration verbs intentionally stay out
-// of the user-facing command list, which is why the catalog — not
-// proto.WellKnownVerbs — decides membership and order.
-func PublicJobCommands() []JobCommand {
-	out := make([]JobCommand, 0, len(catalog))
-	for _, command := range catalog {
-		if command.Kind != KindJob {
-			continue
-		}
-		desc := command.Summary
-		if spec, ok := proto.WellKnownVerbs[command.Path]; ok && spec.Description != "" {
-			desc = spec.Description
-		}
-		out = append(out, JobCommand{Name: command.Path, Description: desc})
-	}
-	return out
+	_, mine := workspace[name]
+	return mine
 }

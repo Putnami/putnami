@@ -640,13 +640,19 @@ func (s *Server) toolRunJobs(ctx context.Context, args json.RawMessage) (any, er
 		return nil, err
 	}
 	if len(a.Commands) == 0 {
-		return nil, errors.New(`commands is required, e.g. ["lint","test","build"]`)
+		return nil, errors.New(`commands is required: the commands a loaded extension declares, e.g. ["lint","test","build"] with @putnami/dev`)
 	}
 	if a.DryRun {
 		// Planning is a pure read: it never schedules anything and mutates
 		// nothing outside the workspace, so neither refusal below applies here. An
 		// agent can still ask what `serve` or `deploy` would run.
-		return s.planJobs(ctx, a)
+		plan, err := s.planJobs(ctx, a)
+		if err != nil {
+			// A nil *MCPResult in the any result would be encoded as a
+			// "null" content block ahead of the error.
+			return nil, err
+		}
+		return plan, nil
 	}
 	if err := rejectLongLivedCommands(a.Commands); err != nil {
 		return nil, err
@@ -894,26 +900,27 @@ func rejectLongLivedCommands(commands []string) error {
 // step exists between a tool call and the effect. So the refusal names the
 // terminal as the remedy rather than pretending the run is unavailable.
 //
-// The classification is NOT a second list of names. The extension protocol
-// already types it as CommandTraits.SideEffects ("registry" for publish, "cloud"
-// for deploy), and extension.CommandSideEffects resolves it per command from
-// the loaded extensions, so an extension's own release verb is covered by
-// declaring the trait — which a hardcoded pair of well-known names would let
-// walk straight through.
+// The classification is NOT a list of names. The extension protocol types it
+// as CommandTraits.SideEffects ("registry", "cloud"), and
+// extension.CommandSideEffects resolves it per command from the traits the
+// loaded jobs declare or take from their verb's vocabulary, so an extension's
+// own release verb is covered by declaring the trait. The core gives no
+// command a side effect of its own: a command no loaded extension declares
+// runs nothing, and the engine refuses it.
 //
-// Discovery failure loads no extension, which leaves every command on the
-// well-known verb table: an unreadable manifest must not open the gate for
-// `publish` and `deploy`.
+// When the extensions cannot be read, no command can be classified, so every
+// command is refused: an unreadable manifest must not open the gate.
 //
 // Only EXECUTION is gated: dryRun returns before this, exactly as it does for
 // rejectLongLivedCommands.
 func (s *Server) rejectSideEffectingCommands(commands []string) error {
-	var extensions []*extension.ExtensionDescription
-	if discovered, err := s.discoverExtensions(); err == nil {
-		extensions = discovered.Extensions
+	discovered, err := s.discoverExtensions()
+	if err != nil {
+		return fmt.Errorf("run_jobs cannot run %s: the workspace's extensions cannot be read (%w), so what the run "+
+			"mutates outside the workspace is unknown. Run it in a terminal instead", strings.Join(commands, ","), err)
 	}
 	for _, command := range commands {
-		if effects := extension.CommandSideEffects(extensions, command); len(effects) > 0 {
+		if effects := extension.CommandSideEffects(discovered.Extensions, command); len(effects) > 0 {
 			return fmt.Errorf("run_jobs cannot run %q: it mutates %s outside the workspace, "+
 				"which is not a decision an agent tool call can make. Run it in a terminal instead",
 				command, strings.Join(effects, " and "))

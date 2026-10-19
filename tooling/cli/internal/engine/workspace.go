@@ -90,14 +90,20 @@ func loadWorkspaceAndExtensions(req *Request) (*workspace.Workspace, *extension.
 // a hosted run whose CI configuration needs a provider that only a path
 // extension declares (requireHostedProviders), before any job. A run that
 // reads the remote cache was already refused before its hooks
-// (startHostedRemoteCache); this refuses one that does not. It prints the
-// refusal and returns its exit code and error.
+// (startHostedRemoteCache); this refuses one that does not. It then refuses
+// the commands no loaded extension declares (refuseUndeclaredCommands), once
+// for every entry point, before any flag, policy or selection is read. It
+// prints the refusal and returns its exit code and error.
 func loadRunWorkspace(req *Request) (*workspace.Workspace, *extension.DiscoveryResult, int, error) {
 	ws, discovered, code := loadWorkspaceAndExtensions(req)
 	if code != ExitSuccess {
 		return nil, nil, code, nil
 	}
 	if err := requireHostedProviders(req, discovered); err != nil {
+		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
+		return nil, nil, protocolcli.ExitCodeForError(err), err
+	}
+	if err := refuseUndeclaredCommands(req, discovered); err != nil {
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
 		return nil, nil, protocolcli.ExitCodeForError(err), err
 	}

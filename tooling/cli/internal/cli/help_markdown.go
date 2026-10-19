@@ -8,17 +8,29 @@ import (
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
 
-// PrintHelpMarkdown prints the full help as markdown documentation.
+// PrintHelpMarkdown prints the full help as Markdown, with no extension
+// loaded.
 func PrintHelpMarkdown() {
+	printHelpMarkdown(nil)
+}
+
+// printHelpMarkdown prints the full help of scope as Markdown: the job
+// commands and aliases the loaded extensions declare, and every core command
+// and flag.
+func printHelpMarkdown(scope *helpScope) {
 	iox.Fprintf(os.Stdout, "# putnami\n\n")
 	iox.Fprintf(os.Stdout, "> polyglot build orchestrator — v%s\n\n", Version)
 	iox.Fprintf(os.Stdout, "## Usage\n\n```\nputnami <command[,command...]> [options]\n```\n\n")
 
 	iox.Fprintf(os.Stdout, "## Build Commands\n\n")
-	iox.Fprintf(os.Stdout, "| Command | Description |\n|---------|-------------|\n")
-	printMarkdownGroup(jobCommands.Commands)
+	if commands := scope.jobCommands(); len(commands) > 0 {
+		iox.Fprintf(os.Stdout, "| Command | Description |\n|---------|-------------|\n")
+		printMarkdownGroup(commands)
+	} else {
+		iox.Fprintf(os.Stdout, "%s\n\n", oneLine(noJobCommandHelp(scope)))
+	}
 
-	iox.Fprintf(os.Stdout, "Multi-command: `putnami lint,test,build --impacted`\n\n")
+	iox.Fprintf(os.Stdout, "Multi-command: `putnami <command>,<command> --impacted`\n\n")
 
 	for _, cat := range allFlagCategories {
 		iox.Fprintf(os.Stdout, "## %s Options\n\n", cat.Name)
@@ -58,8 +70,13 @@ func PrintHelpMarkdown() {
 		printCommandReferenceMarkdown(command)
 	}
 
-	iox.Fprintf(os.Stdout, "## Aliases\n\n")
-	iox.Fprintf(os.Stdout, "%s\n\n", builtinAliasMarkdown())
+	if aliases := scope.aliases(); len(aliases) > 0 {
+		parts := make([]string, 0, len(aliases))
+		for _, alias := range aliases {
+			parts = append(parts, "`"+alias.Name+"`="+alias.Command)
+		}
+		iox.Fprintf(os.Stdout, "## Aliases\n\n%s\n\n", strings.Join(parts, ", "))
+	}
 
 	iox.Fprintf(os.Stdout, "## Exit Codes\n\n")
 	iox.Fprintf(os.Stdout, "| Code | Meaning |\n|------|----------|\n")
@@ -79,15 +96,6 @@ func PrintHelpMarkdown() {
 	iox.Fprintf(os.Stdout, "| `PUTNAMI_CACHE_OBJECT_SOCKET` | Set BY the CLI for each job: the cache provider's object-cache socket |\n")
 	iox.Fprintf(os.Stdout, "| `PUTNAMI_NO_COLOR` | Disable color output |\n")
 	iox.Fprintf(os.Stdout, "| `NO_COLOR` | Standard no-color convention |\n")
-}
-
-func builtinAliasMarkdown() string {
-	aliases := commandmeta.BuiltinAliasList()
-	parts := make([]string, 0, len(aliases))
-	for _, alias := range aliases {
-		parts = append(parts, "`"+alias.Name+"`="+alias.Command)
-	}
-	return strings.Join(parts, ", ")
 }
 
 func printMarkdownGroup(entries []CommandInfo) {

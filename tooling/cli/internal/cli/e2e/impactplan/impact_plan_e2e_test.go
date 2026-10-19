@@ -105,7 +105,7 @@ func TestImpactPlanPlansTheNamedCommandsAndRunsNothing(t *testing.T) {
 	root, baseSHA := impactPlanFixture(t)
 	headSHA := strings.TrimSpace(clitest.GitOutput(t, root, "rev-parse", "HEAD"))
 
-	plan := runStructured[ciproto.ImpactPlan](t, root, "impact-plan", "l,test", "--base", baseSHA, "--no-cache", "--output=json")
+	plan := runStructured[ciproto.ImpactPlan](t, root, "impact-plan", "lint,test", "--base", baseSHA, "--no-cache", "--output=json")
 	if err := ciproto.ValidateImpactPlan(plan); err != nil {
 		t.Fatalf("data does not validate: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestImpactPlanRefusesACommandNoExtensionDeclares(t *testing.T) {
 		{"lint,typo,test,missing", "typo, missing"},
 	} {
 		code, stdout, stderr := run(t, root, "impact-plan", tc.list, "--base", baseSHA, "--no-cache", "--output=json")
-		want := "no extension of this workspace declares " + tc.undeclared + ", so impact-plan cannot plan it"
+		want := "no extension of this workspace declares " + tc.undeclared + "; name a language extension in putnami.workspace.json, then run: putnami extensions install"
 		if code != 2 || !strings.Contains(stdout+stderr, want) {
 			t.Fatalf("impact-plan %s exit = %d, want 2 and %q\nstdout:\n%s\nstderr:\n%s", tc.list, code, want, stdout, stderr)
 		}

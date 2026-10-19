@@ -12,7 +12,6 @@ import (
 	"go.putnami.dev/cli/model/workspace"
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	internalextension "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
@@ -120,10 +119,8 @@ func buildPlan(
 		// workspace that never actually ran lint/test/build.
 		if missing := missingExtensions(); len(missing) > 0 {
 			reportMissingExtensions(missing, skipped, "")
-			reportUnservedSDDCommands(req.Commands, extensions)
 			return nil, ExitError
 		}
-		reportUnservedSDDCommands(req.Commands, extensions)
 		// A release set that builds no member is released by the finalizer
 		// alone. A publish-only session, or a gate that selected nothing,
 		// then leaves no job to plan: the empty plan is the whole session, not
@@ -166,7 +163,6 @@ func buildPlan(
 		if starved := selectedCommandsWithoutJobs(req.Commands, planned, extensions); len(starved) > 0 {
 			reportMissingExtensions(missing, skipped,
 				"selected command(s) produced no jobs because their extension failed to load: "+strings.Join(starved, ", "))
-			reportUnservedSDDCommands(req.Commands, extensions)
 			return nil, ExitError
 		}
 	}
@@ -269,59 +265,6 @@ func reportMissingExtensions(missing []string, skipped []extension.SkippedExtens
 	}
 }
 
-// sddExtensionCommands are the four command groups that moved out of the CLI
-// into an extension.
-//
-// They were built in for two years, so `putnami features` is in muscle memory,
-// in shell history and in checked-in scripts. Without this list, a workspace
-// that has not declared the extension answers "No jobs matched. Nothing to do."
-// — which is true, and useless: it describes the plan instead of the reason the
-// plan is empty.
-//
-// The list is a literal rather than a read of the extension's manifest on
-// purpose. The whole case it serves is the one where that manifest is NOT in
-// the workspace, so there is nothing to read; the manifest's own copy is pinned
-// by tooling/sdd-extension's contract test.
-var sddExtensionCommands = []string{"architecture", "contracts", "features", "specs"}
-
-// sddExtensionHintRemedy is the one-line answer, stated once so the two callers
-// below cannot drift into two different instructions. It names no extension and
-// no path: the engine does not know which extension a workspace installs for
-// these commands, and a path of one repository means nothing in another. The
-// published reference it cites names the extension.
-const sddExtensionHintRemedy = "moved from the core CLI to an extension that is not loaded; " +
-	commandmeta.CommandsThatLeftTheCoreURL + " names that extension: " +
-	"declare it under \"extensions\" in putnami.workspace.json, then run `putnami install`"
-
-// reportUnservedSDDCommands writes the courtesy hint for every selected command
-// that moved into an extension and that no loaded extension serves.
-//
-// It is a HINT, never a verdict: it changes no exit code and prints nothing
-// when the extension is loaded. The "no loaded extension declares it" condition
-// is what keeps it from firing on a workspace that has the extension and simply
-// selected no matching project — telling a user to install what they already
-// have is worse than saying nothing.
-func reportUnservedSDDCommands(commands []string, extensions []*extension.ExtensionDescription) {
-	jobMap := extension.BuildJobMap(extensions)
-	seen := make(map[string]bool, len(commands))
-	unserved := make([]string, 0, len(commands))
-	for _, cmd := range commands {
-		if seen[cmd] || len(jobMap[cmd]) > 0 {
-			continue
-		}
-		if !slices.Contains(sddExtensionCommands, cmd) {
-			continue
-		}
-		seen[cmd] = true
-		unserved = append(unserved, cmd)
-	}
-	if len(unserved) == 0 {
-		return
-	}
-	sort.Strings(unserved)
-	iox.Fprintf(os.Stderr, "putnami: %s %s\n", strings.Join(unserved, ", "), sddExtensionHintRemedy)
-}
-
 // skipReasonFor finds the discovery skip record for a configured extension
 // name. A skip is matched on either field it can carry the name in: Ref is the
 // reference discovery was resolving (the config key), Name the manifest's own
@@ -381,6 +324,47 @@ func missingRegistryExtensions(cfg *wsproto.Config, extensions []*extension.Exte
 	}
 	sort.Strings(missing)
 	return missing
+}
+
+// UndeclaredCommandsError is the usage error of a command that no loaded
+// extension declares as a job. It names the commands, comma-joined in the
+// order given, and how to add an extension. Help returns it for the help of
+// such a command, so both say the same thing.
+func UndeclaredCommandsError(commands []string) error {
+	return protocolcli.Usagef(
+		"no extension of this workspace declares %s; name a language extension in putnami.workspace.json, then run: putnami extensions install",
+		strings.Join(commands, ", "))
+}
+
+// refuseUndeclaredCommands returns the usage error of a run that names a
+// command no loaded extension declares as a job, or nil. The core declares no
+// job command, so this is where every entry point that runs jobs (a terminal
+// run, impact-plan, cache verify, MCP run_jobs, compose) learns that a command
+// does not exist in the workspace: once, after extension discovery and before
+// selection.
+//
+// It refuses nothing when the answer is not known. A workspace lifecycle run
+// plans its own jobs against every provider. When an extension was skipped, or
+// a configured one did not load, the commands it would declare are unknown, so
+// the missing-extension guards of planning name the root cause instead.
+func refuseUndeclaredCommands(req *Request, discovered *internalextension.DiscoveryResult) error {
+	if req.WorkspaceLifecycle || discovered == nil || len(discovered.Skipped) > 0 {
+		return nil
+	}
+	if len(missingRegistryExtensions(req.Config, discovered.Extensions, discovered.MissingDependencies()...)) > 0 {
+		return nil
+	}
+	jobs := extension.BuildJobMap(discovered.Extensions)
+	var undeclared []string
+	for _, command := range req.Commands {
+		if _, declared := jobs[command]; !declared && !slices.Contains(undeclared, command) {
+			undeclared = append(undeclared, command)
+		}
+	}
+	if len(undeclared) == 0 {
+		return nil
+	}
+	return UndeclaredCommandsError(undeclared)
 }
 
 // selectedCommandsWithoutJobs returns the selected commands that contributed no

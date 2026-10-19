@@ -531,7 +531,7 @@ func TestToolsListAdvertisesExpectedTools(t *testing.T) {
 		t.Errorf("tools count = %d, want %d", len(tools), len(commandmeta.CoreMCPToolNames()))
 	}
 	for name, phrases := range map[string][]string{
-		"run_jobs":        {"same planner and engine as the CLI", "dryRun=true", "refuses long-lived serve mode", "mutate external systems", "get_diagnostics"},
+		"run_jobs":        {"same planner and engine as the CLI", "dryRun=true", "refuses long-lived commands", "mutate external systems", "get_diagnostics"},
 		"get_diagnostics": {"most recent executed run_jobs", "dry run does not replace", "without rerunning"},
 	} {
 		for _, phrase := range phrases {

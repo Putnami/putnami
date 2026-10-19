@@ -32,6 +32,51 @@ func rootWithoutRepository(t *testing.T) string {
 	return root
 }
 
+// declaringWorkspace writes, at root, a workspace whose one extension declares
+// build, test, lint and serve without traits, publish with registry side
+// effects and deploy with cloud side effects. The core gives no command a side
+// effect, so these declarations are the only ones the repository guard reads.
+func declaringWorkspace(t *testing.T, root string) *workspacepb.Config {
+	t.Helper()
+	step := func(id string) []extensionproto.PipelineStep {
+		return []extensionproto.PipelineStep{{ID: id, Task: "noop"}}
+	}
+	manifest, err := json.Marshal(extensionproto.Manifest{
+		Name: "@test/ship", Version: "1.0.0", CLIContract: 4,
+		Commands: map[string]extensionproto.CommandDefinition{
+			"build": {Run: step("build")},
+			"test":  {Run: step("test")},
+			"lint":  {Run: step("lint")},
+			"serve": {Run: step("serve")},
+			"publish": {Run: step("publish"), Traits: &extensionproto.CommandTraits{
+				InjectPublishChannels: true, SideEffects: extensionproto.SideEffectsRegistry,
+			}},
+			"deploy": {Run: step("deploy"), Traits: &extensionproto.CommandTraits{SideEffects: extensionproto.SideEffectsCloud}},
+		},
+		Tasks: map[string]extensionproto.TaskDefinition{
+			"noop": {Kind: "command", Command: "true", Cwd: "{projectRoot}", TimeoutMs: -1},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, data := range map[string][]byte{
+		"putnami.workspace.json":           []byte(`{"name":"ship","includes":["app","extension"],"extensions":["/extension"]}`),
+		"app/putnami.json":                 []byte(`{"name":"app","extensions":["/extension"]}`),
+		"extension/putnami.json":           []byte(`{"name":"@test/ship"}`),
+		"extension/putnami.extension.json": manifest,
+	} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, path)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, path), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	workspace.InvalidateLoadCache(root)
+	return workspacepb.Load(root)
+}
+
 func twoProjectWorkspace(root string) *workspace.Workspace {
 	return workspace.NewWorkspace(root, &workspacepb.Config{}, []*workspace.Project{
 		{ID: "/app", Name: "app", Path: "app"},
@@ -158,6 +203,7 @@ func TestRun_PublishAndDeployOutsideARepositoryNameGit(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-without-git", "git-history-is-refused-in-one-line",
 		"publish-and-deploy-outside-a-repository-name-git")
 	root := rootWithoutRepository(t)
+	cfg := declaringWorkspace(t, root)
 
 	for _, commands := range [][]string{{"publish"}, {"deploy"}, {"build", "publish"}} {
 		t.Run(strings.Join(commands, ","), func(t *testing.T) {
@@ -165,7 +211,7 @@ func TestRun_PublishAndDeployOutsideARepositoryNameGit(t *testing.T) {
 			var err error
 			stderr := captureStderr(t, func() {
 				result, err = New().Run(context.Background(), Request{
-					WorkspaceRoot: root, Config: &workspacepb.Config{}, Commands: commands,
+					WorkspaceRoot: root, Config: cfg, Commands: commands,
 				}, nil)
 			})
 			if result.ExitCode != ExitError || !errors.Is(err, git.ErrNotRepository) {
@@ -181,8 +227,9 @@ func TestRun_PublishAndDeployOutsideARepositoryNameGit(t *testing.T) {
 }
 
 // shippingWorkspace writes a workspace at a root git discovery cannot escape.
-// Its local extension serves build, and publish too when servesPublish is set,
-// with a task that records each run in the returned runs file. declareCloud
+// Its local extension serves build, and publish with registry side effects
+// too when servesPublish is set, with a task that records each run in the
+// returned runs file. declareCloud
 // adds the registry extension @putnami/cloud, which is never installed.
 func shippingWorkspace(t *testing.T, servesPublish, declareCloud bool) (root, runs string) {
 	t.Helper()
@@ -210,7 +257,10 @@ func shippingWorkspace(t *testing.T, servesPublish, declareCloud bool) (root, ru
 		},
 	}
 	if servesPublish {
-		manifest.Commands["publish"] = extensionproto.CommandDefinition{Run: []extensionproto.PipelineStep{{ID: "publish", Task: "ship"}}}
+		manifest.Commands["publish"] = extensionproto.CommandDefinition{
+			Run:    []extensionproto.PipelineStep{{ID: "publish", Task: "ship"}},
+			Traits: &extensionproto.CommandTraits{SideEffects: extensionproto.SideEffectsRegistry},
+		}
 	}
 	data, err := json.Marshal(manifest)
 	if err != nil {
@@ -228,10 +278,11 @@ func shippingWorkspace(t *testing.T, servesPublish, declareCloud bool) (root, ru
 	return root, runs
 }
 
-// A publish whose own extension is not installed reports that extension first:
-// it cannot run in any directory, and the repository matters only once it can.
-// With its extension present, the refusal stands, also beside a missing
-// extension the command does not need. Either way no hook and no job runs.
+// A publish whose own extension is not installed reports that extension, and
+// no repository refusal: nothing loaded declares that it ships a commit, so
+// the run reaches the missing-extension guard of planning. With its extension
+// present, the refusal stands, also beside a missing extension the command
+// does not need, and no hook runs. Either way no job runs.
 func TestRun_PublishOutsideARepositoryReportsAMissingExtensionFirst(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-without-git", "git-history-is-refused-in-one-line",
 		"publish-and-deploy-outside-a-repository-name-git")
@@ -273,7 +324,11 @@ func TestRun_PublishOutsideARepositoryReportsAMissingExtensionFirst(t *testing.T
 				}
 				oneLineRefusal(t, stderr, "publish", root)
 			}
-			for what, path := range map[string]string{"a before hook": hookRuns, "a job": runs} {
+			stopped := map[string]string{"a job": runs}
+			if !tc.wantMissing {
+				stopped["a before hook"] = hookRuns
+			}
+			for what, path := range stopped {
 				if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
 					t.Errorf("%s ran before the run stopped", what)
 				}
@@ -286,8 +341,9 @@ func TestRun_PublishOutsideARepositoryReportsAMissingExtensionFirst(t *testing.T
 // runs where Git does not manage the root, and the guard asks git nothing for it.
 func TestRequireRepository(t *testing.T) {
 	root := rootWithoutRepository(t)
+	cfg := declaringWorkspace(t, root)
 	request := func(commands ...string) *Request {
-		return &Request{WorkspaceRoot: root, Commands: commands}
+		return &Request{WorkspaceRoot: root, Config: cfg, Commands: commands}
 	}
 	for _, commands := range [][]string{{"build"}, {"test", "lint"}, {"serve"}, nil} {
 		if _, err := requireRepository(request(commands...)); err != nil {
@@ -344,14 +400,14 @@ func TestRequireRepository(t *testing.T) {
 }
 
 // The refusal follows the side effects a command's jobs declare, not its name,
-// and declared traits never remove a well-known verb's default. A verb of the
-// extension's own that declares registry side effects is refused like publish;
-// a publish whose declared traits name none keeps its registry default and is
-// refused; deploy, which no loaded extension declares, keeps its default and is
-// refused.
-func TestRequireRepository_DeclaredSideEffectsAddToTheWellKnownDefaults(t *testing.T) {
+// and the core gives no command a side effect. A verb of the extension's own
+// that declares registry side effects is refused; a publish whose declared
+// traits name none is not; deploy, which no loaded extension declares, is not
+// either: the run refuses it as a command no extension declares.
+func TestRequireRepository_FollowsOnlyTheDeclaredSideEffects(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-without-git", "git-history-is-refused-in-one-line",
 		"a-declared-side-effect-outside-a-repository-names-git")
+	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "side-effects-come-only-from-loaded-jobs")
 	root := rootWithoutRepository(t)
 	step := func(id string) []extensionproto.PipelineStep {
 		return []extensionproto.PipelineStep{{ID: id, Task: "noop"}}
@@ -390,15 +446,17 @@ func TestRequireRepository_DeclaredSideEffectsAddToTheWellKnownDefaults(t *testi
 		return &Request{WorkspaceRoot: root, Config: workspacepb.Load(root), Commands: commands}
 	}
 
-	for _, commands := range [][]string{{"release"}, {"build", "release"}, {"deploy"}, {"publish"}, {"build", "publish"}} {
+	for _, commands := range [][]string{{"release"}, {"build", "release"}} {
 		_, err := requireRepository(request(commands...))
 		what := commands[len(commands)-1]
 		if !errors.Is(err, git.ErrNotRepository) || !strings.HasPrefix(err.Error(), what+" needs git history: ") {
 			t.Errorf("requireRepository(%v) = %v, want the refusal naming %s", commands, err, what)
 		}
 	}
-	if _, err := requireRepository(request("build")); err != nil {
-		t.Errorf("requireRepository(build) = %v, want nil: no job of the run declares a side effect", err)
+	for _, commands := range [][]string{{"build"}, {"publish"}, {"build", "publish"}, {"deploy"}} {
+		if _, err := requireRepository(request(commands...)); err != nil {
+			t.Errorf("requireRepository(%v) = %v, want nil: no job of the run declares a side effect", commands, err)
+		}
 	}
 }
 

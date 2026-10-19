@@ -43,15 +43,6 @@ func TestCompletionBash(t *testing.T) {
 	if !strings.Contains(output, "complete -F _putnami_completions putnami") {
 		t.Error("expected complete registration")
 	}
-	if !strings.Contains(output, "build") {
-		t.Error("expected 'build' command in completions")
-	}
-	if !strings.Contains(output, "deploy") {
-		t.Error("expected protocol-level 'deploy' command in completions")
-	}
-	if !strings.Contains(output, " d ") {
-		t.Error("expected deploy alias in completions")
-	}
 	if !strings.Contains(output, "extensions") {
 		t.Error("expected 'extensions' structured command")
 	}
@@ -88,14 +79,9 @@ func TestCompletionZsh(t *testing.T) {
 	if !strings.Contains(output, "_putnami") {
 		t.Error("expected _putnami function")
 	}
-	if !strings.Contains(output, "'build:Compile or transpile project sources into runnable or distributable outputs.'") {
-		t.Error("expected build command with description")
-	}
-	// The apostrophe in "workload's" must arrive POSIX-escaped: emitted raw it
-	// closes the _describe entry early and corrupts the rest of the array. This
-	// assertion previously pinned the raw form — it encoded the bug.
-	if !strings.Contains(output, `'deploy:Converge a cloud environment on the workload'\''s aggregated infra manifest.'`) {
-		t.Error("expected deploy command with escaped protocol description")
+	// Outside a workspace no extension is loaded, so no job command is offered.
+	if strings.Contains(output, "'build:") || strings.Contains(output, "'deploy:") {
+		t.Error("expected no job command outside a workspace")
 	}
 	if !strings.Contains(output, "'--verbose[Show job results and diagnostics]'") {
 		t.Error("expected verbose flag with description")
@@ -129,12 +115,6 @@ func TestCompletionFish(t *testing.T) {
 	if !strings.Contains(output, "complete -c putnami") {
 		t.Error("expected fish complete command")
 	}
-	if !strings.Contains(output, "build") {
-		t.Error("expected 'build' command")
-	}
-	if !strings.Contains(output, "deploy") {
-		t.Error("expected 'deploy' command")
-	}
 	if !strings.Contains(output, "extensions") {
 		t.Error("expected 'extensions' command")
 	}
@@ -162,21 +142,12 @@ func TestGatherCompletionContext(t *testing.T) {
 	cfg := &wsproto.Config{}
 	ctx := gatherCompletionContext("", cfg)
 
-	// Should have default commands
-	if !sharedtest.Contains(ctx.commands, "build") {
-		t.Error("expected 'build' in default commands")
-	}
-	if !sharedtest.Contains(ctx.commands, "test") {
-		t.Error("expected 'test' in default commands")
-	}
-	if !sharedtest.Contains(ctx.commands, "deploy") {
-		t.Error("expected protocol-level 'deploy' in default commands")
-	}
-	if !sharedtest.Contains(ctx.commands, "package") {
-		t.Error("expected protocol-level 'package' in default commands")
-	}
-	if !sharedtest.Contains(ctx.commands, "d") || !sharedtest.Contains(ctx.commands, "D") {
-		t.Error("expected deploy aliases in default commands")
+	// Outside a workspace no extension is loaded: the core offers no job
+	// command and no alias.
+	for _, name := range []string{"build", "test", "lint", "serve", "run", "format", "package", "publish", "deploy", "generate", "validate", "b", "t", "l", "s", "f", "p", "P", "d", "D"} {
+		if sharedtest.Contains(ctx.commands, name) {
+			t.Errorf("%q offered outside a workspace", name)
+		}
 	}
 
 	// Should have structured commands
@@ -285,7 +256,12 @@ func TestCompletionHidesInternalExtensionCommands(t *testing.T) {
 
 func TestGatherCompletionContext_FlatJobFlagsAndAliases(t *testing.T) {
 	dir := writeJobFlagCompletionWorkspace(t)
-	ctx := gatherCompletionContext(dir, &wsproto.Config{})
+	// The fixture declares no vocabulary, so the aliases d and D exist only as
+	// the workspace names them.
+	if bare := gatherCompletionContext(dir, &wsproto.Config{}); sharedtest.Contains(bare.commands, "d") || sharedtest.Contains(bare.commands, "D") {
+		t.Fatalf("aliases d and D offered without a vocabulary or a workspace alias: %v", bare.commands)
+	}
+	ctx := gatherCompletionContext(dir, &wsproto.Config{Aliases: map[string]string{"d": "deploy", "D": "deploy"}})
 
 	deployFlags := ctx.structuredFlags["deploy"]
 	if !containsStructuredFlag(deployFlags, "--environment") {

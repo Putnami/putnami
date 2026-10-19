@@ -2,7 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
-    "tooling/development-verbs#core-default-traits",
+    "tooling/development-verbs#dev-is-the-sole-declarer",
     "tooling/development-verbs#eleven-ordered-verbs",
     "tooling/development-verbs#handshake-only-runtime",
     "tooling/development-verbs#language-extensions-depend"

@@ -656,8 +656,7 @@ func warnOnce(key, msg string, args ...any) {
 
 // applyVocabularyTraits runs the vocabulary pass over the loaded extensions
 // and warns, once per process, about each declaration the merge set aside: a
-// verb two vocabularies declare, or default traits that would change a
-// well-known verb's side effects.
+// verb two vocabularies declare.
 func applyVocabularyTraits(extensions []*ExtensionDescription) {
 	for _, warning := range ApplyVocabularyTraits(extensions) {
 		warnOnce("vocabulary\x00"+warning, "verb vocabulary declaration set aside", "reason", warning)

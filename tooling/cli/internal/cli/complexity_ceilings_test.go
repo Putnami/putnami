@@ -85,8 +85,13 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  25,
-		funcs:  183,
-		why: "RAISED 181→183 (cli/credential-custody, needed-provider-only-on-a-path-extension): " +
+		funcs:  184,
+		why: "RAISED 183→184 (cli/job-planning-execution, no-core-development-verb): " +
+			"the core declares no development verb, so the engine refuses a command no loaded extension " +
+			"declares once, after the run's one discovery, for every entry point. refuseUndeclaredCommands " +
+			"replaces reportUnservedSDDCommands, and UndeclaredCommandsError is its message, which help " +
+			"returns too; both live in plan.go, so files stay at 25. " +
+			"RAISED 181→183 (cli/credential-custody, needed-provider-only-on-a-path-extension): " +
 			"a hosted run whose CI configuration needs a provider that only a path extension declares " +
 			"fails before any job, so its pull request fails instead of the publish on main. " +
 			"run_credential.go holds requireHostedProviders, which reads what the CI document and the " +

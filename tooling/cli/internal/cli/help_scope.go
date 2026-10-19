@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -11,20 +12,22 @@ import (
 )
 
 // helpScope is the set of commands a workspace's loaded extensions declare.
-// Help inside a workspace lists a job command, an alias or a global flag only
-// when an extension there gives it meaning: a workspace with no deploying
-// extension shows no deploy, and one with no cache provider no --cache-trust.
+// The core declares no job command and no alias, so help lists a job command,
+// an alias or a provider-bound global flag only when a loaded extension gives
+// it meaning: a workspace with no deploying extension shows no deploy, and one
+// with no cache provider no --cache-trust.
 //
-// A nil scope hides nothing. That is the help outside a workspace. A scope
-// without commands hides nothing either: it is the help of a workspace where an
-// extension did not load, whose commands are unknown, and help must not hide
-// what it would provide.
+// A nil scope is the help outside a workspace, or where the extensions cannot
+// be read: no extension is loaded, so it lists none of them. A scope without
+// commands is the help of a workspace where an extension did not load: its
+// commands are unknown, so help hides nothing it would provide.
 //
 // The verb vocabulary of the loaded extensions comes first: its verbs lead the
-// job commands in its order, its aliases lead the built-in ones, and a verb's
-// related commands replace the catalog's.
+// job commands in its order, its aliases are the only ones help lists, and a
+// verb's related commands replace the catalog's.
 type helpScope struct {
 	commands   map[string]bool
+	listed     []CommandInfo
 	vocabulary extension.Vocabulary
 }
 
@@ -59,13 +62,13 @@ func workspaceAliases(cfg *wsproto.Config) map[string]string {
 
 // helpScopeOf returns the scope a discovery gives in a workspace whose aliases
 // are user. When an extension did not load, the scope hides nothing and keeps
-// the vocabulary of those that did.
+// the vocabulary and commands of those that did.
 func helpScopeOf(result *extension.DiscoveryResult, user map[string]string) *helpScope {
-	vocabulary := commandVocabulary(result.Extensions, user)
+	scope := &helpScope{vocabulary: commandVocabulary(result.Extensions, user), listed: listedCommands(result.Extensions)}
 	if len(result.Skipped) > 0 {
-		return &helpScope{vocabulary: vocabulary}
+		return scope
 	}
-	scope := &helpScope{commands: map[string]bool{}, vocabulary: vocabulary}
+	scope.commands = map[string]bool{}
 	for _, ext := range result.Extensions {
 		if ext == nil {
 			continue
@@ -77,10 +80,62 @@ func helpScopeOf(result *extension.DiscoveryResult, user map[string]string) *hel
 	return scope
 }
 
+// listedCommands returns, by name, the commands of extensions that help lists
+// after the vocabulary's verbs: the ones a user types as a job command. It
+// leaves out an internal command, a provider command, which the core calls,
+// and a command an extension's command group carries, which the user types as
+// a subcommand of the group. A command several extensions declare takes the
+// description of the first, in extension-name order, that gives one.
+func listedCommands(extensions []*extension.ExtensionDescription) []CommandInfo {
+	ordered := make([]*extension.ExtensionDescription, 0, len(extensions))
+	for _, ext := range extensions {
+		if ext != nil {
+			ordered = append(ordered, ext)
+		}
+	}
+	slices.SortStableFunc(ordered, func(a, b *extension.ExtensionDescription) int { return strings.Compare(a.Name, b.Name) })
+	descriptions := map[string]string{}
+	for _, ext := range ordered {
+		carried, providers := groupCommands(ext.CommandGroups), extension.ProviderCommands(ext)
+		for name, description := range ext.Commands {
+			if ext.CommandVisibility[name] == "internal" || carried[name] || slices.Contains(providers, name) {
+				continue
+			}
+			if current, seen := descriptions[name]; !seen || current == "" {
+				descriptions[name] = description
+			}
+		}
+	}
+	out := make([]CommandInfo, 0, len(descriptions))
+	for _, name := range slices.Sorted(maps.Keys(descriptions)) {
+		out = append(out, CommandInfo{Name: name, Description: strings.TrimSuffix(descriptions[name], ".")})
+	}
+	return out
+}
+
+// groupCommands returns the flat commands the subcommands of groups route to,
+// nested subcommands included.
+func groupCommands(groups map[string]extension.CommandGroupDefinition) map[string]bool {
+	carried := map[string]bool{}
+	var walk func(map[string]extension.SubcommandDefinition)
+	walk = func(subcommands map[string]extension.SubcommandDefinition) {
+		for _, subcommand := range subcommands {
+			if subcommand.Command != "" {
+				carried[subcommand.Command] = true
+			}
+			walk(subcommand.Subcommands)
+		}
+	}
+	for _, group := range groups {
+		walk(group.Subcommands)
+	}
+	return carried
+}
+
 // commandVocabulary merges the verb vocabularies of extensions for a workspace
 // whose aliases are user. A vocabulary alias never takes a command path of the
-// catalog, structured or job, and a workspace alias of the same name that
-// applies hides it (commandmeta.ReservesVocabularyAlias).
+// catalog, and a workspace alias of the same name hides it
+// (commandmeta.ReservesVocabularyAlias).
 func commandVocabulary(extensions []*extension.ExtensionDescription, user map[string]string) extension.Vocabulary {
 	return extension.MergeVocabulary(extensions, func(name string) bool {
 		return commandmeta.ReservesVocabularyAlias(name, user)
@@ -88,16 +143,14 @@ func commandVocabulary(extensions []*extension.ExtensionDescription, user map[st
 }
 
 // hiddenAliasWarnings returns a warning for each vocabulary alias a workspace
-// alias of the same name hides, in merge order. A workspace alias named like a
-// built-in alias never applied, so it hides nothing and draws no warning.
+// alias of the same name hides, in merge order.
 func hiddenAliasWarnings(extensions []*extension.ExtensionDescription, user map[string]string) []string {
 	if len(user) == 0 {
 		return nil
 	}
 	var warnings []string
 	for _, alias := range commandVocabulary(extensions, nil).Aliases {
-		if commandmeta.WorkspaceAliasApplies(alias.Name, user) {
-			target := user[alias.Name]
+		if target, mine := user[alias.Name]; mine {
 			warnings = append(warnings, fmt.Sprintf(
 				"warning: the workspace alias %s (%s) hides the alias %s of %s that %s declares",
 				alias.Name, target, alias.Name, alias.Verb, alias.Extension))
@@ -106,10 +159,11 @@ func hiddenAliasWarnings(extensions []*extension.ExtensionDescription, user map[
 	return warnings
 }
 
-// declares reports whether help lists command: always outside a workspace,
-// and inside one only when a loaded extension declares it.
+// declares reports whether a loaded extension declares command: never
+// outside a workspace, and always where an extension did not load, whose
+// commands are unknown.
 func (s *helpScope) declares(command string) bool {
-	return s == nil || s.commands == nil || s.commands[command]
+	return s != nil && (s.commands == nil || s.commands[command])
 }
 
 // verb returns the vocabulary's verb named command.
@@ -121,7 +175,7 @@ func (s *helpScope) verb(command string) (extension.VerbDefinition, bool) {
 }
 
 // commandAliases returns the alias tables a command name resolves through in
-// this scope: the vocabulary's, the built-in ones, then user.
+// this scope: the vocabulary's, then user.
 func (s *helpScope) commandAliases(user map[string]string) commandAliases {
 	aliases := commandAliases{user: user}
 	if s != nil {
@@ -130,12 +184,12 @@ func (s *helpScope) commandAliases(user map[string]string) commandAliases {
 	return aliases
 }
 
-// listsJobCommand reports whether help lists path. A built-in command of the
-// catalog is always listed, because the core always provides it. Any other
-// path (a job command of the catalog, a verb of the vocabulary, a command of
-// an extension) is listed only when a loaded extension declares it.
+// listsJobCommand reports whether help lists path. A command of the catalog
+// is always listed, because the core always provides it. Any other path (a
+// verb of the vocabulary, a command of an extension) is listed only when a
+// loaded extension declares it.
 func (s *helpScope) listsJobCommand(path string) bool {
-	if command, ok := commandmeta.Lookup(path); ok && command.Kind != commandmeta.KindJob {
+	if _, ok := commandmeta.Lookup(path); ok {
 		return true
 	}
 	return s.declares(path)
@@ -156,20 +210,20 @@ func (s *helpScope) listsFlag(flag FlagInfo) bool {
 	return len(flag.Providers) == 0 || slices.ContainsFunc(flag.Providers, s.declares)
 }
 
-// jobCommands returns the public job commands help lists: the verbs of the
-// vocabulary in its order, then the catalog's job commands it does not name.
+// jobCommands returns the job commands help lists: the verbs of the
+// vocabulary in its order, then the other listed commands of the loaded
+// extensions by name, each only when a loaded extension declares it.
 func (s *helpScope) jobCommands() []CommandInfo {
-	var verbs []extension.VerbDefinition
-	if s != nil {
-		verbs = s.vocabulary.Verbs
+	if s == nil {
+		return nil
 	}
-	out := make([]CommandInfo, 0, len(verbs)+len(jobCommands.Commands))
-	for _, verb := range verbs {
+	out := make([]CommandInfo, 0, len(s.vocabulary.Verbs)+len(s.listed))
+	for _, verb := range s.vocabulary.Verbs {
 		if s.declares(verb.Name) {
 			out = append(out, CommandInfo{Name: verb.Name, Description: strings.TrimSuffix(verb.Description, ".")})
 		}
 	}
-	for _, command := range jobCommands.Commands {
+	for _, command := range s.listed {
 		if _, isVerb := s.verb(command.Name); !isVerb && s.declares(command.Name) {
 			out = append(out, command)
 		}
@@ -195,25 +249,16 @@ func (s *helpScope) flagCategories() []FlagCategory {
 	return out
 }
 
-// aliases returns the aliases help lists, those whose command it lists: the
-// vocabulary's, then the built-in ones whose name the vocabulary leaves free.
+// aliases returns the aliases help lists: the vocabulary's whose verb a
+// loaded extension declares. The core declares no alias.
 func (s *helpScope) aliases() []commandmeta.Alias {
-	var vocabulary []extension.VerbAlias
-	if s != nil {
-		vocabulary = s.vocabulary.Aliases
+	if s == nil {
+		return nil
 	}
-	builtin := commandmeta.BuiltinAliasList()
-	out := make([]commandmeta.Alias, 0, len(vocabulary)+len(builtin))
-	claimed := make(map[string]bool, len(vocabulary))
-	for _, alias := range vocabulary {
-		claimed[alias.Name] = true
+	out := make([]commandmeta.Alias, 0, len(s.vocabulary.Aliases))
+	for _, alias := range s.vocabulary.Aliases {
 		if s.listsJobCommand(alias.Verb) {
 			out = append(out, commandmeta.Alias{Name: alias.Name, Command: alias.Verb})
-		}
-	}
-	for _, alias := range builtin {
-		if !claimed[alias.Name] && s.listsJobCommand(alias.Command) {
-			out = append(out, alias)
 		}
 	}
 	return out

@@ -7,7 +7,6 @@ import (
 
 	"go.putnami.dev/cli/model/jobs"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -491,79 +490,5 @@ func TestReportMissingExtensions_HeadlineTellsTheTwoFailuresApart(t *testing.T) 
 				t.Errorf("install hint present = %v, want %v:\n%s", got, tc.wantInstall, out)
 			}
 		})
-	}
-}
-
-// TestReportUnservedSDDCommands_NamesTheExtensionOnlyWhenNothingServesIt pins
-// the courtesy hint added when the four SDD commands leave the CLI.
-//
-// The three cases are the three states a user can be in, and the hint is right
-// in exactly one of them: the command is one that moved into an extension and
-// no loaded extension declares it. Firing when the extension IS loaded would
-// tell a user to install what they already have — the failure mode that makes
-// people stop reading hints — and firing on a command the extension never
-// served would send them after the wrong dependency.
-func TestReportUnservedSDDCommands_NamesTheExtensionOnlyWhenNothingServesIt(t *testing.T) {
-	sddExt := &extension.ExtensionDescription{
-		Name: "@putnami/sdd",
-		Jobs: map[string]*extension.JobDefinition{
-			"features": {Name: "features", ExtensionName: "@putnami/sdd"},
-		},
-	}
-
-	tests := []struct {
-		name     string
-		commands []string
-		ext      []*extension.ExtensionDescription
-		want     string
-	}{
-		{
-			name:     "no extension serves features",
-			commands: []string{"features"},
-			want:     "putnami: features " + sddExtensionHintRemedy + "\n",
-		},
-		{
-			name:     "every SDD command is named once, sorted, in one line",
-			commands: []string{"specs", "features", "features", "architecture", "contracts"},
-			want:     "putnami: architecture, contracts, features, specs " + sddExtensionHintRemedy + "\n",
-		},
-		{
-			name:     "a loaded extension serving the command silences the hint",
-			commands: []string{"features"},
-			ext:      []*extension.ExtensionDescription{sddExt},
-			want:     "",
-		},
-		{
-			name:     "a command @putnami/sdd never served gets no hint",
-			commands: []string{"deploy"},
-			want:     "",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := captureStderr(t, func() { reportUnservedSDDCommands(tc.commands, tc.ext) })
-			if got != tc.want {
-				t.Errorf("hint =\n%q\nwant\n%q", got, tc.want)
-			}
-		})
-	}
-}
-
-// TestSDDExtensionHintNamesNoExtensionAndStaysActionable keeps the engine
-// from naming an extension or a path of one repository, while the remedy
-// still cites the published reference that names the extension, and says
-// where an extension is declared and how it is installed.
-func TestSDDExtensionHintNamesNoExtensionAndStaysActionable(t *testing.T) {
-	t.Parallel()
-	for _, banned := range []string{"@putnami/", "sdd", "/tooling/"} {
-		if strings.Contains(sddExtensionHintRemedy, banned) {
-			t.Errorf("the remedy names %q:\n%s", banned, sddExtensionHintRemedy)
-		}
-	}
-	for _, want := range []string{"moved from the core CLI to an extension", commandmeta.CommandsThatLeftTheCoreURL + " names that extension", `"extensions"`, "putnami.workspace.json", "`putnami install`"} {
-		if !strings.Contains(sddExtensionHintRemedy, want) {
-			t.Errorf("the remedy does not name %q:\n%s", want, sddExtensionHintRemedy)
-		}
 	}
 }

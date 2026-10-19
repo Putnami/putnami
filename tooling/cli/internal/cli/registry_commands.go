@@ -13,7 +13,6 @@ import (
 
 	supportproto "go.putnami.dev/protocol/support"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
 	"go.putnami.dev/tooling/cli/internal/commands/cachecmd"
 	"go.putnami.dev/tooling/cli/internal/commands/ci"
@@ -98,7 +97,7 @@ func cmdImpactPlan(env *CommandEnv) error {
 	if err != nil {
 		return err
 	}
-	planner := newImpactPlanPlanner(env.WsRoot, env.Cfg, commands, refuseUndeclaredCommands(commands, engine.New().Run))
+	planner := newImpactPlanPlanner(env.WsRoot, env.Cfg, commands, engine.New().Run)
 	document, err := ci.EmitImpactPlan(env.Ctx, env.WsRoot, ci.PlanOptions{
 		Base:       parsed.value("--base"),
 		Head:       parsed.value("--head"),
@@ -113,7 +112,7 @@ func cmdImpactPlan(env *CommandEnv) error {
 
 // impactPlanCommands parses the command list of impact-plan the way the CLI
 // parses `putnami <command[,command...]>`: comma-separated, with the
-// vocabulary, built-in and workspace aliases resolved, in order. A command
+// vocabulary and workspace aliases resolved, in order. A command
 // named twice, and an alias that expands to several commands, are usage
 // errors: the plan names each command once, by its own name.
 func impactPlanCommands(list string, aliases commandAliases) ([]string, error) {
@@ -177,39 +176,6 @@ func newImpactPlanPlanner(wsRoot string, cfg *wsproto.Config, commands []string,
 			Jobs:     result.Plan,
 			Versions: versions,
 		}, nil
-	}
-}
-
-// refuseUndeclaredCommands is the engine run of impact-plan. It refuses, with a
-// usage error, every command of commands that no discovered extension declares
-// as a job. The core declares no job, so such a command plans zero tasks, and a
-// caller that admits a change from the plan would read "nothing to run". The
-// check reads the job map the engine plans from, after extension discovery and
-// before selection. A declared command that plans zero tasks because nothing it
-// serves is impacted stays a valid empty plan.
-func refuseUndeclaredCommands(commands []string, run engineRun) engineRun {
-	requested := append([]string(nil), commands...)
-	return func(ctx context.Context, req engine.Request, sink engine.EventSink) (engine.SessionResult, error) {
-		req.ValidateCommandFlags = func(discovered *extension.DiscoveryResult, _ GlobalFlags) error {
-			var extensions []*extension.ExtensionDescription
-			if discovered != nil {
-				extensions = discovered.Extensions
-			}
-			jobMap := extension.BuildJobMap(extensions)
-			var undeclared []string
-			for _, command := range requested {
-				if len(jobMap[command]) == 0 {
-					undeclared = append(undeclared, command)
-				}
-			}
-			if len(undeclared) == 0 {
-				return nil
-			}
-			return usageErrorf("no extension of this workspace declares %s, so impact-plan cannot plan it; "+
-				"%s lists the commands that moved to an extension",
-				strings.Join(undeclared, ", "), commandmeta.CommandsThatLeftTheCoreURL)
-		}
-		return run(ctx, req, sink)
 	}
 }
 
@@ -595,21 +561,32 @@ func cmdCache(env *CommandEnv) error {
 		if env.Global.NoCache {
 			return usageErrorf("cache verify cannot run with --no-cache")
 		}
-		return cachecmd.CacheVerifyCommand(env.Ctx, env.WsRoot, []string{"lint", "test", "build"},
-			env.OutputFormat, newCacheVerifyRunner(env.Cfg, env.Global, engine.New().Run))
+		commands := cacheVerifyCommands(env.WsRoot)
+		return cachecmd.CacheVerifyCommand(env.Ctx, env.WsRoot, commands,
+			env.OutputFormat, newCacheVerifyRunner(env.Cfg, env.Global, commands, engine.New().Run))
 	default:
 		return usageErrorf("unknown subcommand: cache %s\n  Available: clean, gc, verify", env.Sub)
 	}
 }
 
+// cacheVerifyCommands returns the commands cache verify runs in the workspace
+// at wsRoot: its gate, the commands its generated guidance tells a contributor
+// to run (agentctx.GateTasks). The core names no command of its own.
+func cacheVerifyCommands(wsRoot string) []string {
+	return strings.Split(agentctx.GateTasks(wsRoot), ",")
+}
+
 // newCacheVerifyRunner is the CLI-owned adapter from the cache verifier onto
-// Engine.Run. The checker observes the real plan, keys, scheduler, capture, and
-// restore paths without becoming a second execution composition.
+// Engine.Run for commands. The checker observes the real plan, keys,
+// scheduler, capture, and restore paths without becoming a second execution
+// composition.
 func newCacheVerifyRunner(
 	cfg *wsproto.Config,
 	global GlobalFlags,
+	commands []string,
 	run engineRun,
 ) cachecmd.CacheVerifyRunner {
+	commands = append([]string(nil), commands...)
 	return func(ctx context.Context, workspaceRoot, storeRoot string) (cachecmd.CacheVerifyEngineResult, error) {
 		flags := global
 		flags.Plan = false
@@ -638,7 +615,7 @@ func newCacheVerifyRunner(
 		request := engine.Request{
 			WorkspaceRoot:    workspaceRoot,
 			Config:           cfg,
-			Commands:         []string{"lint", "test", "build"},
+			Commands:         append([]string(nil), commands...),
 			Global:           flags,
 			Hooks:            hooks,
 			Preflight:        doctor.DoctorPreflight,
@@ -971,10 +948,10 @@ func cmdHelp(env *CommandEnv) error {
 	for _, a := range env.Args {
 		switch a {
 		case "--man":
-			PrintHelpMan()
+			printHelpMan(newHelpScope(env.WsRoot, env.Cfg))
 			return nil
 		case "--markdown":
-			PrintHelpMarkdown()
+			printHelpMarkdown(newHelpScope(env.WsRoot, env.Cfg))
 			return nil
 		}
 	}
@@ -994,10 +971,15 @@ func cmdHelp(env *CommandEnv) error {
 		// resolved again once the help scope knows them.
 		scope, extensions := discoverHelpScope(env.WsRoot, env.Cfg)
 		command = resolveAliasOrSelf(env.Sub, scope.commandAliases(env.Cfg.Aliases))
-		if isStructuredCommand(command) || nestedSub != "" {
+		switch {
+		case isStructuredCommand(command) || nestedSub != "":
 			printSubcommandHelp(command, nestedSub, scope)
-		} else {
-			printCommandHelp(command, jobCommandFlags(command, extensions), scope)
+		case commandGroupsFor(extensions, env.WsRoot, false)[command]:
+			// A command group of a loaded extension, or a collaboration
+			// contract, is no job command: it prints its subcommands.
+			printCommandGroupHelp(env.Ctx, os.Stdout, env.WsRoot, env.Cfg, extensions, command, "", env.OutputFormat)
+		default:
+			return printDeclaredJobCommandHelp(command, extensions, scope)
 		}
 	} else {
 		printHelp(newHelpScope(env.WsRoot, env.Cfg))

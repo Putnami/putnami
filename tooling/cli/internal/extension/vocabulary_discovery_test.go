@@ -52,7 +52,8 @@ func TestDiscovery_AJobWithoutTraitsTakesItsVerbsDefaultTraits(t *testing.T) {
 	want := map[string]CommandTraits{
 		"bundle":      {RequiresRunnable: true, SideEffects: SideEffectsRegistry},
 		"bundle-fast": {Heavy: true},
-		"publish":     {InjectPublishChannels: true, SideEffects: SideEffectsRegistry},
+		// The vocabulary gives publish no trait, and the core gives it none.
+		"publish": {},
 	}
 	for name, traits := range want {
 		if got := lang.Jobs[name].Traits; got != traits {

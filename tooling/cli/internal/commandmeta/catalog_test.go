@@ -45,13 +45,6 @@ func TestCatalog_ListingRowsAreRenderable(t *testing.T) {
 			t.Errorf("%q sets Label %q but declares no Category, so the display override is never used",
 				command.Path, command.Label)
 		}
-		if command.Kind != KindJob {
-			continue
-		}
-		if command.Category != "" || command.Description != "" {
-			t.Errorf("job command %q must be described by the protocol vocabulary, not by a catalog Category/Description",
-				command.Path)
-		}
 	}
 }
 
@@ -321,52 +314,63 @@ func TestCatalog_ReferenceCommandsCoverEveryDocumentedPathOnce(t *testing.T) {
 	}
 }
 
-// TestBuiltinAliasesResolveToCatalogCommands keeps the shortcut table honest
-// against the vocabulary it abbreviates: an alias for a command the catalog does
-// not know expands to an unknown command at dispatch.
-func TestBuiltinAliasesResolveToCatalogCommands(t *testing.T) {
-	for _, alias := range BuiltinAliasList() {
-		if _, ok := Lookup(alias.Command); !ok {
-			t.Errorf("alias %q expands to %q, which is not a catalog path", alias.Name, alias.Command)
+// developmentSpellings are the development verbs and the short names that
+// @putnami/dev declares for them. The core declares none of them.
+var developmentSpellings = []string{
+	"build", "test", "lint", "serve", "run", "format", "package", "publish", "deploy", "generate", "validate",
+	"b", "t", "l", "s", "f", "p", "P", "d", "D",
+}
+
+// TestCatalog_DeclaresNoJobCommand pins that the catalog is structured-only:
+// no entry is a job command, no development verb or alias is a catalog path,
+// and the command surface lists none of them.
+func TestCatalog_DeclaresNoJobCommand(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "no-core-development-verb", "the-catalog-declares-no-job-command")
+	for _, command := range catalog {
+		if command.Kind != KindStructured {
+			t.Errorf("%q has kind %d, want every catalog entry structured", command.Path, command.Kind)
+		}
+	}
+	surface, err := Surface()
+	if err != nil {
+		t.Fatalf("Surface: %v", err)
+	}
+	for _, name := range developmentSpellings {
+		if _, ok := Lookup(name); ok {
+			t.Errorf("the catalog declares %q, want it declared only by a loaded extension", name)
+		}
+		if IsStructuredRoot(name) {
+			t.Errorf("%q is a structured root, want no core command of that name", name)
+		}
+		for _, command := range surface.Commands {
+			if command.Path == name {
+				t.Errorf("the command surface lists %q, want it absent from the core", name)
+			}
 		}
 	}
 }
 
-// TestWorkspaceAliasReservesOnlyWhatApplies keeps the reservation rule that
-// help, completion and dispatch share: a workspace alias named like a built-in
-// alias never applies, so it reserves no name from a vocabulary.
-func TestWorkspaceAliasReservesOnlyWhatApplies(t *testing.T) {
+// TestWorkspaceAliasReservesWhatItNames keeps the reservation rule that help,
+// completion and dispatch share: a catalog path or a workspace alias reserves
+// its name from a vocabulary alias, and nothing else does.
+func TestWorkspaceAliasReservesWhatItNames(t *testing.T) {
+	t.Parallel()
 	workspace := map[string]string{"b": "lint", "x": "test"}
-	if WorkspaceAliasApplies("b", workspace) || ReservesVocabularyAlias("b", workspace) {
-		t.Error("workspace alias b applies, want the built-in b to resolve first")
+	if !ReservesVocabularyAlias("b", workspace) {
+		t.Error("workspace alias b reserves nothing, want it to reserve b")
 	}
-	if !WorkspaceAliasApplies("x", workspace) || !ReservesVocabularyAlias("x", workspace) {
-		t.Error("workspace alias x does not apply, want it to reserve x")
+	if !ReservesVocabularyAlias("x", workspace) {
+		t.Error("workspace alias x reserves nothing, want it to reserve x")
 	}
-	if WorkspaceAliasApplies("y", workspace) || ReservesVocabularyAlias("y", workspace) {
+	if ReservesVocabularyAlias("y", workspace) {
 		t.Error("y is reserved, want no workspace alias and no catalog command to reserve it")
 	}
-	if !ReservesVocabularyAlias("deploy", nil) {
-		t.Error("deploy is free, want every catalog command reserved")
+	if !ReservesVocabularyAlias("doctor", nil) {
+		t.Error("doctor is free, want every catalog command reserved")
 	}
-}
-
-func TestPublicJobCommands_MatchCatalogOrder(t *testing.T) {
-	var want []string
-	for _, command := range catalog {
-		if command.Kind == KindJob {
-			want = append(want, command.Path)
-		}
-	}
-	var got []string
-	for _, command := range PublicJobCommands() {
-		got = append(got, command.Name)
-		if command.Description == "" {
-			t.Errorf("job command %q has no description", command.Name)
-		}
-	}
-	if strings.Join(got, ",") != strings.Join(want, ",") {
-		t.Errorf("PublicJobCommands() = %v, want the catalog's job order %v", got, want)
+	if ReservesVocabularyAlias("deploy", nil) || ReservesVocabularyAlias("b", nil) {
+		t.Error("deploy or b is reserved, want the core to reserve no development verb or alias")
 	}
 }
 

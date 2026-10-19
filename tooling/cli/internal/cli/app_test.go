@@ -700,6 +700,8 @@ func TestAppRun_NoArgs(t *testing.T) {
 	}
 }
 
+// TestAppRun_HelpForCommand pins that help for a command no loaded extension
+// declares is a usage error: outside a workspace, no extension declares build.
 func TestAppRun_HelpForCommand(t *testing.T) {
 	t.Chdir(t.TempDir())
 	app, err := NewApp()
@@ -707,8 +709,8 @@ func TestAppRun_HelpForCommand(t *testing.T) {
 		t.Fatalf("NewApp: %v", err)
 	}
 	code := app.Run(context.Background(), []string{"build", "--help"})
-	if code != ExitSuccess {
-		t.Errorf("build --help exit code = %d, want %d", code, ExitSuccess)
+	if code != ExitUsage {
+		t.Errorf("build --help exit code = %d, want %d", code, ExitUsage)
 	}
 }
 
