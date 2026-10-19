@@ -113,7 +113,14 @@ the user entry, and a checked-in `.mcp.json` server requires the host's one-time
 project approval. `putnami init`, `putnami install` and `putnami upgrade` add
 the `putnami` entry to that file when it is missing, and `putnami mcp install`
 repairs a diverged one. In a source workspace whose root holds an executable
-`putnamiw`, that entry runs `./putnamiw mcp`, not the user launcher. Codex
+`putnamiw`, that entry runs `./putnamiw mcp`, not the user launcher. When the
+CLI of that tree is not built yet, `./putnamiw mcp` answers the host while it
+builds, as a server that is still preparing and has no tools. When the build
+lands, it hands the session to the built server and sends
+`notifications/tools/list_changed`, and the host lists the real tools. A host
+that ignores that notification shows them after it reconnects. The session
+keeps the instructions of the preparing server: reconnect it for the server's
+own. Codex
 loads `.codex/config.toml` only after the project is trusted, and a project
 entry can replace the user launcher. Inspect a preserved
 override with `claude mcp get putnami` or `codex mcp get putnami`. A host session

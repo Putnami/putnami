@@ -2680,6 +2680,22 @@
           }
         },
         {
+          "id": "cold-mcp-start",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-cold-mcp-start-answers-initialize-and-hands-the-session-to-the-built-server",
+              "a-failed-cold-mcp-build-ends-the-session-with-its-error",
+              "the-built-server-receives-the-signals-the-client-sends",
+              "an-exited-server-ends-the-session"
+            ]
+          }
+        },
+        {
           "id": "build-toolchain-stays-in-the-build",
           "stage": "coded",
           "evidenceKinds": [
