@@ -620,6 +620,7 @@
       },
       "batchable": {
         "tool": "go-test",
+        "kind": "verification",
         "maxProjectsParam": "batch-max-projects"
       },
       "declares": {
@@ -1171,6 +1172,8 @@
       },
       "batchable": {
         "tool": "golangci-lint",
+        "kind": "diagnostics",
+        "phase": "lint",
         "configFiles": [
           "{projectRoot}/.golangci.yml",
           "{projectRoot}/.golangci.yaml",
@@ -1215,6 +1218,8 @@
       },
       "batchable": {
         "tool": "golangci-lint",
+        "kind": "diagnostics",
+        "phase": "lint",
         "configFiles": [
           "{projectRoot}/.golangci.yml",
           "{projectRoot}/.golangci.yaml",
@@ -1299,6 +1304,8 @@
       },
       "batchable": {
         "tool": "staticcheck",
+        "kind": "diagnostics",
+        "phase": "lint",
         "maxProjects": 12
       },
       "declares": {

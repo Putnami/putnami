@@ -1609,6 +1609,8 @@
       ],
       "batchable": {
         "tool": "biome",
+        "kind": "diagnostics",
+        "phase": "lint",
         "configFiles": [
           "{projectRoot}/biome.json",
           "{workspaceRoot}/biome.json",
@@ -1841,6 +1843,7 @@
       ],
       "batchable": {
         "tool": "biome",
+        "phase": "lint",
         "configFiles": [
           "{projectRoot}/biome.json",
           "{workspaceRoot}/biome.json",
@@ -1996,6 +1999,7 @@
       ],
       "batchable": {
         "tool": "bun",
+        "kind": "verification",
         "maxWorkers": 1,
         "maxProjects": 4,
         "configFiles": [

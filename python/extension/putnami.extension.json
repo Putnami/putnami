@@ -267,6 +267,7 @@
       "reads": ["sources"],
       "batchable": {
         "tool": "ruff",
+        "phase": "format",
         "configFiles": [
           "{projectRoot}/ruff.toml",
           "{projectRoot}/.ruff.toml",
@@ -304,6 +305,7 @@
       "writes": ["sources"],
       "batchable": {
         "tool": "ruff",
+        "phase": "lint",
         "configFiles": [
           "{projectRoot}/ruff.toml",
           "{projectRoot}/.ruff.toml",
@@ -364,6 +366,7 @@
       "reads": ["sources"],
       "batchable": {
         "tool": "ruff",
+        "phase": "lint",
         "configFiles": [
           "{projectRoot}/ruff.toml",
           "{projectRoot}/.ruff.toml",
@@ -399,6 +402,7 @@
       },
       "batchable": {
         "tool": "pytest",
+        "kind": "verification",
         "maxWorkers": 1,
         "maxProjects": 4,
         "configFiles": ["{workspaceRoot}/uv.lock", "{workspaceRoot}/pyproject.toml"]
