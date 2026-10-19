@@ -231,6 +231,12 @@ var verticalCrossImportExceptions = []verticalCrossImportException{
 	{file: "internal/commands/lifecycle/workspace_init.go", imports: "agentctx", why: whyLifecycleAgentctx},
 	{file: "internal/commands/lifecycle/ensure.go", imports: "agentctx", why: whyLifecycleAgentctx},
 	{
+		file:    "internal/commands/lifecycle/extensions_install.go",
+		imports: "agentctx",
+		why: whyLifecycleAgentctx + ". `extensions install <name>` opts the workspace into the content " +
+			"of the extension it names and materializes it (OptIntoExtensionAgentContent, InstallExtensionAgentContentWithResult)",
+	},
+	{
 		file:    "internal/commands/lifecycle/install_test.go",
 		imports: "agentctx",
 		why: whyLifecycleAgentctx +
@@ -244,6 +250,12 @@ var verticalCrossImportExceptions = []verticalCrossImportException{
 			"lives in lifecycle and reaches agentctx through its exported seams",
 	},
 	{file: "internal/commands/lifecycle/install.go", imports: "extensions", why: whyLifecycleExtensions},
+	{
+		file:    "internal/commands/lifecycle/extensions_install.go",
+		imports: "extensions",
+		why: whyLifecycleExtensions + ". `extensions install <name>` installs the extension, then " +
+			"opts into its agent content as one command (ExtensionsInstall, InstallTargetName)",
+	},
 	{file: "internal/commands/lifecycle/upgrade.go", imports: "extensions", why: whyLifecycleExtensions},
 	{file: "internal/commands/lifecycle/workspace_init.go", imports: "extensions", why: whyLifecycleExtensions},
 	{file: "internal/commands/lifecycle/projects_create.go", imports: "extensions", why: whyLifecycleExtensions},

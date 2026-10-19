@@ -240,3 +240,28 @@ func TestExtensionsInstallMaterializes(t *testing.T) {
 		}
 	}
 }
+
+// TestInstallTargetName covers the name the agent-content opt-in follows: the
+// registry extension the command names, and nothing else.
+func TestInstallTargetName(t *testing.T) {
+	cases := []struct {
+		args []string
+		want string
+	}{
+		{nil, ""},
+		{[]string{"--latest"}, ""},
+		{[]string{"@putnami/contributor"}, "@putnami/contributor"},
+		{[]string{"--latest", "@putnami/contributor"}, "@putnami/contributor"},
+		{[]string{"@putnami/contributor@1.2.0"}, "@putnami/contributor"},
+		{[]string{"@putnami/contributor@canary"}, "@putnami/contributor"},
+		{[]string{"/tooling/contributor"}, ""},
+		{[]string{"./tooling/contributor"}, ""},
+		{[]string{"--platform", foreignPlatformArg(), "@putnami/contributor"}, ""},
+		{[]string{"--dest", "/tmp/warm", "@putnami/contributor"}, ""},
+	}
+	for _, c := range cases {
+		if got := InstallTargetName(c.args); got != c.want {
+			t.Errorf("InstallTargetName(%v) = %q, want %q", c.args, got, c.want)
+		}
+	}
+}

@@ -84,7 +84,7 @@
     },
     {
       "id": "starter-agent-content-opt-in",
-      "text": "No built-in starter opts into agent content: `putnami init` declares and installs no agent-content extension. A workspace asks by declaring `@putnami/contributor` in `extensions` and `extension:@putnami/contributor` in `agentArtifacts`, then running `putnami install`. A starter that names one has init install it and materialize its content; if the install fails, init keeps both declarations, writes no agent file, and names `putnami install`."
+      "text": "No built-in starter opts into agent content, so `putnami init` declares none. `putnami extensions install @putnami/contributor` declares the extension and materializes only its content, and reports each write; an extension without content, or installed as a dependency, gets no opt-in. A starter that names one has init do the same. When the content step fails, both declarations stay, no agent file is written, and `putnami install` is the next step."
     }
   ],
   "decisions": [

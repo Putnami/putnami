@@ -925,7 +925,11 @@ so on down the graph. See
   `putnami.workspace.json`. A dependency appears in the output with the
   extension that requires it: `✓ @acme/dev@1.2.0 (required by @acme/app)`.
   `putnami extensions install <name>` installs `<name>` and its dependencies
-  only, and runs their `onInstall` hooks.
+  only, and runs their `onInstall` hooks. When `<name>` ships agent content, it
+  also declares `<name>` in `extensions`, opts into the content in
+  `agentArtifacts` and materializes it ([Agent
+  Workflows](18-agent-workflows.md#how-a-workspace-opts-in)); a dependency gets
+  neither entry.
 - **Edges.** The CLI follows the dependencies of an extension installed from
   the artifact store or declared by path. It follows those of an extension
   loaded from `node_modules` only when the workspace declares its name and

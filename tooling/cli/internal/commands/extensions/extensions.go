@@ -108,6 +108,26 @@ func ExtensionsInstallMaterializes(args []string) bool {
 	return target.Materializes()
 }
 
+// InstallTargetName returns the registry extension an `extensions install`
+// argument list names, without any version. It returns "" when the list names
+// none, names a workspace-local path, or asks for a packaging materialization,
+// which installs nothing into this workspace.
+func InstallTargetName(args []string) string {
+	rest, target, err := parseArtifactTarget("", args)
+	if err != nil || target.Materializes() {
+		return ""
+	}
+	_, rest = splitLatestInstallArg(rest)
+	if len(rest) == 0 {
+		return ""
+	}
+	name, _ := parseExtensionArg(rest[0])
+	if isLocalExtensionRef(name) {
+		return ""
+	}
+	return name
+}
+
 // parseArtifactTarget splits the materialization flags out of an install
 // argument list and validates them, returning the remaining arguments (the
 // optional artifact name, --latest, …) untouched.

@@ -342,7 +342,7 @@ A channel that names no release for one of them fails the run; `init` does not f
 
 The channel is a target of that run only. `putnami.workspace.json` keeps bare extension and template names, `putnami.lock.json` records the exact versions, and the TypeScript workspace catalog gets the exact versions the channel names, never the channel name. `putnami install` reads the lock afterwards, and `putnami upgrade` still follows `latest` by default. See [ADR 0056](adr/0056-init-resolves-on-one-channel.md).
 
-No built-in starter opts into agent content, so `init` does not install `@putnami/contributor` and adds no `agentArtifacts` entry. To ask for it, add `@putnami/contributor` to `extensions` and `extension:@putnami/contributor` to `agentArtifacts` in `putnami.workspace.json`, then run `putnami install`. The declaration in `putnami.workspace.json` is the only opt-in, `init` has no flag for it, and `putnami extensions install` alone writes only the lock. A starter that names an agent-content extension has `init` declare it in `extensions`, opt into its content with `extension:<name>` in `agentArtifacts`, install it, and materialize its content; when the install fails, both declarations stay and `init` names `putnami install` as the next step. `init --force` on a workspace that already opted in keeps those declarations rather than rewriting them away. See [Agent Workflows](18-agent-workflows.md#lifecycle-init-install-upgrade).
+No built-in starter opts into agent content, so `init` does not install `@putnami/contributor` and adds no `agentArtifacts` entry. To ask for it, run `putnami extensions install @putnami/contributor`: it declares the extension in `extensions`, opts into its content with `extension:@putnami/contributor` in `agentArtifacts`, and materializes the content. The declaration in `putnami.workspace.json` is the only opt-in, `init` has no flag for it, and only the extension the command names gets one: an extension without agent content, or installed only as a dependency of another, gets none. A second run, or `putnami install` afterwards, changes nothing. A starter that names an agent-content extension has `init` declare it in `extensions`, opt into its content with `extension:<name>` in `agentArtifacts`, install it, and materialize its content; when the install fails, both declarations stay and `init` names `putnami install` as the next step. `init --force` on a workspace that already opted in keeps those declarations rather than rewriting them away. See [Agent Workflows](18-agent-workflows.md#lifecycle-init-install-upgrade).
 
 `workspace describe` shows the workspace name, version, project count, extension count, and configuration summary. Supports `--output=jsonl`.
 
@@ -583,6 +583,20 @@ putnami extensions remove <name>    # Remove an extension
 putnami extensions prepare          # Prepare the provider runtimes of a source workspace
 putnami extensions validate [path]  # Validate an extension manifest (for authors; needs no workspace)
 ```
+
+`extensions install <name>` also acts on the agent content of the extension it
+names: when that extension ships content, the command adds it to `extensions`
+and `extension:<name>` to `agentArtifacts` in `putnami.workspace.json`, then
+materializes the content of that extension only, so another opted-in extension
+whose content is not installed here neither fails the command nor changes. An
+extension without content, a workspace-local path, and an extension installed
+only as a dependency leave the file as it was. A second run changes nothing.
+When the content step fails after the opt-in was written, for example on a file
+you own at a path the content needs, the command exits non-zero and leaves both
+declarations and the lock pin in place with no agent file written: remove the
+cause, then run `putnami install`. With `--output=jsonl` the command reports the
+opt-in and each materialized contribution as lifecycle actions, as `install`
+does, and keeps stdout to the install records.
 
 `extensions update`, with or without a name, resolves each extension and each
 of its dependencies again on its constraint and writes the new version to the

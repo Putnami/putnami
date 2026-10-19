@@ -341,6 +341,8 @@ func TestLocateAgentContent_RefusesAPackageThatDoesNotBindItsContent(t *testing.
 		setup func(t *testing.T, wsRoot string)
 		cfg   *wsproto.Config
 		want  string
+		// next is the command the error suggests; empty when it suggests none.
+		next string
 	}{
 		"a package the package manager has not installed": {
 			setup: func(t *testing.T, wsRoot string) {
@@ -348,6 +350,7 @@ func TestLocateAgentContent_RefusesAPackageThatDoesNotBindItsContent(t *testing.
 			},
 			cfg:  contentConfig(),
 			want: "has not installed it",
+			next: "putnami install",
 		},
 		"another package installed under the name": {
 			setup: func(t *testing.T, wsRoot string) {
@@ -422,6 +425,9 @@ func TestLocateAgentContent_RefusesAPackageThatDoesNotBindItsContent(t *testing.
 			}
 			if !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("error = %v, want it to mention %q", err, tc.want)
+			}
+			if got := protocolcli.SuggestedNext(err); got != tc.next {
+				t.Fatalf("suggested next step = %q, want %q", got, tc.next)
 			}
 		})
 	}

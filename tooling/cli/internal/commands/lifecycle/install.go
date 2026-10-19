@@ -375,12 +375,18 @@ func installAgentWorkflows(ctx context.Context, wsRoot string, cfg *wsproto.Conf
 		return fmt.Errorf("agent workflows install: %w", err)
 	}
 	for _, action := range workflowActions {
-		phase.record(LifecycleAction{
-			Kind: "agent-workflow", Name: action.Name,
-			Description: fmt.Sprintf("Agent workflow %s@%s materialized", action.Name, action.Version),
-		})
+		phase.record(agentWorkflowLifecycleAction(action))
 	}
 	return nil
+}
+
+// agentWorkflowLifecycleAction is the record of one contribution whose files
+// changed, shared by every command that materializes agent content.
+func agentWorkflowLifecycleAction(action agentctx.AgentWorkflowInstallAction) LifecycleAction {
+	return LifecycleAction{
+		Kind: "agent-workflow", Name: action.Name,
+		Description: fmt.Sprintf("Agent workflow %s@%s materialized", action.Name, action.Version),
+	}
 }
 
 func artifactLifecycleAction(action extensions.InstallAction) (LifecycleAction, bool) {

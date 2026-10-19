@@ -5,9 +5,10 @@ extension the workspace declares and opts into. The CLI materializes that
 content **without ever overwriting a file you own**. Putnami's own workflows
 ship as the agent content of one extension,
 [`@putnami/contributor`](../../contributor/README.md); no built-in starter
-declares it. A workspace asks for it by declaring it in `extensions` and
-`extension:@putnami/contributor` in `agentArtifacts`, then running
-`putnami install`. This repository opts into it too.
+declares it. A workspace asks for it with
+`putnami extensions install @putnami/contributor`, which declares it in
+`extensions`, opts into it with `extension:@putnami/contributor` in
+`agentArtifacts` and materializes its content. This repository opts into it too.
 
 Workflows declared as separate artifacts — a registry reference such as
 `@putnami/agent-workflows:stable` or an in-tree project path such as
@@ -91,7 +92,9 @@ the archive. A member the manifest does not declare is inert.
 ## How a workspace opts in
 
 By declaring the extension in `extensions` and opting into its content in
-`agentArtifacts`, in `putnami.workspace.json`, and in no other way:
+`agentArtifacts`, in `putnami.workspace.json`, and in no other way.
+`putnami extensions install <name>` writes both entries for the extension it
+names, when that extension ships agent content:
 
 ```json
 {
@@ -101,7 +104,9 @@ By declaring the extension in `extensions` and opting into its content in
 ```
 
 Installing an extension that carries content activates nothing: only the
-`extension:<name>` entry does. The entry names no version — the content always
+`extension:<name>` entry does. Naming the extension on `extensions install` is
+the request that writes it; an extension installed only because another one
+requires it gets no entry. The entry names no version — the content always
 has the version the extension resolves to, so there is one version to install,
 pin and upgrade. Nothing is pinned under `agentArtifacts` either: the
 extension's own lock entry is the pin, and it binds the content end to end. The
@@ -240,10 +245,9 @@ reads and hashes them.
 
 No built-in starter (`--extension ts|go|py`) opts into agent content, so `init`
 does not install `@putnami/contributor` and writes no agent-content declaration.
-To ask for it, add `@putnami/contributor` to `extensions` and
-`extension:@putnami/contributor` to `agentArtifacts` in `putnami.workspace.json`,
-then run `putnami install`; `putnami extensions install` alone writes only the
-lock. When a starter does name an agent-content extension, `init` writes both
+To ask for it, run `putnami extensions install @putnami/contributor`, which
+declares it, opts into its content and materializes it; a second run, or
+`putnami install` afterwards, changes nothing. When a starter does name an agent-content extension, `init` writes both
 declarations into the new `putnami.workspace.json`, installs the extension —
 which pins it — and materializes its content. If the extension cannot be
 installed, both declarations stay, no agent file is written, and `init` reports

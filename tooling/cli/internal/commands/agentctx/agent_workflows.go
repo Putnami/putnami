@@ -253,6 +253,34 @@ func InstallAgentWorkflowsWithResult(_ context.Context, wsRoot string, cfg *wspr
 	if err != nil {
 		return nil, err
 	}
+	return installAgentArtifactRefs(wsRoot, cfg, refs, out)
+}
+
+// InstallExtensionAgentContentWithResult materializes the agent content of the
+// one extension name, at the release the committed lock pins, and nothing else.
+// It is the agent phase of `putnami extensions install <name>`.
+//
+// The other opted-in contributions are not read, so one that cannot be
+// materialized here (pinned but not installed on this machine) cannot fail the
+// command that names a different extension. They are also not written: the run
+// plans and applies only name's own record and the files that record owns, so
+// no other owner's file is pruned and no other record is dropped. It retires no
+// owner and touches no lock pin; the full `putnami install` still reconciles
+// every contribution.
+func InstallExtensionAgentContentWithResult(_ context.Context, wsRoot string, cfg *wsproto.Config, name string, out io.Writer) ([]AgentWorkflowInstallAction, error) {
+	ref, ok, err := parseExtensionAgentContentReference(extensionAgentContentPrefix + name)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("agent content of %q cannot be named", name)
+	}
+	return installAgentArtifactRefs(wsRoot, cfg, []AgentArtifactRef{ref}, out)
+}
+
+// installAgentArtifactRefs prepares every contribution in refs before writing
+// any of them, then commits those and no others, with no retirement.
+func installAgentArtifactRefs(wsRoot string, cfg *wsproto.Config, refs []AgentArtifactRef, out io.Writer) ([]AgentWorkflowInstallAction, error) {
 	if len(refs) == 0 {
 		return nil, nil
 	}
