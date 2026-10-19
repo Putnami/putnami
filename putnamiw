@@ -1301,8 +1301,9 @@ run_prepared_cli() {
 # `notifications/resources/list_changed` in its place. The session directory
 # exists until the CLI is ready; once it is gone, the relay copies every frame
 # to the CLI unread. The CLI replaces the wrapper process, so the signals the
-# client sends reach it. A failed preparation ends the session with its error
-# on stderr.
+# client sends reach it. When the CLI's stdout closes, the relay ends, so the
+# client's stdout and stderr close with the CLI. A failed preparation ends the
+# session with its error on stderr.
 
 MCP_PREPARE_ID='"putnamiw-prepare"'
 
@@ -1418,9 +1419,10 @@ mcp_relay_while_preparing() {
 
 # mcp_announce_ready copies the CLI's stdout to the client. When its first frame
 # is the reply to the replayed initialize, it writes the two list_changed
-# notifications in its place.
+# notifications in its place. When the CLI's stdout closes, it ends the relay
+# whose process id is $1.
 mcp_announce_ready() {
-  local line
+  local relay="$1" line
   if IFS= read -r line || [ -n "$line" ]; then
     case "$line" in
       *"\"id\":$MCP_PREPARE_ID"*)
@@ -1430,23 +1432,25 @@ mcp_announce_ready() {
       *) printf '%s\n' "$line" ;;
     esac
   fi
-  exec cat
+  cat || true
+  kill "$relay" 2>/dev/null || true
 }
 
 # serve_mcp_while_preparing prepares the CLI and serves the MCP session as the
 # section above states. It never returns.
 serve_mcp_while_preparing() {
-  local dir
+  local dir relay
   dir="$(mktemp -d "${TMPDIR:-/tmp}/putnamiw-mcp.XXXXXX")" || fail "Cannot create a directory for the MCP session"
   register_cleanup "$dir"
   mkfifo "$dir/frames" || fail "Cannot create the MCP frame queue at $dir/frames"
   mcp_relay_while_preparing "$dir" <&0 4>"$dir/frames" &
   MCP_RELAY_PID=$!
+  relay="$MCP_RELAY_PID"
   exec <"$dir/frames"
   prepare_cli </dev/null >&2
   rm -rf "$dir"
   MCP_RELAY_PID=""
-  exec > >(mcp_announce_ready)
+  exec > >(mcp_announce_ready "$relay")
   run_prepared_cli
 }
 

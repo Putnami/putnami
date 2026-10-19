@@ -323,8 +323,7 @@ func TestPutnamiwMCP_FailedBuildEndsTheSession(t *testing.T) {
 }
 
 // Once the CLI runs, it is the process the client started: a signal the client
-// sends to that process ends it with the client's stdin still open. The relay
-// ends when the client closes stdin.
+// sends to that process ends it with the client's stdin still open.
 func TestPutnamiwMCP_TheBuiltServerReceivesTheClientsSignals(t *testing.T) {
 	repo, _, baseEnv := gitSourceRepo(t)
 	env, gate, _, tmp := mcpEnv(t, baseEnv)
@@ -366,4 +365,29 @@ func TestPutnamiwMCP_TheBuiltServerReceivesTheClientsSignals(t *testing.T) {
 	assertEmptyDir(t, tmp)
 	spectest.Proves(t, "cli/engine-provenance", "cold-mcp-start",
 		"the-built-server-receives-the-signals-the-client-sends")
+}
+
+// A built server that exits on its own closes the client's stdout, with the
+// client's stdin still open.
+func TestPutnamiwMCP_AnExitedServerEndsTheSession(t *testing.T) {
+	repo, _, baseEnv := gitSourceRepo(t)
+	env, gate, _, tmp := mcpEnv(t, baseEnv)
+	if err := os.WriteFile(envValue(env, "SENTINEL_FAIL"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := startMCP(t, repo, env)
+	s.send(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`)
+	if reply := s.next(); reply.Result.ServerInfo.Version != "preparing" {
+		t.Fatalf("initialize reply = %+v, want the preparing server", reply)
+	}
+	if err := os.WriteFile(gate, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code := s.wait(false); code != 7 {
+		t.Fatalf("exit code %d, want the built server's 7; stderr:\n%s", code, s.stderr.String())
+	}
+	assertEmptyDir(t, tmp)
+	spectest.Proves(t, "cli/engine-provenance", "cold-mcp-start",
+		"an-exited-server-ends-the-session")
 }

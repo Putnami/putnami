@@ -561,6 +561,8 @@ case "$1" in
          if [ -f "$GO_BUILD_FAIL" ]; then echo "stub go: build refused" >&2; exit 1; fi
          [ -n "$out" ] && { cat > "$out" <<'SENTINEL'
 #!/usr/bin/env bash
+if [ -f "$SENTINEL_FAIL" ]; then echo "sentinel: $* refused" >&2; exit 7; fi
+if [ -n "${SENTINEL_NEEDS:-}" ] && [ ! -x "$SENTINEL_NEEDS" ]; then echo "sentinel: $SENTINEL_NEEDS is missing" >&2; exit 8; fi
 if [ "$*" = "mcp" ] && [ -n "${SENTINEL_MCP_LOG:-}" ]; then
   id_re='.*"id":("[^"]*"|[0-9]+)'
   method_re='"method":"([^"]*)"'
@@ -574,8 +576,6 @@ if [ "$*" = "mcp" ] && [ -n "${SENTINEL_MCP_LOG:-}" ]; then
   done
   exit 0
 fi
-if [ -f "$SENTINEL_FAIL" ]; then echo "sentinel: $* refused" >&2; exit 7; fi
-if [ -n "${SENTINEL_NEEDS:-}" ] && [ ! -x "$SENTINEL_NEEDS" ]; then echo "sentinel: $SENTINEL_NEEDS is missing" >&2; exit 8; fi
 echo RAN_BUILT
 echo "ARGS=$*"
 echo "CWD=$PWD"
