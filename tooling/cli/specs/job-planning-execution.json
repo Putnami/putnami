@@ -102,6 +102,10 @@
       "text": "The verification report comes from verification-kind commands and the criteria projection from criteria-kind commands, via the tasks that declare each as a command-output file; a stepless verification job also writes the report. A session naming a verification command carries the spec gate, which plans those commands to recover cached reports and the declaring criteria commands to learn applicability. A warm hit restores both artifacts. Coverage comes from verification jobs and replays under their command."
     },
     {
+      "id": "batch-parity-and-live-cells-follow-declared-kinds",
+      "text": "A batch member tallies by its task's batchable.kind, names its phase from batchable.phase else its step id, and names its command in the meta event as a solo run does. The live view values a cell, its Tasks line and its failure cause by the command's kind: diagnostics counts errors and warnings, verification tests and coverage, files produced files; criteria or no kind shows status only. Columns follow the loaded vocabulary, then name order; width and hide priority follow kind, side effects and workload."
+    },
+    {
       "id": "scoped-cache-bypass",
       "text": "--no-cache-projects <selector> refuses cache reuse for the named projects' tasks and every planned task that transitively depends on one, while the rest of the run keeps its reuse. A bypassed task is never looked up, served, published or failure-replayed, and records no failure; only its success deletes one. The selector speaks the --projects grammar, ignores tag and exclude filters, and fails the run when it matches nothing. --no-cache subsumes it. Neither reaches a cache key or task params."
     },

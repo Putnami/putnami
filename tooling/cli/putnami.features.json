@@ -862,6 +862,26 @@
           }
         },
         {
+          "id": "batch-parity-and-live-cells-follow-declared-kinds",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-batch-member-tallies-by-its-declared-batchable-kind",
+              "a-batch-member-phase-is-its-declared-phase-else-its-step-id",
+              "a-batch-member-meta-names-its-command-as-a-solo-run-does",
+              "the-first-party-batchable-tasks-keep-their-tally-and-phase",
+              "a-live-cell-values-by-the-declared-kind",
+              "the-tasks-line-and-failure-cause-follow-the-kind",
+              "columns-no-vocabulary-names-rank-after-it-alphabetically",
+              "cell-width-and-hide-priority-derive-from-traits"
+            ]
+          }
+        },
+        {
           "id": "scoped-cache-bypass",
           "stage": "coded",
           "evidenceKinds": [

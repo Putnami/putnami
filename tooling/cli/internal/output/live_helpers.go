@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"go.putnami.dev/cli/model/jobs"
+	extensionproto "go.putnami.dev/protocol/extension"
 )
 
 // stripStepSuffix removes the pipeline step suffix: "build~generate" → "build".
@@ -32,55 +33,42 @@ func commandName(job *jobs.ScheduledJob) string {
 	return stripStepSuffix(job.JobDef.Name)
 }
 
-// fallbackCommandOrder orders the verbs that no loaded vocabulary orders.
-var fallbackCommandOrder = []string{
-	"generate", "lint", "format", "test", "build", "package", "publish", "deploy", "serve",
-}
-
-// unknownCommandRank is the lowest rank of a command that neither the loaded
-// vocabularies nor the fallback order name; a longer vocabulary pushes it
-// further.
+// unknownCommandRank is the lowest rank of a command that the loaded
+// vocabularies do not name; a longer vocabulary pushes it further.
 const unknownCommandRank = 100
 
 // commandRank ranks name in the column order of the live view: the verbs of
-// the loaded vocabularies first, in vocabulary order, then the fallback verbs
-// the vocabularies do not name, in fallback order. A command neither names
-// ranks after them all; the caller sorts those alphabetically.
+// the loaded vocabularies first, in vocabulary order. A command no vocabulary
+// names ranks after them all; the caller sorts those alphabetically.
 func commandRank(vocabulary []string, name string) int {
 	if i := slices.Index(vocabulary, name); i >= 0 {
 		return i
 	}
-	rank := len(vocabulary)
-	for _, verb := range fallbackCommandOrder {
-		if verb == name {
-			return rank
-		}
-		if !slices.Contains(vocabulary, verb) {
-			rank++
-		}
-	}
-	return max(unknownCommandRank, rank)
+	return max(unknownCommandRank, len(vocabulary))
 }
 
 // summaryColumnHideRank orders summary cells by how readily they should be
-// removed as terminal width tightens. The rendered order stays canonical; this
+// removed as terminal width tightens, from the command's traits: a cell that
+// shows a status only hides first, then a diagnostics or criteria tally, the
+// verification counts, the produced files, a registry publication, and last a
+// cloud effect or a workload. The rendered order stays canonical; this
 // priority only chooses which achievements survive on narrower windows.
-func summaryColumnHideRank(name string) int {
-	switch name {
-	case "package":
-		return 0
-	case "generate", "format", "lint":
-		return 2
-	case "test":
-		return 3
-	case "build":
-		return 4
-	case "publish":
-		return 5
-	case "deploy", "serve":
+func summaryColumnHideRank(traits extensionproto.CommandTraits) int {
+	switch {
+	case traits.Workload != "" || traits.SideEffects == extensionproto.SideEffectsCloud:
 		return 6
-	default:
+	case traits.SideEffects == extensionproto.SideEffectsRegistry:
+		return 5
+	}
+	switch traits.Kind {
+	case extensionproto.CommandKindFiles:
+		return 4
+	case extensionproto.CommandKindVerification:
+		return 3
+	case extensionproto.CommandKindDiagnostics, extensionproto.CommandKindCriteria:
 		return 2
+	default:
+		return 0
 	}
 }
 

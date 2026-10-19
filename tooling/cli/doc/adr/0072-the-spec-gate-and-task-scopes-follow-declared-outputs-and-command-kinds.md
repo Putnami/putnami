@@ -124,8 +124,9 @@ Behavior changes only for a manifest whose command name and kind disagree:
   and kind disagree. The executor then refuses the request rather than run a
   different graph, as the seam already does for any graph difference.
 - The unconsulted-candidate messages keep their wording ("the test task that
-  writes its verification report"), and the run summary still renders
-  coverage only on the `test` line. Both are outside this decision.
+  writes its verification report"), which is outside this decision. The run
+  summary renders coverage on the line of a verification-kind command once the
+  live view follows the declared kinds.
 
 ## How this is proven
 

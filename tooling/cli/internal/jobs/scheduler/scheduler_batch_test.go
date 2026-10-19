@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -377,15 +379,22 @@ func TestProjectPathsOverlap(t *testing.T) {
 	}
 }
 
-func TestBatchResultEventsRenderGoTestMetricsWithoutLintMetrics(t *testing.T) {
-	ws, planned := makeBatchSchedulerFixture(t, "")
-	job := planned[0]
-	job.JobDef.CommandName = "test"
-	job.JobDef.Name = "test~test"
-	job.JobDef.Args = []string{"test"}
+// declareBatchKind gives job its own copy of its batch policy, declaring kind.
+func declareBatchKind(job *ScheduledJob, kind string) {
+	policy := *job.JobDef.Batchable
+	policy.Kind = kind
+	job.JobDef.Batchable = &policy
+}
 
-	result := jobResultFromBatchWire(ws.Root, job, batchWireResult{
-		ProjectID: job.Project.ID,
+// A batch member reports the tally its task's batch kind names. The wire below
+// carries both a lint summary and test data, so only the kind can choose: the
+// lint counters, progress, log and summary for diagnostics, the test and
+// coverage ones for verification, and neither without a kind.
+func TestBatchMemberTalliesByItsDeclaredBatchKind(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "batch-parity-and-live-cells-follow-declared-kinds",
+		"a-batch-member-tallies-by-its-declared-batchable-kind")
+	wire := batchWireResult{
+		ProjectID: "/a",
 		Status:    "OK",
 		Data: map[string]any{
 			"testSummary": map[string]any{
@@ -400,48 +409,140 @@ func TestBatchResultEventsRenderGoTestMetricsWithoutLintMetrics(t *testing.T) {
 				"coveredStatements": float64(6),
 			},
 		},
+		Summary: batchWireSummary{Warnings: 2},
 		Artifacts: []batchWireArtifact{{
 			ID: "coverage", Name: "Coverage Profile", Kind: "coverage", Path: ".putnami/out/a/test/coverage.out",
 		}},
-	}, &JobResult{Duration: time.Second}, nil)
+	}
+	for _, test := range []struct {
+		kind     string
+		metrics  []string
+		progress string
+		logs     []string
+		summary  string
+	}{
+		{
+			kind: extensionproto.CommandKindVerification,
+			metrics: []string{
+				"tests-total", "tests-passed", "tests-failed", "tests-skipped",
+				"coverage", "coverage-statements-total", "coverage-statements-covered",
+			},
+			progress: "Running tests...",
+			summary:  "3/4 passed, 1 skipped, 75.0% coverage",
+		},
+		{
+			kind:     extensionproto.CommandKindDiagnostics,
+			metrics:  []string{"lint-warnings"},
+			progress: "Formatting and linting code",
+			logs:     []string{"Lint completed for a"},
+			summary:  "2 warnings",
+		},
+		{kind: ""},
+	} {
+		ws, planned := makeBatchSchedulerFixture(t, "")
+		job := planned[0]
+		job.JobDef.CommandName = "test"
+		job.JobDef.Name = "test~test"
+		declareBatchKind(job, test.kind)
 
-	metricNames := make(map[string]bool)
-	var summary string
-	var artifactPath string
-	for _, event := range result.Events {
-		if event.Type == EventTypeMetric {
-			if name, _ := event.Data["name"].(string); name != "" {
-				metricNames[name] = true
+		result := jobResultFromBatchWire(ws.Root, job, wire, &JobResult{Duration: time.Second}, nil)
+		var metrics, logs []string
+		var progress, summary, artifactPath string
+		for _, event := range result.Events {
+			switch event.Type {
+			case EventTypeMetric:
+				name, _ := event.Data["name"].(string)
+				metrics = append(metrics, name)
+			case EventTypeProgress:
+				progress = event.Message
+			case EventTypeLog:
+				logs = append(logs, event.Message)
+			case EventTypeSummary:
+				summary = event.Message
+			case EventTypeArtifact:
+				artifactPath, _ = event.Data["path"].(string)
 			}
 		}
-		if event.Type == EventTypeSummary {
-			summary = event.Message
+		if !slices.Equal(metrics, test.metrics) {
+			t.Errorf("kind %q: metrics = %v, want %v", test.kind, metrics, test.metrics)
 		}
-		if event.Type == EventTypeArtifact {
-			artifactPath, _ = event.Data["path"].(string)
+		if progress != test.progress || summary != test.summary || !slices.Equal(logs, test.logs) {
+			t.Errorf("kind %q: progress %q, logs %v, summary %q; want %q, %v, %q",
+				test.kind, progress, logs, summary, test.progress, test.logs, test.summary)
+		}
+		if artifactPath != ".putnami/out/a/test/coverage.out" {
+			t.Errorf("kind %q: artifact path = %q", test.kind, artifactPath)
 		}
 	}
-	for _, want := range []string{
-		"tests-total",
-		"tests-passed",
-		"tests-failed",
-		"tests-skipped",
-		"coverage",
-		"coverage-statements-total",
-		"coverage-statements-covered",
+}
+
+// A build step of the test command declares no batch kind: like its solo run,
+// its batch projection names the test command but reports neither test
+// progress nor a test summary, even when it fails.
+func TestABuildStepOfTheTestCommandProjectsNoTestLines(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "batch-parity-and-live-cells-follow-declared-kinds",
+		"a-batch-member-tallies-by-its-declared-batchable-kind")
+	ws, planned := makeBuildBatchSchedulerFixture(t)
+	job := planned[0]
+	job.JobDef.Name = "test~generate"
+	job.JobDef.CommandName = "test"
+	job.JobDef.StepID = "generate"
+	job.JobDef.Args = []string{"cmd/putnami-ts", "build-generate"}
+
+	result := jobResultFromBatchWire(ws.Root, job, batchWireResult{ProjectID: job.Project.ID, Status: "FAILED"},
+		&JobResult{Duration: time.Second}, nil)
+	var types []string
+	for _, event := range result.Events {
+		types = append(types, event.Type)
+		if event.Type == EventTypeMeta && event.Message != "Starting test" {
+			t.Errorf("meta = %q, want the test command", event.Message)
+		}
+	}
+	want := []string{EventTypeMeta, EventTypePhase, EventTypePhase, EventTypeResult}
+	if !slices.Equal(types, want) {
+		t.Fatalf("event types = %v, want %v with no progress and no summary", types, want)
+	}
+}
+
+// A batch member's phase is the phase its task declares, else its step id,
+// else "batch": its arguments no longer name it.
+func TestBatchMemberPhaseIsItsDeclaredPhaseElseItsStepID(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "batch-parity-and-live-cells-follow-declared-kinds",
+		"a-batch-member-phase-is-its-declared-phase-else-its-step-id")
+	_, lint := makeBatchSchedulerFixture(t, "")
+	_, build := makeBuildBatchSchedulerFixture(t)
+	withPolicy := func(job *ScheduledJob, name, step, phase string, args ...string) *ScheduledJob {
+		copied := *job
+		def := *job.JobDef
+		policy := *def.Batchable
+		policy.Phase = phase
+		def.Name, def.StepID, def.Args, def.Batchable = name, step, args, &policy
+		copied.JobDef = &def
+		return &copied
+	}
+	for _, test := range []struct {
+		job  *ScheduledJob
+		want string
+	}{
+		{withPolicy(lint[0], "lint~check-only", "check-only", "lint", "lint"), "lint"},
+		{withPolicy(lint[0], "lint~check-only", "check-only", "", "lint"), "check-only"},
+		{withPolicy(lint[0], "lint~format-check-only", "format-check-only", "", "lint-format"), "format-check-only"},
+		{withPolicy(build[0], "build~transpile", "transpile", "", "cmd/putnami-ts", "build-transpile"), "transpile"},
+		{withPolicy(build[0], "build", "", "", "build-compile"), "batch"},
 	} {
-		if !metricNames[want] {
-			t.Errorf("missing test metric %q in %v", want, metricNames)
+		result := jobResultFromBatchWire("", test.job, batchWireResult{ProjectID: test.job.Project.ID, Status: "OK"},
+			&JobResult{Duration: time.Second}, nil)
+		var phases []string
+		for _, event := range result.Events {
+			if event.Type == EventTypePhase {
+				name, _ := event.Data["name"].(string)
+				phases = append(phases, name)
+			}
 		}
-	}
-	if metricNames["lint-errors"] {
-		t.Fatalf("Go test result emitted lint metrics: %v", metricNames)
-	}
-	if summary != "3/4 passed, 1 skipped, 75.0% coverage" {
-		t.Fatalf("summary = %q", summary)
-	}
-	if artifactPath != ".putnami/out/a/test/coverage.out" {
-		t.Fatalf("artifact path = %q", artifactPath)
+		if want := []string{test.want, test.want}; !slices.Equal(phases, want) {
+			t.Errorf("%s with phase %q: phases = %v, want %v",
+				test.job.JobDef.Name, test.job.JobDef.Batchable.Phase, phases, want)
+		}
 	}
 }
 
@@ -705,7 +806,7 @@ func TestSplitBatchResultReattachesOnlyOwnedTestTranscripts(t *testing.T) {
 	for _, job := range planned {
 		job.JobDef.CommandName = "test"
 		job.JobDef.Name = "test~test"
-		job.JobDef.Args = []string{"test"}
+		declareBatchKind(job, extensionproto.CommandKindVerification)
 	}
 	work := []taskWork{{job: planned[0]}, {job: planned[1]}}
 	aggregate := &JobResult{
@@ -782,7 +883,7 @@ func TestBatchResultZeroCountFailureEmitsFailedRecap(t *testing.T) {
 	job := planned[0]
 	job.JobDef.CommandName = "test"
 	job.JobDef.Name = "test~test"
-	job.JobDef.Args = []string{"test"}
+	declareBatchKind(job, extensionproto.CommandKindVerification)
 	result := jobResultFromBatchWire(ws.Root, job, batchWireResult{
 		ProjectID: job.Project.ID,
 		Status:    "FAILED",
@@ -1082,6 +1183,8 @@ func makeBatchSchedulerFixture(t *testing.T, logPath string) (*workspace.Workspa
 			"{workspaceRoot}/biome.json",
 			"{extensionRoot}/config/biome.json",
 		},
+		Kind:  extensionproto.CommandKindDiagnostics,
+		Phase: "lint",
 	}
 	cpuWeight := 2.0
 	planned := make([]*ScheduledJob, 0, len(projects))

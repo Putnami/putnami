@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"go.putnami.dev/cli/model/jobs"
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -16,11 +17,29 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
 
+// devVerbTraits are the traits the @putnami/dev vocabulary gives the verbs
+// whose cells read a kind, a side effect or a workload.
+var devVerbTraits = map[string]extensionproto.CommandTraits{
+	"build":    {Kind: extensionproto.CommandKindFiles},
+	"test":     {Kind: extensionproto.CommandKindVerification},
+	"lint":     {Kind: extensionproto.CommandKindDiagnostics},
+	"validate": {Kind: extensionproto.CommandKindCriteria},
+	"serve":    {Workload: extensionproto.WorkloadServe},
+	"run":      {Workload: extensionproto.WorkloadOnce},
+	"publish":  {SideEffects: extensionproto.SideEffectsRegistry},
+	"deploy":   {SideEffects: extensionproto.SideEffectsCloud},
+}
+
+// makeLiveTestJob plans jobName with the traits @putnami/dev gives its verb.
 func makeLiveTestJob(projectName, jobName string) *jobs.ScheduledJob {
+	return makeLiveTestJobWithTraits(projectName, jobName, devVerbTraits[stripStepSuffix(jobName)])
+}
+
+func makeLiveTestJobWithTraits(projectName, jobName string, traits extensionproto.CommandTraits) *jobs.ScheduledJob {
 	return &jobs.ScheduledJob{
 		Project:   &workspace.Project{ID: projectName, Name: projectName},
 		Extension: &extension.ExtensionDescription{Name: "@test/ext"},
-		JobDef:    &extension.JobDefinition{Name: jobName},
+		JobDef:    &extension.JobDefinition{Name: jobName, Traits: traits},
 	}
 }
 
@@ -205,49 +224,53 @@ func TestTruncate(t *testing.T) {
 	}
 }
 
-func TestCommandRankOrder(t *testing.T) {
-	commandRank := func(name string) int { return commandRank(nil, name) }
-	if commandRank("lint") >= commandRank("test") {
-		t.Error("lint should rank before test")
-	}
-	if commandRank("test") >= commandRank("build") {
-		t.Error("test should rank before build")
-	}
-	if commandRank("build") >= commandRank("deploy") {
-		t.Error("build should rank before deploy")
-	}
-	if commandRank("publish") >= commandRank("deploy") {
-		t.Error("publish should rank before deploy")
-	}
-	if commandRank("unknown") <= commandRank("deploy") {
-		t.Error("unknown commands should rank after known ones")
-	}
-	// Without a vocabulary the fallback order is short, so an unknown command
-	// ranks at the floor.
-	if commandRank("unknown") != unknownCommandRank {
-		t.Errorf("unknown command rank = %d, want the floor %d", commandRank("unknown"), unknownCommandRank)
-	}
-}
+// A command no loaded vocabulary names ranks after every verb it names, and
+// the renderer orders those commands alphabetically: without a vocabulary,
+// every column is in alphabetical order.
+func TestColumnsNoVocabularyNamesRankAfterItAlphabetically(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "batch-parity-and-live-cells-follow-declared-kinds",
+		"columns-no-vocabulary-names-rank-after-it-alphabetically")
+	initial := ColorsEnabled()
+	SetColorsEnabled(false)
+	t.Cleanup(func() { SetColorsEnabled(initial) })
 
-// TestCommandRankFollowsTheVocabulary: the verbs of the loaded vocabularies
-// rank first, in vocabulary order; the fallback verbs they do not name follow
-// in fallback order; a command neither names ranks last.
-func TestCommandRankFollowsTheVocabulary(t *testing.T) {
-	vocabulary := []string{"build", "test", "audit", "lint"}
 	names := []string{"serve", "unknown", "lint", "generate", "deploy", "audit", "test", "format", "build"}
-	slices.SortStableFunc(names, func(a, b string) int {
-		return commandRank(vocabulary, a) - commandRank(vocabulary, b)
-	})
-	want := []string{"build", "test", "audit", "lint", "generate", "format", "deploy", "serve", "unknown"}
-	if !slices.Equal(names, want) {
-		t.Errorf("order = %v, want %v", names, want)
+	for _, test := range []struct {
+		vocabulary []string
+		want       []string
+	}{
+		{nil, []string{"audit", "build", "deploy", "format", "generate", "lint", "serve", "test", "unknown"}},
+		{
+			[]string{"build", "test", "audit", "lint"},
+			[]string{"build", "test", "audit", "lint", "deploy", "format", "generate", "serve", "unknown"},
+		},
+	} {
+		r := NewLiveRenderer(&bytes.Buffer{}, &bytes.Buffer{})
+		r.verbOrder = test.vocabulary
+		r.width = 400
+		planned := make([]*jobs.ScheduledJob, 0, len(names))
+		for _, name := range names {
+			planned = append(planned, makeLiveTestJob("app", name))
+		}
+		r.Start(planned)
+		stopSpinner(r)
+
+		if !slices.Equal(r.colOrder, test.want) {
+			t.Errorf("vocabulary %v: column order = %v, want %v", test.vocabulary, r.colOrder, test.want)
+		}
+		if !slices.Equal(r.rowByID["app"].commandOrder, test.want) {
+			t.Errorf("vocabulary %v: row command order = %v, want %v", test.vocabulary, r.rowByID["app"].commandOrder, test.want)
+		}
+		if got := r.taskCommandOrder(); !slices.Equal(got, test.want) {
+			t.Errorf("vocabulary %v: summary command order = %v, want %v", test.vocabulary, got, test.want)
+		}
 	}
+
 	// A short vocabulary leaves an unknown command at the floor; a longer one
 	// pushes it past the last verb.
-	if got := commandRank(vocabulary, "unknown"); got != unknownCommandRank {
+	if got := commandRank(nil, "unknown"); got != unknownCommandRank {
 		t.Errorf("unknown command rank = %d, want the floor %d", got, unknownCommandRank)
 	}
-
 	long := make([]string, unknownCommandRank+1)
 	for i := range long {
 		long[i] = fmt.Sprintf("verb-%03d", i)
@@ -326,9 +349,9 @@ func TestProjectRowsBuiltFromPlan(t *testing.T) {
 	if len(r.rows) != 2 {
 		t.Fatalf("expected 2 project rows, got %d", len(r.rows))
 	}
-	// Commands sorted into canonical order: lint, test, build.
+	// No vocabulary is loaded, so the commands sort by name.
 	app := r.rowByID["app"]
-	want := []string{"lint", "test", "build"}
+	want := []string{"build", "lint", "test"}
 	if strings.Join(app.commandOrder, ",") != strings.Join(want, ",") {
 		t.Errorf("command order = %v, want %v", app.commandOrder, want)
 	}
@@ -1200,6 +1223,119 @@ func TestFinalSummaryBlocks(t *testing.T) {
 	}
 }
 
+// A cell reads the metrics its command's kind names, whatever the command is
+// called, and a command without a kind shows its status only.
+func TestLiveCellValuesFollowTheDeclaredKind(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "batch-parity-and-live-cells-follow-declared-kinds",
+		"a-live-cell-values-by-the-declared-kind")
+	none := extensionproto.CommandTraits{}
+	warnings := []jobs.RawJobEvent{metricEvent("lint-warnings", 2, "count")}
+	errorCounts := []jobs.RawJobEvent{metricEvent("lint-errors", 3, "count")}
+	counts := []jobs.RawJobEvent{
+		metricEvent("tests-total", 4, "count"),
+		metricEvent("tests-passed", 3, "count"),
+		metricEvent("coverage", 80, "percent"),
+	}
+	failing := []jobs.RawJobEvent{metricEvent("tests-failed", 2, "count")}
+	files := []jobs.RawJobEvent{metricEvent("transpiled-files", 7, "count")}
+	for _, test := range []struct {
+		name   string
+		traits extensionproto.CommandTraits
+		status string
+		events []jobs.RawJobEvent
+		want   string
+	}{
+		{"check", devVerbTraits["lint"], "success", warnings, "2 warn"},
+		{"lint", none, "success", warnings, "ok"},
+		{"check", devVerbTraits["lint"], "failed", errorCounts, "3 err"},
+		{"lint", none, "failed", errorCounts, "failed"},
+		{"verify", devVerbTraits["test"], "success", counts, "3/4 80.0%"},
+		{"test", none, "success", counts, "ok"},
+		{"verify", devVerbTraits["test"], "failed", failing, "2 failed"},
+		{"test", none, "failed", failing, "failed"},
+		{"make", devVerbTraits["build"], "success", files, "7 files"},
+		{"build", none, "success", files, "ok"},
+		{"check", devVerbTraits["validate"], "success", warnings, "ok"},
+	} {
+		job := makeLiveTestJobWithTraits("app", test.name, test.traits)
+		r, _ := newTestRenderer(t, 120, job)
+		r.JobStart(job)
+		r.JobComplete(job, &jobs.JobResult{Status: test.status, Events: test.events})
+		if _, value := r.cellValue(r.rowByID["app"].commands[test.name]); value.text != test.want {
+			t.Errorf("%s of kind %q, %s: cell value = %q, want %q", test.name, test.traits.Kind, test.status, value.text, test.want)
+		}
+	}
+}
+
+// The Tasks line and the failure cause read the command's kind: renamed
+// commands with a kind aggregate and explain like the first-party verbs, and
+// a lint or test without a kind reports its status only.
+func TestTasksLineAndFailureCauseFollowTheKind(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "batch-parity-and-live-cells-follow-declared-kinds",
+		"the-tasks-line-and-failure-cause-follow-the-kind")
+	none := extensionproto.CommandTraits{}
+	check := makeLiveTestJobWithTraits("app", "check", devVerbTraits["lint"])
+	verify := makeLiveTestJobWithTraits("app", "verify", devVerbTraits["test"])
+	build := makeLiveTestJobWithTraits("app", "make", devVerbTraits["build"])
+	lint := makeLiveTestJobWithTraits("lib", "lint", none)
+	test := makeLiveTestJobWithTraits("lib", "test", none)
+	r, errOut := newTestRenderer(t, 160, check, verify, build, lint, test)
+
+	for _, run := range []struct {
+		job    *jobs.ScheduledJob
+		status string
+		events []jobs.RawJobEvent
+	}{
+		{check, "failed", []jobs.RawJobEvent{metricEvent("lint-errors", 3, "count"), metricEvent("lint-warnings", 1, "count")}},
+		{verify, "failed", []jobs.RawJobEvent{metricEvent("tests-total", 18, "count"), metricEvent("tests-failed", 2, "count")}},
+		{build, "success", []jobs.RawJobEvent{metricEvent("transpiled-files", 300, "count")}},
+		{lint, "failed", []jobs.RawJobEvent{metricEvent("lint-errors", 5, "count")}},
+		{test, "failed", []jobs.RawJobEvent{metricEvent("tests-total", 7, "count"), metricEvent("tests-failed", 4, "count")}},
+	} {
+		r.JobStart(run.job)
+		r.JobComplete(run.job, &jobs.JobResult{Status: run.status, Events: run.events})
+	}
+	r.Finish(map[string]*jobs.JobResult{
+		check.Key():  {Status: "failed"},
+		verify.Key(): {Status: "failed"},
+		build.Key():  {Status: "success"},
+		lint.Key():   {Status: "failed"},
+		test.Key():   {Status: "failed"},
+	}, jobs.SessionOutcome{})
+	out := errOut.String()
+
+	tasksLine := func(command string) string {
+		for _, line := range strings.Split(out, "\n") {
+			if strings.HasPrefix(line, command+" ") {
+				return line
+			}
+		}
+		t.Fatalf("no Tasks line for %s: %s", command, out)
+		return ""
+	}
+	for command, want := range map[string]string{
+		"check":  "0 passed · 1 failed · 3 errors · 1 warnings",
+		"verify": "0 passed · 1 failed · 18 tests · 2 failed",
+		"make":   "1 passed · 0 failed · 300 files built",
+		"lint":   "0 passed · 1 failed",
+		"test":   "0 passed · 1 failed",
+	} {
+		if line := tasksLine(command); !strings.HasSuffix(line, "  "+want) {
+			t.Errorf("Tasks line of %s = %q, want it to end with %q", command, line, want)
+		}
+	}
+	for _, want := range []string{
+		"app · check · 3 errors\n",
+		"app · verify · 2 failing tests\n",
+		"lib · lint · failed\n",
+		"lib · test · failed\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected failure cause %q: %s", strings.TrimSpace(want), out)
+		}
+	}
+}
+
 // Hybrid coverage display. Only --enforce-coverage instruments, so an
 // ordinary `putnami test` measures nothing and the summary
 // lost its coverage part. These three pin the whole rule: the replay fills the
@@ -1465,36 +1601,87 @@ func TestNarrowTerminalDropsColumns(t *testing.T) {
 	}
 }
 
+// A column's width and hide priority derive from its command's traits, never
+// its name: renamed commands with the first-party traits reserve the same
+// widths and hide in the same order. A status-only cell hides first, then the
+// diagnostics tally, the verification counts, the produced files, a registry
+// publication, and last a cloud effect.
 func TestNarrowTerminalHidesColumnsByAchievementPriority(t *testing.T) {
-	planned := []*jobs.ScheduledJob{
-		makeLiveTestJob("app", "lint"),
-		makeLiveTestJob("app", "test"),
-		makeLiveTestJob("app", "build"),
-		makeLiveTestJob("app", "package"),
-		makeLiveTestJob("app", "publish"),
-		makeLiveTestJob("app", "deploy"),
+	spectest.Proves(t, "cli/job-planning-execution", "batch-parity-and-live-cells-follow-declared-kinds",
+		"cell-width-and-hide-priority-derive-from-traits")
+	traits := []extensionproto.CommandTraits{
+		devVerbTraits["lint"],
+		devVerbTraits["test"],
+		devVerbTraits["build"],
+		{InjectPublishChannels: true},
+		devVerbTraits["publish"],
+		devVerbTraits["deploy"],
 	}
-	r, _ := newTestRenderer(t, 140, planned...)
-
-	tests := []struct {
-		budget int
-		want   []string
-		hidden int
-	}{
-		{budget: 120, want: []string{"lint", "test", "build", "package", "publish", "deploy"}, hidden: 0},
-		{budget: 110, want: []string{"lint", "test", "build", "publish", "deploy"}, hidden: 1},
-		{budget: 90, want: []string{"test", "build", "publish", "deploy"}, hidden: 2},
-		{budget: 70, want: []string{"build", "publish", "deploy"}, hidden: 3},
-		{budget: 45, want: []string{"publish", "deploy"}, hidden: 4},
-		{budget: 20, want: []string{"deploy"}, hidden: 5},
-	}
-	for _, tt := range tests {
-		fit, _ := r.visibleColumnsForBudget(tt.budget)
-		if strings.Join(fit.names, ",") != strings.Join(tt.want, ",") {
-			t.Errorf("budget %d names = %v, want %v", tt.budget, fit.names, tt.want)
+	for _, names := range [][]string{
+		{"lint", "test", "build", "package", "publish", "deploy"},
+		{"check", "verify", "make", "archive", "release", "launch"},
+	} {
+		initial := ColorsEnabled()
+		SetColorsEnabled(false)
+		r := NewLiveRenderer(&bytes.Buffer{}, &bytes.Buffer{})
+		r.verbOrder = names
+		r.width = 140
+		planned := make([]*jobs.ScheduledJob, 0, len(names))
+		for i, name := range names {
+			planned = append(planned, makeLiveTestJobWithTraits("app", name, traits[i]))
 		}
-		if fit.hidden != tt.hidden {
-			t.Errorf("budget %d hidden = %d, want %d", tt.budget, fit.hidden, tt.hidden)
+		r.Start(planned)
+		stopSpinner(r)
+		SetColorsEnabled(initial)
+
+		widths := make([]int, 0, len(names))
+		for _, name := range names {
+			widths = append(widths, r.colWidth[name])
+		}
+		if want := []int{15, 22, 16, len(names[3]) + 10, len(names[4]) + 10, len(names[5]) + 10}; !slices.Equal(widths, want) {
+			t.Errorf("%v: cell widths = %v, want %v", names, widths, want)
+		}
+
+		tests := []struct {
+			budget int
+			want   []int
+		}{
+			{budget: 120, want: []int{0, 1, 2, 3, 4, 5}},
+			{budget: 110, want: []int{0, 1, 2, 4, 5}},
+			{budget: 90, want: []int{1, 2, 4, 5}},
+			{budget: 70, want: []int{2, 4, 5}},
+			{budget: 45, want: []int{4, 5}},
+			{budget: 20, want: []int{5}},
+		}
+		for _, tt := range tests {
+			want := make([]string, 0, len(tt.want))
+			for _, i := range tt.want {
+				want = append(want, names[i])
+			}
+			fit, _ := r.visibleColumnsForBudget(tt.budget)
+			if !slices.Equal(fit.names, want) {
+				t.Errorf("budget %d names = %v, want %v", tt.budget, fit.names, want)
+			}
+			if fit.hidden != len(names)-len(want) {
+				t.Errorf("budget %d hidden = %d, want %d", tt.budget, fit.hidden, len(names)-len(want))
+			}
+		}
+	}
+
+	// The remaining traits: a workload hides last, a criteria tally with a
+	// diagnostics one, and a command without traits first.
+	for _, test := range []struct {
+		traits extensionproto.CommandTraits
+		want   int
+	}{
+		{devVerbTraits["serve"], 6},
+		{devVerbTraits["run"], 6},
+		{devVerbTraits["validate"], 2},
+		{extensionproto.CommandTraits{RewritesSources: true}, 0},
+		{extensionproto.CommandTraits{}, 0},
+	} {
+		if got := summaryColumnHideRank(test.traits); got != test.want {
+			t.Errorf("hide rank of %+v = %d, want %d", test.traits, got, test.want)
 		}
 	}
 }
