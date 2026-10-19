@@ -1,6 +1,6 @@
 # ADR 0073 — The core declares no development verb
 
-- **Status**: accepted
+- **Status**: proposed
 - **Scope**: `@putnami/cli` (`internal/commandmeta`, `internal/cli`,
   `internal/commands/completion`, `internal/engine`, `internal/extension`,
   `internal/mcp`), `@putnami/cli-model` (`extension`) and `@putnami/dev`
@@ -26,10 +26,13 @@ one breaking change that meets D2. This is that change.
    aliases (`b`, `t`, `l`, `s`, `f`, `p`, `P`, `d`, `D`) leave the catalog.
    Help, completion, the command surface and MCP `run_jobs` read the
    vocabulary and commands of the loaded extensions: the vocabulary's verbs
-   first, in vocabulary order, then the other public commands by name (D2).
+   first, in vocabulary order, then the other public commands by name (D2),
+   except a name the catalog resolves to a core command, which a user cannot
+   run as a job.
    Outside a workspace, help lists no job command, alias or provider-bound
    flag, says that no extension is loaded and how to add one, and reads no
-   user-scope extension (D4). A command name resolves through the
+   user-scope extension (D4). There, the help of a job command says that no
+   workspace was found, as a run of it does. A command name resolves through the
    vocabulary's aliases, then the workspace's. A workspace alias of the same
    name hides a vocabulary alias with a warning, one named like a former
    built-in alias included.
@@ -42,9 +45,11 @@ one breaking change that meets D2. This is that change.
    run, a comma list, an alias, `impact-plan`, `cache verify`, `compose` and
    MCP `run_jobs` all reach it through `engine.Run`; `putnami help
    <command>` and `<command> --help` return the same error. The refusal
-   steps aside for a workspace lifecycle run, and when an extension was
-   skipped or a configured extension is missing, so the missing-extension
-   guidance comes first. `cache verify` runs the agent gate tasks
+   steps aside for a workspace lifecycle run, and when a configured registry
+   extension or a dependency is missing, so the missing-extension guidance
+   comes first. When another extension did not load, it may be the one that
+   declares the command: the refusal names each such extension and why it
+   did not load, and exits 1. `cache verify` runs the agent gate tasks
    (`agentctx.GateTasks`). The engine's `@putnami/sdd` hint is deleted.
 3. **The core keeps no side-effect floor.** A command's side effects are
    the traits its loaded jobs declare. The git requirement, the cache trust
@@ -52,7 +57,10 @@ one breaking change that meets D2. This is that change.
    `extension.CommandSideEffects` with no `WellKnownVerbs` fallback. A job
    that declares no traits takes its vocabulary verb's defaults, or none.
    Every first-party `publish` declares `sideEffects: "registry"`, so
-   first-party plans keep what they kept.
+   first-party plans keep what they kept. The CLI resolves the cache trust
+   before the first-use bootstrap, from the extensions installed then, so
+   the run raises a trust of `any` to `ci` when its own discovery finds a
+   command with registry side effects.
 
 ## What this amends
 
@@ -74,8 +82,17 @@ one breaking change that meets D2. This is that change.
 - A `publish` or `deploy` whose traits name no side effect is planned, kept
   and gated like any command: it narrows by task scope, needs no git
   history and keeps the requested cache trust.
-- Workspace before hooks run before the refusal: hooks run before discovery.
+- The first-use bootstrap and the workspace before hooks run before the
+  refusal, which needs the run's discovery: in a fresh checkout, a mistyped
+  command installs the workspace, then exits 2.
 - `protocols/` keeps `WellKnownVerbs` and the strict `invalid-verb-traits`
-  check; no core reader of side effects consults them. The `serve`, `run`,
-  `compose` and `qualify` literals of watch mode and the long-lived
-  refusals stay until declared traits replace them.
+  check; no core reader of side effects consults them.
+- Some name reads stay until declared traits replace them. `serve`, `run`
+  and `format` decide watch mode, the hosted and `run_jobs` refusals,
+  composition, exit-code forwarding and the portable refusal, beside the
+  `compose` and `qualify` literals; workload and source-rewriting traits
+  replace them. `runner.PublicationCommands` (`publish`, `deploy`) decides
+  the ancestry snapshot, the portable and publication paths and the
+  publication outbox, and `--dry-run` synthesizes its parameter for
+  `publish` alone; release-set and publication traits replace them. None of
+  them runs a command that no loaded extension declares.

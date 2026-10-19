@@ -136,7 +136,6 @@ func startHostedRemoteCache(ctx context.Context, req *Request) (*remotecache.Rem
 	if !readsHostedRemoteCache(req) {
 		return nil, nil
 	}
-	trust := store.CacheTrust(req.Global.CacheTrust)
 	ws, err := workspace.Load(req.WorkspaceRoot)
 	if err != nil {
 		return nil, nil
@@ -152,9 +151,10 @@ func startHostedRemoteCache(ctx context.Context, req *Request) (*remotecache.Rem
 	if err := requireHostedProviders(req, discovered); err != nil {
 		return nil, err
 	}
+	raiseReleaseCacheTrust(req, discovered.Extensions)
 	setupStart := time.Now()
 	remote, notice := remotecache.LoadRemoteCache(ctx, req.WorkspaceRoot, discovered.Extensions, discovered,
-		trust, launchCacheProvider, remoteCacheOptions()...)
+		store.CacheTrust(req.Global.CacheTrust), launchCacheProvider, remoteCacheOptions()...)
 	if notice != "" {
 		iox.Fprintln(os.Stderr, notice)
 	}

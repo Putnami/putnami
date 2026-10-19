@@ -113,7 +113,7 @@ func stricterCacheTrust(left, right store.CacheTrust) bool {
 
 // releaseCacheTrustRequired reports whether a run ships a release: a command
 // whose jobs declare registry side effects (extension.CommandSideEffects),
-// which publish always has, or a release tag. A cloud side effect alone, such
+// as the publish of @putnami/dev does, or a release tag. A cloud side effect alone, such
 // as deploy's, does not raise the trust. The tag arms read names: `version tag`
 // is a core command, which declares no traits.
 func releaseCacheTrustRequired(extensions []*extension.ExtensionDescription, commands []string, subcommand string) bool {

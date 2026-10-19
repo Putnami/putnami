@@ -2,10 +2,12 @@ package engine
 
 import (
 	"os"
+	"slices"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -107,5 +109,24 @@ func loadRunWorkspace(req *Request) (*workspace.Workspace, *extension.DiscoveryR
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
 		return nil, nil, protocolcli.ExitCodeForError(err), err
 	}
+	raiseReleaseCacheTrust(req, discovered.Extensions)
 	return ws, discovered, ExitSuccess, nil
+}
+
+// raiseReleaseCacheTrust raises the remote cache trust of a run from any to ci
+// when a command it runs declares registry side effects in extensions, so a
+// release never reads a cache entry that a developer machine wrote. The CLI
+// resolves the trust before the first-use bootstrap, from the extensions
+// installed then; an extension that the bootstrap installs can only raise the
+// trust here, never lower it.
+func raiseReleaseCacheTrust(req *Request, extensions []*extension.ExtensionDescription) {
+	if store.CacheTrust(req.Global.CacheTrust) != store.CacheTrustAny {
+		return
+	}
+	for _, command := range req.Commands {
+		if slices.Contains(extension.CommandSideEffects(extensions, command), extension.SideEffectsRegistry) {
+			req.Global.CacheTrust = string(store.CacheTrustCI)
+			return
+		}
+	}
 }

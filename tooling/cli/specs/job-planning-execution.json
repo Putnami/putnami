@@ -35,7 +35,7 @@
     },
     {
       "id": "no-core-development-verb",
-      "text": "The core declares no development verb: no job command, alias or default trait of build, test, lint, serve, run, format, package, publish, deploy, generate or validate. Help, completion, MCP run_jobs and dispatch read the vocabulary and commands of the loaded extensions. A command no loaded extension declares as a job is a usage error raised once, after extension discovery and before selection, in every entry point, saying how to add an extension. A workspace with no development extension shows none of them."
+      "text": "The core declares no job command, alias or default trait of build, test, lint, serve, run, format, package, publish, deploy, generate or validate. Help, completion, MCP run_jobs and dispatch read the loaded extensions' vocabulary and commands. Every entry point refuses once, after extension discovery, a command no loaded extension declares as a job: a usage error saying how to add an extension, or an error naming each extension that did not load. A workspace with no development extension shows none."
     },
     {
       "id": "selection-before-plan",

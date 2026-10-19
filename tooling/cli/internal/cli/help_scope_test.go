@@ -112,8 +112,8 @@ func TestHelpInAWorkspaceListsWhatItsExtensionsDeclare(t *testing.T) {
 
 // TestHelpListsOnlyTheCommandsAUserTypes pins what help lists after the
 // vocabulary's verbs: a public command by name, with the description of the
-// first extension that gives one, and no internal command, provider command or
-// command a command group carries.
+// first extension that gives one, and no internal command, provider command,
+// command a command group carries or command a core path shadows.
 func TestHelpListsOnlyTheCommandsAUserTypes(t *testing.T) {
 	t.Parallel()
 	zeta := &extension.ExtensionDescription{
@@ -125,7 +125,7 @@ func TestHelpListsOnlyTheCommandsAUserTypes(t *testing.T) {
 			"ops":   {Subcommands: map[string]extension.SubcommandDefinition{"logs": {Command: "zeta-logs"}}},
 		}}},
 	}
-	alpha := &extension.ExtensionDescription{Name: "@acme/alpha", Commands: map[string]string{"build": "", "check": "Check."}}
+	alpha := &extension.ExtensionDescription{Name: "@acme/alpha", Commands: map[string]string{"build": "", "check": "Check.", "version": "Stamp the version."}}
 	scope := helpScopeOf(&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{zeta, nil, alpha}}, nil)
 	want := []CommandInfo{{Name: "build", Description: "Zeta build"}, {Name: "check", Description: "Check"}}
 	if got := scope.jobCommands(); !slices.Equal(got, want) {

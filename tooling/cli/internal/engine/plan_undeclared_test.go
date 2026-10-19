@@ -24,9 +24,10 @@ func declaringDiscovery(commands ...string) *extension.DiscoveryResult {
 
 // A run that names a command no loaded extension declares as a job is a usage
 // error that names every such command once, in the order the run names them,
-// and says how to add an extension. Nothing is refused when what the
-// extensions declare is not known: a workspace lifecycle run, an extension
-// that did not load, a configured extension that is missing.
+// and says how to add an extension. When an extension did not load, the error
+// names it and why instead. Nothing is refused for a workspace lifecycle run,
+// or when a configured extension or a dependency is missing, which planning
+// reports.
 func TestRefuseUndeclaredCommands(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/impact-plan", "named-commands", "an-undeclared-command-is-refused")
@@ -57,10 +58,6 @@ func TestRefuseUndeclaredCommands(t *testing.T) {
 			&Request{Commands: []string{"build"}, WorkspaceLifecycle: true}, declaringDiscovery(),
 		},
 		"no discovery": {&Request{Commands: []string{"build"}}, nil},
-		"an extension that did not load": {
-			&Request{Commands: []string{"build"}},
-			&extension.DiscoveryResult{Skipped: []extension.SkippedExtension{{Name: "@acme/dev", Reason: errors.New("bad manifest")}}},
-		},
 		"a configured extension that is missing": {
 			&Request{Commands: []string{"build"}, Config: &wsproto.Config{
 				Extensions: wsproto.ExtensionsConfig{List: map[string]string{"@acme/lang": "", "@acme/go": "1.0.0"}},
@@ -79,5 +76,22 @@ func TestRefuseUndeclaredCommands(t *testing.T) {
 		if err := refuseUndeclaredCommands(test.req, test.discovered); err != nil {
 			t.Errorf("%s: refused %v: %v", name, test.req.Commands, err)
 		}
+	}
+
+	// An extension that did not load may be the one that declares the command:
+	// the refusal names it and its reason, as a failed run rather than a usage
+	// error, and only for a command the loaded extensions do not declare.
+	skipped := declaringDiscovery("lint")
+	skipped.Skipped = []extension.SkippedExtension{{Ref: "./tools/acme", Reason: errors.New("bad manifest")}}
+	err = refuseUndeclaredCommands(&Request{Commands: []string{"lint", "build"}}, skipped)
+	const wantSkipped = "no loaded extension declares build; extension ./tools/acme did not load: bad manifest"
+	if err == nil || err.Error() != wantSkipped {
+		t.Fatalf("refusal with a skipped extension = %v, want %q", err, wantSkipped)
+	}
+	if code := protocolcli.ExitCodeForError(err); code != ExitError {
+		t.Errorf("refusal with a skipped extension exits %d, want %d", code, ExitError)
+	}
+	if err := refuseUndeclaredCommands(&Request{Commands: []string{"lint"}}, skipped); err != nil {
+		t.Errorf("declared lint refused beside a skipped extension: %v", err)
 	}
 }

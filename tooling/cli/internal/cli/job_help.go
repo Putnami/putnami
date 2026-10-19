@@ -11,13 +11,17 @@ import (
 
 // printJobCommandHelpForWorkspace prints the help of a job command for
 // `putnami <command> --help` and returns the exit code: the usage error of a
-// run of that command when no loaded extension declares it.
+// run of that command when no loaded extension declares it, and outside a
+// workspace the error of such a run.
 func printJobCommandHelpForWorkspace(
 	command string,
 	wsRoot string,
 	cfg *wsproto.Config,
 	extensions []*extension.ExtensionDescription,
 ) int {
+	if wsRoot == "" {
+		return noWorkspaceFound(os.Stderr)
+	}
 	scope, discovered := discoverHelpScope(wsRoot, cfg)
 	if extensions == nil {
 		extensions = discovered

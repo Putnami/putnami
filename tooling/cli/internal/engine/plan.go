@@ -336,22 +336,21 @@ func UndeclaredCommandsError(commands []string) error {
 		strings.Join(commands, ", "))
 }
 
-// refuseUndeclaredCommands returns the usage error of a run that names a
-// command no loaded extension declares as a job, or nil. The core declares no
-// job command, so this is where every entry point that runs jobs (a terminal
-// run, impact-plan, cache verify, MCP run_jobs, compose) learns that a command
-// does not exist in the workspace: once, after extension discovery and before
+// refuseUndeclaredCommands returns the error of a run that names a command no
+// loaded extension declares as a job, or nil. The core declares no job
+// command, so this is where every entry point that runs jobs (a terminal run,
+// impact-plan, cache verify, MCP run_jobs, compose) learns that a command does
+// not exist in the workspace: once, after extension discovery and before
 // selection.
 //
-// It refuses nothing when the answer is not known. A workspace lifecycle run
-// plans its own jobs against every provider. When an extension was skipped, or
-// a configured one did not load, the commands it would declare are unknown, so
-// the missing-extension guards of planning name the root cause instead.
+// A workspace lifecycle run plans its own jobs against every provider, so it
+// is never refused here. When a configured registry extension or a dependency
+// did not load, the missing-extension guards of planning name it and its
+// remedy instead. When another extension did not load, the run cannot know
+// whether it declares the command, so the error names it and why it did not
+// load rather than call the command undeclared.
 func refuseUndeclaredCommands(req *Request, discovered *internalextension.DiscoveryResult) error {
-	if req.WorkspaceLifecycle || discovered == nil || len(discovered.Skipped) > 0 {
-		return nil
-	}
-	if len(missingRegistryExtensions(req.Config, discovered.Extensions, discovered.MissingDependencies()...)) > 0 {
+	if req.WorkspaceLifecycle || discovered == nil {
 		return nil
 	}
 	jobs := extension.BuildJobMap(discovered.Extensions)
@@ -364,7 +363,28 @@ func refuseUndeclaredCommands(req *Request, discovered *internalextension.Discov
 	if len(undeclared) == 0 {
 		return nil
 	}
+	if len(missingRegistryExtensions(req.Config, discovered.Extensions, discovered.MissingDependencies()...)) > 0 {
+		return nil
+	}
+	if len(discovered.Skipped) > 0 {
+		return skippedExtensionsError(undeclared, discovered.Skipped)
+	}
 	return UndeclaredCommandsError(undeclared)
+}
+
+// skippedExtensionsError is the error of a run whose commands no loaded
+// extension declares while some extensions did not load: it names the
+// commands, then each extension that did not load and why.
+func skippedExtensionsError(commands []string, skipped []extension.SkippedExtension) error {
+	reasons := make([]string, 0, len(skipped))
+	for _, skip := range skipped {
+		name := skip.Name
+		if name == "" {
+			name = skip.Ref
+		}
+		reasons = append(reasons, fmt.Sprintf("extension %s did not load: %v", name, skip.Reason))
+	}
+	return fmt.Errorf("no loaded extension declares %s; %s", strings.Join(commands, ", "), strings.Join(reasons, "; "))
 }
 
 // selectedCommandsWithoutJobs returns the selected commands that contributed no

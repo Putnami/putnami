@@ -978,6 +978,9 @@ func cmdHelp(env *CommandEnv) error {
 			// A command group of a loaded extension, or a collaboration
 			// contract, is no job command: it prints its subcommands.
 			printCommandGroupHelp(env.Ctx, os.Stdout, env.WsRoot, env.Cfg, extensions, command, "", env.OutputFormat)
+		case env.WsRoot == "":
+			// A job command runs only in a workspace, so its help says so.
+			return env.requireWorkspace()
 		default:
 			return printDeclaredJobCommandHelp(command, extensions, scope)
 		}

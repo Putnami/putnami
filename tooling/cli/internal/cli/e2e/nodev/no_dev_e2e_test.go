@@ -176,6 +176,24 @@ func TestAnUndeclaredJobCommandIsRefusedInEveryEntryPoint(t *testing.T) {
 		t.Fatalf("run_jobs build = %+v, want the tool error %q", result, refusal("build"))
 	}
 
+	// Outside a workspace, the help of a job command reports what a run of it
+	// reports, no workspace, with the exit code of its entry point: a job
+	// command's, or the help command's usage error.
+	outside := t.TempDir()
+	for _, tc := range []struct {
+		args []string
+		code int
+	}{
+		{[]string{"build"}, 1},
+		{[]string{"build", "--help"}, 1},
+		{[]string{"help", "build"}, 2},
+	} {
+		code, output := clitest.RunGateArgs(t, outside, tc.args...)
+		if code != tc.code || !strings.Contains(output, "putnami: no workspace found") || strings.Contains(output, "declares") {
+			t.Errorf("%s outside a workspace: exit %d, want %d and no workspace found:\n%s", strings.Join(tc.args, " "), code, tc.code, output)
+		}
+	}
+
 	// Control: the command the extension declares runs.
 	if code, output := clitest.RunGateArgs(t, root, "inspect", "--projects", "app", "--no-cache"); code != 0 {
 		t.Fatalf("inspect exit %d:\n%s", code, output)

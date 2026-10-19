@@ -82,10 +82,11 @@ func helpScopeOf(result *extension.DiscoveryResult, user map[string]string) *hel
 
 // listedCommands returns, by name, the commands of extensions that help lists
 // after the vocabulary's verbs: the ones a user types as a job command. It
-// leaves out an internal command, a provider command, which the core calls,
-// and a command an extension's command group carries, which the user types as
-// a subcommand of the group. A command several extensions declare takes the
-// description of the first, in extension-name order, that gives one.
+// leaves out an internal command, a provider command, which the core calls, a
+// command an extension's command group carries, which the user types as a
+// subcommand of the group, and a command named like a path of the catalog,
+// which runs the core's command instead. A command several extensions declare
+// takes the description of the first, in extension-name order, that gives one.
 func listedCommands(extensions []*extension.ExtensionDescription) []CommandInfo {
 	ordered := make([]*extension.ExtensionDescription, 0, len(extensions))
 	for _, ext := range extensions {
@@ -98,7 +99,8 @@ func listedCommands(extensions []*extension.ExtensionDescription) []CommandInfo 
 	for _, ext := range ordered {
 		carried, providers := groupCommands(ext.CommandGroups), extension.ProviderCommands(ext)
 		for name, description := range ext.Commands {
-			if ext.CommandVisibility[name] == "internal" || carried[name] || slices.Contains(providers, name) {
+			if _, core := commandmeta.Lookup(name); core || ext.CommandVisibility[name] == "internal" ||
+				carried[name] || slices.Contains(providers, name) {
 				continue
 			}
 			if current, seen := descriptions[name]; !seen || current == "" {
