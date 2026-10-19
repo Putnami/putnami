@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	extproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -363,8 +364,8 @@ func locatePackageAgentContent(wsRoot string, declared DeclaredExtension) (*Agen
 	display := workspaceDisplayPath(wsRoot, filepath.Join(declared.Dir, ManifestFilename))
 	data, err := readRegularManifest(filepath.Join(declared.Dir, ManifestFilename))
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, fmt.Errorf("the root package manifest declares extension %s as a development dependency, but the package manager has not installed it (%s): run `putnami install`",
-			name, display)
+		return nil, protocolcli.WithNext(fmt.Errorf("the root package manifest declares extension %s as a development dependency, but the package manager has not installed it (%s): run `putnami install`",
+			name, display), "putnami install")
 	}
 	if err != nil {
 		return nil, fmt.Errorf("extension %s (%s): %w", name, display, err)

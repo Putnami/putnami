@@ -587,9 +587,16 @@ putnami extensions validate [path]  # Validate an extension manifest (for author
 `extensions install <name>` also acts on the agent content of the extension it
 names: when that extension ships content, the command adds it to `extensions`
 and `extension:<name>` to `agentArtifacts` in `putnami.workspace.json`, then
-materializes the content. An extension without content, a workspace-local path,
-and an extension installed only as a dependency leave the file as it was. A
-second run changes nothing.
+materializes the content of that extension only, so another opted-in extension
+whose content is not installed here neither fails the command nor changes. An
+extension without content, a workspace-local path, and an extension installed
+only as a dependency leave the file as it was. A second run changes nothing.
+When the content step fails after the opt-in was written, for example on a file
+you own at a path the content needs, the command exits non-zero and leaves both
+declarations and the lock pin in place with no agent file written: remove the
+cause, then run `putnami install`. With `--output=jsonl` the command reports the
+opt-in and each materialized contribution as lifecycle actions, as `install`
+does, and keeps stdout to the install records.
 
 `extensions update`, with or without a name, resolves each extension and each
 of its dependencies again on its constraint and writes the new version to the

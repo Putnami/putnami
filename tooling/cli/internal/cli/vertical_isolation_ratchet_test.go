@@ -234,7 +234,7 @@ var verticalCrossImportExceptions = []verticalCrossImportException{
 		file:    "internal/commands/lifecycle/extensions_install.go",
 		imports: "agentctx",
 		why: whyLifecycleAgentctx + ". `extensions install <name>` opts the workspace into the content " +
-			"of the extension it names and materializes it (OptIntoExtensionAgentContent, InstallAgentWorkflows)",
+			"of the extension it names and materializes it (OptIntoExtensionAgentContent, InstallExtensionAgentContentWithResult)",
 	},
 	{
 		file:    "internal/commands/lifecycle/install_test.go",

@@ -1772,7 +1772,10 @@
               "a-failed-starter-install-points-at-install",
               "extensions-install-opts-into-the-content-it-ships",
               "extensions-install-writes-no-opt-in-without-content",
-              "extensions-install-opts-in-only-the-extension-it-names"
+              "extensions-install-opts-in-only-the-extension-it-names",
+              "extensions-install-materializes-only-the-content-it-names",
+              "extensions-install-keeps-the-opt-in-when-the-content-fails",
+              "extensions-install-reports-the-opt-in-and-the-content"
             ]
           }
         }

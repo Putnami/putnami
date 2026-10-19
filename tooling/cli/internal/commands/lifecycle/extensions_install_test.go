@@ -3,17 +3,21 @@ package lifecycle
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	sdkagentartifact "go.putnami.dev/sdk/extension/agentartifact"
 	"go.putnami.dev/tooling/cli/internal/agentartifacts"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
 
 // The acceptance cases of `putnami extensions install <name>`: naming an
@@ -29,9 +33,23 @@ const (
 // runExtensionsInstall runs `putnami extensions install args...` in root.
 func runExtensionsInstall(t *testing.T, root string, args ...string) (string, error) {
 	t.Helper()
-	return captureStdout(t, func() error {
-		return ExtensionsInstallNamed(context.Background(), root, wsproto.Load(root), args, "")
+	var human strings.Builder
+	stdout, err := captureStdout(t, func() error {
+		return ExtensionsInstallNamed(context.Background(), root, wsproto.Load(root), args, "", LifecycleEnv{Out: &human})
 	})
+	return stdout + human.String(), err
+}
+
+// runExtensionsInstallJSONL runs the command under --output=jsonl and returns
+// what reached stdout and the lifecycle actions the command recorded.
+func runExtensionsInstallJSONL(t *testing.T, root string, args ...string) (string, []LifecycleAction, error) {
+	t.Helper()
+	var actions []LifecycleAction
+	env := LifecycleEnv{Out: io.Discard, OnAction: func(action LifecycleAction) { actions = append(actions, action) }}
+	stdout, err := captureStdout(t, func() error {
+		return ExtensionsInstallNamed(context.Background(), root, wsproto.Load(root), args, "jsonl", env)
+	})
+	return stdout, actions, err
 }
 
 // workspaceDeclarations is the part of putnami.workspace.json this feature writes.
@@ -220,4 +238,199 @@ func TestExtensionsInstallNamed_DependencyIsNotOptedIn(t *testing.T) {
 	if _, err := os.Lstat(filepath.Join(root, ".claude", "skills", "fixture-review", "SKILL.md")); err != nil {
 		t.Errorf("the named extension's content is missing: %v", err)
 	}
+}
+
+const secondContentExtensionName = "@fixture/second"
+
+// packageSecondContentExtension is a content extension whose skills and agents
+// carry other names than the fixture contributor's, so both can be
+// materialized into one workspace without sharing a path.
+func packageSecondContentExtension(t *testing.T) *sdkagentartifact.ExtensionPackage {
+	t.Helper()
+	files := map[string]string{}
+	for path, content := range contentExtensionSourceFiles(secondContentExtensionName, "s1", false) {
+		files[strings.ReplaceAll(path, "fixture-review", "second-review")] = strings.ReplaceAll(content, "fixture-review", "second-review")
+	}
+	source := t.TempDir()
+	writeTree(t, source, files)
+	pkg, err := sdkagentartifact.PackageExtension(source, "1.0.0")
+	if err != nil {
+		t.Fatalf("package %s: %v", secondContentExtensionName, err)
+	}
+	return pkg
+}
+
+// Naming an extension materializes the content of that extension only. A
+// workspace that already opts into a second extension, whose content cannot be
+// materialized here, keeps that extension's files and ownership record as they
+// are, and the command does not fail on it.
+func TestExtensionsInstallNamed_MaterializesOnlyTheNamedContent(t *testing.T) {
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "starter-agent-content-opt-in", "extensions-install-materializes-only-the-content-it-names")
+	registry := newContentRegistry(t)
+	registry.publish(packageContentExtension(t, contentExtensionName, "r1", "1.0.0", false))
+	registry.publish(packageSecondContentExtension(t))
+	root := t.TempDir()
+	writeAgentFile(t, root, wsproto.WorkspaceConfigFilename, `{"name":"ws"}`+"\n")
+
+	if out, err := runExtensionsInstall(t, root, secondContentExtensionName); err != nil {
+		t.Fatalf("install the second extension: %v\n%s", err, out)
+	}
+	secondFiles := []string{
+		".claude/skills/second-review/SKILL.md",
+		".agents/skills/second-review/SKILL.md",
+		".codex/agents/second-reviewer.toml",
+	}
+	for _, path := range secondFiles {
+		readAgentFile(t, root, path)
+	}
+	// The second extension's content can no longer be read: its pin is gone.
+	lock, err := lockfile.ReadLockFile(root)
+	if err != nil || lock == nil {
+		t.Fatalf("read lock: %v (%v)", lock, err)
+	}
+	lock.RemoveExtension(secondContentExtensionName)
+	if err := lockfile.WriteLockFile(root, lock); err != nil {
+		t.Fatal(err)
+	}
+	stateBefore, err := agentartifacts.LoadState(root, secondContentExtensionName)
+	if err != nil || stateBefore == nil {
+		t.Fatalf("ownership state of the second extension = %+v, err %v", stateBefore, err)
+	}
+	secondBefore := map[string]string{}
+	for path, digest := range snapshotContentSurface(t, root) {
+		secondBefore[path] = digest
+	}
+
+	if out, err := runExtensionsInstall(t, root, contentExtensionName); err != nil {
+		t.Fatalf("extensions install %s: %v\n%s", contentExtensionName, err, out)
+	}
+	if got := readAgentFile(t, root, ".claude/skills/fixture-review/SKILL.md"); !strings.Contains(got, "Review revision r1.") {
+		t.Fatalf("the named extension's content = %q", got)
+	}
+	after := snapshotContentSurface(t, root)
+	for path, digest := range secondBefore {
+		if after[path] != digest {
+			t.Errorf("%s changed: %s -> %s", path, digest, after[path])
+		}
+	}
+	for _, path := range secondFiles {
+		if _, ok := after[path]; !ok {
+			t.Errorf("%s was deleted", path)
+		}
+	}
+	if state, err := agentartifacts.LoadState(root, secondContentExtensionName); err != nil || !reflect.DeepEqual(state, stateBefore) {
+		t.Errorf("ownership state of the second extension = %+v (err %v), want it untouched", state, err)
+	}
+	if state, err := agentartifacts.LoadState(root, contentExtensionName); err != nil || state == nil {
+		t.Errorf("ownership state of the named extension = %+v, err %v", state, err)
+	}
+	if got := readDeclarations(t, root).AgentArtifacts; !reflect.DeepEqual(got, []string{"extension:" + secondContentExtensionName, contentExtensionOptIn}) {
+		t.Errorf("agentArtifacts = %v", got)
+	}
+}
+
+// When the content step fails after the opt-in was written, the workspace
+// file keeps both declarations and the lock keeps the pin. The error names
+// `putnami install`, which finishes the job once the cause is gone.
+func TestExtensionsInstallNamed_ContentFailureKeepsTheOptIn(t *testing.T) {
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "starter-agent-content-opt-in", "extensions-install-keeps-the-opt-in-when-the-content-fails")
+	registry := newContentRegistry(t)
+	registry.publish(packageContentExtension(t, contentExtensionName, "r1", "1.0.0", false))
+	root := t.TempDir()
+	writeAgentFile(t, root, wsproto.WorkspaceConfigFilename, `{"name":"ws"}`+"\n")
+	const owned = ".claude/skills/fixture-review/SKILL.md"
+	writeAgentFile(t, root, owned, "# my own skill\n")
+
+	_, err := runExtensionsInstall(t, root, contentExtensionName)
+	if !errors.Is(err, agentartifacts.ErrCollision) || !strings.Contains(err.Error(), owned+" [unmanaged]") {
+		t.Fatalf("error = %v, want a collision naming %s", err, owned)
+	}
+	if next := protocolcli.SuggestedNext(err); next != "putnami install" {
+		t.Errorf("next step = %q, want putnami install", next)
+	}
+	declared := readDeclarations(t, root)
+	if !reflect.DeepEqual(declaredExtensionNames(t, root), []string{contentExtensionName}) ||
+		!reflect.DeepEqual(declared.AgentArtifacts, []string{contentExtensionOptIn}) {
+		t.Fatalf("workspace file = %s", readWorkspaceFile(t, root, wsproto.WorkspaceConfigFilename))
+	}
+	if pin, ok := extensionPin(t, root, contentExtensionName); !ok || pin.Version != "1.0.0" {
+		t.Fatalf("extension pin = %+v (present %v)", pin, ok)
+	}
+	if got := readAgentFile(t, root, owned); got != "# my own skill\n" {
+		t.Fatalf("the user's file was overwritten: %q", got)
+	}
+	assertFileMissing(t, root, ".agents/skills/fixture-review/SKILL.md")
+	assertFileMissing(t, root, ".putnami/agent-artifacts")
+
+	// The next step works once the file is out of the way.
+	if err := os.Remove(filepath.Join(root, filepath.FromSlash(owned))); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runInstall(t, root); err != nil {
+		t.Fatalf("install: %v\n%s", err, out)
+	}
+	if got := readAgentFile(t, root, owned); !strings.Contains(got, "Review revision r1.") {
+		t.Fatalf("content after install = %q", got)
+	}
+}
+
+// Under --output=jsonl stdout carries only the install records, and the
+// opt-in and the materialization are reported as lifecycle actions, the way
+// `putnami install` reports its agent phase.
+func TestExtensionsInstallNamed_ReportsActionsUnderJSONL(t *testing.T) {
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "starter-agent-content-opt-in", "extensions-install-reports-the-opt-in-and-the-content")
+	registry := newContentRegistry(t)
+	registry.publish(packageContentExtension(t, contentExtensionName, "r1", "1.0.0", false))
+	root := t.TempDir()
+	writeAgentFile(t, root, wsproto.WorkspaceConfigFilename, `{"name":"ws"}`+"\n")
+
+	stdout, actions, err := runExtensionsInstallJSONL(t, root, contentExtensionName)
+	if err != nil {
+		t.Fatalf("extensions install: %v\n%s", err, stdout)
+	}
+	for _, line := range strings.Split(strings.TrimSpace(stdout), "\n") {
+		var record struct {
+			Kind string `json:"kind"`
+		}
+		if json.Unmarshal([]byte(line), &record) != nil || record.Kind != "extension" {
+			t.Errorf("stdout line %q is not an extension install record", line)
+		}
+	}
+	want := []LifecycleAction{
+		{
+			Kind: "workspace-config", Name: wsproto.WorkspaceConfigFilename,
+			Description: "Opted into the agent content of " + contentExtensionName + " in " + wsproto.WorkspaceConfigFilename,
+		},
+		{
+			Kind: "agent-workflow", Name: contentExtensionName,
+			Description: "Agent workflow " + contentExtensionName + "@1.0.0 materialized",
+		},
+	}
+	if !reflect.DeepEqual(actions, want) {
+		t.Fatalf("actions = %+v, want %+v", actions, want)
+	}
+
+	// A second run changes nothing, so it records nothing.
+	if _, actions, err := runExtensionsInstallJSONL(t, root, contentExtensionName); err != nil || len(actions) != 0 {
+		t.Fatalf("second run: actions %+v, err %v", actions, err)
+	}
+}
+
+// An agentArtifacts member that is not an array is refused with the existing
+// message, before the workspace file is written.
+func TestExtensionsInstallNamed_AgentArtifactsObjectIsRefused(t *testing.T) {
+	registry := newContentRegistry(t)
+	registry.publish(packageContentExtension(t, contentExtensionName, "r1", "1.0.0", false))
+	root := t.TempDir()
+	config := `{"name":"ws","agentArtifacts":{}}` + "\n"
+	writeAgentFile(t, root, wsproto.WorkspaceConfigFilename, config)
+
+	_, err := runExtensionsInstall(t, root, contentExtensionName)
+	if err == nil || !strings.Contains(err.Error(), "agentArtifacts must be an array") {
+		t.Fatalf("error = %v, want agentArtifacts must be an array", err)
+	}
+	if got := readWorkspaceFile(t, root, wsproto.WorkspaceConfigFilename); got != config {
+		t.Errorf("the workspace file changed:\n%s", got)
+	}
+	assertNoAgentSurface(t, root)
 }

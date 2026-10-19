@@ -261,7 +261,7 @@ func cmdExtensions(env *CommandEnv) error {
 		if err := env.requireWorkspace(); err != nil {
 			return err
 		}
-		if err := lifecycle.ExtensionsInstallNamed(env.Ctx, env.WsRoot, env.Cfg, env.Args, env.OutputFormat); err != nil {
+		if err := lifecycle.ExtensionsInstallNamed(env.Ctx, env.WsRoot, env.Cfg, env.Args, env.OutputFormat, lifecycleEnv(env)); err != nil {
 			return err
 		}
 		// A materialization (`--platform` / `--dest`) installed nothing
