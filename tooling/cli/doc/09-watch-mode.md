@@ -51,7 +51,7 @@ When changes are detected, the classifier:
 
 ## Serve Mode
 
-`serve` watches without `--watch`. To run the server once, with no restarts, turn serve's own `watch` flag off:
+A command whose traits declare the `serve` workload, such as `serve`, watches without `--watch`, whatever its name. A `serve` that declares no workload does not. To run the server once, with no restarts, turn the command's own `watch` flag off:
 
 ```bash
 putnami serve my-app --no-watch

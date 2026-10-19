@@ -220,6 +220,18 @@ type compositionFixture struct {
 	projects map[string]*workspace.Project
 	jobs     []*jobs.ScheduledJob
 	prepared []string
+	// serveCommands are the commands the fake preparation was asked to plan.
+	serveCommands []string
+}
+
+// serveWorkloadExtensions are the loaded extensions of a workspace whose
+// commands declare the given workloads; an empty workload declares none.
+func serveWorkloadExtensions(workloads map[string]string) []*extension.ExtensionDescription {
+	definitions := make(map[string]*extension.JobDefinition, len(workloads))
+	for command, workload := range workloads {
+		definitions[command] = &extension.JobDefinition{Name: command, Kind: "command", Traits: extension.CommandTraits{Workload: workload}}
+	}
+	return []*extension.ExtensionDescription{{Name: "@putnami/fixture-serve", Jobs: definitions}}
 }
 
 func newCompositionFixture(t *testing.T, specs ...fixtureProject) *compositionFixture {
@@ -281,8 +293,12 @@ func writeFile(t *testing.T, path, content string) {
 func (f *compositionFixture) deps(provider databaseProvider) upDeps {
 	return upDeps{
 		loadWorkspace: func(string) (*workspace.Workspace, error) { return f.ws, nil },
-		prepare: func(_ context.Context, _ Options, projectIDs []string) (*preparation, error) {
+		discover: func(*workspace.Workspace, *wsproto.Config) ([]*extension.ExtensionDescription, error) {
+			return serveWorkloadExtensions(map[string]string{"serve": extension.WorkloadServe}), nil
+		},
+		prepare: func(_ context.Context, _ Options, projectIDs, serveCommands []string) (*preparation, error) {
 			f.prepared = append([]string(nil), projectIDs...)
+			f.serveCommands = append([]string(nil), serveCommands...)
 			return &preparation{ws: f.ws, withheld: f.jobs}, nil
 		},
 		provider: func() databaseProvider { return provider },

@@ -4,8 +4,7 @@
   [ADR 0073 of `@putnami/cli`](../../../cli/doc/adr/0073-the-core-declares-no-development-verb.md):
   the core presents no verb and gives none a default, so this vocabulary is
   the only presentation and the only source of default traits, and `serve`
-  stays long-running through the core's remaining name checks, not
-  `WellKnownVerbs`.
+  is long-running through the `workload` it declares, not `WellKnownVerbs`.
 - **Scope**: `@putnami/dev` (`tooling/dev`), the manifests of `@putnami/go`,
   `@putnami/typescript` and `@putnami/python`, and this repository's
   `putnami.workspace.json`

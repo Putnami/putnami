@@ -81,6 +81,70 @@ func CommandsOfKind(extensions []*extension.ExtensionDescription, kind string) [
 	return sortedCommands(found)
 }
 
+// CommandWorkload returns the workload lifecycle the resolved traits of
+// command's jobs in extensions declare: extension.WorkloadServe when any job
+// declares it, otherwise extension.WorkloadOnce when any does, otherwise "".
+// No command name decides.
+func CommandWorkload(extensions []*extension.ExtensionDescription, command string) string {
+	workload := ""
+	for _, definition := range commandDefinitions(extensions, command) {
+		switch definition.Traits.Workload {
+		case extension.WorkloadServe:
+			return extension.WorkloadServe
+		case extension.WorkloadOnce:
+			workload = extension.WorkloadOnce
+		}
+	}
+	return workload
+}
+
+// CommandRewritesSources reports whether the resolved traits of any of
+// command's jobs in extensions declare rewritesSources.
+func CommandRewritesSources(extensions []*extension.ExtensionDescription, command string) bool {
+	for _, definition := range commandDefinitions(extensions, command) {
+		if definition.Traits.RewritesSources {
+			return true
+		}
+	}
+	return false
+}
+
+// CommandsOfWorkload returns, sorted, the commands of extensions whose
+// workload (CommandWorkload) is workload. An empty workload names none.
+func CommandsOfWorkload(extensions []*extension.ExtensionDescription, workload string) []string {
+	found := make(map[string]bool)
+	for _, ext := range extensions {
+		if ext == nil {
+			continue
+		}
+		for name := range ext.Jobs {
+			command, _ := JobCommandAndStep(name)
+			if workload != "" && CommandWorkload(extensions, command) == workload {
+				found[command] = true
+			}
+		}
+	}
+	return sortedCommands(found)
+}
+
+// commandDefinitions returns the job definitions extensions hold for command,
+// a pipeline step's name naming its command.
+func commandDefinitions(extensions []*extension.ExtensionDescription, command string) []*extension.JobDefinition {
+	command, _ = JobCommandAndStep(command)
+	var definitions []*extension.JobDefinition
+	for _, ext := range extensions {
+		if ext == nil {
+			continue
+		}
+		for name, definition := range ext.Jobs {
+			if base, _ := JobCommandAndStep(name); definition != nil && base == command {
+				definitions = append(definitions, definition)
+			}
+		}
+	}
+	return definitions
+}
+
 // SpecCriteriaProjectionCommands returns, sorted, the criteria commands of
 // extensions one of whose pipeline steps runs a task that declares the
 // projection (ProducesSpecCriteriaProjection). The spec gate plans them to

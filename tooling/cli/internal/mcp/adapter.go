@@ -654,10 +654,17 @@ func (s *Server) toolRunJobs(ctx context.Context, args json.RawMessage) (any, er
 		}
 		return plan, nil
 	}
-	if err := rejectLongLivedCommands(a.Commands); err != nil {
+	// One discovery answers both refusals. When it fails, no command is
+	// classified, and the side-effect refusal refuses them all.
+	discovered, discoverErr := s.discoverExtensions()
+	var extensions []*extension.ExtensionDescription
+	if discoverErr == nil {
+		extensions = discovered.Extensions
+	}
+	if err := rejectLongLivedCommands(extensions, a.Commands); err != nil {
 		return nil, err
 	}
-	if err := s.rejectSideEffectingCommands(a.Commands); err != nil {
+	if err := rejectSideEffectingCommands(extensions, discoverErr, a.Commands); err != nil {
 		return nil, err
 	}
 	res, err := s.runJobs(ctx, a)
@@ -855,20 +862,13 @@ func (s *Server) abortedRunError(a runJobsArgs, exitCode int) error {
 
 // longLivedCommands names the commands routing through the engine makes
 // UNTERMINATABLE over MCP, so the refusal is scoped to the hazard A4 actually
-// introduces rather than to blocking calls in general.
+// introduces rather than to blocking calls in general. A command whose
+// resolved traits declare the serve workload qualifies too (serveWorkloadHazard).
 //
-// `serve` qualifies: the engine promotes it to watch mode
-// (internal/engine/execute.go:110), so it no longer ends even when its child
-// exits. The MCP transport is synchronous — one tool call at a time on a single
-// stdio loop — so that wedges the WHOLE session with no way out.
-//
-// `run` deliberately does NOT qualify. It is not promoted to watch, so it
-// terminates exactly as it did on MCP's pre-A4 fork, and forwarding a workload's
-// exit code (a migration returning 3) is a legitimate agent use. Refusing it
-// would narrow a published tool's accepted input for a hazard this slice does
-// not create.
+// A command of the once workload deliberately does NOT qualify. It is not
+// promoted to watch, so it terminates, and forwarding a workload's exit code (a
+// migration returning 3) is a legitimate agent use.
 var longLivedCommands = map[string]string{
-	"serve": "is promoted to watch mode by the engine, so it never returns — not even when its child exits",
 	// `compose` is a structured command rather than a job verb, so run_jobs
 	// cannot reach it today. It is named here anyway: it supervises serve
 	// processes until a signal, and a future surface that forwards command
@@ -881,9 +881,21 @@ var longLivedCommands = map[string]string{
 	"qualify": "waits on a live workload (and composes one for a local target) for as long as its readiness and request deadlines allow",
 }
 
-func rejectLongLivedCommands(commands []string) error {
+// serveWorkloadHazard is why a serve-workload command is refused: the engine
+// promotes it to watch mode, so it no longer ends even when its child exits.
+// The MCP transport is synchronous — one tool call at a time on a single stdio
+// loop — so that wedges the WHOLE session with no way out.
+const serveWorkloadHazard = "is promoted to watch mode by the engine, so it never returns — not even when its child exits"
+
+// rejectLongLivedCommands refuses the longLivedCommands and every command whose
+// resolved traits in extensions declare the serve workload.
+func rejectLongLivedCommands(extensions []*extension.ExtensionDescription, commands []string) error {
 	for _, command := range commands {
-		if why, blocked := longLivedCommands[command]; blocked {
+		why, blocked := longLivedCommands[command]
+		if !blocked && jobs.CommandWorkload(extensions, command) == extension.WorkloadServe {
+			why, blocked = serveWorkloadHazard, true
+		}
+		if blocked {
 			return fmt.Errorf("run_jobs cannot run %q: it %s, and one MCP tool call blocks the whole session. "+
 				"Run it in a terminal instead", command, why)
 		}
@@ -908,19 +920,19 @@ func rejectLongLivedCommands(commands []string) error {
 // command a side effect of its own: a command no loaded extension declares
 // runs nothing, and the engine refuses it.
 //
-// When the extensions cannot be read, no command can be classified, so every
-// command is refused: an unreadable manifest must not open the gate.
+// When the extensions cannot be read (discoverErr), no command can be
+// classified, so every command is refused: an unreadable manifest must not
+// open the gate.
 //
 // Only EXECUTION is gated: dryRun returns before this, exactly as it does for
 // rejectLongLivedCommands.
-func (s *Server) rejectSideEffectingCommands(commands []string) error {
-	discovered, err := s.discoverExtensions()
-	if err != nil {
+func rejectSideEffectingCommands(extensions []*extension.ExtensionDescription, discoverErr error, commands []string) error {
+	if discoverErr != nil {
 		return fmt.Errorf("run_jobs cannot run %s: the workspace's extensions cannot be read (%w), so what the run "+
-			"mutates outside the workspace is unknown. Run it in a terminal instead", strings.Join(commands, ","), err)
+			"mutates outside the workspace is unknown. Run it in a terminal instead", strings.Join(commands, ","), discoverErr)
 	}
 	for _, command := range commands {
-		if effects := extension.CommandSideEffects(discovered.Extensions, command); len(effects) > 0 {
+		if effects := extension.CommandSideEffects(extensions, command); len(effects) > 0 {
 			return fmt.Errorf("run_jobs cannot run %q: it mutates %s outside the workspace, "+
 				"which is not a decision an agent tool call can make. Run it in a terminal instead",
 				command, strings.Join(effects, " and "))

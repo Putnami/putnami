@@ -249,21 +249,21 @@ type Request struct {
 	// turn `putnami cloud deploy --dry-run` into a no-op. --plan stays the
 	// plan-only preview on both paths.
 	ExecutesUnderDryRun bool
-	// WithholdServeSteps runs a `serve` request as the PREPARATION of a
-	// supervisor that starts the workloads itself: `putnami compose`, which must
-	// hand each workload its own process environment (an ephemeral port, the
-	// URLs of the workloads it runs with, its database binding) and learn the
-	// port it bound, one member at a time.
+	// WithholdServeSteps runs a request for serve-workload commands as the
+	// PREPARATION of a supervisor that starts the workloads itself: `putnami
+	// compose`, which must hand each workload its own process environment (an
+	// ephemeral port, the URLs of the workloads it runs with, its database
+	// binding) and learn the port it bound, one member at a time.
 	//
 	// Everything up to the serve step stays the engine's: resolution, runtime
 	// synchronization, selection, planning with its guards, and the scheduled
 	// execution — cache, session file and all — of every finite step the serve
 	// pipelines declare (config merge, generate, describe, and their dependency
 	// steps). What changes is the one step no other job depends on: each
-	// selected project's uncacheable `serve` step is not started. It is returned
-	// on SessionResult.Withheld together with the workspace it was planned
-	// against, and the serve force-watch rule does not apply, because nothing
-	// long-running is left in the run.
+	// selected project's uncacheable serve-workload step is not started. It is
+	// returned on SessionResult.Withheld together with the workspace it was
+	// planned against, and the serve force-watch rule does not apply, because
+	// nothing long-running is left in the run.
 	//
 	// The composition adapter (internal/compose) is the only caller. It executes
 	// the withheld steps with scheduler.RunJobWithProcessEnv, which keeps the

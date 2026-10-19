@@ -200,6 +200,10 @@
     {
       "id": "command-kinds-and-traits",
       "text": "A command's traits may declare its kind (verification, criteria, diagnostics or files), its workload (serve or once), that it rewrites sources, and that it consumes the release set; a batchable task may declare the kind and phase of its shared invocation. Strict validation refuses a value outside each vocabulary. A manifest that declares any of them requires CLI contract 11 wherever it loads from, and the packagers stamp it. Declared traits replace a verb's defaults wholesale, kind included."
+    },
+    {
+      "id": "workload-lifecycle",
+      "text": "A command whose traits declare the serve workload streams it until interrupted: the run is promoted to watch unless its own --no-watch is set, a hosted run and MCP run_jobs refuse it, a composition starts only its terminal uncacheable step, and no portable run carries it. The once workload streams once and forwards the workload's exit code. A command that declares rewritesSources is never portable. Neither behavior follows a command's name."
     }
   ],
   "decisions": [

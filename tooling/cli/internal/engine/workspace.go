@@ -94,8 +94,11 @@ func loadWorkspaceAndExtensions(req *Request) (*workspace.Workspace, *extension.
 // reads the remote cache was already refused before its hooks
 // (startHostedRemoteCache); this refuses one that does not. It then refuses
 // the commands no loaded extension declares (refuseUndeclaredCommands), once
-// for every entry point, before any flag, policy or selection is read. It
-// prints the refusal and returns its exit code and error.
+// for every entry point, before any flag, policy or selection is read. The
+// executing engine of a portable request of either version then refuses a
+// workload or source-rewriting command, read from the manifests the request
+// pins (refuseUnportableCommands), as a usage error. It prints the refusal and
+// returns its exit code and error.
 func loadRunWorkspace(req *Request) (*workspace.Workspace, *extension.DiscoveryResult, int, error) {
 	ws, discovered, code := loadWorkspaceAndExtensions(req)
 	if code != ExitSuccess {
@@ -108,6 +111,12 @@ func loadRunWorkspace(req *Request) (*workspace.Workspace, *extension.DiscoveryR
 	if err := refuseUndeclaredCommands(req, discovered); err != nil {
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
 		return nil, nil, protocolcli.ExitCodeForError(err), err
+	}
+	if req.Portable != nil {
+		if err := refuseUnportableCommands(discovered.Extensions, req.Commands); err != nil {
+			iox.Fprintf(os.Stderr, "putnami: portable execution refused: %v\n", err)
+			return nil, nil, ExitUsage, nil
+		}
 	}
 	raiseReleaseCacheTrust(req, discovered.Extensions)
 	return ws, discovered, ExitSuccess, nil

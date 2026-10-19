@@ -10,6 +10,7 @@ import (
 	modeljobs "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	protocoljob "go.putnami.dev/protocol/job"
 	runner "go.putnami.dev/protocol/runner"
 	internalextension "go.putnami.dev/tooling/cli/internal/extension"
@@ -122,21 +123,44 @@ func hostAbs(p string) string {
 	return abs
 }
 
+// workloadCommands are the loaded extensions of a workspace whose serve and
+// daemon commands declare the serve workload, run declares once, format and
+// tidy declare rewritesSources, and whose legacy extension declares lint and
+// fmt with no trait.
+func workloadCommands() []*internalextension.ExtensionDescription {
+	command := func(name string, traits extension.CommandTraits) *extension.JobDefinition {
+		return &extension.JobDefinition{Name: name, Kind: "command", Traits: traits}
+	}
+	return []*internalextension.ExtensionDescription{
+		{Name: "@acme/lang", Jobs: map[string]*extension.JobDefinition{
+			"build":  command("build", extension.CommandTraits{}),
+			"serve":  command("serve", extension.CommandTraits{Workload: extension.WorkloadServe}),
+			"daemon": command("daemon", extension.CommandTraits{Workload: extension.WorkloadServe}),
+			"run":    command("run", extension.CommandTraits{Workload: extension.WorkloadOnce}),
+			"format": command("format", extension.CommandTraits{RewritesSources: true}),
+			"tidy":   command("tidy", extension.CommandTraits{RewritesSources: true}),
+		}},
+		{Name: "@acme/legacy", Jobs: map[string]*extension.JobDefinition{
+			"lint": command("lint", extension.CommandTraits{}),
+			"fmt":  command("fmt", extension.CommandTraits{}),
+		}},
+	}
+}
+
 func TestRejectUnsupportedRemoteShape(t *testing.T) {
 	t.Parallel()
 	planned := portablePlan()
+	extensions := workloadCommands()
 	base := func() *Request {
 		return &Request{WorkspaceRoot: hostAbs("/ws"), Commands: []string{"build"}}
 	}
-	if err := rejectUnsupportedRemoteShape(base(), planned); err != nil {
+	if err := rejectUnsupportedRemoteShape(base(), extensions, planned); err != nil {
 		t.Fatalf("finite verification refused: %v", err)
 	}
 	cases := map[string]func(*Request, []*scheduler.ScheduledJob){
 		"watch":   func(r *Request, _ []*scheduler.ScheduledJob) { r.Global.Watch = true },
-		"serve":   func(r *Request, _ []*scheduler.ScheduledJob) { r.Commands = []string{"build", "serve"} },
-		"run":     func(r *Request, _ []*scheduler.ScheduledJob) { r.Commands = []string{"run"} },
+		"compose": func(r *Request, _ []*scheduler.ScheduledJob) { r.Commands = []string{"compose"} },
 		"qualify": func(r *Request, _ []*scheduler.ScheduledJob) { r.Commands = []string{"qualify"} },
-		"format":  func(r *Request, _ []*scheduler.ScheduledJob) { r.Commands = []string{"format"} },
 		"dry-run": func(r *Request, _ []*scheduler.ScheduledJob) { r.ExecutesUnderDryRun = true },
 		"side effects": func(_ *Request, p []*scheduler.ScheduledJob) {
 			p[0].JobDef.Traits.SideEffects = extensionproto.SideEffectsRegistry
@@ -147,30 +171,54 @@ func TestRejectUnsupportedRemoteShape(t *testing.T) {
 	for name, mutate := range cases {
 		req, planned := base(), portablePlan()
 		mutate(req, planned)
-		if err := rejectUnsupportedRemoteShape(req, planned); err == nil {
+		if err := rejectUnsupportedRemoteShape(req, extensions, planned); err == nil {
 			t.Errorf("%s: accepted", name)
-		}
-	}
-	// The submitting side refuses every command the protocol refuses in a
-	// version 2 request, so both versions leave the same commands behind.
-	for _, command := range runner.UnportableCommands {
-		req := base()
-		req.Commands = []string{"build", command}
-		if err := rejectUnsupportedRemoteShape(req, portablePlan()); err == nil || !strings.Contains(err.Error(), "is not portable") {
-			t.Errorf("%s: %v; want the submitting side to refuse it", command, err)
 		}
 	}
 	// A manifest task's declared effect is refused even when its command's
 	// traits declare none: the submitter never sets invocation.publication.
 	declared := portablePlan()
 	declareTaskEffect(declared[0], extension.EffectCloud)
-	if err := rejectUnsupportedRemoteShape(base(), declared); err == nil || !strings.Contains(err.Error(), "registry or cloud effects") {
+	if err := rejectUnsupportedRemoteShape(base(), extensions, declared); err == nil || !strings.Contains(err.Error(), "registry or cloud effects") {
 		t.Fatalf("a task declaring a cloud effect was not refused as publication: %v", err)
 	}
 	inside := portablePlan()
 	inside[0].JobDef.Cwd = hostAbs("/ws/app")
-	if err := rejectUnsupportedRemoteShape(base(), inside); err != nil {
+	if err := rejectUnsupportedRemoteShape(base(), extensions, inside); err != nil {
 		t.Fatalf("a cwd inside the workspace was refused: %v", err)
+	}
+}
+
+// The submitting side refuses a command whose resolved traits declare a
+// workload or rewritesSources, whatever its name, with the message of its
+// kind, and refuses none by its name alone: a lint or fmt that declares
+// neither, and a serve or format no loaded extension declares, reach the plan
+// checks.
+func TestRejectUnsupportedRemoteShapeFollowsTheDeclaredTraits(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/portable-runner", "portable-request", "a-workload-or-rewriting-command-is-refused-before-submission")
+	extensions := workloadCommands()
+	for command, refusal := range map[string]string{
+		"serve":  `"serve" streams a live workload and is not portable`,
+		"daemon": `"daemon" streams a live workload and is not portable`,
+		"run":    `"run" streams a live workload and is not portable`,
+		"format": `"format" rewrites source and is not portable`,
+		"tidy":   `"tidy" rewrites source and is not portable`,
+		"lint":   "",
+		"fmt":    "",
+	} {
+		req := &Request{WorkspaceRoot: hostAbs("/ws"), Commands: []string{"build", command}}
+		err := rejectUnsupportedRemoteShape(req, extensions, portablePlan())
+		if refusal == "" && err != nil {
+			t.Errorf("%s: refused: %v", command, err)
+		}
+		if refusal != "" && (err == nil || !strings.HasPrefix(err.Error(), refusal)) {
+			t.Errorf("%s: %v; want %q", command, err, refusal)
+		}
+	}
+	req := &Request{WorkspaceRoot: hostAbs("/ws"), Commands: []string{"serve", "format"}}
+	if err := rejectUnsupportedRemoteShape(req, nil, portablePlan()); err != nil {
+		t.Errorf("serve and format with no loaded extension declaring them were refused: %v", err)
 	}
 }
 

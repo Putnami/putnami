@@ -87,11 +87,12 @@ one breaking change that meets D2. This is that change.
   command installs the workspace, then exits 2.
 - `protocols/` keeps `WellKnownVerbs` and the strict `invalid-verb-traits`
   check; no core reader of side effects consults them.
-- Some name reads stay until declared traits replace them. `serve`, `run`
-  and `format` decide watch mode, the hosted and `run_jobs` refusals,
-  composition, exit-code forwarding and the portable refusal, beside the
-  `compose` and `qualify` literals; workload and source-rewriting traits
-  replace them. `runner.PublicationCommands` (`publish`, `deploy`) decides
+- The workload and source-rewriting traits, not the names `serve`, `run`
+  and `format`, decide watch mode, the hosted and `run_jobs` refusals,
+  composition, exit-code forwarding and the portable refusal. The `compose`
+  and `qualify` literals name core commands and stay.
+- Some name reads stay until declared traits replace them.
+  `runner.PublicationCommands` (`publish`, `deploy`) decides
   the ancestry snapshot, the portable and publication paths and the
   publication outbox, and `--dry-run` synthesizes its parameter for
   `publish` alone; release-set and publication traits replace them. None of

@@ -914,6 +914,17 @@ func sideEffectFixture(t *testing.T) string {
 	return dir
 }
 
+// sideEffectRefusal is run_jobs' side-effect refusal of commands, after the
+// one discovery srv makes for it.
+func sideEffectRefusal(srv *Server, commands []string) error {
+	discovered, err := srv.discoverExtensions()
+	var extensions []*extension.ExtensionDescription
+	if err == nil {
+		extensions = discovered.Extensions
+	}
+	return rejectSideEffectingCommands(extensions, err, commands)
+}
+
 func sideEffectFixtureServer(t *testing.T) (*Server, string) {
 	t.Helper()
 	dir := sideEffectFixture(t)
@@ -957,7 +968,7 @@ func TestRejectSideEffectingCommands_ReadsTheDeclaredTrait(t *testing.T) {
 		{name: "custom verb without the trait is allowed", commands: []string{"ship"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := srv.rejectSideEffectingCommands(tc.commands)
+			err := sideEffectRefusal(srv, tc.commands)
 			if tc.classification == "" {
 				if err != nil {
 					t.Fatalf("rejectSideEffectingCommands(%v) = %v, want it accepted", tc.commands, err)
@@ -988,7 +999,7 @@ func TestRejectSideEffectingCommands_ReadsOnlyLoadedJobs(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "side-effects-come-only-from-loaded-jobs")
 	srv := newFixtureServer(t) // no extensions at all
 	for _, commands := range [][]string{{"deploy"}, {"publish"}, {"lint", "test", "build"}} {
-		if err := srv.rejectSideEffectingCommands(commands); err != nil {
+		if err := sideEffectRefusal(srv, commands); err != nil {
 			t.Errorf("%v refused by its side effects with no extension declaring it: %v", commands, err)
 		}
 	}
@@ -998,7 +1009,7 @@ func TestRejectSideEffectingCommands_ReadsOnlyLoadedJobs(t *testing.T) {
 	}
 
 	unreadable := NewServer(Options{ServerVersion: "test"}) // no workspace root
-	err = unreadable.rejectSideEffectingCommands([]string{"lint"})
+	err = sideEffectRefusal(unreadable, []string{"lint"})
 	if err == nil || !strings.Contains(err.Error(), "the workspace's extensions cannot be read") {
 		t.Fatalf("lint with unreadable extensions = %v, want a refusal", err)
 	}

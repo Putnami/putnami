@@ -167,10 +167,12 @@ const remoteDeadline = 4 * time.Hour
 // publication and admission checks read the whole graph.
 // A version 2 request carries no expected plan and captured no input, and no
 // CLI submitter ran rejectUnsupportedRemoteShape on it: the protocol refuses
-// its unportable commands (runner.UnportableCommands), and its executing side
-// refuses a task outside the checkout, then checks publication
-// (validateCommitPublication). Its publication rides invocation.publication,
-// as on the version 1 executing side, so declared effects are not refused.
+// the commands it names as unportable, the executing engine refuses a
+// workload or source-rewriting command after discovery
+// (refuseUnportableCommands), and this seam refuses a task outside the
+// checkout, then checks publication (validateCommitPublication). Its
+// publication rides invocation.publication, as on the version 1 executing
+// side, so declared effects are not refused.
 //
 // Between the unsupported-shape refusal and the request projection sits the
 // input admission (ADR 0037): on the plan's declared inputs it binds every
@@ -217,7 +219,7 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 	if req.runnerProvider == nil || req.previewsOnly() || len(planned) == 0 {
 		return SessionResult{}, false
 	}
-	if err := rejectUnsupportedRemoteShape(req, planned); err != nil {
+	if err := rejectUnsupportedRemoteShape(req, discovered.Extensions, planned); err != nil {
 		iox.Fprintf(os.Stderr, "putnami: --where remote: %v\n", err)
 		return SessionResult{ExitCode: ExitUsage, Plan: planned}, true
 	}
@@ -275,12 +277,12 @@ func (e *Engine) portableSeam(ctx context.Context, req *Request, ws *workspace.W
 }
 
 // rejectUnsupportedRemoteShape refuses, before any transfer, the invocations
-// this release does not carry: long-running or interactive modes, source
-// rewriting, and jobs with side effects outside the workspace. Rejection is a
-// precise diagnostic, never a silent modification of the request. Its command
-// refusals cover runner.UnportableCommands, which a version 2 request meets in
-// the protocol instead.
-func rejectUnsupportedRemoteShape(req *Request, planned []*scheduler.ScheduledJob) error {
+// this release does not carry: long-running or interactive modes, compose and
+// qualify, a command whose resolved traits in extensions declare a workload or
+// source rewriting (refuseUnportableCommands), and jobs with side effects
+// outside the workspace. Rejection is a precise diagnostic, never a silent
+// modification of the request.
+func rejectUnsupportedRemoteShape(req *Request, extensions []*internalextension.ExtensionDescription, planned []*scheduler.ScheduledJob) error {
 	if req.Global.Watch {
 		return fmt.Errorf("--watch is not portable; remote execution covers finite commands only")
 	}
@@ -289,13 +291,14 @@ func rejectUnsupportedRemoteShape(req *Request, planned []*scheduler.ScheduledJo
 	}
 	for _, command := range req.Commands {
 		switch command {
-		case "serve", "run", "compose":
+		case "compose":
 			return fmt.Errorf("%q streams a live workload and is not portable", command)
 		case "qualify":
 			return fmt.Errorf("%q reaches a live workload from this machine and is not portable", command)
-		case "format":
-			return fmt.Errorf("%q rewrites source and is not portable; remote edits would never return to this worktree", command)
 		}
+	}
+	if err := refuseUnportableCommands(extensions, req.Commands); err != nil {
+		return err
 	}
 	for _, job := range planned {
 		if job == nil || job.JobDef == nil {
@@ -309,6 +312,23 @@ func rejectUnsupportedRemoteShape(req *Request, planned []*scheduler.ScheduledJo
 		}
 		if err := outsideWorkspace(req.WorkspaceRoot, job); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// refuseUnportableCommands refuses the first of commands whose resolved traits
+// in extensions declare a workload, which streams from the machine that runs
+// it, or rewritesSources, whose edits would never return to the submitting
+// worktree. The submitting side and the executing engine of a request of
+// either version both apply it, to the manifests the request pins.
+func refuseUnportableCommands(extensions []*internalextension.ExtensionDescription, commands []string) error {
+	for _, command := range commands {
+		if scheduler.CommandWorkload(extensions, command) != "" {
+			return fmt.Errorf("%q streams a live workload and is not portable", command)
+		}
+		if scheduler.CommandRewritesSources(extensions, command) {
+			return fmt.Errorf("%q rewrites source and is not portable; remote edits would never return to this worktree", command)
 		}
 	}
 	return nil

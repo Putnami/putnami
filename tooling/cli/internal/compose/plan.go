@@ -26,9 +26,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// serveCommand is the job command every member runs.
-const serveCommand = "serve"
-
 // DatabaseBinding is one datasource a member declares in its committed
 // infra/requirements.json, and the physical database the composition gave it.
 type DatabaseBinding struct {
@@ -106,13 +103,16 @@ func (p *Plan) ProjectIDs() []string {
 // runsWith in topological order, each member's database requirements, and the
 // client-contract service ids of every member another one runs with.
 //
+// serveCommands are the loaded commands whose resolved traits declare the
+// serve workload, the commands every member runs.
+//
 // It rejects a member that cannot serve before anything starts: a library or
-// image project (compose.not_serveable), a project whose serve job is disabled
-// (compose.serve_disabled), a runsWith name that resolves to no project
+// image project (compose.not_serveable), a project that disables a serve
+// command (compose.serve_disabled), a runsWith name that resolves to no project
 // (compose.unknown_member), and a runsWith cycle (compose.cycle). Whether an
 // extension provides a serve step is only known once the engine planned it:
-// BindServeJobs reports compose.no_serve_command.
-func PlanFor(ws *workspace.Workspace, target *workspace.Project) (*Plan, error) {
+// BindServeJobs reports compose.no_serve_command and compose.ambiguous_serve.
+func PlanFor(ws *workspace.Workspace, target *workspace.Project, serveCommands []string) (*Plan, error) {
 	if ws == nil || target == nil {
 		return nil, newError(CodeUnknownMember, "", PhasePlan, "no workspace or target project")
 	}
@@ -136,7 +136,7 @@ func PlanFor(ws *workspace.Workspace, target *workspace.Project) (*Plan, error) 
 			return newError(CodeCycle, project.ID, PhasePlan,
 				"runsWith forms a cycle: "+strings.Join(cycle, " -> "))
 		}
-		if err := checkServeable(ws, project); err != nil {
+		if err := checkServeable(ws, project, serveCommands); err != nil {
 			return err
 		}
 		state[project.ID] = visiting
@@ -192,19 +192,32 @@ func PlanFor(ws *workspace.Workspace, target *workspace.Project) (*Plan, error) 
 
 // BindServeJobs attaches each member's serve step from the jobs the engine
 // withheld while preparing the composition. A member without one has no
-// extension that serves it (compose.no_serve_command).
+// extension that serves it (compose.no_serve_command). A member with the serve
+// steps of two commands has no one workload to start
+// (compose.ambiguous_serve).
 func (p *Plan) BindServeJobs(withheld []*jobs.ScheduledJob) error {
 	for _, member := range p.Members {
 		member.ServeJob = nil
+		var commands []string
 		for _, job := range withheld {
-			if job != nil && job.Project != nil && job.Project.ID == member.Project.ID {
+			if job == nil || job.Project == nil || job.Project.ID != member.Project.ID {
+				continue
+			}
+			if member.ServeJob == nil {
 				member.ServeJob = job
-				break
+			}
+			if job.JobDef != nil && !slices.Contains(commands, job.CommandName()) {
+				commands = append(commands, job.CommandName())
 			}
 		}
 		if member.ServeJob == nil {
 			return newError(CodeNoServeCommand, member.Project.ID, PhasePlan,
 				"no extension provides a serve step for this project")
+		}
+		if len(commands) > 1 {
+			slices.Sort(commands)
+			return newError(CodeAmbiguousServe, member.Project.ID, PhasePlan,
+				"the commands "+strings.Join(commands, ", ")+" each provide a serve step for this project; compose starts one per project")
 		}
 	}
 	return nil
@@ -219,29 +232,31 @@ func resolveRunsWith(ws *workspace.Workspace, name string) *workspace.Project {
 }
 
 // checkServeable rejects the members compose can never start.
-func checkServeable(ws *workspace.Workspace, project *workspace.Project) error {
+func checkServeable(ws *workspace.Workspace, project *workspace.Project, serveCommands []string) error {
 	switch project.Type {
 	case "library", "image":
 		return newError(CodeNotServeable, project.ID, PhasePlan,
 			fmt.Sprintf("a %s project has no workload to serve", project.Type))
 	}
-	if project.Config != nil && project.Config.Disable != nil && disablesServe(project.Config.Disable.Jobs) {
+	if project.Config != nil && project.Config.Disable != nil && disablesServe(project.Config.Disable.Jobs, serveCommands) {
 		return newError(CodeServeDisabled, project.ID, PhasePlan,
-			"the project's putnami.json disables the serve job")
+			"the project's putnami.json disables a command whose traits declare the serve workload")
 	}
-	if ws.Config != nil && ws.Config.Disable != nil && disablesServe(ws.Config.Disable.Jobs) {
+	if ws.Config != nil && ws.Config.Disable != nil && disablesServe(ws.Config.Disable.Jobs, serveCommands) {
 		return newError(CodeServeDisabled, project.ID, PhasePlan,
-			"the workspace configuration disables the serve job")
+			"the workspace configuration disables a command whose traits declare the serve workload")
 	}
 	return nil
 }
 
-// disablesServe reports whether a disable.jobs list turns off `serve`, either
-// for every extension or for one ("@putnami/go:serve").
-func disablesServe(disabled []string) bool {
+// disablesServe reports whether a disable.jobs list turns off one of
+// serveCommands, either for every extension or for one ("@putnami/go:serve").
+func disablesServe(disabled, serveCommands []string) bool {
 	for _, entry := range disabled {
-		if entry == serveCommand || strings.HasSuffix(entry, ":"+serveCommand) {
-			return true
+		for _, command := range serveCommands {
+			if entry == command || strings.HasSuffix(entry, ":"+command) {
+				return true
+			}
 		}
 	}
 	return false

@@ -5,14 +5,30 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
-// `serve --watch=false` turned watch ON and left a stray "false"
-// token. It now turns serve's own watch flag off, as --no-watch does.
+// serveWorkloadAliases are the alias tables of a process whose loaded serve
+// command declares the serve workload, as the first-party extensions do.
+func serveWorkloadAliases(t *testing.T) commandAliases {
+	t.Helper()
+	aliases, _ := processAliases(nil, false, workloadExtensions(map[string]string{"serve": extension.WorkloadServe}))
+	return aliases
+}
+
+// `serve --watch=false` turned watch ON and left a stray "false" token. On a
+// command whose traits declare the serve workload, whatever its name, it now
+// turns the command's own watch flag off, as --no-watch does. A serve command
+// that declares no workload owns no --no-watch: `--watch=false` only leaves
+// watch off there, as on any other command.
 func TestParseArgs_WatchFalseIsNoWatch(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "workload-lifecycle", "a-serve-workload-command-owns-no-watch")
+	aliases, _ := processAliases(nil, false, workloadExtensions(map[string]string{"daemon": extension.WorkloadServe, "serve": ""}))
 	for _, spelling := range []string{"--watch=false", "--no-watch"} {
-		parsed := ParseArgs([]string{"serve", "--projects", "app", spelling}, nil, nil)
+		parsed := parseArgs([]string{"daemon", "--projects", "app", spelling}, aliases, nil)
 		if parsed.Err != nil {
 			t.Fatalf("%s: %v", spelling, parsed.Err)
 		}
@@ -22,6 +38,10 @@ func TestParseArgs_WatchFalseIsNoWatch(t *testing.T) {
 		if params := buildCommandParams(parsed.RawJobArgs); len(params) != 1 || params["watch"] != false {
 			t.Errorf("%s: params = %v, want watch=false", spelling, params)
 		}
+	}
+	parsed := parseArgs([]string{"serve", "--projects", "app", "--watch=false"}, aliases, nil)
+	if parsed.Err != nil || parsed.Global.Watch || len(parsed.RawJobArgs) != 0 {
+		t.Errorf("serve without the workload: watch=%v raw=%v err=%v, want watch off and no tokens", parsed.Global.Watch, parsed.RawJobArgs, parsed.Err)
 	}
 }
 
@@ -36,7 +56,7 @@ func TestParseArgs_SwitchTakesAnInlineBoolean(t *testing.T) {
 		{args: []string{"build", "--verbose=false"}},
 		{args: []string{"serve", "--watch=true"}, watch: true},
 	} {
-		parsed := ParseArgs(tc.args, nil, nil)
+		parsed := parseArgs(tc.args, serveWorkloadAliases(t), nil)
 		if parsed.Err != nil {
 			t.Fatalf("%v: %v", tc.args, parsed.Err)
 		}
@@ -58,8 +78,8 @@ func TestParseArgs_ComposeWatchFalseIsNoWatch(t *testing.T) {
 	}
 }
 
-// Only serve and compose declare a `watch` flag: elsewhere `--watch=false` leaves watch
-// off and hands the job no undeclared --no-watch.
+// Only a serve-workload command and compose own --no-watch: elsewhere
+// `--watch=false` leaves watch off and hands the job no undeclared --no-watch.
 func TestParseArgs_WatchFalseOutsideServeOnlyLeavesWatchOff(t *testing.T) {
 	t.Parallel()
 	parsed := ParseArgs([]string{"test", "--projects", "app", "--watch=false"}, nil, nil)
@@ -86,8 +106,8 @@ func TestParseArgs_SwitchRefusesAnyOtherInlineValue(t *testing.T) {
 		{"build", "--verbose=1"},
 		{"build", "--no-cache="},
 	} {
-		if parsed := ParseArgs(args, nil, nil); parsed.Err == nil {
-			t.Errorf("ParseArgs(%v) should be a usage error", args)
+		if parsed := parseArgs(args, serveWorkloadAliases(t), nil); parsed.Err == nil {
+			t.Errorf("parseArgs(%v) should be a usage error", args)
 		}
 	}
 }

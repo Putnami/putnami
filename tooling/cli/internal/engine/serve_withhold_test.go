@@ -5,17 +5,25 @@ import (
 	"testing"
 
 	"go.putnami.dev/cli/model/jobs"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-func servePipelineJob(project *workspace.Project, name string, cache bool, dependsOn ...string) *jobs.ScheduledJob {
+// pipelineJob is a planned step whose command's resolved traits declare
+// workload, or none when it is empty.
+func pipelineJob(project *workspace.Project, name, workload string, cache bool, dependsOn ...string) *jobs.ScheduledJob {
 	return &jobs.ScheduledJob{
 		Project:   project,
 		Extension: &extension.ExtensionDescription{Name: "@putnami/fixture"},
-		JobDef:    &extension.JobDefinition{Name: name, Cache: cache},
+		JobDef:    &extension.JobDefinition{Name: name, Cache: cache, Traits: extension.CommandTraits{Workload: workload}},
 		DependsOn: dependsOn,
 	}
+}
+
+// servePipelineJob is a step of a command that declares the serve workload.
+func servePipelineJob(project *workspace.Project, name string, cache bool, dependsOn ...string) *jobs.ScheduledJob {
+	return pipelineJob(project, name, extension.WorkloadServe, cache, dependsOn...)
 }
 
 func jobKeys(planned []*jobs.ScheduledJob) []string {
@@ -73,8 +81,8 @@ func TestWithholdServeSteps_TakesOnlyTheTerminalServeStepOfSelectedProjects(t *t
 func TestWithholdServeSteps_NonServeCommandsAreNeverWithheld(t *testing.T) {
 	app := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
 	planned := []*jobs.ScheduledJob{
-		servePipelineJob(app, "run~exec", false),
-		servePipelineJob(app, "test", false),
+		pipelineJob(app, "run~exec", extension.WorkloadOnce, false),
+		pipelineJob(app, "test", "", false),
 		nil,
 	}
 	kept, withheld := withholdServeSteps(planned, []*workspace.Project{app, nil})
@@ -83,6 +91,66 @@ func TestWithholdServeSteps_NonServeCommandsAreNeverWithheld(t *testing.T) {
 	}
 	if len(kept) != len(planned) {
 		t.Errorf("kept %d of %d jobs", len(kept), len(planned))
+	}
+}
+
+// A composition withholds the terminal step of a command whose traits declare
+// the serve workload, whatever its name: a daemon command that declares it
+// gives its step to the supervisor, and a serve command that declares no
+// workload runs its step like any finite one.
+func TestWithholdServeSteps_FollowTheServeWorkloadNotTheName(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "workload-lifecycle", "a-serve-workload-command-of-any-name-streams-until-interrupted")
+	app := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
+	planned := []*jobs.ScheduledJob{
+		pipelineJob(app, "daemon~start", extension.WorkloadServe, false),
+		pipelineJob(app, "serve~serve", "", false),
+	}
+	kept, withheld := withholdServeSteps(planned, []*workspace.Project{app})
+	if got := jobKeys(withheld); !slices.Equal(got, []string{"/app:daemon~start"}) {
+		t.Errorf("withheld = %v, want [/app:daemon~start]", got)
+	}
+	if got := jobKeys(kept); !slices.Equal(got, []string{"/app:serve~serve"}) {
+		t.Errorf("kept = %v, want [/app:serve~serve]", got)
+	}
+}
+
+// A run streams its workload when one of its commands declares a workload in
+// the loaded extensions, whatever its name: the serve workload is promoted to
+// watch, the once workload streams once. A serve or run command that declares
+// none streams nothing and is not promoted.
+func TestWorkloadModes_FollowTheDeclaredWorkloadNotTheName(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "workload-lifecycle", "a-serve-workload-command-of-any-name-streams-until-interrupted")
+	command := func(name, workload string) *extension.JobDefinition {
+		return &extension.JobDefinition{Name: name, Kind: "command", Traits: extension.CommandTraits{Workload: workload}}
+	}
+	extensions := []*extension.ExtensionDescription{{Name: "@acme/lang", Jobs: map[string]*extension.JobDefinition{
+		"daemon":  command("daemon", extension.WorkloadServe),
+		"migrate": command("migrate", extension.WorkloadOnce),
+		"serve":   command("serve", ""),
+		"run":     command("run", ""),
+	}}}
+	for _, tc := range []struct {
+		commands    []string
+		serve, once bool
+	}{
+		{commands: []string{"daemon"}, serve: true},
+		{commands: []string{"build", "daemon"}, serve: true},
+		{commands: []string{"migrate"}, once: true},
+		{commands: []string{"serve"}},
+		{commands: []string{"run"}},
+	} {
+		serve, once := workloadModes(extensions, tc.commands)
+		if serve != tc.serve || once != tc.once {
+			t.Errorf("workloadModes(%v) = (%v, %v), want (%v, %v)", tc.commands, serve, once, tc.serve, tc.once)
+		}
+		if got := forcesServeWatch(&Request{Commands: tc.commands}, serve); got != tc.serve {
+			t.Errorf("%v promoted to watch: %v, want %v", tc.commands, got, tc.serve)
+		}
+	}
+	if serve, once := workloadModes(nil, []string{"serve", "run"}); serve || once {
+		t.Errorf("without a loaded extension, serve and run stream: (%v, %v)", serve, once)
 	}
 }
 

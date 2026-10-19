@@ -21,7 +21,7 @@
   "requirements": [
     {
       "id": "runs-with-closure-served-behind-stable-proxies",
-      "text": "compose serves the transitive runsWith closure of one project in topological order, each member behind a 127.0.0.1 proxy whose URL is known before any process starts and answers 503 until the member announces a port. A dependant receives each provider's proxy URL under its client-contract service id and its project name. A library, image, disabled, unknown or cyclic member is refused before anything starts."
+      "text": "compose serves the transitive runsWith closure of one project in topological order, each member behind a 127.0.0.1 proxy whose URL is known before any process starts and answers 503 until the member announces a port. A dependant receives each provider's proxy URL under its client-contract service id and its project name. A library, image, disabled, unknown or cyclic member, or one that two serve-workload commands serve, is refused before anything starts."
     },
     {
       "id": "ephemeral-databases-per-composition",
