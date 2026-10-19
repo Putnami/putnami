@@ -4,8 +4,8 @@ Usage:
   putnami <command[,command...]> [options]
 
 Build (from extensions):
-  build, test, lint, serve, run, format, package, publish, deploy, generate, validate
-  Multi-command: putnami lint,test,build --impacted
+  No extension is loaded. Name a language extension in
+  putnami.workspace.json, then run: putnami extensions install
 
 CI:
   impact-plan                  Emit the impacted plan of a change for a command list
@@ -98,12 +98,9 @@ Project Selection:
   --impacted-strict            Fail when baseline can't be resolved
 
 Execution:
-  --where <placement>          Execution placement: local | remote (local when no runner provider is installed)
-  --providers <list>           Credentials to ask the credential provider for: install, publish (comma list)
   --credential-fd <n>          Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2
   --no-cache                   Force re-execution (skip cache)
   --no-cache-projects <list>   Force re-execution of these projects only
-  --cache-trust <policy>       Remote cache trust: ci | any | none
   --continue-on-error          Don't abort on first failure
   --max-parallel <mode|n>      Parallelism: auto | eco | max | number
   --resource <name=units>      Budget for a named shared resource (repeatable)
@@ -128,9 +125,6 @@ Default Selection:
 
 Positional:
   .                    Current directory scope (project or subtree)
-
-Aliases:
-  b=build  t=test  l=lint  s=serve  f=format  p=publish  P=publish  d=deploy  D=deploy
 
 Help:
   putnami help <command>   Command help

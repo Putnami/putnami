@@ -10,21 +10,9 @@ putnami <command[,command...]> [options]
 
 ## Build Commands
 
-| Command | Description |
-|---------|-------------|
-| `putnami build` | Compile or transpile project sources into runnable or distributable outputs |
-| `putnami test` | Run the project's tests, emitting test counts and coverage metrics |
-| `putnami lint` | Check code for style and correctness findings, emitting per-issue diagnostics |
-| `putnami serve` | Run the project's dev server until interrupted |
-| `putnami run` | Execute the project once and exit |
-| `putnami format` | Rewrite sources into canonical formatting |
-| `putnami package` | Assemble distributable artifacts for the project's publish channels |
-| `putnami publish` | Push packaged artifacts to registries |
-| `putnami deploy` | Converge a cloud environment on the workload's aggregated infra manifest |
-| `putnami generate` | Run code generators |
-| `putnami validate` | Check the project against its declared specs, contracts and compatibility rules |
+No extension is loaded. Name a language extension in putnami.workspace.json, then run: putnami extensions install
 
-Multi-command: `putnami lint,test,build --impacted`
+Multi-command: `putnami <command>,<command> --impacted`
 
 ## Common Options
 
@@ -859,7 +847,7 @@ putnami cache gc
 
 ### `putnami cache verify`
 
-Run lint, test, and build twice in isolated worktrees, compare cache keys and captured artifacts, restore the first run into a pristine tree, and fail on undeclared writes or live-versus-hit differences; declared ambient key inputs are reported without failing
+Run the workspace gate tasks (the blocking commands of putnami.ci.json; lint, test and build without one) twice in isolated worktrees, compare cache keys and captured artifacts, restore the first run into a pristine tree, and fail on undeclared writes or live-versus-hit differences; declared ambient key inputs are reported without failing
 
 **Usage**
 
@@ -1323,10 +1311,6 @@ putnami help [<command>] [<subcommand>] [--man] [--markdown]
 - `putnami help projects list`
 - `putnami help --man`
 - `putnami help --markdown`
-
-## Aliases
-
-`b`=build, `t`=test, `l`=lint, `s`=serve, `f`=format, `p`=publish, `P`=publish, `d`=deploy, `D`=deploy
 
 ## Exit Codes
 

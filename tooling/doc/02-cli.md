@@ -62,7 +62,8 @@ Jobs run sequentially in the order specified, all sharing the same project selec
 
 ### Command aliases
 
-Single-letter shortcuts for common jobs:
+The verb vocabulary of `@putnami/dev`, which the language extensions install,
+gives common jobs single-letter shortcuts:
 
 | Alias | Command |
 |-------|---------|
@@ -224,10 +225,10 @@ and `putnami help` of each, because the core still answers `tree` and
 `proposals`. The refusal of `putnami dev …` names the `extensions` and
 `templates` spellings, and the refusal of `putnami contributor …` names
 `putnami doctor --machine`. The refusals of `putnami tree verify …` and
-`putnami proposals finalize …` name no successor. A run of a moved SDD command
-that plans no job prints a hint. The refusals and the hint link to this
-section, and so does the `impact-plan` refusal of a command that no installed
-extension declares.
+`putnami proposals finalize …` name no successor. The refusals link to this
+section. A command that no loaded extension declares, a moved SDD command
+included, is refused with exit code 2 and a message that says how to add an
+extension.
 
 ## Project targeting
 

@@ -145,26 +145,6 @@
   ],
   "commands": [
     {
-      "path": "D",
-      "flags": [],
-      "positionals": []
-    },
-    {
-      "path": "P",
-      "flags": [],
-      "positionals": []
-    },
-    {
-      "path": "b",
-      "flags": [],
-      "positionals": []
-    },
-    {
-      "path": "build",
-      "flags": [],
-      "positionals": []
-    },
-    {
       "path": "cache",
       "flags": [],
       "positionals": []
@@ -333,16 +313,6 @@
       "positionals": []
     },
     {
-      "path": "d",
-      "flags": [],
-      "positionals": []
-    },
-    {
-      "path": "deploy",
-      "flags": [],
-      "positionals": []
-    },
-    {
       "path": "deps",
       "flags": [],
       "positionals": []
@@ -453,21 +423,6 @@
       ]
     },
     {
-      "path": "f",
-      "flags": [],
-      "positionals": []
-    },
-    {
-      "path": "format",
-      "flags": [],
-      "positionals": []
-    },
-    {
-      "path": "generate",
-      "flags": [],
-      "positionals": []
-    },
-    {
       "path": "help",
       "flags": [
         {
@@ -550,16 +505,6 @@
       "positionals": []
     },
     {
-      "path": "l",
-      "flags": [],
-      "positionals": []
-    },
-    {
-      "path": "lint",
-      "flags": [],
-      "positionals": []
-    },
-    {
       "path": "mcp",
       "flags": [],
       "positionals": [
@@ -591,16 +536,6 @@
           "type": "bool"
         }
       ],
-      "positionals": []
-    },
-    {
-      "path": "p",
-      "flags": [],
-      "positionals": []
-    },
-    {
-      "path": "package",
-      "flags": [],
       "positionals": []
     },
     {
@@ -699,11 +634,6 @@
       ]
     },
     {
-      "path": "publish",
-      "flags": [],
-      "positionals": []
-    },
-    {
       "path": "qualify",
       "flags": [
         {
@@ -749,27 +679,12 @@
       "positionals": []
     },
     {
-      "path": "run",
-      "flags": [],
-      "positionals": []
-    },
-    {
-      "path": "s",
-      "flags": [],
-      "positionals": []
-    },
-    {
       "path": "scopes",
       "flags": [],
       "positionals": []
     },
     {
       "path": "scopes list",
-      "flags": [],
-      "positionals": []
-    },
-    {
-      "path": "serve",
       "flags": [],
       "positionals": []
     },
@@ -839,11 +754,6 @@
           "type": "value"
         }
       ],
-      "positionals": []
-    },
-    {
-      "path": "t",
-      "flags": [],
       "positionals": []
     },
     {
@@ -960,11 +870,6 @@
       ]
     },
     {
-      "path": "test",
-      "flags": [],
-      "positionals": []
-    },
-    {
       "path": "tree",
       "flags": [],
       "positionals": []
@@ -1023,11 +928,6 @@
           "type": "value"
         }
       ],
-      "positionals": []
-    },
-    {
-      "path": "validate",
-      "flags": [],
       "positionals": []
     },
     {

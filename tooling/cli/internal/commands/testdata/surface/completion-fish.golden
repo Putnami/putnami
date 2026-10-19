@@ -41,26 +41,6 @@ function __putnami_seen_path
 end
 
 # Job commands
-complete -c putnami -n '__fish_use_subcommand' -a 'D' -d 'Alias for deploy'
-complete -c putnami -n '__fish_use_subcommand' -a 'P' -d 'Alias for publish'
-complete -c putnami -n '__fish_use_subcommand' -a 'b' -d 'Alias for build'
-complete -c putnami -n '__fish_use_subcommand' -a 'build' -d 'Compile or transpile project sources into runnable or distributable outputs.'
-complete -c putnami -n '__fish_use_subcommand' -a 'd' -d 'Alias for deploy'
-complete -c putnami -n '__fish_use_subcommand' -a 'deploy' -d 'Converge a cloud environment on the workload\'s aggregated infra manifest.'
-complete -c putnami -n '__fish_use_subcommand' -a 'f' -d 'Alias for format'
-complete -c putnami -n '__fish_use_subcommand' -a 'format' -d 'Rewrite sources into canonical formatting.'
-complete -c putnami -n '__fish_use_subcommand' -a 'generate' -d 'Run code generators.'
-complete -c putnami -n '__fish_use_subcommand' -a 'l' -d 'Alias for lint'
-complete -c putnami -n '__fish_use_subcommand' -a 'lint' -d 'Check code for style and correctness findings, emitting per-issue diagnostics.'
-complete -c putnami -n '__fish_use_subcommand' -a 'p' -d 'Alias for publish'
-complete -c putnami -n '__fish_use_subcommand' -a 'package' -d 'Assemble distributable artifacts for the project\'s publish channels.'
-complete -c putnami -n '__fish_use_subcommand' -a 'publish' -d 'Push packaged artifacts to registries.'
-complete -c putnami -n '__fish_use_subcommand' -a 'run' -d 'Execute the project once and exit.'
-complete -c putnami -n '__fish_use_subcommand' -a 's' -d 'Alias for serve'
-complete -c putnami -n '__fish_use_subcommand' -a 'serve' -d 'Run the project\'s dev server until interrupted.'
-complete -c putnami -n '__fish_use_subcommand' -a 't' -d 'Alias for test'
-complete -c putnami -n '__fish_use_subcommand' -a 'test' -d 'Run the project\'s tests, emitting test counts and coverage metrics.'
-complete -c putnami -n '__fish_use_subcommand' -a 'validate' -d 'Check the project against its declared specs, contracts and compatibility rules.'
 
 # Structured commands
 complete -c putnami -n '__fish_use_subcommand' -a 'cache' -d 'Manage cache'

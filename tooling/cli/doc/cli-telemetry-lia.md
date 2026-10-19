@@ -40,7 +40,7 @@ for the stated purpose.
 
 The field set is limited by a compiled allowlist, and the random identifier
 rotates every UTC month. The command vocabulary holds only names that Putnami
-chose: the eleven original job commands of the CLI catalog and the public
+chose: the eleven development verbs `@putnami/dev` declares and the public
 commands that extensions of the `@putnami` scope declare. The CLI sends a
 command only when a loaded `@putnami` extension declares it, so a command that
 only an extension whose name is outside the `@putnami` scope declares is never

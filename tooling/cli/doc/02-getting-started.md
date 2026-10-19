@@ -220,7 +220,8 @@ putnami serve my-app --watch
 
 ### Use Aliases
 
-Single-letter aliases speed up common commands:
+The verb vocabulary of `@putnami/dev`, which the language extensions install,
+gives the common commands single-letter aliases:
 
 | Alias | Command |
 |-------|---------|
