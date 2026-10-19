@@ -1,6 +1,6 @@
 # AGENTS.md
 
-<!-- putnami:guidance v2 begin sha256:0bfc6f8f7879e914d3959f1307c0ed3d0274d06a03ab7cd423ae573a180e9237 -->
+<!-- putnami:guidance v2 begin sha256:60084656a374bd62fea92ddd3b46e197ea12b710d2cdea3f9659ae5981257d63 -->
 This is a Putnami workspace.
 - Build, test, lint, install, add dependencies, and generate with `./putnamiw` when present, otherwise `putnami`. Never call npm, bun, go, pip, or cargo directly for those.
 - While iterating, select the projects you changed with `--projects <a>,<b>`; unlike `--impacted`, it skips every project that depends on them. Before declaring work complete, run `putnami lint,test,build,validate --impacted --enforce-coverage` once, when feasible.
