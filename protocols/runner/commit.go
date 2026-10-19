@@ -21,13 +21,14 @@ const (
 	CommitInputDomain = "putnami/runner/execution-input/v2"
 )
 
-// UnportableCommands are the well-known commands no portable run carries:
-// serve, run and compose stream a live workload, qualify reaches one from the
-// executing machine, and format rewrites a source that never returns to the
-// caller. The submitting CLI refuses them before it builds a version 1
-// request; a version 2 request has no such submitter, so ValidateCommitRequest
-// refuses them.
-var UnportableCommands = []string{"compose", "format", "qualify", "run", "serve"}
+// UnportableCommands are the core commands no portable run carries: compose
+// streams live workloads, and qualify reaches one from the executing machine.
+// The submitting CLI refuses them before it builds a version 1 request; a
+// version 2 request has no such submitter, so ValidateCommitRequest refuses
+// them. An extension command that declares a workload or rewritesSources is
+// not named here: the executing engine refuses it from the traits of the
+// manifests it loads.
+var UnportableCommands = []string{"compose", "qualify"}
 
 // CommitRequest is the version 2 execution request. It names a commit instead
 // of a snapshot and a requested selection instead of a frozen one, and carries
@@ -288,7 +289,7 @@ func ValidateCommitRequest(request CommitRequest) error {
 	}
 	for _, command := range request.Invocation.Commands {
 		if slices.Contains(UnportableCommands, command) {
-			return fmt.Errorf("runner: invocation.commands names %q, which no portable run carries: serve, run and compose stream a live workload, qualify reaches one, and format rewrites the source", command)
+			return fmt.Errorf("runner: invocation.commands names %q, which no portable run carries: compose streams live workloads, and qualify reaches one", command)
 		}
 	}
 	if err := validateRequestedSelection(request.Selection, request.Source); err != nil {

@@ -168,11 +168,12 @@ version 1 document parses, encodes and digests exactly as
 `ParseExecutionRequest` reads it. It refuses any other version.
 
 A version 2 request reaches an engine with no submitting CLI in front of it,
-so `ValidateCommitRequest` refuses the commands no portable run carries
-(`UnportableCommands`): `serve`, `run` and `compose` stream a live workload,
-`qualify` reaches one, and `format` rewrites the source. The submitting CLI
-refuses the same commands before it builds a version 1 request; version 1
-validation is unchanged.
+so `ValidateCommitRequest` refuses the core commands no portable run carries
+(`UnportableCommands`): `compose` streams live workloads, and `qualify`
+reaches one. The submitting CLI refuses the same commands before it builds a
+version 1 request; version 1 validation is unchanged. An extension command
+whose traits declare a workload or `rewritesSources` is valid here: the
+executing engine refuses it from the manifests it loads, in both versions.
 
 `CommitInputDigest` is `sha256:` over the canonical JSON of
 `{"domain":"putnami/runner/execution-input/v2","protocolVersion":1,"source":…,"invocation":…,"selection":…}`.

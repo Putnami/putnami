@@ -8,8 +8,8 @@
   "required": ["version", "protocol", "source", "invocation", "selection", "control"],
   "allOf": [
     {
-      "description": "The invocation block is version 1's, and a version 2 request names no unportable command: serve, run and compose stream a live workload, qualify reaches one, and format rewrites the source.",
-      "properties": { "invocation": { "properties": { "commands": { "items": { "not": { "enum": ["compose", "format", "qualify", "run", "serve"] } } } } } }
+      "description": "The invocation block is version 1's, and a version 2 request names no unportable command: compose streams live workloads, and qualify reaches one.",
+      "properties": { "invocation": { "properties": { "commands": { "items": { "not": { "enum": ["compose", "qualify"] } } } } } }
     }
   ],
   "properties": {

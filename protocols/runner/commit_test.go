@@ -215,8 +215,8 @@ func TestCommitRequestRejectsSemanticViolations(t *testing.T) {
 // sits in the list, and names it.
 func TestCommitRequestRefusesUnportableCommands(t *testing.T) {
 	t.Parallel()
-	if !slices.IsSorted(UnportableCommands) || len(UnportableCommands) != 5 {
-		t.Fatalf("UnportableCommands = %v; want the five sorted commands", UnportableCommands)
+	if !slices.Equal(UnportableCommands, []string{"compose", "qualify"}) {
+		t.Fatalf("UnportableCommands = %v; want compose and qualify", UnportableCommands)
 	}
 	for _, command := range UnportableCommands {
 		for _, commands := range [][]string{{command}, {"build", command}} {
