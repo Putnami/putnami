@@ -31,5 +31,5 @@ This is a Putnami workspace.
   - D-021 — an extension manifest declares the kind of each command it adds, in an additive contract rung that ships with the traits that replace verb-name checks (settled 2026-10-18, review-only, held by a human reviewer)
   - D-022 — a feature declaration may list the commands and MCP tools that carry the feature (settled 2026-10-18, review-only, held by a human reviewer)
   - D-023 — Cloud deletes its nine alias subcommands (tokens, distribution, oci, publish-archives, track, report, validate-config, publish-config, publish-migration) in a dedicated Cloud pull request that ships as a breaking Cloud release (settled 2026-10-18, review-only, held by a human reviewer)
-  - Project decisions, returned by `putnami.context` with their project: `tooling/cli/decisions.json` (12).
+  - Project decisions, returned by `putnami.context` with their project: `tooling/cli/decisions.json` (13).
 <!-- putnami:guidance v2 end -->

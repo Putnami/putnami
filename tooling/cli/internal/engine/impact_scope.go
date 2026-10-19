@@ -76,9 +76,11 @@ func narrowToTaskScopes(ws *workspace.Workspace, planned []*scheduler.ScheduledJ
 		}
 		scope, scoped := scopes[job.Project.ID]
 		// This rule also counts the well-known verb's default side effect when
-		// a declaration drops it, so `publish` and `deploy` keep their jobs
-		// whatever their manifest declares. Every other reader of a command's
-		// side effects follows the declared traits as resolved.
+		// a declaration replaces it, so `publish` and `deploy` keep their jobs
+		// whatever their manifest declares. extension.CommandSideEffects holds
+		// the same rule for the git requirement, the remote cache trust floor
+		// and the MCP run_jobs refusal. Every other reader of a command's side
+		// effects takes the declared traits as resolved.
 		command := modeljobs.JobCommandName(job)
 		sideEffects := job.JobDef.Traits.SideEffects != extensionproto.SideEffectsNone ||
 			extensionproto.EffectiveTraits(command, nil).SideEffects != extensionproto.SideEffectsNone

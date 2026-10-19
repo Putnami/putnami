@@ -63,7 +63,10 @@ merged, with one exception: a declaration that names no `sideEffects` keeps
 the verb's. A `publish` that declares only `injectPublishChannels` still has
 `registry` side effects, and a `deploy` that declares only `heavy` still has
 `cloud` ones, so every gate that reads the trait treats them as side-effecting.
-A declared `sideEffects` still replaces the verb's. Per-step heaviness uses
+A declared `sideEffects` replaces the verb's for most readers. The git
+requirement, the `run_jobs` refusal, the remote cache trust floor and the task
+scope add declared traits to a well-known verb's side effects and never remove
+them. Per-step heaviness uses
 `heavy` on the pipeline step:
 
 ```json

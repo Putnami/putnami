@@ -31,6 +31,13 @@
       "reviewOnly": true
     },
     {
+      "id": "D-W13",
+      "statement": "the remote cache trust floor rises to ci only for a command that publishes to a registry or creates a release tag; a deploy, whose side effects are cloud, raises none",
+      "settled": "2026-10-19",
+      "settledBy": "fdumay",
+      "reviewOnly": true
+    },
+    {
       "id": "D-W2",
       "statement": "release archives stay .tar.gz on every platform, with the Windows binary at compiled/<name>.exe; every extractor in the CLI reads tar.gz only; the CLI's own release may also publish raw executables, which self-update installs as is",
       "settled": "2026-10-02",
