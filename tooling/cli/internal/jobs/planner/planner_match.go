@@ -197,9 +197,8 @@ func matchWorkspaceOnceJobs(
 //  1. The command has workspace activation (activates for all projects), OR
 //  2. The command's activation files matched the project, OR
 //  3. The extension is listed in the project's Dependencies or Extensions, OR
-//  4. The project IS the extension itself (self-publish exception).
-//
-// This matches the TypeScript SDK's filter in job.planning.ts.
+//  4. The project IS the extension itself and the command's traits declare
+//     injectPublishChannels: an extension packages and publishes itself.
 func isProjectExtensionDep(proj *workspace.Project, job *extension.JobDefinition, matchedActivationFiles bool) bool {
 	extName := job.ExtensionName
 	extID := ""
@@ -217,8 +216,9 @@ func isProjectExtensionDep(proj *workspace.Project, job *extension.JobDefinition
 		return true
 	}
 
-	// Self-publish: extension projects can always package/publish themselves
-	if proj.Name == extName && (cmdName == "publish" || cmdName == "package") {
+	// Self-publish: an extension project runs its own extension's packaging
+	// and publishing commands, the ones that receive publish channels.
+	if proj.Name == extName && job.Traits.InjectPublishChannels {
 		return true
 	}
 

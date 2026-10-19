@@ -598,14 +598,6 @@ func RecordsFromEvents(events []RawJobEvent) ([]TaskDiagnostic, []TaskArtifact, 
 
 const verifiedImagePublicationStep = "docker"
 
-// ExpectsVerifiedImagePublication reports whether a planned job owns the
-// established image-publication result contract. Provider vocabulary remains
-// quarantined in this canonical projection instead of leaking into the
-// scheduler or release-set coordinator.
-func ExpectsVerifiedImagePublication(job *ScheduledJob) bool {
-	return job != nil && job.JobDef != nil && job.CommandName() == "publish" && job.StepID() == verifiedImagePublicationStep
-}
-
 // publicationFromEvent accepts only the shared Docker publisher's published
 // artifact records. Unknown publisher-specific fields remain harmless runtime
 // event extensions; a malformed optional payload never turns a successful task

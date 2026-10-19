@@ -196,8 +196,8 @@ const boundPublicationManifest = `{
   ],
   "commands": {
     "build": {"run": [{"id": "compile", "task": "noop"}]},
-    "package": {"dependsOn": ["build"], "run": [{"id": "artifact", "task": "noop"}]},
-    "publish": {"dependsOn": ["package"], "run": [{"id": "artifact", "task": "pack"}]},
+    "package": {"dependsOn": ["build"], "traits": {"injectPublishChannels": true}, "run": [{"id": "artifact", "task": "noop"}]},
+    "publish": {"dependsOn": ["package"], "traits": {"injectPublishChannels": true, "sideEffects": "registry"}, "run": [{"id": "artifact", "task": "pack"}]},
     "cloud-release-set": {"visibility": "internal", "run": [{"id": "provider", "task": "noop"}]}
   },
   "tasks": {
@@ -280,7 +280,7 @@ func (reg *boundPublicationRegistry) take() (stored, refused int) {
 // runWithPublicationProvider runs req with a publish broker over provider
 // installed as the run's publication provider, as the CLI installs it for an
 // invocation whose providers name publish.
-func runWithPublicationProvider(t *testing.T, req Request, provider *providertest.Provider) (SessionResult, string) {
+func runWithPublicationProvider(t *testing.T, ctx context.Context, req Request, provider *providertest.Provider) (SessionResult, string) {
 	t.Helper()
 	broker := credentialprovider.NewBroker(credentialprovider.Purposes([]string{runner.InvocationProviderPublish}),
 		func(ctx context.Context) (*credentialprovider.Session, error) {
@@ -296,7 +296,7 @@ func runWithPublicationProvider(t *testing.T, req Request, provider *providertes
 		restore()
 		_ = broker.Close()
 	}()
-	return runBound(t, req)
+	return runBoundIn(t, ctx, req)
 }
 
 // A submitter that plans without the provider's capability computes the
@@ -353,8 +353,16 @@ func TestBoundRequestPublishesThroughThePublicationProvider(t *testing.T) {
 	}
 
 	// A local run of the commit opens the plan digest the bound run must open.
+	// It reads its ancestry where the terminal adapter does: at process start,
+	// for the commands whose declared traits publish (CaptureAncestry).
 	local := providertest.New(providertest.Config{Bearer: boundPublicationBearer, Hosts: []string{target.Host}})
-	result, stderr := runWithPublicationProvider(t, request(GlobalFlags{Projects: boundPublicationProject, NoCache: true}), local)
+	localRequest := request(GlobalFlags{Projects: boundPublicationProject, NoCache: true})
+	discovered := discoverDeclaredExtensions(&localRequest)
+	if discovered == nil {
+		t.Fatal("the fixture workspace declares no readable extension")
+	}
+	captured := CaptureAncestry(context.Background(), root, commands, nil, discovered.Extensions...)
+	result, stderr := runWithPublicationProvider(t, captured, localRequest, local)
 	if result.ExitCode != ExitSuccess || len(local.Opens()) != 1 {
 		t.Fatalf("the local publish = exit %d with %d opens, stderr %q", result.ExitCode, len(local.Opens()), stderr)
 	}
@@ -371,7 +379,7 @@ func TestBoundRequestPublishesThroughThePublicationProvider(t *testing.T) {
 		Plan:       expected,
 	}}
 	provider := providertest.New(providertest.Config{Bearer: boundPublicationBearer, Hosts: []string{target.Host}})
-	result, stderr = runWithPublicationProvider(t, bound, provider)
+	result, stderr = runWithPublicationProvider(t, context.Background(), bound, provider)
 	if result.ExitCode != ExitSuccess {
 		t.Fatalf("the bound publish = exit %d, stderr %q", result.ExitCode, stderr)
 	}

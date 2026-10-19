@@ -128,7 +128,7 @@ func TestReleaseSetE2EArchiveRoutesItsPackageProviderBeforeCoordinatorCommit(t *
 		routes: map[string]releaseMemberRoute{
 			releaseset.MemberKey(member.Ecosystem, member.Coordinate): {
 				projectID: project.ID, publisher: "@putnami/cloud", packagePublisher: "@putnami/go",
-				packageStep: "archives", publishCommand: "publish", publishStep: "cloud-publish-archives",
+				packageCommand: "package", packageStep: "archives", publishCommand: "publish", publishStep: "cloud-publish-archives",
 			},
 		},
 	}
@@ -143,7 +143,7 @@ func TestReleaseSetE2EArchiveRoutesItsPackageProviderBeforeCoordinatorCommit(t *
 	}}
 	fixtureTask(t, packageJob.JobDef, fixtureScript{{"write", "packaged\n", packageMarker}, {"print", releaseSetSuccessLine}})
 	publishJob := &jobmodel.ScheduledJob{Project: project, Extension: publisher, JobDef: &modelextension.JobDefinition{
-		Name: "publish~cloud-publish-archives", CommandName: "publish", StepID: "cloud-publish-archives", ExtensionName: publisher.Name,
+		Name: "publish~cloud-publish-archives", CommandName: "publish", StepID: "cloud-publish-archives", ExtensionName: publisher.Name, Traits: registryPublication,
 	}, DependsOn: []string{packageJob.Key()}}
 	fixtureTask(t, publishJob.JobDef, fixtureScript{
 		{"exit-unless", "1", "nonempty:" + packageMarker},
@@ -198,7 +198,7 @@ func TestReleaseSetE2ESameSessionCommitsBeforeDependentDeploy(t *testing.T) {
 	useReleaseSetProvenance(t, nil)
 
 	run, err := PrepareReleaseSet(ctx, ReleaseSetOptions{
-		Commands: []string{"publish", "deploy"}, ConsumesReleaseSet: true, All: true, Channels: []string{"canary"}, Profiles: testProfiles(),
+		Commands: []string{"publish", "deploy"}, Publishes: true, ConsumesReleaseSet: true, All: true, Channels: []string{"canary"}, Profiles: testProfiles(),
 	}, ws, []*workspace.Project{project}, releaseSetE2EDiscovery(), releaseSetTestFingerprints(t, ws))
 	if err != nil || run == nil || run.Plan() == nil {
 		t.Fatalf("prepare same-session release set = %+v, %v", run, err)
@@ -208,7 +208,7 @@ func TestReleaseSetE2ESameSessionCommitsBeforeDependentDeploy(t *testing.T) {
 	publish := &jobmodel.ScheduledJob{
 		Project: project, Extension: ext,
 		JobDef: &modelextension.JobDefinition{
-			Name: "publish~npm", CommandName: "publish", ExtensionName: ext.Name,
+			Name: "publish~npm", CommandName: "publish", ExtensionName: ext.Name, Traits: registryPublication,
 		},
 	}
 	fixtureTask(t, publish.JobDef, fixtureScript{
@@ -266,7 +266,7 @@ func TestReleaseSetBarrierCompletesTheDeployContractFromTheReleasedSet(t *testin
 	}
 	ext := &modelextension.ExtensionDescription{Name: "@putnami/go"}
 	publish := &jobmodel.ScheduledJob{Project: workload, Extension: ext, JobDef: &modelextension.JobDefinition{
-		Name: "publish~docker", CommandName: "publish", ExtensionName: ext.Name, Kind: "docker-publish",
+		Name: "publish~docker", CommandName: "publish", ExtensionName: ext.Name, Kind: "docker-publish", Traits: registryPublication,
 	}}
 	deploy := &jobmodel.ScheduledJob{Project: workload, Extension: ext, JobDef: &modelextension.JobDefinition{
 		Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name, Traits: releaseSetConsumer,
@@ -312,7 +312,7 @@ func TestReleaseSetBarrierFailsWhenAWorkloadIsNotInTheReleasedSet(t *testing.T) 
 	}
 	ext := &modelextension.ExtensionDescription{Name: "@putnami/go"}
 	publish := &jobmodel.ScheduledJob{Project: workload, Extension: ext, JobDef: &modelextension.JobDefinition{
-		Name: "publish~docker", CommandName: "publish", ExtensionName: ext.Name, Kind: "docker-publish",
+		Name: "publish~docker", CommandName: "publish", ExtensionName: ext.Name, Kind: "docker-publish", Traits: registryPublication,
 	}}
 	deploy := &jobmodel.ScheduledJob{Project: workload, Extension: ext, JobDef: &modelextension.JobDefinition{
 		Name: "deploy~cloud", CommandName: "deploy", ExtensionName: ext.Name, Traits: releaseSetConsumer,
@@ -352,7 +352,7 @@ func TestReleaseSetE2ESameSessionNoImpactConfirmsExactHeadBeforeDeploy(t *testin
 
 	ext := &modelextension.ExtensionDescription{Name: "@test/release-boundary", Path: root}
 	publish := &jobmodel.ScheduledJob{Project: upstream, Extension: ext, JobDef: &modelextension.JobDefinition{
-		Name: "publish~noop", CommandName: "publish", ExtensionName: ext.Name,
+		Name: "publish~noop", CommandName: "publish", ExtensionName: ext.Name, Traits: registryPublication,
 	}}
 	fixtureTask(t, publish.JobDef, fixtureScript{{"print", releaseSetSuccessLine}})
 	deploy := &jobmodel.ScheduledJob{Project: upstream, Extension: ext, JobDef: &modelextension.JobDefinition{
@@ -1279,23 +1279,23 @@ func useReleaseSetE2EProvider(t *testing.T, ledger *releaseSetE2ELedger) *int {
 }
 
 func releaseSetE2EDiscovery() *extension.DiscoveryResult {
-	return &extension.DiscoveryResult{Extensions: []*modelextension.ExtensionDescription{{
+	return &extension.DiscoveryResult{Extensions: append([]*modelextension.ExtensionDescription{{
 		Name: "cloud", Commands: map[string]string{distribution.ProviderCommandName: "release sets"},
-	}}}
+	}}, fixtureRoutes()...)}
 }
 
 func releaseSetE2EImpactedOptions(channels ...string) ReleaseSetOptions {
 	if len(channels) == 0 {
 		channels = []string{"canary"}
 	}
-	return ReleaseSetOptions{Commands: []string{"publish"}, Impacted: true, Channels: channels, Profiles: testProfiles()}
+	return ReleaseSetOptions{Commands: []string{"publish"}, Publishes: true, Impacted: true, Channels: channels, Profiles: testProfiles()}
 }
 
 func releaseSetE2EAllOptions(channels ...string) ReleaseSetOptions {
 	if len(channels) == 0 {
 		channels = []string{"canary"}
 	}
-	return ReleaseSetOptions{Commands: []string{"publish"}, All: true, Channels: channels, Profiles: testProfiles()}
+	return ReleaseSetOptions{Commands: []string{"publish"}, Publishes: true, All: true, Channels: channels, Profiles: testProfiles()}
 }
 
 func releaseSetE2EChannelKey(namespace, channel string) string { return namespace + "\x00" + channel }

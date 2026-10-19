@@ -266,7 +266,7 @@ func AuthorizeProcessCapabilities(
 	// stamp waits for the gate commands on its behalf (ADR 0023).
 	gated := make([]*ScheduledJob, 0)
 	for _, job := range planned {
-		if HasCloudCapabilitySideEffects(job) {
+		if HasExternalEffects(job) {
 			protected = append(protected, job)
 			if !isReleaseSetMemberPublication(job) {
 				gated = append(gated, job)
@@ -422,7 +422,7 @@ func capabilityPlanShape(planned []*ScheduledJob) [sha256.Size]byte {
 			job.Key(),
 			job.CommandName(),
 			job.JobDef.Traits.SideEffects,
-			strings.Join(declaredCapabilityEffects(job), "\x00"),
+			strings.Join(declaredExternalEffects(job), "\x00"),
 			strings.Join(dependsOn, "\x00"),
 			strings.Join(serializeAfter, "\x00"),
 			strings.Join(noopGates, "\x00"),
@@ -509,37 +509,6 @@ func functionalAncestors(job *ScheduledJob, jobsByKey map[string]*ScheduledJob) 
 		}
 	}
 	return ancestors
-}
-
-func HasCloudCapabilitySideEffects(job *ScheduledJob) bool {
-	if job == nil || job.JobDef == nil {
-		return false
-	}
-	switch job.JobDef.Traits.SideEffects {
-	case extensionproto.SideEffectsRegistry, extensionproto.SideEffectsCloud:
-		return true
-	}
-	return len(declaredCapabilityEffects(job)) > 0
-}
-
-// declaredCapabilityEffects projects the actual manifest task's registry/cloud
-// effects into capability classification. Command traits describe a whole
-// command and cannot safely stand in for a side-effecting nested task: an
-// unclassified task would otherwise receive no gating, while a post-authorization
-// task swap could retain a grant unless the declaration also enters plan shape.
-func declaredCapabilityEffects(job *ScheduledJob) []string {
-	declaration := taskDeclarationOf(job)
-	if declaration == nil {
-		return nil
-	}
-	effects := make([]string, 0, 2)
-	for _, effect := range declaration.Effects {
-		switch effect {
-		case extensionproto.EffectRegistry, extensionproto.EffectCloud:
-			effects = append(effects, effect)
-		}
-	}
-	return dedupeSorted(effects)
 }
 
 // processCapabilityRuntime owns grants proven against terminal dependency
@@ -670,7 +639,7 @@ func scopeProcessCapabilities(ctx context.Context, env []string, job *ScheduledJ
 	if capabilities.cloudToken == "" {
 		return env
 	}
-	if !HasCloudCapabilitySideEffects(job) {
+	if !HasExternalEffects(job) {
 		return env
 	}
 	grantedJob, _ := ctx.Value(processCapabilityGrantContextKey{}).(string)
@@ -695,7 +664,7 @@ func processCapabilityOutputNeedsRedaction(ctx context.Context, capabilities *pr
 	if capabilities != nil && capabilities.releaseSetProvider != nil {
 		return releaseSetProviderGrantMatches(ctx, capabilities, job)
 	}
-	return HasCloudCapabilitySideEffects(job)
+	return HasExternalEffects(job)
 }
 
 // ReleaseSetProviderProcessEnv binds every coordinator call to the nested

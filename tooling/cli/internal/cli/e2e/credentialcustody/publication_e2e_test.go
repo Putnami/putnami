@@ -554,9 +554,10 @@ type manifestRuntime struct {
 }
 
 type manifestCommand struct {
-	Description string         `json:"description,omitempty"`
-	DependsOn   []string       `json:"dependsOn,omitempty"`
-	Run         []manifestStep `json:"run"`
+	Description string          `json:"description,omitempty"`
+	DependsOn   []string        `json:"dependsOn,omitempty"`
+	Traits      json.RawMessage `json:"traits,omitempty"`
+	Run         []manifestStep  `json:"run"`
 }
 
 type manifestStep struct {
@@ -602,8 +603,9 @@ type extensionFixture struct {
 }
 
 // installExtension installs ext in the store, with its runtime as the native
-// runtime. The manifest keeps the shipped ecosystems, the shipped workspace
-// probe scope without its sync task, and the shipped publication task, whose
+// runtime. The manifest keeps the shipped ecosystems, the shipped traits of
+// package and publish, the shipped workspace probe scope without its sync
+// task, and the shipped publication task, whose
 // command becomes this binary in ext's publish environment. Its package
 // command runs the stage task, and its publish command the publication task.
 func (fx *publicationE2EFixture) installExtension(t *testing.T, ext extensionFixture) {
@@ -622,8 +624,8 @@ func (fx *publicationE2EFixture) installExtension(t *testing.T, ext extensionFix
 		Workspace:  shipped.Workspace,
 		Ecosystems: shipped.Ecosystems,
 		Commands: map[string]manifestCommand{
-			"package": {Run: []manifestStep{{ID: ext.step, Task: ext.packageTask}}},
-			"publish": {DependsOn: []string{"package"}, Run: []manifestStep{{ID: ext.step, Task: ext.publishTask}}},
+			"package": {Traits: shipped.Commands["package"].Traits, Run: []manifestStep{{ID: ext.step, Task: ext.packageTask}}},
+			"publish": {DependsOn: []string{"package"}, Traits: shipped.Commands["publish"].Traits, Run: []manifestStep{{ID: ext.step, Task: ext.publishTask}}},
 		},
 		Tasks: map[string]json.RawMessage{ext.packageTask: rawJSON(t, ext.stage), ext.publishTask: rawJSON(t, publish)},
 	})
@@ -685,7 +687,14 @@ func rawJSON(t *testing.T, value any) json.RawMessage {
 type shippedManifest struct {
 	Workspace  map[string]json.RawMessage `json:"workspace"`
 	Ecosystems json.RawMessage            `json:"ecosystems"`
+	Commands   map[string]shippedCommand  `json:"commands"`
 	Tasks      map[string]json.RawMessage `json:"tasks"`
+}
+
+// shippedCommand is what the fixture keeps of a shipped command: the traits
+// that make its package and publish what they are.
+type shippedCommand struct {
+	Traits json.RawMessage `json:"traits"`
 }
 
 func readShippedManifest(t *testing.T, source string) shippedManifest {

@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -118,7 +117,7 @@ func stricterCacheTrust(left, right store.CacheTrust) bool {
 // is a core command, which declares no traits.
 func releaseCacheTrustRequired(extensions []*extension.ExtensionDescription, commands []string, subcommand string) bool {
 	for _, command := range commands {
-		if slices.Contains(extension.CommandSideEffects(extensions, command), extension.SideEffectsRegistry) {
+		if extension.CommandPublishes(extensions, command) {
 			return true
 		}
 		switch command {

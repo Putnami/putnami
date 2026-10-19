@@ -255,6 +255,7 @@ type releaseMemberRoute struct {
 	projectID        string
 	publisher        string
 	packagePublisher string
+	packageCommand   string
 	packageStep      string
 	publishCommand   string
 	publishStep      string
@@ -292,6 +293,10 @@ const (
 // boundary while preserving the exact terminal dry-run value.
 type ReleaseSetOptions struct {
 	Commands []string
+	// Publishes reports that the run names a command whose loaded jobs declare
+	// the registry side effect (extension.CommandPublishes): it publishes a
+	// release set rather than consuming one.
+	Publishes bool
 	// ConsumesReleaseSet reports that the run names a command whose loaded
 	// jobs declare the consumesReleaseSet trait
 	// (extension.CommandConsumesReleaseSet): it binds the set and an
@@ -372,6 +377,9 @@ type ReleaseSetOptions struct {
 type ReleaseSetRequest struct {
 	// Commands is the run's command list.
 	Commands []string
+	// Publishes reports that one of Commands publishes to a registry
+	// (ReleaseSetOptions.Publishes).
+	Publishes bool
 	// ConsumesReleaseSet reports that one of Commands binds the release set
 	// (ReleaseSetOptions.ConsumesReleaseSet).
 	ConsumesReleaseSet bool
@@ -432,7 +440,7 @@ func BuildReleaseSetOptions(request ReleaseSetRequest) (ReleaseSetOptions, error
 			return ReleaseSetOptions{}, err
 		}
 	}
-	line, tagged, err := taggedRunLine(request.Commands, request.Versions, request.Scope)
+	line, tagged, err := taggedRunLine(request.Publishes, request.Versions, request.Scope)
 	if err != nil {
 		return ReleaseSetOptions{}, err
 	}
@@ -441,7 +449,7 @@ func BuildReleaseSetOptions(request ReleaseSetRequest) (ReleaseSetOptions, error
 		ignoredReuseChannel, reuseChannel, reuseSourceRevision = reuseChannel, "", ""
 	}
 	return ReleaseSetOptions{
-		Commands: request.Commands, ConsumesReleaseSet: request.ConsumesReleaseSet,
+		Commands: request.Commands, Publishes: request.Publishes, ConsumesReleaseSet: request.ConsumesReleaseSet,
 		Channels: channels, BaselineChannel: baselineChannel,
 		ReuseChannel: reuseChannel, ReuseSourceRevision: reuseSourceRevision, IgnoredReuseChannel: ignoredReuseChannel,
 		Impacted: request.Impacted, All: request.All, DryRun: request.DryRun,
@@ -463,10 +471,10 @@ func ReleaseSetReuseNotice(options ReleaseSetOptions) string {
 }
 
 // distributingRun reports a run that can consult the repository's distribution
-// policy: a publish, or a release-set consumer whose environment follows a
-// channel.
+// policy: a registry publication, or a release-set consumer whose environment
+// follows a channel.
 func distributingRun(request ReleaseSetRequest) bool {
-	return slices.Contains(request.Commands, "publish") || request.ConsumesReleaseSet
+	return request.Publishes || request.ConsumesReleaseSet
 }
 
 // taggedRunLine names the version line HEAD's tag releases.
@@ -477,8 +485,8 @@ func distributingRun(request ReleaseSetRequest) bool {
 // seeding commit that tags every line, or a runner checkout that carries every
 // tag of the commit — `--scope` names the one being released; without it the
 // publish is refused rather than guessing which cohort was meant (D9).
-func taggedRunLine(commands []string, versions cachekey.RunVersions, scope string) (string, bool, error) {
-	if !slices.Contains(commands, "publish") {
+func taggedRunLine(publishes bool, versions cachekey.RunVersions, scope string) (string, bool, error) {
+	if !publishes {
 		return "", false, nil
 	}
 	tagged := make([]string, 0, len(versions))
@@ -708,7 +716,7 @@ func releaseSetBaselineHead(
 // refused there, because the tag would then name content that is not what was
 // tagged.
 func ValidateReleaseSetSelection(options ReleaseSetOptions) error {
-	if !slices.Contains(options.Commands, "publish") && !options.PlannedPublish {
+	if !options.Publishes && !options.PlannedPublish {
 		return nil
 	}
 	for _, name := range options.Channels {
@@ -818,7 +826,7 @@ func validateReleaseSetReuseChannel(options ReleaseSetOptions) error {
 // when no --channel is named, because the immutable channel it creates is
 // derived from the tag rather than requested.
 func RequestedReleaseSetMode(options ReleaseSetOptions) ReleaseSetMode {
-	if !slices.Contains(options.Commands, "publish") && !options.PlannedPublish {
+	if !options.Publishes && !options.PlannedPublish {
 		return ReleaseSetDisabled
 	}
 	if options.Tagged {
@@ -870,7 +878,7 @@ func taggedLineVersion(options ReleaseSetOptions) *cachekey.JobContextVersion {
 	if !options.Tagged {
 		return nil
 	}
-	if !slices.Contains(options.Commands, "publish") && !options.PlannedPublish {
+	if !options.Publishes && !options.PlannedPublish {
 		return nil
 	}
 	info := options.Versions[options.Line]
@@ -967,7 +975,7 @@ func prepareDependentReleaseSet(
 	if prepared != nil || (len(options.Channels) == 0 && !options.Tagged) {
 		return prepared, nil
 	}
-	projects := PlannedCommandProjects(planned, func(job *jobmodel.ScheduledJob) bool { return job.CommandName() == "publish" })
+	projects := PlannedCommandProjects(planned, jobmodel.PublishesToRegistry)
 	if len(projects) == 0 {
 		return nil, nil
 	}
@@ -1001,7 +1009,8 @@ func (run *ReleaseSetRun) AttachBarrier(planned []*jobmodel.ScheduledJob) ([]*jo
 
 // attachDeployBarrier adds the release node every release-set consumer waits
 // for, when the plan holds a job whose command traits declare
-// consumesReleaseSet.
+// consumesReleaseSet. The node waits for every registry publication of the
+// plan, whatever its command name, and for the publication-v1 open node.
 func (run *ReleaseSetRun) attachDeployBarrier(planned []*jobmodel.ScheduledJob) ([]*jobmodel.ScheduledJob, map[string]scheduler.InternalJobRunner, error) {
 	var publishKeys []string
 	var deployJobs []*jobmodel.ScheduledJob
@@ -1011,7 +1020,7 @@ func (run *ReleaseSetRun) attachDeployBarrier(planned []*jobmodel.ScheduledJob) 
 			continue
 		}
 		switch {
-		case job.CommandName() == "publish":
+		case jobmodel.PublishesToRegistry(job), job.Key() == publicationOpenKey:
 			publishKeys = append(publishKeys, job.Key())
 		case consumesReleaseSet(job):
 			deployJobs = append(deployJobs, job)
@@ -1119,7 +1128,11 @@ func PrepareReleaseSet(
 	if options.Profiles == nil {
 		return nil, fmt.Errorf("release-set publish requires the workspace ecosystem profiles")
 	}
-	candidates, err := releaseProjects(ws.Projects, options.Profiles)
+	var extensions []*extension.ExtensionDescription
+	if discovered != nil {
+		extensions = discovered.Extensions
+	}
+	candidates, err := releaseProjects(ws.Projects, options.Profiles, extensions)
 	if err != nil {
 		return nil, err
 	}
@@ -1210,6 +1223,7 @@ func prepareReleaseSetRun(
 			projectID:        candidate.project.ID,
 			publisher:        candidate.publisher,
 			packagePublisher: candidate.packagePublisher,
+			packageCommand:   candidate.packageCommand,
 			packageStep:      candidate.packageStep,
 			publishCommand:   candidate.publishCommand,
 			publishStep:      candidate.publishStep,
@@ -1466,7 +1480,7 @@ func resolveSelectionFingerprints(
 	if len(members) == 0 {
 		return options, nil
 	}
-	fingerprints, err := cachekey.SelectionFingerprints(ws, keying, commandParams, cache, profiles, members)
+	fingerprints, err := cachekey.SelectionFingerprints(ws, keying, commandParams, cache, profiles, discovered.Extensions, members)
 	if err != nil {
 		return options, err
 	}
@@ -1793,8 +1807,9 @@ func (run *ReleaseSetRun) ScopePlanning(
 		if packageDescription == nil {
 			return nil, nil, fmt.Errorf("scope release-set planning: member %s is packaged by %q, which this run did not plan", printableReleaseKey(key), packagePublisher)
 		}
-		if packageDescription.Jobs["package"] == nil {
-			return nil, nil, fmt.Errorf("scope release-set planning: member %s package publisher %q does not declare package", printableReleaseKey(key), packagePublisher)
+		if route.packageCommand == "" || packageDescription.Jobs[route.packageCommand] == nil {
+			return nil, nil, fmt.Errorf("scope release-set planning: member %s package publisher %q declares no command that %s runs first with the injectPublishChannels trait and step %q",
+				printableReleaseKey(key), packagePublisher, route.publishCommand, route.packageStep)
 		}
 		selectedExtensions[publicationPublisher] = struct{}{}
 		selectedExtensions[packagePublisher] = struct{}{}
@@ -1832,12 +1847,16 @@ func mergeProjectsByID(members, verification []*workspace.Project) []*workspace.
 
 // A mixed verification/publication DAG also needs command providers that emit
 // no release member (for example SDD's validate). Retaining one must not bring
-// its unrelated publication jobs into the release transaction.
+// its unrelated publication jobs into the release transaction: a job whose
+// traits declare the registry side effect is a publication, whatever its name.
 func releaseVerificationExtensions(
 	extensions []*extension.ExtensionDescription,
 	selectedExtensions map[string]struct{},
 	commands []string,
 ) []*extension.ExtensionDescription {
+	publishes := func(_ string, job *extension.JobDefinition) bool {
+		return job != nil && job.Traits.SideEffects == extension.SideEffectsRegistry
+	}
 	scopedExtensions := make([]*extension.ExtensionDescription, 0, len(extensions))
 	for _, candidate := range extensions {
 		if candidate == nil {
@@ -1848,12 +1867,12 @@ func releaseVerificationExtensions(
 			continue
 		}
 		for _, command := range commands {
-			if command == "publish" || candidate.Jobs[command] == nil {
+			if job := candidate.Jobs[command]; job == nil || publishes(command, job) {
 				continue
 			}
 			verification := *candidate
 			verification.Jobs = maps.Clone(candidate.Jobs)
-			delete(verification.Jobs, "publish")
+			maps.DeleteFunc(verification.Jobs, publishes)
 			scopedExtensions = append(scopedExtensions, &verification)
 			break
 		}
@@ -1871,6 +1890,7 @@ type releaseCandidate struct {
 	project          *workspace.Project
 	publisher        string
 	packagePublisher string
+	packageCommand   string
 	packageStep      string
 	publishCommand   string
 	publishStep      string
@@ -1883,7 +1903,11 @@ type releaseCandidate struct {
 // members, one per (ecosystem, coordinate) declared by a project's release-set
 // metadata. A project that declares none contributes no member: publishability
 // is what the extension probe recorded, not a shape the CLI infers.
-func releaseProjects(projects []*workspace.Project, profiles *extproto.ProfileRegistry) (map[string]*releaseCandidate, error) {
+//
+// A member's package command is the one extensions declare for its route
+// (extension.MemberPackageCommand), and "" when they declare none: ScopePlanning
+// refuses such a member, and AttachPlan finds no package step for it.
+func releaseProjects(projects []*workspace.Project, profiles *extproto.ProfileRegistry, extensions []*extension.ExtensionDescription) (map[string]*releaseCandidate, error) {
 	result := make(map[string]*releaseCandidate)
 	for _, project := range projects {
 		if project == nil {
@@ -1920,11 +1944,13 @@ func releaseProjects(projects []*workspace.Project, profiles *extproto.ProfileRe
 			if previous := result[key]; previous != nil {
 				return nil, fmt.Errorf("release-set identity %s is shared by projects %q and %q", printableReleaseKey(key), previous.project.ID, project.ID)
 			}
+			packageCommand := extension.MemberPackageCommand(extensions, publisher, packagePublisher, profile.Publish, declaration.PackageStep)
 			result[key] = &releaseCandidate{
 				key:              key,
 				project:          project,
 				publisher:        publisher,
 				packagePublisher: packagePublisher,
+				packageCommand:   packageCommand,
 				packageStep:      declaration.PackageStep,
 				publishCommand:   profile.Publish,
 				publishStep:      publishStep,
@@ -1942,7 +1968,7 @@ func releaseProjects(projects []*workspace.Project, profiles *extproto.ProfileRe
 // selection fingerprint per member, before it knows whether a plan will be
 // built at all.
 func ReleaseSetMembers(projects []*workspace.Project, profiles *extproto.ProfileRegistry) (map[string]*workspace.Project, error) {
-	candidates, err := releaseProjects(projects, profiles)
+	candidates, err := releaseProjects(projects, profiles, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -2540,7 +2566,7 @@ type releaseTaskRoute struct {
 func packageTaskRoute(route releaseMemberRoute) releaseTaskRoute {
 	return releaseTaskRoute{
 		projectID: route.projectID, publisher: route.packagePublisher,
-		command: "package", step: route.packageStep,
+		command: route.packageCommand, step: route.packageStep,
 	}
 }
 
@@ -2604,6 +2630,7 @@ func (run *ReleaseSetRun) AttachPlan(planned []*jobmodel.ScheduledJob) ([]*jobmo
 	selectedPublishRoutes := make(map[releaseTaskRoute]struct{}, len(selectedMembers))
 	publishRouteMembers := make(map[releaseTaskRoute]string, len(run.routes))
 	publishCommands := make(map[string]struct{})
+	boundCommands := make(map[string]struct{})
 	for key, route := range run.routes {
 		selected, plannedMember := memberSelection[key]
 		if !plannedMember {
@@ -2622,6 +2649,10 @@ func (run *ReleaseSetRun) AttachPlan(planned []*jobmodel.ScheduledJob) ([]*jobmo
 		allPackageRoutes[packageRoute] = struct{}{}
 		allPublishRoutes[publishRoute] = struct{}{}
 		publishCommands[route.publishCommand] = struct{}{}
+		boundCommands[route.publishCommand] = struct{}{}
+		if route.packageCommand != "" {
+			boundCommands[route.packageCommand] = struct{}{}
+		}
 		if selected {
 			selectedPackageRoutes[packageRoute] = struct{}{}
 			selectedPublishRoutes[publishRoute] = struct{}{}
@@ -2709,7 +2740,7 @@ func (run *ReleaseSetRun) AttachPlan(planned []*jobmodel.ScheduledJob) ([]*jobmo
 		job.SerializeAfter = withoutReleaseJobs(job.SerializeAfter, dropped)
 		scoped = append(scoped, job)
 	}
-	attachReleaseSetContext(scoped, run.plan, publishCommands)
+	attachReleaseSetContext(scoped, run.plan, boundCommands)
 	return scoped, nil
 }
 
@@ -2722,8 +2753,9 @@ func (run *ReleaseSetRun) AttachPlan(planned []*jobmodel.ScheduledJob) ([]*jobmo
 // set's: publish-only sessions never planned it either. Two rules, and the
 // difference between them is what a node WRITES.
 //
-// A publish node — the `publish` command, or the publish command of any member
-// this plan carries — is a registry write the transaction never accounted for.
+// A publish node — a job whose traits declare the registry side effect, or a
+// job of the publish command of any member this plan carries — is a registry
+// write the transaction never accounted for.
 // It is dropped whatever depends on it, because retaining it on an edge a
 // repository declared would publish outside the release.
 //
@@ -2752,7 +2784,7 @@ func (run *ReleaseSetRun) collectUncoordinatedPublication(
 			continue
 		}
 		command := job.CommandName()
-		if _, publishes := publishCommands[command]; publishes || command == "publish" {
+		if _, publishes := publishCommands[command]; publishes || jobmodel.PublishesToRegistry(job) {
 			dropped[job.Key()] = struct{}{}
 			continue
 		}
@@ -2827,7 +2859,9 @@ func withoutReleaseJobs(keys []string, dropped map[string]struct{}) []string {
 	return kept
 }
 
-func attachReleaseSetContext(planned []*jobmodel.ScheduledJob, plan *releaseset.Plan, publishCommands map[string]struct{}) {
+// attachReleaseSetContext binds the plan to every job of a member project
+// whose command is in commands: the commands that package or publish a member.
+func attachReleaseSetContext(planned []*jobmodel.ScheduledJob, plan *releaseset.Plan, commands map[string]struct{}) {
 	if plan == nil {
 		return
 	}
@@ -2842,9 +2876,7 @@ func attachReleaseSetContext(planned []*jobmodel.ScheduledJob, plan *releaseset.
 		if _, ok := members[plannedJob.Project.ID]; !ok {
 			continue
 		}
-		command := plannedJob.CommandName()
-		_, isPublish := publishCommands[command]
-		if command != "package" && !isPublish {
+		if _, bound := commands[plannedJob.CommandName()]; !bound {
 			continue
 		}
 		definition := *plannedJob.JobDef
@@ -2855,50 +2887,6 @@ func attachReleaseSetContext(planned []*jobmodel.ScheduledJob, plan *releaseset.
 		definition.BoundParams[releaseset.ContextParamName] = releaseset.ClonePlan(plan)
 		plannedJob.JobDef = &definition
 	}
-}
-
-// AttachReleaseSetPlan carries one SDK-owned plan through every selected
-// package and publish node, including package nodes reached transitively.
-func AttachReleaseSetPlan(planned []*jobmodel.ScheduledJob, plan *releaseset.Plan) error {
-	if plan == nil {
-		return nil
-	}
-	members := make(map[string]struct{}, len(plan.Members))
-	selected := make(map[string]struct{})
-	for _, member := range plan.Members {
-		members[member.ProjectID] = struct{}{}
-	}
-	for _, member := range plan.SelectedMembers() {
-		selected[member.ProjectID] = struct{}{}
-	}
-	packageJobs := make(map[string]int, len(selected))
-	publishJobs := make(map[string]int, len(selected))
-	for _, plannedJob := range planned {
-		if plannedJob == nil || plannedJob.Project == nil || plannedJob.JobDef == nil {
-			continue
-		}
-		if _, ok := members[plannedJob.Project.ID]; !ok {
-			continue
-		}
-		command := plannedJob.CommandName()
-		if command != "package" && command != "publish" {
-			continue
-		}
-		if _, isSelected := selected[plannedJob.Project.ID]; isSelected {
-			if command == "package" {
-				packageJobs[plannedJob.Project.ID]++
-			} else {
-				publishJobs[plannedJob.Project.ID]++
-			}
-		}
-	}
-	attachReleaseSetContext(planned, plan, map[string]struct{}{"publish": {}})
-	for projectID := range selected {
-		if packageJobs[projectID] == 0 || publishJobs[projectID] == 0 {
-			return fmt.Errorf("release-set member %q does not have both package and publish tasks in the plan", projectID)
-		}
-	}
-	return nil
 }
 
 // Plan returns the immutable plan carried by this coordinator.

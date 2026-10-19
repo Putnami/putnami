@@ -15,12 +15,15 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
+// registryTraits are the resolved traits of a registry publication.
+var registryTraits = extension.CommandTraits{SideEffects: extension.SideEffectsRegistry}
+
 // archivePublisher is a planned publish job that reads (uploads) a project's
 // package archives, the way an extension's archive upload job does.
 func archivePublisher(projID string) *jobs.ScheduledJob {
 	return &jobs.ScheduledJob{
 		Project:   &workspace.Project{ID: projID},
-		JobDef:    &extension.JobDefinition{Name: "publish~cloud-publish-archives", CommandName: "publish"},
+		JobDef:    &extension.JobDefinition{Name: "publish~cloud-publish-archives", CommandName: "publish", Traits: registryTraits},
 		DependsOn: []string{projID + ":package~archives"},
 	}
 }
@@ -31,7 +34,7 @@ func archivePublisher(projID string) *jobs.ScheduledJob {
 func namespacedArchivePublisher(projID string) *jobs.ScheduledJob {
 	return &jobs.ScheduledJob{
 		Project:   &workspace.Project{ID: projID},
-		JobDef:    &extension.JobDefinition{Name: "publish~cloud-publish-archives", CommandName: "publish"},
+		JobDef:    &extension.JobDefinition{Name: "publish~cloud-publish-archives", CommandName: "publish", Traits: registryTraits},
 		DependsOn: []string{projID + ":package~@putnami/go~archives"},
 	}
 }
@@ -42,7 +45,7 @@ func namespacedArchivePublisher(projID string) *jobs.ScheduledJob {
 func templateArchivePublisher(projID string) *jobs.ScheduledJob {
 	return &jobs.ScheduledJob{
 		Project:   &workspace.Project{ID: projID},
-		JobDef:    &extension.JobDefinition{Name: "publish~cloud-publish-archives", CommandName: "publish"},
+		JobDef:    &extension.JobDefinition{Name: "publish~cloud-publish-archives", CommandName: "publish", Traits: registryTraits},
 		DependsOn: []string{projID + ":package~template"},
 	}
 }
@@ -51,9 +54,17 @@ func templateArchivePublisher(projID string) *jobs.ScheduledJob {
 func nonArchivePublisher(projID string) *jobs.ScheduledJob {
 	return &jobs.ScheduledJob{
 		Project:   &workspace.Project{ID: projID},
-		JobDef:    &extension.JobDefinition{Name: "publish~publish-docker", CommandName: "publish"},
+		JobDef:    &extension.JobDefinition{Name: "publish~publish-docker", CommandName: "publish", Traits: registryTraits},
 		DependsOn: []string{projID + ":build~cross-compile"},
 	}
+}
+
+// tracedArchivePublisher is archivePublisher under another command name with
+// the given traits: the guard reads the traits, never the name.
+func tracedArchivePublisher(projID, command string, traits extension.CommandTraits) *jobs.ScheduledJob {
+	job := archivePublisher(projID)
+	job.JobDef.Name, job.JobDef.CommandName, job.JobDef.Traits = command+"~cloud-publish-archives", command, traits
+	return job
 }
 
 // archivePackage models the archive artifact node that survives planning only
@@ -90,68 +101,79 @@ func TestUnpublishedArchiveProjects(t *testing.T) {
 	projects := []*workspace.Project{cli}
 
 	tests := []struct {
-		name     string
-		commands []string
-		params   extension.ParamMap
-		planned  []*jobs.ScheduledJob
-		want     []string
+		name      string
+		publishes bool
+		params    extension.ParamMap
+		planned   []*jobs.ScheduledJob
+		want      []string
 	}{
 		{
-			name:     "publish not selected — no warning",
-			commands: []string{"package"},
-			planned:  nil,
-			want:     nil,
+			name:    "publish not selected — no warning",
+			planned: nil,
+			want:    nil,
 		},
 		{
-			name:     "declares archives and a publish job uploads them — healthy",
-			commands: []string{"publish"},
-			planned:  []*jobs.ScheduledJob{archivePublisher(id)},
-			want:     nil,
+			name:      "declares archives and a publish job uploads them — healthy",
+			publishes: true,
+			planned:   []*jobs.ScheduledJob{archivePublisher(id)},
+			want:      nil,
 		},
 		{
-			name:     "uploader uses the namespaced package~<ext>~archives key — healthy",
-			commands: []string{"publish"},
-			planned:  []*jobs.ScheduledJob{namespacedArchivePublisher(id)},
-			want:     nil,
+			name:      "uploader uses the namespaced package~<ext>~archives key — healthy",
+			publishes: true,
+			planned:   []*jobs.ScheduledJob{namespacedArchivePublisher(id)},
+			want:      nil,
 		},
 		{
-			name:     "archives disabled with equals syntax leaves only another ecosystem — ignored",
-			commands: []string{"publish"},
-			params:   extension.ParamMap{"archives": "false"},
-			planned:  []*jobs.ScheduledJob{nonArchivePublisher("/other")},
-			want:     nil,
+			name:      "archives disabled with equals syntax leaves only another ecosystem — ignored",
+			publishes: true,
+			params:    extension.ParamMap{"archives": "false"},
+			planned:   []*jobs.ScheduledJob{nonArchivePublisher("/other")},
+			want:      nil,
 		},
 		{
-			name:     "archives disabled with negative flag leaves only a non-archive publish — ignored",
-			commands: []string{"publish"},
-			params:   extension.ParamMap{"archives": false},
-			planned:  []*jobs.ScheduledJob{nonArchivePublisher(id)},
-			want:     nil,
+			name:      "archives disabled with negative flag leaves only a non-archive publish — ignored",
+			publishes: true,
+			params:    extension.ParamMap{"archives": false},
+			planned:   []*jobs.ScheduledJob{nonArchivePublisher(id)},
+			want:      nil,
 		},
 		{
-			name:     "archive provider entirely absent without opt-out — orphaned",
-			commands: []string{"publish"},
-			planned:  []*jobs.ScheduledJob{nonArchivePublisher(id)},
-			want:     []string{name},
+			name:      "archive provider entirely absent without opt-out — orphaned",
+			publishes: true,
+			planned:   []*jobs.ScheduledJob{nonArchivePublisher(id)},
+			want:      []string{name},
 		},
 		{
-			name:     "malformed archive opt-out does not weaken guard",
-			commands: []string{"publish"},
-			params:   extension.ParamMap{"archives": "FALSE"},
-			planned:  []*jobs.ScheduledJob{nonArchivePublisher(id)},
-			want:     []string{name},
+			name:      "malformed archive opt-out does not weaken guard",
+			publishes: true,
+			params:    extension.ParamMap{"archives": "FALSE"},
+			planned:   []*jobs.ScheduledJob{nonArchivePublisher(id)},
+			want:      []string{name},
 		},
 		{
-			name:     "archive packaging selected but publish uploads nothing — orphaned",
-			commands: []string{"publish"},
-			planned:  []*jobs.ScheduledJob{archivePackage(id), nonArchivePublisher(id)},
-			want:     []string{name},
+			name:      "archive packaging selected but publish uploads nothing — orphaned",
+			publishes: true,
+			planned:   []*jobs.ScheduledJob{archivePackage(id), nonArchivePublisher(id)},
+			want:      []string{name},
+		},
+		{
+			name:      "an uploader of another name with the registry trait — healthy",
+			publishes: true,
+			planned:   []*jobs.ScheduledJob{tracedArchivePublisher(id, "ship", registryTraits)},
+			want:      nil,
+		},
+		{
+			name:      "a publish job without the registry trait uploads nothing — orphaned",
+			publishes: true,
+			planned:   []*jobs.ScheduledJob{tracedArchivePublisher(id, "publish", extension.CommandTraits{})},
+			want:      []string{name},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, unannounced := unpublishedArchiveProjects(tt.commands, tt.params, projects, tt.planned, nil)
+			got, unannounced := unpublishedArchiveProjects(tt.publishes, tt.params, projects, tt.planned, nil)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("got %v, want %v", got, tt.want)
 			}
@@ -177,7 +199,7 @@ func TestUnpublishedArchiveProjects_DisabledArchivesManagedLibraryPlan(t *testin
 	}
 	planned := []*jobs.ScheduledJob{nonArchivePublisher("/runtime/libs/runtime")}
 
-	if got, _ := unpublishedArchiveProjects([]string{"publish"}, extension.ParamMap{"archives": "false"}, projects, planned, nil); got != nil {
+	if got, _ := unpublishedArchiveProjects(true, extension.ParamMap{"archives": "false"}, projects, planned, nil); got != nil {
 		t.Fatalf("--archives=false plan must not trigger the archive guard, got %v", got)
 	}
 }
@@ -191,7 +213,7 @@ func TestUnpublishedArchiveProjects_TemplateArchivesHealthy(t *testing.T) {
 	const id, name = "/go/templates/go-server", "go-server"
 	tmpl := templateArchiveProject(id, name)
 	got, _ := unpublishedArchiveProjects(
-		[]string{"publish"},
+		true,
 		nil,
 		[]*workspace.Project{tmpl},
 		[]*jobs.ScheduledJob{templateArchivePublisher(id)},
@@ -207,7 +229,7 @@ func TestUnpublishedArchiveProjects_NonArchiveProjectIgnored(t *testing.T) {
 	// A project that does not declare archive publishing is never flagged,
 	// even when publish uploads nothing for it.
 	plain := &workspace.Project{ID: "/lib", Name: "@putnami/lib"}
-	got, _ := unpublishedArchiveProjects([]string{"publish"}, nil, []*workspace.Project{plain}, nil, nil)
+	got, _ := unpublishedArchiveProjects(true, nil, []*workspace.Project{plain}, nil, nil)
 	if got != nil {
 		t.Errorf("got %v, want nil", got)
 	}
@@ -229,7 +251,7 @@ func TestUnpublishedArchiveProjects_NoImpactReleaseSetIsHealthy(t *testing.T) {
 		JobDef:  &extension.JobDefinition{Name: "test~test", CommandName: "test"},
 	}}
 
-	got, unannounced := unpublishedArchiveProjects([]string{"test", "publish"}, nil, []*workspace.Project{cli, tmpl}, verificationOnly, members)
+	got, unannounced := unpublishedArchiveProjects(true, nil, []*workspace.Project{cli, tmpl}, verificationOnly, members)
 	if got != nil || unannounced != nil {
 		t.Fatalf("no-impact release set must not report unpublished archives, got %v / %v", got, unannounced)
 	}
@@ -245,7 +267,7 @@ func TestUnpublishedArchiveProjects_ReleaseSetNonMemberStillChecked(t *testing.T
 	outsider := archiveProject("/tooling/other-cli", "other-cli")
 	members := map[string]struct{}{member.ID: {}}
 
-	got, unannounced := unpublishedArchiveProjects([]string{"publish"}, nil, []*workspace.Project{member, outsider}, nil, members)
+	got, unannounced := unpublishedArchiveProjects(true, nil, []*workspace.Project{member, outsider}, nil, members)
 	if want := []string{"other-cli"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
@@ -270,7 +292,7 @@ func TestUnpublishedArchiveProjects_ReleaseSetScopingDropIsReported(t *testing.T
 	planned := []*jobs.ScheduledJob{archivePublisher(cli.ID)}
 
 	got, unannounced := unpublishedArchiveProjects(
-		[]string{"publish"}, nil, []*workspace.Project{cli, agent}, planned, members)
+		true, nil, []*workspace.Project{cli, agent}, planned, members)
 
 	want := []string{"@putnami/agent-workflows"}
 	if !reflect.DeepEqual(got, want) {
@@ -293,7 +315,7 @@ func TestUnpublishedArchiveProjects_ReleaseSetMemberOwnerIsNotReported(t *testin
 	planned := []*jobs.ScheduledJob{archivePublisher(cli.ID)}
 
 	got, unannounced := unpublishedArchiveProjects(
-		[]string{"publish"}, nil, []*workspace.Project{cli, agent}, planned, members)
+		true, nil, []*workspace.Project{cli, agent}, planned, members)
 	if got != nil || unannounced != nil {
 		t.Fatalf("a release-set member owner is the coordinator's business, got %v / %v", got, unannounced)
 	}
@@ -310,7 +332,7 @@ func TestUnpublishedArchiveProjects_ReleaseSetScopingDropRespectsOptOut(t *testi
 
 	for _, optOut := range []any{false, "false"} {
 		got, unannounced := unpublishedArchiveProjects(
-			[]string{"publish"}, extension.ParamMap{"archives": optOut},
+			true, extension.ParamMap{"archives": optOut},
 			[]*workspace.Project{cli, agent}, nil, members)
 		if got != nil || unannounced != nil {
 			t.Fatalf("archives=%v opt-out must silence the guard, got %v / %v", optOut, got, unannounced)
@@ -398,8 +420,10 @@ func TestArchiveDepProject(t *testing.T) {
 		{"/tooling/contributor:package~agent-content", "/tooling/contributor", true},
 		{"/tooling/contributor:package~@putnami/scaffold~agent-content", "/tooling/contributor", true},
 		{"/go/templates/x:package~@putnami/scaffold~template", "/go/templates/x", true},
+		{"/acme/bundler:bundle~archives", "/acme/bundler", true},
 		{"/tooling/cli:build~cross-compile", "", false},
 		{"/tooling/cli:package~cross-compile", "", false},
+		{"/tooling/cli:archives", "", false},
 		{"no-colon", "", false},
 	}
 	for _, tt := range tests {

@@ -237,15 +237,15 @@ func (r *RemoteCache) UploadTaskEntry(ctx context.Context, hash string, job *job
 
 // prepareTaskUpload turns a published task-owned entry into the input to share
 // with the provider, applying the same eligibility rule as the legacy write
-// path: every entry is shared whatever its build duration or size, except a
-// side-effecting task's (cache.SideEffectingTask). It returns ok=false when the
-// entry should not be uploaded.
+// path: every entry is shared whatever its build duration or size, except the
+// entry of a job with external effects (jobmodel.HasExternalEffects). It
+// returns ok=false when the entry should not be uploaded.
 func (r *RemoteCache) PrepareTaskUpload(hash string, job *jobmodel.ScheduledJob, cm *store.CacheManager) (TaskUploadInput, bool) {
 	entry, err := cm.LookupTaskEntry(hash)
 	if err != nil || entry == nil || entry.Result == nil {
 		return TaskUploadInput{}, false
 	}
-	if cache.SideEffectingTask(job.JobDef.Name) {
+	if jobmodel.HasExternalEffects(job) {
 		return TaskUploadInput{}, false
 	}
 

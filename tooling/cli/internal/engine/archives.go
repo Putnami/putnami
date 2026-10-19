@@ -23,14 +23,14 @@ import (
 // project's package-archives output and so lists
 // "<projectID>:package~archives" in DependsOn. A selected project that declares
 // archive-publish intent (the "archives" publish channel or
-// options.publish.archives) but whose package-archives key no planned publish
-// job consumes has no uploader. The explicit `publish --archives=false`
+// options.publish.archives) but whose package-archives key no planned registry
+// publication (jobs.PublishesToRegistry) consumes has no uploader. The explicit `publish --archives=false`
 // boundary is load-bearing: it deliberately removes the archive ecosystem and
 // must not make unrelated npm/Go publication fail. An absent flag is not an
 // opt-out, because a missing archive provider produces no archive plan nodes at
 // all and is exactly the silent failure this guard must keep catching. Returns
-// nil unless publish was actually selected — building archives via `putnami
-// package` is legitimate.
+// nil unless the run publishes (ReleaseSetOptions.Publishes) — building
+// archives via `putnami package` is legitimate.
 //
 // sessionProjects is the selection the SESSION made, read BEFORE a release-set
 // publish narrows it (ReleaseSetRun.ScopePlanning) to the owners of the plan's
@@ -55,15 +55,8 @@ import (
 // The second return value is the subset whose archives no release-set member
 // announces: same failure, different cause, and the report names it so the fix
 // is the extension's member declaration rather than installing a publisher.
-func unpublishedArchiveProjects(commands []string, commandParams extension.ParamMap, sessionProjects []*workspace.Project, planned []*jobs.ScheduledJob, releaseMembers map[string]struct{}) (unpublished, unannounced []string) {
-	publishing := false
-	for _, c := range commands {
-		if c == "publish" {
-			publishing = true
-			break
-		}
-	}
-	if !publishing {
+func unpublishedArchiveProjects(publishes bool, commandParams extension.ParamMap, sessionProjects []*workspace.Project, planned []*jobs.ScheduledJob, releaseMembers map[string]struct{}) (unpublished, unannounced []string) {
+	if !publishes {
 		return nil, nil
 	}
 	// The terminal adapter preserves the two explicit negative spellings in
@@ -81,14 +74,16 @@ func unpublishedArchiveProjects(commands []string, commandParams extension.Param
 
 	// Projects whose package-archives output a publish job reads (uploads). The
 	// archive build's plan name varies — "package~archives" for a Go binary,
-	// "package~<ext>~archives" when another extension drives the Go packager —
-	// so match the family by prefix/suffix rather than a synthesized key.
+	// "package~<ext>~archives" when another extension drives the Go packager,
+	// another command name for a member whose declared package route is not
+	// `package` — so match the family by its step suffix rather than a
+	// synthesized key.
 	publishedArchives := make(map[string]bool) // project ID
 	for _, j := range planned {
 		if j == nil || j.Project == nil || j.JobDef == nil {
 			continue
 		}
-		if j.CommandName() != "publish" {
+		if !jobs.PublishesToRegistry(j) {
 			continue
 		}
 		for _, dep := range j.DependsOn {
@@ -124,8 +119,9 @@ func unpublishedArchiveProjects(commands []string, commandParams extension.Param
 
 // archiveDepProject reports whether a dependency key refers to a package
 // archives build and, if so, returns the project ID. This is the edge every
-// archive uploader has on the archives it reads. Two families qualify, both
-// read by the same archive upload job:
+// archive uploader has on the archives it reads. The command is the member's
+// package route, `package` for every first-party extension, so only the step
+// counts. Two families qualify, both read by the same archive upload job:
 //   - release archives: "<projectID>:package~archives" (a Go binary) or
 //     "<projectID>:package~<ext>~archives" (another extension driving the Go
 //     packager).
@@ -137,11 +133,10 @@ func unpublishedArchiveProjects(commands []string, commandParams extension.Param
 //     archive, and an upload job that consumes this key uploads them.
 func archiveDepProject(depKey string) (string, bool) {
 	projID, plan, ok := strings.Cut(depKey, ":")
-	if !ok {
+	if !ok || !strings.Contains(plan, "~") {
 		return "", false
 	}
-	if strings.HasPrefix(plan, "package~") &&
-		(strings.HasSuffix(plan, "~archives") || strings.HasSuffix(plan, "~template") || strings.HasSuffix(plan, "~agent-content")) {
+	if strings.HasSuffix(plan, "~archives") || strings.HasSuffix(plan, "~template") || strings.HasSuffix(plan, "~agent-content") {
 		return projID, true
 	}
 	return "", false

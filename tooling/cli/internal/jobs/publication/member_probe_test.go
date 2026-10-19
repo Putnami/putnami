@@ -77,7 +77,7 @@ func dryRunResults(t *testing.T, probes ...extensionproto.MemberProbe) map[strin
 func finalizeDryRun(t *testing.T, run *ReleaseSetRun, results map[string]*jobmodel.JobResult) (report, failure string) {
 	t.Helper()
 	var out bytes.Buffer
-	finalize := MemberProbeReport{Run: run, Commands: []string{"publish"}, DryRun: true, Out: &out}.Finalizer()
+	finalize := MemberProbeReport{Run: run, Publishes: true, DryRun: true, Out: &out}.Finalizer()
 	if finalize == nil {
 		t.Fatal("a dry-run publish has no member-probe finalizer")
 	}
@@ -239,7 +239,7 @@ func TestDryRunWarnsAboutAMovedTag(t *testing.T) {
 	unbuilt.ArtifactDigest = ""
 	results := dryRunResults(t, moved, unbuilt)
 	var out bytes.Buffer
-	MemberProbeReport{Commands: []string{"publish"}, DryRun: true, Quiet: true, Out: &out}.Finalizer()(results)
+	MemberProbeReport{Publishes: true, DryRun: true, Quiet: true, Out: &out}.Finalizer()(results)
 
 	if result := results[memberProbeResultKey]; result != nil {
 		t.Fatalf("a moved tag failed the dry run: %+v", result)
@@ -534,7 +534,7 @@ func TestQuietDryRunKeepsFailuresAndWarnings(t *testing.T) {
 	)
 	var out bytes.Buffer
 
-	MemberProbeReport{Commands: []string{"publish"}, DryRun: true, Quiet: true, Out: &out}.Finalizer()(results)
+	MemberProbeReport{Publishes: true, DryRun: true, Quiet: true, Out: &out}.Finalizer()(results)
 
 	report := out.String()
 	if !strings.Contains(report, "conflict    oci putnami/cli@1.4.0") || !strings.Contains(report, "warning:") {
@@ -548,13 +548,13 @@ func TestQuietDryRunKeepsFailuresAndWarnings(t *testing.T) {
 	}
 }
 
-// Only an executing dry-run publish reads probes: a real publish, a preview and
-// any other command carry no finalizer.
+// Only an executing dry run of a registry-publishing command reads probes: a
+// real publish and a dry run that publishes nothing, such as a build or a
+// deploy, carry no finalizer.
 func TestMemberProbeFinalizerIsForADryRunPublishOnly(t *testing.T) {
 	for name, report := range map[string]MemberProbeReport{
-		"real publish":   {Commands: []string{"publish"}},
-		"dry-run build":  {Commands: []string{"build"}, DryRun: true},
-		"dry-run deploy": {Commands: []string{"deploy"}, DryRun: true},
+		"real publish":                {Publishes: true},
+		"dry run that publishes none": {DryRun: true},
 	} {
 		if report.Finalizer() != nil {
 			t.Errorf("%s carries a member-probe finalizer", name)

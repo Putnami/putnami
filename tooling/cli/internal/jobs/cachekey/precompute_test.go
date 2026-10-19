@@ -155,7 +155,7 @@ func TestSelectionFingerprintsPropagateInvocationProducerGoEmbedInputs(t *testin
 	planned := []*jobmodel.ScheduledJob{producer, packageJob}
 	fingerprint := func() (string, error) {
 		cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(root, ".putnami", "store")))
-		got, err := SelectionFingerprints(ws, planned, nil, cache, testProfiles(), members)
+		got, err := SelectionFingerprints(ws, planned, nil, cache, testProfiles(), memberRoute("test-provider", "npm"), members)
 		return got[memberKey], err
 	}
 
@@ -275,7 +275,7 @@ func TestSelectionFingerprintChangesWithPackagerIdentity(t *testing.T) {
 
 	fingerprint := func(planned []*jobmodel.ScheduledJob, params map[string]any, versionInfo *JobContextVersion) string {
 		t.Helper()
-		got, err := SelectionFingerprints(ws, planned, params, cache, testProfiles(), members)
+		got, err := SelectionFingerprints(ws, planned, params, cache, testProfiles(), memberRoute("test-provider", "npm"), members)
 		if err != nil {
 			t.Fatalf("SelectionFingerprints: %v", err)
 		}
@@ -341,7 +341,7 @@ func TestSelectionFingerprintChangesWithPackagerIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	edited := store.NewCacheManager(store.NewLocalStore(filepath.Join(root, ".putnami", "store")))
-	got, err := SelectionFingerprints(ws, newPlan("1.0.0"), map[string]any{"channel": "canary"}, edited, testProfiles(), members)
+	got, err := SelectionFingerprints(ws, newPlan("1.0.0"), map[string]any{"channel": "canary"}, edited, testProfiles(), memberRoute("test-provider", "npm"), members)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,11 +374,11 @@ func TestSelectionFingerprintsFollowEachMembersDeclaredPackageStep(t *testing.T)
 	stepA := packageTaskFixtureFor(project, "test-provider", "1.0.0", t.TempDir(), "npm-a")
 	stepB := packageTaskFixtureFor(project, "test-provider", "1.0.0", t.TempDir(), "npm-b")
 
-	forward, err := SelectionFingerprints(ws, []*jobmodel.ScheduledJob{stepA, stepB}, nil, cache, testProfiles(), members)
+	forward, err := SelectionFingerprints(ws, []*jobmodel.ScheduledJob{stepA, stepB}, nil, cache, testProfiles(), memberRoute("test-provider", "npm-a", "npm-b"), members)
 	if err != nil {
 		t.Fatal(err)
 	}
-	reversed, err := SelectionFingerprints(ws, []*jobmodel.ScheduledJob{stepB, stepA}, nil, cache, testProfiles(), members)
+	reversed, err := SelectionFingerprints(ws, []*jobmodel.ScheduledJob{stepB, stepA}, nil, cache, testProfiles(), memberRoute("test-provider", "npm-a", "npm-b"), members)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,7 +407,7 @@ func TestSelectionFingerprintsRequireThePackageTaskOfTheDeclaringPublisher(t *te
 	// A package task owned by the profile owner is not automatically this
 	// member's packager: the metadata envelope names the actual publisher.
 	foreign := packageTaskFixture(project, "go-owner", "1.0.0", t.TempDir())
-	_, err := SelectionFingerprints(ws, []*jobmodel.ScheduledJob{foreign}, nil, cache, testProfiles(), members)
+	_, err := SelectionFingerprints(ws, []*jobmodel.ScheduledJob{foreign}, nil, cache, testProfiles(), memberRoute("test-provider", "npm"), members)
 	if err == nil || !strings.Contains(err.Error(), `"test-provider"`) || !strings.Contains(err.Error(), "/library") {
 		t.Fatalf("error = %v, want it to name the declaring publisher and the project", err)
 	}
@@ -433,8 +433,9 @@ func TestSelectionFingerprintsUseTheDeclaredPackagePublisher(t *testing.T) {
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(root, ".putnami", "store")))
 	members := map[string]*workspace.Project{releaseset.MemberKey("npm", "@putnami/library"): project}
 	packageJob := packageTaskFixtureFor(project, "go-packager", "1.0.0", t.TempDir(), "archive")
+	goPackagerRoute := append(memberRoute("test-provider"), memberRoute("go-packager", "archive")...)
 
-	got, err := SelectionFingerprints(ws, []*jobmodel.ScheduledJob{packageJob}, nil, cache, testProfiles(), members)
+	got, err := SelectionFingerprints(ws, []*jobmodel.ScheduledJob{packageJob}, nil, cache, testProfiles(), goPackagerRoute, members)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -447,7 +448,7 @@ func TestSelectionFingerprintsUseTheDeclaredPackagePublisher(t *testing.T) {
 	upgradedPath := t.TempDir()
 	writeTestFile(t, filepath.Join(upgradedPath, "compiled", "packager"), "upgraded packager")
 	upgraded := packageTaskFixtureFor(project, "go-packager", "2.0.0", upgradedPath, "archive")
-	got, err = SelectionFingerprints(ws, []*jobmodel.ScheduledJob{upgraded}, nil, cache, testProfiles(), members)
+	got, err = SelectionFingerprints(ws, []*jobmodel.ScheduledJob{upgraded}, nil, cache, testProfiles(), goPackagerRoute, members)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -458,7 +459,7 @@ func TestSelectionFingerprintsUseTheDeclaredPackagePublisher(t *testing.T) {
 		t.Fatal(err)
 	}
 	edited := store.NewCacheManager(store.NewLocalStore(filepath.Join(root, ".putnami", "edited-store")))
-	got, err = SelectionFingerprints(ws, []*jobmodel.ScheduledJob{packageJob}, nil, edited, testProfiles(), members)
+	got, err = SelectionFingerprints(ws, []*jobmodel.ScheduledJob{packageJob}, nil, edited, testProfiles(), goPackagerRoute, members)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -467,10 +468,75 @@ func TestSelectionFingerprintsUseTheDeclaredPackagePublisher(t *testing.T) {
 	}
 
 	foreign := packageTaskFixtureFor(project, "test-provider", "1.0.0", t.TempDir(), "archive")
-	_, err = SelectionFingerprints(ws, []*jobmodel.ScheduledJob{foreign}, nil, cache, testProfiles(), members)
+	_, err = SelectionFingerprints(ws, []*jobmodel.ScheduledJob{foreign}, nil, cache, testProfiles(), goPackagerRoute, members)
 	if err == nil || !strings.Contains(err.Error(), `"go-packager"`) {
 		t.Fatalf("wrong package publisher error = %v", err)
 	}
+}
+
+// The package job of a member is the one its publisher's publish command runs
+// first with the injectPublishChannels trait and the member's package step,
+// whatever the command's name. A command outside that route never keys the
+// member, and two candidates are refused rather than chosen between.
+func TestSelectionFingerprintsFindTheMemberPackageJobByItsDeclaredRoute(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "publication-follows-declared-effects", "a-member-package-job-is-found-by-its-declared-route")
+	root := t.TempDir()
+	project := &workspace.Project{
+		ID: "/library", Name: "@putnami/library", Path: "library", Type: "library",
+		Metadata: releaseSetProjectMetadata(t, "npm", "@putnami/library"),
+	}
+	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "putnami"}, []*workspace.Project{project})
+	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(root, ".putnami", "store")))
+	members := map[string]*workspace.Project{releaseset.MemberKey("npm", "@putnami/library"): project}
+	step := []extension.PipelineStep{{ID: "npm"}}
+	inject := extension.CommandTraits{InjectPublishChannels: true}
+	route := func(publishRunsFirst ...string) []*extension.ExtensionDescription {
+		return []*extension.ExtensionDescription{{Name: "test-provider", Jobs: map[string]*extension.JobDefinition{
+			"build":   {Name: "build", PipelineSteps: step},
+			"bundle":  {Name: "bundle", Traits: inject, PipelineSteps: step},
+			"check":   {Name: "check", Traits: inject, PipelineSteps: step},
+			"publish": {Name: "publish", CommandDependsOn: publishRunsFirst, Traits: extension.CommandTraits{SideEffects: extension.SideEffectsRegistry}},
+		}}}
+	}
+	planned := make([]*jobmodel.ScheduledJob, 0, 3)
+	for _, command := range []string{"build", "bundle", "check"} {
+		path := t.TempDir()
+		writeTestFile(t, filepath.Join(path, "compiled", "packager"), command)
+		job := packageTaskFixture(project, "test-provider", "1.0.0", path)
+		job.JobDef.Name, job.JobDef.CommandName = command+"~npm", command
+		planned = append(planned, job)
+	}
+	bundleKey, err := ComputeJobCacheHashWith(ws, planned[1], nil, nil, cache, map[string]string{}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := SelectionFingerprints(ws, planned, nil, cache, testProfiles(), route("build", "bundle"), members)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := releaseset.SelectionFingerprint(bundleKey); got[releaseset.MemberKey("npm", "@putnami/library")] != want {
+		t.Fatalf("fingerprints = %v, want the bundle job's selection fingerprint %s", got, want)
+	}
+	_, err = SelectionFingerprints(ws, planned, nil, cache, testProfiles(), route("build", "bundle", "check"), members)
+	if err == nil || !strings.Contains(err.Error(), "has no package command") {
+		t.Fatalf("two declared package routes: error = %v, want the member refused", err)
+	}
+}
+
+// memberRoute declares the extension a member resolves its package command
+// from (extension.MemberPackageCommand): its publish runs package first, and
+// its package carries the injectPublishChannels trait and runs steps.
+func memberRoute(name string, steps ...string) []*extension.ExtensionDescription {
+	pipeline := make([]extension.PipelineStep, 0, len(steps))
+	for _, step := range steps {
+		pipeline = append(pipeline, extension.PipelineStep{ID: step})
+	}
+	return []*extension.ExtensionDescription{{Name: name, Jobs: map[string]*extension.JobDefinition{
+		"package": {Name: "package", Traits: extension.CommandTraits{InjectPublishChannels: true}, PipelineSteps: pipeline},
+		"publish": {Name: "publish", CommandDependsOn: []string{"package"}, Traits: extension.CommandTraits{SideEffects: extension.SideEffectsRegistry}},
+	}}}
 }
 
 // packageTaskFixture is shaped like the real npm/go packagers: it has a stable

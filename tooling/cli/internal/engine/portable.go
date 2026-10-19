@@ -124,8 +124,9 @@ type selectionEvidence struct {
 
 // validateCommitPublication is the executing side's publication check of a
 // version 2 request on the plan this engine made, since no expected plan came
-// with it. A plan with a publication task, by command name or by declared
-// registry or cloud effects, is held to both version 1 checks over the plan
+// with it. A plan with a publication task, a task with declared registry or
+// cloud effects (scheduler.HasExternalEffects), is held to both version 1
+// checks over the plan
 // without the nodes a publication-v1 provider adds: the protocol's, which
 // classifies by command name and which a version 1 request passes when it is
 // parsed, and the executing engine's (scheduler.ValidatePortablePublication). It
@@ -135,9 +136,7 @@ type selectionEvidence struct {
 // and a commit whose selection publishes nothing is a run that publishes
 // nothing.
 func validateCommitPublication(request runner.CommitRequest, comparable, planned []*scheduler.ScheduledJob) error {
-	if !slices.ContainsFunc(planned, func(job *scheduler.ScheduledJob) bool {
-		return scheduler.HasExternalEffects(job) || slices.Contains(runner.PublicationCommands, job.CommandName())
-	}) {
+	if !slices.ContainsFunc(planned, scheduler.HasExternalEffects) {
 		return nil
 	}
 	plan, err := expectedPlan(comparable)

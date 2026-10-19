@@ -2,7 +2,6 @@ package engine
 
 import (
 	"os"
-	"slices"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -133,7 +132,7 @@ func raiseReleaseCacheTrust(req *Request, extensions []*extension.ExtensionDescr
 		return
 	}
 	for _, command := range req.Commands {
-		if slices.Contains(extension.CommandSideEffects(extensions, command), extension.SideEffectsRegistry) {
+		if extension.CommandPublishes(extensions, command) {
 			req.Global.CacheTrust = string(store.CacheTrustCI)
 			return
 		}

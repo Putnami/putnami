@@ -54,7 +54,7 @@ func TestSelectionFingerprintIgnoresTheHostOSClass(t *testing.T) {
 
 	fingerprint := func() string {
 		t.Helper()
-		got, err := SelectionFingerprints(ws, planned, nil, cache, testProfiles(), members)
+		got, err := SelectionFingerprints(ws, planned, nil, cache, testProfiles(), memberRoute("test-provider", "npm"), members)
 		if err != nil {
 			t.Fatalf("SelectionFingerprints: %v", err)
 		}

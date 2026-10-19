@@ -127,13 +127,13 @@ func TestCommitRequestSeamChecksItsOwnPlan(t *testing.T) {
 
 // A version 2 caller authorizes publication before any plan exists, so a
 // block over a plan that publishes nothing is a run that publishes nothing.
-// A plan that publishes, by command name or by declared effects, keeps every
-// version 1 rule.
+// A plan that publishes by its declared effects keeps every version 1 rule.
 func TestCommitPublicationHoldsAPublishingPlanToTheBarrier(t *testing.T) {
 	t.Parallel()
 	plain := portablePlan()
 	app := plain[0].Project
 	publishing := append(portablePlan(), portableJob(app, "publish", "/app:build"))
+	publishing[len(publishing)-1].JobDef.Traits.SideEffects = extensionproto.SideEffectsRegistry
 	modeljobs.AttachIdentities(publishing)
 	skipping := append(portablePlan(), portableJob(app, "ship", "/app:build"))
 	skipping[len(skipping)-1].JobDef.Traits.SideEffects = extensionproto.SideEffectsCloud
@@ -179,7 +179,7 @@ func TestCommitRequestReadsItsCheckoutLikeALocalRun(t *testing.T) {
 	if _, err := requireRepository(frozen); err != nil {
 		t.Fatalf("a frozen publish in its snapshot was refused: %v", err)
 	}
-	if !readsAncestry(&Request{Commands: []string{"build"}, Portable: commitExecution(runner.RequestedSelection{Mode: runner.SelectionModeAll}, "", &runner.PublicationBlock{Barrier: []string{"build"}})}) {
+	if !mayPublish(nil, commitExecution(runner.RequestedSelection{Mode: runner.SelectionModeAll}, "", &runner.PublicationBlock{Barrier: []string{"build"}}).invocation(), nil) {
 		t.Fatal("a version 2 request carrying invocation.publication reads no ancestry")
 	}
 }

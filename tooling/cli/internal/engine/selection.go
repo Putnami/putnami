@@ -13,6 +13,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	protocoljob "go.putnami.dev/protocol/job"
 	"go.putnami.dev/tooling/cli/internal/agentartifacts"
+	internalextension "go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/planner"
@@ -312,8 +313,9 @@ func adoptVerificationEvidence(req *Request, preparation *publication.ReleaseSet
 // verificationSelection is the projection of the caller's own flags a mixed
 // session verifies over. resolveReleaseSetSelections is its only caller and
 // states why it exists; this half answers WHICH projects, and refuses the two
-// session shapes that have no verification half at all. consumesReleaseSet is
-// the run's resolved trait (ReleaseSetOptions.ConsumesReleaseSet).
+// session shapes that have no verification half at all: a run that consumes
+// the release set (ReleaseSetOptions.ConsumesReleaseSet), and a run whose
+// every command publishes (internalextension.CommandPublishes).
 func verificationSelection(
 	req *Request,
 	ws *workspace.Workspace,
@@ -323,7 +325,7 @@ func verificationSelection(
 	if req.Portable.frozen() || consumesReleaseSet {
 		return nil, selectionEvidence{}, ExitSuccess
 	}
-	if !slices.ContainsFunc(req.Commands, func(command string) bool { return command != "publish" }) {
+	if !slices.ContainsFunc(req.Commands, func(command string) bool { return !internalextension.CommandPublishes(extensions, command) }) {
 		return nil, selectionEvidence{}, ExitSuccess
 	}
 	gate := *req

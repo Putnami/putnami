@@ -49,7 +49,6 @@ import (
 	"go.putnami.dev/cli/model/workspace"
 	protocolcli "go.putnami.dev/protocol/cli"
 	protocoljob "go.putnami.dev/protocol/job"
-	runner "go.putnami.dev/protocol/runner"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
@@ -409,7 +408,7 @@ type Request struct {
 	// 0.0.0 stamp can be told apart from a line that is really untagged.
 	versionsErr error
 	// ancestry is the bound commit's ancestry, read before the first hook by a
-	// run that may publish (readsAncestry), nil for every other run.
+	// run that may publish (runAncestry), nil for every other run.
 	//
 	// UNEXPORTED for the same reason preparation is: Engine.Run reads it
 	// itself, and nothing an adapter can set replaces it.
@@ -583,14 +582,8 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	// the first hook runs repository code that could rewrite refs or replace
 	// objects (AncestrySnapshot). The snapshot an adapter read at process
 	// start for the same workspace, before its bootstrap or install ran any
-	// repository code, is that read (CaptureAncestry).
-	req.ancestry = nil
-	if readsAncestry(req) {
-		req.ancestry = capturedAncestry(ctx, req.WorkspaceRoot)
-		if req.ancestry == nil {
-			req.ancestry = captureAncestrySnapshot(req.WorkspaceRoot, MaxAncestryCommits)
-		}
-	}
+	// repository code, is that read (runAncestry).
+	req.ancestry = runAncestry(ctx, req)
 
 	// Hook verbosity is resolved once, here, from the flags as parsed. The run
 	// stages layer env/config overrides onto Global later (applyEnvOverrides);
@@ -869,7 +862,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// uploaders. A project the release-set plan never announced is not
 	// coordinated by anything, so it is reported even though scoping dropped
 	// it.
-	unpublishedArchives, unannouncedArchives := unpublishedArchiveProjects(req.Commands, req.CommandParams, sessionProjects, planned, releaseSetRun.MemberProjectIDs())
+	unpublishedArchives, unannouncedArchives := unpublishedArchiveProjects(releaseSetOptions.Publishes, req.CommandParams, sessionProjects, planned, releaseSetRun.MemberProjectIDs())
 
 	// --plan: show the plan and exit.
 	if req.Global.Plan {
@@ -944,7 +937,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		req.specGate); gate != nil {
 		finalizers = append(finalizers, gate)
 	}
-	ctx, finalizers, closeOutboxes, err := releaseSetExecution(ctx, req, releaseSetRun, finalizers)
+	ctx, finalizers, closeOutboxes, err := releaseSetExecution(ctx, req, releaseSetRun, releaseSetOptions.Publishes, finalizers)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: release-set publish: %v\n", err)
 		return SessionResult{ExitCode: ExitError, Plan: planned, Projects: selectedProjects}, nil
@@ -965,8 +958,8 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 // and returns the context that carries the private outboxes of a
 // publication-v1 run's publication jobs, and the function that removes them
 // when the run ends.
-func releaseSetExecution(ctx context.Context, req *Request, run *publication.ReleaseSetRun, finalizers []func(map[string]*scheduler.JobResult)) (context.Context, []func(map[string]*scheduler.JobResult), func(), error) {
-	finalizers = append(finalizers, publishFinalizers(ctx, req, run)...)
+func releaseSetExecution(ctx context.Context, req *Request, run *publication.ReleaseSetRun, publishes bool, finalizers []func(map[string]*scheduler.JobResult)) (context.Context, []func(map[string]*scheduler.JobResult), func(), error) {
+	finalizers = append(finalizers, publishFinalizers(ctx, req, run, publishes)...)
 	ctx, closeOutboxes, err := run.PublicationContext(ctx)
 	return ctx, finalizers, closeOutboxes, err
 }
@@ -998,18 +991,19 @@ func attachReleaseSet(req *Request, run *publication.ReleaseSetRun, planned []*s
 // order.
 //
 // The first reads the registry probes of a dry-run publish once, after every
-// job, and is nil for any other run. The dry-run parameter the jobs receive
-// selects it, as it selects the release-set mode: a preview executes no job and
-// runs no finalizer.
+// job, and is nil for any other run. publishes is whether a command of the run
+// declares the registry side effect (ReleaseSetOptions.Publishes). The dry-run
+// parameter the jobs receive selects it, as it selects the release-set mode: a
+// preview executes no job and runs no finalizer.
 //
 // The release-set coordinator comes last. It sees the synthetic failure of a
 // session gate or of the probe report, and publishes no successful outcome
 // after one. A run whose deploy barrier releases the set has no release
 // finalizer.
-func publishFinalizers(ctx context.Context, req *Request, releaseSetRun *publication.ReleaseSetRun) []func(map[string]*scheduler.JobResult) {
+func publishFinalizers(ctx context.Context, req *Request, releaseSetRun *publication.ReleaseSetRun, publishes bool) []func(map[string]*scheduler.JobResult) {
 	dryRun, _ := req.CommandParams["dry-run"].(bool)
 	finalizers := []func(map[string]*scheduler.JobResult){publication.MemberProbeReport{
-		Run: releaseSetRun, Commands: req.Commands, DryRun: dryRun, Quiet: req.Global.Quiet, Out: os.Stderr,
+		Run: releaseSetRun, Publishes: publishes, DryRun: dryRun, Quiet: req.Global.Quiet, Out: os.Stderr,
 	}.Finalizer()}
 	if release := releaseSetRun.Finalizer(ctx); release != nil {
 		finalizers = append(finalizers, release)
@@ -1020,8 +1014,10 @@ func publishFinalizers(ctx context.Context, req *Request, releaseSetRun *publica
 // buildReleaseSetOptions reads the publication-shaping parameters this run was
 // invoked with and resolves the release-set mode from them. The parameters are
 // only ever read here, so nothing downstream re-derives a channel or a
-// visibility from the raw map. The run consumes the release set when one of its
-// commands does in extensions (extension.CommandConsumesReleaseSet).
+// visibility from the raw map. The run publishes when one of its commands
+// declares the registry side effect in extensions (extension.CommandPublishes),
+// and consumes the release set when one of them does
+// (extension.CommandConsumesReleaseSet).
 func buildReleaseSetOptions(
 	req *Request, ws *workspace.Workspace, extensions ...*extension.ExtensionDescription,
 ) (publication.ReleaseSetOptions, error) {
@@ -1034,6 +1030,9 @@ func buildReleaseSetOptions(
 	dryRun, _ := req.CommandParams["dry-run"].(bool)
 	return publication.BuildReleaseSetOptions(publication.ReleaseSetRequest{
 		Commands: req.Commands, WorkspaceRoot: req.WorkspaceRoot,
+		Publishes: slices.ContainsFunc(req.Commands, func(command string) bool {
+			return extension.CommandPublishes(extensions, command)
+		}),
 		ConsumesReleaseSet: slices.ContainsFunc(req.Commands, func(command string) bool {
 			return extension.CommandConsumesReleaseSet(extensions, command)
 		}),
@@ -1064,8 +1063,8 @@ func keyingPlan(
 }
 
 // refusesUnauthorizedPublication refuses a bound request that carries no
-// invocation.publication when its keying plan may publish: a planned task of a
-// publication command or with declared registry or cloud effects, or a
+// invocation.publication when its keying plan may publish: a planned task with
+// declared registry or cloud effects (scheduler.HasExternalEffects), or a
 // release-set publication the request enables. It runs before the release-set
 // preparation and every later stage that can start a provider, so a gate-only
 // request starts none. It prints the refusal and reports whether it refused.
@@ -1075,7 +1074,7 @@ func refusesUnauthorizedPublication(req *Request, options publication.ReleaseSet
 	}
 	var err error
 	for _, job := range planned {
-		if slices.Contains(runner.PublicationCommands, job.CommandName()) || scheduler.HasExternalEffects(job) {
+		if scheduler.HasExternalEffects(job) {
 			err = fmt.Errorf("runner: plan task %s publishes, but the request carries no invocation.publication", job.TypedIdentity().Key)
 			break
 		}

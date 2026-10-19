@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	runner "go.putnami.dev/protocol/runner"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -139,15 +140,16 @@ type ancestryContextKey struct{}
 
 // CaptureAncestry reads the ancestry snapshot of the workspace at root when
 // the invocation may publish, and returns ctx carrying it. commands are the
-// invocation's commands and portable its bound request's invocation block, nil
-// without one.
+// invocation's commands, portable its bound request's invocation block, nil
+// without one, and extensions the extensions installed at process start, whose
+// traits say which commands may publish (mayPublish).
 //
 // An adapter calls it at process start, before the first-use bootstrap or an
 // install runs repository code. Engine.Run then reuses the snapshot for the
 // same workspace instead of reading one after them. An invocation that cannot
 // publish reads nothing and returns ctx unchanged.
-func CaptureAncestry(ctx context.Context, root string, commands []string, portable *runner.InvocationBlock) context.Context {
-	if root == "" || !mayPublish(commands, portable) {
+func CaptureAncestry(ctx context.Context, root string, commands []string, portable *runner.InvocationBlock, extensions ...*extension.ExtensionDescription) context.Context {
+	if root == "" || !mayPublish(commands, portable, extensions) {
 		return ctx
 	}
 	return context.WithValue(ctx, ancestryContextKey{}, captureAncestrySnapshot(root, MaxAncestryCommits))
@@ -166,25 +168,36 @@ func capturedAncestry(ctx context.Context, root string) *AncestrySnapshot {
 	return snapshot
 }
 
-// readsAncestry reports whether the run may publish, and so reads the
-// ancestry snapshot: it names a publish or deploy command, or it executes a
-// bound request that carries invocation.publication. A watch iteration reads
-// none: repository code has already run in its session, so a snapshot read
-// there would not precede it.
-func readsAncestry(req *Request) bool {
+// runAncestry is the ancestry snapshot of a run, read before its first hook:
+// the one its adapter captured at process start for the same workspace, else
+// one it reads itself when it executes a bound request that carries
+// invocation.publication. The engine knows no extension before its hooks, so
+// a command that publishes by its traits relies on the adapter's capture
+// (CaptureAncestry). A watch iteration reads none: repository code has
+// already run in its session, so a snapshot read there would not precede it.
+func runAncestry(ctx context.Context, req *Request) *AncestrySnapshot {
 	if req.watchIteration {
-		return false
+		return nil
 	}
-	return mayPublish(req.Commands, req.Portable.invocation())
+	if captured := capturedAncestry(ctx, req.WorkspaceRoot); captured != nil {
+		return captured
+	}
+	if !mayPublish(nil, req.Portable.invocation(), nil) {
+		return nil
+	}
+	return captureAncestrySnapshot(req.WorkspaceRoot, MaxAncestryCommits)
 }
 
 // mayPublish reports whether an invocation may publish: a bound request that
-// carries invocation.publication, or a publish or deploy command.
-func mayPublish(commands []string, portable *runner.InvocationBlock) bool {
+// carries invocation.publication, or a command whose traits in extensions
+// declare the registry side effect (extension.CommandPublishes) or consume the
+// release set (extension.CommandConsumesReleaseSet), which a dependent
+// publication can join.
+func mayPublish(commands []string, portable *runner.InvocationBlock, extensions []*extension.ExtensionDescription) bool {
 	if portable != nil && portable.Publication != nil {
 		return true
 	}
 	return slices.ContainsFunc(commands, func(command string) bool {
-		return slices.Contains(runner.PublicationCommands, command)
+		return extension.CommandPublishes(extensions, command) || extension.CommandConsumesReleaseSet(extensions, command)
 	})
 }

@@ -54,6 +54,14 @@ var CommandsOfWorkload = model.CommandsOfWorkload
 // include a criteria-projection producer.
 var SpecCriteriaProjectionCommands = model.SpecCriteriaProjectionCommands
 
+// HasExternalEffects reports whether a planned job writes outside the
+// workspace, by its resolved traits or its task's declared effects.
+var HasExternalEffects = model.HasExternalEffects
+
+// PublishesToRegistry reports whether a planned job's resolved traits declare
+// the registry side effect.
+var PublishesToRegistry = model.PublishesToRegistry
+
 // --- Typed identity ---
 
 // TaskIdentityOfKey is the fallback for a result the plan does not name.
@@ -159,10 +167,6 @@ type TaskResult = model.TaskResult
 // TaskResultOf projects a scheduled job and its legacy JobResult onto the
 // canonical model.
 var TaskResultOf = model.TaskResultOf
-
-// ExpectsVerifiedImagePublication reports whether a job owns the established
-// immutable image-publication result contract.
-var ExpectsVerifiedImagePublication = model.ExpectsVerifiedImagePublication
 
 // TaskSummaryOf projects a job and its result WITHOUT the structured records.
 var TaskSummaryOf = model.TaskSummaryOf
@@ -314,6 +318,7 @@ type (
 var (
 	applyTaskIdentity       = model.ApplyTaskIdentity
 	batchNumber             = model.BatchNumber
+	declaredExternalEffects = model.DeclaredExternalEffects
 	dedupeSorted            = model.DedupeSorted
 	eventField              = model.EventField
 	eventFloat              = model.EventFloat

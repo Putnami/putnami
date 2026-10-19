@@ -92,9 +92,10 @@ one breaking change that meets D2. This is that change.
   and `format`, decide watch mode, the hosted and `run_jobs` refusals,
   composition, exit-code forwarding and the portable refusal. The `compose`
   and `qualify` literals name core commands and stay.
-- Some name reads stay until declared traits replace them.
-  `runner.PublicationCommands` (`publish`, `deploy`) decides
-  the ancestry snapshot, the portable and publication paths and the
-  publication outbox, and `--dry-run` synthesizes its parameter for
-  `publish` alone; release-set and publication traits replace them. None of
-  them runs a command that no loaded extension declares.
+- Publication reads no name:
+  [ADR 0074](0074-deployment-follows-the-declared-release-set-trait.md)
+  replaces `runner.PublicationCommands` with the registry and cloud side
+  effects that commands and tasks declare, in the ancestry snapshot, the
+  portable and publication paths and the publication outbox, and `--dry-run`
+  synthesizes its parameter for a single command that declares the registry
+  side effect.

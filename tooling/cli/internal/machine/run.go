@@ -392,11 +392,13 @@ func validMemoryEvents(events *jobs.CgroupMemoryEvents) bool {
 }
 
 // publications joins the Docker publisher's typed artifact facts with the
-// corresponding package task's measured wall time and the renderer's observed
-// scheduler bound. The terminal summary is intentionally conservative: a
-// record is omitted unless it has a concrete target registry and a verified
-// immutable digest, so a tag can never slip into the machine contract as
-// provenance.
+// build time of the image and the renderer's observed scheduler bound. The
+// build time is the longest wall time among the project's Docker tasks whose
+// results carry no publication, whatever their command: a project that runs
+// another Docker step beside the image build reports the longer of the two.
+// The terminal summary is intentionally conservative: a record is omitted
+// unless it has a concrete target registry and a verified immutable digest,
+// so a tag can never slip into the machine contract as provenance.
 func (r Run) publications() []protocolcli.DockerPublication {
 	if len(r.Tasks) == 0 || r.publishConcurrency.configuredCap < 1 {
 		return nil
@@ -405,7 +407,7 @@ func (r Run) publications() []protocolcli.DockerPublication {
 	buildMsByProject := make(map[string]int64)
 	for i := range r.Tasks {
 		task := r.Tasks[i]
-		if task.Identity.Task.Command != "package" || !dockerTask(task.Identity) {
+		if len(task.Result.Publications) > 0 || !dockerTask(task.Identity) {
 			continue
 		}
 		buildMs := millis(task.Result.Timing.TaskWall)

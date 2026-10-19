@@ -220,8 +220,8 @@ func writePutPublicationFixture(t *testing.T, self, endpoint string) putPublicat
   "workspace": { "markers": ["marker.txt"], "inputs": ["marker.txt"] },
   "ecosystems": [%s, %s],
   "commands": {
-    "package": { "run": [{ "id": "artifact", "task": "noop" }] },
-    "publish": { "dependsOn": ["package"], "run": [%s] },
+    "package": { "traits": { "injectPublishChannels": true }, "run": [{ "id": "artifact", "task": "noop" }] },
+    "publish": { "dependsOn": ["package"], "traits": { "injectPublishChannels": true, "sideEffects": "registry" }, "run": [%s] },
     %s: { "description": "Serve credentials.", "run": [{ "id": "serve", "task": "credential-provider" }] }
   },
   "tasks": {

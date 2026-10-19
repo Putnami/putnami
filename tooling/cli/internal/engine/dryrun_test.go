@@ -204,7 +204,7 @@ func TestPublishFinalizers_ProbeReportOnlyUnderAnExecutingDryRunPublish(t *testi
 		"dry-run preview":           {req: preview},
 		"real publish":              {req: &Request{Commands: []string{"publish"}}},
 	} {
-		finalizers := publishFinalizers(context.Background(), test.req, nil)
+		finalizers := publishFinalizers(context.Background(), test.req, nil, true)
 		if len(finalizers) != 1 || (finalizers[0] != nil) != test.probes {
 			t.Errorf("%s: publishFinalizers = %d finalizer(s), probe report present = %v, want %v",
 				name, len(finalizers), len(finalizers) == 1 && finalizers[0] != nil, test.probes)
@@ -241,7 +241,7 @@ func TestExecute_DryRunPublishFailsOnAConflictProbe(t *testing.T) {
 	out := captureStdout(t, func() {
 		code = f.engine.execute(ctx, f.req, f.ws, []*workspace.Project{f.project},
 			&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{f.ext}}, f.planned, nil, nil,
-			publishFinalizers(ctx, f.req, nil)...).ExitCode
+			publishFinalizers(ctx, f.req, nil, true)...).ExitCode
 	})
 
 	if code != ExitError {
