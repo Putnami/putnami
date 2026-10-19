@@ -688,8 +688,8 @@ in either spelling.
 From contract 11, `kind` and `phase` describe the shared invocation.
 `kind` is `verification` or `diagnostics`: the per-project tally the
 scheduler rebuilds from the shared result. `phase` names the phase of each
-project's rebuilt run, in lowercase letters, digits and hyphens. The CLI reads
-neither field yet ([command kinds](06-verbs.md#command-kinds)). A manifest that
+project's rebuilt run, in lowercase letters, digits and hyphens
+([command kinds](06-verbs.md#command-kinds)). A manifest that
 declares one requires CLI contract 11. Both fields enter the task contract
 digest, so a task that declares them gets a new cache key once.
 

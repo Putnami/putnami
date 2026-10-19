@@ -30,12 +30,10 @@ func TestConformance_CommandTraitsVocabulary(t *testing.T) {
 	}
 }
 
-// TestConformance_WellKnownVerbs pins the canonical verb vocabulary.
-// Adding or removing a verb is a protocol change.
+// TestConformance_WellKnownVerbs pins the lifecycle verb registry: five rows,
+// no development verb. Adding or removing a verb is a protocol change.
 func TestConformance_WellKnownVerbs(t *testing.T) {
 	want := []string{
-		"build", "test", "lint", "format", "serve", "run",
-		"package", "publish", "deploy",
 		"workspace-fetch", "workspace-install", "deps-upgrade", "config-extract", "config-merge",
 	}
 	if len(WellKnownVerbs) != len(want) {
@@ -50,74 +48,33 @@ func TestConformance_WellKnownVerbs(t *testing.T) {
 		if spec.Description == "" {
 			t.Errorf("verb %q requires a description", name)
 		}
-	}
-}
-
-// TestConformance_VerbTraits pins the default traits the orchestrator
-// relies on. Changing any of these changes scheduling/gating behavior.
-func TestConformance_VerbTraits(t *testing.T) {
-	cases := []struct {
-		verb string
-		want CommandTraits
-	}{
-		// test heaviness is step-granular (declared on the runner step),
-		// not a command-level default.
-		{"test", CommandTraits{}},
-		{"serve", CommandTraits{RequiresRunnable: true}},
-		{"run", CommandTraits{RequiresRunnable: true}},
-		{"package", CommandTraits{InjectPublishChannels: true}},
-		// publish/deploy carry no orchestrator-side workload inspection.
-		// Contract 3 deleted the `preflight: config-schema`
-		// trait: whether a task needs another task's artifact is stated by
-		// the consuming task's typed input port, not derived by core from
-		// the workload's imports and infra markers.
-		{"publish", CommandTraits{
-			InjectPublishChannels: true,
-			SideEffects:           SideEffectsRegistry,
-		}},
-		{"deploy", CommandTraits{
-			SideEffects: SideEffectsCloud,
-		}},
-		{"build", CommandTraits{}},
-	}
-	for _, c := range cases {
-		if got := EffectiveTraits(c.verb, nil); got != c.want {
-			t.Errorf("EffectiveTraits(%q) = %+v, want %+v", c.verb, got, c.want)
+		if spec.LongRunning || spec.Traits != (CommandTraits{}) {
+			t.Errorf("verb %q carries a default: %+v", name, spec)
 		}
 	}
-	if !WellKnownVerbs["serve"].LongRunning {
-		t.Error("serve must be long-running")
-	}
-	if WellKnownVerbs["run"].LongRunning {
-		t.Error("run must not be long-running")
-	}
 }
 
+// TestEffectiveTraits pins that the protocol adds no default: a command gets
+// the traits it declares, or the zero traits.
 func TestEffectiveTraits(t *testing.T) {
-	// Pipeline step names resolve through the base command.
-	if got := EffectiveTraits("serve~dev", nil); !got.RequiresRunnable {
-		t.Error("serve~dev should inherit the serve verb's requiresRunnable trait")
-	}
-	// Manifest traits replace the defaults, but naming no side effects keeps
-	// the verb's: a declaration cannot make publish or deploy look harmless.
 	declared := &CommandTraits{RequiresRunnable: true}
-	if got, want := EffectiveTraits("publish", declared), (CommandTraits{RequiresRunnable: true, SideEffects: SideEffectsRegistry}); got != want {
-		t.Errorf("EffectiveTraits(publish, %+v) = %+v, want %+v", *declared, got, want)
+	// Pipeline step names resolve through the base command, and a declared
+	// object comes back as declared.
+	if got, want := EffectiveTraits("serve~dev", declared), *declared; got != want {
+		t.Errorf("EffectiveTraits(serve~dev, %+v) = %+v, want %+v", *declared, got, want)
 	}
-	if got := EffectiveTraits("deploy~apply", &CommandTraits{Heavy: true}); got.SideEffects != SideEffectsCloud {
-		t.Errorf("deploy~apply declared without side effects = %+v, want the cloud side effect kept", got)
+	// A declaration replaces everything, side effects included.
+	for _, side := range []string{SideEffectsNone, SideEffectsRegistry, SideEffectsCloud} {
+		traits := &CommandTraits{Heavy: true, SideEffects: side}
+		if got := EffectiveTraits("publish", traits); got != *traits {
+			t.Errorf("EffectiveTraits(publish, %+v) = %+v, want the declaration", *traits, got)
+		}
 	}
-	// A declared side effect still replaces the verb's: the trait holds one value.
-	if got := EffectiveTraits("publish", &CommandTraits{SideEffects: SideEffectsCloud}); got.SideEffects != SideEffectsCloud {
-		t.Errorf("publish declared with cloud side effects = %+v, want cloud", got)
-	}
-	// A verb without default side effects takes the declaration as is.
-	if got, want := EffectiveTraits("build", declared), *declared; got != want {
-		t.Errorf("EffectiveTraits(build, %+v) = %+v, want %+v", *declared, got, want)
-	}
-	// Unknown verbs default to zero traits.
-	if got := EffectiveTraits("frobnicate", nil); got != (CommandTraits{}) {
-		t.Errorf("unknown verb traits = %+v, want zero", got)
+	// A command that declares none gets the zero traits, whatever its name.
+	for _, name := range []string{"build", "publish", "deploy~apply", "serve", "frobnicate"} {
+		if got := EffectiveTraits(name, nil); got != (CommandTraits{}) {
+			t.Errorf("EffectiveTraits(%q, nil) = %+v, want zero", name, got)
+		}
 	}
 }
 

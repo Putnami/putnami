@@ -11,12 +11,10 @@ import (
 // command in machine-readable form. The orchestrator consults traits
 // instead of matching command names, so a new extension inherits
 // correct scheduling and gating behavior by declaring them (or by using
-// a well-known verb, which carries defaults).
+// a verb whose vocabulary carries default traits).
 //
-// A manifest-declared traits object replaces the verb's defaults, except
-// that a declaration naming no side effects keeps the verb's: `publish`
-// always mutates a registry and `deploy` a cloud, so no declaration can make
-// either look harmless to the gates that read SideEffects.
+// A manifest-declared traits object replaces the verb's default traits
+// wholesale, side effects included.
 //
 // Traits describe the COMMAND, never the workload the command runs
 // against. Contract 3 deleted the one trait that broke that
@@ -107,8 +105,7 @@ func (t *CommandTraits) DeclaresCommandKind() bool {
 // ValidateTraits checks the closed vocabularies of a command's or a verb's
 // traits: a kind from ValidCommandKinds and a workload from ValidWorkloads.
 // field is the path of the traits object, for the diagnostics. It is inert
-// for nil traits, and it leaves sideEffects to its callers: a verb keeps the
-// side effects WellKnownVerbs gives it (ValidateVerbs).
+// for nil traits, and it leaves sideEffects to its callers (ValidateVerbs).
 func ValidateTraits(traits *CommandTraits, field string) []diag.Diagnostic {
 	if traits == nil {
 		return nil
@@ -143,62 +140,26 @@ const (
 	CloudCapabilityAfterEnv = "PUTNAMI_CLOUD_CAPABILITY_AFTER"
 )
 
-// VerbSpec documents a well-known verb: its purpose, whether it targets
-// long-running workloads only, and the traits it carries by default.
+// VerbSpec documents a lifecycle verb: its purpose and the traits it carries
+// by default.
 type VerbSpec struct {
 	Description string
-	// LongRunning verbs (serve) only apply to workload types with a
-	// run-forever lifecycle; jobs and commands skip them.
+	// LongRunning marks a verb that applies only to workloads with a
+	// run-forever lifecycle.
+	//
+	// Deprecated: no lifecycle verb sets it. A command declares
+	// `workload: "serve"` instead (CommandTraits.Workload).
 	LongRunning bool
 	Traits      CommandTraits
 }
 
-// WellKnownVerbs is the canonical verb vocabulary. Extensions may
-// declare any command name, but commands using these names inherit the
-// documented semantics and default traits. See doc/06-verbs.md.
+// WellKnownVerbs is the registry of the lifecycle verbs: the commands a
+// language extension declares to prepare a workspace or a project's config
+// (workspace-fetch, workspace-install, deps-upgrade, config-extract and
+// config-merge). It lists no development verb. A verb vocabulary
+// (Manifest.Verbs) declares the others, such as build or publish, with their
+// default traits. See doc/06-verbs.md.
 var WellKnownVerbs = map[string]VerbSpec{
-	"build": {
-		Description: "Compile or transpile project sources into runnable or distributable outputs.",
-	},
-	// test carries no command-level heavy default because heaviness is
-	// step-granular: the runner step is heavy, prerequisite steps (e.g.
-	// describe/generate) are not. Manifests declare `heavy` on the
-	// runner step instead.
-	"test": {
-		Description: "Run the project's tests, emitting test counts and coverage metrics.",
-	},
-	"lint": {
-		Description: "Check code for style and correctness findings, emitting per-issue diagnostics.",
-	},
-	"format": {
-		Description: "Rewrite sources into canonical formatting.",
-	},
-	"serve": {
-		Description: "Run the project's dev server until interrupted.",
-		LongRunning: true,
-		Traits:      CommandTraits{RequiresRunnable: true},
-	},
-	"run": {
-		Description: "Execute the project once and exit.",
-		Traits:      CommandTraits{RequiresRunnable: true},
-	},
-	"package": {
-		Description: "Assemble distributable artifacts for the project's publish channels.",
-		Traits:      CommandTraits{InjectPublishChannels: true},
-	},
-	"publish": {
-		Description: "Push packaged artifacts to registries.",
-		Traits: CommandTraits{
-			InjectPublishChannels: true,
-			SideEffects:           SideEffectsRegistry,
-		},
-	},
-	"deploy": {
-		Description: "Converge a cloud environment on the workload's aggregated infra manifest.",
-		Traits: CommandTraits{
-			SideEffects: SideEffectsCloud,
-		},
-	},
 	"workspace-fetch": {
 		Description: "Download the language ecosystem's dependencies for the workspace, running none of their code.",
 	},
@@ -225,19 +186,13 @@ func BaseCommandName(name string) string {
 	return name
 }
 
-// EffectiveTraits resolves the traits for a command: a manifest-declared
-// traits object wins, except that its empty SideEffects keeps the well-known
-// verb's; otherwise the well-known verb's default traits apply; unknown verbs
-// default to the zero traits. SideEffects holds one value, so a declared side
-// effect still replaces the verb's.
+// EffectiveTraits resolves the traits for a command: the traits its manifest
+// declares, or the zero traits when it declares none. The registry adds no
+// default, so a verb's default traits come from the vocabulary that declares
+// the verb, which the caller applies before it asks.
 func EffectiveTraits(commandName string, declared *CommandTraits) CommandTraits {
-	defaults := WellKnownVerbs[BaseCommandName(commandName)].Traits
 	if declared == nil {
-		return defaults
+		return CommandTraits{}
 	}
-	traits := *declared
-	if traits.SideEffects == SideEffectsNone {
-		traits.SideEffects = defaults.SideEffects
-	}
-	return traits
+	return *declared
 }
