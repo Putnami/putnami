@@ -226,6 +226,47 @@ func TestRun_PublishAndDeployOutsideARepositoryNameGit(t *testing.T) {
 	}
 }
 
+// A refusal that Run returns is reported on Request.ErrorOut, once. An
+// adapter that reports the returned error itself discards that report, and
+// stderr then carries none, whichever stage refused.
+func TestRun_ReportsAReturnedErrorOnErrorOut(t *testing.T) {
+	root := rootWithoutRepository(t)
+	cfg := declaringWorkspace(t, root)
+
+	for name, commands := range map[string][]string{
+		"a command no extension declares": {"bundle"},
+		"a repository the command needs":  {"publish"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			run := func(out io.Writer) (string, error) {
+				var err error
+				stderr := captureStderr(t, func() {
+					_, err = New().Run(context.Background(), Request{
+						WorkspaceRoot: root, Config: cfg, Commands: commands, ErrorOut: out,
+					}, nil)
+				})
+				return stderr, err
+			}
+
+			stderr, err := run(io.Discard)
+			if err == nil || stderr != "" {
+				t.Fatalf("with io.Discard: error = %v, stderr = %q, want the error returned and nothing on stderr", err, stderr)
+			}
+
+			var reported strings.Builder
+			stderr, err = run(&reported)
+			if err == nil || stderr != "" || reported.String() != "putnami: "+err.Error()+"\n" {
+				t.Fatalf("with a writer: error = %v, stderr = %q, report = %q, want the error reported once on the writer", err, stderr, reported.String())
+			}
+
+			stderr, err = run(nil)
+			if err == nil || stderr != "putnami: "+err.Error()+"\n" {
+				t.Fatalf("with no writer: error = %v, stderr = %q, want the report on stderr", err, stderr)
+			}
+		})
+	}
+}
+
 // shippingWorkspace writes a workspace at a root git discovery cannot escape.
 // Its local extension serves build, and publish with registry side effects
 // too when servesPublish is set, with a task that records each run in the

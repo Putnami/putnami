@@ -426,6 +426,13 @@ type Request struct {
 	// Diagnostics on stderr are untouched: stderr is not a protocol channel for
 	// any adapter.
 	Stdout io.Writer
+	// ErrorOut receives the one-line report of an error Run also returns: a
+	// refused command, a hosted provider only a path extension declares, a
+	// failed hook. Nil means os.Stderr, which is every adapter that discards
+	// the returned error and relies on this report. An adapter that reports the
+	// returned error itself passes io.Discard, so the error reaches the user
+	// once. Every other diagnostic stays on os.Stderr.
+	ErrorOut io.Writer
 }
 
 // CacheVerificationRequest contains the one execution override the verifier
@@ -451,6 +458,14 @@ func (r *Request) stdout() io.Writer {
 		return r.Stdout
 	}
 	return os.Stdout
+}
+
+// errorOut returns the stream that carries the report of an error Run returns.
+func (r *Request) errorOut() io.Writer {
+	if r.ErrorOut != nil {
+		return r.ErrorOut
+	}
+	return os.Stderr
 }
 
 // runMarkerParams returns the params that key persisted successful-run state.
@@ -564,7 +579,7 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	if req.VersionSnapshot == nil {
 		snapshot, err := captureVersionSnapshot(req.WorkspaceRoot)
 		if err != nil {
-			iox.Fprintf(os.Stderr, "putnami: %v\n", err)
+			iox.Fprintf(req.errorOut(), "putnami: %v\n", err)
 			return SessionResult{ExitCode: ExitError}, err
 		}
 		req.VersionSnapshot = snapshot
@@ -603,7 +618,7 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	}
 	hostedRemote, err := hosted.Start(ctx, req)
 	if err != nil {
-		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
+		iox.Fprintf(req.errorOut(), "putnami: %v\n", err)
 		return SessionResult{ExitCode: protocolcli.ExitCodeForError(err)}, err
 	}
 	req.hostedRemote = hostedRemote
@@ -667,7 +682,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// an invalid-config stop, never a silent fallback (no runtime weakener
 	// exists, which makes the committed spelling the only one).
 	if err := specgate.ValidatePolicy(ws); err != nil {
-		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
+		iox.Fprintf(req.errorOut(), "putnami: %v\n", err)
 		return SessionResult{ExitCode: protocolcli.ExitCodeForError(err)}, err
 	}
 
@@ -1107,11 +1122,11 @@ func runBeforeHooks(ctx context.Context, req *Request, verbose bool) error {
 		return nil
 	}
 	if err := hooks.RunCLIHooks(ctx, req.Hooks, "before", req.WorkspaceRoot, verbose); err != nil {
-		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
+		iox.Fprintf(req.errorOut(), "putnami: %v\n", err)
 		return err
 	}
 	if err := hooks.RunCommandHooks(ctx, req.Hooks, "before", req.Commands, req.WorkspaceRoot, verbose); err != nil {
-		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
+		iox.Fprintf(req.errorOut(), "putnami: %v\n", err)
 		return err
 	}
 	return nil
@@ -1167,17 +1182,19 @@ func runAfterHooks(ctx context.Context, req *Request, verbose bool, code int) (i
 	commandCtx := contextForHooks()
 	var firstErr error
 	if err := hooks.RunCommandHooks(commandCtx, req.Hooks, "after", req.Commands, req.WorkspaceRoot, verbose); err != nil {
-		iox.Fprintf(os.Stderr, "putnami: hook after error: %v\n", err)
+		iox.Fprintf(req.errorOut(), "putnami: hook after error: %v\n", err)
 		firstErr = err
 		if code == ExitSuccess {
 			code = ExitError
 		}
 	}
 	if err := hooks.RunCLIHooks(contextForHooks(), req.Hooks, "after", req.WorkspaceRoot, verbose); err != nil {
-		iox.Fprintf(os.Stderr, "putnami: hook after error: %v\n", err)
+		// Only the first hook error is returned; a later one has no other report.
+		out := io.Writer(os.Stderr)
 		if firstErr == nil {
-			firstErr = err
+			out, firstErr = req.errorOut(), err
 		}
+		iox.Fprintf(out, "putnami: hook after error: %v\n", err)
 		if code == ExitSuccess {
 			code = ExitError
 		}

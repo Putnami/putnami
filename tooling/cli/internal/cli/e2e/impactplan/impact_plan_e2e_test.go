@@ -190,3 +190,22 @@ func TestImpactPlanRefusesACommandNoExtensionDeclares(t *testing.T) {
 		t.Fatalf("plan = commands %v, %d tasks, changed %v; want an empty plan of format", empty.Commands, len(empty.Tasks), empty.ChangedFiles)
 	}
 }
+
+// TestImpactPlanReportsARefusalOnce holds the report of an engine refusal to
+// one copy per channel. The text form prints it once on stderr. The JSON form
+// carries it in the error envelope on stdout, and the dispatcher's echo of the
+// error is the only copy on stderr.
+func TestImpactPlanReportsARefusalOnce(t *testing.T) {
+	root, baseSHA := impactPlanFixture(t)
+	const refusal = "no extension of this workspace declares typo; name a language extension in putnami.workspace.json, then run: putnami extensions install"
+
+	code, stdout, stderr := run(t, root, "impact-plan", "typo", "--base", baseSHA, "--no-cache")
+	if code != 2 || strings.Count(stderr, refusal) != 1 || strings.Contains(stdout, refusal) {
+		t.Fatalf("text form: exit = %d, want 2 with the refusal once on stderr\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+
+	code, stdout, stderr = run(t, root, "impact-plan", "typo", "--base", baseSHA, "--no-cache", "--output=json")
+	if code != 2 || strings.Count(stdout, refusal) != 1 || strings.Count(stderr, refusal) != 1 {
+		t.Fatalf("JSON form: exit = %d, want 2 with the refusal once in the envelope and once on stderr\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+}

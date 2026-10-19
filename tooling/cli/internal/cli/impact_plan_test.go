@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"io"
 	"reflect"
 	"strings"
 	"testing"
@@ -116,6 +117,9 @@ func TestImpactPlanPlannerRoutesThroughEngine(t *testing.T) {
 			if request.WorkspaceRoot != root || !request.Global.Impacted || request.Global.Baseline != impactPlanTestBase ||
 				request.Global.NoCache || !request.Global.Plan || !request.Global.Quiet {
 				t.Fatalf("request = %#v, want an immutable impacted plan of the workspace", request)
+			}
+			if request.ErrorOut != io.Discard {
+				t.Fatalf("ErrorOut = %v, want io.Discard: the dispatcher reports the returned error", request.ErrorOut)
 			}
 			return engine.SessionResult{ExitCode: engine.ExitError}, nil
 		})

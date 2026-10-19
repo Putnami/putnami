@@ -157,6 +157,8 @@ func newImpactPlanPlanner(wsRoot string, cfg *wsproto.Config, commands []string,
 				Quiet:    true,
 			},
 			Stdout: io.Discard,
+			// The dispatcher reports the error returned below, once.
+			ErrorOut: io.Discard,
 		}, nil)
 		if err != nil {
 			return ci.PlannerResult{}, fmt.Errorf("plan %s: %w", gate, err)

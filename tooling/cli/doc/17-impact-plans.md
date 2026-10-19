@@ -18,7 +18,9 @@ It plans and executes nothing else.
 2. A command that no discovered extension declares is a usage error that names
    it, so a misspelled or uninstalled command never yields an empty plan. A
    declared command that plans no task over the range gives a valid empty
-   plan.
+   plan. An engine refusal is reported once per channel: once on stderr in the
+   text form, and under `--output=json` once in the error envelope on stdout
+   and once in the line the command echoes to stderr.
 3. `--baseline`, `--impacted`, `--projects` and `--all` are refused: the range
    selects the projects.
 4. No repository remote is needed.
