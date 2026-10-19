@@ -64,11 +64,11 @@ func TestCIViewRendersTheFailureDigestWithoutALogRead(t *testing.T) {
 			t.Fatalf("a run whose digest carries detail fetched its logs: %s %s", req.Method, req.Path)
 		}
 		if req.Path == "/v1/workspaces/ws-acme/runs/run-1" {
-			asked = req.Query == "detail=true"
+			asked = req.Query == "detail=true&reuse=true"
 		}
 	}
 	if !asked {
-		t.Fatalf("view never asked for the run's detail (detail=true): %+v", fake.requests)
+		t.Fatalf("view never asked for the run's detail (detail=true&reuse=true): %+v", fake.requests)
 	}
 }
 

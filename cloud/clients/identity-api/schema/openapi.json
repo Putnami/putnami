@@ -144,6 +144,12 @@
           "organization_name": {
             "type": "string"
           },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "roles": {
             "items": {
               "type": "string"
@@ -244,7 +250,7 @@
   "paths": {
     "/v1/workspaces": {
       "get": {
-        "description": "List the workspaces the signed-in caller belongs to, derived from server-resolved IAM memberships. Requires the platform.workspace.read permission. Deprecated off-contract mode: with ?name= the route instead resolves a single workspace by name within the caller's personal organization and returns one Workspace object.\n\nRequired scopes: platform.workspace.read.",
+        "description": "List the workspaces the signed-in caller belongs to, derived from server-resolved IAM memberships, each with the caller's effective roles and permissions there. Requires the platform.workspace.read permission. Deprecated off-contract mode: with ?name= the route instead resolves a single workspace by name within the caller's personal organization and returns one Workspace object.\n\nRequired scopes: platform.workspace.read.",
         "operationId": "getV1_Workspaces",
         "responses": {
           "200": {
@@ -393,7 +399,7 @@
         }
       },
       "post": {
-        "description": "Create a workspace. Requires the platform.workspace.manage permission, except the self-bootstrap path: omitting organization_id resolves the caller's personal scope (creating it on first use) and needs a trusted issuer+subject identity; verified email is required only for a first unmapped login.",
+        "description": "Create a workspace. Requires the platform.workspace.manage permission at the organization named by organization_id, except the self-bootstrap path: omitting organization_id resolves the caller's personal scope (creating it on first use) and needs a trusted issuer+subject identity; verified email is required only for a first unmapped login.",
         "operationId": "postV1_Workspaces",
         "requestBody": {
           "content": {

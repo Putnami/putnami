@@ -153,6 +153,19 @@ The auth server stamps the selected workspace into the JWT as
 grant. Control-plane and config APIs still authorize the request with the
 caller's roles and scopes; missing permissions return `403`.
 
+## Run view
+
+`putnami cloud ci view <run>` shows one run: its phases, timing, cache use
+and, when it failed, the failing tasks. A main run can release the members its
+pull request already published instead of building them again. For such a
+run, `view` adds a `Reused:` section with the channel the members came from
+(for example `pr-4361`), the source revision and the head they were released
+from, and each member as `coordinate version (ecosystem)`. When the server
+lists only part of the members, the last line says how many more are not
+listed. A run that reused nothing prints no `Reused:` section.
+`--output=json` carries the same facts in the `reuse` member. A server that
+predates the `reuse` query leaves the section out.
+
 ## Live workspace CI settings
 
 `putnami cloud ci enable` creates or enables the current workspace's operational
@@ -546,6 +559,7 @@ putnami cloud channels follow <namespace> <stable|canary|rs_id>  # what the work
 putnami cloud ci init|validate|fmt|explain         # author putnami.ci.json
 putnami cloud ci report --conclusion success       # report a delivery-run outcome
 putnami cloud ci status                            # CI readiness checks, queue, last run reuse, runs and spend over 7 days
+putnami cloud ci view <run> [--output=json]        # one run: phases, timing, cache, failures, and the release-set members it reused
 putnami cloud cache [status]                       # the build cache config, its identity, and the reuse of the last CI run
 putnami cloud cache disable [--remove]             # disable (enabled:false) or delete the cache config
 putnami cloud source connect [--repo owner/name] [--replace]  # browser-assisted GitHub authorization; structured mode requires --repo
@@ -1228,8 +1242,8 @@ db-gateway, delivery-api, distribution-api, identity-api, observability-api,
 oci-server, put-server, runtime-api and source-api.
 
 The schemas come from the Put package `cloud/doc-contents-cloud-cli-schema`,
-channel `canary`, version `0.0.0-20261014111756-10ec53b5f` (archive digest
-`sha256:81201d632697918965f36aadd602534526f2b44d74f886c5331c4725f8dbcccb`). Its
+channel `canary`, version `0.0.0-20261019101219-1963566e9` (archive digest
+`sha256:40ed37e5959a9da97ad06dd5da33c354db005e4c13770dd6645f6b40f8cdb923`). Its
 file layout is `docs/cloud-cli-schema/services/<service>/openapi.json`. Each
 file is copied byte for byte. To update the schemas:
 

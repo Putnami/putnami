@@ -470,11 +470,17 @@
           "400": {
             "description": "Malformed or semantically invalid migration publication"
           },
+          "401": {
+            "description": "Authentication required"
+          },
           "403": {
             "description": "Caller is not authorized for the workspace or Put"
           },
           "409": {
             "description": "Authored member or immutable publication conflicts with owner authority"
+          },
+          "413": {
+            "description": "The body or the migration bundle is too large"
           },
           "500": {
             "content": {
@@ -519,12 +525,20 @@
               "status": 400
             },
             {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
               "code": "forbidden",
               "status": 403
             },
             {
               "code": "conflict",
               "status": 409
+            },
+            {
+              "code": "http.payload_too_large",
+              "status": 413
             },
             {
               "code": "http.internal_server",
@@ -1079,6 +1093,9 @@
           "409": {
             "description": "Grant is not in an openable state"
           },
+          "413": {
+            "description": "Request body too large"
+          },
           "500": {
             "content": {
               "application/json": {
@@ -1133,6 +1150,10 @@
             {
               "code": "conflict",
               "status": 409
+            },
+            {
+              "code": "http.payload_too_large",
+              "status": 413
             },
             {
               "code": "http.internal_server",
@@ -1386,6 +1407,9 @@
           "404": {
             "description": "Database or grant not found in the caller's scope"
           },
+          "413": {
+            "description": "Request body too large"
+          },
           "429": {
             "description": "Per-workspace query rate limit exceeded"
           },
@@ -1442,6 +1466,10 @@
             {
               "code": "not_found",
               "status": 404
+            },
+            {
+              "code": "http.payload_too_large",
+              "status": 413
             },
             {
               "code": "http.too_many_requests",
