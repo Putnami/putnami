@@ -330,13 +330,16 @@ func TestCacheMachineTokenNeedsEveryCondition(t *testing.T) {
 		signedIn bool
 		setenv   map[string]string
 		want     bool
+		// readOnly marks a session that does not send PUTNAMI_CLOUD_TOKEN but
+		// still opens read-only: its PUTNAMI_CACHE_TOKEN is a machine token.
+		readOnly bool
 	}{
 		{name: "canonical recipe, no session", token: canonical, url: "https://cache.putnami.cloud", want: true},
 		{name: "no token source, no session", url: "https://cache.putnami.cloud", want: true},
 		{name: "hosted launch", token: canonical, url: "https://cache.putnami.cloud", hosted: true},
 		{name: "stored user session", token: canonical, url: "https://cache.putnami.cloud", signedIn: true},
 		{name: "cache token override", token: canonical, url: "https://cache.putnami.cloud",
-			setenv: map[string]string{remotecache.TokenEnv: "pkt_cache_override"}},
+			setenv: map[string]string{remotecache.TokenEnv: "pkt_cache_override"}, readOnly: true},
 		{name: "metadata selector", token: canonical, url: "https://cache.putnami.cloud",
 			setenv: map[string]string{remotecache.TokenSourceEnv: "metadata"}},
 		{name: "custom command", token: map[string]any{"command": []string{"my-token-helper"}}, url: "https://cache.putnami.cloud"},
@@ -386,13 +389,14 @@ func TestCacheMachineTokenNeedsEveryCondition(t *testing.T) {
 			if cfg.SendsMachineToken() != test.want {
 				t.Fatalf("SendsMachineToken = %t, want %t", cfg.SendsMachineToken(), test.want)
 			}
-			if s.readOnly != test.want {
-				t.Fatalf("readOnly = %t, want %t: a session sends the machine token and no write, or neither", s.readOnly, test.want)
+			readOnly := test.want || test.readOnly
+			if s.readOnly != readOnly {
+				t.Fatalf("readOnly = %t, want %t: a session that holds a machine token sends no write", s.readOnly, readOnly)
 			}
-			if !test.want && logw.Len() != 0 {
+			if !readOnly && logw.Len() != 0 {
 				t.Fatalf("the provider logged %q; a session with another credential logs nothing here", logw.String())
 			}
-			if test.want && strings.Count(logw.String(), "\n") != 1 {
+			if readOnly && strings.Count(logw.String(), "\n") != 1 {
 				t.Fatalf("the provider logged %q; the read-only state is stated in exactly one line", logw.String())
 			}
 		})
@@ -562,6 +566,59 @@ func TestCloudTokenSessionIsReadOnlyBeforeTheFirstWrite(t *testing.T) {
 	}
 	if strings.Contains(log, testMachineToken) {
 		t.Fatal("the provider log carries the machine token")
+	}
+}
+
+// A machine token set through PUTNAMI_CACHE_TOKEN reads the shared cache and
+// writes nothing, like one set through PUTNAMI_CLOUD_TOKEN: the session opens
+// read-only and names the variable that holds it. Any other cache token, and a
+// hosted run, keep the write path.
+func TestCacheTokenOverrideMachineTokenSessionIsReadOnly(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		token    string
+		hosted   bool
+		readOnly bool
+	}{
+		{name: "machine token", token: testMachineToken, readOnly: true},
+		{name: "machine token with spaces around it", token: " " + testMachineToken + "\n", readOnly: true},
+		{name: "another bearer", token: "developer-token"},
+		{name: "hosted run", token: testMachineToken, hosted: true},
+		{name: "no override"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			machineTokenSession(t, "")
+			t.Setenv(remotecache.TokenEnv, test.token)
+			srv, writes := writeRefusingCacheServer(t)
+			t.Setenv(remotecache.URLEnv, srv.URL)
+
+			var logw bytes.Buffer
+			s := newProviderSession(t.TempDir(), &logw)
+			defer s.close()
+			s.hosted = test.hosted
+			cfg, err := remotecache.LoadConfig(CachePath(t.TempDir()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := cfg.ApplyEnv(); err != nil {
+				t.Fatal(err)
+			}
+			s.applyMachineToken(cfg)
+
+			if s.readOnly != test.readOnly {
+				t.Fatalf("readOnly = %t, want %t", s.readOnly, test.readOnly)
+			}
+			line := "the remote cache is read-only for this run: " + remotecache.TokenEnv + " is a workspace machine token"
+			if got := strings.Contains(logw.String(), line); got != test.readOnly {
+				t.Fatalf("read-only line logged = %t, want %t, got %q", got, test.readOnly, logw.String())
+			}
+			if strings.Contains(logw.String(), strings.TrimSpace(test.token)) && test.token != "" {
+				t.Fatal("the provider log carries the cache token")
+			}
+			if got := writes.Load(); got != 0 {
+				t.Fatalf("write requests = %d, want none before any upload", got)
+			}
+		})
 	}
 }
 

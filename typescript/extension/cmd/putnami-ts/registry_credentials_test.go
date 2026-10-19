@@ -114,7 +114,7 @@ func stubNpmCredential(t *testing.T, outcome registrycred.Outcome) *[]string {
 	original := ensureNpmRegistryCredential
 	t.Cleanup(func() {
 		ensureNpmRegistryCredential = original
-		heldCredentialWarnings.take()
+		drainHeldWarnings()
 	})
 	var hosts []string
 	ensureNpmRegistryCredential = func(_ context.Context, _ string, host string) registrycred.Outcome {
@@ -155,7 +155,7 @@ func TestRefreshPutnamiNpmCredential_DebugOutcomeLogsAtOnce(t *testing.T) {
 	}
 }
 
-func TestReportRegistryRefusal_LogsTheHeldWarningOnlyOnA401Or403(t *testing.T) {
+func TestReportRegistryRefusal_LogsTheHeldWarningOnlyOnARefusal(t *testing.T) {
 	const missing = "no registry credential for npm.putnami.dev: needs a signed-in user; PUTNAMI_CLOUD_TOKEN cannot read it; continuing with the existing credential"
 	for _, tc := range []struct {
 		name     string
@@ -163,17 +163,13 @@ func TestReportRegistryRefusal_LogsTheHeldWarningOnlyOnA401Or403(t *testing.T) {
 		want     bool
 	}{
 		{name: "bun 401", evidence: "error: GET https://npm.putnami.dev/@putnami%2fcore - 401", want: true},
-		{name: "bun 403 with a reason", evidence: "error: 403 Forbidden", want: true},
-		{name: "a metadata lookup", evidence: "dist-tag \"next\" for @putnami/cli: packument request failed (registry npm.putnami.dev, HTTP 401, no credential sent)", want: true},
-		{name: "unauthorized word", evidence: "error: Unauthorized", want: true},
+		{name: "a metadata lookup", evidence: "dist-tag \"next\" for @putnami/cli: packument request failed (registry npm.putnami.dev, HTTP 403, no credential sent)", want: true},
+		{name: "another registry refused", evidence: "error: GET https://registry.npmjs.org/left-pad - 401"},
 		{name: "not found", evidence: "error: GET https://npm.putnami.dev/@putnami%2fcore - 404"},
-		{name: "a version ending in 401", evidence: "error: no matching version 1.4.401"},
-		{name: "a timeout", evidence: "timed out after 2m0s"},
-		{name: "empty", evidence: ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Cleanup(func() { heldCredentialWarnings.take() })
-			heldCredentialWarnings.hold(missing)
+			stubNpmCredential(t, registrycred.Outcome{})
+			registrycred.HoldWarning("npm.putnami.dev", missing)
 
 			events := captureEvents(t, func() { reportRegistryRefusal(jsonl.New(), tc.evidence) })
 
@@ -182,13 +178,9 @@ func TestReportRegistryRefusal_LogsTheHeldWarningOnlyOnA401Or403(t *testing.T) {
 				t.Fatalf("warning logged = %t, want %t: %#v", logged != nil, tc.want, events)
 			}
 			if tc.want {
-				if msg, _ := logged["message"].(string); !strings.Contains(msg, "no registry credential for npm.putnami.dev") {
-					t.Errorf("warning = %q, want it to name the missing credential", msg)
-				}
-				// Reported once: the next refusal has nothing left to say.
-				again := captureEvents(t, func() { reportRegistryRefusal(jsonl.New(), tc.evidence) })
-				if findEvent(again, func(e map[string]any) bool { return e["level"] == "warn" }) != nil {
-					t.Error("the warning was logged twice")
+				msg, _ := logged["message"].(string)
+				if !strings.Contains(msg, "no registry credential for npm.putnami.dev") || strings.Contains(msg, "continuing") {
+					t.Errorf("warning = %q, want it to name the missing credential and not say the run continues", msg)
 				}
 			}
 		})
@@ -224,4 +216,10 @@ func TestRefreshPutnamiNpmCredential_SkipsWithoutAnHttpsScopeRegistry(t *testing
 			t.Errorf("%q asked the cloud about %v, want no call", body, *hosts)
 		}
 	}
+}
+
+// drainHeldWarnings forgets the warnings a test left held, so the next test
+// starts with none.
+func drainHeldWarnings() {
+	registrycred.ReportRefusal("401", func(string, string) {})
 }

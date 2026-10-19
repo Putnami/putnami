@@ -38,6 +38,11 @@ var moduleFetchingJobs = map[string]bool{
 	"workspace-sync": true,
 }
 
+// streamingJobs run a program that writes its own log lines, such as the server
+// `serve` and `run` start. A 403 in those lines is the program's answer to its
+// own client, not a module fetch, so the refusal check leaves them alone.
+var streamingJobs = map[string]bool{"serve": true, "run": true}
+
 // ensureGoRegistryCredential is a package var so tests exercise every outcome
 // class without a `putnami` binary.
 var ensureGoRegistryCredential = registrycred.EnsureNativeCredential
@@ -66,13 +71,23 @@ func withDeclaredRegistries(job cli.JobFunc) cli.JobFunc {
 // origin is refreshed before the job runs any `go` command.
 //
 // The refresh is best effort by construction: it returns an outcome, never an
-// error, and the job runs either way.
+// error, and the job runs either way. A missing credential matters only when the
+// origin refuses a module fetch, and most jobs fetch public modules only, so the
+// warning is held (refreshModuleOriginCredential) and logged only when a message
+// the job reports shows a 401 or 403 (registrycred.ReportRefusal).
 func withRegistryCredential(name string, job cli.JobFunc) cli.JobFunc {
 	if !moduleFetchingJobs[name] {
 		return job
 	}
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 		refreshModuleOriginCredential(ctx, emit)
+		// The output of a failed `go` command reaches the job's log and
+		// diagnostic events, wherever the job runs it. ReportRefusal forgets a
+		// warning once it logs it, so the message it emits finds nothing held.
+		if !streamingJobs[name] {
+			emit.Observe(func(message string) { registrycred.ReportRefusal(message, emit.Log) })
+			defer emit.Observe(nil)
+		}
 		return job(ctx, emit, args)
 	}
 }
@@ -110,7 +125,12 @@ func refreshModuleOriginCredential(ctx *pctx.Context, emit *jsonl.Emitter) {
 		return
 	}
 	outcome := ensureGoRegistryCredential(context.Background(), ctx.WorkspaceRoot, host)
-	if outcome.Message != "" {
-		emit.Log(outcome.Level, outcome.Message)
+	if outcome.Message == "" {
+		return
 	}
+	if outcome.Level == "warn" {
+		registrycred.HoldWarning(host, outcome.Message)
+		return
+	}
+	emit.Log(outcome.Level, outcome.Message)
 }

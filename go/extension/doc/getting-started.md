@@ -371,7 +371,13 @@ it looked in.
 
 The refresh never blocks a build. A workspace that declares no origin, a machine
 with no `@putnami/cloud`, and a user who is not signed in (`run putnami cloud
-login`) each log one line and let the job run.
+login`) let the job run with whatever credential the machine already has. Most
+jobs fetch public modules only and need no credential, so the extension does not
+warn about the missing one up front. It holds the warning and logs it once, only
+when a message the job reports shows the origin answered a fetch with HTTP 401 or
+403. The warning names the missing credential: the sign-in hint, or, for a
+session that holds only `PUTNAMI_CLOUD_TOKEN`, the cloud's reason. `serve` and
+`run` never log it, because their output is a program's own.
 
 ### Hosted runs: only workspace-fetch sees the credential
 

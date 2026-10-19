@@ -48,27 +48,44 @@ func cacheMachineToken(cfg *remotecache.Config, hosted bool, env map[string]stri
 	return token, ""
 }
 
+// cacheTokenOverrideIsMachineToken reports whether PUTNAMI_CACHE_TOKEN, the
+// explicit bearer override, holds a workspace machine token. A hosted CI
+// launcher's run credential never has the machine token prefix, and a hosted run
+// is excluded anyway: a hosted run writes. A nil env is the process environment.
+func cacheTokenOverrideIsMachineToken(cfg *remotecache.Config, hosted bool, env map[string]string) bool {
+	if hosted || !cfg.Active() {
+		return false
+	}
+	return strings.HasPrefix(strings.TrimSpace(clicore.EnvGet(env, remotecache.TokenEnv)), machineTokenPrefix)
+}
+
 // applyMachineToken hands the config the session's workspace machine token
 // when cacheMachineToken allows one. The token stays in memory: it is not
 // written to .putnami/cache.json or to a log.
 //
-// A session that sends the machine token never writes. The cache server stores
-// task results only from a hosted CI run, so it refuses a write from a machine
-// token whatever scopes the token carries, even cache.write. The token is
-// opaque to the client (it holds no scope claim to read), but that server rule
-// is documented, so the session opens read-only instead of sending a write the
-// server refuses on every run. It says so once.
+// A session that holds a machine token never writes, whichever variable carries
+// it: PUTNAMI_CLOUD_TOKEN, or PUTNAMI_CACHE_TOKEN with a machine token value.
+// The cache server stores task results only from a hosted CI run, so it refuses
+// a write from a machine token whatever scopes the token carries, even
+// cache.write. The token is opaque to the client and holds no scope claim, but
+// that server rule is documented, so the session opens read-only and says so
+// once.
 func (s *providerSession) applyMachineToken(cfg *remotecache.Config) {
 	token, problem := cacheMachineToken(cfg, s.hosted, nil)
 	if problem != "" {
 		s.log(problem)
 	}
 	cfg.UseMachineToken(token)
-	if token == "" {
+	variable := cloudTokenEnv
+	switch {
+	case token != "":
+	case cacheTokenOverrideIsMachineToken(cfg, s.hosted, nil):
+		variable = remotecache.TokenEnv
+	default:
 		return
 	}
 	if !s.readOnly {
-		s.log("the remote cache is read-only for this run: " + cloudTokenEnv + " is a workspace machine token, which reads the shared cache and writes nothing to it; only hosted CI runs write")
+		s.log("the remote cache is read-only for this run: " + variable + " is a workspace machine token, which reads the shared cache and writes nothing to it; only hosted CI runs write")
 	}
 	s.readOnly = true
 }

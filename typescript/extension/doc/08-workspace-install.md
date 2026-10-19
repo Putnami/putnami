@@ -120,7 +120,8 @@ you are not signed in (`run putnami cloud login`), or if the registry is not an
 `https` host, the install runs with whatever credential your machine already
 has. Most installs fetch public packages only and need no credential, so the
 install does not warn about the missing one up front. It holds the warning and
-logs it only when the registry answers a request with HTTP 401 or 403. The
+logs it only when the registry that holds the credential answers a request with
+HTTP 401 or 403. The
 warning names the missing credential: the sign-in hint, or, for a session that
 holds only `PUTNAMI_CLOUD_TOKEN` and cannot sign in, the cloud's reason.
 
