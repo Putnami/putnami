@@ -106,7 +106,7 @@ func TestCIViewRendersTheMembersARunReused(t *testing.T) {
 			Reuse: &CIRunReuse{
 				Channel:        "pr-4361",
 				SourceRevision: "0123456789abcdef0123456789abcdef01234567",
-				Head:           "fedcba9876543210fedcba9876543210fedcba98",
+				Head:           "rs_9a0364b9e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c",
 				Members: []CIRunReusedMember{
 					{Ecosystem: "archive", Coordinate: "acme/app", Version: "1.2.3-pr.4361"},
 					{Ecosystem: "put", Coordinate: "acme/doc-contents-app", Version: "0.0.0-20261019-abc"},
@@ -124,7 +124,7 @@ func TestCIViewRendersTheMembersARunReused(t *testing.T) {
 		"Reused:",
 		"  Channel:  pr-4361",
 		"  Source:   0123456789ab\n",
-		"  Head:     fedcba987654\n",
+		"  Head:     rs_9a0364b9e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c\n",
 		"  acme/app 1.2.3-pr.4361 (archive)",
 		"  acme/doc-contents-app 0.0.0-20261019-abc (put)",
 		"  … and 3 more not listed",
@@ -184,7 +184,7 @@ func TestCIViewJSONCarriesTheReuse(t *testing.T) {
 		"GET /v1/workspaces/ws-acme/runs/run-1": {status: 200, body: CIRunResponse{
 			ID: "run-1", Status: "completed", Conclusion: "success",
 			Reuse: &CIRunReuse{
-				Channel: "pr-4361", SourceRevision: "0123456789abcdef", Head: "fedcba9876543210",
+				Channel: "pr-4361", SourceRevision: "0123456789abcdef", Head: "rs_9a0364b9e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c",
 				Members:        []CIRunReusedMember{{Ecosystem: "archive", Coordinate: "acme/app", Version: "1.2.3"}},
 				MembersOmitted: 2,
 			},

@@ -130,8 +130,9 @@ type CIRunResponse struct {
 
 // CIRunReuse mirrors apis.CIRunReuseResponse: where a run's reused members came
 // from. Channel is the channel that held them (for example `pr-<n>`),
-// SourceRevision the revision they were released from, and Head the head that
-// revision belongs to.
+// SourceRevision the revision they were released from, and Head the id of the
+// release-set head the publication resolved for that channel (`rs_` and 64
+// hex), which the view prints whole so it can be passed to `channels set`.
 type CIRunReuse struct {
 	Channel        string              `json:"channel,omitempty"`
 	Head           string              `json:"head,omitempty"`
@@ -3057,7 +3058,7 @@ func ciRenderReuse(ioctx clicore.IO, reuse *CIRunReuse) {
 		ioctx.Stdout("  Source:   " + shortSHA(reuse.SourceRevision))
 	}
 	if reuse.Head != "" {
-		ioctx.Stdout("  Head:     " + shortSHA(reuse.Head))
+		ioctx.Stdout("  Head:     " + reuse.Head)
 	}
 	for i := range reuse.Members {
 		m := reuse.Members[i]
