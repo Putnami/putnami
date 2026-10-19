@@ -114,6 +114,13 @@ const (
 	CommandKindCriteria     = proto.CommandKindCriteria
 )
 
+// The workload lifecycles the watch promotion, the composition, the exit-code
+// forwarding and the portable refusals read from a job's resolved traits.
+const (
+	WorkloadServe = proto.WorkloadServe
+	WorkloadOnce  = proto.WorkloadOnce
+)
+
 // The closed task-effect vocabulary, so the planner names the same effects a
 // manifest declares.
 const (

@@ -232,3 +232,57 @@ func TestCommandsOfKindFollowTheResolvedTraits(t *testing.T) {
 		t.Errorf("SpecCriteriaProjectionCommands(nil) = %v, want none", got)
 	}
 }
+
+// TestCommandWorkloadFollowsTheResolvedTraits pins how a command's lifecycle
+// and source rewriting are read: from the resolved traits of its jobs in any
+// loaded extension, never from its name. serve wins over once across
+// extensions, a step name answers for its command, and a serve or format
+// command without the trait has neither.
+func TestCommandWorkloadFollowsTheResolvedTraits(t *testing.T) {
+	t.Parallel()
+	command := func(name string, traits extension.CommandTraits) *extension.JobDefinition {
+		return &extension.JobDefinition{Name: name, Kind: "command", Traits: traits}
+	}
+	serve, once := extension.WorkloadServe, extension.WorkloadOnce
+	lang := &extension.ExtensionDescription{Name: "@acme/lang",
+		Jobs: map[string]*extension.JobDefinition{
+			"daemon":  command("daemon", extension.CommandTraits{Workload: serve}),
+			"migrate": command("migrate", extension.CommandTraits{Workload: once}),
+			"tidy":    command("tidy", extension.CommandTraits{RewritesSources: true}),
+			"both":    command("both", extension.CommandTraits{Workload: once}),
+			"empty":   nil,
+		}}
+	legacy := &extension.ExtensionDescription{Name: "@acme/legacy",
+		Jobs: map[string]*extension.JobDefinition{
+			"serve":  command("serve", extension.CommandTraits{RequiresRunnable: true}),
+			"format": command("format", extension.CommandTraits{}),
+			"both":   command("both", extension.CommandTraits{Workload: serve}),
+		}}
+	extensions := []*extension.ExtensionDescription{nil, lang, legacy}
+
+	for command, want := range map[string]string{
+		"daemon": serve, "daemon~run": serve, "migrate": once, "both": serve,
+		"serve": "", "format": "", "tidy": "", "missing": "",
+	} {
+		if got := CommandWorkload(extensions, command); got != want {
+			t.Errorf("CommandWorkload(%s) = %q, want %q", command, got, want)
+		}
+	}
+	for command, want := range map[string]bool{"tidy": true, "tidy~apply": true, "format": false, "daemon": false} {
+		if got := CommandRewritesSources(extensions, command); got != want {
+			t.Errorf("CommandRewritesSources(%s) = %v, want %v", command, got, want)
+		}
+	}
+	if got := CommandsOfWorkload(extensions, serve); !slices.Equal(got, []string{"both", "daemon"}) {
+		t.Errorf("serve-workload commands = %v, want [both daemon]", got)
+	}
+	if got := CommandsOfWorkload(extensions, once); !slices.Equal(got, []string{"migrate"}) {
+		t.Errorf("once-workload commands = %v, want [migrate]", got)
+	}
+	if got := CommandsOfWorkload(extensions, ""); len(got) != 0 {
+		t.Errorf("CommandsOfWorkload(\"\") = %v, want none", got)
+	}
+	if got := CommandWorkload(nil, "serve"); got != "" {
+		t.Errorf("CommandWorkload(nil, serve) = %q, want none", got)
+	}
+}

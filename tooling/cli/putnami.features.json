@@ -38,7 +38,8 @@
             "checks": [
               "unsupported-shapes-rejected-before-submission",
               "unready-provider-is-an-error-not-a-fallback",
-              "executing-engine-refuses-divergent-plan"
+              "executing-engine-refuses-divergent-plan",
+              "a-workload-or-rewriting-command-is-refused-before-submission"
             ]
           }
         },
@@ -50,7 +51,8 @@
             "kind": "acceptance",
             "checks": [
               "commit-request-plans-and-runs-the-checkout",
-              "commit-request-refuses-another-checkout"
+              "commit-request-refuses-another-checkout",
+              "the-executing-engine-refuses-a-workload-or-rewriting-command"
             ]
           }
         },
@@ -1283,6 +1285,23 @@
               "the-dev-vocabulary-declares-every-first-party-kind",
               "the-go-packager-stamps-command-kinds",
               "the-npm-packager-stamps-command-kinds"
+            ]
+          }
+        },
+        {
+          "id": "workload-lifecycle",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-serve-workload-command-of-any-name-streams-until-interrupted",
+              "a-once-workload-command-forwards-its-exit-code",
+              "a-hosted-run-refuses-a-serve-workload-command",
+              "a-serve-workload-command-owns-no-watch",
+              "a-composition-member-is-a-serve-workload-step"
             ]
           }
         }

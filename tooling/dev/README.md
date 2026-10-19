@@ -33,7 +33,8 @@ verb's description, aliases and related commands from this vocabulary, and the
 CLI runs a verb where a loaded extension declares its command. The kind, workload and
 effects need CLI contract 11, and the manifest claims it. A job takes them from
 its verb unless its command declares its own `traits`, which replace the
-verb's wholesale. The CLI reads none of them yet; the [verbs
+verb's wholesale. The CLI reads a command's workload, source rewriting and
+side effects from these traits, not from its name; the [verbs
 reference](../../protocols/extension/doc/06-verbs.md) defines each value.
 
 ## Use it

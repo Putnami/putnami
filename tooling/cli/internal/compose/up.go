@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/sdk/extension/dbtestenv"
 	"go.putnami.dev/tooling/cli/internal/commands/doctor"
 	"go.putnami.dev/tooling/cli/internal/engine"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -77,17 +78,23 @@ type preparation struct {
 // upDeps are the effects Up acts through, replaceable in tests.
 type upDeps struct {
 	loadWorkspace func(root string) (*workspace.Workspace, error)
-	prepare       func(ctx context.Context, opts Options, projectIDs []string) (*preparation, error)
-	provider      func() databaseProvider
-	reap          func(workspaceRoot string) []ReapedLease
+	// discover loads the workspace's extensions, whose resolved traits name the
+	// serve-workload commands every member runs.
+	discover func(ws *workspace.Workspace, cfg *wsproto.Config) ([]*extension.ExtensionDescription, error)
+	prepare  func(ctx context.Context, opts Options, projectIDs, serveCommands []string) (*preparation, error)
+	provider func() databaseProvider
+	reap     func(workspaceRoot string) []ReapedLease
 }
 
 func defaultUpDeps() upDeps {
 	return upDeps{
 		loadWorkspace: workspace.Load,
-		prepare:       enginePrepare,
-		provider:      func() databaseProvider { return dbtestenv.SelectProvider() },
-		reap:          ReapOrphans,
+		discover: func(ws *workspace.Workspace, cfg *wsproto.Config) ([]*extension.ExtensionDescription, error) {
+			return extension.DiscoverExtensions(ws.Root, cfg, ws.ProjectPaths())
+		},
+		prepare:  enginePrepare,
+		provider: func() databaseProvider { return dbtestenv.SelectProvider() },
+		reap:     ReapOrphans,
 	}
 }
 
@@ -156,11 +163,11 @@ func up(ctx context.Context, opts Options, deps upDeps) (composition *Compositio
 	if target == nil {
 		return nil, newError(CodeUnknownMember, opts.Target.ID, PhasePlan, "the target is not a project of this workspace")
 	}
-	draft, err := PlanFor(loaded, target)
+	draft, serveCommands, err := planDraft(opts, deps, loaded, target)
 	if err != nil {
 		return nil, err
 	}
-	prepared, err := deps.prepare(ctx, opts, draft.ProjectIDs())
+	prepared, err := deps.prepare(ctx, opts, draft.ProjectIDs(), serveCommands)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +178,7 @@ func up(ctx context.Context, opts Options, deps upDeps) (composition *Compositio
 	if target == nil {
 		return nil, newError(CodePrepareFailed, opts.Target.ID, PhasePrepare, "the prepared workspace no longer contains the target")
 	}
-	plan, err := PlanFor(prepared.ws, target)
+	plan, err := PlanFor(prepared.ws, target, serveCommands)
 	if err != nil {
 		return nil, err
 	}
@@ -499,10 +506,35 @@ func (c *Composition) close(ctx context.Context) CleanupReport {
 	return CleanupReport{State: CleanupPartial, Leftovers: leftovers}
 }
 
-// enginePrepare runs the members' serve pipelines through the engine without
-// their serve steps, and returns the steps it withheld (engine.Request
-// WithholdServeSteps).
-func enginePrepare(ctx context.Context, opts Options, projectIDs []string) (*preparation, error) {
+// planDraft plans target against the loaded workspace ws, and returns the plan
+// with the loaded commands whose resolved traits declare the serve workload.
+// A member that cannot serve is refused first, then a workspace whose loaded
+// extensions declare no serve-workload command (compose.no_serve_command).
+func planDraft(opts Options, deps upDeps, ws *workspace.Workspace, target *workspace.Project) (*Plan, []string, error) {
+	cfg := opts.Config
+	if cfg == nil {
+		cfg = wsproto.Load(opts.WorkspaceRoot)
+	}
+	extensions, err := deps.discover(ws, cfg)
+	if err != nil {
+		return nil, nil, newError(CodePrepareFailed, opts.Target.ID, PhasePlan, "discover the workspace's extensions: "+err.Error())
+	}
+	serveCommands := jobs.CommandsOfWorkload(extensions, extension.WorkloadServe)
+	draft, err := PlanFor(ws, target, serveCommands)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(serveCommands) == 0 {
+		return nil, nil, newError(CodeNoServeCommand, opts.Target.ID, PhasePlan,
+			"no loaded extension declares a command whose traits declare the serve workload")
+	}
+	return draft, serveCommands, nil
+}
+
+// enginePrepare runs the members' serve pipelines, those of serveCommands,
+// through the engine without their serve steps, and returns the steps it
+// withheld (engine.Request WithholdServeSteps).
+func enginePrepare(ctx context.Context, opts Options, projectIDs, serveCommands []string) (*preparation, error) {
 	cfg := opts.Config
 	if cfg == nil {
 		cfg = wsproto.Load(opts.WorkspaceRoot)
@@ -514,7 +546,7 @@ func enginePrepare(ctx context.Context, opts Options, projectIDs []string) (*pre
 	result, err := engine.New().Run(ctx, engine.Request{
 		WorkspaceRoot:      opts.WorkspaceRoot,
 		Config:             cfg,
-		Commands:           []string{serveCommand},
+		Commands:           serveCommands,
 		Global:             engine.GlobalFlags{Projects: strings.Join(projectIDs, ",")},
 		WithholdServeSteps: true,
 		Preflight:          doctor.DoctorPreflight,

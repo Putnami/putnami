@@ -61,6 +61,10 @@ func ParseArgs(args []string, userAliases map[string]string, extensionGroups map
 type commandAliases struct {
 	vocabulary map[string]string
 	user       map[string]string
+	// serveWorkloads are the loaded commands whose resolved traits declare the
+	// serve workload: each watches by default and owns --no-watch
+	// (ownsWatchFlag).
+	serveWorkloads []string
 }
 
 // lookup returns the command alias name stands for.
@@ -146,9 +150,9 @@ func parseArgs(args []string, aliases commandAliases, extensionGroups map[string
 	var globals GlobalFlags
 	var remaining []string
 	if structured {
-		globals, remaining, err = parseCommandFlags(rest, commands)
+		globals, remaining, err = parseCommandFlags(rest, commands, aliases.serveWorkloads)
 	} else {
-		globals, remaining, err = parseJobFlags(rest, commands)
+		globals, remaining, err = parseJobFlags(rest, commands, aliases.serveWorkloads)
 	}
 	result.Global, result.RawJobArgs = globals, remaining
 	result.Global.Help = result.Global.Help || helpRequested

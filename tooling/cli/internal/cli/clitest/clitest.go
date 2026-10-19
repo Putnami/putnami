@@ -219,12 +219,16 @@ fi
 	for _, command := range []string{"lint", "test", "build", "validate", "validate-workspace", "format"} {
 		commands[command] = extensionproto.CommandDefinition{ActivationFiles: []string{"gate.project"}, Run: []extensionproto.PipelineStep{{ID: "check", Task: "check"}}}
 	}
+	// format rewrites sources, so a remote run refuses it before submission.
+	format := commands["format"]
+	format.Traits = &extensionproto.CommandTraits{RewritesSources: true}
+	commands["format"] = format
 	if provider {
 		commands["runner-provider"] = extensionproto.CommandDefinition{Description: "Unimplemented execution capability", Run: []extensionproto.PipelineStep{{ID: "provider", Task: "check"}}}
 	}
 	disabled := false
 	manifest := extensionproto.Manifest{
-		Name: "@fixture/gate", Version: "1.0.0", CLIContract: protocolcli.CurrentContract, Commands: commands,
+		Name: "@fixture/gate", Version: "1.0.0", CLIContract: protocolcli.CommandKindContract, Commands: commands,
 		// The task declares resources so a portable request carries reads and
 		// writes and a submit envelope reaches its deepest admitted level.
 		Tasks: map[string]extensionproto.TaskDefinition{"check": {

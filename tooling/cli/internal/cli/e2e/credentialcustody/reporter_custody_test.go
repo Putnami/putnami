@@ -17,8 +17,8 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/artifactstore"
-	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
+	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
@@ -107,9 +107,9 @@ func runReporterRole(v1 bool) int {
 // writeReporterFixture writes a workspace whose one extension, admitted into
 // the artifact store under home and pinned by the lock, serves its session
 // reporter as its native runtime, a copy of this binary in role. The
-// extension also declares an onInstall hook, a workspace-install and the
-// build, and the workspace a before-hook of the build. Every step appends what
-// it did to the returned log.
+// extension also declares an onInstall hook, a workspace-install, the build
+// and a serve whose traits declare the serve workload, and the workspace a
+// before-hook of the build. Every step appends what it did to the returned log.
 func writeReporterFixture(t *testing.T, home, role string) (wsRoot, log string) {
 	t.Helper()
 	wsRoot, log = t.TempDir(), filepath.Join(t.TempDir(), "order.log")
@@ -138,6 +138,12 @@ func writeReporterFixture(t *testing.T, home, role string) (wsRoot, log string) 
       "description": "Build.",
       "activationFiles": ["app.project"],
       "run": [{ "id": "build", "task": "build-task" }]
+    },
+    "serve": {
+      "description": "Serve.",
+      "activationFiles": ["app.project"],
+      "traits": { "workload": "serve" },
+      "run": [{ "id": "serve", "task": "build-task" }]
     }
   },
   "tasks": {
@@ -151,7 +157,7 @@ func writeReporterFixture(t *testing.T, home, role string) (wsRoot, log string) 
     "build-task": { "kind": "command", "command": "/bin/sh", "args": ["-c", %s], "cache": false, "timeoutMs": -1 }
   }
 }`,
-		protocolcli.CurrentContract, logStep(installHookRan), jsonString(protocolcli.SessionReporterCommand),
+		protocolcli.CommandKindContract, logStep(installHookRan), jsonString(protocolcli.SessionReporterCommand),
 		jsonString(custodyRoleEnv), jsonString(role), jsonString(custodyReportEnv), jsonString(log),
 		logStep(installerRan), logStep(taskRan))
 
@@ -307,9 +313,9 @@ func withTaskRan(log, want []string) bool {
 // A hosted run that watches is refused before anything starts: each watch
 // iteration starts after repository code ran, when its reporters could no
 // longer receive the run credential, and a hosted runner runs one finite
-// invocation per fresh sandbox. `build --watch` and `serve`, which watches
-// by default, exit 2 with the named usage error, and no reporter, install, hook
-// or task starts.
+// invocation per fresh sandbox. `build --watch` and `serve`, whose traits
+// declare the serve workload, which watches by default, exit 2 with the named
+// usage error, and no reporter, install, hook or task starts.
 func TestAHostedRunThatWatchesIsRefusedBeforeAnythingStarts(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/credential-custody", "hostile-process-finds-nothing", "no-credential-after-repository-code")
@@ -331,7 +337,7 @@ func TestAHostedRunThatWatchesIsRefusedBeforeAnythingStarts(t *testing.T) {
 			if code != 2 {
 				t.Errorf("hosted %s exit=%d, want 2\n%s", name, code, output)
 			}
-			if want := "putnami: " + cli.ErrHostedWatch.Error(); !strings.Contains(output, want) {
+			if want := "putnami: " + engine.ErrHostedWatch.Error(); !strings.Contains(output, want) {
 				t.Errorf("hosted %s output lacks %q:\n%s", name, want, output)
 			}
 			if _, err := os.Stat(log); !errors.Is(err, fs.ErrNotExist) {

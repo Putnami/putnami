@@ -25,18 +25,19 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
 
-// detectServeRunModes reports whether the command set includes serve and/or
-// run, which both stream the child workload's output live.
-func detectServeRunModes(commands []string) (serve, run bool) {
-	for _, cmd := range commands {
-		switch cmd {
-		case "serve":
+// workloadModes reports whether the command set includes a command whose
+// resolved traits in extensions declare the serve workload and one that
+// declares the once workload. Both stream the child workload's output live.
+func workloadModes(extensions []*extension.ExtensionDescription, commands []string) (serve, once bool) {
+	for _, command := range commands {
+		switch scheduler.CommandWorkload(extensions, command) {
+		case extension.WorkloadServe:
 			serve = true
-		case "run":
-			run = true
+		case extension.WorkloadOnce:
+			once = true
 		}
 	}
-	return serve, run
+	return serve, once
 }
 
 func executionRenderer(
@@ -63,8 +64,9 @@ func executionRenderer(
 		Debug:   req.Global.Debug,
 		Quiet:   req.Global.Quiet,
 		NoColor: noColor,
-		// serve and run both stream the child workload's output live; run differs
-		// only in that it is one-shot (no forced watch — see below).
+		// A serve and a once workload both stream the child workload's output
+		// live; once differs only in that it is one-shot (no forced watch — see
+		// below).
 		ServeMode:      isServeMode || isRunMode,
 		CoverageReplay: sessStore.LatestValidationCoverage(replayed, nil),
 		// The live view orders its command columns by the merged vocabulary.
@@ -202,7 +204,7 @@ func (e *Engine) executeSession(
 	// first plan used — otherwise an extension alias would widen to every
 	// extension the moment it entered the watch loop.
 	planExtensions := req.planExtensions(discovered)
-	isServeMode, isRunMode := detectServeRunModes(req.Commands)
+	isServeMode, isRunMode := workloadModes(extensions, req.Commands)
 	// Retention comes from the merged workspace config (`sessions.keep`), the
 	// same document store.ConfigFromWorkspace reads below. Only Prune consults
 	// it; every read-only caller keeps the default constructor.
@@ -213,8 +215,8 @@ func (e *Engine) executeSession(
 		return SessionResult{ExitCode: renderPlan(req, planned, selectedProjects)}
 	}
 
-	// Serve commands run in watch mode (auto-restart on file changes) unless
-	// --no-watch turned serve's own watch flag off.
+	// Serve-workload commands run in watch mode (auto-restart on file changes)
+	// unless --no-watch turned the command's own watch flag off.
 	if forcesServeWatch(req, isServeMode) {
 		req.Global.Watch = true
 	}
@@ -502,10 +504,10 @@ func (e *Engine) executeSession(
 
 	return SessionResult{
 		ExitCode: sessionExitCode(result.Session, func() (int, bool) {
-			// `putnami run` forwards the workload's exact exit code so callers can
-			// assert specific gate codes (e.g. a migration returning 3). The run job
-			// reports it in its result data; the generic failure code stands when a
-			// build step failed before the workload ran.
+			// A once-workload command forwards the workload's exact exit code so
+			// callers can assert specific gate codes (e.g. a migration returning 3).
+			// Its job reports it in its result data; the generic failure code stands
+			// when a build step failed before the workload ran.
 			if !isRunMode {
 				return 0, false
 			}
@@ -604,14 +606,14 @@ func attachResultFinalizers(schedCfg *scheduler.SchedulerConfig, resultFinalizer
 	}
 }
 
-// runForwardedExitCode returns the first non-zero exit code reported by a `run`
-// command's workload, so the CLI process can exit with it. It returns
-// (0, false) when no run workload reported a non-zero code (e.g. an upstream
-// build step failed before the workload ran), leaving the caller to use the
-// generic failure code.
+// runForwardedExitCode returns the first non-zero exit code reported by the
+// workload of a job whose resolved traits declare the once workload, so the
+// CLI process can exit with it. It returns (0, false) when no such workload
+// reported a non-zero code (e.g. an upstream build step failed before the
+// workload ran), leaving the caller to use the generic failure code.
 func runForwardedExitCode(planned []*scheduler.ScheduledJob, results map[string]*scheduler.JobResult) (int, bool) {
 	for _, job := range planned {
-		if job.CommandName() != "run" {
+		if job == nil || job.JobDef == nil || job.JobDef.Traits.Workload != extension.WorkloadOnce {
 			continue
 		}
 		res, ok := results[job.Key()]

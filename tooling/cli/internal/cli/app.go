@@ -391,23 +391,18 @@ var ErrHostedExtensionCommand = fmt.Errorf("an extension command group does not 
 	"it resolves its remote cache after the workspace install ran repository code, and a hosted run starts its cache provider before that; "+
 	"run a job command, such as build, or a built-in command, such as install", runcredential.Flag)
 
-// ErrHostedWatch refuses a hosted run (runcredential.Flag) that watches:
-// --watch, or serve, which watches by default. Every watch iteration starts after
-// repository code ran, when custody hands the run credential to no new
-// process, so its reporters could never hold it; and a hosted runner runs one
-// finite invocation per fresh sandbox.
-var ErrHostedWatch = fmt.Errorf("--watch and serve do not accept %s: "+
-	"a hosted run is one finite invocation per fresh sandbox, and each watch iteration starts after repository code ran, "+
-	"when no process may receive the run credential; run a finite command, such as build, without --watch", runcredential.Flag)
-
 // refuseHostedWatch refuses, as a usage error, a hosted run whose commands
-// watch: global.Watch, or serve, which the engine runs in watch mode by default
-// (ErrHostedWatch).
-func refuseHostedWatch(hosted bool, global *GlobalFlags, commands []string) error {
-	if !hosted || !global.Watch && !slices.Contains(commands, "serve") {
+// watch: global.Watch, or a command whose resolved traits in extensions declare
+// the serve workload, which the engine runs in watch mode by default
+// (engine.ErrHostedWatch).
+func refuseHostedWatch(hosted bool, global *GlobalFlags, extensions []*extension.ExtensionDescription, commands []string) error {
+	serves := slices.ContainsFunc(commands, func(command string) bool {
+		return scheduler.CommandWorkload(extensions, command) == extension.WorkloadServe
+	})
+	if !hosted || !global.Watch && !serves {
 		return nil
 	}
-	return cmderr.Classify(ErrHostedWatch, cmderr.ErrUsage)
+	return cmderr.Classify(engine.ErrHostedWatch, cmderr.ErrUsage)
 }
 
 // closeHostedHolders closes the reporters, then the remote cache provider,
@@ -520,7 +515,7 @@ func withAutomaticReadPreparation(ctx context.Context, wsRoot string, cfg *wspro
 // extensions are the dispatch extensions, whose declared traits decide which
 // command is a release.
 func resolveCommandCacheTrust(global *GlobalFlags, cfg *wsproto.Config, extensions []*extension.ExtensionDescription, commands []string, subcommand string, extensionGroups map[string]bool) error {
-	if err := refuseHostedWatch(runcredential.Hosted(), global, commands); err != nil {
+	if err := refuseHostedWatch(runcredential.Hosted(), global, extensions, commands); err != nil {
 		return err
 	}
 	if extensionGroups[commands[0]] && runcredential.Hosted() {
@@ -604,7 +599,8 @@ func ensureArtifactsForProcessMode(
 }
 
 // processAliases returns the alias tables this process resolves a command name
-// through, and a warning for each vocabulary alias a workspace alias hides.
+// through, with the serve-workload commands of extensions, and a warning for
+// each vocabulary alias a workspace alias hides.
 func processAliases(
 	cfg *wsproto.Config,
 	providerMode bool,
@@ -618,7 +614,8 @@ func processAliases(
 	}
 	user := workspaceAliases(cfg)
 	vocabulary := commandVocabulary(extensions, user).AliasMap()
-	return commandAliases{vocabulary: vocabulary, user: user}, hiddenAliasWarnings(extensions, user)
+	serveWorkloads := scheduler.CommandsOfWorkload(extensions, extension.WorkloadServe)
+	return commandAliases{vocabulary: vocabulary, user: user, serveWorkloads: serveWorkloads}, hiddenAliasWarnings(extensions, user)
 }
 
 // shouldDiscoverExtensions reports whether App.Run should pre-load extensions

@@ -45,8 +45,8 @@ func (c extensionToolCandidate) extensionRoot() string {
 // discoverExtensions loads the workspace's extension descriptions, with their
 // commands' traits already resolved by extension.Resolve. Every reader of
 // manifest metadata on this surface goes through it — tool registration and
-// run_jobs' side-effect gate — so the two can never disagree about what an
-// extension declares.
+// run_jobs' long-lived and side-effect gates — so they can never disagree
+// about what an extension declares.
 func (s *Server) discoverExtensions() (*extension.DiscoveryResult, error) {
 	if s.opts.WorkspaceRoot == "" {
 		return nil, errors.New("no workspace root")

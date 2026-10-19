@@ -88,6 +88,9 @@ func TestUp_StartsMembersInOrderAndWaitsForTypedReady(t *testing.T) {
 	if !slices.Equal(fixture.prepared, []string{"/provider", "/consumer"}) {
 		t.Errorf("prepared %v, want the closure in start order", fixture.prepared)
 	}
+	if !slices.Equal(fixture.serveCommands, []string{"serve"}) {
+		t.Errorf("prepared the commands %v, want the serve workload's [serve]", fixture.serveCommands)
+	}
 	status := comp.Status()
 	if len(status.Members) != 2 || status.Isolation != IsolationDatabase || status.Target != "/consumer" {
 		t.Fatalf("status = %+v", status)

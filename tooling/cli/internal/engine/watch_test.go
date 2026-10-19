@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"io"
 	"reflect"
 	"testing"
@@ -8,9 +9,11 @@ import (
 	"go.putnami.dev/cli/model/jobs"
 	protocolcli "go.putnami.dev/protocol/cli"
 	extproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/git"
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/watch"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -43,6 +46,19 @@ func outerWatchRequest() *Request {
 			ExcludeTag: "slow",
 			Exclude:    "docs",
 		},
+	}
+}
+
+// A hosted run never enters the watch loop, even when the CLI's own discovery
+// found no serve-workload command and let the run start: the engine refuses it
+// as a usage error from the extensions it planned with. It sets the process's
+// run credential (runcredential.SetForTest), so it does not run in parallel.
+func TestAHostedRunNeverEntersTheWatchLoop(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "workload-lifecycle", "a-hosted-run-refuses-a-serve-workload-command")
+	defer runcredential.SetForTest("prc_engine_watch")()
+	result := New().runWatch(context.Background(), outerWatchRequest(), nil, watchTestProjects(), nil, nil, true)
+	if result.ExitCode != ExitUsage {
+		t.Fatalf("a hosted watch exited %d, want %d", result.ExitCode, ExitUsage)
 	}
 }
 

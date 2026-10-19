@@ -31,17 +31,19 @@ Planning refuses, before anything starts:
 | Code | Meaning |
 | --- | --- |
 | `compose.not_serveable` | A member is a `library` or `image` project |
-| `compose.serve_disabled` | A member's `putnami.json`, or the workspace, disables `serve` |
+| `compose.serve_disabled` | A member's `putnami.json`, or the workspace, disables a command whose traits declare the `serve` workload |
 | `compose.unknown_member` | A `runsWith` entry names no project |
 | `compose.cycle` | `runsWith` forms a cycle |
-| `compose.no_serve_command` | No extension provides a serve step for a member |
+| `compose.no_serve_command` | No loaded extension declares a command with the `serve` workload, or none provides a serve step for a member |
+| `compose.ambiguous_serve` | Two commands with the `serve` workload each provide a serve step for one member |
 | `compose.invalid_requirements` | A member's `infra/requirements.json` or client contract is invalid |
 
 ### Start order and readiness
 
 1. Orphaned compositions are reaped (see [Recovery](#recovery)).
-2. The members' `serve` pipelines are prepared through the engine: every finite
-   step (config merge, generate, describe, and the steps of their dependencies)
+2. The members' pipelines of every command whose traits declare the `serve`
+   workload (the first-party `serve`) are prepared through the engine: every
+   finite step (config merge, generate, describe, and the steps of their dependencies)
    runs as an ordinary cached session. The long-running serve steps are withheld.
 3. Databases are provisioned.
 4. One reverse proxy starts per member, so every URL is known.

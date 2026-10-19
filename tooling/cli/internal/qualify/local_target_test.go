@@ -316,10 +316,11 @@ func newLocalFixture(t *testing.T, members ...localMember) *localFixture {
 	write("fixture-extension/putnami.extension.json", []byte(fmt.Sprintf(`{
   "name": "@putnami/qualify-fixture",
   "version": "0.1.0",
-  "cliContract": 4,
+  "cliContract": 11,
   "commands": {
     "serve": {
       "description": "Serve the qualify fixture workload.",
+      "traits": {"workload": "serve"},
       "run": [{"id": "serve", "task": "serve-run"}]
     }
   },

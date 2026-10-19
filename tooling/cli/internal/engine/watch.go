@@ -2,7 +2,9 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -10,9 +12,24 @@ import (
 	"go.putnami.dev/cli/model/extension"
 	"go.putnami.dev/cli/model/workspace"
 	"go.putnami.dev/tooling/cli/internal/abort"
+	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/watch"
 )
+
+// ErrHostedWatch refuses a hosted run (runcredential.Flag) that watches:
+// --watch, or a command whose resolved traits declare the serve workload,
+// which watches by default. Every watch iteration starts after repository code
+// ran, when custody hands the run credential to no new process, so its
+// reporters could never hold it; and a hosted runner runs one finite
+// invocation per fresh sandbox. The CLI refuses such a run before anything
+// starts, from the extensions it dispatches with, and runWatch refuses it
+// again from the extensions the engine planned with.
+var ErrHostedWatch = fmt.Errorf("a run that watches does not accept %s: "+
+	"--watch and a command whose traits declare the serve workload, such as serve, watch; "+
+	"a hosted run is one finite invocation per fresh sandbox, and each watch iteration starts after repository code ran, "+
+	"when no process may receive the run credential; run a finite command, such as build, without --watch", runcredential.Flag)
 
 // This file is the WATCH ADAPTER over Engine.Run.
 //
@@ -31,6 +48,7 @@ import (
 // commands.LifecycleEnv.RunJob.
 
 // runWatch enters the watch loop and maps its result onto the run's exit code.
+// A hosted run never enters it: it is a usage error (ErrHostedWatch).
 func (e *Engine) runWatch(
 	ctx context.Context,
 	req *Request,
@@ -40,6 +58,10 @@ func (e *Engine) runWatch(
 	sink EventSink,
 	serveMode bool,
 ) SessionResult {
+	if runcredential.Hosted() {
+		iox.Fprintf(os.Stderr, "putnami: %v\n", ErrHostedWatch)
+		return SessionResult{ExitCode: ExitUsage}
+	}
 	code := watch.RunWatch(ctx, watch.SessionConfig{
 		Workspace:        ws,
 		SelectedProjects: selectedProjects,

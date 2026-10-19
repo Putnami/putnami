@@ -1214,9 +1214,10 @@ manifest traits. Spending CPU on the workspace is reversible and local; pushing
 a release or converging a cloud environment is neither, and there is no
 confirmation step between an agent's tool call and the effect, so those stay a
 terminal decision. Planning is unaffected: `dryRun: true` still returns the DAG
-for them, exactly as it does for `serve` (which `run_jobs` also refuses to
-execute, because the engine promotes it to watch mode and one blocking tool call
-wedges the whole stdio session).
+for them, exactly as it does for a command whose traits declare the `serve`
+workload, such as `serve` (which `run_jobs` also refuses to execute, because
+the engine promotes it to watch mode and one blocking tool call wedges the
+whole stdio session).
 
 Claude Code discovers the server through a `.mcp.json` file at the workspace
 root:
@@ -1591,8 +1592,9 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
 - **`putnami upgrade` refuses the flag.** An upgrade rewrites the lock that a
   hosted run executes as committed. Upgrade without the flag and commit the
   lock.
-- **Watch refuses the flag.** `--watch`, and `serve`, which watches by default,
-  stop with exit 2 before anything starts. Each watch iteration starts after
+- **Watch refuses the flag.** `--watch`, and a command whose traits declare
+  the `serve` workload, such as `serve`, which watches by default, stop with
+  exit 2 before anything starts. Each watch iteration starts after
   repository code ran, when the CLI hands the credential to no new process,
   and a hosted runner runs one finite invocation per fresh sandbox. Run a
   finite command, such as `putnami build`, without `--watch`.
@@ -1697,8 +1699,9 @@ Use the `=` spelling too when the first word of the value holds `=`:
 A global switch such as `--verbose` or `--watch` takes no value, but accepts
 an inline boolean: `--verbose=true` is `--verbose`, and `--verbose=false`
 leaves it off. `--color=false` is `--no-color`, and `--no-color=false` is
-`--color`. On `serve` and `compose`, `--watch=false` is `--no-watch`, which
-turns off the command's own `watch` flag and its restarts on changes. Any other
+`--color`. On `compose`, and on a command whose traits declare the `serve`
+workload, such as `serve`, `--watch=false` is `--no-watch`, which turns off the
+command's own `watch` flag and its restarts on changes. Any other
 inline value on a switch is a usage error.
 
 Unknown flags are passed through to job processes. The CLI provides typo suggestions using Levenshtein distance when a flag doesn't match any known flag.

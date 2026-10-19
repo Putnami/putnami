@@ -85,8 +85,10 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  25,
-		funcs:  185,
-		why: "RAISED 183→185 (cli/job-planning-execution, no-core-development-verb): " +
+		funcs:  186,
+		why: "RAISED 185→186 (cli/portable-runner, commit-request): refuseUnportableCommands reads the " +
+			"workload and rewritesSources traits for both the submitter and the executing engine; files stay at 25. " +
+			"RAISED 183→185 (cli/job-planning-execution, no-core-development-verb): " +
 			"the core declares no development verb, so the engine refuses a command no loaded extension " +
 			"declares once, after the run's one discovery, for every entry point. refuseUndeclaredCommands " +
 			"replaces reportUnservedSDDCommands, and UndeclaredCommandsError is its message, which help " +

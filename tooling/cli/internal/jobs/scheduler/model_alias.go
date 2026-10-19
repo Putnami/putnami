@@ -38,6 +38,18 @@ var ProducesSpecCriteriaProjection = model.ProducesSpecCriteriaProjection
 // command kind.
 var CommandsOfKind = model.CommandsOfKind
 
+// CommandWorkload returns the workload lifecycle a loaded command's resolved
+// traits declare.
+var CommandWorkload = model.CommandWorkload
+
+// CommandRewritesSources reports whether a loaded command's resolved traits
+// declare rewritesSources.
+var CommandRewritesSources = model.CommandRewritesSources
+
+// CommandsOfWorkload returns the loaded commands whose resolved traits declare
+// a workload lifecycle.
+var CommandsOfWorkload = model.CommandsOfWorkload
+
 // SpecCriteriaProjectionCommands returns the criteria commands whose jobs
 // include a criteria-projection producer.
 var SpecCriteriaProjectionCommands = model.SpecCriteriaProjectionCommands

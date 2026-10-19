@@ -52,11 +52,12 @@ capability is a precise error; it is never a reason to run locally, and no
 task runs in the submitting worktree. Two providers are an ambiguous
 configuration. An edit made after submission never reaches execution.
 
-Refused before submission, with a diagnostic: `--watch`, `serve`, `run`,
-`compose`, `qualify`, `format`, an executing `--dry-run`, tasks with registry
-or cloud side effects, tasks whose declared cwd leaves the workspace, and
-cacheable tasks keyed on environment variables. Verification never publishes
-or deploys through this path.
+Refused before submission, with a diagnostic: `--watch`, `compose`, `qualify`,
+a command whose traits declare a `workload` or `rewritesSources` (the
+first-party `serve`, `run` and `format`), whatever its name, an executing
+`--dry-run`, tasks with registry or cloud side effects, tasks whose declared
+cwd leaves the workspace, and cacheable tasks keyed on environment variables.
+Verification never publishes or deploys through this path.
 
 ## Required inputs
 
@@ -109,9 +110,11 @@ variable before anything else runs and strips it from every task environment,
 so a task that calls the CLI again (a nested session, a hook, an extension
 callback through `PUTNAMI_CLI_EXECUTABLE`) runs as an ordinary invocation and
 is never hijacked into a second bound execution. That engine restores
-workspace state through the ordinary first-use bootstrap, plans exactly the
-frozen project ids while keeping the recorded selection mode, and compares
-its plan against the expected one before scheduling: any difference in
+workspace state through the ordinary first-use bootstrap, refuses with exit 2
+and no session a command whose traits, in the extensions the request pins,
+declare a `workload` or `rewritesSources`, plans exactly the frozen project
+ids while keeping the recorded selection mode, and compares its plan against
+the expected one before scheduling: any difference in
 identities, edges, contracts, deadlines, cacheability or declared resources
 refuses the run and records no session. The comparison leaves out the `open`
 and upload nodes a `publication-v1` provider adds, and reads an edge to an
@@ -131,11 +134,10 @@ A caller that holds a commit and no snapshot, such as a hosted CI service,
 sends a version 2 request on the same channel: the commit, the invocation, and
 a requested selection (`all`, `impacted` with `source.base`, or `projects`
 with selectors), with no plan and no environment (see the `protocols/runner`
-README). No submitting CLI checked it, so the protocol refuses the commands
-the submitting side refuses: a request that names `serve`, `run`, `compose`,
-`qualify` or `format` is malformed and exits 2. The provider checks the commit
-out and launches its pinned entrypoint as it does for a snapshot. The engine
-then:
+README). No submitting CLI checked it, so the protocol refuses commands by
+name: a request that names `serve`, `run`, `compose`, `qualify` or `format` is
+malformed and exits 2. The provider checks the commit out and launches its
+pinned entrypoint as it does for a snapshot. The engine then:
 
 1. Refuses the request unless the checkout's HEAD is `source.commit` and no
    tracked file differs from it, in the index or the working tree. The check
@@ -143,7 +145,9 @@ then:
    before the entrypoint: that comes from the checkout, and in a source
    workspace `./putnamiw` builds the CLI from it. Untracked files are not
    checked. A refused request exits 1 and records no session.
-2. Plans the checkout through the ordinary selection. `impacted` is
+2. Refuses, with exit 2 and no session, a command whose traits declare a
+   `workload` or `rewritesSources`, as the version 1 executing side does.
+   Then it plans the checkout through the ordinary selection. `impacted` is
    `--impacted --baseline <source.base>`: untracked files count as changes, a
    baseline the checkout cannot read falls back to every project unless
    `impactedStrict` is set, and an empty selection is the ordinary no-op.

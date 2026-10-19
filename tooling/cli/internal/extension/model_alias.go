@@ -104,6 +104,13 @@ const (
 	CommandKindCriteria     = model.CommandKindCriteria
 )
 
+// The workload lifecycles the watch promotion, the composition, the exit-code
+// forwarding and the portable refusals read from a job's resolved traits.
+const (
+	WorkloadServe = model.WorkloadServe
+	WorkloadOnce  = model.WorkloadOnce
+)
+
 // Declared-output drift policies and the diagnostic code the engine reports a
 // difference under (protocol ADR 0004).
 const (

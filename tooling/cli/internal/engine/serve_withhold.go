@@ -1,7 +1,7 @@
 package engine
 
 import (
-	modeljobs "go.putnami.dev/cli/model/jobs"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -34,12 +34,13 @@ func servePreparationWithoutFiniteSteps(req *Request, planned []*scheduler.Sched
 	return attachWithheldServeSteps(SessionResult{ExitCode: ExitSuccess, Projects: selected}, req, ws, withheld), true
 }
 
-// forcesServeWatch reports whether a run is promoted to watch mode. Serve
-// commands watch by default, except an iteration of an outer watch loop, which
-// already owns the replan policy, a serve preparation whose serve steps were
-// left to the supervisor that asked for it (Request.WithholdServeSteps): what
-// remains of that run is finite, and a run that turned serve's own `watch` flag
-// off with --no-watch: restarting it on changes would overrule that flag.
+// forcesServeWatch reports whether a run is promoted to watch mode.
+// Serve-workload commands watch by default, except an iteration of an outer
+// watch loop, which already owns the replan policy, a serve preparation whose
+// serve steps were left to the supervisor that asked for it
+// (Request.WithholdServeSteps): what remains of that run is finite, and a run
+// that turned the command's own `watch` flag off with --no-watch: restarting it
+// on changes would overrule that flag.
 func forcesServeWatch(req *Request, isServeMode bool) bool {
 	if watch, set := req.CommandParams["watch"].(bool); set && !watch {
 		return false
@@ -47,8 +48,8 @@ func forcesServeWatch(req *Request, isServeMode bool) bool {
 	return isServeMode && !req.Global.Watch && !req.watchIteration && !req.WithholdServeSteps
 }
 
-// withholdServeSteps splits a planned `serve` run into the jobs the scheduler
-// runs and the long-running serve steps a supervisor starts itself
+// withholdServeSteps splits a planned serve-workload run into the jobs the
+// scheduler runs and the long-running serve steps a supervisor starts itself
 // (Request.WithholdServeSteps).
 //
 // A job is withheld only when every one of these holds, so nothing finite can
@@ -56,7 +57,7 @@ func forcesServeWatch(req *Request, isServeMode bool) bool {
 //
 //   - it belongs to a SELECTED project: a dependency's `^generate` step, which
 //     the serve pipeline schedules on a project nobody asked to serve, still runs;
-//   - its command is `serve`;
+//   - its command's resolved traits declare the serve workload;
 //   - its task is uncacheable, which is what every serve step declares ("a
 //     cache hit cannot reproduce a live process or a bound port");
 //   - no other planned job depends on it or is serialized after it: it is the
@@ -96,7 +97,7 @@ func isWithheldServeStep(job *scheduler.ScheduledJob, selectedIDs, predecessors 
 		return false
 	}
 	return selectedIDs[job.Project.ID] &&
-		modeljobs.JobCommandName(job) == "serve" &&
+		job.JobDef.Traits.Workload == extension.WorkloadServe &&
 		!job.JobDef.Cache &&
 		!predecessors[job.Key()]
 }

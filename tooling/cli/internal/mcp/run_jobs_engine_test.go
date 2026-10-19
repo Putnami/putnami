@@ -18,6 +18,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/engine"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
@@ -125,6 +126,32 @@ func jobFixtureServer(t *testing.T) (*Server, string) {
 	t.Helper()
 	dir := jobFixture(t)
 	return NewServer(Options{WorkspaceRoot: dir, Config: wsproto.Load(dir), ServerVersion: "test"}), dir
+}
+
+// workloadFixtureServer serves jobFixture with an extension that declares, at
+// contract 11, serve and daemon with the serve workload and run with the once
+// workload.
+func workloadFixtureServer(t *testing.T) *Server {
+	t.Helper()
+	dir := jobFixture(t)
+	manifest := `{
+  "name": "@putnami/demo",
+  "version": "0.1.0",
+  "cliContract": 11,
+  "commands": {
+    "serve": {"traits": {"workload": "serve"}, "activationFiles": ["demo.activate"], "run": [{"id": "serve", "task": "workload"}]},
+    "daemon": {"traits": {"workload": "serve"}, "activationFiles": ["demo.activate"], "run": [{"id": "daemon", "task": "workload"}]},
+    "run": {"traits": {"workload": "once"}, "activationFiles": ["demo.activate"], "run": [{"id": "run", "task": "workload"}]}
+  },
+  "tasks": {
+    "workload": {"kind": "command", "command": "{extensionRoot}/ok.sh", "cache": false, "timeoutMs": -1}
+  }
+}`
+	if err := os.WriteFile(filepath.Join(dir, "tools", "demo", "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	workspace.InvalidateLoadCache(dir)
+	return NewServer(Options{WorkspaceRoot: dir, Config: wsproto.Load(dir), ServerVersion: "test"})
 }
 
 // captureStdout runs fn with os.Stdout redirected to a pipe and returns
@@ -517,22 +544,25 @@ func TestRunJobs_ImpactedFailsClosed(t *testing.T) {
 }
 
 // TestRunJobs_RejectsLongLivedCommands guards the one hazard routing through the
-// engine introduces: `serve` makes the engine enter WATCH mode, which never
-// returns even when its child exits. The MCP transport is a single synchronous
-// stdio loop, so such a call wedges the entire session rather than one tool.
-// Only `serve` is refused — it is the one command the engine promotes to watch
-// mode, so it never returns. `run` stays accepted; see
+// engine introduces: a command whose traits declare the serve workload makes
+// the engine enter WATCH mode, which never returns even when its child exits.
+// The MCP transport is a single synchronous stdio loop, so such a call wedges
+// the entire session rather than one tool. Only the serve workload is refused,
+// whatever the command's name: the engine promotes it to watch mode, so it
+// never returns. The once workload stays accepted; see
 // TestRejectLongLivedCommands_ScopedToTheWatchPromotion for that half.
 func TestRunJobs_RejectsLongLivedCommands(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-side-effect-boundary", "long-lived-and-externally-mutating-jobs-are-refused")
-	srv, _ := jobFixtureServer(t)
-	text := refuseRunJobs(t, srv, `{"commands":["serve"]}`)
-	if !strings.Contains(text, "blocks the whole session") {
-		t.Errorf("serve refusal = %q, want it to explain the transport constraint", text)
-	}
-	if !strings.Contains(text, "watch mode") {
-		t.Errorf("serve refusal = %q, want it to name the watch promotion that causes it", text)
+	srv := workloadFixtureServer(t)
+	for _, command := range []string{"serve", "daemon"} {
+		text := refuseRunJobs(t, srv, `{"commands":["`+command+`"]}`)
+		if !strings.Contains(text, "blocks the whole session") {
+			t.Errorf("%s refusal = %q, want it to explain the transport constraint", command, text)
+		}
+		if !strings.Contains(text, "watch mode") {
+			t.Errorf("%s refusal = %q, want it to name the watch promotion that causes it", command, text)
+		}
 	}
 }
 
@@ -620,30 +650,43 @@ func initFixtureGitRepo(t *testing.T, dir string) {
 
 // TestRejectLongLivedCommands_ScopedToTheWatchPromotion pins BOTH halves of the
 // refusal this adapter adds. The policy exists for one reason — the engine
-// promotes `serve` to watch mode (internal/engine/execute.go:110), so it never
-// returns even when its child exits, and the synchronous MCP stdio loop then
-// wedges for the whole session.
+// promotes a command whose traits declare the serve workload to watch mode
+// (engine.forcesServeWatch), so it never returns even when its child exits,
+// and the synchronous MCP stdio loop then wedges for the whole session.
 //
-// `run` must stay accepted: it is not promoted to watch, so it terminates
-// exactly as it did on MCP's earlier fork. Refusing it would narrow a
-// published tool's accepted input for a hazard this change does not create —
-// and forwarding a workload's exit code is a legitimate agent use.
+// The once workload must stay accepted: it is not promoted to watch, so it
+// terminates exactly as it did on MCP's earlier fork. Refusing it would narrow
+// a published tool's accepted input for a hazard this change does not create —
+// and forwarding a workload's exit code is a legitimate agent use. A serve
+// command that declares no workload is not promoted either, and is accepted.
 func TestRejectLongLivedCommands_ScopedToTheWatchPromotion(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/context-mcp-discovery", "mcp-side-effect-boundary", "long-lived-and-externally-mutating-jobs-are-refused")
+	command := func(name, workload string) *extension.JobDefinition {
+		return &extension.JobDefinition{Name: name, Kind: "command", Traits: extension.CommandTraits{Workload: workload}}
+	}
+	firstParty := []*extension.ExtensionDescription{{Name: "@acme/lang", Jobs: map[string]*extension.JobDefinition{
+		"serve": command("serve", extension.WorkloadServe), "run": command("run", extension.WorkloadOnce),
+	}}}
+	renamed := []*extension.ExtensionDescription{{Name: "@acme/lang", Jobs: map[string]*extension.JobDefinition{
+		"daemon": command("daemon", extension.WorkloadServe), "serve": command("serve", ""),
+	}}}
 	for _, tc := range []struct {
-		name     string
-		commands []string
-		refused  bool
+		name       string
+		extensions []*extension.ExtensionDescription
+		commands   []string
+		refused    bool
 	}{
-		{name: "serve is refused", commands: []string{"serve"}, refused: true},
-		{name: "serve refused among others", commands: []string{"build", "serve"}, refused: true},
+		{name: "serve is refused", extensions: firstParty, commands: []string{"serve"}, refused: true},
+		{name: "serve refused among others", extensions: firstParty, commands: []string{"build", "serve"}, refused: true},
+		{name: "a serve-workload daemon is refused", extensions: renamed, commands: []string{"daemon"}, refused: true},
+		{name: "a serve without the workload is accepted", extensions: renamed, commands: []string{"serve"}, refused: false},
 		{name: "qualify is refused", commands: []string{"build", "qualify"}, refused: true},
-		{name: "run is accepted", commands: []string{"run"}, refused: false},
-		{name: "ordinary commands accepted", commands: []string{"lint", "test", "build"}, refused: false},
+		{name: "run is accepted", extensions: firstParty, commands: []string{"run"}, refused: false},
+		{name: "ordinary commands accepted", extensions: firstParty, commands: []string{"lint", "test", "build"}, refused: false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := rejectLongLivedCommands(tc.commands)
+			err := rejectLongLivedCommands(tc.extensions, tc.commands)
 			if tc.refused && err == nil {
 				t.Fatalf("rejectLongLivedCommands(%v) = nil, want a refusal", tc.commands)
 			}

@@ -21,6 +21,7 @@ const (
 const (
 	CodeNotServeable       = "compose.not_serveable"
 	CodeNoServeCommand     = "compose.no_serve_command"
+	CodeAmbiguousServe     = "compose.ambiguous_serve"
 	CodeServeDisabled      = "compose.serve_disabled"
 	CodeUnknownMember      = "compose.unknown_member"
 	CodeCycle              = "compose.cycle"
