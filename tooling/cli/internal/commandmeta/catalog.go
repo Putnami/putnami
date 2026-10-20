@@ -124,6 +124,14 @@ type GlobalFlag struct {
 	// completion and the command surface keep it. Empty means the core gives
 	// the flag its meaning.
 	Providers []string
+	// JobOnly marks a flag that only extension commands read, the job commands
+	// and the subcommands of command groups: no core command gives it an
+	// effect. Help and shell completion list it only where a loaded extension
+	// declares a job command or a command group, so a workspace with none, and
+	// the space outside a workspace, show no such flag. The parser still
+	// accepts it everywhere, and the full Markdown reference lists it always.
+	// False means a core command reads the flag, or help must always list it.
+	JobOnly bool
 }
 
 // GlobalFlagCategory is one group of help's categorized global-flag listing.

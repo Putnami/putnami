@@ -13,9 +13,10 @@ import (
 
 // helpScope is the set of commands a workspace's loaded extensions declare.
 // The core declares no job command and no alias, so help lists a job command,
-// an alias or a provider-bound global flag only when a loaded extension gives
-// it meaning: a workspace with no deploying extension shows no deploy, and one
-// with no cache provider no --cache-trust.
+// an alias, a provider-bound global flag or a flag only extension commands read
+// only when a loaded extension gives it meaning: a workspace with no deploying
+// extension shows no deploy, one with no cache provider no --cache-trust, and
+// one with no job command and no command group no --retry.
 //
 // A nil scope is the help outside a workspace, or where the extensions cannot
 // be read: no extension is loaded, so it lists none of them. A scope without
@@ -220,8 +221,13 @@ func (s *helpScope) related(command string) []string {
 }
 
 // listsFlag reports whether help lists a global flag: one the core gives its
-// meaning, or one whose provider a loaded extension declares.
+// meaning, or one whose provider a loaded extension declares. A flag only
+// extension commands read is listed only where help lists a job command or a
+// command group.
 func (s *helpScope) listsFlag(flag FlagInfo) bool {
+	if flag.JobOnly && len(s.jobCommands()) == 0 && len(s.commandGroups()) == 0 {
+		return false
+	}
 	return len(flag.Providers) == 0 || slices.ContainsFunc(flag.Providers, s.declares)
 }
 

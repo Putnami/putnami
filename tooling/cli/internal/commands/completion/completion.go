@@ -75,6 +75,7 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config, warnings io.Wri
 	// declare: the core declares none.
 	var vocabulary extension.Vocabulary
 	var workspaceAliases map[string]string
+	declaresCommands := false
 	if cfg != nil {
 		workspaceAliases = cfg.Aliases
 	}
@@ -135,6 +136,7 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config, warnings io.Wri
 			return commandmeta.ReservesVocabularyAlias(name, workspaceAliases)
 		})
 		for _, verb := range vocabulary.Verbs {
+			declaresCommands = true
 			addCompletionCommand(&ctx, verb.Name, "")
 			if verb.Description != "" {
 				ctx.commandDesc[verb.Name] = verb.Description
@@ -145,9 +147,13 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config, warnings io.Wri
 			maps.Copy(carried, extension.GroupCarriedCommands(ext.CommandGroups))
 		}
 		for _, ext := range extensions {
+			providers := extension.ProviderCommands(ext)
 			for name, description := range ext.Commands {
 				if ext.CommandVisibility[name] == "internal" || carried[name] {
 					continue
+				}
+				if _, core := commandmeta.Lookup(name); !core && !slices.Contains(providers, name) {
+					declaresCommands = true
 				}
 				addCompletionCommand(&ctx, name, description)
 			}
@@ -166,6 +172,7 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config, warnings io.Wri
 			}
 		}
 		addExtensionCommandGroupCompletions(&ctx, extensions)
+		declaresCommands = declaresCommands || declaresReachableGroup(extensions)
 		templates, _ := template.DiscoverTemplates(wsRoot, projectPaths)
 		for _, tpl := range templates {
 			ctx.structuredFlagValues["projects create --template"] = appendUniqueCompletionValue(
@@ -173,6 +180,15 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config, warnings io.Wri
 				completionValue{Value: tpl.Name, Description: tpl.Description},
 			)
 		}
+	}
+
+	// The core declares no job command, so a flag only extension commands read
+	// is offered where a loaded extension declares one: a verb of the
+	// vocabulary, a command that is neither a core path nor a provider command,
+	// or a command group that no core root shadows. Help lists the same flags
+	// (helpScope.listsFlag).
+	if !declaresCommands {
+		ctx.globalFlags = slices.DeleteFunc(ctx.globalFlags, func(flag commandmeta.GlobalFlag) bool { return flag.JobOnly })
 	}
 
 	finalizeCompletionContext(&ctx)
@@ -272,6 +288,20 @@ func addCommandAliasCompletions(ctx *completionContext, vocabulary []extension.V
 			ctx.knownSubcommandPaths[alias.Name] = true
 		}
 	}
+}
+
+// declaresReachableGroup reports whether a loaded extension declares a command
+// group that dispatch reaches. A group named like a core structured root is
+// unreachable, because the core answers that name first.
+func declaresReachableGroup(extensions []*extension.ExtensionDescription) bool {
+	return slices.ContainsFunc(extensions, func(ext *extension.ExtensionDescription) bool {
+		for name := range ext.CommandGroups {
+			if !commandmeta.IsStructuredRoot(name) {
+				return true
+			}
+		}
+		return false
+	})
 }
 
 func addExtensionCommandGroupCompletions(ctx *completionContext, extensions []*extension.ExtensionDescription) {

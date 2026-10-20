@@ -1245,6 +1245,11 @@ func userScopeFlag(description string) Flag {
 //     --credential-fd declares none although only a hosted provider uses it:
 //     a hosted launcher reads it from the pinned CLI's --help wherever that
 //     runs (launch.credentialProbe), so help must always list it.
+//   - JobOnly marks a flag that only extension commands read (job commands and
+//     the subcommands of command groups). A flag is not JobOnly
+//     when a core command reads it, directly or through the lifecycle jobs it
+//     runs (install, upgrade, deps, projects). A command that declares the flag
+//     in its own catalog entry (doctor --profile) does not make it shared.
 //   - Values enumerate what completion offers for a FlagValue flag. Leave it nil
 //     when the value is unbounded (a path, a project selector, a count): an
 //     incomplete candidate list reads as "these are the only values".
@@ -1257,8 +1262,8 @@ func userScopeFlag(description string) Flag {
 var globalFlags = []GlobalFlag{
 	{Long: "--verbose", Short: "-v", Description: "Show job results and diagnostics", Category: "Common"},
 	{Long: "--debug", Short: "-d", Description: "Stream all events in real-time", Category: "Common"},
-	{Long: "--watch", Short: "-w", Description: "Re-run on file changes", Category: "Common"},
-	{Long: "--plan", Description: "Show execution plan without running", Category: "Common"},
+	{Long: "--watch", Short: "-w", Description: "Re-run on file changes", Category: "Common", JobOnly: true},
+	{Long: "--plan", Description: "Show execution plan without running", Category: "Common", JobOnly: true},
 	{Long: "--help", Short: "-h", Description: "Show help", Category: "Common"},
 
 	{Long: "--all", Description: "All projects", Category: "Project Selection"},
@@ -1266,23 +1271,23 @@ var globalFlags = []GlobalFlag{
 	{Long: "--projects", Type: FlagValue, ValueName: "<list>", Description: "Comma-separated project names", Category: "Project Selection"},
 	{Long: "--tag", Type: FlagValue, ValueName: "<tags>", Description: "Filter by tags", Category: "Project Selection"},
 	{Long: "--exclude-tag", Type: FlagValue, ValueName: "<tags>", Description: "Exclude by tags", Category: "Project Selection"},
-	{Long: "--exclude", Type: FlagValue, ValueName: "<names>", Description: "Exclude by name", Category: "Project Selection"},
+	{Long: "--exclude", Type: FlagValue, ValueName: "<names>", Description: "Exclude by name", Category: "Project Selection", JobOnly: true},
 	{Long: "--baseline", Type: FlagValue, ValueName: "<branch>", Description: "Custom git baseline for --impacted; a job command with no target or --all implies --impacted", Category: "Project Selection"},
-	{Long: "--impacted-strict", Description: "Fail when baseline can't be resolved", Category: "Project Selection"},
+	{Long: "--impacted-strict", Description: "Fail when baseline can't be resolved", Category: "Project Selection", JobOnly: true},
 
-	{Long: "--where", Type: FlagValue, ValueName: "<placement>", Description: "Execution placement: local | remote (local when no runner provider is installed)", Category: "Execution", Values: []string{"local", "remote"}, Providers: []string{runner.ProviderCommandName}},
+	{Long: "--where", Type: FlagValue, ValueName: "<placement>", Description: "Execution placement: local | remote (local when no runner provider is installed)", Category: "Execution", Values: []string{"local", "remote"}, Providers: []string{runner.ProviderCommandName}, JobOnly: true},
 	{Long: "--providers", Type: FlagValue, ValueName: "<list>", Description: "Credentials to ask the credential provider for: install, publish (comma list)", Category: "Execution", Values: []string{"install", "publish"}, Providers: []string{registry.CredentialProviderCommand}},
 	{Long: runcredential.Flag, Type: FlagValue, ValueName: "<n>", Description: runcredential.FlagDescription, Category: "Execution"},
 	{Long: "--no-cache", Description: "Force re-execution (skip cache)", Category: "Execution"},
-	{Long: "--no-cache-projects", Type: FlagValue, ValueName: "<list>", Description: "Force re-execution of these projects only", Category: "Execution"},
-	{Long: "--cache-trust", Type: FlagValue, ValueName: "<policy>", Description: "Remote cache trust: ci | any | none", Category: "Execution", Values: []string{"ci", "any", "none"}, Providers: []string{cache.ProviderCommandName}},
+	{Long: "--no-cache-projects", Type: FlagValue, ValueName: "<list>", Description: "Force re-execution of these projects only", Category: "Execution", JobOnly: true},
+	{Long: "--cache-trust", Type: FlagValue, ValueName: "<policy>", Description: "Remote cache trust: ci | any | none", Category: "Execution", Values: []string{"ci", "any", "none"}, Providers: []string{cache.ProviderCommandName}, JobOnly: true},
 	{Long: "--continue-on-error", Description: "Don't abort on first failure", Category: "Execution"},
-	{Long: "--max-parallel", Type: FlagValue, ValueName: "<mode|n>", Description: "Parallelism: auto | eco | max | number", Category: "Execution", Values: []string{"auto", "eco", "max"}},
-	{Long: "--resource", Type: FlagValue, ValueName: "<name=units>", Description: "Budget for a named shared resource (repeatable)", Category: "Execution"},
-	{Long: "--cpu-policy", Type: FlagValue, ValueName: "<policy>", Description: "CPU ceiling policy: critical-path | measured", Category: "Execution", Values: []string{"critical-path", "measured"}},
-	{Long: "--retry", Type: FlagValue, ValueName: "<n>", Description: "Retry transient failures", Category: "Execution"},
-	{Long: "--retry-failed", Description: "Re-run tasks whose identical failure is cached", Category: "Execution"},
-	{Long: "--profile", Type: FlagValue, ValueName: "<profile>", Description: "Deployment profile: dev | test | production", Category: "Execution", Values: []string{"dev", "test", "production"}},
+	{Long: "--max-parallel", Type: FlagValue, ValueName: "<mode|n>", Description: "Parallelism: auto | eco | max | number", Category: "Execution", Values: []string{"auto", "eco", "max"}, JobOnly: true},
+	{Long: "--resource", Type: FlagValue, ValueName: "<name=units>", Description: "Budget for a named shared resource (repeatable)", Category: "Execution", JobOnly: true},
+	{Long: "--cpu-policy", Type: FlagValue, ValueName: "<policy>", Description: "CPU ceiling policy: critical-path | measured", Category: "Execution", Values: []string{"critical-path", "measured"}, JobOnly: true},
+	{Long: "--retry", Type: FlagValue, ValueName: "<n>", Description: "Retry transient failures", Category: "Execution", JobOnly: true},
+	{Long: "--retry-failed", Description: "Re-run tasks whose identical failure is cached", Category: "Execution", JobOnly: true},
+	{Long: "--profile", Type: FlagValue, ValueName: "<profile>", Description: "Deployment profile: dev | test | production", Category: "Execution", Values: []string{"dev", "test", "production"}, JobOnly: true},
 	{Long: "--dry-run", Description: "Show changes without applying", Category: "Execution"},
 
 	{Long: "--output", Type: FlagValue, ValueName: "<format>", Description: "Output format: text | json | jsonl | cloud-logging", Category: "Output", Values: []string{"text", "json", "jsonl", "cloud-logging"}},
@@ -1291,7 +1296,7 @@ var globalFlags = []GlobalFlag{
 	{Long: "--color", Description: "Force color output", Category: "Output"},
 	{Long: "--no-color", Description: "Disable color output", Category: "Output"},
 
-	{Long: "--trace-profile", Type: FlagValue, ValueName: "<path>", Description: "Collect trace events (Chrome trace format)", Category: "Advanced"},
+	{Long: "--trace-profile", Type: FlagValue, ValueName: "<path>", Description: "Collect trace events (Chrome trace format)", Category: "Advanced", JobOnly: true},
 
 	// Unlisted: the version path prints the version, so the flag catalog does
 	// not carry a row for it (internal/cli's TestHelpCatalogCoversReservedGlobals

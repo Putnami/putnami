@@ -28,6 +28,9 @@ type FlagInfo struct {
 	// Providers are the reserved commands that give the flag meaning
 	// (commandmeta.GlobalFlag.Providers); helpScope.listsFlag reads them.
 	Providers []string
+	// JobOnly marks a flag that only extension commands read
+	// (commandmeta.GlobalFlag.JobOnly); helpScope.listsFlag reads it.
+	JobOnly bool
 }
 
 // allFlagCategories is the categorized global-flag listing the text, man, and
@@ -50,6 +53,7 @@ func flagCategoriesFromCatalog() []FlagCategory {
 				Description: flag.Description,
 				ValueName:   flag.ValueName,
 				Providers:   flag.Providers,
+				JobOnly:     flag.JobOnly,
 			})
 		}
 		out = append(out, FlagCategory{Name: category.Name, Flags: infos})

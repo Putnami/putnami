@@ -82,8 +82,6 @@ Other:
 Common:
   -v, --verbose                Show job results and diagnostics
   -d, --debug                  Stream all events in real-time
-  -w, --watch                  Re-run on file changes
-  --plan                       Show execution plan without running
   -h, --help                   Show help
 
 Project Selection:
@@ -92,21 +90,12 @@ Project Selection:
   --projects <list>            Comma-separated project names
   --tag <tags>                 Filter by tags
   --exclude-tag <tags>         Exclude by tags
-  --exclude <names>            Exclude by name
   --baseline <branch>          Custom git baseline for --impacted; a job command with no target or --all implies --impacted
-  --impacted-strict            Fail when baseline can't be resolved
 
 Execution:
   --credential-fd <n>          Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2
   --no-cache                   Force re-execution (skip cache)
-  --no-cache-projects <list>   Force re-execution of these projects only
   --continue-on-error          Don't abort on first failure
-  --max-parallel <mode|n>      Parallelism: auto | eco | max | number
-  --resource <name=units>      Budget for a named shared resource (repeatable)
-  --cpu-policy <policy>        CPU ceiling policy: critical-path | measured
-  --retry <n>                  Retry transient failures
-  --retry-failed               Re-run tasks whose identical failure is cached
-  --profile <profile>          Deployment profile: dev | test | production
   --dry-run                    Show changes without applying
 
 Output:
@@ -115,9 +104,6 @@ Output:
   --quiet                      Suppress non-error output
   --color                      Force color output
   --no-color                   Disable color output
-
-Advanced:
-  --trace-profile <path>       Collect trace events (Chrome trace format)
 
 Default Selection:
   no target            Feature branch: impacted vs trunk; main/master: local marker, then remote cache marker when active, otherwise all

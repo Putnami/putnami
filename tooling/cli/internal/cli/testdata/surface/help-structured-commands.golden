@@ -2,11 +2,10 @@
 putnami cache
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ cli ═══
 putnami cli
@@ -21,11 +20,10 @@ Examples:
   putnami cli use go-dev
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ completion ═══
 putnami completion
@@ -41,11 +39,10 @@ Examples:
   putnami completion fish
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ compose ═══
 putnami compose
@@ -65,11 +62,10 @@ Examples:
   putnami compose /typescript/samples/06-database --port 0 --output=json
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami qualify
@@ -78,31 +74,28 @@ Related Commands:
 putnami config
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ context ═══
 putnami context
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ deps ═══
 putnami deps
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ doctor ═══
 putnami doctor
@@ -125,11 +118,10 @@ Examples:
   putnami doctor --profile production --output=jsonl
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami config show
@@ -139,11 +131,10 @@ Related Commands:
 putnami extensions
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ help ═══
 putnami help
@@ -164,11 +155,10 @@ Examples:
   putnami help --markdown
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ impact-plan ═══
 putnami impact-plan
@@ -187,11 +177,10 @@ Examples:
   putnami impact-plan lint --base 0123456789abcdef0123456789abcdef01234567 --no-cache --output=jsonl
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami projects list
@@ -220,11 +209,10 @@ Examples:
   putnami init --project my-app --channel canary
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ install ═══
 putnami install
@@ -241,11 +229,10 @@ Examples:
   putnami install
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami extensions install
@@ -264,11 +251,10 @@ Examples:
   putnami mcp install
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami mcp install
@@ -278,11 +264,10 @@ Related Commands:
 putnami migrate
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ pin ═══
 putnami pin
@@ -301,11 +286,10 @@ Examples:
   putnami pin --remove
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami upgrade
@@ -314,11 +298,10 @@ Related Commands:
 putnami projects
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ qualify ═══
 putnami qualify
@@ -342,11 +325,10 @@ Examples:
   putnami qualify /go/samples/migrations-feature --print-contract --output=json
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami compose
@@ -369,11 +351,10 @@ Examples:
   putnami report --output=json
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami sessions list
@@ -392,11 +373,10 @@ Examples:
   putnami scopes list --output=jsonl
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami scopes list
@@ -407,41 +387,37 @@ Related Commands:
 putnami sessions
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ telemetry ═══
 putnami telemetry
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ templates ═══
 putnami templates
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ tree ═══
 putnami tree
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ upgrade ═══
 putnami upgrade
@@ -472,11 +448,10 @@ Examples:
   putnami upgrade --from-source --global
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami extensions update
@@ -486,41 +461,37 @@ Related Commands:
 putnami workspace
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ architecture inspect ═══
 putnami architecture inspect
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ architecture snapshot ═══
 putnami architecture snapshot
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ architecture validate ═══
 putnami architecture validate
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ cache clean ═══
 putnami cache clean
@@ -535,11 +506,10 @@ Examples:
   putnami cache clean --all
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ cache gc ═══
 putnami cache gc
@@ -553,11 +523,10 @@ Examples:
   putnami cache gc
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ cache verify ═══
 putnami cache verify
@@ -572,11 +541,10 @@ Examples:
   putnami cache verify --all --output=jsonl
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami cache clean
@@ -597,11 +565,10 @@ Examples:
   putnami cli list --global
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ cli use ═══
 putnami cli use
@@ -619,11 +586,10 @@ Examples:
   putnami cli use go-source-1a2b3c4 --global
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ config set ═══
 putnami config set
@@ -637,11 +603,10 @@ Examples:
   putnami config set maxParallel 4
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami config show
@@ -659,11 +624,10 @@ Examples:
   putnami config show --output=jsonl
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami config set
@@ -673,21 +637,19 @@ Related Commands:
 putnami contracts check
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ contracts generate ═══
 putnami contracts generate
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ context generate ═══
 putnami context generate
@@ -705,11 +667,10 @@ Examples:
   putnami context generate --force
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami extensions install
@@ -733,11 +694,10 @@ Examples:
   putnami context map --impacted
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami context generate
@@ -756,11 +716,10 @@ Examples:
   putnami deps install --tag go
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami extensions install
@@ -787,11 +746,10 @@ Examples:
   putnami extensions install --user @acme/audit
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami extensions list
@@ -815,11 +773,10 @@ Examples:
   putnami extensions list --user
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami extensions install
@@ -842,11 +799,10 @@ Examples:
   putnami extensions remove @acme/audit --user
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami extensions list
@@ -865,11 +821,10 @@ Examples:
   putnami extensions update --output=jsonl
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami extensions install
@@ -888,11 +843,10 @@ Examples:
   putnami extensions validate ./my-extension/
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami templates validate
@@ -902,41 +856,37 @@ Related Commands:
 putnami features diff
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ features inspect ═══
 putnami features inspect
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ features snapshot ═══
 putnami features snapshot
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ features validate ═══
 putnami features validate
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ mcp install ═══
 putnami mcp install
@@ -950,11 +900,10 @@ Examples:
   putnami mcp install
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami mcp
@@ -978,11 +927,10 @@ Examples:
   putnami migrate vnext --apply
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami extensions install
@@ -1006,11 +954,10 @@ Examples:
   putnami projects create my-app --template typescript-web --path apps/my-app
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami projects list
@@ -1029,11 +976,10 @@ Examples:
   putnami projects describe my-app --output=jsonl
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami projects list
@@ -1052,11 +998,10 @@ Examples:
   putnami projects list --output=jsonl
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami projects describe
@@ -1080,11 +1025,10 @@ Examples:
   putnami projects sync --dry-run
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami projects list
@@ -1106,11 +1050,10 @@ Examples:
   putnami projects tag my-app frontend
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami projects list
@@ -1129,11 +1072,10 @@ Examples:
   putnami scopes list --output=jsonl
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami projects list
@@ -1156,11 +1098,10 @@ Examples:
   putnami sessions inspect --run fixture-attempt-42
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami sessions list
@@ -1182,11 +1123,10 @@ Examples:
   putnami sessions list --output=jsonl
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami sessions inspect
@@ -1206,11 +1146,10 @@ Examples:
   putnami sessions replay --session 20260914-120000-abc123
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami sessions inspect
@@ -1220,41 +1159,37 @@ Related Commands:
 putnami specs init
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ specs inspect ═══
 putnami specs inspect
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ specs list ═══
 putnami specs list
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ specs validate ═══
 putnami specs validate
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ telemetry off ═══
 putnami telemetry off
@@ -1265,11 +1200,10 @@ Usage:
   putnami telemetry off
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami telemetry on
@@ -1284,11 +1218,10 @@ Usage:
   putnami telemetry on
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami telemetry off
@@ -1303,11 +1236,10 @@ Usage:
   putnami telemetry show [--output <format>]
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami telemetry status
@@ -1321,11 +1253,10 @@ Usage:
   putnami telemetry status
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami telemetry on
@@ -1349,11 +1280,10 @@ Examples:
   putnami templates install --output=jsonl
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami templates list
@@ -1373,11 +1303,10 @@ Examples:
   putnami templates list --output=jsonl
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami templates install
@@ -1400,11 +1329,10 @@ Examples:
   putnami templates package ./my-template/ --version 1.2.3 --stable
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami templates validate
@@ -1422,11 +1350,10 @@ Examples:
   putnami templates remove go-server
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami templates list
@@ -1449,11 +1376,10 @@ Examples:
   putnami templates test ./my-template/ --skip-build
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami templates validate
@@ -1472,11 +1398,10 @@ Examples:
   putnami templates update --output=jsonl
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami templates install
@@ -1495,11 +1420,10 @@ Examples:
   putnami templates validate ./my-template/
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami templates test
@@ -1520,11 +1444,10 @@ Examples:
   putnami workspace describe --output=jsonl
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami projects list
@@ -1554,11 +1477,10 @@ Examples:
   putnami init --project my-app --channel canary
 
 Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
+  Common: --verbose, --debug, --help
+  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --baseline
+  Execution: --credential-fd, --no-cache, --continue-on-error, --dry-run
   Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 Related Commands:
   putnami extensions install
