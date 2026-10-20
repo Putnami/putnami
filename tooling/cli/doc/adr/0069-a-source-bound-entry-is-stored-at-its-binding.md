@@ -1,6 +1,7 @@
 # ADR 0069 — A source-bound entry is stored at its binding
 
 - **Status**: accepted
+- **Amended**: 2026-10-20, decision 10: a run that moves its binding settles at the binding it leaves
 - **Scope**: `@putnami/cli` (`internal/jobs`, `internal/jobs/cachekey`,
   `internal/jobs/remotecache`, `internal/commands/cachecmd`),
   `@putnami/cli-model`, `go.putnami.dev/protocol/extension` (the
