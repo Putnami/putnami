@@ -848,7 +848,7 @@ putnami context generate [--force]
 
 ### `putnami context map`
 
-Regenerate the ephemeral workspace map under .putnami/context-map/ (repo-map.json and repo-map.md) from committed artifacts (project manifests, schema/openapi.json, schema/config.jsonschema.json, READMEs, and the workspace docs tree). Byte-deterministic on an unchanged tree, gitignored, and never committed. --print renders it to stdout and writes nothing. `putnami build` refreshes it automatically outside CI; set PUTNAMI_CONTEXT_MAP=off|write to override. Agents get the same document fresh from the MCP workspace_map tool
+Regenerate the ephemeral workspace map under .putnami/context-map/ (repo-map.json and repo-map.md) from committed artifacts (project manifests, schema/openapi.json, schema/config.jsonschema.json, READMEs, and the workspace docs tree). Byte-deterministic on an unchanged tree, gitignored, and never committed. --print renders it to stdout and writes nothing. A build writes no map. Agents get the same document fresh from the MCP workspace_map tool
 
 **Usage**
 

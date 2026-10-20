@@ -867,9 +867,9 @@ plus the workspace `docs/` index — into
 The map is **ephemeral, gitignored, CLI-owned state**, never committed.
 It is a pure projection of committed inputs, so committing the projection bought
 nothing and cost a permanent merge hotspot (one flat sorted list, so parallel
-branches collide), a drift class, and a CI gate. Every build refreshes it and the
-MCP `workspace_map` tool serves it fresh, so there is nothing to regenerate by
-ritual and nothing that can go stale in a review.
+branches collide), a drift class, and a CI gate. A build writes no map. The MCP
+`workspace_map` tool serves it fresh, and `context map` writes it on demand, so
+nothing can go stale in a review.
 
 It is byte-deterministic on an unchanged tree: entries are sorted by project
 path, and the documents carry no timestamp, no absolute path, and no CLI version.
@@ -901,34 +901,17 @@ view (`.putnami/workspace-index.json`, which is not committed). On a clone that
 has none, every project would resolve from authored config alone and the map
 would render without provider-derived edges — a confident wrong answer — so in a
 workspace that declares extensions, `context map` refuses and points at
-`putnami projects sync`. The build attachment is never affected: the engine
-probes before the finalizer runs.
-
-##### Build attachment
-
-`putnami build` refreshes the map after a successful session, in every
-workspace — writing into the CLI's own gitignored state directory is harmless
-anywhere, so there is no adoption ceremony:
-
-| Environment | Behavior |
-| --- | --- |
-| `PUTNAMI_CONTEXT_MAP=off` | Never runs |
-| `PUTNAMI_CONTEXT_MAP=write` | Always writes, CI included |
-| `CI` set (non-empty) | **off** — nothing is committed and a runner has no map consumer |
-| otherwise | **write** — the map is left correct as a side effect |
-
-The attachment never runs for `--plan`/`--dry-run` (they never execute), and it
-does nothing when the session failed or was aborted. A map it cannot write is a
-stderr warning, not a failed build: the artifact is a convenience, and the MCP
-tool rebuilds it in memory regardless.
+`putnami projects sync`.
 
 ##### Serving it to agents
 
 The MCP `workspace_map` tool (see [`mcp`](#mcp)) renders the same document on
-every call from the working tree, so an agent never depends on whether a build
-ran. It takes `section` (`projects`, `dependencies`, `intercalls`, `apis`,
-`config-keys`, `schemas`, `docs`, `all`) and an optional `project`, and reports
-whether the on-disk artifact matches the fresh render.
+every call from the working tree, so an agent never depends on whether
+`context map` ran. It takes `section` (`projects`, `dependencies`,
+`intercalls`, `apis`, `config-keys`, `schemas`, `docs`, `all`) and an optional
+`project`, and reports whether the on-disk artifact is present and matches the
+fresh render. A missing or outdated file is reported as such; only `context map`
+rewrites it.
 
 ### `doctor`
 
@@ -1175,8 +1158,9 @@ The core server exposes eleven tools: ten read-heavy workspace tools
 `find_owner`, `why_impacted`, `topo_sort`, `impacted`, `get_diagnostics`) plus
 `run_jobs`, whose `dryRun` mode returns the planned DAG without executing
 subprocesses. `workspace_map` renders the whole
-workspace orientation map in memory on every call — independent of whether a
-build ever wrote the ephemeral `.putnami/context-map/repo-map.json` — and takes
+workspace orientation map in memory on every call — independent of whether
+`putnami context map` ever wrote the ephemeral
+`.putnami/context-map/repo-map.json` — and takes
 `section` (`projects`, `dependencies`, `intercalls`, `apis`, `config-keys`,
 `schemas`, `docs`, `all`) plus an optional `project`, so a scoped question costs
 a few KB instead of the full map. It also exposes

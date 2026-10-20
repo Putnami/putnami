@@ -10,9 +10,8 @@
 // The map is EPHEMERAL CLI state under `.putnami/context-map/`, never
 // committed, so this command has no drift to report and no `--check`: a run
 // either refreshes those files or, with `--print`, renders to stdout and touches
-// nothing. `putnami build` attaches the same reduce as a post-session finalizer
-// (internal/engine/context_map.go) and the MCP `workspace_map` tool serves the
-// same document rebuilt in memory, so the map stays correct without a verb.
+// nothing. A build writes no map; the MCP `workspace_map` tool serves the same
+// document rebuilt in memory.
 package agentctx
 
 import (
@@ -118,7 +117,7 @@ func parsePrintFlag(args []string) (string, error) {
 // printWorkspaceMap renders the map to stdout and writes NOTHING — not a
 // fragment, not a document. It is the no-toolchain-state path: the same
 // in-memory reduce the MCP tool serves, so what a caller pipes is what an agent
-// would be told, whether or not a build ever ran here.
+// would be told, whether or not `putnami context map` ever ran here.
 //
 // --print owns stdout: the run report (`--output=jsonl`, or the human summary)
 // is suppressed so the emitted bytes are exactly the document. A caller that
@@ -147,9 +146,8 @@ func printWorkspaceMap(ws *workspace.Workspace, format string) error {
 // `.putnami/workspace-index.json`. A workspace that has adopted none — a fresh
 // clone, where that file is gitignored — still loads, but every project resolves
 // from authored config alone and the graph carries zero provider-derived edges.
-// The build attachment never sees that state (the engine probes before the
-// finalizer runs), so a `context map` run on a snapshot-less clone would render
-// a strictly smaller map than a build renders, and an agent reading it would
+// A `context map` run on a snapshot-less clone would render a strictly smaller
+// map than the engine's resolved view gives, and an agent reading it would
 // conclude the workspace has no dependency edges — a confident wrong answer,
 // which is worse than a refusal naming its own repair.
 //
@@ -167,7 +165,7 @@ func requireResolvedIdentity(ws *workspace.Workspace) error {
 	if !ws.HasProbeView() {
 		return cmderr.InvalidConfigf(
 			"the workspace has no resolved provider view, so project identity and dependency edges " +
-				"would be incomplete and the workspace map would render smaller than a build renders it; " +
+				"would be incomplete and the workspace map would render smaller than the resolved workspace gives it; " +
 				"run `putnami projects sync` first")
 	}
 	// An ADOPTED view is not enough: workspace.Load restores the recorded

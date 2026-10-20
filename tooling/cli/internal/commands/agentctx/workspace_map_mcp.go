@@ -97,8 +97,8 @@ type WorkspaceMapProvenance struct {
 // project (id or name).
 //
 // It deliberately does NOT enforce the migration refusal that `putnami
-// build` and `putnami context map` apply: those two PRODUCE the map, and a
-// retired committed copy is a producer conflict. This tool only reads, from the
+// context map` applies: that command PRODUCES the map, and a retired committed
+// copy is a producer conflict. This tool only reads, from the
 // working tree, so refusing to answer an agent's question over a leftover file
 // would withhold a correct answer to punish a state the agent cannot fix.
 func BuildWorkspaceMapResult(wsRoot, section, projectSelector string) (WorkspaceMapResult, error) {
@@ -145,7 +145,7 @@ func BuildWorkspaceMapResult(wsRoot, section, projectSelector string) (Workspace
 		status.Present = true
 		status.Fresh = bytes.Equal(onDisk, freshBytes)
 	case os.IsNotExist(readErr):
-		// Present/Fresh stay false: no build or `context map` has run here yet.
+		// Present/Fresh stay false: `putnami context map` has not run here, or the file was deleted.
 		// The served document is unaffected — that is the point of the in-memory
 		// reduce.
 	default:

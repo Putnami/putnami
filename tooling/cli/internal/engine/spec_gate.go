@@ -27,8 +27,8 @@ import (
 // expensive work — running the tests — was already parallelized by the DAG.
 //
 // The POLICY (what to collect, how to join, when a group blocks) lives in
-// internal/specgate and protocols/features; only the attachment lives here,
-// the same split context_map.go established. Terminal, watch, extension
+// internal/specgate and protocols/features; only the attachment lives here.
+// Terminal, watch, extension
 // aliases, lifecycle adapters, and MCP run_jobs all receive identical
 // behavior by going through Engine.Run.
 
@@ -39,6 +39,23 @@ import (
 // collection pass.
 type specGateOutcome struct {
 	record *features.SpecVerificationRecord
+}
+
+// resultsSucceeded reports whether every result the session produced reached a
+// clean verdict. It is the finalizer's view of jobs.SessionResult.Success, which
+// is computed AFTER finalizers run and so cannot be consulted here: a failed
+// task fails the run, and a canceled one means a signal or a fail-fast abort cut
+// the session short. Skipped tasks are not failures.
+func resultsSucceeded(results map[string]*scheduler.JobResult) bool {
+	for _, result := range results {
+		if result == nil {
+			continue
+		}
+		if result.Status == "failed" || result.Status == "canceled" {
+			return false
+		}
+	}
+	return true
 }
 
 // specGateFinalizer returns the post-session spec-verification finalizer, or

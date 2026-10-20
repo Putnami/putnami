@@ -63,7 +63,7 @@ const (
 
 // Emitted document paths, workspace-relative and slash-formed. They sit beside
 // the fragments because they are the same kind of thing: derived,
-// gitignored, CLI-owned state that any build refreshes and no commit carries.
+// gitignored, CLI-owned state that `putnami context map` writes and no commit carries.
 const (
 	// JSONPath is the machine-readable map.
 	JSONPath = FragmentDir + "/repo-map.json"
@@ -93,9 +93,8 @@ const FragmentVersion = 2
 // purpose (see SchemaVersion).
 const GeneratedBy = "putnami context map"
 
-// Regenerate is the command a reader runs to refresh the map by hand; the build
-// attachment does it automatically, and the MCP tool renders it without needing
-// the file at all.
+// Regenerate is the command a reader runs to refresh the map by hand; the MCP
+// tool renders it without needing the file at all.
 const Regenerate = "putnami context map"
 
 // ProjectInputFiles are the four project-scoped FILE inputs a fragment is

@@ -29,8 +29,8 @@ const readmeFilename = "README.md"
 
 // prunedDirNames are the directory names the document walk never descends into,
 // matched by NAME at any depth and skipped BEFORE descending — the walk covers
-// the whole workspace now and its cost is paid on every build that refreshes the
-// map. Anything dot-prefixed is covered separately (it catches .git, .gen,
+// the whole workspace now and its cost is paid on every run that generates or
+// serves the map. Anything dot-prefixed is covered separately (it catches .git, .gen,
 // .putnami, .claude, .agents in one rule), which leaves the three names that hold
 // bulk non-authored content.
 var prunedDirNames = map[string]bool{

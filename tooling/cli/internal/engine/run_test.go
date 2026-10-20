@@ -22,6 +22,7 @@ import (
 
 	cache "go.putnami.dev/protocol/cache"
 	protocolcli "go.putnami.dev/protocol/cli"
+	extensionproto "go.putnami.dev/protocol/extension"
 	workspacepb "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/tooling/cli/internal/abort"
@@ -1406,5 +1407,64 @@ func TestRun_SelectionReceivesTheResolvedExtensions(t *testing.T) {
 	if !strings.Contains(string(data), want) {
 		t.Fatalf("engine.go does not call %q: the run's selection stage must receive the "+
 			"resolved extensions, or bare commands lose remote run markers", want)
+	}
+}
+
+// TestRun_ABuildSessionWritesNoWorkspaceMap runs a real, successful build
+// session and checks that nothing appears under .putnami/context-map/. The map
+// comes live from the MCP workspace_map tool or on demand from `putnami context
+// map`; a build refreshes nothing. The environment is set to what once made a
+// build write the map (outside CI, with the retired override at "write"), so
+// the assertion holds against that history.
+func TestRun_ABuildSessionWritesNoWorkspaceMap(t *testing.T) {
+	spectest.Proves(t, "cli/context-mcp-discovery", "build-writes-no-workspace-map", "a-build-session-writes-nothing-under-the-map-directory")
+	t.Setenv("CI", "")
+	t.Setenv("PUTNAMI_CONTEXT_MAP", "write")
+	root := t.TempDir()
+	taskPath := fixtureproc.Write(t, filepath.Join(t.TempDir(), "build-exec"), fixtureproc.Program{Record: "executions"})
+	write := func(path string, data []byte) {
+		t.Helper()
+		path = filepath.Join(root, path)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("putnami.workspace.json", []byte(`{"name":"map-proof","includes":["app","extension"]}`))
+	write("app/putnami.json", []byte(`{"name":"app","extensions":["/extension"]}`))
+	write("extension/putnami.json", []byte(`{"name":"@test/builder"}`))
+	cacheEnabled := false
+	manifest, err := json.Marshal(extensionproto.Manifest{
+		Name: "@test/builder", Version: "1.0.0", CLIContract: 11,
+		Commands: map[string]extensionproto.CommandDefinition{
+			"build": {Run: []extensionproto.PipelineStep{{ID: "build", Task: "build-exec"}}},
+		},
+		Tasks: map[string]extensionproto.TaskDefinition{
+			"build-exec": {Kind: "command", Command: taskPath, Cwd: "{workspaceRoot}", Cache: &extensionproto.TaskCachePolicy{Enabled: &cacheEnabled}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	write("extension/putnami.extension.json", manifest)
+	workspace.InvalidateLoadCache(root)
+
+	result, err := New().Run(context.Background(), Request{
+		WorkspaceRoot: root,
+		Config:        workspacepb.Load(root),
+		Commands:      []string{"build"},
+		Global:        GlobalFlags{Projects: "app", NoCache: true},
+		Stdout:        io.Discard,
+	}, discardEvents{})
+	if err != nil || result.ExitCode != ExitSuccess {
+		t.Fatalf("build session: exit %d, error %v", result.ExitCode, err)
+	}
+	if runs := fixtureproc.Runs(t, filepath.Join(root, "executions")); len(runs) != 1 {
+		t.Fatalf("build task ran %d times, want 1: the session did not execute", len(runs))
+	}
+	if _, err := os.Stat(filepath.Join(root, ".putnami", "context-map")); !os.IsNotExist(err) {
+		t.Errorf("a build session created .putnami/context-map (stat error %v)", err)
 	}
 }

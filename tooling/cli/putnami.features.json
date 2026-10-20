@@ -385,6 +385,19 @@
           }
         },
         {
+          "id": "build-writes-no-workspace-map",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-build-session-writes-nothing-under-the-map-directory"
+            ]
+          }
+        },
+        {
           "id": "extension-tool-workspace-facts",
           "stage": "coded",
           "evidenceKinds": [
