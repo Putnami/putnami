@@ -1281,7 +1281,19 @@
               "a-source-bound-failure-is-never-replayed",
               "a-source-bound-entry-prunes-no-producer",
               "a-test-only-edit-stores-beside-the-first-entry-and-keeps-every-key",
-              "an-execution-after-an-in-run-rewrite-reads-the-current-binding",
+              "an-execution-after-an-in-run-rewrite-reads-the-current-binding"
+            ]
+          }
+        },
+        {
+          "id": "source-bound-settle",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
               "an-execution-that-moves-its-binding-settles-at-the-binding-it-leaves",
               "a-task-that-keeps-moving-its-binding-executes-at-most-once-more",
               "a-run-without-the-cache-settles-too"

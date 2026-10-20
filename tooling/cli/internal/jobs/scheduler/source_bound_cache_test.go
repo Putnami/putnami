@@ -23,6 +23,8 @@ import (
 const sourceBoundFeature = "cli/job-planning-execution"
 const sourceBoundRequirement = "source-bound-cache"
 
+const sourceBoundSettleRequirement = "source-bound-settle"
+
 // sourceBoundJob is a declared-capture task that declares cache.sourceBound,
 // with one required project-rooted output directory.
 func sourceBoundJob() *ScheduledJob {
@@ -756,7 +758,7 @@ func projectTreeBinding(t *testing.T, ws *workspace.Workspace) string {
 // describe. The settled result keeps the writes of the first execution, and no
 // key moves.
 func TestSourceBoundExecutionThatMovesItsBindingSettlesAtTheBindingItLeaves(t *testing.T) {
-	spectest.Proves(t, sourceBoundFeature, sourceBoundRequirement, "an-execution-that-moves-its-binding-settles-at-the-binding-it-leaves")
+	spectest.Proves(t, sourceBoundFeature, sourceBoundSettleRequirement, "an-execution-that-moves-its-binding-settles-at-the-binding-it-leaves")
 	requireShell(t)
 	logs := t.TempDir()
 	describeLog, compileLog := filepath.Join(logs, "describe"), filepath.Join(logs, "compile")
@@ -837,7 +839,7 @@ func TestSourceBoundExecutionThatMovesItsBindingSettlesAtTheBindingItLeaves(t *t
 // further. Its entry is stored at the binding its last execution was stamped
 // with, which is the binding its outputs embed.
 func TestSourceBoundExecutionSettlesAtMostOnce(t *testing.T) {
-	spectest.Proves(t, sourceBoundFeature, sourceBoundRequirement, "a-task-that-keeps-moving-its-binding-executes-at-most-once-more")
+	spectest.Proves(t, sourceBoundFeature, sourceBoundSettleRequirement, "a-task-that-keeps-moving-its-binding-executes-at-most-once-more")
 	requireShell(t)
 	logs := t.TempDir()
 	describeLog, compileLog := filepath.Join(logs, "describe"), filepath.Join(logs, "compile")
@@ -869,7 +871,7 @@ func TestSourceBoundExecutionSettlesAtMostOnce(t *testing.T) {
 // tree it leaves whether or not an entry is stored. An execution that moves
 // nothing executes once.
 func TestSourceBoundExecutionWithoutTheCacheSettlesToo(t *testing.T) {
-	spectest.Proves(t, sourceBoundFeature, sourceBoundRequirement, "a-run-without-the-cache-settles-too")
+	spectest.Proves(t, sourceBoundFeature, sourceBoundSettleRequirement, "a-run-without-the-cache-settles-too")
 	requireShell(t)
 	logs := t.TempDir()
 	describeLog, compileLog := filepath.Join(logs, "describe"), filepath.Join(logs, "compile")
