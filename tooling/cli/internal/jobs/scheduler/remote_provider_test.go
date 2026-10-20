@@ -75,7 +75,6 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 	markerOut := getenv("FAKE_MARKER_OUT")
 	markerLookupOut := getenv("FAKE_MARKER_LOOKUP_OUT")
 	uploadOut := getenv("FAKE_UPLOAD_OUT")
-	envOut := getenv("FAKE_ENV_OUT")
 	restoreEmpty := getenv("FAKE_RESTORE_EMPTY") == "1"
 	restoreClientOutput := getenv("FAKE_RESTORE_CLIENT_OUTPUT")
 	restoreStatus := getenv("FAKE_RESTORE_STATUS")
@@ -157,13 +156,6 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 			p, _ := cache.ParseAndValidateInitializeParams(req.Payload)
 			if p != nil {
 				exchangeDir = p.BlobExchangeDir
-			}
-			if envOut != "" {
-				_ = os.WriteFile(envOut, []byte(strings.Join([]string{
-					getenv("PUTNAMI_CACHE_URL"),
-					getenv("PUTNAMI_CACHE_TOKEN"),
-					getenv("PUTNAMI_CACHE_MODE"),
-				}, "|")), 0o644)
 			}
 			negotiatedVersion := req.ProtocolVersion
 			if p != nil && providerProtocolVersion >= cache.ProviderProtocolProvenanceVersion &&
@@ -354,8 +346,8 @@ func applyFakeRestoreProvenance(res *cache.RestoreResult, channel cache.Channel,
 
 // useInProcessFakeProvider reroutes provider spawning to run the fake provider
 // in-process over pipes for the duration of the test. The fake reads its
-// configuration and the PUTNAMI_CACHE_* passthrough from the LaunchSpec env
-// that providerLaunchSpec built, so the env-forwarding contract stays covered;
+// configuration from the LaunchSpec env that providerLaunchSpec built, so the
+// env-forwarding contract stays covered;
 // only exec.Command's own env application (stdlib behavior) goes unexercised.
 // TestProviderRemoteCache_RestoreAndUpload keeps the real subprocess as the
 // end-to-end spawn integration test.
@@ -465,11 +457,6 @@ func fakeProviderLaunch(_ context.Context, workspaceRoot string, ext *extension.
 		launch.Env = append(launch.Env, key+"="+extension.ExpandTemplateVars(job.Env[key], vars))
 	}
 	return launch, nil
-}
-
-func enableProviderRemoteCache(t *testing.T) {
-	t.Helper()
-	t.Setenv(remotecache.CacheURLEnv, "https://cache.example")
 }
 
 // TestProviderRemoteCache_FilesLessRequiredInputRestore pins the required-input

@@ -214,7 +214,6 @@ func startProviderSession(t *testing.T, wsRoot string) *RemoteCache {
 // keeps a fresh one and a live one. The test waits for the sweep, as a run
 // that outlives it does, because Close stops a sweep that is still running.
 func TestProviderStartSweepsStaleExchangeDirs(t *testing.T) {
-	enableProviderRemoteCache(t)
 	useInProcessFakeProvider(t)
 	t.Setenv(storeGCGraceEnv, "")
 	wsRoot := t.TempDir()
@@ -246,7 +245,6 @@ func TestProviderStartSweepsStaleExchangeDirs(t *testing.T) {
 // hours have passed still cannot take the live session's lock, and the lock is
 // free again once the session has deleted its directory.
 func TestProviderExchangeDirOutlivesGraceWhileSessionRuns(t *testing.T) {
-	enableProviderRemoteCache(t)
 	useInProcessFakeProvider(t)
 	wsRoot := t.TempDir()
 	parent := filepath.Join(wsRoot, ".putnami")
@@ -269,7 +267,6 @@ func TestProviderExchangeDirOutlivesGraceWhileSessionRuns(t *testing.T) {
 // that cannot start deletes the directory it was given and releases its lock,
 // and the sweep that start launched still runs.
 func TestProviderStartFailureLeavesNoExchangeDir(t *testing.T) {
-	enableProviderRemoteCache(t)
 	orig := SpawnProviderSession
 	SpawnProviderSession = func(context.Context, cacheprovider.LaunchSpec, ...cacheprovider.Option) (*cacheprovider.Session, error) {
 		return nil, errors.New("provider binary missing")
@@ -339,7 +336,6 @@ func TestSweepStaleExchangeDirsStopsBetweenDirectories(t *testing.T) {
 // only when asked, so a Close that waited first would wait for the stand-in's
 // failure deadline and fail here.
 func TestProviderCloseStopsItsSweepBeforeWaiting(t *testing.T) {
-	enableProviderRemoteCache(t)
 	useInProcessFakeProvider(t)
 	started := make(chan struct{})
 	sawStop := make(chan bool, 1)

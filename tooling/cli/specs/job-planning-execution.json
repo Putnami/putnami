@@ -244,6 +244,14 @@
     {
       "id": "deps-edit-runs-in-the-project-extension",
       "text": "putnami deps add and deps remove run the deps-edit job of the selected project's extension for that project only, with the params action and edits, one {project, path, modules} entry; deps prune hands it each manifest finding with the target directories. The extension is one the project lists in dependencies or extensions that declares the job, the first by name of several. A project whose extensions declare none is refused, naming them and the hand edit. A failed job fails the command."
+    },
+    {
+      "id": "the-cache-provider-owns-its-configuration",
+      "text": "The core reads no remote cache configuration: no .putnami/cache.json and no PUTNAMI_CACHE_URL or PUTNAMI_CACHE_MODE. When an extension declares the cache provider and the trust is not none, the run uses that provider, which resolves its configuration. The core sends no mode, lists provider-configuration, and materializes in the mode the provider returns, else full. A provider that is not ready stops, and the run builds locally with no notice. A run starts at most one provider."
+    },
+    {
+      "id": "a-declared-provider-that-cannot-serve-says-so-once",
+      "text": "When an extension declares the cache provider and the provider cannot serve the run, the run builds locally and says so once on stderr with the cause: a hosted run removed the provider from a path extension, the provider fails to start, or its initialize handshake fails. An extension skipped for another reason adds no notice."
     }
   ],
   "decisions": [

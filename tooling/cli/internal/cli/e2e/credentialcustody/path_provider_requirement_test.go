@@ -66,28 +66,35 @@ func writePathProviderFixture(t *testing.T, publish bool) (wsRoot, log string) {
 
 // A consumer workspace that serves a provider capability only from a path
 // extension fails a hosted run when its CI configuration needs that
-// capability: the release-set provider for a rule that publishes, the cache
-// provider for a configured remote cache. The run fails before any job, with
-// the capability, the path extension and the fix in its message. A hosted run
-// that needs neither builds, and so does a run without --credential-fd.
+// capability: the release-set provider for a rule that publishes. The run
+// fails before any job, with the capability, the path extension and the fix in
+// its message. The cache provider is no such need: a hosted run that reads the
+// remote cache builds locally and says once that the path extension does not
+// serve it. A hosted run that needs neither builds, and so does a run without
+// --credential-fd.
 func TestAHostedRunFailsWhenTheCIConfigurationNeedsAPathExtensionProvider(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/credential-custody", "needed-provider-only-on-a-path-extension", "a-hosted-run-fails-when-the-ci-needs-a-path-extension-provider")
+	spectest.Proves(t, "cli/job-planning-execution", "a-declared-provider-that-cannot-serve-says-so-once", "a-hosted-run-without-its-path-cache-provider-builds-locally")
 	clitest.RequireShell(t)
 	self, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
 	}
 	cacheEnv := []string{custodyCacheEnv + "=1", "PUTNAMI_CACHE_URL=https://cache.invalid", "PUTNAMI_CACHE_TRUST=any"}
+	// cacheNotice is the start of the line that says the run builds locally
+	// because no extension of the hosted run serves the cache provider.
+	const cacheNotice = "putnami: no cache provider serves this run"
 	for _, tc := range []struct {
 		name    string
 		publish bool
 		hosted  bool
 		env     []string
 		missing string
+		notice  bool
 	}{
 		{name: "publish rule", publish: true, hosted: true, missing: distribution.ProviderCommandName},
-		{name: "remote cache", hosted: true, env: cacheEnv, missing: cache.ProviderCommandName},
+		{name: "remote cache", hosted: true, env: cacheEnv, notice: true},
 		{name: "neither", hosted: true},
 		{name: "not hosted", publish: true, env: cacheEnv},
 	} {
@@ -100,6 +107,20 @@ func TestAHostedRunFailsWhenTheCIConfigurationNeedsAPathExtensionProvider(t *tes
 			if tc.missing == "" {
 				if code != 0 || !built {
 					t.Fatalf("build exit=%d built=%t, want 0 and true\n%s", code, built, output)
+				}
+				want := 0
+				if tc.notice {
+					want = 1
+				}
+				if got := strings.Count(output, cacheNotice); got != want {
+					t.Errorf("build output holds %d cache provider notices, want %d\n%s", got, want, output)
+				}
+				if tc.notice {
+					for _, want := range []string{cache.ProviderCommandName, "@fixture/path-provider", "building locally"} {
+						if !strings.Contains(output, want) {
+							t.Errorf("build output lacks %q:\n%s", want, output)
+						}
+					}
 				}
 				return
 			}
@@ -116,6 +137,9 @@ func TestAHostedRunFailsWhenTheCIConfigurationNeedsAPathExtensionProvider(t *tes
 				if !strings.Contains(output, want) {
 					t.Errorf("hosted build output lacks %q:\n%s", want, output)
 				}
+			}
+			if strings.Contains(output, cache.ProviderCommandName) {
+				t.Errorf("hosted build names the cache provider as a need:\n%s", output)
 			}
 		})
 	}

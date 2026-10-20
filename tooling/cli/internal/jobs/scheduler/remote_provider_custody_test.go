@@ -57,7 +57,6 @@ func nativeProviderExtension(t *testing.T) *extension.ExtensionDescription {
 // provider.
 func custodyProviderCache(t *testing.T, bearer string, ext *extension.ExtensionDescription) (*remotecache.RemoteCache, *atomic.Int32) {
 	t.Helper()
-	enableProviderRemoteCache(t)
 	useInProcessFakeProvider(t)
 	inProcess := remotecache.SpawnProviderSession
 	spawns := new(atomic.Int32)

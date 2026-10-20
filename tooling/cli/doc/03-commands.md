@@ -817,7 +817,7 @@ Cache subcommands do not support `--dry-run`. Passing it returns a usage error
 before any store is mutated, extension cache hook is invoked, or verification
 worktree is created.
 
-To share the cache across machines and CI, see the [Remote Build Cache](10-caching.md#remote-build-cache) (opt-in, configured via `.putnami/cache.json` or `PUTNAMI_CACHE_*`).
+To share the cache across machines and CI, see the [Remote Build Cache](10-caching.md#remote-build-cache). The cache provider extension owns its configuration.
 
 ### `config`
 
@@ -1504,9 +1504,9 @@ putnami build --impacted --credential-fd 3 3< <(printf '%s' "$RUN_CREDENTIAL")
   When a run needs a provider and no store extension serves it, the error
   names each path extension and command that the CLI removed. A run whose
   CI configuration needs such a provider fails before any job:
-  `cloud-release-set` when `putnami.ci.json` declares a rule that publishes,
-  and `cache-provider` when the run reads a configured remote cache. The pull
-  request then fails, not the publish on `main`. To fix it, declare the
+  `cloud-release-set` when `putnami.ci.json` declares a rule that publishes.
+  The pull request then fails, not the publish on `main`. The cache provider
+  is no such need: a run without it says so once and builds locally. To fix it, declare the
   extension by name instead of by path in `putnami.workspace.json` and pin it
   from the registry. Every provider
   comes from a store extension, except in a source workspace (next item). The

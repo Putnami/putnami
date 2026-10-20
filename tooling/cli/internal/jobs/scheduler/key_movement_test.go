@@ -296,7 +296,6 @@ func TestAPrecomputedKeyAnEarlierWriteMovesIsNeverLookedUpNorUploaded(t *testing
 	spectest.Proves(t, "cli/job-planning-execution", "session-written-input-keys",
 		"a-precomputed-key-a-write-may-move-is-never-looked-up-or-shared")
 	server := newFakeCacheServer()
-	enableProviderRemoteCache(t)
 	useSharedFakeProvider(t, server)
 
 	producer, check := layersProducer(), layersCheck()

@@ -377,6 +377,10 @@ func (s *Session) do(ctx context.Context, op cache.ProviderOp, params any) (*cac
 // The bootstrap always advertises cache.CapabilityRestoreResultOnly. Only a
 // provider that echoes it receives RestoreParams.ResultOnly and
 // PrefetchParams.ResultOnlyKeys; see RestoreResultOnly.
+//
+// The bootstrap always advertises cache.CapabilityProviderConfiguration too:
+// the core reads no remote cache configuration, so a provider that echoes it
+// returns the materialization mode it resolved in InitializeResult.Mode.
 func (s *Session) Initialize(ctx context.Context, p *cache.InitializeParams) (*cache.InitializeResult, error) {
 	if p == nil {
 		return nil, errors.New("provider initialize params are nil")
@@ -405,6 +409,7 @@ func (s *Session) Initialize(ctx context.Context, p *cache.InitializeParams) (*c
 	// Result-only restores are an opt-in of the same kind: the request fields
 	// that carry them are sent only after the echo.
 	bootstrap.Capabilities = appendCapability(bootstrap.Capabilities, cache.CapabilityRestoreResultOnly)
+	bootstrap.Capabilities = appendCapability(bootstrap.Capabilities, cache.CapabilityProviderConfiguration)
 
 	resp, err := s.do(ctx, cache.OpInitialize, &bootstrap)
 	if err != nil {

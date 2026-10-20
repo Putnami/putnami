@@ -147,9 +147,10 @@ The local developer loop does not require `@putnami/cloud`. A workspace with
 only the Go and/or TypeScript extensions can install dependencies, build, test,
 serve, use the local action cache, and use the local MCP tools without cloud
 credentials or network access. Cloud is an explicit capability boundary:
-configured remote cache falls back to local-only with a one-line notice when no
-cache provider is installed, while publish and deploy flows that require a
-missing extension fail with a `putnami install` hint. Runtime remote config and
+without a cache provider extension the build cache stays local with no notice,
+because the provider owns the remote cache configuration, while publish and
+deploy flows that require a missing extension fail with a `putnami install`
+hint. Runtime remote config and
 secrets sources are likewise registered only when the optional cloud runtime is
 installed; local files and environment configuration continue to boot alone.
 

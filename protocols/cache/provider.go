@@ -179,6 +179,16 @@ const CapabilityRunCredential = "run-credential" // #nosec G101 -- capability na
 // still place blobs for a result-only key; core ignores them.
 const CapabilityRestoreResultOnly = "restore-result-only"
 
+// CapabilityProviderConfiguration is listed in the v1-bootstrap
+// InitializeParams.Capabilities by a core that leaves the remote cache
+// configuration to the provider, and echoed in InitializeResult.Capabilities
+// by a provider that resolves it. After the echo, InitializeResult.Mode is the
+// materialization mode the provider resolved for the session. A provider sets
+// that field only with the echo, and only when core listed the capability, so
+// a strict parser that predates the field never receives it. Without the echo
+// core materializes in ModeFull.
+const CapabilityProviderConfiguration = "provider-configuration"
+
 // ObjectCacheSocketEnv is the environment variable core exports to every job
 // subprocess, carrying the absolute path of the provider's object-cache socket
 // (InitializeResult.ObjectCacheSocket). Its ABSENCE is the off switch: a job
@@ -398,7 +408,10 @@ type InitializeParams struct {
 	// handoff directory, not core's live CAS — core ingests/exports between it and
 	// the store.
 	BlobExchangeDir string `json:"blobExchangeDir"`
-	// Mode is the build's materialization intent (minimal/toplevel/full).
+	// Mode is the build's materialization intent (minimal/toplevel/full). It
+	// is optional, and normalization leaves it absent: a core that lists
+	// CapabilityProviderConfiguration sends none and reads the mode the
+	// provider resolved (InitializeResult.Mode).
 	Mode Mode `json:"mode,omitempty"`
 	// Workspace is the opaque client-derived workspace identity used to scope
 	// run markers (empty disables markers for the session).
@@ -443,6 +456,10 @@ type InitializeResult struct {
 	// run, never fail the initialize that carries it, so core checks it and
 	// degrades on its own (and platform path rules stay out of the protocol).
 	ObjectCacheSocket string `json:"objectCacheSocket,omitempty"`
+	// Mode is the materialization mode the provider resolved for this session.
+	// A provider sets it only when it echoes CapabilityProviderConfiguration
+	// above, and strict validation refuses it otherwise.
+	Mode Mode `json:"mode,omitempty"`
 	// Ready reports whether the provider is configured and able to serve the
 	// remote cache. A provider that loads but has no cache URL/token reports
 	// Ready=false so core stays local-only without an error. A provider that

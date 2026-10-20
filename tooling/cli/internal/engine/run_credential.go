@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	cache "go.putnami.dev/protocol/cache"
 	ciproto "go.putnami.dev/protocol/ci"
 	protocolcli "go.putnami.dev/protocol/cli"
 	distribution "go.putnami.dev/protocol/distribution"
@@ -119,10 +118,10 @@ func readsHostedRemoteCache(req *Request) bool {
 // the first operation that needs it, after the hooks, would be refused.
 //
 // It returns nil without a run credential, under --no-cache, under the trust
-// policy "none" (a watch iteration), and when no remote cache is configured,
-// and prints the notice of a configured cache that cannot serve the run. It
-// refuses, before any hook, a run whose CI configuration needs a provider that
-// only a path extension declares (requireHostedProviders). A
+// policy "none" (a watch iteration), and when no extension declares the cache
+// provider, and prints the notice of a declared provider that cannot serve the
+// run. It refuses, before any hook, a run whose CI configuration needs a
+// provider that only a path extension declares (requireHostedProviders). A
 // workspace that does not load starts nothing here: the run reports it after
 // the hooks. A provider that fails to start leaves the run building locally,
 // as a lazy start does. The error is the refusal to start the provider:
@@ -173,8 +172,8 @@ func startHostedRemoteCache(ctx context.Context, req *Request) (*remotecache.Rem
 // hostedRunRemoteCache is the remote cache a hosted run executes with: the one
 // startHostedRemoteCache started before the hooks. When that found none, the
 // remote cache is loaded again, silently, because startHostedRemoteCache
-// already printed its notice. A cache configured only now has a provider that
-// would start after repository code, and the error is its refusal
+// already printed its notice. A provider declared only now would start after
+// repository code, and the error is its refusal
 // (remotecache.RemoteCache.StartProvider): the run fails and never builds locally in
 // its place. It returns nil without a run credential, under --no-cache, and
 // when cache is nil.
@@ -199,14 +198,14 @@ func hostedRunRemoteCache(ctx context.Context, req *Request, ws *workspace.Works
 // a hosted run removes it from them
 // (extension.DiscoveryResult.OnlyFromPathExtensions). The configuration needs
 // the release-set provider when the workspace's CI document declares a rule
-// that publishes to at least one channel, and the cache provider when req
-// reads the remote cache (readsHostedRemoteCache) and the workspace configures
-// one (remotecache.Configured). A CI document that cannot be read or parsed
-// declares no rule: only a run that publishes reads it as a failure. The error
-// is an invalid configuration that names, for each capability, what needs it
-// and each path extension that declares it, then the fix. A run without a run
-// credential and a workspace lifecycle run (Request.WorkspaceLifecycle) are
-// never refused.
+// that publishes to at least one channel. The cache provider is no such need:
+// without it the run builds locally, which costs time and not correctness, and
+// the remote cache says so once (remotecache.LoadRemoteCache). A CI document
+// that cannot be read or parsed declares no rule: only a run that publishes
+// reads it as a failure. The error is an invalid configuration that names, for
+// each capability, what needs it and each path extension that declares it,
+// then the fix. A run without a run credential and a workspace lifecycle run
+// (Request.WorkspaceLifecycle) are never refused.
 func requireHostedProviders(req *Request, discovered *extension.DiscoveryResult) error {
 	if !runcredential.Hosted() || req.WorkspaceLifecycle {
 		return nil
@@ -219,9 +218,6 @@ func requireHostedProviders(req *Request, discovered *extension.DiscoveryResult)
 		}) {
 			needs = append(needs, need{distribution.ProviderCommandName, ciproto.Filename + " declares a rule that publishes"})
 		}
-	}
-	if readsHostedRemoteCache(req) && remotecache.Configured(req.WorkspaceRoot) {
-		needs = append(needs, need{cache.ProviderCommandName, "the workspace configures a remote cache"})
 	}
 	var unmet, names []string
 	for _, need := range needs {

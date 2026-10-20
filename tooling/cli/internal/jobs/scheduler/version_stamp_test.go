@@ -463,7 +463,6 @@ func TestRemoteGenerationHitStampsTheCurrentRevision(t *testing.T) {
 // cache, configured to build at `version`.
 func genStampRemoteFixture(t *testing.T, server *fakeCacheServer, version cachekey.RunVersions) (*captureFixture, *remotecache.RemoteCache) {
 	t.Helper()
-	enableProviderRemoteCache(t)
 	useSharedFakeProvider(t, server)
 
 	f := newCaptureFixture(t, genStampJob())

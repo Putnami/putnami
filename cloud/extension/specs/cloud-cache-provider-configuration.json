@@ -1,0 +1,18 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/cache-provider-configuration",
+  "outcomes": [
+    "The Cloud cache provider resolves the remote cache configuration and the materialization mode of a session, and tells the core the mode it resolved"
+  ],
+  "nonGoals": [
+    "Changing how the provider reads .putnami/cache.json, the PUTNAMI_CACHE_* variables or the default of a linked workspace",
+    "A new protocol version. provider-configuration is a capability of the v1 bootstrap"
+  ],
+  "requirements": [
+    {
+      "id": "provider-resolves-its-configuration",
+      "text": "The session mode is the core's intent, else the configured mode, else full. When the core lists provider-configuration in initialize, the provider echoes it and returns the session mode in the result. When the core does not list it, the provider echoes nothing and returns no mode."
+    }
+  ]
+}

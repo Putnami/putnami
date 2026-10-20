@@ -113,7 +113,6 @@ func newObjectCacheFixture(t *testing.T, providerEnv map[string]string, cacheabl
 	if _, err := os.Stat("/bin/sh"); err != nil && !useClient {
 		t.Skip("/bin/sh unavailable")
 	}
-	enableProviderRemoteCache(t)
 	useInProcessFakeProvider(t)
 
 	root := t.TempDir()

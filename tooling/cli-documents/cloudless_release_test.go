@@ -81,18 +81,16 @@ func TestCloudlessReleaseFixture_LocalDeveloperLoop(t *testing.T) {
 	runCloudlessServe(t, app, marker, "go-app", "go:serve")
 	runCloudlessServe(t, app, marker, "ts-app", "typescript:serve")
 
-	// A configured remote cache with no provider must emit exactly one notice,
-	// keep the successful local path, and never contact the configured endpoint.
+	// The core reads no remote cache configuration: the cache provider owns it.
+	// With no extension that declares one, a cache variable keeps the successful
+	// local path, says nothing, and never contacts the configured endpoint.
 	t.Setenv("PUTNAMI_CACHE_URL", endpoint.URL)
 	output, code := runCloudlessCLI(t, app, context.Background(), "build", "--projects", "go-app")
 	if code != cli.ExitSuccess {
-		t.Fatalf("configured-cache local fallback exit = %d\n%s", code, output)
+		t.Fatalf("configured-cache local build exit = %d\n%s", code, output)
 	}
-	if got := strings.Count(output, "remote cache"); got != 1 {
-		t.Fatalf("configured cache emitted %d remote-cache notices, want exactly one\n%s", got, output)
-	}
-	if !strings.Contains(output, "building locally") {
-		t.Fatalf("configured cache notice did not explain the local fallback:\n%s", output)
+	if strings.Contains(output, "remote cache") || strings.Contains(output, "building locally") {
+		t.Fatalf("a cache variable without a provider announced the remote cache:\n%s", output)
 	}
 	if got := networkRequests.Load(); got != 0 {
 		t.Fatalf("configured cache without a provider contacted an endpoint %d times", got)

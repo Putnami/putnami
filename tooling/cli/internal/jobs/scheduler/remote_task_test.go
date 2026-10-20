@@ -209,6 +209,11 @@ func (f *fakeCacheServer) lookup(key string) (fakeCacheEntry, bool) {
 // useSharedFakeProvider routes every provider spawn in this test to a session
 // backed by server, so two RemoteCache instances (two "machines") exchange real
 // bytes through it.
+// fakeProviderModeEnv names the materialization mode the shared fake provider
+// resolves and returns at initialize; unset, it returns none and core
+// materializes in full.
+const fakeProviderModeEnv = "FAKE_PROVIDER_MODE"
+
 func useSharedFakeProvider(t *testing.T, server *fakeCacheServer) {
 	t.Helper()
 	orig := remotecache.SpawnProviderSession
@@ -264,12 +269,21 @@ func serveSharedFakeProvider(stdin io.Reader, stdout io.Writer, server *fakeCach
 					capabilities = append(capabilities, cache.CapabilityRestoreResultOnly)
 				}
 			}
+			// The fake resolves the mode fakeProviderModeEnv names, as a provider
+			// resolves its configured mode, and returns it with the echo.
+			var mode cache.Mode
+			if resolved := cache.Mode(os.Getenv(fakeProviderModeEnv)); resolved != "" && p != nil &&
+				slices.Contains(p.Capabilities, cache.CapabilityProviderConfiguration) {
+				capabilities = append(capabilities, cache.CapabilityProviderConfiguration)
+				mode = resolved
+			}
 			ok(req.ProtocolVersion, req.ID, &cache.InitializeResult{
 				ProtocolVersion: negotiated,
 				ProviderName:    fakeProviderExtensionName,
 				ProviderVersion: fakeProviderVersion,
 				Ready:           true,
 				Capabilities:    capabilities,
+				Mode:            mode,
 			})
 		case cache.OpPrefetch:
 			started := 0
@@ -457,7 +471,6 @@ func mutateDeclaredOutputs(t *testing.T, f *captureFixture) {
 // provider-backed RemoteCache.
 func matrixFixture(t *testing.T, server *fakeCacheServer) (*captureFixture, *remotecache.RemoteCache) {
 	t.Helper()
-	enableProviderRemoteCache(t)
 	useSharedFakeProvider(t, server)
 
 	job := matrixJob()

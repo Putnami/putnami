@@ -33,10 +33,14 @@ func dependedOnJobs(planned []*jobmodel.ScheduledJob) map[string]bool {
 // entry. It is true unless the provider echoed the result-only capability and
 // the plan proves that no reader exists; see this file's header for the rule.
 func (r *RemoteCache) TaskFilesNeeded(job *jobmodel.ScheduledJob) bool {
-	if r == nil || job == nil || r.dependedOn == nil || !r.restoresResultOnly() {
+	if r == nil || job == nil || r.dependedOn == nil {
 		return true
 	}
-	switch r.provider.mode {
+	mode, ok := r.resultOnlyMode()
+	if !ok {
+		return true
+	}
+	switch mode {
 	case cache.ModeMinimal:
 	case cache.ModeToplevel:
 		if requestedByRun(job) {

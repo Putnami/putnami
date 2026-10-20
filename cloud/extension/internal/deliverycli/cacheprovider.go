@@ -594,10 +594,10 @@ func (s *providerSession) handle(req *cache.ProviderRequest) *cache.ProviderResp
 }
 
 // initialize opens the session: it records the blob-exchange directory and
-// run-marker identity, resolves the materialization mode (core's intent, else the
-// configured default), and builds the remote-cache client when the cache is
-// configured and enabled. A provider with no client reports Ready=false and
-// stays a no-op so core remains local-only without an error.
+// run-marker identity, resolves the materialization mode (resolveSessionMode),
+// and builds the remote-cache client when the cache is configured and enabled.
+// A provider with no client reports Ready=false and stays a no-op so core
+// remains local-only without an error.
 func (s *providerSession) initialize(req *cache.ProviderRequest, p *cache.InitializeParams) *cache.ProviderResponse {
 	s.exchangeDir = p.BlobExchangeDir
 	s.workspace = p.Workspace
@@ -625,13 +625,7 @@ func (s *providerSession) initialize(req *cache.ProviderRequest, p *cache.Initia
 	s.hosted = hostedLaunch()
 	s.applyMachineToken(cfg)
 
-	mode := p.Mode
-	if !mode.Valid() {
-		mode = cfg.Mode
-	}
-	if !mode.Valid() {
-		mode = cache.DefaultMode
-	}
+	mode := resolveSessionMode(p.Mode, cfg.Mode)
 	s.mode = mode
 	s.providerProtocolVersion = cache.ProviderProtocolMinVersion
 	for _, capability := range p.Capabilities {
@@ -678,7 +672,27 @@ func (s *providerSession) initialize(req *cache.ProviderRequest, p *cache.Initia
 	if slices.Contains(p.Capabilities, cache.CapabilityRestoreResultOnly) {
 		result.Capabilities = append(result.Capabilities, cache.CapabilityRestoreResultOnly)
 	}
+	// Core lists provider-configuration when it reads no cache configuration
+	// itself. The echo tells it the mode this session resolved; without core's
+	// offer nothing is echoed and the result carries no mode.
+	if slices.Contains(p.Capabilities, cache.CapabilityProviderConfiguration) {
+		result.Capabilities = append(result.Capabilities, cache.CapabilityProviderConfiguration)
+		result.Mode = mode
+	}
 	return providerOK(req, result)
+}
+
+// resolveSessionMode is the materialization mode of a session: core's intent,
+// else the configured mode, else cache.ModeFull.
+func resolveSessionMode(intent, configured cache.Mode) cache.Mode {
+	switch {
+	case intent.Valid():
+		return intent
+	case configured.Valid():
+		return configured
+	default:
+		return cache.ModeFull
+	}
 }
 
 // acceptRunCredential decides whether to echo cache.CapabilityRunCredential,
