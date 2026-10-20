@@ -52,6 +52,15 @@ import (
 // earlier binding, and its evidence and its entry would name a tree the run
 // has left. The write keeps a stamp whose identity already matches, so it
 // changes nothing when no source moved.
+//
+// The write replaces the stamp whole (replaceVersionStamp): a task that reads
+// the stamp meanwhile reads the earlier stamp or this one. A source-bound task
+// writes it while it holds its project's source-bound lock
+// (lockSourceBoundProjects) and, from its preparation through its capture, the
+// project's task-output key exclusively (preparationWritesProjectTree,
+// taskReadLockNames), so no other source-bound task of the project, in this
+// session or another, rewrites the stamp between this write and the capture
+// of this task's entry.
 func (s *Scheduler) restampSourceBinding(job *ScheduledJob) {
 	if s.ws == nil || job == nil || job.Project == nil {
 		return
@@ -78,8 +87,9 @@ func (s *Scheduler) stampedSourceBinding(job *ScheduledJob) (string, bool) {
 		return "", false
 	}
 	path := filepath.Join(s.ws.Root, job.Project.Path, filepath.FromSlash(versionStampRelPath))
-	// The stamp writers hold versionFilesMu, and writeVersionStamp is not an
-	// atomic replace, so the read takes it too.
+	// A stamp write replaces the file whole, so the read never sees a torn
+	// stamp. It takes versionFilesMu, which every stamp writer of this
+	// session holds, so it reads after a write in progress.
 	s.versionFilesMu.Lock()
 	data, err := os.ReadFile(path)
 	s.versionFilesMu.Unlock()

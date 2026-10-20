@@ -573,7 +573,8 @@
               "an-unknown-schema-producer-overwriting-a-committed-file-is-an-error",
               "only-changed-files-are-committed",
               "an-unchanged-untouched-file-is-left-alone",
-              "publishing-an-unmerged-canonical-provider-document-preserves-its-hash"
+              "publishing-an-unmerged-canonical-provider-document-preserves-its-hash",
+              "committed-feature-evidence-is-only-what-the-run-wrote"
             ]
           }
         },

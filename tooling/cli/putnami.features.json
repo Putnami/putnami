@@ -1305,6 +1305,22 @@
           }
         },
         {
+          "id": "source-bound-stamp",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-stamp-write-replaces-the-stamp-whole",
+              "a-source-bound-preparation-takes-its-project-key",
+              "the-source-bound-tasks-of-one-project-take-turns",
+              "a-restore-of-paths-the-binding-excludes-keeps-the-binding"
+            ]
+          }
+        },
+        {
           "id": "workload-lifecycle",
           "stage": "coded",
           "evidenceKinds": [

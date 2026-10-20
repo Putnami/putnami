@@ -173,6 +173,9 @@ func (s *Scheduler) executeJobGroup(
 		return completed
 	}
 	defer outputs.release()
+	// The source-bound tasks of one project take turns from their stamp
+	// rewrite to their capture (source_bound_lock.go).
+	defer s.lockSourceBoundProjects(lockJobs)()
 
 	work := make([]taskWork, 0, len(opened))
 	for i := range opened {

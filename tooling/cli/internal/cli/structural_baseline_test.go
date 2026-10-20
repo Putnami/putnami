@@ -141,7 +141,7 @@ var structuralPins = []structuralPin{
 		name:  "test-only newScheduler constructions",
 		token: "newScheduler(",
 		scope: testFiles,
-		want:  60,
+		want:  61,
 		why: "all in internal/jobs/scheduler/*_test.go, exercising the scheduler directly. Pinned separately " +
 			"so they can never inflate the production count above. An earlier change removes the inferred " +
 			"capture lifecycle but retains its supported scheduler coverage under explicit task " +
@@ -197,7 +197,11 @@ var structuralPins = []structuralPin{
 			"never call newScheduler. 59\u219260 is source_state_test.go's one-answer case: \"the version " +
 			"stamp's marker and every execution key of a run read one answer\" is a property of " +
 			"newScheduler wiring the stamp's memo to the run's cache manager, which a Scheduler " +
-			"literal skips, and of nothing smaller; its four cases share ONE construction site",
+			"literal skips, and of nothing smaller; its four cases share ONE construction site" +
+			". 60\u219261 is source_bound_stamp_test.go's warm-hit case: \"a warm run computes a " +
+			"project's binding once\" is a property of newScheduler wiring the binding memo that the " +
+			"test counts before Run, which runSharedScheduler cannot reach; its two runs share ONE " +
+			"construction site",
 	},
 	{
 		name:  "production planner.Plan call sites",

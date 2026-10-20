@@ -994,6 +994,10 @@ func (s schemaSnapshot) content(path string) ([]byte, bool) {
 // Files that are neither changed nor staged (e.g. stale .gen/ leftovers from a
 // removed producer) are ignored, so describe never resurrects them into the
 // tracked tree.
+//
+// The committed feature evidence is the one tracked file it removes: when this
+// run did not commit it, the copy an earlier run left goes
+// (removeUncommittedFeatureEvidence).
 func collectArtifacts(projectPath, genDir string, commit bool, before schemaSnapshot, staged map[string]bool) ([]string, error) {
 	var artifacts []string
 
@@ -1098,7 +1102,37 @@ func collectArtifacts(projectPath, genDir string, commit bool, before schemaSnap
 	if err != nil {
 		return nil, err
 	}
+	if err := removeUncommittedFeatureEvidence(projectPath, artifacts); err != nil {
+		return nil, err
+	}
 	return artifacts, nil
+}
+
+// committedFeatureEvidenceRelPath is the Go framework's committed feature
+// evidence, relative to the project: the featureEvidence output build-describe
+// declares.
+const committedFeatureEvidenceRelPath = "schema/feature-evidence/go-framework.json"
+
+// removeUncommittedFeatureEvidence removes the committed feature evidence when
+// artifacts, the paths this run committed, do not name it: the app produced no
+// feature evidence, or the project does not commit its schemas. The evidence
+// names the source binding of the tree that produced it, and build-describe
+// declares the file as an output, so the scheduler stores what the path holds
+// after the run. Removing a copy an earlier run left makes the entry record the
+// file absent: a hit, on this machine or another, never restores evidence the
+// run that stored the entry did not write. Evidence files of other frameworks
+// in the same directory stay.
+func removeUncommittedFeatureEvidence(projectPath string, artifacts []string) error {
+	for _, artifact := range artifacts {
+		if filepath.ToSlash(artifact) == committedFeatureEvidenceRelPath {
+			return nil
+		}
+	}
+	err := os.Remove(filepath.Join(projectPath, filepath.FromSlash(committedFeatureEvidenceRelPath)))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("remove committed feature evidence this run did not write: %w", err)
+	}
+	return nil
 }
 
 // stagedSchemaArtifacts reads .gen/generate-result.json and returns the set of

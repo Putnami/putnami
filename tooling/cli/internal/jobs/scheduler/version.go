@@ -290,7 +290,38 @@ func writeVersionStamp(path string, info VersionInfo) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(data, '\n'), 0o644)
+	return replaceVersionStamp(path, append(data, '\n'))
+}
+
+// replaceVersionStamp replaces the file at path with data through a temporary
+// file in the same directory and a rename. A reader of the stamp, such as a
+// task subprocess or a cache-key digest, therefore reads the earlier document
+// or the new one whole, never a truncated or partly written one, and a failed
+// write leaves the earlier document in place.
+func replaceVersionStamp(path string, data []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".version.json-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Chmod(tmpPath, 0o644); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	return nil
 }
 
 // readVersionStampDocument decodes the stamp as a raw JSON object, or nil when
@@ -540,10 +571,13 @@ func (s *Scheduler) invalidateCapabilitySourceBindingsForProject(job *ScheduledJ
 }
 
 // invalidateCapabilitySourceBindingsForRestore brackets materialization of a
-// cached entry. Project-rooted outputs outside .gen can change source-v1;
-// workspace-rooted outputs may intersect any project (including a root project),
-// so they conservatively invalidate the whole memo. Command and invocation
-// outputs live outside project source roots. Calling this both before and after
+// cached entry. A project-rooted output can change the project's source-v1
+// binding unless source-v1 excludes its path (putnamigit.SourceBindingExcludes),
+// as it excludes .gen and the committed feature evidence a describe hit
+// restores: such a restore keeps the project's memoized binding. Workspace-rooted
+// outputs may intersect any project (including a root project), so they
+// conservatively invalidate the whole memo. Command and invocation outputs live
+// outside project source roots. Calling this both before and after
 // materialization also clears a value computed concurrently with the write.
 func (s *Scheduler) invalidateCapabilitySourceBindingsForRestore(job *ScheduledJob, entry *store.TaskEntry) {
 	if job == nil || job.Project == nil || entry == nil {
@@ -559,8 +593,7 @@ func (s *Scheduler) invalidateCapabilitySourceBindingsForRestore(job *ScheduledJ
 		case extension.OutputRootWorkspace:
 			invalidateAll = true
 		case extension.OutputRootProject:
-			clean := path.Clean(output.Path)
-			if clean != ".gen" && !strings.HasPrefix(clean, ".gen/") {
+			if !putnamigit.SourceBindingExcludes(path.Clean(output.Path)) {
 				invalidateProject = true
 			}
 		}

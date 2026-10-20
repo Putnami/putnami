@@ -50,8 +50,17 @@ out, so it cannot see a stale committed copy either.
      rewrites the stamp from the current binding when the two differ, then
      reads the binding the stamp names for the task's own project. A
      follower of a shared execution uses its leader's binding.
+   - **The stamp holds still from that rewrite to the capture.** Every stamp
+     write replaces the file whole, through a temporary file and a rename, so
+     a reader sees the earlier stamp or the new one. The source-bound tasks of
+     one project take turns from the rewrite to the capture: in one session
+     through a per-project lock, and across sessions because a source-bound
+     task holds the project's task-output key exclusively from its
+     preparation through its capture.
    - **At lookup** the binding is the project's current one, from the memo the
-     stamp writer reads.
+     stamp writer reads. A restore whose project paths `source-v1` all
+     excludes, such as a describe hit's `.gen/schema` and committed evidence,
+     keeps the memo, so a warm run computes each project's binding once.
    - **An unmanaged workspace** uses the empty binding on both sides.
    - **Inside a repository, a binding the CLI cannot compute** gives no lookup
      key and no store key. The task executes and stores nothing.
@@ -82,7 +91,9 @@ out, so it cannot see a stale committed copy either.
    not emptied, no drift). The app's describe binary is the only writer of
    that file, so the claim is exclusive. A hit restores both copies, so a
    tree that returns to an earlier binding gets that binding's evidence back
-   in the committed file too.
+   in the committed file too. A describe run that writes no evidence, because
+   the app has none or the project does not commit its schemas, removes the
+   committed file, so its entry records the file absent.
 9. **A manifest that declares the field requires CLI contract 10**
    (`protocols/cli.SourceBoundCacheContract`) wherever it loads from. An older
    CLI stores the entry at its cache key alone, so it refuses the manifest.
@@ -104,6 +115,17 @@ out, so it cannot see a stale committed copy either.
   every file, with the same effect on dependent keys.
 - **Disable the describe cache.** Every run would build and run a host binary
   for every Go project, and every dependent would wait for it.
+- **Declare that `build-describe` writes the `gen` resource,** so the planner
+  orders a build's describe and a test's describe of one project. The
+  declaration is part of the task contract digest, so every Go describe key
+  would move. The second describe would also wait for every task that reads
+  the first one's `gen`, such as the build's compile. The per-project lock
+  orders only the source-bound tasks and moves no key.
+- **Record the committed evidence absent when the run did not write it.** The
+  scheduler cannot tell a file the run wrote from one an earlier run left
+  without a new contract signal or a modification-time guess. Describe knows
+  what it committed. `emptied` does not apply: the engine refuses it on a
+  tracked file.
 - **Rewrite the binding inside a restored output.** The CLI would have to
   parse an extension's evidence format, and the evidence would claim a tree its
   producer never described.
@@ -127,9 +149,10 @@ out, so it cannot see a stale committed copy either.
   as `schema/http-routes.json` and `infra/requirements.json`. When an
   execution changes one, its evidence names the binding before that write,
   and the next run misses once and converges. This ADR does not change it.
-- Describe never deletes a committed evidence file. An app that loses its
-  last feature keeps the earlier file, and its entry captures the file as it
-  stands.
+- Describe removes the committed evidence when its run wrote none. An app
+  that loses its last feature loses the file, and its entry records the file
+  absent. Restoring that entry leaves a file already in the tree as it stands,
+  like any optional output recorded absent.
 - Each binding a project passes through leaves one describe entry. Store
   collection reclaims them like any other entry.
 - Two sessions at the same cache key and different bindings take different
