@@ -188,15 +188,23 @@ func (w *install) buildTool(tool, installSpec, expected, dest string) bool {
 // toolVersionMatches reports whether binary reports version, asking the way
 // each tool answers: `golangci-lint version --short`, `<tool> -version`.
 func (w *install) toolVersionMatches(tool, binary, version string) bool {
+	matched, _, _ := w.askToolVersion(tool, binary, version)
+	return matched
+}
+
+// askToolVersion is toolVersionMatches with what the tool answered: its
+// combined output and the error of the call, so a caller can tell a wrong
+// version from a tool that did not run.
+func (w *install) askToolVersion(tool, binary, version string) (matched bool, output string, err error) {
 	args := []string{"-version"}
 	if tool == "golangci-lint" {
 		args = []string{"version", "--short"}
 	}
-	output, err := w.Combined(nil, binary, args...)
+	output, err = w.Combined(nil, binary, args...)
 	if err != nil {
-		return false
+		return false, output, err
 	}
-	return VersionReported(output, version)
+	return VersionReported(output, version), output, nil
 }
 
 // VersionReported reports whether a line of output names version (with or
