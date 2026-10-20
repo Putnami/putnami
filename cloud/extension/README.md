@@ -386,8 +386,8 @@ assembles and verifies the bundles with no network and keys on the project
 tree, so a docs edit republishes the sections. Its
 `publish~cloud-publish-site-content` step publishes exactly the planned
 members at the planned version and moves the plan's first channel (`canary` on
-main) in the same atomic Put publish. Pass `--skip-publish-doc` to skip that
-step. Without a release-set plan the step publishes nothing;
+main) in the same atomic Put publish. To leave docs out of a run, do not
+select the docs project. Without a release-set plan the step publishes nothing;
 `putnami operator publish-doc`, from the `@putnami/operator` extension, stays
 the direct operator path. Both resolve the Put credential the way archive
 publication does: a stored machine credential for the Put host, else a minted

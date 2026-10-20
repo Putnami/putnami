@@ -3148,13 +3148,16 @@ func TestExtensionManifestTargetedPublishCanSkipWorkspaceDocs(t *testing.T) {
 	if !ok {
 		t.Fatal("manifest contributes no publish command")
 	}
+	// A docs section is a release-set member, and the coordinator refuses a
+	// plan that selects a member without its publish step, so a flag that turns
+	// the step off could only fail the run. A run leaves docs out by not
+	// selecting the docs project.
 	flags, _ := publish["flags"].(map[string]any)
-	if _, ok := flags["skip-publish-doc"]; !ok {
-		t.Fatal("publish must expose skip-publish-doc so a docs project's site-content step can be skipped")
+	if _, ok := flags["skip-publish-doc"]; ok {
+		t.Fatal("publish declares skip-publish-doc, which can only fail a run that selects changed docs")
 	}
 	// Docs no longer publish as a workspace prerequisite of every publish: a
-	// package-scoped publish never reaches them, and the docs project's own
-	// step honors the skip flag.
+	// package-scoped publish never reaches them.
 	if prerequisites, present := publish["sessionPrerequisites"]; present {
 		t.Fatalf("publish.sessionPrerequisites = %v, want none", prerequisites)
 	}
@@ -3163,7 +3166,7 @@ func TestExtensionManifestTargetedPublishCanSkipWorkspaceDocs(t *testing.T) {
 		if step["id"] != cloudSiteContentPublishStep {
 			continue
 		}
-		if got, want := step["if"], "params.site-content && !params.skip-publish-doc && !params.skipPublishDoc"; got != want {
+		if got, want := step["if"], "params.site-content"; got != want {
 			t.Fatalf("publish site-content condition = %v, want %v", got, want)
 		}
 		return

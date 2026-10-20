@@ -104,7 +104,6 @@ func init() {
 		"for-registry", "forRegistry", "global", "opaque", "materialize", "include-revoked", "remove", "if-present", "ifPresent",
 		"skip-publish-config", "skipPublishConfig",
 		"skip-publish-migration", "skipPublishMigration", "stable", "archives",
-		"skip-publish-doc", "skipPublishDoc",
 		"skip-publish-deployment", "skipPublishDeployment",
 		// config put --roll-shared opts a shared/overlay-block write into the
 		// bounded inline-primary fleet roll.

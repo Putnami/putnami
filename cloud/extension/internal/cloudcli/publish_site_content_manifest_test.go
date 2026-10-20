@@ -177,8 +177,7 @@ func TestExtensionManifestWiresSiteContentWithoutPublishDoc(t *testing.T) {
 	if !activated {
 		t.Fatalf("package activationFiles = %v, want */index.md so a docs site project plans its package step", commands["package"].(map[string]any)["activationFiles"])
 	}
-	requireStep("publish", cloudSiteContentPublishStep, "cloud-publish-site-content-project",
-		"params.site-content && !params.skip-publish-doc && !params.skipPublishDoc")
+	requireStep("publish", cloudSiteContentPublishStep, "cloud-publish-site-content-project", "params.site-content")
 
 	tasks := manifest["tasks"].(map[string]any)
 	for name, verb := range map[string]string{
