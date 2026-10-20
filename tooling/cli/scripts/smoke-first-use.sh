@@ -350,7 +350,8 @@ wait_for_ready() {
   done
 }
 
-# Require HTTP 200 and a non-empty body from each page of a served starter.
+# Require HTTP 200 and a non-empty body from each page of a served starter. The
+# body of "/" is kept: require_stop compares the answer after the stop with it.
 require_pages() {
   leg="$1"
   log="$2"
@@ -368,20 +369,35 @@ require_pages() {
     if [ ! -s "$workdir/response" ]; then
       fail_with_log "${leg} leg: ${page_url} answered 200 with an empty body" "$log"
     fi
+    if [ "$page_path" = "/" ]; then
+      cp "$workdir/response" "$workdir/served-root"
+    fi
     echo "smoke: GET ${page_url} answered 200"
   done
 }
 
+# Stop the starter, then require that it no longer answers. A freed ephemeral
+# port can be taken at once by an unrelated listener of the machine, so an
+# answer alone does not prove the starter is alive. The starter is alive when
+# "/" answers 200 with the body the pages leg saw before the stop: an orphaned
+# starter serves the same page, another listener does not.
 require_stop() {
   leg="$1"
   log="$2"
   if ! stop_group; then
     fail_with_log "${leg} leg: the starter did not stop within the graceful shutdown budget" "$log"
   fi
-  if curl -sS --connect-timeout 1 --max-time 1 -o /dev/null \
-    "http://127.0.0.1:${ready_port}/" >/dev/null 2>&1; then
-    fail_with_log "${leg} leg: the HTTP listener still answers after the commands stopped" "$log"
+  after_status="000"
+  after_status="$(curl -sS --connect-timeout 1 --max-time 1 \
+    -o "$workdir/after-stop" -w '%{http_code}' \
+    "http://127.0.0.1:${ready_port}/" 2>/dev/null)" || return 0
+  if [ ! -f "$workdir/served-root" ]; then
+    fail_with_log "${leg} leg: something answers HTTP ${after_status} on the starter's port after the commands stopped, and the pages leg kept no page to compare it with" "$log"
   fi
+  if [ "$after_status" = "200" ] && [ "$(cat "$workdir/after-stop")" = "$(cat "$workdir/served-root")" ]; then
+    fail_with_log "${leg} leg: the HTTP listener still answers the starter's page after the commands stopped" "$log"
+  fi
+  echo "smoke: the starter's page no longer answers on port ${ready_port}"
 }
 
 # ── Leg: block, run as printed ───────────────────────────────────────────────
@@ -467,6 +483,7 @@ set -m
 group_pid=$!
 set +m
 wait_for_ready go-serve "$go_serve_log"
+rm -f "$workdir/served-root"
 require_pages go-pages "$go_serve_log" /
 require_stop go-stop "$go_serve_log"
 

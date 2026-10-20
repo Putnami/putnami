@@ -3,14 +3,18 @@ package installscript
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
 )
@@ -26,7 +30,16 @@ const (
 	firstUseHelperEnv   = "GO_WANT_FIRST_USE_HELPER"
 	firstUseScenarioEnv = "FIRST_USE_SCENARIO"
 	firstUseChannelEnv  = "FIRST_USE_EXPECT_CHANNEL"
+	// firstUseSuccessorEnv marks the process that takes over a stopped
+	// starter's listener; its value is the page the successor serves.
+	firstUseSuccessorEnv = "FIRST_USE_SUCCESSOR"
 )
+
+// firstUseStarterPage is the page every stub starter serves.
+const firstUseStarterPage = "<!doctype html><title>Welcome to Putnami</title>"
+
+// firstUseOtherPage is the page of a listener that is not the starter.
+const firstUseOtherPage = "<!doctype html><title>Another service</title>"
 
 // firstUseBlock is the block of the getting-started page, as the fixtures
 // print it.
@@ -162,6 +175,9 @@ func TestFirstUseCLIHelperProcess(t *testing.T) {
 	if os.Getenv(firstUseHelperEnv) != "1" {
 		return
 	}
+	if page := os.Getenv(firstUseSuccessorEnv); page != "" {
+		serveAsSuccessor(page)
+	}
 	args := os.Args
 	for i, arg := range args {
 		if arg == "--" {
@@ -199,7 +215,7 @@ func TestFirstUseCLIHelperProcess(t *testing.T) {
 			refuse("%v", err)
 		}
 	}
-	serve := func(statuses map[string]int) {
+	serve := func(statuses map[string]int, handOver string) {
 		if _, err := os.Stat("putnami.workspace.json"); err != nil {
 			fmt.Fprintln(os.Stderr, "stub cli: no workspace here")
 			os.Exit(1)
@@ -212,14 +228,22 @@ func TestFirstUseCLIHelperProcess(t *testing.T) {
 			refuse("%v", err)
 		}
 		_, _ = os.Stdout.WriteString(smokeReadyRecord(listener.Addr().(*net.TCPAddr).Port) + "\n")
-		_ = http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			status, known := statuses[r.URL.Path]
-			if !known {
-				status = http.StatusNotFound
-			}
-			w.WriteHeader(status)
-			_, _ = w.Write([]byte("<!doctype html><title>Welcome to Putnami</title>"))
-		}))
+		go func() {
+			_ = http.Serve(listener, pageHandler(statuses, firstUseStarterPage))
+			os.Exit(0)
+		}()
+		// A starter that does not end with its group: on TERM, the socket
+		// passes to a process of another group, which answers on the same port
+		// with the starter's page (an orphan) or with another page (the port
+		// taken by an unrelated listener).
+		terminated := make(chan os.Signal, 1)
+		if handOver != "" {
+			signal.Notify(terminated, syscall.SIGTERM)
+		}
+		<-terminated
+		if err := handOverListener(listener, handOver); err != nil {
+			refuse("%v", err)
+		}
 		os.Exit(0)
 	}
 	requireHumanOutput := func() {
@@ -274,7 +298,7 @@ func TestFirstUseCLIHelperProcess(t *testing.T) {
 		if scenario == "page-404" {
 			delete(statuses, "/guestbook")
 		}
-		serve(statuses)
+		serve(statuses, "")
 	case "lint,test,build\x00webapp":
 		inDirectory("first-use")
 		requireHumanOutput()
@@ -300,7 +324,10 @@ func TestFirstUseCLIHelperProcess(t *testing.T) {
 		if scenario == "go-page-500" {
 			status = http.StatusInternalServerError
 		}
-		serve(map[string]int{"/": status})
+		serve(map[string]int{"/": status}, map[string]string{
+			"go-stop-orphan":      firstUseStarterPage,
+			"go-stop-port-reused": firstUseOtherPage,
+		}[scenario])
 	case "lint,test,build\x00api":
 		inDirectory("first-use-go")
 		requireHumanOutput()
@@ -308,6 +335,77 @@ func TestFirstUseCLIHelperProcess(t *testing.T) {
 	default:
 		refuse("unexpected first-use argv: %q", args)
 	}
+	os.Exit(0)
+}
+
+// pageHandler answers every known path with its status and the given page.
+func pageHandler(statuses map[string]int, page string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		status, known := statuses[r.URL.Path]
+		if !known {
+			status = http.StatusNotFound
+		}
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(page))
+	})
+}
+
+// handOverListener passes the listening socket to a process of another group
+// that answers on it with page, and returns once that process serves. The
+// caller ends afterwards, so the port never goes unanswered between the two.
+// The test binary re-executes itself as the successor: any helper of this
+// package can call it.
+func handOverListener(listener net.Listener, page string) error {
+	file, err := listener.(*net.TCPListener).File()
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	serving, announce, err := os.Pipe()
+	if err != nil {
+		return err
+	}
+	defer serving.Close()
+	successor := exec.Command(executable, "-test.run=^TestFirstUseCLIHelperProcess$")
+	successor.Env = append(os.Environ(), firstUseHelperEnv+"=1", firstUseSuccessorEnv+"="+page)
+	successor.ExtraFiles = []*os.File{file, announce}
+	inOwnProcessGroup(successor)
+	err = successor.Start()
+	_ = announce.Close()
+	if err != nil {
+		return err
+	}
+	_, _ = io.Copy(io.Discard, serving)
+	return nil
+}
+
+// serveAsSuccessor answers on the listener the stopped starter passed as file
+// descriptor 3, tells it through descriptor 4 that it serves, and never
+// returns. It ends when the home directory of the run
+// is removed, so no process outlives the test that started it.
+func serveAsSuccessor(page string) {
+	listener, err := net.FileListener(os.NewFile(3, "listener"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "first-use successor: %v\n", err)
+		os.Exit(70)
+	}
+	home := os.Getenv("HOME")
+	go func() {
+		for {
+			if _, err := os.Stat(home); err != nil {
+				os.Exit(0)
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
+	go func() {
+		_ = os.NewFile(4, "announce").Close()
+	}()
+	_ = http.Serve(listener, pageHandler(map[string]int{"/": http.StatusOK}, page))
 	os.Exit(0)
 }
 
@@ -374,6 +472,7 @@ func TestFirstUseSmokeFailsUnderTheLegThatBroke(t *testing.T) {
 		{"check-fails", "::error::check leg: 'putnami lint,test,build webapp' failed"},
 		{"go-init-fails", "::error::go-init leg: 'putnami init --project api --extension go' failed"},
 		{"go-page-500", "::error::go-pages leg:"},
+		{"go-stop-orphan", "::error::go-stop leg: the HTTP listener still answers the starter's page after the commands stopped"},
 		{"go-check-fails", "::error::go-check leg: 'putnami lint,test,build api' failed"},
 		{"bun-outside-home", "/.bun exists; Bun must be installed under"},
 		{"no-bun-under-home", "::error::home leg: no Bun under"},
@@ -393,6 +492,26 @@ func TestFirstUseSmokeFailsUnderTheLegThatBroke(t *testing.T) {
 				t.Fatalf("first-use smoke reported OK for scenario %s:\n%s", tc.scenario, res.output)
 			}
 		})
+	}
+}
+
+// A freed ephemeral port can be taken at once by a listener that is not the
+// starter. When the starter's group has ended and the port answers with another
+// page, the stop leg passes: only the starter's own page proves it is alive.
+func TestFirstUseSmokeStopIgnoresAnotherListenerOnTheFreedPort(t *testing.T) {
+	spectest.Proves(t, "cli/first-use-path", "first-use-smoke-legs", "the-stop-leg-ignores-another-listener-on-the-freed-port")
+	res := runFirstUseOnHost(t, "go-stop-port-reused", "latest")
+	if res.exitCode != 0 {
+		t.Fatalf("first-use smoke failed although only another listener answered after the stop (exit %d):\n%s", res.exitCode, res.output)
+	}
+	for _, want := range []string{
+		"smoke: GET http://127.0.0.1:",
+		"smoke: the starter's page no longer answers on port ",
+		"smoke: OK — channel 'latest' passes the documented block",
+	} {
+		if !res.contains(want) {
+			t.Fatalf("first-use smoke did not report %q:\n%s", want, res.output)
+		}
 	}
 }
 

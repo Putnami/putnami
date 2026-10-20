@@ -1107,10 +1107,20 @@ function Invoke-Smoke {
     if (-not (Stop-Server)) {
         Stop-Smoke 'shutdown leg: webapp did not stop within the graceful shutdown budget' $serveLog
     }
+    # A freed ephemeral port can be taken at once by an unrelated listener, so an
+    # answer alone does not prove the starter is alive.
     $listenerStopped = $false
     for ($probe = 0; $probe -lt 20; $probe++) {
-        $answer = Invoke-SmokeGet "http://127.0.0.1:${readyPort}/" (Join-Path $Workdir 'probe.html') 1000
+        $probeFile = Join-Path $Workdir 'probe.html'
+        $answer = Invoke-SmokeGet "http://127.0.0.1:${readyPort}/" $probeFile 1000
         if ($answer.Status -eq 0) {
+            $listenerStopped = $true
+            break
+        }
+        # The starter is alive only when "/" answers 2xx with the page it served
+        # before the stop; a listener that took the freed port serves another.
+        if (($answer.Status -lt 200) -or ($answer.Status -gt 299) -or
+            ([IO.File]::ReadAllText($probeFile) -cne [IO.File]::ReadAllText($responseFile))) {
             $listenerStopped = $true
             break
         }

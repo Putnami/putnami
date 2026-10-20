@@ -676,14 +676,32 @@ if ! terminate_server; then
   tail -n 200 "$serve_log" || true
   exit 1
 fi
+# A freed ephemeral port can be taken at once by an unrelated listener, so an
+# answer alone does not prove the starter is alive. The starter is alive when
+# "/" answers 2xx with the page it served before the stop; any other answer, or
+# none, means it is gone. An orphaned starter serves the same page.
 listener_stopped=0
 shutdown_probe=0
+probe_file="$workdir/probe.html"
 while [ "$shutdown_probe" -lt 20 ]; do
-  if ! curl -sS --connect-timeout 1 --max-time 1 \
-    -o /dev/null "http://127.0.0.1:${ready_port}/" >/dev/null 2>&1; then
+  probe_status="000"
+  if ! probe_status="$(curl -sS --connect-timeout 1 --max-time 1 \
+    -o "$probe_file" -w '%{http_code}' "http://127.0.0.1:${ready_port}/" 2>/dev/null)"; then
     listener_stopped=1
     break
   fi
+  case "$probe_status" in
+    2??)
+      if [ "$(cat "$probe_file")" != "$(cat "$response_file")" ]; then
+        listener_stopped=1
+        break
+      fi
+      ;;
+    *)
+      listener_stopped=1
+      break
+      ;;
+  esac
   sleep 0.1
   shutdown_probe=$((shutdown_probe + 1))
 done

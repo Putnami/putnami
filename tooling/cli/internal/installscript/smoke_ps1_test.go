@@ -367,6 +367,18 @@ func TestSmokePS1NamesTheLegsOfTheShellSmoke(t *testing.T) {
 			t.Fatalf("smoke-check-release.ps1 does not fail with %q", text)
 		}
 	}
+	// The shutdown leg fails only on the page the starter served before the
+	// stop, as the shell smoke does: a listener that took the freed port serves
+	// another page. The Windows harness cannot hand a socket to a second
+	// process, so this is checked on the text.
+	for _, text := range []string{
+		"([IO.File]::ReadAllText($probeFile) -cne [IO.File]::ReadAllText($responseFile))",
+		"($answer.Status -lt 200) -or ($answer.Status -gt 299)",
+	} {
+		if !strings.Contains(src, text) {
+			t.Fatalf("smoke-check-release.ps1 shutdown leg does not compare the page after the stop: missing %q", text)
+		}
+	}
 	for _, pattern := range []string{`'"type":"ready"'`, `'"port":([0-9]+)'`, `"record":"session:end"`, `'Integrity verified'`, `'without integrity verification'`} {
 		if !strings.Contains(src, pattern) {
 			t.Fatalf("smoke-check-release.ps1 does not look for %s", pattern)

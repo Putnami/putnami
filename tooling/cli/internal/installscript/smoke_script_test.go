@@ -8,10 +8,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
@@ -360,10 +362,27 @@ func TestSmokeCLIHelperProcess(t *testing.T) {
 				t.Fatalf("invalid helper HTTP status %q: %v", configured, err)
 			}
 		}
-		_ = http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(httpStatus)
-			_, _ = w.Write([]byte("<!doctype html><title>Welcome to Putnami</title>"))
-		}))
+			_, _ = w.Write([]byte(firstUseStarterPage))
+		})
+		handOver := map[string]string{
+			"orphan":        firstUseStarterPage,
+			"other-service": firstUseOtherPage,
+		}[os.Getenv(smokeStopHandoverEnv)]
+		if handOver == "" {
+			_ = http.Serve(listener, handler)
+			return
+		}
+		// A starter that does not end with its stop: on TERM the socket passes
+		// to a process of another group, which answers on the same port.
+		go func() { _ = http.Serve(listener, handler) }()
+		terminated := make(chan os.Signal, 1)
+		signal.Notify(terminated, syscall.SIGTERM)
+		<-terminated
+		if err := handOverListener(listener, handOver); err != nil {
+			t.Fatal(err)
+		}
 		return
 	case "extensions\x00install\x00--user\x00--latest\x00" + smokeRunExtension:
 		_, _ = os.Stdout.WriteString("  ✓ Pinned " + smokeRunExtension + " for this user\n")
@@ -391,6 +410,11 @@ func TestSmokeCLIHelperProcess(t *testing.T) {
 		t.Fatalf("unexpected golden-path argv: %q", args)
 	}
 }
+
+// smokeStopHandoverEnv makes the stub starter hand its port to another process
+// when it is stopped: "orphan" answers with the starter's page, "other-service"
+// with the page of an unrelated listener that took the freed port.
+const smokeStopHandoverEnv = "SMOKE_TEST_STOP_HANDOVER"
 
 // smokeReadyShapeEnv selects the line the stub prints for a ready listener.
 const smokeReadyShapeEnv = "SMOKE_TEST_READY_SHAPE"
@@ -551,6 +575,29 @@ func TestSmokeRunsExactTypeScriptGoldenPathThroughHTTPAndCleanStop(t *testing.T)
 	// The run leg is opt-in through SMOKE_RUN_COMMAND.
 	if res.contains("?run=") || res.contains("→ run ") {
 		t.Fatalf("the run leg ran without SMOKE_RUN_COMMAND:\n%s", res.output)
+	}
+}
+
+// The shutdown leg fails when the port still answers with the page the starter
+// served, and passes when an unrelated listener took the freed port.
+func TestSmokeShutdownLegTellsAnOrphanFromAnotherListenerOnTheFreedPort(t *testing.T) {
+	requireBash(t)
+	t.Setenv("GO_WANT_SMOKE_CLI_HELPER", "1")
+	body := fullGoldenPathStub(t)
+	server := newRegistry(t, registryOptions{
+		body:      body,
+		integrity: "sha256:" + sha256Hex(body),
+		resolved:  stubVersion,
+	})
+
+	orphan := runSmokeFrom(t, server.URL, server.URL+"/install.sh", "", t.TempDir(), smokeStopHandoverEnv+"=orphan")
+	if orphan.exitCode == 0 || !orphan.contains("::error::shutdown leg: HTTP listener still answers after the CLI exited; the starter may be orphaned") {
+		t.Fatalf("the smoke accepted a starter whose page still answers after the stop (exit %d):\n%s", orphan.exitCode, orphan.output)
+	}
+
+	other := runSmokeFrom(t, server.URL, server.URL+"/install.sh", "", t.TempDir(), smokeStopHandoverEnv+"=other-service")
+	if other.exitCode != 0 || !other.contains("HTTP listener is unreachable after clean stop") {
+		t.Fatalf("the smoke failed although only another listener answered after the stop (exit %d):\n%s", other.exitCode, other.output)
 	}
 }
 

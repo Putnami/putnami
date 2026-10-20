@@ -307,7 +307,7 @@ cleared. It exports `PUTNAMI_CHANNEL=<channel>` for `init`, so the workspace
 is resolved from the release set of the channel under test rather than from
 `latest`. It verifies the selected executable and stamp, generated workspace,
 locks, extension and MCP registration, typed readiness, a real successful HTTP
-response, and graceful shutdown. Any failing leg prints bounded diagnostics;
+response, and graceful shutdown: after the stop, `/` must no longer answer with the page the starter served (a different page from an unrelated listener on the freed port does not fail the leg). Any failing leg prints bounded diagnostics;
 an automated run sets `SMOKE_DIAGNOSTICS_DIR` to retain the artifact bundle.
 The legs themselves are covered by `tooling/cli/internal/installscript`, which
 points both served URLs at local test servers — see
