@@ -180,6 +180,13 @@ type LaunchSpec struct {
 }
 type Resolve func(context.Context) (LaunchSpec, error)
 
+// Cause is why the engine cannot prepare a capability's provider, in the
+// engine's own words, so the warning names it. The warning echoes no other
+// error: one may carry provider output.
+type Cause string
+
+func (c Cause) Error() string { return string(c) }
+
 // Run owns a single delivery worker of one capability, independent of
 // scheduler cancellation and of every other capability's worker. Only Finish
 // enables terminal transmission. The worker is a declared subscriber of the
@@ -246,6 +253,10 @@ func startRun(ctx context.Context, capability Capability, events *sessionstream.
 		_ = r.save()
 		r.release()
 		close(r.done)
+		var cause Cause
+		if errors.As(err, &cause) {
+			return r, fmt.Errorf("%s unavailable: %w; retained session %s for replay", capability.Label, cause, sessionID)
+		}
 		return r, fmt.Errorf("%s unavailable; retained session %s for replay", capability.Label, sessionID)
 	}
 	launch.Env = capability.providerEnv(ctx, launch.Env)
