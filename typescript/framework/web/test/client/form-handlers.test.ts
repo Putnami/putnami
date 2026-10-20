@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import { actionHandler as clientActionHandler } from '../../src/client/form/action.handler';
 import { layoutLoaderHandler, pageLoaderHandler } from '../../src/client/form/loader.handler';
 
@@ -255,6 +256,90 @@ describe('Client Form Handlers', () => {
         headers: { Accept: 'application/json', 'X-Putnami-Loader': '1' },
         signal: expect.any(AbortSignal),
       });
+    });
+    describe('under a dynamic segment', () => {
+      const fillsParams = {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'layout-loader-endpoint',
+        check: 'a-layout-endpoint-fills-its-dynamic-segments-from-the-matched-params',
+      };
+      const expectLayoutFetch = (url: string) =>
+        expect(fetchMock).toHaveBeenCalledWith(url, {
+          headers: { Accept: 'application/json', 'X-Putnami-Loader': '1' },
+          signal: expect.any(AbortSignal),
+        });
+
+      specTest('fills and encodes a dynamic segment from the matched params', fillsParams, async () => {
+        await layoutLoaderHandler('/w/:workspace')({
+          request: new Request('http://localhost/w/a%20b/settings'),
+          params: { workspace: 'a b' },
+          context: undefined,
+        });
+
+        expectLayoutFetch('http://localhost/w/a%20b-layout.json');
+      });
+
+      specTest('fills nested dynamic segments and encodes a slash in a value', fillsParams, async () => {
+        await layoutLoaderHandler('/w/:workspace/p/:project')({
+          request: new Request('http://localhost/w/acme/p/x%2Fy/runs'),
+          params: { workspace: 'acme', project: 'x/y' },
+          context: undefined,
+        });
+
+        expectLayoutFetch('http://localhost/w/acme/p/x%2Fy-layout.json');
+      });
+
+      specTest('keeps the basename and the query string around the filled path', fillsParams, async () => {
+        (globalThis as typeof globalThis & { window?: { __basename?: string } }).window = { __basename: '/app' };
+
+        await layoutLoaderHandler('/w/:workspace')({
+          request: new Request('http://localhost/app/w/acme/settings?tab=2'),
+          params: { workspace: 'acme' },
+          context: undefined,
+        });
+
+        expectLayoutFetch('http://localhost/app/w/acme-layout.json?tab=2');
+      });
+
+      it('fills the unstable_pattern fallback and drops its catch-all', async () => {
+        await layoutLoaderHandler()({
+          request: new Request('http://localhost/w/acme/docs/intro'),
+          params: { workspace: 'acme', '*': 'docs/intro' },
+          unstable_pattern: '/w/:workspace/*',
+          context: undefined,
+        });
+
+        expectLayoutFetch('http://localhost/w/acme-layout.json');
+      });
+
+      it('drops an optional segment that has no value', async () => {
+        await layoutLoaderHandler('/w/:workspace?')({
+          request: new Request('http://localhost/w'),
+          params: {},
+          context: undefined,
+        });
+
+        expectLayoutFetch('http://localhost/w-layout.json');
+      });
+
+      specTest(
+        'rejects without a request when a required param is missing',
+        {
+          feature: 'typescript/web-application-delivery',
+          requirement: 'layout-loader-endpoint',
+          check: 'a-layout-endpoint-without-a-required-param-is-never-requested',
+        },
+        async () => {
+          const load = layoutLoaderHandler('/w/:workspace')({
+            request: new Request('http://localhost/w/acme'),
+            params: {},
+            context: undefined,
+          });
+
+          await expect(load).rejects.toThrow('Missing ":workspace" param');
+          expect(fetchMock).not.toHaveBeenCalled();
+        },
+      );
     });
   });
 

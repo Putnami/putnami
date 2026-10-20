@@ -73,11 +73,19 @@ export class ReactApplication {
   ) {
     this.cache = new ReactModuleCache(this.config.moduleCacheSize);
     this.middlewareResolver = new RouteMiddlewareResolver(this.cache);
+    // A node created on the path to a deeper layout (`w` for `/w/:workspace`)
+    // nests the routes below it like a layout, as the client route tree does,
+    // so a page under that layout renders inside it and runs its loader.
+    const pathNodes = new WeakSet<RouteObject>();
     this.routeHelper =
       routeHelper ??
       new RouteTreeHelper<RouteObject>(this.reactRouter[0], {
-        isLayout: (node) => node.id?.endsWith('-layout') === true,
-        createLayoutNode: (path, id) => ({ path, id }),
+        isLayout: (node) => node.id?.endsWith('-layout') === true || pathNodes.has(node),
+        createLayoutNode: (path, id) => {
+          const node: RouteObject = { path, id };
+          pathNodes.add(node);
+          return node;
+        },
       });
     this.scripts = new ReactScriptRegistry(this.httpPlugin, this.config);
     this.statics = new ReactStaticServer(

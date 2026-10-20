@@ -202,6 +202,7 @@
               "a-loader-endpoint-is-registered-when-declared",
               "a-nested-layout-produces-nested-nodes",
               "a-nested-page-id-is-derived-deterministically",
+              "a-page-nests-inside-a-layout-whose-parent-path-has-none",
               "a-page-registers-under-its-route-id",
               "a-route-group-is-filtered-out-of-the-path",
               "a-scan-root-prefix-is-inferred-and-normalized",
@@ -209,6 +210,19 @@
               "an-index-page-is-placed-at-its-parent",
               "several-dynamic-segments-are-mapped-together",
               "the-default-scan-path-applies-when-none-is-configured"
+            ]
+          }
+        },
+        {
+          "id": "layout-loader-endpoint",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-layout-endpoint-fills-its-dynamic-segments-from-the-matched-params",
+              "a-layout-endpoint-without-a-required-param-is-never-requested",
+              "the-server-answers-a-dynamic-layout-endpoint-with-the-render-params"
             ]
           }
         },

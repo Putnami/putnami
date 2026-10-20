@@ -368,6 +368,41 @@ describe('ReactApplication', () => {
       expect(dashboardNode.children[0].element).toBeDefined();
     });
 
+    specTest(
+      'nests a page inside a layout whose parent path has no layout',
+      {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'route-graph',
+        check: 'a-page-nests-inside-a-layout-whose-parent-path-has-none',
+      },
+      () => {
+        app.reactLayout('/w/:workspace', { layout: { default: () => null } });
+        app.reactPage('/w/:workspace/settings', { page: { default: () => 'Settings' } });
+
+        type Node = { path?: string; id?: string; children?: Node[] };
+        const shape = (node: Node): Node => ({
+          path: node.path,
+          id: node.id,
+          ...(node.children?.length ? { children: node.children.map(shape) } : {}),
+        });
+        const root = (app as unknown as { reactRouter: Node[] }).reactRouter[0] as Node;
+
+        expect(root.children?.map(shape)).toEqual([
+          {
+            path: 'w',
+            id: 'root-w',
+            children: [
+              {
+                path: ':workspace',
+                id: 'root-w-workspace-layout',
+                children: [{ path: 'settings', id: 'root-w-workspace-settings-page' }],
+              },
+            ],
+          },
+        ]);
+      },
+    );
+
     it('registers layout loader JSON endpoint', () => {
       const httpPluginMock = {
         get: mock(),

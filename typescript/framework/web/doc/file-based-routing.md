@@ -330,6 +330,11 @@ export default function PostPage() {
 }
 ```
 
+A layout under a dynamic segment, such as `src/app/w/[workspace]/layout.loader.ts`,
+receives the same `ctx.params.workspace` on a full page load and on client
+navigation. During client navigation the router fetches the layout's data from
+`/w/<workspace>-layout.json`, with the value URL-encoded.
+
 ### Catch-all Routes
 
 Use `[...param]` for catch-all routes:
