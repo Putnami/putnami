@@ -20,13 +20,24 @@ import (
 
 // everyCapability is the negotiation of a session that offered and echoed
 // every capability this package defines.
-var everyCapability = []string{CapabilityCredentialV1, CapabilityPublicationV1}
+var everyCapability = []string{CapabilityCredentialV1, CapabilityPublicationV1, CapabilityUploaderV1}
+
+// publicationSessionFixtures are the fixtures that hold an uploader-v1 op
+// valid in every other respect. They parse in a session that negotiated every
+// capability and are refused in a session that negotiated publication-v1
+// without uploader-v1. Each sits under invalid/, where the schema, which does
+// not see the session, accepts it.
+var publicationSessionFixtures = map[string]bool{
+	"request-upload-publication-session.json":  true,
+	"response-upload-publication-session.json": true,
+}
 
 // TestCredentialFixtures runs every fixture through the Go validator, in a
 // session that negotiated every capability: valid lines parse and re-encode
-// byte for byte, a publication-v1 payload included, and invalid lines are
-// refused. A response fixture names the op it answers:
-// response-<op>-<case>.json.
+// byte for byte, a publication-v1 or uploader-v1 payload included, and
+// invalid lines are refused, except publicationSessionFixtures, which a
+// session without uploader-v1 refuses. A response fixture names the op it
+// answers: response-<op>-<case>.json.
 func TestCredentialFixtures(t *testing.T) {
 	t.Parallel()
 	for _, validity := range []string{"valid", "invalid"} {
@@ -43,6 +54,10 @@ func TestCredentialFixtures(t *testing.T) {
 					t.Fatal(err)
 				}
 				line := bytes.TrimSuffix(data, []byte("\n"))
+				negotiated := everyCapability
+				if publicationSessionFixtures[name] {
+					negotiated = []string{CapabilityCredentialV1, CapabilityPublicationV1}
+				}
 				var decoded any
 				var op CredentialOp
 				var payload json.RawMessage
@@ -50,7 +65,7 @@ func TestCredentialFixtures(t *testing.T) {
 				switch {
 				case strings.HasPrefix(name, "request-"):
 					var request *CredentialRequest
-					request, err = ParseNegotiatedCredentialRequest(line, everyCapability)
+					request, err = ParseNegotiatedCredentialRequest(line, negotiated)
 					if request != nil {
 						decoded, op, payload = request, request.Op, request.Payload
 					}
@@ -61,7 +76,7 @@ func TestCredentialFixtures(t *testing.T) {
 						t.Fatalf("fixture %s names no op", name)
 					}
 					var response *CredentialResponse
-					response, err = ParseNegotiatedCredentialResponse(line, op, everyCapability)
+					response, err = ParseNegotiatedCredentialResponse(line, op, negotiated)
 					if response != nil {
 						decoded, payload, answer = response, response.Payload, true
 					}
@@ -71,6 +86,16 @@ func TestCredentialFixtures(t *testing.T) {
 				if validity == "invalid" {
 					if err == nil {
 						t.Fatalf("invalid fixture accepted: %s", line)
+					}
+					if publicationSessionFixtures[name] {
+						if name, ok := strings.CutPrefix(name, "response-"); ok {
+							_, err = ParseNegotiatedCredentialResponse(line, CredentialOp(strings.SplitN(name, "-", 2)[0]), everyCapability)
+						} else {
+							_, err = ParseNegotiatedCredentialRequest(line, everyCapability)
+						}
+						if err != nil {
+							t.Fatalf("fixture is refused for another reason than the session: %v", err)
+						}
 					}
 					return
 				}
@@ -84,7 +109,7 @@ func TestCredentialFixtures(t *testing.T) {
 				if !bytes.Equal(encoded, line) {
 					t.Fatalf("fixture is not the canonical encoding:\n%s\n%s", line, encoded)
 				}
-				if op.Capability() != CapabilityPublicationV1 || len(payload) == 0 {
+				if (op.Capability() != CapabilityPublicationV1 && op.Capability() != CapabilityUploaderV1) || len(payload) == 0 {
 					return
 				}
 				typed, err := parsePublicationPayload(op, answer, payload)
@@ -102,8 +127,8 @@ func TestCredentialFixtures(t *testing.T) {
 	}
 }
 
-// parsePublicationPayload decodes the payload of a publication-v1 request, or
-// of its answer, into its type.
+// parsePublicationPayload decodes the payload of a publication-v1 or
+// uploader-v1 request, or of its answer, into its type.
 func parsePublicationPayload(op CredentialOp, answer bool, payload json.RawMessage) (any, error) {
 	switch {
 	case op == CredentialOpResolve && answer:
@@ -118,8 +143,12 @@ func parsePublicationPayload(op CredentialOp, answer bool, payload json.RawMessa
 		return ParseReleaseResult(payload)
 	case op == CredentialOpRelease:
 		return ParseReleaseParams(payload)
+	case op == CredentialOpUpload && answer:
+		return ParseUploadResult(payload)
+	case op == CredentialOpUpload:
+		return ParseUploadParams(payload)
 	}
-	return nil, fmt.Errorf("%s is not a publication-v1 op", op)
+	return nil, fmt.Errorf("%s is not a publication-v1 or uploader-v1 op", op)
 }
 
 // TestCredentialSchemaTracksWireShape keeps the JSON Schema and the Go
@@ -191,6 +220,8 @@ func TestCredentialSchemaTracksWireShape(t *testing.T) {
 		"evidence":         {PublicationEvidence{}, "images,members"},
 		"imageEvidence":    {runtimeproto.ReleaseSetPublishedImage{}, "project,digest"},
 		"memberEvidence":   {PublicationMemberEvidence{}, "project,ecosystem,coordinate,version,digest,publisher,command,step"},
+		"uploadParams":     {UploadParams{}, "planDigest,registry,outbox,member"},
+		"uploadResult":     {UploadResult{}, "digest"},
 	}
 	for name, object := range objects {
 		def, ok := schema.Definitions[name]
@@ -212,7 +243,7 @@ func TestCredentialSchemaTracksWireShape(t *testing.T) {
 			t.Errorf("%s: protocolVersion const diverged", name)
 		}
 	}
-	ops := []string{string(CredentialOpInitialize), string(CredentialOpCredential), string(CredentialOpShutdown), string(CredentialOpResolve), string(CredentialOpOpen), string(CredentialOpRelease)}
+	ops := []string{string(CredentialOpInitialize), string(CredentialOpCredential), string(CredentialOpShutdown), string(CredentialOpResolve), string(CredentialOpOpen), string(CredentialOpRelease), string(CredentialOpUpload)}
 	if got := strings.Join(schema.Definitions["request"].Properties["op"].Enum, ","); got != strings.Join(ops, ",") {
 		t.Errorf("op enum = %s", got)
 	}

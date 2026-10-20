@@ -134,3 +134,31 @@ func TestConformance_PublicationProvider(t *testing.T) {
 		t.Error("plan version, plan bound or ancestry snapshot bound changed")
 	}
 }
+
+// TestConformance_UploaderProvider pins the uploader-v1 tokens and bounds: the
+// capability, the op, its refusal codes, its registry and outbox bounds, and
+// its line bound. The engine and every provider that echoes uploader-v1
+// depend on them.
+func TestConformance_UploaderProvider(t *testing.T) {
+	if CapabilityUploaderV1 != "uploader-v1" || CredentialOpUpload != "upload" {
+		t.Errorf("uploader-v1 tokens = %q, %q; want uploader-v1, upload", CapabilityUploaderV1, CredentialOpUpload)
+	}
+	if CredentialOpUpload.Capability() != CapabilityUploaderV1 || CredentialOpUpload.MaxLineBytes() != 8<<20 {
+		t.Errorf("upload: capability %q, line bound %d; want uploader-v1, 8 MiB", CredentialOpUpload.Capability(), CredentialOpUpload.MaxLineBytes())
+	}
+	if MaxUploadRegistryBytes != 2048 || MaxUploadOutboxBytes != 4096 {
+		t.Errorf("upload bounds = %d, %d; want 2048, 4096", MaxUploadRegistryBytes, MaxUploadOutboxBytes)
+	}
+	want := []string{"plan_not_open", "plan_mismatch", "registry_not_served", "artifact_digest_mismatch", "artifact_conflict", "upload_failed"}
+	if len(UploadRefusalCodes) != len(want) {
+		t.Fatalf("UploadRefusalCodes = %v, want %v", UploadRefusalCodes, want)
+	}
+	for index, code := range want {
+		if UploadRefusalCodes[index] != code {
+			t.Errorf("UploadRefusalCodes[%d] = %q, want %q", index, UploadRefusalCodes[index], code)
+		}
+		if err := ValidateRefusal(CredentialRefusal{Code: code}); err != nil {
+			t.Errorf("refusal code %q: %v", code, err)
+		}
+	}
+}

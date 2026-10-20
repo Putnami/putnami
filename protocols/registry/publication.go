@@ -68,20 +68,23 @@ const (
 // is a release answer whose outcome is conflict.
 const (
 	// RefusalPlanNotOpen: no plan is open in the session, and the op needs
-	// one: credential with purpose publish, or release.
+	// one: credential with purpose publish, release, or upload.
 	RefusalPlanNotOpen = "plan_not_open"
 	// RefusalPlanAlreadyOpen: open names a plan whose planDigest differs from
 	// the plan already open in the session.
 	RefusalPlanAlreadyOpen = "plan_already_open"
 	// RefusalPlanMismatch: release names a planDigest other than the opened
 	// plan's, carries a request that does not match the opened plan, or asks
-	// again under a planDigest whose stored release derived another set ref.
+	// again under a planDigest whose stored release derived another set ref;
+	// or upload names a planDigest other than the opened plan's, or a member
+	// the opened plan does not select.
 	RefusalPlanMismatch = "plan_mismatch"
 	// RefusalArtifactMissing: a selected member of the opened plan has no
 	// artifact in its registry at release.
 	RefusalArtifactMissing = "artifact_missing"
 	// RefusalArtifactDigestMismatch: a member's artifactDigest differs from
-	// the artifact its registry stores.
+	// the artifact its registry stores, or a file that upload reads from the
+	// outbox differs from the size or digest the member names.
 	RefusalArtifactDigestMismatch = "artifact_digest_mismatch"
 	// RefusalNotForward: an advanced channel's head is not the run's source
 	// revision or one of its ancestors, at open or at release.
@@ -544,10 +547,10 @@ func ParseReleaseResult(payload json.RawMessage) (*ReleaseResult, error) {
 	return &ReleaseResult{Response: *response}, nil
 }
 
-// strictPublicationPayload decodes a publication-v1 payload: a payload within
-// the line bounds of its op, one level below the envelope, in which every
-// member without omitempty is present and every omitempty member is absent
-// rather than empty. delegated names the top-level member that carries a
+// strictPublicationPayload decodes a publication-v1 or uploader-v1 payload: a
+// payload within the line bounds of its op, one level below the envelope, in
+// which every member without omitempty is present and every omitempty member
+// is absent rather than empty. delegated names the top-level member that carries a
 // distribution document, "" when none does.
 func strictPublicationPayload(payload json.RawMessage, target any, delegated string) error {
 	if len(payload) == 0 {

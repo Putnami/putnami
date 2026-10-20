@@ -100,7 +100,7 @@ func TestPublicationOpsAreRefusedWithoutTheCapability(t *testing.T) {
 		{everyCapability, everyCapability, everyCapability},
 		{everyCapability, []string{CapabilityCredentialV1}, []string{CapabilityCredentialV1}},
 		{[]string{CapabilityCredentialV1}, everyCapability, []string{CapabilityCredentialV1}},
-		{[]string{CapabilityCredentialV1, CapabilityPublicationV1, CapabilityPublicationV1}, []string{CapabilityPublicationV1, CapabilityCredentialV1}, everyCapability},
+		{[]string{CapabilityCredentialV1, CapabilityPublicationV1, CapabilityPublicationV1}, []string{CapabilityPublicationV1, CapabilityCredentialV1}, []string{CapabilityCredentialV1, CapabilityPublicationV1}},
 		{nil, everyCapability, nil},
 	} {
 		negotiated := NegotiatedCapabilities(test.offered, test.echoed)
