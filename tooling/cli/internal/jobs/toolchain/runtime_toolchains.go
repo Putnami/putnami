@@ -54,14 +54,23 @@ const unavailableRuntimeToolchainIdentity = "unavailable"
 // extensionproto.WorkspaceFetchCommand resolves the same way: a hosted run
 // fetches the dependencies before the installers run, so the fetch starts
 // before the pinned toolchain may be installed (IsToolchainProvisioningCommand).
+// So does ProjectSetupCommand.
 const ToolchainProvisioningCommand = "workspace-install"
 
+// ProjectSetupCommand is the job `putnami projects create` runs in the
+// extension of the template it rendered. Its prepare stage writes the files a
+// pin derives from (a new Go project's go.work) before any pin exists: create
+// runs that stage when a toolchain the job requires does not resolve
+// (UnresolvedRuntimeToolchainLocks), pins and installs it, then runs the job.
+const ProjectSetupCommand = "project-setup"
+
 // IsToolchainProvisioningCommand reports whether command, or the command a
-// pipeline step job belongs to, is ToolchainProvisioningCommand or
-// extensionproto.WorkspaceFetchCommand, which runs before it.
+// pipeline step job belongs to, is ToolchainProvisioningCommand,
+// extensionproto.WorkspaceFetchCommand, which runs before it, or
+// ProjectSetupCommand.
 func IsToolchainProvisioningCommand(command string) bool {
 	switch extensionproto.BaseCommandName(command) {
-	case ToolchainProvisioningCommand, extensionproto.WorkspaceFetchCommand:
+	case ToolchainProvisioningCommand, extensionproto.WorkspaceFetchCommand, ProjectSetupCommand:
 		return true
 	}
 	return false
@@ -1050,25 +1059,6 @@ func applyRuntimeToolchainsContext(ctx context.Context, base []string, ext *mode
 // environment as ordinary tasks to an engine-owned provider subprocess.
 // Call SynchronizeExtensionRuntimesForCommands before constructing the launch.
 func ProviderRuntimeEnvironment(ctx context.Context, base []string, ext *model.ExtensionDescription, refs []string) ([]string, error) {
-	return applyRuntimeToolchainsContext(ctx, base, ext, refs)
-}
-
-// RunToolchainEnvironment resolves the toolchains every task of ext runs with
-// (runtime.runToolchains) and returns base with their environment applied, for
-// a command that starts one of those tools outside the task graph. Resolution
-// is the one a job of an ordinary command gets: strict against the workspace
-// lock, and the unavailable bootstrap identity when no lock exists yet, which
-// leaves the ambient PATH in charge. Resolution records on ext and reuses an
-// earlier record, so ext must be a description no run shares, and a caller that
-// wants a fresh answer discovers ext again.
-func RunToolchainEnvironment(ctx context.Context, workspaceRoot string, ext *model.ExtensionDescription, base []string) ([]string, error) {
-	if ext == nil || ext.Runtime == nil || len(ext.Runtime.RunToolchains) == 0 {
-		return append([]string(nil), base...), nil
-	}
-	refs := append([]string(nil), ext.Runtime.RunToolchains...)
-	if err := resolveRuntimeToolchainsContext(ctx, workspaceRoot, ext, refs, base); err != nil {
-		return nil, err
-	}
 	return applyRuntimeToolchainsContext(ctx, base, ext, refs)
 }
 

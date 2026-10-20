@@ -1,7 +1,6 @@
 package template
 
 import (
-	"bytes"
 	"io"
 	"io/fs"
 	"os"
@@ -19,7 +18,6 @@ type RenderVars struct {
 	ProjectModule         string
 	PutnamiVersion        string
 	WorkspaceRelativePath string
-	GoFrameworkVersion    string
 }
 
 // RenderDir copies a template directory to the target, performing
@@ -106,59 +104,14 @@ func RenderDir(src, dst string, vars RenderVars) error {
 	})
 }
 
-// GoFrameworkVersionVariable is the variable RenderVars.GoFrameworkVersion
-// fills.
-const GoFrameworkVersionVariable = "goFrameworkVersion"
-
-// UsesVariable reports whether a .template file of the template at src holds
-// the <%= name %> placeholder, which RenderDir substitutes. A caller computes a
-// variable that costs a network request only for a template that renders it.
-func UsesVariable(src, name string) (bool, error) {
-	src, err := dirlink.Resolve(src)
-	if err != nil {
-		return false, err
-	}
-	root, err := os.OpenRoot(src)
-	if err != nil {
-		return false, err
-	}
-	defer root.Close() //nolint:errcheck // best-effort cleanup
-
-	placeholder := []byte("<%= " + name + " %>")
-	used := false
-	err = filepath.WalkDir(src, func(path string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if d.IsDir() || !strings.HasSuffix(path, ".template") {
-			return nil
-		}
-		rel, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-		data, err := root.ReadFile(rel)
-		if err != nil {
-			return err
-		}
-		if bytes.Contains(data, placeholder) {
-			used = true
-			return filepath.SkipAll
-		}
-		return nil
-	})
-	return used, err
-}
-
 // EvalTemplate replaces <%= varName %> placeholders with values from vars.
 func EvalTemplate(content string, vars RenderVars) string {
 	replacements := map[string]string{
-		"projectName":              vars.ProjectName,
-		"projectPath":              vars.ProjectPath,
-		"projectModule":            vars.ProjectModule,
-		"putnamiVersion":           vars.PutnamiVersion,
-		"workspaceRelativePath":    vars.WorkspaceRelativePath,
-		GoFrameworkVersionVariable: vars.GoFrameworkVersion,
+		"projectName":           vars.ProjectName,
+		"projectPath":           vars.ProjectPath,
+		"projectModule":         vars.ProjectModule,
+		"putnamiVersion":        vars.PutnamiVersion,
+		"workspaceRelativePath": vars.WorkspaceRelativePath,
 	}
 	for key, val := range replacements {
 		if val == "" {
@@ -200,6 +153,5 @@ func DefaultTestVars() RenderVars {
 		ProjectModule:         "test_project",
 		PutnamiVersion:        "latest",
 		WorkspaceRelativePath: "..",
-		GoFrameworkVersion:    "v0.0.0",
 	}
 }

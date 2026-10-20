@@ -10,8 +10,6 @@
     "A toolchain pin survives the refresh while a declared extension's runtime resolves it, even in a workspace with no project of that language",
     "A workspace putnami init creates pins the toolchains it declares, so the commands init prints next resolve them",
     "A checkout whose lock lacks a pin for a declared toolchain gets it from the first command's implicit install, and keeps every committed pin",
-    "A Go project created on a host with only Putnami installed is set up with the Go the lock pins, pinned and installed first when the host has none",
-    "A new Go project requires the Go framework release the consumer's module proxies serve, and create fails before it writes anything when none answers",
     "A machine that pinned a Go release pins it again in any workspace with no request to go.dev"
   ],
   "nonGoals": [
@@ -41,40 +39,8 @@
       "text": "The first-use install a command runs implicitly pins each toolchain go.work, package.json#packageManager or the root pyproject.toml [tool.uv] required-version declares that the lock does not pin yet, with the same verified release metadata. It keeps every other entry as committed, stamps no CLI protocol, and creates no lock. Without a missing pin it reads no release metadata and writes nothing."
     },
     {
-      "id": "create-installs-a-missing-go",
-      "text": "putnami projects create sets a Go project up with the go command the template extension's tasks resolve: the release the lock pins, else a go on PATH. On a host with neither, it writes a missing go.work from the project's go directive, pins the Go that go.work declares, runs workspace-install and resolves again. If no go results, it fails naming the reasons and the create command to run again with --force. A go whose version probe times out is not missing: create installs nothing and fails the same way."
-    },
-    {
-      "id": "create-reports-a-failed-install",
-      "text": "When the workspace-install that putnami projects create runs to install a missing Go fails but still leaves a go, create finishes the Go setup with that go and runs the installers no second time. It keeps the project files and the workspace membership, and exits non-zero naming putnami deps install, as putnami init --project does after a failed install."
-    },
-    {
-      "id": "create-fails-when-go-mod-tidy-fails",
-      "text": "When go mod tidy fails in the Go project putnami projects create sets up, create keeps the project files and the workspace membership and exits non-zero. The error names tidy, quotes the end of go's output with URL credentials redacted, and names the create command to run again with --force."
-    },
-    {
-      "id": "create-resolves-the-go-framework-version",
-      "text": "putnami projects create asks the proxies of the effective GOPROXY, read from the environment then the go env file, for the @latest go.putnami.dev/app version a template renders; a 404 or 410 passes to the next. direct, and a module GONOPROXY or GOPRIVATE matches, follow the origin's go-import mod tag. Requests carry the credentials go would send, never printed. When nothing answers a canonical version, create writes nothing and fails naming each source asked, the fix and the command to rerun."
-    },
-    {
       "id": "install-pins-before-installers",
       "text": "An explicit putnami install pins each toolchain go.work, package.json#packageManager or the root pyproject.toml [tool.uv] required-version declares, at the declared release, when the lock pins none or another release, before any workspace installer runs, so the installers install the release the lock pins. A failed pin stops the install before the installers run. The implicit first-use install still only fills a missing pin."
-    },
-    {
-      "id": "deps-run-the-pinned-go",
-      "text": "putnami deps add and deps remove run their go commands with the go command the Go extension's tasks resolve: the release the lock pins, else a go on PATH. On a host with neither, they pin and install the Go the lock pins the way projects create does, and fail naming putnami install when no go results. A go whose version probe times out is not missing: deps add, remove and prune install nothing, edit no go.mod or putnami.json, and fail naming the timeout and the same deps command."
-    },
-    {
-      "id": "deps-edit-reads-no-replaced-version",
-      "text": "putnami deps add resolves each module with go list -m and requires it with go mod edit; deps remove drops it with go mod edit -droprequire. Neither runs go get, so a go.mod that requires a version no proxy serves is edited. A spec names a module path. A spec without a version takes the latest version, or keeps the version go.mod requires when it is newer, and deps add refuses the version none, naming the deps remove command."
-    },
-    {
-      "id": "deps-report-a-failed-install",
-      "text": "When the workspace-install that putnami deps add, deps remove or deps prune runs to install a missing Go fails but still leaves a go, the command edits the Go modules with that go, and prune edits every module it selected. It runs the installers no second time and exits non-zero naming putnami deps install, as putnami projects create does, so a failed install never ends in success."
-    },
-    {
-      "id": "deps-tidy-resolves-as-the-workspace-does",
-      "text": "putnami deps add, deps remove and deps prune run go mod tidy on a copy of go.mod that also states each go.work replace directive for a module version the module does not replace itself, such as the release go.work pins for a generated client's placeholder. go.mod and go.sum take the tidied copy without those directives. A failed go step leaves every putnami.json, go.mod and go.sum the command edits as it was."
     },
     {
       "id": "go-pin-reuses-the-machine-record",

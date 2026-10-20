@@ -73,7 +73,6 @@ Available variables:
 | `<%= projectModule %>` | Normalized module name (e.g., `my-lib` becomes `my_lib` for Python) |
 | `<%= putnamiVersion %>` | Current Putnami CLI version |
 | `<%= workspaceRelativePath %>` | Relative path from project to workspace root |
-| `<%= goFrameworkVersion %>` | Version to require for `go.putnami.dev/*` modules: the `@latest` version of `go.putnami.dev/app` that your Go module proxies serve. `create` asks for it only when a template uses the variable, and fails before it writes anything when no proxy answers |
 
 Directory and file **names** support one substitution: the literal segment
 `__module__` is replaced with the normalized module name, which is how the

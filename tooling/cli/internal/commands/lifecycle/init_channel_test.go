@@ -274,7 +274,7 @@ func recordInitStages(t *testing.T) *initStageCalls {
 		calls.params = append(calls.params, env.installParams())
 		return nil
 	}
-	createInitProject = func(_ context.Context, _ string, _ *wsproto.Config, _ []string, _ bool, env LifecycleEnv) error {
+	createInitProject = func(_ context.Context, _ string, _ *wsproto.Config, _ []string, env LifecycleEnv) error {
 		calls.creates = append(calls.creates, env.channel)
 		return nil
 	}

@@ -455,11 +455,7 @@ func initializeProject(
 		createArgs = append(createArgs, "--path", projectPath)
 	}
 
-	// verbose=false: init has its own scaffolding output; naming the module
-	// proxy that answered the framework-version lookup is a `projects create`
-	// concern and would need plumbing a verbose flag through WorkspaceInit that
-	// init does not otherwise use. A failed lookup still fails the create.
-	if err := createInitProject(ctx, cwd, wsCfg, createArgs, false, env); err != nil {
+	if err := createInitProject(ctx, cwd, wsCfg, createArgs, env); err != nil {
 		// A failed create may leave the project directory behind, which only
 		// --force lets the retry render over.
 		return protocolcli.WithNext(

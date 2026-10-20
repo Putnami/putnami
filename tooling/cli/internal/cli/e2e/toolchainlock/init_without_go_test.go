@@ -44,37 +44,39 @@ import (
 // records its runs in.
 const goExtensionFixtureEnv = "PUTNAMI_TOOLCHAINLOCK_GO_EXTENSION_FIXTURE"
 
-const (
-	// initGoRelease is the Go release the fixture template declares, and the
-	// one the release index offers.
-	initGoRelease = "1.26.1"
-	// initFrameworkVersion is the version the fixture Go module proxy answers
-	// for the Go framework's @latest.
-	initFrameworkVersion = "v0.7.3"
-)
+// initGoRelease is the Go release the fixture template declares, and the one
+// the release index offers.
+const initGoRelease = "1.26.1"
+
+// errNoGo is the failure of the fixture project-setup on a host without go.
+var errNoGo = errors.New("no go command is available")
 
 // A consumer who installed only Putnami runs `putnami init --extension go
 // --project app` on a host with no Go at all. Init installs the Go extension
-// and the go-server template from the registry. Create writes go.work, pins
-// the Go it declares from the release index, and runs workspace-install over
-// the new project, which downloads the pinned archive and checks it against
-// the pinned SHA-256 before it installs it. The project is set up with that
-// Go, and a build runs with it. The chain is the real one: WorkspaceInit → DepsInstall and
-// ProjectsCreate → RunWorkspaceJob → Engine.Run → runtime toolchain resolution
-// → the extension's task. The registry, the Go release index and download, and
-// the Go framework proxy are local servers, so nothing reaches the network.
+// and the go-server template from the registry. The Go the extension locks
+// does not resolve, so create runs the prepare stage of the extension's
+// project-setup, which writes go.work and runs no go. Create then pins the Go
+// go.work declares from the release index, runs workspace-install over the new
+// project, which downloads the pinned archive and checks it against the pinned
+// SHA-256 before it installs it, and runs project-setup once, which sets the
+// project up with that Go. No task fails. A build runs with it. The chain is
+// the real one: WorkspaceInit → DepsInstall and ProjectsCreate →
+// RunWorkspaceJob → Engine.Run → runtime toolchain resolution → the
+// extension's task. The registry and the Go release index and download are
+// local servers, so nothing reaches the network.
 //
 // The Go is installed once for the machine, under the Putnami home, and the
 // workspace holds no copy: a second workspace that init sets up on the same
 // machine runs the same install, downloads no archive, and pins the release
 // from the record the first pin left, with no request to the release index.
 //
-// The extension is a fixture whose workspace-install does what @putnami/go's
-// does for these steps: it installs nothing while nothing declares Go, and
-// installs the release the lock pins, verified, where its candidates look.
+// The extension is a fixture whose workspace-install and project-setup do what
+// @putnami/go's do for these steps: the install installs nothing while nothing
+// declares Go, and installs the release the lock pins, verified, where its
+// candidates look.
 func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
-	spectest.Proves(t, "cli/toolchain-lock", "create-installs-a-missing-go",
-		"init-and-create-install-the-pinned-go-through-the-engine")
+	spectest.Proves(t, "cli/job-planning-execution", "project-setup-runs-in-the-project-extension",
+		"a-bare-host-create-sets-the-project-up-with-no-failed-task")
 	spectest.Proves(t, "cli/toolchain-lock", "go-pin-reuses-the-machine-record",
 		"a-second-init-makes-no-request-to-the-release-index")
 	clitest.RequireShell(t)
@@ -130,28 +132,14 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 	t.Cleanup(goDev.Close)
 	t.Cleanup(versioncmd.SetGoReleaseEndpoints(goDev.URL+"/dl/?mode=json&include=all", goDev.URL+"/dl/"))
 
-	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/go.putnami.dev/app/@latest" {
-			http.NotFound(w, r)
-			return
-		}
-		_, _ = io.WriteString(w, `{"Version":"`+initFrameworkVersion+`"}`)
-	}))
-	t.Cleanup(proxy.Close)
-	// The Go settings of the host must not reach the lookup: the fixture proxy
-	// is the only one, and no go env file or private pattern applies.
-	t.Setenv("GOPROXY", proxy.URL)
-	t.Setenv("GOENV", "off")
-	t.Setenv("GONOPROXY", "")
-	t.Setenv("GOPRIVATE", "")
-
 	registry := newFixtureRegistry(t, map[string][]byte{
 		"/putnami/go/download":        goExtensionArchive(t, records),
 		"/putnami/go-server/download": goServerTemplateArchive(t),
 	})
 	t.Setenv("PUTNAMI_REGISTRY_URL", registry.URL)
 
-	env := lifecycle.LifecycleEnv{Out: io.Discard, RunJob: cli.RunWorkspaceJob}
+	var progress bytes.Buffer
+	env := lifecycle.LifecycleEnv{Out: &progress, RunJob: cli.RunWorkspaceJob}
 	var logs bytes.Buffer
 	previousLogger := slog.Default()
 	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
@@ -164,6 +152,8 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 	if initErr != nil {
 		t.Fatalf("putnami init --extension go --project app on a host without go: %v\n%s", initErr, transcript)
 	}
+	// No task of the init fails: each line a task reports says how it ended.
+	requireNoFailedTask(t, progress.String()+transcript)
 	// Create's workspace-install starts before the pinned Go exists and
 	// installs it. It says so at info level and warns about no toolchain.
 	if got := logs.String(); strings.Contains(got, `level=WARN msg="runtime toolchain`) ||
@@ -196,11 +186,7 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 			pin, pinned, initGoRelease, goDev.URL, goArchiveDigest)
 	}
 	if data, err := os.ReadFile(filepath.Join(wsRoot, "go.work")); err != nil || string(data) != "go "+initGoRelease+"\n\nuse ./app\n" {
-		t.Fatalf("go.work = %q, %v; want the bytes create writes for app", data, err)
-	}
-	if data, err := os.ReadFile(filepath.Join(wsRoot, "app", "go.mod")); err != nil ||
-		!strings.Contains(string(data), "go.putnami.dev/app "+initFrameworkVersion) {
-		t.Fatalf("app/go.mod = %q, %v; want the framework release the local proxy lists", data, err)
+		t.Fatalf("go.work = %q, %v; want the bytes project-setup writes for app", data, err)
 	}
 	// The Go is where the putnami-home candidate looks, and the workspace
 	// holds no Go release of its own.
@@ -216,6 +202,12 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 	}
 	if got := readLines(t, goCalls); !slices.Equal(got, wantCalls) {
 		t.Fatalf("go calls =\n%s\nwant, with the installed Go:\n%s", strings.Join(got, "\n"), strings.Join(wantCalls, "\n"))
+	}
+	// The prepare stage wrote go.work and ran no go; the setup, after the
+	// install, set app up with the installed Go.
+	wantSetups := []string{"prepare app", managedGo + " app"}
+	if got := fixtureRuns(t, records, "setup"); !slices.Equal(got, wantSetups) {
+		t.Fatalf("project-setup runs = %v, want %v\n%s", got, wantSetups, transcript)
 	}
 
 	// The tasks accept the Go the install left: a build runs with it on PATH.
@@ -253,6 +245,7 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 	if initErr != nil {
 		t.Fatalf("putnami init --extension go --project app in a second workspace: %v\n%s", initErr, transcript)
 	}
+	requireNoFailedTask(t, progress.String()+transcript)
 	if got, want := fixtureRuns(t, records, "install"), []string{"installed", "present", "present", "present"}; !slices.Equal(got, want) {
 		t.Fatalf("workspace-install runs = %v, want %v: the second workspace finds the installed Go\n%s", got, want, transcript)
 	}
@@ -274,12 +267,26 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 	if _, err := os.Lstat(filepath.Join(secondRoot, ".putnami", "extensions", "@putnami-go")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("the second workspace holds a Go release of its own: %v", err)
 	}
+	if got := fixtureRuns(t, records, "setup"); !slices.Equal(got, append(wantSetups, wantSetups...)) {
+		t.Fatalf("project-setup runs = %v, want those of the first workspace twice\n%s", got, transcript)
+	}
 	if got := readLines(t, goCalls); !slices.Equal(got, append(wantCalls, wantCalls...)) {
 		t.Fatalf("go calls =\n%s\nwant those of the first workspace twice, with the same installed Go:\n%s",
 			strings.Join(got, "\n"), strings.Join(wantCalls, "\n"))
 	}
 	if unexpected := registry.unexpected(); len(unexpected) > 0 {
 		t.Fatalf("the registry was asked for artifacts the fixture does not serve: %v", unexpected)
+	}
+}
+
+// requireNoFailedTask fails the test when a line of output reports a failed
+// task: the line of a task that ends in failure says FAIL.
+func requireNoFailedTask(t *testing.T, output string) {
+	t.Helper()
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "FAIL") {
+			t.Fatalf("a task failed: %q\n%s", line, output)
+		}
 	}
 }
 
@@ -369,6 +376,11 @@ func goExtensionArchive(t *testing.T, records string) []byte {
       "description": "Install the pinned Go toolchain.",
       "run": [{ "id": "workspace-install", "task": "workspace-install-exec" }]
     },
+    "project-setup": {
+      "description": "Set a created Go project up.",
+      "visibility": "internal",
+      "run": [{ "id": "project-setup", "task": "project-setup-exec" }]
+    },
     "build": {
       "description": "Build a Go project.",
       "run": [{ "id": "compile", "task": "build-task" }]
@@ -379,6 +391,14 @@ func goExtensionArchive(t *testing.T, records string) []byte {
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["workspace-install"],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": -1
+    },
+    "project-setup-exec": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["project-setup"],
       "cwd": "{workspaceRoot}",
       "cache": false,
       "timeoutMs": -1
@@ -403,12 +423,11 @@ func goExtensionArchive(t *testing.T, records string) []byte {
 }
 
 // goServerTemplateArchive is the fixture go-server template: a Go module on
-// the fixture Go release that requires the Go framework.
+// the fixture Go release.
 func goServerTemplateArchive(t *testing.T) []byte {
 	t.Helper()
 	return tarGz(t, []tarEntry{
-		{name: "go.mod.template", mode: 0o644, content: "module <%= projectModule %>\n\ngo " + initGoRelease +
-			"\n\nrequire go.putnami.dev/app <%= goFrameworkVersion %>\n"},
+		{name: "go.mod.template", mode: 0o644, content: "module <%= projectModule %>\n\ngo " + initGoRelease + "\n"},
 		{name: "putnami.json.template", mode: 0o644, content: `{"name":"<%= projectName %>","extensions":["@putnami/go"]}`},
 		{name: "putnami.template.json", mode: 0o644, content: `{"name":"go-server","description":"Go server","extension":"@putnami/go","version":"0.1.0"}`},
 	})
@@ -480,8 +499,8 @@ func readLines(t *testing.T, file string) []string {
 
 // runGoExtensionFixture is the fixture @putnami/go runtime, run by the test
 // binary under goExtensionFixtureEnv. It answers the runtime handshake,
-// installs the Go the lock pins on workspace-install, and records each run in
-// the directory the variable names.
+// installs the Go the lock pins on workspace-install, sets a project up on
+// project-setup, and records each run in the directory the variable names.
 func runGoExtensionFixture(args []string) int {
 	if len(args) >= 2 && args[0] == "__putnami" && args[1] == "runtime-info" {
 		fmt.Printf(`{"extension":"@putnami/go","version":"0.1.0","platform":%q,"cliContract":%d,"runtimeProtocol":%d,"runtimeABI":%d}`+"\n",
@@ -508,10 +527,18 @@ func runGoExtensionFixture(args []string) int {
 	case "workspace-install":
 		outcome, err = installPinnedGoFixture(root)
 		command = "install"
+	case "project-setup":
+		outcome, err = setUpGoProjectFixture(root, args[1:])
+		command = "setup"
 	case "build":
 		outcome, err = exec.LookPath("go")
 	default:
 		return 0
+	}
+	if errors.Is(err, errNoGo) {
+		if recordErr := appendLine(filepath.Join(records, command+"-runs.txt"), outcome); recordErr != nil {
+			fmt.Fprintln(os.Stderr, recordErr)
+		}
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -522,6 +549,94 @@ func runGoExtensionFixture(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+// setUpGoProjectFixture is the fixture project-setup: the go commands
+// @putnami/go's job runs for a project whose go.mod requires no framework
+// module, with the go on PATH. Its prepare stage only writes a missing go.work
+// from the project's go directive and runs no go, as the job's does. Without a
+// go it writes that go.work and fails with errNoGo, as the job does on a host
+// where the lock pins no Go yet. It returns the go it ran, or the stage, and
+// the project path.
+func setUpGoProjectFixture(root string, args []string) (string, error) {
+	params, err := readFixtureSetupParams(args)
+	if err != nil {
+		return "", err
+	}
+	project := params.Path
+	projectDir := filepath.Join(root, project)
+	goVersion := ""
+	if data, err := os.ReadFile(filepath.Join(projectDir, "go.mod")); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			if fields := strings.Fields(line); len(fields) == 2 && fields[0] == "go" {
+				goVersion = fields[1]
+			}
+		}
+	}
+	writeGoWork := func() error {
+		goWork := filepath.Join(root, "go.work")
+		if _, statErr := os.Stat(goWork); errors.Is(statErr, os.ErrNotExist) {
+			return os.WriteFile(goWork, []byte("go "+goVersion+"\n\nuse ./"+project+"\n"), 0o644)
+		}
+		return nil
+	}
+	if params.Stage == "prepare" {
+		return "prepare " + project, writeGoWork()
+	}
+	goPath, err := exec.LookPath("go")
+	if err != nil {
+		if err := writeGoWork(); err != nil {
+			return "", err
+		}
+		return "no-go " + project, errNoGo
+	}
+	for _, step := range []struct {
+		dir  string
+		args []string
+	}{
+		{root, []string{"work", "use", "./" + project}},
+		{root, []string{"work", "edit", "-go=" + goVersion}},
+		{projectDir, []string{"mod", "edit", "-go=" + goVersion}},
+		{projectDir, []string{"mod", "tidy"}},
+	} {
+		cmd := exec.Command(goPath, step.args...)
+		cmd.Dir = step.dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return "", fmt.Errorf("go %s: %w: %s", strings.Join(step.args, " "), err, out)
+		}
+	}
+	return goPath + " " + project, nil
+}
+
+// fixtureSetupJobParams are the project-setup params the fixture reads.
+type fixtureSetupJobParams struct {
+	Path  string `json:"path"`
+	Stage string `json:"stage"`
+}
+
+// readFixtureSetupParams reads the path and stage params from the job context
+// file the --putnamiContext argument names.
+func readFixtureSetupParams(args []string) (fixtureSetupJobParams, error) {
+	contextFile := ""
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == "--putnamiContext" {
+			contextFile = args[i+1]
+		}
+	}
+	data, err := os.ReadFile(contextFile)
+	if err != nil {
+		return fixtureSetupJobParams{}, fmt.Errorf("read the job context: %w", err)
+	}
+	var jobContext struct {
+		Params fixtureSetupJobParams `json:"params"`
+	}
+	if err := json.Unmarshal(data, &jobContext); err != nil {
+		return fixtureSetupJobParams{}, fmt.Errorf("decode the job context: %w", err)
+	}
+	if jobContext.Params.Path == "" {
+		return fixtureSetupJobParams{}, errors.New("the job context has no path param")
+	}
+	return jobContext.Params, nil
 }
 
 // installPinnedGoFixture installs the Go the workspace lock pins where the

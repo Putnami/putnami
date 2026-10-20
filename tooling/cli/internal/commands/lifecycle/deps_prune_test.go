@@ -68,7 +68,7 @@ func TestDepsPruneDryRunListsEveryClassAndChangesNothing(t *testing.T) {
 	before := readToolConfig(t, root)
 
 	var out bytes.Buffer
-	if err := prunePlan(context.Background(), root, ws, "", true, &out, LifecycleEnv{}); err != nil {
+	if err := prunePlan(context.Background(), root, ws, nil, "", true, &out, LifecycleEnv{}); err != nil {
 		t.Fatalf("a dry run must not fail on a finding it would refuse: %v", err)
 	}
 	listing := out.String()
@@ -94,7 +94,7 @@ func TestDepsPruneRemovesTheDeclaredEntryAndRefusesTheOrphanManifest(t *testing.
 	root, ws := declaredEdgeWorkspace(t)
 
 	var out bytes.Buffer
-	err := prunePlan(context.Background(), root, ws, "", false, &out, LifecycleEnv{})
+	err := prunePlan(context.Background(), root, ws, nil, "", false, &out, LifecycleEnv{})
 	if err == nil {
 		t.Fatal("prune reported success while an orphan client manifest was left behind")
 	}
@@ -118,7 +118,7 @@ func TestDepsPruneRemovesTheDeclaredEntryAndRefusesTheOrphanManifest(t *testing.
 func TestDepsPruneNarrowsToTheSelectedProject(t *testing.T) {
 	root, ws := declaredEdgeWorkspace(t)
 	var out bytes.Buffer
-	if err := prunePlan(context.Background(), root, ws, "acme/tool", true, &out, LifecycleEnv{}); err != nil {
+	if err := prunePlan(context.Background(), root, ws, nil, "acme/tool", true, &out, LifecycleEnv{}); err != nil {
 		t.Fatalf("prune: %v", err)
 	}
 	if strings.Contains(out.String(), "orders") {
@@ -133,7 +133,7 @@ func TestDepsPruneOnACleanWorkspaceSaysSo(t *testing.T) {
 		{ID: "/libs/core", Name: "acme/core", Path: "libs/core"},
 	})
 	var out bytes.Buffer
-	if err := prunePlan(context.Background(), root, ws, "", false, &out, LifecycleEnv{}); err != nil {
+	if err := prunePlan(context.Background(), root, ws, nil, "", false, &out, LifecycleEnv{}); err != nil {
 		t.Fatalf("prune: %v", err)
 	}
 	if !strings.Contains(out.String(), "No declared dependency edge") {
@@ -165,7 +165,7 @@ func TestDepsPruneNamesTheHandEditForAManifestItKeeps(t *testing.T) {
 	const unnamedEdit = "remove the dependency on @acme/ui from acme/other's language manifest by hand"
 
 	var out bytes.Buffer
-	if err := prunePlan(context.Background(), root, ws, "", true, &out, LifecycleEnv{}); err != nil {
+	if err := prunePlan(context.Background(), root, ws, nil, "", true, &out, LifecycleEnv{}); err != nil {
 		t.Fatalf("dry run: %v", err)
 	}
 	for _, want := range []string{
@@ -178,7 +178,7 @@ func TestDepsPruneNamesTheHandEditForAManifestItKeeps(t *testing.T) {
 	}
 
 	out.Reset()
-	err = prunePlan(context.Background(), root, ws, "", false, &out, LifecycleEnv{})
+	err = prunePlan(context.Background(), root, ws, nil, "", false, &out, LifecycleEnv{})
 	if err == nil {
 		t.Fatal("prune reported success while a package.json dependency was left behind")
 	}
@@ -247,7 +247,7 @@ func TestDepsPruneRefusesAProviderViewTheTreeMovedPast(t *testing.T) {
 	if err := DepsPrune(context.Background(), root, "", true, LifecycleEnv{Out: &out}); err != nil {
 		t.Fatalf("prune over the recorded view: %v", err)
 	}
-	if !strings.Contains(out.String(), "prune example.com/api → example.com/lib") {
+	if !strings.Contains(out.String(), "example.com/api → example.com/lib [manifest]") {
 		t.Fatalf("prune over the recorded view = %q, want the unimported requirement listed", out.String())
 	}
 

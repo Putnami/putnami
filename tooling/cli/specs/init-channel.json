@@ -20,11 +20,11 @@
     },
     {
       "id": "every-resolution-reads-the-channel",
-      "text": "On a channel other than latest, every resolution of the run reads that channel and none reads latest: both extensions, the template, the template install project creation falls back to, the Go framework version (@v/<channel>.info where @latest is asked), and the workspace installers, which receive the putnami-channel job option. A channel that names no release fails the run instead of resolving latest. Init passes while latest names an older release set and while latest is empty."
+      "text": "On a channel other than latest, every resolution of the run reads that channel and none reads latest: both extensions, the template, the template install project creation falls back to, and the workspace installers and the project-setup job, which receive the putnami-channel job option. A channel that names no release fails the run instead of resolving latest. Init passes while latest names an older release set and while latest is empty."
     },
     {
       "id": "no-choice-is-unchanged",
-      "text": "Without a channel choice and without an install record, and on latest, init sends the requests it sent before it took a channel: bare artifact names, @latest for the Go framework, and no putnami-channel option."
+      "text": "Without a channel choice and without an install record, and on latest, init sends the requests it sent before it took a channel: bare artifact names, and no putnami-channel option to the workspace installers or the project-setup job."
     },
     {
       "id": "the-workspace-pins-no-channel",

@@ -243,34 +243,25 @@ under the same rules. `projects sync` reports the state itself and writes no
 separate warning.
 
 `projects create <name> --template <template>` renders the template and lists
-the project in the workspace config. On a host without Go, a Go project first
-installs the Go the workspace lock pins through the workspace installers. When
-those installers fail but still leave a Go, the project stays and the command
-exits non-zero with the command to run next: `putnami deps install`. A Go that
-does not answer its version probe within 5 seconds is not missing: the command
-installs nothing, names the timeout, keeps the project, and exits non-zero with
-the command that creates the project again.
+the project in the workspace config. It then runs the `project-setup` job of
+the template's extension for the new project, when the extension declares one.
+The job receives the directory of the project as `path` and, in a `putnami
+init` that resolves on a channel, that channel as `putnami-channel`. For a Go
+project, `@putnami/go` adds the project to `go.work`, pins the framework
+release, and runs `go mod tidy`: see
+[the Go extension](../../../go/extension/doc/getting-started.md#project-setup-and-dependency-edits).
 
-When the template renders `<%= goFrameworkVersion %>`, `projects create` asks
-for the newest version of `go.putnami.dev/app` the way the `go` command
-reaches a module, before it writes anything:
-
-1. It reads `GOPROXY`, `GONOPROXY` and `GOPRIVATE` from the environment, then
-   from the file `go env -w` writes. Without either, Go's default
-   `https://proxy.golang.org,direct` applies.
-2. It asks each proxy for the module's `@latest` version, in order. A 404 or a
-   410 passes to the next proxy; any other failure does only after a `|`.
-3. `direct`, and a module that `GONOPROXY` or `GOPRIVATE` matches, read the
-   module's `go-import` meta tag and ask the module proxy its `mod` tag names.
-4. A request carries the credentials the `go` command would send: the user
-   information of a `GOPROXY` URL, and over HTTPS your netrc entry for the
-   host (`NETRC`, else `~/.netrc`, or `%USERPROFILE%\_netrc` on Windows).
-   `GOAUTH=off` sends none. No credential is printed.
-
-When no source answers with a valid version, `projects create` writes nothing
-and fails. The error names each source it asked and its answer, the setting
-to fix, and the command to run again. With `--verbose`, a successful create
-names the source that answered.
+Before it runs the job, `projects create` checks whether the toolchains the
+extension's runtime locks resolve, such as the Go of `@putnami/go`. When one
+does not, the job first runs with `stage` set to `prepare`, which only writes
+the files a pin derives from, such as the `go.work` of a new Go project. The
+command then pins what the workspace lock misses, installs only a newly pinned
+toolchain that the extension locks, and runs the job once. A pinned toolchain
+that is not installed ends that run with an error that names `putnami install`.
+When the installers fail but the job then succeeds, the project stays and the
+command exits non-zero with the command to run next: `putnami deps install`.
+When the job fails, the project stays and the command exits non-zero with the
+create command to run again with `--force`.
 
 `projects describe` shows:
 - Project name, path, type, tags
@@ -360,9 +351,9 @@ On a channel other than `latest`, `init` prints the channel and what chose it, a
 |---|---|
 | Extension, template, and an agent-content extension a starter names | The put registry's `download?channel=<channel>` |
 | TypeScript starter | The version the npm dist-tag `<channel>` names for each `@putnami/*` package it seeds in the workspace catalog |
-| Go starter | The version the Go version query `@v/<channel>.info` names for `go.putnami.dev/app` |
+| Go starter | The `project-setup` job of `@putnami/go` receives the channel, and asks the Go version query `@v/<channel>.info` for the version of each framework module the template requires |
 
-A channel that names no release for one of them fails the run; `init` does not fall back to `latest`. The Go starter renders one version for its four framework modules, so a channel must publish all four at the version it names for `go.putnami.dev/app`. A tagged publish does.
+A channel that names no release for one of them fails the run; `init` does not fall back to `latest`. The Go starter requires five framework modules (`go.putnami.dev/app`, `config`, `http`, `logger` and `platform`), and the job resolves each one on the channel on its own, so a channel must name a release of all five.
 
 The channel is a target of that run only. `putnami.workspace.json` keeps bare extension and template names, `putnami.lock.json` records the exact versions, and the TypeScript workspace catalog gets the exact versions the channel names, never the channel name. `putnami install` reads the lock afterwards, and `putnami upgrade` still follows `latest` by default. See [ADR 0056](adr/0056-init-resolves-on-one-channel.md).
 
@@ -768,12 +759,12 @@ they are included when present and are not required to package a template.
 ### `deps`
 
 Manage workspace dependencies. `install` delegates to the appropriate package
-manager via extensions; `add`/`remove` edit a Go module's `go.mod` for you (so
-you don't hand-edit it) and reconcile the closure with `go mod tidy`.
+manager via extensions; `add`, `remove` and `prune` edit a project's language
+manifest for you, through the `deps-edit` job of the project's extension.
 
 ```bash
 putnami deps install                       # Install all dependencies (default)
-putnami deps add golang.org/x/text@latest  # Add a Go module (sole Go module, or --projects <name>)
+putnami deps add golang.org/x/text@latest  # Add a Go module (sole editable project, or --projects <name>)
 putnami deps add rsc.io/quote@v1.5.2 --projects api
 putnami deps remove golang.org/x/text      # Drop a Go module and tidy
 putnami deps prune                         # Remove declared edges no import backs
@@ -781,42 +772,26 @@ putnami deps prune --dry-run               # List them and change nothing
 putnami deps prune --projects api          # Narrow to one project
 ```
 
-`add`/`remove` currently support Go modules. The target module is the workspace's
-sole Go module, or the one named by `--projects <name>`. `add` resolves each
-module with `go list -m` (with `GOWORK=off`, so the query reads no workspace
-build list), then writes the versions with `go mod edit -require`; `remove` runs
-`go mod edit -droprequire`. Neither runs `go get`, which loads the module graph
-and fails on a `go.mod` that requires a version no module proxy serves, such as
-`v0.0.0`. `add` takes module paths, not package paths. A module without a version
-resolves to the latest version, or to the version `go.mod` already requires when
-that is newer; `add <module>@none` is refused, and the error names `putnami deps
-remove`. Both run
-the go command the Go extension's tasks run: the release the lock pins, or else
-a `go` on PATH. On a host with neither, they first pin and install the pinned Go,
-as `projects create` does. When the workspace installers fail but still leave a
-Go, `add`, `remove` and `prune` edit the modules with it and exit non-zero with
-the command to run next: `putnami deps install`. A Go that does not answer its
-version probe within 5 seconds is not missing: they install nothing, edit no
-`go.mod` or `putnami.json`, name the timeout, and exit non-zero with the same
-`deps` command to run next. For
-TypeScript, edit `package.json` and run `putnami deps install`.
-
-`go mod tidy` does not read `go.work`. So `add`, `remove` and `prune` run it on a
-copy of the module's `go.mod` that also states each `go.work` `replace` directive
-for a module version the module does not replace itself, such as the framework
-release `putnami upgrade` pins in place of a generated client's
-`v0.0.1` placeholder. `go.mod` and `go.sum` take the tidied copy without those
-directives. A `go.work` `use` line is not copied: a module requires a sibling
-workspace module through its own `replace` directive, which `putnami projects
-sync` writes. When a Go step fails, the command leaves every `putnami.json`,
-`go.mod` and `go.sum` it edits as it was.
+`add` and `remove` edit one project: the one `--projects <name>` names, or else
+the sole project whose extension declares the `deps-edit` job. They run that
+job for the project, with the action and the dependencies you pass. A project
+whose extensions declare no `deps-edit` job is refused, and the error names its
+extensions. `add <module>@none` is a usage error before any job runs, and the
+error names `putnami deps remove <module>`. `@putnami/go` declares the job: it edits `go.mod` and tidies the
+module, without `go get`, with the Go the workspace lock pins. When that Go is
+missing, the error names `putnami install`. See
+[the Go extension](../../../go/extension/doc/getting-started.md#project-setup-and-dependency-edits).
+For TypeScript, edit `package.json` and run `putnami deps install`.
 
 `prune` reads the provider view that the last install or build recorded. When a
 file that view was recorded from changed since, such as a hand-edited `go.mod`,
 `prune` refuses, names the changed files, and asks you to run `putnami install`
-first. It drops a Go requirement with `go mod edit -droprequire` of the module
-path the target's `go.mod` declares, not `go get`, so a requirement that only
-`go.work` satisfies, one that no module proxy serves, is removed too.
+first. It removes a `putnami.json` entry itself. It hands a language manifest
+entry to the `deps-edit` job of the importer's extension, with the directory of
+each target to drop, and reports one whose project has no such job with the
+edit to make by hand. Each extension's job runs once. When one fails, `prune`
+puts back every `putnami.json` it edited; a manifest an earlier extension's job
+edited stays edited.
 
 ### `cache`
 

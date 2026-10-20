@@ -30,9 +30,9 @@ import (
 )
 
 const (
-	// fixtureRuntimeEnv makes the test binary run the workspace-install job of
-	// a fixture language extension; its value is the directory the job records
-	// its runs in.
+	// fixtureRuntimeEnv makes the test binary run the workspace-install and
+	// project-setup jobs of a fixture language extension; its value is the
+	// directory the jobs record their runs in.
 	fixtureRuntimeEnv = "PUTNAMI_INITCHANNEL_FIXTURE"
 
 	// candidateChannel is the immutable channel a tagged publish creates for a
@@ -51,31 +51,29 @@ const (
 )
 
 // releaseSet is one release of every artifact a starter resolves: its language
-// extension, its template and, for the Go starter, go.putnami.dev/app. The
-// lines do not share a version, as the published lines do not.
+// extension and its template. The lines do not share a version, as the
+// published lines do not.
 type releaseSet struct {
 	extension string
 	template  string
-	// framework is the version of go.putnami.dev/app.
-	framework string
 }
 
 var (
 	// olderSet is the release set `latest` names in these scenarios.
-	olderSet = releaseSet{extension: "0.3.0", template: "0.3.1", framework: "v0.3.0"}
+	olderSet = releaseSet{extension: "0.3.0", template: "0.3.1"}
 	// candidateSet is the release set candidateChannel names.
-	candidateSet = releaseSet{extension: "0.4.0", template: "0.4.1", framework: "v0.4.0"}
+	candidateSet = releaseSet{extension: "0.4.0", template: "0.4.1"}
 	// newerSet is a release set `latest` moves to after the candidate.
-	newerSet = releaseSet{extension: "0.5.0", template: "0.5.1", framework: "v0.5.0"}
+	newerSet = releaseSet{extension: "0.5.0", template: "0.5.1"}
 )
 
 // A smoke against a candidate channel, while `latest` names an older release
-// set: init resolves the extension, the template
-// and the Go framework version of the candidate set only. The channel reaches
-// init the way the release smokes hand it: PUTNAMI_CHANNEL, with the public
-// command line. The lock records exact versions and the workspace names no
-// channel, so a later install reads the lock and `putnami upgrade` follows
-// `latest`.
+// set: init resolves the extension and the template of the candidate set
+// only, and hands the channel to the installers and to the project-setup job
+// of the extension. The channel reaches init the way the release smokes hand
+// it: PUTNAMI_CHANNEL, with the public command line. The lock records exact
+// versions and the workspace names no channel, so a later install reads the
+// lock and `putnami upgrade` follows `latest`.
 func TestInit_OnACandidateChannelUsesOnlyTheCandidateReleaseSet(t *testing.T) {
 	spectest.Proves(t, "cli/init-channel", "every-resolution-reads-the-channel",
 		"a-candidate-channel-resolves-only-its-release-set-while-latest-is-older")
@@ -94,12 +92,13 @@ func TestInit_OnACandidateChannelUsesOnlyTheCandidateReleaseSet(t *testing.T) {
 	h.assertResolved(t, candidateSet, output)
 	h.assertAskedOnly(t, candidateChannel, candidateSet)
 	h.assertInstallerChannels(t, candidateChannel)
+	h.assertSetupChannel(t, candidateChannel)
 	h.assertPinsNoChannel(t, candidateSet)
 }
 
-// The same smoke passes while `latest` is empty: no registry and no module
-// proxy answers `latest`, and init never asks them for it. The channel is
-// chosen by flag here.
+// The same smoke passes while `latest` is empty: no registry answers
+// `latest`, and init never asks it for it. The channel is chosen by flag
+// here.
 func TestInit_OnACandidateChannelPassesWhileLatestIsEmpty(t *testing.T) {
 	spectest.Proves(t, "cli/init-channel", "every-resolution-reads-the-channel",
 		"a-candidate-channel-resolves-while-latest-is-empty")
@@ -116,6 +115,7 @@ func TestInit_OnACandidateChannelPassesWhileLatestIsEmpty(t *testing.T) {
 	h.assertResolved(t, candidateSet, output)
 	h.assertAskedOnly(t, candidateChannel, candidateSet)
 	h.assertInstallerChannels(t, candidateChannel)
+	h.assertSetupChannel(t, candidateChannel)
 	h.assertPinsNoChannel(t, candidateSet)
 }
 
@@ -134,9 +134,9 @@ func TestInit_WithoutAChannelStopsWhileLatestIsEmpty(t *testing.T) {
 	}
 }
 
-// With no channel choice, init resolves every artifact and the Go framework
-// version on `latest`, and hands the installers no channel option. A CLI whose
-// name records no channel, which is what this test binary is, has no install
+// With no channel choice, init resolves every artifact on `latest`, and hands
+// the installers and the project-setup job no channel option. A CLI whose name
+// records no channel, which is what this test binary is, has no install
 // record.
 func TestInit_WithoutAChannelChoiceResolvesOnLatest(t *testing.T) {
 	spectest.Proves(t, "cli/init-channel", "no-choice-is-unchanged", "no-choice-asks-every-registry-for-latest")
@@ -158,6 +158,7 @@ func TestInit_WithoutAChannelChoiceResolvesOnLatest(t *testing.T) {
 		t.Errorf("channel requests = %v, want %v", got, want)
 	}
 	h.assertInstallerChannels(t, "none")
+	h.assertSetupChannel(t, "none")
 	h.assertPinsNoChannel(t, olderSet)
 }
 
@@ -246,9 +247,6 @@ func TestInit_OnACandidateChannelHandsTheTypeScriptInstallerTheChannelAndItsRegi
 			t.Errorf("the registry was asked %q: init on %s reads latest", request, candidateChannel)
 		}
 	}
-	if got := h.proxy.asked(); len(got) != 0 {
-		t.Errorf("the module proxy was asked %v by a TypeScript starter", got)
-	}
 }
 
 // A channel init cannot resolve on stops the real command with a usage error
@@ -282,26 +280,22 @@ func TestInit_RefusesAnUnsafeChannelBeforeAnyRequest(t *testing.T) {
 			if got := h.registry.asked(); len(got) != 0 {
 				t.Errorf("a refused init asked the registry %v", got)
 			}
-			if got := h.proxy.asked(); len(got) != 0 {
-				t.Errorf("a refused init asked the module proxy %v", got)
-			}
 		})
 	}
 }
 
-// harness is one empty directory to run init in, the registry and the module
-// proxy init reaches, and the directory the fixture runtime records in.
+// harness is one empty directory to run init in, the registry init reaches,
+// and the directory the fixture runtime records in.
 type harness struct {
 	root     string
 	records  string
 	registry *releaseRegistry
-	proxy    *moduleProxy
 	// archives are the release archives by set, built once per harness.
 	archives map[releaseSet]map[string]release
 }
 
-// newHarness starts a registry and a module proxy that serve channels, and
-// points a fresh, isolated CLI environment at them.
+// newHarness starts a registry that serves channels, and points a fresh,
+// isolated CLI environment at it.
 func newHarness(t *testing.T, channels map[string]releaseSet) *harness {
 	t.Helper()
 	clitest.RequireShell(t)
@@ -324,20 +318,10 @@ func newHarness(t *testing.T, channels map[string]releaseSet) *harness {
 
 	h := &harness{root: root, records: t.TempDir(), archives: map[releaseSet]map[string]release{}}
 	h.registry = newReleaseRegistry(t)
-	frameworks := map[string]string{}
 	for channel, set := range channels {
 		h.registry.publish(channel, h.releases(t, set))
-		frameworks[channel] = set.framework
 	}
 	t.Setenv("PUTNAMI_REGISTRY_URL", h.registry.URL)
-
-	h.proxy = newModuleProxy(t, frameworks)
-	// The Go settings of the host must not reach the lookup: the fixture proxy
-	// is the only one, and no go env file or private pattern applies.
-	t.Setenv("GOPROXY", h.proxy.URL)
-	t.Setenv("GOENV", "off")
-	t.Setenv("GONOPROXY", "")
-	t.Setenv("GOPRIVATE", "")
 	return h
 }
 
@@ -366,8 +350,8 @@ func (h *harness) lock(t *testing.T) *lockfile.LockFile {
 }
 
 // assertResolved fails unless the lock pins set's exact versions with the
-// digests of set's archives, the project renders set's framework version, and
-// no agent content is installed.
+// digests of set's archives, the project renders set's template, and no agent
+// content is installed.
 func (h *harness) assertResolved(t *testing.T, set releaseSet, transcript string) {
 	t.Helper()
 	lock := h.lock(t)
@@ -386,9 +370,6 @@ func (h *harness) assertResolved(t *testing.T, set releaseSet, transcript string
 	if !ok || templatePin.Version != set.template || templatePin.Integrity != sha256Hex(archives[templatePath].archive) {
 		t.Errorf("templates.go-server = %+v (present %v), want %s with the digest of that release\n%s",
 			templatePin, ok, set.template, transcript)
-	}
-	if data, err := os.ReadFile(filepath.Join(h.root, "webapp", "framework.txt")); err != nil || string(data) != "app "+set.framework+"\n" {
-		t.Errorf("webapp/framework.txt = %q, %v; want the framework version %s", data, err, set.framework)
 	}
 	if data, err := os.ReadFile(filepath.Join(h.root, "webapp", "template.txt")); err != nil || string(data) != "template "+set.template+"\n" {
 		t.Errorf("webapp/template.txt = %q, %v; want the template release %s", data, err, set.template)
@@ -416,8 +397,8 @@ func (h *harness) assertNoAgentContent(t *testing.T, lock *lockfile.LockFile) {
 	}
 }
 
-// assertAskedOnly fails when the registry or the module proxy was asked for
-// anything but channel and the exact versions of set.
+// assertAskedOnly fails when the registry was asked for anything but channel
+// and the exact versions of set.
 func (h *harness) assertAskedOnly(t *testing.T, channel string, set releaseSet) {
 	t.Helper()
 	allowed := map[string][]string{
@@ -439,13 +420,6 @@ func (h *harness) assertAskedOnly(t *testing.T, channel string, set releaseSet) 
 			t.Errorf("the registry was asked %v, want %s on %s", asked, path, channel)
 		}
 	}
-	want := "/go.putnami.dev/app/@v/" + channel + ".info"
-	if channel == "latest" {
-		want = "/go.putnami.dev/app/@latest"
-	}
-	if got := h.proxy.asked(); !slices.Equal(got, []string{want}) {
-		t.Errorf("the module proxy was asked %v, want only %s", got, want)
-	}
 }
 
 // assertInstallerChannels fails unless every workspace-install run received
@@ -461,6 +435,16 @@ func (h *harness) assertInstallerChannels(t *testing.T, want string) {
 			t.Errorf("workspace-install runs = %v, want every run with putnami-channel=%s", runs, want)
 			return
 		}
+	}
+}
+
+// assertSetupChannel fails unless the project-setup job ran once, for
+// webapp, with want as its putnami-channel option ("none" for no option).
+func (h *harness) assertSetupChannel(t *testing.T, want string) {
+	t.Helper()
+	runs := readLines(t, filepath.Join(h.records, "setup-runs.txt"))
+	if wantRuns := []string{"path=webapp putnami-channel=" + want}; !slices.Equal(runs, wantRuns) {
+		t.Errorf("project-setup runs = %v, want %v", runs, wantRuns)
 	}
 }
 
@@ -609,54 +593,11 @@ func (r *releaseRegistry) channelRequests() []string {
 	return out
 }
 
-// moduleProxy is a Go module proxy that answers the version of
-// go.putnami.dev/app per channel, and records the paths it is asked.
-type moduleProxy struct {
-	*httptest.Server
-	mu    sync.Mutex
-	paths []string
-}
-
-// newModuleProxy starts a module proxy that answers frameworks[channel]:
-// `latest` on /@latest, any other channel on /@v/<channel>.info.
-func newModuleProxy(t *testing.T, frameworks map[string]string) *moduleProxy {
-	t.Helper()
-	answers := map[string]string{}
-	for channel, version := range frameworks {
-		if channel == "latest" {
-			answers["/go.putnami.dev/app/@latest"] = version
-			continue
-		}
-		answers["/go.putnami.dev/app/@v/"+channel+".info"] = version
-	}
-	proxy := &moduleProxy{}
-	proxy.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		proxy.mu.Lock()
-		proxy.paths = append(proxy.paths, r.URL.Path)
-		proxy.mu.Unlock()
-		version, ok := answers[r.URL.Path]
-		if !ok {
-			http.NotFound(w, r)
-			return
-		}
-		_, _ = io.WriteString(w, `{"Version":"`+version+`","Time":"2026-09-20T10:00:00Z"}`)
-	}))
-	t.Cleanup(proxy.Close)
-	return proxy
-}
-
-// asked returns the paths the proxy was asked so far.
-func (p *moduleProxy) asked() []string {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return slices.Clone(p.paths)
-}
-
 // extensionArchive is the fixture language extension name at version. Its
 // runtime is a shell script: it prints the runtime-info document of name at
-// version itself, execs the test binary for workspace-install
-// (runFixtureRuntime), which records the channel option and the registries it
-// received, and exits 0 for any other invocation.
+// version itself, execs the test binary for workspace-install and
+// project-setup (runFixtureRuntime), which records the options it received,
+// and exits 0 for any other invocation.
 func extensionArchive(t *testing.T, records, name, version string) []byte {
 	t.Helper()
 	testBinary, err := os.Executable()
@@ -683,6 +624,11 @@ func extensionArchive(t *testing.T, records, name, version string) []byte {
     "workspace-install": {
       "description": "Record the options the installers receive.",
       "run": [{ "id": "workspace-install", "task": "workspace-install-exec" }]
+    },
+    "project-setup": {
+      "description": "Record the options the project setup receives.",
+      "visibility": "internal",
+      "run": [{ "id": "project-setup", "task": "project-setup-exec" }]
     }
   },
   "tasks": {
@@ -690,6 +636,14 @@ func extensionArchive(t *testing.T, records, name, version string) []byte {
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["workspace-install"],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": -1
+    },
+    "project-setup-exec": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["project-setup"],
       "cwd": "{workspaceRoot}",
       "cache": false,
       "timeoutMs": -1
@@ -701,7 +655,7 @@ func extensionArchive(t *testing.T, records, name, version string) []byte {
 		"  printf '%s\\n' " + shellQuote(string(info)) + "\n" +
 		"  exit 0\n" +
 		"fi\n" +
-		"if [ \"$1\" != \"workspace-install\" ]; then\n" +
+		"if [ \"$1\" != \"workspace-install\" ] && [ \"$1\" != \"project-setup\" ]; then\n" +
 		"  exit 0\n" +
 		"fi\n" +
 		fixtureRuntimeEnv + "=" + shellQuote(records) + "\n" +
@@ -718,14 +672,12 @@ func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
 }
 
-// templateArchive is the fixture go-server template at version. It renders the
-// Go framework version and its own release into text files and declares no Go
-// module, so create resolves the framework version and runs no go command:
-// the toolchainlock package covers the Go setup of a real module.
+// templateArchive is the fixture go-server template at version. It renders its
+// own release into a text file and declares no Go module: the toolchainlock
+// package covers the Go setup of a real module.
 func templateArchive(t *testing.T, version string) []byte {
 	t.Helper()
 	return tarGz(t, []tarEntry{
-		{name: "framework.txt.template", mode: 0o644, content: "app <%= goFrameworkVersion %>\n"},
 		{name: "template.txt", mode: 0o644, content: "template " + version + "\n"},
 		{name: "putnami.json.template", mode: 0o644, content: `{"name":"<%= projectName %>","extensions":["@putnami/go"]}`},
 		{name: "putnami.template.json", mode: 0o644,
@@ -791,14 +743,15 @@ func readLines(t *testing.T, file string) []string {
 	return strings.Split(strings.TrimSpace(string(data)), "\n")
 }
 
-// runFixtureRuntime is the workspace-install job of a fixture language
-// extension, run by the test binary under fixtureRuntimeEnv. It records two
-// members of the job context it was handed: the putnami-channel option, and
-// the registries as JSON. It records "none" for a member the context does not
-// carry.
+// runFixtureRuntime is the workspace-install and project-setup jobs of a
+// fixture language extension, run by the test binary under fixtureRuntimeEnv.
+// workspace-install records two members of the job context it was handed: the
+// putnami-channel option, and the registries as JSON. project-setup records
+// its path and putnami-channel options. Each records "none" for a member the
+// context does not carry.
 func runFixtureRuntime(args []string) int {
-	if len(args) == 0 || args[0] != "workspace-install" {
-		fmt.Fprintf(os.Stderr, "the fixture runtime runs workspace-install only, got %q\n", args)
+	if len(args) == 0 || (args[0] != "workspace-install" && args[0] != "project-setup") {
+		fmt.Fprintf(os.Stderr, "the fixture runtime runs workspace-install and project-setup only, got %q\n", args)
 		return 1
 	}
 	contextFile := ""
@@ -823,6 +776,15 @@ func runFixtureRuntime(args []string) int {
 	if value, ok := jobContext.Params["putnami-channel"]; ok {
 		channel = fmt.Sprint(value)
 	}
+	records := os.Getenv(fixtureRuntimeEnv)
+	if args[0] == "project-setup" {
+		line := fmt.Sprintf("path=%v putnami-channel=%s", jobContext.Params["path"], channel)
+		if err := appendLine(filepath.Join(records, "setup-runs.txt"), line); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		return 0
+	}
 	registries := "none"
 	if value, ok := jobContext.Params["registries"]; ok {
 		encoded, err := json.Marshal(value)
@@ -832,7 +794,6 @@ func runFixtureRuntime(args []string) int {
 		}
 		registries = string(encoded)
 	}
-	records := os.Getenv(fixtureRuntimeEnv)
 	for name, line := range map[string]string{
 		"install-runs.txt":       "putnami-channel=" + channel,
 		"install-registries.txt": registries,

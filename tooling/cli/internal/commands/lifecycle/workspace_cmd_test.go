@@ -229,7 +229,7 @@ func TestWorkspaceInitRecordsToolchainPinsAfterItsLastInstall(t *testing.T) {
 				stages = append(stages, "dependencies")
 				return nil
 			}
-			createInitProject = func(context.Context, string, *wsproto.Config, []string, bool, LifecycleEnv) error {
+			createInitProject = func(context.Context, string, *wsproto.Config, []string, LifecycleEnv) error {
 				stages = append(stages, "project")
 				return nil
 			}
@@ -268,7 +268,7 @@ func TestWorkspaceInitListsTheProjectOnce(t *testing.T) {
 	dir := t.TempDir()
 	failure := stubWorkspaceInitStages(t, "dependencies", 2)
 	t.Chdir(dir)
-	createInitProject = func(_ context.Context, wsRoot string, _ *wsproto.Config, _ []string, _ bool, _ LifecycleEnv) error {
+	createInitProject = func(_ context.Context, wsRoot string, _ *wsproto.Config, _ []string, _ LifecycleEnv) error {
 		// What the project create leaves: the project on disk, and listed in
 		// the workspace config.
 		if err := os.MkdirAll(filepath.Join(wsRoot, "webapp"), 0o755); err != nil {
@@ -313,7 +313,7 @@ func TestWorkspaceInitWritesAnEmptyWorkspacesList(t *testing.T) {
 	dir := t.TempDir()
 	stubWorkspaceInitStages(t, "", 0)
 	t.Chdir(dir)
-	createInitProject = func(_ context.Context, wsRoot string, _ *wsproto.Config, _ []string, _ bool, _ LifecycleEnv) error {
+	createInitProject = func(_ context.Context, wsRoot string, _ *wsproto.Config, _ []string, _ LifecycleEnv) error {
 		if err := os.MkdirAll(filepath.Join(wsRoot, "api"), 0o755); err != nil {
 			return err
 		}
@@ -386,7 +386,7 @@ func stubWorkspaceInitStages(t *testing.T, failingStage string, failingDependenc
 		}
 		return nil
 	}
-	createInitProject = func(context.Context, string, *wsproto.Config, []string, bool, LifecycleEnv) error {
+	createInitProject = func(context.Context, string, *wsproto.Config, []string, LifecycleEnv) error {
 		if failingStage == "project" {
 			return failure
 		}

@@ -6,102 +6,90 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// writeGoMod creates <root>/<rel>/go.mod so the project reads as a Go module.
-func writeGoMod(t *testing.T, root, rel string) {
-	t.Helper()
-	dir := filepath.Join(root, rel)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module x\n\ngo 1.25\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func fakeWorkspace(projects ...*workspace.Project) *workspace.Workspace {
 	return &workspace.Workspace{Projects: projects}
 }
 
-func TestResolveGoDepsProject_SoleGoModuleAutoSelected(t *testing.T) {
-	root := t.TempDir()
-	writeGoMod(t, root, "api")
+// editableWorkspace holds api and worker, whose extension declares deps-edit,
+// and web, whose extension does not.
+func editableWorkspace() (*workspace.Workspace, map[string]string) {
 	ws := fakeWorkspace(
-		&workspace.Project{Name: "api", Path: "api"},
-		&workspace.Project{Name: "web", Path: "web"}, // no go.mod → not a Go module
+		&workspace.Project{ID: "/api", Name: "api", Path: "api", Extensions: []string{"@acme/go"}},
+		&workspace.Project{ID: "/web", Name: "web", Path: "web", Extensions: []string{"@acme/web"}},
+		&workspace.Project{ID: "/worker", Name: "worker", Path: "worker", Extensions: []string{"@acme/go"}},
 	)
-	got, err := resolveGoDepsProject(root, ws, "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got.Name != "api" {
-		t.Errorf("auto-selected %q, want the sole Go module \"api\"", got.Name)
+	return ws, map[string]string{"/api": "@acme/go", "/worker": "@acme/go"}
+}
+
+func TestDepsEditTarget_SoleEditableProjectAutoSelected(t *testing.T) {
+	t.Parallel()
+	ws, editors := editableWorkspace()
+	delete(editors, "/worker")
+	got, err := depsEditTarget(ws, editors, "add", "")
+	if err != nil || got.Name != "api" {
+		t.Fatalf("depsEditTarget = %v, %v; want the sole project with an editor, api", got, err)
 	}
 }
 
-func TestResolveGoDepsProject_AmbiguousRequiresSelector(t *testing.T) {
-	root := t.TempDir()
-	writeGoMod(t, root, "api")
-	writeGoMod(t, root, "worker")
-	ws := fakeWorkspace(
-		&workspace.Project{Name: "api", Path: "api"},
-		&workspace.Project{Name: "worker", Path: "worker"},
-	)
-	_, err := resolveGoDepsProject(root, ws, "")
-	if err == nil || !strings.Contains(err.Error(), "multiple Go modules") {
-		t.Fatalf("want an ambiguity error listing modules, got %v", err)
+func TestDepsEditTarget_AmbiguousRequiresSelector(t *testing.T) {
+	t.Parallel()
+	ws, editors := editableWorkspace()
+	_, err := depsEditTarget(ws, editors, "add", "")
+	if err == nil || !strings.Contains(err.Error(), "several projects") || !strings.Contains(err.Error(), "(api, worker)") {
+		t.Fatalf("want an ambiguity error listing api and worker, got %v", err)
 	}
 }
 
-func TestResolveGoDepsProject_SelectorPicksNamedModule(t *testing.T) {
-	root := t.TempDir()
-	writeGoMod(t, root, "api")
-	writeGoMod(t, root, "worker")
-	ws := fakeWorkspace(
-		&workspace.Project{Name: "api", Path: "api"},
-		&workspace.Project{Name: "worker", Path: "worker"},
-	)
-	got, err := resolveGoDepsProject(root, ws, "worker")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got.Name != "worker" {
-		t.Errorf("selector picked %q, want \"worker\"", got.Name)
+func TestDepsEditTarget_SelectorPicksTheNamedProject(t *testing.T) {
+	t.Parallel()
+	ws, editors := editableWorkspace()
+	for _, selector := range []string{"worker", "/worker"} {
+		got, err := depsEditTarget(ws, editors, "remove", selector)
+		if err != nil || got.Name != "worker" {
+			t.Fatalf("depsEditTarget(%q) = %v, %v; want worker", selector, got, err)
+		}
 	}
 }
 
-func TestResolveGoDepsProject_NonGoSelectorErrors(t *testing.T) {
-	root := t.TempDir()
-	writeGoMod(t, root, "api")
-	ws := fakeWorkspace(
-		&workspace.Project{Name: "api", Path: "api"},
-		&workspace.Project{Name: "web", Path: "web"}, // TS project, no go.mod
-	)
-	_, err := resolveGoDepsProject(root, ws, "web")
-	if err == nil || !strings.Contains(err.Error(), "not a Go module") || !strings.Contains(err.Error(), "pyproject.toml") {
-		t.Fatalf("want a not-a-Go-module error, got %v", err)
+func TestDepsEditTarget_RefusesAProjectWithoutAnEditor(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "deps-edit-runs-in-the-project-extension",
+		"deps-refuses-a-project-whose-extensions-declare-no-deps-edit")
+	ws, editors := editableWorkspace()
+	_, err := depsEditTarget(ws, editors, "add", "web")
+	if err == nil {
+		t.Fatal("depsEditTarget selected a project whose extensions declare no deps-edit job")
+	}
+	for _, want := range []string{"deps add cannot edit web", "deps-edit", "@acme/web", "putnami deps install"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %q, want it to name %q", err, want)
+		}
 	}
 }
 
-func TestResolveGoDepsProject_NoGoModuleErrors(t *testing.T) {
-	root := t.TempDir()
-	ws := fakeWorkspace(&workspace.Project{Name: "web", Path: "web"})
-	_, err := resolveGoDepsProject(root, ws, "")
-	if err == nil || !strings.Contains(err.Error(), "no Go module") {
-		t.Fatalf("want a no-Go-module error, got %v", err)
+func TestDepsEditTarget_NoEditableProjectErrors(t *testing.T) {
+	t.Parallel()
+	ws, _ := editableWorkspace()
+	_, err := depsEditTarget(ws, nil, "add", "")
+	if err == nil || !strings.Contains(err.Error(), "no project of the workspace") {
+		t.Fatalf("want a no-editable-project error, got %v", err)
 	}
 }
 
-func TestResolveGoDepsProject_UnknownSelectorErrors(t *testing.T) {
-	root := t.TempDir()
-	writeGoMod(t, root, "api")
-	ws := fakeWorkspace(&workspace.Project{Name: "api", Path: "api"})
-	if _, err := resolveGoDepsProject(root, ws, "nope"); err == nil || !strings.Contains(err.Error(), "not found") {
+func TestDepsEditTarget_UnknownOrSeveralSelectorsError(t *testing.T) {
+	t.Parallel()
+	ws, editors := editableWorkspace()
+	if _, err := depsEditTarget(ws, editors, "add", "nope"); err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Fatalf("want a not-found error, got %v", err)
+	}
+	if _, err := depsEditTarget(ws, editors, "add", "api,worker"); err == nil || !strings.Contains(err.Error(), "a single project") {
+		t.Fatalf("want a single-project error, got %v", err)
 	}
 }
 

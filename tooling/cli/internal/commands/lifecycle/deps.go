@@ -1,30 +1,20 @@
 package lifecycle
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
-
-	"golang.org/x/mod/modfile"
-	"golang.org/x/mod/module"
-	"golang.org/x/mod/semver"
 
 	"go.putnami.dev/cli/model/extension"
 	protocolcli "go.putnami.dev/protocol/cli"
 	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/commands/shared"
+	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
-	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -56,6 +46,10 @@ type WorkspaceJobRequest struct {
 	// Job is the workspace-level job name ("workspace-install", "deps-upgrade").
 	Job    string
 	Params map[string]any
+	// Projects selects the projects whose extensions run the job, as a
+	// --projects value: comma-separated project IDs for the project jobs of
+	// create and deps (project_jobs.go). Empty selects every project.
+	Projects string
 	// FilterTag/ExcludeTag scope which projects (and therefore which providers)
 	// take part, e.g. --tag go on a Go-only CI runner.
 	FilterTag  string
@@ -168,9 +162,13 @@ type LifecycleEnv struct {
 	fetched bool
 	// channel is the release channel `putnami init` resolves on when it is not
 	// latest; every other command leaves it empty. The workspace installers
-	// receive it as a job option (installParams), and the project create of
-	// init resolves its template and its Go framework version on it.
+	// and the project-setup job receive it as a job option (installParams),
+	// and the project create of init resolves its template on it.
 	channel string
+	// pinToolchains is the lock step create takes when a toolchain the
+	// project-setup job requires does not resolve (setUpProject). Nil is
+	// fillImplicitToolchainPins.
+	pinToolchains func(ctx context.Context, wsRoot string) (bool, error)
 }
 
 // installParams is the job options of the workspace fetch and installers: the
@@ -287,348 +285,126 @@ func depsFetch(ctx context.Context, wsRoot string, cfg *wsproto.Config, filterTa
 	return nil
 }
 
-// DepsAdd adds one or more dependencies to a project's manifest via the owning
-// ecosystem's tooling, then reconciles the dependency closure so the standing
-// "run `putnami deps …` instead of a package manager" rule has a real path for
-// adding, not just installing. Only Go modules are wired today (`go list -m`,
-// `go mod edit -require`, then `go mod tidy`; goDepsEdit says why not `go
-// get`); a TypeScript target reports an actionable message rather than silently
-// doing nothing. env runs the workspace installers when the host has
-// no go command yet. When those installers fail but still leave a go, the
-// module is edited with it and the command exits non-zero naming the command
-// that finishes the install, as `projects create` does.
+// DepsAdd adds one or more dependencies to a project's manifest through the
+// deps-edit job of the project's extension, which edits the manifest of its
+// language and reconciles the dependency closure, so the standing "run
+// `putnami deps …` instead of a package manager" rule has a real path for
+// adding, not just installing. A project whose extensions declare no
+// deps-edit job is refused, naming them (depsEditTarget). A spec at the
+// version none is refused before any job runs (refuseDropOnAdd).
 func DepsAdd(ctx context.Context, wsRoot string, modules []string, projectSelector string, env LifecycleEnv) error {
 	if err := refuseDropOnAdd(modules, projectSelector); err != nil {
 		return err
 	}
-	installErr, err := runGoDeps(ctx, wsRoot, "add", modules, projectSelector, depsCommand("add", modules, projectSelector), env)
-	return goDepsResult("add", installErr, err)
+	return editDeps(ctx, wsRoot, "add", modules, projectSelector, env)
 }
 
-// refuseDropOnAdd fails `deps add` for a spec whose version is none, which
-// `go get` read as "drop this module", before any go command runs. The error
+// refuseDropOnAdd fails `deps add` with a usage error for a spec whose version
+// is none, which a package manager reads as "drop this module". The error
 // suggests the `deps remove` command that does it.
 func refuseDropOnAdd(modules []string, projectSelector string) error {
 	var dropped []string
 	for _, spec := range modules {
-		if path, version, ok := strings.Cut(spec, "@"); ok && version == "none" {
+		if path, version, ok := splitSpecVersion(spec); ok && version == "none" {
 			dropped = append(dropped, path)
 		}
 	}
 	if len(dropped) == 0 {
 		return nil
 	}
+	next := "putnami deps remove " + strings.Join(dropped, " ")
+	if projectSelector != "" {
+		next += " --projects " + projectSelector
+	}
 	return protocolcli.WithNext(
 		protocolcli.Usagef("deps add does not drop a module: %s names the version none; deps remove drops it", strings.Join(dropped, ", ")),
-		depsCommand("remove", dropped, projectSelector))
+		next)
 }
 
-// DepsRemove drops one or more dependencies from a Go module (`go mod edit
-// -droprequire`) and tidies the closure. See DepsAdd for the
-// ecosystem/selection rules and the failed-install report.
+// splitSpecVersion splits a dependency spec at its last "@" that is not its
+// first character, so a scoped name such as @scope/pkg has no version and
+// @scope/pkg@none has the version none.
+func splitSpecVersion(spec string) (path, version string, ok bool) {
+	i := strings.LastIndex(spec, "@")
+	if i <= 0 {
+		return spec, "", false
+	}
+	return spec[:i], spec[i+1:], true
+}
+
+// DepsRemove drops one or more dependencies from a project's manifest through
+// the deps-edit job of the project's extension. See DepsAdd.
 func DepsRemove(ctx context.Context, wsRoot string, modules []string, projectSelector string, env LifecycleEnv) error {
-	installErr, err := runGoDeps(ctx, wsRoot, "remove", modules, projectSelector, depsCommand("remove", modules, projectSelector), env)
-	return goDepsResult("remove", installErr, err)
+	return editDeps(ctx, wsRoot, "remove", modules, projectSelector, env)
 }
 
-// depsCommand is the deps command the user ran: action on modules, which prune
-// takes from the workspace rather than its arguments, with the project
-// selector the user gave.
-func depsCommand(action string, modules []string, projectSelector string) string {
-	command := "putnami deps " + action
-	if action != "prune" {
-		command += " " + strings.Join(modules, " ")
-	}
-	if projectSelector != "" {
-		command += " --projects " + projectSelector
-	}
-	return command
-}
-
-// goDepsResult is the error of a deps command that edited Go modules. err is
-// the failure of the edit itself. installErr is the failure of the workspace
-// installers that installed the go the edit ran with: the edit still ran, and
-// the command fails naming the command that finishes the install, so a failed
-// install never ends in success.
-func goDepsResult(action string, installErr, err error) error {
-	if installErr == nil {
-		return err
-	}
-	return protocolcli.WithNext(
-		errors.Join(err, fmt.Errorf("install workspace dependencies during deps %s: %w", action, installErr)),
-		"putnami deps install")
-}
-
-// runGoDeps resolves the target Go module and the go command (goDepsCommand),
-// then edits the module's requirements (editGoModule), and puts the files of
-// the module back as they were when the edit fails (goModuleFiles). installErr
-// is the failure of the workspace installers that installed the go; err is the
-// failure of the edit. The caller reports both (goDepsResult).
-func runGoDeps(ctx context.Context, wsRoot, action string, modules []string, projectSelector, rerun string, lifecycleEnv LifecycleEnv) (installErr, err error) {
+// editDeps selects the project and its editor (depsEditTarget), then runs the
+// editor's deps-edit job with action on modules.
+func editDeps(ctx context.Context, wsRoot, action string, modules []string, projectSelector string, env LifecycleEnv) error {
 	if len(modules) == 0 {
-		return nil, fmt.Errorf("deps %s requires at least one module (e.g. `putnami deps %s golang.org/x/text@latest`)", action, action)
+		return cmderr.Usagef("deps %s requires at least one dependency: putnami deps %s <dependency>... [--projects <name>]", action, action)
 	}
-
 	ws, err := workspace.Load(wsRoot)
 	if err != nil {
-		return nil, fmt.Errorf("load workspace: %w", err)
+		return fmt.Errorf("load workspace: %w", err)
 	}
-	proj, err := resolveGoDepsProject(wsRoot, ws, projectSelector)
+	editors, err := projectJobProviders(ctx, wsRoot, ws, depsEditJob)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	goCmd, err := goDepsCommand(ctx, wsRoot, proj.Path, action, rerun, lifecycleEnv)
+	project, err := depsEditTarget(ws, editors, action, projectSelector)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	snapshot, err := snapshotFiles(goModuleFiles(filepath.Join(wsRoot, proj.Path))...)
-	if err != nil {
-		return goCmd.installErr, err
-	}
-	if err := editGoModule(ctx, wsRoot, proj, goCmd, action, modules); err != nil {
-		return goCmd.installErr, snapshot.restoreAfter(err)
-	}
-	return goCmd.installErr, nil
+	return runDepsEdit(ctx, wsRoot, editors[project.ID], action, []depsEdit{{project: project, modules: modules}}, env)
 }
 
-// goDepsCommand returns the go command a deps edit runs: the one a task of the
-// workspace's Go extension runs, the release the workspace lock pins, installed
-// first on a host that has none (ensureGoCommand). A caller resolves it before
-// its first edit, so a failure edits no go.mod or putnami.json. When the version
-// probe of a go timed out, that go is there and slow: the error names rerun, the
-// deps command the user ran, as the next step. Any other failure to find a go
-// names putnami install.
-func goDepsCommand(ctx context.Context, wsRoot, projectPath, action, rerun string, env LifecycleEnv) (goCommand, error) {
-	goCmd, err := ensureGoCommand(ctx, wsRoot, projectPath, "", goToolchainExtension(wsRoot), env)
-	if err != nil {
-		next := "putnami install"
-		if errors.Is(err, toolchain.ErrToolchainProbeTimeout) {
-			next = rerun
-		}
-		return goCommand{}, protocolcli.WithNext(fmt.Errorf("deps %s: %w", action, err), next)
-	}
-	return goCmd, nil
-}
-
-// editGoModule edits the requirements of proj's Go module with goCmd, then
-// tidies it (tidyGoModule), both in the module directory with GOWORK pointed
-// at the workspace file. add resolves the module specs with `go list -m`
-// (resolveGoModules) and requires what that returns with `go mod edit
-// -require`; remove and prune run `go mod edit -droprequire=<module>`.
-// goDepsEdit says why none of them runs `go get`. The caller puts the files
-// back when it fails (goModuleFiles).
-func editGoModule(ctx context.Context, wsRoot string, proj *workspace.Project, goCmd goCommand, action string, modules []string) error {
-	moduleDir := filepath.Join(wsRoot, proj.Path)
-	env := shared.GoCommandEnvFrom(goCmd.env, moduleDir)
-
-	verb := map[string]string{"add": "Adding", "remove": "Removing", "prune": "Removing"}[action]
-	iox.Fprintf(os.Stdout, "  %s %s in %s...\n", verb, strings.Join(modules, " "), proj.Name)
-
-	var resolved []module.Version
-	if action == "add" {
-		var err error
-		if resolved, err = resolveGoModules(ctx, goCmd.path, moduleDir, env, modules); err != nil {
-			return fmt.Errorf("go list -m: %w (a spec names a module path, not a package path)", err)
-		}
-	}
-	if err := runGoInModule(ctx, goCmd.path, moduleDir, env, goDepsEdit(action, modules, resolved)); err != nil {
-		return fmt.Errorf("go mod edit: %w", err)
-	}
-	if err := tidyGoModule(ctx, goCmd.path, moduleDir, env); err != nil {
-		return fmt.Errorf("go mod tidy: %w", err)
-	}
-	iox.Fprintf(os.Stdout, "  ✓ updated %s\n", filepath.Join(proj.Path, "go.mod"))
-	return nil
-}
-
-// requiredGoModules returns the version of each module the go.mod in dir
-// requires, by module path. A go.mod that is missing or does not parse requires
-// none: go reports it.
-func requiredGoModules(dir string) map[string]string {
-	required := map[string]string{}
-	goModPath := filepath.Join(dir, "go.mod")
-	data, err := os.ReadFile(goModPath)
-	if err != nil {
-		return required
-	}
-	file, err := modfile.Parse(goModPath, data, nil)
-	if err != nil {
-		return required
-	}
-	for _, require := range file.Require {
-		required[require.Mod.Path] = require.Mod.Version
-	}
-	return required
-}
-
-// goDepsEdit returns the arguments of the `go mod edit` that edits the module's
-// requirements for action. resolved is what resolveGoModules returned for the
-// modules of an add.
-//
-// None of the edits runs `go get`. `go get` loads the module graph, which
-// resolves every version go.mod requires through the module proxy, whatever
-// the edit is. A requirement no proxy serves, such as `require example.com/lib
-// v0.0.0`, the placeholder a workspace module keeps after its local `replace`
-// is gone or that only go.work satisfies, then fails the very add or remove
-// that would fix it.
-//
-// add requires the versions `go list -m` resolved, which does not load the
-// graph. remove and prune drop each requirement from go.mod without resolving
-// it. The `go mod tidy` that follows resolves the rest of the graph with the
-// replace directives of go.work (tidyGoModule).
-func goDepsEdit(action string, modules []string, resolved []module.Version) []string {
-	args := []string{"mod", "edit"}
-	if action == "add" {
-		for _, m := range resolved {
-			args = append(args, "-require="+m.Path+"@"+m.Version)
-		}
-		return args
-	}
-	for _, m := range modules {
-		// A version the caller gave is not part of the requirement to drop.
-		args = append(args, "-droprequire="+strings.SplitN(m, "@", 2)[0])
-	}
-	return args
-}
-
-// resolveGoModules returns the module version each spec names, from one `go
-// list -m` in moduleDir. A spec without a version asks for what `go get` asks
-// for, @upgrade: @latest, unless go.mod already requires the module at a newer
-// version, which is kept (keepNewerRequired).
-//
-// @upgrade is not queried itself. It reads the version go.mod requires, so it
-// loads the module graph, which resolves every required version through the
-// proxy, unless the path is a root requirement of a pruned go.mod whose go.sum
-// has that version. @latest and an exact version load no graph, so they resolve
-// a spec in a module that requires a version no proxy serves (goDepsEdit).
-//
-// Two flags keep the query away from the graph:
-//
-//   - GOWORK=off. In workspace mode a query reads the workspace build list,
-//     which resolves the unserved version and fails. A version query reads no
-//     replace directive, so go.work changes no answer.
-//   - -mod=readonly. It keeps go list from writing go.mod or go.sum, and in a
-//     module with a vendor directory it lets the query reach the proxy: the
-//     default, -mod=vendor, refuses to query.
-//
-// go's error output streams to the terminal, as for the other go runs.
-func resolveGoModules(ctx context.Context, goPath, moduleDir string, env, specs []string) ([]module.Version, error) {
-	args := []string{"list", "-m", "-json", "-mod=readonly"}
-	bare := make([]bool, len(specs))
-	for i, spec := range specs {
-		if !strings.Contains(spec, "@") {
-			bare[i] = true
-			spec += "@latest"
-		}
-		args = append(args, spec)
-	}
-	var out bytes.Buffer
-	if err := runGoWithStdout(ctx, goPath, moduleDir, append(env[:len(env):len(env)], "GOWORK=off"), &out, args); err != nil {
-		return nil, err
-	}
-	var resolved []module.Version
-	for decoder := json.NewDecoder(&out); ; {
-		var listed struct{ Path, Version string }
-		if err := decoder.Decode(&listed); errors.Is(err, io.EOF) {
-			break
-		} else if err != nil {
-			return nil, fmt.Errorf("read the go list output: %w", err)
-		}
-		if listed.Path == "" || listed.Version == "" {
-			return nil, fmt.Errorf("go list gave no version for %q", listed.Path)
-		}
-		resolved = append(resolved, module.Version{Path: listed.Path, Version: listed.Version})
-	}
-	if len(resolved) != len(specs) {
-		return nil, fmt.Errorf("go list resolved %d of %d modules", len(resolved), len(specs))
-	}
-	return keepNewerRequired(resolved, bare, requiredGoModules(moduleDir)), nil
-}
-
-// keepNewerRequired returns resolved with, for each module whose spec named no
-// version (bare), the version go.mod requires when that is semver-greater than
-// the latest one: @upgrade never downgrades a module.
-func keepNewerRequired(resolved []module.Version, bare []bool, required map[string]string) []module.Version {
-	for i, m := range resolved {
-		if have, ok := required[m.Path]; ok && bare[i] && semver.Compare(have, m.Version) > 0 {
-			resolved[i].Version = have
-		}
-	}
-	return resolved
-}
-
-// runGoInModule runs the go command at goPath with args in dir with the given
-// environment, streaming output to the user's terminal. What the go command
-// runs is up to the module the repository declares (a toolchain directive
-// selects another go), so this process records repository code before it
-// starts it (runcredential.MarkRepositoryCodeStarted).
-func runGoInModule(ctx context.Context, goPath, dir string, env, args []string) error {
-	return runGoWithStdout(ctx, goPath, dir, env, os.Stdout, args)
-}
-
-// runGoWithStdout is runGoInModule with the standard output going to stdout.
-func runGoWithStdout(ctx context.Context, goPath, dir string, env []string, stdout io.Writer, args []string) error {
-	runcredential.MarkRepositoryCodeStarted("go " + strings.Join(args, " "))
-	cmd := exec.CommandContext(ctx, goPath, args...)
-	cmd.Dir = dir
-	cmd.Env = env
-	cmd.Stdout = stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-// goModExists reports whether dir is a Go module (has a go.mod file).
-func goModExists(dir string) bool {
-	info, err := os.Stat(filepath.Join(dir, "go.mod"))
-	return err == nil && !info.IsDir()
-}
-
-// resolveGoDepsProject selects the single Go module a deps add/remove targets. A
-// --projects selector wins (and must name a Go module); otherwise the sole Go
-// module in the workspace is used. No selector with several Go modules, or a
-// non-Go target, is an actionable error rather than a silent guess.
-func resolveGoDepsProject(wsRoot string, ws *workspace.Workspace, selector string) (*workspace.Project, error) {
+// depsEditTarget selects the single project a deps add or remove edits. A
+// --projects selector names it, by name or ID, and a project whose extensions
+// declare no deps-edit job (editors) is refused. Without a selector, the sole
+// project with an editor is used, and several are an error that lists them.
+func depsEditTarget(ws *workspace.Workspace, editors map[string]string, action, selector string) (*workspace.Project, error) {
 	selector = strings.TrimSpace(selector)
 	switch selector {
 	case "", "*", ".", "[impacted]":
-		// No explicit single-project selection — fall through to auto-detect.
+		// No single project named: the sole one with an editor.
 	default:
 		if strings.Contains(selector, ",") {
-			return nil, fmt.Errorf("deps add/remove targets a single project; got --projects %q", selector)
+			return nil, fmt.Errorf("deps %s edits a single project; got --projects %q", action, selector)
 		}
-		var p *workspace.Project
-		for _, cand := range ws.Projects {
-			if cand.Name == selector {
-				p = cand
-				break
+		for _, project := range ws.Projects {
+			if project.Name != selector && project.ID != selector {
+				continue
 			}
+			if editors[project.ID] == "" {
+				return nil, fmt.Errorf("deps %s cannot edit %s: no extension of the project declares the %s job, and %s; "+
+					"edit the project's manifest by hand, then run `putnami deps install`",
+					action, project.Name, depsEditJob, projectExtensionsText(project))
+			}
+			return project, nil
 		}
-		if p == nil {
-			return nil, fmt.Errorf("project %q not found in the workspace", selector)
-		}
-		if !goModExists(filepath.Join(wsRoot, p.Path)) {
-			return nil, fmt.Errorf("project %q is not a Go module (no go.mod); `deps add`/`deps remove` support Go modules only: edit the project's own manifest (package.json, pyproject.toml) and run `putnami deps install`", p.Name)
-		}
-		return p, nil
+		return nil, fmt.Errorf("project %q not found in the workspace", selector)
 	}
 
-	var goProjects []*workspace.Project
-	for _, p := range ws.Projects {
-		if goModExists(filepath.Join(wsRoot, p.Path)) {
-			goProjects = append(goProjects, p)
+	var editable []*workspace.Project
+	for _, project := range ws.Projects {
+		if editors[project.ID] != "" {
+			editable = append(editable, project)
 		}
 	}
-	switch len(goProjects) {
+	switch len(editable) {
 	case 0:
-		return nil, fmt.Errorf("no Go module found in the workspace; `deps add`/`deps remove` currently support Go modules only")
+		return nil, fmt.Errorf("deps %s: no project of the workspace has an extension that declares the %s job; "+
+			"edit the project's manifest by hand, then run `putnami deps install`", action, depsEditJob)
 	case 1:
-		return goProjects[0], nil
+		return editable[0], nil
 	default:
-		names := make([]string, len(goProjects))
-		for i, p := range goProjects {
-			names[i] = p.Name
+		names := make([]string, len(editable))
+		for i, project := range editable {
+			names[i] = project.Name
 		}
-		return nil, fmt.Errorf("multiple Go modules in the workspace; select one with --projects <name> (%s)", strings.Join(names, ", "))
+		return nil, fmt.Errorf("deps %s: several projects have an extension that declares the %s job; select one with --projects <name> (%s)",
+			action, depsEditJob, strings.Join(names, ", "))
 	}
 }
 
