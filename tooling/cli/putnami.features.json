@@ -1278,10 +1278,6 @@
               "an-unmanaged-workspace-uses-the-empty-binding",
               "the-remote-and-status-only-legs-use-the-bound-key",
               "a-lease-at-one-binding-never-holds-a-waiter-at-another",
-              "a-stamp-write-replaces-the-stamp-whole",
-              "a-source-bound-preparation-takes-its-project-key",
-              "the-source-bound-tasks-of-one-project-take-turns",
-              "a-restore-of-paths-the-binding-excludes-keeps-the-binding",
               "a-source-bound-failure-is-never-replayed",
               "a-source-bound-entry-prunes-no-producer",
               "a-test-only-edit-stores-beside-the-first-entry-and-keeps-every-key",
@@ -1305,6 +1301,22 @@
               "the-dev-vocabulary-declares-every-first-party-kind",
               "the-go-packager-stamps-command-kinds",
               "the-npm-packager-stamps-command-kinds"
+            ]
+          }
+        },
+        {
+          "id": "source-bound-stamp",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-stamp-write-replaces-the-stamp-whole",
+              "a-source-bound-preparation-takes-its-project-key",
+              "the-source-bound-tasks-of-one-project-take-turns",
+              "a-restore-of-paths-the-binding-excludes-keeps-the-binding"
             ]
           }
         },

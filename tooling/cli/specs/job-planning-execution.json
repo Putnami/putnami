@@ -206,6 +206,10 @@
       "text": "A command's traits may declare its kind (verification, criteria, diagnostics or files), its workload (serve or once), that it rewrites sources, and that it consumes the release set; a batchable task may declare the kind and phase of its shared invocation. Strict validation refuses a value outside each vocabulary. A manifest that declares any of them requires CLI contract 11 wherever it loads from, and the packagers stamp it. Declared traits replace a verb's defaults wholesale, kind included."
     },
     {
+      "id": "source-bound-stamp",
+      "text": "A source-bound task rewrites its project's binding stamp whole, so a reader sees the earlier stamp or the new one. The source-bound tasks of one project take turns from the stamp rewrite to the capture of their entry, within a session and across sessions. A restore of paths the binding excludes keeps the project's computed binding."
+    },
+    {
       "id": "workload-lifecycle",
       "text": "A command whose traits declare the serve workload streams it until interrupted: the run is promoted to watch unless its own --no-watch is set, a hosted run and MCP run_jobs refuse it, a composition starts only its terminal uncacheable step, and no portable run carries it. The once workload streams once and forwards the workload's exit code. A command that declares rewritesSources is never portable. Neither behavior follows a command's name."
     }

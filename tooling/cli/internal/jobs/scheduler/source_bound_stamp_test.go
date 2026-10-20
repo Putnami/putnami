@@ -17,12 +17,16 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
+// sourceBoundStampRequirement is the requirement the stamp and turn-taking
+// tests prove.
+const sourceBoundStampRequirement = "source-bound-stamp"
+
 // A stamp write replaces the file whole. A reader that opened the stamp before
 // the write keeps reading the complete earlier document, the written document
 // is complete, and no temporary file is left beside it. A write in place would
 // truncate the file under the reader.
 func TestVersionStampWriteReplacesTheFileWhole(t *testing.T) {
-	spectest.Proves(t, sourceBoundFeature, sourceBoundRequirement, "a-stamp-write-replaces-the-stamp-whole")
+	spectest.Proves(t, sourceBoundFeature, sourceBoundStampRequirement, "a-stamp-write-replaces-the-stamp-whole")
 	dir := filepath.Join(t.TempDir(), ".gen")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -91,7 +95,7 @@ func TestVersionStampWriteReplacesTheFileWhole(t *testing.T) {
 // project waits for both. A task that is not source-bound takes neither once
 // the session stamped the project.
 func TestPreparationOfASourceBoundTaskTakesItsProjectKey(t *testing.T) {
-	spectest.Proves(t, sourceBoundFeature, sourceBoundRequirement, "a-source-bound-preparation-takes-its-project-key")
+	spectest.Proves(t, sourceBoundFeature, sourceBoundStampRequirement, "a-source-bound-preparation-takes-its-project-key")
 	t.Parallel()
 	s := &Scheduler{versionFiles: map[string]bool{"proj": true}}
 	bound := outputLockJob("proj", "build~describe", nil)
@@ -151,7 +155,7 @@ func secondSourceBoundDescribe(describeJob *ScheduledJob, command string) *Sched
 // so neither rewrites the stamp while the other executes or captures. Each
 // entry is stored at the binding the evidence names.
 func TestSourceBoundTasksOfOneProjectTakeTurns(t *testing.T) {
-	spectest.Proves(t, sourceBoundFeature, sourceBoundRequirement, "the-source-bound-tasks-of-one-project-take-turns")
+	spectest.Proves(t, sourceBoundFeature, sourceBoundStampRequirement, "the-source-bound-tasks-of-one-project-take-turns")
 	requireShell(t)
 	logs := t.TempDir()
 	ws, planned := sourceBoundRunFixture(t, filepath.Join(logs, "describe"), filepath.Join(logs, "compile"))
@@ -195,7 +199,7 @@ func countSourceBindings(s *Scheduler) map[string]int {
 // evidence, cannot change the project's binding, so the memo keeps it. A
 // restore of a path the binding covers still drops it.
 func TestRestoreOfPathsTheBindingExcludesKeepsTheBinding(t *testing.T) {
-	spectest.Proves(t, sourceBoundFeature, sourceBoundRequirement, "a-restore-of-paths-the-binding-excludes-keeps-the-binding")
+	spectest.Proves(t, sourceBoundFeature, sourceBoundStampRequirement, "a-restore-of-paths-the-binding-excludes-keeps-the-binding")
 	ws := makeExecutorTestWorkspace(t)
 	runVersionsGit(t, ws.Root, "init")
 	project := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
@@ -242,7 +246,7 @@ func TestRestoreOfPathsTheBindingExcludesKeepsTheBinding(t *testing.T) {
 // computes the project's binding once: the first hit restores only paths the
 // binding excludes, so the second lookup reads the memo.
 func TestWarmSourceBoundHitsComputeTheBindingOnce(t *testing.T) {
-	spectest.Proves(t, sourceBoundFeature, sourceBoundRequirement, "a-restore-of-paths-the-binding-excludes-keeps-the-binding")
+	spectest.Proves(t, sourceBoundFeature, sourceBoundStampRequirement, "a-restore-of-paths-the-binding-excludes-keeps-the-binding")
 	requireShell(t)
 	logs := t.TempDir()
 	describeLog := filepath.Join(logs, "describe")
