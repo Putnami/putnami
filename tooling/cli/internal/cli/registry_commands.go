@@ -44,7 +44,6 @@ func init() {
 	registerCommand("scopes", cmdScopes)
 	registerCommand("init", cmdInit)
 	registerCommand("workspace", cmdWorkspace)
-	registerCommand("version", cmdVersion)
 	registerCommand("cli", cmdCLI)
 	registerCommand("deps", cmdDeps)
 	registerCommand("cache", cmdCache)
@@ -420,55 +419,6 @@ func cmdCLI(env *CommandEnv) error {
 	}
 }
 
-// cmdVersion serves the release versions of the workspace, its scopes, and its
-// projects; get and tag always require a workspace. The installed CLI binaries
-// belong to cmdCLI.
-func cmdVersion(env *CommandEnv) error {
-	if err := env.requireWorkspace(); err != nil {
-		return err
-	}
-	if env.Sub == "get" || env.Sub == "" || env.Sub == "tag" {
-		if err := synchronizeVersionGraph(env); err != nil {
-			return err
-		}
-	}
-	switch env.Sub {
-	case "get", "":
-		return versioncmd.VersionGet(env.WsRoot, env.Args, env.OutputFormat)
-	case "tag":
-		args := env.Args
-		if env.Global.DryRun {
-			args = append(append([]string{}, args...), "--dry-run")
-		}
-		return versioncmd.VersionTag(env.Ctx, env.WsRoot, args)
-	default:
-		return usageErrorf("unknown subcommand: version %s\n  Available: get, tag", env.Sub)
-	}
-}
-
-// synchronizeVersionGraph refreshes the recorded dependency graph before a
-// version is computed from a support catalog. The catalog promotes an unlisted
-// project a stable one depends on, and a Go dependency edge exists only in the
-// recorded provider view, so a version read from a missing or outdated view
-// would differ between a fresh clone and a machine that ran a build. A
-// workspace without a catalog never reads an edge and is not refreshed.
-//
-// When the refresh fails, `version get` still answers from a recorded view, and
-// says so, because it is a recovery command that must work offline or with a
-// broken provider. `version tag` writes a release and refuses.
-func synchronizeVersionGraph(env *CommandEnv) error {
-	refresh := refreshVersionGraph(env.Ctx, env.WsRoot, env.Cfg)
-	if refresh.err == nil {
-		return nil
-	}
-	if env.Sub != "tag" && refresh.recorded.Usable() {
-		iox.Fprintf(os.Stderr, "putnami: version: the dependency graph could not be refreshed (%v); "+
-			"answering from the recorded view observed at %s\n", refresh.err, refresh.recorded.ObservedAt)
-		return nil
-	}
-	return refresh.refusal()
-}
-
 // versionGraphRefresh is the outcome of refreshVersionGraph: err is why the
 // refresh failed, nil when it succeeded or was not needed, and recorded is the
 // view a version can still be read from after a failure.
@@ -477,10 +427,14 @@ type versionGraphRefresh struct {
 	recorded workspace.RecordedView
 }
 
-// refreshVersionGraph refreshes the recorded dependency graph when the
-// workspace has a support catalog (synchronizeVersionGraph says why), and
-// reads the recorded view when the refresh fails. The version.lines host RPC
-// method calls it too, so both read a version from the same graph.
+// refreshVersionGraph refreshes the recorded dependency graph before a version
+// is computed from a support catalog, and reads the recorded view when the
+// refresh fails. The catalog promotes an unlisted project a stable one depends
+// on, and a Go dependency edge exists only in the recorded provider view, so a
+// version read from a missing or outdated view would differ between a fresh
+// clone and a machine that ran a build. A workspace without a catalog never
+// reads an edge and is not refreshed. The version.lines host RPC method calls
+// it.
 func refreshVersionGraph(ctx context.Context, wsRoot string, cfg *wsproto.Config) versionGraphRefresh {
 	if _, err := os.Stat(filepath.Join(wsRoot, supportproto.CatalogFilename)); err != nil {
 		return versionGraphRefresh{}

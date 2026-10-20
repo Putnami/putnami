@@ -29,7 +29,7 @@ func TestDispatchUnknownSubcommandIsUsageError(t *testing.T) {
 	t.Parallel()
 	wsRoot := t.TempDir()
 
-	groups := []string{"extensions", "templates", "projects", "scopes", "workspace", "version", "cli"}
+	groups := []string{"extensions", "templates", "projects", "scopes", "workspace", "cli"}
 	for _, name := range groups {
 		t.Run(name, func(t *testing.T) {
 			cmd, ok := lookupCommand(name)
@@ -380,27 +380,27 @@ func TestCmdCLI_ListGlobalNeedsNoWorkspace(t *testing.T) {
 	}
 }
 
-// D-018 moved the installed-binary commands from the version noun to the cli
-// noun with no alias: the old spellings are unknown subcommands of version, and
-// the version catalog no longer documents them.
-func TestCmdVersion_BinaryManagementMovedToCLI(t *testing.T) {
+// The core serves no version command: the installed-binary commands moved to
+// the cli noun with no alias (D-018), and version get and tag to @putnami/dev
+// (D-010). The catalog documents none of them, and the version root is refused
+// as a root that left the core.
+func TestVersionIsNoCoreCommand(t *testing.T) {
 	t.Parallel()
-	cmd, ok := lookupCommand("version")
-	if !ok {
-		t.Fatal("version command is not registered")
+	if _, ok := lookupCommand("version"); ok {
+		t.Fatal("the core still registers a version command")
 	}
-	wsRoot := t.TempDir()
+	for _, path := range []string{"version", "version list", "version use", "version get", "version tag"} {
+		if _, ok := commandmeta.Lookup(path); ok {
+			t.Errorf("the catalog still documents `%s`", path)
+		}
+	}
 	for _, sub := range []string{"list", "use"} {
-		env := &CommandEnv{Ctx: context.Background(), Cfg: &wsproto.Config{}, WsRoot: wsRoot, Sub: sub, Args: []string{"go-dev"}}
-		if err := cmd.run(env); !errors.Is(err, cmderr.ErrUsage) {
-			t.Errorf("version %s: err = %v, want a usage error", sub, err)
-		}
-		if _, ok := commandmeta.Lookup("version " + sub); ok {
-			t.Errorf("the catalog still documents `version %s`", sub)
-		}
 		if _, ok := commandmeta.Lookup("cli " + sub); !ok {
 			t.Errorf("the catalog does not document `cli %s`", sub)
 		}
+	}
+	if err := refuseRemovedCoreRoot("version", nil, nil); !errors.Is(err, cmderr.ErrUsage) {
+		t.Errorf("putnami version without an extension that declares it: err = %v, want a usage error", err)
 	}
 }
 

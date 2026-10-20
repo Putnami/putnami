@@ -29,8 +29,8 @@ const (
 // variable carries a value after trimming; err reports a value that is not a
 // full lowercase hex commit id, in which case revision is "" and set is true.
 // This is the ONE reader of the variable: the version suffix, the release-set
-// provenance and `version tag` all go through it, so they cannot disagree
-// about which commit a run is bound to.
+// provenance and the version.lines host RPC method all go through it, so they
+// cannot disagree about which commit a run is bound to.
 func SourceRevisionOverride() (revision string, set bool, err error) {
 	revision = strings.TrimSpace(os.Getenv(SourceRevisionEnv))
 	if revision == "" {

@@ -1228,8 +1228,8 @@ Resolution is explicit and source-aware: `--cache-trust` wins over
 (`options.<command>.cache-trust`), then the environment default. For a
 multi-command run, differing command options combine to the strictest policy.
 A command whose jobs declare `sideEffects: registry`, which `publish` always has,
-`tag`, and `version tag` force at least `ci` even when `any` was requested;
-`none` remains a stricter opt-out. A `cloud` side effect alone, such as
+forces at least `ci` even when `any` was requested; `none` remains a stricter
+opt-out. A `cloud` side effect alone, such as
 `deploy`'s, does not raise the policy.
 
 Older providers do not return a channel. Under `any` they retain their previous

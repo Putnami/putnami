@@ -152,14 +152,12 @@ func (b hostRPCBinding) workspaceOwners(_ context.Context, params hostrpcproto.W
 	return result, nil
 }
 
-// versionLines answers version.lines with what `putnami version get` and
-// `putnami version tag` compute for the launch's workspace, through the same
-// functions. Like them, it first refreshes the dependency graph a support
-// catalog reads. When the refresh fails it answers from the recorded view and
-// names it in RecordedGraph, so a caller that releases can refuse as
-// `version tag` does; without a usable view it fails, as both commands do. A
-// scope that names no line is invalid params, and any other failure, such as
-// a shallow clone, is the host's.
+// versionLines answers version.lines for the launch's workspace. It first
+// refreshes the dependency graph a support catalog reads. When the refresh
+// fails it answers from the recorded view and names it in RecordedGraph, so a
+// caller that releases can refuse; without a usable view it fails. A scope
+// that names no line is invalid params, and any other failure, such as a
+// shallow clone, is the host's.
 func (b hostRPCBinding) versionLines(ctx context.Context, params hostrpcproto.VersionLinesParams) (hostrpcproto.VersionLinesResult, error) {
 	if b.root == "" {
 		return hostrpcproto.VersionLinesResult{}, &hostrpcproto.Error{Code: hostrpcproto.CodeUnavailable,

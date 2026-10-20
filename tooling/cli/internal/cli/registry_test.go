@@ -70,7 +70,7 @@ func TestCommandRegistryCoversStructuredCommands(t *testing.T) {
 	t.Parallel()
 	// The catalog and the dispatcher must expose the same structured roots.
 	want := []string{
-		"extensions", "templates", "projects", "workspace", "version", "deps",
+		"extensions", "templates", "projects", "workspace", "deps",
 		"cache", "config", "context", "migrate", "sessions", "completion",
 		"install", "telemetry", "upgrade", "help", "init", "scopes",
 		"mcp", "pin", "doctor", "impact-plan", "report", "tree",

@@ -118,12 +118,6 @@ _putnami_subcommands_for() {
                 'fingerprint'
             )
             ;;
-        'version')
-            reply=(
-                'get'
-                'tag'
-            )
-            ;;
         'workspace')
             reply=(
                 'describe'
@@ -207,9 +201,6 @@ _putnami_path_known() {
         'tree') return 0 ;;
         'tree fingerprint') return 0 ;;
         'upgrade') return 0 ;;
-        'version') return 0 ;;
-        'version get') return 0 ;;
-        'version tag') return 0 ;;
         'workspace') return 0 ;;
         'workspace describe') return 0 ;;
         'workspace init') return 0 ;;
@@ -408,19 +399,6 @@ _putnami_flags_for() {
                 '--version[Use an exact Putnami release version]:version:'
             )
             ;;
-        'version get')
-            reply=(
-                '--scope[Report only this version line, by its scope path]:line:'
-            )
-            ;;
-        'version tag')
-            reply=(
-                '--dry-run[Print the proposed tag and changelog without writing anything]'
-                '--push[Push the release commit and the tag to origin]'
-                '--scope[The version line to release, by its scope path (required when the workspace declares several)]:line:'
-                '--yes[Skip the confirmation and create the release commit and tag]'
-            )
-            ;;
         'workspace init')
             reply=(
                 '--channel[Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)]:channel:'
@@ -466,7 +444,6 @@ _putnami() {
         'templates:Manage templates'
         'tree:Identify the worktree the CLI runs in'
         'upgrade:Upgrade CLI, extensions, and dependencies'
-        'version:Versions derived from git and release tags'
         'workspace:Manage workspace'
     )
 

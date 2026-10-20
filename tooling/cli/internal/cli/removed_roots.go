@@ -13,7 +13,7 @@ import (
 // names no destination: the refusal cites the published reference that does.
 // The exception is a root whose successors the core serves itself
 // (removedRootSuccessors): its refusal names them.
-var removedCoreRoots = []string{"channel", "ci", "change-plan", "infra", "dev", "contributor"}
+var removedCoreRoots = []string{"channel", "ci", "change-plan", "infra", "dev", "contributor", "version"}
 
 // removedRootSuccessors names, for a removed root whose commands the core still
 // serves under another spelling, where they went. The core serves them in any

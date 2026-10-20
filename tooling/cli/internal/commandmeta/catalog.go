@@ -211,7 +211,7 @@ type Command struct {
 	// (a bare group root, or a subcommand collapsed into a sibling's row).
 	Category string
 	// Label overrides Path in the categorized listing, for rows that collapse
-	// several paths ("version get|tag") or name an argument
+	// several paths ("cli list|use") or name an argument
 	// ("completion <shell>"). Display only.
 	Label string
 	// Summary is the one-line listing description. It is deliberately shorter

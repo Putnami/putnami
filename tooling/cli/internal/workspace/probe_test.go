@@ -355,7 +355,7 @@ func TestRequireProbe_GraphCommandsFailAndRecoveryCommandsSurvive(t *testing.T) 
 
 	// Exactly the recovery set: the user must be able to repair
 	// the workspace, and to read help, after a provider breaks.
-	survivors := []string{"install", "extensions", "extensions install", "projects sync", "help", "version"}
+	survivors := []string{"install", "extensions", "extensions install", "projects sync", "help"}
 	for _, path := range survivors {
 		if err := RequireProbe(path, failure); err != nil {
 			t.Errorf("recovery command %q was blocked by a probe failure: %v", path, err)

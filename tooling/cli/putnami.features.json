@@ -2286,7 +2286,7 @@
       "id": "cli/version-from-git",
       "type": "feature",
       "name": "Versions derived from git",
-      "outcome": "A user gets the exact version every version line is at, derived from the line's git tags and the conventional commits that touch it, and releases a line with one command that writes its changelog, its release commit, and its tag",
+      "outcome": "A user gets the exact version every version line is at, derived from the line's git tags and the conventional commits that touch it",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -2299,8 +2299,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "tagged-commit-uses-the-tag-version",
-              "dirty-tree-is-refused"
+              "tagged-commit-uses-the-tag-version"
             ]
           }
         },
@@ -2347,19 +2346,6 @@
               "shallow-clone-is-refused"
             ]
           }
-        },
-        {
-          "id": "release-commit-then-tag",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "changelog-is-in-the-tagged-commit"
-            ]
-          }
         }
       ]
     },
@@ -2397,7 +2383,8 @@
             "kind": "acceptance",
             "checks": [
               "cohort-selects-every-line-member",
-              "immutable-channel-is-requested"
+              "immutable-channel-is-requested",
+              "a-dirty-tree-is-refused"
             ]
           }
         },
