@@ -350,8 +350,7 @@ wait_for_ready() {
   done
 }
 
-# Require HTTP 200 and a non-empty body from each page of a served starter. The
-# body of "/" is kept: require_stop compares the answer after the stop with it.
+# Require HTTP 200 and a non-empty body from each page of a served starter.
 require_pages() {
   leg="$1"
   log="$2"
@@ -369,35 +368,70 @@ require_pages() {
     if [ ! -s "$workdir/response" ]; then
       fail_with_log "${leg} leg: ${page_url} answered 200 with an empty body" "$log"
     fi
-    if [ "$page_path" = "/" ]; then
-      cp "$workdir/response" "$workdir/served-root"
-    fi
     echo "smoke: GET ${page_url} answered 200"
   done
 }
 
-# Stop the starter, then require that it no longer answers. A freed ephemeral
-# port can be taken at once by an unrelated listener of the machine, so an
-# answer alone does not prove the starter is alive. The starter is alive when
-# "/" answers 200 with the body the pages leg saw before the stop: an orphaned
-# starter serves the same page, another listener does not.
+# Print every process of the machine as a "pid command line" line. procps is not
+# in the bare image, so without ps the command lines come from /proc.
+list_processes() {
+  if command -v ps >/dev/null 2>&1; then
+    ps -ww -eo pid=,args=
+    return
+  fi
+  for process_dir in /proc/[0-9]*; do
+    if [ -r "$process_dir/cmdline" ]; then
+      printf '%s ' "${process_dir#/proc/}"
+      tr '\0' ' ' <"$process_dir/cmdline" 2>/dev/null || true
+      printf '\n'
+    fi
+  done
+}
+
+# Print the processes that belong to this smoke: those whose command line names
+# its workdir or its Putnami home. The listing is taken before grep starts, so
+# grep does not match itself.
+smoke_processes() {
+  process_list="$(list_processes 2>/dev/null)" || true
+  printf '%s\n' "$process_list" | grep -F -e "${HOME}/.putnami" -e "${workdir}/" || true
+}
+
+# Stop the starter, then require that no process of this smoke runs. A freed
+# ephemeral port can be taken at once by an unrelated listener, so an HTTP
+# answer on the port does not show the starter is alive: the response of "/"
+# differs by request on a real webapp, and any listener can answer 200. The
+# processes that belong to this smoke do show it, whatever the port serves.
+# The answer of the port is only reported.
 require_stop() {
   leg="$1"
   log="$2"
   if ! stop_group; then
     fail_with_log "${leg} leg: the starter did not stop within the graceful shutdown budget" "$log"
   fi
-  after_status="000"
-  after_status="$(curl -sS --connect-timeout 1 --max-time 1 \
-    -o "$workdir/after-stop" -w '%{http_code}' \
-    "http://127.0.0.1:${ready_port}/" 2>/dev/null)" || return 0
-  if [ ! -f "$workdir/served-root" ]; then
-    fail_with_log "${leg} leg: something answers HTTP ${after_status} on the starter's port after the commands stopped, and the pages leg kept no page to compare it with" "$log"
+  if [ -z "$(list_processes 2>/dev/null)" ]; then
+    fail_with_log "${leg} leg: the machine cannot list its processes, which the stop check needs" "$log"
   fi
-  if [ "$after_status" = "200" ] && [ "$(cat "$workdir/after-stop")" = "$(cat "$workdir/served-root")" ]; then
-    fail_with_log "${leg} leg: the HTTP listener still answers the starter's page after the commands stopped" "$log"
+  survivors=""
+  stop_probe=0
+  while [ "$stop_probe" -lt 20 ]; do
+    survivors="$(smoke_processes)"
+    if [ -z "$survivors" ]; then
+      break
+    fi
+    sleep 0.1
+    stop_probe=$((stop_probe + 1))
+  done
+  if [ -n "$survivors" ]; then
+    printf '%s\n' "$survivors"
+    fail_with_log "${leg} leg: a process of the smoke still runs after the commands stopped; the starter may be orphaned" "$log"
   fi
-  echo "smoke: the starter's page no longer answers on port ${ready_port}"
+  echo "smoke: no process of the smoke runs after the stop"
+  if after_status="$(curl -sS --connect-timeout 1 --max-time 5 -o /dev/null \
+    -w '%{http_code}' "http://127.0.0.1:${ready_port}/" 2>/dev/null)"; then
+    echo "smoke: port ${ready_port} answers HTTP ${after_status} after the stop; no process of the smoke serves it, so another listener took it"
+  else
+    echo "smoke: port ${ready_port} no longer answers"
+  fi
 }
 
 # ── Leg: block, run as printed ───────────────────────────────────────────────
@@ -483,7 +517,6 @@ set -m
 group_pid=$!
 set +m
 wait_for_ready go-serve "$go_serve_log"
-rm -f "$workdir/served-root"
 require_pages go-pages "$go_serve_log" /
 require_stop go-stop "$go_serve_log"
 

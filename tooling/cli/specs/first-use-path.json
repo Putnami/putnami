@@ -23,7 +23,11 @@
     },
     {
       "id": "first-use-smoke-legs",
-      "text": "The smoke runs the block as printed, in a shell that stops at the first failed command. It requires HTTP 200 from /, /about and /guestbook, then exit status 0 from putnami lint,test,build on the starter and from init and lint,test,build of a Go api, whose / answers 200. After each served starter stops, it fails when / still answers 200 with the page the starter served; another listener that takes the freed port does not fail it. It fails when ~/.bun exists, when Bun or Go is missing under the Putnami home, or when a workspace holds a copy of Go. A channel other than latest is passed as PUTNAMI_VERSION. Every failure names its leg and exits non-zero."
+      "text": "The smoke runs the block as printed, in a shell that stops at the first failed command. It requires HTTP 200 from /, /about and /guestbook, then exit status 0 from putnami lint,test,build on the starter and from init and lint,test,build of a Go api, whose / answers 200. It fails when ~/.bun exists, when Bun or Go is missing under the Putnami home, or when a workspace holds a copy of Go. A channel other than latest is passed as PUTNAMI_VERSION. Every failure names its leg and exits non-zero."
+    },
+    {
+      "id": "first-use-smoke-stop",
+      "text": "After a served starter stops, the smoke fails when a process of the smoke still runs: one whose command line names the smoke's workdir or Putnami home. It does not compare what the starter's port serves, because the page of a webapp changes on every request and a freed port can go to an unrelated listener, even one that serves the same page. It reports who answers on the port. Every failure names its leg and exits non-zero."
     },
     {
       "id": "init-lists-members-once",

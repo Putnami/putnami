@@ -134,6 +134,29 @@ terminate_server() {
   [ "$forced" -eq 0 ]
 }
 
+# Print every process of the machine as a "pid command line" line. procps may be
+# missing from a minimal image, so without ps the command lines come from /proc.
+list_processes() {
+  if command -v ps >/dev/null 2>&1; then
+    ps -ww -eo pid=,args=
+    return
+  fi
+  for process_dir in /proc/[0-9]*; do
+    if [ -r "$process_dir/cmdline" ]; then
+      printf '%s ' "${process_dir#/proc/}"
+      tr '\0' ' ' <"$process_dir/cmdline" 2>/dev/null || true
+      printf '\n'
+    fi
+  done
+}
+
+# Print the processes whose command line names the smoke workdir. The listing is
+# taken before grep starts, so grep does not match itself.
+smoke_processes() {
+  process_list="$(list_processes 2>/dev/null)" || true
+  printf '%s\n' "$process_list" | grep -F -e "${workdir}/" || true
+}
+
 capture_failure_artifacts() {
   [ -n "$diagnostics_dir" ] || return 0
 
@@ -677,40 +700,39 @@ if ! terminate_server; then
   exit 1
 fi
 # A freed ephemeral port can be taken at once by an unrelated listener, so an
-# answer alone does not prove the starter is alive. The starter is alive when
-# "/" answers 2xx with the page it served before the stop; any other answer, or
-# none, means it is gone. An orphaned starter serves the same page.
+# HTTP answer on the port does not show the starter is alive; the page of the
+# real webapp also changes on every request. The processes that belong to this
+# smoke do: everything the smoke starts has a command line under its workdir.
+# The answer of the port is only reported.
+if [ -z "$(list_processes 2>/dev/null)" ]; then
+  echo "::error::shutdown leg: the machine cannot list its processes, which the stop check needs"
+  exit 1
+fi
 listener_stopped=0
 shutdown_probe=0
-probe_file="$workdir/probe.html"
+survivors=""
 while [ "$shutdown_probe" -lt 20 ]; do
-  probe_status="000"
-  if ! probe_status="$(curl -sS --connect-timeout 1 --max-time 1 \
-    -o "$probe_file" -w '%{http_code}' "http://127.0.0.1:${ready_port}/" 2>/dev/null)"; then
+  survivors="$(smoke_processes)"
+  if [ -z "$survivors" ]; then
     listener_stopped=1
     break
   fi
-  case "$probe_status" in
-    2??)
-      if [ "$(cat "$probe_file")" != "$(cat "$response_file")" ]; then
-        listener_stopped=1
-        break
-      fi
-      ;;
-    *)
-      listener_stopped=1
-      break
-      ;;
-  esac
   sleep 0.1
   shutdown_probe=$((shutdown_probe + 1))
 done
 if [ "$listener_stopped" -ne 1 ]; then
-  echo "::error::shutdown leg: HTTP listener still answers after the CLI exited; the starter may be orphaned"
+  printf '%s\n' "$survivors"
+  echo "::error::shutdown leg: a process of the smoke still runs after the CLI exited; the starter may be orphaned"
   tail -n 200 "$serve_log" || true
   exit 1
 fi
-echo "smoke: HTTP listener is unreachable after clean stop"
+if after_status="$(curl -sS --connect-timeout 1 --max-time 5 -o /dev/null \
+  -w '%{http_code}' "http://127.0.0.1:${ready_port}/" 2>/dev/null)"; then
+  echo "smoke: port ${ready_port} answers HTTP ${after_status} after the stop; no process of the smoke serves it, so another listener took it"
+else
+  echo "smoke: port ${ready_port} no longer answers"
+fi
+echo "smoke: no process of the smoke runs after clean stop"
 
 # ── Optional leg: run one command without a workspace ───────────────────────
 #

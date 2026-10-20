@@ -327,7 +327,7 @@ func TestWindowsSmokePS1RunsTheGoldenPath(t *testing.T) {
 		"smoke: a new terminal resolves putnami to ",
 		"smoke: selected executable windows/amd64, digest ",
 		"smoke: installed binary reports " + stubVersion,
-		"smoke: HTTP listener is unreachable after clean stop",
+		"smoke: no process of the smoke runs after clean stop",
 	} {
 		if !res.contains(want) {
 			t.Fatalf("the smoke output does not contain %q:\n%s", want, res.output())
@@ -385,7 +385,7 @@ func TestWindowsSmokePS1RunsTheOptionalRunLegInAnUntouchedDirectory(t *testing.T
 	}
 	for _, want := range []string{
 		smokeOKLine[:strings.Index(smokeOKLine, " on windows/amd64")],
-		"smoke: HTTP listener is unreachable after clean stop",
+		"smoke: no process of the smoke runs after clean stop",
 		"smoke: irm '" + server.URL + "/install.ps1?run=" + smokeRunCommand + "' | iex",
 		"smoke: putnami " + smokeRunCommand + " exited 0 and left ",
 	} {

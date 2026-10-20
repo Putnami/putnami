@@ -3604,7 +3604,18 @@
             "checks": [
               "the-smoke-runs-the-documented-block-then-the-checks-and-the-go-path",
               "a-candidate-channel-is-selected-through-the-environment",
-              "the-smoke-fails-under-the-leg-that-broke",
+              "the-smoke-fails-under-the-leg-that-broke"
+            ]
+          }
+        },
+        {
+          "id": "first-use-smoke-stop",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-stop-leg-fails-on-a-process-of-the-smoke-that-outlives-the-stop",
               "the-stop-leg-ignores-another-listener-on-the-freed-port"
             ]
           }
