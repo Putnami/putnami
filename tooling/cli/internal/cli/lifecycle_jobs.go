@@ -134,6 +134,8 @@ func RunWorkspaceJob(ctx context.Context, req lifecycle.WorkspaceJobRequest) (li
 		// like any other. See terminalRequest for why this is injected.
 		Preflight: doctor.DoctorPreflight,
 		Stdout:    io.Discard,
+		// The caller reports the returned error.
+		ErrorOut: io.Discard,
 	}, output.NewLifecycleRenderer(output.Config{
 		Verbose: req.Display.Verbose,
 		Debug:   req.Display.Debug,

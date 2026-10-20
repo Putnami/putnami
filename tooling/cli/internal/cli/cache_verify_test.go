@@ -45,7 +45,7 @@ func TestCacheVerifyRunnerRoutesExecutionThroughEngine(t *testing.T) {
 			t.Fatalf("request = %#v, want a staged run of the commands the runner was built with", request)
 		}
 		if !request.Global.All || request.Global.NoCache || request.Global.MaxParallel != 1 ||
-			!request.Global.Quiet || !request.EphemeralSession || request.Stdout != io.Discard {
+			!request.Global.Quiet || !request.EphemeralSession || request.Stdout != io.Discard || request.ErrorOut != io.Discard {
 			t.Fatalf("request policy = %#v", request)
 		}
 	}

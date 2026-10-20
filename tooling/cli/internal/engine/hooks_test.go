@@ -182,7 +182,7 @@ func TestRunAfterHooks_TurnsSuccessIntoFailure(t *testing.T) {
 	var code int
 	var err error
 	_ = captureStderr(t, func() {
-		code, err = runAfterHooks(context.Background(), req, false, ExitSuccess)
+		code, err = runAfterHooks(context.Background(), req, false, ExitSuccess, os.Stderr)
 	})
 	if err == nil {
 		t.Fatal("a failing after-hook must report an error")
@@ -196,13 +196,37 @@ func TestRunAfterHooks_TurnsSuccessIntoFailure(t *testing.T) {
 	}
 }
 
+// Only the first after-hook error is returned, so only it goes to the writer
+// the caller gave; the second has no other report and goes to stderr.
+func TestRunAfterHooks_OnlyTheReturnedErrorGoesToTheCallersWriter(t *testing.T) {
+	hooks, _ := hookRecorder(t)
+	hooks.Commands["build"].After = []string{"false"}
+	hooks.CLI.After = []string{"exit 3"}
+	req := &Request{WorkspaceRoot: t.TempDir(), Commands: []string{"build"}, Hooks: hooks}
+
+	var returned strings.Builder
+	var err error
+	stderr := captureStderr(t, func() {
+		_, err = runAfterHooks(context.Background(), req, false, ExitSuccess, &returned)
+	})
+	if err == nil {
+		t.Fatal("failing after-hooks must report an error")
+	}
+	if want := "putnami: hook after error: " + err.Error() + "\n"; returned.String() != want {
+		t.Fatalf("writer = %q, want the returned error %q", returned.String(), want)
+	}
+	if strings.Count(stderr, "hook after error") != 1 || strings.Contains(stderr, err.Error()) {
+		t.Fatalf("stderr = %q, want only the second hook's error", stderr)
+	}
+}
+
 func TestRunHooks_NilHooksAreANoOp(t *testing.T) {
 	t.Parallel()
 	req := &Request{WorkspaceRoot: t.TempDir(), Commands: []string{"build"}}
 	if err := runBeforeHooks(context.Background(), req, false); err != nil {
 		t.Fatalf("nil hooks before: %v", err)
 	}
-	code, err := runAfterHooks(context.Background(), req, false, ExitSuccess)
+	code, err := runAfterHooks(context.Background(), req, false, ExitSuccess, os.Stderr)
 	if err != nil || code != ExitSuccess {
 		t.Fatalf("nil hooks after = (%d, %v), want (%d, nil)", code, err, ExitSuccess)
 	}
@@ -225,7 +249,7 @@ func TestRunAfterHooks_StillRunAfterAbort(t *testing.T) {
 	var code int
 	var err error
 	_ = captureStderr(t, func() {
-		code, err = runAfterHooks(ctx, req, false, ExitSuccess)
+		code, err = runAfterHooks(ctx, req, false, ExitSuccess, os.Stderr)
 	})
 	if err != nil {
 		t.Fatalf("cleanup after-hooks failed under an aborted run: %v", err)
@@ -283,7 +307,7 @@ func TestRunAfterHooks_CancellationBetweenGroupsStillRunsCLICleanup(t *testing.T
 
 	var code int
 	_ = captureStderr(t, func() {
-		code, _ = runAfterHooks(ctx, req, false, ExitSuccess)
+		code, _ = runAfterHooks(ctx, req, false, ExitSuccess, os.Stderr)
 	})
 	if code != ExitError {
 		t.Fatalf("exit code = %d, want the canceled command hook to fail the run (%d)", code, ExitError)
@@ -316,7 +340,7 @@ func TestRunAfterHooks_CleanupStaysBounded(t *testing.T) {
 	start := time.Now()
 	var code int
 	_ = captureStderr(t, func() {
-		code, _ = runAfterHooks(ctx, req, false, ExitSuccess)
+		code, _ = runAfterHooks(ctx, req, false, ExitSuccess, os.Stderr)
 	})
 	elapsed := time.Since(start)
 

@@ -104,11 +104,11 @@ func loadRunWorkspace(req *Request) (*workspace.Workspace, *extension.DiscoveryR
 		return nil, nil, code, nil
 	}
 	if err := requireHostedProviders(req, discovered); err != nil {
-		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
+		iox.Fprintf(req.ErrorOut, "putnami: %v\n", err)
 		return nil, nil, protocolcli.ExitCodeForError(err), err
 	}
 	if err := refuseUndeclaredCommands(req, discovered); err != nil {
-		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
+		iox.Fprintf(req.ErrorOut, "putnami: %v\n", err)
 		return nil, nil, protocolcli.ExitCodeForError(err), err
 	}
 	if req.Portable != nil {
