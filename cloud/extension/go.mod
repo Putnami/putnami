@@ -36,6 +36,7 @@ require (
 	go.putnami.dev/protocol/infra v0.0.0
 	go.putnami.dev/protocol/job v0.0.0
 	go.putnami.dev/protocol/migration v0.0.0
+	go.putnami.dev/protocol/oci v0.0.0
 	go.putnami.dev/protocol/put v0.0.0
 	go.putnami.dev/protocol/registry v0.0.0
 	go.putnami.dev/protocol/runtime v0.0.0
@@ -58,11 +59,13 @@ require (
 	go.putnami.dev/protocol/capabilities v0.0.0 // indirect
 	go.putnami.dev/protocol/database v0.0.0 // indirect
 	go.putnami.dev/protocol/events v0.0.0 // indirect
+	go.putnami.dev/protocol/gomod v0.0.0 // indirect
 	go.putnami.dev/protocol/http-routes v0.0.0 // indirect
 	go.putnami.dev/protocol/identity v0.0.0 // indirect
 	go.putnami.dev/protocol/platform v0.0.0 // indirect
 	go.putnami.dev/protocol/storage v0.0.0 // indirect
 	go.putnami.dev/schema v0.0.1 // indirect
+	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect

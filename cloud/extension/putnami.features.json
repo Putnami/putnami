@@ -225,6 +225,33 @@
           }
         }
       ]
+    },
+    {
+      "id": "cloud/publication-uploader",
+      "type": "feature",
+      "name": "Publication uploads from the credential provider",
+      "outcome": "A hosted run can upload each publication member to the Putnami registries from its credential provider session, under the plan's write bearer that session holds",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "cloud-uploads-its-registries-in-the-provider-session",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "uploader-v1-is-echoed-only-beside-publication-v1",
+              "each-ecosystem-uploads-and-answers-the-stored-digest",
+              "no-answer-carries-the-bearer",
+              "upload-refusals-come-before-any-registry-request",
+              "upload-failures-map-to-their-refusal-codes"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

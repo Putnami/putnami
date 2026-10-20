@@ -109,6 +109,10 @@
       "text": "publicationupload.Upload uploads one npm, go, oci, put or archive member to the registry its caller resolved and answers the digest the registry stores, with an archive's platforms. It reads only the files the request's member names, never outbox.json, and refuses a size or digest other than an entry's before any request. It asks the bearer at most once, for that registry, sends it nowhere else and puts it in no error. A version held at the same digest is reused."
     },
     {
+      "id": "upload-kit-tells-a-mismatch-from-a-conflict",
+      "text": "An error of publicationupload.Upload for an artifact whose size or digest is not its member entry's matches ErrArtifactMismatch under errors.Is, and one for a registry that already holds another artifact at the member's version matches ErrArtifactConflict. Any other failure matches neither, and a marked error keeps its text."
+    },
+    {
       "id": "tree-fingerprint",
       "text": "The treefingerprint package computes the tree fingerprint the CLI prints and records. One SHA-256 covers HEAD, the bytes on disk at every tracked path that differs from it, recursing through checked-out submodules, and every untracked non-ignored file, in the versioned stream the CLI protocol documents. Git display settings and variables that select another repository or inject configuration do not change it. Outside a worktree or before the first commit it returns an error."
     },

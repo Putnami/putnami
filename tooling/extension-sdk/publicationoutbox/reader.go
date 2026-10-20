@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	extproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/sdk/extension/internal/artifacterr"
 	"go.putnami.dev/sdk/extension/internal/regularfile"
 )
 
@@ -121,16 +122,17 @@ func (o *Outbox) open(file extproto.OutboxFile) (*os.File, error) {
 }
 
 // checkContent refuses size bytes of digest sum, read from file through a
-// limit of one byte past its size, unless they are the bytes file names.
+// limit of one byte past its size, unless they are the bytes file names. The
+// refusal is marked artifacterr.ErrMismatch.
 func checkContent(file extproto.OutboxFile, size int64, sum [sha256.Size]byte) error {
 	if size > file.Size {
-		return fmt.Errorf("outbox file %q size mismatch: it is longer than the descriptor's %d bytes", file.Path, file.Size)
+		return artifacterr.Mismatch(fmt.Errorf("outbox file %q size mismatch: it is longer than the descriptor's %d bytes", file.Path, file.Size))
 	}
 	if size < file.Size {
-		return fmt.Errorf("outbox file %q size mismatch: descriptor %d bytes, file %d", file.Path, file.Size, size)
+		return artifacterr.Mismatch(fmt.Errorf("outbox file %q size mismatch: descriptor %d bytes, file %d", file.Path, file.Size, size))
 	}
 	if digest := fmt.Sprintf("sha256:%x", sum); digest != file.Digest {
-		return fmt.Errorf("outbox file %q digest mismatch: descriptor %s, file %s", file.Path, file.Digest, digest)
+		return artifacterr.Mismatch(fmt.Errorf("outbox file %q digest mismatch: descriptor %s, file %s", file.Path, file.Digest, digest))
 	}
 	return nil
 }

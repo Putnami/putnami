@@ -72,8 +72,11 @@ type ReadCredentialSource func(ctx context.Context) (*registry.Credential, error
 // A hosted run whose launcher exported its publication origins
 // (CI_LIBRARY_PUBLISH_*) also serves publication-v1 when the engine offers
 // it (registry ADR 0003, see publisher): resolve, open, the publish
-// credential and release. Everywhere else the publish purpose is absence and
-// publishing keeps its own credential path.
+// credential and release. When the engine also offers uploader-v1, the
+// session serves upload too: it uploads each member of the open plan to its
+// publication origin with the plan's write bearer, which stays in this
+// process. Everywhere else the publish purpose is absence and publishing
+// keeps its own credential path.
 //
 // The run credential stays in this process's memory. The process denies
 // inspection before it reads its first line, never writes the credential to
@@ -263,7 +266,7 @@ func (s *credentialServer) handle(line []byte) bool {
 		s.initialize(request)
 	case registry.CredentialOpCredential:
 		s.credential(request)
-	case registry.CredentialOpResolve, registry.CredentialOpOpen, registry.CredentialOpRelease:
+	case registry.CredentialOpResolve, registry.CredentialOpOpen, registry.CredentialOpRelease, registry.CredentialOpUpload:
 		s.publicationOp(request)
 	case registry.CredentialOpShutdown:
 		s.stop()
@@ -339,6 +342,9 @@ func (s *credentialServer) initialize(request *registry.CredentialRequest) {
 	echo := []string{registry.CapabilityCredentialV1}
 	if s.servesPublication(params.Capabilities) {
 		echo = append(echo, registry.CapabilityPublicationV1)
+		if slices.Contains(params.Capabilities, registry.CapabilityUploaderV1) {
+			echo = append(echo, registry.CapabilityUploaderV1)
+		}
 	}
 	s.negotiated = registry.NegotiatedCapabilities(params.Capabilities, echo)
 	s.answer(request.ID, registry.CredentialInitializeResult{
@@ -436,9 +442,10 @@ func (s *credentialServer) publishCredential(id int64) {
 	}()
 }
 
-// publicationOp serves resolve, open and release beside the request loop, so
-// a second attempt of an op the engine stopped waiting for is read while the
-// first is still in progress, and gets its answer.
+// publicationOp serves resolve, open, release and upload beside the request
+// loop, so a second attempt of an op the engine stopped waiting for is read
+// while the first is still in progress, and gets its answer, and uploads run
+// side by side.
 func (s *credentialServer) publicationOp(request *registry.CredentialRequest) {
 	id, op, payload := request.ID, request.Op, request.Payload
 	s.work.Add(1)
@@ -452,6 +459,8 @@ func (s *credentialServer) publicationOp(request *registry.CredentialRequest) {
 			answer = s.publisher.open(s.ctx, payload)
 		case registry.CredentialOpRelease:
 			answer = s.publisher.release(s.ctx, payload)
+		case registry.CredentialOpUpload:
+			answer = s.publisher.upload(s.ctx, payload)
 		}
 		switch {
 		case s.ctx.Err() != nil:
