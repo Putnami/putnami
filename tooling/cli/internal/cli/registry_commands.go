@@ -623,6 +623,8 @@ func newCacheVerifyRunner(
 			Preflight:        doctor.DoctorPreflight,
 			EphemeralSession: true,
 			Stdout:           io.Discard,
+			// The dispatcher reports the returned error, once.
+			ErrorOut: io.Discard,
 		}
 		request.CacheVerification = &engine.CacheVerificationRequest{StoreRoot: storeRoot}
 		result, err := run(ctx, request, output.NewPassthroughRenderer())

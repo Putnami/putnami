@@ -267,6 +267,37 @@ func TestRun_ReportsAReturnedErrorOnErrorOut(t *testing.T) {
 	}
 }
 
+// When the run fails and an after-hook fails too, Run returns the run's error
+// and not the hook's, so the hook error goes to stderr and never to ErrorOut:
+// an adapter that discards ErrorOut still shows the user the hook failure.
+func TestRun_AHookErrorTheRunDoesNotReturnReachesStderr(t *testing.T) {
+	root := rootWithoutRepository(t)
+	cfg := declaringWorkspace(t, root)
+	hooks := &workspacepb.HooksConfig{Commands: map[string]*workspacepb.HookPhaseConfig{
+		"bundle": {After: []string{"false"}},
+	}}
+	if runtime.GOOS == "windows" {
+		t.Skip("hooks need sh")
+	}
+
+	var reported strings.Builder
+	var err error
+	stderr := captureStderr(t, func() {
+		_, err = New().Run(context.Background(), Request{
+			WorkspaceRoot: root, Config: cfg, Commands: []string{"bundle"}, Hooks: hooks, ErrorOut: &reported,
+		}, nil)
+	})
+	if err == nil || !strings.Contains(err.Error(), "no extension of this workspace declares bundle") {
+		t.Fatalf("Run error = %v, want the refusal of bundle", err)
+	}
+	if want := "putnami: " + err.Error() + "\n"; reported.String() != want {
+		t.Fatalf("ErrorOut = %q, want only the returned error %q", reported.String(), want)
+	}
+	if strings.Count(stderr, "hook after error") != 1 {
+		t.Fatalf("stderr = %q, want the hook error once", stderr)
+	}
+}
+
 // shippingWorkspace writes a workspace at a root git discovery cannot escape.
 // Its local extension serves build, and publish with registry side effects
 // too when servesPublish is set, with a task that records each run in the

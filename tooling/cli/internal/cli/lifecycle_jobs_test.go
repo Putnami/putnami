@@ -11,6 +11,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
+	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
@@ -42,6 +43,32 @@ func TestRunWorkspaceJob_DefaultReportsOnlyCompletedProviderAction(t *testing.T)
 	}
 	if len(actions) != 1 || actions[0].Description != "Workspace setup completed (@putnami/installer)" {
 		t.Fatalf("actions = %+v, want only the completed provider", actions)
+	}
+}
+
+// TestRunWorkspaceJob_ReportsAnEngineRefusalOnce holds the run to returning an
+// engine refusal without printing it: the caller reports the returned error, so
+// a copy on stderr would be a second report.
+func TestRunWorkspaceJob_ReportsAnEngineRefusalOnce(t *testing.T) {
+	wsRoot := t.TempDir()
+	writeLifecycleFixture(t, wsRoot, "app")
+	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
+	t.Setenv(git.SourceRevisionEnv, "not-a-commit")
+
+	var err error
+	_, stderr := captureLifecycleStreams(t, func() {
+		_, err = RunWorkspaceJob(context.Background(), lifecycle.WorkspaceJobRequest{
+			WorkspaceRoot: wsRoot,
+			Config:        wsproto.Load(wsRoot),
+			Job:           "workspace-install",
+			Out:           io.Discard,
+		})
+	})
+	if err == nil || !strings.Contains(err.Error(), git.SourceRevisionEnv) {
+		t.Fatalf("RunWorkspaceJob error = %v, want the refusal of the source revision", err)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want the refusal returned and not printed", stderr)
 	}
 }
 

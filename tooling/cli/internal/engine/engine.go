@@ -428,10 +428,15 @@ type Request struct {
 	Stdout io.Writer
 	// ErrorOut receives the one-line report of an error Run also returns: a
 	// refused command, a hosted provider only a path extension declares, a
-	// failed hook. Nil means os.Stderr, which is every adapter that discards
-	// the returned error and relies on this report. An adapter that reports the
-	// returned error itself passes io.Discard, so the error reaches the user
-	// once. Every other diagnostic stays on os.Stderr.
+	// failed hook. Run reports every such error here, and returns it. Nil
+	// means os.Stderr, which suits an adapter that discards the returned
+	// error. An adapter that reports the returned error itself passes
+	// io.Discard, so the error reaches the user once; an adapter that
+	// propagates the error and leaves this nil reports it twice (the MCP
+	// adapter does: its stderr is a log, and the tool result is the report).
+	// An error Run does not return, such as a second hook failure, always
+	// goes to stderr.
+	// Every other diagnostic stays on os.Stderr.
 	ErrorOut io.Writer
 }
 
@@ -458,14 +463,6 @@ func (r *Request) stdout() io.Writer {
 		return r.Stdout
 	}
 	return os.Stdout
-}
-
-// errorOut returns the stream that carries the report of an error Run returns.
-func (r *Request) errorOut() io.Writer {
-	if r.ErrorOut != nil {
-		return r.ErrorOut
-	}
-	return os.Stderr
 }
 
 // runMarkerParams returns the params that key persisted successful-run state.
@@ -565,6 +562,9 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	ctx = scheduler.CaptureProcessCapabilities(ctx)
 	req := &request
 	req.versions, req.versionsErr = nil, nil
+	if req.ErrorOut == nil {
+		req.ErrorOut = os.Stderr
+	}
 	// A version 2 bound request names the selection this engine resolves; it
 	// binds onto the selection flags before any stage reads them.
 	req.Portable.bindSelection(&req.Global)
@@ -579,7 +579,7 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	if req.VersionSnapshot == nil {
 		snapshot, err := captureVersionSnapshot(req.WorkspaceRoot)
 		if err != nil {
-			iox.Fprintf(req.errorOut(), "putnami: %v\n", err)
+			iox.Fprintf(req.ErrorOut, "putnami: %v\n", err)
 			return SessionResult{ExitCode: ExitError}, err
 		}
 		req.VersionSnapshot = snapshot
@@ -618,7 +618,7 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	}
 	hostedRemote, err := hosted.Start(ctx, req)
 	if err != nil {
-		iox.Fprintf(req.errorOut(), "putnami: %v\n", err)
+		iox.Fprintf(req.ErrorOut, "putnami: %v\n", err)
 		return SessionResult{ExitCode: protocolcli.ExitCodeForError(err)}, err
 	}
 	req.hostedRemote = hostedRemote
@@ -648,7 +648,13 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	}
 
 	// After hooks run even if jobs failed.
-	code, hookErr := runAfterHooks(ctx, req, verbose, result.ExitCode)
+	// The first after-hook error is the one Run returns, unless the run already
+	// failed: then no hook error is returned and each one is reported on stderr.
+	hookOut := req.ErrorOut
+	if runErr != nil {
+		hookOut = os.Stderr
+	}
+	code, hookErr := runAfterHooks(ctx, req, verbose, result.ExitCode, hookOut)
 	result.ExitCode, result.ancestry = code, req.ancestry
 	if runErr == nil {
 		runErr = hookErr
@@ -682,7 +688,7 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	// an invalid-config stop, never a silent fallback (no runtime weakener
 	// exists, which makes the committed spelling the only one).
 	if err := specgate.ValidatePolicy(ws); err != nil {
-		iox.Fprintf(req.errorOut(), "putnami: %v\n", err)
+		iox.Fprintf(req.ErrorOut, "putnami: %v\n", err)
 		return SessionResult{ExitCode: protocolcli.ExitCodeForError(err)}, err
 	}
 
@@ -1122,11 +1128,11 @@ func runBeforeHooks(ctx context.Context, req *Request, verbose bool) error {
 		return nil
 	}
 	if err := hooks.RunCLIHooks(ctx, req.Hooks, "before", req.WorkspaceRoot, verbose); err != nil {
-		iox.Fprintf(req.errorOut(), "putnami: %v\n", err)
+		iox.Fprintf(req.ErrorOut, "putnami: %v\n", err)
 		return err
 	}
 	if err := hooks.RunCommandHooks(ctx, req.Hooks, "before", req.Commands, req.WorkspaceRoot, verbose); err != nil {
-		iox.Fprintf(req.errorOut(), "putnami: %v\n", err)
+		iox.Fprintf(req.ErrorOut, "putnami: %v\n", err)
 		return err
 	}
 	return nil
@@ -1152,7 +1158,7 @@ var abortCleanupBudget = hooks.AbortCleanupBudget
 // abortCleanupBudget, well inside the 10s deadline cmd/putnami's signal handler
 // gives the whole shutdown, so a cleanup hook that ignores cancellation cannot
 // make Ctrl-C feel unresponsive.
-func runAfterHooks(ctx context.Context, req *Request, verbose bool, code int) (int, error) {
+func runAfterHooks(ctx context.Context, req *Request, verbose bool, code int, returnedOut io.Writer) (int, error) {
 	if req.Hooks == nil {
 		return code, nil
 	}
@@ -1179,25 +1185,24 @@ func runAfterHooks(ctx context.Context, req *Request, verbose bool, code int) (i
 		}
 	}()
 
-	commandCtx := contextForHooks()
+	// Only the first hook error is returned, so only it goes to returnedOut;
+	// every later one has no other report and goes to stderr.
 	var firstErr error
-	if err := hooks.RunCommandHooks(commandCtx, req.Hooks, "after", req.Commands, req.WorkspaceRoot, verbose); err != nil {
-		iox.Fprintf(req.errorOut(), "putnami: hook after error: %v\n", err)
-		firstErr = err
-		if code == ExitSuccess {
-			code = ExitError
-		}
-	}
-	if err := hooks.RunCLIHooks(contextForHooks(), req.Hooks, "after", req.WorkspaceRoot, verbose); err != nil {
-		// Only the first hook error is returned; a later one has no other report.
+	report := func(err error) {
 		out := io.Writer(os.Stderr)
 		if firstErr == nil {
-			out, firstErr = req.errorOut(), err
+			out, firstErr = returnedOut, err
 		}
 		iox.Fprintf(out, "putnami: hook after error: %v\n", err)
 		if code == ExitSuccess {
 			code = ExitError
 		}
+	}
+	if err := hooks.RunCommandHooks(contextForHooks(), req.Hooks, "after", req.Commands, req.WorkspaceRoot, verbose); err != nil {
+		report(err)
+	}
+	if err := hooks.RunCLIHooks(contextForHooks(), req.Hooks, "after", req.WorkspaceRoot, verbose); err != nil {
+		report(err)
 	}
 	return code, firstErr
 }

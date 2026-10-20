@@ -111,7 +111,7 @@ func reportRepositoryRefusal(req *Request, discovered *internalextension.Discove
 			return nil
 		}
 	}
-	iox.Fprintf(req.errorOut(), "putnami: %v\n", refusal)
+	iox.Fprintf(req.ErrorOut, "putnami: %v\n", refusal)
 	return refusal
 }
 

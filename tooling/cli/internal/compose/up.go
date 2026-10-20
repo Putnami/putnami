@@ -551,6 +551,8 @@ func enginePrepare(ctx context.Context, opts Options, projectIDs, serveCommands 
 		WithholdServeSteps: true,
 		Preflight:          doctor.DoctorPreflight,
 		Stdout:             io.Discard,
+		// The returned error becomes the composition's failure, which the caller reports.
+		ErrorOut: io.Discard,
 	}, sink)
 	if err != nil {
 		return nil, newError(CodePrepareFailed, opts.Target.ID, PhasePrepare, err.Error())

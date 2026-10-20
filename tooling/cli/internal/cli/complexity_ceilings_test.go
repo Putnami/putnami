@@ -85,11 +85,8 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  25,
-		funcs:  187,
-		why: "RAISED 186→187 (cli/impact-plan, named-commands): Request.errorOut resolves the stream " +
-			"that carries the report of an error Run returns, so an adapter that reports that error " +
-			"itself passes io.Discard and the user reads it once; files stay at 25. " +
-			"RAISED 185→186 (cli/portable-runner, commit-request): refuseUnportableCommands reads the " +
+		funcs:  186,
+		why: "RAISED 185→186 (cli/portable-runner, commit-request): refuseUnportableCommands reads the " +
 			"workload and rewritesSources traits for both the submitter and the executing engine; files stay at 25. " +
 			"RAISED 183→185 (cli/job-planning-execution, no-core-development-verb): " +
 			"the core declares no development verb, so the engine refuses a command no loaded extension " +
