@@ -74,7 +74,6 @@ export interface RenderVars {
   projectModule: string;
   putnamiVersion: string;
   workspaceRelativePath: string;
-  goFrameworkVersion: string;
 }
 
 /** A template rendered into its own throwaway workspace. */
@@ -150,7 +149,6 @@ export function testVars(template: Template): RenderVars {
     projectModule: 'test_project',
     putnamiVersion: 'latest',
     workspaceRelativePath: '..',
-    goFrameworkVersion: 'v0.0.0',
   };
   const overrides = template.manifest.testVariables ?? {};
   if (overrides['projectName'] !== undefined) {

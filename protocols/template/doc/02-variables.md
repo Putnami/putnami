@@ -26,7 +26,7 @@ visible in the rendered output instead of silently vanishing.
 
 ## Variables
 
-The engine provides six variables:
+The engine provides five variables:
 
 | Variable | Meaning | Value under `templates test` |
 |----------|---------|---------------------------------|
@@ -35,7 +35,6 @@ The engine provides six variables:
 | `<%= projectModule %>` | A language-safe identifier derived from the name (lower-cased, non-alphanumerics folded to `_`) | `test_project` |
 | `<%= putnamiVersion %>` | The Putnami version to depend on | `latest` |
 | `<%= workspaceRelativePath %>` | The path from the project back to the workspace root | `..` |
-| `<%= goFrameworkVersion %>` | The Go framework version to depend on | `v0.0.0` |
 
 ## Directory names
 
