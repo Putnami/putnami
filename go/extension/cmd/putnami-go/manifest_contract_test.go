@@ -1532,6 +1532,30 @@ func TestTaskEffectTable(t *testing.T) {
 	}
 }
 
+// TestPublishChannelTable pins the publish channels each task serves. A
+// publishing run counts a project's declared channel as served only by a
+// planned task that declares it, so a publish task that drops its channel
+// fails every run of a project that declares it. A task missing from the table
+// serves no channel.
+func TestPublishChannelTable(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "publish-tasks-declare-their-channels", "the-go-extension-declares-its-publish-channels")
+	m := loadExtensionManifest(t)
+
+	want := map[string][]string{
+		"publish-docker": {"docker"},
+		"publish-go":     {"go"},
+	}
+	for _, name := range sortedTaskNames(m) {
+		var got []string
+		if declares := m.Tasks[name].Declares; declares != nil {
+			got = declares.PublishChannels
+		}
+		if !slices.Equal(got, want[name]) {
+			t.Errorf("task %q publishChannels = %v, want %v", name, got, want[name])
+		}
+	}
+}
+
 // TestServeDeclaresTheProcessEffect is the positive form of the B3b gap test:
 // Making serve-run uncacheable, which is what the gap was waiting
 // on, so the external `process` effect is now declared outright — an

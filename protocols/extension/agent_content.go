@@ -81,17 +81,18 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: CommandKindContract for command or verb traits that declare a
-// kind, a workload, rewritesSources or consumesReleaseSet, or a task's
-// batchable policy that declares a kind or a phase, SourceBoundCacheContract
-// for a task that declares cache.sourceBound, VerbVocabularyContract for a
-// verb vocabulary, ExtensionDependenciesContract for extensionDependencies
-// that name a registry extension, ReleaseBaselineInputContract for a task that
-// declares the releaseBaseline runtime input, GitInputModeContract (the same
-// rung) for a task that declares a `git:` file pattern, GoEmbedInputsContract
-// for Go embed task inputs/cache-key files, AgentContentContract for an
-// agent-content contribution, CurrentContract otherwise. The highest rung
-// wins.
+// the manifest: PublishChannelsContract for a task that declares the publish
+// channels it serves, CommandKindContract for command or verb traits that
+// declare a kind, a workload, rewritesSources or consumesReleaseSet, or a
+// task's batchable policy that declares a kind or a phase,
+// SourceBoundCacheContract for a task that declares cache.sourceBound,
+// VerbVocabularyContract for a verb vocabulary, ExtensionDependenciesContract
+// for extensionDependencies that name a registry extension,
+// ReleaseBaselineInputContract for a task that declares the releaseBaseline
+// runtime input, GitInputModeContract (the same rung) for a task that declares
+// a `git:` file pattern, GoEmbedInputsContract for Go embed task
+// inputs/cache-key files, AgentContentContract for an agent-content
+// contribution, CurrentContract otherwise. The highest rung wins.
 //
 // It is the stamp a packager writes on a put archive. A manifest stamped below
 // it uses vocabulary its stamp does not cover; a manifest stamped at or above
@@ -131,6 +132,9 @@ func RequiredLoadContract(m *Manifest) int {
 		if declaresSourceBound(task) {
 			required = max(required, protocolcli.SourceBoundCacheContract)
 		}
+		if declaresPublishChannels(task) {
+			required = max(required, protocolcli.PublishChannelsContract)
+		}
 	}
 	// A vocabulary's default traits change plans wherever the manifest loads
 	// from, so its rung is part of the load floor.
@@ -167,6 +171,13 @@ func DeclaresCommandKinds(m *Manifest) bool {
 		}
 	}
 	return false
+}
+
+// declaresPublishChannels reports whether a task's v3 declaration lists the
+// publish channels it serves, which a publishing run reads to decide whether a
+// project's declared channel has a publish step.
+func declaresPublishChannels(task TaskDefinition) bool {
+	return task.Declares != nil && len(task.Declares.PublishChannels) > 0
 }
 
 // declaresSourceBound reports whether a task declares the source-bound cache

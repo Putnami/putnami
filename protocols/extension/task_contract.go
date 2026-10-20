@@ -50,6 +50,7 @@ package extension
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -256,6 +257,14 @@ type TaskDeclaration struct {
 	// validation error rather than a silent de-duplication, so a manifest never
 	// means two things.
 	Effects []string `json:"effects,omitempty"`
+	// PublishChannels are the publish channels the task publishes, in the
+	// grammar of a project's `publish` list: a publishing run counts a
+	// project's declared channel as served by a planned job whose task lists
+	// it. Channel names are opaque to the CLI. A task that declares them also
+	// declares EffectRegistry. Normalized to sorted order; an empty list and a
+	// duplicate are validation errors. A task that declares them requires CLI
+	// contract protocolcli.PublishChannelsContract.
+	PublishChannels []string `json:"publishChannels,omitempty"`
 	// MutatesSources declares that the task rewrites files in the source tree
 	// it reads — a formatter, a lint --fix, a codemod. It replaces the
 	// cache-private per-result marker the CLI used to infer this after the
@@ -681,6 +690,7 @@ func validateTaskDeclaration(field string, task TaskDefinition) []diag.Diagnosti
 	}
 
 	diags = append(diags, validateTaskEffects(base, declaration.Effects)...)
+	diags = append(diags, validatePublishChannels(base, declaration.PublishChannels)...)
 	diags = append(diags, validateDeclarationConflicts(base, task, declaration)...)
 	return diags
 }
@@ -1053,6 +1063,29 @@ func validateTaskEffects(base string, effects []string) []diag.Diagnostic {
 	return diags
 }
 
+// validatePublishChannels checks the publish channels a task declares. A
+// declared list names at least one channel, and each channel once. A channel
+// name takes any string a project's `publish` list accepts.
+func validatePublishChannels(base string, channels []string) []diag.Diagnostic {
+	if channels == nil {
+		return nil
+	}
+	if len(channels) == 0 {
+		return []diag.Diagnostic{diag.Errorf("invalid-value", base+".publishChannels",
+			"publishChannels must name at least one channel; leave the field out when the task serves none")}
+	}
+	var diags []diag.Diagnostic
+	seen := make(map[string]bool, len(channels))
+	for i, channel := range channels {
+		if seen[channel] {
+			diags = append(diags, diag.Errorf("duplicate-publish-channel", fmt.Sprintf("%s.publishChannels[%d]", base, i),
+				"publish channel %q is declared more than once", channel))
+		}
+		seen[channel] = true
+	}
+	return diags
+}
+
 // validateDeclarationConflicts checks the ways a declaration can contradict the
 // rest of the task it belongs to. Each rule compares two statements the task
 // makes about itself, so it is decidable from the manifest alone.
@@ -1096,6 +1129,14 @@ func validateDeclarationConflicts(base string, task TaskDefinition, declaration 
 				"task declares the external effect %q, which a cache hit would skip; such a task must set cache.enabled to false",
 				effect))
 		}
+	}
+
+	// A publish channel is served by a task that publishes to a registry, so a
+	// task that declares channels and no registry effect contradicts itself.
+	if len(declaration.PublishChannels) > 0 && !slices.Contains(declaration.Effects, EffectRegistry) {
+		diags = append(diags, diag.Errorf("effect-conflict", base+".publishChannels",
+			"task declares publish channels but not the %q effect; only a task that publishes to a registry serves a publish channel",
+			EffectRegistry))
 	}
 
 	writesSources := declaresSourceWrite(task.Writes)
@@ -1282,8 +1323,9 @@ func sharesCommand(a, b []string) bool {
 }
 
 // NormalizeTaskDeclarations rewrites every v3 declaration into its canonical
-// form in place: effects sorted, output paths cleaned. It is what makes a
-// digest over a parsed manifest independent of how the manifest was authored.
+// form in place: effects and publish channels sorted, output paths cleaned. It
+// is what makes a digest over a parsed manifest independent of how the
+// manifest was authored.
 // Paths that cannot be normalized are left untouched for validation to report.
 func NormalizeTaskDeclarations(m *Manifest) {
 	if m == nil {
@@ -1300,10 +1342,10 @@ func NormalizeTaskDeclarations(m *Manifest) {
 
 // NormalizeTask canonicalizes one task in place: derives the cache key from
 // input ports when no explicit policy is set (matching NormalizeManifest's
-// historical behavior), sorts declared effects, and cleans declared output
-// paths. NormalizeManifest applies it to every task; TaskContractDigest
-// applies it to its private copy, so a digest never depends on whether the
-// manifest traveled through a normalizing load path.
+// historical behavior), sorts declared effects and publish channels, and
+// cleans declared output paths. NormalizeManifest applies it to every task;
+// TaskContractDigest applies it to its private copy, so a digest never
+// depends on whether the manifest traveled through a normalizing load path.
 func NormalizeTask(t *TaskDefinition) {
 	if t == nil {
 		return
@@ -1322,6 +1364,9 @@ func normalizeTaskDeclaration(t *TaskDefinition) {
 	}
 	if len(t.Declares.Effects) > 1 {
 		sort.Strings(t.Declares.Effects)
+	}
+	if len(t.Declares.PublishChannels) > 1 {
+		sort.Strings(t.Declares.PublishChannels)
 	}
 	for id, output := range t.Declares.Outputs {
 		changed := false

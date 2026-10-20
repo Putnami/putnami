@@ -894,10 +894,10 @@ func NormalizeManifest(m *Manifest) {
 		m.ExtensionDeps.List = make(map[string]string)
 	}
 
-	// Normalize every task: derived cache keys, sorted declared effects,
-	// cleaned declared paths. One shared implementation with the task-contract
-	// digest (NormalizeTask), so the strict path and TaskContractDigest can
-	// never disagree about canonical form.
+	// Normalize every task: derived cache keys, sorted declared effects and
+	// publish channels, cleaned declared paths. One shared implementation with
+	// the task-contract digest (NormalizeTask), so the strict path and
+	// TaskContractDigest can never disagree about canonical form.
 	for name, task := range m.Tasks {
 		NormalizeTask(&task)
 		m.Tasks[name] = task

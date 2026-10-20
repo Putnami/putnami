@@ -1373,6 +1373,26 @@
           }
         },
         {
+          "id": "publish-tasks-declare-their-channels",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-manifest-declaring-publish-channels-requires-contract-12",
+              "an-invalid-publish-channel-declaration-is-refused",
+              "a-planned-job-exposes-its-tasks-publish-channels",
+              "the-go-extension-declares-its-publish-channels",
+              "the-typescript-extension-declares-its-publish-channels",
+              "the-cloud-extension-declares-its-publish-channels",
+              "the-go-packager-stamps-publish-channels",
+              "the-npm-packager-stamps-publish-channels"
+            ]
+          }
+        },
+        {
           "id": "source-bound-stamp",
           "stage": "coded",
           "evidenceKinds": [

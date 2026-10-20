@@ -22,8 +22,8 @@
     "cliContract": {
       "type": "integer",
       "minimum": 4,
-      "maximum": 11,
-      "description": "CLI ↔ extension contract version this manifest was validated against: the lowest contract whose vocabulary covers it. Contract 4 adds same-session prerequisites; older readers must reject rather than silently omit their gates. Contract 5 is additive and is stamped only on a manifest that declares agentContent, so a contract-4 reader refuses that manifest instead of dropping its agent content. Contract 6 covers Go embed inputs, contract 7 the releaseBaseline runtime input and git: file patterns, contract 8 a registry-named extensionDependencies entry, contract 9 a verbs vocabulary, contract 10 a task that declares cache.sourceBound, and contract 11 command or verb traits that declare kind, workload, rewritesSources or consumesReleaseSet, or a batchable policy that declares kind or phase. Earned, not claimed: the package job stamps it after strict validation. Absent means contract 0 (pre-registry); loaders reject a stamp below what the manifest's vocabulary requires, or above the latest contract they read."
+      "maximum": 12,
+      "description": "CLI ↔ extension contract version this manifest was validated against: the lowest contract whose vocabulary covers it. Contract 4 adds same-session prerequisites; older readers must reject rather than silently omit their gates. Contract 5 is additive and is stamped only on a manifest that declares agentContent, so a contract-4 reader refuses that manifest instead of dropping its agent content. Contract 6 covers Go embed inputs, contract 7 the releaseBaseline runtime input and git: file patterns, contract 8 a registry-named extensionDependencies entry, contract 9 a verbs vocabulary, contract 10 a task that declares cache.sourceBound, contract 11 command or verb traits that declare kind, workload, rewritesSources or consumesReleaseSet, or a batchable policy that declares kind or phase, and contract 12 a task that declares publishChannels. Earned, not claimed: the package job stamps it after strict validation. Absent means contract 0 (pre-registry); loaders reject a stamp below what the manifest's vocabulary requires, or above the latest contract they read."
     },
     "extensionDependencies": {
       "description": "Other extensions this extension needs: a list of names, or a map from name to version constraint. The CLI installs, pins and loads each registry name (@scope/name) for an extension installed from the artifact store or declared by path, and leaves any other name, and the dependencies of an extension loaded from node_modules, to the package manager. A manifest that names a registry dependency requires cliContract 8 when it loads from the artifact store or a declared path.",
@@ -1167,7 +1167,7 @@
     "taskDeclaration": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Task contract v3: the exact outputs the task produces, its effects beyond those outputs, and whether it rewrites the sources it reads. Additive — a task without this block keeps v2 semantics, where the footprint is inferred from a captured directory.",
+      "description": "Task contract v3: the exact outputs the task produces, its effects beyond those outputs, the publish channels it serves, and whether it rewrites the sources it reads. Additive — a task without this block keeps v2 semantics, where the footprint is inferred from a captured directory.",
       "properties": {
         "outputs": {
           "type": "object",
@@ -1182,6 +1182,15 @@
           "items": {
             "$ref": "#/$defs/taskEffect"
           },
+          "uniqueItems": true
+        },
+        "publishChannels": {
+          "type": "array",
+          "description": "The publish channels this task publishes, in the grammar of a project's publish list. A publishing run counts a project's declared channel as served by a planned job whose task lists it; channel names are opaque to the CLI. Requires the registry effect. Normalized to sorted order; duplicates are a validation error. Requires cliContract 12.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
           "uniqueItems": true
         },
         "mutatesSources": {

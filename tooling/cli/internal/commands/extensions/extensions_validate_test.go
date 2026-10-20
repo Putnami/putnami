@@ -201,6 +201,51 @@ func TestExtensionsValidate_AnUnknownKindWorkloadOrPhaseIsRefused(t *testing.T) 
 	}
 }
 
+// `putnami extensions validate` refuses a publish channel list that is empty,
+// names a channel twice, or sits on a task that does not publish to a
+// registry, and names each offending task.
+func TestExtensionsValidate_AnInvalidPublishChannelDeclarationIsRefused(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "publish-tasks-declare-their-channels", "an-invalid-publish-channel-declaration-is-refused")
+	manifest := `{
+  "name": "@putnami/test-ext",
+  "cliContract": 12,
+  "commands": {
+    "publish": {"run": [{"id": "twice", "task": "twice"}, {"id": "none", "task": "none"}, {"id": "local", "task": "local"}]}
+  },
+  "tasks": {
+    "twice": {"kind": "command", "command": "echo", "timeoutMs": -1, "cache": false, "declares": {"effects": ["network", "registry"], "publishChannels": ["npm", "docker", "npm"]}},
+    "none": {"kind": "command", "command": "echo", "timeoutMs": -1, "cache": false, "declares": {"effects": ["network", "registry"], "publishChannels": []}},
+    "local": {"kind": "command", "command": "echo", "timeoutMs": -1, "cache": false, "declares": {"effects": ["network"], "publishChannels": ["npm"]}}
+  }
+}`
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) })
+	if err == nil {
+		t.Fatalf("an invalid publish channel declaration validated:\n%s", out)
+	}
+	for _, want := range []string{
+		"tasks.twice.declares.publishChannels[2]", "duplicate-publish-channel",
+		"tasks.none.declares.publishChannels", "invalid-value",
+		"tasks.local.declares.publishChannels", "effect-conflict",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+
+	valid := strings.NewReplacer(`["npm", "docker", "npm"]`, `["npm", "docker"]`, `"publishChannels": []`, `"publishChannels": ["docker"]`,
+		`"effects": ["network"]`, `"effects": ["network", "registry"]`).Replace(manifest)
+	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(valid), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) }); err != nil {
+		t.Fatalf("the same manifest with valid channel lists must validate: %v\n%s", err, out)
+	}
+}
+
 func TestExtensionsValidate_MissingPath(t *testing.T) {
 	err := ExtensionsValidate([]string{filepath.Join(t.TempDir(), "missing")})
 	if err == nil || !strings.Contains(err.Error(), "path not found") {

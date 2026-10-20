@@ -128,6 +128,8 @@ manifest that predates the task contract keeps its exact verdict.
 | `pathFrom` names a port the task declares in its `outputs` map | `unresolved-output-port` |
 | `within` is set only with `pathFrom`, and is relative, cleaned, concrete, and never the root itself | `invalid-output-within`, `invalid-output-path` |
 | `effects` come from the closed vocabulary, without duplicates | `invalid-enum`, `duplicate-effect` |
+| `publishChannels`, when present, names at least one channel and each channel once | `invalid-value`, `duplicate-publish-channel` |
+| A task that declares `publishChannels` also declares the `registry` effect | `effect-conflict` |
 | A task cannot both declare outputs and claim `cache.noOutput` | `effect-conflict` |
 | A task declaring an external effect (`registry`, `cloud`, `process`) must disable caching — a hit would skip the effect | `effect-conflict` |
 | `mutatesSources` and the project-scoped `sources` write resource are declared together or not at all | `effect-conflict` |
@@ -178,15 +180,17 @@ the lowest contract whose vocabulary covers the manifest
 (8) for `extensionDependencies` that name a registry extension (`@scope/name`),
 `protocols/cli.VerbVocabularyContract` (9) for a `verbs` vocabulary,
 `protocols/cli.SourceBoundCacheContract` (10) for a task that declares
-`cache.sourceBound`, or `protocols/cli.CommandKindContract` (11) for a command
-kind, workload or effect, or a batchable kind or phase.
+`cache.sourceBound`, `protocols/cli.CommandKindContract` (11) for a command
+kind, workload or effect, or a batchable kind or phase, or
+`protocols/cli.PublishChannelsContract` (12) for a task that declares
+`declares.publishChannels`.
 `protocols/cli.GitInputModeContract` names the same rung 7 for a task whose
 input port or cache-key files select a `git:` pattern. The gate applies to every non-empty command, command-group, MCP
 tool, or agent-content surface, and to a verb vocabulary. A non-conforming manifest — for example one
 that shadows a reserved global flag — fails packaging and never reaches a
 registry. A manifest without the field is contract `0` (pre-registry).
 
-Contracts 5, 6, 7, 8, 9, 10 and 11 are **additive**. They add vocabulary a manifest opts into
+Contracts 5, 6, 7, 8, 9, 10, 11 and 12 are **additive**. They add vocabulary a manifest opts into
 and change nothing a manifest without that vocabulary means. An extension without
 agent content, Go embed inputs, a `releaseBaseline` input or a `git:` input keeps
 its contract-4 stamp; one with agent content but no Go embed inputs requires
@@ -214,8 +218,13 @@ verb traits declare `kind`, `workload`, `rewritesSources` or
 `consumesReleaseSet`, or whose task's `batchable` policy declares `kind` or
 `phase`, requires contract 11 wherever it loads from: an older reader would
 plan a declared kind or workload as a plain command. `RequiredLoadContract`
-includes that rung as well. The reader loads every stamp from the one the
-manifest's vocabulary requires up to `protocols/cli.LatestContract` (11):
+includes that rung as well. A manifest with a task that declares
+`declares.publishChannels` requires contract 12 wherever it loads from: a
+publishing run counts a project's declared channel as served only by a planned
+job whose task declares it, and an older reader would judge those channels by
+another rule. `RequiredLoadContract` includes that rung too. The reader loads
+every stamp from the one the manifest's vocabulary requires up to
+`protocols/cli.LatestContract` (12):
 
 | Manifest contract vs CLI | Loader behavior |
 |--------------------------|-----------------|

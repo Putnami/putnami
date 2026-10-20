@@ -446,6 +446,30 @@ func TestTaskEffectTable(t *testing.T) {
 	}
 }
 
+// TestPublishChannelTable pins the publish channels each task serves. A
+// publishing run counts a project's declared channel as served only by a
+// planned task that declares it, so a publish task that drops its channel
+// fails every run of a project that declares it. A task missing from the table
+// serves no channel.
+func TestPublishChannelTable(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "publish-tasks-declare-their-channels", "the-typescript-extension-declares-its-publish-channels")
+	m := loadExtensionManifest(t)
+
+	want := map[string][]string{
+		"publish-docker": {"docker"},
+		"publish-npm":    {"npm"},
+	}
+	for name, task := range m.Tasks {
+		var got []string
+		if task.Declares != nil {
+			got = task.Declares.PublishChannels
+		}
+		if !slices.Equal(got, want[name]) {
+			t.Errorf("task %q publishChannels = %v, want %v", name, got, want[name])
+		}
+	}
+}
+
 // TestOnlyTheBiomeFixTasksMutateSources pins the check/fix split. `lint-all` is
 // the read-only pass (`biome check`, never writes) and must declare neither
 // source mutation nor the write resource; the two writer phases the fix

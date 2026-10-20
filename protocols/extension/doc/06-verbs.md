@@ -71,7 +71,7 @@ workload. Per-step heaviness uses
 | --- | --- |
 | `heavy` | Worker tuning leaves the command's jobs CPU/memory headroom. |
 | `requiresRunnable` | The command is skipped for `library` projects. |
-| `injectPublishChannels` | The project's `publish: [...]` channels are auto-activated as boolean params. |
+| `injectPublishChannels` | The project's `publish: [...]` channels are auto-activated as boolean params. The publish task that serves a channel says so in its own [`declares.publishChannels`](02-commands-and-tasks.md#publish-channels). |
 | `sideEffects` | `registry` or `cloud`: what the command mutates outside the workspace. Any side effect refuses a root Git does not manage, makes MCP `run_jobs` refuse the command, and keeps the command's jobs on a task-scoped `--impacted` project; `registry` raises remote cache trust to at least `ci`. A command that declares no `sideEffects` has none. |
 
 ### Command kinds

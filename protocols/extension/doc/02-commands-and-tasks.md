@@ -329,7 +329,7 @@ A task is an atomic executable unit — a subprocess with defined inputs, output
 | `outputs` | no | Output port declarations |
 | `cache` | no | Cache policy |
 | `batchable` | no | Opportunistic same-key batching policy for cacheable per-project tasks |
-| `declares` | no | Task contract v3: exact outputs, effects, and source mutation |
+| `declares` | no | Task contract v3: exact outputs, effects, the publish channels a publish task serves, and source mutation |
 | `inputSchemaRef` | no | Reference to a contract schema for input validation |
 | `outputSchemaRef` | no | Reference to a contract schema for output validation |
 
@@ -605,6 +605,41 @@ outputs. The vocabulary is closed:
 would skip them entirely, so a task declaring one must set `"cache": false`.
 `network` and `toolchain-cache` are not — a cache hit legitimately skips them,
 and the declaration documents the dependency.
+
+#### Publish Channels
+
+`declares.publishChannels` names the publish channels a publish task
+publishes. A project lists its channels in the `publish` list of its
+`putnami.json`. A publishing run counts a project's declared channel as served
+when the plan holds a job whose task lists that channel, and that job is the
+project's own or depends on one of the project's jobs. The CLI knows no channel
+name: the extension that publishes a channel is the only place that says so.
+
+```json
+{
+  "tasks": {
+    "publish-npm": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["publish-npm"],
+      "cache": false,
+      "declares": {
+        "effects": ["network", "registry"],
+        "publishChannels": ["npm"]
+      }
+    }
+  }
+}
+```
+
+A channel name takes any string a project's `publish` list accepts. The list
+names at least one channel and each channel once. It is normalized to sorted
+order, and a duplicate is a validation error. A task that declares channels also
+declares the `registry` effect, because only a task that publishes to a
+registry serves a channel. A task that publishes something no project declares
+as a channel, such as a configuration or a migration, declares none. A manifest
+with a task that declares the field requires CLI contract 12. See
+[ADR 0011](adr/0011-a-publish-task-declares-the-channels-it-serves.md).
 
 #### Source Mutation
 
