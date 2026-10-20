@@ -208,8 +208,10 @@ A publication job does not upload. It packs each managed member's artifacts
 into the private directory the engine names in `PUTNAMI_PUBLICATION_OUTBOX`
 (`PublicationOutboxEnv`) and writes the `outbox.json` descriptor
 (`PublicationOutbox`) at its root, last. The engine reads the descriptor after
-the job exits, re-hashes every artifact, and uploads with a bearer the job never
-holds ([SDK ADR 0004](../../tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md)).
+the job exits and sends each member to the credential provider, which re-hashes
+every artifact and uploads with a bearer the job never holds
+([SDK ADR 0004](../../tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md),
+[registry ADR 0004](../registry/doc/adr/0004-an-uploader-capability-on-the-provider-session.md)).
 Members that a route does not manage publish themselves and are not listed.
 
 | Field | Meaning |
@@ -229,15 +231,15 @@ Each file is `{path, digest, size}`: a path relative to the outbox root, the
 `sha256:` digest of its bytes, and its size, at least 1 byte and within the
 ecosystem's cap. An npm member carries no access level and no dist-tag. Its
 registry is an absolute `https` URL, or `http` to a loopback host, with no
-userinfo, query or fragment; the engine uploads there and refuses a registry
-other than the project's `registries.npm.publish` when the project declares
-one. A Go member carries no registry endpoint: the engine resolves it. A `put`
-or `archive` member names no registry either: the engine uploads it to the
-project's `registries.put.registry`, else the default Put registry, with the
-[Put write protocol](../put/README.md). A media type is lowercase
+userinfo, query or fragment; the member is uploaded there, and the engine
+refuses a registry other than the project's `registries.npm.publish` when the
+project declares one. A Go member carries no registry endpoint: the engine
+resolves it. A `put` or `archive` member names no registry either: it is
+uploaded to the project's `registries.put.registry`, else the default Put
+registry, with the [Put write protocol](../put/README.md). A media type is lowercase
 `type/subtype` with no parameter. Which media types a member kind publishes,
 and which blobs its manifest references, are rules of that protocol, which the
-engine checks before it asks for a bearer.
+upload checks before it asks for a bearer.
 
 `ParsePublicationOutbox` is strict: the document is at most 256 KiB of UTF-8
 (`MaxPublicationOutboxBytes`), with no unknown, duplicate, case-folded or null

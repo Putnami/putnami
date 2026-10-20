@@ -189,7 +189,8 @@ func PublishArchivesWithResult(params map[string]any, args []string, workspaceRo
 	}
 	if outbox := PublicationOutbox(env); outbox != "" {
 		// publication-v1: pack the planned member and report no published
-		// result; the engine uploads it and emits the member itself.
+		// result; the credential provider uploads it and the engine emits the
+		// member.
 		if planned == nil {
 			return nil, OutboxWithoutPlanError("archive publication")
 		}

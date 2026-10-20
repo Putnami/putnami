@@ -252,7 +252,7 @@ type PublicationMemberEvidence struct {
 	Coordinate string `json:"coordinate"`
 	// Version is the version the member was published at.
 	Version string `json:"version"`
-	// Digest is the digest of the artifact the engine uploaded for the member.
+	// Digest is the digest of the artifact uploaded for the member.
 	Digest string `json:"digest"`
 	// Publisher is the package publisher the member's package metadata names.
 	Publisher string `json:"publisher"`

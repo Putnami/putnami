@@ -367,8 +367,8 @@ const (
 // packGoModuleIntoOutbox copies the packaged module zip, go.mod and .info into
 // the publication outbox and commits the descriptor. It resolves no
 // credential, sends no request, runs no `go mod download` smoke, and emits no
-// published or published-member event: the engine uploads the bytes it
-// verifies and reports the member.
+// published or published-member event: the credential provider uploads the
+// bytes, and the engine reports the member.
 func packGoModuleIntoOutbox(ctx *pctx.Context, emit *jsonl.Emitter, planned *releaseplan.GoProject, meta *pkgmeta.GoModuleMetadata) (string, map[string]any, error) {
 	fail := func(err error) error {
 		emit.Diagnostic("error", err.Error(), "", 0)

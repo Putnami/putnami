@@ -17,8 +17,8 @@ import (
 // The publication outbox (go.putnami.dev/protocol/extension): under the
 // engine's publication-v1 capability a publish job receives a private
 // directory in PUTNAMI_PUBLICATION_OUTBOX and no registry credential. The job
-// packs its one planned member there and uploads nothing; the engine uploads
-// the packed bytes and the credential provider's release moves the channels.
+// packs its one planned member there and uploads nothing; the credential
+// provider uploads the packed bytes and its release moves the channels.
 // The packed manifest is the exact payload the direct path publishes, so the
 // member's artifact digest is the same on both paths.
 
@@ -107,12 +107,12 @@ func (p *putOutboxPacker) recordBlob(file extensionproto.OutboxFile, mediaType s
 // the blobs it references, and writes the descriptor. kind is the member's
 // release-set kind and project the plan's project id, with its leading slash.
 // A packed blob the manifest does not reference is left out: Put links exactly
-// the referenced blobs, and the engine uploads a put block only when its blobs
-// are exactly those.
+// the referenced blobs, and the upload refuses a put block whose blobs are not
+// exactly those.
 //
-// Before it writes the manifest, commit runs the put-write/v1 check the
-// engine's upload node runs (putpublish.Check), so a member the engine would
-// refuse, such as an archive with an invalid platform key, fails here.
+// Before it writes the manifest, commit runs the put-write/v1 check the upload
+// runs (putpublish.Check), so a member the upload would refuse, such as an
+// archive with an invalid platform key, fails here.
 func (p *putOutboxPacker) commit(kind distributionproto.MemberKind, ecosystem, coordinate, version, project, mediaType string, manifest []byte) (extensionproto.OutboxMember, error) {
 	references, err := put.BlobReferences(manifest)
 	if err != nil {

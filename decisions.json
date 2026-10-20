@@ -172,6 +172,13 @@
       "settled": "2026-10-18",
       "settledBy": "fdumay",
       "reviewOnly": true
+    },
+    {
+      "id": "D-024",
+      "statement": "publication uploads have two uploaders: a standard one in @putnami/dev that uses the standard protocols (OCI, npm), and one in @putnami/cloud for the Putnami registries, which can optimize transfer and cost",
+      "settled": "2026-10-20",
+      "settledBy": "fdumay",
+      "reviewOnly": true
     }
   ]
 }

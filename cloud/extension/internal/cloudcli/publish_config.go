@@ -137,7 +137,7 @@ func publishConfig(params map[string]any, args []string, workspaceRoot string, e
 	}
 	if outbox != "" {
 		// publication-v1: pack the member and emit no published member; the
-		// engine uploads it and reports the member itself.
+		// credential provider uploads it, and the engine reports the member.
 		packed, err := distributioncli.PackConfigMember(outbox, selected.ProjectID, publication)
 		if err != nil {
 			return err

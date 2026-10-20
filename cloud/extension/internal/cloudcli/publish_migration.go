@@ -45,8 +45,8 @@ func publishMigration(params map[string]any, args []string, workspaceRoot string
 	}
 	if outbox != "" {
 		// publication-v1: pack the member and emit no published member. The
-		// engine uploads it and reports the member itself, and Data accepts it
-		// at the first deploy that selects it, so the job calls no Data
+		// credential provider uploads it, the engine reports the member, and
+		// Data accepts it at the first deploy that selects it, so the job calls no Data
 		// endpoint and resolves no credential.
 		packed, err := datacli.PackPreparedMigration(outbox, prepared.ProjectPath, prepared, selection)
 		if err != nil {

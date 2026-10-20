@@ -5,11 +5,11 @@ The Putnami Put registry **immutable write** protocol: `put-write/v1`.
 ## Why
 
 A release set names Put registry members: release archives, config members,
-migrations and site-content bundles. Under `publication-v1`
-([registry ADR 0003](../registry/doc/adr/0003-publication-ops-behind-a-negotiated-capability.md)),
-the engine uploads every managed member itself, with a publish bearer no
-repository process holds, and only the provider's `release` moves a channel.
-The engine, the extension SDK and the Put registry therefore need one
+migrations and site-content bundles. Under `publication-v1` and `uploader-v1`
+([registry ADR 0004](../registry/doc/adr/0004-an-uploader-capability-on-the-provider-session.md)),
+the credential provider uploads every managed member with a bearer no other
+process holds, and only its `release` moves a channel. The credential
+provider, the extension SDK and the Put registry therefore need one
 description of the write: which requests, which media types, which digest.
 
 ## What
@@ -139,11 +139,11 @@ registry answered.
 ## Producers and consumers
 
 **Client (in this repository)** — `tooling/extension-sdk/putpublish` sends
-every request; the engine's publication upload node
-(`tooling/cli/internal/jobs/publication`) calls it for every `put` and
-`archive` member a publication job packed into its outbox
-([extension protocol](../extension/README.md)). The bearer is the provider's
-publish credential for the registry host, and no error carries it.
+every request; the SDK upload kit (`tooling/extension-sdk/publicationupload`)
+calls it for every `put` and `archive` member a publication job packed into its
+outbox ([extension protocol](../extension/README.md)), in the credential
+provider that serves `uploader-v1`. The bearer is the one the provider holds
+for the opened plan, and no error carries it.
 
 **Server** — the Put registry, implemented by `@putnami/cloud` in a separate
 repository. Its field names are pinned here so neither side can rename them

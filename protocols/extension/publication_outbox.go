@@ -1,4 +1,5 @@
-// The publication outbox: a publication job packs, the engine uploads.
+// The publication outbox: a publication job packs, the engine checks, and the
+// credential provider uploads.
 //
 // A publication job that finds PublicationOutboxEnv set uploads no managed
 // member and holds no registry credential for one: a member on a route the
@@ -6,10 +7,10 @@
 // it does without the variable. The job writes every artifact of a managed
 // member under that directory and describes them in one descriptor,
 // PublicationOutboxDescriptor, at the directory's root. The engine reads the
-// descriptor with ParsePublicationOutbox, resolves every path with
-// ResolveOutboxPath, hashes the bytes it is about to upload, refuses any digest
-// or size that differs from the descriptor, and uploads with a credential it
-// obtains itself.
+// descriptor with ParsePublicationOutbox and resolves every path with
+// ResolveOutboxPath. The credential provider that uploads a member reads its
+// files again, refuses any digest or size that differs from the descriptor,
+// and uploads with a credential it holds itself.
 //
 // The descriptor is written by repository-controlled code, so it carries no
 // credential, and the parser accepts one exact shape: a bounded document, no
@@ -17,9 +18,9 @@
 // the outbox root. An npm member names the registry the job resolved with the
 // managed npm rules (ManagedNPMRegistry) and an OCI member names its registry
 // host; the engine refuses one that the project's registries declaration
-// contradicts, and sends a bearer only to a host the provider's credential
-// serves. A put or archive member names no registry: the engine uploads it to
-// the project's Put registry.
+// contradicts, and the provider refuses a registry it does not serve. A put or
+// archive member names no registry: the engine sends it to the project's Put
+// registry.
 
 package extension
 
