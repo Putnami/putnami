@@ -9,6 +9,9 @@
     "jobs": ["serve"]
   },
   "options": {
+    "test": {
+      "filePatterns": ["fixtures/**"]
+    },
     "publish": {
       "archives": false
     }

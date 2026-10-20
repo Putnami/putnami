@@ -38,6 +38,14 @@ var schemaOnlyInexpressible = map[string]string{
 	"request-open-own-head-not-ancestor.json":            "ancestor true when headSourceRevision equals sourceRevision",
 	"request-release-head-for-empty-channel.json":        "no headSourceRevision for a release channel expected to have no head",
 	"request-release-unsorted-images.json":               "evidence images unique, in project order",
+	"request-upload-publication-session.json":            "the op upload only on a session that negotiated uploader-v1 and publication-v1",
+	"response-upload-publication-session.json":           "the op upload only on a session that negotiated uploader-v1 and publication-v1",
+	"request-upload-member-two-blocks.json":              "a publication outbox member validated by go.putnami.dev/protocol/extension",
+	"request-upload-member-escaping-path.json":           "a publication outbox member validated by go.putnami.dev/protocol/extension",
+	"request-upload-npm-registry-mismatch.json":          "an upload registry equal to the member's npm registry once normalized",
+	"request-upload-registry-port-range.json":            "whose port is between 1 and 65535",
+	"request-upload-registry-http.json":                  "whose scheme is http only for a loopback host",
+	"request-upload-outbox-dot-segment.json":             "with no . or .. segment",
 }
 
 // TestCredentialFixturesAgainstTheSchema evaluates every fixture against
@@ -204,12 +212,30 @@ func (e *schemaEvaluator) object(node map[string]any, keyword string, argument a
 		return true
 	case "additionalProperties":
 		declared, _ := node["properties"].(map[string]any)
-		for name := range value {
-			if _, ok := declared[name]; !ok && !argument.(bool) {
+		for name, member := range value {
+			if _, ok := declared[name]; ok {
+				continue
+			}
+			if allowed, ok := argument.(bool); ok {
+				if !allowed {
+					return false
+				}
+			} else if !e.valid(argument, member) {
 				return false
 			}
 		}
 		return true
+	case "propertyNames":
+		for name := range value {
+			if !e.valid(argument, name) {
+				return false
+			}
+		}
+		return true
+	case "minProperties":
+		return float64(len(value)) >= schemaNumber(argument)
+	case "maxProperties":
+		return float64(len(value)) <= schemaNumber(argument)
 	}
 	return e.known(keyword)
 }
@@ -236,6 +262,13 @@ func (e *schemaEvaluator) array(keyword string, argument any, value []any) bool 
 			}
 		}
 		return true
+	case "contains":
+		for _, item := range value {
+			if e.valid(argument, item) {
+				return true
+			}
+		}
+		return false
 	}
 	return e.known(keyword)
 }
@@ -268,8 +301,8 @@ func (e *schemaEvaluator) number(keyword string, argument any, value json.Number
 // the test on a keyword this evaluator does not implement.
 func (e *schemaEvaluator) known(keyword string) bool {
 	switch keyword {
-	case "required", "properties", "additionalProperties", "minItems", "maxItems", "uniqueItems", "items",
-		"minLength", "maxLength", "pattern", "minimum", "maximum":
+	case "required", "properties", "additionalProperties", "propertyNames", "minProperties", "maxProperties",
+		"minItems", "maxItems", "uniqueItems", "items", "contains", "minLength", "maxLength", "pattern", "minimum", "maximum":
 		return true
 	}
 	e.t.Fatalf("the schema uses %q, which this evaluator does not implement", keyword)
