@@ -1899,3 +1899,68 @@ func mustResolveGo(t *testing.T) string {
 	}
 	return goBinary
 }
+
+// The committed feature evidence holds only what this run wrote. build-describe
+// declares the file as an output, so the scheduler stores whatever the path
+// holds after the run: a copy an earlier run left would be stored under this
+// run's key and restored by every hit on it. A run that commits fresh evidence
+// replaces the copy; a run whose app wrote no evidence, or whose project does
+// not commit its schemas, removes it. Another framework's evidence in the same
+// directory stays.
+func TestCollectArtifactsRemovesCommittedFeatureEvidenceItDidNotWrite(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "single-schema-committer", "committed-feature-evidence-is-only-what-the-run-wrote")
+	const (
+		stale = `{"evidence":[{"source":{"binding":"source-v1:sha256:earlier"}}]}` + "\n"
+		fresh = `{"evidence":[{"source":{"binding":"source-v1:sha256:current"}}]}` + "\n"
+		other = `{"evidence":[]}` + "\n"
+	)
+	for _, test := range []struct {
+		name          string
+		writeEvidence bool
+		commit        bool
+		want          string // "" means the committed copy is absent
+	}{
+		{name: "fresh evidence is committed", writeEvidence: true, commit: true, want: fresh},
+		{name: "no evidence this run", writeEvidence: false, commit: true},
+		{name: "schemas not committed", writeEvidence: true, commit: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			projectPath := t.TempDir()
+			genDir := filepath.Join(projectPath, ".gen")
+			genEvidenceDir := filepath.Join(genDir, "schema", "feature-evidence")
+			committedDir := filepath.Join(projectPath, "schema", "feature-evidence")
+			for _, dir := range []string{genEvidenceDir, committedDir} {
+				if err := os.MkdirAll(dir, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			committed := filepath.Join(committedDir, "go-framework.json")
+			otherFramework := filepath.Join(committedDir, "ts-framework.json")
+			for path, body := range map[string]string{committed: stale, otherFramework: other} {
+				if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			snap := snapshotSchemaDir(filepath.Join(genDir, "schema"))
+			if test.writeEvidence {
+				if err := os.WriteFile(filepath.Join(genEvidenceDir, "go-framework.json"), []byte(fresh), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			if _, err := collectArtifacts(projectPath, genDir, test.commit, snap, nil); err != nil {
+				t.Fatalf("collectArtifacts: %v", err)
+			}
+			got, err := os.ReadFile(committed)
+			switch {
+			case test.want == "" && !errors.Is(err, os.ErrNotExist):
+				t.Fatalf("committed evidence = %q (err %v), want it removed", got, err)
+			case test.want != "" && (err != nil || string(got) != test.want):
+				t.Fatalf("committed evidence = %q (err %v), want %q", got, err, test.want)
+			}
+			if body, err := os.ReadFile(otherFramework); err != nil || string(body) != other {
+				t.Fatalf("another framework's evidence = %q (err %v), want it left as it was", body, err)
+			}
+		})
+	}
+}

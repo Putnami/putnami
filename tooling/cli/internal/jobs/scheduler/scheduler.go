@@ -217,6 +217,12 @@ type Scheduler struct {
 	versionFiles             map[string]bool
 	capabilitySourceBindings *capabilitySourceBindingMemo
 	versionFilesMu           sync.Mutex
+	// sourceBoundLocks holds one lock per project path, created on first use
+	// under sourceBoundLocksMu. The source-bound tasks of one project take it
+	// in turn, from their preparation through their capture
+	// (lockSourceBoundProjects).
+	sourceBoundLocks   map[string]*sync.Mutex
+	sourceBoundLocksMu sync.Mutex
 
 	// invocations owns the plan's `finalizes` relations: the private
 	// invocation scratch each producer writes into, the non-secret lease that

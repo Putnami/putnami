@@ -1650,9 +1650,18 @@ The local store and the remote cache use the same store key.
    refresh and the preBuild hook. An earlier task of the run, such as a lint
    fix, can move the binding after the stamp was written, so the scheduler
    rewrites the stamp from the current binding first. A follower of a shared
-   execution uses its leader's binding.
+   execution uses its leader's binding. Every stamp write replaces the file
+   whole, through a temporary file and a rename. The source-bound tasks of
+   one project take turns from that rewrite to the capture of their entry: in
+   one session through a per-project lock, and across sessions through the
+   project's task-output key, which a source-bound task holds exclusively
+   until its capture. No other source-bound task moves the stamp between the
+   two.
 2. When it looks up the entry, the scheduler uses the project's current
-   binding. An entry is found only at the binding its outputs embed.
+   binding. An entry is found only at the binding its outputs embed. A
+   restore that writes only paths the binding excludes, such as a describe
+   hit's `.gen/schema` and committed evidence, keeps the project's computed
+   binding, so a warm run computes it once per project.
 3. A workspace root Git does not manage uses the empty binding on both sides.
 4. Inside a repository, a binding the CLI cannot compute gives no store key.
    The task executes without a lookup and stores nothing.
@@ -1677,6 +1686,11 @@ first, the next run at the same tree hits it, and a tree that returns to the
 earlier binding hits the earlier entry and gets its committed evidence back.
 Two sessions at the same cache key with different bindings lease different
 store keys, so neither waits on, or receives, the other's entry.
+
+Go `build-describe` removes the committed evidence when its run wrote none,
+because the app has no feature evidence or the project does not commit its
+schemas. The entry then records the file absent, so no hit restores evidence
+an earlier run left.
 
 A manifest with a task that declares `sourceBound` requires CLI contract 10
 (`SourceBoundCacheContract`), so an older CLI refuses the manifest instead of

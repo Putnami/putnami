@@ -95,6 +95,15 @@ func ComputeSourceBinding(records []SourceBindingFile) (string, error) {
 	return "source-v1:sha256:" + hex.EncodeToString(hash.Sum(nil)), nil
 }
 
+// SourceBindingExcludes reports whether source-v1 leaves the slash-separated,
+// source-root-relative path out of a binding: a .git or .gen component at any
+// depth, a schema/ capability manifest, or a schema/feature-evidence tree. The
+// answer for a directory holds for every path below it, so a write confined
+// to an excluded path does not change the binding of that source root.
+func SourceBindingExcludes(path string) bool {
+	return sourceBindingExcluded(path)
+}
+
 func sourceBindingExcluded(value string) bool {
 	parts := strings.Split(value, "/")
 	for i, part := range parts {

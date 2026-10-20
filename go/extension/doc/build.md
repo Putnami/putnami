@@ -295,6 +295,9 @@ there would serve a stored verdict for a test the run never executed.
    - Runs it with `PUTNAMI_DESCRIBE=all`
    - Captures artifacts emitted by `app.Describer` plugins
    - Merges duplicate `schema/openapi.json` producers deterministically
+   - Commits `schema/feature-evidence/go-framework.json` when the app writes
+     feature evidence and the project commits its schemas, and removes it
+     otherwise, so the cache entry never captures evidence an earlier run left
    - For projects whose `go.mod` does not require `go.putnami.dev/app`, this
      step is pruned from the plan entirely (via a step `activation` gate)
      instead of being scheduled and skipped. Its dependents reconnect to

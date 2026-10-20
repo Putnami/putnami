@@ -36,7 +36,9 @@ package scheduler
 // An executing task also takes a reader key for every resource its
 // definition reads and does not write (taskReadLockNames): project:<project>
 // for a project-scoped resource such as gen, workspace: for a
-// workspace-scoped one. It is derived from the reader's declaration alone, so
+// workspace-scoped one. A source-bound task also takes project:<project>: its
+// subprocess reads the project's version stamp, whose binding its outputs
+// embed. It is derived from the reader's declaration alone, so
 // it is knowable before the run and the same in every session. A reader key
 // excludes only the writers that hold that key: the tasks that declare a
 // durable output rooted in that project or in the workspace, such as the
@@ -51,7 +53,9 @@ package scheduler
 // when that preparation writes the project tree
 // (preparationWritesProjectTree): the extension declares a preBuild hook,
 // which writes the project's .gen, or this session has not yet refreshed the
-// project's version stamp, .gen/version.json. The flag refreshVersionFile
+// project's version stamp, .gen/version.json, or the task is source-bound,
+// whose preparation brings that stamp to the current tree
+// (restampSourceBinding). The flag refreshVersionFile
 // reads turns true only inside a preparation, so the task that writes the
 // stamp is always one that took the key. The key is released when the
 // preparation ends, before the subprocess starts, unless the task's
@@ -114,8 +118,9 @@ package scheduler
 // this session's: after the revision, the dirty state or a source binding
 // changed. Once one session wrote the current identity, a session over the
 // same worktree state writes nothing. Another session that reads or captures
-// that project's .gen while a seed writes can see the new stamp, or a partial
-// one, because the write is not atomic. A restore re-stamps what it restores
+// that project's .gen while a seed writes can see the earlier stamp or the new
+// one, never a partial one: every stamp write replaces the file whole
+// (replaceVersionStamp). A restore re-stamps what it restores
 // (restampRestoredVersionStamp), so a captured stamp is never served as is.
 // Locking the seed would make each session wait, before its first cache key,
 // for every execution another session runs in any planned project.
@@ -416,7 +421,9 @@ func taskOutputLockNames(job *ScheduledJob) []string {
 // not write, the key that resource's writers hold until theirs. A
 // project-scoped resource maps to the task's project key, a workspace-scoped
 // one to the workspace key. The sources resource maps to none: the tasks that
-// write it mutate the source tree, which no output key covers.
+// write it mutate the source tree, which no output key covers. A source-bound
+// task also reads its project's version stamp, whose binding its outputs
+// embed, so it holds its project key until its capture whatever it declares.
 func taskReadLockNames(job *ScheduledJob) []string {
 	if job == nil || job.Project == nil || job.JobDef == nil {
 		return nil
@@ -425,7 +432,7 @@ func taskReadLockNames(job *ScheduledJob) []string {
 	for _, ref := range job.JobDef.Writes {
 		written[planner.ResourceConflictKey(job.Project.ID, ref)] = true
 	}
-	projectRead, workspaceRead := false, false
+	projectRead, workspaceRead := cachekey.TaskIsSourceBound(job), false
 	for _, ref := range job.JobDef.Reads {
 		if ref.ID == extension.ResourceIDSources || written[planner.ResourceConflictKey(job.Project.ID, ref)] {
 			continue
@@ -974,10 +981,14 @@ func preBuildHookKey(job *ScheduledJob) string {
 // are only created inside a preparation that already holds the project key,
 // so a task that reads them absent takes the key, and a task that reads them
 // present writes nothing: it waits for the session's hook run or skips the
-// stamp.
+// stamp. A source-bound task always writes it: its preparation brings the
+// project's stamp to the current tree (restampSourceBinding).
 func (s *Scheduler) preparationWritesProjectTree(job *ScheduledJob) bool {
 	if job == nil || job.Project == nil {
 		return false
+	}
+	if cachekey.TaskIsSourceBound(job) {
+		return true
 	}
 	if job.Extension != nil && job.Extension.Hooks != nil && job.Extension.Hooks.PreBuild != nil {
 		s.hooksMu.Lock()
