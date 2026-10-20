@@ -89,8 +89,9 @@ workspace-relative directory. A path that no project owns gets an empty
 that is not in `io/fs` form, is `-32602`. Outside a workspace the method
 answers `-32002`.
 
-`version.lines` reports the workspace's version lines, computed by the
-functions `putnami version get` and `putnami version tag` call. The params
+`version.lines` reports the workspace's version lines as the core computes
+them. The `putnami version get` and `putnami version tag` commands of
+`@putnami/dev` read them. The params
 object is required; `{}` asks for every line, sorted by scope path. A `scope`
 names one line by its scope path, as the `--scope` flag of
 `putnami version get` does: leading and trailing slashes are ignored, and an

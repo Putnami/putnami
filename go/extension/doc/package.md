@@ -452,7 +452,8 @@ There is no flag and no configuration field that sets it:
 | dirty tree | the untagged shape plus the diff hash; refused for a tagged publish |
 
 `<next>` is the line's last tag advanced by the conventional commits that touch
-the line. Release a line with `putnami version tag --scope <line>`; see
+the line. Release a line with `putnami version tag --scope <line>`, a command
+of `@putnami/dev`; see
 [Version Management](../../../tooling/cli/doc/14-version-management.md).
 
 ## Archive Contents

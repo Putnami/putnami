@@ -151,6 +151,11 @@ putnami version tag --scope tooling        # print the proposal, write nothing
 putnami version tag --scope tooling --yes --push
 ```
 
+`putnami version get` and `putnami version tag` are commands of
+`@putnami/dev`, which every language extension depends on. They read the
+versions the core computes, and need an interactive launch: a terminal or a
+CI step, not a hosted run.
+
 A commit carrying its line's tag has the tag's version, with no suffix. Any
 other commit takes the line's last tag advanced by the conventional commits
 that touch the line — breaking is a minor before 1.0, `feat`, `fix` and `perf`

@@ -72,6 +72,6 @@ For example, make builds authoritative without changing local test behavior:
 ```
 
 A multi-command invocation uses the strictest configured command policy because
-it shares one provider session. Release paths (`publish`, `tag`, and
-`version tag`) force at least `ci`; `--cache-trust=none` remains a stricter
-remote opt-out.
+it shares one provider session. A command whose jobs declare a registry side
+effect, such as `publish`, forces at least `ci`; `--cache-trust=none` remains a
+stricter remote opt-out.
