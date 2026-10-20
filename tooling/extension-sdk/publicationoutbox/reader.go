@@ -19,16 +19,28 @@ type Outbox struct {
 	Descriptor *extproto.PublicationOutbox
 }
 
-// Read reads and validates the descriptor of the outbox at root. root must be
-// a directory, not a symbolic link, and outbox.json a regular file of at most
-// MaxPublicationOutboxBytes.
-func Read(root string) (*Outbox, error) {
+// Open returns the outbox at root without reading its descriptor: Descriptor
+// is nil. A caller that holds a member the engine read and validated reads
+// that member's files by the entries it holds, so a descriptor rewritten since
+// cannot redirect a read. root must be a directory, not a symbolic link.
+func Open(root string) (*Outbox, error) {
 	info, err := os.Lstat(root)
 	if err != nil {
 		return nil, fmt.Errorf("publication outbox: %w", err)
 	}
 	if !info.IsDir() {
 		return nil, fmt.Errorf("publication outbox %s is not a directory", root)
+	}
+	return &Outbox{root: root}, nil
+}
+
+// Read reads and validates the descriptor of the outbox at root. root must be
+// a directory, not a symbolic link, and outbox.json a regular file of at most
+// MaxPublicationOutboxBytes.
+func Read(root string) (*Outbox, error) {
+	outbox, err := Open(root)
+	if err != nil {
+		return nil, err
 	}
 	file, err := regularfile.Open(filepath.Join(root, extproto.PublicationOutboxDescriptor))
 	if err != nil {
@@ -46,7 +58,8 @@ func Read(root string) (*Outbox, error) {
 	if len(diagnostics) > 0 {
 		return nil, descriptorError(diagnostics)
 	}
-	return &Outbox{root: root, Descriptor: descriptor}, nil
+	outbox.Descriptor = descriptor
+	return outbox, nil
 }
 
 // Root returns the outbox directory.
