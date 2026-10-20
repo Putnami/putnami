@@ -4,6 +4,8 @@ import { createBrowserRouter, matchRoutes, type RouteObject, RouterProvider, typ
 import { ANONYMOUS_SECURITY_CONTEXT, type ClientSecurityContext } from '../../shared/security.types';
 import { SecurityContextProvider, setSecurityContext } from '../security/security-context';
 import { createNavigationTracker } from './navigation-tracking';
+import { setRouterRoutes } from './router-routes';
+import { restoreScrollAtRoot } from './scroll-restoration';
 
 /**
  * Type definition for the hydration data injected by the server.
@@ -117,6 +119,13 @@ export async function hydratePage(containerId: string, routes: RouteObject[]) {
     // tear down the SSR tree. Leave the server HTML in place as static content.
     return undefined;
   }
+
+  // Scroll on client navigation as a full page load does: to the top, to the
+  // hash target, or back to the saved position.
+  if (routes[0]) {
+    restoreScrollAtRoot(routes[0]);
+  }
+  setRouterRoutes(routes, basename);
 
   const router = createBrowserRouter(routes, {
     basename,

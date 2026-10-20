@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { specTest } from '@putnami/runtime/spectest';
 import { actionHandler as clientActionHandler } from '../../src/client/form/action.handler';
 import { layoutLoaderHandler, pageLoaderHandler } from '../../src/client/form/loader.handler';
+import { setRouterRoutes } from '../../src/client/router/router-routes';
 
 describe('Client Form Handlers', () => {
   const originalFetch = globalThis.fetch;
@@ -126,6 +127,109 @@ describe('Client Form Handlers', () => {
         fetchMock.mockImplementationOnce(async () => followed);
 
         expect(await navigate()).toBe(followed);
+      });
+
+      describe('to a page the router does not render', () => {
+        const documentLoad = {
+          feature: 'typescript/web-application-delivery',
+          requirement: 'redirect-outside-the-router',
+          check: 'a-redirect-to-a-page-the-router-does-not-render-loads-a-document',
+        };
+        const inRouter = {
+          feature: 'typescript/web-application-delivery',
+          requirement: 'redirect-outside-the-router',
+          check: 'a-redirect-to-a-router-page-stays-in-the-router',
+        };
+        const answerRedirect = (location: string) =>
+          fetchMock.mockImplementationOnce(
+            async () => new Response(null, { status: 204, headers: { 'X-Putnami-Redirect': location } }),
+          );
+        const answerFollowedPage = (url: string) =>
+          fetchMock.mockImplementationOnce(async () => {
+            const followed = new Response('<!DOCTYPE html><html></html>', {
+              status: 200,
+              headers: { 'Content-Type': 'text/html' },
+            });
+            Object.defineProperty(followed, 'redirected', { value: true });
+            Object.defineProperty(followed, 'url', { value: url });
+            return followed;
+          });
+        const isDocumentLoad = (result: Response) => result.headers.get('X-Remix-Reload-Document') === 'true';
+
+        beforeEach(() => {
+          setRouterRoutes(
+            [
+              {
+                path: '/',
+                children: [
+                  { path: 'tasks/:id', id: 'root-tasks-id-page' },
+                  { path: 'docs/*', id: 'root-docs-*-page' },
+                  { path: '*' },
+                ],
+              },
+            ],
+            '/app',
+          );
+        });
+
+        afterEach(() => {
+          setRouterRoutes(undefined);
+        });
+
+        specTest('loads a document for a redirect to a server-only path', documentLoad, async () => {
+          answerRedirect('/app/login');
+
+          const result = await navigate();
+
+          expect(isDocumentLoad(result)).toBe(true);
+          expect(result.headers.get('Location')).toBe('http://localhost/app/login');
+        });
+
+        specTest(
+          'loads a document for a followed redirect that ended on a server-only page',
+          documentLoad,
+          async () => {
+            answerFollowedPage('http://localhost/app/login');
+
+            const result = await navigate();
+
+            expect(isDocumentLoad(result)).toBe(true);
+            expect(result.headers.get('Location')).toBe('http://localhost/app/login');
+          },
+        );
+
+        it('loads a document for a redirect outside the basename', async () => {
+          answerRedirect('/login');
+
+          expect(isDocumentLoad(await navigate())).toBe(true);
+        });
+
+        specTest('stays in the router for a redirect to a router page', inRouter, async () => {
+          answerRedirect('/app/tasks/8');
+
+          const result = await navigate();
+
+          expect(isDocumentLoad(result)).toBe(false);
+          expect(result.headers.get('Location')).toBe('http://localhost/app/tasks/8');
+        });
+
+        specTest('stays in the router for a followed redirect that ended on a router page', inRouter, async () => {
+          answerFollowedPage('http://localhost/app/docs/intro');
+
+          const result = await navigate();
+
+          expect(isDocumentLoad(result)).toBe(false);
+          expect(result.headers.get('Location')).toBe('http://localhost/app/docs/intro');
+        });
+
+        it('leaves a redirect to another origin to the router', async () => {
+          answerRedirect('https://idp.example.com/authorize');
+
+          const result = await navigate();
+
+          expect(isDocumentLoad(result)).toBe(false);
+          expect(result.headers.get('Location')).toBe('https://idp.example.com/authorize');
+        });
       });
 
       it('resolves a layout loader redirect against the page URL, not the layout endpoint', async () => {

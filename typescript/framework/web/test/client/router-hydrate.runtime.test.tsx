@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeEach, describe, expect, mock } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { specTest } from '@putnami/runtime/spectest';
 import React from 'react';
 
@@ -40,11 +40,14 @@ mock.module('react-router', () => ({
   createBrowserRouter: (...args: [unknown, unknown]) => createBrowserRouterMock(...args),
   matchRoutes: (...args: [unknown, unknown, unknown]) => matchRoutesMock(...args),
   RouterProvider: ({ router }: { router: unknown }) => React.createElement('router-provider', { router }),
+  Outlet: () => null,
+  UNSAFE_useScrollRestoration: () => undefined,
 }));
 
 const { hydratePage } = await import('../../src/client/router');
 const { ANONYMOUS_SECURITY_CONTEXT } = await import('../../src/shared/security.types');
 const { getSecurityContext, setSecurityContext } = await import('../../src/client/security/security-context');
+const { setRouterRoutes } = await import('../../src/client/router/router-routes');
 
 afterAll(() => {
   mock.module('react-dom/client', () => realReactDomClient);
@@ -113,11 +116,45 @@ describe('hydratePage', () => {
   });
 
   afterEach(() => {
+    setRouterRoutes(undefined);
     (globalThis as typeof globalThis & { document?: unknown; window?: unknown }).document = undefined;
     (globalThis as typeof globalThis & { document?: unknown; window?: unknown }).window = undefined;
     // Drop any callbacks left over from the scheduled guard so they cannot leak
     // into (or fire during) another test.
     animationFrameQueue = [];
+  });
+
+  specTest(
+    'wraps the root route to restore scroll',
+    {
+      feature: 'typescript/web-application-delivery',
+      requirement: 'navigation-scroll',
+      check: 'the-hydrated-root-route-restores-scroll',
+    },
+    async () => {
+      const page = React.createElement('main', null, 'Docs');
+      const root: Record<string, unknown> = { path: '/docs', element: page };
+
+      await hydratePage('root', [root] as never);
+
+      const element = root['element'] as React.ReactElement<{ children: unknown }>;
+      expect((element.type as { name?: string }).name).toBe('ScrollRestoring');
+      expect(element.props.children).toBe(page);
+      expect(root['Component']).toBeUndefined();
+    },
+  );
+
+  it('wraps a root route that is still lazy when it loads', async () => {
+    const Layout = () => null;
+    const root: Record<string, unknown> = { path: '/', lazy: async () => ({ Component: Layout }) };
+
+    await hydratePage('root', [root] as never);
+    const loaded = await (root['lazy'] as () => Promise<Record<string, unknown>>)();
+
+    const element = loaded['element'] as React.ReactElement<{ children: React.ReactElement }>;
+    expect((element.type as { name?: string }).name).toBe('ScrollRestoring');
+    expect(element.props.children.type).toBe(Layout);
+    expect(loaded['Component']).toBeUndefined();
   });
 
   specTest(

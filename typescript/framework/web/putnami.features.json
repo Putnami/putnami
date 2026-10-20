@@ -214,6 +214,32 @@
           }
         },
         {
+          "id": "navigation-scroll",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-new-location-scrolls-to-its-hash-target",
+              "a-new-location-scrolls-to-the-top",
+              "back-and-forward-restore-the-saved-position",
+              "the-hydrated-root-route-restores-scroll"
+            ]
+          }
+        },
+        {
+          "id": "redirect-outside-the-router",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-redirect-to-a-page-the-router-does-not-render-loads-a-document",
+              "a-redirect-to-a-router-page-stays-in-the-router"
+            ]
+          }
+        },
+        {
           "id": "link-navigation",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
