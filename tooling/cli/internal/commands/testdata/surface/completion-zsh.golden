@@ -520,8 +520,6 @@ _putnami() {
                         _describe -t project-ids 'project ID' project_ids
                         _describe -t project-names 'project name' projects
                         _describe -t project-names 'project name' project_basenames
-                    elif [[ "${prev}" == "--exclude" ]]; then
-                        _describe -t project-names 'project name' projects
                     elif [[ "${prev}" == "--output" ]]; then
                         compadd text json jsonl cloud-logging
                     elif [[ "${cur}" == -* ]]; then

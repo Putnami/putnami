@@ -987,7 +987,7 @@ putnami sessions list [--revision <sha>] [--output <format>]
 
 ### `putnami sessions inspect`
 
-Show full details and event stream for a specific session. --run names a remote attempt instead of a session: the attempt reference or submission key printed when a --where remote run was submitted, resolved through the durable attempt records under .putnami/runner/attempts. An attempt whose session is already imported is shown from the local store; one that is not (the CLI died mid-run, the import failed) is resumed through the workspace's runner provider from the persisted cursor and imported through the same path, and nothing is ever resubmitted. Ctrl-C during a resumed follow cancels the attempt within bounded time
+Show full details and event stream for a specific session. --run names a remote attempt instead of a session: the attempt reference or submission key a remote run printed when it was submitted, resolved through the durable attempt records under .putnami/runner/attempts. An attempt whose session is already imported is shown from the local store; one that is not (the CLI died mid-run, the import failed) is resumed through the workspace's runner provider from the persisted cursor and imported through the same path, and nothing is ever resubmitted. Ctrl-C during a resumed follow cancels the attempt within bounded time
 
 **Usage**
 

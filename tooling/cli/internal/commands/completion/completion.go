@@ -497,6 +497,12 @@ func (c completionContext) globalFlagNames() []string {
 	return names
 }
 
+// offersGlobalFlag reports whether the script offers the global flag long, so
+// a shell writes no value branch for a flag it hides.
+func (c completionContext) offersGlobalFlag(long string) bool {
+	return slices.ContainsFunc(c.globalFlags, func(flag commandmeta.GlobalFlag) bool { return flag.Long == long })
+}
+
 // globalFlagValues returns the candidate values a global flag accepts, so a
 // shell that completes them inline does not retype the vocabulary.
 func (c completionContext) globalFlagValues(long string) []string {

@@ -155,9 +155,12 @@ _putnami() {
 	if len(ctx.aliases) > 0 {
 		iox.Fprintf(w, "                        _describe -t aliases 'project alias' project_aliases\n")
 	}
-	iox.Fprintf(w, `                    elif [[ "${prev}" == "--exclude" ]]; then
+	if ctx.offersGlobalFlag("--exclude") {
+		iox.Fprintf(w, `                    elif [[ "${prev}" == "--exclude" ]]; then
                         _describe -t project-names 'project name' projects
-                    elif [[ "${prev}" == "--output" ]]; then
+`)
+	}
+	iox.Fprintf(w, `                    elif [[ "${prev}" == "--output" ]]; then
                         compadd %s
                     elif [[ "${cur}" == -* ]]; then
                         local -a cmd_flags

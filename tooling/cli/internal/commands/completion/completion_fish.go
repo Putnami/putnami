@@ -141,7 +141,7 @@ end
 	}
 
 	// --exclude matches project names.
-	if len(ctx.projects) > 0 {
+	if len(ctx.projects) > 0 && ctx.offersGlobalFlag("--exclude") {
 		iox.Fprintf(w, "\n# Project names (for --exclude flag value)\n")
 		iox.Fprintf(w, "complete -c putnami -n '__fish_seen_subcommand_from --exclude' -a '%s'\n",
 			strings.Join(ctx.projects, " "))

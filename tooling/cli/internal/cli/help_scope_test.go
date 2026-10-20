@@ -2,6 +2,7 @@ package cli
 
 import (
 	"errors"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -317,8 +318,41 @@ func TestReferencesListTheFlagsHelpLists(t *testing.T) {
 			if !strings.Contains(reference, "--credential-fd") {
 				t.Errorf("%s: the %s reference must always list --credential-fd", c.name, format)
 			}
+			if c.jobFlags {
+				continue
+			}
+			// Not even a description names a flag the reference does not list.
+			for _, flag := range unlistedJobFlags() {
+				if namesFlag(reference, flag) {
+					t.Errorf("%s: the %s reference names %s, which it does not list", c.name, format, flag)
+				}
+			}
 		}
 	}
+}
+
+// unlistedJobFlags returns the global flags that only extension commands read
+// and that no core command declares as its own flag.
+func unlistedJobFlags() []string {
+	own := map[string]bool{}
+	for _, command := range commandmeta.Commands() {
+		for _, flag := range command.Flags {
+			own[flag.Long] = true
+		}
+	}
+	var names []string
+	for _, flag := range commandmeta.GlobalFlags() {
+		if flag.JobOnly && !own[flag.Long] {
+			names = append(names, flag.Long)
+		}
+	}
+	return names
+}
+
+// namesFlag reports whether text names flag as a whole word: "--exclude" is
+// not named by "--exclude-tag".
+func namesFlag(text, flag string) bool {
+	return regexp.MustCompile(`(^|[^A-Za-z0-9-])` + regexp.QuoteMeta(flag) + `($|[^A-Za-z0-9-])`).MatchString(text)
 }
 
 // jobOnlyFlags returns the global flags that only extension commands read.
