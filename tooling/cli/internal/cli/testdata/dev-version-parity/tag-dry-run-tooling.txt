@@ -1,0 +1,19 @@
+exit 0
+--- stdout ---
+  Would release tooling 0.0.1 as tooling/v0.0.1
+## 0.0.1 — {{DATE}}
+
+### Features
+
+- feat: the workspace (9c7dcf7)
+
+### Fixes
+
+- fix(cli): stop the leak (9f0a77a)
+
+--- stderr ---
+--- repository ---
+status: clean
+head:
+docs: the readme
+tags at head: none

@@ -1,0 +1,34 @@
+exit 0
+--- stdout ---
+[main {{RELEASE_COMMIT}}] chore(release): typescript 0.4.1
+ 1 file changed, 9 insertions(+)
+ create mode 100644 typescript/CHANGELOG.md
+  Created ts/v0.4.1 on the release commit
+--- stderr ---
+--- repository ---
+status: clean
+head:
+chore(release): typescript 0.4.1
+
+Co-Authored-By: Release Fixture <release@example.invalid>
+tags at head: ts/v0.4.1
+tag ts/v0.4.1:
+## 0.4.1 — {{DATE}}
+
+### Breaking
+
+- feat(lab)!: drop the flag (5b1d2c5)
+
+### Features
+
+- feat(web): add the thing (d8b2a60)
+file typescript/CHANGELOG.md:
+## 0.4.1 — {{DATE}}
+
+### Breaking
+
+- feat(lab)!: drop the flag (5b1d2c5)
+
+### Features
+
+- feat(web): add the thing (d8b2a60)

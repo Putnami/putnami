@@ -1,0 +1,10 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: --output=json is not supported by "version tag"
+  structured-output commands: cache verify, compose, config show, context map, context pack, doctor, extensions install, extensions list, extensions prepare, extensions update, impact-plan, migrate vnext, projects describe, projects list, qualify, report, scopes list, sessions export, sessions inspect, sessions list, sessions replay, sessions summary, telemetry show, templates install, templates list, templates update, tree fingerprint, version get, workspace describe
+--- repository ---
+status: clean
+head:
+docs: the readme
+tags at head: none

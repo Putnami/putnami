@@ -1,0 +1,10 @@
+exit 2
+--- stdout ---
+--- stderr ---
+putnami: git tree is not clean; commit or discard changes before tagging
+--- repository ---
+status:
+ M typescript/web/src.ts
+head:
+docs: the readme
+tags at head: none

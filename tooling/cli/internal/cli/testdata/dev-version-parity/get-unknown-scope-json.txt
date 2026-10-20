@@ -1,0 +1,19 @@
+exit 2
+--- stdout ---
+{
+  "protocolVersion": 2,
+  "command": "version get",
+  "status": "failure",
+  "exitCode": 2,
+  "error": {
+    "code": "usage",
+    "message": "no version line \"nope\"; this workspace declares tooling, typescript"
+  }
+}
+--- stderr ---
+putnami: no version line "nope"; this workspace declares tooling, typescript
+--- repository ---
+status: clean
+head:
+docs: the readme
+tags at head: none

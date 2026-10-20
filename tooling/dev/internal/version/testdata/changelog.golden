@@ -1,0 +1,22 @@
+## 0.5.0 — 2026-09-04
+
+### Breaking
+
+- feat(cli)!: rename the flag (2222222)
+- refactor(core): move it (3333333)
+
+### Features
+
+- feat(web): add the thing (1111111)
+
+### Fixes
+
+- fix(web): stop the leak (4444444)
+
+### Performance
+
+- perf(cli): halve the walk (5555555)
+
+### Other
+
+- docs: rewrite the guide (6666666)

@@ -1,0 +1,9 @@
+exit 1
+--- stdout ---
+--- stderr ---
+putnami: usage: putnami version get [--scope <line>]
+--- repository ---
+status: clean
+head:
+docs: the readme
+tags at head: none

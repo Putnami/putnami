@@ -83,6 +83,129 @@
           "validate"
         ]
       }
+    },
+    {
+      "id": "tooling/version-commands",
+      "type": "feature",
+      "name": "Version commands",
+      "outcome": "A user reads the version every version line is at with putnami version get, and releases one line with putnami version tag, which writes its changelog, its release commit and its tag, from the versions the core computes",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "get-prints-every-line",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "get-prints-each-line-the-host-answers",
+              "get-prints-one-envelope-under-structured-output"
+            ]
+          }
+        },
+        {
+          "id": "recorded-graph-reads-only",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "get-answers-from-a-recorded-graph-and-says-so",
+              "tag-refuses-a-recorded-graph"
+            ]
+          }
+        },
+        {
+          "id": "release-commit-then-tag",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "changelog-is-in-the-tagged-commit",
+              "push-sends-the-commit-and-the-tag",
+              "the-changelog-matches-the-golden"
+            ]
+          }
+        },
+        {
+          "id": "release-is-reviewable-first",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "dry-run-prints-the-proposal-and-the-changelog",
+              "without-yes-nothing-is-written",
+              "an-explicit-tag-replaces-the-proposal"
+            ]
+          }
+        },
+        {
+          "id": "release-refusals",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "several-lines-need-a-scope",
+              "tagged-head-is-refused",
+              "dirty-tree-is-refused",
+              "existing-tag-is-refused",
+              "a-run-bound-to-another-commit-is-refused",
+              "an-off-pattern-tag-is-refused",
+              "a-line-without-a-proposed-release-is-refused",
+              "structured-output-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "usage-and-host-errors",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "usage-errors-exit-2",
+              "host-refusals-keep-their-exit-codes",
+              "no-channel-names-the-interactive-launch"
+            ]
+          }
+        },
+        {
+          "id": "version-group-runs-the-executable",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-declares-the-version-group",
+              "the-executable-dispatches-the-version-commands"
+            ]
+          }
+        }
+      ],
+      "surface": {
+        "commands": [
+          "version get",
+          "version tag"
+        ]
+      }
     }
   ]
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -76,8 +77,8 @@ func readManifestAt(t *testing.T, path string) *extension.Manifest {
 }
 
 // TestTheManifestDeclaresTheElevenVerbsInOrder holds the shipped manifest to
-// the shape of a vocabulary-only extension: the eleven development verbs in
-// help order, and nothing that runs.
+// the eleven development verbs in help order, and to nothing that runs
+// beyond the version commands.
 func TestTheManifestDeclaresTheElevenVerbsInOrder(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, feature, "eleven-ordered-verbs", "the-manifest-declares-the-eleven-verbs-in-order")
@@ -96,12 +97,17 @@ func TestTheManifestDeclaresTheElevenVerbsInOrder(t *testing.T) {
 	if !slices.Equal(names, want) {
 		t.Fatalf("verbs %v, want %v", names, want)
 	}
-	if len(manifest.Commands) != 0 || len(manifest.CommandGroups) != 0 || len(manifest.Tasks) != 0 || len(manifest.Tools) != 0 {
-		t.Errorf("the manifest declares something that runs: commands %v, command groups %v, tasks %v, tools %v",
-			manifest.Commands, manifest.CommandGroups, manifest.Tasks, manifest.Tools)
+	if got := slices.Sorted(maps.Keys(manifest.Commands)); !slices.Equal(got, versionCommands) {
+		t.Errorf("commands %v, want only the version commands %v", got, versionCommands)
 	}
-	if manifest.AgentContent != nil || manifest.Runtime != nil || manifest.Hooks != nil {
-		t.Errorf("the manifest declares agent content %+v, a runtime %+v or hooks %+v", manifest.AgentContent, manifest.Runtime, manifest.Hooks)
+	if got := slices.Sorted(maps.Keys(manifest.Tasks)); !slices.Equal(got, versionCommands) {
+		t.Errorf("tasks %v, want only the version tasks %v", got, versionCommands)
+	}
+	if got := slices.Sorted(maps.Keys(manifest.CommandGroups)); !slices.Equal(got, []string{"version"}) {
+		t.Errorf("command groups %v, want only version", got)
+	}
+	if len(manifest.Tools) != 0 || manifest.AgentContent != nil || manifest.Hooks != nil {
+		t.Errorf("the manifest declares tools %v, agent content %+v or hooks %+v", manifest.Tools, manifest.AgentContent, manifest.Hooks)
 	}
 	if len(manifest.ExtensionDeps.List) != 0 {
 		t.Errorf("the manifest names extension dependencies %v", manifest.ExtensionDeps.List)

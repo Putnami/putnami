@@ -1,0 +1,9 @@
+exit 0
+--- stdout ---
+{"protocolVersion":2,"command":"version get","status":"success","exitCode":0,"data":[{"action":"get","line":"tooling","version":"0.0.0-20260106000000-832b9a3"},{"action":"get","line":"typescript","version":"0.4.1-20260106000000-832b9a3"}]}
+--- stderr ---
+--- repository ---
+status: clean
+head:
+docs: the readme
+tags at head: none

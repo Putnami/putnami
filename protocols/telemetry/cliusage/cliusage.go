@@ -138,6 +138,8 @@ var Commands = []string{
 	"session-reporter",
 	"validate-workspace",
 	"version",
+	"version-get",
+	"version-tag",
 	"workspace-fetch",
 	"workspace-install",
 }

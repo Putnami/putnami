@@ -62,6 +62,10 @@
         "../contributor/go.mod",
         "../contributor/go.sum",
         "../contributor/src/**",
+        "../dev/cmd/**",
+        "../dev/internal/**",
+        "../dev/go.mod",
+        "../dev/go.sum",
         "git:../../**/client.putnami.json",
         "git:../../**/schema/openapi.json",
         "command-surface.json"

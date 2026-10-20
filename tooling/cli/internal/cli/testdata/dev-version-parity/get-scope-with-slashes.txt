@@ -1,0 +1,9 @@
+exit 0
+--- stdout ---
+  typescript 0.4.1-20260106000000-832b9a3
+--- stderr ---
+--- repository ---
+status: clean
+head:
+docs: the readme
+tags at head: none

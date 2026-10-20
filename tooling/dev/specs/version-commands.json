@@ -1,0 +1,48 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/version-commands",
+  "outcomes": [
+    "A user reads the version every version line is at with putnami version get, and releases one line with putnami version tag, which writes its changelog, its release commit and its tag",
+    "A release is reviewable before it happens: version tag prints the proposed tag and its changelog and writes nothing without --yes",
+    "The versions come from the putnami process that launched the command, so version get prints and version tag releases what the core computes from git"
+  ],
+  "nonGoals": [
+    "Computing a version: the core computes every version, proposed release and line history, and answers them through version.lines",
+    "Running from a hosted run or from a putnami process that opens no host channel"
+  ],
+  "requirements": [
+    {
+      "id": "get-prints-every-line",
+      "text": "putnami version get prints one row per version line: two spaces, the line's scope path, or (workspace root) for the root line, a space and the version the host answers. --scope names one line, with or without its slashes. Under --output=json or jsonl it prints one result envelope for version get, whose data is the line's record, or an array of records when there are several."
+    },
+    {
+      "id": "recorded-graph-reads-only",
+      "text": "When the host answers from a recorded dependency graph because it could not refresh the graph a support catalog reads, version get says so on standard error and prints that answer, and version tag refuses with exit status 1."
+    },
+    {
+      "id": "release-commit-then-tag",
+      "text": "putnami version tag --yes renders the line's changelog from the commits the host lists, prepends it to the line's CHANGELOG.md, commits it as chore(release): <line> <version> with the human's Co-Authored-By trailer, then creates the annotated tag on that commit with the changelog as its message. --push then pushes HEAD and the tag to origin."
+    },
+    {
+      "id": "release-is-reviewable-first",
+      "text": "Without --yes, version tag writes nothing: --dry-run prints the line, the version and the tag it proposes, then the changelog, and otherwise it prints the release and asks for --yes. An explicit tag replaces the proposed one when it is the line's tag pattern with a MAJOR.MINOR.PATCH version."
+    },
+    {
+      "id": "release-refusals",
+      "text": "version tag exits 2 and writes nothing when the workspace declares several lines and --scope names none, HEAD carries the line's release tag, an explicit tag is not a release tag of the line, the host is bound to a commit other than HEAD, the tree is dirty, the tag exists, the host proposes no release and no tag is named, or the output mode is json or jsonl. It exits 1, not 2, for a dependency graph the host could not refresh and for a failure of git."
+    },
+    {
+      "id": "usage-and-host-errors",
+      "text": "An unexpected argument or --scope without a value exits 2 with the reason on standard error. A scope that names no line and an invalid configuration the host refuses exit 2, and a failure of the host exits 1, each with the host's message. Without a host channel the commands exit 1 and name the interactive launch that opens one."
+    },
+    {
+      "id": "version-group-runs-the-executable",
+      "text": "The manifest declares the version command group, whose default is get, with interactive get and tag subcommands that run the executable in the workspace root without a cache. tag declares the dry-run flag the core forwards. The executable runs version get and version tag with the job context argument putnami appends removed."
+    }
+  ],
+  "decisions": [
+    "tooling/dev/doc/adr/0002-the-dev-extension-serves-version-get-and-tag.md",
+    "tooling/cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md"
+  ]
+}
