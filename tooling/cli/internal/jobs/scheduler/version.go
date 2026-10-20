@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strings"
 
-	protocaps "go.putnami.dev/protocol/capabilities"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -573,7 +572,7 @@ func (s *Scheduler) invalidateCapabilitySourceBindingsForProject(job *ScheduledJ
 
 // invalidateCapabilitySourceBindingsForRestore brackets materialization of a
 // cached entry. A project-rooted output can change the project's source-v1
-// binding unless source-v1 excludes its path (protocaps.SourceBindingExcludes),
+// binding unless source-v1 excludes its path (putnamigit.SourceBindingExcludes),
 // as it excludes .gen and the committed feature evidence a describe hit
 // restores: such a restore keeps the project's memoized binding. Workspace-rooted
 // outputs may intersect any project (including a root project), so they
@@ -594,7 +593,7 @@ func (s *Scheduler) invalidateCapabilitySourceBindingsForRestore(job *ScheduledJ
 		case extension.OutputRootWorkspace:
 			invalidateAll = true
 		case extension.OutputRootProject:
-			if !protocaps.SourceBindingExcludes(path.Clean(output.Path)) {
+			if !putnamigit.SourceBindingExcludes(path.Clean(output.Path)) {
 				invalidateProject = true
 			}
 		}

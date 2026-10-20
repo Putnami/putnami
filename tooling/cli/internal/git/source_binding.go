@@ -175,3 +175,10 @@ func parseStageEntry(entry string) (mode, objectID, stage, repoPath string, ok b
 	}
 	return fields[0], fields[1], fields[2], repoPath, true
 }
+
+// SourceBindingExcludes reports whether source-v1 leaves the slash-separated,
+// source-root-relative path out of a project's binding. It is the protocol's
+// rule, so a caller that may not import the protocol package reads it here.
+func SourceBindingExcludes(path string) bool {
+	return protocaps.SourceBindingExcludes(path)
+}
