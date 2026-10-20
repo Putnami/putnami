@@ -1,0 +1,34 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/deps-edit",
+  "outcomes": [
+    "putnami deps add, deps remove and deps prune edit a Go module's requirements through the Go extension, so the core CLI runs no go command for them",
+    "An edit succeeds on a module that requires a version no proxy serves, and tidies the module as the workspace build resolves it"
+  ],
+  "nonGoals": [
+    "Editing putnami.json or choosing the projects prune drops, which the core CLI does",
+    "Upgrading the framework modules, which deps-upgrade does"
+  ],
+  "requirements": [
+    {
+      "id": "deps-edit-reads-no-replaced-version",
+      "text": "deps-edit adds a module by resolving each spec with go list -m and requiring the result with go mod edit, and removes one with go mod edit -droprequire. It never runs go get, so a go.mod that requires a version no proxy serves is edited. A spec names a module path. A spec without a version takes the latest, or keeps the version go.mod requires when it is newer. An add refuses the version none and names the deps remove command."
+    },
+    {
+      "id": "deps-tidy-resolves-as-the-workspace-does",
+      "text": "deps-edit runs go mod tidy on a copy of go.mod that also states each go.work replace directive for a module version the module does not replace itself, then writes go.mod and go.sum from the tidied copy without those directives. The edits of one run are one transaction: a failed go step puts every go.mod and go.sum the run edited back as it was, each through a rename, so a file never holds a part of its bytes."
+    },
+    {
+      "id": "deps-run-the-pinned-go",
+      "text": "deps-edit runs its go commands with the go the extension's tasks resolve: the release the workspace lock pins, else a go on PATH. It installs none. With no go, it edits nothing and emits one error naming putnami install. A hosted run, whose dependencies are offline, is refused."
+    },
+    {
+      "id": "prune-names-the-module-the-target-declares",
+      "text": "A prune names each requirement to drop by the module path the go.mod in the target project's directory declares, not by the project's putnami.json name, and fails naming the target and the project when it cannot read one."
+    }
+  ],
+  "decisions": [
+    "go/extension/doc/adr/0012-the-extension-owns-the-go-steps-of-create-and-deps.md"
+  ]
+}

@@ -60,7 +60,7 @@ func newFetcher(j *workspacejob.Job) *fetcher {
 		userAgent: j.UserAgent(),
 		env:       j.Env,
 		goAuth:    func() string { return j.Env.Get("GOAUTH") },
-		client:    &http.Client{Timeout: requestTimeout, CheckRedirect: refuseDowngrade},
+		client:    &http.Client{Timeout: requestTimeout, CheckRedirect: RefuseDowngrade},
 		probe: &http.Client{
 			Timeout: requestTimeout,
 			CheckRedirect: func(*http.Request, []*http.Request) error {
@@ -75,9 +75,9 @@ var errHTTPStatus = errors.New("unsuccessful HTTP status")
 // maxRedirects is net/http's own limit on one request's redirects.
 const maxRedirects = 10
 
-// refuseDowngrade stops a redirect chain that starts on https and leaves it,
+// RefuseDowngrade stops a redirect chain that starts on https and leaves it,
 // as the go command does, so a credential never travels in clear text.
-func refuseDowngrade(request *http.Request, via []*http.Request) error {
+func RefuseDowngrade(request *http.Request, via []*http.Request) error {
 	if len(via) >= maxRedirects {
 		return fmt.Errorf("stopped after %d redirects", maxRedirects)
 	}
@@ -96,7 +96,7 @@ func (f *fetcher) fetch(rawURL string) ([]byte, error) {
 	}
 	switch parsed.Scheme {
 	case "file":
-		return os.ReadFile(fileURLPath(parsed))
+		return os.ReadFile(FileURLPath(parsed))
 	case "http", "https":
 	default:
 		return nil, fmt.Errorf("unsupported URL scheme %q", parsed.Scheme)
@@ -174,8 +174,8 @@ func httpsLocation(parsed *url.URL) string {
 	return strings.TrimPrefix(parsed.String(), "https://")
 }
 
-// fileURLPath is the local path of a file:// URL.
-func fileURLPath(parsed *url.URL) string {
+// FileURLPath is the local path of a file:// URL.
+func FileURLPath(parsed *url.URL) string {
 	path := parsed.Path
 	if runtime.GOOS == "windows" && len(path) >= 3 && path[0] == '/' && path[2] == ':' {
 		path = path[1:]

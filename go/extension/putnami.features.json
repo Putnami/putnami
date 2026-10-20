@@ -823,6 +823,163 @@
           }
         }
       ]
+    },
+    {
+      "id": "go/project-setup",
+      "type": "feature",
+      "name": "Go project setup",
+      "outcome": "A Go project putnami projects create renders is in go.work, states the workspace's go directive, pins each framework module to a released version and is tidy, set up by the Go extension that ships the template",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "create-sets-up-a-go-project",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "setup-adds-the-project-pins-the-framework-and-tidies",
+              "setup-leaves-a-project-without-go-mod-alone",
+              "setup-refuses-a-path-outside-the-workspace-and-a-hosted-run"
+            ]
+          }
+        },
+        {
+          "id": "create-resolves-the-go-framework-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-channel-fails-instead-of-resolving-latest",
+              "setup-writes-nothing-when-no-source-answers",
+              "the-channel-param-is-asked-as-given",
+              "the-framework-version-is-the-one-the-channel-names",
+              "the-lookup-passes-a-404-to-the-next-proxy-as-go-does",
+              "the-lookup-reads-a-private-module-from-its-origin-as-go-does",
+              "the-lookup-sends-the-credentials-go-would-and-prints-none"
+            ]
+          }
+        },
+        {
+          "id": "create-fails-when-go-mod-tidy-fails",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "setup-quotes-go-when-go-mod-tidy-fails",
+              "the-quoted-go-output-is-bounded-and-redacts-url-credentials"
+            ]
+          }
+        },
+        {
+          "id": "create-holds-a-missing-credential-warning",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-refused-lookup-logs-the-held-warning",
+              "a-successful-or-unrefused-lookup-logs-no-warning"
+            ]
+          }
+        },
+        {
+          "id": "create-runs-the-pinned-go",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "setup-writes-go-work-and-names-putnami-install-without-go",
+              "the-prepare-stage-writes-go-work-and-runs-no-go"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "go/deps-edit",
+      "type": "feature",
+      "name": "Go dependency edits",
+      "outcome": "putnami deps add, deps remove and deps prune edit a Go module's requirements through the Go extension, which resolves no version go.mod already names and tidies the module as the workspace build resolves it",
+      "owner": "go",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "deps-edit-reads-no-replaced-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "add-and-remove-edit-a-module-that-requires-an-unserved-version",
+              "add-keeps-a-required-version-newer-than-the-latest",
+              "add-refuses-the-version-none-naming-deps-remove",
+              "add-reports-a-failed-go-list"
+            ]
+          }
+        },
+        {
+          "id": "deps-tidy-resolves-as-the-workspace-does",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-go-step-leaves-every-file-as-it-was",
+              "a-rollback-replaces-each-file-through-a-rename",
+              "tidy-reads-the-go-work-replace-directives",
+              "tidy-states-a-go-work-directory-replace-from-the-module"
+            ]
+          }
+        },
+        {
+          "id": "deps-run-the-pinned-go",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "edit-names-putnami-install-without-go",
+              "edit-refuses-a-hosted-run-before-any-go-command",
+              "edit-runs-every-go-command-with-the-go-the-extension-resolves"
+            ]
+          }
+        },
+        {
+          "id": "prune-names-the-module-the-target-declares",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "prune-drops-the-module-path-the-target-go-mod-declares",
+              "prune-reads-the-module-path-of-each-target-and-names-one-it-cannot-read"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

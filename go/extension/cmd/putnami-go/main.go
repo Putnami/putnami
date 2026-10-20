@@ -20,6 +20,8 @@
 //	                   job a hosted run gives the registry credential
 //	workspace-install  Install Go and the pinned dev tools (`putnami install`)
 //	deps-upgrade       Upgrade the go.putnami.dev release lock (`putnami upgrade`)
+//	project-setup      Set a created Go project up (`putnami projects create`)
+//	deps-edit          Edit a Go module's requirements (`putnami deps add|remove|prune`)
 package main
 
 import (
@@ -41,9 +43,11 @@ import (
 	"go.putnami.dev/go/extension/internal/jobs/cachepolicy"
 	"go.putnami.dev/go/extension/internal/jobs/configextract"
 	"go.putnami.dev/go/extension/internal/jobs/configmerge"
+	"go.putnami.dev/go/extension/internal/jobs/depsedit"
 	"go.putnami.dev/go/extension/internal/jobs/depsupgrade"
 	"go.putnami.dev/go/extension/internal/jobs/lint"
 	"go.putnami.dev/go/extension/internal/jobs/pkg"
+	"go.putnami.dev/go/extension/internal/jobs/projectsetup"
 	"go.putnami.dev/go/extension/internal/jobs/publish"
 	"go.putnami.dev/go/extension/internal/jobs/run"
 	"go.putnami.dev/go/extension/internal/jobs/serve"
@@ -100,16 +104,21 @@ func commandHandlers() map[string]cli.JobFunc {
 }
 
 // lifecycleHandlers are the workspace lifecycle jobs: `putnami install` runs
-// workspace-install and `putnami upgrade` runs deps-upgrade. They were shell
-// scripts, and they keep the scripts' contract: no registry-credential
-// refresh, and a run without a project is a run for the workspace, never a
-// SKIP. On a hosted run the engine runs workspace-fetch before
-// workspace-install, and hands it, and only it, the read credential.
+// workspace-install, `putnami upgrade` runs deps-upgrade, `putnami projects
+// create` runs project-setup and `putnami deps add|remove|prune` run
+// deps-edit. A run without a project is a run for the workspace, never a SKIP,
+// and no job gets the registry-credential refresh of the build jobs:
+// project-setup refreshes the credential of a framework module's origin itself,
+// and only when it reads that origin. On a hosted run the engine runs
+// workspace-fetch before workspace-install, and hands it, and only it, the
+// read credential.
 func lifecycleHandlers() map[string]cli.JobFunc {
 	return map[string]cli.JobFunc{
 		"workspace-fetch":   workspaceinstall.RunFetch,
 		"workspace-install": workspaceinstall.Run,
 		"deps-upgrade":      depsupgrade.Run,
+		"project-setup":     projectsetup.Job(refreshHostCredential),
+		"deps-edit":         depsedit.Run,
 	}
 }
 
@@ -122,6 +131,8 @@ var lifecycleUsage = map[string]struct {
 	"workspace-fetch":   {usage: workspaceinstall.FetchUsage, valued: []string{"--putnamiContext", "--output"}},
 	"workspace-install": {usage: workspaceinstall.Usage, valued: []string{"--putnamiContext", "--output"}},
 	"deps-upgrade":      {usage: depsupgrade.Usage, valued: []string{"--putnamiContext", "--output", "--version", "--channel"}},
+	"project-setup":     {usage: projectsetup.Usage, valued: []string{"--putnamiContext", "--output"}},
+	"deps-edit":         {usage: depsedit.Usage, valued: []string{"--putnamiContext", "--output"}},
 }
 
 // lifecycleHelp returns the usage line to print when args ask a lifecycle job

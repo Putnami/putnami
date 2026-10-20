@@ -1476,6 +1476,8 @@ func TestTaskEffectTable(t *testing.T) {
 		"build-describe":         {"network", "toolchain-cache"},
 		"build-tidy":             {"network", "toolchain-cache"},
 		"deps-upgrade-exec":      {"network", "toolchain-cache", "workspace-files"},
+		"deps-edit-exec":         {"network", "toolchain-cache", "workspace-files"},
+		"project-setup-exec":     {"network", "toolchain-cache", "workspace-files"},
 		"lint-golangci-fix":      {"network", "toolchain-cache"},
 		"lint-golangci-readonly": {"network", "toolchain-cache"},
 		"lint-staticcheck":       {"network", "toolchain-cache"},

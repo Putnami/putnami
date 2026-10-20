@@ -2,6 +2,10 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "go/deps-edit#deps-edit-reads-no-replaced-version",
+    "go/deps-edit#deps-run-the-pinned-go",
+    "go/deps-edit#deps-tidy-resolves-as-the-workspace-does",
+    "go/deps-edit#prune-names-the-module-the-target-declares",
     "go/go-project-toolchain#api-compatibility-marker",
     "go/go-project-toolchain#archive-agent-content",
     "go/go-project-toolchain#archive-matrix-honesty",
@@ -42,6 +46,11 @@
     "go/go-project-toolchain#test-failure-attribution",
     "go/go-project-toolchain#test-host-identity-scrub",
     "go/go-project-toolchain#testdata-is-a-test-input",
-    "go/go-project-toolchain#tidy-drift-visibility"
+    "go/go-project-toolchain#tidy-drift-visibility",
+    "go/project-setup#create-fails-when-go-mod-tidy-fails",
+    "go/project-setup#create-holds-a-missing-credential-warning",
+    "go/project-setup#create-resolves-the-go-framework-version",
+    "go/project-setup#create-runs-the-pinned-go",
+    "go/project-setup#create-sets-up-a-go-project"
   ]
 }

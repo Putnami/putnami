@@ -9,7 +9,7 @@
           "path": "go/extension/internal/jobs/depsupgrade/resolve.go",
           "transport": "http",
           "symbol": "http.Client",
-          "fingerprint": "0ffb73ec24c292e8a640609ff42c35fb6e1e4da1378ff9f8c1cfa4a358e0fd47"
+          "fingerprint": "9fa29a3c06cd1d54481204467be93976add2cc670bf3e8bd34c4c54a51094904"
         },
         {
           "path": "go/extension/internal/jobs/depsupgrade/resolve.go",
@@ -30,6 +30,29 @@
         "go/extension/internal/jobs/depsupgrade/netrc_test.go"
       ],
       "reason": "Resolves a release channel to one version per module from the module origin that putnami upgrade targets. The wire contract belongs to the Go module proxy protocol, so no Putnami provider declaration can generate this client."
+    },
+    {
+      "authority": "Go module proxy protocol (go.dev/ref/mod#goproxy-protocol): the /@latest and /@v/<query>.info endpoints, and the go-import meta tag of a remote import path (go.dev/ref/mod#vcs-find)",
+      "adapter": "go/extension/internal/jobs/projectsetup/lookup.go",
+      "callsites": [
+        {
+          "path": "go/extension/internal/jobs/projectsetup/lookup.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "f8c98270ed5c73ba6e98215990a9542a809ede515fc73d5de3d019431d4b733e"
+        },
+        {
+          "path": "go/extension/internal/jobs/projectsetup/lookup.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "5ad5e1b0cac1fc4aa37af6dc5826707c52cacee458029c11bd08d2d346453cc7"
+        }
+      ],
+      "owner": "@putnami/go",
+      "tests": [
+        "go/extension/internal/jobs/projectsetup/lookup_test.go"
+      ],
+      "reason": "Asks the module proxies GOPROXY names, or the module origin a go-import mod tag names, for the version of each framework module a created project requires, as the go command does. The wire contract belongs to the Go module proxy protocol, so no Putnami provider declaration can generate this client."
     },
     {
       "authority": "Go module proxy protocol (go.dev/ref/mod#goproxy-protocol) and the Putnami module registry publish routes it extends",

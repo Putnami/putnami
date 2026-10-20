@@ -3,6 +3,7 @@ package depsupgrade
 import (
 	"errors"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -64,6 +65,17 @@ func loadNetrcOn(env *workspacejob.Env, goAuth, goos string) netrcCredentials {
 	}
 	credentials.entries = parseNetrc(string(data))
 	return credentials
+}
+
+// NetrcCredential is the login and password the go command sends to the
+// https URL target under goAuth, from the netrc file it reads with env
+// (loadNetrc). It reports false when the go command sends none: target is not
+// https, carries its own user information, or no entry covers it.
+func NetrcCredential(env *workspacejob.Env, goAuth string, target *url.URL) (login, password string, ok bool) {
+	if target.Scheme != "https" || target.User != nil {
+		return "", "", false
+	}
+	return loadNetrc(env, goAuth).lookup(httpsLocation(target))
 }
 
 // pathlessError is err without the operation and path a file system error

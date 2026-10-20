@@ -3,9 +3,9 @@ module <%= projectModule %>
 go 1.25.7
 
 require (
-	go.putnami.dev/app <%= goFrameworkVersion %>
-	go.putnami.dev/config <%= goFrameworkVersion %>
-	go.putnami.dev/http <%= goFrameworkVersion %>
-	go.putnami.dev/logger <%= goFrameworkVersion %>
-	go.putnami.dev/platform <%= goFrameworkVersion %>
+	go.putnami.dev/app v0.0.0
+	go.putnami.dev/config v0.0.0
+	go.putnami.dev/http v0.0.0
+	go.putnami.dev/logger v0.0.0
+	go.putnami.dev/platform v0.0.0
 )

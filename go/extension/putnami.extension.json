@@ -393,6 +393,18 @@
       },
       "run": [{ "id": "deps-upgrade", "task": "deps-upgrade-exec" }]
     },
+    "project-setup": {
+      "description": "Set a created Go project up: add it to go.work, pin the go.putnami.dev/* modules its template requires to the channel's version, and tidy it.",
+      "visibility": "internal",
+      "quiet": true,
+      "run": [{ "id": "project-setup", "task": "project-setup-exec" }]
+    },
+    "deps-edit": {
+      "description": "Add, remove or prune the requirements of Go modules with go mod edit, then tidy each module as the workspace resolves it.",
+      "visibility": "internal",
+      "quiet": true,
+      "run": [{ "id": "deps-edit", "task": "deps-edit-exec" }]
+    },
     "package": {
       "description": "Create distribution packages (archives, binaries, Docker images, Go modules).",
       "traits": { "injectPublishChannels": true },
@@ -771,6 +783,38 @@
       "inputs": {
         "releaseSet": { "from": "params" }
       },
+      "cache": false,
+      "timeoutMs": 300000,
+      "declares": {
+        "effects": [
+          "network",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "project-setup-exec": {
+      "description": "Add a created Go project to go.work, align its go directive, pin the go.putnami.dev/* modules it requires at v0.0.0 to the version the channel names, and run go mod tidy. Declares no outputs: go.work, go.mod and go.sum are a workspace-files effect.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["project-setup"],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 300000,
+      "declares": {
+        "effects": [
+          "network",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
+    "deps-edit-exec": {
+      "description": "Edit the requirements of Go modules with go mod edit and tidy each one, putting every go.mod and go.sum back when a step fails. Declares no outputs: the module files are a workspace-files effect.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["deps-edit"],
+      "cwd": "{workspaceRoot}",
       "cache": false,
       "timeoutMs": 300000,
       "declares": {

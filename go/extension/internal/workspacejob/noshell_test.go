@@ -13,12 +13,15 @@ import (
 	"go.putnami.dev/go/extension/internal/workspacejob/jobtest"
 )
 
-// lifecycleJobPackages are the packages `putnami install` and
-// `putnami upgrade` run in a consumer workspace, relative to this one.
+// lifecycleJobPackages are the packages `putnami install`, `putnami upgrade`,
+// `putnami projects create` and `putnami deps add|remove|prune` run in a
+// consumer workspace, relative to this one.
 var lifecycleJobPackages = []string{
 	".",
 	filepath.Join("..", "jobs", "workspaceinstall"),
 	filepath.Join("..", "jobs", "depsupgrade"),
+	filepath.Join("..", "jobs", "projectsetup"),
+	filepath.Join("..", "jobs", "depsedit"),
 }
 
 // TestLifecycleJobsStartNoShell is the static half of the no-shell proof (the

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "go/project-setup",
+  "outcomes": [
+    "A Go project putnami projects create renders builds at once: it is in go.work, its go directive is the workspace's, and each framework module it requires is pinned to a released version",
+    "The core CLI runs no Go step to create a project: the Go extension that ships the template sets the project up"
+  ],
+  "nonGoals": [
+    "Rendering the template, writing putnami.json or running workspace-install, which the core CLI does",
+    "Choosing the channel, which the core CLI passes from the command or the workspace",
+    "Reading a version control repository: the lookup follows only a go-import tag that names a module proxy"
+  ],
+  "requirements": [
+    {
+      "id": "create-sets-up-a-go-project",
+      "text": "The project-setup job adds the created project, params.path relative to the workspace root, to go.work, creating go.work when missing. It gives go.work and the project's go.mod the go directive of go.work, else the project's, pins each go.putnami.dev requirement at v0.0.0 to the version the channel names, and runs go mod tidy. A project without go.mod is left alone. A path outside the workspace and a hosted run, whose dependencies are offline, are refused."
+    },
+    {
+      "id": "create-resolves-the-go-framework-version",
+      "text": "project-setup asks the proxies of GOPROXY, as go env reports it, for each framework module on params.putnami-channel as given: @latest when absent or latest, else @v/<channel>.info, never latest for a channel. A 404 or 410 passes to the next proxy. direct, and a module GONOPROXY matches, follow the origin's go-import mod tag. Requests carry the credentials go would send, never printed. When nothing answers a canonical version, the job writes nothing and fails naming each source asked and the fix."
+    },
+    {
+      "id": "create-fails-when-go-mod-tidy-fails",
+      "text": "When go mod tidy fails in the created project, project-setup fails and quotes the end of go's output with URL credentials redacted. It keeps the project in go.work with its framework modules pinned, so a second create resumes from there."
+    },
+    {
+      "id": "create-holds-a-missing-credential-warning",
+      "text": "project-setup refreshes the netrc credential of a framework module's origin before it reads the origin. A refresh outcome at the warn level is held, not logged. When the proxy or origin lookup fails with HTTP 401 or 403, the job logs the warning held for that host with the failure. A lookup that succeeds logs no warning, and a failure of another kind logs none. An outcome of any other level is logged at once."
+    },
+    {
+      "id": "create-runs-the-pinned-go",
+      "text": "project-setup runs the go the extension's tasks resolve: the release the workspace lock pins, else a go on PATH. It installs none. With neither, it writes a missing go.work from the project's go directive, which the lock pins Go from, and emits one error naming putnami install. Its prepare stage, params.stage prepare, only writes that missing go.work and runs no go command, so the core can pin and install that Go first. Any other stage is refused."
+    }
+  ],
+  "decisions": [
+    "go/extension/doc/adr/0012-the-extension-owns-the-go-steps-of-create-and-deps.md"
+  ]
+}

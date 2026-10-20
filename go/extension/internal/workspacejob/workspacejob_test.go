@@ -707,6 +707,44 @@ func TestSnapshotRestoresTheRecordedMode(t *testing.T) {
 	}
 }
 
+// Restore replaces a changed file through a rename in its directory, as the
+// edit it undoes wrote it: the path holds the edited or the recorded bytes,
+// never a part of them, so the edited file, which a hard link keeps, is left
+// whole, and no temporary file stays behind.
+func TestSnapshotRestoreReplacesAFileThroughARename(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "go/deps-edit", "deps-tidy-resolves-as-the-workspace-does",
+		"a-rollback-replaces-each-file-through-a-rename")
+	dir := t.TempDir()
+	goMod := jobtest.WriteFile(t, dir, "go.mod", "module example.com/m\n")
+	var snapshot workspacejob.Snapshot
+	if err := snapshot.Add(goMod); err != nil {
+		t.Fatal(err)
+	}
+	jobtest.WriteFile(t, dir, "go.mod", "module example.com/m\n\nrequire example.com/lib v1.0.0\n")
+	edited := filepath.Join(t.TempDir(), "edited")
+	if err := os.Link(goMod, edited); err != nil {
+		t.Skipf("no hard link here: %v", err)
+	}
+
+	if err := snapshot.Restore(nil, nil); err != nil {
+		t.Fatalf("Restore: %v", err)
+	}
+	if got := jobtest.ReadFile(t, goMod); got != "module example.com/m\n" {
+		t.Fatalf("go.mod = %q, want its recorded content", got)
+	}
+	if got := jobtest.ReadFile(t, edited); got != "module example.com/m\n\nrequire example.com/lib v1.0.0\n" {
+		t.Errorf("Restore wrote into the edited file instead of replacing it: %q", got)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("Restore left files beside go.mod: %v", entries)
+	}
+}
+
 // A file Restore cannot put back is named in the error it returns, and every
 // other file is still put back.
 func TestSnapshotRestoreReportsWhatItCannotPutBack(t *testing.T) {
