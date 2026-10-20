@@ -1,9 +1,11 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { specTest } from '@putnami/runtime/spectest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { FakeDocument } from '../utils/fake-document';
 
 let currentPathname = '/docs';
+let inRouter = true;
 let fetcherState: 'idle' | 'loading' = 'idle';
 let fetcherData: unknown;
 let lastRouterLinkProps: Record<string, unknown> | undefined;
@@ -35,6 +37,8 @@ mock.module('react-router', () => ({
     return React.createElement('a', props);
   },
   useLocation: () => ({ pathname: currentPathname }),
+  useInRouterContext: () => inRouter,
+  createPath: realReactRouter.createPath,
   useFetcher: () => ({
     state: fetcherState,
     data: fetcherData,
@@ -58,6 +62,7 @@ afterAll(() => {
 describe('Link runtime behavior', () => {
   beforeEach(() => {
     currentPathname = '/docs';
+    inRouter = true;
     fetcherState = 'idle';
     fetcherData = undefined;
     lastRouterLinkProps = undefined;
@@ -85,42 +90,90 @@ describe('Link runtime behavior', () => {
     expect(lastRouterLinkProps?.to).toBe('/docs');
   });
 
-  it('prevents navigation when the link targets the current route', () => {
-    renderToStaticMarkup(React.createElement(Link, { to: '/docs', prefetch: 'none' }, 'Docs'));
+  it('runs the onClick of a placeholder link and does not navigate', () => {
+    const onClick = mock(() => undefined);
+    renderToStaticMarkup(React.createElement(Link, { to: '#', onClick }, 'Menu'));
 
     const preventDefault = mock(() => undefined);
     getLinkHandler<{ preventDefault: () => void }>('onClick')({ preventDefault });
 
+    expect(onClick).toHaveBeenCalledTimes(1);
     expect(preventDefault).toHaveBeenCalledTimes(1);
   });
 
-  it('prefetches the route module and data on user intent for internal links and forwards handlers', () => {
-    renderToStaticMarkup(
-      React.createElement(Link, {
-        to: '/guides',
-        prefetch: 'intent',
-        onMouseEnter: mock(() => undefined),
-        onFocus: mock(() => undefined),
-        onTouchStart: mock(() => undefined),
-      }),
-    );
+  it('leaves a click on a link to the current path to the router', () => {
+    const onClick = mock(() => undefined);
+    renderToStaticMarkup(React.createElement(Link, { to: '/docs', onClick }, 'Docs'));
 
-    const mouseEvent = {};
-    const focusEvent = {};
-    const touchEvent = {};
-    getLinkHandler('onMouseEnter')(mouseEvent);
-    getLinkHandler('onFocus')(focusEvent);
-    getLinkHandler('onTouchStart')(touchEvent);
+    const preventDefault = mock(() => undefined);
+    getLinkHandler<{ preventDefault: () => void }>('onClick')({ preventDefault });
 
-    expect(lazyGuidesMock).toHaveBeenCalledTimes(3);
-    // The loader does not run: a loader that redirects would navigate on a hover.
-    expect(fetcherLoadMock).not.toHaveBeenCalled();
-    expect((globalThis as typeof globalThis & { document?: FakeDocument }).document?.head.children).toHaveLength(1);
-    expect(
-      ((globalThis as typeof globalThis & { document?: FakeDocument }).document?.head.children[0] as { href?: string })
-        ?.href,
-    ).toBe('/guides.json');
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(lastRouterLinkProps?.to).toBe('/docs');
   });
+
+  specTest(
+    'renders a plain anchor outside a router',
+    {
+      feature: 'typescript/web-application-delivery',
+      requirement: 'link-navigation',
+      check: 'a-link-outside-a-router-renders-a-plain-anchor',
+    },
+    () => {
+      inRouter = false;
+
+      const string = renderToStaticMarkup(
+        React.createElement(Link, { to: '/tasks?page=2', className: 'nav', replace: true, prefetch: 'intent' }, 'Next'),
+      );
+      const object = renderToStaticMarkup(
+        React.createElement(Link, { to: { pathname: '/tasks', search: '?page=3', hash: '#top' } }, 'Top'),
+      );
+
+      expect(string).toBe('<a class="nav" href="/tasks?page=2">Next</a>');
+      expect(object).toBe('<a href="/tasks?page=3#top">Top</a>');
+      expect(lastRouterLinkProps).toBeUndefined();
+    },
+  );
+
+  specTest(
+    'prefetches the route module and data on user intent for internal links and forwards handlers',
+    {
+      feature: 'typescript/web-application-delivery',
+      requirement: 'link-navigation',
+      check: 'a-link-prefetches-its-route-on-intent',
+    },
+    () => {
+      renderToStaticMarkup(
+        React.createElement(Link, {
+          to: '/guides',
+          prefetch: 'intent',
+          onMouseEnter: mock(() => undefined),
+          onFocus: mock(() => undefined),
+          onTouchStart: mock(() => undefined),
+        }),
+      );
+
+      const mouseEvent = {};
+      const focusEvent = {};
+      const touchEvent = {};
+      getLinkHandler('onMouseEnter')(mouseEvent);
+      getLinkHandler('onFocus')(focusEvent);
+      getLinkHandler('onTouchStart')(touchEvent);
+
+      expect(lazyGuidesMock).toHaveBeenCalledTimes(3);
+      // The loader does not run: a loader that redirects would navigate on a hover.
+      expect(fetcherLoadMock).not.toHaveBeenCalled();
+      expect((globalThis as typeof globalThis & { document?: FakeDocument }).document?.head.children).toHaveLength(1);
+      expect(
+        (
+          (globalThis as typeof globalThis & { document?: FakeDocument }).document?.head.children[0] as {
+            href?: string;
+          }
+        )?.href,
+      ).toBe('/guides.json');
+    },
+  );
 
   it('skips intent prefetching for external targets', () => {
     renderToStaticMarkup(React.createElement(Link, { to: 'https://putnami.dev', prefetch: 'intent' }));

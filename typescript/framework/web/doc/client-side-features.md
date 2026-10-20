@@ -457,6 +457,16 @@ export default function Dashboard() {
 }
 ```
 
+### Scroll Position
+
+A client navigation scrolls as a full page load does. A new location scrolls to
+the top, or to the element whose `id` matches its hash. Back and forward restore
+the position the page had. Pass `preventScrollReset` to keep the current position:
+
+```tsx
+<Link to="?tab=2" preventScrollReset>Next tab</Link>
+```
+
 ## Navigation events
 
 The browser router announces every client-side route change on the DOM. Use it

@@ -24,6 +24,18 @@
       "text": "Generation maps page, layout, loader, action, error, not-found, dynamic segment, route group, and prefixed scan-root files into one deterministic nested route graph with matching server and client route identifiers."
     },
     {
+      "id": "navigation-scroll",
+      "text": "After a client navigation, the hydrated app scrolls a new location to the top or to its hash target, restores the saved position on back and forward, keeps the position when the navigation asks to, and leaves the server markup unchanged."
+    },
+    {
+      "id": "redirect-outside-the-router",
+      "text": "A loader or action redirect, whether the server signals it or fetch already followed it, stays in the router when the router renders its target, and loads the target as a new document when it is a same-origin path the router does not render, such as a server-only page, a path outside the basename, or a path only a not-found catch-all matches."
+    },
+    {
+      "id": "link-navigation",
+      "text": "A Link that changes only the query or the hash navigates, a Link to the current URL replaces the entry and re-runs the route loaders, a `#` or empty target is a placeholder that runs its own click handler without navigating, intent prefetch loads the target route, and outside a router a Link renders a plain anchor with the same props."
+    },
+    {
       "id": "layout-loader-endpoint",
       "text": "On client navigation, a layout loader fetches the JSON endpoint the server registers at the layout's path: each dynamic segment is filled from the matched params and URL-encoded, a trailing catch-all is dropped, and the mounted basename and the request query string are kept; a missing required param fails the loader without a request, and the server answers that endpoint with the same loader and params as the server render."
     },
