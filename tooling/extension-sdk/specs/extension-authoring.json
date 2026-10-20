@@ -119,6 +119,10 @@
     {
       "id": "host-rpc-version-lines-client",
       "text": "The Go client's VersionLines sends the scope and returns the host's answer, with an empty commit list for a line without commits. An answer without a source revision or a line, with another line than the scope names, or with a tagged line that lacks its tag or has a release, or an untagged line without one, is an error that leaves the client usable."
+    },
+    {
+      "id": "resolve-a-path-against-the-typed-directory",
+      "text": "The context package's ResolvePath resolves a path argument as the user typed it. An empty or absolute path is returned unchanged. A relative path is joined to the context's InvocationDir, else to UserScope.CallerDir, and is returned unchanged when the context has neither or is nil, so it resolves against the process directory as before. The function reads no file and no environment variable."
     }
   ],
   "decisions": [
@@ -127,6 +131,7 @@
     "protocols/extension/doc/adr/0006-agent-content-is-an-additive-contract.md",
     "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md",
     "tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md",
-    "tooling/cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md"
+    "tooling/cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md",
+    "tooling/cli/doc/adr/0075-an-interactive-command-knows-the-directory-it-was-typed-in.md"
   ]
 }

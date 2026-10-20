@@ -1336,6 +1336,23 @@
               "a-composition-member-is-a-serve-workload-step"
             ]
           }
+        },
+        {
+          "id": "an-interactive-launch-names-the-directory-it-was-typed-in",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-context-and-environment-carry-the-typed-directory",
+              "the-context-conforms-to-the-job-protocol",
+              "a-planned-job-carries-none",
+              "an-inherited-value-is-stripped",
+              "outside-a-workspace-it-equals-the-caller-directory"
+            ]
+          }
         }
       ]
     },

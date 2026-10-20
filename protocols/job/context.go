@@ -108,6 +108,13 @@ type Context struct {
 	// orchestrator runs the job in, not a workspace the user owns, and the job
 	// acts on UserScope.CallerDir.
 	UserScope *UserScope `json:"userScope,omitempty"`
+	// InvocationDir is the absolute directory the user typed an interactive
+	// extension command in. v2 only and optional: the orchestrator sets it on
+	// every interactive launch, inside a workspace or outside one, and never on
+	// a planned job. A relative path argument of the command resolves against
+	// it, not against the directory the task runs in. Unlike UserScope it does
+	// not say whether a workspace exists.
+	InvocationDir string `json:"invocationDir,omitempty"`
 	// Params are the merged, coerced job parameters (CLI flags over config
 	// defaults); accessors define the shared coercion contract.
 	Params Params `json:"params"`

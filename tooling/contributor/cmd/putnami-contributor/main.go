@@ -24,6 +24,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	sdkcontext "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/runtimeinfo"
 
 	"go.putnami.dev/tooling/contributor/internal/finalize"
@@ -70,7 +71,7 @@ func runIn(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	contextFile := contextPath(args)
 	args = withoutContext(args)
 	if len(args) > 0 && args[0] == "language" {
-		return runLanguage(args[1:], stdin, stdout, stderr)
+		return runLanguage(args[1:], contextFile, stdin, stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "verify" {
 		return runVerify(args[1:], stdout, stderr)
@@ -111,8 +112,10 @@ func withoutContext(args []string) []string {
 }
 
 // runLanguage runs putnami change language in the workspace root, which is
-// the working directory putnami launches the command in.
-func runLanguage(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+// the working directory putnami launches the command in. A file argument of the
+// text mode resolves against the directory the user typed the command in,
+// which the job context records as invocationDir.
+func runLanguage(args []string, contextFile string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "change language needs text, files, commits or tasks")
 		return 2
@@ -124,8 +127,25 @@ func runLanguage(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	caller := host.Take(languageRemedy)
 	defer func() { _ = caller.Close() }()
-	runner := language.LanguageRunner{Root: root, Stdin: stdin, Out: stdout, Err: stderr, Call: caller.Call}
+	runner := language.LanguageRunner{Root: root, Stdin: stdin, Out: stdout, Err: stderr, Call: caller.Call,
+		ResolvePath: invocationResolver(contextFile)}
 	return runner.RunLanguage(context.Background(), args[0], args[1:])
+}
+
+// invocationResolver returns the function that resolves a path argument as the
+// user typed it. A launch without a readable context file, such as a run of
+// the executable by hand, resolves against the working directory: the
+// command's checks do not depend on the context, so an unreadable one is not
+// an error here.
+func invocationResolver(contextFile string) func(string) string {
+	if contextFile == "" {
+		return nil
+	}
+	launch, err := sdkcontext.Parse(contextFile)
+	if err != nil {
+		return nil
+	}
+	return func(p string) string { return sdkcontext.ResolvePath(launch, p) }
 }
 
 // runVerify runs putnami change verify in its working directory: putnami

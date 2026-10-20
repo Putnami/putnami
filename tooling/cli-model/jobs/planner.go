@@ -36,6 +36,16 @@ type ScheduledJob struct {
 	// It is run state, not task identity: nothing derived from it may reach a
 	// cache key or a session record.
 	UserScope *protocoljob.UserScope
+	// InvocationDir is the absolute directory the user typed an interactive
+	// extension command in, inside a workspace or outside one. The job's
+	// context reports it as invocationDir and its environment as
+	// PUTNAMI_INVOCATION_DIR, so the command can resolve a relative path
+	// argument against it instead of the directory its task runs in. Only the
+	// interactive launch sets it; a planned job never does.
+	//
+	// It is run state, not task identity: nothing derived from it may reach a
+	// cache key or a session record.
+	InvocationDir string
 	// SessionPrerequisiteNoopGates records dependent-owned gate commands that
 	// the planner proved have zero contributors across this prerequisite's
 	// active selection. It is an execution-only authorization fact, stamped on

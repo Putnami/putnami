@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestParams_String_Present(t *testing.T) {
@@ -527,5 +529,74 @@ func TestParse_UserScope(t *testing.T) {
 	}
 	if workspaceCtx := read(t, ""); workspaceCtx.UserScope != nil {
 		t.Fatalf("a workspace context carries UserScope %+v", workspaceCtx.UserScope)
+	}
+}
+
+// The requirement the ResolvePath tests prove.
+const (
+	resolvePathFeature     = "tooling/extension-authoring"
+	resolvePathRequirement = "resolve-a-path-against-the-typed-directory"
+)
+
+func TestResolvePath_RelativeJoinsTheInvocationDir(t *testing.T) {
+	spectest.Proves(t, resolvePathFeature, resolvePathRequirement, "a-relative-path-joins-the-invocation-directory")
+	ctx := &Context{InvocationDir: filepath.FromSlash("/ws/docs")}
+	got := ResolvePath(ctx, "notes.md")
+	if want := filepath.FromSlash("/ws/docs/notes.md"); got != want {
+		t.Errorf("ResolvePath = %q, want %q", got, want)
+	}
+	got = ResolvePath(ctx, filepath.FromSlash("../README.md"))
+	if want := filepath.FromSlash("/ws/README.md"); got != want {
+		t.Errorf("ResolvePath = %q, want %q", got, want)
+	}
+}
+
+func TestResolvePath_AbsoluteIsLeftAlone(t *testing.T) {
+	spectest.Proves(t, resolvePathFeature, resolvePathRequirement, "an-absolute-or-empty-path-is-left-alone")
+	abs := filepath.Join(t.TempDir(), "a", "..", "notes.md")
+	ctx := &Context{InvocationDir: filepath.FromSlash("/ws/docs")}
+	if got := ResolvePath(ctx, abs); got != abs {
+		t.Errorf("ResolvePath = %q, want the argument unchanged: %q", got, abs)
+	}
+}
+
+func TestResolvePath_EmptyIsLeftAlone(t *testing.T) {
+	spectest.Proves(t, resolvePathFeature, resolvePathRequirement, "an-absolute-or-empty-path-is-left-alone")
+	ctx := &Context{InvocationDir: filepath.FromSlash("/ws/docs")}
+	if got := ResolvePath(ctx, ""); got != "" {
+		t.Errorf("ResolvePath = %q, want empty", got)
+	}
+}
+
+func TestResolvePath_FallsBackToTheUserScopeCallerDir(t *testing.T) {
+	spectest.Proves(t, resolvePathFeature, resolvePathRequirement, "outside-a-workspace-it-falls-back-to-the-caller-directory")
+	ctx := &Context{UserScope: &UserScope{CallerDir: filepath.FromSlash("/home/u/src")}}
+	got := ResolvePath(ctx, "notes.md")
+	if want := filepath.FromSlash("/home/u/src/notes.md"); got != want {
+		t.Errorf("ResolvePath = %q, want %q", got, want)
+	}
+}
+
+func TestResolvePath_TheInvocationDirWinsOverTheUserScope(t *testing.T) {
+	ctx := &Context{
+		InvocationDir: filepath.FromSlash("/home/u/src/sub"),
+		UserScope:     &UserScope{CallerDir: filepath.FromSlash("/home/u/src")},
+	}
+	got := ResolvePath(ctx, "notes.md")
+	if want := filepath.FromSlash("/home/u/src/sub/notes.md"); got != want {
+		t.Errorf("ResolvePath = %q, want %q", got, want)
+	}
+}
+
+func TestResolvePath_UnsetLeavesTheArgumentForTheProcessDirectory(t *testing.T) {
+	spectest.Proves(t, resolvePathFeature, resolvePathRequirement, "with-neither-the-path-is-returned-unchanged")
+	for name, ctx := range map[string]*Context{
+		"nil context":      nil,
+		"no invocation":    {},
+		"empty user scope": {UserScope: &UserScope{}},
+	} {
+		if got := ResolvePath(ctx, "notes.md"); got != "notes.md" {
+			t.Errorf("%s: ResolvePath = %q, want the argument unchanged", name, got)
+		}
 	}
 }

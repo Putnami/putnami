@@ -302,6 +302,9 @@ func buildJobInvocation(
 	// workspace. A workspace run nested under a user-scope job would otherwise
 	// inherit the outer value and read as a run without a workspace.
 	env = removeEnvKey(env, CallerDirEnv)
+	// The invocation directory belongs to the interactive launch that typed the
+	// command. A job that is not one, or a nested run, must not inherit it.
+	env = removeEnvKey(env, InvocationDirEnv)
 	// The credential-provider choice belongs to the process that made it.
 	env = removeEnvKey(env, ProvidersEnv)
 	env = append(env, BuildEnvVars(jobCtx)...)

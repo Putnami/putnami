@@ -10,6 +10,7 @@ package context
 
 import (
 	"encoding/json"
+	"path/filepath"
 
 	job "go.putnami.dev/protocol/job"
 )
@@ -94,4 +95,35 @@ func GenerateSchemaCommit(ctx *Context) (commit bool, declared bool) {
 		return false, false
 	}
 	return *opts.Schema, true
+}
+
+// ResolvePath resolves a path argument the user typed, as the user meant it.
+//
+// An interactive command runs in the directory its task names, often the
+// workspace root, not in the directory the user typed it in. A relative path
+// argument therefore resolves against ctx.InvocationDir, the directory the
+// orchestrator recorded for that launch. The result is, in order:
+//
+//   - p unchanged when it is empty or absolute;
+//   - p joined to ctx.InvocationDir when the launch recorded one;
+//   - p joined to ctx.UserScope.CallerDir when the launch has none but ran
+//     outside a workspace, where the caller's directory is the working
+//     directory anyway;
+//   - p unchanged otherwise (a nil ctx, a planned job, an older CLI), so the
+//     path resolves against the process's working directory as before.
+//
+// It is a pure string function: it reads no file and no environment variable.
+// A command that takes "-" for standard input, or a non-path token, must test
+// for that before calling it.
+func ResolvePath(ctx *Context, p string) string {
+	if p == "" || filepath.IsAbs(p) || ctx == nil {
+		return p
+	}
+	switch {
+	case ctx.InvocationDir != "":
+		return filepath.Join(ctx.InvocationDir, p)
+	case ctx.UserScope != nil && ctx.UserScope.CallerDir != "":
+		return filepath.Join(ctx.UserScope.CallerDir, p)
+	}
+	return p
 }

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 	protocoljob "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -119,5 +120,116 @@ func TestJobInvocation_WorkspaceRunStripsInheritedCallerDir(t *testing.T) {
 	}
 	if want := filepath.Join(ws.Root, "."); inv.cwd != want {
 		t.Fatalf("cwd = %q, want the project root %q", inv.cwd, want)
+	}
+}
+
+// The requirement these tests prove.
+const (
+	invocationDirFeature     = "cli/job-planning-execution"
+	invocationDirRequirement = "an-interactive-launch-names-the-directory-it-was-typed-in"
+)
+
+// interactiveTestJob is a job the CLI launches interactively: a workspace job
+// that also records where the user typed the command.
+func interactiveTestJob(t *testing.T, invocationDir string) (*workspace.Workspace, *ScheduledJob) {
+	t.Helper()
+	ws, job := userScopeTestJob(t, "")
+	job.InvocationDir = invocationDir
+	return ws, job
+}
+
+// TestBuildJobContext_InvocationDirConformsToProtocol pins the producer half of
+// invocationDir: an interactive launch emits a v2 document the protocol's
+// strict parser accepts, with no userScope, because the member says nothing
+// about workspaces.
+func TestBuildJobContext_InvocationDirConformsToProtocol(t *testing.T) {
+	spectest.Proves(t, invocationDirFeature, invocationDirRequirement, "the-context-conforms-to-the-job-protocol")
+	t.Parallel()
+	typedIn := t.TempDir()
+	ws, job := interactiveTestJob(t, typedIn)
+
+	data, err := json.Marshal(BuildJobContext(ws, job, nil, nil, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, diags := protocoljob.ParseAndValidate(data)
+	if diag.HasErrors(diags) {
+		t.Fatalf("interactive context violates the job context protocol: %v\n%s", diags, data)
+	}
+	if parsed.InvocationDir != typedIn {
+		t.Fatalf("invocationDir = %q, want %q", parsed.InvocationDir, typedIn)
+	}
+	if parsed.UserScope != nil {
+		t.Fatalf("userScope = %+v, want absent inside a workspace", parsed.UserScope)
+	}
+}
+
+// TestBuildJobContext_PlannedJobOmitsInvocationDir pins that a job with no
+// interactive launch has no member, so no cached task can see one.
+func TestBuildJobContext_PlannedJobOmitsInvocationDir(t *testing.T) {
+	spectest.Proves(t, invocationDirFeature, invocationDirRequirement, "a-planned-job-carries-none")
+	t.Parallel()
+	ws, job := interactiveTestJob(t, "")
+	data, err := json.Marshal(BuildJobContext(ws, job, nil, nil, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(data, []byte(`"invocationDir"`)) {
+		t.Fatalf("a planned job context carries invocationDir:\n%s", data)
+	}
+}
+
+// TestJobInvocation_InteractiveSetsInvocationDirAndKeepsTheCwd pins the
+// environment: PUTNAMI_INVOCATION_DIR is the typed directory, the inherited
+// value is replaced, PUTNAMI_CALLER_DIR stays unset, and the task still runs
+// in its own directory.
+func TestJobInvocation_InteractiveSetsInvocationDirAndKeepsTheCwd(t *testing.T) {
+	spectest.Proves(t, invocationDirFeature, invocationDirRequirement, "the-context-and-environment-carry-the-typed-directory")
+	t.Setenv(InvocationDirEnv, "/inherited/outer/invocation")
+	t.Setenv(CallerDirEnv, "/inherited/outer/caller")
+	typedIn := t.TempDir()
+	ws, job := interactiveTestJob(t, typedIn)
+
+	inv := buildJobInvocation(ws, job, BuildJobContext(ws, job, nil, nil, nil), nil, "")
+	if got := envValues(inv.env, InvocationDirEnv); len(got) != 1 || got[0] != typedIn {
+		t.Fatalf("%s values = %q, want exactly [%q]", InvocationDirEnv, got, typedIn)
+	}
+	if got := envValues(inv.env, CallerDirEnv); len(got) != 0 {
+		t.Fatalf("%s reaches a workspace job: %q", CallerDirEnv, got)
+	}
+	if want := filepath.Join(ws.Root, "."); inv.cwd != want {
+		t.Fatalf("cwd = %q, want the project root %q", inv.cwd, want)
+	}
+}
+
+// TestJobInvocation_PlannedJobStripsInheritedInvocationDir pins that a job
+// that is not an interactive launch, such as a nested run, never reads the
+// outer command's directory.
+func TestJobInvocation_PlannedJobStripsInheritedInvocationDir(t *testing.T) {
+	spectest.Proves(t, invocationDirFeature, invocationDirRequirement, "an-inherited-value-is-stripped")
+	t.Setenv(InvocationDirEnv, "/inherited/outer/invocation")
+	ws, job := interactiveTestJob(t, "")
+
+	inv := buildJobInvocation(ws, job, BuildJobContext(ws, job, nil, nil, nil), nil, "")
+	if got := envValues(inv.env, InvocationDirEnv); len(got) != 0 {
+		t.Fatalf("%s reaches a planned job: %q", InvocationDirEnv, got)
+	}
+}
+
+// TestJobInvocation_UserScopeLaunchCarriesBothDirectories pins the equality the
+// protocol documents: outside a workspace the invocation directory equals the
+// caller directory.
+func TestJobInvocation_UserScopeLaunchCarriesBothDirectories(t *testing.T) {
+	spectest.Proves(t, invocationDirFeature, invocationDirRequirement, "outside-a-workspace-it-equals-the-caller-directory")
+	t.Parallel()
+	callerDir := t.TempDir()
+	ws, job := userScopeTestJob(t, callerDir)
+	job.InvocationDir = callerDir
+
+	inv := buildJobInvocation(ws, job, BuildJobContext(ws, job, nil, nil, nil), nil, "")
+	for _, name := range []string{CallerDirEnv, InvocationDirEnv} {
+		if got := envValues(inv.env, name); len(got) != 1 || got[0] != callerDir {
+			t.Fatalf("%s values = %q, want exactly [%q]", name, got, callerDir)
+		}
 	}
 }

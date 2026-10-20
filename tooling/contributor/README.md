@@ -69,7 +69,9 @@ parent reference and skip that transition. It consumes current producer proof
 and never runs or retries a local gate; `--gate ci` explicitly selects hosted
 checks ([Publish a proposal](doc/06-change-finalize.md)).
 `putnami change language text|files|commits|tasks`, which this
-extension's executable serves, enforces the configured language rule, the
+extension's executable serves, enforces the configured language rule. A file
+given to `text` resolves against the directory you typed the command in;
+the pathspecs of `files` are relative to the workspace root. The
 core's `putnami doctor --machine` reports load for hosted-gate admission, and
 `putnami tree fingerprint` supplies tree identity.
 Host session limits remain the host runtime's responsibility.

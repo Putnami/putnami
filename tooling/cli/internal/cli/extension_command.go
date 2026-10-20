@@ -189,6 +189,16 @@ func (a *App) runExtensionStructuredCommand(
 			iox.Fprintf(stderr, "putnami: %v\n", err)
 			return exitCodeForError(err)
 		}
+		// The directory the user typed the command in. The task runs in its own
+		// cwd (often the workspace root), so a relative path argument needs this
+		// to mean what the user meant. Only this launch sets it: a planned job's
+		// result is cached, and a directory its key does not cover must not
+		// decide it.
+		invocationDir, err := os.Getwd()
+		if err != nil {
+			iox.Fprintf(stderr, "putnami: resolve the current directory: %v\n", err)
+			return ExitError
+		}
 		wireSelection := selection.Wire()
 		jobDef := *resolved.JobDefinition
 		// EffectiveFlags is a fresh superset of the command's own flags, so
@@ -197,10 +207,11 @@ func (a *App) runExtensionStructuredCommand(
 		jobDef.Flags = effectiveFlags
 		jobDef.Args = append(append([]string{}, jobDef.Args...), parsed.RawJobArgs...)
 		job := &scheduler.ScheduledJob{
-			Project:   workspaceOnceProject(ws),
-			Extension: resolved.Extension,
-			JobDef:    &jobDef,
-			Selection: &wireSelection,
+			Project:       workspaceOnceProject(ws),
+			Extension:     resolved.Extension,
+			JobDef:        &jobDef,
+			Selection:     &wireSelection,
+			InvocationDir: invocationDir,
 			// The RESOLVED projects, not just their ids. `selection` says WHICH
 			// ids are in scope; this is what an extension opens a file with — a
 			// name, a workspace-relative path and an absolute one. Without it a

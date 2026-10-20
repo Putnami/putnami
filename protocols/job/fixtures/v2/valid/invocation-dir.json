@@ -1,0 +1,19 @@
+{
+  "protocolVersion": 2,
+  "workspaceRoot": "/home/u/src/repository",
+  "outputPath": "/home/u/src/repository/.putnami/out/docs-language",
+  "cacheRoot": "/home/u/src/repository/.putnami/cache",
+  "workspace": {"name": "repository", "rootPath": "/home/u/src/repository"},
+  "project": {"name": "repository", "path": ".", "fullPath": "/home/u/src/repository"},
+  "extension": {"name": "@acme/docs", "root": "/home/u/src/repository/.putnami/extensions/@acme/docs"},
+  "job": {"name": "docs-language"},
+  "identity": {
+    "key": "repository:docs-language",
+    "scope": "workspace",
+    "project": {"id": "repository", "name": "repository"},
+    "task": {"name": "docs-language", "command": "docs-language", "kind": "docs-language"},
+    "provider": {"extension": "@acme/docs", "version": "1.2.0"}
+  },
+  "invocationDir": "/home/u/src/repository/docs",
+  "params": {}
+}

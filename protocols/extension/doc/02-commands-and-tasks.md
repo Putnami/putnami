@@ -241,8 +241,11 @@ here, fails with `putnami: no workspace found (looking for
 putnami.workspace.json)` and exit code 1. The subcommand's process starts in
 the caller's directory, and its job context carries a `userScope` member that
 names that directory; see the job context protocol
-(`protocols/job/README.md`). Inside a workspace, `workspace` changes nothing:
-the workspace's own pin of the extension runs.
+(`protocols/job/README.md`). Every interactive launch, inside a workspace or
+outside one, also carries `invocationDir`, the directory the user typed the
+command in, which a command resolves its relative path arguments against.
+Inside a workspace, `workspace` changes nothing: the workspace's own pin of the
+extension runs.
 
 The CLI reads `workspace`, `interactive` and `default` on the group and the
 top-level subcommand it dispatches. A nested subcommand is validated with the
