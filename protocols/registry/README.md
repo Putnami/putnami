@@ -8,6 +8,10 @@ The registry credential seams between the framework and the credential issuer:
 - `publication-v1`: a capability of that RPC. A session that negotiates it also
   resolves channel heads, opens a publication plan and releases its set. See
   [ADR 0003](doc/adr/0003-publication-ops-behind-a-negotiated-capability.md).
+- `uploader-v1`: a capability beside `publication-v1`. A session that
+  negotiates it also uploads each member of the opened plan, so no publish
+  credential crosses the session. See
+  [ADR 0004](doc/adr/0004-an-uploader-capability-on-the-provider-session.md).
 - `registry-token/v1`: publishers and installs run
   `putnami cloud registry-token --host <host>` and read a bare bearer. See
   [ADR 0001](doc/adr/0001-host-keyed-credential-seam.md).
@@ -145,7 +149,7 @@ The evidence binds what the run published to its release:
 
 | Rule | Meaning |
 |------|---------|
-| Order | The engine sends `open` after every barrier task has succeeded and before the first upload. It asks for `credential` with purpose `publish` only after `open`; before it, a provider refuses with `plan_not_open`. It sends `release` after the last upload. |
+| Order | The engine sends `open` after every barrier task has succeeded and before the first upload, and `release` after the last upload. A provider refuses `credential` with purpose `publish` before `open` with `plan_not_open`. Under `uploader-v1`, the engine asks for no `publish` credential: it sends one `upload` per member. |
 | Idempotency | `open` is idempotent on `planDigest`: the same plan gets the same answer, and another plan in the same session gets `plan_already_open`. A provider releases at most once per `planDigest`. It stores the outcome with the set ref the request derives (`distribution.DeriveReleaseSetRef`). A `release` with the same `planDigest` and the same set gets the stored outcome; one with another set gets `plan_mismatch`. |
 | Retry | The engine sends `open` or `release` again once, after the op timed out while the session was still live, and in no other case. A session that ends cannot carry a second attempt. An answer, a refusal included, is final. |
 | Forward only | A channel moves only to a source revision equal to its head's or descending from it: `ancestor` is true. A channel without a head, the immutable channel and a baseline channel, which the publication reads and does not advance, are exempt. The provider checks at `open`, and again at `release` for the heads its compare-and-swap matches, and refuses with `not_forward`. |
@@ -163,6 +167,58 @@ The evidence binds what the run published to its release:
 | `PublicationPlan` / `PublicationAncestry` / `PublicationEvidence` and their entries | The plan tuple, the ancestry statement and the evidence |
 | `PlanDigest` / `ValidatePublicationPlan` / `ValidatePublicationAncestry` / `ValidatePublicationEvidence` | The digest and the validators |
 | `Refusal*` / `PublicationRefusalCodes` | The refusal codes |
+
+## What: `uploader-v1`
+
+`uploader-v1` is a capability beside `publication-v1`. The engine offers both
+at `initialize`; a provider that echoes both answers one more op, `upload`, on
+the same session. With it, the provider uploads each member of the opened plan
+with a credential it holds itself, so no publish credential crosses the
+session.
+
+```
+→ {"protocolVersion":1,"id":1,"op":"initialize","payload":{"protocolVersion":1,"capabilities":["credential-v1","publication-v1","uploader-v1"]}}
+← {"protocolVersion":1,"id":1,"ok":true,"payload":{"protocolVersion":1,"capabilities":["credential-v1","publication-v1","uploader-v1"]}}
+  … resolve and open, as above …
+→ {"protocolVersion":1,"id":4,"op":"upload","payload":{"planDigest":"sha256:…","registry":"https://npm.putnami.dev","outbox":"/tmp/putnami-publication-1/typescript-core","member":{…}}}
+← {"protocolVersion":1,"id":4,"ok":true,"payload":{"digest":"sha256:…"}}
+  … release, as above …
+```
+
+The request names one packed member of the publication outbox and the
+registry the engine resolved for it:
+
+| Member | Rule |
+|--------|------|
+| `planDigest` | The opened plan's digest |
+| `registry` | The registry URL: `https`, or `http` to a loopback host, without userinfo, query, fragment or trailing slash, at most 2,048 bytes. For an npm member, the registry the member names (`extension.ManagedNPMRegistry`). |
+| `kind` | The release-set member kind of a Put registry member: `archive` for an archive member, another kind for a put member. Absent for an npm, Go or OCI member. |
+| `outbox` | The absolute path of the outbox directory the member's paths are relative to: at most 4,096 bytes, without control characters or a `.` or `..` segment |
+| `member` | The member's outbox entry, valid under the publication outbox contract (`extension.ValidatePublicationOutbox`) |
+
+The answer names what the registry stores:
+
+| Member | Rule |
+|--------|------|
+| `digest` | The artifact digest: the npm tarball's, the Go module zip's, the OCI manifest's, or the stored Put manifest payload's |
+| `platforms` | For a member published as a multi-platform set, each `os/arch` mapped to the digest of that platform's artifact: 1 to 32 entries. Absent otherwise. |
+
+| Rule | Meaning |
+|------|---------|
+| Negotiation | `uploader-v1` holds only beside `publication-v1`: a capability list that names it without `publication-v1` is refused. In a session without it, both sides refuse `upload`. |
+| Order | After `open` and before `release`. Before `open`, a provider refuses with `plan_not_open`. |
+| No credential | The request carries no credential, and the answer carries none. |
+| Files | The provider reads every file of the member from the outbox and refuses one whose size or digest is not the member's with `artifact_digest_mismatch`. |
+| Bounds | The publication bounds: a line is at most 8 MiB and 12 levels deep. |
+| Refusals | `plan_not_open`; `plan_mismatch`, for another plan or a member the opened plan does not select; `registry_not_served`, for a registry the provider does not upload to; `artifact_digest_mismatch`; `artifact_conflict`, when the registry holds another artifact at the member's version and nothing was uploaded; and `upload_failed`, for any other registry refusal or an upload that did not complete (`UploadRefusalCodes`). |
+
+| Symbol | Meaning |
+|--------|---------|
+| `CapabilityUploaderV1` / `CredentialOpUpload` | The capability and its op |
+| `UploadParams` / `UploadResult` / `ParseUploadParams` / `ParseUploadResult` | The payloads and their strict decoders |
+| `ValidateUploadParams` / `ValidateUploadResult` | The validators |
+| `Upload*Pattern` / `MaxUpload*Bytes` | The registry, outbox and platform grammars and bounds, shared with the schema |
+| `RefusalRegistryNotServed` / `RefusalArtifactConflict` / `RefusalUploadFailed` / `UploadRefusalCodes` | The refusal codes |
 
 ## What: `registry-token/v1`
 
@@ -198,38 +254,44 @@ an opaque 401, so the seam treats it as "no token" instead.
 
 ## Producers and consumers
 
-**`credential-provider/v1` producer** — none ships yet. `@putnami/cloud` is the
-intended producer, in a separate repository. Until it declares the command, the
-flag enables nothing and every path below stays on `registry-token/v1`.
+**`credential-provider/v1` producer** — `@putnami/cloud`
+(`cloud/extension/internal/deliverycli`), which declares the command. Without
+a declaring extension, the flag enables nothing and every path below stays on
+`registry-token/v1`.
 
 **`credential-provider/v1` consumer** — the CLI engine
 (`tooling/cli/internal/credentialprovider`). Its first consumer is the CLI's own
 archive download, `AuthorizeRegistryRequest` in
 `tooling/cli/internal/extension`, which uses the `read` purpose. A host outside
 the credential's `hosts`, an absent provider, or `--providers` off keeps the
-request on the host-keyed seam, unchanged. The release set's upload nodes use
-the `publish` purpose, in a session that negotiated `publication-v1` only.
+request on the host-keyed seam, unchanged. The `publish` purpose enables the
+publication session; the engine asks for no `publish` credential.
 
-**`publication-v1` producer** — none ships in this repository. `@putnami/cloud`
-is the intended producer, in a separate repository.
-`tooling/cli/internal/credentialprovider/providertest` is an in-process
-producer for tests: it keeps the heads, the plan and the released sets in
-memory.
+**`publication-v1` and `uploader-v1` producer** — `@putnami/cloud`, on a
+hosted run whose launcher exports the publication origins. It holds the plan's
+write bearer in its own process and uploads each member to its Put, Go, npm or
+OCI origin; a Put registry member is written with
+[`put-write/v1`](../put/README.md). It refuses any other registry with
+`registry_not_served`. `tooling/cli/internal/credentialprovider/providertest`
+is an in-process producer for tests: it keeps the heads, the plan and the
+released sets in memory, and uploads to fake registries.
 
-**`publication-v1` consumer** — the CLI engine. Its session
-(`tooling/cli/internal/credentialprovider`) offers the capability and sends the
-three ops. The release set (`tooling/cli/internal/jobs/publication`) resolves
-through it, opens after the barrier, uploads every packed npm, Go module, OCI
-and Put registry member in the engine with the `publish` credential, and
-releases. A Put registry member is written with
-[`put-write/v1`](../put/README.md). A
-session without the echo leaves the release set on its release-set provider
-process, unchanged.
+**`publication-v1` and `uploader-v1` consumer** — the CLI engine. Its session
+(`tooling/cli/internal/credentialprovider`) offers both capabilities and sends
+the four ops. The release set (`tooling/cli/internal/jobs/publication`)
+resolves through it, opens after the barrier, checks each packed npm, Go
+module, OCI and Put registry member, sends one `upload` per member, compares
+the answered digest with the packed one, and releases. A session without the
+`publication-v1` echo leaves the release set on its release-set provider
+process, unchanged. A session that echoes `publication-v1` without
+`uploader-v1` fails the command before the first hook when the run is hosted
+or enables the `publish` purpose.
 
-**`registry-token/v1` producer** — `putnami cloud registry-token`, implemented by `@putnami/cloud`
-in a separate repository. This repository ships no producer, which is exactly
-why the seam is host-keyed: a core-only install simply has no such command, and
-that is a supported state rather than an error.
+**`registry-token/v1` producer** — `putnami cloud registry-token`, implemented by
+`@putnami/cloud` (`cloud/extension/internal/distributioncli`). The core ships
+no producer, which is exactly why the seam is host-keyed: a core-only install
+simply has no such command, and that is a supported state rather than an
+error.
 
 **`registry-token/v1` consumers** — all reach the seam through the extension SDK client
 `go.putnami.dev/sdk/extension/registrycred` (`tooling/extension-sdk/registrycred`),
@@ -251,8 +313,8 @@ cloudless-compatible fallback.
 Every one of them degrades to explicit or native credentials (`.npmrc`, the
 platform keychain, an explicit token) when the seam yields nothing. When
 `PUTNAMI_PUBLICATION_OUTBOX` is set, the npm, Go module and managed OCI paths
-pack a managed member into the outbox and ask the seam for nothing: the engine
-uploads it.
+pack a managed member into the outbox and ask the seam for nothing: the
+credential provider uploads it (`uploader-v1`).
 
 ## The retired publish-provider marker
 
@@ -284,15 +346,16 @@ a new capability negotiated at `initialize`, never a silent addition, because
 both sides decode strictly. The one exception is `initialize`'s optional
 `runCredential`, added before any producer shipped; the amendment to
 [ADR 0002](doc/adr/0002-one-credential-call-per-purpose.md) records why.
-`publication-v1` is such a capability: a session that does not negotiate it
-reads and writes exactly the v1 lines above, under the v1 bounds.
+`publication-v1` and `uploader-v1` are such capabilities: a session that does
+not negotiate them reads and writes exactly the v1 lines above, under the v1
+bounds.
 
 `registry-token/v1` retires only after the cloud producer serves
 `credential-provider`: the SDK's `--materialize` form and its per-host,
-per-process credential memo retire with it. Two follow-up changes move the
-remaining consumers: one hands credentials to extension processes without the
-environment, and the other moves uploads in process behind the `publish`
-purpose.
+per-process credential memo retire with it. One follow-up change moves the
+remaining consumers: it hands credentials to extension processes without the
+environment. A hosted publication already reads no credential from it: under
+`uploader-v1`, the credential provider uploads every member.
 
 Compatibility of `registry-token/v1` is cross-repository and therefore conservative:
 
@@ -340,6 +403,23 @@ Compatibility of `registry-token/v1` is cross-repository and therefore conservat
   unsorted or malformed evidence; a case-variant member; and `null` outside a
   distribution document or where that protocol refuses it.
 
+`uploader-v1` shares them too:
+
+- valid: an `initialize` that negotiates it, an `upload` of an npm, Go, OCI,
+  put and archive member, one to a loopback npm registry, answers with and
+  without platforms, and the `registry_not_served` and `artifact_conflict`
+  refusals.
+- invalid: an `initialize` or its answer that names `uploader-v1` without
+  `publication-v1`; an `upload` or its answer in a session without it; a
+  malformed plan digest; a missing member, a member that escapes the outbox
+  or carries two artifact blocks; a `credential` or `project` member; a kind
+  that is empty, `null`, unknown, missing for a put member, present for an npm
+  member, or not `archive` exactly for an archive member; a registry over
+  `http` to a host that is not loopback, with a port out of range, a query, a
+  trailing slash or userinfo, or other than the npm member's; an outbox that
+  is relative or holds a `.` segment; and an answer with a malformed digest,
+  an empty platform map, a malformed platform, or a `reused` member.
+
 A fixture is one line. A response fixture names the op it answers:
 `response-<op>-<case>.json`. `TestCredentialFixtures` requires every valid
 fixture to parse and re-encode byte for byte and every invalid fixture to be
@@ -376,9 +456,9 @@ Evidence behind `preview`:
 
 Evidence still missing for `stable`:
 
-- the producers live in another repository, so no test here can exercise
-  either seam end to end against the real issuer;
-- no producer serves `credential-provider/v1` yet.
+- the issuer and the registries the producers call run outside this
+  repository, so no test here exercises either seam end to end against them;
+  the producers' tests use fake servers.
 
 Per the [support protocol](../support/README.md), `preview` means public and
 usable, but subject to change before it becomes stable. It is not a statement
@@ -402,3 +482,4 @@ Durable decisions:
 - [ADR 0001 — Registry credentials come from a host-keyed cloud command](doc/adr/0001-host-keyed-credential-seam.md)
 - [ADR 0002 — One credential call per purpose, from the workspace's credential provider](doc/adr/0002-one-credential-call-per-purpose.md)
 - [ADR 0003 — Publication ops behind a negotiated capability](doc/adr/0003-publication-ops-behind-a-negotiated-capability.md)
+- [ADR 0004 — An uploader capability on the provider session](doc/adr/0004-an-uploader-capability-on-the-provider-session.md)

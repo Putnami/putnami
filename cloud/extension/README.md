@@ -416,17 +416,18 @@ sets `PUTNAMI_PUBLICATION_OUTBOX` and gives the step no registry credential.
 The config, migration, archive, site-content and deployment steps then pack
 their one planned member into that outbox: the exact Put manifest and blobs
 they would publish, so the artifact digest is the same. They upload nothing,
-move no channel, and emit no `published-member` fact; the engine uploads the
-packed member and reports it. Before it commits a Put or archive member, a step
-runs the same put-write/v1 check as the engine's upload, so an invalid member,
-such as an archive with an invalid platform key, fails in the step. The config,
+move no channel, and emit no `published-member` fact; the credential provider
+uploads the packed member ([Credential provider](#credential-provider)) and the
+engine reports it. Before it commits a Put or archive member, a step runs the
+same put-write/v1 check as the upload, so an invalid member, such as an archive
+with an invalid platform key, fails in the step. The config,
 migration and deployment steps, and an archive step with archives to publish,
 fail when they hold an outbox but no release-set plan. The site-content step
 skips without a plan, and an archive step skips when it has nothing to publish:
 no archives channel, or no metadata or archive files under `--if-present`. The
 site-content step fails when the plan selects more than one section of the
 project. In every case the engine itself refuses a release whose selected Put
-or archive member it did not upload.
+or archive member no upload node reported.
 
 For generated opaque Config objects (such as external Go structs), declare their
 exact public descendant paths and types in `schema/config-authored-fields.json`
@@ -1195,17 +1196,19 @@ diagnostics on stderr.
 
 | Op | Answer |
 | --- | --- |
-| `initialize` | `credential-v1`, with or without `runCredential`. An invalid run credential is refused with `invalid_run_credential`, and a run credential the process cannot protect with `inspection_guard_unavailable`. |
+| `initialize` | `credential-v1`, with or without `runCredential`. An invalid run credential is refused with `invalid_run_credential`, and a run credential the process cannot protect with `inspection_guard_unavailable`. On a hosted run with a Delivery ingest base and publication origins (`CI_LIBRARY_PUBLISH_PUT_URL`, and optionally `CI_LIBRARY_PUBLISH_NPM_URL`, `CI_LIBRARY_PUBLISH_GO_URL` and `CI_LIBRARY_PUBLISH_OCI_URL`), it also echoes `publication-v1` when the engine offers it, and `uploader-v1` when the engine offers both. |
 | `credential`, purpose `read`, hosted run | `POST ${PUTNAMI_CLOUD_INGEST_URL}/capabilities/install` with body `{}` and the run credential as bearer. 201: the install credential `{bearer, expiresAt, hosts}`. 204: absence. Every other 4xx, 404 included: a refusal with Delivery's `code`, whatever it is (for example `install_capability_denied` or `install_capability_conflict`), else `install_refused`, never retried. 5xx, 408, 429 or network error: one retry after 0.5 s, then `install_capability_unavailable`. No usable ingest base: `install_capability_unconfigured`. |
 | `credential`, purpose `read`, developer machine | One bearer for the signed-in user of a linked checkout: client `distribution`, scope `go npm oci put`, for the sorted hosts of the four registry endpoints. It is cached in `~/.putnami/registries.json` under a key no host can take, until shortly before it expires. Not signed in, not linked, or any failure: absence, with one redacted stderr line for a failure. |
-| `credential`, purpose `publish` | Absence. Publishing keeps `putnami cloud token`. |
+| `credential`, purpose `publish` | In a `publication-v1` session, the opened plan's write bearer for the publication origins; before `open`, `plan_not_open`. Otherwise absence, and publishing keeps `putnami cloud token`. |
+| `resolve`, `open`, `release` (`publication-v1`) | Delivery decides what the run may publish. `resolve` reads channel heads from the Put registry. `open` has Delivery freeze the plan and mint its write bearer. `release` releases the set at most once per plan digest, and moves a forward-only channel only while the run is still the head of its default branch. |
+| `upload` (`uploader-v1`) | After `open`, uploads one member of the plan to its Put, Go, npm or OCI origin with the SDK upload kit, under the plan's write bearer, which no answer carries. A registry outside the publication origins: `registry_not_served`. A file that differs from the outbox descriptor: `artifact_digest_mismatch`. A version the registry holds at another digest: `artifact_conflict`. Any other failure: `upload_failed`. |
 | `shutdown` | Acknowledged; the process exits. It also exits on stdin EOF. |
 
 The provider denies inspection of itself before it reads its first line, and
 keeps the run credential in memory only: never in its environment, a file, an
-argument, a child process or a log. Every answer comes within the engine's 30 s
-op timeout: two Delivery attempts of at most 12 s each, 24.5 s with the wait
-between them, and 25 s for the developer-machine mint. When the mint runs out
+argument, a child process or a log. Every `credential` answer comes within the
+engine's 30 s op timeout: two Delivery attempts of at most 12 s each, 24.5 s
+with the wait between them, and 25 s for the developer-machine mint. When the mint runs out
 of time, the provider answers absence and tells the mint to stop: a pending key
 creation or exchange ends, and the mint stores nothing. Two steps finish
 anyway. A sign-in refresh in progress completes and is saved, because the auth

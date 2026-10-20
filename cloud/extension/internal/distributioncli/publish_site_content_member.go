@@ -166,7 +166,7 @@ func PackageSiteContent(params map[string]any, args []string, workspaceRoot stri
 // publish-doc` remains the direct operator path. Under the engine's
 // publication-v1 capability, which every hosted CI run has, it packs the one
 // planned member into the publication outbox and sends no Put request: the
-// engine uploads the member.
+// credential provider uploads the member.
 func PublishSiteContentMembers(params map[string]any, args []string, workspaceRoot string, env map[string]string, ioctx clicore.IO) ([]SiteContentMemberResult, error) {
 	project, found, err := resolveSiteContentProject(params, args, workspaceRoot)
 	if err != nil {
@@ -244,7 +244,7 @@ func PublishSiteContentMembers(params map[string]any, args []string, workspaceRo
 
 	if outbox := PublicationOutbox(env); outbox != "" {
 		// publication-v1: pack the planned member without a channel and report
-		// no published result; the engine uploads it and the provider's
+		// no published result; the credential provider uploads it and its
 		// release moves the plan's channels.
 		if len(planned) != 1 {
 			return nil, clicore.NewError(fmt.Sprintf("the release-set plan selects %d site-content members of %s; a publication outbox packs exactly one", len(planned), project.id), clicore.ExitUsage)

@@ -32,9 +32,9 @@ type PackedMigration struct {
 // PackPreparedMigration packs one prepared migration into the publication
 // outbox the engine gave this job (go.putnami.dev/protocol/extension): the
 // bundle tar blob and the migration manifest, packed by publication.Pack, the
-// function Data's publisher stores with. The engine uploads the member and
-// Data accepts it at the first deploy that selects it, so this makes no Data
-// call, needs no credential and reports no published member. projectID is the
+// function Data's publisher stores with. The credential provider uploads the
+// member and Data accepts it at the first deploy that selects it, so this
+// makes no Data call, needs no credential and reports no published member. projectID is the
 // plan's project id of the member, with its leading slash.
 //
 // Every validation refusal, Data's canonical scope included, happens before

@@ -1,6 +1,9 @@
 # ADR 0004 — A publication job packs and the engine uploads
 
-- **Status**: accepted
+- **Status**: accepted. Decision 4 is amended by
+  [registry ADR 0004](../../../../protocols/registry/doc/adr/0004-an-uploader-capability-on-the-provider-session.md)
+  and [CLI ADR 0076](../../../cli/doc/adr/0076-publication-uploads-leave-the-engine.md):
+  the credential provider re-reads and uploads the bytes, not the engine.
 - **Scope**: `putnami-extension-sdk` (`publicationoutbox`, `npmpublish`,
   `gomodpublish`, `putpublish`, `oci.PushLayout`), the publication outbox
   contract in

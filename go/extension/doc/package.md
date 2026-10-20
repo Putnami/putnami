@@ -332,8 +332,8 @@ copies the packaged zip, `go.mod` and `.info` into the outbox and writes
 `outbox.json`, which names the module path, the version, the owning project
 and the digest and size of each file. The job asks for no credential, consults
 no broker, sends no registry request, runs no `go mod download` smoke and
-reports no published member: the engine uploads the bytes it verifies and
-reports the member. A publication with `--go-registry-token`,
+reports no published member: the credential provider uploads the bytes, and
+the engine reports the member. A publication with `--go-registry-token`,
 `PUTNAMI_REGISTRY_TOKEN` or `goRegistryToken` ignores the outbox and uploads as
 above. A dry run packs nothing.
 

@@ -225,7 +225,8 @@ and writes `outbox.json`, which names the package, the planned version, the
 owning project, the digest and size of each file, and the managed registry
 the job resolved, as described below. The job asks for no credential, consults
 no broker, sends no registry request and reports no published member: the
-engine uploads the bytes it verifies to that registry and reports the member.
+credential provider uploads the bytes to that registry, and the engine reports
+the member.
 The engine refuses the member when the project's `registries.npm.publish`
 names another registry, so a `--registry` that contradicts the declaration
 fails instead of publishing. Unmanaged publication ignores the outbox and runs `npm` as described

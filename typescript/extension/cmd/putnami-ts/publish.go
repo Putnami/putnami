@@ -100,8 +100,8 @@ func npmCommand(goos string, args []string) (string, error) {
 // When the engine names a publication outbox, a release-set member is packed
 // into it and nothing else happens: no credential, no broker route, no upload
 // and no published-member event (packManagedNPMIntoOutbox). The member names
-// the managed registry resolved here, and the engine uploads there. Unmanaged
-// publication ignores the outbox.
+// the managed registry resolved here, and the credential provider uploads
+// there. Unmanaged publication ignores the outbox.
 func runPublishNpm(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	if ctx.Project.Name == "" {
 		emit.Summary("Skipped: no project context")

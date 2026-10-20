@@ -1,6 +1,7 @@
 # protocol/oci
 
-Putnami OCI registry extensions that layer on the standard OCI distribution spec.
+Putnami OCI registry extensions that layer on the standard OCI distribution
+spec, and the rules that derive a registry host from a repository.
 Image content is pushed with any standard registry client; these contracts are
 the **optional** fast paths a Putnami-managed registry advertises and the
 framework uses when present, always degrading to the standard distribution API
@@ -27,6 +28,23 @@ reservation trick as `/v2/_catalog`.
 Why an extension exists at all, and why it must always degrade, is recorded in
 [`doc/adr/0001-optional-registry-fast-paths.md`](doc/adr/0001-optional-registry-fast-paths.md).
 
+## Registry host rules
+
+`RegistryHost`, `NormalizeRegistryHost` and `RegistryScheme` read a repository
+and a registry host the way go-containerregistry's `name` package reads them
+under strict validation. A component that does not import that library
+therefore derives the same host and scheme as one that does. One rule differs:
+the host is lowercased first, so hosts that differ only in case name one
+registry.
+
+| Function | Rule |
+| --- | --- |
+| `RegistryHost` | The part of a repository before its first `/`, which must hold a `.` or a `:`, normalized by `NormalizeRegistryHost`. The path after it is 2 to 255 characters from `[a-z0-9_-./]`, and a Docker Hub path names its namespace (`library/nginx`, not `nginx`). |
+| `NormalizeRegistryHost` | A URI authority without userinfo, lowercased, with `docker.io` read as `index.docker.io` |
+| `RegistryScheme` | `http` for an RFC 1918 address, a host that starts with `localhost:` or ends with `.localhost`, and a host that holds `127.0.0.1` or `::1`; `https` for any other |
+
+No error repeats the repository or the host, which may carry a credential.
+
 ## Producers and consumers
 
 | Role | Implementation |
@@ -34,6 +52,12 @@ Why an extension exists at all, and why it must always degrade, is recorded in
 | Client (in repo) | `tooling/extension-sdk/oci` — `push.go` probes the capabilities endpoint, takes `tag-digest/v1` when advertised, and logs and falls back to per-tag manifest `PUT`s on any failure. |
 | Server (out of repo) | The Putnami-managed OCI registry, implemented in the cloud repository. No public server implementation exists in this repository. |
 | Non-participants | Any standard registry (gcr, ghcr, Docker Hub). They never answer the probe, so clients use the standard distribution API unchanged. |
+
+The registry host rules have two consumers: the CLI engine, which compares an
+OCI member's registry host with the workspace's declared OCI registry before
+it sends the member's upload (`tooling/cli/internal/jobs/publication`), and the
+Cloud credential provider, which refuses an upload to a host outside its
+publication origins (`cloud/extension/internal/deliverycli`).
 
 The client never depends on the fast path existing: a missing endpoint, an
 unknown capability list, an auth failure, or a non-2xx response all mean "use
@@ -58,6 +82,11 @@ implementation must agree on. There is no JSON Schema for these messages: the
 Go types plus the fixture corpus are the normative surface, and the request
 bodies are small enough that a second description would be the thing that
 drifts.
+
+The registry host rules are pinned by
+[`fixtures/registry-host/cases.json`](fixtures/registry-host/cases.json):
+repositories and hosts, each with the host and scheme it yields or the reason
+it is refused. `TestConformance_RegistryHost` runs every case.
 
 ## Ownership, support, and evidence
 

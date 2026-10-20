@@ -176,9 +176,9 @@ publish/upgrade jobs outside this reserved child keep their ambient compatibilit
 When the credential provider negotiates `publication-v1`, the coordinator
 starts no nested CLI. The provider resolves, opens and releases over its own
 session, each publication job packs into an outbox with no registry or cloud
-credential, and the engine uploads with the `publish` credential the provider
-issues
-([CLI ADR 0057](../../../tooling/cli/doc/adr/0057-publication-authority-stays-in-the-engine.md)).
+credential, and the provider uploads each member over the same session with a
+credential it holds itself
+([CLI ADR 0076](../../../tooling/cli/doc/adr/0076-publication-uploads-leave-the-engine.md)).
 
 The trusted runner must separately set `PUTNAMI_CLOUD_CAPABILITY_AFTER` to a
 comma-separated command list. The production release runner uses

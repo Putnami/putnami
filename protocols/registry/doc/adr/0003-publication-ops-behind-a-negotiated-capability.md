@@ -1,6 +1,7 @@
 # ADR 0003 — Publication ops behind a negotiated capability
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0004](0004-an-uploader-capability-on-the-provider-session.md)
 - **Scope**: `go.putnami.dev/protocol/registry` (`protocols/registry`),
   `credential-provider/v1`, capability `publication-v1`
 
