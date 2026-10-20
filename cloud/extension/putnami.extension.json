@@ -1593,11 +1593,6 @@
           "default": false,
           "description": "Skip the migration bundle publish step (other publish channels still run)."
         },
-        "skip-publish-doc": {
-          "type": "boolean",
-          "default": false,
-          "description": "Skip the site-content bundle publish step of a docs project (other publish channels still run)."
-        },
         "skip-publish-deployment": {
           "type": "boolean",
           "default": false,
@@ -1640,7 +1635,7 @@
         },
         {
           "id": "cloud-publish-site-content",
-          "if": "params.site-content && !params.skip-publish-doc && !params.skipPublishDoc",
+          "if": "params.site-content",
           "task": "cloud-publish-site-content-project"
         },
         {
