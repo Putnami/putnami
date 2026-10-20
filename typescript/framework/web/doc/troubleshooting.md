@@ -357,7 +357,11 @@ export default function Page() {
    Ensure routes are generated in `.gen/`.
 
 2. **Verify public folder:**
-   Client bundles should be in `.gen/public/`.
+   Client bundles should be in `.gen/public/`. Each `generate` run replaces
+   the bundle folders `react/` and `react-islands/` under the public folder.
+   The planner never runs two `generate` steps of one project at the same
+   time, such as those of `putnami build` and `putnami test`, so one run
+   never deletes the bundles another run is writing.
 
 3. **Check server configuration:**
    Ensure server serves static files correctly.

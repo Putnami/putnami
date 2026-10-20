@@ -69,7 +69,7 @@ putnami test . --concurrent
 generate ──→ discover ──→ run ──→ parse
 ```
 
-1. **Generate** — runs the build generate phase to ensure `.gen/` is current
+1. **Generate** — runs the build generate phase to ensure `.gen/` is current. It writes the same `.gen/` tree as the `generate` step of `build`, so in a run such as `putnami lint,test,build` the planner orders the two: one never starts while the other, or a step that reads its output, still runs
 2. **Discover** — scans the project for test files matching `**/*.{test,spec}.{ts,tsx,js,jsx}` (excludes `node_modules`, `.gen`, and `dist` directories)
 3. **Run** — executes `bun test` with discovered files and configured options
 4. **Parse** — reads JUnit XML and optional LCOV output, extracts failures and metrics

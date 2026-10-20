@@ -117,6 +117,96 @@ func TestSerializeWriteResources_ReadersParallelWriterExclusive(t *testing.T) {
 	}
 }
 
+// withoutJobs removes the jobs named in drop from plan and strips every edge
+// to them, the way a pass that scopes a planned run does: an ordering edge
+// goes with its target.
+func withoutJobs(plan []*jobmodel.ScheduledJob, drop ...*jobmodel.ScheduledJob) []*jobmodel.ScheduledJob {
+	dropped := make(map[string]bool, len(drop))
+	for _, job := range drop {
+		dropped[job.Key()] = true
+	}
+	strip := func(keys []string) []string {
+		var kept []string
+		for _, key := range keys {
+			if !dropped[key] {
+				kept = append(kept, key)
+			}
+		}
+		return kept
+	}
+	var kept []*jobmodel.ScheduledJob
+	for _, job := range plan {
+		if dropped[job.Key()] {
+			continue
+		}
+		job.DependsOn = strip(job.DependsOn)
+		job.SerializeAfter = strip(job.SerializeAfter)
+		kept = append(kept, job)
+	}
+	return kept
+}
+
+// Three commands generate one project into the same tree: build, package and
+// test. A release-set scope later removes the package steps it does not
+// publish, with the edges to them. The build and test runs of generate must
+// still never overlap, and the test run must still wait for the build block's
+// readers, so every writer is ordered directly after every access before it,
+// never only through the writer in between.
+func TestSerializeWriteResources_WritersStayOrderedWhenAPassDropsAWriter(t *testing.T) {
+	t.Parallel()
+	lintDocs := resourceJob("/p", "lint~docs", nil, nil, proj("gen"))
+	buildGen := resourceJob("/p", "build~generate", nil, proj("gen"), nil)
+	buildTranspile := resourceJob("/p", "build~transpile", []string{buildGen.Key()}, nil, proj("gen"))
+	buildTypes := resourceJob("/p", "build~types", []string{buildGen.Key()}, nil, proj("gen"))
+	pkgGen := resourceJob("/p", "package~generate", nil, proj("gen"), nil)
+	pkgTranspile := resourceJob("/p", "package~transpile", []string{pkgGen.Key()}, nil, proj("gen"))
+	pkgDocker := resourceJob("/p", "package~docker", []string{pkgTranspile.Key()}, nil, proj("gen"))
+	testGen := resourceJob("/p", "test~generate", nil, proj("gen"), nil)
+	testRun := resourceJob("/p", "test~test", []string{testGen.Key()}, nil, proj("gen"))
+
+	plan := []*jobmodel.ScheduledJob{lintDocs, buildGen, buildTranspile, buildTypes, pkgGen, pkgTranspile, pkgDocker, testGen, testRun}
+	serializeWriteResources(plan)
+	if err := ValidatePlanDAG(plan); err != nil {
+		t.Fatalf("plan with serialize edges must stay schedulable: %v", err)
+	}
+
+	// Every writer waits directly for every access that precedes it.
+	for _, want := range []*jobmodel.ScheduledJob{lintDocs, buildGen, buildTranspile, buildTypes, pkgGen, pkgTranspile, pkgDocker} {
+		if !containsStr(testGen.SchedulingPredecessors(), want.Key()) {
+			t.Errorf("test~generate scheduling predecessors = %v, want to contain %s", testGen.SchedulingPredecessors(), want.Key())
+		}
+	}
+	for _, want := range []*jobmodel.ScheduledJob{lintDocs, buildGen, buildTranspile, buildTypes} {
+		if !containsStr(pkgGen.SchedulingPredecessors(), want.Key()) {
+			t.Errorf("package~generate scheduling predecessors = %v, want to contain %s", pkgGen.SchedulingPredecessors(), want.Key())
+		}
+	}
+
+	// Without the package steps, test~generate is not ready while the build
+	// block runs: it waits for build~generate and both of its readers.
+	kept := withoutJobs(plan, pkgGen, pkgTranspile, pkgDocker)
+	state := NewDAGState(kept)
+	ready := func(jobs []*jobmodel.ScheduledJob) map[string]bool {
+		keys := make(map[string]bool, len(jobs))
+		for _, job := range jobs {
+			keys[job.Key()] = true
+		}
+		return keys
+	}
+	if r := ready(state.Ready()); r[testGen.Key()] {
+		t.Fatalf("test~generate is ready before build~generate ran: ready = %v", r)
+	}
+	state.Complete(lintDocs.Key())
+	state.Complete(buildGen.Key())
+	state.Complete(buildTranspile.Key())
+	if r := ready(state.Ready()); r[testGen.Key()] {
+		t.Fatalf("test~generate is ready while build~types still reads the tree: ready = %v", r)
+	}
+	if newly := ready(state.Complete(buildTypes.Key())); !newly[testGen.Key()] {
+		t.Fatalf("test~generate is not ready once the build block completed: newly ready = %v", newly)
+	}
+}
+
 func TestSerializeWriteResources_ReadOnlyTasksNotSerialized(t *testing.T) {
 	t.Parallel()
 	// No writer of "gen" exists, so readers are free to run concurrently — this

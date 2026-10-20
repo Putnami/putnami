@@ -22,12 +22,14 @@ import (
 //
 // For each resource the writers are ordered into blocks. A reader joins the block
 // of the writer it functionally derives from (its nearest writer ancestor), so it
-// observes that writer's output. Blocks are then serialized end-to-end: the next
-// writer waits for the previous writer AND every reader in its block before
-// overwriting. Readers in the same block share no edges, so they still run in
-// parallel. Functional dependencies (DependsOn) are never modified, and every
-// edge is consistent with a topological order of the functional graph, so the
-// combined graph stays acyclic.
+// observes that writer's output. Blocks are then serialized end-to-end: a
+// writer waits for every earlier writer AND every reader of an earlier block
+// before overwriting, through a direct edge to each, so removing any planned
+// job later never leaves two of the jobs that remain unordered. Readers in the
+// same block share no edges, so they still run in parallel. Functional
+// dependencies (DependsOn) are never modified, and every edge is consistent
+// with a topological order of the functional graph, so the combined graph
+// stays acyclic.
 func serializeWriteResources(jobs []*jobmodel.ScheduledJob) {
 	pos, ok := functionalTopoOrder(jobs)
 	if !ok {
@@ -138,21 +140,20 @@ func serializeWriteResources(jobs []*jobmodel.ScheduledJob) {
 			}
 		}
 
-		// Serialize the blocks. The first writer waits for the epoch-zero readers
-		// it would overwrite; every later writer waits for the entire previous
-		// block (its writer and that writer's readers).
-		for i, w := range writerKeys {
-			if i == 0 {
-				for _, r := range epochZeroReaders {
-					addEdge(r, w)
-				}
-				continue
+		// Serialize the blocks. Each writer waits directly for every access
+		// before it: the epoch-zero readers, every earlier writer and the readers
+		// of every earlier block. The edges the previous writer already implies
+		// are kept on purpose. A pass that removes planned jobs after this one,
+		// such as a release-set scope that drops the package steps it does not
+		// publish, strips the edges to the jobs it removes, and the writers it
+		// keeps must stay ordered without the writer in between.
+		preceding := append([]string(nil), epochZeroReaders...)
+		for _, w := range writerKeys {
+			for _, p := range preceding {
+				addEdge(p, w)
 			}
-			prev := writerKeys[i-1]
-			addEdge(prev, w)
-			for _, r := range blockReaders[prev] {
-				addEdge(r, w)
-			}
+			preceding = append(preceding, w)
+			preceding = append(preceding, blockReaders[w]...)
 		}
 	}
 
