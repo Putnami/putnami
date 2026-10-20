@@ -436,7 +436,8 @@ type Request struct {
 	// adapter does: its stderr is a log, and the tool result is the report).
 	// An error Run does not return, such as a second hook failure, always
 	// goes to stderr.
-	// Every other diagnostic stays on os.Stderr.
+	// Every other diagnostic stays on os.Stderr. Run fills a nil value in
+	// before any write, so a helper called outside Run needs a writer.
 	ErrorOut io.Writer
 }
 
