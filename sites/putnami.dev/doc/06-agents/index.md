@@ -43,8 +43,9 @@ the docs tree. It answers "which project owns X", "what depends on Y", "where
 are the APIs, the config keys, the docs" without shell exploration.
 
 It is byte-deterministic on an unchanged tree, lives gitignored under
-`.putnami/context-map/`, and is never committed. `putnami build` refreshes it
-automatically outside CI, so it does not go stale behind the code.
+`.putnami/context-map/`, and is never committed. A build does not write it: run
+`putnami context map` to refresh the file, or read the map from the MCP
+`workspace_map` tool, which renders it fresh on every call.
 
 ### `putnami context pack` — how one project is composed
 
