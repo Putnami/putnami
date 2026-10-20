@@ -550,8 +550,11 @@ output") and from `inputs`/`outputs` (which feed cache keys).
 
 The planner serializes only conflicting accesses to the same resource: two
 writers never overlap, a reader never overlaps a writer, and two readers stay
-parallel. A resource is a bare string (project-scoped) or an object with an
-explicit scope:
+parallel. This also holds for two commands that run the same step on one
+project, such as the `generate` step of `build` and of `test`, and it still
+holds when the planner later removes a step between them from the run. A
+resource is a bare string (project-scoped) or an object with an explicit
+scope:
 
 | Form | Meaning |
 |------|---------|

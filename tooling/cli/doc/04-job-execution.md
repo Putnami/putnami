@@ -185,6 +185,15 @@ After functional dependencies are resolved, `serializeWriteResources`
 - a **reader** never overlaps a writer, and observes the writer it derives from;
 - two **readers** stay independent and run in parallel.
 
+Each writer gets a direct edge from every access before it: every earlier
+writer, every reader of an earlier writer, and every reader that derives from
+no writer. The order never depends on the writer in between. A pass that
+removes planned jobs later, such as a release-set scope that drops the
+`package` steps it does not publish, removes the edges to those jobs, and the
+writers it keeps stay ordered. This is how the `build` and `test` runs of
+`generate` on one project stay apart when the `package` run between them is
+dropped.
+
 Edges are emitted along a deterministic topological order of the functional
 graph, so they can never introduce a cycle. They are kept separate from
 `DependsOn`: they order execution but are **not** functional dependencies — they
