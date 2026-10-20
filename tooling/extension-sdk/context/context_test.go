@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestParams_String_Present(t *testing.T) {
@@ -530,7 +532,14 @@ func TestParse_UserScope(t *testing.T) {
 	}
 }
 
+// The requirement the ResolvePath tests prove.
+const (
+	resolvePathFeature     = "tooling/extension-authoring"
+	resolvePathRequirement = "resolve-a-path-against-the-typed-directory"
+)
+
 func TestResolvePath_RelativeJoinsTheInvocationDir(t *testing.T) {
+	spectest.Proves(t, resolvePathFeature, resolvePathRequirement, "a-relative-path-joins-the-invocation-directory")
 	ctx := &Context{InvocationDir: filepath.FromSlash("/ws/docs")}
 	got := ResolvePath(ctx, "notes.md")
 	if want := filepath.FromSlash("/ws/docs/notes.md"); got != want {
@@ -543,6 +552,7 @@ func TestResolvePath_RelativeJoinsTheInvocationDir(t *testing.T) {
 }
 
 func TestResolvePath_AbsoluteIsLeftAlone(t *testing.T) {
+	spectest.Proves(t, resolvePathFeature, resolvePathRequirement, "an-absolute-or-empty-path-is-left-alone")
 	abs := filepath.Join(t.TempDir(), "a", "..", "notes.md")
 	ctx := &Context{InvocationDir: filepath.FromSlash("/ws/docs")}
 	if got := ResolvePath(ctx, abs); got != abs {
@@ -551,6 +561,7 @@ func TestResolvePath_AbsoluteIsLeftAlone(t *testing.T) {
 }
 
 func TestResolvePath_EmptyIsLeftAlone(t *testing.T) {
+	spectest.Proves(t, resolvePathFeature, resolvePathRequirement, "an-absolute-or-empty-path-is-left-alone")
 	ctx := &Context{InvocationDir: filepath.FromSlash("/ws/docs")}
 	if got := ResolvePath(ctx, ""); got != "" {
 		t.Errorf("ResolvePath = %q, want empty", got)
@@ -558,6 +569,7 @@ func TestResolvePath_EmptyIsLeftAlone(t *testing.T) {
 }
 
 func TestResolvePath_FallsBackToTheUserScopeCallerDir(t *testing.T) {
+	spectest.Proves(t, resolvePathFeature, resolvePathRequirement, "outside-a-workspace-it-falls-back-to-the-caller-directory")
 	ctx := &Context{UserScope: &UserScope{CallerDir: filepath.FromSlash("/home/u/src")}}
 	got := ResolvePath(ctx, "notes.md")
 	if want := filepath.FromSlash("/home/u/src/notes.md"); got != want {
@@ -577,6 +589,7 @@ func TestResolvePath_TheInvocationDirWinsOverTheUserScope(t *testing.T) {
 }
 
 func TestResolvePath_UnsetLeavesTheArgumentForTheProcessDirectory(t *testing.T) {
+	spectest.Proves(t, resolvePathFeature, resolvePathRequirement, "with-neither-the-path-is-returned-unchanged")
 	for name, ctx := range map[string]*Context{
 		"nil context":      nil,
 		"no invocation":    {},

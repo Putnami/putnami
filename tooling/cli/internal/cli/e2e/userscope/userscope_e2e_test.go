@@ -331,6 +331,7 @@ func realPath(t *testing.T, path string) string {
 // its context and from PUTNAMI_CALLER_DIR, gets every workspace path rooted at
 // the user scope, and leaves the caller's directory byte-identical.
 func TestAppRun_UserScope_OptionalSubcommandRunsInCallerDir(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-interactive-launch-names-the-directory-it-was-typed-in", "outside-a-workspace-it-equals-the-caller-directory")
 	userRoot, callerDir := userScopeTestEnv(t)
 	pinUserScopeExtension(t, userRoot, "user-scope")
 	before := snapshotTree(t, callerDir)

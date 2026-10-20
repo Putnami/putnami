@@ -208,6 +208,10 @@
     {
       "id": "workload-lifecycle",
       "text": "A command whose traits declare the serve workload streams it until interrupted: the run is promoted to watch unless its own --no-watch is set, a hosted run and MCP run_jobs refuse it, a composition starts only its terminal uncacheable step, and no portable run carries it. The once workload streams once and forwards the workload's exit code. A command that declares rewritesSources is never portable. Neither behavior follows a command's name."
+    },
+    {
+      "id": "an-interactive-launch-names-the-directory-it-was-typed-in",
+      "text": "An interactive extension subcommand launch, in a workspace or outside one, carries the absolute directory the user typed the command in, as the job context's invocationDir and PUTNAMI_INVOCATION_DIR. The task keeps its working directory; userScope and PUTNAMI_CALLER_DIR stay absent in a workspace and, outside one, the value equals the caller directory. A planned job carries neither, so no cache key depends on it, and an inherited value is dropped."
     }
   ],
   "decisions": [
@@ -232,6 +236,7 @@
     "tooling/cli/doc/adr/0067-putnami-dev-declares-the-development-verbs.md",
     "tooling/cli/doc/adr/0073-the-core-declares-no-development-verb.md",
     "tooling/cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md",
-    "tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md"
+    "tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md",
+    "tooling/cli/doc/adr/0075-an-interactive-command-knows-the-directory-it-was-typed-in.md"
   ]
 }

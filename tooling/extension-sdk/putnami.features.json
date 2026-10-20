@@ -448,6 +448,22 @@
               "version-lines-rejects-an-answer-it-cannot-use-and-stays-usable"
             ]
           }
+        },
+        {
+          "id": "resolve-a-path-against-the-typed-directory",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-relative-path-joins-the-invocation-directory",
+              "an-absolute-or-empty-path-is-left-alone",
+              "outside-a-workspace-it-falls-back-to-the-caller-directory",
+              "with-neither-the-path-is-returned-unchanged"
+            ]
+          }
         }
       ]
     }

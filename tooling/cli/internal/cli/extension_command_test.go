@@ -13,6 +13,7 @@ import (
 
 	distribution "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
@@ -1916,12 +1917,19 @@ func TestAppRun_SelectedProjectsAgreeAcrossCommandPaths(t *testing.T) {
 	}
 }
 
+// The requirement the invocation-directory tests prove.
+const (
+	invocationDirFeature     = "cli/job-planning-execution"
+	invocationDirRequirement = "an-interactive-launch-names-the-directory-it-was-typed-in"
+)
+
 // TestAppRun_ExtensionStructuredCommand_InteractiveCarriesTheInvocationDir pins
 // the fix for a command typed in a subdirectory: the task runs in the
 // workspace root, so the context and the environment must name the directory
 // the user typed it in, while userScope and PUTNAMI_CALLER_DIR keep saying
 // that a workspace exists.
 func TestAppRun_ExtensionStructuredCommand_InteractiveCarriesTheInvocationDir(t *testing.T) {
+	spectest.Proves(t, invocationDirFeature, invocationDirRequirement, "the-context-and-environment-carry-the-typed-directory")
 	if _, err := os.Stat("/bin/sh"); err != nil {
 		t.Skip("/bin/sh unavailable on this platform")
 	}
@@ -2014,6 +2022,7 @@ echo
 // job, whose result is cached, gets neither the context member nor the
 // variable, even when the environment inherited one.
 func TestAppRun_PlannedJobCarriesNoInvocationDir(t *testing.T) {
+	spectest.Proves(t, invocationDirFeature, invocationDirRequirement, "a-planned-job-carries-none")
 	if _, err := os.Stat("/bin/sh"); err != nil {
 		t.Skip("/bin/sh unavailable on this platform")
 	}
