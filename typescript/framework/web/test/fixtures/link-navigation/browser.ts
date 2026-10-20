@@ -37,16 +37,19 @@ Object.assign(globalThis, {
 });
 
 const { createRoot } = await import('react-dom/client');
-const { createMemoryRouter, RouterProvider } = await import('react-router');
+const { createMemoryRouter, createPath, RouterProvider, useLocation } = await import('react-router');
 const { Link } = await import('../../../src/client/components');
 
 let loads = 0;
 const errors: string[] = [];
 
+// The location the page rendered with. A Link decides PUSH or REPLACE from it,
+// so a click must wait until React has committed the router's location.
 const Page = () =>
   React.createElement(
     'nav',
     null,
+    React.createElement('output', { 'data-testid': 'rendered' }, createPath(useLocation())),
     React.createElement(Link, { 'data-testid': 'query', to: { pathname: '/tasks', search: '?env=qa' } }, 'QA'),
     React.createElement(Link, { 'data-testid': 'clear', to: '/tasks' }, 'All'),
     React.createElement(
@@ -94,6 +97,10 @@ const idle = () => router.state.navigation.state === 'idle';
 async function scenario(from: string, testId: string): Promise<LinkClickResult> {
   await router.navigate(from);
   await waitFor(idle);
+  // The router settles before React renders its new location: a click before
+  // that render reaches a Link that still holds the previous location.
+  const rendered = () => container.querySelector('[data-testid="rendered"]')?.textContent;
+  await waitFor(() => rendered() === createPath(router.state.location));
   const selector = `[data-testid="${testId}"]`;
   await waitFor(() => container.querySelector(selector) !== null);
   loads = 0;
