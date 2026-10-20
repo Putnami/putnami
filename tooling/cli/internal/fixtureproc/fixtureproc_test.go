@@ -10,7 +10,19 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"go.putnami.dev/sdk/extension/proctree"
+	"go.putnami.dev/tooling/cli/internal/jobs/procdeadline"
 )
+
+// A held program must outlast the bound on time a probe's deadline does not
+// count, so a probe ends by its deadline or by that bound, never by the
+// program giving up with status 124.
+func TestWaitForBoundOutlastsTheUncountedTimeBound(t *testing.T) {
+	if waitForBound <= procdeadline.UncountedTimeBound {
+		t.Fatalf("waitForBound = %s, want more than procdeadline.UncountedTimeBound = %s", waitForBound, procdeadline.UncountedTimeBound)
+	}
+}
 
 func TestMain(m *testing.M) {
 	code := m.Run()
@@ -197,7 +209,7 @@ func TestHoldOutputKeepsTheOutputOpenAfterTheProgramExits(t *testing.T) {
 // Release lets the copy go while another handle holds the release file open.
 // Windows refuses to delete a file that os.Create or os.WriteFile holds open,
 // so a copy that removed the release file failed there, with no trace, and
-// Release waited a minute for it.
+// Release waited for its bound for it.
 func TestReleaseLetsTheCopyGoWhileTheReleaseFileIsOpen(t *testing.T) {
 	dir := t.TempDir()
 	releasePath := filepath.Join(dir, "release")
@@ -233,6 +245,14 @@ func TestReleaseNamesACopyThatDiedWithoutReporting(t *testing.T) {
 	// On Windows this waits for the copy to go, so the test directory can be
 	// removed; elsewhere the copy is no child of this process, and Wait fails.
 	_, _ = copyProcess.Wait()
+	// A kill takes effect when the copy's threads next get a CPU, and until
+	// then the copy can still see the release file release creates and report
+	// an exit status. Wait until it is gone.
+	for deadline := time.Now().Add(waitForBound); proctree.ProcessAlive(pid); time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("the killed copy (pid %d) still runs after %s", pid, waitForBound)
+		}
+	}
 	// The copy is dead, so the bound only sets how soon release gives up.
 	err = release(releasePath, 100*time.Millisecond)
 	if want := fmt.Sprintf("the copy (pid %d) started and reported no exit status", pid); err == nil || !strings.Contains(err.Error(), want) {
@@ -243,7 +263,7 @@ func TestReleaseNamesACopyThatDiedWithoutReporting(t *testing.T) {
 // A copy that failed says why, and Release fails with that line at once.
 func TestReleaseReportsTheExitStatusOfACopyThatFailed(t *testing.T) {
 	releasePath := filepath.Join(t.TempDir(), "release")
-	line := "exit 124: " + releasePath + " never appeared within 1m0s\n"
+	line := "exit 124: " + releasePath + " never appeared within " + waitForBound.String() + "\n"
 	if err := os.WriteFile(releasePath+holderExitSuffix, []byte(line), 0o644); err != nil {
 		t.Fatal(err)
 	}

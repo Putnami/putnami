@@ -112,8 +112,11 @@ func sameEnvName(a, b string) bool {
 const descriptionSuffix = ".fixture.json"
 
 // waitForBound is a hang detector, not a latency budget: a program still
-// waiting after it failed to see the file it was held for.
-const waitForBound = time.Minute
+// waiting after it failed to see the file it was held for. It exceeds
+// procdeadline.UncountedTimeBound, which TestWaitForBoundOutlastsTheUncountedTimeBound
+// pins, so a test that times a held program out ends by the test's deadline or
+// by that bound, never by this one.
+const waitForBound = 3 * time.Minute
 
 // holdOutputEnv names, in the environment of the copy a program starts for
 // Program.HoldOutput, the file that releases the copy.
@@ -362,7 +365,7 @@ func Runs(t testing.TB, record string) []Run {
 
 // Holder returns the process ID of the copy a program started for
 // Program.HoldOutput, once the copy reported it. It fails the test when no copy
-// reported within a minute.
+// reported within waitForBound.
 func Holder(t testing.TB, release string) int {
 	t.Helper()
 	for deadline := time.Now().Add(waitForBound); ; time.Sleep(10 * time.Millisecond) {
