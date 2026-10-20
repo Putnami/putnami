@@ -526,3 +526,15 @@ func TestRejectStructuredIfUnsupported(t *testing.T) {
 		})
 	}
 }
+
+// TestWarningWriter pins where a command that reads the workspace writes the
+// warnings its load recorded: stderr, and nowhere under --quiet.
+func TestWarningWriter(t *testing.T) {
+	t.Parallel()
+	if got := warningWriter(&CommandEnv{}); got != os.Stderr {
+		t.Errorf("warningWriter = %v, want stderr", got)
+	}
+	if got := warningWriter(&CommandEnv{Global: GlobalFlags{Quiet: true}}); got != nil {
+		t.Errorf("warningWriter under --quiet = %v, want nil", got)
+	}
+}

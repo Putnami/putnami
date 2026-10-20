@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/template"
@@ -610,7 +611,7 @@ func TestProjectsList_SortsTextOutputByName(t *testing.T) {
 	dir := makeProjectsListWorkspace(t)
 
 	output, err := captureStdout(t, func() error {
-		return ProjectsList(dir, nil, "")
+		return ProjectsList(dir, nil, "", nil)
 	})
 	if err != nil {
 		t.Fatalf("ProjectsList: %v", err)
@@ -643,7 +644,7 @@ func TestProjectsList_SortsJSONLOutputByName(t *testing.T) {
 	dir := makeProjectsListWorkspace(t)
 
 	output, err := captureStdout(t, func() error {
-		return ProjectsList(dir, nil, "jsonl")
+		return ProjectsList(dir, nil, "jsonl", nil)
 	})
 	if err != nil {
 		t.Fatalf("ProjectsList: %v", err)
@@ -688,7 +689,7 @@ func TestProjectsDescribe_TransparentGroupFolderUsesLogicalID(t *testing.T) {
 	writeJSONFile(t, filepath.Join(projectDir, "putnami.json"), map[string]any{"name": "auth-server"})
 
 	output, err := captureStdout(t, func() error {
-		return ProjectsDescribe(dir, nil, []string{"/identity/auth-server"}, "")
+		return ProjectsDescribe(dir, nil, []string{"/identity/auth-server"}, "", nil)
 	})
 	if err != nil {
 		t.Fatalf("ProjectsDescribe(logical ID): %v", err)
@@ -699,7 +700,7 @@ func TestProjectsDescribe_TransparentGroupFolderUsesLogicalID(t *testing.T) {
 		}
 	}
 	if _, err := captureStdout(t, func() error {
-		return ProjectsDescribe(dir, nil, []string{"/identity/workloads/auth-server"}, "")
+		return ProjectsDescribe(dir, nil, []string{"/identity/workloads/auth-server"}, "", nil)
 	}); err == nil {
 		t.Error("former path-derived ID must not resolve as a compatibility alias")
 	}
@@ -909,7 +910,7 @@ func TestProjectsDescribe_ListsDeclaredJobsAsIgnored(t *testing.T) {
 	t.Cleanup(func() { workspace.InvalidateLoadCache(dir) })
 
 	output, err := captureStdout(t, func() error {
-		return ProjectsDescribe(dir, nil, []string{"app"}, "")
+		return ProjectsDescribe(dir, nil, []string{"app"}, "", nil)
 	})
 	if err != nil {
 		t.Fatalf("ProjectsDescribe: %v", err)
@@ -943,7 +944,7 @@ func TestProjectsDescribe_ReportsEmptyJobsBlock(t *testing.T) {
 	t.Cleanup(func() { workspace.InvalidateLoadCache(dir) })
 
 	output, err := captureStdout(t, func() error {
-		return ProjectsDescribe(dir, nil, []string{"app"}, "")
+		return ProjectsDescribe(dir, nil, []string{"app"}, "", nil)
 	})
 	if err != nil {
 		t.Fatalf("ProjectsDescribe: %v", err)
@@ -954,5 +955,144 @@ func TestProjectsDescribe_ReportsEmptyJobsBlock(t *testing.T) {
 	}
 	if !strings.Contains(output, "ignored") {
 		t.Errorf("describe does not mark the empty `jobs` block as ignored:\n%s", output)
+	}
+}
+
+// --- workspace warnings ---
+
+// assertProviderViewWarning fails unless stderr carries the warning Load
+// records for a workspace with no index, naming the index file and the
+// affected project.
+func assertProviderViewWarning(t *testing.T, stderr string) {
+	t.Helper()
+	if !strings.HasPrefix(stderr, "putnami: warning: ") {
+		t.Fatalf("stderr = %q, want a putnami warning line", stderr)
+	}
+	for _, want := range []string{workspace.WorkspaceIndexFilename, "web", "putnami projects sync"} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("warning does not mention %q:\n%s", want, stderr)
+		}
+	}
+}
+
+func TestProjectsList_WarnsOnAnUnindexedWorkspace(t *testing.T) {
+	for _, format := range []string{"", "jsonl"} {
+		t.Run("format="+format, func(t *testing.T) {
+			root := sharedtest.UnindexedWorkspace(t)
+			var stderr bytes.Buffer
+			stdout, err := captureStdout(t, func() error {
+				return ProjectsList(root, nil, format, &stderr)
+			})
+			if err != nil {
+				t.Fatalf("ProjectsList: %v", err)
+			}
+			assertProviderViewWarning(t, stderr.String())
+			if strings.Contains(stdout, "warning") {
+				t.Errorf("the warning reached stdout:\n%s", stdout)
+			}
+			if !strings.Contains(stdout, "web") {
+				t.Errorf("the project is missing from the listing:\n%s", stdout)
+			}
+		})
+	}
+}
+
+func TestProjectsList_IndexedWorkspaceAndQuietWriteNoWarning(t *testing.T) {
+	root := sharedtest.UnindexedWorkspace(t)
+	if err := quietly(t, func() error { return ProjectsList(root, nil, "jsonl", nil) }); err != nil {
+		t.Fatalf("ProjectsList with no warning writer: %v", err)
+	}
+
+	sharedtest.RecordWorkspaceIndex(t, root)
+	var stderr bytes.Buffer
+	stdout, err := captureStdout(t, func() error {
+		return ProjectsList(root, nil, "jsonl", &stderr)
+	})
+	if err != nil {
+		t.Fatalf("ProjectsList: %v", err)
+	}
+	if stderr.Len() != 0 {
+		t.Errorf("an indexed workspace warned:\n%s", stderr.String())
+	}
+	if !strings.Contains(stdout, `"name":"@acme/web"`) {
+		t.Errorf("the indexed listing does not carry the manifest name:\n%s", stdout)
+	}
+}
+
+func TestProjectsDescribe_WarnsOnAnUnindexedWorkspace(t *testing.T) {
+	root := sharedtest.UnindexedWorkspace(t)
+	var stderr bytes.Buffer
+	if _, err := captureStdout(t, func() error {
+		return ProjectsDescribe(root, nil, []string{"/web"}, "", &stderr)
+	}); err != nil {
+		t.Fatalf("ProjectsDescribe: %v", err)
+	}
+	assertProviderViewWarning(t, stderr.String())
+
+	sharedtest.RecordWorkspaceIndex(t, root)
+	stderr.Reset()
+	if _, err := captureStdout(t, func() error {
+		return ProjectsDescribe(root, nil, []string{"/web"}, "", &stderr)
+	}); err != nil {
+		t.Fatalf("ProjectsDescribe (indexed): %v", err)
+	}
+	if stderr.Len() != 0 {
+		t.Errorf("an indexed workspace warned:\n%s", stderr.String())
+	}
+}
+
+// quietly runs fn with stdout captured and discarded.
+func quietly(t *testing.T, fn func() error) error {
+	t.Helper()
+	_, err := captureStdout(t, fn)
+	return err
+}
+
+// The commands that read the workspace without planning over it report the
+// warning Load records for a workspace with no index, as projects list does.
+func TestWorkspaceReadingCommandsWarnOnAnUnindexedWorkspace(t *testing.T) {
+	commands := map[string]func(root string, warnings io.Writer) error{
+		"workspace describe": func(root string, warnings io.Writer) error {
+			return WorkspaceDescribe(root, wsproto.Load(root), "", warnings)
+		},
+		"scopes list": func(root string, warnings io.Writer) error {
+			return ScopesList(root, wsproto.Load(root), "", warnings)
+		},
+		"projects tag": func(root string, warnings io.Writer) error {
+			return ProjectsTag(root, wsproto.Load(root), []string{"web"}, warnings)
+		},
+	}
+	for name, run := range commands {
+		t.Run(name, func(t *testing.T) {
+			root := sharedtest.UnindexedWorkspace(t)
+			var stderr bytes.Buffer
+			stdout, err := captureStdout(t, func() error { return run(root, &stderr) })
+			if err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+			assertProviderViewWarning(t, stderr.String())
+			if strings.Contains(stdout, "warning") {
+				t.Errorf("the warning reached stdout:\n%s", stdout)
+			}
+
+			sharedtest.RecordWorkspaceIndex(t, root)
+			stderr.Reset()
+			if name == "projects tag" {
+				// The recorded view renames the project.
+				run = func(root string, warnings io.Writer) error {
+					return ProjectsTag(root, wsproto.Load(root), []string{"@acme/web"}, warnings)
+				}
+			}
+			if _, err := captureStdout(t, func() error { return run(root, &stderr) }); err != nil {
+				t.Fatalf("%s (indexed): %v", name, err)
+			}
+			if stderr.Len() != 0 {
+				t.Errorf("an indexed workspace warned:\n%s", stderr.String())
+			}
+
+			if err := quietly(t, func() error { return run(root, nil) }); err != nil {
+				t.Fatalf("%s with no warning writer: %v", name, err)
+			}
+		})
 	}
 }

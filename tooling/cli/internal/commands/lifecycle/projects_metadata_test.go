@@ -71,7 +71,7 @@ func tagsEqual(a, b []string) bool {
 func TestProjectsTag_Add(t *testing.T) {
 	ws, pkgPath := setupTaggableProject(t, "")
 
-	if err := ProjectsTag(ws, nil, []string{"@demo/api", "backend,go"}); err != nil {
+	if err := ProjectsTag(ws, nil, []string{"@demo/api", "backend,go"}, nil); err != nil {
 		t.Fatalf("ProjectsTag add: %v", err)
 	}
 
@@ -84,7 +84,7 @@ func TestProjectsTag_Add(t *testing.T) {
 func TestProjectsTag_AddDedupes(t *testing.T) {
 	ws, pkgPath := setupTaggableProject(t, `,"tags":["go"]`)
 
-	if err := ProjectsTag(ws, nil, []string{"@demo/api", "go,api"}); err != nil {
+	if err := ProjectsTag(ws, nil, []string{"@demo/api", "go,api"}, nil); err != nil {
 		t.Fatalf("ProjectsTag add: %v", err)
 	}
 	if got := readPutnamiTags(t, pkgPath); !tagsEqual(got, []string{"api", "go"}) {
@@ -95,7 +95,7 @@ func TestProjectsTag_AddDedupes(t *testing.T) {
 func TestProjectsTag_Remove(t *testing.T) {
 	ws, pkgPath := setupTaggableProject(t, `,"tags":["api","backend","go"]`)
 
-	if err := ProjectsTag(ws, nil, []string{"@demo/api", "backend", "--remove"}); err != nil {
+	if err := ProjectsTag(ws, nil, []string{"@demo/api", "backend", "--remove"}, nil); err != nil {
 		t.Fatalf("ProjectsTag remove: %v", err)
 	}
 	if got := readPutnamiTags(t, pkgPath); !tagsEqual(got, []string{"api", "go"}) {
@@ -106,7 +106,7 @@ func TestProjectsTag_Remove(t *testing.T) {
 func TestProjectsTag_Set(t *testing.T) {
 	ws, pkgPath := setupTaggableProject(t, `,"tags":["old"]`)
 
-	if err := ProjectsTag(ws, nil, []string{"@demo/api", "x,y", "--set"}); err != nil {
+	if err := ProjectsTag(ws, nil, []string{"@demo/api", "x,y", "--set"}, nil); err != nil {
 		t.Fatalf("ProjectsTag set: %v", err)
 	}
 	if got := readPutnamiTags(t, pkgPath); !tagsEqual(got, []string{"x", "y"}) {
@@ -117,7 +117,7 @@ func TestProjectsTag_Set(t *testing.T) {
 func TestProjectsTag_RemoveAllClears(t *testing.T) {
 	ws, pkgPath := setupTaggableProject(t, `,"tags":["only"]`)
 
-	if err := ProjectsTag(ws, nil, []string{"@demo/api", "only", "--remove"}); err != nil {
+	if err := ProjectsTag(ws, nil, []string{"@demo/api", "only", "--remove"}, nil); err != nil {
 		t.Fatalf("ProjectsTag remove last: %v", err)
 	}
 	// Clearing all tags leaves no tag behind. The field itself SURVIVES, as an
@@ -190,7 +190,7 @@ func TestProjectsTag_RemoveAllClearsProviderTags(t *testing.T) {
 		t.Fatalf("fixture tags = %v, want the provider view's [api web]", got)
 	}
 
-	if err := ProjectsTag(ws, nil, []string{"@demo/api", "api,web", "--remove"}); err != nil {
+	if err := ProjectsTag(ws, nil, []string{"@demo/api", "api,web", "--remove"}, nil); err != nil {
 		t.Fatalf("ProjectsTag remove all: %v", err)
 	}
 
@@ -220,7 +220,7 @@ func TestProjectsTag_PartialRemoveKeepsTheRest(t *testing.T) {
 	recordProviderTags(t, ws, "packages/api", []string{"api", "web"})
 	t.Cleanup(func() { workspace.InvalidateLoadCache(ws) })
 
-	if err := ProjectsTag(ws, nil, []string{"@demo/api", "web", "--remove"}); err != nil {
+	if err := ProjectsTag(ws, nil, []string{"@demo/api", "web", "--remove"}, nil); err != nil {
 		t.Fatalf("ProjectsTag remove: %v", err)
 	}
 	if got := readPutnamiTags(t, cfgPath); !tagsEqual(got, []string{"api"}) {
@@ -255,7 +255,7 @@ func TestProjectsTag_UnauthoredTagsStillComeFromTheProviderView(t *testing.T) {
 
 func TestProjectsTag_MissingNameIsUsageError(t *testing.T) {
 	ws, _ := setupTaggableProject(t, "")
-	err := ProjectsTag(ws, nil, nil)
+	err := ProjectsTag(ws, nil, nil, nil)
 	if err == nil {
 		t.Fatal("ProjectsTag with no project name should error")
 	}
@@ -263,7 +263,7 @@ func TestProjectsTag_MissingNameIsUsageError(t *testing.T) {
 
 func TestProjectsTag_UnknownProjectNotFound(t *testing.T) {
 	ws, _ := setupTaggableProject(t, "")
-	err := ProjectsTag(ws, nil, []string{"@demo/nope", "x"})
+	err := ProjectsTag(ws, nil, []string{"@demo/nope", "x"}, nil)
 	if err == nil {
 		t.Fatal("ProjectsTag with unknown project should error")
 	}

@@ -43,10 +43,8 @@ func loadWorkspaceAndExtensions(req *Request) (*workspace.Workspace, *extension.
 	// package.json/go.mod). These are always shown — silently swallowed
 	// parse errors lead to "my project isn't listed" with zero diagnostic.
 	// Quiet mode still hides them so scripts can stay clean.
-	if len(ws.Warnings) > 0 && !req.Global.Quiet {
-		for _, w := range ws.Warnings {
-			iox.Fprintf(os.Stderr, "putnami: warning: %s\n", w)
-		}
+	if !req.Global.Quiet {
+		workspace.WriteWarnings(os.Stderr, ws)
 	}
 
 	projectPaths := make([]string, len(ws.Projects))

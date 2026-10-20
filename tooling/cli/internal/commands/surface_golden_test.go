@@ -80,7 +80,7 @@ func firstSurfaceGoldenDiff(want, got string) string {
 func TestGoldenCompletionScripts(t *testing.T) {
 	generators := []struct {
 		name     string
-		generate func(io.Writer, string, *wsproto.Config)
+		generate func(io.Writer, string, *wsproto.Config, io.Writer)
 	}{
 		{"completion-bash", completion.CompletionBash},
 		{"completion-zsh", completion.CompletionZsh},
@@ -89,7 +89,7 @@ func TestGoldenCompletionScripts(t *testing.T) {
 	for _, generator := range generators {
 		t.Run(generator.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			generator.generate(&buf, "", &wsproto.Config{})
+			generator.generate(&buf, "", &wsproto.Config{}, nil)
 			assertSurfaceGolden(t, generator.name, buf.String())
 		})
 	}

@@ -12,6 +12,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/hometest"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // completionBinaryEnv makes this test binary stand in for the putnami binary
@@ -34,7 +35,7 @@ func TestCompletionBash(t *testing.T) {
 	var buf bytes.Buffer
 	cfg := &wsproto.Config{}
 
-	CompletionBash(&buf, "", cfg)
+	CompletionBash(&buf, "", cfg, nil)
 	output := buf.String()
 
 	if !strings.Contains(output, "_putnami_completions") {
@@ -70,7 +71,7 @@ func TestCompletionZsh(t *testing.T) {
 	var buf bytes.Buffer
 	cfg := &wsproto.Config{}
 
-	CompletionZsh(&buf, "", cfg)
+	CompletionZsh(&buf, "", cfg, nil)
 	output := buf.String()
 
 	if !strings.Contains(output, "#compdef putnami") {
@@ -109,7 +110,7 @@ func TestCompletionFish(t *testing.T) {
 	var buf bytes.Buffer
 	cfg := &wsproto.Config{}
 
-	CompletionFish(&buf, "", cfg)
+	CompletionFish(&buf, "", cfg, nil)
 	output := buf.String()
 
 	if !strings.Contains(output, "complete -c putnami") {
@@ -140,7 +141,7 @@ func TestCompletionFish(t *testing.T) {
 
 func TestGatherCompletionContext(t *testing.T) {
 	cfg := &wsproto.Config{}
-	ctx := gatherCompletionContext("", cfg)
+	ctx := gatherCompletionContext("", cfg, nil)
 
 	// Outside a workspace no extension is loaded: the core offers no job
 	// command and no alias.
@@ -208,7 +209,7 @@ func TestGatherCompletionContext(t *testing.T) {
 
 func TestCompletionHidesInternalExtensionCommands(t *testing.T) {
 	dir := writeInternalCommandCompletionWorkspace(t)
-	ctx := gatherCompletionContext(dir, &wsproto.Config{})
+	ctx := gatherCompletionContext(dir, &wsproto.Config{}, nil)
 
 	if sharedtest.Contains(ctx.commands, "deps-upgrade") {
 		t.Fatalf("internal command leaked into completion commands: %v", ctx.commands)
@@ -227,7 +228,7 @@ func TestCompletionHidesInternalExtensionCommands(t *testing.T) {
 	}
 
 	var bash bytes.Buffer
-	CompletionBash(&bash, dir, &wsproto.Config{})
+	CompletionBash(&bash, dir, &wsproto.Config{}, nil)
 	if strings.Contains(bash.String(), "deps-upgrade") {
 		t.Error("expected bash completion to hide deps-upgrade")
 	}
@@ -236,7 +237,7 @@ func TestCompletionHidesInternalExtensionCommands(t *testing.T) {
 	}
 
 	var zsh bytes.Buffer
-	CompletionZsh(&zsh, dir, &wsproto.Config{})
+	CompletionZsh(&zsh, dir, &wsproto.Config{}, nil)
 	if strings.Contains(zsh.String(), "deps-upgrade") {
 		t.Error("expected zsh completion to hide deps-upgrade")
 	}
@@ -245,7 +246,7 @@ func TestCompletionHidesInternalExtensionCommands(t *testing.T) {
 	}
 
 	var fish bytes.Buffer
-	CompletionFish(&fish, dir, &wsproto.Config{})
+	CompletionFish(&fish, dir, &wsproto.Config{}, nil)
 	if strings.Contains(fish.String(), "deps-upgrade") {
 		t.Error("expected fish completion to hide deps-upgrade")
 	}
@@ -258,10 +259,10 @@ func TestGatherCompletionContext_FlatJobFlagsAndAliases(t *testing.T) {
 	dir := writeJobFlagCompletionWorkspace(t)
 	// The fixture declares no vocabulary, so the aliases d and D exist only as
 	// the workspace names them.
-	if bare := gatherCompletionContext(dir, &wsproto.Config{}); sharedtest.Contains(bare.commands, "d") || sharedtest.Contains(bare.commands, "D") {
+	if bare := gatherCompletionContext(dir, &wsproto.Config{}, nil); sharedtest.Contains(bare.commands, "d") || sharedtest.Contains(bare.commands, "D") {
 		t.Fatalf("aliases d and D offered without a vocabulary or a workspace alias: %v", bare.commands)
 	}
-	ctx := gatherCompletionContext(dir, &wsproto.Config{Aliases: map[string]string{"d": "deploy", "D": "deploy"}})
+	ctx := gatherCompletionContext(dir, &wsproto.Config{Aliases: map[string]string{"d": "deploy", "D": "deploy"}}, nil)
 
 	deployFlags := ctx.structuredFlags["deploy"]
 	if !containsStructuredFlag(deployFlags, "--environment") {
@@ -280,19 +281,19 @@ func TestGatherCompletionContext_FlatJobFlagsAndAliases(t *testing.T) {
 	}
 
 	var bash bytes.Buffer
-	CompletionBash(&bash, dir, &wsproto.Config{})
+	CompletionBash(&bash, dir, &wsproto.Config{}, nil)
 	if !strings.Contains(bash.String(), "'deploy') printf '%s\\n' '--confirm --environment'") {
 		t.Error("expected bash completion to include deploy command flags")
 	}
 
 	var zsh bytes.Buffer
-	CompletionZsh(&zsh, dir, &wsproto.Config{})
+	CompletionZsh(&zsh, dir, &wsproto.Config{}, nil)
 	if !strings.Contains(zsh.String(), "'--environment[Deployment environment]:value:'") {
 		t.Error("expected zsh completion to include deploy string flag")
 	}
 
 	var fish bytes.Buffer
-	CompletionFish(&fish, dir, &wsproto.Config{})
+	CompletionFish(&fish, dir, &wsproto.Config{}, nil)
 	if !strings.Contains(fish.String(), "__putnami_seen_path deploy' -l 'environment'") {
 		t.Error("expected fish completion to include deploy string flag")
 	}
@@ -325,7 +326,7 @@ func TestGatherCompletionContext_DiscoversTemplateValues(t *testing.T) {
 	}
 
 	cfg := &wsproto.Config{}
-	ctx := gatherCompletionContext(dir, cfg)
+	ctx := gatherCompletionContext(dir, cfg, nil)
 
 	values := ctx.structuredFlagValues["projects create --template"]
 	if len(values) != 2 {
@@ -341,7 +342,7 @@ func TestGatherCompletionContext_DiscoversTemplateValues(t *testing.T) {
 
 func TestGatherCompletionContext_ExtensionNestedCommandGroups(t *testing.T) {
 	dir := writeNestedCompletionExtensionWorkspace(t)
-	ctx := gatherCompletionContext(dir, &wsproto.Config{})
+	ctx := gatherCompletionContext(dir, &wsproto.Config{}, nil)
 
 	if !sharedtest.Contains(ctx.structured, "cloud") {
 		t.Fatalf("expected cloud structured command, got %v", ctx.structured)
@@ -373,7 +374,7 @@ func TestCompletionScripts_ExtensionNestedCommandGroups(t *testing.T) {
 	cfg := &wsproto.Config{}
 
 	var bash bytes.Buffer
-	CompletionBash(&bash, dir, cfg)
+	CompletionBash(&bash, dir, cfg, nil)
 	bashOut := bash.String()
 	for _, want := range []string{
 		"'cloud') printf '%s\\n' 'config secrets'",
@@ -387,7 +388,7 @@ func TestCompletionScripts_ExtensionNestedCommandGroups(t *testing.T) {
 	}
 
 	var zsh bytes.Buffer
-	CompletionZsh(&zsh, dir, cfg)
+	CompletionZsh(&zsh, dir, cfg, nil)
 	zshOut := zsh.String()
 	for _, want := range []string{
 		"'cloud config')",
@@ -400,7 +401,7 @@ func TestCompletionScripts_ExtensionNestedCommandGroups(t *testing.T) {
 	}
 
 	var fish bytes.Buffer
-	CompletionFish(&fish, dir, cfg)
+	CompletionFish(&fish, dir, cfg, nil)
 	fishOut := fish.String()
 	for _, want := range []string{
 		"__putnami_complete_children cloud config' -a 'show'",
@@ -415,7 +416,7 @@ func TestCompletionScripts_ExtensionNestedCommandGroups(t *testing.T) {
 
 func TestGatherCompletionContext_ExtensionFlatCommandGroupStillWorks(t *testing.T) {
 	dir := writeFlatCompletionExtensionWorkspace(t)
-	ctx := gatherCompletionContext(dir, &wsproto.Config{})
+	ctx := gatherCompletionContext(dir, &wsproto.Config{}, nil)
 
 	if !sharedtest.Contains(ctx.structured, "demo") {
 		t.Fatalf("expected demo structured command, got %v", ctx.structured)
@@ -444,19 +445,19 @@ func TestCompletionScripts_IncludeDiscoveredTemplateValues(t *testing.T) {
 	cfg := &wsproto.Config{}
 
 	var bash bytes.Buffer
-	CompletionBash(&bash, dir, cfg)
+	CompletionBash(&bash, dir, cfg, nil)
 	if !strings.Contains(bash.String(), "custom-template") {
 		t.Error("expected discovered template in bash completion")
 	}
 
 	var zsh bytes.Buffer
-	CompletionZsh(&zsh, dir, cfg)
+	CompletionZsh(&zsh, dir, cfg, nil)
 	if !strings.Contains(zsh.String(), "'custom-template:Custom template'") {
 		t.Error("expected discovered template in zsh completion")
 	}
 
 	var fish bytes.Buffer
-	CompletionFish(&fish, dir, cfg)
+	CompletionFish(&fish, dir, cfg, nil)
 	if !strings.Contains(fish.String(), "-l 'template'") || !strings.Contains(fish.String(), "custom-template") {
 		t.Error("expected discovered template in fish completion")
 	}
@@ -930,7 +931,7 @@ func completionBinary(t *testing.T) string {
 
 func TestGatherCompletionContext_CollectsBasenames(t *testing.T) {
 	dir := writeCompletionWorkspace(t)
-	ctx := gatherCompletionContext(dir, &wsproto.Config{})
+	ctx := gatherCompletionContext(dir, &wsproto.Config{}, nil)
 
 	if !sharedtest.Contains(ctx.projects, "@acme/web-app") || !sharedtest.Contains(ctx.projects, "acme-api") {
 		t.Errorf("expected project names, got %v", ctx.projects)
@@ -957,7 +958,7 @@ func TestCompletionScripts_OfferNamesAndBasenamesAsTargets(t *testing.T) {
 	cfg := &wsproto.Config{}
 
 	var bash bytes.Buffer
-	CompletionBash(&bash, dir, cfg)
+	CompletionBash(&bash, dir, cfg, nil)
 	bashOut := bash.String()
 	if !strings.Contains(bashOut, `local project_basenames="`) {
 		t.Error("bash: missing project_basenames variable")
@@ -976,7 +977,7 @@ func TestCompletionScripts_OfferNamesAndBasenamesAsTargets(t *testing.T) {
 	}
 
 	var zsh bytes.Buffer
-	CompletionZsh(&zsh, dir, cfg)
+	CompletionZsh(&zsh, dir, cfg, nil)
 	zshOut := zsh.String()
 	if !strings.Contains(zshOut, "project_basenames=(") {
 		t.Error("zsh: missing project_basenames array")
@@ -994,7 +995,7 @@ func TestCompletionScripts_OfferNamesAndBasenamesAsTargets(t *testing.T) {
 	}
 
 	var fish bytes.Buffer
-	CompletionFish(&fish, dir, cfg)
+	CompletionFish(&fish, dir, cfg, nil)
 	fishOut := fish.String()
 	for _, want := range []string{"web-app", "api", "acme-api"} {
 		if !strings.Contains(fishOut, want) {
@@ -1003,5 +1004,40 @@ func TestCompletionScripts_OfferNamesAndBasenamesAsTargets(t *testing.T) {
 	}
 	if strings.Contains(fishOut, "Project names/IDs (for --exclude flag value)") {
 		t.Error("fish: --exclude should not suggest project IDs")
+	}
+}
+
+func TestCompletionWarnsOnAnUnindexedWorkspace(t *testing.T) {
+	generators := map[string]func(w, warnings *bytes.Buffer, root string){
+		"bash": func(w, warnings *bytes.Buffer, root string) { CompletionBash(w, root, &wsproto.Config{}, warnings) },
+		"zsh":  func(w, warnings *bytes.Buffer, root string) { CompletionZsh(w, root, &wsproto.Config{}, warnings) },
+		"fish": func(w, warnings *bytes.Buffer, root string) { CompletionFish(w, root, &wsproto.Config{}, warnings) },
+	}
+	for shell, generate := range generators {
+		t.Run(shell, func(t *testing.T) {
+			root := sharedtest.UnindexedWorkspace(t)
+			var script, warnings bytes.Buffer
+			generate(&script, &warnings, root)
+
+			for _, want := range []string{"putnami: warning: ", workspace.WorkspaceIndexFilename, "putnami projects sync"} {
+				if !strings.Contains(warnings.String(), want) {
+					t.Errorf("warnings do not mention %q:\n%s", want, warnings.String())
+				}
+			}
+			if strings.Contains(script.String(), "warning") {
+				t.Errorf("the warning reached the script:\n%s", script.String())
+			}
+
+			sharedtest.RecordWorkspaceIndex(t, root)
+			script.Reset()
+			warnings.Reset()
+			generate(&script, &warnings, root)
+			if warnings.Len() != 0 {
+				t.Errorf("an indexed workspace warned:\n%s", warnings.String())
+			}
+			if !strings.Contains(script.String(), "@acme/web") {
+				t.Errorf("the indexed script does not embed the manifest name:\n%s", script.String())
+			}
+		})
 	}
 }

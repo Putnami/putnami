@@ -37,7 +37,7 @@ func writeVocabularyCompletionWorkspace(t *testing.T) string {
 
 func TestGatherCompletionContext_OffersTheLoadedVocabulary(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "extension-verb-vocabulary", "completion-offers-the-loaded-vocabulary")
-	ctx := gatherCompletionContext(writeVocabularyCompletionWorkspace(t), &wsproto.Config{})
+	ctx := gatherCompletionContext(writeVocabularyCompletionWorkspace(t), &wsproto.Config{}, nil)
 
 	if !sharedtest.Contains(ctx.commands, "bundle") || ctx.commandDesc["bundle"] != "Bundle the project." {
 		t.Fatalf("bundle = %q, want the vocabulary's description (commands %v)", ctx.commandDesc["bundle"], ctx.commands)
@@ -58,7 +58,7 @@ func TestGatherCompletionContext_OffersTheLoadedVocabulary(t *testing.T) {
 
 	// A workspace alias of the same name hides a vocabulary alias, and is
 	// offered in its place, whatever its name.
-	hidden := gatherCompletionContext(writeVocabularyCompletionWorkspace(t), &wsproto.Config{Aliases: map[string]string{"x": "lint", "b": "test"}})
+	hidden := gatherCompletionContext(writeVocabularyCompletionWorkspace(t), &wsproto.Config{Aliases: map[string]string{"x": "lint", "b": "test"}}, nil)
 	if got := hidden.commandDesc["x"]; got != "Alias for lint" || !sharedtest.Contains(hidden.commands, "x") {
 		t.Errorf("alias x = %q, want the workspace alias Alias for lint", got)
 	}

@@ -10,8 +10,8 @@ import (
 )
 
 // CompletionFish generates a fish completion script.
-func CompletionFish(w io.Writer, wsRoot string, cfg *wsproto.Config) {
-	ctx := gatherCompletionContext(wsRoot, cfg)
+func CompletionFish(w io.Writer, wsRoot string, cfg *wsproto.Config, warnings io.Writer) {
+	ctx := gatherCompletionContext(wsRoot, cfg, warnings)
 
 	iox.Fprintf(w, `# fish completion for putnami
 # Install: putnami completion fish > ~/.config/fish/completions/putnami.fish

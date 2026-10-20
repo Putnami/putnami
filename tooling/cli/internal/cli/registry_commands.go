@@ -354,15 +354,15 @@ func cmdProjects(env *CommandEnv) error {
 	}
 	switch env.Sub {
 	case "list", "":
-		return lifecycle.ProjectsList(env.WsRoot, env.Cfg, env.OutputFormat)
+		return lifecycle.ProjectsList(env.WsRoot, env.Cfg, env.OutputFormat, warningWriter(env))
 	case "create":
 		return lifecycle.ProjectsCreate(env.Ctx, env.WsRoot, env.Cfg, env.Args, env.Global.Verbose, lifecycleEnv(env))
 	case "describe":
-		return lifecycle.ProjectsDescribe(env.WsRoot, env.Cfg, env.Args, env.OutputFormat)
+		return lifecycle.ProjectsDescribe(env.WsRoot, env.Cfg, env.Args, env.OutputFormat, warningWriter(env))
 	case "sync":
 		return lifecycle.ProjectsSync(env.Ctx, env.WsRoot, env.Cfg, env.Args, env.Global.DryRun, lifecycleEnv(env))
 	case "tag":
-		return lifecycle.ProjectsTag(env.WsRoot, env.Cfg, env.Args)
+		return lifecycle.ProjectsTag(env.WsRoot, env.Cfg, env.Args, warningWriter(env))
 	default:
 		return usageErrorf("unknown subcommand: projects %s", env.Sub)
 	}
@@ -374,7 +374,7 @@ func cmdScopes(env *CommandEnv) error {
 	}
 	switch env.Sub {
 	case "list", "":
-		return lifecycle.ScopesList(env.WsRoot, env.Cfg, env.OutputFormat)
+		return lifecycle.ScopesList(env.WsRoot, env.Cfg, env.OutputFormat, warningWriter(env))
 	default:
 		return usageErrorf("unknown subcommand: scopes %s\n  Available: list", env.Sub)
 	}
@@ -392,7 +392,7 @@ func cmdWorkspace(env *CommandEnv) error {
 		if err := env.requireWorkspace(); err != nil {
 			return err
 		}
-		return lifecycle.WorkspaceDescribe(env.WsRoot, env.Cfg, env.OutputFormat)
+		return lifecycle.WorkspaceDescribe(env.WsRoot, env.Cfg, env.OutputFormat, warningWriter(env))
 	default:
 		return usageErrorf("unknown subcommand: workspace %s", env.Sub)
 	}
@@ -907,18 +907,29 @@ func cmdReport(env *CommandEnv) error {
 	return sessions.ReportShow(env.WsRoot, parsed.value("--session"), env.OutputFormat)
 }
 
+// warningWriter is where a command that reads the workspace writes the
+// warnings the load recorded: stderr, which keeps stdout and the machine
+// envelope clean, or nil under --quiet, as for the engine's own warnings.
+func warningWriter(env *CommandEnv) io.Writer {
+	if env.Global.Quiet {
+		return nil
+	}
+	return os.Stderr
+}
+
 func cmdCompletion(env *CommandEnv) error {
 	shell := env.Sub
 	if shell == "" && len(env.Args) > 0 {
 		shell = env.Args[0]
 	}
+	warnings := warningWriter(env)
 	switch shell {
 	case "bash":
-		completion.CompletionBash(os.Stdout, env.WsRoot, env.Cfg)
+		completion.CompletionBash(os.Stdout, env.WsRoot, env.Cfg, warnings)
 	case "zsh":
-		completion.CompletionZsh(os.Stdout, env.WsRoot, env.Cfg)
+		completion.CompletionZsh(os.Stdout, env.WsRoot, env.Cfg, warnings)
 	case "fish":
-		completion.CompletionFish(os.Stdout, env.WsRoot, env.Cfg)
+		completion.CompletionFish(os.Stdout, env.WsRoot, env.Cfg, warnings)
 	default:
 		return usageErrorf("shell required: completion <bash|zsh|fish>")
 	}
