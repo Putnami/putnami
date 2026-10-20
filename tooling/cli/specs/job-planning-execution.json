@@ -26,6 +26,14 @@
       "text": "Help lists the public commands the loaded extensions declare: the vocabulary's verbs first, in vocabulary order, then the other declared commands by name, with the vocabulary's aliases and the provider-bound global flags a loaded extension gives meaning. Outside a workspace, help says no extension is loaded and how to add one, and reads no user-scope extension. When an extension did not load, help keeps the vocabulary of those that did. --credential-fd is always listed."
     },
     {
+      "id": "help-lists-command-groups",
+      "text": "Help inside a workspace lists the command groups of the loaded extensions in a section titled Commands (from extensions), after the job commands: one row per group, in name order, with its description. A group named like a core command is not listed, because the core answers that name first. A name that a group shares with a flat extension command is listed once, as the group. Outside a workspace the section is absent."
+    },
+    {
+      "id": "completion-skips-carried-commands",
+      "text": "Top-level completion offers the command groups of the loaded extensions and their subcommands, and no flat command that a group carries, which fails typed directly. Help and completion read one rule for a carried command."
+    },
+    {
       "id": "extension-verb-vocabulary",
       "text": "An extension manifest may declare a verb vocabulary: an ordered list of verbs, each with a description, aliases, default traits and related commands. The CLI merges the loaded vocabularies in extension-name order; the first declaration of a verb wins, and a second warns. Help, completion, impact-plan and the live view read the result. Its aliases are the only short command names; a same-named workspace alias hides one with a warning, and an alias never takes a verb, command, command group or core root."
     },

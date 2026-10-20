@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -93,6 +94,10 @@ func oneLine(text string) string {
 	return strings.Join(strings.Fields(text), " ")
 }
 
+// commandGroupsTitle heads the help section that lists the command groups of
+// the loaded extensions.
+const commandGroupsTitle = "Commands (from extensions):"
+
 // structuredCommandCategories is the categorized command listing the text, man,
 // and markdown help renderers all draw from. It is DERIVED from the command
 // catalog (internal/commandmeta): a command appears here because it declares a
@@ -149,46 +154,54 @@ func PrintHelp() {
 	printHelp(nil)
 }
 
-// printHelp prints the top-level help of scope: the job commands, aliases and
-// global flags the loaded extensions give meaning. A nil scope loads no
-// extension, so it lists none of them.
+// printHelp prints the top-level help of scope to the process's standard
+// output.
 func printHelp(scope *helpScope) {
-	iox.Fprintf(os.Stdout, `putnami %s — polyglot build orchestrator
+	printHelpTo(os.Stdout, scope)
+}
+
+// printHelpTo writes the top-level help of scope to w: the job commands, the
+// command groups, the aliases and the global flags the loaded extensions give
+// meaning. A nil scope loads no extension, so it lists none of them.
+func printHelpTo(w io.Writer, scope *helpScope) {
+	iox.Fprintf(w, `putnami %s — polyglot build orchestrator
 
 Usage:
   putnami <command[,command...]> [options]
 
 `, Version)
 	if names := jobCommandNames(scope); names != "" {
-		iox.Fprintf(os.Stdout, `Build (from extensions):
+		iox.Fprintf(w, `Build (from extensions):
   %s
   Multi-command: putnami <command>,<command> --impacted
 
 `, names)
 	} else {
-		iox.Fprintf(os.Stdout, `Build (from extensions):
+		iox.Fprintf(w, `Build (from extensions):
   %s
 
 `, noJobCommandHelp(scope))
 	}
 
+	printCommandGroups(w, scope)
+
 	for _, cat := range structuredCommandCategories {
-		iox.Fprintf(os.Stdout, "%s:\n", cat.Name)
+		iox.Fprintf(w, "%s:\n", cat.Name)
 		for _, c := range cat.Commands {
-			iox.Fprintf(os.Stdout, "  %-28s %s\n", c.Name, c.Description)
+			iox.Fprintf(w, "  %-28s %s\n", c.Name, c.Description)
 		}
-		iox.Fprintln(os.Stdout)
+		iox.Fprintln(w)
 	}
 
 	for _, cat := range scope.flagCategories() {
-		iox.Fprintf(os.Stdout, "%s:\n", cat.Name)
+		iox.Fprintf(w, "%s:\n", cat.Name)
 		for _, f := range cat.Flags {
-			printFlagLine(f)
+			printFlagLine(w, f)
 		}
-		iox.Fprintln(os.Stdout)
+		iox.Fprintln(w)
 	}
 
-	iox.Fprintf(os.Stdout, `Default Selection:
+	iox.Fprintf(w, `Default Selection:
   no target            Feature branch: impacted vs trunk; main/master: local marker, then remote cache marker when active, otherwise all
 
 Positional:
@@ -196,17 +209,36 @@ Positional:
 
 `)
 	if aliases := aliasSummary(scope); aliases != "" {
-		iox.Fprintf(os.Stdout, `Aliases:
+		iox.Fprintf(w, `Aliases:
   %s
 
 `, aliases)
 	}
-	iox.Fprint(os.Stdout, `Help:
+	iox.Fprint(w, `Help:
   putnami help <command>   Command help
   putnami help --man       Man page format
   putnami help --markdown  Markdown format
 
 `)
+}
+
+// printCommandGroups writes the command groups the loaded extensions declare,
+// one row each in the column format of the structured categories. A scope
+// without a group prints no section.
+func printCommandGroups(w io.Writer, scope *helpScope) {
+	groups := scope.commandGroups()
+	if len(groups) == 0 {
+		return
+	}
+	iox.Fprintf(w, "%s\n", commandGroupsTitle)
+	for _, group := range groups {
+		if group.Description == "" {
+			iox.Fprintf(w, "  %s\n", group.Name)
+			continue
+		}
+		iox.Fprintf(w, "  %-28s %s\n", group.Name, group.Description)
+	}
+	iox.Fprintln(w)
 }
 
 // extensionFlagHelpLine is one manifest flag's help line. A boolean flag on by
@@ -325,7 +357,7 @@ func printRelatedCommands(command string, scope *helpScope) {
 }
 
 // printFlagLine prints a single flag line for the text help output.
-func printFlagLine(f FlagInfo) {
+func printFlagLine(w io.Writer, f FlagInfo) {
 	prefix := "  "
 	flag := f.Long
 	if f.Short != "" {
@@ -334,7 +366,7 @@ func printFlagLine(f FlagInfo) {
 	if f.ValueName != "" {
 		flag += " " + f.ValueName
 	}
-	iox.Fprintf(os.Stdout, "%s%-28s %s\n", prefix, flag, f.Description)
+	iox.Fprintf(w, "%s%-28s %s\n", prefix, flag, f.Description)
 }
 
 func printStructuredFlagLine(f completion.StructuredFlagInfo) {

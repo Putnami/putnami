@@ -506,6 +506,27 @@ func CommandGroupNames(extensions []*ExtensionDescription) map[string]bool {
 	return names
 }
 
+// GroupCarriedCommands returns the flat commands the subcommands of groups
+// route to, nested subcommands included. A user types such a command as a
+// subcommand of its group; typed directly, it fails. Help and completion both
+// leave it out of their lists of top-level commands.
+func GroupCarriedCommands(groups map[string]CommandGroupDefinition) map[string]bool {
+	carried := map[string]bool{}
+	var walk func(map[string]SubcommandDefinition)
+	walk = func(subcommands map[string]SubcommandDefinition) {
+		for _, subcommand := range subcommands {
+			if subcommand.Command != "" {
+				carried[subcommand.Command] = true
+			}
+			walk(subcommand.Subcommands)
+		}
+	}
+	for _, group := range groups {
+		walk(group.Subcommands)
+	}
+	return carried
+}
+
 // CommandSubcommandOwners returns, sorted, the names of every extension with
 // an executable definition for the given command-group subcommand. Multiple
 // owners make dispatch first-match-wins across independently released

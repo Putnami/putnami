@@ -28,6 +28,7 @@ import (
 type helpScope struct {
 	commands   map[string]bool
 	listed     []CommandInfo
+	groups     []CommandInfo
 	vocabulary extension.Vocabulary
 }
 
@@ -64,7 +65,7 @@ func workspaceAliases(cfg *wsproto.Config) map[string]string {
 // are user. When an extension did not load, the scope hides nothing and keeps
 // the vocabulary and commands of those that did.
 func helpScopeOf(result *extension.DiscoveryResult, user map[string]string) *helpScope {
-	scope := &helpScope{vocabulary: commandVocabulary(result.Extensions, user), listed: listedCommands(result.Extensions)}
+	scope := &helpScope{vocabulary: commandVocabulary(result.Extensions, user), listed: listedCommands(result.Extensions), groups: listedGroups(result.Extensions)}
 	if len(result.Skipped) > 0 {
 		return scope
 	}
@@ -97,7 +98,7 @@ func listedCommands(extensions []*extension.ExtensionDescription) []CommandInfo 
 	slices.SortStableFunc(ordered, func(a, b *extension.ExtensionDescription) int { return strings.Compare(a.Name, b.Name) })
 	descriptions := map[string]string{}
 	for _, ext := range ordered {
-		carried, providers := groupCommands(ext.CommandGroups), extension.ProviderCommands(ext)
+		carried, providers := extension.GroupCarriedCommands(ext.CommandGroups), extension.ProviderCommands(ext)
 		for name, description := range ext.Commands {
 			if _, core := commandmeta.Lookup(name); core || ext.CommandVisibility[name] == "internal" ||
 				carried[name] || slices.Contains(providers, name) {
@@ -115,23 +116,35 @@ func listedCommands(extensions []*extension.ExtensionDescription) []CommandInfo 
 	return out
 }
 
-// groupCommands returns the flat commands the subcommands of groups route to,
-// nested subcommands included.
-func groupCommands(groups map[string]extension.CommandGroupDefinition) map[string]bool {
-	carried := map[string]bool{}
-	var walk func(map[string]extension.SubcommandDefinition)
-	walk = func(subcommands map[string]extension.SubcommandDefinition) {
-		for _, subcommand := range subcommands {
-			if subcommand.Command != "" {
-				carried[subcommand.Command] = true
-			}
-			walk(subcommand.Subcommands)
+// listedGroups returns the command groups of extensions that help lists, by
+// name. A group named like a structured root of the core is unreachable: the
+// core answers that name without loading extensions (shouldDiscoverExtensions),
+// so help leaves it out. A group several extensions declare takes the
+// description of the first, in extension-name order, that gives one.
+func listedGroups(extensions []*extension.ExtensionDescription) []CommandInfo {
+	ordered := make([]*extension.ExtensionDescription, 0, len(extensions))
+	for _, ext := range extensions {
+		if ext != nil {
+			ordered = append(ordered, ext)
 		}
 	}
-	for _, group := range groups {
-		walk(group.Subcommands)
+	slices.SortStableFunc(ordered, func(a, b *extension.ExtensionDescription) int { return strings.Compare(a.Name, b.Name) })
+	descriptions := map[string]string{}
+	for _, ext := range ordered {
+		for name, group := range ext.CommandGroups {
+			if isStructuredCommand(name) {
+				continue
+			}
+			if current, seen := descriptions[name]; !seen || current == "" {
+				descriptions[name] = group.Description
+			}
+		}
 	}
-	return carried
+	out := make([]CommandInfo, 0, len(descriptions))
+	for _, name := range slices.Sorted(maps.Keys(descriptions)) {
+		out = append(out, CommandInfo{Name: name, Description: strings.TrimSuffix(descriptions[name], ".")})
+	}
+	return out
 }
 
 // commandVocabulary merges the verb vocabularies of extensions for a workspace
@@ -221,16 +234,32 @@ func (s *helpScope) jobCommands() []CommandInfo {
 	}
 	out := make([]CommandInfo, 0, len(s.vocabulary.Verbs)+len(s.listed))
 	for _, verb := range s.vocabulary.Verbs {
-		if s.declares(verb.Name) {
+		if s.declares(verb.Name) && !s.declaresGroup(verb.Name) {
 			out = append(out, CommandInfo{Name: verb.Name, Description: strings.TrimSuffix(verb.Description, ".")})
 		}
 	}
 	for _, command := range s.listed {
-		if _, isVerb := s.verb(command.Name); !isVerb && s.declares(command.Name) {
+		if _, isVerb := s.verb(command.Name); !isVerb && s.declares(command.Name) && !s.declaresGroup(command.Name) {
 			out = append(out, command)
 		}
 	}
 	return out
+}
+
+// commandGroups returns the command groups help lists, by name. A nil scope
+// loads no extension, so it lists none.
+func (s *helpScope) commandGroups() []CommandInfo {
+	if s == nil {
+		return nil
+	}
+	return s.groups
+}
+
+// declaresGroup reports whether help lists a command group named name.
+// Dispatch sends that name to the group before any flat command of an
+// extension, so help lists the name once, as the group.
+func (s *helpScope) declaresGroup(name string) bool {
+	return slices.ContainsFunc(s.commandGroups(), func(group CommandInfo) bool { return group.Name == name })
 }
 
 // flagCategories returns the global-flag categories help lists, dropping a

@@ -27,8 +27,14 @@ has depends on the extensions it installs. `build`, `test`, `lint`, `serve`,
 the development verbs: `@putnami/dev` declares them, and the language
 extensions, which depend on it, run them. The core CLI declares none of them.
 Inside a workspace, `putnami help` lists the commands the workspace's loaded
-extensions declare, with the aliases of their verb vocabulary. Outside a
-workspace it lists none, and says how to add an extension. A command that no
+extensions declare, with the aliases of their verb vocabulary, then a
+`Commands (from extensions):` section with one row per command group of those
+extensions and its description. A group named like a core command is not
+listed, because the core answers that name first; a group named like a flat
+extension command is listed once, as the group. Shell
+completion offers the groups and their subcommands, and not the flat commands a
+group carries, which fail when typed directly. Outside a workspace help lists
+none of these, and says how to add an extension. A command that no
 loaded extension declares is a usage error (exit code 2) in every entry point,
 help included.
 
