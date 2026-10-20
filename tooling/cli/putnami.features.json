@@ -554,7 +554,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "help-and-completion-hide-the-job-flags-where-no-job-command-is-loaded"
+              "help-and-completion-hide-the-job-flags-where-no-job-command-is-loaded",
+              "the-references-and-completion-list-the-flags-help-lists"
             ]
           }
         },

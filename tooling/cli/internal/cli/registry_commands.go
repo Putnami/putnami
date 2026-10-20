@@ -917,10 +917,10 @@ func cmdHelp(env *CommandEnv) error {
 	for _, a := range env.Args {
 		switch a {
 		case "--man":
-			printHelpMan(newHelpScope(env.WsRoot, env.Cfg))
+			printHelpMan(os.Stdout, newHelpScope(env.WsRoot, env.Cfg))
 			return nil
 		case "--markdown":
-			printHelpMarkdown(newHelpScope(env.WsRoot, env.Cfg))
+			printHelpMarkdown(os.Stdout, newHelpScope(env.WsRoot, env.Cfg))
 			return nil
 		}
 	}

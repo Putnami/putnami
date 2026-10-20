@@ -457,7 +457,6 @@ _putnami() {
         '--tag[Filter by tags]:tags:'
         '--exclude-tag[Exclude by tags]:tags:'
         '--baseline[Custom git baseline for --impacted; a job command with no target or --all implies --impacted]:branch:'
-        '--providers[Credentials to ask the credential provider for: install, publish (comma list)]:list:(install publish)'
         '--credential-fd[Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2]:n:'
         '--no-cache[Force re-execution (skip cache)]'
         '--continue-on-error[Don'\''t abort on first failure]'
