@@ -666,7 +666,9 @@ function Remove-Workdir {
 
 # Processes that still run an executable from the smoke workdir, or whose command
 # line names it, after the CLI stopped. On Windows, every process the CLI starts
-# ends with it (ADR 0052).
+# ends with it: ADR 0052 puts it in a Job Object, and that is the guarantee. This
+# check is a sanity check on it. It cannot see a host bun.exe that serves
+# "./src/serve.ts", because Win32_Process reports no working directory.
 function Get-OrphanedProcesses {
     $prefix = (Get-FullPath $Workdir).TrimEnd('\') + '\'
     return @(Get-CimInstance -ClassName Win32_Process | Where-Object {

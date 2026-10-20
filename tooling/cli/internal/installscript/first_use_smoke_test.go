@@ -47,20 +47,55 @@ const firstUseOtherPage = "<!doctype html><title>Another service</title>"
 type stopHandover struct {
 	// page is what the successor serves.
 	page string
-	// ofTheSmoke makes the command line of the successor name a path under the
-	// home of the smoke, as every process the smoke starts does.
-	ofTheSmoke bool
+	// belongsBy says how the successor is under the smoke: by a path in its
+	// command line, by its working directory, or not at all. A successor that
+	// does not belong runs from the temporary directory with a neutral command
+	// line.
+	belongsBy stopIdentity
 }
+
+// stopIdentity is the way a successor is tied to the smoke that started it.
+type stopIdentity int
+
+const (
+	_ stopIdentity = iota // the zero value: the successor does not belong
+	// byCommandLine puts a path under the smoke's home in the command line.
+	byCommandLine
+	// byWorkingDirectory keeps a neutral command line, as a host Bun that runs
+	// "./src/serve.ts" does, and runs in the directory of the stub starter, which
+	// is below the smoke's workdir or home.
+	byWorkingDirectory
+)
 
 // stopHandovers maps a scenario to its successor.
 var stopHandovers = map[string]stopHandover{
 	// The starter outlives its group and serves its own page.
-	"go-stop-orphan": {page: firstUseStarterPage, ofTheSmoke: true},
+	"go-stop-orphan": {page: firstUseStarterPage, belongsBy: byCommandLine},
+	// The same orphan, with a command line that names no path of the smoke.
+	"go-stop-orphan-cwd": {page: firstUseStarterPage, belongsBy: byWorkingDirectory},
 	// Another service takes the freed port.
 	"go-stop-port-reused": {page: firstUseOtherPage},
 	// A sibling stub of this package takes the freed port: it serves the very
 	// page of the starter, from a process that is not under the smoke's home.
 	"go-stop-sibling-stub": {page: firstUseStarterPage},
+}
+
+// processDirectoryLookupAvailable reports whether the smoke scripts can read
+// the working directory of a process: /proc on Linux, lsof elsewhere. Without
+// it the scripts decide on command lines alone.
+func processDirectoryLookupAvailable() bool {
+	if runtime.GOOS == "linux" {
+		return true
+	}
+	if _, err := exec.LookPath("lsof"); err == nil {
+		return true
+	}
+	for _, candidate := range []string{"/usr/sbin/lsof", "/usr/bin/lsof"} {
+		if _, err := os.Stat(candidate); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // stopHandoverMarker is the argument that puts a successor under the home of
@@ -381,8 +416,8 @@ func pageHandler(statuses map[string]int, page string) http.Handler {
 
 // handOverListener passes the listening socket to a process of another group
 // that answers on it with the page of next, and returns once that process
-// serves. The command line of the successor names the smoke's home only when
-// next says it belongs to the smoke. The
+// serves. The successor belongs to the smoke only as next says: by its command
+// line, by its working directory, or not at all. The
 // caller ends afterwards, so the port never goes unanswered between the two.
 // The test binary re-executes itself as the successor: any helper of this
 // package can call it.
@@ -402,10 +437,18 @@ func handOverListener(listener net.Listener, next stopHandover) error {
 	}
 	defer serving.Close()
 	arguments := []string{"-test.run=^TestFirstUseCLIHelperProcess$"}
-	if next.ofTheSmoke {
+	if next.belongsBy == byCommandLine {
 		arguments = append(arguments, stopHandoverMarker())
 	}
 	successor := exec.Command(executable, arguments...)
+	successor.Dir = os.TempDir()
+	if next.belongsBy == byWorkingDirectory {
+		directory, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		successor.Dir = directory
+	}
 	successor.Env = append(os.Environ(), firstUseHelperEnv+"=1", firstUseSuccessorEnv+"="+next.page)
 	successor.ExtraFiles = []*os.File{file, announce}
 	inOwnProcessGroup(successor)
@@ -546,6 +589,26 @@ func TestFirstUseSmokeStopFailsOnAProcessOfTheSmokeThatOutlivesTheStop(t *testin
 	}
 	if want := "/.putnami/stub-starter"; !res.contains(want) {
 		t.Fatalf("first-use smoke did not print the surviving process (%q):\n%s", want, res.output)
+	}
+}
+
+// A starter can serve from a host Bun whose command line names no path of the
+// smoke: it runs "./src/serve.ts" in the project directory. The working
+// directory then names the tree, and the stop leg still fails.
+func TestFirstUseSmokeStopFailsOnAProcessThatRunsInTheTreeOfTheSmoke(t *testing.T) {
+	spectest.Proves(t, "cli/first-use-path", "first-use-smoke-stop", "the-stop-leg-fails-on-a-process-that-runs-in-the-tree-of-the-smoke")
+	if !processDirectoryLookupAvailable() {
+		t.Skip("neither /proc nor lsof can read the working directory of a process here; the scripts decide on command lines alone")
+	}
+	res := runFirstUseOnHost(t, "go-stop-orphan-cwd", "latest")
+	if res.exitCode == 0 {
+		t.Fatalf("first-use smoke passed although a process kept running in the tree of the smoke:\n%s", res.output)
+	}
+	if want := "::error::go-stop leg: a process of the smoke still runs after the commands stopped"; !res.contains(want) {
+		t.Fatalf("first-use smoke did not report %q:\n%s", want, res.output)
+	}
+	if !res.contains(" cwd ") {
+		t.Fatalf("first-use smoke did not print the surviving process by its working directory:\n%s", res.output)
 	}
 }
 

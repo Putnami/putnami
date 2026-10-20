@@ -593,6 +593,18 @@ func TestSmokeShutdownLegTellsAnOrphanFromAnotherListenerOnTheFreedPort(t *testi
 		t.Fatalf("the smoke accepted a starter that still runs after the stop (exit %d):\n%s", orphan.exitCode, orphan.output)
 	}
 
+	// The same orphan with a command line that names no path of the smoke, as a
+	// host Bun running "./src/serve.ts" has: only its working directory, the
+	// project directory, names the tree.
+	if processDirectoryLookupAvailable() {
+		byDirectory := runSmokeFrom(t, server.URL, server.URL+"/install.sh", "", t.TempDir(), smokeStopHandoverEnv+"=go-stop-orphan-cwd")
+		if byDirectory.exitCode == 0 || !byDirectory.contains("::error::shutdown leg: a process of the smoke still runs after the CLI exited; the starter may be orphaned") || !byDirectory.contains(" cwd ") {
+			t.Fatalf("the smoke accepted a starter that still runs in its tree after the stop (exit %d):\n%s", byDirectory.exitCode, byDirectory.output)
+		}
+	} else {
+		t.Log("neither /proc nor lsof can read the working directory of a process here; the working-directory orphan is not checked")
+	}
+
 	for _, successor := range []string{"go-stop-port-reused", "go-stop-sibling-stub"} {
 		other := runSmokeFrom(t, server.URL, server.URL+"/install.sh", "", t.TempDir(), smokeStopHandoverEnv+"="+successor)
 		if other.exitCode != 0 || !other.contains("smoke: no process of the smoke runs after clean stop") || !other.contains("so another listener took it") {

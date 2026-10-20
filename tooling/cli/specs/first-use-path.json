@@ -27,7 +27,7 @@
     },
     {
       "id": "first-use-smoke-stop",
-      "text": "After a served starter stops, the smoke fails when a process of the smoke still runs: one whose command line names the smoke's workdir or Putnami home. It does not compare what the starter's port serves, because the page of a webapp changes on every request and a freed port can go to an unrelated listener, even one that serves the same page. It reports who answers on the port. Every failure names its leg and exits non-zero."
+      "text": "After a served starter stops, the smoke fails when a process of the smoke still runs: one whose command line names the smoke's workdir or Putnami home, or whose working directory is below either. It does not compare what the starter's port serves, because the page of a webapp changes on every request and a freed port can go to an unrelated listener, even one that serves the same page. It reports who answers on the port. Every failure names its leg and exits non-zero."
     },
     {
       "id": "init-lists-members-once",

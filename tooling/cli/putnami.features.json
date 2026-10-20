@@ -3616,6 +3616,7 @@
             "kind": "acceptance",
             "checks": [
               "the-stop-leg-fails-on-a-process-of-the-smoke-that-outlives-the-stop",
+              "the-stop-leg-fails-on-a-process-that-runs-in-the-tree-of-the-smoke",
               "the-stop-leg-ignores-another-listener-on-the-freed-port"
             ]
           }

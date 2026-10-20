@@ -103,6 +103,7 @@ esac
 url="${base}/putnami/cli/download?channel=${channel}&os=${os}&arch=${arch}"
 
 workdir="$(mktemp -d)"
+workdir_real="$(cd "$workdir" && pwd -P)" || workdir_real="$workdir"
 workspace=""
 server_pid=""
 
@@ -150,11 +151,49 @@ list_processes() {
   done
 }
 
-# Print the processes whose command line names the smoke workdir. The listing is
-# taken before grep starts, so grep does not match itself.
+# Print "pid directory" for the working directory of each process whose
+# directory the user can read: from /proc on Linux, from lsof where it is
+# installed (macOS). Where neither exists it prints nothing, and the command
+# lines alone decide.
+list_directories() {
+  if readlink /proc/self/cwd >/dev/null 2>&1; then
+    for process_dir in /proc/[0-9]*; do
+      process_cwd="$(readlink "$process_dir/cwd" 2>/dev/null)" || continue
+      printf '%s %s\n' "${process_dir#/proc/}" "$process_cwd"
+    done
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -a -d cwd -Fpn 2>/dev/null |
+      awk '/^p/ { pid = substr($0, 2) } /^n/ { print pid, substr($0, 2) }' || true
+  fi
+}
+
+# Print the processes that belong to this smoke: those whose command line names
+# its workdir, and those that run in a directory below it. Each path is matched
+# as written and as resolved (macOS resolves /var to /private/var). The
+# listings are taken before grep and awk start, so neither matches itself.
 smoke_processes() {
+  # The working directory of this subshell must not count as one of the smoke's.
+  cd / 2>/dev/null || true
   process_list="$(list_processes 2>/dev/null)" || true
-  printf '%s\n' "$process_list" | grep -F -e "${workdir}/" || true
+  directory_list="$(list_directories 2>/dev/null)" || true
+  smoke_roots="${workdir}
+${workdir_real}"
+  printf '%s\n' "$process_list" | grep -F -e "${workdir}/" -e "${workdir_real}/" || true
+  # A process that serves from the smoke's tree can carry no path in its command
+  # line: a host Bun runs "./src/serve.ts" from the project directory. Its
+  # working directory names the tree. This shell is left out: it is in the tree.
+  printf '%s\n' "$directory_list" | SMOKE_ROOTS="$smoke_roots" awk -v self="$$" '
+    BEGIN { roots_count = split(ENVIRON["SMOKE_ROOTS"], roots, "\n") }
+    $1 != self {
+      path = substr($0, length($1) + 2)
+      for (i = 1; i <= roots_count; i++) {
+        if (roots[i] != "" && index(path, roots[i] "/") == 1) {
+          print $1, "cwd", path
+          next
+        }
+      }
+    }
+  ' || true
 }
 
 capture_failure_artifacts() {
@@ -702,7 +741,9 @@ fi
 # A freed ephemeral port can be taken at once by an unrelated listener, so an
 # HTTP answer on the port does not show the starter is alive; the page of the
 # real webapp also changes on every request. The processes that belong to this
-# smoke do: everything the smoke starts has a command line under its workdir.
+# smoke do: everything the smoke starts has a command line or a working
+# directory under its workdir. A host Bun serves "./src/serve.ts", so only its
+# working directory names the tree.
 # The answer of the port is only reported.
 if [ -z "$(list_processes 2>/dev/null)" ]; then
   echo "::error::shutdown leg: the machine cannot list its processes, which the stop check needs"
