@@ -221,6 +221,13 @@ validation refuses a value outside each vocabulary. A reader below 11 would
 plan a declared kind or workload as a plain command, so it refuses the stamp.
 The floor binds a manifest wherever it loads from. Only a manifest that
 declares one of the fields is stamped 11.
+Contract `12` (`PublishChannelsContract`) is additive for
+`declares.publishChannels`, the publish channels a publish task serves. From 12
+on, a publishing run counts a project's declared publish channel as served only
+by a planned job whose task declares that channel. A reader below 12 would
+judge those channels by another rule, so it refuses the stamp. The floor binds
+a manifest wherever it loads from. Only a manifest with a task that declares
+the field is stamped 12.
 Contract `6` is additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs. A reader limited to contract 5 refuses that
 manifest before interpreting its inputs; unrelated manifests retain their

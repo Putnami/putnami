@@ -45,6 +45,13 @@ package cli
 // downgrade. An additive increment needs none: a manifest that does not use
 // its vocabulary keeps the stamp it already carries.
 //
+//	12: ADDITIVE — the publish channels a publish task serves
+//	   (`declares.publishChannels`). From 12 on, a publishing run counts a
+//	   project's declared publish channel as served only by a planned job
+//	   whose task declares that channel. An older reader would judge the
+//	   channels of a publishing run by another rule, so it must refuse the
+//	   stamp. Only a manifest with a task that declares the field is
+//	   stamped 12, and the floor binds it from every origin.
 //	11: ADDITIVE — command kinds and traits. A command's traits may declare
 //	   its kind (`kind`: verification, criteria, diagnostics or files), its
 //	   workload (`workload`: serve or once), that it rewrites the source tree
@@ -177,7 +184,14 @@ const SourceBoundCacheContract = 10
 // stamp instead of planning such a command as a plain one.
 const CommandKindContract = 11
 
+// PublishChannelsContract is required by a manifest with a task whose v3
+// declaration lists the publish channels it serves. A publishing run counts a
+// project's declared channel as served only by a planned job whose task
+// declares it, so an older reader refuses the stamp instead of judging those
+// channels by another rule.
+const PublishChannelsContract = 12
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = CommandKindContract
+const LatestContract = PublishChannelsContract

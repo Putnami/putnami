@@ -386,6 +386,9 @@ var v3InvalidFixtureCodes = map[string][]string{
 	// WITHIN — only a pathFrom output is bounded, and the bound is a subtree of
 	// the root.
 	"declared-output-within-invalid.json": {"invalid-output-path", "invalid-output-within"},
+	// PUBLISH CHANNELS — each channel once, at least one, and only on a task
+	// that publishes to a registry.
+	"publish-channels-invalid.json": {"duplicate-publish-channel", "invalid-value", "effect-conflict"},
 }
 
 // lifecycleInvalidFixtureCodes is the manifest-level counterpart of

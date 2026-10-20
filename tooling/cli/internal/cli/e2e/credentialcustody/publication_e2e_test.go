@@ -608,6 +608,8 @@ type extensionFixture struct {
 // task, and the shipped publication task, whose
 // command becomes this binary in ext's publish environment. Its package
 // command runs the stage task, and its publish command the publication task.
+// The shipped publication task declares the publish channels it serves, so the
+// manifest is stamped with the contract that field requires.
 func (fx *publicationE2EFixture) installExtension(t *testing.T, ext extensionFixture) {
 	t.Helper()
 	shipped := readShippedManifest(t, ext.source)
@@ -619,7 +621,7 @@ func (fx *publicationE2EFixture) installExtension(t *testing.T, ext extensionFix
 	ext.stage.Command = fx.self
 	delete(shipped.Workspace, "syncTask")
 	fx.install(t, ext.name, ext.shortName, fixtureManifest{
-		Name: ext.name, Version: e2eRuntimeVersion, CLIContract: protocolcli.CurrentContract,
+		Name: ext.name, Version: e2eRuntimeVersion, CLIContract: protocolcli.PublishChannelsContract,
 		Runtime:    manifestRuntime{Executable: "compiled/" + filepath.Base(ext.runtime)},
 		Workspace:  shipped.Workspace,
 		Ecosystems: shipped.Ecosystems,

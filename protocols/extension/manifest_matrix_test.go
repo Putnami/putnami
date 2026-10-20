@@ -21,14 +21,14 @@ import (
 //
 // So this is the full cross product of {absent, one behind, current, latest,
 // one ahead of latest} × {commands, command groups, tools, agent content,
-// verbs, command kinds, none},
+// verbs, command kinds, publish channels, none},
 // in one table, next to the doc it mirrors. Ratcheting a row means editing this
 // table and that table together.
 //
 // The additive contracts above the base are opted into: a manifest needs one
-// only when it declares agent content, a verb vocabulary or command kinds, so
-// the floor a stamp must reach depends on the surface, while the ceiling does
-// not.
+// only when it declares agent content, a verb vocabulary, command kinds or
+// publish channels, so the floor a stamp must reach depends on the surface,
+// while the ceiling does not.
 
 // matrixManifest renders a manifest carrying exactly one kind of contract
 // surface at a given declared contract. Contract 0 is written as an ABSENT
@@ -74,6 +74,10 @@ const (
 
 	commandKindsSurface = `"commands": {"check": {"traits": {"kind": "criteria"}, "run": [{"id": "c", "task": "t"}]}},
   "tasks": {"t": {"kind": "command", "command": "echo", "timeoutMs": -1}}`
+
+	publishChannelsSurface = `"commands": {"ship": {"run": [{"id": "s", "task": "t"}]}},
+  "tasks": {"t": {"kind": "command", "command": "echo", "timeoutMs": -1, "cache": false,
+    "declares": {"effects": ["registry"], "publishChannels": ["npm"]}}}`
 )
 
 func writeMatrixManifest(t *testing.T, body string) string {
@@ -114,6 +118,7 @@ func TestLoadManifest_CompatibilityMatrix(t *testing.T) {
 		{name: "agentContent", body: agentContentSurface, governs: true, required: protocolcli.AgentContentContract},
 		{name: "verbs", body: verbsSurface, governs: true, required: protocolcli.VerbVocabularyContract},
 		{name: "command kinds", body: commandKindsSurface, governs: true, required: protocolcli.CommandKindContract},
+		{name: "publish channels", body: publishChannelsSurface, governs: true, required: protocolcli.PublishChannelsContract},
 		{name: "hook-only", body: hookOnlySurface, governs: false, required: current},
 	}
 	contracts := []struct {
@@ -193,13 +198,14 @@ func assertRejected(t *testing.T, m *Manifest, err error, want []string) {
 // matrix above would still pass its commands rows.
 func TestDeclaresContractSurface_CountsEverySurfaceKind(t *testing.T) {
 	cases := map[string]bool{
-		commandsSurface:      true,
-		commandGroupsSurface: true,
-		toolsSurface:         true,
-		agentContentSurface:  true,
-		verbsSurface:         true,
-		commandKindsSurface:  true,
-		hookOnlySurface:      false,
+		commandsSurface:        true,
+		commandGroupsSurface:   true,
+		toolsSurface:           true,
+		agentContentSurface:    true,
+		verbsSurface:           true,
+		commandKindsSurface:    true,
+		publishChannelsSurface: true,
+		hookOnlySurface:        false,
 	}
 	for surface, want := range cases {
 		path := writeMatrixManifest(t, matrixManifest(protocolcli.LatestContract, surface))

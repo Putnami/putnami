@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 11,
+  "cliContract": 12,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-go",
@@ -1481,6 +1481,9 @@
         "effects": [
           "network",
           "registry"
+        ],
+        "publishChannels": [
+          "go"
         ]
       }
     },
@@ -1505,6 +1508,9 @@
         "effects": [
           "network",
           "registry"
+        ],
+        "publishChannels": [
+          "docker"
         ]
       }
     },

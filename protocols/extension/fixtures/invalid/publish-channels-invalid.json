@@ -1,0 +1,41 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "commands": {
+    "publish": {
+      "run": [
+        { "id": "duplicate", "task": "publish-duplicate" },
+        { "id": "empty", "task": "publish-empty" },
+        { "id": "unregistered", "task": "publish-unregistered" }
+      ]
+    }
+  },
+  "tasks": {
+    "publish-duplicate": {
+      "kind": "command",
+      "command": "echo",
+      "cache": false,
+      "declares": {
+        "effects": ["network", "registry"],
+        "publishChannels": ["npm", "docker", "npm"]
+      }
+    },
+    "publish-empty": {
+      "kind": "command",
+      "command": "echo",
+      "cache": false,
+      "declares": {
+        "effects": ["registry"],
+        "publishChannels": []
+      }
+    },
+    "publish-unregistered": {
+      "kind": "command",
+      "command": "echo",
+      "cache": false,
+      "declares": {
+        "effects": ["network"],
+        "publishChannels": ["npm"]
+      }
+    }
+  }
+}

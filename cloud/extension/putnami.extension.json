@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 11,
+  "cliContract": 12,
   "name": "@putnami/cloud",
   "version": "0.1.0",
   "ecosystems": [
@@ -2689,6 +2689,9 @@
         "effects": [
           "network",
           "registry"
+        ],
+        "publishChannels": [
+          "site-content"
         ]
       },
       "description": "Publish exactly the site-content members the release-set plan selected for this site project, at the planned version, moving the plan's first channel in the same atomic Put publish.",
@@ -2725,6 +2728,10 @@
         "effects": [
           "network",
           "registry"
+        ],
+        "publishChannels": [
+          "archives",
+          "template-archives"
         ]
       },
       "description": "Publish the selected project's pre-built archives to the Put registry when present.",
