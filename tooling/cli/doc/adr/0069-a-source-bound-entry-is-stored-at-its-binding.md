@@ -6,7 +6,7 @@
   `@putnami/cli-model`, `go.putnami.dev/protocol/extension` (the
   `cache.sourceBound` field and the contract floor),
   `go.putnami.dev/protocol/cli` (contract 10), `@putnami/go`
-  (`build-describe`)
+  (`build-describe`), `@putnami/typescript` (`build-generate`)
 
 ## Context
 
@@ -34,7 +34,8 @@ out, so it cannot see a stale committed copy either.
 
 1. **A task declares that its outputs embed its project's binding.** The task
    cache policy gains `sourceBound`, a boolean that defaults to false and is
-   left out of the JSON when false. `build-describe` declares it.
+   left out of the JSON when false. `build-describe` declares it, and so
+   does `@putnami/typescript`'s `build-generate`.
 2. **The binding is not a key input.** `ComputeJobCacheHash` does not read it,
    so a test-only edit keeps the task's cache key and every key that folds it.
 3. **The binding is part of the entry's store key.** A source-bound entry is
@@ -134,6 +135,16 @@ out, so it cannot see a stale committed copy either.
   collection reclaims them like any other entry.
 - Two sessions at the same cache key and different bindings take different
   leases, so a waiter never waits on, or receives, another binding's entry.
-- `@putnami/typescript`'s `build-generate` also writes a binding into
-  `.gen/schema/feature-evidence/typescript-framework.json` and does not
-  declare the policy. This ADR does not change it.
+- `@putnami/typescript`'s `build-generate` writes a binding into
+  `.gen/schema/feature-evidence/typescript-framework.json` and declares the
+  policy too. Its key reads `src/`, `public/`, `package.json` and the
+  workspace configuration. The evidence has no committed copy: it lives only
+  inside the `.gen` output the task owns, so a hit restores it. Every command
+  that runs the task gets the policy, so after an edit outside the key the
+  task executes once per mode a run uses (`build`, `test`, `serve`), for
+  every TypeScript project, with feature evidence or not. Dependents keep
+  their keys and their hits. Like describe, the task rewrites committed files
+  the binding covers (`schema/openapi.json`, `infra/requirements.json`, a
+  generated client inside the project), with the same consequence. The
+  policy moves the contract digest of `build-generate`, so every TypeScript
+  generate key, and every key that folds it, misses once after the upgrade.

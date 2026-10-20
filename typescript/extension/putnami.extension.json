@@ -1055,7 +1055,7 @@
       }
     },
     "build-generate": {
-      "description": "Generate code into the project's .gen subtree (and, when the project generates one, the configured TypeScript client directory). Ownership decision: build-generate is the SINGLE producer of <project>/.gen, minus the .gen/deployment.json it cedes to package-deployment, the .gen/requirements.json and .gen/infra/runtime.json it cedes to build-infra, which write them after this task's snapshot, the .gen/layers it cedes to cloud-image-layers of @putnami/cloud, which declares it, and the .gen/config-schema.json fallback and its JSON Schema companion that config-extract-exec writes, which it cedes without a declaring owner. This task deletes the .gen/infra fragments at the start of every run, the runtime defaults file with them, which build-infra writes again after this task. Its v3 `declares` block below names these outputs; an executing run starts from a .gen emptied of everything it does not cede, except the scheduler's version stamp.",
+      "description": "Generate code into the project's .gen subtree (and, when the project generates one, the configured TypeScript client directory). Ownership decision: build-generate is the SINGLE producer of <project>/.gen, minus the .gen/deployment.json it cedes to package-deployment, the .gen/requirements.json and .gen/infra/runtime.json it cedes to build-infra, which write them after this task's snapshot, the .gen/layers it cedes to cloud-image-layers of @putnami/cloud, which declares it, and the .gen/config-schema.json fallback and its JSON Schema companion that config-extract-exec writes, which it cedes without a declaring owner. This task deletes the .gen/infra fragments at the start of every run, the runtime defaults file with them, which build-infra writes again after this task. Its v3 `declares` block below names these outputs; an executing run starts from a .gen emptied of everything it does not cede, except the scheduler's version stamp. Source binding: the @putnami/application pre-build hook writes .gen/schema/feature-evidence/typescript-framework.json, which names the project's source binding, the source-v1 digest the scheduler stamps into .gen/version.json. The binding covers every project file, tests, specs and putnami.features.json included, and the inputs below do not. So the cache policy declares `sourceBound`: the CLI stores and looks up this task's entry at a key that also binds the binding each execution was stamped with, so a stored result serves only at the binding it names, while this key and every dependent key stay as the inputs below define them. The evidence lives only inside the declared .gen output, so a hit restores the evidence of the binding its store key binds.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -1132,7 +1132,8 @@
       },
       "cache": {
         "enabled": true,
-        "deterministic": true
+        "deterministic": true,
+        "sourceBound": true
       },
       "declares": {
         "outputs": {

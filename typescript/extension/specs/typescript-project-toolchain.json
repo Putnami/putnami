@@ -156,6 +156,10 @@
       "text": "The OpenAPI contract build-generate writes to schema/openapi.json is committed, and build-generate is its first writer in a session; its declared openapi output carries drift: fail, so a committed contract that differs from the one openapi() regenerates fails the task with generated-output-drift, leaving the regenerated contract in the worktree to commit."
     },
     {
+      "id": "source-bound-generate",
+      "text": "build-generate writes the project's TypeScript feature evidence under .gen, and the evidence names the project's source binding. Its cache policy declares sourceBound, so a cached generate serves only at the binding its evidence names: an edit outside its key, such as a test file, a spec or putnami.features.json, executes generate once at the new binding and moves neither its key nor any dependent key."
+    },
+    {
       "id": "api-compatibility-marker",
       "text": "Validate holds the breaking-change marker for every TypeScript package the root support catalog lists as stable, or every package when there is no catalog: an entry point, an export or a member removed, a changed kind or reduced visibility since the last release of the project's line fails, naming the package and the symbol, unless a commit since that tag that touches the project declares it breaking. A change of written type warns and passes. Additions pass. A release the check cannot read warns."
     }
@@ -168,6 +172,7 @@
     "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md",
     "tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md",
     "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md",
-    "protocols/extension/doc/adr/0004-a-declared-output-may-police-its-own-drift.md"
+    "protocols/extension/doc/adr/0004-a-declared-output-may-police-its-own-drift.md",
+    "tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md"
   ]
 }

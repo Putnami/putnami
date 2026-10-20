@@ -557,6 +557,45 @@ func TestGenerateDeclaresTheClientOutputPort(t *testing.T) {
 	}
 }
 
+// typeScriptFeatureEvidencePath is where the @putnami/application pre-build
+// hook writes the project's feature evidence. No committed copy exists.
+const typeScriptFeatureEvidencePath = ".gen/schema/feature-evidence/typescript-framework.json"
+
+// TestGenerateIsSourceBound pins the cache policy of the task that writes the
+// TypeScript feature evidence. The evidence names the project's source
+// binding, which covers every project file, while the task's key reads only
+// src, public and package.json. So the policy declares sourceBound (CLI ADR
+// 0069): the CLI stores and looks up the entry at a key that also binds the
+// binding, and an entry serves only at the binding its evidence names. The
+// evidence lives inside the .gen output this task owns and does not cede, so
+// a hit restores the evidence of the binding it was stored at.
+func TestGenerateIsSourceBound(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "source-bound-generate", "the-generate-cache-policy-is-source-bound")
+	m := loadExtensionManifest(t)
+	generate, ok := m.Tasks["build-generate"]
+	if !ok {
+		t.Fatal("manifest task \"build-generate\" is missing")
+	}
+	if generate.Cache == nil || !generate.Cache.IsEnabled() || !generate.Cache.Deterministic || !generate.Cache.SourceBound {
+		t.Fatalf("build-generate cache = %+v, want an enabled, deterministic, source-bound policy", generate.Cache)
+	}
+	if generate.Declares == nil {
+		t.Fatal("build-generate lost its v3 declaration")
+	}
+	gen, ok := generate.Declares.Outputs["gen"]
+	if !ok || gen.Path != ".gen" || gen.EffectiveRoot() != proto.OutputRootProject {
+		t.Fatalf("gen ownership = %+v, want the project-rooted .gen directory", gen)
+	}
+	for _, ceded := range gen.Excludes {
+		if typeScriptFeatureEvidencePath == ceded || strings.HasPrefix(typeScriptFeatureEvidencePath, ceded+"/") {
+			t.Errorf("build-generate cedes %s, so a hit would not restore the evidence %s", ceded, typeScriptFeatureEvidencePath)
+		}
+	}
+	if got := proto.RequiredCLIContract(m); got > m.CLIContract {
+		t.Errorf("the manifest is stamped %d and requires %d", m.CLIContract, got)
+	}
+}
+
 // configSchemaFallbackCompanionPath is the JSON Schema the TypeScript extractor
 // writes next to the fallback manifest.
 const configSchemaFallbackCompanionPath = ".gen/config-schema.jsonschema.json"

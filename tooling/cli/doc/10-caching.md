@@ -1622,10 +1622,11 @@ validate`) and `@putnami/clientgen`'s `clientgen-workspace-check` (the
 
 A task can write outputs that embed the **source binding** of its own project:
 the `source-v1` digest the scheduler stamps into `<project>/.gen/version.json`.
-Go `build-describe` is one. Its feature evidence names the binding of the tree
-it described. The binding covers every project file, test files, specs and
-`putnami.features.json` included. The task's key does not, because the task
-reads none of those files to build its output.
+Go `build-describe` and TypeScript `build-generate` are two. Their feature
+evidence names the binding of the tree they described. The binding covers
+every project file, test files, specs and `putnami.features.json` included.
+The task's key does not, because the task reads none of those files to build
+its output.
 
 Such a task declares `"sourceBound": true`:
 
