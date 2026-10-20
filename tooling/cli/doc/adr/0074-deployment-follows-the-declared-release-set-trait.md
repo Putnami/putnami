@@ -53,13 +53,15 @@ the `publish` name, and declared member routes replace the `package` name.
    it.** `extension.CommandPublishes` answers for a command and
    `jobs.PublishesToRegistry` for a planned job. The run-level answer decides
    the release-set mode, the tag line, the selection check, the distribution
-   policy read, the dry-run probe report, archive accounting, the verification
-   half of a mixed session and the cache-trust floor. With `--dry-run`, such a
-   command alone executes with a synthesized `dry-run` parameter. The
-   job-level answer decides the member publication gate, a dependent
-   publish's projects, the publication side of the release barrier and which
-   uncoordinated jobs a release drops. The machine summary's image build time
-   is the project's docker task whose result records no publication.
+   policy read, the dry-run probe report, publish channel accounting, the
+   verification half of a mixed session and the cache-trust floor. With
+   `--dry-run`, such a command alone executes with a synthesized `dry-run`
+   parameter. The job-level answer decides the member publication gate, a
+   dependent publish's projects, the publication side of the release barrier
+   and which uncoordinated jobs a release drops. The machine summary's image
+   build time is the project's docker task whose result records no
+   publication. A planned job's task, not its command traits, says which
+   publish channels it serves.
 4. **A member's package job is the command that its publisher's publish
    command runs first, that its package publisher declares with the
    `injectPublishChannels` trait and a step of the member's package step.**

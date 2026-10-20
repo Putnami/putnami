@@ -126,6 +126,10 @@
       "text": "A job publishes when its command traits declare the registry side effect, whatever its name, and has external effects when its traits or task declare a registry or cloud effect. A job with external effects never reaches a remote cache. A run naming a registry command joins the release set and reads the distribution policy; that command alone executes under --dry-run. A member's package job is the one command its publisher's publish runs first with injectPublishChannels and the member's package step."
     },
     {
+      "id": "publish-run-checks-declared-channels",
+      "text": "A publishing run fails when a selected project declares a publish channel that no planned job serves. A job serves a channel when its task declares it in publishChannels and the job is the project's own or depends on one of its jobs; the command's traits decide nothing. The failure names the project and its unserved channels. --<channel>=false opts a declared channel out. A project that declares no channel is not checked, and the owner of a release-set member is left to the release-set coordinator."
+    },
+    {
       "id": "scoped-cache-bypass",
       "text": "--no-cache-projects <selector> refuses cache reuse for the named projects' tasks and every planned task that transitively depends on one, while the rest of the run keeps its reuse. A bypassed task is never looked up, served, published or failure-replayed, and records no failure; only its success deletes one. The selector speaks the --projects grammar, ignores tag and exclude filters, and fails the run when it matches nothing. --no-cache subsumes it. Neither reaches a cache key or task params."
     },

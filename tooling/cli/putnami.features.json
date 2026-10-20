@@ -971,6 +971,22 @@
           }
         },
         {
+          "id": "publish-run-checks-declared-channels",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declared-channel-no-publish-step-serves-fails-the-run",
+              "a-job-serves-only-the-channels-its-task-declares",
+              "a-dependent-job-of-another-project-serves-the-channels-its-task-declares",
+              "cloud-archive-publication-serves-the-declaring-project"
+            ]
+          }
+        },
+        {
           "id": "scoped-cache-bypass",
           "stage": "coded",
           "evidenceKinds": [
