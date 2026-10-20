@@ -999,11 +999,13 @@ and `--env` to target an environment other than the configured default
 ## Build cache
 
 `putnami cloud setup` provisions the remote build cache by writing
-`.putnami/cache.json` at the workspace root. A stock CLI picks this file up on
-the next build: it negotiates against the cache and restores hits using a
-per-user bearer. A laptop reads the shared cache and writes nothing to it; only
-hosted CI writes. The file is safe to commit. It never contains a token, only a
-token *source*:
+`.putnami/cache.json` at the workspace root. The Cloud cache provider reads
+this file on the next build; the core reads no cache configuration. The
+provider negotiates against the cache and restores hits using a per-user
+bearer. A linked workspace without the file uses the default of its workspace
+link, `https://cache.putnami.cloud`. A laptop reads the shared cache and
+writes nothing to it; only hosted CI writes. The file is safe to commit. It
+never contains a token, only a token *source*:
 
 ```json
 {
@@ -1141,14 +1143,14 @@ and presence in core. All of them use the shared `protocol/cache` vocabulary.
 | **Presence** (`.putnami/cache-present.json`) | **Core** | Core owns its CAS, so it passes the digests it already has in `InitializeParams.KnownDigests`. The provider only *consumes* that set: it skips re-staging those blobs on restore, and keeps no presence file. The provider-owned-presence path via `SummaryResult.KnownDigests` (for very large warm sets) is a deferred optimization; the seam exists, unused. |
 | **Eligibility** (`SideEffectingTask`) | **Core** | Core shares every key whose task is not side-effecting, whatever its duration or size. The provider's restore, prefetch and upload params carry only keys, so it serves exactly what core asks and never re-filters. |
 | **Capabilities discovery** | **Provider**, per run | The provider's client probes the cache server's capabilities (find-missing, commit-batch, direct-CAS-PUT, and others) on the batch write path and memoizes per session: one client per run, not per job. |
-| **Materialization mode** (`minimal`/`toplevel`/`full`) | **Core** drives, provider applies | Core sends the build's intent in `InitializeParams.Mode`; the provider passes it to the server on every negotiate and materializes exactly the blobs the server returns for that mode (minus `KnownDigests`). |
+| **Materialization mode** (`minimal`/`toplevel`/`full`) | **Provider** resolves, core applies | Core lists `provider-configuration` and sends no mode. The provider resolves core's intent when one is sent, else the configured `mode`, else `full`, and returns it with the echo. It passes the mode to the server on every negotiate and materializes exactly the blobs the server returns for that mode (minus `KnownDigests`). |
 | **gzip by uncompressed digest** | **Provider**, internal | The client transparently gzips on upload and decompresses on download; the CAS digest always addresses the *uncompressed* content, so core only ever sees uncompressed, content-addressed blobs in the exchange directory. |
 
 CAS here means content-addressed storage.
 
-The provider reads the same `.putnami/cache.json` (written by `cloud setup`) and
-the same `PUTNAMI_CACHE_URL`, `PUTNAMI_CACHE_MODE` and `PUTNAMI_CACHE_TOKEN`
-environment as a stock CLI's in-core cache, so CI configures it identically. In
+The provider reads `.putnami/cache.json` (written by `cloud setup`) and the
+`PUTNAMI_CACHE_URL`, `PUTNAMI_CACHE_MODE` and `PUTNAMI_CACHE_TOKEN`
+environment; the core reads none of them. In
 a session with no signed-in user it also reads `PUTNAMI_CLOUD_TOKEN`, under the
 conditions listed in [Build cache](#build-cache). The
 [cache provider section](internal/deliverycli/README.md#cache-provider) of the

@@ -279,6 +279,16 @@ stream.
   no blob: it cannot check that the entry records the requested key, as it does
   on a full restore. The provider must answer with exactly the entry stored
   under the requested key, or with a miss.
+- **Provider configuration.** Core reads no remote cache configuration. It
+  lists `provider-configuration` in the bootstrap
+  `InitializeParams.Capabilities` and sends no `InitializeParams.Mode`, which
+  stays an optional intent: normalization leaves an absent mode absent, so a
+  provider tells no intent apart from a mode core chose. A provider that
+  echoes the capability returns the materialization mode it resolved in
+  `InitializeResult.Mode`; strict validation refuses that field without the
+  echo, and refuses an unknown mode. Without the echo core materializes in
+  `full`. A provider that answers `Ready=false` leaves the run building
+  locally with no notice: that is the unconfigured default.
 - **Object cache (socket).** `object-get` / `object-put` are a generic,
   language-neutral object cache: small opaque payloads addressed by
   `(namespace, id)`, batched, with bytes travelling through the blob-exchange
@@ -360,13 +370,13 @@ Two contracts, two pairs of sides:
 | HTTP wire (`cache.go`, `strict_*.go`) | the cache-provider extension, which owns the HTTP client | the cloud cache server |
 | Provider RPC (`provider.go`, `provider_strict.go`) | the CLI build scheduler (`tooling/cli/internal/jobs/remotecache/remote_provider.go` over the `internal/cacheprovider` session harness) | any extension declaring the reserved `cache-provider` command |
 
-The CLI links **no** HTTP cache client: remote caching is delegated to the
-provider subprocess, and the CLI's persisted `.putnami/cache.json` only says
-whether a cache is configured and in which materialization mode — never a
-credential. Run markers travel the same way, through `marker-lookup` /
-`marker-write` on the provider session. The RPC is exercised end to end in the
-CLI test suite by a fake provider, and this module's own conformance corpus
-pins every message on both contracts.
+The CLI links **no** HTTP cache client and reads no cache configuration:
+remote caching is delegated to the provider subprocess, which owns its
+configuration and answers at `initialize` whether it serves the run and in
+which materialization mode. Run markers travel the same way, through
+`marker-lookup` / `marker-write` on the provider session. The RPC is exercised
+end to end in the CLI test suite by a fake provider, and this module's own
+conformance corpus pins every message on both contracts.
 
 ## Versioning and compatibility
 
