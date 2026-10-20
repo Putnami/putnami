@@ -104,6 +104,7 @@ func TestCommandHandlersWrapEveryModuleFetchingJob(t *testing.T) {
 }
 
 func TestWithRegistryCredential_RefreshesBeforeAFetchingJobAndNeverBlocksIt(t *testing.T) {
+	resetHeld(t)
 	root := declaringWorkspace(t)
 	hosts := stubGoCredential(t, registrycred.Outcome{
 		Kind: registrycred.KindNotSignedIn, Level: "warn",
@@ -133,15 +134,67 @@ func TestWithRegistryCredential_RefreshesBeforeAFetchingJobAndNeverBlocksIt(t *t
 	if len(*hosts) != 1 || (*hosts)[0] != declaredOriginHost {
 		t.Fatalf("hosts = %v, want [%s]", *hosts, declaredOriginHost)
 	}
-	var warned bool
+	// A job that fetched public modules only has no use for the credential.
 	for _, e := range events {
-		if e["level"] == "warn" && strings.Contains(e["message"].(string), registrycred.SignInHint) {
-			warned = true
+		if e["level"] == "warn" {
+			t.Errorf("a missing credential warned before any origin refusal: %#v", e)
 		}
 	}
-	if !warned {
-		t.Errorf("no sign-in warning emitted: %#v", events)
+}
+
+// A fetch the origin refuses reaches the job's reports as the go command's
+// output. The held warning then names the missing credential, once.
+func TestWithRegistryCredential_WarnsWhenTheOriginRefusesAFetch(t *testing.T) {
+	root := declaringWorkspace(t)
+	const message = "no registry credential for " + declaredOriginHost + ": needs a signed-in user; PUTNAMI_CLOUD_TOKEN cannot read it; continuing with the existing credential"
+	stubGoCredential(t, registrycred.Outcome{Kind: registrycred.KindNotSignedIn, Level: "warn", Message: message})
+	t.Setenv("NETRC", "")
+	t.Setenv("GO_REGISTRY_URL", "")
+
+	for _, tc := range []struct {
+		name   string
+		job    string
+		output string
+		want   bool
+	}{
+		{name: "403 from the origin", job: "build", output: "go: m@v1.0.0: reading https://" + declaredOriginHost + "/m/@v/v1.0.0.mod: 403 Forbidden", want: true},
+		{name: "401 from the origin", job: "test", output: "go: m@v1.0.0: reading https://" + declaredOriginHost + "/m/@v/v1.0.0.info: 401 Unauthorized", want: true},
+		{name: "403 from another host", job: "build", output: "go: m@v1.0.0: reading https://proxy.golang.org/m/@v/v1.0.0.mod: 403 Forbidden"},
+		{name: "a compile error", job: "build", output: "main.go:3:2: undefined: x"},
+		{name: "a served program's own 403", job: "serve", output: "GET /admin 403 Forbidden"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetHeld(t)
+			job := withRegistryCredential(tc.job, func(_ *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
+				emit.Diagnostic("error", tc.output, "", 0)
+				return "FAILED", nil, nil
+			})
+			events := captureLogs(t, func(emit *jsonl.Emitter) {
+				_, _, _ = job(&pctx.Context{WorkspaceRoot: root}, emit, nil)
+			})
+
+			var warnings []string
+			for _, e := range events {
+				if e["level"] == "warn" {
+					warnings = append(warnings, e["message"].(string))
+				}
+			}
+			if (len(warnings) == 1) != tc.want || len(warnings) > 1 {
+				t.Fatalf("warnings = %q, want one: %t", warnings, tc.want)
+			}
+			if tc.want && (!strings.Contains(warnings[0], "no registry credential for "+declaredOriginHost) || strings.Contains(warnings[0], "continuing")) {
+				t.Errorf("warning = %q, want it to name the missing credential and not say the run continues", warnings[0])
+			}
+		})
 	}
+}
+
+// resetHeld forgets the warnings an earlier case left held.
+func resetHeld(t *testing.T) {
+	t.Helper()
+	drain := func() { registrycred.ReportRefusal("401", func(string, string) {}) }
+	drain()
+	t.Cleanup(drain)
 }
 
 func TestWithRegistryCredential_LeavesLocalJobsAlone(t *testing.T) {

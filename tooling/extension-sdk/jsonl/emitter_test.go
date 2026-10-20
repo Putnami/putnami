@@ -467,3 +467,26 @@ func TestEmitter_AllEventsHaveVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestEmitter_ObserveSeesEveryLogAndDiagnosticMessage(t *testing.T) {
+	var seen []string
+	e := New()
+	e.Observe(func(message string) { seen = append(seen, message) })
+	captureStdout(t, func() {
+		e.Log("info", "log")
+		e.LogEvent("warn", "log event", nil, nil)
+		e.Diagnostic("error", "diagnostic", "", 0)
+		e.DiagnosticWithCode("error", "coded diagnostic", "main.go", 1, 1, "E1")
+		e.Metric("tests-total", 1, "count")
+	})
+	want := []string{"log", "log event", "diagnostic", "coded diagnostic"}
+	if strings.Join(seen, "|") != strings.Join(want, "|") {
+		t.Fatalf("observed %q, want %q", seen, want)
+	}
+
+	e.Observe(nil)
+	captureStdout(t, func() { e.Log("info", "unobserved") })
+	if len(seen) != len(want) {
+		t.Fatalf("an observer removed with Observe(nil) still saw %q", seen[len(want):])
+	}
+}

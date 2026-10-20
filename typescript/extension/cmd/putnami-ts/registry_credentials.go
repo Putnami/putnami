@@ -165,8 +165,11 @@ var ensureNpmRegistryCredential = registrycred.EnsureNativeCredential
 // the `//<host>/:_authToken=` line itself; this extension only names the host.
 //
 // It never fails the install. Every failure mode — no cloud, no session, a cloud
-// that does not implement the shape yet — logs one line and lets bun run with
-// whatever credential the machine already has.
+// that does not implement the shape yet — lets bun run with whatever credential
+// the machine already has. A missing credential matters only when the registry
+// then refuses a package, and most installs fetch public packages only. So the
+// warning for it is held, not logged: reportRegistryRefusal logs it once a
+// request the install needs answers 401 or 403.
 func refreshPutnamiNpmCredential(ctx *pctx.Context, emit *jsonl.Emitter) {
 	declared, err := npmRegistriesFrom(ctx.Params)
 	if err != nil {
@@ -175,10 +178,24 @@ func refreshPutnamiNpmCredential(ctx *pctx.Context, emit *jsonl.Emitter) {
 	}
 	for _, host := range putnamiScopeRegistryHost(declared) {
 		outcome := ensureNpmRegistryCredential(context.Background(), ctx.WorkspaceRoot, host)
-		if outcome.Message != "" {
-			emit.Log(outcome.Level, outcome.Message)
+		if outcome.Message == "" {
+			continue
 		}
+		if outcome.Level == "warn" {
+			registrycred.HoldWarning(host, outcome.Message)
+			continue
+		}
+		emit.Log(outcome.Level, outcome.Message)
 	}
+}
+
+// reportRegistryRefusal logs the held credential warnings when evidence — the
+// error text of a failed registry request or of a failed package manager run —
+// shows a registry answered 401 or 403 (registrycred.ReportRefusal). Any other
+// evidence leaves them held: an install that fetched public packages, or failed
+// for another reason, has nothing to say about a credential.
+func reportRegistryRefusal(emit *jsonl.Emitter, evidence string) {
+	registrycred.ReportRefusal(evidence, emit.Log)
 }
 
 // putnamiScopeRegistryHost returns the hosts that need a credential: the host

@@ -27,6 +27,8 @@ type Emitter struct {
 	version int
 	// timedOut is set by MarkTimedOut and read by Result.
 	timedOut atomic.Bool
+	// observer, when set, sees the message of every log and diagnostic event.
+	observer atomic.Pointer[func(message string)]
 }
 
 // New creates a JSONL emitter whose stream speaks the protocol version the
@@ -41,6 +43,27 @@ func NewForVersion(version int) *Emitter {
 		version = runtime.ProtocolVersion
 	}
 	return &Emitter{version: version}
+}
+
+// Observe registers fn to receive the message of every log and diagnostic event
+// this emitter emits from now on, before the event is written. A job wrapper
+// uses it to read the failure text a job reports, such as the output of a failed
+// `go` command, without owning the job's code. fn may emit events itself: those
+// reach fn too, so it must not reach itself again for the same message. A nil fn
+// stops the observation.
+func (e *Emitter) Observe(fn func(message string)) {
+	if fn == nil {
+		e.observer.Store(nil)
+		return
+	}
+	e.observer.Store(&fn)
+}
+
+// observe hands message to the registered observer.
+func (e *Emitter) observe(message string) {
+	if fn := e.observer.Load(); fn != nil {
+		(*fn)(message)
+	}
 }
 
 // Version reports the protocol version this emitter stamps on every event.
@@ -64,12 +87,14 @@ func (e *Emitter) Meta(extension, job string) {
 
 // Log emits a log event. Level: debug, info, warn, error.
 func (e *Emitter) Log(level, message string) {
+	e.observe(message)
 	_ = e.rt().Log(runtime.LogLevel(level), message)
 }
 
 // LogEvent emits a log event with optional context and error fields.
 // This is used to forward structured log output from child processes.
 func (e *Emitter) LogEvent(level, message string, context map[string]any, errInfo map[string]any) {
+	e.observe(message)
 	var info *runtime.ErrorInfo
 	if len(errInfo) > 0 {
 		info = &runtime.ErrorInfo{}
@@ -112,6 +137,7 @@ func (e *Emitter) Progress(current, total int, message string) {
 
 // Diagnostic emits a diagnostic event. Severity: error, warning, info, hint.
 func (e *Emitter) Diagnostic(severity, message string, file string, line int) {
+	e.observe(message)
 	var loc *runtime.SourceLocation
 	if file != "" {
 		loc = &runtime.SourceLocation{File: file, Line: line}
@@ -121,6 +147,7 @@ func (e *Emitter) Diagnostic(severity, message string, file string, line int) {
 
 // DiagnosticWithCode emits a diagnostic with optional location and code.
 func (e *Emitter) DiagnosticWithCode(severity, message string, file string, line, column int, code string) {
+	e.observe(message)
 	var loc *runtime.SourceLocation
 	if file != "" {
 		loc = &runtime.SourceLocation{File: file, Line: line, Column: column}

@@ -58,6 +58,7 @@ func runWorkspaceInstall(ctx *pctx.Context, emit *jsonl.Emitter, args []string) 
 
 	if !result.Success {
 		emit.PhaseEnd("install", "failed")
+		reportRegistryRefusal(emit, result.Stderr)
 		emit.Log("error", "bun install failed: "+result.Stderr)
 		return "FAILED", nil, nil
 	}
@@ -572,6 +573,7 @@ func catalogSeedVersions(ctx *pctx.Context, emit *jsonl.Emitter, missing []catal
 		}
 		version, err := resolvePutnamiNPMVersion(context.Background(), ctx.WorkspaceRoot, declared, ref.name, channel)
 		if err != nil {
+			reportRegistryRefusal(emit, err.Error())
 			return nil, err
 		}
 		seeds[ref.name] = version

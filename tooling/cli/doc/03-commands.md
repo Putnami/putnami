@@ -430,10 +430,14 @@ writes the native credential itself — the `//<host>/:_authToken=` line in
 
 No token passes through the framework, and the host is the whole request. The
 refresh never blocks an install: with no cloud extension, no session
-(`run putnami cloud login`), or a registry the cloud does not manage, the command
-logs one line and continues with whatever credential the machine already has.
-A session that holds only `PUTNAMI_CLOUD_TOKEN` cannot sign in, so its line
-gives the cloud's reason instead of the sign-in hint.
+(`run putnami cloud login`), or a registry the cloud does not manage, the
+command continues with whatever credential the machine already has. Most
+installs fetch public packages only and need no credential, so the extension
+holds the warning about a missing one and logs it only when the registry answers
+a request with HTTP 401 or 403 (the npm install and the Go jobs do this). The
+warning names the missing credential. A session that holds only
+`PUTNAMI_CLOUD_TOKEN` cannot sign in, so its warning gives the cloud's reason
+instead of the sign-in hint.
 
 `putnami cloud registry-token` never runs the first-use install, even when the
 lock changed since the last install (the state mid-`upgrade`, once the extension

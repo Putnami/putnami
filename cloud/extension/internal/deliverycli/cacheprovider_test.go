@@ -1089,7 +1089,9 @@ func TestCacheMarkerKeysAreWorkspaceScoped(t *testing.T) {
 func TestCacheAuthRefusalsAreReportedProminentlyAtSummary(t *testing.T) {
 	enableCacheWritesForTest(t)
 	key := strings.Repeat("d", cache.KeyLength)
-	const secret = "pkt_injected_machine_token"
+	// Not a machine token (pkt_…): a machine token opens the session read-only
+	// and sends no write to refuse.
+	const secret = "injected_cache_bearer"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == cache.NegotiatePath {
 			_ = json.NewEncoder(w).Encode(cache.NegotiateResponse{ProtocolVersion: cache.ProtocolVersion})
