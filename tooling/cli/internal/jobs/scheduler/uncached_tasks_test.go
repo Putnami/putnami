@@ -15,7 +15,6 @@ import (
 // stored one from another commit or invocation would be wrong. A task of the
 // same name in another manifest is not exempt.
 var uncachedByVerdict = map[string]string{
-	"typescript/extension/putnami.extension.json:version-report":              "its output is the commit's identity: sha, branch and dirty bit",
 	"tooling/sdd-extension/putnami.extension.json:sdd-selfcheck-exec":         "its verdict is the environment of this invocation",
 	"tooling/sdd-extension/putnami.extension.json:breaking-marker-validate":   "its verdict reads the proposed squash message of this invocation and the commits since its baseline",
 	"tooling/sdd-extension/putnami.extension.json:agent-attribution-validate": "its verdict reads the proposed squash message of this invocation",
@@ -111,8 +110,8 @@ func TestUncachedTaskExemptionsRestOnStructuredFacts(t *testing.T) {
 		{"interactive with an output port", sdd, "sdd-specs-list-exec", withPort, true, false},
 		{"interactive with a declared output", sdd, "sdd-specs-list-exec", withDeclaredOutput, true, false},
 		{"a declared effect", sdd, "publish", effect, false, true},
-		{"a listed verdict", ts, "version-report", bare, false, true},
-		{"a listed name in another manifest", sdd, "version-report", bare, false, false},
+		{"a listed verdict", sdd, "sdd-selfcheck-exec", bare, false, true},
+		{"a listed name in another manifest", ts, "sdd-selfcheck-exec", bare, false, false},
 		{"nothing", ts, "lint", bare, false, false},
 	} {
 		if _, got := uncachedTaskExemption(test.manifest, test.task, test.def, test.interactive); got != test.want {

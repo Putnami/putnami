@@ -898,15 +898,6 @@
           "task": "deps-upgrade-exec"
         }
       ]
-    },
-    "version": {
-      "description": "Report the project's version metadata (from .gen/version.json).",
-      "run": [
-        {
-          "id": "version",
-          "task": "version-report"
-        }
-      ]
     }
   },
   "tools": {
@@ -2251,22 +2242,6 @@
           "toolchain-cache"
         ]
       }
-    },
-    "version-report": {
-      "kind": "command",
-      "command": "{extensionRuntime}",
-      "args": [
-        "version"
-      ],
-      "cwd": "{projectRoot}",
-      "cache": false,
-      "timeoutMs": 60000,
-      "outputs": {
-        "data": {
-          "description": "Project version metadata (name, version, sha, branch, isDirty, buildTime)"
-        }
-      },
-      "declares": {}
     }
   }
 }
