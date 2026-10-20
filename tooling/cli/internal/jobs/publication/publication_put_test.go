@@ -143,14 +143,15 @@ func packedPutMember(t *testing.T, h *publicationHarness, f putMemberFixture, re
 	return addPutMember(h, f, registry, append(fixtureScript(before), []string{"copy-tree", outbox, "$PUTNAMI_PUBLICATION_OUTBOX"}))
 }
 
-// The engine uploads a release archive, a config, a migration and a doc
-// member to the Put registry with the provider's publish bearer, as private
-// immutable versions with no channel. Each published-member event, the
-// released set and the release evidence carry the SHA-256 of the stored
-// manifest payload, and the archive carries its platforms. No publication
-// job holds the bearer or reports a member.
+// The engine sends a release archive, a config, a migration and a doc member
+// to the provider's upload, for the project's Put registry and with the kind
+// the plan gives each; the provider uploads them as private immutable
+// versions with no channel. Each published-member event, the released set and
+// the release evidence carry the SHA-256 of the stored manifest payload, and
+// the archive carries the platforms its packed manifest names. No
+// publication job holds the bearer or reports a member.
 func TestEngineUploadsPutRegistryMembers(t *testing.T) {
-	spectest.Proves(t, "cli/provider-publication", "put-registry-members-upload-in-the-engine", "put-registry-members-are-uploaded-by-the-engine")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "put-registry-members-go-to-the-session")
 	reg := newPutRegistry(t)
 	h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: []string{serverHost(t, reg.server)}})
 	fixtures := putMemberFixtures()
@@ -222,8 +223,14 @@ func TestEngineUploadsPutRegistryMembers(t *testing.T) {
 			t.Fatalf("a publish request carried %v", keys)
 		}
 	}
-	if ops := h.session.recorded(); slices.Index(ops, "open") > slices.Index(ops, "credential") {
-		t.Fatalf("ops %v: a publish credential before open", ops)
+	if ops := h.session.recorded(); slices.Index(ops, "open") > slices.Index(ops, "upload") {
+		t.Fatalf("ops %v: an upload before open", ops)
+	}
+	for _, upload := range h.provider.Uploads() {
+		index := slices.IndexFunc(fixtures, func(f putMemberFixture) bool { return f.coordinate == upload.Params.Member.Coordinate })
+		if index < 0 || upload.Params.Kind != fixtures[index].kind || upload.Params.Registry != reg.server.URL {
+			t.Fatalf("upload of %s: kind %q, registry %q", upload.Params.Member.Coordinate, upload.Params.Kind, upload.Params.Registry)
+		}
 	}
 }
 
@@ -232,7 +239,7 @@ func TestEngineUploadsPutRegistryMembers(t *testing.T) {
 // member is refused before the plan opens. The kind is the one the member's
 // declared steps give it, with or without member attribution.
 func TestPublicationAdmitsPutRegistryMembersByKind(t *testing.T) {
-	spectest.Proves(t, "cli/provider-publication", "put-registry-members-upload-in-the-engine", "put-registry-members-are-uploaded-by-the-engine")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "put-registry-members-go-to-the-session")
 	for _, tc := range []struct {
 		ecosystem string
 		kind      distribution.MemberKind
@@ -297,7 +304,7 @@ func TestPublicationAdmitsPutRegistryMembersByKind(t *testing.T) {
 // reports for one fails the release, and so does a selected member no upload
 // node published. No channel moves.
 func TestAPutMemberTheEngineDidNotUploadFailsTheRelease(t *testing.T) {
-	spectest.Proves(t, "cli/provider-publication", "put-registry-members-upload-in-the-engine", "a-put-member-the-engine-did-not-upload-fails-the-release")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "a-put-member-the-engine-did-not-upload-fails-the-release")
 	for _, tc := range []struct {
 		name    string
 		packs   bool
@@ -343,10 +350,11 @@ func TestAPutMemberTheEngineDidNotUploadFailsTheRelease(t *testing.T) {
 }
 
 // A packed member the Put write protocol refuses for its planned kind is
-// refused before the publish bearer is asked and before any byte reaches the
-// registry.
-func TestAPutMemberIsCheckedBeforeTheBearerIsAsked(t *testing.T) {
-	spectest.Proves(t, "cli/provider-publication", "put-registry-members-upload-in-the-engine", "a-put-member-is-checked-before-the-bearer-is-asked")
+// refused by the provider's upload before any byte reaches the registry. The
+// refusal fails the upload with the code the provider named, and nothing is
+// released.
+func TestARefusedPutUploadFailsTheMember(t *testing.T) {
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "a-refused-upload-fails-the-member")
 	for name, tc := range map[string]struct {
 		change  func(*putMemberFixture)
 		refusal string
@@ -381,25 +389,25 @@ func TestAPutMemberIsCheckedBeforeTheBearerIsAsked(t *testing.T) {
 			planned, internal := h.plan(nil, fixedAncestry{testRevision}, nil)
 			results := h.execute(context.Background(), planned, internal, nil)
 
-			if upload := results[h.uploadKey(job)]; upload == nil || upload.Status != "failed" || upload.Error == nil || !strings.Contains(upload.Error.Message, tc.refusal) {
-				t.Fatalf("upload: %s; want a refusal that says %q", resultMessage(upload), tc.refusal)
+			if upload := results[h.uploadKey(job)]; upload == nil || upload.Status != "failed" || upload.Error == nil ||
+				!strings.Contains(upload.Error.Message, tc.refusal) || !strings.Contains(upload.Error.Message, registryproto.RefusalUploadFailed) {
+				t.Fatalf("upload: %s; want a %s refusal that says %q", resultMessage(upload), registryproto.RefusalUploadFailed, tc.refusal)
 			}
 			if requests, _ := reg.recorded(); len(requests) != 0 {
 				t.Fatalf("the registry received %v", requests)
 			}
-			if ops := h.session.recorded(); slices.Contains(ops, "credential") || slices.Contains(ops, "release") {
+			if ops := h.session.recorded(); slices.Contains(ops, "release") {
 				t.Fatalf("ops %v after a refused member", ops)
 			}
 		})
 	}
 }
 
-// A Put blob whose bytes are not the bytes its descriptor names is refused
-// before the bearer is asked for: the engine hashes every blob of the member
-// first, so the registry receives no blob, not even the intact one listed
-// before it.
-func TestATamperedPutBlobGetsNoBearer(t *testing.T) {
-	spectest.Proves(t, "cli/provider-publication", "put-registry-members-upload-in-the-engine", "a-put-member-is-checked-before-the-bearer-is-asked")
+// A Put blob whose bytes are not the bytes its descriptor names is refused by
+// digest: the provider hashes every blob of the member before it sends one,
+// so the registry receives no blob, not even the intact one listed before it.
+func TestATamperedPutBlobReachesNoRegistry(t *testing.T) {
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "a-tampered-artifact-is-refused-by-digest")
 	reg := newPutRegistry(t)
 	h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: []string{serverHost(t, reg.server)}})
 	f := putMemberFixtures()[0]
@@ -421,13 +429,14 @@ func TestATamperedPutBlobGetsNoBearer(t *testing.T) {
 	planned, internal := h.plan(nil, fixedAncestry{testRevision}, nil)
 	results := h.execute(context.Background(), planned, internal, nil)
 
-	if upload := results[h.uploadKey(job)]; upload == nil || upload.Status != "failed" || upload.Error == nil || !strings.Contains(upload.Error.Message, "digest mismatch") {
+	if upload := results[h.uploadKey(job)]; upload == nil || upload.Status != "failed" || upload.Error == nil ||
+		!strings.Contains(upload.Error.Message, "digest mismatch") || !strings.Contains(upload.Error.Message, registryproto.RefusalArtifactDigestMismatch) {
 		t.Fatalf("upload of a tampered blob: %s", resultMessage(upload))
 	}
 	if requests, _ := reg.recorded(); len(requests) != 0 {
 		t.Fatalf("the registry received %v", requests)
 	}
-	if ops := h.session.recorded(); slices.Contains(ops, "credential") || slices.Contains(ops, "release") {
+	if ops := h.session.recorded(); slices.Contains(ops, "release") {
 		t.Fatalf("ops %v after a tampered blob", ops)
 	}
 }
@@ -437,7 +446,7 @@ func TestATamperedPutBlobGetsNoBearer(t *testing.T) {
 // with no credential, query or fragment. A refusal does not print the
 // declared value.
 func TestPutRegistryEndpoint(t *testing.T) {
-	spectest.Proves(t, "cli/provider-publication", "put-registry-members-upload-in-the-engine", "put-registry-members-are-uploaded-by-the-engine")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "put-registry-members-go-to-the-session")
 	project := func(entry string) *workspace.Project {
 		if entry == "" {
 			return &workspace.Project{}
@@ -464,5 +473,32 @@ func TestPutRegistryEndpoint(t *testing.T) {
 		if got, err := putRegistryEndpoint(project(entry)); err == nil || strings.Contains(err.Error(), "secret") {
 			t.Errorf("putRegistryEndpoint(%s) = %q, %v; want a refusal that does not print it", entry, got, err)
 		}
+	}
+}
+
+// An archive member's platforms are the ones its packed manifest names: an
+// answer that names other platforms fails the upload, reports no published
+// member and releases nothing.
+func TestAnArchiveAnsweredWithOtherPlatformsFailsTheUpload(t *testing.T) {
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "the-answered-digest-must-be-the-packed-one")
+	reg := newPutRegistry(t)
+	h := newPublicationHarness(t, providertest.Config{
+		Bearer: publicationBearer, Hosts: []string{serverHost(t, reg.server)},
+		UploadAnswer: func(_ registryproto.UploadParams, answer registryproto.UploadResult) registryproto.UploadResult {
+			answer.Platforms = map[string]string{"linux/amd64": answer.Platforms["linux/amd64"]}
+			return answer
+		},
+	})
+	job := packedPutMember(t, h, putMemberFixtures()[0], reg.server.URL)
+	planned, internal := h.plan(nil, fixedAncestry{testRevision}, nil)
+	results := h.execute(context.Background(), planned, internal, nil)
+
+	upload := results[h.uploadKey(job)]
+	if upload == nil || upload.Status != "failed" || upload.Error == nil ||
+		!strings.Contains(upload.Error.Message, "platforms for the archive member putnami/cli other than its packed manifest names") {
+		t.Fatalf("upload answered with other platforms: %s", resultMessage(upload))
+	}
+	if events := uploadEvents(t, upload); len(events) != 0 || slices.Contains(h.session.recorded(), "release") {
+		t.Fatalf("events %+v, ops %v after a refused answer", events, h.session.recorded())
 	}
 }

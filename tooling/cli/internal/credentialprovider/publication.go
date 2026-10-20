@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"time"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	distribution "go.putnami.dev/protocol/distribution"
+	extproto "go.putnami.dev/protocol/extension"
 	registry "go.putnami.dev/protocol/registry"
 	"go.putnami.dev/tooling/cli/internal/jobs/publication"
 )
@@ -17,15 +18,49 @@ import (
 // the other ops.
 const DefaultReleaseTimeout = 2 * time.Minute
 
-// Publication is the publication-v1 surface of one provider session
-// (registry ADR 0003): resolve, open, the publish credential, and release.
-// Every op goes to the session the handle was taken from. When that session
-// ends, every later op fails: a provider started again has no plan open.
+// DefaultUploadTimeout is the base bound of one upload exchange. Each upload
+// gets one more minute per uploadBytesPerMinute of the files its member
+// declares (uploadTimeout).
+const DefaultUploadTimeout = 10 * time.Minute
+
+// uploadBytesPerMinute is the declared size that adds one minute to the bound
+// of an upload: 256 MiB.
+const uploadBytesPerMinute = 256 << 20
+
+// UploaderRequiredError refuses a credential provider session that serves
+// publication-v1 without uploader-v1. This CLI sends every publication upload
+// to its credential provider, so the session cannot publish; upgrading the
+// provider's extension fixes it. It is an invalid configuration
+// (protocolcli.ErrInvalidConfig).
+type UploaderRequiredError struct {
+	// Extension names the extension that declares the provider; empty when
+	// it is not known.
+	Extension string
+}
+
+func (e *UploaderRequiredError) Error() string {
+	provider, upgrade := "the credential provider", "the extension that declares it"
+	if e.Extension != "" {
+		provider, upgrade = "the credential provider of "+e.Extension, e.Extension
+	}
+	return fmt.Sprintf("%s serves %s without %s, and this CLI sends every publication upload to its credential provider: upgrade %s to a version that serves %s",
+		provider, registry.CapabilityPublicationV1, registry.CapabilityUploaderV1, upgrade, registry.CapabilityUploaderV1)
+}
+
+// Is classifies the refusal as an invalid configuration.
+func (e *UploaderRequiredError) Is(target error) bool {
+	return target == protocolcli.ErrInvalidConfig
+}
+
+// Publication is the publication-v1 and uploader-v1 surface of one provider
+// session (registry ADR 0003): resolve, open, upload and release. Every op
+// goes to the session the handle was taken from. When that session ends,
+// every later op fails: a provider started again has no plan open.
 type Publication struct {
-	broker         *Broker
 	session        *Session
 	timeout        time.Duration
 	releaseTimeout time.Duration
+	uploadTimeout  time.Duration
 }
 
 // Publication returns the publication-v1 surface of the broker's provider. It
@@ -33,7 +68,8 @@ type Publication struct {
 // purpose, when no provider serves this process, and when the provider's
 // initialize answer did not echo publication-v1: the echo alone decides. A
 // failed start is an error, so a run that enabled publish never falls back to
-// another authority because its provider failed.
+// another authority because its provider failed. A session that echoed
+// publication-v1 without uploader-v1 is an *UploaderRequiredError.
 func (b *Broker) Publication(ctx context.Context) (*Publication, error) {
 	if !b.Enabled(registry.PurposePublish) {
 		return nil, nil
@@ -48,7 +84,10 @@ func (b *Broker) Publication(ctx context.Context) (*Publication, error) {
 	if session == nil || !session.Publication() {
 		return nil, nil
 	}
-	return &Publication{broker: b, session: session, timeout: b.timeout, releaseTimeout: b.releaseTimeout}, nil
+	if err := b.requireUploader(session); err != nil {
+		return nil, err
+	}
+	return &Publication{session: session, timeout: b.timeout, releaseTimeout: b.releaseTimeout, uploadTimeout: b.uploadTimeout}, nil
 }
 
 // Resolve asks the session for the heads of request's channels, within the op
@@ -101,22 +140,44 @@ func (p *Publication) Release(ctx context.Context, params *registry.ReleaseParam
 	return response, nil
 }
 
-// PublishBearer returns the publish bearer for target. The credential is the
-// broker's publish credential, which the provider issues only once a plan is
-// open. A credential that does not name target's host and port is an error,
-// as is a refusal: no upload falls back to another credential.
-func (p *Publication) PublishBearer(ctx context.Context, target *url.URL) (string, error) {
-	if p.session.ended() {
-		return "", fmt.Errorf("the credential provider session that opened the plan ended: %w", p.session.deathErr())
+// Upload sends params, one packed member of the opened plan, to the session,
+// and returns what the registry stores. The provider uploads with a
+// credential it holds itself; the engine asks for none. The exchange is
+// bounded by uploadTimeout and is not retried: an upload the provider did not
+// answer may have reached the registry, so the session ends instead. A
+// refusal is a *PublicationRefusalError.
+func (p *Publication) Upload(ctx context.Context, params *registry.UploadParams) (*registry.UploadResult, error) {
+	if params == nil {
+		return nil, errors.New("credential provider upload: no member")
 	}
-	bearer, served, err := p.broker.Bearer(ctx, registry.PurposePublish, target)
+	timeout := uploadTimeout(p.uploadTimeout, params.Member)
+	opCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	result, err := p.session.Upload(opCtx, params)
 	if err != nil {
-		return "", err
+		return nil, p.endUnanswered(ctx, registry.CredentialOpUpload, err, timeout)
 	}
-	if !served {
-		return "", fmt.Errorf("the credential provider holds no publish credential for %s", target.Host)
+	return result, nil
+}
+
+// uploadTimeout bounds the upload of member: base, plus one minute per whole
+// uploadBytesPerMinute of the files member declares. An OCI member declares
+// its layout directory and no file, so it gets base. The outbox contract
+// bounds every declared size, so the sum cannot overflow.
+func uploadTimeout(base time.Duration, member extproto.OutboxMember) time.Duration {
+	var declared int64
+	switch {
+	case member.NPM != nil:
+		declared = member.NPM.Tarball.Size + member.NPM.Manifest.Size
+	case member.Go != nil:
+		declared = member.Go.Zip.Size + member.Go.Mod.Size + member.Go.Info.Size
+	case member.Put != nil:
+		declared = member.Put.Manifest.Size
+		for _, blob := range member.Put.Blobs {
+			declared += blob.Size
+		}
 	}
-	return bearer, nil
+	return base + time.Duration(declared/uploadBytesPerMinute)*time.Minute
 }
 
 // retryUnanswered runs attempt within timeout, and once more when the first

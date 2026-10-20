@@ -962,16 +962,19 @@ func failureLines(output string) string {
 }
 
 // A publish run through the real TypeScript and Go extensions and a
-// publication-v1 provider: the extensions' package steps stage an npm package
-// and a Go module, their publication jobs, behind a probe, pack them into the
-// outbox and find no credential, and the engine uploads both with the
-// credential the provider issues after the one open, then releases the
-// opened plan forward from the channel's head. A head that is not an ancestor
-// of the commit is refused at open and nothing is uploaded; a release whose
-// members the registries do not store is refused, and no channel moves.
-func TestReleaseSetE2EPublicationV1UploadsInProcessAndReleasesForwardOnly(t *testing.T) {
+// publication-v1 and uploader-v1 provider: the extensions' package steps
+// stage an npm package and a Go module, their publication jobs, behind a
+// probe, pack them into the outbox and find no credential, and after the one
+// open the engine sends each member's upload to the provider, which uploads
+// it with the credential it holds. The engine asks no publish credential. It
+// then releases the opened plan forward from the channel's head. A head that
+// is not an ancestor of the commit is refused at open and nothing is
+// uploaded; a release whose members the registries do not store is refused,
+// and no channel moves.
+func TestReleaseSetE2EPublicationV1UploadsThroughTheProviderAndReleasesForwardOnly(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/provider-publication", "uploads-run-in-the-engine", "real-extension-jobs-pack-and-the-engine-uploads")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "real-extension-jobs-pack-and-the-session-uploads")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "the-engine-asks-no-publish-credential")
 	spectest.Proves(t, "cli/provider-publication", "open-credential-release-through-one-provider", "real-extensions-open-once-and-release-forward-only")
 	fx := writePublicationE2EFixture(t)
 
@@ -983,18 +986,21 @@ func TestReleaseSetE2EPublicationV1UploadsInProcessAndReleasesForwardOnly(t *tes
 			t.Fatalf("publish exit=%d, want 0: %s\n%s", run.code, failureLines(run.output), run.output)
 		}
 
-		// One open, after every package step, then the publish credential,
-		// then one release.
+		// One open, after every package step, then one upload per member,
+		// then one release, and no publish credential asked.
 		opens := indexesOf(run.order, string(registry.CredentialOpOpen))
-		credential := slices.Index(run.order, string(registry.CredentialOpCredential)+" "+registry.PurposePublish)
+		uploads := indexesOf(run.order, string(registry.CredentialOpUpload))
 		release := indexesOf(run.order, string(registry.CredentialOpRelease))
 		staged := indexesOf(run.order, "staged "+e2eNPMProject, "staged "+e2eGoProject)
 		if len(opens) != 1 || len(staged) != 2 || slices.Max(staged) > opens[0] ||
-			credential < opens[0] || len(release) != 1 || release[0] < credential {
-			t.Errorf("order = %q; want both members staged, then one open, then the publish credential, then one release", run.order)
+			len(uploads) != 2 || slices.Min(uploads) < opens[0] || len(release) != 1 || release[0] < slices.Max(uploads) {
+			t.Errorf("order = %q; want both members staged, then one open, then two uploads, then one release", run.order)
+		}
+		if slices.Contains(run.order, string(registry.CredentialOpCredential)+" "+registry.PurposePublish) {
+			t.Errorf("order = %q; the engine asked the publish credential", run.order)
 		}
 
-		// The engine uploaded both members with the provider's credential.
+		// The provider uploaded both members with its own credential.
 		npmStored := fx.npm.storedDigests()
 		_, npmRefused := fx.npm.stored()
 		goStored, goRefused := fx.gomod.stored()
@@ -1063,8 +1069,9 @@ func TestReleaseSetE2EPublicationV1UploadsInProcessAndReleasesForwardOnly(t *tes
 			t.Fatalf("publish over a head that is not forward exit=0, want a failure\n%s", run.output)
 		}
 		boundedRefusal(t, run.output, registry.RefusalNotForward)
-		if len(run.opens) != 1 || len(run.releases) != 0 || slices.Contains(run.order, string(registry.CredentialOpCredential)+" "+registry.PurposePublish) {
-			t.Fatalf("order = %q with %d releases; want one refused open, no publish credential and no release", run.order, len(run.releases))
+		if len(run.opens) != 1 || len(run.releases) != 0 || slices.Contains(run.order, string(registry.CredentialOpUpload)) ||
+			slices.Contains(run.order, string(registry.CredentialOpCredential)+" "+registry.PurposePublish) {
+			t.Fatalf("order = %q with %d releases; want one refused open, no upload, no publish credential and no release", run.order, len(run.releases))
 		}
 		if channel := run.opens[0].Ancestry.Channels; len(channel) != 1 || channel[0].HeadSourceRevision != e2eUnheldRevision || channel[0].Ancestor {
 			t.Errorf("open ancestry %+v; want the unheld head revision, not an ancestor", channel)

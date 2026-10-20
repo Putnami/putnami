@@ -12,8 +12,8 @@
 //     through and no offline signal is added.
 //   - On a run that publishes through a publication-v1 credential provider,
 //     the publication job, repository code, finds the publish credential
-//     nowhere: the engine uploads what the job packed with a credential only
-//     it receives.
+//     nowhere: the engine sends what the job packed to the credential
+//     provider, which uploads it with a credential only it holds.
 //
 // The engine, the hostile hook and the hostile task are all this test binary
 // re-executed in a role (custodyRoleEnv), the same pattern
@@ -100,7 +100,7 @@ const (
 // provider, the workspace-fetch of a store or a path extension, a hook that
 // overwrites the provider's executable, a hostile hook, task or publication
 // job that probes for the credential and packs an npm or Put registry member,
-// a probe that runs while the engine uploads, a package step that stages a
+// a probe that runs during an upload, a package step that stages a
 // member, the bun a real extension packs with, a probe that then runs a real
 // extension binary, or a v2 or v1 session reporter. A role process exits
 // without running any test. As the

@@ -15,18 +15,17 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/go-containerregistry/pkg/name"
-
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
 	distribution "go.putnami.dev/protocol/distribution"
 	extproto "go.putnami.dev/protocol/extension"
+	ociproto "go.putnami.dev/protocol/oci"
 	put "go.putnami.dev/protocol/put"
+	registryproto "go.putnami.dev/protocol/registry"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/sdk/extension/gomodpublish"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/publicationoutbox"
-	"go.putnami.dev/sdk/extension/publicationupload"
 	"go.putnami.dev/sdk/extension/putpublish"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -148,7 +147,7 @@ func (run *ReleaseSetRun) attachPublication(planned []*jobmodel.ScheduledJob) ([
 	return planned, runners, nil
 }
 
-// publicationKind is the kind the engine uploads member as: the kind its
+// publicationKind is the kind member is uploaded as: the kind its
 // declared package and publish steps give it (releaseset.KindFor), which is
 // the kind a plan with member attribution records. It does not depend on
 // that opt-in.
@@ -282,9 +281,10 @@ func unsatisfiedDependency(job *jobmodel.ScheduledJob, results map[string]*jobmo
 }
 
 // uploadOutbox reads the outbox publish packed, checks every packed member
-// against the plan before any upload, and uploads each with a publish
-// credential the provider issues for its registry. A job that packed nothing
-// wrote no descriptor: it published, or skipped, on its own route.
+// against the plan before any upload, and sends each to the provider's
+// upload, which uploads it with a credential the provider holds. A job that
+// packed nothing wrote no descriptor: it published, or skipped, on its own
+// route.
 func (run *ReleaseSetRun) uploadOutbox(ctx context.Context, publish *jobmodel.ScheduledJob, memberKey string) ([]*extproto.PublishedMember, error) {
 	root := run.outboxes[publish.Key()]
 	if root == "" {
@@ -349,35 +349,97 @@ func (run *ReleaseSetRun) checkPacked(packed extproto.OutboxMember, planned rele
 	return nil
 }
 
-// uploadPacked uploads one checked member of the planned kind to the registry
-// the engine resolves for it, with the provider's publish bearer for that
-// registry (publicationupload.Upload), and returns its artifact digest: the
-// npm tarball's, the Go module zip's, the OCI manifest's, or the stored Put
-// manifest payload's, with the platforms of an archive. Every check that
-// needs the project's declarations runs before the upload.
+// uploadPacked sends one checked member of the planned kind to the
+// provider's upload (PublicationProvider.Upload), for the registry the engine
+// resolves for it, and returns its artifact digest: the npm tarball's, the Go
+// module zip's, the OCI manifest's, or the stored Put manifest payload's,
+// with the platforms of an archive. Every check that needs the project's
+// declarations runs before the upload, and the answer must name the packed
+// digest. An OCI member's published image is then recorded beside the
+// publication job's output (recordPublishedImage).
 func (run *ReleaseSetRun) uploadPacked(ctx context.Context, publish *jobmodel.ScheduledJob, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember, kind distribution.MemberKind) (string, map[string]string, error) {
-	request := publicationupload.Request{Outbox: outbox.Root(), Member: packed, Kind: kind}
+	params := &registryproto.UploadParams{PlanDigest: run.open.Plan.PlanDigest, Outbox: outbox.Root(), Member: packed}
+	var image *packedImage
 	var err error
 	switch packed.Ecosystem {
 	case extproto.OutboxEcosystemNPM:
-		request.Registry, err = memberRegistryEndpoint(publish.Project, packed)
+		params.Registry, err = memberRegistryEndpoint(publish.Project, packed)
 	case extproto.OutboxEcosystemGo:
-		request.Registry, err = goRegistryEndpoint(publish.Project, packed.Ecosystem)
+		params.Registry, err = goRegistryEndpoint(publish.Project, packed.Ecosystem)
 	case extproto.OutboxEcosystemOCI:
-		var digest string
-		digest, err = run.uploadOCI(ctx, publish, request)
-		return digest, nil, err
+		image, err = run.checkPackedImage(publish, packed)
+		if err == nil {
+			params.Registry = ociproto.RegistryScheme(image.host) + "://" + image.host
+		}
 	case extproto.OutboxEcosystemPut, extproto.OutboxEcosystemArchive:
-		request.Registry, err = putRegistryEndpoint(publish.Project)
+		params.Registry, err = putRegistryEndpoint(publish.Project)
+		params.Kind = kind
 	}
 	if err != nil {
 		return "", nil, err
 	}
-	uploaded, err := publicationupload.Upload(ctx, request, run.publication.PublishBearer)
+	answer, err := run.publication.Upload(ctx, params)
 	if err != nil {
 		return "", nil, err
 	}
-	return uploaded.Digest, uploaded.Platforms, nil
+	if packedDigest := packedArtifactDigest(packed); answer.Digest != packedDigest {
+		return "", nil, fmt.Errorf("the credential provider answered digest %s for %s; the publication job packed %s",
+			answer.Digest, printableReleaseKey(releaseset.MemberKey(distribution.Ecosystem(packed.Ecosystem), packed.Coordinate)), packedDigest)
+	}
+	platforms, err := packedPlatforms(outbox, packed, answer.Platforms)
+	if err != nil {
+		return "", nil, err
+	}
+	if image != nil {
+		if err := run.recordPublishedImage(publish, packed, image, answer.Digest); err != nil {
+			return "", nil, err
+		}
+	}
+	return answer.Digest, platforms, nil
+}
+
+// packedArtifactDigest is the artifact digest of a packed member: its npm
+// tarball's, its Go module zip's, its OCI manifest's, or its Put manifest
+// payload's. An upload answer must name it.
+func packedArtifactDigest(packed extproto.OutboxMember) string {
+	switch {
+	case packed.NPM != nil:
+		return packed.NPM.Tarball.Digest
+	case packed.Go != nil:
+		return packed.Go.Zip.Digest
+	case packed.OCI != nil:
+		return packed.OCI.Digest
+	case packed.Put != nil:
+		return packed.Put.Manifest.Digest
+	}
+	return ""
+}
+
+// packedPlatforms returns the platforms of an archive member, which its packed
+// manifest names (put.ArchivePayload.Platforms), and refuses an upload answer
+// that names others. The manifest is read from the outbox and must still be
+// the packed bytes. Any other member has no platforms, and an answer that
+// names some is refused.
+func packedPlatforms(outbox *publicationoutbox.Outbox, packed extproto.OutboxMember, answered map[string]string) (map[string]string, error) {
+	if packed.Ecosystem != extproto.OutboxEcosystemArchive {
+		if len(answered) > 0 {
+			return nil, fmt.Errorf("the credential provider answered platforms for the %s member %s, which has none", packed.Ecosystem, packed.Coordinate)
+		}
+		return nil, nil
+	}
+	manifest, err := outbox.ReadFile(packed.Put.Manifest)
+	if err != nil {
+		return nil, err
+	}
+	archive, _ := put.ParseArchivePayload(manifest)
+	if archive == nil {
+		return nil, fmt.Errorf("the archive member %s packed a manifest that is not an archive payload", packed.Coordinate)
+	}
+	platforms := archive.Platforms()
+	if !maps.Equal(platforms, answered) {
+		return nil, fmt.Errorf("the credential provider answered platforms for the archive member %s other than its packed manifest names", packed.Coordinate)
+	}
+	return platforms, nil
 }
 
 // maxPrintedRegistry bounds a registry URL or host an upload error names.
@@ -394,9 +456,9 @@ func printableRegistry(endpoint string) string {
 // memberRegistryEndpoint is the registry the npm member names, normalized by
 // the managed rules (extproto.ManagedNPMRegistry). When the project declares
 // registries.npm.publish, the member must name that same registry
-// (registryURLIdentity): the engine uploads nowhere the declaration
-// contradicts. Neither URL carries a credential, a query or a fragment, so the
-// refusal names both, cut to maxPrintedRegistry.
+// (registryURLIdentity): the engine sends no upload to a registry the
+// declaration contradicts. Neither URL carries a credential, a query or a
+// fragment, so the refusal names both, cut to maxPrintedRegistry.
 func memberRegistryEndpoint(project *workspace.Project, packed extproto.OutboxMember) (string, error) {
 	endpoint, err := extproto.ManagedNPMRegistry(packed.NPM.Registry)
 	if err != nil {
@@ -466,59 +528,67 @@ func putRegistryEndpoint(project *workspace.Project) (string, error) {
 	return putpublish.ValidateRegistryURL(declared)
 }
 
-// uploadOCI refuses an image for a registry host the project's
-// registries.oci.publish does not name, or other than the image its package
-// step built, uploads it (publicationupload.Upload), then records the
-// published image beside the publication job's output, where a same-run
-// consumer reads it (pkgmeta.PublishedImageManifestPath).
-func (run *ReleaseSetRun) uploadOCI(ctx context.Context, publish *jobmodel.ScheduledJob, request publicationupload.Request) (string, error) {
-	packed := request.Member
-	repository, err := name.NewRepository(packed.OCI.Repository, name.StrictValidation)
+// packedImage is a checked OCI member: the registry host its repository
+// names, and the image its package step built.
+type packedImage struct {
+	host      string
+	candidate *pkgmeta.DockerManifest
+}
+
+// checkPackedImage reads the registry host an OCI member's repository names
+// (ociproto.RegistryHost), which the upload reaches with that host's scheme
+// (ociproto.RegistryScheme). It refuses an image for a registry host the
+// project's registries.oci.publish does not name, or other than the image its
+// package step built.
+func (run *ReleaseSetRun) checkPackedImage(publish *jobmodel.ScheduledJob, packed extproto.OutboxMember) (*packedImage, error) {
+	host, err := ociproto.RegistryHost(packed.OCI.Repository)
 	if err != nil {
-		return "", fmt.Errorf("OCI repository %q: %w", packed.OCI.Repository, err)
+		return nil, fmt.Errorf("OCI repository of %s: %w", packed.Coordinate, err)
 	}
-	host := repository.RegistryStr()
 	declaredHost, err := declaredOCIRegistryHost(publish.Project, packed.Ecosystem)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if declaredHost != "" && !strings.EqualFold(declaredHost, host) {
-		return "", fmt.Errorf("the publication job packed an image for %s; registries.%s.publish names %s", host, packed.Ecosystem, printableRegistry(declaredHost))
+	if declaredHost != "" && declaredHost != host {
+		return nil, fmt.Errorf("the publication job packed an image for %s; registries.%s.publish names %s", host, packed.Ecosystem, printableRegistry(declaredHost))
 	}
 	candidate, err := pkgmeta.ReadDockerManifest(run.root, publish.Project.Path)
 	if err != nil {
-		return "", fmt.Errorf("read the packaged image: %w", err)
+		return nil, fmt.Errorf("read the packaged image: %w", err)
 	}
 	if candidate.Digest != packed.OCI.Digest {
-		return "", fmt.Errorf("the publication job packed image %s; the package step built %s", packed.OCI.Digest, candidate.Digest)
+		return nil, fmt.Errorf("the publication job packed image %s; the package step built %s", packed.OCI.Digest, candidate.Digest)
 	}
-	pushed, err := publicationupload.Upload(ctx, request, run.publication.PublishBearer)
-	if err != nil {
-		return "", err
-	}
+	return &packedImage{host: host, candidate: candidate}, nil
+}
+
+// recordPublishedImage records the image the provider uploaded at digest
+// beside the publication job's output, where a same-run consumer reads it
+// (pkgmeta.PublishedImageManifestPath).
+func (run *ReleaseSetRun) recordPublishedImage(publish *jobmodel.ScheduledJob, packed extproto.OutboxMember, image *packedImage, digest string) error {
 	outputDir := filepath.Join(run.root, ".putnami", "out", publish.Project.Path, publish.CommandName())
 	if err := pkgmeta.WritePublishedImageManifest(outputDir, pkgmeta.PublishedImageManifest{
 		Image:           packed.OCI.Repository,
-		ImmutableRef:    packed.OCI.Repository + "@" + pushed.Digest,
-		Digest:          pushed.Digest,
-		CandidateDigest: candidate.Digest,
-		ContentHash:     candidate.ContentHash,
-		Platform:        candidate.Platform,
-		TargetRegistry:  host,
+		ImmutableRef:    packed.OCI.Repository + "@" + digest,
+		Digest:          digest,
+		CandidateDigest: image.candidate.Digest,
+		ContentHash:     image.candidate.ContentHash,
+		Platform:        image.candidate.Platform,
+		TargetRegistry:  image.host,
 		Verified:        true,
 	}); err != nil {
-		return "", fmt.Errorf("record the published image: %w", err)
+		return fmt.Errorf("record the published image: %w", err)
 	}
-	return pushed.Digest, nil
+	return nil
 }
 
 // declaredOCIRegistryHost is the registry host the project's
 // registries.<ecosystem>.publish entry names, "" when it declares none. The
 // entry is a repository prefix such as "ghcr.io/team" or a URL such as
 // "https://ghcr.io/team"; both name the host "ghcr.io", normalized as an image
-// repository's host is (name.NewRegistry), so "docker.io" names
-// "index.docker.io". An entry that names no valid host is refused without
-// being printed, since it may carry a credential.
+// repository's host is (ociproto.NormalizeRegistryHost): lowercased, with
+// "docker.io" read as "index.docker.io". An entry that names no valid host is
+// refused without being printed, since it may carry a credential.
 func declaredOCIRegistryHost(project *workspace.Project, ecosystem string) (string, error) {
 	declared, err := declaredRegistryEndpoint(project, ecosystem, "publish")
 	if err != nil || declared == "" {
@@ -532,11 +602,11 @@ func declaredOCIRegistryHost(project *workspace.Project, ecosystem string) (stri
 		}
 		host = target.Host
 	}
-	registry, err := name.NewRegistry(host, name.StrictValidation)
+	registry, err := ociproto.NormalizeRegistryHost(host)
 	if err != nil {
 		return "", fmt.Errorf("registries.%s.publish names no registry host", ecosystem)
 	}
-	return registry.RegistryStr(), nil
+	return registry, nil
 }
 
 // declaredRegistryEndpoint reads field of the project's registries entry for

@@ -16,9 +16,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/google/go-containerregistry/pkg/registry"
-	"github.com/google/go-containerregistry/pkg/v1/random"
-
 	modelextension "go.putnami.dev/cli/model/extension"
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	"go.putnami.dev/cli/model/workspace"
@@ -28,7 +25,6 @@ import (
 	registryproto "go.putnami.dev/protocol/registry"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/npmpublish"
-	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/publicationoutbox"
 	"go.putnami.dev/sdk/extension/publicationupload/publicationuploadtest"
@@ -45,8 +41,9 @@ const publicationBearer = "publication-bearer-fixture"
 
 // sessionPublication is the publication surface of one providertest session,
 // as the credential provider's broker serves it: every request is checked
-// with the protocol's own parser first, a refusal is an error that names its
-// code, and the publish bearer goes only to a host the credential serves.
+// with the protocol's own parser first, and a refusal is an error that names
+// its code. It has no publish credential to hand out: the provider uploads
+// with the credential it holds.
 type sessionPublication struct {
 	session *providertest.Session
 
@@ -61,7 +58,7 @@ func newSessionPublication(t *testing.T, config providertest.Config) (*providert
 	t.Helper()
 	provider := providertest.New(config)
 	session := provider.NewSession()
-	session.Initialize([]string{registryproto.CapabilityCredentialV1, registryproto.CapabilityPublicationV1})
+	session.Initialize([]string{registryproto.CapabilityCredentialV1, registryproto.CapabilityPublicationV1, registryproto.CapabilityUploaderV1})
 	if !session.Publication() {
 		t.Fatal("the test provider did not negotiate publication-v1")
 	}
@@ -133,16 +130,21 @@ func (p *sessionPublication) Release(_ context.Context, params *registryproto.Re
 	return &result.Response, nil
 }
 
-func (p *sessionPublication) PublishBearer(_ context.Context, target *url.URL) (string, error) {
-	p.record("credential")
-	result, refusal := p.session.Credential(registryproto.PurposePublish)
+func (p *sessionPublication) Upload(ctx context.Context, params *registryproto.UploadParams) (*registryproto.UploadResult, error) {
+	p.record("upload")
+	encoded, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+	parsed, err := registryproto.ParseUploadParams(encoded)
+	if err != nil {
+		return nil, fmt.Errorf("the engine sent an invalid upload: %w", err)
+	}
+	result, refusal := p.session.Upload(ctx, *parsed)
 	if refusal != nil {
-		return "", refusalError("credential", refusal)
+		return nil, refusalError("upload", refusal)
 	}
-	if result.Credential == nil || !result.Credential.Serves(target) {
-		return "", fmt.Errorf("the credential provider holds no publish credential for %s", target.Host)
-	}
-	return result.Credential.Bearer, nil
+	return result, nil
 }
 
 // fixedAncestry is an ancestry snapshot holding the commits it lists, the
@@ -464,7 +466,7 @@ func resultMessage(result *jobmodel.JobResult) string {
 // The open node waits for every task that neither publishes nor depends on a
 // publication, or, for a bound request, for every task of its barrier
 // commands. It is sent once, with the plan the release-plan contract states,
-// and before any publish credential is asked.
+// and before any upload.
 func TestSessionOpenIsSentOnceAfterEveryBarrierLeaf(t *testing.T) {
 	spectest.Proves(t, "cli/provider-publication", "open-credential-release-through-one-provider", "open-follows-every-barrier-leaf-once")
 	for name, barrier := range map[string][]string{"local run": nil, "bound request": {"test"}} {
@@ -515,8 +517,8 @@ func TestSessionOpenIsSentOnceAfterEveryBarrierLeaf(t *testing.T) {
 			if !slices.Equal(openedAfter, []bool{true, true}) {
 				t.Fatalf("open was sent before every gate finished: %v", openedAfter)
 			}
-			if index := slices.Index(ops, "open"); index < 0 || slices.Index(ops, "credential") < index {
-				t.Fatalf("ops %v: a publish credential was asked before open", ops)
+			if index := slices.Index(ops, "open"); index < 0 || slices.Index(ops, "upload") < index {
+				t.Fatalf("ops %v: an upload was sent before open", ops)
 			}
 			if opens := h.provider.Opens(); len(opens) != 1 || opens[0].Plan.PlanDigest != h.run.open.Plan.PlanDigest {
 				t.Fatalf("the provider opened %d plans", len(opens))
@@ -595,10 +597,10 @@ func TestHandoffAndSessionStateOnePlanDigestInAnyMemberOrder(t *testing.T) {
 
 // A publication job of a publication-v1 run receives a private outbox and no
 // credential: not the captured cloud token, not the job credential
-// descriptor, not a registry route, and not the publish bearer the engine
+// descriptor, not a registry route, and not the publish bearer the provider
 // uploads with.
 func TestPublishJobReceivesNoCredentialUnderPublicationV1(t *testing.T) {
-	spectest.Proves(t, "cli/provider-publication", "uploads-run-in-the-engine", "a-publication-job-holds-no-credential")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "a-publication-job-holds-no-credential")
 	const token = "captured-cloud-token-fixture"
 	t.Setenv("PUTNAMI_REGISTRY_NPM_URL", "http://127.0.0.1:1/npm")
 	t.Setenv("PUTNAMI_REGISTRY_FUTUREKIND_URL", "http://127.0.0.1:1/futurekind")
@@ -658,22 +660,20 @@ func TestPublishJobReceivesNoCredentialUnderPublicationV1(t *testing.T) {
 		t.Fatalf("the outbox mode is %q (%v), want 0700", got, err)
 	}
 	if tarball, _ := npm.stored("@putnami/web", "1.2.3"); string(tarball) != "tarball of @putnami/web@1.2.3" {
-		t.Fatalf("the engine uploaded %q", tarball)
+		t.Fatalf("the provider uploaded %q", tarball)
 	}
 }
 
-// The engine uploads every packed member with the provider's publish
-// credential, records the published image beside the publication job's
-// output, reports one published-member event per upload, and releases the
-// uploaded digests with their routes as evidence.
+// The engine sends every packed member to the provider's upload, with the
+// registry it resolved for the member and no credential, records the
+// published image beside the publication job's output, reports one
+// published-member event per upload, and releases the uploaded digests with
+// their routes as evidence.
 func TestEngineUploadsManagedMembersAndEmitsPublishedMembers(t *testing.T) {
-	spectest.Proves(t, "cli/provider-publication", "uploads-run-in-the-engine", "each-packed-member-is-uploaded-by-the-engine")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "each-packed-member-goes-to-the-session")
 	npm := newNPMRegistry(t)
 	gomod := newGoRegistry(t)
-	ociServer := httptest.NewServer(registry.New())
-	t.Cleanup(ociServer.Close)
-	ociHost := serverHost(t, ociServer)
-	hosts := []string{serverHost(t, npm.server), serverHost(t, gomod.server), ociHost}
+	hosts := []string{serverHost(t, npm.server), serverHost(t, gomod.server), testOCIHost}
 	slices.Sort(hosts)
 	h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: slices.Compact(hosts)})
 
@@ -705,7 +705,7 @@ func TestEngineUploadsManagedMembersAndEmitsPublishedMembers(t *testing.T) {
 	}
 	npmJob := h.addMember("npm", "@putnami/web", "1.2.3", "web", map[string]string{"npm": registriesEntry("publish", npm.server.URL)}, copyOutbox(npmOutbox))
 	goJob := h.addMember("go", "example.test/mod", "v1.2.3", "mod", map[string]string{"go": registriesEntry("origin", gomod.server.URL)}, copyOutbox(goOutbox))
-	ociJob, imageDigest := addOCIMember(t, h, ociHost, ociHost)
+	ociJob, imageDigest := addOCIMember(t, h, testOCIHost, testOCIHost)
 
 	planned, internal := h.plan(nil, fixedAncestry{testRevision}, nil)
 	results := h.execute(context.Background(), planned, internal, nil)
@@ -744,8 +744,22 @@ func TestEngineUploadsManagedMembersAndEmitsPublishedMembers(t *testing.T) {
 		}
 	}
 	published, err := pkgmeta.ReadPublishedImageManifest(filepath.Join(h.root, ".putnami", "out", "app", "publish"))
-	if err != nil || published.Digest != imageDigest || !published.Verified || published.ImmutableRef != ociHost+"/team/app@"+imageDigest {
+	if err != nil || published.Digest != imageDigest || !published.Verified || published.ImmutableRef != testOCIHost+"/team/app@"+imageDigest ||
+		published.TargetRegistry != testOCIHost {
 		t.Fatalf("published image %+v, %v", published, err)
+	}
+	wantRegistries := map[string]string{
+		"npm": npm.server.URL, "go": gomod.server.URL, "oci": "http://" + testOCIHost,
+	}
+	uploads := h.provider.Uploads()
+	if len(uploads) != 3 {
+		t.Fatalf("the provider applied %d uploads, want 3", len(uploads))
+	}
+	for _, upload := range uploads {
+		if upload.Params.Registry != wantRegistries[upload.Params.Member.Ecosystem] || upload.Params.Kind != "" ||
+			upload.Params.PlanDigest != h.run.open.Plan.PlanDigest {
+			t.Fatalf("upload of %s: registry %q, kind %q, plan %s", upload.Params.Member.Coordinate, upload.Params.Registry, upload.Params.Kind, upload.Params.PlanDigest)
+		}
 	}
 	releases := h.session.releases
 	if len(releases) != 1 || len(releases[0].Evidence.Members) != 3 || len(releases[0].Evidence.Images) != 1 ||
@@ -755,21 +769,69 @@ func TestEngineUploadsManagedMembersAndEmitsPublishedMembers(t *testing.T) {
 	}
 }
 
-// addOCIMember adds the project app, whose publication job packs a random
-// image as ociHost/team/app at 1.2.3 and whose package step built it, under
+// testOCIHost is the registry host the OCI members of these tests name. The
+// test provider checks an OCI layout and pushes nothing, so no registry
+// listens there.
+const testOCIHost = "127.0.0.1:5000"
+
+// writeImageLayout writes an OCI image layout of one image, one layer of
+// content, at dir and returns the digest of its manifest.
+func writeImageLayout(t *testing.T, dir string, content []byte) string {
+	t.Helper()
+	blobs := filepath.Join(dir, "blobs", "sha256")
+	if err := os.MkdirAll(blobs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	type descriptor struct {
+		MediaType string `json:"mediaType"`
+		Digest    string `json:"digest"`
+		Size      int    `json:"size"`
+	}
+	writeBlob := func(mediaType string, data []byte) descriptor {
+		sum := fmt.Sprintf("%x", sha256.Sum256(data))
+		if err := os.WriteFile(filepath.Join(blobs, sum), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return descriptor{MediaType: mediaType, Digest: "sha256:" + sum, Size: len(data)}
+	}
+	const manifestType = "application/vnd.oci.image.manifest.v1+json"
+	manifest, err := json.Marshal(struct {
+		SchemaVersion int          `json:"schemaVersion"`
+		MediaType     string       `json:"mediaType"`
+		Config        descriptor   `json:"config"`
+		Layers        []descriptor `json:"layers"`
+	}{
+		SchemaVersion: 2, MediaType: manifestType,
+		Config: writeBlob("application/vnd.oci.image.config.v1+json", []byte(`{"architecture":"amd64","os":"linux","rootfs":{"type":"layers","diff_ids":[]}}`)),
+		Layers: []descriptor{writeBlob("application/vnd.oci.image.layer.v1.tar", content)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	image := writeBlob(manifestType, manifest)
+	index, err := json.Marshal(struct {
+		SchemaVersion int          `json:"schemaVersion"`
+		Manifests     []descriptor `json:"manifests"`
+	}{SchemaVersion: 2, Manifests: []descriptor{image}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, data := range map[string][]byte{"index.json": index, "oci-layout": []byte(`{"imageLayoutVersion":"1.0.0"}`)} {
+		if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return image.Digest
+}
+
+// addOCIMember adds the project app, whose publication job packs an image as
+// ociHost/team/app at 1.2.3 and whose package step built it, under
 // registries.oci.publish declared. It returns the publication job and the
 // image's manifest digest.
 func addOCIMember(t *testing.T, h *publicationHarness, ociHost, declared string) (*jobmodel.ScheduledJob, string) {
 	t.Helper()
-	image, err := random.Image(256, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
 	layout := filepath.Join(t.TempDir(), "layout")
-	imageDigest, err := oci.WriteLayout(layout, image)
-	if err != nil {
-		t.Fatal(err)
-	}
+	imageDigest := writeImageLayout(t, layout, []byte("image layer of team/app"))
 	outbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
 		if err := w.CopyLayout("oci/layout", layout); err != nil {
 			t.Fatal(err)
@@ -796,13 +858,13 @@ func addOCIMember(t *testing.T, h *publicationHarness, ociHost, declared string)
 	return job, imageDigest
 }
 
-// The engine uploads an npm member to the registry the member names. A
-// project that declares registries.npm.publish must declare that registry,
+// The engine sends an npm member's upload for the registry the member names.
+// A project that declares registries.npm.publish must declare that registry,
 // written in any form the managed rules normalize alike; a project that
-// declares another is refused, naming both, before any credential is asked or
-// any byte reaches either registry.
+// declares another is refused, naming both, before any upload is sent or any
+// byte reaches either registry.
 func TestNPMUploadGoesToTheRegistryTheMemberNames(t *testing.T) {
-	spectest.Proves(t, "cli/provider-publication", "uploads-run-in-the-engine", "each-packed-member-is-uploaded-by-the-engine")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "each-packed-member-goes-to-the-session")
 	for name, tc := range map[string]struct {
 		// declared is the registries.npm.publish entry, "" for none, given
 		// the registry the member names and another one.
@@ -844,7 +906,7 @@ func TestNPMUploadGoesToTheRegistryTheMemberNames(t *testing.T) {
 				!strings.Contains(upload.Error.Message, npm.server.URL) || !strings.Contains(upload.Error.Message, other.server.URL) {
 				t.Fatalf("upload under a contradicting declaration: %s", resultMessage(upload))
 			}
-			if requests != 0 || slices.Contains(h.session.recorded(), "credential") {
+			if requests != 0 || slices.Contains(h.session.recorded(), "upload") {
 				t.Fatalf("a contradicting declaration sent %d requests; ops %v", requests, h.session.recorded())
 			}
 		})
@@ -856,7 +918,7 @@ func TestNPMUploadGoesToTheRegistryTheMemberNames(t *testing.T) {
 // bounded error naming both, and never prints a declaration that carries a
 // credential.
 func TestMemberRegistryEndpointComparesTheNormalizedRegistry(t *testing.T) {
-	spectest.Proves(t, "cli/provider-publication", "uploads-run-in-the-engine", "each-packed-member-is-uploaded-by-the-engine")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "each-packed-member-goes-to-the-session")
 	long := "https://npm.acme.dev/" + strings.Repeat("a", 4096)
 	for name, tc := range map[string]struct {
 		packed, declared, want, refusal string
@@ -898,11 +960,11 @@ func TestMemberRegistryEndpointComparesTheNormalizedRegistry(t *testing.T) {
 }
 
 // The declared OCI registry names its host as a repository prefix or as a
-// URL. Either form naming the image's host lets the engine push; either form
-// naming another host, or a URL carrying a credential, is refused before any
-// credential is asked.
+// URL. Either form naming the image's host lets the engine send the upload;
+// either form naming another host, or a URL carrying a credential, is refused
+// before any upload is sent.
 func TestOCIUploadReadsTheDeclaredHostInEitherForm(t *testing.T) {
-	spectest.Proves(t, "cli/provider-publication", "uploads-run-in-the-engine", "each-packed-member-is-uploaded-by-the-engine")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "each-packed-member-goes-to-the-session")
 	for name, tc := range map[string]struct {
 		declared func(host string) string
 		refusal  string
@@ -914,9 +976,7 @@ func TestOCIUploadReadsTheDeclaredHostInEitherForm(t *testing.T) {
 		"a URL carrying a credential":  {declared: func(host string) string { return "https://publisher:secret@" + host }, refusal: "without credentials"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			server := httptest.NewServer(registry.New())
-			t.Cleanup(server.Close)
-			host := serverHost(t, server)
+			host := testOCIHost
 			h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: []string{host}})
 			job, imageDigest := addOCIMember(t, h, host, tc.declared(host))
 			planned, internal := h.plan(nil, fixedAncestry{testRevision}, nil)
@@ -934,7 +994,7 @@ func TestOCIUploadReadsTheDeclaredHostInEitherForm(t *testing.T) {
 				!strings.Contains(upload.Error.Message, tc.refusal) || strings.Contains(upload.Error.Message, "secret") {
 				t.Fatalf("upload under a contradicting declaration: %s", resultMessage(upload))
 			}
-			if slices.Contains(h.session.recorded(), "credential") {
+			if slices.Contains(h.session.recorded(), "upload") {
 				t.Fatalf("ops %v after a contradicting declaration", h.session.recorded())
 			}
 		})
@@ -971,10 +1031,12 @@ func TestDeclaredOCIRegistryHost(t *testing.T) {
 	}
 }
 
-// An artifact changed after the descriptor named its digest is refused before
-// any credential is asked or any byte reaches the registry.
+// An artifact changed after the descriptor named its digest is refused by
+// digest before any byte reaches the registry: the provider re-hashes every
+// file it reads from the outbox, and its refusal fails the upload with the
+// code it names. Nothing is released.
 func TestTamperedOutboxArtifactIsRefusedByDigest(t *testing.T) {
-	spectest.Proves(t, "cli/provider-publication", "uploads-run-in-the-engine", "a-tampered-artifact-is-refused-by-digest")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "a-tampered-artifact-is-refused-by-digest")
 	npm := newNPMRegistry(t)
 	h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: []string{serverHost(t, npm.server)}})
 	outbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
@@ -999,13 +1061,14 @@ func TestTamperedOutboxArtifactIsRefusedByDigest(t *testing.T) {
 	results := h.execute(context.Background(), planned, internal, nil)
 
 	upload := results[h.uploadKey(job)]
-	if upload == nil || upload.Status != "failed" || upload.Error == nil || !strings.Contains(upload.Error.Message, "digest mismatch") {
+	if upload == nil || upload.Status != "failed" || upload.Error == nil || !strings.Contains(upload.Error.Message, "digest mismatch") ||
+		!strings.Contains(upload.Error.Message, registryproto.RefusalArtifactDigestMismatch) {
 		t.Fatalf("upload of a tampered artifact: %s", resultMessage(upload))
 	}
 	if _, requests := npm.stored("@putnami/web", "1.2.3"); requests != 0 {
 		t.Fatalf("the registry received %d requests", requests)
 	}
-	if slices.Contains(h.session.recorded(), "credential") || slices.Contains(h.session.recorded(), "release") {
+	if slices.Contains(h.session.recorded(), "release") {
 		t.Fatalf("ops %v after a tampered artifact", h.session.recorded())
 	}
 	if _, moved := h.provider.Head("putnami", "canary"); moved {
@@ -1013,11 +1076,91 @@ func TestTamperedOutboxArtifactIsRefusedByDigest(t *testing.T) {
 	}
 }
 
+// The provider's answer must name the packed artifact digest, and platforms
+// only for an archive member: an upload answered otherwise fails, reports no
+// published member, records no published image, and releases nothing.
+func TestAnAnsweredDigestOtherThanThePackedOneFailsTheUpload(t *testing.T) {
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "the-answered-digest-must-be-the-packed-one")
+	for name, tc := range map[string]struct {
+		oci     bool
+		answer  func(registryproto.UploadResult) registryproto.UploadResult
+		refusal string
+	}{
+		"an npm member at another digest": {
+			answer: func(registryproto.UploadResult) registryproto.UploadResult {
+				return registryproto.UploadResult{Digest: digestFor('f')}
+			},
+			refusal: "the credential provider answered digest " + digestFor('f'),
+		},
+		"an OCI member at another digest": {
+			oci: true,
+			answer: func(registryproto.UploadResult) registryproto.UploadResult {
+				return registryproto.UploadResult{Digest: digestFor('f')}
+			},
+			refusal: "the credential provider answered digest " + digestFor('f'),
+		},
+		"an npm member with platforms": {
+			answer: func(answer registryproto.UploadResult) registryproto.UploadResult {
+				answer.Platforms = map[string]string{"linux/amd64": digestFor('f')}
+				return answer
+			},
+			refusal: "answered platforms for the npm member @putnami/web, which has none",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			npm := newNPMRegistry(t)
+			hosts := []string{testOCIHost, serverHost(t, npm.server)}
+			slices.Sort(hosts)
+			h := newPublicationHarness(t, providertest.Config{
+				Bearer: publicationBearer, Hosts: hosts,
+				UploadAnswer: func(_ registryproto.UploadParams, answer registryproto.UploadResult) registryproto.UploadResult {
+					return tc.answer(answer)
+				},
+			})
+			var job *jobmodel.ScheduledJob
+			packed := ""
+			if tc.oci {
+				job, packed = addOCIMember(t, h, testOCIHost, testOCIHost)
+			} else {
+				outbox := stageOutbox(t, func(w *publicationoutbox.Writer) []extensionproto.OutboxMember {
+					member := npmOutboxMember(t, w, npm.server.URL, "/web", "@putnami/web", "1.2.3")
+					packed = member.NPM.Tarball.Digest
+					return []extensionproto.OutboxMember{member}
+				})
+				job = h.addMember("npm", "@putnami/web", "1.2.3", "web", map[string]string{"npm": registriesEntry("publish", npm.server.URL)},
+					fixtureScript{{"copy-tree", outbox, "$PUTNAMI_PUBLICATION_OUTBOX"}})
+			}
+			planned, internal := h.plan(nil, fixedAncestry{testRevision}, nil)
+			results := h.execute(context.Background(), planned, internal, nil)
+
+			upload := results[h.uploadKey(job)]
+			if upload == nil || upload.Status != "failed" || upload.Error == nil || !strings.Contains(upload.Error.Message, tc.refusal) {
+				t.Fatalf("upload answered otherwise: %s; want a refusal that says %q", resultMessage(upload), tc.refusal)
+			}
+			if tc.answer(registryproto.UploadResult{}).Digest != "" && !strings.Contains(upload.Error.Message, packed) {
+				t.Fatalf("the refusal %q does not name the packed digest %s", upload.Error.Message, packed)
+			}
+			if events := uploadEvents(t, upload); len(events) != 0 {
+				t.Fatalf("a refused answer reported %+v", events)
+			}
+			if _, err := os.Stat(pkgmeta.PublishedImageManifestPath(filepath.Join(h.root, ".putnami", "out", "app", "publish"))); !os.IsNotExist(err) {
+				t.Fatalf("a refused answer recorded a published image (%v)", err)
+			}
+			if slices.Contains(h.session.recorded(), "release") {
+				t.Fatalf("ops %v after a refused answer", h.session.recorded())
+			}
+			if _, moved := h.provider.Head("putnami", "canary"); moved {
+				t.Fatal("a refused answer moved the channel")
+			}
+		})
+	}
+}
+
 // Every packed member is checked against the plan before any upload: a member
 // the plan does not select is refused, and a job that packed nothing
 // published on its own route.
 func TestPackedMembersAreCheckedAgainstThePlan(t *testing.T) {
-	spectest.Proves(t, "cli/provider-publication", "uploads-run-in-the-engine", "a-member-the-plan-does-not-select-is-refused")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "a-member-the-plan-does-not-select-is-refused")
 	t.Run("a member the plan does not select", func(t *testing.T) {
 		npm := newNPMRegistry(t)
 		h := newPublicationHarness(t, providertest.Config{Bearer: publicationBearer, Hosts: []string{serverHost(t, npm.server)}})
@@ -1035,8 +1178,8 @@ func TestPackedMembersAreCheckedAgainstThePlan(t *testing.T) {
 		if upload == nil || upload.Status != "failed" || upload.Error == nil || !strings.Contains(upload.Error.Message, "which the plan does not select") {
 			t.Fatalf("upload of an unselected member: %s", resultMessage(upload))
 		}
-		if _, requests := npm.stored("@putnami/web", "1.2.3"); requests != 0 {
-			t.Fatalf("the registry received %d requests", requests)
+		if _, requests := npm.stored("@putnami/web", "1.2.3"); requests != 0 || slices.Contains(h.session.recorded(), "upload") {
+			t.Fatalf("the registry received %d requests; ops %v", requests, h.session.recorded())
 		}
 	})
 	t.Run("a job that packed nothing", func(t *testing.T) {
@@ -1095,7 +1238,7 @@ func TestNotForwardHeadIsRefusedAtOpen(t *testing.T) {
 	if upload := results[h.uploadKey(job)]; upload == nil || upload.Status == "success" {
 		t.Fatalf("upload after a refused open: %s", resultMessage(upload))
 	}
-	if ops := h.session.recorded(); slices.Contains(ops, "credential") || slices.Contains(ops, "release") {
+	if ops := h.session.recorded(); slices.Contains(ops, "upload") || slices.Contains(ops, "release") {
 		t.Fatalf("ops %v after a refused open", ops)
 	}
 	if current, _ := h.provider.Head("putnami", "canary"); current != ref || h.provider.Releases() != 0 {

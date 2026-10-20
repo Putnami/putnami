@@ -2,8 +2,10 @@
 
 - **Status**: accepted. A run whose credential provider negotiates
   `publication-v1` uses no handoff: its publication jobs receive no callback
-  and no credential, and the engine uploads
-  ([ADR 0057](0057-publication-authority-stays-in-the-engine.md)).
+  and no credential
+  ([ADR 0057](0057-publication-authority-stays-in-the-engine.md)), and the
+  credential provider uploads what they pack
+  ([ADR 0076](0076-publication-uploads-leave-the-engine.md)).
 - **Scope**: `@putnami/cli` (`tooling/cli/internal/jobs`: release-plan
   handoff, runner capability gates, release evidence) and
   `@putnami/extension-sdk` (`tooling/extension-sdk/releaseset` provider client)

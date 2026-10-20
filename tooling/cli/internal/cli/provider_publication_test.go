@@ -1,16 +1,20 @@
 package cli
 
 import (
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	registry "go.putnami.dev/protocol/registry"
 	runner "go.putnami.dev/protocol/runner"
+	"go.putnami.dev/tooling/cli/internal/credentialprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
@@ -118,6 +122,51 @@ func TestPublishPurposeStartsTheProviderBeforeTheFirstHook(t *testing.T) {
 		dropped := strings.Contains(stderr.String(), "names publish without invocation.publication; the publish purpose stays off")
 		if want := tc.request != nil && tc.request.Invocation.Publication == nil; dropped != want {
 			t.Errorf("%s: stderr %q names the dropped publish purpose = %v, want %v", tc.name, stderr.String(), dropped, want)
+		}
+	}
+
+	// A provider that echoes publication-v1 without uploader-v1 fails the
+	// command at install, before the first hook, as an invalid configuration
+	// that names the extension to upgrade.
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "a-session-without-uploader-v1-fails-before-the-first-hook")
+	provider := credentialDeclarer("@a/x")
+	provider.Path = t.TempDir()
+	provider.Jobs[registry.CredentialProviderCommand].Command = "/bin/sh"
+	provider.Jobs[registry.CredentialProviderCommand].Args = []string{"-c", `read line; printf '%s\n' '{"protocolVersion":1,"id":1,"ok":true,"payload":{"protocolVersion":1,"capabilities":["credential-v1","publication-v1"]}}'; read line; printf '%s\n' '{"protocolVersion":1,"id":2,"ok":true}'`}
+	stop, err := installCredentialProviders([]string{"publish"}, providersFromFlag, t.TempDir(), nil, []*extension.ExtensionDescription{provider}, io.Discard)
+	stop()
+	var required *credentialprovider.UploaderRequiredError
+	if !errors.As(err, &required) || protocolcli.ExitCodeForError(err) != protocolcli.ExitUsage {
+		t.Fatalf("install over a provider without uploader-v1 = %v, want an *UploaderRequiredError that exits %d", err, protocolcli.ExitUsage)
+	}
+	if !strings.Contains(err.Error(), "upgrade @a/x to a version that serves uploader-v1") {
+		t.Fatalf("the refusal %q does not name the extension to upgrade", err)
+	}
+}
+
+// registryClientModules are OCI registry client libraries and the Docker
+// credential modules they bring. The core requires none of them.
+var registryClientModules = []string{
+	"github.com/google/go-containerregistry",
+	"github.com/docker/cli",
+	"github.com/docker/docker-credential-helpers",
+	"oras.land/oras-go/v2",
+}
+
+// The engine sends every publication upload to its credential provider, so
+// the core links no registry client: its go.mod requires none, directly or
+// indirectly.
+func TestTheCoreRequiresNoRegistryClient(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "the-core-requires-no-registry-client")
+	data, err := os.ReadFile(filepath.Join(moduleRoot(t), "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(strings.TrimPrefix(strings.TrimSpace(line), "require "))
+		if len(fields) > 0 && slices.Contains(registryClientModules, fields[0]) {
+			t.Errorf("go.mod requires %s; the core uploads through its credential provider and links no registry client", fields[0])
 		}
 	}
 }

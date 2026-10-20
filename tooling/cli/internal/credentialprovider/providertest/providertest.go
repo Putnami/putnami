@@ -1,20 +1,23 @@
 // Package providertest is an in-process credential provider for tests. It
-// speaks credential-v1 and, when its initialize answer echoes it,
-// publication-v1 (registry ADR 0003) over the pipes credentialprovider.Connect
-// takes, and it keeps the release-set ledger a publication provider owns:
-// channel heads, stored sets, and one release per plan digest.
+// speaks credential-v1 and, when its initialize answer echoes them,
+// publication-v1 and uploader-v1 (registry ADR 0003) over the pipes
+// credentialprovider.Connect takes, and it keeps the release-set ledger a
+// publication provider owns: channel heads, stored sets, and one release per
+// plan digest. Its uploads go to the registry each request names, with the
+// credential it holds, through the extension SDK's publishers.
 //
 // A Provider is the server side. Each Pipes call serves one session; a plan
 // opened in one session is not open in another. The ledger and the releases
 // recorded by plan digest belong to the Provider and outlive every session.
 //
-// The package imports no engine code, so the engine's own packages can drive
-// a Session directly (Provider.NewSession) and get the same answers a wire
-// session gets.
+// The package imports no engine code and no registry client library, so the
+// engine's own packages can drive a Session directly (Provider.NewSession)
+// and get the same answers a wire session gets.
 package providertest
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,7 +36,7 @@ import (
 // no credential, refuses nothing and stores every artifact a release names.
 type Config struct {
 	// Echo is the capability list the initialize answer carries. Nil echoes
-	// credential-v1 and publication-v1.
+	// credential-v1, publication-v1 and uploader-v1.
 	Echo []string
 	// Bearer is the credential the provider issues for both purposes, with
 	// Hosts. Empty answers every credential request with absence.
@@ -54,6 +57,9 @@ type Config struct {
 	// false when it stores none. Nil stores every artifact at the digest the
 	// release names.
 	Stored func(ecosystem, coordinate, version string) (digest string, stored bool)
+	// UploadAnswer, when set, replaces the answer of every upload the
+	// provider applied, as a provider that answers another digest does.
+	UploadAnswer func(params registry.UploadParams, answer registry.UploadResult) registry.UploadResult
 }
 
 // Call records one request the provider read.
@@ -62,7 +68,7 @@ type Call struct {
 	Op registry.CredentialOp
 	// Purpose is the purpose of a credential request.
 	Purpose string
-	// PlanDigest is the plan an open or a release names.
+	// PlanDigest is the plan an open, an upload or a release names.
 	PlanDigest string
 	// Code is the refusal code of a refused request, "" otherwise.
 	Code string
@@ -79,6 +85,7 @@ type Provider struct {
 	offered     [][]string
 	calls       []Call
 	opens       []registry.OpenParams
+	uploads     []Upload
 	releases    int
 	unanswered  map[registry.CredentialOp]int
 	released    map[string]releaseRecord
@@ -96,7 +103,7 @@ type releaseRecord struct {
 // New returns a Provider with an empty ledger.
 func New(config Config) *Provider {
 	if config.Echo == nil {
-		config.Echo = []string{registry.CapabilityCredentialV1, registry.CapabilityPublicationV1}
+		config.Echo = []string{registry.CapabilityCredentialV1, registry.CapabilityPublicationV1, registry.CapabilityUploaderV1}
 	}
 	if config.Lifetime == 0 {
 		config.Lifetime = time.Hour
@@ -219,6 +226,14 @@ func (s *Session) handle(request *registry.CredentialRequest) (any, *registry.Cr
 		}
 		call.PlanDigest = params.Plan.PlanDigest
 		payload, refusal = s.Open(*params)
+	case registry.CredentialOpUpload:
+		params, err := registry.ParseUploadParams(request.Payload)
+		if err != nil {
+			refusal = refuse("invalid_request", "upload is invalid")
+			break
+		}
+		call.PlanDigest = params.PlanDigest
+		payload, refusal = s.Upload(context.Background(), *params)
 	case registry.CredentialOpRelease:
 		params, err := registry.ParseReleaseParams(request.Payload)
 		if err != nil {

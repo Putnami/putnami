@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -18,11 +17,11 @@ import (
 	"go.putnami.dev/sdk/extension/releaseset"
 )
 
-// PublicationProvider is the publication-v1 surface of the run's credential
-// provider (registry ADR 0003). A release-set publish that obtains one
-// resolves, opens, uploads and releases through it, in that order, and asks
-// no other authority: no nested provider process starts, and no publication
-// job receives a credential.
+// PublicationProvider is the publication-v1 and uploader-v1 surface of the
+// run's credential provider (registry ADR 0003). A release-set publish that
+// obtains one resolves, opens, uploads and releases through it, in that
+// order, and asks no other authority: no nested provider process starts, no
+// publication job receives a credential, and the engine asks for none.
 type PublicationProvider interface {
 	// Resolve answers the heads of the request's channels.
 	Resolve(ctx context.Context, request *distribution.ResolveRequest) (*distribution.ResolveResponse, error)
@@ -31,9 +30,10 @@ type PublicationProvider interface {
 	// Release releases the opened plan's set. A refusal is an error that
 	// names its code; no channel moved.
 	Release(ctx context.Context, params *registryproto.ReleaseParams) (*distribution.ReleaseResponse, error)
-	// PublishBearer returns the publish bearer for target. It is an error when
-	// the provider's credential does not name target's host and port.
-	PublishBearer(ctx context.Context, target *url.URL) (string, error)
+	// Upload uploads one packed member of the opened plan with a credential
+	// the provider holds, and answers what the registry stores. A refusal is
+	// an error that names its code.
+	Upload(ctx context.Context, params *registryproto.UploadParams) (*registryproto.UploadResult, error)
 }
 
 // PublicationSource answers the run's publication provider. A nil provider

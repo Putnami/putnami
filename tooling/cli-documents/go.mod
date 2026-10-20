@@ -17,13 +17,6 @@ require (
 )
 
 require (
-	github.com/docker/cli v29.4.3+incompatible // indirect
-	github.com/docker/docker-credential-helpers v0.9.3 // indirect
-	github.com/google/go-containerregistry v0.21.6 // indirect
-	github.com/klauspost/compress v1.18.6 // indirect
-	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/sirupsen/logrus v1.9.4 // indirect
 	go.putnami.dev/cli/model v0.0.0 // indirect
 	go.putnami.dev/protocol/agentcontext v0.0.0 // indirect
 	go.putnami.dev/protocol/architecture v0.0.0 // indirect
@@ -56,7 +49,6 @@ require (
 	go.putnami.dev/protocol/template v0.0.0 // indirect
 	go.putnami.dev/sdk/extension v0.0.0 // indirect
 	golang.org/x/mod v0.36.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 )
 

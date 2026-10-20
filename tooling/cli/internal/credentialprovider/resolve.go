@@ -84,6 +84,7 @@ func New(workspaceRoot string, extensions []*extension.ExtensionDescription, pro
 		return session, nil
 	}
 	broker = NewBroker(purposes, open, options...)
+	broker.extensionName = provider.ExtensionName
 	return broker
 }
 

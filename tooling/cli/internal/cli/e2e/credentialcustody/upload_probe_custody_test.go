@@ -27,10 +27,9 @@ const uploadGateProbe = "upload-in-progress"
 
 // uploadGate orders an upload probe run across processes without a sleep.
 // The npm registry holds the first request that carries the publish
-// credential, which the engine sends only after open, until the probe has
-// reported; the probe starts probing only once the registry holds that
-// request. The probe therefore probes while the engine holds the credential
-// for an upload in progress.
+// credential, which the credential provider sends only after open, until the
+// probe has reported; the probe starts probing only once the registry holds
+// that request. The probe therefore probes while an upload is in progress.
 type uploadGate struct {
 	server    *httptest.Server
 	uploading chan struct{}
@@ -126,7 +125,7 @@ func newHeldNPMRegistry(t *testing.T, gate *uploadGate) *custodyNPMRegistry {
 
 // runUploadProbeRole is a hostile publish step beside the publication job:
 // repository code the upload does not wait for. It waits until the registry
-// holds the engine's upload, probes for the credential as every hostile role
+// holds the provider's upload, probes for the credential as every hostile role
 // does, records whether the upload was in progress, and then lets the upload
 // finish. It exits 0 when it could report, so the run completes.
 func runUploadProbeRole() int {
@@ -154,17 +153,17 @@ func runUploadProbeRole() int {
 	return code
 }
 
-// A probe that runs while the engine uploads finds no credential. The probe
-// is a publish step beside the publication job: the upload does not wait for
-// it, and it starts probing only once the registry holds the upload, which the
-// engine sends with the publish credential after open. The registry answers
-// that upload only after the probe reported, so the probe searched its
-// environment, the home, workspace and temporary directories, its
-// descriptors, and, on Linux, the engine's /proc and a ptrace attach, while
-// the engine held the credential.
+// A probe that runs during an upload finds no credential. The probe is a
+// publish step beside the publication job: the upload does not wait for it,
+// and it starts probing only once the registry holds the upload, which the
+// credential provider sends with its publish credential after open, while the
+// engine waits for the provider's answer. The registry answers that upload
+// only after the probe reported, so the probe searched its environment, the
+// home, workspace and temporary directories, its descriptors, and, on Linux,
+// the engine's /proc and a ptrace attach, while the upload was in flight.
 func TestAProbeDuringAnUploadFindsNoCredential(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/provider-publication", "uploads-run-in-the-engine", "a-probe-during-an-upload-finds-no-credential")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "a-probe-during-an-upload-finds-no-credential")
 	clitest.RequireShell(t)
 
 	self, err := os.Executable()

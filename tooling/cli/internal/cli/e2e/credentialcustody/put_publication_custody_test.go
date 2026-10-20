@@ -408,14 +408,15 @@ func readRelease(t *testing.T, ledger string) registry.ReleaseParams {
 // A publish run through a publication-v1 credential provider whose workspace
 // holds a release archive, a config, a migration and a doc member. Each
 // publication job, repository code, hunts for the publish credential, finds
-// nothing, and packs its member. The engine uploads every member to the Put
-// registry with the credential the provider issues it after open, as a
-// private version with no channel, and releases the set. The released set,
-// the release evidence and each upload node's published-member event carry
-// the SHA-256 of the stored manifest payload, and the archive its platforms.
+// nothing, and packs its member. After open the engine sends every member's
+// upload to the provider, which uploads it to the Put registry with the
+// credential it holds, as a private version with no channel; the engine asks
+// for none. The engine then releases the set. The released set, the release
+// evidence and each upload node's published-member event carry the SHA-256
+// of the stored manifest payload, and the archive its platforms.
 func TestEveryPutRegistryKindUploadsWithNoBearerInTheRepository(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/provider-publication", "put-registry-members-upload-in-the-engine", "every-put-registry-kind-uploads-with-no-bearer-in-the-repository")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "every-put-registry-kind-uploads-with-no-bearer-in-the-repository")
 	clitest.RequireShell(t)
 
 	self, err := os.Executable()
@@ -430,14 +431,23 @@ func TestEveryPutRegistryKindUploadsWithNoBearerInTheRepository(t *testing.T) {
 		t.Fatalf("publish exit=%d, want 0: %s\n%s", code, failureLines(output), output)
 	}
 
-	// The provider issued the publish credential after the plan opened, and
-	// released the set once.
+	// The provider read one upload per member after the plan opened, and
+	// released the set once. The engine never asked it for the publish
+	// credential.
 	calls := readLog(t, fx.providerLog)
 	open := slices.Index(calls, string(registry.CredentialOpOpen))
-	credential := slices.Index(calls, string(registry.CredentialOpCredential)+" "+registry.PurposePublish)
+	var uploads []int
+	for index, call := range calls {
+		if call == string(registry.CredentialOpUpload) {
+			uploads = append(uploads, index)
+		}
+	}
 	release := slices.Index(calls, string(registry.CredentialOpRelease))
-	if open < 0 || credential < open || release < credential {
-		t.Errorf("provider calls = %q; want open, then the publish credential, then release", calls)
+	if open < 0 || len(uploads) != len(putCustodyMembers) || uploads[0] < open || release < uploads[len(uploads)-1] {
+		t.Errorf("provider calls = %q; want open, then one upload per member, then release", calls)
+	}
+	if slices.Contains(calls, string(registry.CredentialOpCredential)+" "+registry.PurposePublish) {
+		t.Errorf("provider calls = %q; the engine asked the publish credential", calls)
 	}
 
 	// Every member is stored, released and evidenced at the digest of its

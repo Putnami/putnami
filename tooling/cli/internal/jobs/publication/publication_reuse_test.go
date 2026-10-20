@@ -18,7 +18,7 @@ import (
 // entry replays names an upload this run did not make. The release refuses
 // with a named error, and no channel moves.
 func TestCachedPublicationJobThatPackedNothingFailsTheRelease(t *testing.T) {
-	spectest.Proves(t, "cli/provider-publication", "uploads-run-in-the-engine", "a-reused-publication-job-fails-the-release")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "a-reused-publication-job-fails-the-release")
 	h := newPublicationHarness(t, providertest.Config{})
 	h.cache = store.NewCacheManager(store.NewLocalStore(filepath.Join(t.TempDir(), "store")))
 	publish := h.addMember("npm", "@putnami/web", "1.2.3", "web", nil, fixtureScript{})
