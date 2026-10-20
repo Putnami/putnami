@@ -35,7 +35,8 @@ var runPreBuildHookFunc = hooks.RunPreBuildHook
 //	                        preparation and emptying, version refresh, preBuild
 //	                        hook, JobStart
 //	runWorkItems (1..n)     the runner API: ONE shared subprocess for the whole
-//	                        group, then PER-TASK re-execution of failures
+//	                        group, then PER-TASK re-execution of failures and
+//	                        of a source-bound execution that moved its binding
 //	closeTask    (per task) finalizeExecutedJob — run history, source-mutation
 //	                        marking, task-owned capture, and the remote upload —
 //	                        plus the scheduler-level wall
@@ -54,11 +55,11 @@ type taskWork struct {
 	cacheEnabled    bool
 	cacheHash       string
 	sourceInputHash string
-	// sourceBinding is the binding of the project's own sources that a
-	// source-bound execution is stamped with, read once its stamp is final
-	// (source_bound.go). The entry's store key binds it. sourceBindingStamped
-	// is false when the stamp named none, and the execution then stores no
-	// entry.
+	// sourceBinding is the binding of the project's own sources that the
+	// last execution of a source-bound task was stamped with: read once its
+	// stamp is final, and replaced when the task settles (source_bound.go).
+	// The entry's store key binds it. sourceBindingStamped is false when the
+	// stamp named none, and the execution then stores no entry.
 	sourceBinding        string
 	sourceBindingStamped bool
 	release              func()
@@ -368,12 +369,11 @@ func (s *Scheduler) prepareTask(
 		// The stamp is written once per project per session, so it can name a
 		// binding an earlier task of this run has moved. Bring it to the
 		// current tree first, then read the binding the subprocess is about to
-		// read. A follower does neither: it adopts its leader's binding with
-		// the tree it captures.
+		// read, with or without the cache: settleSourceBinding compares it
+		// with the tree the execution leaves. A follower does neither: it
+		// adopts its leader's binding with the tree it captures.
 		s.restampSourceBinding(job)
-		if item.cacheEnabled {
-			item.sourceBinding, item.sourceBindingStamped = s.stampedSourceBinding(job)
-		}
+		item.sourceBinding, item.sourceBindingStamped = s.stampedSourceBinding(job)
 	}
 	return &item, jobDone{}
 }
@@ -542,6 +542,10 @@ func (s *Scheduler) runWorkItems(ctx context.Context, work []taskWork) map[strin
 			s.executions.record(run.result)
 			run.ranAt = time.Now()
 		}
+		// A source-bound execution that moved its own project's binding
+		// executes once more at the binding it left, and work[i] takes the
+		// binding of that execution, which closeTask stores the entry at.
+		s.settleSourceBinding(ctx, &work[i], &run)
 		runs[key] = run
 	}
 	return runs

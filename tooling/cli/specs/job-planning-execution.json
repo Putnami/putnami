@@ -202,6 +202,10 @@
       "text": "A task that declares cache.sourceBound stores and looks up its entry, locally and remotely, at a key derived from its cache key and its project's source binding: the stamped binding when storing, the current one when looking up, the empty one in an unmanaged workspace. A binding the CLI cannot compute inside a repository gives no hit and no store. Dependents fold the unchanged cache key, so a test-only edit keeps every key. A source-bound failure is never replayed, and its entry prunes no producer."
     },
     {
+      "id": "source-bound-settle",
+      "text": "A successful execution of a source-bound task that moves its own project's binding executes once more at the binding it left, with or without the cache, so its outputs, its entry and the tree it leaves name one binding. A task settles at most once per run."
+    },
+    {
       "id": "command-kinds-and-traits",
       "text": "A command's traits may declare its kind (verification, criteria, diagnostics or files), its workload (serve or once), that it rewrites sources, and that it consumes the release set; a batchable task may declare the kind and phase of its shared invocation. Strict validation refuses a value outside each vocabulary. A manifest that declares any of them requires CLI contract 11 wherever it loads from, and the packagers stamp it. Declared traits replace a verb's defaults wholesale, kind included."
     },

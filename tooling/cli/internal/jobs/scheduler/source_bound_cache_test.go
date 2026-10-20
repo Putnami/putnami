@@ -14,6 +14,7 @@ import (
 	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	putnamigit "go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -21,6 +22,8 @@ import (
 
 const sourceBoundFeature = "cli/job-planning-execution"
 const sourceBoundRequirement = "source-bound-cache"
+
+const sourceBoundSettleRequirement = "source-bound-settle"
 
 // sourceBoundJob is a declared-capture task that declares cache.sourceBound,
 // with one required project-rooted output directory.
@@ -718,4 +721,181 @@ func TestSourceBoundExecutionAfterAnInRunRewriteReadsTheCurrentBinding(t *testin
 	if got := sourceBoundEvidenceBinding(t, projectRoot); got != evidence {
 		t.Fatalf("the hit left evidence binding %q, want %q", got, evidence)
 	}
+}
+
+// useConvergingDescribe points the fixture's describe job at a script that
+// writes the evidence the way the fixture's own script does, then runs
+// sidecar in the project directory, the way Go describe converges committed
+// sidecars after its binary wrote the evidence.
+func useConvergingDescribe(t *testing.T, describeJob *ScheduledJob, describeLog, sidecar string) {
+	t.Helper()
+	script := filepath.Join(t.TempDir(), "describe.sh")
+	writeExecutable(t, script, "#!/bin/sh\n"+
+		"printf 'run\\n' >> "+shellQuote(describeLog)+"\n"+
+		"mkdir -p .gen/schema/feature-evidence schema/feature-evidence\n"+
+		"cp .gen/version.json .gen/schema/feature-evidence/go-framework.json\n"+
+		"cp .gen/schema/feature-evidence/go-framework.json "+committedFeatureEvidence+"\n"+
+		sidecar+
+		sourceBoundEvents+"exit 0\n")
+	describeJob.JobDef.Command = script
+}
+
+// projectTreeBinding computes the source binding of the fixture's project
+// from the tree as it stands, outside any scheduler memo.
+func projectTreeBinding(t *testing.T, ws *workspace.Workspace) string {
+	t.Helper()
+	binding, _, err := putnamigit.ProjectSourceBindingMeasured(ws.Root, filepath.Join(ws.Root, "app"))
+	if err != nil {
+		t.Fatalf("compute the project's source binding: %v", err)
+	}
+	return binding
+}
+
+// A describe that converges a committed sidecar the binding covers moves the
+// binding of its own project. The scheduler executes it once more at the
+// binding the tree now has: its evidence, the stamp, its entry and the tree
+// name one binding, and the next run at that tree hits without executing
+// describe. The settled result keeps the writes of the first execution, and no
+// key moves.
+func TestSourceBoundExecutionThatMovesItsBindingSettlesAtTheBindingItLeaves(t *testing.T) {
+	spectest.Proves(t, sourceBoundFeature, sourceBoundSettleRequirement, "an-execution-that-moves-its-binding-settles-at-the-binding-it-leaves")
+	requireShell(t)
+	logs := t.TempDir()
+	describeLog, compileLog := filepath.Join(logs, "describe"), filepath.Join(logs, "compile")
+	ws, planned := sourceBoundRunFixture(t, describeLog, compileLog)
+	projectRoot := filepath.Join(ws.Root, "app")
+	sidecar := filepath.Join(projectRoot, "schema", "http-routes.json")
+	writeTestFile(t, sidecar, "stale routes\n")
+	useConvergingDescribe(t, planned[0], describeLog, "printf 'converged routes\\n' > schema/http-routes.json\n")
+	cache := sharedRuntimeCache(t)
+	before := projectTreeBinding(t, ws)
+
+	run := func(name string, cfg SchedulerConfig) (*JobResult, *JobResult) {
+		t.Helper()
+		result := runSharedScheduler(t.Context(), ws, planned, cfg, cache)
+		for i := range planned {
+			if got := resultOf(t, result, planned, i); got.Status != "success" {
+				t.Fatalf("%s: %s = %+v, want success", name, planned[i].Key(), got)
+			}
+		}
+		return resultOf(t, result, planned, 0), resultOf(t, result, planned, 1)
+	}
+
+	describe, compile := run("the run that converges the sidecar", SchedulerConfig{MaxParallel: 1, CacheVerification: true})
+	if describe.Reuse.CacheHit() {
+		t.Fatalf("the run that converges the sidecar: describe = %+v, want an execution", describe)
+	}
+	if got := subprocessRuns(t, describeLog); got != 2 {
+		t.Fatalf("describe executions = %d, want 2: the execution that moved the binding, then one at the binding it left", got)
+	}
+	if got := readFileAt(t, sidecar); got != "converged routes\n" {
+		t.Fatalf("sidecar = %q, want the converged bytes", got)
+	}
+	settled := projectTreeBinding(t, ws)
+	if settled == before {
+		t.Fatalf("converging the sidecar left the binding at %q", before)
+	}
+	if got := sourceBoundEvidenceBinding(t, projectRoot); got != settled {
+		t.Fatalf("the evidence names %q, the tree the run left is %q", got, settled)
+	}
+	if got := readVersionStamp(t, projectRoot).CapabilityPackages[0].SourceBinding; got != settled {
+		t.Fatalf("the stamp names %q, the tree the run left is %q", got, settled)
+	}
+	if written := filepath.ToSlash(filepath.Join("app", "schema", "http-routes.json")); !slices.Contains(describe.VerificationWrites, written) {
+		t.Fatalf("the settled result's writes %v miss %s, which only the first execution wrote", describe.VerificationWrites, written)
+	}
+	keys := []string{describe.CacheKey, compile.CacheKey}
+	storedAt := func(binding string) bool {
+		t.Helper()
+		entry, err := cache.LookupTaskEntry(cachekey.SourceBoundEntryKey(keys[0], binding))
+		return err == nil && entry != nil
+	}
+	if !storedAt(settled) || storedAt(before) {
+		t.Fatalf("entries at the settled binding %t and at the binding before the run %t, want only the settled one", storedAt(settled), storedAt(before))
+	}
+
+	describe, compile = run("the next run at the converged tree", SchedulerConfig{MaxParallel: 1})
+	if !describe.Reuse.CacheHit() {
+		t.Fatalf("the next run at the converged tree: describe = %+v, want a hit", describe)
+	}
+	if got := subprocessRuns(t, describeLog); got != 2 {
+		t.Fatalf("describe executions = %d, want 2: the next run must not execute describe", got)
+	}
+	if got := subprocessRuns(t, compileLog); got != 1 {
+		t.Fatalf("compile executions = %d, want 1: the dependent's key must hit", got)
+	}
+	if now := []string{describe.CacheKey, compile.CacheKey}; !slices.Equal(now, keys) {
+		t.Fatalf("keys moved from %v to %v", keys, now)
+	}
+	if got := sourceBoundEvidenceBinding(t, projectRoot); got != settled {
+		t.Fatalf("the hit left evidence binding %q, want %q", got, settled)
+	}
+	if got := projectTreeBinding(t, ws); got != settled {
+		t.Fatalf("the hit moved the tree's binding from %q to %q", settled, got)
+	}
+}
+
+// A task whose every execution moves its binding executes once more and no
+// further. Its entry is stored at the binding its last execution was stamped
+// with, which is the binding its outputs embed.
+func TestSourceBoundExecutionSettlesAtMostOnce(t *testing.T) {
+	spectest.Proves(t, sourceBoundFeature, sourceBoundSettleRequirement, "a-task-that-keeps-moving-its-binding-executes-at-most-once-more")
+	requireShell(t)
+	logs := t.TempDir()
+	describeLog, compileLog := filepath.Join(logs, "describe"), filepath.Join(logs, "compile")
+	ws, planned := sourceBoundRunFixture(t, describeLog, compileLog)
+	projectRoot := filepath.Join(ws.Root, "app")
+	useConvergingDescribe(t, planned[0], describeLog, "printf 'run\\n' >> schema/http-routes.json\n")
+	cache := sharedRuntimeCache(t)
+
+	result := runSharedScheduler(t.Context(), ws, planned, SchedulerConfig{MaxParallel: 1}, cache)
+	for i := range planned {
+		if got := resultOf(t, result, planned, i); got.Status != "success" {
+			t.Fatalf("%s = %+v, want success", planned[i].Key(), got)
+		}
+	}
+	if got := subprocessRuns(t, describeLog); got != 2 {
+		t.Fatalf("describe executions = %d, want 2: one execution and one settling execution", got)
+	}
+	evidence := sourceBoundEvidenceBinding(t, projectRoot)
+	if tree := projectTreeBinding(t, ws); tree == evidence {
+		t.Fatalf("the settling execution left the binding at %q; the fixture must move it on every execution", tree)
+	}
+	key := resultOf(t, result, planned, 0).CacheKey
+	if entry, err := cache.LookupTaskEntry(cachekey.SourceBoundEntryKey(key, evidence)); err != nil || entry == nil {
+		t.Fatalf("no entry at the binding the outputs embed, %q: %+v, %v", evidence, entry, err)
+	}
+}
+
+// A run without the cache settles too: the evidence describe leaves names the
+// tree it leaves whether or not an entry is stored. An execution that moves
+// nothing executes once.
+func TestSourceBoundExecutionWithoutTheCacheSettlesToo(t *testing.T) {
+	spectest.Proves(t, sourceBoundFeature, sourceBoundSettleRequirement, "a-run-without-the-cache-settles-too")
+	requireShell(t)
+	logs := t.TempDir()
+	describeLog, compileLog := filepath.Join(logs, "describe"), filepath.Join(logs, "compile")
+	ws, planned := sourceBoundRunFixture(t, describeLog, compileLog)
+	projectRoot := filepath.Join(ws.Root, "app")
+	writeTestFile(t, filepath.Join(projectRoot, "schema", "http-routes.json"), "stale routes\n")
+	useConvergingDescribe(t, planned[0], describeLog, "printf 'converged routes\\n' > schema/http-routes.json\n")
+	cache := sharedRuntimeCache(t)
+
+	run := func(name string, describeRuns int) {
+		t.Helper()
+		result := runSharedScheduler(t.Context(), ws, planned, SchedulerConfig{MaxParallel: 1, NoCache: true}, cache)
+		for i := range planned {
+			if got := resultOf(t, result, planned, i); got.Status != "success" {
+				t.Fatalf("%s: %s = %+v, want success", name, planned[i].Key(), got)
+			}
+		}
+		if got := subprocessRuns(t, describeLog); got != describeRuns {
+			t.Fatalf("%s: describe executions = %d, want %d", name, got, describeRuns)
+		}
+		if evidence, tree := sourceBoundEvidenceBinding(t, projectRoot), projectTreeBinding(t, ws); evidence != tree {
+			t.Fatalf("%s: the evidence names %q, the tree the run left is %q", name, evidence, tree)
+		}
+	}
+	run("the run that converges the sidecar", 2)
+	run("the next run at the converged tree", 3)
 }

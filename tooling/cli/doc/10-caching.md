@@ -1681,6 +1681,15 @@ The local store and the remote cache use the same store key.
    `build-describe` that is `.gen/schema` and the committed
    `schema/feature-evidence/go-framework.json`, so a hit restores the
    committed evidence too.
+9. An execution can move its own binding. Go `build-describe` converges
+   committed sidecars the binding covers, such as `schema/http-routes.json`
+   and `infra/requirements.json`. After a successful execution the scheduler
+   brings the stamp to the tree the execution left. When the binding moved,
+   the task executes once more, from emptied outputs, at the new binding, and
+   the entry is stored at that binding. The evidence then names the tree the
+   run leaves, with or without the cache, and the next run hits. A task
+   settles at most once per run: when the binding moves again, the entry is
+   stored at the binding its last execution read, and the run warns.
 
 Entries stay immutable. A test-only edit stores a second entry beside the
 first, the next run at the same tree hits it, and a tree that returns to the
