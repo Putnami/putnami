@@ -146,7 +146,7 @@ _putnami_completions() {
 
     local commands="cache cli completion compose config context deps doctor extensions help impact-plan init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade workspace"
     local structured="cache cli completion compose config context deps doctor extensions help impact-plan init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade workspace"
-    local global_flags="--verbose --debug --watch --plan --help --all --impacted --projects --tag --exclude-tag --exclude --baseline --impacted-strict --where --providers --credential-fd --no-cache --no-cache-projects --cache-trust --continue-on-error --max-parallel --resource --cpu-policy --retry --retry-failed --profile --dry-run --output --json --quiet --color --no-color --trace-profile --version"
+    local global_flags="--verbose --debug --help --all --impacted --projects --tag --exclude-tag --baseline --providers --credential-fd --no-cache --continue-on-error --dry-run --output --json --quiet --color --no-color --version"
     local projects=""
     local project_ids=""
     local project_basenames=""

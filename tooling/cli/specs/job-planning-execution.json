@@ -26,6 +26,10 @@
       "text": "Help lists the public commands the loaded extensions declare: the vocabulary's verbs first, in vocabulary order, then the other declared commands by name, with the vocabulary's aliases and the provider-bound global flags a loaded extension gives meaning. Outside a workspace, help says no extension is loaded and how to add one, and reads no user-scope extension. When an extension did not load, help keeps the vocabulary of those that did. --credential-fd is always listed."
     },
     {
+      "id": "job-flags-follow-job-commands",
+      "text": "Help and shell completion list a global flag that only extension commands read (such as --retry or --max-parallel) only where a loaded extension declares a job command or a command group. Elsewhere they omit it. The parser still accepts the flag and the full Markdown reference still lists it. --credential-fd stays listed."
+    },
+    {
       "id": "help-lists-command-groups",
       "text": "Help inside a workspace lists the command groups of the loaded extensions in a section titled Commands (from extensions), after the job commands: one row per group, in name order, with its description. A group named like a core command is not listed, because the core answers that name first. A name that a group shares with a flat extension command is listed once, as the group. Outside a workspace the section is absent."
     },

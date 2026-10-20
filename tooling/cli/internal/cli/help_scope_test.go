@@ -9,6 +9,7 @@ import (
 	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/protocol/features/spectest"
 	runner "go.putnami.dev/protocol/runner"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
@@ -18,6 +19,31 @@ func scopeOf(commands ...string) *helpScope {
 		scope.commands[command] = true
 	}
 	return scope
+}
+
+// declaredScope returns the scope of a workspace whose one extension declares
+// commands, with the job commands help lists among them.
+func declaredScope(commands ...string) *helpScope {
+	declared := map[string]string{}
+	for _, command := range commands {
+		declared[command] = ""
+	}
+	return helpScopeOf(&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{
+		{Name: "@acme/flow", Commands: declared},
+	}}, nil)
+}
+
+// groupScope returns the scope of a workspace whose one extension declares
+// only the command group name, which carries the command name-run.
+func groupScope(name string) *helpScope {
+	return helpScopeOf(&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{{
+		Name:     "@acme/flow",
+		Commands: map[string]string{name + "-run": ""},
+		CommandGroups: map[string]extension.CommandGroupDefinition{name: {
+			Description: "Group.",
+			Subcommands: map[string]extension.SubcommandDefinition{"run": {Command: name + "-run"}},
+		}},
+	}}}, nil)
 }
 
 func jobNames(scope *helpScope) []string {
@@ -136,7 +162,7 @@ func TestHelpListsOnlyTheCommandsAUserTypes(t *testing.T) {
 
 func TestHelpListsAProviderFlagWhenAnExtensionServesIt(t *testing.T) {
 	t.Parallel()
-	flags := flagNames(scopeOf("build", cache.ProviderCommandName))
+	flags := flagNames(declaredScope("build", cache.ProviderCommandName))
 	if !slices.Contains(flags, "--cache-trust") {
 		t.Error("a cache provider gives --cache-trust meaning, help misses it")
 	}
@@ -145,7 +171,7 @@ func TestHelpListsAProviderFlagWhenAnExtensionServesIt(t *testing.T) {
 			t.Errorf("help lists %s without its provider", hidden)
 		}
 	}
-	if !slices.Contains(flagNames(scopeOf(runner.ProviderCommandName)), "--where") {
+	if !slices.Contains(flagNames(declaredScope("build", runner.ProviderCommandName)), "--where") {
 		t.Error("a runner provider gives --where meaning, help misses it")
 	}
 }
@@ -260,4 +286,89 @@ func TestHelpWithoutAVocabularyListsNoAlias(t *testing.T) {
 	if got := aliasNames(scope); len(got) != 0 {
 		t.Errorf("aliases = %v, want none: the core declares no alias", got)
 	}
+}
+
+// jobOnlyFlags returns the global flags that only extension commands read.
+func jobOnlyFlags() []string {
+	var names []string
+	for _, flag := range commandmeta.GlobalFlags() {
+		if flag.JobOnly {
+			names = append(names, flag.Long)
+		}
+	}
+	return names
+}
+
+func TestHelpListsTheJobFlagsOnlyWithAJobCommand(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "job-flags-follow-job-commands", "help-and-completion-hide-the-job-flags-where-no-job-command-is-loaded")
+	jobFlags := jobOnlyFlags()
+	for _, flag := range []string{"--retry", "--max-parallel", "--impacted-strict", "--plan"} {
+		if !slices.Contains(jobFlags, flag) {
+			t.Errorf("the catalog does not mark %s as read by job commands only", flag)
+		}
+	}
+	for _, flag := range []string{"--credential-fd", "--no-cache", "--projects", "--dry-run", "--providers", "--verbose", "--output", "--help"} {
+		if slices.Contains(jobFlags, flag) {
+			t.Errorf("the catalog marks %s as read by job commands only, but a core command or help reads it", flag)
+		}
+	}
+
+	cases := []struct {
+		name    string
+		scope   *helpScope
+		listsIt bool
+	}{
+		{"outside a workspace", nil, false},
+		{"a workspace with no extension", scopeOf(), false},
+		{"an extension that declares only a provider command", declaredScope(cache.ProviderCommandName), false},
+		{"an extension that declares a job command", declaredScope("build"), true},
+		{"an extension that declares only a command group", groupScope("ship"), true},
+		{"an extension that declares only a group a core root shadows", groupScope("projects"), false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			flags := flagNames(c.scope)
+			help := renderHelp(c.scope)
+			for _, flag := range commandmeta.GlobalFlags() {
+				if !flag.JobOnly {
+					continue
+				}
+				// A provider-bound flag also needs its provider, which none of
+				// these workspaces declares.
+				want := c.listsIt && len(flag.Providers) == 0
+				if got := slices.Contains(flags, flag.Long); got != want {
+					t.Errorf("flag listing has %s = %v, want %v", flag.Long, got, want)
+				}
+			}
+			if got := strings.Contains(help, "--max-parallel"); got != c.listsIt {
+				t.Errorf("help text lists --max-parallel = %v, want %v", got, c.listsIt)
+			}
+			for _, flag := range []string{"--credential-fd", "--no-cache", "--projects", "--dry-run", "--output", "--help"} {
+				if !slices.Contains(flags, flag) {
+					t.Errorf("help must always list %s", flag)
+				}
+			}
+		})
+	}
+
+	t.Run("the full reference and the parser keep every flag", func(t *testing.T) {
+		t.Parallel()
+		var reference []string
+		for _, category := range allFlagCategories {
+			for _, flag := range category.Flags {
+				reference = append(reference, flag.Long)
+			}
+		}
+		for _, flag := range jobFlags {
+			if !slices.Contains(reference, flag) {
+				t.Errorf("the full reference misses %s", flag)
+			}
+		}
+		global, rest, err := parseFlags([]string{"--retry", "2", "--max-parallel", "3", "--impacted-strict"})
+		if err != nil || len(rest) != 0 || global.Retry != 2 || global.MaxParallel != 3 || !global.ImpactedStrict {
+			t.Errorf("parseFlags = %+v, %v, %v: a flag that only extension commands read stays accepted", global, rest, err)
+		}
+	})
 }

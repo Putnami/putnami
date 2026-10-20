@@ -67,12 +67,16 @@ func TestCompletionProjectsEveryCatalogPath(t *testing.T) {
 }
 
 // TestCompletionOffersEveryGlobalFlag pins that all three shells offer the whole
-// global-flag vocabulary. --cache-trust, --profile, --json, --color, --no-color,
-// and --trace-profile were absent from every shell before A1b because each
-// generator carried its own list.
+// global-flag vocabulary where a loaded extension declares a job command.
+// --cache-trust, --profile, --json, --color, --no-color, and --trace-profile
+// were absent from every shell before A1b because each generator carried its
+// own list.
 func TestCompletionOffersEveryGlobalFlag(t *testing.T) {
-	for shell := range completionGenerators {
-		script := renderCompletion(t, shell)
+	wsRoot := writeExtensionWorkspace(t, "lint-docs")
+	for shell, generate := range completionGenerators {
+		var buf bytes.Buffer
+		generate(&buf, wsRoot, &wsproto.Config{}, nil)
+		script := buf.String()
 		for _, flag := range commandmeta.GlobalFlags() {
 			// fish spells the long form without its leading dashes.
 			needle := flag.Long
