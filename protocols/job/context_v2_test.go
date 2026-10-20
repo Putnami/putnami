@@ -146,6 +146,7 @@ func TestV2InvalidFixtureCoverage(t *testing.T) {
 		"workspaceProjects[1].path",
 		"userScope",
 		"userScope.callerDir",
+		"invocationDir",
 		"invocation",
 		"invocation.id",
 		"invocation.artifactRoot",
@@ -206,6 +207,9 @@ func TestV1FixturesStayV1(t *testing.T) {
 		}
 		if ctx.UserScope != nil {
 			t.Errorf("v1 fixture %s carries the v2 userScope member", path)
+		}
+		if ctx.InvocationDir != "" {
+			t.Errorf("v1 fixture %s carries the v2 invocationDir member", path)
 		}
 		if ctx.Workspace.Options != nil {
 			t.Errorf("v1 fixture %s carries the v2 workspace.options member", path)
@@ -1670,5 +1674,61 @@ func TestParse_UserScopeIsIgnoredByAnOlderShape(t *testing.T) {
 	}
 	if err := json.Unmarshal(data, &older); err != nil || older.WorkspaceRoot == "" {
 		t.Fatalf("a consumer without the member cannot read the document: %v", err)
+	}
+}
+
+// TestValidate_V2InvocationDir pins the member that names where an interactive
+// command was typed. A consumer resolves relative arguments against it, so a
+// present member must be an absolute path, and a null or empty one is not an
+// absent one.
+func TestValidate_V2InvocationDir(t *testing.T) {
+	cases := []struct {
+		name    string
+		dir     string
+		present bool
+		wantErr bool
+	}{
+		{name: "absent is accepted"},
+		{name: "an absolute directory is accepted", dir: "/ws/docs", present: true},
+		{name: "the workspace root itself is accepted", dir: "/ws", present: true},
+		{name: "a present empty value is rejected", present: true, wantErr: true},
+		{name: "a relative directory resolves against nothing", dir: "docs", present: true, wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := validV2Context()
+			ctx.InvocationDir = tc.dir
+			ctx.presence.invocationDir = tc.present
+			diags := Validate(ctx)
+			if !tc.wantErr {
+				if diag.HasErrors(diags) {
+					t.Fatalf("expected acceptance, got %v", diags)
+				}
+				return
+			}
+			assertDiagnostic(t, diags, ErrorCodeInvalidValue, "invocationDir")
+		})
+	}
+
+	v1 := validV2Context()
+	v1.ProtocolVersion = 0
+	v1.Identity = nil
+	v1.InvocationDir = "/ws/docs"
+	assertDiagnostic(t, Validate(v1), ErrorCodeUnexpectedField, "invocationDir")
+}
+
+// TestParse_InvocationDirFixture pins that the valid fixture parses, validates
+// and keeps userScope absent: the member does not say whether a workspace
+// exists.
+func TestParse_InvocationDirFixture(t *testing.T) {
+	ctx, diags := ParseAndValidate(readFixture(t, "fixtures/v2/valid/invocation-dir.json"))
+	if diag.HasErrors(diags) {
+		t.Fatalf("valid fixture rejected: %v", diags)
+	}
+	if ctx.InvocationDir != "/home/u/src/repository/docs" {
+		t.Fatalf("invocationDir = %q, want the typed directory", ctx.InvocationDir)
+	}
+	if ctx.UserScope != nil {
+		t.Fatalf("userScope = %+v, want absent inside a workspace", ctx.UserScope)
 	}
 }

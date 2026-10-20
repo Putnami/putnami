@@ -102,6 +102,8 @@ func (a *App) runUserScopeSubcommand(
 		Extension: resolved.Extension,
 		JobDef:    &jobDef,
 		UserScope: &protocoljob.UserScope{CallerDir: callerDir},
+		// The same directory under the name every interactive launch uses.
+		InvocationDir: callerDir,
 	}
 	// No version snapshot: the user scope is not a repository, and the caller's
 	// directory is none of the CLI's business beyond being where the job runs.

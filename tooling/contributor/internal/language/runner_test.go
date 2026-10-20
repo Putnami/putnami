@@ -176,3 +176,26 @@ func TestLanguageCommitsNeverRunsConfiguredVerifier(t *testing.T) {
 		t.Fatalf("read invoked the configured verifier: %v", err)
 	}
 }
+
+// TestLanguageTextReadsTheFileTheResolverNames pins that the text mode opens
+// the resolved path, and that without a resolver it opens the argument.
+func TestLanguageTextReadsTheFileTheResolverNames(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "notes.md"), []byte("Plain English text.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	resolve := func(p string) string { return filepath.Join(dir, p) }
+
+	var out, errOut bytes.Buffer
+	runner := LanguageRunner{Out: &out, Err: &errOut, ResolvePath: resolve}
+	if code := runner.RunLanguage(context.Background(), "text", []string{"notes.md"}); code != 0 {
+		t.Fatalf("exit %d, stderr %q; want the resolved file read", code, errOut.String())
+	}
+
+	errOut.Reset()
+	runner = LanguageRunner{Out: &out, Err: &errOut}
+	if code := runner.RunLanguage(context.Background(), "text", []string{filepath.Join(dir, "notes.md")}); code != 0 {
+		t.Fatalf("exit %d, stderr %q; want the absolute argument read without a resolver", code, errOut.String())
+	}
+}

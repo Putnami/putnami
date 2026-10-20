@@ -257,6 +257,17 @@ defaults are) is the language extension's, the graph is core's.
   absence means "a workspace". A present member is a non-null object with an
   absolute `callerDir` (`job.invalid_value`, `job.missing_field`).
 
+- **`invocationDir`** — the absolute directory the user typed an interactive
+  extension command in. v2 only and optional. The orchestrator sets it on every
+  interactive launch, inside a workspace or outside one, and never on a planned
+  job, so it cannot reach a cache key. A task runs in the directory its `cwd`
+  names, so a relative path argument must resolve against `invocationDir`, not
+  against the process directory. Unlike `userScope` it does not say whether a
+  workspace exists: `userScope` and `PUTNAMI_CALLER_DIR` keep their meaning.
+  Outside a workspace it equals `userScope.callerDir`. A present member is an
+  absolute path (`job.invalid_value`); an empty or null one is rejected, not
+  read as absent.
+
 A v1 document may not carry v2 members (`job.unexpected_field`): a v1
 consumer would ignore exactly the members a v2 consumer would trust.
 
@@ -375,6 +386,7 @@ the orchestrator alongside the context file:
 | `PUTNAMI_SELECTED_PROJECT_PATHS` | `selectedProjects[].path` |
 | `PUTNAMI_SELECTED_PROJECT_ROOTS` | `selectedProjects[].fullPath` |
 | `PUTNAMI_CALLER_DIR` | `userScope.callerDir`; unset inside a workspace |
+| `PUTNAMI_INVOCATION_DIR` | `invocationDir`; set on an interactive launch only |
 
 The orchestrator also sets `PUTNAMI_CLI_USER_AGENT` to the invoking CLI's
 User-Agent (`putnami-cli/<version>`, or the agent identity the CLI was given).

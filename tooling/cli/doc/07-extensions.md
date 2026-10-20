@@ -1052,6 +1052,11 @@ context carries `userScope.callerDir`, and the environment carries
 `PUTNAMI_CALLER_DIR`. Either tells the extension that no workspace exists; see
 [Process Setup](04-job-execution.md#process-setup).
 
+Any interactive launch, in a workspace or not, also carries `invocationDir` and
+`PUTNAMI_INVOCATION_DIR`, the directory the command was typed in; an extension
+resolves a relative path argument against it with `context.ResolvePath` of the
+SDK.
+
 Inside a workspace the workspace's own pins are the only ones, so a workspace
 that pins version A of an extension runs A even when the user scope pins B.
 

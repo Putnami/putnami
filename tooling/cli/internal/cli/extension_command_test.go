@@ -1409,6 +1409,10 @@ type contextDocumentJSON struct {
 	Identity         *struct {
 		Scope string `json:"scope"`
 	} `json:"identity"`
+	InvocationDir string `json:"invocationDir"`
+	UserScope     *struct {
+		CallerDir string `json:"callerDir"`
+	} `json:"userScope"`
 }
 
 // interactiveContextDocument runs an interactive extension subcommand and
@@ -1909,5 +1913,150 @@ func TestAppRun_SelectedProjectsAgreeAcrossCommandPaths(t *testing.T) {
 	}
 	if strings.Join(plannedOrder, ",") != "/demo-extension,/app" {
 		t.Errorf("planned order = %v, want the engine's run order", plannedOrder)
+	}
+}
+
+// TestAppRun_ExtensionStructuredCommand_InteractiveCarriesTheInvocationDir pins
+// the fix for a command typed in a subdirectory: the task runs in the
+// workspace root, so the context and the environment must name the directory
+// the user typed it in, while userScope and PUTNAMI_CALLER_DIR keep saying
+// that a workspace exists.
+func TestAppRun_ExtensionStructuredCommand_InteractiveCarriesTheInvocationDir(t *testing.T) {
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skip("/bin/sh unavailable on this platform")
+	}
+	wsRoot := t.TempDir()
+	writeWorkspaceFixture(t, wsRoot)
+	script := `#!/bin/sh
+ctx=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--putnamiContext" ]; then
+    ctx="$2"
+  fi
+  shift
+done
+echo "invocation_env=$PUTNAMI_INVOCATION_DIR"
+echo "caller_env=${PUTNAMI_CALLER_DIR-unset}"
+echo "cwd=$(pwd -P)"
+cat "$ctx"
+echo
+`
+	if err := os.WriteFile(filepath.Join(wsRoot, "demo-extension", "fixture.sh"), []byte(script), 0o755); err != nil {
+		t.Fatalf("write fixture script: %v", err)
+	}
+	typedIn := filepath.Join(wsRoot, "docs")
+	if err := os.MkdirAll(typedIn, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// An outer user-scope run leaves this in the environment; it must not
+	// reach a workspace job.
+	t.Setenv("PUTNAMI_CALLER_DIR", "/inherited/outer/caller")
+	t.Setenv("PUTNAMI_INVOCATION_DIR", "/inherited/outer/invocation")
+
+	var code int
+	output := captureStdoutStderr(t, func() {
+		app, err := NewApp()
+		if err != nil {
+			t.Fatalf("NewApp: %v", err)
+		}
+		t.Chdir(typedIn)
+		code = app.Run(context.Background(), []string{"demo", "login"})
+	})
+	if code != ExitSuccess {
+		t.Fatalf("demo login exit = %d, want %d:\n%s", code, ExitSuccess, output)
+	}
+	want, err := filepath.EvalSymlinks(typedIn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := filepath.EvalSymlinks(wsRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// os.Getwd may return the symlinked spelling of the directory (macOS
+	// temporary directories do), so compare the directories, not the spellings.
+	sameDir := func(got string) bool {
+		resolved, err := filepath.EvalSymlinks(got)
+		return err == nil && resolved == want
+	}
+	envLine := ""
+	for _, line := range strings.Split(output, "\n") {
+		if v, ok := strings.CutPrefix(line, "invocation_env="); ok {
+			envLine = v
+		}
+	}
+	if !filepath.IsAbs(envLine) || !sameDir(envLine) {
+		t.Errorf("PUTNAMI_INVOCATION_DIR = %q, want the directory %q:\n%s", envLine, want, output)
+	}
+	if !strings.Contains(output, "caller_env=unset\n") {
+		t.Errorf("PUTNAMI_CALLER_DIR reaches a workspace job:\n%s", output)
+	}
+	if !strings.Contains(output, "cwd="+root+"\n") {
+		t.Errorf("the task no longer runs in the workspace root %q:\n%s", root, output)
+	}
+	start, end := strings.Index(output, "{"), strings.LastIndex(output, "}")
+	if start < 0 || end < start {
+		t.Fatalf("no context document in the output:\n%s", output)
+	}
+	var document contextDocumentJSON
+	if err := json.Unmarshal([]byte(output[start:end+1]), &document); err != nil {
+		t.Fatalf("the interactive context is not JSON: %v\n%s", err, output)
+	}
+	if !filepath.IsAbs(document.InvocationDir) || !sameDir(document.InvocationDir) {
+		t.Errorf("invocationDir = %q, want the directory %q", document.InvocationDir, want)
+	}
+	if document.UserScope != nil {
+		t.Errorf("userScope = %+v, want absent inside a workspace", document.UserScope)
+	}
+}
+
+// TestAppRun_PlannedJobCarriesNoInvocationDir pins the cache claim: a planned
+// job, whose result is cached, gets neither the context member nor the
+// variable, even when the environment inherited one.
+func TestAppRun_PlannedJobCarriesNoInvocationDir(t *testing.T) {
+	if _, err := os.Stat("/bin/sh"); err != nil {
+		t.Skip("/bin/sh unavailable on this platform")
+	}
+	wsRoot := t.TempDir()
+	writeWorkspaceAliasFixture(t, wsRoot)
+	dump := filepath.Join(wsRoot, "planned-dump.txt")
+	script := `#!/bin/sh
+ctx=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --putnamiContext) ctx="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+{
+  echo "env=${PUTNAMI_INVOCATION_DIR-unset}"
+  cat "$ctx"
+} > "` + dump + `"
+exit 0
+`
+	if err := os.WriteFile(filepath.Join(wsRoot, "demo-extension", "fixture.sh"), []byte(script), 0o755); err != nil {
+		t.Fatalf("write fixture script: %v", err)
+	}
+	t.Setenv("PUTNAMI_INVOCATION_DIR", "/inherited/outer/invocation")
+
+	captureStdoutStderr(t, func() {
+		app, err := NewApp()
+		if err != nil {
+			t.Fatalf("NewApp: %v", err)
+		}
+		t.Chdir(wsRoot)
+		if code := app.Run(context.Background(), []string{"demo", "deploy", "app"}); code != ExitSuccess {
+			t.Fatalf("demo deploy app exit = %d, want %d", code, ExitSuccess)
+		}
+	})
+	data, err := os.ReadFile(dump)
+	if err != nil {
+		t.Fatalf("the planned job wrote no dump: %v", err)
+	}
+	if !strings.HasPrefix(string(data), "env=unset\n") {
+		t.Errorf("PUTNAMI_INVOCATION_DIR reaches a planned job:\n%s", data)
+	}
+	if strings.Contains(string(data), "invocationDir") {
+		t.Errorf("a planned job context carries invocationDir:\n%s", data)
 	}
 }

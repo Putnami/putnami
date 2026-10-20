@@ -78,9 +78,13 @@ type JobCommandContext struct {
 	// an extension pinned in the user scope. The workspace members then name the
 	// user-scope directory, and CallerDir is where the command was invoked and
 	// where the job runs. Inside a workspace the member is absent.
-	UserScope  *protocoljob.UserScope `json:"userScope,omitempty"`
-	OutputPath string                 `json:"outputPath"`
-	CacheRoot  string                 `json:"cacheRoot"`
+	UserScope *protocoljob.UserScope `json:"userScope,omitempty"`
+	// InvocationDir is present exactly when the job is an interactive command
+	// launch: the directory the user typed the command in, inside a workspace or
+	// outside one. A planned job omits it.
+	InvocationDir string `json:"invocationDir,omitempty"`
+	OutputPath    string `json:"outputPath"`
+	CacheRoot     string `json:"cacheRoot"`
 }
 
 // JobContextWorkspace describes the workspace in the context file. Options
@@ -266,6 +270,9 @@ func BuildJobContext(
 		// caller to think a task may edit its own view of the run's scope.
 		Selection: job.Selection,
 		UserScope: job.UserScope,
+		// Run state of an interactive launch; a planned job has none, so the
+		// member never reaches a context a cache key could cover.
+		InvocationDir: job.InvocationDir,
 	}
 	if ws.Config != nil {
 		ctx.Workspace.Options = ws.Config.Options
@@ -458,6 +465,13 @@ func WriteContextFile(ctx *JobCommandContext, cacheRoot string) (string, error) 
 // presence tells a shell extension that no workspace exists.
 const CallerDirEnv = "PUTNAMI_CALLER_DIR"
 
+// InvocationDirEnv mirrors invocationDir. It is set only for an interactive
+// extension command launch, inside a workspace or outside one, and the runner
+// strips an inherited value, so a planned job or a nested run never reads the
+// outer command's directory. Unlike CallerDirEnv it says nothing about whether
+// a workspace exists.
+const InvocationDirEnv = "PUTNAMI_INVOCATION_DIR"
+
 // ProvidersEnv names the invocation providers a CLI process enables when its
 // command line has no --providers. The choice holds for one process: the
 // runner strips an inherited value, so a nested CLI in a job starts with the
@@ -497,6 +511,9 @@ func BuildEnvVars(ctx *JobCommandContext) []string {
 	}
 	if ctx.UserScope != nil {
 		vars = append(vars, CallerDirEnv+"="+ctx.UserScope.CallerDir)
+	}
+	if ctx.InvocationDir != "" {
+		vars = append(vars, InvocationDirEnv+"="+ctx.InvocationDir)
 	}
 	if len(ctx.SelectedProjects) > 0 {
 		vars = append(vars,

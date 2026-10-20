@@ -248,6 +248,32 @@ for _, ref := range ctx.SelectedProjects {
 member emits none. Read an empty value as **"nobody said"**, never as an answer
 — match a package by name alone rather than against a version you invented.
 
+### Resolving a path argument against the directory the user typed
+
+An interactive command runs in the directory its task names, usually the
+workspace root. A relative path argument typed in `docs/` would then resolve
+against the root. The context carries the directory the user typed the command
+in as `InvocationDir` (`invocationDir` in the JSON, `PUTNAMI_INVOCATION_DIR` in
+the environment). The orchestrator sets it on every interactive launch, inside
+a workspace or outside one, and never on a planned job.
+
+```go
+file := context.ResolvePath(ctx, os.Args[1])
+data, err := os.ReadFile(file)
+```
+
+`ResolvePath` returns an empty or absolute path unchanged. It joins a relative
+path to `InvocationDir`; with no `InvocationDir` it joins it to
+`UserScope.CallerDir` when the job runs outside a workspace; with neither (a
+nil context, a planned job, an older CLI) it returns the path unchanged, so it
+resolves against the process directory as before. It reads no file and no
+environment variable. Test for `-` (standard input) and for flags before you
+call it.
+
+`InvocationDir` does not say whether a workspace exists. `UserScope` and
+`PUTNAMI_CALLER_DIR` keep that meaning. See ADR 0075 of the CLI
+(`tooling/cli/doc/adr`).
+
 ### The whole workspace membership
 
 `WorkspaceProjects` is every project the orchestrator resolved, in canonical id
@@ -355,6 +381,8 @@ Reads and parses a Putnami context JSON file.
 | `Extension` | `Extension` | Extension identity |
 | `Job` | `Job` | Current job identity |
 | `Params` | `Params` | Job parameters |
+| `InvocationDir` | `string` | The directory the user typed an interactive command in (empty for a planned job) |
+| `UserScope` | `*UserScope` | Set only when the job runs outside any workspace; `CallerDir` is where it was invoked |
 | `FilePatterns` | `[]string` | Optional file patterns for targeted operations |
 | `Version` | `*Version` | Git version info (nil if unavailable) |
 
@@ -430,6 +458,11 @@ Returns the boolean value of a parameter. Recognizes JSON booleans and string va
 #### `(Params) Int(key string, defaultVal int, fallbacks ...string) int`
 
 Returns the integer value of a parameter. Parses JSON numbers (truncates to int). Returns `defaultVal` if no key is found or the value is not a number.
+
+### `ResolvePath(ctx *Context, p string) string`
+
+Resolves a path argument against `ctx.InvocationDir`, then
+`ctx.UserScope.CallerDir`; see the section above for the exact order.
 
 ### `(*Context) PublishChannels() []string`
 

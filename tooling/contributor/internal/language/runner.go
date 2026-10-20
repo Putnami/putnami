@@ -28,6 +28,18 @@ type LanguageRunner struct {
 	Out   io.Writer
 	Err   io.Writer
 	Call  CallProvider
+	// ResolvePath resolves a file argument of the text mode against the
+	// directory the user typed the command in. Nil leaves the argument for the
+	// process's working directory.
+	ResolvePath func(string) string
+}
+
+// argumentPath returns the file a text-mode argument names.
+func (r LanguageRunner) argumentPath(path string) string {
+	if r.ResolvePath == nil {
+		return path
+	}
+	return r.ResolvePath(path)
 }
 
 func (r LanguageRunner) git(args ...string) ([]byte, error) {
@@ -121,7 +133,7 @@ func (s *languageScan) text(args []string) error {
 		if path == "-" {
 			data, err = io.ReadAll(io.LimitReader(s.runner.Stdin, 16<<20))
 		} else {
-			data, err = os.ReadFile(path)
+			data, err = os.ReadFile(s.runner.argumentPath(path))
 		}
 		if err != nil {
 			return err

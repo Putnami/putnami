@@ -24,6 +24,7 @@ type contextPresence struct {
 	selection                bool
 	workspaceProjects        bool
 	userScope                bool
+	invocationDir            bool
 }
 
 // v2 validation rules. Validate (strict.go) checks every document against the
@@ -115,6 +116,10 @@ func validateVersioned(ctx *Context) []diag.Diagnostic {
 			diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField, "userScope",
 				"userScope requires protocolVersion %d", ProtocolVersion2))
 		}
+		if ctx.presence.invocationDir || ctx.InvocationDir != "" {
+			diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField, "invocationDir",
+				"invocationDir requires protocolVersion %d", ProtocolVersion2))
+		}
 		// The v2-only members of ProjectRef are v2-only for the same reason as
 		// every member above, and the cost of getting it wrong is concrete: a
 		// v1 consumer ignores `sourceName` and renames the manifest anyway,
@@ -183,6 +188,7 @@ func validateVersioned(ctx *Context) []diag.Diagnostic {
 		diags = append(diags, validateProjectTags(ctx.Project.Tags, ctx.presence.projectTags)...)
 		diags = append(diags, validateInvocation(ctx.Invocation, ctx.presence.invocation)...)
 		diags = append(diags, validateUserScope(ctx.UserScope, ctx.presence.userScope)...)
+		diags = append(diags, validateInvocationDir(ctx.InvocationDir, ctx.presence.invocationDir)...)
 		diags = append(diags, validateSelection(ctx.Selection, ctx.presence.selection)...)
 		for i, project := range ctx.SelectedProjects {
 			diags = append(diags, validateProjectRefConfig(
@@ -558,6 +564,26 @@ func validateUserScope(scope *UserScope, present bool) []diag.Diagnostic {
 	case !isAbsolutePath(scope.CallerDir):
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidValue, "userScope.callerDir",
 			"userScope.callerDir must be an absolute path, got %q", scope.CallerDir)}
+	}
+	return nil
+}
+
+// validateInvocationDir checks the member that names where an interactive
+// command was typed. A present member is an absolute path: a relative one would
+// resolve against a directory the consumer cannot name, and an empty or null
+// one is not an absent one.
+func validateInvocationDir(dir string, present bool) []diag.Diagnostic {
+	present = present || dir != ""
+	if !present {
+		return nil
+	}
+	switch {
+	case strings.TrimSpace(dir) == "":
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidValue, "invocationDir",
+			"invocationDir must be omitted or an absolute path, got an empty value")}
+	case !isAbsolutePath(dir):
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidValue, "invocationDir",
+			"invocationDir must be an absolute path, got %q", dir)}
 	}
 	return nil
 }

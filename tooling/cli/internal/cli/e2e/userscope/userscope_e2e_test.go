@@ -360,6 +360,11 @@ func TestAppRun_UserScope_OptionalSubcommandRunsInCallerDir(t *testing.T) {
 	if realPath(t, parsed.WorkspaceRoot) != realPath(t, userRoot) {
 		t.Fatalf("workspaceRoot = %q, want the user scope %q", parsed.WorkspaceRoot, userRoot)
 	}
+	// Every interactive launch names the directory it was typed in; outside a
+	// workspace that is the caller directory too.
+	if parsed.InvocationDir == "" || realPath(t, parsed.InvocationDir) != realPath(t, callerDir) {
+		t.Fatalf("invocationDir = %q, want the caller directory %q", parsed.InvocationDir, callerDir)
+	}
 
 	assertSameTree(t, "the caller directory", before, snapshotTree(t, callerDir))
 	if _, err := os.Stat(filepath.Join(callerDir, ".putnami")); !os.IsNotExist(err) {

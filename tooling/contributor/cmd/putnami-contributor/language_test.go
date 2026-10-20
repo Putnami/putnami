@@ -388,3 +388,69 @@ func TestTasksWithoutAChannelNeedsAnInteractiveLaunch(t *testing.T) {
 		}
 	}
 }
+
+// writeLaunchContext writes the job context a launch in dir carries, with the
+// member under test, and returns its path.
+func writeLaunchContext(t *testing.T, members map[string]any) string {
+	t.Helper()
+	members["protocolVersion"] = 2
+	data, err := json.Marshal(members)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "context.json")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// TestLanguageTextResolvesAFileAgainstTheInvocationDir pins the launch from a
+// subdirectory: the task runs in the workspace root, the user typed the
+// command in docs/, and a relative file means docs/notes.md.
+func TestLanguageTextResolvesAFileAgainstTheInvocationDir(t *testing.T) {
+	root := t.TempDir()
+	docs := filepath.Join(root, "docs")
+	if err := os.MkdirAll(docs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(docs, "notes.md"), []byte("The notes are written in English.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+
+	t.Run("a relative file reads from the directory the user typed", func(t *testing.T) {
+		contextFile := writeLaunchContext(t, map[string]any{"invocationDir": docs})
+		var stdout, stderr bytes.Buffer
+		code := run([]string{"language", "text", "notes.md", "--putnamiContext", contextFile}, &stdout, &stderr)
+		if code != 0 || !strings.Contains(stderr.String(), "1 scanned unit(s), no offender") {
+			t.Fatalf("exit %d, stdout %q, stderr %q; want the docs/notes.md read", code, stdout.String(), stderr.String())
+		}
+	})
+
+	t.Run("an absolute file is read as given", func(t *testing.T) {
+		contextFile := writeLaunchContext(t, map[string]any{"invocationDir": filepath.Join(root, "elsewhere")})
+		var stdout, stderr bytes.Buffer
+		code := run([]string{"language", "text", filepath.Join(docs, "notes.md"), "--putnamiContext", contextFile}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+		}
+	})
+
+	t.Run("without an invocation directory the file resolves against the working directory", func(t *testing.T) {
+		contextFile := writeLaunchContext(t, map[string]any{})
+		var stdout, stderr bytes.Buffer
+		code := run([]string{"language", "text", "notes.md", "--putnamiContext", contextFile}, &stdout, &stderr)
+		if code != 2 {
+			t.Fatalf("exit %d, want 2: root/notes.md does not exist; stderr %q", code, stderr.String())
+		}
+	})
+
+	t.Run("an unreadable context file leaves the working directory in charge", func(t *testing.T) {
+		var stdout, stderr bytes.Buffer
+		code := run([]string{"language", "text", "docs/notes.md", "--putnamiContext", filepath.Join(root, "absent.json")}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+		}
+	})
+}

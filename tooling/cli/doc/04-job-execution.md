@@ -681,6 +681,14 @@ ways:
 - The process runs in `callerDir` instead of the project root. A task that
   declares its own `cwd` still runs there.
 
+Every interactive launch, inside a workspace or outside one, also carries
+`invocationDir` in the context and `PUTNAMI_INVOCATION_DIR` in the
+environment: the directory the user typed the command in. A task runs in its
+own `cwd`, often the workspace root, so a relative path argument resolves
+against `invocationDir` (the SDK's `context.ResolvePath` does it). Unlike
+`userScope` it does not say whether a workspace exists, and a planned job never
+carries it. See [ADR 0075](adr/0075-an-interactive-command-knows-the-directory-it-was-typed-in.md).
+
 `userScope` is run state, like `selection`: nothing derived from it reaches a
 cache key or a session record.
 
