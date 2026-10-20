@@ -86,6 +86,22 @@ describe('ReactClientGenerator', () => {
     expect(generator.root.children?.[0]?.children?.[0]?.path).toBe('settings');
   });
 
+  it('nests a page inside a layout whose parent path has no layout', () => {
+    const generator = new ReactClientGenerator('/client.tsx', './src/app', '/scanned');
+
+    generator.addLayout('w/[workspace]/layout.tsx');
+    generator.addPage('w/[workspace]/settings/page.tsx');
+
+    const w = generator.root.children?.[0];
+    const workspace = w?.children?.[0];
+    expect(generator.root.children).toHaveLength(1);
+    expect({ path: w?.path, id: w?.id }).toEqual({ path: 'w', id: 'root-w' });
+    expect({ path: workspace?.path, id: workspace?.id }).toEqual({ path: ':workspace', id: 'root-w-workspace-layout' });
+    expect(workspace?.children?.map((c) => ({ path: c.path, id: c.id }))).toEqual([
+      { path: 'settings', id: 'root-w-workspace-settings-page' },
+    ]);
+  });
+
   it('moves an existing page under a layout and wires the layout loader', () => {
     mockFileExists.mockImplementation((path: string) => path.endsWith('/dashboard/layout.loader.ts'));
     const generator = new ReactClientGenerator('/client.tsx', './src/app', '/scanned');
