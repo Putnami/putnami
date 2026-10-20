@@ -48,7 +48,8 @@ const (
 )
 
 // publisher serves the publication-v1 ops of one hosted session (registry ADR
-// 0003): resolve, open, the publish credential, and release.
+// 0003): resolve, open, the publish credential, and release; and the
+// uploader-v1 op, upload, when the session negotiated it.
 //
 // Delivery decides what the run may publish. Its planning answer names the
 // namespace, the commit, the channels and the forward-only channels, with a

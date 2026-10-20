@@ -26,6 +26,7 @@ import (
 	distribution "go.putnami.dev/protocol/distribution"
 	infra "go.putnami.dev/protocol/infra"
 	put "go.putnami.dev/protocol/put"
+	"go.putnami.dev/sdk/extension/internal/artifacterr"
 	"go.putnami.dev/sdk/extension/internal/retry"
 	"go.putnami.dev/sdk/extension/registryorigin"
 )
@@ -282,7 +283,8 @@ func UploadBlob(ctx context.Context, client *http.Client, registryURL, token, co
 // PublishManifest publishes member's manifest without a channel and returns
 // the manifest the registry stores. A 409 means the version is already
 // published: the stored manifest is read back, and the version is a reuse only
-// when its media type and payload bytes equal member's. A transient failure
+// when its media type and payload bytes equal member's; another manifest is
+// refused with an error marked artifacterr.ErrConflict. A transient failure
 // (package retry) sends the publish again, up to retry.Attempts times in all,
 // and a 409 after a lost answer is accepted by the same rule. A registryURL
 // that ValidateRegistryURL refuses is refused before any request.
@@ -325,7 +327,7 @@ func PublishManifest(ctx context.Context, client *http.Client, registryURL, toke
 			return nil, false, fmt.Errorf("version %s is already published, and its manifest cannot be read: %w", member.Version, err)
 		}
 		if diag.HasErrors(put.ValidateManifestFor(*manifest, member.MediaType, member.Manifest)) {
-			return nil, false, fmt.Errorf("version %s is already published with another manifest", member.Version)
+			return nil, false, artifacterr.Conflict(fmt.Errorf("version %s is already published with another manifest", member.Version))
 		}
 		return manifest, true, nil
 	}

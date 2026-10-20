@@ -13,6 +13,9 @@
 // once, and hands it to the SDK uploader of the member's ecosystem
 // (npmpublish, gomodpublish, putpublish or oci.PushLayout), which sends it to
 // that registry alone, through no ambient proxy, and puts it in no error.
+//
+// An Upload error matches ErrArtifactMismatch or ErrArtifactConflict under
+// errors.Is when the failure is one of those two, and neither otherwise.
 package publicationupload
 
 import (
@@ -28,10 +31,20 @@ import (
 	distribution "go.putnami.dev/protocol/distribution"
 	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/sdk/extension/gomodpublish"
+	"go.putnami.dev/sdk/extension/internal/artifacterr"
 	"go.putnami.dev/sdk/extension/npmpublish"
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/publicationoutbox"
 	"go.putnami.dev/sdk/extension/putpublish"
+)
+
+var (
+	// ErrArtifactMismatch marks an Upload error for an artifact whose size or
+	// digest is not the one the member's entry names.
+	ErrArtifactMismatch = artifacterr.ErrMismatch
+	// ErrArtifactConflict marks an Upload error for a registry that already
+	// holds another artifact at the member's version.
+	ErrArtifactConflict = artifacterr.ErrConflict
 )
 
 // BearerFunc returns the publish bearer for the registry at target: its

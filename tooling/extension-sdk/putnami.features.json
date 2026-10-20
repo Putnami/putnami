@@ -407,6 +407,21 @@
           }
         },
         {
+          "id": "upload-kit-tells-a-mismatch-from-a-conflict",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-tampered-artifact-is-a-mismatch",
+              "another-artifact-at-the-version-is-a-conflict",
+              "any-other-failure-is-neither"
+            ]
+          }
+        },
+        {
           "id": "tree-fingerprint",
           "stage": "coded",
           "evidenceKinds": [

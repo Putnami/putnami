@@ -23,6 +23,7 @@ import (
 	"time"
 	"unicode"
 
+	"go.putnami.dev/sdk/extension/internal/artifacterr"
 	"go.putnami.dev/sdk/extension/internal/retry"
 )
 
@@ -209,7 +210,8 @@ func probeRetrying(ctx context.Context, client *http.Client, registry, token, pa
 }
 
 // probe sends one Probe GET and returns its answer. A transient failure
-// (package retry) is marked with retry.Again.
+// (package retry) is marked with retry.Again, and a tarball of another size or
+// digest with artifacterr.ErrConflict.
 func probe(ctx context.Context, client *http.Client, registry, token, packageName, version, wantDigest string, wantSize int64) (bool, retry.Answer, error) {
 	client, err := withoutRedirects(client)
 	if err != nil {
@@ -246,11 +248,11 @@ func probe(ctx context.Context, client *http.Client, registry, token, packageNam
 		return false, answer, exchange.Failed(err, fmt.Errorf("hash registry npm artifact: %w", err))
 	}
 	if read != wantSize {
-		return false, answer, fmt.Errorf("published npm artifact size mismatch: staged %d, registry %d", wantSize, read)
+		return false, answer, artifacterr.Conflict(fmt.Errorf("published npm artifact size mismatch: staged %d, registry %d", wantSize, read))
 	}
 	gotDigest := fmt.Sprintf("sha256:%x", hash.Sum(nil))
 	if gotDigest != wantDigest {
-		return false, answer, fmt.Errorf("published npm artifact digest mismatch: staged %s, registry %s", wantDigest, gotDigest)
+		return false, answer, artifacterr.Conflict(fmt.Errorf("published npm artifact digest mismatch: staged %s, registry %s", wantDigest, gotDigest))
 	}
 	return true, answer, nil
 }

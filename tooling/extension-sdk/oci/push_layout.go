@@ -16,6 +16,7 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 
+	"go.putnami.dev/sdk/extension/internal/artifacterr"
 	"go.putnami.dev/sdk/extension/registryorigin"
 )
 
@@ -53,7 +54,8 @@ var (
 //
 // Before any request it refuses a layout that holds a symbolic link or another
 // non-regular entry, a layout that does not index target.Digest, and a manifest
-// whose bytes do not hash to target.Digest. Every file it reads is opened
+// whose bytes do not hash to target.Digest; the last two errors are marked
+// artifacterr.ErrMismatch. Every file it reads is opened
 // without following a symbolic link or waiting on a FIFO, so an entry replaced
 // after that check fails the push instead of blocking it. The manifest bytes it
 // hashes are the bytes it uploads. When the registry already holds the digest,
@@ -101,7 +103,7 @@ func pushLayout(ctx context.Context, layoutDir string, target LayoutTarget, bear
 	}
 	img, err := layoutImage(layoutDir, want)
 	if err != nil {
-		return PushedLayout{}, fmt.Errorf("OCI layout does not hold manifest %s: %w", want, err)
+		return PushedLayout{}, artifacterr.Mismatch(fmt.Errorf("OCI layout does not hold manifest %s: %w", want, err))
 	}
 	mediaType, err := img.MediaType()
 	if err != nil {
@@ -115,7 +117,7 @@ func pushLayout(ctx context.Context, layoutDir string, target LayoutTarget, bear
 		return PushedLayout{}, fmt.Errorf("hash layout manifest: %w", err)
 	}
 	if got != want {
-		return PushedLayout{}, fmt.Errorf("layout manifest digest %s does not match expected digest %s", got, want)
+		return PushedLayout{}, artifacterr.Mismatch(fmt.Errorf("layout manifest digest %s does not match expected digest %s", got, want))
 	}
 
 	keychain := bearerKeychain{host: repo.RegistryStr(), token: bearer}
@@ -213,7 +215,8 @@ func directTransport() (http.RoundTripper, error) {
 var bearerCredential = regexp.MustCompile(`(?i)bearer\s+[^\s"',;]+`)
 
 // redactedError carries a message with every bearer value removed. It unwraps
-// only to a context error, whose text holds no credential.
+// only to a context error or to artifacterr.ErrMismatch, whose texts hold no
+// credential.
 type redactedError struct {
 	message string
 	cause   error
@@ -240,6 +243,8 @@ func redactBearer(err error, bearer string) error {
 		cause = context.Canceled
 	case errors.Is(err, context.DeadlineExceeded):
 		cause = context.DeadlineExceeded
+	case errors.Is(err, artifacterr.ErrMismatch):
+		cause = artifacterr.ErrMismatch
 	}
 	return &redactedError{message: message, cause: cause}
 }

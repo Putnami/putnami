@@ -26,6 +26,7 @@ import (
 	"golang.org/x/mod/module"
 
 	gomod "go.putnami.dev/protocol/gomod"
+	"go.putnami.dev/sdk/extension/internal/artifacterr"
 	"go.putnami.dev/sdk/extension/internal/retry"
 )
 
@@ -386,7 +387,8 @@ func (r *readRecorder) Read(p []byte) (int, error) {
 
 // VerifyZip downloads the module zip the registry serves to consumers and
 // refuses it unless its digest is wantDigest. A blob-upload answer alone is
-// no proof: the version could point at other bytes.
+// no proof: the version could point at other bytes. A zip of another digest
+// is refused with an error marked artifacterr.ErrConflict.
 func VerifyZip(ctx context.Context, client *http.Client, registryURL, token, modulePath, version, wantDigest string) error {
 	target, err := proxyURL(registryURL, modulePath, version, ".zip")
 	if err != nil {
@@ -399,7 +401,7 @@ func VerifyZip(ctx context.Context, client *http.Client, registryURL, token, mod
 		}
 		gotDigest := fmt.Sprintf("sha256:%x", hash.Sum(nil))
 		if gotDigest != wantDigest {
-			return fmt.Errorf("downloaded module zip digest %q does not match uploaded digest %q", gotDigest, wantDigest)
+			return artifacterr.Conflict(fmt.Errorf("downloaded module zip digest %q does not match uploaded digest %q", gotDigest, wantDigest))
 		}
 		return nil
 	})
@@ -407,7 +409,8 @@ func VerifyZip(ctx context.Context, client *http.Client, registryURL, token, mod
 
 // VerifyMod downloads the go.mod the registry serves to consumers and refuses
 // it unless it equals want byte for byte. The zip digest does not prove this
-// separately served file.
+// separately served file. Other bytes are refused with an error marked
+// artifacterr.ErrConflict.
 func VerifyMod(ctx context.Context, client *http.Client, registryURL, token, modulePath, version string, want []byte) error {
 	target, err := proxyURL(registryURL, modulePath, version, ".mod")
 	if err != nil {
@@ -419,7 +422,7 @@ func VerifyMod(ctx context.Context, client *http.Client, registryURL, token, mod
 			return fmt.Errorf("read downloaded go.mod: %w", err)
 		}
 		if !bytes.Equal(got, want) {
-			return fmt.Errorf("downloaded go.mod does not match submitted bytes")
+			return artifacterr.Conflict(fmt.Errorf("downloaded go.mod does not match submitted bytes"))
 		}
 		return nil
 	})
