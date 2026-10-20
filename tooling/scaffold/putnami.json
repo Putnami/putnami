@@ -18,6 +18,9 @@
     "/typescript/templates/typescript-server",
     "/typescript/templates/typescript-web"
   ],
+  "publish": [
+    "archives"
+  ],
   "options": {
     "@putnami/go": {
       "entrypoint": "./cmd"
