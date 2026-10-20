@@ -215,6 +215,8 @@ fi
 os="$(uname -s | tr '[:upper:]' '[:lower:]')"
 arch="$(uname -m)"
 workdir="$(mktemp -d)"
+workdir_real="$(cd "$workdir" && pwd -P)" || workdir_real="$workdir"
+home_real="$(cd "$HOME" 2>/dev/null && pwd -P)" || home_real="$HOME"
 group_pid=""
 
 # Stop the process group of a served starter the way a terminal does when its
@@ -372,15 +374,107 @@ require_pages() {
   done
 }
 
+# Print every process of the machine as a "pid command line" line. procps is not
+# in the bare image, so without ps the command lines come from /proc.
+list_processes() {
+  if command -v ps >/dev/null 2>&1; then
+    ps -ww -eo pid=,args=
+    return
+  fi
+  for process_dir in /proc/[0-9]*; do
+    if [ -r "$process_dir/cmdline" ]; then
+      printf '%s ' "${process_dir#/proc/}"
+      tr '\0' ' ' <"$process_dir/cmdline" 2>/dev/null || true
+      printf '\n'
+    fi
+  done
+}
+
+# Print "pid directory" for the working directory of each process whose
+# directory the user can read: from /proc on Linux, from lsof where it is
+# installed (macOS). Where neither exists it prints nothing, and the command
+# lines alone decide.
+list_directories() {
+  if readlink /proc/self/cwd >/dev/null 2>&1; then
+    for process_dir in /proc/[0-9]*; do
+      process_cwd="$(readlink "$process_dir/cwd" 2>/dev/null)" || continue
+      printf '%s %s\n' "${process_dir#/proc/}" "$process_cwd"
+    done
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -a -d cwd -Fpn 2>/dev/null |
+      awk '/^p/ { pid = substr($0, 2) } /^n/ { print pid, substr($0, 2) }' || true
+  fi
+}
+
+# Print the processes that belong to this smoke: those whose command line names
+# its workdir or its Putnami home, and those that run in a directory below its
+# workdir or its home. Each path is matched as written and as resolved (macOS
+# resolves /var to /private/var). The listings are taken before grep and awk
+# start, so neither matches itself.
+smoke_processes() {
+  # The working directory of this subshell must not count as one of the smoke's.
+  cd / 2>/dev/null || true
+  process_list="$(list_processes 2>/dev/null)" || true
+  directory_list="$(list_directories 2>/dev/null)" || true
+  smoke_roots="${workdir}
+${workdir_real}
+${HOME}
+${home_real}"
+  printf '%s\n' "$process_list" | grep -F \
+    -e "${HOME}/.putnami" -e "${home_real}/.putnami" \
+    -e "${workdir}/" -e "${workdir_real}/" || true
+  # A process that serves from the smoke's tree can carry no path in its command
+  # line: a host Bun runs "./src/serve.ts" from the project directory. Its
+  # working directory names the tree. This shell is left out: it is in the tree.
+  printf '%s\n' "$directory_list" | SMOKE_ROOTS="$smoke_roots" awk -v self="$$" '
+    BEGIN { roots_count = split(ENVIRON["SMOKE_ROOTS"], roots, "\n") }
+    $1 != self {
+      path = substr($0, length($1) + 2)
+      for (i = 1; i <= roots_count; i++) {
+        if (roots[i] != "" && index(path, roots[i] "/") == 1) {
+          print $1, "cwd", path
+          next
+        }
+      }
+    }
+  ' || true
+}
+
+# Stop the starter, then require that no process of this smoke runs. A freed
+# ephemeral port can be taken at once by an unrelated listener, so an HTTP
+# answer on the port does not show the starter is alive: the response of "/"
+# differs by request on a real webapp, and any listener can answer 200. The
+# processes that belong to this smoke do show it, whatever the port serves.
+# The answer of the port is only reported.
 require_stop() {
   leg="$1"
   log="$2"
   if ! stop_group; then
     fail_with_log "${leg} leg: the starter did not stop within the graceful shutdown budget" "$log"
   fi
-  if curl -sS --connect-timeout 1 --max-time 1 -o /dev/null \
-    "http://127.0.0.1:${ready_port}/" >/dev/null 2>&1; then
-    fail_with_log "${leg} leg: the HTTP listener still answers after the commands stopped" "$log"
+  if [ -z "$(list_processes 2>/dev/null)" ]; then
+    fail_with_log "${leg} leg: the machine cannot list its processes, which the stop check needs" "$log"
+  fi
+  survivors=""
+  stop_probe=0
+  while [ "$stop_probe" -lt 20 ]; do
+    survivors="$(smoke_processes)"
+    if [ -z "$survivors" ]; then
+      break
+    fi
+    sleep 0.1
+    stop_probe=$((stop_probe + 1))
+  done
+  if [ -n "$survivors" ]; then
+    printf '%s\n' "$survivors"
+    fail_with_log "${leg} leg: a process of the smoke still runs after the commands stopped; the starter may be orphaned" "$log"
+  fi
+  echo "smoke: no process of the smoke runs after the stop"
+  if after_status="$(curl -sS --connect-timeout 1 --max-time 5 -o /dev/null \
+    -w '%{http_code}' "http://127.0.0.1:${ready_port}/" 2>/dev/null)"; then
+    echo "smoke: port ${ready_port} answers HTTP ${after_status} after the stop; no process of the smoke serves it, so another listener took it"
+  else
+    echo "smoke: port ${ready_port} no longer answers"
   fi
 }
 

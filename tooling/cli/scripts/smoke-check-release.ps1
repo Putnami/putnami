@@ -664,12 +664,16 @@ function Remove-Workdir {
     return $false
 }
 
-# Processes that still run an executable from the smoke workdir after the CLI
-# stopped. On Windows, every process the CLI starts ends with it (ADR 0052).
+# Processes that still run an executable from the smoke workdir, or whose command
+# line names it, after the CLI stopped. On Windows, every process the CLI starts
+# ends with it: ADR 0052 puts it in a Job Object, and that is the guarantee. This
+# check is a sanity check on it. It cannot see a host bun.exe that serves
+# "./src/serve.ts", because Win32_Process reports no working directory.
 function Get-OrphanedProcesses {
     $prefix = (Get-FullPath $Workdir).TrimEnd('\') + '\'
     return @(Get-CimInstance -ClassName Win32_Process | Where-Object {
-            $_.ExecutablePath -and ([string]$_.ExecutablePath).StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)
+            ($_.ExecutablePath -and ([string]$_.ExecutablePath).StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) -or
+            ($_.CommandLine -and (([string]$_.CommandLine).IndexOf($prefix, [StringComparison]::OrdinalIgnoreCase) -ge 0))
         })
 }
 
@@ -1107,19 +1111,31 @@ function Invoke-Smoke {
     if (-not (Stop-Server)) {
         Stop-Smoke 'shutdown leg: webapp did not stop within the graceful shutdown budget' $serveLog
     }
-    $listenerStopped = $false
+    # A freed ephemeral port can be taken at once by an unrelated listener, so an
+    # HTTP answer on the port does not show the starter is alive. The processes
+    # that belong to this smoke do: everything it starts runs from its workdir.
+    $survivors = @()
     for ($probe = 0; $probe -lt 20; $probe++) {
-        $answer = Invoke-SmokeGet "http://127.0.0.1:${readyPort}/" (Join-Path $Workdir 'probe.html') 1000
-        if ($answer.Status -eq 0) {
-            $listenerStopped = $true
+        $survivors = @(Get-OrphanedProcesses)
+        if ($survivors.Count -eq 0) {
             break
         }
         Start-Sleep -Milliseconds 100
     }
-    if (-not $listenerStopped) {
-        Stop-Smoke 'shutdown leg: HTTP listener still answers after the CLI exited; the starter may be orphaned' $serveLog
+    if ($survivors.Count -gt 0) {
+        foreach ($survivor in $survivors) {
+            Write-Smoke "smoke: still running from the smoke workdir: pid $($survivor.ProcessId) $($survivor.CommandLine)"
+        }
+        Stop-Smoke 'shutdown leg: a process of the smoke still runs after the CLI exited; the starter may be orphaned' $serveLog
     }
-    Write-Smoke 'smoke: HTTP listener is unreachable after clean stop'
+    # The answer of the port is only reported.
+    $answer = Invoke-SmokeGet "http://127.0.0.1:${readyPort}/" (Join-Path $Workdir 'probe.html') 5000
+    if ($answer.Status -eq 0) {
+        Write-Smoke "smoke: port ${readyPort} no longer answers"
+    } else {
+        Write-Smoke "smoke: port ${readyPort} answers HTTP $($answer.Status) after the stop; no process of the smoke serves it, so another listener took it"
+    }
+    Write-Smoke 'smoke: no process of the smoke runs after clean stop'
 
     # -- Optional leg: run one command without a workspace --
     #

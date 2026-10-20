@@ -3,14 +3,18 @@ package installscript
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
 )
@@ -26,7 +30,79 @@ const (
 	firstUseHelperEnv   = "GO_WANT_FIRST_USE_HELPER"
 	firstUseScenarioEnv = "FIRST_USE_SCENARIO"
 	firstUseChannelEnv  = "FIRST_USE_EXPECT_CHANNEL"
+	// firstUseSuccessorEnv marks the process that takes over a stopped
+	// starter's listener; its value is the page the successor serves.
+	firstUseSuccessorEnv = "FIRST_USE_SUCCESSOR"
 )
+
+// firstUseStarterPage is the page every stub starter serves.
+const firstUseStarterPage = "<!doctype html><title>Welcome to Putnami</title>"
+
+// firstUseOtherPage is the page of a listener that is not the starter.
+const firstUseOtherPage = "<!doctype html><title>Another service</title>"
+
+// stopHandover says which process takes over the socket of a stub starter when
+// it is stopped. The smoke tells them apart by process identity, not by what
+// they serve.
+type stopHandover struct {
+	// page is what the successor serves.
+	page string
+	// belongsBy says how the successor is under the smoke: by a path in its
+	// command line, by its working directory, or not at all. A successor that
+	// does not belong runs from the temporary directory with a neutral command
+	// line.
+	belongsBy stopIdentity
+}
+
+// stopIdentity is the way a successor is tied to the smoke that started it.
+type stopIdentity int
+
+const (
+	_ stopIdentity = iota // the zero value: the successor does not belong
+	// byCommandLine puts a path under the smoke's home in the command line.
+	byCommandLine
+	// byWorkingDirectory keeps a neutral command line, as a host Bun that runs
+	// "./src/serve.ts" does, and runs in the directory of the stub starter, which
+	// is below the smoke's workdir or home.
+	byWorkingDirectory
+)
+
+// stopHandovers maps a scenario to its successor.
+var stopHandovers = map[string]stopHandover{
+	// The starter outlives its group and serves its own page.
+	"go-stop-orphan": {page: firstUseStarterPage, belongsBy: byCommandLine},
+	// The same orphan, with a command line that names no path of the smoke.
+	"go-stop-orphan-cwd": {page: firstUseStarterPage, belongsBy: byWorkingDirectory},
+	// Another service takes the freed port.
+	"go-stop-port-reused": {page: firstUseOtherPage},
+	// A sibling stub of this package takes the freed port: it serves the very
+	// page of the starter, from a process that is not under the smoke's home.
+	"go-stop-sibling-stub": {page: firstUseStarterPage},
+}
+
+// processDirectoryLookupAvailable reports whether the smoke scripts can read
+// the working directory of a process: /proc on Linux, lsof elsewhere. Without
+// it the scripts decide on command lines alone.
+func processDirectoryLookupAvailable() bool {
+	if runtime.GOOS == "linux" {
+		return true
+	}
+	if _, err := exec.LookPath("lsof"); err == nil {
+		return true
+	}
+	for _, candidate := range []string{"/usr/sbin/lsof", "/usr/bin/lsof"} {
+		if _, err := os.Stat(candidate); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// stopHandoverMarker is the argument that puts a successor under the home of
+// the smoke the stub runs in.
+func stopHandoverMarker() string {
+	return filepath.Join(os.Getenv("HOME"), ".putnami", "stub-starter")
+}
 
 // firstUseBlock is the block of the getting-started page, as the fixtures
 // print it.
@@ -162,6 +238,9 @@ func TestFirstUseCLIHelperProcess(t *testing.T) {
 	if os.Getenv(firstUseHelperEnv) != "1" {
 		return
 	}
+	if page := os.Getenv(firstUseSuccessorEnv); page != "" {
+		serveAsSuccessor(page)
+	}
 	args := os.Args
 	for i, arg := range args {
 		if arg == "--" {
@@ -199,7 +278,7 @@ func TestFirstUseCLIHelperProcess(t *testing.T) {
 			refuse("%v", err)
 		}
 	}
-	serve := func(statuses map[string]int) {
+	serve := func(statuses map[string]int, handOver *stopHandover) {
 		if _, err := os.Stat("putnami.workspace.json"); err != nil {
 			fmt.Fprintln(os.Stderr, "stub cli: no workspace here")
 			os.Exit(1)
@@ -212,14 +291,22 @@ func TestFirstUseCLIHelperProcess(t *testing.T) {
 			refuse("%v", err)
 		}
 		_, _ = os.Stdout.WriteString(smokeReadyRecord(listener.Addr().(*net.TCPAddr).Port) + "\n")
-		_ = http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			status, known := statuses[r.URL.Path]
-			if !known {
-				status = http.StatusNotFound
-			}
-			w.WriteHeader(status)
-			_, _ = w.Write([]byte("<!doctype html><title>Welcome to Putnami</title>"))
-		}))
+		go func() {
+			_ = http.Serve(listener, pageHandler(statuses, firstUseStarterPage))
+			os.Exit(0)
+		}()
+		// A starter that does not end with its group: on TERM, the socket
+		// passes to a process of another group, which answers on the same port.
+		if handOver == nil {
+			// TERM keeps its default action and ends the starter.
+			select {}
+		}
+		terminated := make(chan os.Signal, 1)
+		signal.Notify(terminated, syscall.SIGTERM)
+		<-terminated
+		if err := handOverListener(listener, *handOver); err != nil {
+			refuse("%v", err)
+		}
 		os.Exit(0)
 	}
 	requireHumanOutput := func() {
@@ -274,7 +361,7 @@ func TestFirstUseCLIHelperProcess(t *testing.T) {
 		if scenario == "page-404" {
 			delete(statuses, "/guestbook")
 		}
-		serve(statuses)
+		serve(statuses, nil)
 	case "lint,test,build\x00webapp":
 		inDirectory("first-use")
 		requireHumanOutput()
@@ -300,7 +387,11 @@ func TestFirstUseCLIHelperProcess(t *testing.T) {
 		if scenario == "go-page-500" {
 			status = http.StatusInternalServerError
 		}
-		serve(map[string]int{"/": status})
+		var handOver *stopHandover
+		if successor, ok := stopHandovers[scenario]; ok {
+			handOver = &successor
+		}
+		serve(map[string]int{"/": status}, handOver)
 	case "lint,test,build\x00api":
 		inDirectory("first-use-go")
 		requireHumanOutput()
@@ -308,6 +399,93 @@ func TestFirstUseCLIHelperProcess(t *testing.T) {
 	default:
 		refuse("unexpected first-use argv: %q", args)
 	}
+	os.Exit(0)
+}
+
+// pageHandler answers every known path with its status and the given page.
+func pageHandler(statuses map[string]int, page string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		status, known := statuses[r.URL.Path]
+		if !known {
+			status = http.StatusNotFound
+		}
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(page))
+	})
+}
+
+// handOverListener passes the listening socket to a process of another group
+// that answers on it with the page of next, and returns once that process
+// serves. The successor belongs to the smoke only as next says: by its command
+// line, by its working directory, or not at all. The
+// caller ends afterwards, so the port never goes unanswered between the two.
+// The test binary re-executes itself as the successor: any helper of this
+// package can call it.
+func handOverListener(listener net.Listener, next stopHandover) error {
+	file, err := listener.(*net.TCPListener).File()
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	serving, announce, err := os.Pipe()
+	if err != nil {
+		return err
+	}
+	defer serving.Close()
+	arguments := []string{"-test.run=^TestFirstUseCLIHelperProcess$"}
+	if next.belongsBy == byCommandLine {
+		arguments = append(arguments, stopHandoverMarker())
+	}
+	successor := exec.Command(executable, arguments...)
+	successor.Dir = os.TempDir()
+	if next.belongsBy == byWorkingDirectory {
+		directory, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		successor.Dir = directory
+	}
+	successor.Env = append(os.Environ(), firstUseHelperEnv+"=1", firstUseSuccessorEnv+"="+next.page)
+	successor.ExtraFiles = []*os.File{file, announce}
+	inOwnProcessGroup(successor)
+	err = successor.Start()
+	_ = announce.Close()
+	if err != nil {
+		return err
+	}
+	_, _ = io.Copy(io.Discard, serving)
+	return nil
+}
+
+// serveAsSuccessor answers on the listener the stopped starter passed as file
+// descriptor 3, tells it through descriptor 4 that it serves, and never
+// returns. It ends when the home directory of the run is removed, and at the
+// latest after two minutes, so no process outlives the test that started it,
+// even when the test binary dies before the home is removed.
+func serveAsSuccessor(page string) {
+	listener, err := net.FileListener(os.NewFile(3, "listener"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "first-use successor: %v\n", err)
+		os.Exit(70)
+	}
+	home := os.Getenv("HOME")
+	time.AfterFunc(2*time.Minute, func() { os.Exit(0) })
+	go func() {
+		for {
+			if _, err := os.Stat(home); err != nil {
+				os.Exit(0)
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
+	go func() {
+		_ = os.NewFile(4, "announce").Close()
+	}()
+	_ = http.Serve(listener, pageHandler(map[string]int{"/": http.StatusOK}, page))
 	os.Exit(0)
 }
 
@@ -334,6 +512,8 @@ func TestFirstUseSmokeRunsTheDocumentedBlockThenTheChecksAndTheGoPath(t *testing
 		"/ answered 200",
 		"/about answered 200",
 		"/guestbook answered 200",
+		"smoke: no process of the smoke runs after the stop",
+		"smoke: port ",
 		"the documented block installed, initialized and served webapp; the starter stopped cleanly",
 		"smoke: putnami lint,test,build webapp",
 		"smoke: putnami init --project api --extension go",
@@ -391,6 +571,70 @@ func TestFirstUseSmokeFailsUnderTheLegThatBroke(t *testing.T) {
 			}
 			if res.contains("smoke: OK") {
 				t.Fatalf("first-use smoke reported OK for scenario %s:\n%s", tc.scenario, res.output)
+			}
+		})
+	}
+}
+
+// A starter that outlives its group still runs under the smoke's home, so the
+// stop leg fails, whatever the port serves.
+func TestFirstUseSmokeStopFailsOnAProcessOfTheSmokeThatOutlivesTheStop(t *testing.T) {
+	spectest.Proves(t, "cli/first-use-path", "first-use-smoke-stop", "the-stop-leg-fails-on-a-process-of-the-smoke-that-outlives-the-stop")
+	res := runFirstUseOnHost(t, "go-stop-orphan", "latest")
+	if res.exitCode == 0 {
+		t.Fatalf("first-use smoke passed although a process of the smoke outlived the stop:\n%s", res.output)
+	}
+	if want := "::error::go-stop leg: a process of the smoke still runs after the commands stopped"; !res.contains(want) {
+		t.Fatalf("first-use smoke did not report %q:\n%s", want, res.output)
+	}
+	if want := "/.putnami/stub-starter"; !res.contains(want) {
+		t.Fatalf("first-use smoke did not print the surviving process (%q):\n%s", want, res.output)
+	}
+}
+
+// A starter can serve from a host Bun whose command line names no path of the
+// smoke: it runs "./src/serve.ts" in the project directory. The working
+// directory then names the tree, and the stop leg still fails.
+func TestFirstUseSmokeStopFailsOnAProcessThatRunsInTheTreeOfTheSmoke(t *testing.T) {
+	spectest.Proves(t, "cli/first-use-path", "first-use-smoke-stop", "the-stop-leg-fails-on-a-process-that-runs-in-the-tree-of-the-smoke")
+	if !processDirectoryLookupAvailable() {
+		t.Skip("neither /proc nor lsof can read the working directory of a process here; the scripts decide on command lines alone")
+	}
+	res := runFirstUseOnHost(t, "go-stop-orphan-cwd", "latest")
+	if res.exitCode == 0 {
+		t.Fatalf("first-use smoke passed although a process kept running in the tree of the smoke:\n%s", res.output)
+	}
+	if want := "::error::go-stop leg: a process of the smoke still runs after the commands stopped"; !res.contains(want) {
+		t.Fatalf("first-use smoke did not report %q:\n%s", want, res.output)
+	}
+	if !res.contains(" cwd ") {
+		t.Fatalf("first-use smoke did not print the surviving process by its working directory:\n%s", res.output)
+	}
+}
+
+// A freed ephemeral port can be taken at once by a listener that is not the
+// starter: another service, or a sibling stub of this package that serves the
+// very page of the starter. The stop leg looks at the processes of the smoke,
+// not at what the port serves, so it passes when the starter's group has ended
+// and only a process outside the smoke's home answers.
+func TestFirstUseSmokeStopIgnoresAnotherListenerOnTheFreedPort(t *testing.T) {
+	spectest.Proves(t, "cli/first-use-path", "first-use-smoke-stop", "the-stop-leg-ignores-another-listener-on-the-freed-port")
+	for _, scenario := range []string{"go-stop-port-reused", "go-stop-sibling-stub"} {
+		t.Run(scenario, func(t *testing.T) {
+			t.Parallel()
+			res := runFirstUseOnHost(t, scenario, "latest")
+			if res.exitCode != 0 {
+				t.Fatalf("first-use smoke failed although only another listener answered after the stop (exit %d):\n%s", res.exitCode, res.output)
+			}
+			for _, want := range []string{
+				"smoke: GET http://127.0.0.1:",
+				"smoke: no process of the smoke runs after the stop",
+				"so another listener took it",
+				"smoke: OK — channel 'latest' passes the documented block",
+			} {
+				if !res.contains(want) {
+					t.Fatalf("first-use smoke did not report %q:\n%s", want, res.output)
+				}
 			}
 		})
 	}

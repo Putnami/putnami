@@ -14,3 +14,6 @@ func withoutControllingTerminal(t *testing.T, cmd *exec.Cmd) {
 	t.Helper()
 	t.Fatalf("install.sh run-mode tests do not run on Windows: %s", cmd.Path)
 }
+
+// inOwnProcessGroup has no Windows form: the first-use stub runs under bash.
+func inOwnProcessGroup(cmd *exec.Cmd) {}

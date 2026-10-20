@@ -307,7 +307,13 @@ cleared. It exports `PUTNAMI_CHANNEL=<channel>` for `init`, so the workspace
 is resolved from the release set of the channel under test rather than from
 `latest`. It verifies the selected executable and stamp, generated workspace,
 locks, extension and MCP registration, typed readiness, a real successful HTTP
-response, and graceful shutdown. Any failing leg prints bounded diagnostics;
+response, and graceful shutdown. After the stop, no process whose command line
+names the smoke workdir, or whose working directory is below it, may still run
+(a host Bun serves `./src/serve.ts`, so only its directory names the tree). The
+directory is read from `/proc` on Linux and with `lsof` on macOS. On Windows the
+Job Object of ADR 0052 is the guarantee, and the command-line check is a sanity
+check. An answer on the freed port does not fail the leg, because an unrelated
+listener can take the port. Any failing leg prints bounded diagnostics;
 an automated run sets `SMOKE_DIAGNOSTICS_DIR` to retain the artifact bundle.
 The legs themselves are covered by `tooling/cli/internal/installscript`, which
 points both served URLs at local test servers — see

@@ -356,7 +356,7 @@ func TestSmokePS1NamesTheLegsOfTheShellSmoke(t *testing.T) {
 		"serve leg: webapp's initial serve session ended before readiness",
 		"http leg: webapp returned an empty successful response",
 		"shutdown leg: webapp did not stop within the graceful shutdown budget",
-		"shutdown leg: HTTP listener still answers after the CLI exited; the starter may be orphaned",
+		"shutdown leg: a process of the smoke still runs after the CLI exited; the starter may be orphaned",
 		"run leg: git init failed in $runDir",
 		"run leg: putnami $RunCommand through ${InstallerUrl}?run=$RunCommand exited $runStatus",
 		"run leg: the installer escalated privileges - a one-line install must never ask for elevation",
@@ -365,6 +365,18 @@ func TestSmokePS1NamesTheLegsOfTheShellSmoke(t *testing.T) {
 	} {
 		if !strings.Contains(src, text) {
 			t.Fatalf("smoke-check-release.ps1 does not fail with %q", text)
+		}
+	}
+	// The shutdown leg identifies the starter by the processes of the smoke, as
+	// the shell smoke does, not by what the freed port serves. The Windows
+	// harness cannot hand a socket to a second process, so this is checked on
+	// the text.
+	for _, text := range []string{
+		"$survivors = @(Get-OrphanedProcesses)",
+		"([string]$_.CommandLine).IndexOf($prefix, [StringComparison]::OrdinalIgnoreCase)",
+	} {
+		if !strings.Contains(src, text) {
+			t.Fatalf("smoke-check-release.ps1 shutdown leg does not look for the processes of the smoke: missing %q", text)
 		}
 	}
 	for _, pattern := range []string{`'"type":"ready"'`, `'"port":([0-9]+)'`, `"record":"session:end"`, `'Integrity verified'`, `'without integrity verification'`} {

@@ -3625,6 +3625,19 @@
           }
         },
         {
+          "id": "first-use-smoke-stop",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-stop-leg-fails-on-a-process-of-the-smoke-that-outlives-the-stop",
+              "the-stop-leg-fails-on-a-process-that-runs-in-the-tree-of-the-smoke",
+              "the-stop-leg-ignores-another-listener-on-the-freed-port"
+            ]
+          }
+        },
+        {
           "id": "init-lists-members-once",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

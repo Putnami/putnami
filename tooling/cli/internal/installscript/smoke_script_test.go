@@ -8,10 +8,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
@@ -360,10 +362,24 @@ func TestSmokeCLIHelperProcess(t *testing.T) {
 				t.Fatalf("invalid helper HTTP status %q: %v", configured, err)
 			}
 		}
-		_ = http.Serve(listener, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(httpStatus)
-			_, _ = w.Write([]byte("<!doctype html><title>Welcome to Putnami</title>"))
-		}))
+			_, _ = w.Write([]byte(firstUseStarterPage))
+		})
+		next, handOver := stopHandovers[os.Getenv(smokeStopHandoverEnv)]
+		if !handOver {
+			_ = http.Serve(listener, handler)
+			return
+		}
+		// A starter that does not end with its stop: on TERM the socket passes
+		// to a process of another group, which answers on the same port.
+		go func() { _ = http.Serve(listener, handler) }()
+		terminated := make(chan os.Signal, 1)
+		signal.Notify(terminated, syscall.SIGTERM)
+		<-terminated
+		if err := handOverListener(listener, next); err != nil {
+			t.Fatal(err)
+		}
 		return
 	case "extensions\x00install\x00--user\x00--latest\x00" + smokeRunExtension:
 		_, _ = os.Stdout.WriteString("  ✓ Pinned " + smokeRunExtension + " for this user\n")
@@ -391,6 +407,11 @@ func TestSmokeCLIHelperProcess(t *testing.T) {
 		t.Fatalf("unexpected golden-path argv: %q", args)
 	}
 }
+
+// smokeStopHandoverEnv makes the stub starter hand its port to another process
+// when it is stopped. Its value names a successor of stopHandovers: the orphan
+// starter, an unrelated service, or a sibling stub of this package.
+const smokeStopHandoverEnv = "SMOKE_TEST_STOP_HANDOVER"
 
 // smokeReadyShapeEnv selects the line the stub prints for a ready listener.
 const smokeReadyShapeEnv = "SMOKE_TEST_READY_SHAPE"
@@ -541,7 +562,7 @@ func TestSmokeRunsExactTypeScriptGoldenPathThroughHTTPAndCleanStop(t *testing.T)
 		"generated workspace, webapp, locks, extension and MCP registration verified; build plan validates",
 		"putnami serve webapp",
 		"smoke: GET http://127.0.0.1:",
-		"HTTP listener is unreachable after clean stop",
+		"no process of the smoke runs after clean stop",
 		"HTTP → clean stop",
 	} {
 		if !res.contains(want) {
@@ -551,6 +572,44 @@ func TestSmokeRunsExactTypeScriptGoldenPathThroughHTTPAndCleanStop(t *testing.T)
 	// The run leg is opt-in through SMOKE_RUN_COMMAND.
 	if res.contains("?run=") || res.contains("→ run ") {
 		t.Fatalf("the run leg ran without SMOKE_RUN_COMMAND:\n%s", res.output)
+	}
+}
+
+// The shutdown leg fails when a process of the smoke still runs after the stop,
+// whatever the port serves, and passes when a listener outside the smoke took
+// the freed port, even one that serves the starter's own page.
+func TestSmokeShutdownLegTellsAnOrphanFromAnotherListenerOnTheFreedPort(t *testing.T) {
+	requireBash(t)
+	t.Setenv("GO_WANT_SMOKE_CLI_HELPER", "1")
+	body := fullGoldenPathStub(t)
+	server := newRegistry(t, registryOptions{
+		body:      body,
+		integrity: "sha256:" + sha256Hex(body),
+		resolved:  stubVersion,
+	})
+
+	orphan := runSmokeFrom(t, server.URL, server.URL+"/install.sh", "", t.TempDir(), smokeStopHandoverEnv+"=go-stop-orphan")
+	if orphan.exitCode == 0 || !orphan.contains("::error::shutdown leg: a process of the smoke still runs after the CLI exited; the starter may be orphaned") {
+		t.Fatalf("the smoke accepted a starter that still runs after the stop (exit %d):\n%s", orphan.exitCode, orphan.output)
+	}
+
+	// The same orphan with a command line that names no path of the smoke, as a
+	// host Bun running "./src/serve.ts" has: only its working directory, the
+	// project directory, names the tree.
+	if processDirectoryLookupAvailable() {
+		byDirectory := runSmokeFrom(t, server.URL, server.URL+"/install.sh", "", t.TempDir(), smokeStopHandoverEnv+"=go-stop-orphan-cwd")
+		if byDirectory.exitCode == 0 || !byDirectory.contains("::error::shutdown leg: a process of the smoke still runs after the CLI exited; the starter may be orphaned") || !byDirectory.contains(" cwd ") {
+			t.Fatalf("the smoke accepted a starter that still runs in its tree after the stop (exit %d):\n%s", byDirectory.exitCode, byDirectory.output)
+		}
+	} else {
+		t.Log("neither /proc nor lsof can read the working directory of a process here; the working-directory orphan is not checked")
+	}
+
+	for _, successor := range []string{"go-stop-port-reused", "go-stop-sibling-stub"} {
+		other := runSmokeFrom(t, server.URL, server.URL+"/install.sh", "", t.TempDir(), smokeStopHandoverEnv+"="+successor)
+		if other.exitCode != 0 || !other.contains("smoke: no process of the smoke runs after clean stop") || !other.contains("so another listener took it") {
+			t.Fatalf("the smoke failed although only a listener outside the smoke answered after the stop (%s, exit %d):\n%s", successor, other.exitCode, other.output)
+		}
 	}
 }
 
@@ -879,7 +938,7 @@ func TestSmokeRunsTheOptionalRunScenarioInAnUntouchedDirectory(t *testing.T) {
 		t.Fatalf("run leg failed (exit %d):\n%s", res.exitCode, res.output)
 	}
 	for _, want := range []string{
-		"HTTP listener is unreachable after clean stop",
+		"no process of the smoke runs after clean stop",
 		`smoke: curl -fsSL "` + server.URL + `/install.sh?run=` + smokeRunCommand + `" | bash`,
 		"putnami " + smokeRunCommand + " exited 0 and left ",
 		"clean stop → run " + smokeRunCommand + " on ",
