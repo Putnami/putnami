@@ -157,10 +157,9 @@ rule. See [Source-Bound Tasks](../../../tooling/cli/doc/10-caching.md#source-bou
 `build-generate` also rewrites committed files the binding covers:
 `schema/openapi.json`, `infra/requirements.json` and a generated client inside
 the project. An execution that changes one of them moves its own project's
-binding after the hook wrote the evidence, so the evidence names the tree
-before that write, and the next run executes generate once more and converges.
-ADR [0069](../../../tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md)
-records this consequence.
+binding after the hook wrote the evidence. ADR
+[0069](../../../tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md)
+states how the CLI settles that entry.
 
 #### Pre-build hook order
 

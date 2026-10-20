@@ -34,8 +34,7 @@ out, so it cannot see a stale committed copy either.
 
 1. **A task declares that its outputs embed its project's binding.** The task
    cache policy gains `sourceBound`, a boolean that defaults to false and is
-   left out of the JSON when false. `build-describe` declares it, and so
-   does `@putnami/typescript`'s `build-generate`.
+   left out of the JSON when false. `build-describe` declares it.
 2. **The binding is not a key input.** `ComputeJobCacheHash` does not read it,
    so a test-only edit keeps the task's cache key and every key that folds it.
 3. **The binding is part of the entry's store key.** A source-bound entry is
