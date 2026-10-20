@@ -86,11 +86,11 @@ func hiddenJobFlags() []string {
 }
 
 // scriptNamesFlag reports whether a script names flag as a whole word, in its
-// "--name" form or in fish's "-l name" form: "--exclude" is not named by
+// "--name" form or in fish's "-l 'name'" form: "--exclude" is not named by
 // "--exclude-tag".
 func scriptNamesFlag(script, flag string) bool {
 	name := regexp.QuoteMeta(strings.TrimPrefix(flag, "--"))
-	return regexp.MustCompile(`(^|[^A-Za-z0-9-])(--|-l )` + name + `($|[^A-Za-z0-9-])`).MatchString(script)
+	return regexp.MustCompile(`(^|[^A-Za-z0-9-])(--|-l '?)` + name + `($|[^A-Za-z0-9-])`).MatchString(script)
 }
 
 func TestCompletionOffersTheJobFlagsOnlyWithAJobCommand(t *testing.T) {
