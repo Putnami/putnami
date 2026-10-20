@@ -558,6 +558,19 @@
           }
         },
         {
+          "id": "source-bound-generate",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-generate-cache-policy-is-source-bound"
+            ]
+          }
+        },
+        {
           "id": "api-compatibility-marker",
           "stage": "coded",
           "evidenceKinds": [

@@ -134,6 +134,33 @@ config key (`integrations.stripe.apiKey`), the key the application reads it at.
 
 The scheduler caches the generated `.gen/` tree as the generate task output and restores it in place on cache hits.
 
+#### Feature evidence and the source binding
+
+The `@putnami/application` pre-build hook writes the project's feature
+evidence to `.gen/schema/feature-evidence/typescript-framework.json` when the
+project maps a native feature to a proof. The evidence names the project's
+source binding: the `source-v1` digest the scheduler stamps into
+`.gen/version.json`. The binding covers every project file, test files, specs
+and `putnami.features.json` included. The generate key reads only `src/`,
+`public/`, `package.json` and the workspace configuration.
+
+So `build-generate` declares `cache.sourceBound`. An edit outside the key, such
+as a test file, keeps the generate key and every key that folds it. The CLI
+stores the generate entry at a key that also binds the binding, so the first
+run after the edit executes that project's generate once per mode it uses
+(`build`, `test`, `serve`), and stores a second entry. A later run at either
+tree hits its own entry, and the restore of `.gen/` brings back the evidence
+of that binding. Transpile, types, test and the other dependents keep their
+keys and their hits. A project without feature evidence follows the same
+rule. See [Source-Bound Tasks](../../../tooling/cli/doc/10-caching.md#source-bound-tasks).
+
+`build-generate` also rewrites committed files the binding covers:
+`schema/openapi.json`, `infra/requirements.json` and a generated client inside
+the project. An execution that changes one of them moves its own project's
+binding after the hook wrote the evidence. ADR
+[0069](../../../tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md)
+states how the CLI settles that entry.
+
 #### Pre-build hook order
 
 Every `preBuild` hook for a project writes into the same `.gen/` tree, so a hook
