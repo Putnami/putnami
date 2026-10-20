@@ -389,6 +389,24 @@
           }
         },
         {
+          "id": "upload-kit-uploads-what-the-engine-verified",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-ecosystem-uploads-and-answers-the-stored-digest",
+              "the-request-member-names-every-file-read",
+              "a-tampered-artifact-is-refused-before-any-request",
+              "the-bearer-goes-only-to-its-registry",
+              "no-error-carries-the-bearer",
+              "a-version-held-at-the-same-digest-is-reused"
+            ]
+          }
+        },
+        {
           "id": "tree-fingerprint",
           "stage": "coded",
           "evidenceKinds": [

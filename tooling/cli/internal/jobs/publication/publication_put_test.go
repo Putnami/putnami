@@ -4,15 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"maps"
-	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
@@ -23,122 +20,28 @@ import (
 	put "go.putnami.dev/protocol/put"
 	registryproto "go.putnami.dev/protocol/registry"
 	"go.putnami.dev/sdk/extension/publicationoutbox"
+	"go.putnami.dev/sdk/extension/publicationupload/publicationuploadtest"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/credentialprovider/providertest"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
-// putRegistry is a Put registry that serves put-write/v1 to the publication
-// bearer: one blob per digest, immutable versions, and the manifest read. It
-// records every request and every publish body as sent.
+// putRegistry is the shared fake Put registry (publicationuploadtest),
+// answering the publication bearer.
 type putRegistry struct {
+	*publicationuploadtest.PutRegistry
 	server *httptest.Server
-
-	mu        sync.Mutex
-	blobs     map[string][]byte
-	manifests map[string]put.Manifest
-	requests  []string
-	publishes [][]byte
 }
 
 func newPutRegistry(t *testing.T) *putRegistry {
 	t.Helper()
-	reg := &putRegistry{blobs: map[string][]byte{}, manifests: map[string]put.Manifest{}}
-	reg.server = httptest.NewServer(http.HandlerFunc(reg.serve))
-	t.Cleanup(reg.server.Close)
-	return reg
-}
-
-func (reg *putRegistry) serve(w http.ResponseWriter, r *http.Request) {
-	reg.mu.Lock()
-	defer reg.mu.Unlock()
-	reg.requests = append(reg.requests, r.Method+" "+r.URL.EscapedPath())
-	if r.Header.Get("Authorization") != "Bearer "+publicationBearer {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")
-	switch {
-	case r.Method == http.MethodPost && len(parts) == 3 && parts[2] == "blobs" && len(body) > 0:
-		digest := put.Digest(body)
-		reg.blobs[digest] = body
-		putAnswer(w, http.StatusCreated, put.BlobReceipt{
-			ID: "blob-" + digest[7:15], Digest: digest, Size: int64(len(body)),
-			MediaType: r.Header.Get("Content-Type"), CreatedAt: "2026-10-02T10:00:00Z",
-		})
-	case r.Method == http.MethodPost && len(parts) == 3 && parts[2] == "publish":
-		reg.publish(w, parts[0]+"/"+parts[1], body)
-	case r.Method == http.MethodGet && len(parts) == 5 && parts[2] == "versions" && parts[4] == "manifest":
-		manifest, ok := reg.manifests[parts[0]+"/"+parts[1]+"@"+parts[3]]
-		if !ok {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		putAnswer(w, http.StatusOK, manifest)
-	default:
-		w.WriteHeader(http.StatusNotFound)
-	}
-}
-
-// publish stores a version whose blobs are all uploaded. The strict request
-// reader refuses a channel, a visibility and a source_ref.
-func (reg *putRegistry) publish(w http.ResponseWriter, coordinate string, body []byte) {
-	reg.publishes = append(reg.publishes, body)
-	request, diagnostics := put.ParsePublishRequest(body)
-	if request == nil || len(diagnostics) > 0 {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	references, err := put.BlobReferences(request.Payload)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	for _, reference := range references {
-		if reg.blobs[reference] == nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-	}
-	key := coordinate + "@" + request.Version
-	if _, exists := reg.manifests[key]; exists {
-		w.WriteHeader(http.StatusConflict)
-		return
-	}
-	manifest := put.Manifest{ID: "manifest-" + request.Version, PackageID: "package-1", MediaType: request.MediaType, Payload: request.Payload, CreatedAt: "2026-10-02T10:00:00Z"}
-	reg.manifests[key] = manifest
-	putAnswer(w, http.StatusCreated, put.PublishResponse{
-		Package: coordinate,
-		Version: put.Version{
-			ID: "version-" + request.Version, PackageID: "package-1", Version: request.Version, ManifestID: manifest.ID,
-			State: put.VersionStatePublished, Visibility: put.VisibilityPrivate, CreatedAt: "2026-10-02T10:00:00Z",
-		},
-		Manifest: manifest,
-		Channel:  json.RawMessage("null"),
-	})
-}
-
-func putAnswer(w http.ResponseWriter, status int, value any) {
-	data, err := json.Marshal(value)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_, _ = w.Write(data)
+	reg := publicationuploadtest.NewPutRegistry(t, publicationBearer)
+	return &putRegistry{PutRegistry: reg, server: reg.Server}
 }
 
 // recorded returns the requests and the publish bodies received so far.
 func (reg *putRegistry) recorded() ([]string, [][]byte) {
-	reg.mu.Lock()
-	defer reg.mu.Unlock()
-	return slices.Clone(reg.requests), slices.Clone(reg.publishes)
+	return reg.Recorded()
 }
 
 // putMemberFixture is one Put registry member a publication job packs: its

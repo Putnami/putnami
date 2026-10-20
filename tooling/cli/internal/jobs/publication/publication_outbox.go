@@ -24,10 +24,9 @@ import (
 	put "go.putnami.dev/protocol/put"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/sdk/extension/gomodpublish"
-	"go.putnami.dev/sdk/extension/npmpublish"
-	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/publicationoutbox"
+	"go.putnami.dev/sdk/extension/publicationupload"
 	"go.putnami.dev/sdk/extension/putpublish"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -350,61 +349,35 @@ func (run *ReleaseSetRun) checkPacked(packed extproto.OutboxMember, planned rele
 	return nil
 }
 
-// uploadPacked uploads one checked member of the planned kind and returns its
-// artifact digest: the npm tarball's, the Go module zip's, the OCI
-// manifest's, or the stored Put manifest payload's, with the platforms of an
-// archive.
+// uploadPacked uploads one checked member of the planned kind to the registry
+// the engine resolves for it, with the provider's publish bearer for that
+// registry (publicationupload.Upload), and returns its artifact digest: the
+// npm tarball's, the Go module zip's, the OCI manifest's, or the stored Put
+// manifest payload's, with the platforms of an archive. Every check that
+// needs the project's declarations runs before the upload.
 func (run *ReleaseSetRun) uploadPacked(ctx context.Context, publish *jobmodel.ScheduledJob, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember, kind distribution.MemberKind) (string, map[string]string, error) {
-	var digest string
+	request := publicationupload.Request{Outbox: outbox.Root(), Member: packed, Kind: kind}
 	var err error
 	switch packed.Ecosystem {
 	case extproto.OutboxEcosystemNPM:
-		digest, err = run.uploadNPM(ctx, publish.Project, outbox, packed)
+		request.Registry, err = memberRegistryEndpoint(publish.Project, packed)
 	case extproto.OutboxEcosystemGo:
-		digest, err = run.uploadGo(ctx, publish.Project, outbox, packed)
+		request.Registry, err = goRegistryEndpoint(publish.Project, packed.Ecosystem)
 	case extproto.OutboxEcosystemOCI:
-		digest, err = run.uploadOCI(ctx, publish, outbox, packed)
+		var digest string
+		digest, err = run.uploadOCI(ctx, publish, request)
+		return digest, nil, err
 	case extproto.OutboxEcosystemPut, extproto.OutboxEcosystemArchive:
-		return run.uploadPut(ctx, publish.Project, outbox, packed, kind)
-	default:
-		err = fmt.Errorf("ecosystem %q has no upload", packed.Ecosystem)
+		request.Registry, err = putRegistryEndpoint(publish.Project)
 	}
-	return digest, nil, err
-}
-
-// uploadNPM uploads the member to the registry it names
-// (memberRegistryEndpoint) with the provider's publish bearer for that
-// registry.
-func (run *ReleaseSetRun) uploadNPM(ctx context.Context, project *workspace.Project, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember) (string, error) {
-	endpoint, err := memberRegistryEndpoint(project, packed)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	target, err := url.Parse(endpoint)
+	uploaded, err := publicationupload.Upload(ctx, request, run.publication.PublishBearer)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	tarball, err := outbox.ReadFile(packed.NPM.Tarball)
-	if err != nil {
-		return "", err
-	}
-	manifest, err := outbox.ReadFile(packed.NPM.Manifest)
-	if err != nil {
-		return "", err
-	}
-	bearer, err := run.publication.PublishBearer(ctx, target)
-	if err != nil {
-		return "", err
-	}
-	client, err := npmpublish.NewHTTPClient()
-	if err != nil {
-		return "", err
-	}
-	artifact := npmpublish.Artifact{Name: packed.Coordinate, Version: packed.Version, Manifest: manifest, Tarball: tarball}
-	if _, err := npmpublish.Publish(ctx, client, endpoint, bearer, artifact); err != nil {
-		return "", err
-	}
-	return npmpublish.Digest(tarball), nil
+	return uploaded.Digest, uploaded.Platforms, nil
 }
 
 // maxPrintedRegistry bounds a registry URL or host an upload error names.
@@ -463,114 +436,19 @@ func registryURLIdentity(endpoint string) string {
 	return strings.Join([]string{target.Scheme, strings.ToLower(target.Hostname()), port, target.EscapedPath()}, "\x00")
 }
 
-func (run *ReleaseSetRun) uploadGo(ctx context.Context, project *workspace.Project, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember) (string, error) {
-	declared, err := declaredRegistryEndpoint(project, packed.Ecosystem, "origin")
+// goRegistryEndpoint is the Go module origin the project's
+// registries.<ecosystem>.origin entry names, as an upload endpoint
+// (gomodpublish.ValidateRegistryURL). A project that declares none uploads no
+// Go module.
+func goRegistryEndpoint(project *workspace.Project, ecosystem string) (string, error) {
+	declared, err := declaredRegistryEndpoint(project, ecosystem, "origin")
 	if err != nil {
 		return "", err
 	}
 	if declared == "" {
-		return "", fmt.Errorf("no Go module origin is declared: set registries.%s.origin", packed.Ecosystem)
+		return "", fmt.Errorf("no Go module origin is declared: set registries.%s.origin", ecosystem)
 	}
-	endpoint, err := gomodpublish.ValidateRegistryURL(declared)
-	if err != nil {
-		return "", err
-	}
-	target, err := url.Parse(endpoint)
-	if err != nil {
-		return "", err
-	}
-	zip, err := outbox.ReadFile(packed.Go.Zip)
-	if err != nil {
-		return "", err
-	}
-	mod, err := outbox.ReadFile(packed.Go.Mod)
-	if err != nil {
-		return "", err
-	}
-	info, err := outbox.ReadFile(packed.Go.Info)
-	if err != nil {
-		return "", err
-	}
-	var stated struct{ Version string }
-	if err := json.Unmarshal(info, &stated); err != nil || stated.Version != packed.Version {
-		return "", fmt.Errorf("the module .info does not state version %s", packed.Version)
-	}
-	bearer, err := run.publication.PublishBearer(ctx, target)
-	if err != nil {
-		return "", err
-	}
-	client, err := gomodpublish.NewHTTPClient()
-	if err != nil {
-		return "", err
-	}
-	digest, _, err := gomodpublish.Publish(ctx, client, nil, endpoint, bearer, gomodpublish.Module{
-		Path: packed.Coordinate, Version: packed.Version, Zip: zip, Mod: mod,
-	})
-	if err != nil {
-		return "", err
-	}
-	if digest != packed.Go.Zip.Digest {
-		return "", fmt.Errorf("the registry stored zip digest %s, not the packed %s", digest, packed.Go.Zip.Digest)
-	}
-	return digest, nil
-}
-
-// uploadPut uploads a Put registry member to putRegistryEndpoint with the
-// provider's publish bearer for that registry: the blobs its manifest
-// references, one at a time, then the manifest, with no channel. Every check
-// that needs no registry runs before the bearer is asked for: the member's
-// shape (putpublish.Check), then the size and digest of every blob, streamed
-// from the outbox. Each blob is read and verified again when it is uploaded.
-// The digest is the SHA-256 of the manifest payload the registry stores,
-// which must be the packed manifest's.
-func (run *ReleaseSetRun) uploadPut(ctx context.Context, project *workspace.Project, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember, kind distribution.MemberKind) (string, map[string]string, error) {
-	endpoint, err := putRegistryEndpoint(project)
-	if err != nil {
-		return "", nil, err
-	}
-	target, err := url.Parse(endpoint)
-	if err != nil {
-		return "", nil, err
-	}
-	manifest, err := outbox.ReadFile(packed.Put.Manifest)
-	if err != nil {
-		return "", nil, err
-	}
-	member := putpublish.Member{
-		Kind: kind, Coordinate: packed.Coordinate, Version: packed.Version,
-		MediaType: packed.Put.MediaType, Manifest: manifest,
-	}
-	for _, blob := range packed.Put.Blobs {
-		file := blob.File()
-		member.Blobs = append(member.Blobs, putpublish.Blob{
-			MediaType: blob.MediaType, Digest: blob.Digest, Size: blob.Size,
-			Read: func() ([]byte, error) { return outbox.ReadFile(file) },
-		})
-	}
-	if _, err := putpublish.Check(member); err != nil {
-		return "", nil, err
-	}
-	for _, blob := range packed.Put.Blobs {
-		if err := outbox.VerifyFile(blob.File()); err != nil {
-			return "", nil, err
-		}
-	}
-	bearer, err := run.publication.PublishBearer(ctx, target)
-	if err != nil {
-		return "", nil, err
-	}
-	client, err := putpublish.NewHTTPClient()
-	if err != nil {
-		return "", nil, err
-	}
-	published, err := putpublish.Publish(ctx, client, endpoint, bearer, member)
-	if err != nil {
-		return "", nil, err
-	}
-	if published.Digest != packed.Put.Manifest.Digest {
-		return "", nil, fmt.Errorf("the registry stored manifest %s, not the packed %s", published.Digest, packed.Put.Manifest.Digest)
-	}
-	return published.Digest, published.Platforms, nil
+	return gomodpublish.ValidateRegistryURL(declared)
 }
 
 // putRegistryEndpoint is the Put registry the project's registries.put entry
@@ -588,10 +466,13 @@ func putRegistryEndpoint(project *workspace.Project) (string, error) {
 	return putpublish.ValidateRegistryURL(declared)
 }
 
-// uploadOCI pushes the packed layout, then records the published image beside
-// the publication job's output, where a same-run consumer reads it
-// (pkgmeta.PublishedImageManifestPath).
-func (run *ReleaseSetRun) uploadOCI(ctx context.Context, publish *jobmodel.ScheduledJob, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember) (string, error) {
+// uploadOCI refuses an image for a registry host the project's
+// registries.oci.publish does not name, or other than the image its package
+// step built, uploads it (publicationupload.Upload), then records the
+// published image beside the publication job's output, where a same-run
+// consumer reads it (pkgmeta.PublishedImageManifestPath).
+func (run *ReleaseSetRun) uploadOCI(ctx context.Context, publish *jobmodel.ScheduledJob, request publicationupload.Request) (string, error) {
+	packed := request.Member
 	repository, err := name.NewRepository(packed.OCI.Repository, name.StrictValidation)
 	if err != nil {
 		return "", fmt.Errorf("OCI repository %q: %w", packed.OCI.Repository, err)
@@ -611,22 +492,9 @@ func (run *ReleaseSetRun) uploadOCI(ctx context.Context, publish *jobmodel.Sched
 	if candidate.Digest != packed.OCI.Digest {
 		return "", fmt.Errorf("the publication job packed image %s; the package step built %s", packed.OCI.Digest, candidate.Digest)
 	}
-	layout, err := outbox.Layout(packed.OCI.Layout)
+	pushed, err := publicationupload.Upload(ctx, request, run.publication.PublishBearer)
 	if err != nil {
 		return "", err
-	}
-	bearer, err := run.publication.PublishBearer(ctx, &url.URL{Scheme: repository.Scheme(), Host: host})
-	if err != nil {
-		return "", err
-	}
-	pushed, err := oci.PushLayout(ctx, layout, oci.LayoutTarget{
-		Repository: packed.OCI.Repository, Digest: packed.OCI.Digest, Tags: packed.OCI.Tags,
-	}, bearer)
-	if err != nil {
-		return "", err
-	}
-	if pushed.Digest != packed.OCI.Digest {
-		return "", fmt.Errorf("the registry holds manifest %s, not the packed %s", pushed.Digest, packed.OCI.Digest)
 	}
 	outputDir := filepath.Join(run.root, ".putnami", "out", publish.Project.Path, publish.CommandName())
 	if err := pkgmeta.WritePublishedImageManifest(outputDir, pkgmeta.PublishedImageManifest{

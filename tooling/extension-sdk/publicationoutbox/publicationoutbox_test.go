@@ -166,6 +166,34 @@ func TestOutboxReaderRefusesAnInvalidDescriptor(t *testing.T) {
 	}
 }
 
+// Open reads no descriptor: a member's files read through it by the entries
+// the caller holds, with the size and digest checks of Read, after outbox.json
+// is rewritten. It refuses a root that is not a directory.
+func TestOpenReadsTheMemberTheCallerHolds(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "publication-outbox", "the-engine-uploads-only-bytes-whose-digest-it-verified")
+	root, member := writeNPMOutbox(t)
+	writeOver(t, filepath.Join(root, extproto.PublicationOutboxDescriptor), npmDescriptor("https://npm.acme.dev", "npm/web/package.json"))
+	outbox, err := Open(root)
+	if err != nil || outbox.Descriptor != nil || outbox.Root() != root {
+		t.Fatalf("open = %+v, %v", outbox, err)
+	}
+	if data, err := outbox.ReadFile(member.NPM.Tarball); err != nil || string(data) != "tarball bytes" {
+		t.Fatalf("tarball = %q, %v", data, err)
+	}
+	writeOver(t, filepath.Join(root, "npm/web/web-1.2.3.tgz"), "tarball byteZ")
+	if _, err := outbox.ReadFile(member.NPM.Tarball); err == nil || !strings.Contains(err.Error(), "digest mismatch") {
+		t.Fatalf("a tampered tarball read through Open: %v", err)
+	}
+	for name, root := range map[string]string{
+		"a missing root": filepath.Join(t.TempDir(), "missing"),
+		"a file":         filepath.Join(root, extproto.PublicationOutboxDescriptor),
+	} {
+		if _, err := Open(root); err == nil {
+			t.Errorf("%s opened", name)
+		}
+	}
+}
+
 func TestOutboxWriterRefusesUnwrittenAndOverlappingArtifacts(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "outbox")
 	writer, err := NewWriter(root)

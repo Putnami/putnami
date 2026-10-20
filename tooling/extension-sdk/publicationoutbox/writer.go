@@ -5,7 +5,8 @@
 // A job writes with Writer and uploads nothing. The engine reads with Read
 // after the job exits: every artifact is read once, hashed, and refused unless
 // its size and digest equal the descriptor's, so the bytes it uploads are the
-// bytes it verified.
+// bytes it verified. An uploader that holds a member the engine read opens the
+// outbox with Open and reads that member's files with the same checks.
 package publicationoutbox
 
 import (

@@ -3,12 +3,9 @@ package publication
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"maps"
-	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
@@ -34,6 +31,7 @@ import (
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/publicationoutbox"
+	"go.putnami.dev/sdk/extension/publicationupload/publicationuploadtest"
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/cli/internal/credentialprovider/providertest"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -391,136 +389,34 @@ func npmOutboxMember(t *testing.T, writer *publicationoutbox.Writer, registry, p
 	}
 }
 
-// npmRegistry is an npm registry that stores what it is sent with the
-// publication bearer.
+// npmRegistry is the shared fake npm registry (publicationuploadtest),
+// answering the publication bearer.
 type npmRegistry struct {
+	*publicationuploadtest.NPMRegistry
 	server *httptest.Server
-
-	mu       sync.Mutex
-	tarballs map[string]npmTarball
-	requests int
-}
-
-type npmTarball struct {
-	name, version string
-	data          []byte
 }
 
 func newNPMRegistry(t *testing.T) *npmRegistry {
 	t.Helper()
-	reg := &npmRegistry{tarballs: map[string]npmTarball{}}
-	reg.server = httptest.NewServer(http.HandlerFunc(reg.serve))
-	t.Cleanup(reg.server.Close)
-	return reg
-}
-
-func (reg *npmRegistry) serve(w http.ResponseWriter, r *http.Request) {
-	reg.mu.Lock()
-	defer reg.mu.Unlock()
-	reg.requests++
-	if r.Header.Get("Authorization") != "Bearer "+publicationBearer {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	switch r.Method {
-	case http.MethodPut:
-		var payload npmpublish.Payload
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		for version := range payload.Versions {
-			for _, attachment := range payload.Attachments {
-				data, err := base64.StdEncoding.DecodeString(attachment.Data)
-				if err != nil {
-					w.WriteHeader(http.StatusBadRequest)
-					return
-				}
-				reg.tarballs[payload.Name+"@"+version] = npmTarball{name: payload.Name, version: version, data: data}
-			}
-		}
-		w.WriteHeader(http.StatusCreated)
-	case http.MethodGet:
-		for _, tarball := range reg.tarballs {
-			target, _ := npmpublish.TarballURL(reg.server.URL, tarball.name, tarball.version)
-			if strings.TrimPrefix(target, reg.server.URL) == r.URL.EscapedPath() {
-				_, _ = w.Write(tarball.data)
-				return
-			}
-		}
-		w.WriteHeader(http.StatusNotFound)
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
-	}
+	reg := publicationuploadtest.NewNPMRegistry(t, publicationBearer)
+	return &npmRegistry{NPMRegistry: reg, server: reg.Server}
 }
 
 func (reg *npmRegistry) stored(name, version string) ([]byte, int) {
-	reg.mu.Lock()
-	defer reg.mu.Unlock()
-	return reg.tarballs[name+"@"+version].data, reg.requests
+	return reg.Stored(name, version)
 }
 
-// goRegistry is a Go module registry that stores what it is sent with the
-// publication bearer.
+// goRegistry is the shared fake Go module registry (publicationuploadtest),
+// answering the publication bearer.
 type goRegistry struct {
+	*publicationuploadtest.GoRegistry
 	server *httptest.Server
-
-	mu    sync.Mutex
-	blobs map[string][]byte
-	zips  map[string][]byte
-	mods  map[string][]byte
 }
 
 func newGoRegistry(t *testing.T) *goRegistry {
 	t.Helper()
-	reg := &goRegistry{blobs: map[string][]byte{}, zips: map[string][]byte{}, mods: map[string][]byte{}}
-	reg.server = httptest.NewServer(http.HandlerFunc(reg.serve))
-	t.Cleanup(reg.server.Close)
-	return reg
-}
-
-func (reg *goRegistry) serve(w http.ResponseWriter, r *http.Request) {
-	reg.mu.Lock()
-	defer reg.mu.Unlock()
-	if r.Header.Get("Authorization") != "Bearer "+publicationBearer {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	body, _ := io.ReadAll(r.Body)
-	path := strings.TrimPrefix(r.URL.Path, "/")
-	switch {
-	case r.Method == http.MethodPost && strings.HasSuffix(path, "/-/blobs/upload"):
-		digest := fmt.Sprintf("sha256:%x", sha256.Sum256(body))
-		reg.blobs[digest] = body
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(map[string]string{"digest": digest})
-	case r.Method == http.MethodPut && strings.Contains(path, "/@v/"):
-		var request struct {
-			GoMod     string `json:"go_mod"`
-			ZipDigest string `json:"zip_digest"`
-		}
-		if err := json.Unmarshal(body, &request); err != nil || reg.blobs[request.ZipDigest] == nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		reg.zips[path] = reg.blobs[request.ZipDigest]
-		reg.mods[path] = []byte(request.GoMod)
-		w.WriteHeader(http.StatusCreated)
-	case r.Method == http.MethodGet && strings.HasSuffix(path, ".zip"):
-		reg.answer(w, reg.zips[strings.TrimSuffix(path, ".zip")])
-	case r.Method == http.MethodGet && strings.HasSuffix(path, ".mod"):
-		reg.answer(w, reg.mods[strings.TrimSuffix(path, ".mod")])
-	default:
-		w.WriteHeader(http.StatusNotFound)
-	}
-}
-
-func (reg *goRegistry) answer(w http.ResponseWriter, data []byte) {
-	if data == nil {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	_, _ = w.Write(data)
+	reg := publicationuploadtest.NewGoRegistry(t, publicationBearer)
+	return &goRegistry{GoRegistry: reg, server: reg.Server}
 }
 
 func serverHost(t *testing.T, server *httptest.Server) string {
