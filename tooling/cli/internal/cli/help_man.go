@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"io"
 	"os"
 	"strings"
 
@@ -10,13 +11,14 @@ import (
 
 // PrintHelpMan prints the full help as a man page, with no extension loaded.
 func PrintHelpMan() {
-	printHelpMan(nil)
+	printHelpMan(os.Stdout, nil)
 }
 
-// printHelpMan prints the full help of scope as a man page: the job commands
-// and aliases the loaded extensions declare, and every core command and flag.
-func printHelpMan(scope *helpScope) {
-	iox.Fprintf(os.Stdout, `.TH PUTNAMI 1 "" "putnami %s" "User Commands"
+// printHelpMan writes the full help of scope to w as a man page: the job
+// commands and aliases the loaded extensions declare, every core command, and
+// the global flags help lists (helpScope.flagCategories).
+func printHelpMan(w io.Writer, scope *helpScope) {
+	iox.Fprintf(w, `.TH PUTNAMI 1 "" "putnami %s" "User Commands"
 .SH NAME
 putnami \- polyglot build orchestrator
 .SH SYNOPSIS
@@ -40,28 +42,28 @@ Multiple commands can be chained with commas:
 
 	commands := scope.jobCommands()
 	for _, c := range commands {
-		iox.Fprintf(os.Stdout, ".TP\n.B %s\n%s.\n", c.Name, c.Description)
+		iox.Fprintf(w, ".TP\n.B %s\n%s.\n", c.Name, c.Description)
 	}
 	if len(commands) == 0 {
-		iox.Fprintf(os.Stdout, "%s\n", oneLine(noJobCommandHelp(scope)))
+		iox.Fprintf(w, "%s\n", oneLine(noJobCommandHelp(scope)))
 	}
 
-	for _, cat := range allFlagCategories {
-		iox.Fprintf(os.Stdout, ".SH %s OPTIONS\n", strings.ToUpper(cat.Name))
+	for _, cat := range scope.flagCategories() {
+		iox.Fprintf(w, ".SH %s OPTIONS\n", strings.ToUpper(cat.Name))
 		for _, f := range cat.Flags {
 			if f.Short != "" {
-				iox.Fprintf(os.Stdout, ".TP\n.BR %s \" , \" %s", f.Short, f.Long)
+				iox.Fprintf(w, ".TP\n.BR %s \" , \" %s", f.Short, f.Long)
 			} else {
-				iox.Fprintf(os.Stdout, ".TP\n.B %s", f.Long)
+				iox.Fprintf(w, ".TP\n.B %s", f.Long)
 			}
 			if f.ValueName != "" {
-				iox.Fprintf(os.Stdout, " \" %s\"", f.ValueName)
+				iox.Fprintf(w, " \" %s\"", f.ValueName)
 			}
-			iox.Fprintf(os.Stdout, "\n%s\n", f.Description)
+			iox.Fprintf(w, "\n%s\n", f.Description)
 		}
 	}
 
-	iox.Fprint(os.Stdout, `.SH DEFAULT PROJECT SELECTION
+	iox.Fprint(w, `.SH DEFAULT PROJECT SELECTION
 With no project target, feature branches run impacted projects vs trunk.
 On main or master, Putnami checks the local same-command/params marker first,
 then an active remote-cache successful-run marker, and falls back to all projects
@@ -71,11 +73,11 @@ when no usable marker exists.
 Current directory scope (project or subtree).
 `)
 
-	iox.Fprint(os.Stdout, ".SH STRUCTURED COMMANDS\n")
+	iox.Fprint(w, ".SH STRUCTURED COMMANDS\n")
 	for _, cat := range structuredCommandCategories {
-		iox.Fprintf(os.Stdout, ".SS %s\n", cat.Name)
+		iox.Fprintf(w, ".SS %s\n", cat.Name)
 		for _, c := range cat.Commands {
-			iox.Fprintf(os.Stdout, ".TP\n.B %s\n%s.\n", c.Name, c.Description)
+			iox.Fprintf(w, ".TP\n.B %s\n%s.\n", c.Name, c.Description)
 		}
 	}
 
@@ -83,9 +85,9 @@ Current directory scope (project or subtree).
 	// documented command appears here. Alternate spellings (`scopes` for
 	// `scopes list`, `init` for `workspace init`) share a section rather than
 	// printing the same prose twice.
-	iox.Fprint(os.Stdout, ".SH COMMAND REFERENCE\n")
+	iox.Fprint(w, ".SH COMMAND REFERENCE\n")
 	for _, command := range commandmeta.ReferenceCommands() {
-		printCommandReferenceMan(command)
+		printCommandReferenceMan(w, command)
 	}
 
 	if aliases := scope.aliases(); len(aliases) > 0 {
@@ -93,9 +95,9 @@ Current directory scope (project or subtree).
 		for _, alias := range aliases {
 			parts = append(parts, alias.Name+"="+alias.Command)
 		}
-		iox.Fprintf(os.Stdout, ".SH ALIASES\n%s\n", strings.Join(parts, ", "))
+		iox.Fprintf(w, ".SH ALIASES\n%s\n", strings.Join(parts, ", "))
 	}
-	iox.Fprint(os.Stdout, `.SH EXIT CODES
+	iox.Fprint(w, `.SH EXIT CODES
 .TP
 .B 0
 Success.
@@ -142,13 +144,13 @@ Standard no-color convention.
 // printCommandReferenceMan renders one catalog command as a man subsection:
 // description, usage line, and command flags, matching the layout the two
 // hand-inlined sections used before the catalog generated all of them.
-func printCommandReferenceMan(command commandmeta.Command) {
-	iox.Fprintf(os.Stdout, ".SS %s\n%s\n", command.Path, manSentence(command.Description))
+func printCommandReferenceMan(w io.Writer, command commandmeta.Command) {
+	iox.Fprintf(w, ".SS %s\n%s\n", command.Path, manSentence(command.Description))
 	if command.Usage != "" {
-		iox.Fprintf(os.Stdout, ".PP\n.B Usage:\n.br\n%s\n", command.Usage)
+		iox.Fprintf(w, ".PP\n.B Usage:\n.br\n%s\n", command.Usage)
 	}
 	for _, flag := range command.Flags {
-		iox.Fprintf(os.Stdout, ".TP\n.B %s\n%s\n", flag.Long, manSentence(flag.Description))
+		iox.Fprintf(w, ".TP\n.B %s\n%s\n", flag.Long, manSentence(flag.Description))
 	}
 }
 

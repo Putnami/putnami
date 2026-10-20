@@ -3,6 +3,7 @@ package completion
 import (
 	"bytes"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 
@@ -67,12 +68,18 @@ func TestCompletionProjectsEveryCatalogPath(t *testing.T) {
 }
 
 // TestCompletionOffersEveryGlobalFlag pins that all three shells offer the whole
-// global-flag vocabulary where a loaded extension declares a job command.
+// global-flag vocabulary where a loaded extension declares a job command and
+// every provider a flag needs.
 // --cache-trust, --profile, --json, --color, --no-color, and --trace-profile
 // were absent from every shell before A1b because each generator carried its
 // own list.
 func TestCompletionOffersEveryGlobalFlag(t *testing.T) {
-	wsRoot := writeExtensionWorkspace(t, "lint-docs")
+	commands := []string{"lint-docs"}
+	for _, flag := range commandmeta.GlobalFlags() {
+		commands = append(commands, flag.Providers...)
+	}
+	slices.Sort(commands)
+	wsRoot := writeExtensionWorkspace(t, slices.Compact(commands)...)
 	for shell, generate := range completionGenerators {
 		var buf bytes.Buffer
 		generate(&buf, wsRoot, &wsproto.Config{}, nil)

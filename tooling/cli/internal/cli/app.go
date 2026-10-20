@@ -425,9 +425,9 @@ func printRequestedHelp(
 ) int {
 	switch {
 	case parsed.Global.HelpMan:
-		printHelpMan(newHelpScope(wsRoot, cfg))
+		printHelpMan(os.Stdout, newHelpScope(wsRoot, cfg))
 	case parsed.Global.HelpMD:
-		printHelpMarkdown(newHelpScope(wsRoot, cfg))
+		printHelpMarkdown(os.Stdout, newHelpScope(wsRoot, cfg))
 	case len(parsed.Commands) == 0 || parsed.Commands[0] == "help":
 		printHelp(newHelpScope(wsRoot, cfg))
 	case extensionGroups[parsed.Commands[0]]:

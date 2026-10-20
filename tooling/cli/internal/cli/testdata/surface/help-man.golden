@@ -27,12 +27,6 @@ Show job results and diagnostics
 .BR -d " , " --debug
 Stream all events in real-time
 .TP
-.BR -w " , " --watch
-Re-run on file changes
-.TP
-.B --plan
-Show execution plan without running
-.TP
 .BR -h " , " --help
 Show help
 .SH PROJECT SELECTION OPTIONS
@@ -52,21 +46,9 @@ Filter by tags
 .B --exclude-tag " <tags>"
 Exclude by tags
 .TP
-.B --exclude " <names>"
-Exclude by name
-.TP
 .B --baseline " <branch>"
 Custom git baseline for --impacted; a job command with no target or --all implies --impacted
-.TP
-.B --impacted-strict
-Fail when baseline can't be resolved
 .SH EXECUTION OPTIONS
-.TP
-.B --where " <placement>"
-Execution placement: local | remote (local when no runner provider is installed)
-.TP
-.B --providers " <list>"
-Credentials to ask the credential provider for: install, publish (comma list)
 .TP
 .B --credential-fd " <n>"
 Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2
@@ -74,32 +56,8 @@ Read the run credential from descriptor <n>; keeps it out of every environment a
 .B --no-cache
 Force re-execution (skip cache)
 .TP
-.B --no-cache-projects " <list>"
-Force re-execution of these projects only
-.TP
-.B --cache-trust " <policy>"
-Remote cache trust: ci | any | none
-.TP
 .B --continue-on-error
 Don't abort on first failure
-.TP
-.B --max-parallel " <mode|n>"
-Parallelism: auto | eco | max | number
-.TP
-.B --resource " <name=units>"
-Budget for a named shared resource (repeatable)
-.TP
-.B --cpu-policy " <policy>"
-CPU ceiling policy: critical-path | measured
-.TP
-.B --retry " <n>"
-Retry transient failures
-.TP
-.B --retry-failed
-Re-run tasks whose identical failure is cached
-.TP
-.B --profile " <profile>"
-Deployment profile: dev | test | production
 .TP
 .B --dry-run
 Show changes without applying
@@ -119,10 +77,6 @@ Force color output
 .TP
 .B --no-color
 Disable color output
-.SH ADVANCED OPTIONS
-.TP
-.B --trace-profile " <path>"
-Collect trace events (Chrome trace format)
 .SH DEFAULT PROJECT SELECTION
 With no project target, feature branches run impacted projects vs trunk.
 On main or master, Putnami checks the local same-command/params marker first,

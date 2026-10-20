@@ -266,7 +266,7 @@ func deployVocabularyScope() *helpScope {
 
 func TestPrintHelpMarkdown_IncludesStructuredCommandDetails(t *testing.T) {
 	output := captureStructuredHelp(t, func() {
-		printHelpMarkdown(deployVocabularyScope())
+		printHelpMarkdown(os.Stdout, deployVocabularyScope())
 	})
 
 	if !strings.Contains(output, "### `putnami workspace init`") {

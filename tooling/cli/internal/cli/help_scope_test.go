@@ -8,6 +8,7 @@ import (
 
 	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/protocol/features/spectest"
+	registry "go.putnami.dev/protocol/registry"
 	runner "go.putnami.dev/protocol/runner"
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -288,6 +289,38 @@ func TestHelpWithoutAVocabularyListsNoAlias(t *testing.T) {
 	}
 }
 
+// The Markdown and man references list the global flags help lists.
+func TestReferencesListTheFlagsHelpLists(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "job-flags-follow-job-commands", "the-references-and-completion-list-the-flags-help-lists")
+	for _, c := range []struct {
+		name      string
+		scope     *helpScope
+		jobFlags  bool
+		providers bool
+	}{
+		{"outside a workspace", nil, false, false},
+		{"a workspace with no extension", scopeOf(), false, false},
+		{"an extension that declares a job command", declaredScope("build"), true, false},
+		{"an extension that also declares the credential provider", declaredScope("build", registry.CredentialProviderCommand), true, true},
+	} {
+		var markdown, man strings.Builder
+		printHelpMarkdown(&markdown, c.scope)
+		printHelpMan(&man, c.scope)
+		for format, reference := range map[string]string{"Markdown": markdown.String(), "man": man.String()} {
+			if got := strings.Contains(reference, "--max-parallel"); got != c.jobFlags {
+				t.Errorf("%s: the %s reference lists --max-parallel = %v, want %v", c.name, format, got, c.jobFlags)
+			}
+			if got := strings.Contains(reference, "--providers"); got != c.providers {
+				t.Errorf("%s: the %s reference lists --providers = %v, want %v", c.name, format, got, c.providers)
+			}
+			if !strings.Contains(reference, "--credential-fd") {
+				t.Errorf("%s: the %s reference must always list --credential-fd", c.name, format)
+			}
+		}
+	}
+}
+
 // jobOnlyFlags returns the global flags that only extension commands read.
 func jobOnlyFlags() []string {
 	var names []string
@@ -353,19 +386,8 @@ func TestHelpListsTheJobFlagsOnlyWithAJobCommand(t *testing.T) {
 		})
 	}
 
-	t.Run("the full reference and the parser keep every flag", func(t *testing.T) {
+	t.Run("the parser keeps every flag", func(t *testing.T) {
 		t.Parallel()
-		var reference []string
-		for _, category := range allFlagCategories {
-			for _, flag := range category.Flags {
-				reference = append(reference, flag.Long)
-			}
-		}
-		for _, flag := range jobFlags {
-			if !slices.Contains(reference, flag) {
-				t.Errorf("the full reference misses %s", flag)
-			}
-		}
 		global, rest, err := parseFlags([]string{"--retry", "2", "--max-parallel", "3", "--impacted-strict"})
 		if err != nil || len(rest) != 0 || global.Retry != 2 || global.MaxParallel != 3 || !global.ImpactedStrict {
 			t.Errorf("parseFlags = %+v, %v, %v: a flag that only extension commands read stays accepted", global, rest, err)

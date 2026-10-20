@@ -9,6 +9,7 @@ import (
 
 	cache "go.putnami.dev/protocol/cache"
 	"go.putnami.dev/protocol/features/spectest"
+	registry "go.putnami.dev/protocol/registry"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
@@ -91,9 +92,15 @@ func TestCompletionOffersTheJobFlagsOnlyWithAJobCommand(t *testing.T) {
 			t.Parallel()
 			ctx := gatherCompletionContext(c.wsRoot, &wsproto.Config{}, nil)
 			names := ctx.globalFlagNames()
-			for _, flag := range jobFlags {
-				if got := sharedtest.Contains(names, flag); got != c.offered {
-					t.Errorf("global flags offer %s = %v, want %v", flag, got, c.offered)
+			for _, flag := range commandmeta.GlobalFlags() {
+				if !flag.JobOnly {
+					continue
+				}
+				// A provider-bound flag also needs its provider, which none of
+				// these workspaces declares.
+				want := c.offered && len(flag.Providers) == 0
+				if got := sharedtest.Contains(names, flag.Long); got != want {
+					t.Errorf("global flags offer %s = %v, want %v", flag.Long, got, want)
 				}
 			}
 			// What the core reads stays, with the flag hosted launchers read from help.
@@ -113,6 +120,30 @@ func TestCompletionOffersTheJobFlagsOnlyWithAJobCommand(t *testing.T) {
 				if got := strings.Contains(script.String(), "max-parallel"); got != c.offered {
 					t.Errorf("%s script offers --max-parallel = %v, want %v", shell, got, c.offered)
 				}
+			}
+		})
+	}
+}
+
+func TestCompletionOffersAProviderFlagOnlyWithItsProvider(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "job-flags-follow-job-commands", "the-references-and-completion-list-the-flags-help-lists")
+	cases := []struct {
+		name    string
+		wsRoot  string
+		offered bool
+	}{
+		{"outside a workspace", "", false},
+		{"a workspace with no extension", writeCompletionWorkspace(t), false},
+		{"an extension that declares a job command", writeExtensionWorkspace(t, "lint-docs"), false},
+		{"an extension that declares the credential provider", writeExtensionWorkspace(t, "lint-docs", registry.CredentialProviderCommand), true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			names := gatherCompletionContext(c.wsRoot, &wsproto.Config{}, nil).globalFlagNames()
+			if got := sharedtest.Contains(names, "--providers"); got != c.offered {
+				t.Errorf("global flags offer --providers = %v, want %v", got, c.offered)
 			}
 		})
 	}

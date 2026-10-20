@@ -128,7 +128,7 @@ putnami help --man           # the full reference as a man page
 ```
 
 `putnami help --markdown` is the complete reference: job commands, every
-structured command with its subcommands and flags, the global flag categories,
-and the aliases of the loaded verb vocabulary. See [Commands](doc/03-commands.md) for the concepts
+structured command with its subcommands and flags, the global flags
+`putnami help` lists, and the aliases of the loaded verb vocabulary. See [Commands](doc/03-commands.md) for the concepts
 around it (how job commands come from extensions, multi-command execution,
 first-use auto-install, user-defined aliases).

@@ -1292,15 +1292,16 @@ putnami help                 # categorized global flags
 putnami help --markdown      # the same, plus per-command flags
 ```
 
-`putnami help` leaves out a flag that only an absent provider gives meaning:
-`--where` without a runner provider, `--providers` without a credential
-provider, and `--cache-trust` without a cache provider. Outside a workspace no
-provider is loaded, so it lists none of them. It hides nothing when an
-extension of the workspace does not load. The parser still accepts these
-flags, and the man page, the Markdown reference and shell completion still
-list them. `--credential-fd` is
-always listed, because a hosted launcher reads it from the help of the pinned
-CLI.
+`putnami help` leaves out a flag that only extension commands read, such as
+`--retry` or `--max-parallel`, unless a loaded extension declares a job command
+or a command group. It also leaves out a flag that only an absent provider
+gives meaning: `--where` without a runner provider, `--providers` without a
+credential provider, and `--cache-trust` without a cache provider. Outside a
+workspace no extension is loaded, so it lists none of them. It hides no
+provider flag when an extension of the workspace does not load. The man page,
+the Markdown reference and shell completion list the same flags, and the
+parser accepts every flag. `--credential-fd` is always listed, because a
+hosted launcher reads it from the help of the pinned CLI.
 
 `putnami help` also documents the smart default selection: with no target, a
 feature branch runs `--impacted` against the trunk, while `main`/`master` uses a

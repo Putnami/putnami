@@ -27,7 +27,7 @@
     },
     {
       "id": "job-flags-follow-job-commands",
-      "text": "Help and shell completion list a global flag that only extension commands read (such as --retry or --max-parallel) only where a loaded extension declares a job command or a command group. Elsewhere they omit it. The parser still accepts the flag and the full Markdown reference still lists it. --credential-fd stays listed."
+      "text": "Help, its Markdown and man references, and shell completion list a global flag that only extension commands read (such as --retry or --max-parallel) only where a loaded extension declares a job command or a command group, and a flag that a provider gives meaning (such as --providers) only where a loaded extension declares that provider. Elsewhere they omit it. The parser still accepts every flag. --credential-fd stays listed."
     },
     {
       "id": "help-lists-command-groups",

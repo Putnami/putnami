@@ -20,8 +20,6 @@ Multi-command: `putnami <command>,<command> --impacted`
 |------|-------------|
 | `--verbose`, `-v` | Show job results and diagnostics |
 | `--debug`, `-d` | Stream all events in real-time |
-| `--watch`, `-w` | Re-run on file changes |
-| `--plan` | Show execution plan without running |
 | `--help`, `-h` | Show help |
 
 ## Project Selection Options
@@ -33,27 +31,15 @@ Multi-command: `putnami <command>,<command> --impacted`
 | `--projects` <list> | Comma-separated project names |
 | `--tag` <tags> | Filter by tags |
 | `--exclude-tag` <tags> | Exclude by tags |
-| `--exclude` <names> | Exclude by name |
 | `--baseline` <branch> | Custom git baseline for --impacted; a job command with no target or --all implies --impacted |
-| `--impacted-strict` | Fail when baseline can't be resolved |
 
 ## Execution Options
 
 | Flag | Description |
 |------|-------------|
-| `--where` <placement> | Execution placement: local | remote (local when no runner provider is installed) |
-| `--providers` <list> | Credentials to ask the credential provider for: install, publish (comma list) |
 | `--credential-fd` <n> | Read the run credential from descriptor <n>; keeps it out of every environment and file; custody level 2 |
 | `--no-cache` | Force re-execution (skip cache) |
-| `--no-cache-projects` <list> | Force re-execution of these projects only |
-| `--cache-trust` <policy> | Remote cache trust: ci | any | none |
 | `--continue-on-error` | Don't abort on first failure |
-| `--max-parallel` <mode|n> | Parallelism: auto | eco | max | number |
-| `--resource` <name=units> | Budget for a named shared resource (repeatable) |
-| `--cpu-policy` <policy> | CPU ceiling policy: critical-path | measured |
-| `--retry` <n> | Retry transient failures |
-| `--retry-failed` | Re-run tasks whose identical failure is cached |
-| `--profile` <profile> | Deployment profile: dev | test | production |
 | `--dry-run` | Show changes without applying |
 
 ## Output Options
@@ -65,12 +51,6 @@ Multi-command: `putnami <command>,<command> --impacted`
 | `--quiet` | Suppress non-error output |
 | `--color` | Force color output |
 | `--no-color` | Disable color output |
-
-## Advanced Options
-
-| Flag | Description |
-|------|-------------|
-| `--trace-profile` <path> | Collect trace events (Chrome trace format) |
 
 ## Default Project Selection
 
