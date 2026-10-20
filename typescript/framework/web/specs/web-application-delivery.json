@@ -24,6 +24,10 @@
       "text": "Generation maps page, layout, loader, action, error, not-found, dynamic segment, route group, and prefixed scan-root files into one deterministic nested route graph with matching server and client route identifiers."
     },
     {
+      "id": "link-navigation",
+      "text": "A Link that changes only the query or the hash navigates, a Link to the current URL replaces the entry and re-runs the route loaders, a `#` or empty target is a placeholder that runs its own click handler without navigating, intent prefetch loads the target route, and outside a router a Link renders a plain anchor with the same props."
+    },
+    {
       "id": "layout-loader-endpoint",
       "text": "On client navigation, a layout loader fetches the JSON endpoint the server registers at the layout's path: each dynamic segment is filled from the matched params and URL-encoded, a trailing catch-all is dropped, and the mounted basename and the request query string are kept; a missing required param fails the loader without a request, and the server answers that endpoint with the same loader and params as the server render."
     },

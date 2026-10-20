@@ -214,6 +214,21 @@
           }
         },
         {
+          "id": "link-navigation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-link-outside-a-router-renders-a-plain-anchor",
+              "a-link-prefetches-its-route-on-intent",
+              "a-link-that-changes-only-the-hash-navigates",
+              "a-link-that-changes-only-the-query-navigates",
+              "a-link-to-the-current-url-revalidates"
+            ]
+          }
+        },
+        {
           "id": "layout-loader-endpoint",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

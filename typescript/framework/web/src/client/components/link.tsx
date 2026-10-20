@@ -1,31 +1,48 @@
 import React from 'react';
-import { Link as RouterLink, type LinkProps as RouterLinkProps, useLocation } from 'react-router';
+import {
+  createPath,
+  Link as RouterLink,
+  type LinkProps as RouterLinkProps,
+  useInRouterContext,
+  useLocation,
+} from 'react-router';
 import { type PrefetchBehavior, usePrefetch } from '../hooks/use-prefetch.hook';
 
 export type LinkProps = RouterLinkProps & { prefetch?: PrefetchBehavior };
 
-export const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(({ to, prefetch = 'none', ...props }, ref) => {
+/**
+ * A link to the current location, including one that changes only the query or
+ * the hash, navigates like any other: React Router replaces the entry and
+ * re-runs the loaders of a same-URL navigation.
+ *
+ * Outside a router (a static render, a component test), the link renders a
+ * plain `<a href>` with the same anchor props.
+ */
+export const Link = React.forwardRef<HTMLAnchorElement, LinkProps>((props, ref) =>
+  useInRouterContext() ? <RoutedLink {...props} ref={ref} /> : <PlainLink {...props} ref={ref} />,
+);
+
+Link.displayName = 'Link';
+
+const RoutedLink = React.forwardRef<HTMLAnchorElement, LinkProps>(({ to, prefetch = 'none', ...props }, ref) => {
   const { load } = usePrefetch(to, prefetch);
   const location = useLocation();
 
-  if (to === '#') {
+  // `to="#"` and an empty `to` mark a placeholder link: it points at the
+  // current path, runs its own `onClick`, and does not navigate, because a
+  // navigation would drop the current query and hash and re-run the loaders.
+  const isPlaceholder = to === '#' || !to;
+  if (isPlaceholder) {
     to = location.pathname;
   }
 
-  if (!to) {
-    to = location.pathname;
-  }
-
-  const targetPath = typeof to === 'string' ? to : to?.pathname;
-  const isSelfTarget = targetPath === location.pathname;
   const mustPreload = prefetch === 'intent' && !to.toString().startsWith('http');
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (isSelfTarget) {
-      e.preventDefault();
-      return;
-    }
     props.onClick?.(e);
+    if (isPlaceholder) {
+      e.preventDefault();
+    }
   };
 
   const handleMouseEnter = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -61,4 +78,26 @@ export const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(({ to, prefet
   );
 });
 
-Link.displayName = 'Link';
+RoutedLink.displayName = 'RoutedLink';
+
+const PlainLink = React.forwardRef<HTMLAnchorElement, LinkProps>(
+  (
+    {
+      to,
+      prefetch: _prefetch,
+      discover: _discover,
+      reloadDocument: _reloadDocument,
+      replace: _replace,
+      state: _state,
+      preventScrollReset: _preventScrollReset,
+      relative: _relative,
+      viewTransition: _viewTransition,
+      defaultShouldRevalidate: _defaultShouldRevalidate,
+      mask: _mask,
+      ...anchorProps
+    },
+    ref,
+  ) => <a {...anchorProps} ref={ref} href={typeof to === 'string' ? to : createPath(to)} />,
+);
+
+PlainLink.displayName = 'PlainLink';

@@ -542,6 +542,11 @@ interface LinkProps extends RouterLinkProps {
 - All standard anchor/React Router Link props
 - `prefetch` - Prefetch behavior ('intent' | 'render' | 'none', default: 'none')
 
+**Behavior:**
+- A link that changes only the query or the hash navigates. A link to the current URL replaces the history entry and re-runs the route loaders.
+- `to="#"` or an empty `to` is a placeholder: it points at the current path, runs its `onClick`, and does not navigate.
+- Outside a router, such as in a static render or a component test, `Link` renders a plain `<a href>` with the same anchor props.
+
 **Example:**
 ```typescript
 <Link to="/dashboard" prefetch="intent">Dashboard</Link>
