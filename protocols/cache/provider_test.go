@@ -147,6 +147,58 @@ func TestRestoreResultOnlyContract(t *testing.T) {
 	}
 }
 
+// TestProviderConfigurationContract pins the provider-configuration token a
+// provider in another repository reads, the wire shape of the result's mode
+// (absent when unset, so a result without it is byte-identical to the one a
+// strict parser that predates the field accepts), and the two refusals of
+// strict validation: a mode without the echo, and an unknown mode.
+func TestProviderConfigurationContract(t *testing.T) {
+	if CapabilityProviderConfiguration != "provider-configuration" {
+		t.Errorf("wire token = %q, want %q", CapabilityProviderConfiguration, "provider-configuration")
+	}
+	for _, tc := range []struct {
+		value InitializeResult
+		want  string
+	}{
+		{InitializeResult{ProtocolVersion: 2, ProviderVersion: "1.0.0"}, `{"protocolVersion":2,"providerVersion":"1.0.0","ready":false}`},
+		{InitializeResult{ProtocolVersion: 2, ProviderVersion: "1.0.0", Capabilities: []string{CapabilityProviderConfiguration}, Mode: ModeMinimal, Ready: true},
+			`{"protocolVersion":2,"providerVersion":"1.0.0","capabilities":["provider-configuration"],"mode":"minimal","ready":true}`},
+	} {
+		payload, err := MarshalPayload(tc.value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(payload) != tc.want {
+			t.Errorf("wire = %s, want %s", payload, tc.want)
+		}
+	}
+
+	for _, tc := range []struct {
+		name, body, message string
+	}{
+		{"a mode without the echo", `{"protocolVersion":2,"providerVersion":"1.0.0","mode":"full","ready":true}`, "capability echo"},
+		{"an unknown mode", `{"protocolVersion":2,"providerVersion":"1.0.0","capabilities":["provider-configuration"],"mode":"most","ready":true}`, "unknown materialization mode"},
+	} {
+		_, diags := ParseAndValidateInitializeResult([]byte(tc.body))
+		if len(diags) != 1 || diags[0].Code != CodeInvalidMode || diags[0].Field != "mode" || !strings.Contains(diags[0].Message, tc.message) {
+			t.Errorf("%s: diagnostics = %+v, want one %s on mode naming %q", tc.name, diags, CodeInvalidMode, tc.message)
+		}
+	}
+	result, diags := ParseAndValidateInitializeResult([]byte(
+		`{"protocolVersion":2,"providerVersion":"1.0.0","capabilities":["provider-configuration"],"mode":"toplevel","ready":false}`))
+	if result == nil || diag.HasErrors(diags) || result.Mode != ModeToplevel {
+		t.Fatalf("an echoed mode must parse: %+v / %v", result, diags)
+	}
+
+	// The provider parses core's initialize with no mode as no intent, so it
+	// can fall back to the mode it is configured with.
+	params, diags := ParseAndValidateInitializeParams([]byte(
+		`{"protocolVersion":1,"blobExchangeDir":"/x","capabilities":["provider-configuration"]}`))
+	if params == nil || diag.HasErrors(diags) || params.Mode != "" {
+		t.Fatalf("initialize without a mode = %+v / %v, want it parsed with no mode", params, diags)
+	}
+}
+
 // TestPrefetchParams_ResultOnlyKeysValidation pins the subset rule: every
 // result-only key is well-formed, listed once, and also listed in Keys.
 func TestPrefetchParams_ResultOnlyKeysValidation(t *testing.T) {
@@ -614,7 +666,8 @@ func TestBlobExchangePath(t *testing.T) {
 }
 
 // TestNormalizeInitializeParams_Deterministic verifies normalization sorts the
-// digest/capability sets so the canonical form is stable.
+// digest/capability sets so the canonical form is stable, and leaves an absent
+// mode absent, so a provider can tell core's intent apart from none.
 func TestNormalizeInitializeParams_Deterministic(t *testing.T) {
 	d1 := DigestAlgorithm + digestSep + strings.Repeat("c", KeyLength)
 	d2 := DigestAlgorithm + digestSep + strings.Repeat("a", KeyLength)
@@ -625,8 +678,8 @@ func TestNormalizeInitializeParams_Deterministic(t *testing.T) {
 		KnownDigests:    []string{d1, d2},
 	}
 	NormalizeInitializeParams(p)
-	if p.Mode != DefaultMode {
-		t.Errorf("mode not defaulted: %q", p.Mode)
+	if p.Mode != "" {
+		t.Errorf("absent mode normalized to %q, want it absent", p.Mode)
 	}
 	if p.Capabilities[0] != "find-missing" {
 		t.Errorf("capabilities not sorted: %v", p.Capabilities)

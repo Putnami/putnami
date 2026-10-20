@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -29,7 +28,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	internalgit "go.putnami.dev/tooling/cli/internal/git"
-	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/profiler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -61,12 +59,6 @@ func TestMain(m *testing.M) {
 	if os.Getenv(releaseSetFixtureProviderEnv) != "" {
 		os.Exit(serveReleaseSetFixtureProvider(os.Args[1:]))
 	}
-	// A CI runner exports its own remote cache (PUTNAMI_CACHE_URL and
-	// PUTNAMI_CACHE_MODE) to every job. A test configures the remote cache
-	// through the workspace's .putnami/cache.json only, so the runner's cache
-	// must not configure one for every fixture workspace.
-	os.Unsetenv("PUTNAMI_CACHE_URL")
-	os.Unsetenv("PUTNAMI_CACHE_MODE")
 	// A copy of this race-enabled binary that a test starts, such as the
 	// managed compiler, exits without the race runtime's 1 s exit sleep.
 	fixtureproc.QuietRaceExit()
@@ -559,7 +551,6 @@ func TestSelectProjects_BareMainPrefersLocalMarkerBeforeRemote(t *testing.T) {
 		return nil
 	})
 	defer srv.Close()
-	enableRunMarkerServer(t, wsRoot, srv)
 
 	ws := workspace.NewWorkspace(wsRoot, &workspacepb.Config{}, selectionFixtureProjects())
 	req := &Request{Commands: []string{"build"}, Config: &workspacepb.Config{}}
@@ -594,7 +585,6 @@ func TestSelectProjects_BareMainRemoteMarkerRequiresProvider(t *testing.T) {
 		return &cache.RunMarker{SHA: base}
 	})
 	defer srv.Close()
-	enableRunMarkerServer(t, wsRoot, srv)
 
 	ws := workspace.NewWorkspace(wsRoot, &workspacepb.Config{}, selectionFixtureProjects())
 	req := &Request{Commands: []string{"build"}, Config: &workspacepb.Config{}}
@@ -624,7 +614,6 @@ func TestSelectProjects_BareMainRemoteMarkerMissingFallsBackToAll(t *testing.T) 
 		return nil
 	})
 	defer srv.Close()
-	enableRunMarkerServer(t, wsRoot, srv)
 
 	projects := selectionFixtureProjects()
 	ws := workspace.NewWorkspace(wsRoot, &workspacepb.Config{}, projects)
@@ -651,7 +640,6 @@ func TestSelectProjects_BareMainStaleRemoteMarkerFallsBackToAll(t *testing.T) {
 		return &cache.RunMarker{SHA: "ffffffffffffffffffffffffffffffffffffffff"}
 	})
 	defer srv.Close()
-	enableRunMarkerServer(t, wsRoot, srv)
 
 	projects := selectionFixtureProjects()
 	ws := workspace.NewWorkspace(wsRoot, &workspacepb.Config{}, projects)
@@ -688,7 +676,6 @@ func TestSelectProjects_BareMainFutureRemoteMarkerFallsBackToAll(t *testing.T) {
 		return &cache.RunMarker{SHA: future}
 	})
 	defer srv.Close()
-	enableRunMarkerServer(t, wsRoot, srv)
 
 	projects := selectionFixtureProjects()
 	ws := workspace.NewWorkspace(wsRoot, &workspacepb.Config{}, projects)
@@ -722,7 +709,6 @@ func TestSelectProjects_BareMainRemoteMarkerIsCommandSpecific(t *testing.T) {
 		return nil
 	})
 	defer srv.Close()
-	enableRunMarkerServer(t, wsRoot, srv)
 
 	projects := selectionFixtureProjects()
 	ws := workspace.NewWorkspace(wsRoot, &workspacepb.Config{}, projects)
@@ -936,7 +922,6 @@ func TestExecute_SuccessfulRunWithoutProviderDoesNotPublishRemoteRunMarker(t *te
 	state := &runMarkerServerState{}
 	srv := newRunMarkerTestServer(t, state, nil)
 	defer srv.Close()
-	enableRunMarkerServer(t, f.wsRoot, srv)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -962,7 +947,6 @@ func TestExecute_FailedRunDoesNotPublishRemoteRunMarker(t *testing.T) {
 	state := &runMarkerServerState{}
 	srv := newRunMarkerTestServer(t, state, nil)
 	defer srv.Close()
-	enableRunMarkerServer(t, f.wsRoot, srv)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -1180,22 +1164,6 @@ func newRunMarkerTestServer(t *testing.T, state *runMarkerServerState, lookup fu
 		_ = json.NewEncoder(w).Encode(cache.NegotiateResponse{ProtocolVersion: cache.ProtocolVersion})
 	})
 	return httptest.NewServer(mux)
-}
-
-// enableRunMarkerServer configures the workspace's remote cache to point at the
-// test server. It writes the per-workspace .putnami/cache.json the engine reads
-// (remotecache.RemoteCacheConfigPath) instead of setting PUTNAMI_CACHE_URL, which is
-// the same configuration through the file half of the resolution — and, being
-// workspace-scoped rather than process-global, it is compatible with t.Parallel.
-func enableRunMarkerServer(t *testing.T, wsRoot string, srv *httptest.Server) {
-	t.Helper()
-	path := remotecache.RemoteCacheConfigPath(wsRoot)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(`{"url":`+strconv.Quote(srv.URL)+`}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func selectionFixtureProjects() []*workspace.Project {

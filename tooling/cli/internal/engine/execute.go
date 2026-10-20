@@ -15,7 +15,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hooks"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs/remotecache"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/machine"
 	"go.putnami.dev/tooling/cli/internal/output"
@@ -331,21 +330,24 @@ func (e *Engine) executeSession(
 
 	prof := profiler.New(req.Global.TraceProfile != "")
 
-	// Enable the remote build cache when configured (.putnami/cache.json or the
-	// PUTNAMI_CACHE_* env overrides). Local caching must be on for it to apply.
-	// Config load happens before the run timer starts, so its cost is timed here
-	// and attributed to the cache stats — otherwise it is the invisible "before
-	// negotiate" overhead the session clock misses. The bearer is resolved lazily
-	// inside the first negotiate, so its cost falls within the run timer.
-	// A hosted run reads the remote cache execute resolved (hostedRunRemoteCache).
+	// Enable the remote build cache when an extension declares the cache
+	// provider; the provider owns its configuration and says at initialize
+	// whether it serves the run. Local caching must be on for it to apply.
+	// Provider resolution happens before the run timer starts, so its cost is
+	// timed here and attributed to the cache stats — otherwise it is the
+	// invisible "before negotiate" overhead the session clock misses. The
+	// bearer is resolved lazily inside the first negotiate, so its cost falls
+	// within the run timer. A run that is not hosted reads the remote cache
+	// the bare selection loaded, if it did (Request.runRemote). A hosted run
+	// reads the remote cache execute resolved (hostedRunRemoteCache).
 	var cacheSetup time.Duration
 	remote := req.hostedRemote
 	if cache != nil && !runcredential.Hosted() {
 		setupStart := time.Now()
 		var cacheNotice string
-		remote, cacheNotice = remotecache.LoadRemoteCache(ctx, wsRoot, extensions, discovered, store.CacheTrust(req.Global.CacheTrust), launchCacheProvider, remoteCacheOptions()...)
-		// Per the missing-cloud policy, a configured-but-unusable remote cache must
-		// never degrade to local-only silently — surface the one-line notice.
+		remote, cacheNotice = req.runRemote.Load(ctx, wsRoot, extensions, discovered, store.CacheTrust(req.Global.CacheTrust), launchCacheProvider, remoteCacheOptions()...)
+		// A declared provider that cannot serve the run never degrades to
+		// local-only silently — surface the one-line notice.
 		if cacheNotice != "" {
 			iox.Fprintln(os.Stderr, cacheNotice)
 		}

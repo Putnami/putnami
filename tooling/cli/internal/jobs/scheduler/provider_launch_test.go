@@ -87,7 +87,6 @@ func runtimeProviderExtension(t *testing.T, env map[string]string) *extension.Ex
 // same executable.
 func TestLoadRemoteCacheLaunchesThePreparedProviderRuntime(t *testing.T) {
 	spectest.Proves(t, "cli/windows-consumers", "providers-run-the-prepared-runtime", "a-cache-provider-launches-the-prepared-runtime")
-	enableProviderRemoteCache(t)
 	ext := runtimeProviderExtension(t, nil)
 	want := fixtureproc.Write(t, filepath.Join(ext.Path, filepath.FromSlash(providerRuntimeExecutable)),
 		fixtureproc.Program{Stdout: runtimeInfoFor(t, ext)})
@@ -123,7 +122,6 @@ func TestLoadRemoteCacheLaunchesThePreparedProviderRuntime(t *testing.T) {
 // path, it completes the initialize handshake, on every OS.
 func TestProviderRemoteCacheStartsThePreparedRuntime(t *testing.T) {
 	spectest.Proves(t, "cli/windows-consumers", "providers-run-the-prepared-runtime", "a-cache-provider-launches-the-prepared-runtime")
-	enableProviderRemoteCache(t)
 	// A race-instrumented binary otherwise sleeps a second before it exits.
 	// The handshake inherits this process's environment; the provider gets
 	// its own from the manifest.
@@ -155,7 +153,6 @@ func TestProviderRemoteCacheStartsThePreparedRuntime(t *testing.T) {
 // one-line notice that names the extension and the runtime failure.
 func TestLoadRemoteCacheBuildsLocallyWhenTheProviderRuntimeIsMissing(t *testing.T) {
 	spectest.Proves(t, "cli/windows-consumers", "providers-run-the-prepared-runtime", "an-unprepared-cache-provider-runtime-builds-locally-with-a-notice")
-	enableProviderRemoteCache(t)
 	ext := runtimeProviderExtension(t, nil)
 
 	remote, notice := remotecache.LoadRemoteCache(context.Background(), t.TempDir(), []*extension.ExtensionDescription{ext}, nil, store.CacheTrustAny, preparedProviderLaunch)
@@ -190,7 +187,6 @@ func loadRuntimeProvider(t *testing.T, ext *extension.ExtensionDescription) {
 // failed handshake is not remembered, and a runtime file that changed is
 // verified again.
 func TestProviderRuntimeIsVerifiedOncePerRuntimeIdentity(t *testing.T) {
-	enableProviderRemoteCache(t)
 	ext := runtimeProviderExtension(t, nil)
 	path := filepath.Join(ext.Path, filepath.FromSlash(providerRuntimeExecutable))
 	handshakes := filepath.Join(t.TempDir(), "handshakes.jsonl")

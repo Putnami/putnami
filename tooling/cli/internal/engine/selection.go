@@ -472,9 +472,11 @@ func applyBareProjectSelection(req *Request, ws *workspace.Workspace, extensions
 		}
 
 		// Speculative run-marker lookup during auto-selection. The degraded-cache
-		// notice is suppressed here and surfaced once on the main build path
-		// (below) so it is not emitted twice per invocation; skip records are
-		// omitted for the same reason (they only enrich that notice).
+		// notice is not printed here: execute prints it once, from the same
+		// load (Request.runRemote), which also hands the build the provider
+		// this lookup starts, so a run starts one provider process. The
+		// provider starts with the run's cache manager, so its exchange
+		// directory is the one the build would choose.
 		//
 		// A hosted run reads the marker through the provider it started before
 		// the hooks (startHostedRemoteCache), and reads none when it started
@@ -482,12 +484,13 @@ func applyBareProjectSelection(req *Request, ws *workspace.Workspace, extensions
 		// repository code ran.
 		remote := req.hostedRemote
 		if !runcredential.Hosted() {
-			remote, _ = remotecache.LoadRemoteCache(context.Background(), ws.Root, extensions, nil, trust, launchCacheProvider, remoteCacheOptions()...)
+			remote, _ = req.runRemote.Load(context.Background(), ws.Root, extensions, nil, trust, launchCacheProvider, remoteCacheOptions()...)
+			if req.runRemote == nil {
+				defer remote.Close()
+			}
+			_ = remote.StartProvider(context.Background(), ws, newRunCacheManager(req, ws))
 		}
 		remoteSHA, ok := remote.LookupRunMarker(context.Background(), remotecache.RunMarkerWorkspaceID(ws), branch, commands, paramsHash)
-		if remote != req.hostedRemote {
-			remote.Close()
-		}
 		if !ok {
 			return "", nil
 		}

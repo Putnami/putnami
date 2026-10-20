@@ -105,7 +105,7 @@ single build of `@putnami/cloud` speaks both.
 
 | Op | Request → Result | Notes |
 |----|------------------|-------|
-| `initialize` | `InitializeParams` → `InitializeResult` | First op, once. Carries the blob-exchange dir, mode, workspace identity, capabilities, and the known-digests handshake; returns the provider protocol version, `@putnami/cloud` version, capabilities, and `ready`. |
+| `initialize` | `InitializeParams` → `InitializeResult` | First op, once. Carries the blob-exchange dir, workspace identity, capabilities, and the known-digests handshake; returns the provider protocol version, `@putnami/cloud` version, capabilities, the materialization mode after a `provider-configuration` echo, and `ready`. |
 | `authenticate` | `AuthenticateParams` → `AuthenticateResult` | Hands the provider a hosted run's credential. Sent once, right after `initialize` and before any other op, only when the provider echoed `run-credential`. A refusal ends the session like a failed `initialize`. Not valid on the socket. |
 | `prefetch` | `PrefetchParams` → `PrefetchResult` | Speculatively pull keys' blobs into the exchange dir in the background. `resultOnlyKeys` (only after a `restore-result-only` echo) names the keys whose blobs core will not read. |
 | `restore` | `RestoreParams` → `RestoreResult` | `hit` (blobs in the exchange dir + manifest; core ingests them into its CAS), `miss`, or `error` — the **restore-failure signal**, distinct from a cold miss but both meaning "build locally". A `resultOnly` restore (only after a `restore-result-only` echo) answers the same statuses without placing any blob. |
@@ -192,6 +192,26 @@ malformed credential fails `initialize` before core writes a line.
 that holds it (`AuthenticateParams`, `ProviderRequest`) formats as redacted,
 and core removes the credential from a refusal message before it logs it.
 
+## Provider configuration
+
+The provider owns the remote cache configuration. Core reads no configuration
+file and no configuration variable, so it cannot say whether a remote cache is
+configured or in which materialization mode.
+
+**Negotiation.** Core lists `provider-configuration`
+(`CapabilityProviderConfiguration`) in the v1-bootstrap
+`InitializeParams.Capabilities` of every session and sends no
+`InitializeParams.mode`. A provider that resolves its configuration echoes the
+capability in `InitializeResult.Capabilities` and returns the materialization
+mode it resolved in `InitializeResult.mode`. A provider sets that field only
+with the echo, and strict validation refuses it otherwise, so a strict parser
+that predates the field never receives it. Without the echo core materializes
+in `full`.
+
+**Readiness.** `ready: false` is the unconfigured default: core closes the
+session at once, so the idle provider process stops, and the run builds
+locally with no notice.
+
 ## Result-only restore
 
 A run often reads no file of a cache hit: in `minimal` mode a hit that no job
@@ -266,7 +286,7 @@ Three outcomes:
 | Outcome | Meaning | Caller behavior |
 |---------|---------|-----------------|
 | `(provider, nil)` | exactly one extension declares the command | delegate to it |
-| `(nil, nil)` | none does | local-only **with a one-line notice** when remote cache is configured (carrying discovery's skip records when an extension failed to LOAD, so a fixable fault is never silent); silent when remote cache is not configured |
+| `(nil, nil)` | none does | local-only and silent, except on a hosted run that removed the command from a path extension (`DiscoveryResult.OnlyFromPathExtensions`), which says so once |
 | `(nil, err)` wrapping `extension.ErrProviderAmbiguous` | several declare it | surface the error; picking silently would make the active provider a function of discovery order |
 
 Discovery checks neither a provider's product name nor an extension-version
@@ -296,7 +316,8 @@ The op set is intentionally thin. The split is:
 - **Core owns** local cache keys, dependency hit/miss accounting, materialization
   into the local CAS, upload export from the local CAS, run-marker workspace
   identity, scheduler integration, and best-effort fallback.
-- **The provider owns** the cloud HTTP client, credential resolution, server-side
+- **The provider owns** the remote cache configuration and the materialization
+  mode it resolves, the cloud HTTP client, credential resolution, server-side
   cache protocol, remote run-marker storage, and cloud-specific readiness.
 - **The exchange directory** is the only shared filesystem contract. The
   provider writes restored blobs there and reads upload blobs from there; core is
@@ -304,26 +325,27 @@ The op set is intentionally thin. The split is:
 
 ## Live scheduler path
 
-`remotecache.LoadRemoteCache` first checks whether remote cache is explicitly active
-(`.putnami/cache.json` or `PUTNAMI_CACHE_URL`). If it is inactive, the run stays
-local-only and silent, even when `@putnami/cloud` is installed. If it is active,
-core detects a compatible provider command and prepares the extension runtime
-that command references, as for a task (see
+`remotecache.LoadRemoteCache` reads no remote cache configuration: there is no
+core configuration file and no core configuration variable. When the cache
+trust is not `none` and an extension declares the provider command, core
+prepares the extension runtime that command references, as for a task (see
 [Runtime preparation](07-extensions.md#runtime-preparation)). A runtime that
 cannot be prepared leaves the build local with a one-line notice. Core then
-starts one provider subprocess on the first remote operation and passes the
-configured materialization mode to `initialize`.
+starts one provider subprocess on the first remote operation of the run,
+whether that is the bare selection's run-marker lookup or the build, and reads
+the materialization mode from `initialize` (see
+[Provider configuration](#provider-configuration)).
 
 Provider startup is triggered by either half of the run's needs: a key set to
 warm, **or** at least one planned job that will execute locally and could use the
 object cache. A fully warm rebuild — every planned job a local hit — starts no
 provider. Under `--no-cache` the provider stays down too.
 
-When no capable provider is available for an active remote-cache config, core
-prints one user-facing notice and builds locally. A too-old or non-provider
-`@putnami/cloud` build is an actionable gate failure; an absent provider is an
-install hint. Provider runtime failures remain warning-level best-effort
-fallbacks.
+A declared provider that cannot serve the run says so once on stderr, and the
+run builds locally: a hosted run removed it from a path extension, it fails to
+start, or its `initialize` handshake fails. A workspace without a provider, and
+a provider that answers `ready: false`, build locally with no notice. Later
+provider failures remain warning-level best-effort fallbacks.
 
 ## Testing
 

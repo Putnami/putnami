@@ -26,7 +26,12 @@ import (
 type providerRemote struct {
 	wsRoot string
 	launch cacheprovider.LaunchSpec
-	mode   cache.Mode
+	// mode is the materialization mode the provider resolved at initialize
+	// (providerMode), cache.ModeFull until then. It is guarded by mu.
+	mode cache.Mode
+	// notices receives the one line that says a declared provider failed to
+	// start or to answer initialize. Nil is os.Stderr.
+	notices io.Writer
 	// extensionName names the extension that serves the provider command, or
 	// is empty when unknown.
 	extensionName string
@@ -70,10 +75,7 @@ var SpawnProviderSession = cacheprovider.Spawn
 // swap it to hold a sweep open and prove closeProvider stops it before waiting.
 var sweepExchangeDirs = sweepStaleExchangeDirs
 
-func newProviderRemoteCache(wsRoot string, launch cacheprovider.LaunchSpec, mode cache.Mode, trust store.CacheTrust) *RemoteCache {
-	if !mode.Valid() {
-		mode = cache.ModeFull
-	}
+func newProviderRemoteCache(wsRoot string, launch cacheprovider.LaunchSpec, trust store.CacheTrust) *RemoteCache {
 	if !trust.Valid() || trust == store.CacheTrustNone {
 		trust = store.CacheTrustCI
 	}
@@ -84,17 +86,20 @@ func newProviderRemoteCache(wsRoot string, launch cacheprovider.LaunchSpec, mode
 		provider: &providerRemote{
 			wsRoot: wsRoot,
 			launch: launch,
-			mode:   mode,
+			mode:   cache.ModeFull,
 		},
 	}
 }
 
 // loadProviderRemoteCache resolves the cache-provider extension for this
-// workspace. It returns (nil, "", nil) for the unconfigured default and
-// (nil, notice, nil) for a configured-but-unserved cache — the degradation the
-// caller must surface once. A non-nil error is a hard resolution
-// failure (two extensions claiming the provider command, or a provider runtime
-// that cannot be prepared) the caller turns into a notice too.
+// workspace. The core reads no remote cache configuration, so the cache is
+// provider-backed whenever an extension declares the provider command: the
+// provider's initialize answer says whether it serves the run. It returns
+// (nil, "", nil) when no extension declares the command, and (nil, notice,
+// nil) when a hosted run removed it from a path extension
+// (removedProviderNotice), which the caller says once. A non-nil error is a
+// hard resolution failure (two extensions claiming the provider command, or a
+// provider runtime that cannot be prepared) the caller turns into a notice too.
 //
 // Resolution is by the protocol's reserved command name only. An earlier
 // cleanup deleted the product name and the extension-version floor that used
@@ -102,28 +107,12 @@ func newProviderRemoteCache(wsRoot string, launch cacheprovider.LaunchSpec, mode
 // version at discovery and by provider-RPC negotiation at the initialize
 // handshake, neither of which needs to know which vendor ships the provider.
 func loadProviderRemoteCache(ctx context.Context, wsRoot string, exts []*extension.ExtensionDescription, discovered *extension.DiscoveryResult, trust store.CacheTrust, launcher Launcher) (*RemoteCache, string, error) {
-	cfg, err := loadRemoteCacheConfig(wsRoot)
-	if err != nil {
-		return nil, fmt.Sprintf("putnami: remote cache config unavailable (%v); building locally", err), nil
-	}
-	if !cfg.Active() {
-		return nil, "", nil
-	}
-
 	provider, err := extension.ResolveReservedProvider(exts, cache.ProviderCommandName)
 	if err != nil {
 		return nil, "", err
 	}
 	if provider == nil {
-		// Caching is configured but no installed extension declares the
-		// provider command. Degrade to local-only, but say so once rather than
-		// silently. When discovery SKIPPED an extension, cite that
-		// instead: an unloadable manifest is a fixable fault, not an absence.
-		notice := fmt.Sprintf("putnami: remote cache is configured but no installed extension declares the %q command; building locally.", cache.ProviderCommandName)
-		if cause := discovered.ProviderCause(cache.ProviderCommandName); cause != "" {
-			notice += " " + cause
-		}
-		return nil, notice, nil
+		return nil, removedProviderNotice(discovered), nil
 	}
 
 	launch, err := providerLaunchSpec(ctx, wsRoot, exts, provider, launcher)
@@ -131,14 +120,26 @@ func loadProviderRemoteCache(ctx context.Context, wsRoot string, exts []*extensi
 		return nil, "", err
 	}
 
-	mode := cache.ModeFull
-	if cfg.Mode.Valid() {
-		mode = cfg.Mode
-	}
-	remote := newProviderRemoteCache(wsRoot, launch, mode, trust)
+	remote := newProviderRemoteCache(wsRoot, launch, trust)
 	remote.provider.extensionName = provider.ExtensionName
 	remote.provider.runtime = findExtensionByName(exts, provider.ExtensionName).RuntimeExecutable
 	return remote, "", nil
+}
+
+// removedProviderNotice is the notice of a hosted run that removed the cache
+// provider command from every path extension that declares it, and that no
+// other extension serves (DiscoveryResult.OnlyFromPathExtensions). It returns
+// "" otherwise, so an extension skipped for any other reason adds no notice.
+func removedProviderNotice(discovered *extension.DiscoveryResult) string {
+	removed := discovered.OnlyFromPathExtensions(cache.ProviderCommandName)
+	if len(removed) == 0 {
+		return ""
+	}
+	causes := make([]string, len(removed))
+	for i, capability := range removed {
+		causes[i] = capability.Reason().Error()
+	}
+	return fmt.Sprintf("putnami: no cache provider serves this run (%s); building locally", strings.Join(causes, "; "))
 }
 
 // Launcher resolves how to start the provider command of ext: the runtime
@@ -250,7 +251,7 @@ func (r *RemoteCache) ensureProvider(ctx context.Context, ws *workspace.Workspac
 		removeExchangeDir(exchangeDir, exchangeOwner)
 		p.exchangeDir, p.exchangeOwner = "", nil
 		if !hostedRefusal(err) {
-			slog.Warn("remote cache: provider failed to start; building locally", "error", err)
+			p.notice(ctx, "failed to start", err)
 		}
 		return nil, false
 	}
@@ -259,34 +260,69 @@ func (r *RemoteCache) ensureProvider(ctx context.Context, ws *workspace.Workspac
 	if ws != nil {
 		workspaceID = RunMarkerWorkspaceID(ws)
 	}
+	// No Mode: the provider resolves it (cache.CapabilityProviderConfiguration,
+	// which the session lists) and returns it in the result.
 	init, err := sess.Initialize(ctx, &cache.InitializeParams{
 		ProtocolVersion: cache.ProviderProtocolVersion,
 		BlobExchangeDir: exchangeDir,
-		Mode:            p.mode,
 		Workspace:       workspaceID,
 	})
+	if err == nil && !init.Ready {
+		err = errProviderNotReady
+	}
 	if err != nil {
 		p.initErr = err
 		_ = sess.Close()
 		removeExchangeDir(exchangeDir, exchangeOwner)
 		p.exchangeDir, p.exchangeOwner = "", nil
-		slog.Warn("remote cache: provider initialize failed; building locally", "error", err)
+		if errors.Is(err, errProviderNotReady) {
+			// The unconfigured default: the provider serves nothing, so its
+			// idle process is released now rather than at the end of the run.
+			slog.Debug("remote cache: provider is not ready; building locally")
+		} else {
+			p.notice(ctx, "failed its initialize handshake", err)
+		}
 		return nil, false
-	}
-	if !init.Ready {
-		p.ready = false
-		p.session = sess
-		slog.Warn("remote cache: provider is not ready; building locally")
-		return sess, false
 	}
 
 	r.actionEvents = containsString(init.Capabilities, cache.CapabilityActionEvents)
+	p.mode = providerMode(init)
 	// The session checked the socket the provider offered (echoed capability,
 	// absolute path, really a socket); record only what it accepted.
 	p.objectCacheSocket = sess.ObjectCacheSocket()
 	p.ready = true
 	p.session = sess
 	return sess, true
+}
+
+// errProviderNotReady is the initErr of a provider that answered initialize
+// with Ready=false: the run builds locally and never starts it again.
+var errProviderNotReady = errors.New("cache provider is not ready")
+
+// providerMode is the materialization mode the provider resolved, which it
+// returns only with the cache.CapabilityProviderConfiguration echo, else
+// cache.ModeFull.
+func providerMode(init *cache.InitializeResult) cache.Mode {
+	if init.Mode.Valid() && containsString(init.Capabilities, cache.CapabilityProviderConfiguration) {
+		return init.Mode
+	}
+	return cache.ModeFull
+}
+
+// notice says, once per run, that the declared provider cannot serve it and
+// the run builds locally. ensureProvider calls it at most once, because the
+// failure stays initErr. A run whose context ended says nothing: the failure
+// is the cancellation, not the provider.
+func (p *providerRemote) notice(ctx context.Context, what string, err error) {
+	if ctx.Err() != nil {
+		slog.Debug("remote cache: provider start canceled", "error", err)
+		return
+	}
+	w := p.notices
+	if w == nil {
+		w = os.Stderr
+	}
+	_, _ = fmt.Fprintf(w, "putnami: %s %s (%v); building locally\n", p.holder(), what, err)
 }
 
 // holder names the provider process in a custody refusal.
@@ -398,18 +434,22 @@ func (r *RemoteCache) ObjectCacheJobEnv() []string {
 	}
 }
 
-// restoresResultOnly reports whether a ready provider session echoed
-// cache.CapabilityRestoreResultOnly, so a restore can skip the entry's blobs.
-// It is false before the session starts and for a provider without the echo.
-// The session is the only record of the echo: the same session gates the wire
-// fields, so this answer and the request core sends never disagree.
-func (r *RemoteCache) restoresResultOnly() bool {
+// resultOnlyMode returns the session's materialization mode and true when a
+// ready provider session echoed cache.CapabilityRestoreResultOnly, so a
+// restore can skip the entry's blobs. It is false before the session starts
+// and for a provider without the echo. The session is the only record of the
+// echo: the same session gates the wire fields, so this answer and the request
+// core sends never disagree. The mode is read under the same lock.
+func (r *RemoteCache) resultOnlyMode() (cache.Mode, bool) {
 	if !r.IsProviderBacked() {
-		return false
+		return "", false
 	}
 	r.provider.mu.Lock()
 	defer r.provider.mu.Unlock()
-	return r.provider.ready && r.provider.session.RestoreResultOnly()
+	if !r.provider.ready || !r.provider.session.RestoreResultOnly() {
+		return "", false
+	}
+	return r.provider.mode, true
 }
 
 func (r *RemoteCache) providerExchangeDir() string {

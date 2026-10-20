@@ -143,15 +143,15 @@ func ValidateInitializeParams(p *InitializeParams) []diag.Diagnostic {
 }
 
 // NormalizeInitializeParams applies canonical defaults and ordering in place.
+// It leaves an absent mode absent: the mode is core's optional intent, and a
+// provider that resolves its configuration tells "no intent" apart from a
+// mode core chose.
 func NormalizeInitializeParams(p *InitializeParams) *InitializeParams {
 	if p == nil {
 		return nil
 	}
 	if p.ProtocolVersion == 0 {
 		p.ProtocolVersion = ProviderProtocolVersion
-	}
-	if p.Mode == "" {
-		p.Mode = DefaultMode
 	}
 	sort.Strings(p.Capabilities)
 	sort.Strings(p.KnownDigests)
@@ -171,8 +171,10 @@ func ParseInitializeResultStrict(data []byte) (*InitializeResult, []diag.Diagnos
 	return parseStrict[InitializeResult](data, "initialize result")
 }
 
-// ValidateInitializeResult checks a supported provider protocol version and a
-// present provider version (the version gate depends on it).
+// ValidateInitializeResult checks a supported provider protocol version, a
+// present provider version (the version gate depends on it), and a mode that
+// is set only with the CapabilityProviderConfiguration echo and is a
+// recognized one.
 func ValidateInitializeResult(r *InitializeResult) []diag.Diagnostic {
 	if r == nil {
 		return []diag.Diagnostic{diag.Errorf(CodeRequiredField, "", "result is nil")}
@@ -181,6 +183,15 @@ func ValidateInitializeResult(r *InitializeResult) []diag.Diagnostic {
 	if strings.TrimSpace(r.ProviderVersion) == "" {
 		diags = append(diags, diag.Errorf(CodeRequiredField, "providerVersion",
 			"a provider version is required for the version gate"))
+	}
+	if r.Mode != "" {
+		if !slices.Contains(r.Capabilities, CapabilityProviderConfiguration) {
+			diags = append(diags, diag.Errorf(CodeInvalidMode, "mode",
+				"a mode needs the %q capability echo", CapabilityProviderConfiguration))
+		}
+		if !r.Mode.Valid() {
+			diags = append(diags, diag.Errorf(CodeInvalidMode, "mode", "unknown materialization mode %q", r.Mode))
+		}
 	}
 	return diags
 }

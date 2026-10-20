@@ -20,7 +20,7 @@ func TestObjectCacheJobEnvFailsClosed(t *testing.T) {
 	}
 
 	// A provider-backed cache that has not negotiated a socket exports nothing.
-	local := newProviderRemoteCache(t.TempDir(), cacheprovider.LaunchSpec{Command: "/bin/true"}, cache.ModeFull, store.CacheTrustAny)
+	local := newProviderRemoteCache(t.TempDir(), cacheprovider.LaunchSpec{Command: "/bin/true"}, store.CacheTrustAny)
 	if got := local.ObjectCacheJobEnv(); got != nil {
 		t.Fatalf("un-negotiated env = %v, want none", got)
 	}

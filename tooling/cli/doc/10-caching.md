@@ -1132,14 +1132,15 @@ Combines local and remote stores:
 ### Remote Store
 
 The CLI can share the cache across machines and CI runs through a remote build
-cache server. It is opt-in and configured per workspace. See
+cache server, which a cache provider extension serves and configures. See
 [Remote Build Cache](#remote-build-cache) below.
 
 ## Remote Build Cache
 
-The remote build cache shares cached results across machines and CI runs. It is
-**off by default** and **opt-in**: a build uses it only when a configuration is
-present and enabled. When active, the whole build's cache keys are negotiated
+The remote build cache shares cached results across machines and CI runs. A
+build uses it only when an installed extension declares the cache provider and
+that provider serves the run; the provider owns the configuration. When active,
+the whole build's cache keys are negotiated
 with the server in a single round trip before execution; remote hits are
 restored into the local store (so a later local lookup hits without the network),
 and freshly built misses are uploaded.
@@ -1172,39 +1173,26 @@ successful smart-selected full-target run, and publish failures are best-effort.
 
 ### Enabling and configuration
 
-Remote caching requires a capable `@putnami/cloud` cache-provider extension and
-an explicit opt-in. Core only reads enough configuration to decide whether to
-delegate to the provider and which materialization mode to request; credentials
-and server-specific auth remain provider-owned.
+Remote caching requires an installed extension that declares the
+`cache-provider` command, such as `@putnami/cloud`. The provider owns the remote
+cache configuration: the core reads no configuration file and no configuration
+variable, and credentials and server-specific auth stay in the provider too.
+A run whose cache trust is not `none` starts the provider once, at the first
+operation that needs it, and the provider answers `initialize`:
 
-The opt-in is configured by a per-workspace file — `.putnami/cache.json` — that
-the cloud extension writes, or by environment variables (for CI):
+- `ready: false`: the provider has no remote cache to serve, which is the
+  default. Its process stops, and the run builds locally with no notice.
+- `ready: true`: the run reads and writes the remote cache, in the
+  materialization mode the provider returns, or `full` when it returns none.
 
-```json
-{
-  "enabled": true,
-  "url": "https://cache.putnami.cloud",
-  "mode": "full"
-}
-```
+`@putnami/cloud` reads its own configuration: `.putnami/cache.json`, its
+`PUTNAMI_CACHE_*` variables, and the default of a workspace linked to Putnami
+Cloud, which uses the remote cache from its first build.
 
-| Field | Meaning |
-|-------|---------|
-| `enabled` | Gates remote caching. Omitted ⇒ enabled; set `false` to disable without deleting the file. |
-| `url` | Cache server base URL. Remote caching is inactive when empty. |
-| `mode` | Materialization mode: `minimal`, `toplevel`, or `full` (default `full`). |
-
-Legacy files may still contain a `token` field. Core ignores it; the in-core HTTP
-client that consumed token recipes has been removed. The cloud provider may read
-its own configuration, but core does not execute token commands or fetch token
-URLs.
-
-Environment overrides (useful in CI, no file required):
+Variables the core still handles:
 
 | Variable | Effect |
 |----------|--------|
-| `PUTNAMI_CACHE_URL` | Overrides `url`. |
-| `PUTNAMI_CACHE_MODE` | Overrides `mode`. |
 | `PUTNAMI_CACHE_TOKEN` | Passed through to the provider process for CI credential use; core never reads it. With [`--credential-fd`](03-commands.md#run-credential---credential-fd), the CLI removes it from its environment first, so no process it starts receives it, and hands the run credential to the provider through `authenticate` instead (see [Authentication](#authentication-per-user-token)). |
 | `PUTNAMI_CACHE_TRUST` | Sets remote-entry trust to `ci`, `any`, or `none`. The resolved value is also exported to every job (see [Object cache](#object-cache-for-compiler-caches)). |
 
@@ -1259,16 +1247,16 @@ refused `authenticate` makes the run build locally, like a failed
 `initialize`. Locally, without `--credential-fd`, nothing changes. The
 [cache provider RPC](16-cache-provider-rpc.md) documents the op.
 
-If a cache is configured (`.putnami/cache.json` or a `PUTNAMI_CACHE_*` override
-is present) but no capable provider is available, the build falls back to
-local-only and prints a one-line notice pointing at `@putnami/cloud`. It is never
-silent: a configured-but-unusable cache always reports why it degraded. The plain
-unconfigured case (no file, no env) stays quiet, even when `@putnami/cloud` is
-installed, because local-only is the expected default there rather than a
-degradation.
+A declared provider that cannot serve the run says so once on stderr, and the
+run builds locally. The causes are: a hosted run removed the provider from a
+path extension, the provider fails to start, or its `initialize` handshake
+fails. A workspace without a cache provider, and a provider that is not ready,
+build locally with no notice, because local-only is the default there rather
+than a degradation.
 
-Provisioning this configuration — authenticating the user and writing
-`.putnami/cache.json` — is owned by the cloud extension's setup/login commands.
+Provisioning the provider's configuration, such as authenticating the user and
+writing `.putnami/cache.json`, is owned by the provider extension: the cloud
+extension's setup and login commands.
 
 ### Materialization modes ("Build without the Bytes")
 

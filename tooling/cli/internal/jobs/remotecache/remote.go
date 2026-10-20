@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -209,7 +208,7 @@ func (r *RemoteCache) sourceBoundHitsLocally(job *jobmodel.ScheduledJob, hash st
 	return err == nil && entry != nil
 }
 
-// RecordSetup attributes the pre-run config resolution time to this run's cache
+// RecordSetup attributes the pre-run provider resolution time to this run's cache
 // stats, so the cost the user saw "before negotiate" becomes visible. Safe on a
 // nil cache (the local-only path), so the caller needs no guard.
 func (r *RemoteCache) RecordSetup(d time.Duration) {
@@ -218,42 +217,32 @@ func (r *RemoteCache) RecordSetup(d time.Duration) {
 	}
 }
 
-// RemoteCacheConfigPath is the workspace-relative location of the persisted
-// remote-cache configuration, written by the cloud extension's setup command
-// and read by the CLI.
-func RemoteCacheConfigPath(wsRoot string) string {
-	return filepath.Join(wsRoot, ".putnami", "cache.json")
-}
-
-// LoadRemoteCache builds a RemoteCache that delegates to the cloud cache-provider
-// extension when one is installed and the version/capability gate confirms it can
-// serve this protocol. It returns nil — so the build runs purely local — when no
-// capable provider is available. Credentials and the cache URL/mode (including the
-// PUTNAMI_CACHE_* env overrides) travel to the provider through its inherited
-// environment, so the CLI never handles a bearer token itself. The exception is
-// a hosted run's credential, which the caller passes with WithCacheRunCredential
-// and the provider receives over its RPC, never through its environment.
+// LoadRemoteCache builds a RemoteCache that delegates to the cache-provider
+// extension: the one extension that declares the reserved provider command. It
+// returns nil, so the build runs purely local, when no extension declares it or
+// trust is "none". The core reads no remote cache configuration. The provider
+// owns it (its file, its environment overrides, its defaults) and says at
+// initialize whether it serves the run (InitializeResult.Ready) and in which
+// materialization mode. A provider that is not ready leaves the run building
+// locally with no notice: that is the unconfigured default. Credentials travel
+// to the provider through its inherited environment, so the CLI never handles a
+// bearer token itself. The exception is a hosted run's credential, which the
+// caller passes with WithCacheRunCredential and the provider receives over its
+// RPC, never through its environment.
 //
-// The second return value is a one-line, user-facing notice. It is non-empty only
-// when remote caching was requested — .putnami/cache.json or a PUTNAMI_CACHE_*
-// override is present — but cannot be activated (no capable @putnami/cloud
-// provider installed, or a gate failure), so the build silently degrading to
-// local-only would surprise the user. The plain unconfigured case returns ""
-// because local-only is the expected default there, not a degradation. Callers
-// print a non-empty notice once; per the missing-cloud policy this path must
-// never be silent.
-//
-// discovered carries discovery's unloadable-extension records and the
-// provider capabilities a hosted run removed, so a configured cache whose
-// provider was skipped (unparseable manifest, contract too new) or removed
-// from a path extension degrades with the root cause in the notice
-// (DiscoveryResult.ProviderCause) instead of a generic "not installed". Nil is
-// fine when the caller has no discovery result.
+// The second return value is a one-line, user-facing notice, non-empty only
+// when a declared provider cannot serve the run: a hosted run removed the
+// provider command from a path extension (discovered's
+// OnlyFromPathExtensions), the provider resolution failed, or trust is
+// unresolved. Callers print a non-empty notice once. A provider that fails to
+// start or to answer initialize says so itself, once, when the first operation
+// that needs it starts it. discovered may be nil when the caller has no
+// discovery result.
 //
 // The context bounds provider detection and the preparation of the extension
 // runtime the provider command references; provider startup is deferred to the
 // first request that needs it. launcher prepares that launch; a nil launcher
-// leaves a configured cache unserved, with a notice.
+// leaves a declared provider unserved, with a notice.
 func LoadRemoteCache(ctx context.Context, wsRoot string, exts []*extension.ExtensionDescription, discovered *extension.DiscoveryResult, trust store.CacheTrust, launcher Launcher, options ...RemoteCacheOption) (*RemoteCache, string) {
 	if trust == store.CacheTrustNone {
 		return nil, ""
@@ -290,15 +279,45 @@ func WithCacheRunCredential(bearer string) RemoteCacheOption {
 	return func(p *providerRemote) { p.runCredential = bearer }
 }
 
-// loadRemoteCacheConfig reads the remote-cache config of wsRoot with the
-// PUTNAMI_CACHE_* overrides applied (ApplyEnv).
-func loadRemoteCacheConfig(wsRoot string) (*remoteCacheConfig, error) {
-	cfg, err := loadRemoteCacheConfigFile(RemoteCacheConfigPath(wsRoot))
-	if err != nil {
-		return nil, err
+// RunRemoteCache is the remote cache of one run, loaded at most once, so the
+// auto-selection run-marker lookup and the build read it through one provider
+// process. The zero value is ready to use. A nil RunRemoteCache holds nothing:
+// each Load loads a new remote cache, which its caller closes. Whoever creates
+// a RunRemoteCache closes it, after the last stage of the run that reads it.
+type RunRemoteCache struct {
+	mu     sync.Mutex
+	loaded bool
+	remote *RemoteCache
+	notice string
+}
+
+// Load returns the remote cache of the run and its notice: what the first Load
+// got from LoadRemoteCache with these arguments, whatever later calls pass. A
+// caller that prints the notice prints it once per run, and a nil c returns
+// LoadRemoteCache's answer as is.
+func (c *RunRemoteCache) Load(ctx context.Context, wsRoot string, exts []*extension.ExtensionDescription, discovered *extension.DiscoveryResult, trust store.CacheTrust, launcher Launcher, options ...RemoteCacheOption) (*RemoteCache, string) {
+	if c == nil {
+		return LoadRemoteCache(ctx, wsRoot, exts, discovered, trust, launcher, options...)
 	}
-	cfg.ApplyEnv()
-	return cfg, nil
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.loaded {
+		c.loaded = true
+		c.remote, c.notice = LoadRemoteCache(ctx, wsRoot, exts, discovered, trust, launcher, options...)
+	}
+	return c.remote, c.notice
+}
+
+// Close stops the provider of the remote cache Load returned, if any. Closing a
+// RemoteCache twice is safe, so a stage that closes the one it read changes
+// nothing here. A nil RunRemoteCache does nothing.
+func (c *RunRemoteCache) Close() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.remote.Close()
 }
 
 // Negotiate precomputes every cacheable key and hands the build's non-local,
@@ -866,6 +885,15 @@ func (r *RemoteCache) DrainUploads() {
 	r.providerDrain(ctx)
 	cancel()
 	r.stats.RecordUploadWall(time.Since(start).Nanoseconds())
+}
+
+// uploadInput is the per-job data needed to share a freshly built result with the
+// cache provider: the precomputed cache key, the cached outcome to record, and
+// the built manifest (the file set with per-file CAS digests).
+type uploadInput struct {
+	Key      string
+	Result   *cache.ActionResult
+	Manifest *cache.Manifest
 }
 
 // prepareUpload turns a freshly built local entry into the input to share with

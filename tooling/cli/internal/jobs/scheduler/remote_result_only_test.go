@@ -46,7 +46,7 @@ func publishMatrixEntry(t *testing.T, server *fakeCacheServer) (string, map[stri
 // materialize in mode.
 func resultOnlyConsumer(t *testing.T, server *fakeCacheServer, mode cache.Mode) (*captureFixture, *remotecache.RemoteCache) {
 	t.Helper()
-	t.Setenv(remotecache.CacheModeEnv, string(mode))
+	t.Setenv(fakeProviderModeEnv, string(mode))
 	return matrixFixture(t, server)
 }
 
@@ -54,7 +54,7 @@ func resultOnlyConsumer(t *testing.T, server *fakeCacheServer, mode cache.Mode) 
 // the same workspace has.
 func attachRemote(t *testing.T, f *captureFixture, mode cache.Mode) *remotecache.RemoteCache {
 	t.Helper()
-	t.Setenv(remotecache.CacheModeEnv, string(mode))
+	t.Setenv(fakeProviderModeEnv, string(mode))
 	remote, notice := remotecache.LoadRemoteCache(context.Background(), f.ws.Root,
 		[]*extension.ExtensionDescription{fakeProviderExtension(t, nil)}, nil, store.CacheTrustAny, fakeProviderLaunch)
 	if remote == nil || !remote.IsProviderBacked() {
@@ -450,7 +450,6 @@ func newResultOnlyRun(t *testing.T, server *fakeCacheServer) *resultOnlyRun {
 	if _, err := os.Stat("/bin/sh"); err != nil {
 		t.Skip("/bin/sh unavailable")
 	}
-	enableProviderRemoteCache(t)
 	useSharedFakeProvider(t, server)
 
 	root := t.TempDir()
@@ -529,7 +528,7 @@ func (f *resultOnlyRun) jobs(withCheck bool) []*ScheduledJob {
 // provider session and the object-cache fixture's scheduler runner.
 func (f *resultOnlyRun) run(t *testing.T, mode cache.Mode, storeDir string, planned []*ScheduledJob) (*SchedulerResult, *store.CacheManager) {
 	t.Helper()
-	t.Setenv(remotecache.CacheModeEnv, string(mode))
+	t.Setenv(fakeProviderModeEnv, string(mode))
 	cm := store.NewCacheManager(store.NewLocalStore(storeDir))
 	remote, notice := remotecache.LoadRemoteCache(context.Background(), f.ws.Root,
 		[]*extension.ExtensionDescription{fakeProviderExtension(t, nil)}, nil, store.CacheTrustAny, fakeProviderLaunch)

@@ -28,7 +28,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/store"
 	"go.putnami.dev/tooling/cli/internal/workspace"
-	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
 
 // The tests below that hold a run credential change it for the whole process
@@ -50,21 +49,9 @@ func TestRemoteCacheOptionsCarryOnlyAHeldRunCredential(t *testing.T) {
 // tests below.
 const custodyProviderName = "@fixture/cache"
 
-// configureRemoteCache writes the remote-cache configuration of wsRoot.
-func configureRemoteCache(t *testing.T, wsRoot string) {
-	t.Helper()
-	path := remotecache.RemoteCacheConfigPath(wsRoot)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(`{"url":"https://cache.invalid"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// hostedCacheWorkspace is a workspace on disk with a remote cache configured
-// and one project, whose one extension serves the cache provider and the
-// build, and is installed in the artifact store, as a hosted run requires. The
+// hostedCacheWorkspace is a workspace on disk with one project, whose one
+// extension serves the cache provider and the build, and is installed in the
+// artifact store, as a hosted run requires. The
 // provider is the extension's native runtime, as a hosted run requires too:
 // it records each start in providerStarts and exits at once, so a started
 // provider serves nothing and the run builds locally. The build creates
@@ -130,7 +117,6 @@ func hostedCacheWorkspace(t *testing.T) (wsRoot string, cfg *wsproto.Config) {
 	if err := os.Symlink(extRoot, link); err != nil {
 		t.Skipf("symlinks unavailable: %v", err)
 	}
-	configureRemoteCache(t, wsRoot)
 	return wsRoot, wsproto.Load(wsRoot)
 }
 
@@ -350,45 +336,6 @@ func TestAHostedRunWhoseCacheProviderCannotStartRunsNoHook(t *testing.T) {
 	}
 }
 
-// A hosted run whose before-hook configures the remote cache fails before it
-// records a session or runs a task: the provider of that cache would start
-// after the hook, which is repository code, and would receive the run
-// credential.
-func TestAHostedRunWhoseHookConfiguresTheCacheRecordsNoSession(t *testing.T) {
-	requireSh(t)
-	wsRoot, cfg := hostedCacheWorkspace(t)
-	configPath := remotecache.RemoteCacheConfigPath(wsRoot)
-	if err := os.Remove(configPath); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(runcredential.SetForTest("prc_engine_custody"))
-	configure := "printf '%s' '{\"url\":\"https://cache.invalid\"}' > " + shPath(configPath)
-
-	var result SessionResult
-	var runErr error
-	stderr := captureStderr(t, func() {
-		result, runErr = New().Run(context.Background(), Request{
-			WorkspaceRoot: wsRoot,
-			Config:        cfg,
-			Commands:      []string{"build"},
-			Global:        GlobalFlags{Projects: "app", CacheTrust: string(store.CacheTrustAny)},
-			Hooks:         &wsproto.HooksConfig{CLI: &wsproto.HookPhaseConfig{Before: []string{configure}}},
-		}, nil)
-	})
-	if result.ExitCode != ExitError {
-		t.Errorf("exit code = %d, want %d (error %v)\n%s", result.ExitCode, ExitError, runErr, stderr)
-	}
-	if want := "the cache provider of " + custodyProviderName + " starts after hook "; !strings.Contains(stderr, want) {
-		t.Errorf("stderr does not name the refusal %q (error %v):\n%s", want, runErr, stderr)
-	}
-	if _, err := os.Stat(builtMarker(wsRoot)); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("the build ran after the refusal: %v", err)
-	}
-	if ids, _ := workspace_state.NewSessionStore(wsRoot).List(); len(ids) != 0 {
-		t.Errorf("sessions recorded = %v, want none", ids)
-	}
-}
-
 // startHostedRemoteCache starts nothing without a run credential, under
 // --no-cache, under the trust policy "none" of a watch iteration, or for a
 // workspace that does not load: the run then reads the remote cache as it
@@ -419,12 +366,11 @@ func TestStartHostedRemoteCacheStartsNothingOutsideAHostedCachedRun(t *testing.T
 }
 
 // hostedRunRemoteCache hands execute the remote cache started before the
-// hooks. A remote cache configured only after them fails the run, because its
-// provider would start after repository code; without a run credential, or
-// with the build cache off, it gives nothing.
+// hooks. A cache provider declared only after them fails the run, because it
+// would start after repository code; without a run credential, or with the
+// build cache off, it gives nothing.
 func TestHostedRunRemoteCacheNeverStartsAProviderAfterRepositoryCode(t *testing.T) {
 	wsRoot := t.TempDir()
-	configureRemoteCache(t, wsRoot)
 	executable, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -445,7 +391,7 @@ func TestHostedRunRemoteCacheNeverStartsAProviderAfterRepositoryCode(t *testing.
 	t.Cleanup(runcredential.SetForTest("prc_engine_custody"))
 	started, _ := remotecache.LoadRemoteCache(context.Background(), wsRoot, discovered.Extensions, nil, store.CacheTrustAny, launchCacheProvider)
 	if started == nil {
-		t.Fatal("the fixture configures no provider-backed remote cache")
+		t.Fatal("the fixture declares no provider-backed remote cache")
 	}
 	t.Cleanup(started.Close)
 	req.hostedRemote = started
@@ -466,7 +412,7 @@ func TestHostedRunRemoteCacheNeverStartsAProviderAfterRepositoryCode(t *testing.
 	remote, err := hostedRunRemoteCache(context.Background(), req, ws, discovered, cm)
 	if remote != nil {
 		remote.Close()
-		t.Error("a cache configured after repository code was handed to the run")
+		t.Error("a provider declared after repository code was handed to the run")
 	}
 	wantRefusal(t, err, "hook hooks.commands.build.before")
 
@@ -494,11 +440,11 @@ func TestSchedulerRemoteIsANilInterfaceForALocalRun(t *testing.T) {
 
 // requireHostedProviders refuses a hosted run whose CI configuration needs a
 // capability that only a path extension declares: the release-set provider for
-// a rule that publishes, the cache provider for a remote cache the run reads.
-// It refuses nothing without a run credential, for a capability an extension
-// that stays serves, or for a configuration that needs neither.
+// a rule that publishes. The cache provider is no such need, even for a run
+// that reads the remote cache and a provider configuration the core no longer
+// reads. It refuses nothing without a run credential, for a capability an
+// extension that stays serves, or for a configuration that needs none.
 func TestRequireHostedProviders(t *testing.T) {
-	t.Setenv(remotecache.CacheURLEnv, "")
 	publishing, rules := t.TempDir(), func(wsRoot, rules string) {
 		t.Helper()
 		document := `{"version":3,"commands":["build"],"rules":` + rules + `}`
@@ -507,12 +453,17 @@ func TestRequireHostedProviders(t *testing.T) {
 		}
 	}
 	rules(publishing, `[{"branches":"main","publish":["canary"]}]`)
-	optedOut, invalid, cached, both := t.TempDir(), t.TempDir(), t.TempDir(), t.TempDir()
-	rules(both, `[{"branches":"main","publish":["canary"]}]`)
-	configureRemoteCache(t, both)
+	optedOut, invalid, cached := t.TempDir(), t.TempDir(), t.TempDir()
 	rules(optedOut, `[{"branches":"main","publish":false}]`)
 	rules(invalid, `"main"`)
-	configureRemoteCache(t, cached)
+	// The configuration a cache provider reads, which the core does not.
+	if err := os.MkdirAll(filepath.Join(cached, ".putnami"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cached, ".putnami", "cache.json"), []byte(`{"url":"https://cache.invalid"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PUTNAMI_CACHE_URL", "https://cache.invalid")
 	pathOnly := &extension.DiscoveryResult{RemovedCapabilities: []extension.RemovedCapability{
 		{Extension: "@acme/cloud", Path: "/ws/cloud", Command: distribution.ProviderCommandName},
 		{Extension: "@acme/cloud", Path: "/ws/cloud", Command: cache.ProviderCommandName},
@@ -531,8 +482,7 @@ func TestRequireHostedProviders(t *testing.T) {
 		missing    string
 	}{
 		"a rule that publishes":    {"prc_engine_custody", Request{WorkspaceRoot: publishing, Global: anyTrust}, pathOnly, distribution.ProviderCommandName},
-		"a remote cache":           {"prc_engine_custody", Request{WorkspaceRoot: cached, Global: anyTrust}, pathOnly, cache.ProviderCommandName},
-		"both":                     {"prc_engine_custody", Request{WorkspaceRoot: both, Global: anyTrust}, pathOnly, distribution.ProviderCommandName + "|" + cache.ProviderCommandName},
+		"a remote cache":           {"prc_engine_custody", Request{WorkspaceRoot: cached, Global: anyTrust}, pathOnly, ""},
 		"without a run credential": {"", Request{WorkspaceRoot: publishing, Global: anyTrust}, pathOnly, ""},
 		"a store provider":         {"prc_engine_custody", Request{WorkspaceRoot: publishing, Global: anyTrust}, served, ""},
 		"a rule that opts out":     {"prc_engine_custody", Request{WorkspaceRoot: optedOut, Global: anyTrust}, pathOnly, ""},
@@ -560,6 +510,9 @@ func TestRequireHostedProviders(t *testing.T) {
 			if !strings.Contains(err.Error(), want) {
 				t.Errorf("%s: requireHostedProviders = %q, want it to name %q", name, err, want)
 			}
+		}
+		if strings.Contains(err.Error(), cache.ProviderCommandName) {
+			t.Errorf("%s: requireHostedProviders = %q, names the cache provider as a need", name, err)
 		}
 	}
 }

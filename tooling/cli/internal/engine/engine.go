@@ -370,6 +370,11 @@ type Request struct {
 	// the run that reads the remote cache reads it through this one; execute
 	// sets it to the cache the session runs with (hostedRunRemoteCache).
 	hostedRemote *remotecache.RemoteCache
+	// runRemote is the remote cache of a run that is not hosted, loaded at
+	// most once (remotecache.RunRemoteCache), so the bare selection's
+	// run-marker lookup and execute read it through one provider. Engine.Run
+	// creates it and closes it; nil gives each stage its own.
+	runRemote *remotecache.RunRemoteCache
 	// Hooks are the workspace lifecycle hooks to run around the lifecycle. Nil
 	// runs none: only the terminal adapter passes them today, for the same
 	// reason Observer is injected.
@@ -623,6 +628,8 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 		return SessionResult{ExitCode: protocolcli.ExitCodeForError(err)}, err
 	}
 	req.hostedRemote = hostedRemote
+	req.runRemote = &remotecache.RunRemoteCache{}
+	defer req.runRemote.Close()
 	// Its reporters start before the first hook too, so that each can hold
 	// the run credential; the session's reporting adopts them.
 	if req.HostedReporters == nil {

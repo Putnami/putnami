@@ -202,6 +202,29 @@
           }
         }
       ]
+    },
+    {
+      "id": "cloud/cache-provider-configuration",
+      "type": "feature",
+      "name": "Remote cache configuration resolved by the Cloud cache provider",
+      "outcome": "The Cloud cache provider resolves the remote cache configuration and the materialization mode of a session, and tells the core the mode it resolved",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "provider-resolves-its-configuration",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "provider-configuration-echo-and-mode"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

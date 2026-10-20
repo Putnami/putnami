@@ -1467,6 +1467,37 @@
               "deps-refuses-a-project-whose-extensions-declare-no-deps-edit"
             ]
           }
+        },
+        {
+          "id": "the-cache-provider-owns-its-configuration",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "core-reads-no-cache-configuration",
+              "core-materializes-in-the-mode-the-provider-returns",
+              "a-provider-that-is-not-ready-stops-silently",
+              "one-provider-per-run"
+            ]
+          }
+        },
+        {
+          "id": "a-declared-provider-that-cannot-serve-says-so-once",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-provider-that-fails-to-start-or-to-initialize-says-so-once",
+              "a-hosted-run-without-its-path-cache-provider-builds-locally",
+              "a-skipped-extension-adds-no-cache-notice"
+            ]
+          }
         }
       ]
     },

@@ -692,7 +692,7 @@ func TestInitialize_WithoutARunCredentialIsUnchanged(t *testing.T) {
 			if len(lines) != 2 || !strings.Contains(lines[1], `"op":"prefetch"`) {
 				t.Fatalf("requests = %q, want initialize then prefetch", lines)
 			}
-			if want := initializeLine(t, exchangeDir, `"provider-protocol-v2","object-cache","restore-result-only"`); lines[0] != want {
+			if want := initializeLine(t, exchangeDir, `"provider-protocol-v2","object-cache","restore-result-only","provider-configuration"`); lines[0] != want {
 				t.Fatalf("initialize line\n%s\nwant\n%s", lines[0], want)
 			}
 		})
@@ -719,7 +719,7 @@ func TestInitialize_AuthenticatesOnceAfterTheEcho(t *testing.T) {
 	if len(lines) != 3 {
 		t.Fatalf("requests = %q, want initialize, authenticate, prefetch", lines)
 	}
-	if want := initializeLine(t, exchangeDir, `"provider-protocol-v2","object-cache","run-credential","restore-result-only"`); lines[0] != want {
+	if want := initializeLine(t, exchangeDir, `"provider-protocol-v2","object-cache","run-credential","restore-result-only","provider-configuration"`); lines[0] != want {
 		t.Fatalf("initialize line\n%s\nwant\n%s", lines[0], want)
 	}
 	if want := `{"protocolVersion":2,"id":2,"op":"authenticate","payload":{"credential":"` + secret + `"}}`; lines[1] != want {
