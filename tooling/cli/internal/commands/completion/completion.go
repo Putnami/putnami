@@ -140,9 +140,13 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config, warnings io.Wri
 				ctx.commandDesc[verb.Name] = verb.Description
 			}
 		}
+		carried := map[string]bool{}
+		for _, ext := range extensions {
+			maps.Copy(carried, extension.GroupCarriedCommands(ext.CommandGroups))
+		}
 		for _, ext := range extensions {
 			for name, description := range ext.Commands {
-				if ext.CommandVisibility[name] == "internal" {
+				if ext.CommandVisibility[name] == "internal" || carried[name] {
 					continue
 				}
 				addCompletionCommand(&ctx, name, description)

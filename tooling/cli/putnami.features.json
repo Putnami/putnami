@@ -532,6 +532,32 @@
           }
         },
         {
+          "id": "help-lists-command-groups",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "help-lists-the-command-groups-of-the-loaded-extensions"
+            ]
+          }
+        },
+        {
+          "id": "completion-skips-carried-commands",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "completion-offers-groups-not-the-commands-they-carry"
+            ]
+          }
+        },
+        {
           "id": "extension-verb-vocabulary",
           "stage": "coded",
           "evidenceKinds": [
