@@ -117,22 +117,26 @@ await settle();
 
 const report: RouterNavigationReport = { scrolls: {}, documentLoads, locations: {}, errors };
 
-/** Run one navigation step from scroll position `y` and keep the scrolls it made. */
-async function step(name: string, y: number, go: () => Promise<void>): Promise<void> {
+/**
+ * Run one navigation step from scroll position `y` and keep the scrolls it
+ * made. The scroll runs in a layout effect of the commit that renders the new
+ * page, and React commits that page after the router turns idle, so the step
+ * waits until the page shows `heading`.
+ */
+async function step(name: string, y: number, heading: string, go: () => Promise<void>): Promise<void> {
   scrollY = y;
   scrolls = [];
   await go();
-  await waitFor(() => router.state.navigation.state === 'idle');
-  await settle();
+  await waitFor(() => container.querySelector('h1')?.textContent === heading);
   report.scrolls[name] = scrolls;
 }
 
 const href = () => `${router.state.location.pathname}${router.state.location.search}${router.state.location.hash}`;
 
-await step('newPage', 400, () => router.navigate('/b'));
-await step('hash', 250, () => router.navigate('/a#target'));
-await step('back', 0, () => router.navigate(-1));
-await step('preventScrollReset', 120, () => router.navigate('/a', { preventScrollReset: true }));
+await step('newPage', 400, 'b', () => router.navigate('/b'));
+await step('hash', 250, 'a', () => router.navigate('/a#target'));
+await step('back', 0, 'b', () => router.navigate(-1));
+await step('preventScrollReset', 120, 'a', () => router.navigate('/a', { preventScrollReset: true }));
 
 await router.navigate('/to-login');
 await settle();
