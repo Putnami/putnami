@@ -16,6 +16,9 @@
     "/tooling/extension-sdk",
     "/typescript/framework/client"
   ],
+  "publish": [
+    "archives"
+  ],
   "options": {
     "@putnami/go": {
       "entrypoint": "./cmd/putnami-clientgen",

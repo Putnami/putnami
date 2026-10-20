@@ -6,6 +6,7 @@
   "disable": {
     "jobs": ["serve"]
   },
+  "publish": ["archives"],
   "options": {
     "@putnami/go": {
       "entrypoint": "./cmd/putnami-dev",

@@ -9,6 +9,9 @@
     "/go/extension",
     "/tooling/sdd-extension"
   ],
+  "publish": [
+    "archives"
+  ],
   "options": {
     "@putnami/go": {
       "entrypoint": "./cmd/putnami-sdd",

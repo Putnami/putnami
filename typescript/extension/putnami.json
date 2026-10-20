@@ -12,6 +12,9 @@
   "dependencies": [
     "/protocols/http-routes"
   ],
+  "publish": [
+    "archives"
+  ],
   "options": {
     "@putnami/go": {
       "entrypoint": "./cmd/putnami-ts",

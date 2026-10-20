@@ -10,6 +10,9 @@
     "/go/extension",
     "/tooling/sdd-extension"
   ],
+  "publish": [
+    "archives"
+  ],
   "options": {
     "test": {
       "coverage-threshold": 50,

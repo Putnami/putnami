@@ -8,6 +8,9 @@
   "extensions": [
     "/go/extension"
   ],
+  "publish": [
+    "archives"
+  ],
   "options": {
     "@putnami/go": {
       "entrypoint": "./cmd/putnami-local-collaboration",
