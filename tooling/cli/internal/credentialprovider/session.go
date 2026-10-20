@@ -61,11 +61,12 @@ func (e *RefusalError) Error() string {
 	return fmt.Sprintf("the credential provider refused the %s credential (%s): %s", e.Purpose, e.Code, e.Message)
 }
 
-// PublicationRefusalError is a provider's refusal of a publication-v1 op:
-// resolve, open or release. Code names the refusal, one of
-// registry.PublicationRefusalCodes or another code the provider defines, and
-// Message is the provider's text, at most registry.MaxRefusalMessageBytes. A
-// refusal is an answer: nothing retries it.
+// PublicationRefusalError is a provider's refusal of a publication-v1 or
+// uploader-v1 op: resolve, open, upload or release. Code names the refusal,
+// one of registry.PublicationRefusalCodes, registry.UploadRefusalCodes or
+// another code the provider defines, and Message is the provider's text, at
+// most registry.MaxRefusalMessageBytes. A refusal is an answer: nothing
+// retries it.
 type PublicationRefusalError struct {
 	Op      registry.CredentialOp
 	Code    string
@@ -341,14 +342,16 @@ func (s *Session) call(ctx context.Context, op registry.CredentialOp, params any
 }
 
 // offeredCapabilities is what Initialize offers: credential-v1, which every
-// provider must echo, and publication-v1, which the provider's echo alone
-// decides (registry ADR 0003).
-var offeredCapabilities = []string{registry.CapabilityCredentialV1, registry.CapabilityPublicationV1}
+// provider must echo, and publication-v1 and uploader-v1, which the
+// provider's echo alone decides (registry ADR 0003). This CLI uploads every
+// publication member through the session, so a session that serves
+// publication-v1 without uploader-v1 cannot publish (UploaderRequiredError).
+var offeredCapabilities = []string{registry.CapabilityCredentialV1, registry.CapabilityPublicationV1, registry.CapabilityUploaderV1}
 
 // Initialize negotiates the protocol. A provider that answers with another
 // version or without the credential-v1 capability cannot serve this engine.
 // The session serves publication-v1 exactly when the answer echoes it
-// (Publication).
+// (Publication), and uploader-v1 when the answer echoes both (Uploader).
 //
 // A non-empty runCredential is the hosted run's bearer, handed to the provider
 // in the initialize line and nowhere else. An empty one leaves the line as it
@@ -400,6 +403,14 @@ func (s *Session) Publication() bool {
 	return slices.Contains(s.negotiated, registry.CapabilityPublicationV1)
 }
 
+// Uploader reports whether the session negotiated uploader-v1 beside
+// publication-v1: uploader-v1 alone serves no op.
+func (s *Session) Uploader() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Contains(s.negotiated, registry.CapabilityPublicationV1) && slices.Contains(s.negotiated, registry.CapabilityUploaderV1)
+}
+
 // Resolve asks for the heads of request's channels. The caller binds the
 // answer to the request (distribution.ValidateResolveExchange).
 func (s *Session) Resolve(ctx context.Context, request *distribution.ResolveRequest) (*distribution.ResolveResponse, error) {
@@ -448,10 +459,27 @@ func (s *Session) Release(ctx context.Context, params *registry.ReleaseParams) (
 	return &result.Response, nil
 }
 
-// publicationCall sends one publication-v1 op. It checks the payload with the
-// protocol's own parser before sending, so the provider never receives a
-// request this engine knows to be invalid, and it turns a refusal into a
-// *PublicationRefusalError.
+// Upload sends one packed member of the opened plan. The provider reads the
+// member's files from the outbox, uploads them with a credential it holds
+// itself, and answers what the registry stores. The request carries no
+// credential, and the caller compares the answered digest with the packed
+// one.
+func (s *Session) Upload(ctx context.Context, params *registry.UploadParams) (*registry.UploadResult, error) {
+	if params == nil {
+		return nil, errors.New("credential provider upload: no member")
+	}
+	if !s.Uploader() {
+		return nil, fmt.Errorf("credential provider op %s needs %s, which the session did not negotiate", registry.CredentialOpUpload, registry.CapabilityUploaderV1)
+	}
+	return publicationCall(ctx, s, registry.CredentialOpUpload, params,
+		func(payload json.RawMessage) error { _, err := registry.ParseUploadParams(payload); return err },
+		registry.ParseUploadResult)
+}
+
+// publicationCall sends one publication-v1 or uploader-v1 op. It checks the
+// payload with the protocol's own parser before sending, so the provider
+// never receives a request this engine knows to be invalid, and it turns a
+// refusal into a *PublicationRefusalError.
 func publicationCall[R any](
 	ctx context.Context,
 	s *Session,

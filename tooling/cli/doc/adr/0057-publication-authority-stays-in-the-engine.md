@@ -1,6 +1,10 @@
 # ADR 0057 — Publication authority stays in the engine
 
-- **Status**: accepted
+- **Status**: accepted, superseded in part by
+  [ADR 0076](0076-publication-uploads-leave-the-engine.md): the upload node
+  of decision 3 asks no `publish` credential and sends each member to the
+  credential provider session over `uploader-v1`, and the engine no longer
+  carries the SDK's upload clients
 - **Scope**: `@putnami/cli` (`internal/credentialprovider`,
   `internal/jobs`: release set, publication session, publication outbox,
   process capabilities; `internal/engine`; `internal/cli`)

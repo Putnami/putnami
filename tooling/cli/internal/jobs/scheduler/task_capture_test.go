@@ -10,9 +10,6 @@ import (
 	extensionproto "go.putnami.dev/protocol/extension"
 	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
-	pctx "go.putnami.dev/sdk/extension/context"
-	"go.putnami.dev/sdk/extension/dockerpublish"
-	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -1116,7 +1113,6 @@ func TestPackageDeclaredCaptureRoundTrip(t *testing.T) {
 
 func TestRestoredDockerCandidateFeedsSelectedPublishAlongsideSiblingMetadata(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "declared-output-cache-boundary", "restored-docker-candidate-feeds-selected-publish")
-	t.Setenv("DOCKER_REGISTRY", "")
 	job := declaredJob("package~docker", "docker", &extension.TaskDeclaration{Outputs: map[string]extension.DeclaredOutput{
 		"docker": dirDeclaration(extension.OutputRootCommandOutput, "docker", false),
 	}})
@@ -1142,10 +1138,11 @@ func TestRestoredDockerCandidateFeedsSelectedPublishAlongsideSiblingMetadata(t *
 	if got := readFileAt(t, filepath.Join(dockerDir, "oci", "index.json")); got != "candidate-layout\n" {
 		t.Fatalf("restored layout = %q", got)
 	}
-	ctx := &pctx.Context{WorkspaceRoot: f.ws.Root, Project: pctx.Project{Name: "team/app", Path: captureTestProject}}
-	status, data, err := dockerpublish.Publish(ctx, jsonl.New(), []string{"--dry-run"})
-	if err != nil || status != "OK" || data["contentTag"] != "c-candidate" {
-		t.Fatalf("Publish(restored candidate) = (%q, %+v, %v), want selected Docker dry run", status, data, err)
+	// The Docker publisher reads this typed candidate, never the shared index, so
+	// the sibling record leaves it intact.
+	candidate, err := pkgmeta.ReadDockerManifest(f.ws.Root, captureTestProject)
+	if err != nil || candidate.ContentHash != "candidate" || len(candidate.Tags) != 1 || candidate.Tags[0] != "team/app:c-candidate" {
+		t.Fatalf("ReadDockerManifest(restored candidate) = (%+v, %v), want the restored Docker candidate", candidate, err)
 	}
 }
 

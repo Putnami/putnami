@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	runner "go.putnami.dev/protocol/runner"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/doctor"
@@ -103,7 +104,7 @@ func (a *App) runBoundRequest(ctx context.Context, wsRoot string, cfg *wsproto.C
 	stopProviders, err := installCredentialProviders(providers, source, wsRoot, cfg, nil, os.Stderr)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
-		return ExitError
+		return protocolcli.ExitCodeForError(err)
 	}
 	defer stopProviders()
 	// A hosted request reads the remote cache through one provider, and hands

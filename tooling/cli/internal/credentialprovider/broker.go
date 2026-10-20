@@ -62,7 +62,12 @@ type Broker struct {
 	timeout  time.Duration
 	// releaseTimeout bounds one publication-v1 release (DefaultReleaseTimeout).
 	releaseTimeout time.Duration
-	source         string
+	// uploadTimeout is the base bound of one upload (DefaultUploadTimeout).
+	uploadTimeout time.Duration
+	source        string
+	// extensionName names the extension that declares the provider, in the
+	// errors that ask to upgrade it; empty when the broker does not know it.
+	extensionName string
 	// runCredential is the hosted run's bearer that New's opener hands to the
 	// provider at initialize; empty without one. A Broker is never formatted.
 	runCredential string
@@ -106,6 +111,12 @@ func WithReleaseTimeout(timeout time.Duration) Option {
 	return func(b *Broker) { b.releaseTimeout = timeout }
 }
 
+// WithUploadTimeout replaces DefaultUploadTimeout, the base bound of one
+// upload.
+func WithUploadTimeout(timeout time.Duration) Option {
+	return func(b *Broker) { b.uploadTimeout = timeout }
+}
+
 // WithSource names where the enabled purposes came from — `--providers`,
 // PUTNAMI_PROVIDERS or the execution request — in every error Bearer returns.
 func WithSource(source string) Option { return func(b *Broker) { b.source = source } }
@@ -128,6 +139,7 @@ func NewBroker(purposes []string, open Opener, options ...Option) *Broker {
 		connect:  make(chan struct{}, 1),
 
 		releaseTimeout: DefaultReleaseTimeout,
+		uploadTimeout:  DefaultUploadTimeout,
 	}
 	for _, purpose := range purposes {
 		if registry.ValidPurpose(purpose) {
@@ -284,13 +296,33 @@ func (b *Broker) sessionFor(ctx context.Context) (*Session, error) {
 // consumer asks for, and returns the error of that start, which the first
 // consumers within FailureBackoff also receive. A broker without a provider
 // starts nothing. A hosted run starts its provider before any repository code,
-// after which no provider may start (runcredential.StartHolder).
+// after which no provider may start (runcredential.StartHolder). A started
+// session that serves publication-v1 without uploader-v1 is an
+// *UploaderRequiredError when the run is hosted or enables the publish
+// purpose (requireUploader).
 func (b *Broker) Start(ctx context.Context) error {
 	if b == nil {
 		return nil
 	}
-	_, err := b.sessionFor(ctx)
-	return err
+	session, err := b.sessionFor(ctx)
+	if err != nil {
+		return err
+	}
+	return b.requireUploader(session)
+}
+
+// requireUploader refuses session when it serves publication-v1 without
+// uploader-v1 and the broker holds a hosted run's credential or enables the
+// publish purpose: this CLI sends every publication upload to the session,
+// so such a session cannot publish. Any other session passes.
+func (b *Broker) requireUploader(session *Session) error {
+	if session == nil || !session.Publication() || session.Uploader() {
+		return nil
+	}
+	if b.runCredential == "" && !b.Enabled(registry.PurposePublish) {
+		return nil
+	}
+	return &UploaderRequiredError{Extension: b.extensionName}
 }
 
 // Close shuts the provider down when it was started. Every later Bearer for

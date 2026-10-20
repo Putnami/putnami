@@ -3683,7 +3683,7 @@
       "id": "cli/provider-publication",
       "type": "feature",
       "name": "Publication through providers",
-      "outcome": "A user who publishes, locally or on a hosted runner, gets a run whose ancestry and publish credential are fixed before any repository code runs, whose uploads and channel release run in the engine through one provider session, and whose repository processes hold no publish credential, while a run or a bound request that only gates starts no publication",
+      "outcome": "A user who publishes, locally or on a hosted runner, gets a run whose ancestry and publish credential are fixed before any repository code runs, whose uploads and channel release go through one credential provider session, and in which neither the engine nor a repository process holds a publish credential, while a run or a bound request that only gates starts no publication",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -3739,7 +3739,7 @@
           }
         },
         {
-          "id": "uploads-run-in-the-engine",
+          "id": "uploads-go-to-the-credential-provider",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
           "verification": {
@@ -3747,26 +3747,22 @@
             "checks": [
               "a-publication-job-holds-no-credential",
               "a-hostile-publication-job-finds-no-credential",
-              "each-packed-member-is-uploaded-by-the-engine",
+              "each-packed-member-goes-to-the-session",
+              "the-engine-asks-no-publish-credential",
+              "the-answered-digest-must-be-the-packed-one",
               "a-tampered-artifact-is-refused-by-digest",
               "a-member-the-plan-does-not-select-is-refused",
               "a-reused-publication-job-fails-the-release",
-              "real-extension-jobs-pack-and-the-engine-uploads",
-              "a-probe-during-an-upload-finds-no-credential"
-            ]
-          }
-        },
-        {
-          "id": "put-registry-members-upload-in-the-engine",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "put-registry-members-are-uploaded-by-the-engine",
-              "a-put-member-is-checked-before-the-bearer-is-asked",
+              "real-extension-jobs-pack-and-the-session-uploads",
+              "a-probe-during-an-upload-finds-no-credential",
+              "put-registry-members-go-to-the-session",
+              "a-refused-upload-fails-the-member",
               "a-put-member-the-engine-did-not-upload-fails-the-release",
-              "every-put-registry-kind-uploads-with-no-bearer-in-the-repository"
+              "every-put-registry-kind-uploads-with-no-bearer-in-the-repository",
+              "an-upload-is-bounded-by-its-declared-size",
+              "an-unanswered-upload-ends-the-session",
+              "a-session-without-uploader-v1-fails-before-the-first-hook",
+              "the-core-requires-no-registry-client"
             ]
           }
         },

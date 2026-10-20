@@ -218,9 +218,6 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/protocol/diagnostic",
 			"go.putnami.dev/protocol/features",
 			"go.putnami.dev/protocol/workspace",
-			"go.putnami.dev/sdk/extension/context",
-			"go.putnami.dev/sdk/extension/dockerpublish",
-			"go.putnami.dev/sdk/extension/jsonl",
 			"go.putnami.dev/sdk/extension/ownerperm",
 			"go.putnami.dev/sdk/extension/registrycred",
 			"go.putnami.dev/tooling/cli/internal/cacheprovider",
@@ -239,7 +236,6 @@ var jobsSplitPackages = []jobsSplitPackage{
 	{
 		dir: "internal/jobs/publication",
 		allowed: []string{
-			"github.com/google/go-containerregistry/pkg/name",
 			"go.putnami.dev/cli/model/jobs",
 			"go.putnami.dev/cli/model/workspace",
 			"go.putnami.dev/protocol/ci",
@@ -247,6 +243,7 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/protocol/distribution",
 			"go.putnami.dev/protocol/extension",
 			"go.putnami.dev/protocol/job",
+			"go.putnami.dev/protocol/oci",
 			"go.putnami.dev/protocol/put",
 			"go.putnami.dev/protocol/registry",
 			"go.putnami.dev/protocol/runner",
@@ -256,7 +253,6 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/sdk/extension/memberprobe",
 			"go.putnami.dev/sdk/extension/pkgmeta",
 			"go.putnami.dev/sdk/extension/publicationoutbox",
-			"go.putnami.dev/sdk/extension/publicationupload",
 			"go.putnami.dev/sdk/extension/putpublish",
 			"go.putnami.dev/sdk/extension/releaseset",
 			"go.putnami.dev/tooling/cli/internal/cmderr",
@@ -269,18 +265,12 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"go.putnami.dev/tooling/cli/internal/store",
 		},
 		testOnly: []string{
-			"github.com/google/go-containerregistry/pkg/registry",
-			"github.com/google/go-containerregistry/pkg/v1/random",
 			"go.putnami.dev/cli/model/extension",
 			"go.putnami.dev/protocol/cli",
 			"go.putnami.dev/protocol/features/spectest",
-			"go.putnami.dev/sdk/extension/context",
-			"go.putnami.dev/sdk/extension/dockerpublish",
-			"go.putnami.dev/sdk/extension/jsonl",
 			"go.putnami.dev/sdk/extension/npmpublish",
-			"go.putnami.dev/sdk/extension/oci",
 			"go.putnami.dev/sdk/extension/profiles",
-			"go.putnami.dev/sdk/extension/registrycred",
+			"go.putnami.dev/sdk/extension/publicationupload/publicationuploadtest",
 			"go.putnami.dev/tooling/cli/internal/credentialprovider/providertest",
 			"go.putnami.dev/tooling/cli/internal/workspace",
 		},
@@ -290,7 +280,7 @@ var jobsSplitPackages = []jobsSplitPackage{
 			"release-set, registry and publication protocols and the SDK's publish formats, reads " +
 			"the git history, and starts the release-set provider under the run credential. Its " +
 			"tests run publication plans through the scheduler against a test credential provider " +
-			"and an in-process OCI registry",
+			"that uploads to fake registries",
 	},
 }
 

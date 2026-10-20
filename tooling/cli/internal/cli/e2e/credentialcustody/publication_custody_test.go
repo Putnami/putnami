@@ -272,7 +272,7 @@ func packPublicationMember() error {
 // declares the npm ecosystem, the credential provider, and a publish command
 // whose one task is a hostile publication job; the workspace's after-publish
 // hook is a hostile hook. With a gate, the publish command has a second step,
-// a hostile probe that runs while the engine uploads (runUploadProbeRole).
+// a hostile probe that runs during an upload (runUploadProbeRole).
 // Every report and log lies outside every probed root.
 type publicationFixture struct {
 	wsRoot      string
@@ -481,13 +481,13 @@ func (reg *custodyNPMRegistry) stored() ([]string, int) {
 // hunts for the publish credential in its environment, the user's home, the
 // workspace, the temporary directory, every descriptor it holds, and, on
 // Linux, the /proc environ, memory and descriptors of the engine and a ptrace
-// attach, then packs its member. The engine then uploads that member with the
-// credential the provider issues it after open, and an after-publish hook
-// hunts again once the engine has held the credential. Every probe runs and
-// finds nothing.
+// attach, then packs its member. After open the engine sends that member's
+// upload to the provider, which uploads it with the credential it holds; the
+// engine asks for none. An after-publish hook hunts again once the member is
+// uploaded. Every probe runs and finds nothing.
 func TestHostilePublicationJobFindsNoPublishCredential(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/provider-publication", "uploads-run-in-the-engine", "a-hostile-publication-job-finds-no-credential")
+	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "a-hostile-publication-job-finds-no-credential")
 	clitest.RequireShell(t)
 
 	self, err := os.Executable()
@@ -502,19 +502,22 @@ func TestHostilePublicationJobFindsNoPublishCredential(t *testing.T) {
 		t.Fatalf("publish exit=%d, want 0: %s\n%s", code, failureLines(output), output)
 	}
 
-	// The engine uploaded the packed member with the provider's credential.
+	// The provider uploaded the packed member with its own credential.
 	members, refused := npm.stored()
 	if len(members) != 1 || !strings.HasPrefix(members[0], publicationCoordinate+"@") || refused != 0 {
 		t.Errorf("the registry stores %v and refused %d requests; want the one member, every request with the publish credential", members, refused)
 	}
-	// The provider issued that credential once, after the plan opened, and
-	// released the set.
+	// The provider read the upload after the plan opened, then released the
+	// set. The engine never asked it for the publish credential.
 	calls := readLog(t, fx.providerLog)
 	open := slices.Index(calls, string(registry.CredentialOpOpen))
-	credential := slices.Index(calls, string(registry.CredentialOpCredential)+" "+registry.PurposePublish)
+	upload := slices.Index(calls, string(registry.CredentialOpUpload))
 	release := slices.Index(calls, string(registry.CredentialOpRelease))
-	if open < 0 || credential < open || release < credential {
-		t.Errorf("provider calls = %q; want open, then the publish credential, then release", calls)
+	if open < 0 || upload < open || release < upload {
+		t.Errorf("provider calls = %q; want open, then upload, then release", calls)
+	}
+	if slices.Contains(calls, string(registry.CredentialOpCredential)+" "+registry.PurposePublish) {
+		t.Errorf("provider calls = %q; the engine asked the publish credential", calls)
 	}
 
 	rootExempt := runtime.GOOS == "linux" && os.Geteuid() == 0

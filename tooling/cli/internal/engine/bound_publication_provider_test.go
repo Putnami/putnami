@@ -388,17 +388,20 @@ func TestBoundRequestPublishesThroughThePublicationProvider(t *testing.T) {
 		t.Fatalf("the bound publish opened %d plans, want one with the local digest %s: %+v", len(opens), localDigest, opens)
 	}
 	if stored, refused := npm.take(); stored != 1 || refused != 0 {
-		t.Errorf("the bound publish stored %d tarballs and the registry refused %d requests; want one upload with the publish credential", stored, refused)
+		t.Errorf("the bound publish stored %d tarballs and the registry refused %d requests; want one upload with the provider's publish credential", stored, refused)
 	}
 	var calls []string
 	for _, call := range provider.Calls() {
 		calls = append(calls, strings.TrimSpace(string(call.Op)+" "+call.Purpose))
 	}
 	open := slices.Index(calls, string(registry.CredentialOpOpen))
-	credential := slices.Index(calls, string(registry.CredentialOpCredential)+" "+registry.PurposePublish)
+	upload := slices.Index(calls, string(registry.CredentialOpUpload))
 	release := slices.Index(calls, string(registry.CredentialOpRelease))
-	if open < 0 || credential < open || release < credential || provider.Releases() != 1 {
-		t.Errorf("provider calls = %q with %d releases; want open, then the publish credential, then one release", calls, provider.Releases())
+	if open < 0 || upload < open || release < upload || provider.Releases() != 1 {
+		t.Errorf("provider calls = %q with %d releases; want open, then upload, then one release", calls, provider.Releases())
+	}
+	if slices.Contains(calls, string(registry.CredentialOpCredential)+" "+registry.PurposePublish) {
+		t.Errorf("provider calls = %q; the engine asked the publish credential", calls)
 	}
 	keys := planKeys(t, result.Plan)
 	assertPlanned(t, keys, boundPublicationOpenKey, "/app:publish~artifact~upload")

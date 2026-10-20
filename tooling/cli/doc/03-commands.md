@@ -156,7 +156,7 @@ Members are keyed by `(ecosystem, coordinate)`, not by project: one project yiel
 
 The channels are resolved exactly once and never again. The run's `data.releaseSet` outcome carries the exact `{id, digest}` and the head each channel now points at, with its generation. A compare-and-swap conflict on **any** channel writes nothing on any of them: the publication fails naming every head whose observed ref differs from the expectation, and re-running the publish plans against the current heads. A plan that selects nothing still releases: the provider answers `already-current` and the outcome names the unchanged heads.
 
-A credential provider that negotiates `publication-v1` takes the release-set provider's place: it resolves and releases over its session, and the engine uploads every npm, Go module, OCI and Put registry member; see [`--providers`](#credential-provider---providers).
+A credential provider that negotiates `publication-v1` takes the release-set provider's place: it resolves and releases over its session, and it uploads every npm, Go module, OCI and Put registry member the engine sends it over `uploader-v1`; see [`--providers`](#credential-provider---providers).
 
 Without a release-set provider, `putnami publish --all` still publishes every member to the registries the workspace declares, with git-derived versions. `--channel` is refused.
 
@@ -1331,7 +1331,7 @@ PUTNAMI_PROVIDERS=install putnami build --projects my-app
 | Value | Credential | Used by |
 |---|---|---|
 | `install` | `read` | the CLI's archive downloads: extensions, templates, agent workflows, the CLI binary |
-| `publish` | `publish` | the engine's uploads in a release-set publish, when the provider negotiates `publication-v1` |
+| `publish` | `publish` | a release-set publish through the provider's session, when it negotiates `publication-v1`; the provider uploads with this credential, and the engine never asks for it |
 
 The choice holds for one process. The CLI removes `PUTNAMI_PROVIDERS` from the
 environment of the tasks, hooks and extension commands it starts, so a nested
@@ -1347,12 +1347,13 @@ The credential provider is the one installed extension that declares the
 The CLI starts it on the first download that needs a credential and asks it
 once per credential for the whole process, again only when the credential
 nears its expiry. When `publish` is on, the CLI starts it before the first
-hook instead, locally as on a hosted run, so the publish credential comes from
+hook instead, locally as on a hosted run, so the publish credential stays in
 a provider that started before any repository code.
 
-When the provider also echoes the `publication-v1` capability, a release-set
-publish runs through that one session
-([ADR 0057](adr/0057-publication-authority-stays-in-the-engine.md)):
+When the provider also echoes the `publication-v1` and `uploader-v1`
+capabilities, a release-set publish runs through that one session
+([ADR 0057](adr/0057-publication-authority-stays-in-the-engine.md),
+[ADR 0076](adr/0076-publication-uploads-leave-the-engine.md)):
 
 1. The provider resolves the channels. No release-set provider process starts.
 2. The engine opens the plan once, after every task that neither publishes nor
@@ -1363,20 +1364,32 @@ publish runs through that one session
    credential. A publication job whose result is reused from a cache, or
    shared with another run, packed nothing in this run, so the release refuses
    the run and names the job.
-4. The engine hashes every packed file again, refuses a member the plan does
-   not assign to that job, and uploads each npm, Go module, OCI and Put
-   registry member itself with the `publish` credential. Each upload node
-   reports one `published-member` event in the session.
+4. The engine reads the outbox, refuses a member the plan does not assign to
+   that job, and sends each npm, Go module, OCI and Put registry member to
+   the session in one `upload` request. The provider hashes every packed file
+   again and uploads it with its own `publish` credential; the engine asks
+   for none.
+   The engine compares the answered digest with the packed one, and each
+   upload node reports one `published-member` event in the session. An
+   upload is sent once, bounded by 10 minutes plus 1 minute per 256 MiB of
+   the member's files; an upload the provider does not answer in time ends
+   the session, and the run fails.
 5. The engine releases the set over the same session. A refusal names its code
    and moves no channel.
 
 A Put registry member is a release archive (ecosystem `archive`) or a config,
-migration or site-content member (ecosystem `put`). The engine uploads its
-blobs and its manifest to the project's `registries.put.registry`, else the
-default Put registry, with [`put-write/v1`](../../../protocols/put/README.md),
-which moves no channel. Its digest is the SHA-256 of the manifest payload the
-registry stores. The engine refuses the release when a selected Put registry
-member has no engine upload, or when a job reports one itself.
+migration or site-content member (ecosystem `put`). The engine sends it to
+the session for the project's `registries.put.registry`, else the default Put
+registry, and the provider uploads its blobs and manifest with
+[`put-write/v1`](../../../protocols/put/README.md), which moves no channel.
+Its digest is the SHA-256 of the manifest payload the registry stores. The
+engine refuses the release when a selected Put registry member has no upload
+from an upload node, or when a job reports one itself.
+
+A provider that echoes `publication-v1` without `uploader-v1` cannot publish
+for this CLI. On a hosted run, or when `publish` is on, the command fails
+before the first hook with an invalid-configuration error (exit code 2) that
+names the provider's extension and asks you to upgrade it.
 
 The plan names the commit, its members and the channel heads, and nothing of
 the run that opens it, so a local run and a hosted run of one commit open the

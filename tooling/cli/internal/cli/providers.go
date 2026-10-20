@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	registry "go.putnami.dev/protocol/registry"
 	runner "go.putnami.dev/protocol/runner"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -106,7 +107,7 @@ func resolveExecutionPolicy(g *GlobalFlags, cfg *wsproto.Config, commands []stri
 	stop, err := installCredentialProviders(providers, source, wsRoot, cfg, extensions, os.Stderr)
 	if err != nil {
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
-		return func() {}, ExitError
+		return func() {}, protocolcli.ExitCodeForError(err)
 	}
 	return stop, ExitSuccess
 }
@@ -143,15 +144,18 @@ func guardCredentials(providers []string) error {
 // run refuses to start as a credential holder, because it is not its
 // extension's native runtime (*runcredential.NativeHolderError) or repository
 // code already ran (*runcredential.CustodyError), fails the command here with
-// that refusal, before the first hook. Any other failed start answers the
-// first credentials as a lazy start would.
+// that refusal, before the first hook. So does a session that serves
+// publication-v1 without uploader-v1 on such a run
+// (*credentialprovider.UploaderRequiredError, an invalid configuration): the
+// engine sends every publication upload to the provider. Any other failed
+// start answers the first credentials as a lazy start would.
 func installCredentialProviders(providers []string, source, wsRoot string, cfg *wsproto.Config, extensions []*extension.ExtensionDescription, stderr io.Writer) (func(), error) {
 	broker := credentialBroker(providers, source, wsRoot, cfg, extensions, stderr)
 	if broker == nil {
 		return func() {}, nil
 	}
 	if runcredential.Hosted() || broker.Enabled(registry.PurposePublish) {
-		if err := broker.Start(context.Background()); refusedHolder(err) {
+		if err := broker.Start(context.Background()); failsAtStart(err) {
 			_ = broker.Close()
 			return func() {}, err
 		}
@@ -167,12 +171,14 @@ func installCredentialProviders(providers []string, source, wsRoot string, cfg *
 	}, nil
 }
 
-// refusedHolder reports whether err is a hosted run's refusal to start a
-// credential holder.
-func refusedHolder(err error) bool {
+// failsAtStart reports whether err, the provider's start, fails the command:
+// a hosted run's refusal to start a credential holder, or a session that
+// cannot upload what the run publishes.
+func failsAtStart(err error) bool {
 	var native *runcredential.NativeHolderError
 	var custody *runcredential.CustodyError
-	return errors.As(err, &native) || errors.As(err, &custody)
+	var uploader *credentialprovider.UploaderRequiredError
+	return errors.As(err, &native) || errors.As(err, &custody) || errors.As(err, &uploader)
 }
 
 // credentialBroker returns the broker installCredentialProviders installs, or
