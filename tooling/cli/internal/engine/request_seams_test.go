@@ -137,7 +137,7 @@ func TestRequest_PreviewsOnly(t *testing.T) {
 
 // TestEngine_DryRunDecisionsGoThroughPreviewsOnly is the structural half. Three
 // stages ask "does this run actually execute?" — the plan-only preview, the
-// production preflight gate, and the unpublished-archives fatality — and every
+// production preflight gate, and the unpublished-channels fatality — and every
 // one of them must read previewsOnly. A stage that reads Global.DryRun directly
 // would silently reinstate the plan-only short circuit for extension aliases,
 // turning `putnami <group> <sub> --dry-run` into a no-op that still exits 0.

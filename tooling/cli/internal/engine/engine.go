@@ -803,9 +803,9 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	}
 	// sessionProjects is the selection as the SESSION made it, bound at the same
 	// seam because the next statement narrows selectedProjects to the owners of
-	// the release-set plan's members. A project that declares an archives
-	// publish and owns no member disappears there, so the archive guard below
-	// would never see its missing uploader. The guard reads THIS list;
+	// the release-set plan's members. A project that declares a publish channel
+	// and owns no member disappears there, so the publication guard below
+	// would never see its missing publish step. The guard reads THIS list;
 	// every other stage keeps reading the narrowed one, because that is what
 	// the run plans and executes. A deploy session WIDENS instead of narrowing,
 	// and every project it adds owns a member the coordinator accounts for, so
@@ -862,8 +862,8 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 
 	// Under an executing dry-run, exclude side-effecting jobs that never
 	// declared the dry-run flag they would have to interpret — BEFORE
-	// the archives detector below, so a dropped uploader surfaces as the
-	// existing actionable unpublished-archives failure instead of publishing.
+	// the publication guard below, so a dropped publish step surfaces as the
+	// existing actionable unpublished-channels failure instead of publishing.
 	//
 	// A supervisor that starts the serve steps itself then takes them out of the
 	// run, once the plan is final and before anything reads it for
@@ -882,21 +882,21 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 		return SessionResult{ExitCode: ExitError, Plan: planned, Projects: selectedProjects}, nil
 	}
 
-	// Detect a publish that leaves declared release archives with no uploader.
+	// Detect a publish that leaves a declared publish channel with no publish step.
 	// Computed from the plan against the pre-scope selection, and reported at
 	// the end so it is the last thing seen. Release-set members are left to
 	// the coordinator, which already fails the plan when a selected member has
 	// no publish step; a no-impact release keeps every member project for
 	// verification but plans no publish job, and must not read as missing
-	// uploaders. A project the release-set plan never announced is not
+	// publish steps. A project the release-set plan never announced is not
 	// coordinated by anything, so it is reported even though scoping dropped
 	// it.
-	unpublishedArchives, unannouncedArchives := unpublishedArchiveProjects(releaseSetOptions.Publishes, req.CommandParams, sessionProjects, planned, releaseSetRun.MemberProjectIDs())
+	unpublished, unannounced := unpublishedProjects(releaseSetOptions.Publishes, req.CommandParams, sessionProjects, planned, releaseSetRun.MemberProjectIDs())
 
 	// --plan: show the plan and exit.
 	if req.Global.Plan {
 		code := renderPlan(req, planned, selectedProjects)
-		reportUnpublishedArchives(unpublishedArchives, unannouncedArchives, discovered.Skipped, req.Global, false)
+		reportUnpublishedProjects(unpublished, unannounced, discovered.Skipped, req.Global, false)
 		return SessionResult{ExitCode: code, Plan: planned, Projects: selectedProjects}, nil
 	}
 
@@ -941,10 +941,10 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	}
 
 	// Phase 4: execute.
-	fatalUnpublishedArchives := len(unpublishedArchives) > 0 && !req.previewsOnly()
+	fatalUnpublished := len(unpublished) > 0 && !req.previewsOnly()
 	var finalizers []func(map[string]*scheduler.JobResult)
-	if fatalUnpublishedArchives {
-		finalizers = append(finalizers, unpublishedArchiveFailure(unpublishedArchives, unannouncedArchives, discovered.Skipped))
+	if fatalUnpublished {
+		finalizers = append(finalizers, unpublishedFailure(unpublished, unannounced, discovered.Skipped))
 	}
 	req.specGate = &specGateOutcome{}
 	// The gate's cache-recovery source reuses THIS run's cache manager, so the
@@ -968,9 +968,9 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	result := e.execute(ctx, req, ws, selectedProjects, discovered, planned, cacheManager, sink, finalizers...)
 	result.Plan, result.Projects = planned, selectedProjects
 	result = attachWithheldServeSteps(result, req, ws, withheld)
-	if len(unpublishedArchives) > 0 {
-		reportUnpublishedArchives(unpublishedArchives, unannouncedArchives, discovered.Skipped, req.Global, fatalUnpublishedArchives)
-		result.ExitCode = archivePublishExitCode(result.ExitCode, unpublishedArchives, fatalUnpublishedArchives)
+	if len(unpublished) > 0 {
+		reportUnpublishedProjects(unpublished, unannounced, discovered.Skipped, req.Global, fatalUnpublished)
+		result.ExitCode = publicationGuardExitCode(result.ExitCode, unpublished, fatalUnpublished)
 	}
 	return result, nil
 }

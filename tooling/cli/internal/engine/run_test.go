@@ -816,7 +816,7 @@ func TestExecute_ResultFinalizerFailureIncludedInJSONLStream(t *testing.T) {
 	f := newExecuteFixture(t)
 	f.req.Global.Output = "jsonl"
 	finalize := func(results map[string]*scheduler.JobResult) {
-		results[unpublishedArchiveFailureKey] = &scheduler.JobResult{
+		results[unpublishedFailureKey] = &scheduler.JobResult{
 			Status: "failed",
 			Error:  &scheduler.JobError{Message: "archive publisher missing"},
 		}
@@ -858,7 +858,7 @@ func TestExecute_ResultFinalizerFailureIncludedInJSONLStream(t *testing.T) {
 		if err := json.Unmarshal([]byte(line), &record); err != nil {
 			t.Fatal(err)
 		}
-		if record.Record == protocolcli.RecordTaskEnd && record.Identity != nil && record.Identity.Key == unpublishedArchiveFailureKey {
+		if record.Record == protocolcli.RecordTaskEnd && record.Identity != nil && record.Identity.Key == unpublishedFailureKey {
 			archiveFailure = record.Task
 		}
 	}
