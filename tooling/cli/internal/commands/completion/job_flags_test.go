@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -66,6 +67,32 @@ func jobOnlyFlagNames() []string {
 	return names
 }
 
+// hiddenJobFlags returns the global flags that only extension commands read
+// and that no core command declares as its own flag.
+func hiddenJobFlags() []string {
+	own := map[string]bool{}
+	for _, command := range commandmeta.Commands() {
+		for _, flag := range command.Flags {
+			own[flag.Long] = true
+		}
+	}
+	var names []string
+	for _, flag := range jobOnlyFlagNames() {
+		if !own[flag] {
+			names = append(names, flag)
+		}
+	}
+	return names
+}
+
+// scriptNamesFlag reports whether a script names flag as a whole word, in its
+// "--name" form or in fish's "-l 'name'" form: "--exclude" is not named by
+// "--exclude-tag".
+func scriptNamesFlag(script, flag string) bool {
+	name := regexp.QuoteMeta(strings.TrimPrefix(flag, "--"))
+	return regexp.MustCompile(`(^|[^A-Za-z0-9-])(--|-l '?)` + name + `($|[^A-Za-z0-9-])`).MatchString(script)
+}
+
 func TestCompletionOffersTheJobFlagsOnlyWithAJobCommand(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "job-flags-follow-job-commands", "help-and-completion-hide-the-job-flags-where-no-job-command-is-loaded")
@@ -119,6 +146,15 @@ func TestCompletionOffersTheJobFlagsOnlyWithAJobCommand(t *testing.T) {
 				generate(&script)
 				if got := strings.Contains(script.String(), "max-parallel"); got != c.offered {
 					t.Errorf("%s script offers --max-parallel = %v, want %v", shell, got, c.offered)
+				}
+				if c.offered {
+					continue
+				}
+				// Not even a value branch names a flag the script hides.
+				for _, flag := range hiddenJobFlags() {
+					if scriptNamesFlag(script.String(), flag) {
+						t.Errorf("%s script names %s, which it hides", shell, flag)
+					}
 				}
 			}
 		})

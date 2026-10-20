@@ -127,10 +127,14 @@ _putnami_completions() {
         COMPREPLY=( $(compgen -W "${structured_flags} ${global_flags}" -- "${cur}") )
     elif [[ "${prev}" == "--projects" ]]; then
         COMPREPLY=( $(compgen -W "${project_targets}" -- "${cur}") )
-    elif [[ "${prev}" == "--exclude" ]]; then
+`)
+	if ctx.offersGlobalFlag("--exclude") {
+		iox.Fprintf(w, `    elif [[ "${prev}" == "--exclude" ]]; then
         # --exclude matches project names.
         COMPREPLY=( $(compgen -W "${projects}" -- "${cur}") )
-    elif [[ "${prev}" == "--output" ]]; then
+`)
+	}
+	iox.Fprintf(w, `    elif [[ "${prev}" == "--output" ]]; then
         COMPREPLY=( $(compgen -W "%s" -- "${cur}") )
     elif [[ "${prev}" == "--tag" || "${prev}" == "--exclude-tag" ]]; then
         # Tags are dynamic — no static completion
