@@ -939,13 +939,6 @@ func (e *Engine) run(ctx context.Context, req *Request, sink EventSink) (Session
 	if fatalUnpublishedArchives {
 		finalizers = append(finalizers, unpublishedArchiveFailure(unpublishedArchives, unannouncedArchives, discovered.Skipped))
 	}
-	// The workspace map rides the same seam: it is core-owned work that
-	// attaches to a COMPLETED build session, and in check mode it has to be able
-	// to fail that session. A preview never executes, so the finalizer it would
-	// carry never runs.
-	if refreshMap := contextMapFinalizer(req, ws, selectedProjects); refreshMap != nil {
-		finalizers = append(finalizers, refreshMap)
-	}
 	req.specGate = &specGateOutcome{}
 	// The gate's cache-recovery source reuses THIS run's cache manager, so the
 	// memoized file-hash pass built for the execution keys is the one a recovery

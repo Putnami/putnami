@@ -6,59 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"go.putnami.dev/cli/model/workspace"
 )
-
-// Mode is what a build session does with the workspace map. The map
-// is ephemeral CLI state, so there is nothing to verify and nothing that can
-// drift: a session either refreshes it or leaves it alone.
-type Mode string
-
-const (
-	// ModeOff disables the build attachment entirely.
-	ModeOff Mode = "off"
-	// ModeWrite refreshes the selected projects' fragments and writes the two
-	// documents when they differ from what is on disk.
-	ModeWrite Mode = "write"
-)
-
-// ModeEnv is the explicit override / escape hatch for the build attachment:
-// off | write. CIEnv is the CI marker every other CI-sensitive default in this
-// CLI reads (internal/cli/cache_trust.go, internal/output/live.go).
-const (
-	ModeEnv = "PUTNAMI_CONTEXT_MAP"
-	CIEnv   = "CI"
-)
-
-// ResolveMode decides what a build session does with the workspace map, in
-// precedence order:
-//
-//  1. PUTNAMI_CONTEXT_MAP=off|write — the explicit override. An unrecognized
-//     value is IGNORED rather than fatal: a typo in an environment variable must
-//     not brick every build in a shell.
-//  2. CI non-empty ⇒ OFF. Nothing is committed, so there is nothing for a runner
-//     to keep honest, and a runner has no map consumer — the map's readers are
-//     the human and the agent at the keyboard. Spending a digest sweep per CI
-//     build to render a file nobody opens is pure cost.
-//  3. otherwise ⇒ WRITE. Locally, `putnami build` just leaves the ephemeral map
-//     correct, with no verb to remember.
-//
-// getenv is injected so the policy is testable without mutating the process
-// environment.
-func ResolveMode(getenv func(string) string) Mode {
-	switch Mode(strings.ToLower(strings.TrimSpace(getenv(ModeEnv)))) {
-	case ModeOff:
-		return ModeOff
-	case ModeWrite:
-		return ModeWrite
-	}
-	if strings.TrimSpace(getenv(CIEnv)) != "" {
-		return ModeOff
-	}
-	return ModeWrite
-}
 
 // Outcome values reported by Generate.
 const (
@@ -68,9 +18,8 @@ const (
 	OutcomeUpdated = "updated"
 )
 
-// Report is the machine-readable result of one generation run. It is shared by
-// `putnami context map` and by the build attachment, so both surfaces describe
-// the same run the same way.
+// Report is the machine-readable result of one generation run: what
+// `putnami context map` prints and emits under --output.
 type Report struct {
 	// Outcome is OutcomeClean or OutcomeUpdated.
 	Outcome string `json:"outcome"`

@@ -194,10 +194,10 @@ func TestContextMapCommand_SelectionScopesFragmentsNotTheMap(t *testing.T) {
 }
 
 // TestContextMapCommand_RefusesADegradedIdentity pins the guard that keeps the
-// manual verb, the build attachment, and the MCP tool from disagreeing: a
-// workspace that declares extensions but has adopted no provider view resolves
-// every project from authored config alone (no provider-derived dependency
-// edges), so the map would render without edges an agent would then trust.
+// command and the MCP tool from disagreeing: a workspace that declares
+// extensions but has adopted no provider view resolves every project from
+// authored config alone (no provider-derived dependency edges), so the map would
+// render without edges an agent would then trust.
 func TestContextMapCommand_RefusesADegradedIdentity(t *testing.T) {
 	root := mapCommandWorkspace(t)
 	if err := os.WriteFile(filepath.Join(root, "putnami.workspace.json"),

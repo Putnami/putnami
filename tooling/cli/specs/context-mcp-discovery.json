@@ -29,6 +29,10 @@
       "text": "The workspace map is a deterministic projection of committed inputs; printing it writes nothing, and MCP rebuilds the same projection in memory for each call."
     },
     {
+      "id": "build-writes-no-workspace-map",
+      "text": "A build session writes no workspace map and reads no variable that controls one. The map comes live from the MCP workspace_map tool, or on demand from putnami context map, which writes it under .putnami/context-map/."
+    },
+    {
       "id": "extension-tool-workspace-facts",
       "text": "A tool that declares workspaceSelection receives resolved workspace membership and the resolved selection on its request, from the same resolver the CLI's own commands use, so an extension never re-derives project identity or impact; a tool that does not declare it receives neither."
     },

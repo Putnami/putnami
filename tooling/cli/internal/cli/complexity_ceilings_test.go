@@ -84,9 +84,13 @@ var complexityCeilings = []complexityCeiling{
 	{
 		unit:   "engine",
 		prefix: "internal/engine/",
-		files:  25,
-		funcs:  186,
-		why: "RAISED 185→186 (cli/portable-runner, commit-request): refuseUnportableCommands reads the " +
+		files:  24,
+		funcs:  183,
+		why: "LOWERED 25/186→24/183 (cli/context-mcp-discovery, build-writes-no-workspace-map): " +
+			"context_map.go — the finalizer that refreshed the workspace map after a build session, its " +
+			"two stderr notices and the build-name check that gated it — is deleted. A build writes no " +
+			"map; resultsSucceeded, which the spec gate also uses, moves to spec_gate.go. " +
+			"RAISED 185→186 (cli/portable-runner, commit-request): refuseUnportableCommands reads the " +
 			"workload and rewritesSources traits for both the submitter and the executing engine; files stay at 25. " +
 			"RAISED 183→185 (cli/job-planning-execution, no-core-development-verb): " +
 			"the core declares no development verb, so the engine refuses a command no loaded extension " +

@@ -236,40 +236,9 @@ func TestResolveMap_ColdWorkspaceNeedsNoFragments(t *testing.T) {
 	}
 }
 
-// TestResolveMode_PrecedenceOrder pins the mode ladder the build attachment
-// reads: the explicit override wins, CI resolves to OFF (nothing is committed,
-// so a runner has nothing to keep honest and no map consumer), and everything
-// else writes. An unrecognized override falls through rather than failing — a
-// typo in an environment variable must not brick every build in a shell.
-func TestResolveMode_PrecedenceOrder(t *testing.T) {
-	cases := []struct {
-		name string
-		env  map[string]string
-		want Mode
-	}{
-		{"default", nil, ModeWrite},
-		{"ci is off", map[string]string{CIEnv: "true"}, ModeOff},
-		{"ci blank is not ci", map[string]string{CIEnv: "  "}, ModeWrite},
-		{"override beats ci", map[string]string{CIEnv: "true", ModeEnv: "write"}, ModeWrite},
-		{"override off", map[string]string{ModeEnv: "off"}, ModeOff},
-		{"override is case-insensitive", map[string]string{ModeEnv: "WRITE"}, ModeWrite},
-		{"typo falls through to the ci default", map[string]string{CIEnv: "1", ModeEnv: "yes"}, ModeOff},
-		{"typo falls through to write", map[string]string{ModeEnv: "yes"}, ModeWrite},
-		{"retired check value is not a mode", map[string]string{ModeEnv: "check"}, ModeWrite},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			getenv := func(key string) string { return tc.env[key] }
-			if got := ResolveMode(getenv); got != tc.want {
-				t.Errorf("ResolveMode(%v) = %q, want %q", tc.env, got, tc.want)
-			}
-		})
-	}
-}
-
-// TestGenerate_ReportsAnUnwritableStateDirectory pins the failure surface the
-// engine turns into a warning: an unusable .putnami state directory is an error
-// from Generate, not a silently skipped write.
+// TestGenerate_ReportsAnUnwritableStateDirectory pins the failure surface of
+// `putnami context map`: an unusable .putnami state directory is an error from
+// Generate, not a silently skipped write.
 func TestGenerate_ReportsAnUnwritableStateDirectory(t *testing.T) {
 	ws, api, lib := fixtureWorkspace(t)
 	// A regular file where the state directory belongs: every MkdirAll under it
