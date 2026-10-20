@@ -69,8 +69,8 @@ A scope that names no line is `-32602`, with a message that lists the lines.
 Outside a workspace the host answers `-32002`. A support catalog the host
 cannot parse, and a `PUTNAMI_SOURCE_REVISION` that is not a full lowercase
 commit ID, are `-32004` (`wire.CodeInvalidConfig`), with the message the core
-prints. The core exits 2 for them, so an extension command that reproduces
-`putnami version tag` exits 2 too. A Git failure, such as a shallow clone, is
+prints. The core exits 2 for an invalid configuration, and so do the version
+commands of `@putnami/dev`. A Git failure, such as a shallow clone, is
 `-32603`, which exits 1.
 If the host's answer names no source revision or
 no line, holds another line than your scope names, or holds a line whose

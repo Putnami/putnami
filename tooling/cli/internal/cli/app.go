@@ -289,7 +289,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// Resolve cache authority once, before hooks or bootstrap can mutate state.
 	// Extension-owned command groups defer this until their flat job command is
 	// known; built-in structured commands do not use the remote job cache.
-	if err := resolveCommandCacheTrust(&parsed.Global, cfg, extensions, parsed.Commands, parsed.Subcommand, extensionGroups); err != nil {
+	if err := resolveCommandCacheTrust(&parsed.Global, cfg, extensions, parsed.Commands, extensionGroups); err != nil {
 		iox.Fprintf(os.Stderr, "putnami: %v\n", err)
 		return ExitUsage
 	}
@@ -532,7 +532,7 @@ func ancestryCommands(parsed *ParsedArgs, extensions []*extension.ExtensionDescr
 // (ErrHostedExtensionCommand) and a run that watches (refuseHostedWatch).
 // extensions are the dispatch extensions, whose declared traits decide which
 // command is a release.
-func resolveCommandCacheTrust(global *GlobalFlags, cfg *wsproto.Config, extensions []*extension.ExtensionDescription, commands []string, subcommand string, extensionGroups map[string]bool) error {
+func resolveCommandCacheTrust(global *GlobalFlags, cfg *wsproto.Config, extensions []*extension.ExtensionDescription, commands []string, extensionGroups map[string]bool) error {
 	if err := refuseHostedWatch(runcredential.Hosted(), global, extensions, commands); err != nil {
 		return err
 	}
@@ -542,7 +542,7 @@ func resolveCommandCacheTrust(global *GlobalFlags, cfg *wsproto.Config, extensio
 	if isStructuredCommand(commands[0]) || extensionGroups[commands[0]] {
 		return nil
 	}
-	return resolveCacheTrust(global, cfg, extensions, commands, subcommand)
+	return resolveCacheTrust(global, cfg, extensions, commands)
 }
 
 // enterProcess takes what the invocation hands this process before anything

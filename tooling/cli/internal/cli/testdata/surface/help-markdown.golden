@@ -108,7 +108,6 @@ With no project target, feature branches run impacted projects vs trunk. On `mai
 | `putnami upgrade` | Upgrade CLI, extensions, and dependencies |
 | `putnami pin` | Pin the CLI version this workspace uses |
 | `putnami workspace describe` | Describe the active workspace |
-| `putnami version get|tag` | Versions derived from git and release tags |
 | `putnami cli list|use` | Installed CLI binaries |
 
 ## Extensions & Templates
@@ -441,69 +440,6 @@ putnami workspace describe [--output <format>]
 
 - `putnami workspace describe`
 - `putnami workspace describe --output=jsonl`
-
-### `putnami version`
-
-Show the version each line is at (get) and release a line (tag)
-
-**Usage**
-
-```
-putnami version <get|tag>
-```
-
-**Examples**
-
-- `putnami version get`
-- `putnami version tag --scope typescript --dry-run`
-- `putnami version tag --scope tooling --yes --push`
-
-### `putnami version get`
-
-Show the version every version line is at, derived from its git tags
-
-**Usage**
-
-```
-putnami version get [--scope <line>] [--output <format>]
-```
-
-**Flags**
-
-| Flag | Description |
-|------|-------------|
-| `--scope` <line> | Report only this version line, by its scope path |
-
-**Examples**
-
-- `putnami version get`
-- `putnami version get --scope typescript`
-- `putnami version get --output=jsonl`
-
-### `putnami version tag`
-
-Release a version line: regenerate its changelog, create the release commit, then the annotated tag on it
-
-**Usage**
-
-```
-putnami version tag [<tag>] [--scope <line>] [--push] [--dry-run] [--yes]
-```
-
-**Flags**
-
-| Flag | Description |
-|------|-------------|
-| `--scope` <line> | The version line to release, by its scope path (required when the workspace declares several) |
-| `--push` | Push the release commit and the tag to origin |
-| `--dry-run` | Print the proposed tag and changelog without writing anything |
-| `--yes` | Skip the confirmation and create the release commit and tag |
-
-**Examples**
-
-- `putnami version tag --scope typescript --dry-run`
-- `putnami version tag --scope tooling --yes --push`
-- `putnami version tag tooling/v0.3.0 --scope tooling --yes`
 
 ### `putnami cli`
 

@@ -372,15 +372,9 @@ No built-in starter opts into agent content, so `init` does not install `@putnam
 
 ### `version`
 
-Read the version each line is at (`get`) and release a line (`tag`).
+`putnami version get` and `putnami version tag` are commands of `@putnami/dev`, which every language extension depends on: see [its version commands](../../dev/README.md#the-version-commands). The core computes the versions they print and release. In a workspace without `@putnami/dev`, `putnami version` is a usage error that links the [commands that left the core CLI](../../doc/02-cli.md#commands-that-left-the-core-cli).
 
-```bash
-putnami version get                   # one line per version line: "<line> <version>"
-putnami version tag --scope typescript --dry-run
-putnami version tag --scope typescript --yes --push
-```
-
-There is no `version set` and no `version bump`: a version is **derived from git**, never declared. A commit carrying a release tag of its line has the tag's version; any other commit takes the line's last release advanced by the conventional commits that touch the line, plus an ordered pre-release suffix. `version tag` regenerates the line's changelog from the same commits, creates the release commit, then the annotated tag on it; `--push` pushes both. See [Version Management](14-version-management.md).
+There is no `version set` and no `version bump`: a version is **derived from git**, never declared. A commit carrying a release tag of its line has the tag's version; any other commit takes the line's last release advanced by the conventional commits that touch the line, plus an ordered pre-release suffix. See [Version Management](14-version-management.md).
 
 ### `cli`
 
@@ -1359,8 +1353,8 @@ written and sets no global flag, so `putnami run my-job -- --verbose` passes
 `--verbose` to the job and leaves the CLI's own output unchanged.
 
 A built-in command that runs no job reads no arguments after `--`, so it
-rejects a `--` with a usage error: `putnami version tag -- --push` stops
-before it tags anything.
+rejects a `--` with a usage error: `putnami cli use -- --global` stops
+before it switches anything.
 
 ### Credential provider: `--providers`
 

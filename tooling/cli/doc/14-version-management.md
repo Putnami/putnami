@@ -1,6 +1,8 @@
 # Version Management
 
-Putnami derives release versions from git and separates them from publishing. A version is never declared in a configuration file: `version get` computes it, `version tag` records it, and `publish` stamps every member with the version of the line its project belongs to.
+Putnami derives release versions from git and separates them from publishing. A version is never declared in a configuration file: the core computes it, `version get` prints it, `version tag` records it, and `publish` stamps every member with the version of the line its project belongs to.
+
+`putnami version get` and `putnami version tag` are commands of `@putnami/dev`, which every language extension depends on. They ask the core for the versions over the host RPC channel, so they need an interactive launch: a terminal or a CI step, not a hosted run. See [the `@putnami/dev` version commands](../../dev/README.md#the-version-commands).
 
 ## Version lines
 

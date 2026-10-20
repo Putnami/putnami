@@ -2797,6 +2797,7 @@ func TestTaggedPublishRequestsTheImmutableChannel(t *testing.T) {
 // A tagged publish needs a clean tree: the tag would otherwise name content
 // that is not what was tagged.
 func TestTaggedPublishRefusesADirtyTree(t *testing.T) {
+	spectest.Proves(t, "cli/channels", "tagged-publish-is-a-cohort", "a-dirty-tree-is-refused")
 	options := taggedPublishOptions()
 	options.Versions["typescript"].IsDirty = true
 	err := ValidateReleaseSetSelection(options)

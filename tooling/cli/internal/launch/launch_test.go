@@ -150,8 +150,10 @@ func TestIsExemptInvocation(t *testing.T) {
 		}
 	}
 
-	// A plain channel upgrade, the release-version subcommands, and everything
-	// else relaunch into the pinned engine as before.
+	// A plain channel upgrade, every spelling of version, and everything else
+	// relaunch into the pinned engine as before. The core serves no version
+	// command: the pinned engine runs @putnami/dev's version get and tag, and
+	// refuses the other spellings.
 	notExempt := [][]string{
 		{},
 		{"upgrade"},

@@ -115,13 +115,11 @@ func TestValidateStructuredFlags_LeavesUnknownPathsAlone(t *testing.T) {
 
 // TestParseArgs_BuiltInRejectsUnreadPassthrough pins that a built-in command,
 // which reads no passthrough, rejects a "--", so no payload token reaches a
-// handler that would read it as one of its own flags (`version tag -- --push`
-// pushed the tag).
+// handler that would read it as one of its own flags.
 func TestParseArgs_BuiltInRejectsUnreadPassthrough(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{
-		{"version", "tag", "--", "--push"},
-		{"version", "--", "tag"},
+		{"cli", "use", "--", "--global"},
 		{"tree", "fingerprint", "--", "--help"},
 		{"templates", "package", "--", "--stable"},
 		{"upgrade", "--", "--from-source"},

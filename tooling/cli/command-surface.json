@@ -931,53 +931,6 @@
       "positionals": []
     },
     {
-      "path": "version",
-      "flags": [],
-      "positionals": [
-        {
-          "name": "get|tag",
-          "required": true
-        }
-      ]
-    },
-    {
-      "path": "version get",
-      "flags": [
-        {
-          "long": "--scope",
-          "type": "value"
-        }
-      ],
-      "positionals": []
-    },
-    {
-      "path": "version tag",
-      "flags": [
-        {
-          "long": "--dry-run",
-          "type": "bool"
-        },
-        {
-          "long": "--push",
-          "type": "bool"
-        },
-        {
-          "long": "--scope",
-          "type": "value"
-        },
-        {
-          "long": "--yes",
-          "type": "bool"
-        }
-      ],
-      "positionals": [
-        {
-          "name": "tag",
-          "required": false
-        }
-      ]
-    },
-    {
       "path": "workspace",
       "flags": [],
       "positionals": []

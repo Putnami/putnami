@@ -309,7 +309,6 @@ Global Options:
 
 Related Commands:
   putnami upgrade
-  putnami version get
 
 ═══ projects ═══
 putnami projects
@@ -482,26 +481,6 @@ Global Options:
 Related Commands:
   putnami extensions update
   putnami deps install
-
-═══ version ═══
-putnami version
-
-Show the version each line is at (get) and release a line (tag)
-
-Usage:
-  putnami version <get|tag>
-
-Examples:
-  putnami version get
-  putnami version tag --scope typescript --dry-run
-  putnami version tag --scope tooling --yes --push
-
-Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
-  Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ workspace ═══
 putnami workspace
@@ -1527,55 +1506,6 @@ Related Commands:
   putnami templates package
   putnami extensions validate
   putnami templates install
-
-═══ version get ═══
-putnami version get
-
-Show the version every version line is at, derived from its git tags
-
-Usage:
-  putnami version get [--scope <line>] [--output <format>]
-
-Command Flags:
-  --scope <line>               Report only this version line, by its scope path
-
-Examples:
-  putnami version get
-  putnami version get --scope typescript
-  putnami version get --output=jsonl
-
-Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
-  Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
-
-═══ version tag ═══
-putnami version tag
-
-Release a version line: regenerate its changelog, create the release commit, then the annotated tag on it
-
-Usage:
-  putnami version tag [<tag>] [--scope <line>] [--push] [--dry-run] [--yes]
-
-Command Flags:
-  --scope <line>               The version line to release, by its scope path (required when the workspace declares several)
-  --push                       Push the release commit and the tag to origin
-  --dry-run                    Print the proposed tag and changelog without writing anything
-  --yes                        Skip the confirmation and create the release commit and tag
-
-Examples:
-  putnami version tag --scope typescript --dry-run
-  putnami version tag --scope tooling --yes --push
-  putnami version tag tooling/v0.3.0 --scope tooling --yes
-
-Global Options:
-  Common: --verbose, --debug, --watch, --plan, --help
-  Project Selection: --all, --impacted, --projects, --tag, --exclude-tag, --exclude, --baseline, --impacted-strict
-  Execution: --credential-fd, --no-cache, --no-cache-projects, --continue-on-error, --max-parallel, --resource, --cpu-policy, --retry, --retry-failed, --profile, --dry-run
-  Output: --output, --json, --quiet, --color, --no-color
-  Advanced: --trace-profile
 
 ═══ workspace describe ═══
 putnami workspace describe

@@ -79,8 +79,8 @@ func LineStableTest(repoRoot string, line LineSpec) CommitStableTest {
 //
 // Types other than feat, fix and perf advance nothing on their own: a
 // documentation commit does not make a release. A pre-release still floors at a
-// patch, but that floor belongs to NextVersion, not here — an explicit
-// `version tag` on a docs-only range must be able to see BumpNone and say so.
+// patch, but that floor belongs to NextVersion, not here — a caller on a
+// docs-only range must be able to see BumpNone and say so.
 func BumpFor(commits []Commit, preOne bool, stable CommitStableTest) (Bump, error) {
 	ceiling := BumpMajor
 	if preOne {

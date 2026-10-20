@@ -4,7 +4,9 @@
   name no side effects keep the `WellKnownVerbs` ones. Decisions 3, 4 and
   5, D2, D4 and the consequences are amended by
   [ADR 0073](0073-the-core-declares-no-development-verb.md): the core
-  declares no development verb and keeps no side-effect floor
+  declares no development verb and keeps no side-effect floor. D6 is decided
+  by [ADR 0002 of `@putnami/dev`](../../../dev/doc/adr/0002-the-dev-extension-serves-version-get-and-tag.md):
+  the dev executable serves `version get` and `version tag`
 - **Scope**: `@putnami/cli` (`internal/cli`, `internal/commands/completion`,
   `internal/extension`), `@putnami/cli-model` (`extension`),
   `go.putnami.dev/protocol/extension` and `go.putnami.dev/protocol/cli`

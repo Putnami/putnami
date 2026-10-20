@@ -172,9 +172,6 @@ Pin the CLI version this workspace uses.
 .B workspace describe
 Describe the active workspace.
 .TP
-.B version get|tag
-Versions derived from git and release tags.
-.TP
 .B cli list|use
 Installed CLI binaries.
 .SS Extensions & Templates
@@ -450,39 +447,6 @@ Confirm the active workspace and show its name, version, project count, extensio
 .B Usage:
 .br
 putnami workspace describe [--output <format>]
-.SS version
-Show the version each line is at (get) and release a line (tag).
-.PP
-.B Usage:
-.br
-putnami version <get|tag>
-.SS version get
-Show the version every version line is at, derived from its git tags.
-.PP
-.B Usage:
-.br
-putnami version get [--scope <line>] [--output <format>]
-.TP
-.B --scope
-Report only this version line, by its scope path.
-.SS version tag
-Release a version line: regenerate its changelog, create the release commit, then the annotated tag on it.
-.PP
-.B Usage:
-.br
-putnami version tag [<tag>] [--scope <line>] [--push] [--dry-run] [--yes]
-.TP
-.B --scope
-The version line to release, by its scope path (required when the workspace declares several).
-.TP
-.B --push
-Push the release commit and the tag to origin.
-.TP
-.B --dry-run
-Print the proposed tag and changelog without writing anything.
-.TP
-.B --yes
-Skip the confirmation and create the release commit and tag.
 .SS cli
 List the installed putnami CLI binaries (list) and switch the active one (use).
 .PP

@@ -359,29 +359,6 @@ example: putnami upgrade --channel canary
 example: putnami upgrade --release rs_<64-lowercase-hex> --namespace putnami
 example: putnami upgrade --deps --version 1.2.3
 example: putnami upgrade --from-source --global
-═══ version ═══
-description: Show the version each line is at (get) and release a line (tag)
-usage: putnami version <get|tag>
-example: putnami version get
-example: putnami version tag --scope typescript --dry-run
-example: putnami version tag --scope tooling --yes --push
-═══ version get ═══
-description: Show the version every version line is at, derived from its git tags
-usage: putnami version get [--scope <line>] [--output <format>]
-flag: --scope | <line> | Report only this version line, by its scope path
-example: putnami version get
-example: putnami version get --scope typescript
-example: putnami version get --output=jsonl
-═══ version tag ═══
-description: Release a version line: regenerate its changelog, create the release commit, then the annotated tag on it
-usage: putnami version tag [<tag>] [--scope <line>] [--push] [--dry-run] [--yes]
-flag: --scope | <line> | The version line to release, by its scope path (required when the workspace declares several)
-flag: --push |  | Push the release commit and the tag to origin
-flag: --dry-run |  | Print the proposed tag and changelog without writing anything
-flag: --yes |  | Skip the confirmation and create the release commit and tag
-example: putnami version tag --scope typescript --dry-run
-example: putnami version tag --scope tooling --yes --push
-example: putnami version tag tooling/v0.3.0 --scope tooling --yes
 ═══ workspace describe ═══
 description: Confirm the active workspace and show its name, version, project count, extension count, and configuration summary before selecting work
 usage: putnami workspace describe [--output <format>]

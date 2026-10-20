@@ -429,7 +429,7 @@ func TestIsStructuredCommand(t *testing.T) {
 		{"extensions", "extensions", true},
 		{"projects", "projects", true},
 		{"workspace", "workspace", true},
-		{"version", "version", true},
+		{"version is not structured", "version", false},
 		{"dev is not structured", "dev", false},
 		{"deps", "deps", true},
 		{"cache", "cache", true},

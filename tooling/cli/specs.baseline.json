@@ -134,7 +134,6 @@
     "cli/version-from-git#conventional-advance",
     "cli/version-from-git#full-clone-required",
     "cli/version-from-git#last-release-is-the-baseline",
-    "cli/version-from-git#release-commit-then-tag",
     "cli/version-from-git#tag-sets-the-version",
     "cli/windows-consumers#lf-checkout-policy",
     "cli/windows-consumers#one-binary-switch-on-windows",

@@ -89,8 +89,7 @@ func hostRPCVersionRepo(t *testing.T) (string, []string) {
 	return root, commits
 }
 
-// hostRPCLineSpec is the line of root whose scope path is scope, as
-// `version get` reads it.
+// hostRPCLineSpec is the line of root whose scope path is scope.
 func hostRPCLineSpec(t *testing.T, root, scope string) git.LineSpec {
 	t.Helper()
 	specs, err := versioncmd.LineSpecs(root)
@@ -143,7 +142,7 @@ func TestHostRPC_VersionLinesAnswersWhatTheCoreComputesForEachLine(t *testing.T)
 			t.Fatal(err)
 		}
 		if line.Version != info.Full || !strings.HasPrefix(line.Version, tc.base) || line.Tagged || line.Tag != "" {
-			t.Errorf("line %s: version %q, tagged %t, tag %q; want %q, which `version get` prints, untagged", line.Line, line.Version, line.Tagged, line.Tag, info.Full)
+			t.Errorf("line %s: version %q, tagged %t, tag %q; want %q, which GetVersionInfo computes, untagged", line.Line, line.Version, line.Tagged, line.Tag, info.Full)
 		}
 		if line.TagPattern != line.Line+"/v{version}" || line.Release == nil || *line.Release != tc.release {
 			t.Errorf("line %s: tag pattern %q, release %+v; want %s/v{version} and %+v", line.Line, line.TagPattern, line.Release, line.Line, tc.release)
@@ -168,7 +167,7 @@ func TestHostRPC_VersionLinesAnswersWhatTheCoreComputesForEachLine(t *testing.T)
 		_, err = client.VersionLines(t.Context(), tc.scope)
 		if !errors.As(err, &refusal) || refusal.Code != hostrpcproto.CodeInvalidParams ||
 			refusal.Message != `no version line "`+tc.named+`"; this workspace declares go, tooling` {
-			t.Fatalf("VersionLines(%q) = %v, want %d naming %q, as `version get --scope` does, and listing the lines",
+			t.Fatalf("VersionLines(%q) = %v, want %d naming %q and listing the lines",
 				tc.scope, err, hostrpcproto.CodeInvalidParams, tc.named)
 		}
 	}
@@ -242,7 +241,7 @@ func TestHostRPC_VersionLinesReportsAnInvalidConfigurationWithItsOwnCode(t *test
 		t.Fatalf("the helper process failed: %v\n%s", err, stdout)
 	}
 	report := hostRPCReport(string(stdout))
-	wantMessage := "version tag: " + git.SourceRevisionEnv + `="NOT-A-COMMIT" is not a full lowercase hex commit id (40 or 64 characters)`
+	wantMessage := "version: " + git.SourceRevisionEnv + `="NOT-A-COMMIT" is not a full lowercase hex commit id (40 or 64 characters)`
 	if report["code"] != strconv.Itoa(hostrpcproto.CodeInvalidConfig) || report["message"] != wantMessage {
 		t.Fatalf("version.lines with a malformed %s = %v, want %d with the message %q", git.SourceRevisionEnv, report, hostrpcproto.CodeInvalidConfig, wantMessage)
 	}

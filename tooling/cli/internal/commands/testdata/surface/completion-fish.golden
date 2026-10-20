@@ -68,7 +68,6 @@ complete -c putnami -n '__fish_use_subcommand' -a 'telemetry' -d 'Manage anonymo
 complete -c putnami -n '__fish_use_subcommand' -a 'templates' -d 'Manage templates'
 complete -c putnami -n '__fish_use_subcommand' -a 'tree' -d 'Identify the worktree the CLI runs in'
 complete -c putnami -n '__fish_use_subcommand' -a 'upgrade' -d 'Upgrade CLI, extensions, and dependencies'
-complete -c putnami -n '__fish_use_subcommand' -a 'version' -d 'Versions derived from git and release tags'
 complete -c putnami -n '__fish_use_subcommand' -a 'workspace' -d 'Manage workspace'
 
 # Subcommands
@@ -119,8 +118,6 @@ complete -c putnami -n '__putnami_complete_children templates' -a 'test'
 complete -c putnami -n '__putnami_complete_children templates' -a 'update'
 complete -c putnami -n '__putnami_complete_children templates' -a 'validate'
 complete -c putnami -n '__putnami_complete_children tree' -a 'fingerprint'
-complete -c putnami -n '__putnami_complete_children version' -a 'get'
-complete -c putnami -n '__putnami_complete_children version' -a 'tag'
 complete -c putnami -n '__putnami_complete_children workspace' -a 'describe'
 complete -c putnami -n '__putnami_complete_children workspace' -a 'init'
 
@@ -229,11 +226,6 @@ complete -c putnami -n '__putnami_seen_path upgrade' -l 'global' -d 'Upgrade the
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'namespace' -d 'Release-set namespace that published the --release id; accepted only with --release' -r
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'release' -d 'Use one immutable release-set snapshot for npm and Go dependencies (needs --namespace)' -r
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'version' -d 'Use an exact Putnami release version' -r
-complete -c putnami -n '__putnami_seen_path version get' -l 'scope' -d 'Report only this version line, by its scope path' -r
-complete -c putnami -n '__putnami_seen_path version tag' -l 'dry-run' -d 'Print the proposed tag and changelog without writing anything'
-complete -c putnami -n '__putnami_seen_path version tag' -l 'push' -d 'Push the release commit and the tag to origin'
-complete -c putnami -n '__putnami_seen_path version tag' -l 'scope' -d 'The version line to release, by its scope path (required when the workspace declares several)' -r
-complete -c putnami -n '__putnami_seen_path version tag' -l 'yes' -d 'Skip the confirmation and create the release commit and tag'
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'channel' -d 'Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -r
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'extension' -d 'Default extension to install' -a 'go py ts' -r
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'force' -d 'Reinitialize an existing workspace'

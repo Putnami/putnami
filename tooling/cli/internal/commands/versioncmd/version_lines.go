@@ -8,40 +8,38 @@ import (
 	"go.putnami.dev/tooling/cli/internal/git"
 )
 
-// LineReport is one version line as `version get` prints it and `version tag`
-// releases it, computed by the functions those commands call. The host RPC
-// method version.lines answers with it.
+// LineReport is one version line with its version and its next release. The
+// host RPC method version.lines answers with it, and the version commands of
+// @putnami/dev print or release from it.
 type LineReport struct {
 	// Spec is the line: its scope path and tag pattern.
 	Spec git.LineSpec
 	// Info is the line's version at HEAD (git.GetVersionInfo).
 	Info *git.VersionInfo
-	// Release is the release `version tag` creates without an explicit tag.
-	// It is nil when HEAD already carries the line's release tag, which
-	// `version tag` refuses to release again.
+	// Release is the line's next release when no explicit tag names it. It
+	// is nil when HEAD already carries the line's release tag, which is never
+	// released again.
 	Release *ProposedRelease
 	// Commits are the commits the release's changelog renders (lineCommits),
 	// newest first.
 	Commits []git.Commit
 }
 
-// ProposedRelease is the version and tag `version tag` proposes for a line.
+// ProposedRelease is the version and tag a line's next release takes.
 type ProposedRelease struct {
 	Version string
 	Tag     string
 }
 
-// LineSpecs are the workspace's version lines, sorted by scope path, as
-// `version get` and `version tag` read them.
+// LineSpecs are the workspace's version lines, sorted by scope path.
 func LineSpecs(wsRoot string) ([]git.LineSpec, error) {
 	return lineSpecs(wsRoot)
 }
 
-// SelectLines picks the lines a --scope value names, as `version get` does:
-// every line when the scope is empty once its leading and trailing slashes are
-// trimmed, else the one line whose scope path it is. A scope that names no line
-// is the ErrNotFound error that lists the declared lines by the trimmed scope,
-// as `version get --scope` reports it.
+// SelectLines picks the lines a --scope value names: every line when the scope
+// is empty once its leading and trailing slashes are trimmed, else the one line
+// whose scope path it is. A scope that names no line is the ErrNotFound error
+// that lists the declared lines by the trimmed scope.
 func SelectLines(specs []git.LineSpec, scope string) ([]git.LineSpec, error) {
 	scope = strings.Trim(scope, "/")
 	if scope == "" {
@@ -54,9 +52,9 @@ func SelectLines(specs []git.LineSpec, scope string) ([]git.LineSpec, error) {
 	return []git.LineSpec{spec}, nil
 }
 
-// ReportLine computes one line in the order `version tag` does: its version at
-// HEAD, then, unless HEAD is a release of the line, the release it proposes,
-// then the commits since the line's last release.
+// ReportLine computes one line in this order: its version at HEAD, then,
+// unless HEAD is a release of the line, the release it proposes, then the
+// commits since the line's last release.
 func ReportLine(wsRoot string, spec git.LineSpec) (LineReport, error) {
 	info, err := git.GetVersionInfo(wsRoot, spec)
 	if err != nil {
@@ -64,7 +62,7 @@ func ReportLine(wsRoot string, spec git.LineSpec) (LineReport, error) {
 	}
 	report := LineReport{Spec: spec, Info: info}
 	if !info.Tagged {
-		version, tag, err := proposedTag(wsRoot, spec, "")
+		version, tag, err := proposedTag(wsRoot, spec)
 		if err != nil {
 			return LineReport{}, err
 		}
@@ -76,14 +74,14 @@ func ReportLine(wsRoot string, spec git.LineSpec) (LineReport, error) {
 	return report, nil
 }
 
-// BoundRevision is the full commit ID requireSourceRevisionAtHead compares
-// with HEAD: the commit PUTNAMI_SOURCE_REVISION binds the run to when it is
-// set, else HEAD's, in lower case. A malformed PUTNAMI_SOURCE_REVISION is the
-// ErrInvalidConfig error `version tag` reports, with its message.
+// BoundRevision is the full commit ID a run is bound to, which a release
+// compares with HEAD: the commit PUTNAMI_SOURCE_REVISION names when it is set,
+// else HEAD's, in lower case. A malformed PUTNAMI_SOURCE_REVISION is an
+// ErrInvalidConfig error.
 func BoundRevision(wsRoot string) (string, error) {
 	revision, set, err := git.SourceRevisionOverride()
 	if err != nil {
-		return "", cmderr.InvalidConfigf("version tag: %v", err)
+		return "", cmderr.InvalidConfigf("version: %v", err)
 	}
 	if set {
 		return revision, nil

@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -16,11 +15,9 @@ import (
 	"strings"
 	"testing"
 
-	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
-	"go.putnami.dev/tooling/cli/internal/git"
 )
 
 func TestVersionList_Empty(t *testing.T) {
@@ -121,239 +118,6 @@ func gitInRepo(t *testing.T, dir string, args ...string) {
 	}
 }
 
-// `version get` reports EVERY line, because a repository has no single version
-// and printing one would name a number half the projects never carry.
-func TestVersionGetReportsEveryLine(t *testing.T) {
-	dir := versionLineRepo(t)
-	out, err := sharedtest.CaptureStdout(t, func() error { return VersionGet(dir, nil, "") })
-	if err != nil {
-		t.Fatalf("VersionGet: %v", err)
-	}
-	if !strings.Contains(out, "tooling ") || !strings.Contains(out, "typescript ") {
-		t.Fatalf("output = %q, want one line per version line", out)
-	}
-	if !strings.Contains(out, "0.0.0-") {
-		t.Fatalf("output = %q, want the untagged line at 0.0.0 plus the ordered suffix", out)
-	}
-}
-
-func TestVersionGetJSONLReportsTheTagAndTheLine(t *testing.T) {
-	dir := versionLineRepo(t)
-	gitInRepo(t, dir, "tag", "-a", "ts/v0.4.0", "-m", "release")
-
-	out, err := sharedtest.CaptureStdout(t, func() error {
-		return VersionGet(dir, []string{"--scope", "typescript"}, "jsonl")
-	})
-	if err != nil {
-		t.Fatalf("VersionGet: %v", err)
-	}
-	var entry versionResultEntry
-	if jsonErr := json.Unmarshal([]byte(strings.TrimSpace(out)), &entry); jsonErr != nil {
-		t.Fatalf("parse jsonl %q: %v", out, jsonErr)
-	}
-	if entry.Action != "get" || entry.Line != "typescript" || entry.Version != "0.4.0" ||
-		entry.Tag != "ts/v0.4.0" || !entry.Tagged {
-		t.Fatalf("entry = %+v, want the tagged typescript line at 0.4.0", entry)
-	}
-}
-
-func TestVersionGetRefusesAnUnknownLine(t *testing.T) {
-	dir := versionLineRepo(t)
-	err := VersionGet(dir, []string{"--scope", "python"}, "")
-	if err == nil || !strings.Contains(err.Error(), "no version line") {
-		t.Fatalf("err = %v, want a not-found for an undeclared line", err)
-	}
-}
-
-// A workspace of several lines has no default line: tagging the wrong one
-// publishes the wrong cohort, so the command asks instead of choosing.
-func TestVersionTagRequiresScopeWithSeveralLines(t *testing.T) {
-	dir := versionLineRepo(t)
-	err := VersionTag(context.Background(), dir, []string{"--dry-run"})
-	if err == nil || !strings.Contains(err.Error(), "--scope") {
-		t.Fatalf("err = %v, want a refusal naming --scope", err)
-	}
-}
-
-func TestVersionTagDryRunProposesTheTagAndTheChangelog(t *testing.T) {
-	dir := versionLineRepo(t)
-	gitInRepo(t, dir, "tag", "-a", "ts/v0.4.0", "-m", "release")
-	writeRepoFile(t, dir, "typescript/web/src.ts", "export const x = 1\n")
-	gitInRepo(t, dir, "add", "-A")
-	gitInRepo(t, dir, "commit", "-m", "feat(web): add the thing")
-
-	out, err := sharedtest.CaptureStdout(t, func() error {
-		return VersionTag(context.Background(), dir, []string{"--scope", "typescript", "--dry-run"})
-	})
-	if err != nil {
-		t.Fatalf("VersionTag --dry-run: %v", err)
-	}
-	if !strings.Contains(out, "ts/v0.4.1") {
-		t.Fatalf("output = %q, want the feat advanced to the patch 0.4.1 before 1.0", out)
-	}
-	if !strings.Contains(out, "### Features") || !strings.Contains(out, "feat(web): add the thing") {
-		t.Fatalf("output = %q, want the rendered changelog", out)
-	}
-	if _, statErr := os.Stat(filepath.Join(dir, "typescript", "CHANGELOG.md")); statErr == nil {
-		t.Fatal("--dry-run wrote the changelog")
-	}
-}
-
-// Before 1.0, only a breaking change moves a line to its next minor.
-func TestVersionTagDryRunProposesAMinorForABreakingChangeBeforeOne(t *testing.T) {
-	dir := versionLineRepo(t)
-	gitInRepo(t, dir, "tag", "-a", "ts/v0.4.0", "-m", "release")
-	writeRepoFile(t, dir, "typescript/web/src.ts", "export const x = 1\n")
-	gitInRepo(t, dir, "add", "-A")
-	gitInRepo(t, dir, "commit", "-m", "feat(web): add the thing")
-	writeRepoFile(t, dir, "typescript/web/src.ts", "export const y = 1\n")
-	gitInRepo(t, dir, "add", "-A")
-	gitInRepo(t, dir, "commit", "-m", "fix(web)!: rename x to y")
-
-	out, err := sharedtest.CaptureStdout(t, func() error {
-		return VersionTag(context.Background(), dir, []string{"--scope", "typescript", "--dry-run"})
-	})
-	if err != nil {
-		t.Fatalf("VersionTag --dry-run: %v", err)
-	}
-	if !strings.Contains(out, "ts/v0.5.0") {
-		t.Fatalf("output = %q, want the breaking change advanced to 0.5.0", out)
-	}
-}
-
-// The changelog is in the tagged commit, not beside it: the tag has to point at
-// a tree that already carries its own release notes (D30, R9).
-func TestVersionTagCommitsTheChangelogThenTags(t *testing.T) {
-	spectest.Proves(t, "cli/version-from-git", "release-commit-then-tag", "changelog-is-in-the-tagged-commit")
-	dir := versionLineRepo(t)
-	writeRepoFile(t, dir, "tooling/cli/src.go", "package cli\n")
-	gitInRepo(t, dir, "add", "-A")
-	gitInRepo(t, dir, "commit", "-m", "fix(cli): stop the leak")
-
-	if _, err := sharedtest.CaptureStdout(t, func() error {
-		return VersionTag(context.Background(), dir, []string{"--scope", "tooling", "--yes"})
-	}); err != nil {
-		t.Fatalf("VersionTag: %v", err)
-	}
-
-	tagged := gitOutputInRepo(t, dir, "show", "--name-only", "--format=%s", "tooling/v0.0.1")
-	if !strings.Contains(tagged, "chore(release): tooling 0.0.1") {
-		t.Fatalf("tag points at %q, want the release commit", tagged)
-	}
-	if !strings.Contains(tagged, "tooling/CHANGELOG.md") {
-		t.Fatalf("the tagged commit %q does not carry the changelog", tagged)
-	}
-	changelog := readRepoFile(t, dir, "tooling/CHANGELOG.md")
-	if !strings.Contains(changelog, "## 0.0.1") || !strings.Contains(changelog, "fix(cli): stop the leak") {
-		t.Fatalf("changelog = %q", changelog)
-	}
-	notes := gitOutputInRepo(t, dir, "tag", "-l", "--format=%(contents)", "tooling/v0.0.1")
-	if !strings.Contains(notes, "### Fixes") {
-		t.Fatalf("tag message = %q, want the same rendered notes", notes)
-	}
-}
-
-func TestVersionTagRefusesAnAlreadyTaggedHead(t *testing.T) {
-	dir := versionLineRepo(t)
-	gitInRepo(t, dir, "tag", "-a", "tooling/v0.1.0", "-m", "release")
-
-	err := VersionTag(context.Background(), dir, []string{"--scope", "tooling", "--yes"})
-	if err == nil || !strings.Contains(err.Error(), "already tagged") {
-		t.Fatalf("err = %v, want a refusal of an already-tagged HEAD", err)
-	}
-}
-
-// A dirty tree cannot be released: the tag would name source bytes no commit
-// identifies.
-func TestVersionTagRefusesADirtyTree(t *testing.T) {
-	spectest.Proves(t, "cli/version-from-git", "tag-sets-the-version", "dirty-tree-is-refused")
-	dir := versionLineRepo(t)
-	writeRepoFile(t, dir, "tooling/cli/uncommitted.go", "package cli\n")
-
-	err := VersionTag(context.Background(), dir, []string{"--scope", "tooling", "--yes"})
-	if err == nil || !strings.Contains(err.Error(), "not clean") {
-		t.Fatalf("err = %v, want a refusal of a dirty tree", err)
-	}
-}
-
-// A tag names the checked-out commit, so `version tag` refuses while
-// PUTNAMI_SOURCE_REVISION binds the run to any other commit, reachable or not,
-// before it writes anything. A binding that names HEAD itself proceeds. Not
-// parallel: it sets the environment.
-func TestVersionTagRefusesASourceRevisionOtherThanHEAD(t *testing.T) {
-	dir := versionLineRepo(t)
-	previous := strings.TrimSpace(gitOutputInRepo(t, dir, "rev-parse", "HEAD"))
-	writeRepoFile(t, dir, "tooling/cli/src.go", "package cli\n")
-	gitInRepo(t, dir, "add", "-A")
-	gitInRepo(t, dir, "commit", "-m", "fix(cli): stop the leak")
-	head := strings.TrimSpace(gitOutputInRepo(t, dir, "rev-parse", "HEAD"))
-
-	t.Setenv(git.SourceCommitTimeEnv, "1767323045")
-	for _, revision := range []string{previous, "0123456789abcdef0123456789abcdef01234567", strings.ToUpper(head)} {
-		t.Setenv(git.SourceRevisionEnv, revision)
-		err := VersionTag(context.Background(), dir, []string{"--scope", "tooling", "--yes"})
-		if err == nil || !strings.Contains(err.Error(), git.SourceRevisionEnv) {
-			t.Fatalf("VersionTag bound to %s = %v, want a refusal naming %s", revision, err, git.SourceRevisionEnv)
-		}
-	}
-	if tags := strings.TrimSpace(gitOutputInRepo(t, dir, "tag", "-l")); tags != "" {
-		t.Fatalf("a refused release created tags %q", tags)
-	}
-	if now := strings.TrimSpace(gitOutputInRepo(t, dir, "rev-parse", "HEAD")); now != head {
-		t.Fatalf("a refused release moved HEAD to %s", now)
-	}
-
-	t.Setenv(git.SourceRevisionEnv, head)
-	if _, err := sharedtest.CaptureStdout(t, func() error {
-		return VersionTag(context.Background(), dir, []string{"--scope", "tooling", "--yes"})
-	}); err != nil {
-		t.Fatalf("VersionTag bound to HEAD: %v", err)
-	}
-	if tags := strings.TrimSpace(gitOutputInRepo(t, dir, "tag", "-l")); tags != "tooling/v0.0.1" {
-		t.Fatalf("tags = %q, want the release tagged when the binding names HEAD", tags)
-	}
-}
-
-// Without --yes nothing is written: the proposal is printed and the command
-// stops, because a release is a human decision.
-func TestVersionTagWithoutYesWritesNothing(t *testing.T) {
-	dir := versionLineRepo(t)
-	out, err := sharedtest.CaptureStdout(t, func() error {
-		return VersionTag(context.Background(), dir, []string{"--scope", "tooling"})
-	})
-	if err != nil {
-		t.Fatalf("VersionTag: %v", err)
-	}
-	if !strings.Contains(out, "--yes") {
-		t.Fatalf("output = %q, want the confirmation prompt", out)
-	}
-	if _, statErr := os.Stat(filepath.Join(dir, "tooling", "CHANGELOG.md")); statErr == nil {
-		t.Fatal("the unconfirmed run wrote the changelog")
-	}
-}
-
-// An explicit tag name overrides the computed one, and a name that is not a
-// release tag of the line is refused rather than silently creating a tag no
-// reader takes as the line's release.
-func TestVersionTagExplicitNameMustBeAReleaseTagOfTheLine(t *testing.T) {
-	dir := versionLineRepo(t)
-	for _, name := range []string{"v9.9.9", "ts/v9.9", "ts/v9.9.9-rc.1", "ts/vnext"} {
-		err := VersionTag(context.Background(), dir, []string{name, "--scope", "typescript", "--dry-run"})
-		if err == nil || !strings.Contains(err.Error(), "is not a release tag of line") {
-			t.Fatalf("VersionTag(%s) err = %v, want a refusal of a name that is not a release tag", name, err)
-		}
-	}
-	out, err := sharedtest.CaptureStdout(t, func() error {
-		return VersionTag(context.Background(), dir, []string{"ts/v9.9.9", "--scope", "typescript", "--dry-run"})
-	})
-	if err != nil {
-		t.Fatalf("VersionTag: %v", err)
-	}
-	if !strings.Contains(out, "ts/v9.9.9") || !strings.Contains(out, "9.9.9") {
-		t.Fatalf("output = %q, want the explicit name honored", out)
-	}
-}
-
 func writeRepoFile(t *testing.T, dir, relPath, contents string) {
 	t.Helper()
 	full := filepath.Join(dir, filepath.FromSlash(relPath))
@@ -363,26 +127,6 @@ func writeRepoFile(t *testing.T, dir, relPath, contents string) {
 	if err := os.WriteFile(full, []byte(contents), 0o644); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func readRepoFile(t *testing.T, dir, relPath string) string {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(relPath)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(data)
-}
-
-func gitOutputInRepo(t *testing.T, dir string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return string(out)
 }
 
 // TestDownloadBinary_RejectsOversizedPayload verifies the response-size

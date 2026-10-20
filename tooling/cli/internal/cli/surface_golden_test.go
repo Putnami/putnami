@@ -221,8 +221,6 @@ var structuredHelpSubcommands = []string{
 	"templates test",
 	"templates update",
 	"templates validate",
-	"version get",
-	"version tag",
 	"workspace describe",
 	"workspace init",
 }

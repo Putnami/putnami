@@ -165,16 +165,6 @@ Flags can be combined. When no flags are given, all phases run against the `stab
 - `putnami sessions list` — List recorded job sessions
 - `putnami sessions inspect <id>` — Show details for a session
 
-### `putnami version`
-
-- `putnami version get` — Print the version each line is at, one line per version line
-- `putnami version tag --scope <line>` — Release a line: regenerate its changelog, create the release commit, then the annotated tag on it (`--push` pushes both, `--yes` skips the confirmation, `--dry-run` only prints)
-
-A version is derived from git, never declared: there is no `version set` and no
-`version bump`. `--scope <line>` is required when the workspace declares more
-than one version line. To update installed CLI binaries, use
-`putnami upgrade --cli` (workspace pin) or `putnami upgrade --global`.
-
 ### `putnami cli`
 
 - `putnami cli list [--global]` — List the installed CLI binaries in `.putnami/bin` (or `~/.putnami/bin` with `--global`) and mark the active one
@@ -191,7 +181,9 @@ to `putnami doctor --machine` in the core, and its language check moved to the
 `change` command group of `@putnami/contributor`. The `tree` command keeps
 `tree fingerprint`; `tree verify` moved to the same `change` group. The
 `proposals` command group keeps the operations of the collaboration contract;
-`proposals finalize` moved to the `change` group too.
+`proposals finalize` moved to the `change` group too. `version get` and
+`version tag` keep their names and moved to `@putnami/dev`, which every
+language extension depends on.
 
 | Former command | Command now | Extension that serves it |
 |---|---|---|
@@ -199,6 +191,7 @@ to `putnami doctor --machine` in the core, and its language check moved to the
 | `putnami ci init`, `ci validate`, `ci fmt`, `ci explain` | `putnami cloud ci init`, `cloud ci validate`, `cloud ci fmt`, `cloud ci explain` | `@putnami/cloud` |
 | `putnami features`, `specs`, `architecture`, `contracts` | Unchanged | `@putnami/sdd` |
 | `putnami version list`, `putnami version use <name>` | `putnami cli list`, `putnami cli use <name>` | None: the core serves `cli` |
+| `putnami version get`, `putnami version tag` | Unchanged | `@putnami/dev`, which every language extension depends on |
 | `putnami infra plan [<project>]` | `putnami cloud infra plan [<project>]` | `@putnami/cloud` |
 | `putnami change-plan --base <commit>` | `putnami impact-plan lint,test,build,validate --base <commit>`, then `ChangePlanFromImpactPlan` from `go.putnami.dev/protocol/ci` | None: the core serves `impact-plan` |
 | `putnami dev extension validate [path]` | `putnami extensions validate [path]` | None: the core serves `extensions` |

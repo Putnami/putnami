@@ -382,7 +382,7 @@ func TestRequireWorkspaceSuggestsInit(t *testing.T) {
 //
 // We only assert the return contract here; the stderr message goes via
 // the package's iox helper to os.Stderr and is straightforward to inspect
-// manually with `putnami version tag --output=jsonl`.
+// manually with `putnami cli use --output=jsonl`.
 func TestRejectStructuredIfUnsupported(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -396,24 +396,16 @@ func TestRejectStructuredIfUnsupported(t *testing.T) {
 		{
 			name:         "empty format passes through",
 			outputFormat: "",
-			cmd:          "version",
-			sub:          "get",
-			wantRejected: false,
-			wantCode:     ExitSuccess,
-		},
-		{
-			name:         "jsonl supported for version get",
-			outputFormat: "jsonl",
-			cmd:          "version",
-			sub:          "get",
+			cmd:          "cli",
+			sub:          "use",
 			wantRejected: false,
 			wantCode:     ExitSuccess,
 		},
 		{
 			name:         "jsonl rejected for unsupported mutating subcommand",
 			outputFormat: "jsonl",
-			cmd:          "version",
-			sub:          "tag",
+			cmd:          "cli",
+			sub:          "use",
 			wantRejected: true,
 			wantCode:     ExitUsage,
 		},
@@ -506,10 +498,10 @@ func TestRejectStructuredIfUnsupported(t *testing.T) {
 			wantCode:     ExitSuccess,
 		},
 		{
-			name:         "json rejected for unsupported version tag",
+			name:         "json rejected for unsupported cli use",
 			outputFormat: "json",
-			cmd:          "version",
-			sub:          "tag",
+			cmd:          "cli",
+			sub:          "use",
 			wantRejected: true,
 			wantCode:     ExitUsage,
 		},

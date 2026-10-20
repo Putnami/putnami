@@ -20,7 +20,7 @@ const cacheTrustOption = "cache-trust"
 // developer hint gate a release; "none" remains stricter and stays disabled.
 // extensions are the loaded extensions whose declared traits decide which
 // command is a release (releaseCacheTrustRequired).
-func resolveCacheTrust(g *GlobalFlags, cfg *wsproto.Config, extensions []*extension.ExtensionDescription, commands []string, subcommand string) error {
+func resolveCacheTrust(g *GlobalFlags, cfg *wsproto.Config, extensions []*extension.ExtensionDescription, commands []string) error {
 	if g == nil {
 		return nil
 	}
@@ -52,7 +52,7 @@ func resolveCacheTrust(g *GlobalFlags, cfg *wsproto.Config, extensions []*extens
 	if !trust.Valid() {
 		return fmt.Errorf("invalid %s value %q: must be one of ci, any, none", source, trust)
 	}
-	if releaseCacheTrustRequired(extensions, commands, subcommand) && trust == store.CacheTrustAny {
+	if releaseCacheTrustRequired(extensions, commands) && trust == store.CacheTrustAny {
 		trust = store.CacheTrustCI
 	}
 	g.CacheTrust = string(trust)
@@ -111,22 +111,13 @@ func stricterCacheTrust(left, right store.CacheTrust) bool {
 }
 
 // releaseCacheTrustRequired reports whether a run ships a release: a command
-// whose jobs declare registry side effects (extension.CommandSideEffects),
-// as the publish of @putnami/dev does, or a release tag. A cloud side effect alone, such
-// as deploy's, does not raise the trust. The tag arms read names: `version tag`
-// is a core command, which declares no traits.
-func releaseCacheTrustRequired(extensions []*extension.ExtensionDescription, commands []string, subcommand string) bool {
+// whose jobs declare registry side effects (extension.CommandSideEffects), as
+// the publish of @putnami/dev does. A cloud side effect alone, such as
+// deploy's, does not raise the trust.
+func releaseCacheTrustRequired(extensions []*extension.ExtensionDescription, commands []string) bool {
 	for _, command := range commands {
 		if extension.CommandPublishes(extensions, command) {
 			return true
-		}
-		switch command {
-		case "tag":
-			return true
-		case "version":
-			if subcommand == "tag" {
-				return true
-			}
 		}
 	}
 	return false

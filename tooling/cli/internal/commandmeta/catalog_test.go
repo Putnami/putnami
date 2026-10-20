@@ -236,7 +236,6 @@ func TestWorkspaceNeed_RequiresWorkspace(t *testing.T) {
 		{"cli list", nil, true},
 		{"cli list", []string{"--global"}, false},
 		{"cli use", []string{"-g"}, false},
-		{"version get", []string{"--global"}, true},
 		{"upgrade", nil, true},
 		{"upgrade", []string{"--global"}, false},
 		{"upgrade", []string{"-g"}, false},

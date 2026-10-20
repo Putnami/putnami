@@ -53,7 +53,7 @@ func TestResolveCacheTrustPrecedenceAndDefaults(t *testing.T) {
 			t.Setenv("CI", tt.ci)
 			g := &GlobalFlags{CacheTrust: tt.flag}
 			cfg := &wsproto.Config{Options: tt.options}
-			if err := resolveCacheTrust(g, cfg, nil, tt.commands, ""); err != nil {
+			if err := resolveCacheTrust(g, cfg, nil, tt.commands); err != nil {
 				t.Fatalf("resolveCacheTrust: %v", err)
 			}
 			if got := store.CacheTrust(g.CacheTrust); got != tt.want {
@@ -75,21 +75,18 @@ func TestResolveCacheTrustReleasePathsForceAuthoritative(t *testing.T) {
 		},
 	}}
 	tests := []struct {
-		name       string
-		commands   []string
-		subcommand string
-		flag       string
-		want       store.CacheTrust
+		name     string
+		commands []string
+		flag     string
+		want     store.CacheTrust
 	}{
-		{"publish raises any to ci", []string{"publish"}, "", "any", store.CacheTrustCI},
-		{"tag raises any to ci", []string{"tag"}, "", "any", store.CacheTrustCI},
-		{"version tag raises any to ci", []string{"version"}, "tag", "any", store.CacheTrustCI},
-		{"publish preserves stricter none", []string{"publish"}, "", "none", store.CacheTrustNone},
+		{"publish raises any to ci", []string{"publish"}, "any", store.CacheTrustCI},
+		{"publish preserves stricter none", []string{"publish"}, "none", store.CacheTrustNone},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := &GlobalFlags{CacheTrust: tt.flag}
-			if err := resolveCacheTrust(g, &wsproto.Config{}, loaded, tt.commands, tt.subcommand); err != nil {
+			if err := resolveCacheTrust(g, &wsproto.Config{}, loaded, tt.commands); err != nil {
 				t.Fatalf("resolveCacheTrust: %v", err)
 			}
 			if got := store.CacheTrust(g.CacheTrust); got != tt.want {
@@ -133,7 +130,7 @@ func TestResolveCacheTrustReleaseFollowsTheDeclaredSideEffects(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			g := &GlobalFlags{CacheTrust: string(store.CacheTrustAny)}
-			if err := resolveCacheTrust(g, &wsproto.Config{}, tt.extensions, tt.commands, ""); err != nil {
+			if err := resolveCacheTrust(g, &wsproto.Config{}, tt.extensions, tt.commands); err != nil {
 				t.Fatalf("resolveCacheTrust: %v", err)
 			}
 			if got := store.CacheTrust(g.CacheTrust); got != tt.want {
@@ -148,14 +145,14 @@ func TestResolveCacheTrustRejectsInvalidSources(t *testing.T) {
 	t.Run("flag", func(t *testing.T) {
 		t.Setenv("PUTNAMI_CACHE_TRUST", "ci")
 		g := &GlobalFlags{CacheTrust: "unsafe"}
-		err := resolveCacheTrust(g, &wsproto.Config{}, nil, []string{"build"}, "")
+		err := resolveCacheTrust(g, &wsproto.Config{}, nil, []string{"build"})
 		if err == nil || !strings.Contains(err.Error(), "--cache-trust") {
 			t.Fatalf("error = %v, want flag-specific validation", err)
 		}
 	})
 	t.Run("environment", func(t *testing.T) {
 		t.Setenv("PUTNAMI_CACHE_TRUST", "unsafe")
-		err := resolveCacheTrust(&GlobalFlags{}, &wsproto.Config{}, nil, []string{"build"}, "")
+		err := resolveCacheTrust(&GlobalFlags{}, &wsproto.Config{}, nil, []string{"build"})
 		if err == nil || !strings.Contains(err.Error(), "PUTNAMI_CACHE_TRUST") {
 			t.Fatalf("error = %v, want env-specific validation", err)
 		}
@@ -165,7 +162,7 @@ func TestResolveCacheTrustRejectsInvalidSources(t *testing.T) {
 		cfg := &wsproto.Config{Options: map[string]map[string]any{
 			"build": {cacheTrustOption: "unsafe"},
 		}}
-		err := resolveCacheTrust(&GlobalFlags{}, cfg, nil, []string{"build"}, "")
+		err := resolveCacheTrust(&GlobalFlags{}, cfg, nil, []string{"build"})
 		if err == nil || !strings.Contains(err.Error(), "options.build.cache-trust") {
 			t.Fatalf("error = %v, want config-specific validation", err)
 		}

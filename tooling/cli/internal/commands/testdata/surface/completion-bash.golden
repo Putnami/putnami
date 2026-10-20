@@ -19,7 +19,6 @@ _putnami_subcommands_for() {
         'telemetry') printf '%s\n' 'off on show status' ;;
         'templates') printf '%s\n' 'install list package remove test update validate' ;;
         'tree') printf '%s\n' 'fingerprint' ;;
-        'version') printf '%s\n' 'get tag' ;;
         'workspace') printf '%s\n' 'describe init' ;;
     esac
 }
@@ -98,9 +97,6 @@ _putnami_path_known() {
         'tree') return 0 ;;
         'tree fingerprint') return 0 ;;
         'upgrade') return 0 ;;
-        'version') return 0 ;;
-        'version get') return 0 ;;
-        'version tag') return 0 ;;
         'workspace') return 0 ;;
         'workspace describe') return 0 ;;
         'workspace init') return 0 ;;
@@ -140,8 +136,6 @@ _putnami_flags_for() {
         'templates package') printf '%s\n' '--stable --version' ;;
         'templates test') printf '%s\n' '--keep --skip-build' ;;
         'upgrade') printf '%s\n' '--channel --cli --deps --dry-run --extensions --from-source --global --namespace --release --version' ;;
-        'version get') printf '%s\n' '--scope' ;;
-        'version tag') printf '%s\n' '--dry-run --push --scope --yes' ;;
         'workspace init') printf '%s\n' '--channel --extension --force --project --project-path --workspace' ;;
     esac
 }
@@ -150,8 +144,8 @@ _putnami_completions() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="cache cli completion compose config context deps doctor extensions help impact-plan init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade version workspace"
-    local structured="cache cli completion compose config context deps doctor extensions help impact-plan init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade version workspace"
+    local commands="cache cli completion compose config context deps doctor extensions help impact-plan init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade workspace"
+    local structured="cache cli completion compose config context deps doctor extensions help impact-plan init install mcp migrate pin projects qualify report scopes sessions telemetry templates tree upgrade workspace"
     local global_flags="--verbose --debug --watch --plan --help --all --impacted --projects --tag --exclude-tag --exclude --baseline --impacted-strict --where --providers --credential-fd --no-cache --no-cache-projects --cache-trust --continue-on-error --max-parallel --resource --cpu-policy --retry --retry-failed --profile --dry-run --output --json --quiet --color --no-color --trace-profile --version"
     local projects=""
     local project_ids=""

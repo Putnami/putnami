@@ -21,7 +21,7 @@
     },
     {
       "id": "tagged-publish-is-a-cohort",
-      "text": "A publish on a tagged commit republishes every member of the tag's line at the tag's version and creates an immutable channel named after the tag in the portable encoding."
+      "text": "A publish on a tagged commit republishes every member of the tag's line at the tag's version and creates an immutable channel named after the tag in the portable encoding. It refuses a dirty tree, whose content the tag would not name."
     },
     {
       "id": "protected-channels",

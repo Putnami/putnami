@@ -1,21 +1,20 @@
 package versioncmd
 
 import (
-	"context"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
 	supportproto "go.putnami.dev/protocol/support"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 )
 
-// The bump reads the support status of the projects a commit touches inside
-// its line: a commit that touches no project the catalog lists as stable
-// advances a patch at most, and a workspace with no catalog reads every commit
-// as stable.
-func TestVersionTagBumpFollowsTheSupportCatalog(t *testing.T) {
+// The release a line proposes reads the support status of the projects a
+// commit touches inside the line: a commit that touches no project the catalog
+// lists as stable advances a patch at most, and a workspace with no catalog
+// reads every commit as stable.
+func TestProposedReleaseFollowsTheSupportCatalog(t *testing.T) {
+	t.Parallel()
 	spectest.Proves(t, "cli/version-from-git", "conventional-advance", "bump-follows-the-support-catalog")
 	for _, testCase := range []struct {
 		name, last, subject string
@@ -51,6 +50,7 @@ func TestVersionTagBumpFollowsTheSupportCatalog(t *testing.T) {
 			subject: "feat(lab)!: drop the flag", files: []string{"typescript/lab/src.ts"}, want: "ts/v0.5.0"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			dir := supportCatalogRepo(t, !testCase.noCatalog)
 			if testCase.webDependsOnKit {
 				writeRepoFile(t, dir, "typescript/web/"+wsproto.ConfigFilename,
@@ -71,28 +71,35 @@ func TestVersionTagBumpFollowsTheSupportCatalog(t *testing.T) {
 			gitInRepo(t, dir, "add", "-A")
 			gitInRepo(t, dir, "commit", "-m", testCase.subject)
 
-			out, err := sharedtest.CaptureStdout(t, func() error {
-				return VersionTag(context.Background(), dir, []string{"--scope", "typescript", "--dry-run"})
-			})
+			specs, err := LineSpecs(dir)
 			if err != nil {
-				t.Fatalf("VersionTag --dry-run: %v", err)
+				t.Fatalf("LineSpecs: %v", err)
 			}
-			if !strings.Contains(out, testCase.want) {
-				t.Fatalf("output = %q, want %s", out, testCase.want)
+			lines, err := SelectLines(specs, "typescript")
+			if err != nil {
+				t.Fatalf("SelectLines: %v", err)
+			}
+			report, err := ReportLine(dir, lines[0])
+			if err != nil {
+				t.Fatalf("ReportLine: %v", err)
+			}
+			if report.Release == nil || report.Release.Tag != testCase.want {
+				t.Fatalf("proposed release = %+v, want %s", report.Release, testCase.want)
 			}
 		})
 	}
 }
 
-// A release refuses a catalog it cannot read rather than reading it as absent,
-// which would raise the bump of every preview project without a word.
-func TestVersionTagRefusesAnInvalidSupportCatalog(t *testing.T) {
+// The version lines refuse a catalog they cannot read rather than reading it as
+// absent, which would raise the bump of every preview project without a word.
+func TestLineSpecsRefuseAnInvalidSupportCatalog(t *testing.T) {
+	t.Parallel()
 	dir := supportCatalogRepo(t, false)
 	writeRepoFile(t, dir, supportproto.CatalogFilename, `{"protocolVersion": 1, "entries": [{"id": "@putnami/web"}]}`)
 	gitInRepo(t, dir, "add", "-A")
 	gitInRepo(t, dir, "commit", "-m", "chore: break the catalog")
 
-	err := VersionTag(context.Background(), dir, []string{"--scope", "typescript", "--dry-run"})
+	_, err := LineSpecs(dir)
 	if err == nil || !strings.Contains(err.Error(), "putnami.support.json") {
 		t.Fatalf("err = %v, want a refusal naming putnami.support.json", err)
 	}
