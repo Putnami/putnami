@@ -53,6 +53,8 @@ interface Scripted {
   readonly url: string;
   /** Every frame the real client wrote, as the provider saw it. */
   readonly received: Record<string, unknown>[];
+  /** Settles when the provider sees the first client socket close. */
+  readonly closed: Promise<void>;
   stop(): void;
 }
 
@@ -67,6 +69,10 @@ function scriptedProvider(options: {
   subprotocol?: string | undefined;
 }): Scripted {
   const received: Record<string, unknown>[] = [];
+  let markClosed: () => void = () => {};
+  const closed = new Promise<void>((resolve) => {
+    markClosed = resolve;
+  });
   const echoed = options.subprotocol === undefined ? SERVICE_WEBSOCKET_SUBPROTOCOL : options.subprotocol;
   const server = Bun.serve<{ index: number }, Record<string, never>>({
     port: 0,
@@ -85,15 +91,32 @@ function scriptedProvider(options: {
         socket.data.index += 1;
         options.respond(frame, (out) => socket.send(JSON.stringify(out)), index);
       },
+      close() {
+        markClosed();
+      },
     },
   });
   const scripted: Scripted = {
     url: `http://localhost:${server.port}/watch`,
     received,
+    closed,
     stop: () => server.stop(true),
   };
   servers.push(scripted.stop);
   return scripted;
+}
+
+/** Polls until the provider state the test needs is reached, so no step races a fixed sleep. */
+async function waitFor(condition: () => boolean): Promise<void> {
+  const deadline = Date.now() + 4000;
+  while (!condition()) {
+    if (Date.now() > deadline) throw new Error('condition never became true');
+    await Bun.sleep(5);
+  }
+}
+
+function receivedInit(provider: Scripted): boolean {
+  return provider.received.some((frame) => frame['type'] === 'init');
 }
 
 function operationContract(overrides: Partial<ClientContractOperation> = {}): ClientContractOperation {
@@ -530,7 +553,7 @@ describe('first-party websocket client, conversation', () => {
       session,
     );
     const failure = collect(stream).catch((error: unknown) => error);
-    await Bun.sleep(20);
+    await waitFor(() => receivedInit(provider));
     provider.stop();
     expect(await failure).toBeInstanceOf(ClientResponseContractError);
   });
@@ -547,9 +570,9 @@ describe('first-party websocket client, conversation', () => {
       { stream: 'server', output, resumeDeclared: false },
       session,
     );
-    await Bun.sleep(30);
+    await waitFor(() => receivedInit(provider));
     stream.cancel();
-    await Bun.sleep(20);
+    await provider.closed;
     expect(provider.received.filter((frame) => frame['type'] === 'cancel')).toEqual([
       { v: 1, type: 'cancel', code: 'canceled' },
     ]);
