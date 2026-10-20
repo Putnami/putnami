@@ -9,7 +9,9 @@ import (
 	"testing"
 
 	"go.putnami.dev/go/extension/internal/jobs/cachepolicy"
+	"go.putnami.dev/go/extension/internal/jobs/depsedit"
 	"go.putnami.dev/go/extension/internal/jobs/depsupgrade"
+	"go.putnami.dev/go/extension/internal/jobs/projectsetup"
 	"go.putnami.dev/go/extension/internal/jobs/workspaceinstall"
 	runtimeproto "go.putnami.dev/protocol/runtime"
 	"go.putnami.dev/sdk/extension/cli"
@@ -157,7 +159,7 @@ func TestRunEntrypointDispatchesCompleteCommandSet(t *testing.T) {
 		"build", "build-generate", "build-describe", "test", "lint", "serve",
 		"run", "package", "publish", "config-extract", "config-merge",
 		"workspace-sync", "workspace-fetch", "workspace-install", "deps-upgrade",
-		"validate-api",
+		"project-setup", "deps-edit", "validate-api",
 	} {
 		if commands[name] == nil {
 			t.Errorf("command %q is not registered", name)
@@ -182,6 +184,10 @@ func TestLifecycleHelp(t *testing.T) {
 		{[]string{"deps-upgrade", "--version", "--help"}, ""},
 		{[]string{"deps-upgrade", "--channel", "-h"}, ""},
 		{[]string{"deps-upgrade", "--output=jsonl", "-h"}, depsupgrade.Usage},
+		{[]string{"project-setup", "--help"}, projectsetup.Usage},
+		{[]string{"project-setup", "--putnamiContext", "-h"}, ""},
+		{[]string{"deps-edit", "--output=jsonl", "-h"}, depsedit.Usage},
+		{[]string{"deps-edit", "--output", "--help"}, ""},
 		{[]string{"build", "--help"}, ""},
 		{nil, ""},
 	}
@@ -196,7 +202,7 @@ func TestLifecycleHelp(t *testing.T) {
 // A lifecycle job runs for the workspace: an empty project must not turn it
 // into a SKIP, while every other job keeps the SDK default.
 func TestDispatchOptionsRunLifecycleJobsWithoutAProject(t *testing.T) {
-	for _, name := range []string{"workspace-fetch", "workspace-install", "deps-upgrade"} {
+	for _, name := range []string{"workspace-fetch", "workspace-install", "deps-upgrade", "project-setup", "deps-edit"} {
 		if got := dispatchOptions([]string{name, "--putnamiContext", "ctx.json"}); len(got) != 1 {
 			t.Errorf("dispatchOptions(%s) = %d options, want 1", name, len(got))
 		}

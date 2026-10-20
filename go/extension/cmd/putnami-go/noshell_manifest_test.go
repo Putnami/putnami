@@ -118,7 +118,7 @@ func TestConsumerTasksStartNoShell(t *testing.T) {
 			t.Errorf("task %s runs the runtime with %v, which names no registered subcommand", name, task.Args)
 		}
 	}
-	for _, name := range []string{"workspace-fetch-exec", "workspace-install-exec", "deps-upgrade-exec"} {
+	for _, name := range []string{"workspace-fetch-exec", "workspace-install-exec", "deps-upgrade-exec", "project-setup-exec", "deps-edit-exec"} {
 		if task := manifest.Tasks[name]; task.Command != "{extensionRuntime}" {
 			t.Errorf("task %s runs %q, want the runtime", name, task.Command)
 		}

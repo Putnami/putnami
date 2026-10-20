@@ -183,6 +183,57 @@ func TestDepsUpgradeWireThroughTheEntryPoint(t *testing.T) {
 	})
 }
 
+// project-setup and deps-edit run through the entry point the CLI starts, with
+// the event stream and the exit code the CLI reads: a success, and a refusal
+// that names its cause in an error diagnostic.
+func TestProjectSetupAndDepsEditWireThroughTheEntryPoint(t *testing.T) {
+	t.Parallel()
+	goBinary := jobtest.RequireGo(t)
+	env := jobtest.Env(t, "off", jobtest.CacheRoot(t),
+		"PATH="+filepath.Dir(goBinary),
+		runtimeproto.AdvertisedVersionEnv(runtimeproto.ProtocolVersion2))
+	const goMod = "module example.com/api\n\ngo 1.22\n\nrequire example.com/lib v1.0.0\n"
+	tests := []struct {
+		name, job, params string
+		code              int
+		status            runtimeproto.ResultStatus
+		event             runtimeproto.EventType
+		message           string
+		// wantGoMod is what api/go.mod holds after the job.
+		wantGoMod string
+	}{
+		{"project-setup success", "project-setup", `{"path":"web"}`, 0, runtimeproto.ResultOK,
+			runtimeproto.EventLog, "web has no go.mod: nothing to set up", goMod},
+		{"project-setup failure", "project-setup", `{}`, 1, runtimeproto.ResultFailed, runtimeproto.EventDiagnostic,
+			"project-setup needs the directory of the created project, relative to the workspace root (params.path)", goMod},
+		{"deps-edit success", "deps-edit", `{"action":"remove","edits":[{"project":"api","path":"api","modules":["example.com/lib"]}]}`,
+			0, runtimeproto.ResultOK, runtimeproto.EventLog, "✓ updated api/go.mod", "module example.com/api\n\ngo 1.22\n"},
+		{"deps-edit failure", "deps-edit", `{"action":"add","edits":[{"project":"api","path":"api","modules":["example.com/lib@none"]}]}`,
+			1, runtimeproto.ResultFailed, runtimeproto.EventDiagnostic,
+			"deps add does not drop a module: example.com/lib names the version none; deps remove drops it: putnami deps remove example.com/lib", goMod},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ws := jobtest.RealTempDir(t)
+			jobtest.WriteFile(t, ws, "web/package.json", "{}\n")
+			jobtest.WriteFile(t, ws, "api/go.mod", goMod)
+			context := writeLifecycleContext(t, ws, tt.job, tt.params)
+			events, stderr, code := runPutnamiGo(t, env, tt.job, "--putnamiContext", context)
+			if code != tt.code {
+				t.Fatalf("exit code = %d, want %d\nstderr:\n%s\n%s", code, tt.code, stderr, eventLines(events))
+			}
+			requireJobStream(t, events, tt.job, runtimeproto.ProtocolVersion2, tt.status)
+			if !hasEvent(events, tt.event, tt.message) {
+				t.Errorf("missing the %s %q:\n%s", tt.event, tt.message, eventLines(events))
+			}
+			if got := jobtest.ReadFile(t, filepath.Join(ws, "api", "go.mod")); got != tt.wantGoMod {
+				t.Errorf("api/go.mod = %q, want %q", got, tt.wantGoMod)
+			}
+		})
+	}
+}
+
 func hasEvent(events []*runtimeproto.Event, eventType runtimeproto.EventType, message string) bool {
 	for _, event := range events {
 		if event.Type == eventType && event.Message == message {

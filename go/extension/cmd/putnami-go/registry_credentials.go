@@ -124,7 +124,7 @@ func refreshModuleOriginCredential(ctx *pctx.Context, emit *jsonl.Emitter) {
 	if host == "" {
 		return
 	}
-	outcome := ensureGoRegistryCredential(context.Background(), ctx.WorkspaceRoot, host)
+	outcome := refreshHostCredential(context.Background(), ctx.WorkspaceRoot, host)
 	if outcome.Message == "" {
 		return
 	}
@@ -133,4 +133,12 @@ func refreshModuleOriginCredential(ctx *pctx.Context, emit *jsonl.Emitter) {
 		return
 	}
 	emit.Log(outcome.Level, outcome.Message)
+}
+
+// refreshHostCredential asks @putnami/cloud to write the user's .netrc entry
+// for host: the declared module origin of a build job, or the origin
+// project-setup reads a framework module from. The jobs that call it skip it
+// on a hosted run.
+func refreshHostCredential(ctx context.Context, workspaceRoot, host string) registrycred.Outcome {
+	return ensureGoRegistryCredential(ctx, workspaceRoot, host)
 }

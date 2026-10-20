@@ -430,6 +430,36 @@ With it:
 Without `PUTNAMI_OFFLINE_DEPENDENCIES`, every `go` command runs with the same
 environment and arguments as before.
 
+### Project setup and dependency edits
+
+`putnami projects create` and `putnami deps add|remove|prune` run their Go
+steps in this extension, as two lifecycle jobs
+([ADR 0012](./adr/0012-the-extension-owns-the-go-steps-of-create-and-deps.md)):
+
+- `project-setup` runs after a Go template renders a project. It adds the
+  project to `go.work`, creating `go.work` when the workspace has none. It gives
+  `go.work` and the project's `go.mod` the go directive of `go.work`. It pins
+  each `go.putnami.dev` module the template requires at `v0.0.0` to the version
+  the channel names, then runs `go mod tidy`. On a host where the Go the
+  extension locks does not resolve, the core first runs its prepare stage,
+  which only writes a missing `go.work` and runs no go command, then pins
+  and installs that Go.
+- `deps-edit` adds a module with `go list -m` and `go mod edit -require`, and
+  removes one with `go mod edit -droprequire`. It never runs `go get`, so it
+  edits a `go.mod` that requires a version no proxy serves. It then tidies each
+  module with the `replace` directives of `go.work`. When a step fails, every
+  `go.mod` and `go.sum` the run edited is put back.
+
+The framework lookup asks the proxies of `GOPROXY`, as `go env` reports it, in
+order. A module `GONOPROXY` or `GOPRIVATE` matches is read from its origin, with
+the netrc credential `putnami cloud` refreshes first. A warning that no
+credential is available stays unprinted unless the lookup fails with HTTP 401
+or 403. Both jobs run the Go the
+workspace lock pins, and both refuse a hosted run, whose dependencies are
+offline. Neither installs a Go: the CLI resolves the toolchain before it runs a
+job, so a job that finds no `go` stops with one error that names
+`putnami install`.
+
 ### Lifecycle jobs: differences from the former scripts
 
 `workspace-install` and `deps-upgrade` run as `putnami-go` subcommands. Their

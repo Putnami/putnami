@@ -313,19 +313,21 @@ func (s *Snapshot) Paths() []string {
 	return paths
 }
 
-// Restore puts every recorded file back. changed is called for each file whose
-// content differed and was rewritten, and removed for each file that did not
-// exist and was deleted. A file whose content is back but whose mode differs
-// gets its recorded mode back without a call. Restore puts back every file it
-// can, returns the failures joined, and then forgets the recorded state, so a
-// second call does nothing.
+// Restore puts every recorded file back. A file whose content differs is
+// replaced through a rename (WriteFileAtomically), so it holds its current or
+// its recorded bytes, never a part of them. changed is called for each file
+// whose content differed and was rewritten, and removed for each file that did
+// not exist and was deleted. A file whose content is back but whose mode
+// differs gets its recorded mode back without a call. Restore puts back every
+// file it can, returns the failures joined, and then forgets the recorded
+// state, so a second call does nothing.
 func (s *Snapshot) Restore(changed, removed func(path string)) error {
 	var errs []error
 	for _, entry := range s.entries {
 		if entry.existed {
 			current, err := os.ReadFile(entry.path)
 			if err != nil || !bytes.Equal(current, entry.content) {
-				if writeErr := os.WriteFile(entry.path, entry.content, entry.mode); writeErr != nil {
+				if writeErr := WriteFileAtomically(entry.path, entry.content, entry.mode); writeErr != nil {
 					errs = append(errs, fmt.Errorf("restore %s: %w", entry.path, writeErr))
 					continue
 				}
@@ -350,6 +352,29 @@ func (s *Snapshot) Restore(changed, removed func(path string)) error {
 	}
 	s.entries = nil
 	return errors.Join(errs...)
+}
+
+// WriteFileAtomically replaces path with data and mode through a temporary
+// file in the same directory, so path holds either its old content or data,
+// never a part of data.
+func WriteFileAtomically(path string, data []byte, mode fs.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".putnami-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmpName, mode); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }
 
 func fileExists(path string) bool {

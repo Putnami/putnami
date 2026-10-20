@@ -243,6 +243,18 @@ func declaredProxy(params map[string]json.RawMessage, originHost string) (string
 	return strings.Join(chain, ","), true
 }
 
+// SetupModuleEnv exports the environment the job's go commands run in: the
+// one SetupGoEnv exports around the host of the declared module origin, with
+// the declared proxy chain in place of the public default. SetupGoEnv supplies
+// that default when the caller named no chain, and only then does the declared
+// chain replace it: a caller that named its own proxy keeps it.
+func SetupModuleEnv(j *workspacejob.Job, opts Options) {
+	j.SetupGoEnv(workspacejob.OriginHost(opts.Origin))
+	if opts.Proxy != "" && j.Env.Get("GOPROXY") == defaultGoProxy {
+		j.Env.Set("GOPROXY", opts.Proxy)
+	}
+}
+
 // goCommandAuth is the GOAUTH the job's go command applies, from its
 // environment or its env file, or the environment's alone when go cannot say.
 func goCommandAuth(j *workspacejob.Job) string {
@@ -294,14 +306,8 @@ func run(j *workspacejob.Job, opts Options, members []string) string {
 		j.Emit.Log("error", "Go binary not found")
 		return statusFailed
 	}
-	j.SetupGoEnv(workspacejob.OriginHost(u.Origin))
+	SetupModuleEnv(j, opts)
 	u.fetcher.goAuth = func() string { return goCommandAuth(j) }
-	// SetupGoEnv supplies the public default when the caller named no chain.
-	// A declared chain replaces that default, and only then: a caller that
-	// named its own proxy keeps it.
-	if u.Proxy != "" && j.Env.Get("GOPROXY") == defaultGoProxy {
-		j.Env.Set("GOPROXY", u.Proxy)
-	}
 
 	j.Emit.PhaseStart("scan")
 	u.projects, _ = workspacejob.WorkspaceGoProjects(j.WorkspaceRoot, members)

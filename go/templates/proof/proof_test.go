@@ -39,7 +39,6 @@ type renderVars struct {
 	projectModule         string
 	putnamiVersion        string
 	workspaceRelativePath string
-	goFrameworkVersion    string
 }
 
 // golangciConfig is the golangci-lint configuration the Go extension ships,
@@ -240,7 +239,6 @@ func testVars(tpl committedTemplate) renderVars {
 		projectModule:         "test_project",
 		putnamiVersion:        "latest",
 		workspaceRelativePath: "..",
-		goFrameworkVersion:    "v0.0.0",
 	}
 	if v, ok := tpl.manifest.TestVariables["projectName"]; ok {
 		vars.projectName = v
@@ -310,7 +308,6 @@ func placeholderReplacer(vars renderVars) *strings.Replacer {
 		"projectModule":         vars.projectModule,
 		"putnamiVersion":        vars.putnamiVersion,
 		"workspaceRelativePath": vars.workspaceRelativePath,
-		"goFrameworkVersion":    vars.goFrameworkVersion,
 	} {
 		if value != "" {
 			pairs = append(pairs, "<%= "+key+" %>", value)
