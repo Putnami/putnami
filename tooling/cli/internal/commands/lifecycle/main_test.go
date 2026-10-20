@@ -14,7 +14,7 @@ import (
 // and answers 401 to a test archive, so the process drops it before any test
 // runs. Tests that exercise the broker set it themselves with t.Setenv.
 //
-// The Go toolchain fixtures are fixtureproc programs; the process removes the
+// The toolchain fixtures are fixtureproc programs; the process removes the
 // helper build they are copies of once every test ran.
 func TestMain(m *testing.M) {
 	os.Unsetenv(extension.PrivatePutRegistryURLEnv)

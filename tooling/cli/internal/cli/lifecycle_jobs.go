@@ -96,6 +96,10 @@ func RunWorkspaceJob(ctx context.Context, req lifecycle.WorkspaceJobRequest) (li
 		out = os.Stdout
 	}
 	indexBefore := workspaceIndexIdentity(req.WorkspaceRoot)
+	projects := req.Projects
+	if projects == "" {
+		projects = "*"
+	}
 
 	global := engine.GlobalFlags{
 		// Lifecycle jobs are deliberately uncached: `workspace-install` reconciles
@@ -110,8 +114,9 @@ func RunWorkspaceJob(ctx context.Context, req lifecycle.WorkspaceJobRequest) (li
 		// `ws.Projects`, and it keeps the engine's DirectTarget true so the
 		// workspace's disable.tags cannot narrow an install. It also leaves
 		// isBareProjectSelection false, so auto-selection — and the speculative
-		// run-marker lookup inside it — never runs.
-		Projects:   "*",
+		// run-marker lookup inside it — never runs. A project job of create or
+		// deps selects its projects by ID, which keeps both properties.
+		Projects:   projects,
 		FilterTag:  req.FilterTag,
 		ExcludeTag: req.ExcludeTag,
 		// Off by default: a lifecycle job that fails in one ecosystem must not
@@ -243,6 +248,10 @@ func reportWorkspaceJobActions(req lifecycle.WorkspaceJobRequest, plan []*schedu
 			description = "Workspace upgrade completed (" + name + ")"
 		case extensionproto.WorkspaceFetchCommand:
 			description = "Workspace dependencies fetched (" + name + ")"
+		case "project-setup":
+			description = "Project setup completed (" + name + ")"
+		case "deps-edit":
+			description = "Dependencies edited (" + name + ")"
 		}
 		req.OnAction(lifecycle.LifecycleAction{Kind: req.Job, Name: name, Description: description})
 	}

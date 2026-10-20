@@ -228,6 +228,18 @@
     {
       "id": "an-interactive-launch-names-the-directory-it-was-typed-in",
       "text": "An interactive extension subcommand launch, in a workspace or outside one, carries the absolute directory the user typed the command in, as the job context's invocationDir and PUTNAMI_INVOCATION_DIR. The task keeps its working directory; userScope and PUTNAMI_CALLER_DIR stay absent in a workspace and, outside one, the value equals the caller directory. A planned job carries neither, so no cache key depends on it, and an inherited value is dropped."
+    },
+    {
+      "id": "project-setup-runs-in-the-project-extension",
+      "text": "projects create runs the project-setup job of the extension of the project it rendered, for it only, with params path and, in an init on a channel, putnami-channel; an extension that declares none needs none. When a toolchain the job requires does not resolve as it does for the job, create runs the job with stage prepare, pins what the lock misses, installs a newly pinned toolchain the extension locks, then runs the job once. A failed job keeps the project and names the create to rerun with --force."
+    },
+    {
+      "id": "deps-add-refuses-the-version-none",
+      "text": "putnami deps add refuses a module spec at the version none before any job runs, with a usage error that names the deps remove command for those modules and the --projects selector the command was given. A spec splits at its last @ that is not its first character, so @scope/pkg@none is refused as @scope/pkg, and @scope/pkg alone is not."
+    },
+    {
+      "id": "deps-edit-runs-in-the-project-extension",
+      "text": "putnami deps add and deps remove run the deps-edit job of the selected project's extension for that project only, with the params action and edits, one {project, path, modules} entry; deps prune hands it each manifest finding with the target directories. The extension is one the project lists in dependencies or extensions that declares the job, the first by name of several. A project whose extensions declare none is refused, naming them and the hand edit. A failed job fails the command."
     }
   ],
   "decisions": [

@@ -67,8 +67,6 @@ var spawnSites = map[string]spawnSite{
 		why: "the checkout runs the post-checkout hook and smudge filters"},
 	"commands/completion/completion_install.go:writeCompletionFromBinary": {spawns: 1, verdict: marked, by: "commands/completion/completion_install.go:writeCompletionFromBinary",
 		why: "the workspace's CLI may be a build of its source"},
-	"commands/lifecycle/deps.go:runGoWithStdout": {spawns: 1, verdict: marked, by: "commands/lifecycle/deps.go:runGoWithStdout",
-		why: "go in a workspace module"},
 	"commands/lifecycle/upgrade.go:newUpgradeReleaseSetResolver": {spawns: 1, verdict: marked, by: "commands/lifecycle/upgrade.go:newUpgradeReleaseSetResolver",
 		why: "putnami cloud release-set, a CLI without the run credential that loads the workspace's extensions"},
 	"commands/shared/subprocess.go:RunGroupCombined": {spawns: 1, verdict: marked, by: "commands/shared/subprocess.go:markRepositoryCode",
@@ -117,9 +115,6 @@ var spawnSites = map[string]spawnSite{
 		why: "the pinned or upgraded CLI replaces this process"},
 
 	// Spawns a hosted run never reaches.
-	"commands/lifecycle/projects_create_goframework.go:ensureModuleOriginCredential": {spawns: 1, verdict: hostedNever,
-		by:  "commands/lifecycle/projects_create_goframework.go:ensureModuleOriginCredential",
-		why: "the netrc child of @putnami/cloud, a CLI without the run credential that loads the workspace's extensions"},
 	"extension/http_client.go:AuthorizeRegistryRequest": {spawns: 1, verdict: hostedNever, by: "extension/http_client.go:authorizeRegistryRequest",
 		via: "resolve", why: "putnami cloud registry-token, the host-keyed registry credential"},
 	"extension/http_client.go:AuthorizeRegistryRequestWithCLI": {spawns: 1, verdict: hostedNever, by: "extension/http_client.go:authorizeRegistryRequest",

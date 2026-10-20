@@ -308,7 +308,8 @@
               "an-answer-with-no-edges-leaves-every-entry-declared",
               "an-entry-naming-no-workspace-project-raises-no-attribution-notice",
               "prune-names-the-hand-edit-for-a-manifest-it-keeps",
-              "prune-drops-the-module-path-the-target-go-mod-declares"
+              "prune-hands-a-manifest-finding-to-the-importers-deps-edit-job",
+              "a-failed-deps-edit-puts-putnami-json-back"
             ]
           }
         },
@@ -1394,6 +1395,52 @@
               "outside-a-workspace-it-equals-the-caller-directory"
             ]
           }
+        },
+        {
+          "id": "project-setup-runs-in-the-project-extension",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "create-runs-project-setup-with-the-path-and-the-channel",
+              "a-failed-setup-keeps-the-project-and-names-the-create-to-run-again",
+              "create-reads-the-toolchains-the-setup-job-resolves",
+              "create-runs-the-setup-once-when-its-toolchains-resolve",
+              "create-prepares-pins-and-installs-only-a-toolchain-the-extension-locks",
+              "a-bare-host-create-sets-the-project-up-with-no-failed-task"
+            ]
+          }
+        },
+        {
+          "id": "deps-add-refuses-the-version-none",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "deps-add-refuses-the-version-none-before-any-job",
+              "deps-add-splits-a-scoped-spec-at-its-last-at"
+            ]
+          }
+        },
+        {
+          "id": "deps-edit-runs-in-the-project-extension",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "deps-add-and-remove-run-the-deps-edit-job-of-the-project",
+              "deps-refuses-a-project-whose-extensions-declare-no-deps-edit"
+            ]
+          }
         }
       ]
     },
@@ -2105,67 +2152,6 @@
           }
         },
         {
-          "id": "create-installs-a-missing-go",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "a-lifecycle-command-resolves-run-toolchains-like-a-task",
-              "create-pins-and-installs-go-before-it-sets-the-project-up",
-              "create-runs-the-pinned-go-before-another-on-path",
-              "create-names-the-retry-when-no-go-results",
-              "create-reports-a-go-probe-that-timed-out",
-              "init-and-create-install-the-pinned-go-through-the-engine"
-            ]
-          }
-        },
-        {
-          "id": "create-reports-a-failed-install",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "create-keeps-the-project-and-names-deps-install-when-the-go-install-fails"
-            ]
-          }
-        },
-        {
-          "id": "create-fails-when-go-mod-tidy-fails",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "create-keeps-the-project-and-quotes-tidy-when-go-mod-tidy-fails"
-            ]
-          }
-        },
-        {
-          "id": "create-resolves-the-go-framework-version",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "create-pins-the-framework-version-goproxy-answers",
-              "create-writes-nothing-and-names-the-fix-when-no-proxy-answers",
-              "the-lookup-passes-a-404-to-the-next-proxy-as-go-does",
-              "the-lookup-reads-a-private-module-from-its-origin-as-go-does",
-              "the-lookup-sends-the-credentials-go-would-and-prints-none"
-            ]
-          }
-        },
-        {
           "id": "install-pins-before-installers",
           "stage": "coded",
           "evidenceKinds": [
@@ -2176,66 +2162,6 @@
             "checks": [
               "explicit-install-pins-before-the-installers-run",
               "a-declaration-the-lock-does-not-match-is-repinned"
-            ]
-          }
-        },
-        {
-          "id": "deps-run-the-pinned-go",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "deps-add-and-remove-run-the-pinned-go",
-              "deps-add-installs-the-pinned-go-first",
-              "deps-add-reports-a-go-probe-that-timed-out",
-              "deps-prune-changes-nothing-when-the-go-probe-times-out"
-            ]
-          }
-        },
-        {
-          "id": "deps-edit-reads-no-replaced-version",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "deps-add-and-remove-edit-a-module-that-requires-an-unserved-version",
-              "deps-add-refuses-the-version-none-naming-deps-remove",
-              "deps-add-reports-a-failed-go-list-without-a-suggested-command",
-              "deps-add-keeps-a-required-version-newer-than-the-latest"
-            ]
-          }
-        },
-        {
-          "id": "deps-report-a-failed-install",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "deps-add-and-remove-edit-and-name-deps-install-when-the-go-install-fails",
-              "deps-prune-edits-every-module-and-names-deps-install-when-the-go-install-fails"
-            ]
-          }
-        },
-        {
-          "id": "deps-tidy-resolves-as-the-workspace-does",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "deps-tidy-reads-the-go-work-replace-directives",
-              "a-failed-go-step-leaves-every-file-as-it-was"
             ]
           }
         },
@@ -2615,7 +2541,8 @@
               "workspace-install-resolves-an-unusable-pin-unavailable",
               "another-command-never-runs-on-a-provisioning-resolution",
               "install-runs-on-a-lock-that-does-not-pin-the-toolchain-yet",
-              "a-local-extension-prepares-unpinned-only-in-a-provisioning-run"
+              "a-local-extension-prepares-unpinned-only-in-a-provisioning-run",
+              "project-setup-resolves-an-unusable-pin-unavailable"
             ]
           }
         },
@@ -3577,8 +3504,7 @@
               "every-stage-of-init-receives-the-channel",
               "the-installers-receive-the-channel-as-a-job-option",
               "the-typescript-installer-receives-the-channel-and-its-registries",
-              "the-go-framework-version-is-the-one-the-channel-names",
-              "a-missing-channel-fails-instead-of-resolving-latest",
+              "project-setup-receives-the-channel",
               "the-fallback-template-install-resolves-on-the-channel",
               "a-candidate-channel-resolves-only-its-release-set-while-latest-is-older",
               "a-candidate-channel-resolves-while-latest-is-empty"

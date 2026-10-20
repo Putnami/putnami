@@ -35,7 +35,7 @@
     },
     {
       "id": "provisioning-runs-unpinned",
-      "text": "workspace-install writes the files toolchain pins derive from, and workspace-fetch runs before it, so an alias only they need resolves as if optional: a missing pin, missing host-platform integrity or no matching candidate yields the unavailable identity and never fails the run. A local extension's prepare toolchains do too, in a run of only those two. An alias a planned job of another command requires resolves strictly, and such a job refuses a required alias resolved unavailable while a lock exists."
+      "text": "workspace-install and project-setup write the files toolchain pins derive from, and workspace-fetch precedes workspace-install, so an alias only they need resolves as if optional: a missing pin, missing host-platform integrity or no matching candidate yields the unavailable identity and never fails the run. A local extension's prepare toolchains do too, in a run of only those. A planned job of another command resolves an alias it requires strictly, and refuses one resolved unavailable while a lock exists."
     },
     {
       "id": "unplanned-toolchains-do-not-stop-the-run",

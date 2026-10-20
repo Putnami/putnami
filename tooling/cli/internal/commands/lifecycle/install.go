@@ -33,8 +33,8 @@ func installWritesWorkspace() bool {
 }
 
 // fillImplicitToolchainPins is the implicit install's lock step, and the step
-// `projects create` takes before it installs a missing go command. It is a seam
-// for tests.
+// `projects create` takes when a toolchain the project-setup job requires does
+// not resolve (setUpProject). It is a seam for tests.
 var fillImplicitToolchainPins = versioncmd.FillMissingToolchainPins
 
 // pinExplicitToolchains is the explicit install's lock step before the

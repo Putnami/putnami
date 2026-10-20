@@ -2,29 +2,6 @@
   "protocolVersion": 2,
   "contracts": [
     {
-      "authority": "Go module proxy protocol (go.dev/ref/mod#goproxy-protocol) and the go-import meta tag of a remote import path (go.dev/ref/mod#vcs-find)",
-      "adapter": "tooling/cli/internal/commands/lifecycle/projects_create_goframework.go",
-      "callsites": [
-        {
-          "path": "tooling/cli/internal/commands/lifecycle/projects_create_goframework.go",
-          "transport": "http",
-          "symbol": "http.NewRequestWithContext",
-          "fingerprint": "83f8f83640fa25bd4541768049bba79e6a459fa3377bc68a32a244a705bfd864"
-        },
-        {
-          "path": "tooling/cli/internal/commands/lifecycle/projects_create_goframework.go",
-          "transport": "http",
-          "symbol": "http.NewRequestWithContext",
-          "fingerprint": "95d8d2bf618481aa5cc664e9238c1554fb0e2780e1ae0689efc97d159e4c57c9"
-        }
-      ],
-      "owner": "@putnami/cli",
-      "tests": [
-        "tooling/cli/internal/commands/lifecycle/projects_create_goframework_test.go"
-      ],
-      "reason": "Asks the @latest endpoint of the module proxies GOPROXY names, or of the module origin a go-import mod tag names, for the go.putnami.dev/app version a scaffolded project pins, as the go command does. The wire contract belongs to the Go module proxy protocol, so no Putnami provider declaration can generate this client."
-    },
-    {
       "authority": "go.dev release index, the GitHub REST releases API (docs.github.com/rest/releases) and the sha256.sum checksum file of a GitHub release download",
       "adapter": "tooling/cli/internal/commands/versioncmd/toolchain_lock.go",
       "callsites": [

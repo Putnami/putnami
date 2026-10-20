@@ -11,7 +11,9 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/hometest"
+	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 	"go.putnami.dev/tooling/cli/internal/workspace_state"
 )
@@ -287,6 +289,37 @@ func TestRunWorkspaceJob_DistinguishesMissingProviderFromNoMatches(t *testing.T)
 			t.Errorf("a fully filtered selection ran the job %d times, want 0", runs)
 		}
 	})
+
+	// The project jobs of create and deps select their projects by ID: an ID
+	// runs the job for that project, and an ID no project has matches none.
+	t.Run("a selection by project ID", func(t *testing.T) {
+		wsRoot := t.TempDir()
+		marker := writeLifecycleFixture(t, wsRoot, "app")
+		t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
+
+		outcomes := map[string]lifecycle.WorkspaceJobOutcome{}
+		for _, projects := range []string{"/app", "/missing"} {
+			captureLifecycleStreams(t, func() {
+				result, err := RunWorkspaceJob(context.Background(), lifecycle.WorkspaceJobRequest{
+					WorkspaceRoot: wsRoot,
+					Config:        wsproto.Load(wsRoot),
+					Job:           "workspace-install",
+					Projects:      projects,
+					Out:           os.Stderr,
+				})
+				if err != nil {
+					t.Errorf("RunWorkspaceJob for %s: %v", projects, err)
+				}
+				outcomes[projects] = result.Outcome
+			})
+		}
+		if outcomes["/app"] != lifecycle.WorkspaceJobOK || outcomes["/missing"] != lifecycle.WorkspaceJobNoMatches {
+			t.Fatalf("outcomes = %v, want OK for /app and NoMatches for /missing", outcomes)
+		}
+		if runs := markerRuns(t, marker); runs != 1 {
+			t.Errorf("the job ran %d times, want once, for /app", runs)
+		}
+	})
 }
 
 // DepsInstall's own no-op message is the one the user sees; the engine's generic
@@ -484,5 +517,32 @@ func TestCaptureLifecycleStreams_DrainsBothStreamsBeyondPipeCapacity(t *testing.
 	}
 	if gotErr != wantErr {
 		t.Fatalf("captured %d stderr bytes, want %d", len(gotErr), len(wantErr))
+	}
+}
+
+// The completed action of a project job of create or deps names what the job
+// did, not a workspace setup.
+func TestReportWorkspaceJobActionsNamesTheProjectJobs(t *testing.T) {
+	t.Parallel()
+	for job, want := range map[string]string{
+		"workspace-install": "Workspace setup completed (@acme/go)",
+		"project-setup":     "Project setup completed (@acme/go)",
+		"deps-edit":         "Dependencies edited (@acme/go)",
+	} {
+		scheduled := &scheduler.ScheduledJob{
+			Project:   &workspace.Project{ID: "/api", Name: "api"},
+			Extension: &extension.ExtensionDescription{Name: "@acme/go"},
+			JobDef:    &extension.JobDefinition{Name: job},
+		}
+		var got []string
+		reportWorkspaceJobActions(lifecycle.WorkspaceJobRequest{
+			Job:      job,
+			OnAction: func(action lifecycle.LifecycleAction) { got = append(got, action.Description) },
+		}, []*scheduler.ScheduledJob{scheduled}, map[string]*scheduler.JobResult{
+			scheduled.Key(): {Status: string(scheduler.TaskStatusSuccess)},
+		})
+		if len(got) != 1 || got[0] != want {
+			t.Errorf("actions of %s = %v, want [%s]", job, got, want)
+		}
 	}
 }

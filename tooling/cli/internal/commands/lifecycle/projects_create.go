@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,7 +14,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/extensions"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
 	"go.putnami.dev/tooling/cli/internal/jsonutil"
 	"go.putnami.dev/tooling/cli/internal/template"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -27,19 +25,17 @@ type createFlags struct {
 	force    bool
 }
 
-// ProjectsCreate scaffolds a new project from an extension template. A template
-// that renders the Go framework version gets the one the module proxies name
-// (resolveGoFrameworkVersion), and create fails before it writes anything when
-// none answers. The create `putnami init` runs asks them for the version of
-// the channel init chose (resolveGoFrameworkVersionOn). verbose names the proxy
-// that answered. env runs the workspace installers when a Go project needs a go
-// command the host does not have yet. When those installers fail but still
-// leave a go, the project is set up and kept, and create exits non-zero naming
-// the command that finishes the install, as `init --project` does. When go mod
-// tidy fails, the project is kept and create exits non-zero quoting go's
-// output and naming the create command to run again with --force.
-func ProjectsCreate(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, verbose bool, env LifecycleEnv) error {
-	created, err := createProjectFiles(ctx, wsRoot, cfg, args, verbose, env)
+// ProjectsCreate scaffolds a new project from an extension template, then runs
+// the project-setup job of the project's extensions (setUpProject). env runs
+// the job, and the workspace installers when a toolchain the job requires does
+// not resolve and the lock pins it once the job's prepare stage wrote its
+// source. When those installers fail and the setup still succeeds, the project
+// is kept, and create exits non-zero naming the command that finishes the
+// install, as `init --project` does. When the setup fails, the project is kept
+// and create exits non-zero naming the create command to run again with
+// --force.
+func ProjectsCreate(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, env LifecycleEnv) error {
+	created, err := createProjectFiles(ctx, wsRoot, cfg, args, env)
 	if err != nil {
 		return err
 	}
@@ -54,8 +50,8 @@ func ProjectsCreate(ctx context.Context, wsRoot string, cfg *wsproto.Config, arg
 // createInitProjectFiles is the create `putnami init --project` runs: init
 // runs the workspace installers itself and reports their failure
 // (initializeProject).
-func createInitProjectFiles(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, verbose bool, env LifecycleEnv) error {
-	_, err := createProjectFiles(ctx, wsRoot, cfg, args, verbose, env)
+func createInitProjectFiles(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, env LifecycleEnv) error {
+	_, err := createProjectFiles(ctx, wsRoot, cfg, args, env)
 	return err
 }
 
@@ -63,15 +59,16 @@ func createInitProjectFiles(ctx context.Context, wsRoot string, cfg *wsproto.Con
 // workspace config.
 type createdProject struct {
 	name string
-	// installErr is the failure of the workspace installers the Go setup ran
-	// to install a missing go command, which still left a go.
+	// installErr is the failure of the lock step or the workspace installers
+	// the setup ran to install a toolchain it needed, after which the setup
+	// succeeded.
 	installErr error
 }
 
 // createProjectFiles renders a template into a new project directory, lists
-// the project and its extension in the workspace config, and sets a Go
-// project up in go.work.
-func createProjectFiles(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, verbose bool, env LifecycleEnv) (createdProject, error) {
+// the project and its extension in the workspace config, and runs the
+// project-setup job of the project's extensions.
+func createProjectFiles(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, env LifecycleEnv) (createdProject, error) {
 	name, flags, err := parseProjectsCreateArgs(args)
 	if err != nil {
 		return createdProject{}, err
@@ -126,27 +123,6 @@ func createProjectFiles(ctx context.Context, wsRoot string, cfg *wsproto.Config,
 		PutnamiVersion:        "latest",
 		WorkspaceRelativePath: workspaceRelativePath(projectPath),
 	}
-	// The Go framework version is asked of the module proxies only for a
-	// template that renders it, and before anything is written: a failed lookup
-	// leaves no project behind.
-	usesFramework, err := template.UsesVariable(foundTemplate.Path, template.GoFrameworkVersionVariable)
-	if err != nil {
-		return createdProject{}, fmt.Errorf("read template %s: %w", flags.template, err)
-	}
-	if usesFramework {
-		if message := refreshGoFrameworkCredential(ctx, wsRoot, os.Getenv); message != "" && verbose {
-			iox.Fprintf(os.Stdout, "  %s\n", message)
-		}
-		version, proxy, err := resolveGoFrameworkVersionOn(ctx, http.DefaultClient, os.Getenv, env.channel)
-		if err != nil {
-			return createdProject{}, protocolcli.WithNext(err, projectsCreateCommand(name, flags, projectPath))
-		}
-		if verbose {
-			iox.Fprintf(os.Stdout, "  Resolved %s %s from %s\n", goFrameworkModule, version, proxy)
-		}
-		vars.GoFrameworkVersion = version
-	}
-
 	// Copy template files
 	if err := template.RenderDir(foundTemplate.Path, targetDir, vars); err != nil {
 		return createdProject{}, fmt.Errorf("copy template: %w", err)
@@ -169,27 +145,20 @@ func createProjectFiles(ctx context.Context, wsRoot string, cfg *wsproto.Config,
 	}
 
 	// The memoized workspace predates the project and the config writes above.
-	// The jobs run from here on (the workspace-install that installs Go, and
-	// init's next install) must plan over the new project, or they match
-	// nothing.
+	// The jobs run from here on (project-setup, the workspace-install it may
+	// need, and init's next install) must plan over the new project, or they
+	// match nothing.
 	workspace.InvalidateLoadCache(wsRoot)
 
-	// Go-specific post-create: update go.work and run go mod tidy
-	created := createdProject{name: name}
-	if isGoProject(targetDir) {
-		installErr, err := setupGoProject(ctx, wsRoot, projectPath, foundTemplate.Extension, env)
-		if err != nil {
-			err = fmt.Errorf("go workspace setup: %w", err)
-			if errors.Is(err, errGoModTidy) && installErr != nil {
-				err = errors.Join(err, fmt.Errorf("install workspace dependencies: %w", installErr))
-			}
-			if errors.Is(err, errGoUnavailable) || errors.Is(err, toolchain.ErrToolchainProbeTimeout) || errors.Is(err, errGoModTidy) {
-				return createdProject{}, protocolcli.WithNext(err, projectsCreateRetryCommand(name, flags, projectPath))
-			}
-			return createdProject{}, err
+	installErr, err := setUpProject(ctx, wsRoot, projectPath, env)
+	if err != nil {
+		if installErr != nil {
+			err = errors.Join(err, fmt.Errorf("install workspace dependencies: %w", installErr))
 		}
-		created.installErr = installErr
+		return createdProject{}, protocolcli.WithNext(fmt.Errorf("set up project %s: %w", name, err),
+			projectsCreateRetryCommand(name, flags, projectPath))
 	}
+	created := createdProject{name: name, installErr: installErr}
 
 	iox.Fprintf(os.Stdout, "  Created project %s from template %s (%s)\n", name, flags.template, foundTemplate.Extension)
 	iox.Fprintf(os.Stdout, "  Path: %s\n", targetDir)
@@ -345,102 +314,4 @@ func addProjectToWorkspaceConfig(wsRoot, projectPath string) error {
 	}
 	raw.Set(field, append(includes, projectPath))
 	return jsonutil.WriteFile(cfgPath, raw)
-}
-
-// isGoProject returns true if the directory contains a go.mod file.
-func isGoProject(dir string) bool {
-	_, err := os.Stat(filepath.Join(dir, "go.mod"))
-	return err == nil
-}
-
-// setupGoProject adds the project to go.work (creating it if needed) and runs
-// go mod tidy, with the go command resolveGoCommand finds. On a host without
-// one, the Go the workspace pins is installed first (provisionGoCommand).
-// installErr is the failure of the workspace installers that installed it; err
-// is what stopped the setup, errGoModTidy when tidy failed.
-func setupGoProject(ctx context.Context, wsRoot, projectPath, extensionName string, env LifecycleEnv) (installErr, err error) {
-	goWork := filepath.Join(wsRoot, "go.work")
-	projectDir := filepath.Join(wsRoot, projectPath)
-	workspaceGoVersion := readGoDirective(goWork)
-	if workspaceGoVersion == "" {
-		workspaceGoVersion = readGoDirective(filepath.Join(projectDir, "go.mod"))
-	}
-
-	goCmd, err := ensureGoCommand(ctx, wsRoot, projectPath, workspaceGoVersion, extensionName, env)
-	if err != nil {
-		return nil, err
-	}
-
-	// Init go.work if it doesn't exist
-	if _, err := os.Stat(goWork); os.IsNotExist(err) {
-		if out, err := goCmd.run(ctx, wsRoot, "work", "init"); err != nil {
-			return nil, fmt.Errorf("go work init: %s", out)
-		}
-		iox.Fprintf(os.Stdout, "  Initialized go.work\n")
-	}
-
-	// Add the project to go.work
-	if out, err := goCmd.run(ctx, wsRoot, "work", "use", "./"+projectPath); err != nil {
-		return nil, fmt.Errorf("go work use: %s", out)
-	}
-	if workspaceGoVersion != "" {
-		if out, err := goCmd.run(ctx, wsRoot, "work", "edit", "-go="+workspaceGoVersion); err != nil {
-			return nil, fmt.Errorf("go work edit: %s", out)
-		}
-		if out, err := goCmd.run(ctx, projectDir, "mod", "edit", "-go="+workspaceGoVersion); err != nil {
-			return nil, fmt.Errorf("go mod edit: %s", out)
-		}
-	}
-	iox.Fprintf(os.Stdout, "  Added %s to go.work\n", projectPath)
-
-	// A project tidy cannot resolve does not build, so its failure fails the
-	// setup and quotes what go said.
-	if out, err := goCmd.run(ctx, projectDir, "mod", "tidy"); err != nil {
-		return goCmd.installErr, fmt.Errorf("%w in %s: %w%s", errGoModTidy, projectPath, err, goOutputExcerpt(out))
-	}
-
-	return goCmd.installErr, nil
-}
-
-// errGoModTidy marks a Go project setup whose go mod tidy failed.
-var errGoModTidy = errors.New("go mod tidy failed")
-
-// goOutputMaxLines and goOutputMaxBytes bound the go command output an error
-// quotes. go names the module it could not resolve last, so the end is kept.
-const (
-	goOutputMaxLines = 20
-	goOutputMaxBytes = 2048
-)
-
-// goOutputExcerpt is the end of a go command's output, one indented line per
-// line, after a newline; "" when the output is empty. URL credentials, which
-// a GOPROXY entry can carry, are redacted before the output is cut.
-func goOutputExcerpt(out []byte) string {
-	text := strings.ReplaceAll(shared.RedactURLCredentials(string(out)), "\r\n", "\n")
-	lines := strings.Split(strings.TrimSpace(text), "\n")
-	if len(lines) > goOutputMaxLines {
-		lines = lines[len(lines)-goOutputMaxLines:]
-	}
-	text = strings.Join(lines, "\n")
-	if len(text) > goOutputMaxBytes {
-		text = strings.ToValidUTF8(text[len(text)-goOutputMaxBytes:], "")
-	}
-	if text == "" {
-		return ""
-	}
-	return "\n    " + strings.ReplaceAll(text, "\n", "\n    ")
-}
-
-func readGoDirective(path string) string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) == 2 && fields[0] == "go" {
-			return fields[1]
-		}
-	}
-	return ""
 }

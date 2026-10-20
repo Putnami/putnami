@@ -1174,13 +1174,14 @@ extension compiles its runtime with the pinned Go. The refresh drops the pin
 once no declared extension resolves it, and never adds one the lock does not
 already carry.
 
-The pins derive from files that `workspace-install` writes, such as `go.work`,
-so that command runs before the lock pins anything it installs. A toolchain
-alias that only `workspace-install` needs resolves as if it were optional: when
-the lock does not pin it, has no digest for the host, or no candidate matches,
-the job runs under the unavailable identity. The prepare toolchains of an
-extension declared by path resolve the same way, but only in a run whose every
-command is `workspace-install`. Every other command still stops on a missing
+The pins derive from files that `workspace-install` and `project-setup` write,
+such as `go.work`, so those commands run before the lock pins anything they
+need. A toolchain alias that only they, or the `workspace-fetch` that runs
+before `workspace-install`, need resolves as if it were optional: when the lock
+does not pin it, has no digest for the host, or no candidate matches, the job
+runs under the unavailable identity. The prepare toolchains of an extension
+declared by path resolve the same way, but only in a run whose every command is
+one of them. Every other command still stops on a missing
 pin, even in the same run, once it plans a job that needs the toolchain. A
 workspace that declares `@putnami/go` and has no Go project yet builds without
 a `go` pin, because the build plans no Go job. `putnami install` and
@@ -1293,13 +1294,19 @@ putnami projects create my-app --template typescript-web
 putnami projects create my-lib --template go-library --path libs/my-lib
 ```
 
-A template that renders a `go.mod` is added to `go.work`, and `go mod tidy`
-runs in it, with the go command the template extension's tasks run with: the
-release the lock pins, or else a `go` on PATH. On a host with neither, create
-first pins the Go that `go.work` declares and runs `workspace-install`, which
-installs it. See ADR 0019. When `go mod tidy` fails, create keeps the project
-and exits non-zero. The error quotes the end of the go output, with URL
-credentials redacted, and names the create command to run again with `--force`.
+After it renders a template, create runs the `project-setup` job of the
+template's extension for the new project, when the extension declares one. The
+job receives `path`, the directory of the project, and, in a `putnami init`
+that resolves on a channel, `putnami-channel`. `@putnami/go` adds a project
+that renders a `go.mod` to `go.work` and runs `go mod tidy` in it. Before the
+run, create checks whether the toolchains the extension's runtime locks
+resolve. When one does not, the job first runs with `stage` set to `prepare`,
+which only writes the files a pin derives from, such as the `go.work` of a new
+Go project. Create then pins what the lock misses, installs only a newly pinned
+toolchain that the extension locks, and runs the job once. A pinned toolchain
+that is not installed ends that run with an error that names `putnami install`.
+See ADR 0019. When the job fails, create keeps the project and exits non-zero,
+naming the create command to run again with `--force`.
 
 ### Template Installation
 

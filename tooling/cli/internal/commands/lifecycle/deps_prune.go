@@ -23,24 +23,21 @@ import (
 //   - a putnami.json `dependencies` entry goes through core's project-config
 //     writer, which preserves key order and leaves unrelated members
 //     byte-identical;
-//   - a Go module requirement is dropped with `go mod edit -droprequire` of
-//     the module path the target's go.mod declares, and the module tidied with
-//     `go mod tidy` as go.work resolves it (tidyGoModule), through the go
-//     command `deps remove` runs, so the module graph and go.sum stay
-//     consistent. `deps remove` drops a requirement the same way, and neither
-//     runs `go get <module>@none`: that resolves the requirement it removes,
-//     and a workspace module no proxy serves cannot be resolved (goDepsEdit);
-//   - a TypeScript package dependency has no removal path in this CLI yet —
-//     `deps remove` refuses a TypeScript target for the same reason — so it is
-//     reported with the edit to make, never half-applied: remove it from the
-//     project's package.json, then run `putnami deps install`;
+//   - a language manifest entry goes through the deps-edit job of the
+//     importer's extension, as `deps remove` edits it: the job receives the
+//     workspace-relative directories of the targets, and drops the
+//     requirement each one's manifest names (the Go extension drops the module
+//     path the target's go.mod declares, then tidies the module);
+//   - a manifest entry whose importer has no extension with a deps-edit job
+//     (a TypeScript package dependency today) is reported with the edit to
+//     make, never half-applied: remove it from the project's package.json,
+//     then run `putnami deps install`;
 //   - an orphan client manifest is a deletion, not an edit: the repair is to
 //     remove the generated target or restore its provider's contract, and
 //     guessing which one the user means is not this command's call.
 //
-// Deciding WHICH ecosystem a manifest finding belongs to happens here rather
-// than in the workspace model, which owns no language vocabulary: it is the
-// same question `deps remove` already answers about its target.
+// The extension that edits a manifest finding is the one `deps remove` would
+// run for the importer (projectJobProviders): the core names no language.
 //
 // Refusing is the fail-closed half: a run that cannot repair every finding
 // reports the ones it left, so "prune passed" never means "some phantom edges
@@ -54,18 +51,21 @@ const (
 	pruneRouteKeep pruneRoute = iota
 	// pruneRouteProjectConfig: removed from the project's putnami.json.
 	pruneRouteProjectConfig
-	// pruneRouteGoModule: removed from the project's Go module requirements.
-	pruneRouteGoModule
+	// pruneRouteManifest: removed from the project's language manifest by the
+	// deps-edit job of its extension.
+	pruneRouteManifest
 )
 
 // routedFinding pairs one finding with the repair it gets.
 type routedFinding struct {
 	finding workspace.DeclaredEdgeFinding
 	route   pruneRoute
-	// manifest is the workspace-relative language manifest that carries a
-	// manifest finding: the go.mod this command edits, or the package.json it
-	// names for a hand edit. It is empty when no single file can be named.
+	// manifest is the workspace-relative package.json this command names for
+	// the hand edit of a manifest finding it keeps. It is empty when no single
+	// file can be named.
 	manifest string
+	// editor is the extension whose deps-edit job edits a manifest finding.
+	editor string
 }
 
 // DepsPrune removes the declared dependency edges no import backs.
@@ -88,7 +88,11 @@ func DepsPrune(ctx context.Context, wsRoot, projectSelector string, dryRun bool,
 	if err := requireFreshProviderView(ws); err != nil {
 		return err
 	}
-	return prunePlan(ctx, wsRoot, ws, projectSelector, dryRun, env.out(), env)
+	editors, err := projectJobProviders(ctx, wsRoot, ws, depsEditJob)
+	if err != nil {
+		return err
+	}
+	return prunePlan(ctx, wsRoot, ws, editors, projectSelector, dryRun, env.out(), env)
 }
 
 // requireFreshProviderView refuses a provider view that predates the tree.
@@ -118,12 +122,13 @@ func requireFreshProviderView(ws *workspace.Workspace) error {
 }
 
 // prunePlan lists the findings and, unless the run is a dry one, repairs the
-// ones it owns. It is the whole command minus the workspace load, so a test
-// exercises both halves on a fixture. env runs the workspace installers when a
-// Go module is edited on a host without a go command.
-func prunePlan(ctx context.Context, wsRoot string, ws *workspace.Workspace,
+// ones it owns. It is the whole command minus the workspace load and the
+// discovery of the editors, the extension whose deps-edit job edits each
+// project's manifest by project ID, so a test exercises both halves on a
+// fixture. env runs the deps-edit jobs.
+func prunePlan(ctx context.Context, wsRoot string, ws *workspace.Workspace, editors map[string]string,
 	projectSelector string, dryRun bool, out io.Writer, env LifecycleEnv) error {
-	routed := routeFindings(wsRoot, ws, selectedFindings(ws, projectSelector))
+	routed := routeFindings(wsRoot, ws, editors, selectedFindings(ws, projectSelector))
 	if len(routed) == 0 {
 		iox.Fprintln(out, "  No declared dependency edge without an import.")
 		return nil
@@ -140,7 +145,7 @@ func prunePlan(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 		iox.Fprintf(out, "  %d declared edge(s) would be pruned; run without --dry-run to apply.\n", pruned)
 		return nil
 	}
-	return applyPrune(ctx, wsRoot, ws, routed, pruned, depsCommand("prune", nil, projectSelector), out, env)
+	return applyPrune(ctx, wsRoot, ws, routed, pruned, out, env)
 }
 
 // selectedFindings is the check's answer, narrowed to one project when the
@@ -162,36 +167,32 @@ func selectedFindings(ws *workspace.Workspace, projectSelector string) []workspa
 }
 
 // routeFindings decides the repair for each finding.
-func routeFindings(wsRoot string, ws *workspace.Workspace,
+func routeFindings(wsRoot string, ws *workspace.Workspace, editors map[string]string,
 	findings []workspace.DeclaredEdgeFinding) []routedFinding {
 	routed := make([]routedFinding, 0, len(findings))
 	for _, finding := range findings {
-		entry := routedFinding{finding: finding, route: routeOf(wsRoot, ws, finding)}
+		entry := routedFinding{finding: finding, route: routeOf(ws, editors, finding)}
+		if entry.route == pruneRouteManifest {
+			entry.editor = editors[finding.Project]
+		}
 		entry.manifest = manifestOf(wsRoot, ws, entry)
 		routed = append(routed, entry)
 	}
 	return routed
 }
 
-// manifestOf names the language manifest that carries a manifest finding: the
-// importer's go.mod for a Go module requirement, else its package.json when it
-// has one. Any other manifest is not named, because guessing the wrong file is
-// worse than naming none.
+// manifestOf names the package.json that carries a manifest finding this
+// command keeps, when the importer has one. Any other manifest is not named,
+// because guessing the wrong file is worse than naming none.
 func manifestOf(wsRoot string, ws *workspace.Workspace, entry routedFinding) string {
-	if entry.finding.Class != workspace.DeclaredEdgeManifest {
+	if entry.finding.Class != workspace.DeclaredEdgeManifest || entry.route != pruneRouteKeep {
 		return ""
 	}
 	importer := ws.ProjectByID(entry.finding.Project)
-	if importer == nil {
+	if importer == nil || !packageManifestExists(filepath.Join(wsRoot, importer.Path)) {
 		return ""
 	}
-	switch {
-	case entry.route == pruneRouteGoModule:
-		return filepath.ToSlash(filepath.Join(importer.Path, "go.mod"))
-	case packageManifestExists(filepath.Join(wsRoot, importer.Path)):
-		return filepath.ToSlash(filepath.Join(importer.Path, "package.json"))
-	}
-	return ""
+	return filepath.ToSlash(filepath.Join(importer.Path, "package.json"))
 }
 
 // packageManifestExists reports whether dir holds a package.json file.
@@ -202,23 +203,20 @@ func packageManifestExists(dir string) bool {
 
 // routeOf resolves one finding to its repair.
 //
-// A manifest finding is a Go module requirement when BOTH ends are Go modules:
-// a require of a workspace module needs the target to be one. Anything else is
-// reported rather than guessed at — editing the wrong manifest is worse than
-// editing none.
-func routeOf(wsRoot string, ws *workspace.Workspace, finding workspace.DeclaredEdgeFinding) pruneRoute {
+// A manifest finding goes to the deps-edit job of the importer's extension
+// (editors) when both ends are workspace projects. Anything else is reported
+// rather than guessed at: editing the wrong manifest is worse than editing
+// none.
+func routeOf(ws *workspace.Workspace, editors map[string]string, finding workspace.DeclaredEdgeFinding) pruneRoute {
 	switch finding.Class {
 	case workspace.DeclaredEdgeProjectConfig:
 		return pruneRouteProjectConfig
 	case workspace.DeclaredEdgeManifest:
 		importer, target := ws.ProjectByID(finding.Project), ws.ProjectByID(finding.Target)
-		if importer == nil || target == nil {
+		if importer == nil || target == nil || editors[importer.ID] == "" {
 			return pruneRouteKeep
 		}
-		if goModExists(filepath.Join(wsRoot, importer.Path)) && goModExists(filepath.Join(wsRoot, target.Path)) {
-			return pruneRouteGoModule
-		}
-		return pruneRouteKeep
+		return pruneRouteManifest
 	default:
 		return pruneRouteKeep
 	}
@@ -249,13 +247,17 @@ func pruneSummary(entry routedFinding) string {
 }
 
 // pruneLocation is the file the repair edits: the one the check named when it
-// could, otherwise the manifest that carries the finding.
+// could, otherwise the manifest that carries the finding, or the one the
+// editor's deps-edit job edits.
 func pruneLocation(entry routedFinding) string {
 	if entry.finding.File != "" {
 		return entry.finding.File
 	}
 	if entry.manifest != "" {
 		return entry.manifest
+	}
+	if entry.editor != "" {
+		return "the manifest " + entry.editor + " edits"
 	}
 	return "its own language manifest"
 }
@@ -273,28 +275,22 @@ func manualManifestEdit(entry routedFinding) string {
 }
 
 // applyPrune edits the files the routed findings name and refuses the rest.
-// rerun is the prune command the user ran (goDepsCommand).
 //
-// The go the Go module edits run with is resolved once, before the first edit
-// of any file. A go that cannot be found, or whose version probe timed out,
-// stops the command before it edits any go.mod or putnami.json, so the rerun
-// it names reads the provider view this one read. Any later failure puts every
-// putnami.json, go.mod and go.sum the command edits back as it was, for the
-// same reason.
+// It edits each project's putnami.json first, then runs the deps-edit job of
+// each editor once, with the manifest findings of every project it edits. The
+// job puts the manifests it edits back when it fails, and a failure puts every
+// putnami.json this command edited back as it was, so a rerun reads the
+// provider view this one read.
 func applyPrune(ctx context.Context, wsRoot string, ws *workspace.Workspace,
-	routed []routedFinding, pruned int, rerun string, out io.Writer, env LifecycleEnv) error {
+	routed []routedFinding, pruned int, out io.Writer, env LifecycleEnv) error {
 	byProject := make(map[string][]routedFinding)
 	var kept []routedFinding
-	var goImporter *workspace.Project
 	for _, entry := range routed {
 		if entry.route == pruneRouteKeep {
 			kept = append(kept, entry)
 			continue
 		}
 		byProject[entry.finding.Project] = append(byProject[entry.finding.Project], entry)
-		if entry.route == pruneRouteGoModule && goImporter == nil {
-			goImporter = ws.ProjectByID(entry.finding.Project)
-		}
 	}
 
 	projects := make([]string, 0, len(byProject))
@@ -303,51 +299,30 @@ func applyPrune(ctx context.Context, wsRoot string, ws *workspace.Workspace,
 	}
 	sort.Strings(projects)
 
-	// installErr is the failure of the workspace installers that installed the
-	// go the Go module edits run with. The edits go on with that go, and the
-	// command fails at the end.
-	var goCmd goCommand
-	if goImporter != nil {
-		var err error
-		if goCmd, err = goDepsCommand(ctx, wsRoot, goImporter.Path, "prune", rerun, env); err != nil {
-			return err
-		}
-	}
-	installErr := goCmd.installErr
 	edited := make([]*workspace.Project, 0, len(projects))
+	configs := make([]string, 0, len(projects))
 	for _, id := range projects {
 		project := ws.ProjectByID(id)
 		if project == nil {
-			return goDepsResult("prune", installErr, fmt.Errorf("project %s disappeared from the workspace while pruning", id))
+			return fmt.Errorf("project %s disappeared from the workspace while pruning", id)
 		}
 		edited = append(edited, project)
+		configs = append(configs, wsproto.ResolveFile(filepath.Join(wsRoot, project.Path), wsproto.ConfigFilename))
 	}
-	snapshot, err := snapshotFiles(pruneEditedFiles(wsRoot, edited)...)
+	snapshot, err := snapshotFiles(configs...)
 	if err != nil {
-		return goDepsResult("prune", installErr, err)
+		return err
 	}
 	for _, project := range edited {
 		if err := pruneProjectConfig(wsRoot, project, byProject[project.ID]); err != nil {
-			return goDepsResult("prune", installErr, snapshot.restoreAfter(err))
+			return snapshot.restoreAfter(err)
 		}
-		if err := pruneGoModule(ctx, wsRoot, ws, project, byProject[project.ID], goCmd); err != nil {
-			return goDepsResult("prune", installErr, snapshot.restoreAfter(err))
-		}
+	}
+	if err := pruneManifests(ctx, wsRoot, ws, edited, byProject, env); err != nil {
+		return snapshot.restoreAfter(err)
 	}
 	iox.Fprintf(out, "  ✓ pruned %d declared edge(s) across %d project(s)\n", pruned, len(projects))
-	return goDepsResult("prune", installErr, keptFindingsError(kept))
-}
-
-// pruneEditedFiles are the files a prune of projects may write: each project's
-// putnami.json and the files of its Go module (goModuleFiles).
-func pruneEditedFiles(wsRoot string, projects []*workspace.Project) []string {
-	var files []string
-	for _, project := range projects {
-		dir := filepath.Join(wsRoot, project.Path)
-		files = append(files, wsproto.ResolveFile(dir, wsproto.ConfigFilename))
-		files = append(files, goModuleFiles(dir)...)
-	}
-	return files
+	return keptFindingsError(kept)
 }
 
 // keptFindingsError reports the findings this command leaves for a manual
@@ -407,34 +382,43 @@ func pruneProjectConfig(wsRoot string, project *workspace.Project, routed []rout
 	return nil
 }
 
-// pruneGoModule drops the unimported workspace requirements from one project's
-// Go module with goCmd, the go `deps remove` runs (applyPrune resolves it).
-func pruneGoModule(ctx context.Context, wsRoot string, ws *workspace.Workspace,
-	project *workspace.Project, routed []routedFinding, goCmd goCommand) error {
-	modules := make([]string, 0, len(routed))
-	for _, entry := range routed {
-		if entry.route != pruneRouteGoModule {
+// pruneManifests runs the deps-edit job of each editor once, in name order,
+// with one prune edit per project it edits: the workspace-relative directories
+// of the targets whose requirement the project's manifest drops. A job puts
+// back the manifests it edits when it fails; the manifests an earlier editor's
+// job edited stay edited.
+func pruneManifests(ctx context.Context, wsRoot string, ws *workspace.Workspace,
+	edited []*workspace.Project, byProject map[string][]routedFinding, env LifecycleEnv) error {
+	byEditor := map[string][]depsEdit{}
+	for _, project := range edited {
+		editor := ""
+		var targets []string
+		for _, entry := range byProject[project.ID] {
+			if entry.route != pruneRouteManifest {
+				continue
+			}
+			target := ws.ProjectByID(entry.finding.Target)
+			if target == nil {
+				return fmt.Errorf("project %s disappeared from the workspace while pruning", entry.finding.Target)
+			}
+			editor = entry.editor
+			targets = append(targets, filepath.ToSlash(target.Path))
+		}
+		if len(targets) == 0 {
 			continue
 		}
-		module := goModulePathOf(wsRoot, ws.ProjectByID(entry.finding.Target))
-		if module == "" {
-			return fmt.Errorf("cannot name the module of %s to remove it from %s",
-				entry.finding.TargetName, project.Name)
+		sort.Strings(targets)
+		byEditor[editor] = append(byEditor[editor], depsEdit{project: project, modules: targets})
+	}
+	editors := make([]string, 0, len(byEditor))
+	for editor := range byEditor {
+		editors = append(editors, editor)
+	}
+	sort.Strings(editors)
+	for _, editor := range editors {
+		if err := runDepsEdit(ctx, wsRoot, editor, "prune", byEditor[editor], env); err != nil {
+			return err
 		}
-		modules = append(modules, module)
 	}
-	if len(modules) == 0 {
-		return nil
-	}
-	sort.Strings(modules)
-	return editGoModule(ctx, wsRoot, project, goCmd, "prune", modules)
-}
-
-// goModulePathOf is a project's module path: the one its go.mod declares. The
-// project's name and source name are not: a putnami.json name replaces both.
-func goModulePathOf(wsRoot string, project *workspace.Project) string {
-	if project == nil {
-		return ""
-	}
-	return goModulePath(filepath.Join(wsRoot, project.Path))
+	return nil
 }

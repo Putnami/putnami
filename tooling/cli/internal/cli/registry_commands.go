@@ -355,7 +355,7 @@ func cmdProjects(env *CommandEnv) error {
 	case "list", "":
 		return lifecycle.ProjectsList(env.WsRoot, env.Cfg, env.OutputFormat, warningWriter(env))
 	case "create":
-		return lifecycle.ProjectsCreate(env.Ctx, env.WsRoot, env.Cfg, env.Args, env.Global.Verbose, lifecycleEnv(env))
+		return lifecycle.ProjectsCreate(env.Ctx, env.WsRoot, env.Cfg, env.Args, lifecycleEnv(env))
 	case "describe":
 		return lifecycle.ProjectsDescribe(env.WsRoot, env.Cfg, env.Args, env.OutputFormat, warningWriter(env))
 	case "sync":

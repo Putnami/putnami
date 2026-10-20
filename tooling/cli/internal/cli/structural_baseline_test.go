@@ -301,7 +301,7 @@ var structuralPins = []structuralPin{
 		token:       "map[string]any",
 		scope:       productionFiles,
 		ceilingOnly: true,
-		want:        256,
+		want:        257,
 		why: "untyped payload plumbing the canonical result model (A2a/A2b) replaces. " +
 			"Counted per line, matching the epic's convention. A0 pinned 208; an earlier change " +
 			"typed the session-event seam — SessionEventHandler now takes a jobs.SessionRecord " +
@@ -428,7 +428,8 @@ var structuralPins = []structuralPin{
 			"environment compose adds is a []string that reaches cmd.Env and never a cache key. A further change adds one: ImpactTraceRecord.EventData, the typed selection trace projected onto the untyped session-event seam (jobs.SessionRecord.Data) at the single point it enters it. " +
 			"The final change raises 254→255 for testCasesOf in cli-model/jobs/result_model.go: a test task hands its per-case results to the CLI in the result's untyped data bag, beside testSummary, and this is the one decode that turns them into typed protocolcli.TestCase values. " +
 			"A later change raises 255→256 for jobs.keyInputs, and the line is the ONE payload this pin already names as untypable on one more hop of the path it already travels: the key-movement analysis hands the command params map to keyFilePatterns, exactly as the cache key, the mutation detector and the portable admission do, so the region it bounds is the region the key hashes. Nothing decodes, stores or forwards a new untyped document. " +
-			"A later change takes the count from 255 back to 256, under this ceiling, for jobs.RawJobEvent.RecordPayload: its signature and the one copy it makes to fold an event's type, level and message into the task:event payload, which already was this untyped map. It deletes the inline fold's own make in retainedJobEvents.add",
+			"A later change takes the count from 255 back to 256, under this ceiling, for jobs.RawJobEvent.RecordPayload: its signature and the one copy it makes to fold an event's type, level and message into the task:event payload, which already was this untyped map. It deletes the inline fold's own make in retainedJobEvents.add. " +
+			"A later change raises 256→257, net of the deleted Go steps of create and deps: lifecycle.setUpProject and lifecycle.runDepsEdit hand the project-setup and deps-edit jobs of an extension their params in the existing untyped params bag of WorkspaceJobRequest, two lines for the project-setup params and the deps-edit params, which the job context carries as every job's params. Each deps-edit entry is a typed struct",
 	},
 	{
 		name:        "test lines mentioning map[string]any",

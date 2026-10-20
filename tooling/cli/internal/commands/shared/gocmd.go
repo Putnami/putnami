@@ -11,12 +11,7 @@ import (
 // that reads go.work resolves the workspace's `use` and `replace` directives
 // (and a leaked GOWORK=off cannot force single-module resolution).
 func GoCommandEnv(moduleDir string) []string {
-	return GoCommandEnvFrom(os.Environ(), moduleDir)
-}
-
-// GoCommandEnvFrom is GoCommandEnv over base instead of os.Environ: the
-// environment a resolved go command runs in.
-func GoCommandEnvFrom(base []string, moduleDir string) []string {
+	base := os.Environ()
 	out := make([]string, 0, len(base)+1)
 	for _, e := range base {
 		if strings.HasPrefix(e, "GOWORK=") {

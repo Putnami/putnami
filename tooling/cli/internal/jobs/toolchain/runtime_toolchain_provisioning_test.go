@@ -102,6 +102,33 @@ func TestRuntimeToolchainProvisioningCommandRunsWithoutAUsablePin(t *testing.T) 
 		"workspace-install-resolves-an-unusable-pin-unavailable")
 }
 
+// TestProjectSetupResolvesLikeTheInstall pins that the project-setup job of
+// create resolves a toolchain only it needs as if optional, as
+// workspace-install does: it writes the go.work the go pin derives from, so
+// the lock of a new workspace pins no Go when it first runs.
+func TestProjectSetupResolvesLikeTheInstall(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeRuntimeToolchainLock(t, root, "other", "1.2.3", "integrity-a")
+	bin := t.TempDir()
+	writeRuntimeTool(t, filepath.Join(bin, "compiler"), "0.9.0")
+
+	ext := provisioningToolchainExtension()
+	ext.Jobs[ProjectSetupCommand] = &model.JobDefinition{PipelineSteps: []extensionproto.PipelineStep{{ID: "install", Task: "install"}}}
+	if err := resolveRuntimeToolchainsForCommands(root, []*model.ExtensionDescription{ext},
+		map[string]bool{ProjectSetupCommand: true}, []string{"PATH=" + bin}); err != nil {
+		t.Fatalf("%s refused a lock without a pin: %v", ProjectSetupCommand, err)
+	}
+	if resolved, ok := ext.RuntimeToolchains["compiler"]; !ok || resolved.Available || resolved.Identity == "" {
+		t.Fatalf("resolution = %+v (present %v), want the unavailable identity", resolved, ok)
+	}
+	if !ProvisioningOnlyRun(map[string]bool{ProjectSetupCommand: true}) {
+		t.Errorf("a run of only %s is not a provisioning run", ProjectSetupCommand)
+	}
+	spectest.Proves(t, "cli/runtime-toolchain-pinning", "provisioning-runs-unpinned",
+		"project-setup-resolves-an-unusable-pin-unavailable")
+}
+
 // captureRuntimeToolchainLogs routes the default logger, at its default info
 // level, to a buffer for the rest of the test.
 func captureRuntimeToolchainLogs(t *testing.T) *bytes.Buffer {

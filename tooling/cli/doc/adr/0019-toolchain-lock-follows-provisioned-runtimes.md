@@ -1,6 +1,15 @@
 # ADR 0019 — Toolchain locks follow provisioned runtimes
 
 - **Status**: accepted
+- **Amended**: 2026-10-20, decision 5: the core finds no go command. `projects
+  create` and `deps add|remove|prune` run the `project-setup` and `deps-edit`
+  jobs of the project's extension, with the extension's runtime toolchains, in
+  place of `jobs.RunToolchainEnvironment`, which is deleted. When
+  `toolchain.UnresolvedRuntimeToolchainLocks` reports a toolchain the extension
+  locks as unresolved, create runs the job's prepare stage, pins what the lock
+  misses, installs only a newly pinned toolchain the extension locks, and runs
+  the job once. The deps commands install nothing and name `putnami install`
+  when a pinned toolchain is not installed.
 - **Scope**: the workspace lock's toolchain pins (`tooling/cli` install, init,
   `projects create`, `deps`, runtime toolchain resolution) and the Go,
   TypeScript and Python extensions' `workspace-install`
