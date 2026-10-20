@@ -126,12 +126,15 @@ func reportingResolver(ctx context.Context, capability sessionreporter.Capabilit
 				selected = append(selected, ext)
 			}
 		}
+		if len(selected) == 0 {
+			return sessionreporter.LaunchSpec{}, sessionreporter.Cause(fmt.Sprintf("%s names %s, which this workspace does not load", capability.SelectorEnv, capability.Provider(ctx)))
+		}
 		provider, err := extension.ResolveReservedProvider(selected, capability.Name)
 		if err != nil {
 			return sessionreporter.LaunchSpec{}, err
 		}
 		if provider == nil || provider.ExtensionName != capability.Provider(ctx) {
-			return sessionreporter.LaunchSpec{}, fmt.Errorf("selected reporter is not available")
+			return sessionreporter.LaunchSpec{}, sessionreporter.Cause(fmt.Sprintf("%s serves no %s command in this workspace", capability.Provider(ctx), capability.Name))
 		}
 		for _, ext := range discovered.Extensions {
 			if ext.Name != provider.ExtensionName {

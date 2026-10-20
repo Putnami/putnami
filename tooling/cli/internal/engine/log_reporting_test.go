@@ -280,6 +280,7 @@ func TestLogReportingTokensReachOnlyTheirOwnProvider(t *testing.T) {
 
 func TestLogReportingMissingExtensionRunsLocally(t *testing.T) {
 	spectest.Proves(t, "cli/native-session-reporting", "engine-lifecycle", "reporting-capabilities-deliver-and-fail-independently")
+	spectest.Proves(t, "cli/native-session-reporting", "unavailable-provider", "an-unloaded-selected-provider-is-named")
 	for _, exit := range []int{0, 1} {
 		t.Run(fmt.Sprint(exit), func(t *testing.T) {
 			root, req := logReporterFixture(t, fixtureproc.Program{Record: "executions", Exit: exit})
@@ -292,6 +293,9 @@ func TestLogReportingMissingExtensionRunsLocally(t *testing.T) {
 			}
 			if strings.Count(stderr, "log report") != 1 || !strings.Contains(stderr, "log reporter unavailable") || strings.Contains(stderr, "session report") || strings.Contains(stderr, "secret") {
 				t.Fatalf("want exactly one log reporter diagnostic, got %s", stderr)
+			}
+			if !strings.Contains(stderr, "log reporter unavailable: "+protocolcli.LogReporterEnv+" names @test/missing, which this workspace does not load;") {
+				t.Fatalf("the diagnostic does not name the selector and the missing extension: %s", stderr)
 			}
 			sessionID := workspace_state.NewSessionStore(root).LatestID()
 			verifyReporterArtifacts(t, root, sessionID)
