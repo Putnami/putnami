@@ -245,7 +245,8 @@
               "an-existing-workspace-biome-config-is-preserved",
               "a-missing-extension-biome-default-fails-install",
               "a-fresh-workspace-install-is-idempotent-and-lint-uses-the-root-config",
-              "the-added-biome-is-the-release-the-rules-target"
+              "the-added-biome-is-the-release-the-rules-target",
+              "the-installed-biome-is-the-release-the-shipped-rules-name"
             ]
           }
         },

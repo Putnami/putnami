@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/infra"
 	registry "go.putnami.dev/protocol/registry"
+	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -957,6 +958,87 @@ func TestWorkspaceBiomeDefault_FreshWorkspacePutnamiLifecycle(t *testing.T) {
 	if bytes.Contains(linted, []byte("console")) {
 		t.Fatalf("Putnami lint did not apply the shipped noConsole rule: %q", linted)
 	}
+}
+
+// The Biome release workspace install adds is the exact release the $schema of
+// the shipped rules names, so the Biome a fresh workspace installs accepts the
+// biome.json the same install materializes. Both files are declared test
+// inputs, so an edit to either reruns this check.
+func TestWorkspaceBiomeDefault_InstallsTheBiomeReleaseTheShippedRulesName(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-biome-default", "the-installed-biome-is-the-release-the-shipped-rules-name")
+	extensionRoot := extensionProjectRoot(t)
+
+	manifestData, err := os.ReadFile(filepath.Join(extensionRoot, "putnami.extension.json"))
+	if err != nil {
+		t.Fatalf("read extension manifest: %v", err)
+	}
+	var manifest struct {
+		WorkspaceDevDependencies map[string]string `json:"workspaceDevDependencies"`
+	}
+	if err := json.Unmarshal(manifestData, &manifest); err != nil {
+		t.Fatalf("parse extension manifest: %v", err)
+	}
+	release := manifest.WorkspaceDevDependencies["@biomejs/biome"]
+	if !isExactRelease(release) {
+		t.Fatalf("workspaceDevDependencies[@biomejs/biome] = %q, want the exact MAJOR.MINOR.PATCH release that config/biome.json names", release)
+	}
+
+	configData, err := os.ReadFile(filepath.Join(extensionRoot, "config", "biome.json"))
+	if err != nil {
+		t.Fatalf("read shipped biome config: %v", err)
+	}
+	var config struct {
+		Schema string `json:"$schema"`
+	}
+	if err := json.Unmarshal(configData, &config); err != nil {
+		t.Fatalf("parse shipped biome config: %v", err)
+	}
+	if want := "https://biomejs.dev/schemas/" + release + "/schema.json"; config.Schema != want {
+		t.Fatalf("config/biome.json $schema = %q, want %q, the Biome release workspace install adds", config.Schema, want)
+	}
+
+	declared := declaredTestInputs(t, extensionRoot)
+	for _, read := range []string{"putnami.extension.json", "config/biome.json"} {
+		if !wsproto.SelectsPath(read, declared) {
+			t.Errorf("%s is read by this project's tests but is not a declared test input (options.test.filePatterns in typescript/extension/putnami.json)", read)
+		}
+	}
+}
+
+// isExactRelease reports whether version is MAJOR.MINOR.PATCH with decimal
+// parts and no range operator, prerelease or build suffix.
+func isExactRelease(version string) bool {
+	parts := strings.Split(version, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	for _, part := range parts {
+		if _, err := strconv.ParseUint(part, 10, 64); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
+// declaredTestInputs returns the test filePatterns the project at projectRoot
+// declares in its putnami.json.
+func declaredTestInputs(t *testing.T, projectRoot string) []string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(projectRoot, "putnami.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config struct {
+		Options struct {
+			Test struct {
+				FilePatterns []string `json:"filePatterns"`
+			} `json:"test"`
+		} `json:"options"`
+	}
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatalf("parse %s/putnami.json: %v", projectRoot, err)
+	}
+	return config.Options.Test.FilePatterns
 }
 
 func assertNoAncestorBiomeConfig(t *testing.T, path string) {
