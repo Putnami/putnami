@@ -145,14 +145,8 @@ func TestProjectsSync_PreservesTransparentGroupFolderPaths(t *testing.T) {
 }
 
 // replaceClosureWorkspace builds a workspace already in membership sync whose
-// go.work member `moda` is a LOCAL EXTENSION missing the replace for its
+// go.work member `moda` is a local extension missing the replace for its
 // workspace dependency `modb`.
-//
-// The extension part is what makes the fixture meaningful since slice C4b:
-// core's closure repair is scoped to the extension modules it must prepare a
-// runtime from, because that preparation is what a broken closure blocks. Every
-// other module's closure belongs to the Go extension's own `workspace-sync`
-// task.
 func replaceClosureWorkspace(t *testing.T) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -190,31 +184,24 @@ func syncJobEnv() LifecycleEnv {
 	}}
 }
 
-func TestProjectsSync_RepairsTheBootstrapClosureOfALocalExtension(t *testing.T) {
-	ws := replaceClosureWorkspace(t)
+// The core writes no go.mod, not even the one of a local extension whose
+// runtime it prepares: that extension's own prepare completes the replace
+// closure when it builds, and its sync task maintains the closure. A dry run
+// leaves the file alone too.
+func TestProjectsSync_WritesNoGoMod(t *testing.T) {
+	for _, dryRun := range []bool{false, true} {
+		ws := replaceClosureWorkspace(t)
+		goMod := filepath.Join(ws, "moda", "go.mod")
+		before := readText(t, goMod)
 
-	cfg := wsproto.Load(ws)
-	if err := ProjectsSync(context.Background(), ws, cfg, []string{"--skip-install"}, false, syncJobEnv()); err != nil {
-		t.Fatalf("ProjectsSync: %v", err)
-	}
+		if err := ProjectsSync(context.Background(), ws, wsproto.Load(ws),
+			[]string{"--skip-install"}, dryRun, syncJobEnv()); err != nil {
+			t.Fatalf("ProjectsSync (dry run %t): %v", dryRun, err)
+		}
 
-	got := readText(t, filepath.Join(ws, "moda", "go.mod"))
-	if !strings.Contains(got, "replace example.com/b => ../modb") {
-		t.Errorf("the extension module should have gained the workspace replace:\n%s", got)
-	}
-}
-
-func TestProjectsSync_DryRunLeavesGoModUntouched(t *testing.T) {
-	ws := replaceClosureWorkspace(t)
-
-	before := readText(t, filepath.Join(ws, "moda", "go.mod"))
-	cfg := wsproto.Load(ws)
-	if err := ProjectsSync(context.Background(), ws, cfg, []string{"--skip-install"}, true, syncJobEnv()); err != nil {
-		t.Fatalf("ProjectsSync dry-run: %v", err)
-	}
-
-	if after := readText(t, filepath.Join(ws, "moda", "go.mod")); after != before {
-		t.Errorf("dry-run must not modify go.mod:\nbefore=%q\nafter=%q", before, after)
+		if after := readText(t, goMod); after != before {
+			t.Errorf("ProjectsSync (dry run %t) rewrote the extension's go.mod:\n%s", dryRun, after)
+		}
 	}
 }
 
@@ -327,60 +314,5 @@ func TestProjectsSync_UnchangedTreeDoesNotRewriteSnapshot(t *testing.T) {
 	}
 	if info.ModTime().Equal(pinned) {
 		t.Error("a metadata change did not refresh the snapshot")
-	}
-}
-
-// THE BOOTSTRAP EXCEPTION, NARROWED.
-//
-// The full workspace-replace closure moved to the Go extension's own
-// `workspace-sync` task in C4a. What core kept is the smallest part of it that
-// cannot be handed over: the modules whose runtime must be PREPARED before any
-// extension can run at all, because preparing a local extension compiles it in
-// module mode and a missing replace makes that compile resolve a placeholder
-// version through the proxy.
-//
-// These two tests pin both halves of that narrowing — the repair still happens,
-// and it happens ONLY for the bootstrap modules.
-func TestProjectsSync_ConvergesTheBootstrapClosure(t *testing.T) {
-	ws := replaceClosureWorkspace(t)
-
-	if err := ProjectsSync(context.Background(), ws, wsproto.Load(ws),
-		[]string{"--skip-install"}, false, syncJobEnv()); err != nil {
-		t.Fatalf("ProjectsSync: %v", err)
-	}
-	before := readText(t, filepath.Join(ws, "moda", "go.mod"))
-	if !strings.Contains(before, "replace example.com/b => ../modb") {
-		t.Fatalf("core did not write the missing workspace replace:\n%s", before)
-	}
-
-	// Converged: a second run finds nothing to do and rewrites nothing.
-	if err := ProjectsSync(context.Background(), ws, wsproto.Load(ws),
-		[]string{"--skip-install"}, false, syncJobEnv()); err != nil {
-		t.Fatalf("second ProjectsSync: %v", err)
-	}
-	if after := readText(t, filepath.Join(ws, "moda", "go.mod")); after != before {
-		t.Errorf("a converged closure was rewritten:\n%s", after)
-	}
-}
-
-// A go.work member that is NOT an extension core must prepare is left to the Go
-// extension's sync task. Two maintainers of one append-only codemod is how a
-// go.mod starts gaining directives nobody asked for.
-func TestProjectsSync_LeavesNonBootstrapModulesToTheExtension(t *testing.T) {
-	ws := replaceClosureWorkspace(t)
-	// modc is an ordinary Go project with the same missing replace.
-	writeProjectFile(t, filepath.Join(ws, "putnami.workspace.json"), `{"includes":["moda","modb","modc"]}`)
-	writeProjectFile(t, filepath.Join(ws, "go.work"), "go 1.26\n\nuse (\n\t./moda\n\t./modb\n\t./modc\n)\n")
-	writeProjectFile(t, filepath.Join(ws, "modc", "go.mod"), "module example.com/c\n\ngo 1.26\n\nrequire example.com/b v0.0.0\n")
-	writeProjectFile(t, filepath.Join(ws, "modc", "putnami.json"), `{"name":"@fixture/modc"}`)
-	workspace.InvalidateLoadCache(ws)
-
-	before := readText(t, filepath.Join(ws, "modc", "go.mod"))
-	if err := ProjectsSync(context.Background(), ws, wsproto.Load(ws),
-		[]string{"--skip-install"}, false, syncJobEnv()); err != nil {
-		t.Fatalf("ProjectsSync: %v", err)
-	}
-	if after := readText(t, filepath.Join(ws, "modc", "go.mod")); after != before {
-		t.Errorf("core repaired a module it does not have to prepare:\n%s", after)
 	}
 }

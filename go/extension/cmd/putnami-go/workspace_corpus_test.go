@@ -28,9 +28,8 @@ import (
 // The two copies were pinned together by goCorpusFingerprint while both existed.
 // Deleting the core parser removed its copy of the graph corpus with it, so
 // this is now the SOLE conformance suite for "what does a go.mod say about this
-// project"; the fingerprint stays as the pin for the CLOSURE corpus, whose twin
-// (tooling/cli/internal/workspace/gomod_bootstrap_test.go) survives for core's
-// bootstrap residue.
+// project". The CLOSURE corpus below lost its core copy the same way, when the
+// CLI stopped writing go.mod.
 //
 // Every case is a directory tree of real go.mod files rather than a struct
 // literal. The old core tests built `*Project` values with a pre-parsed GoMod
@@ -315,8 +314,9 @@ type goClosureCase struct {
 	Want  map[string]string   `json:"want"`
 }
 
-// goClosureFingerprint pins this table against its twin. It must equal the
-// constant of the same name on the other side.
+// goClosureFingerprint is the canonical digest of goClosureCorpus(). This table
+// is the only place the closure codemod's byte-exact edits are asserted, so a
+// case weakened or dropped from it has to move the digest on purpose.
 const goClosureFingerprint = "ce84ad46b9afcc748b55d169d6904a40c90ef93b2b743d42391b1a15e84b3bb2"
 
 func goClosureCorpus() []goClosureCase {

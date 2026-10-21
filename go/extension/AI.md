@@ -214,12 +214,13 @@ modules are then settled with `go mod tidy` (best effort). It runs
 selection. It also warns when a selected project carries a `go.mod` that
 `go.work` does not list, since the closure cannot see it.
 
-The CLI still writes the same closure today, on purpose: this edit *bootstraps*
-the extension that performs it — a syncTask runs on a prepared runtime, and in a
-workspace that builds its own extensions from source, preparing that runtime
-needs the closure a broken `go.mod` is missing. Running both is safe because the
-codemod is append-only, deterministic and convergent, and the two
-implementations are pinned byte-for-byte identical by a shared corpus.
+The CLI writes no `go.mod`. A syncTask runs on a prepared runtime, and
+preparing this extension's runtime does not need the closure first:
+`bin/prepare` builds from a copy of `go.mod` and `go.sum`, and adds to the copy
+a replace for each module that the replace closure provides and `go.mod` does
+not replace. The replace closure is every directory a local replace reaches,
+which is the source the runtime digest covers. Two directories that provide one
+module stop the build, and the module's own files are never written.
 
 It deliberately does **not** align a `module` line to the project name: a
 project name (`@putnami/go`) and a module path (`go.putnami.dev/go/extension`)

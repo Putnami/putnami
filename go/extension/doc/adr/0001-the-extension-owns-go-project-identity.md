@@ -68,9 +68,8 @@ The adapter's `inputs` are `go.mod`, `**/*.go` and `go.work`. They exclude
 ## Consequences
 
 - A new probe fact must be derivable from the tree without running a tool.
-- While the workspace builds its own extensions from source, the closure is
-  maintained in two places: `syncTask` runs on a prepared runtime, and
-  preparing that runtime needs the closure. The duplication is safe only
-  because the codemod is append-only and convergent, and a shared corpus pins
-  both implementations byte for byte. Removing either requires proving the
-  bootstrap no longer needs it.
+- The extension alone maintains the closure. `syncTask` runs on a prepared
+  runtime, and preparing that runtime does not need the closure first:
+  `bin/prepare` completes a copy of `go.mod` from the replace closure, which
+  is the source the runtime digest covers, and never writes the module's own
+  files.

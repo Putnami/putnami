@@ -25,26 +25,15 @@ import (
 // missing replace rots in silently as modules gain cross-module dependencies
 // and surfaces later as an offline-tidy 404.
 //
-// THIS TASK OWNS THE CLOSURE. Core's copy is narrowed to a BOOTSTRAP
-// residue — the extension modules whose runtime core has to prepare before any
-// extension can run at all — and left everything else here.
+// THIS TASK ALONE OWNS THE CLOSURE: the CLI writes no go.mod.
 //
-// The residue exists because this task runs on a PREPARED runtime, and in a
-// workspace that builds its extensions from source, preparation compiles this
-// module with `GOWORK=off` (bin/prepare, deliberately, so the artifact is a
-// function of its declared inputs). Module mode is exactly the mode go.work
-// replaces do not apply in, so a missing replace in THIS module's own go.mod
-// makes the runtime unbuildable and `projects sync` unable to repair the one
-// failure it exists for. Core therefore repairs the extension modules, and only
-// those, before preparing them.
-//
-// Running both over one module is safe in a way it never is for a name field:
-// the codemod is append-only, deterministic and convergent, and the two
-// implementations are pinned byte-for-byte identical by the shared closure
-// corpus. Removing the residue means removing the ordering — a `prepare` that
-// resolved through the governing go.work would not need the closure at all —
-// which is a change to an artifact-digest-relevant script and belongs to its own
-// slice.
+// This task runs on a PREPARED runtime, and in a workspace that builds its
+// extensions from source, preparation compiles this module with `GOWORK=off`,
+// the mode go.work replaces do not apply in. A missing replace in THIS module's
+// own go.mod still does not stop that runtime: bin/prepare builds from a copy of
+// go.mod that it completes from the replace closure, the source the runtime
+// digest covers, so the runtime that repairs the file can be built before the
+// repair.
 //
 // What this task deliberately does NOT do is align the `module` line to the
 // resolved project name. That is the one place the TypeScript pilot's shape
