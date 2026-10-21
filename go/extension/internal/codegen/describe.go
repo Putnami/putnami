@@ -24,8 +24,11 @@ import (
 	"github.com/rogpeppe/go-internal/lockedfile"
 	"go.putnami.dev/go/extension/internal/codegen/openapiutil"
 	"go.putnami.dev/go/extension/internal/jobs/configextract"
+	"go.putnami.dev/go/extension/internal/parse"
 	"go.putnami.dev/go/extension/internal/toolchain"
 	protocfg "go.putnami.dev/protocol/config"
+	diag "go.putnami.dev/protocol/diagnostic"
+	grpcservices "go.putnami.dev/protocol/grpc-services"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/genresult"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -234,6 +237,19 @@ func runDescribe(ctx *pctx.Context, emit *jsonl.Emitter) (*describeResult, error
 	// with HTTP routes but no runtime OpenAPI plugin keeps build-generate's
 	// static stub, which is still the converged value.
 	staged := stagedSchemaArtifacts(projectPath)
+	// The gRPC service inventory is checked before any schema is promoted,
+	// whether or not the project commits its schemas: an invalid one fails the
+	// run here, so this run commits no schema file and removes none.
+	inventoryDiagnostics, err := preflightGRPCInventory(genDir, before, staged)
+	if err != nil {
+		return nil, fmt.Errorf("check gRPC service inventory: %w", err)
+	}
+	if len(inventoryDiagnostics) > 0 {
+		file := parse.DiagPath(ctx.WorkspaceRoot, projectPath, filepath.Join(".gen", filepath.FromSlash(grpcServicesSchemaRelPath)))
+		emitGRPCInventoryDiagnostics(emit, file, inventoryDiagnostics)
+		return nil, fmt.Errorf("gRPC service inventory %s is invalid; describe promoted no schema:\n%s",
+			file, diag.ErrorText(inventoryDiagnostics))
+	}
 	artifacts, err := collectArtifacts(projectPath, genDir, commitSchemas, before, staged)
 	if err != nil {
 		return nil, fmt.Errorf("collect artifacts: %w", err)
@@ -310,6 +326,13 @@ func isHTTPRoutesSchemaPath(rel string) bool {
 func isAPIProtoSchemaPath(rel string) bool {
 	rel = strings.TrimPrefix(strings.ReplaceAll(rel, "\\", "/"), "./")
 	return rel == apiProtoSchemaRelPath
+}
+
+// isGRPCServicesSchemaPath reports whether rel points at the gRPC service
+// inventory, which only the app's describe binary produces.
+func isGRPCServicesSchemaPath(rel string) bool {
+	rel = strings.TrimPrefix(strings.ReplaceAll(rel, "\\", "/"), "./")
+	return rel == grpcServicesSchemaRelPath
 }
 
 // isFeatureEvidencePath reports whether rel is a feature-evidence artifact
@@ -998,6 +1021,9 @@ func (s schemaSnapshot) content(path string) ([]byte, bool) {
 // The committed feature evidence and the gRPC service inventory are the only
 // tracked files it removes: when this run did not commit one, the copy an
 // earlier run left goes (removeUncommittedDescribeOutputs).
+//
+// It does not validate the gRPC service inventory: runDescribe refuses an
+// invalid one with preflightGRPCInventory before calling it.
 func collectArtifacts(projectPath, genDir string, commit bool, before schemaSnapshot, staged map[string]bool) ([]string, error) {
 	var artifacts []string
 
@@ -1048,10 +1074,11 @@ func collectArtifacts(projectPath, genDir string, commit bool, before schemaSnap
 						return err
 					}
 				case isCapabilitiesSchemaPath(relSlash), isHTTPRoutesSchemaPath(relSlash),
-					isFeatureEvidencePath(relSlash), isAPIProtoSchemaPath(relSlash):
-					// capabilities.json, http-routes.json, api.proto and the
-					// feature-evidence artifacts have a single producer — the app's
-					// describe binary.
+					isGRPCServicesSchemaPath(relSlash), isFeatureEvidencePath(relSlash),
+					isAPIProtoSchemaPath(relSlash):
+					// capabilities.json, http-routes.json, grpc-services.json,
+					// api.proto and the feature-evidence artifacts have a single
+					// producer — the app's describe binary.
 					// A differing prior copy is describe's OWN stale output from an
 					// earlier incremental build or a build-generate cache restore,
 					// not a competing producer, so take the fresh describe output as
@@ -1159,6 +1186,70 @@ func removeUncommittedDescribeOutputs(projectPath string, artifacts []string) er
 		}
 	}
 	return nil
+}
+
+// grpcInventoryNotCanonicalCode is this extension's diagnostic code for a gRPC
+// service inventory that putnami.grpc-services.v1 accepts but whose bytes are
+// not the protocol's canonical form. The protocol's closed taxonomy names
+// invalid documents only, so the code lives in the extension's namespace.
+const grpcInventoryNotCanonicalCode = "go.describe.grpc_inventory_not_canonical"
+
+// preflightGRPCInventory checks the gRPC service inventory this run would
+// promote, before collectArtifacts writes or removes any file. It returns the
+// error diagnostics that refuse the inventory, and an error when the file
+// cannot be stat'ed or read.
+//
+// The inventory is current when the describe binary wrote or rewrote it
+// (before.changedSince) or build-generate staged it (staged). An absent file
+// leaves service facts unavailable and is not checked; neither is an
+// untouched, unstaged leftover, which collectArtifacts does not promote. A
+// current file must parse, validate and match its digest under the protocol
+// module (grpcservices.ParseAndValidateManifest), and its bytes must equal the
+// protocol's canonical form (grpcservices.CanonicalJSON): describe promotes
+// producer bytes verbatim, so it refuses a valid non-canonical document
+// instead of rewriting it. The committed copy is never read.
+func preflightGRPCInventory(genDir string, before schemaSnapshot, staged map[string]bool) ([]diag.Diagnostic, error) {
+	path := filepath.Join(genDir, filepath.FromSlash(grpcServicesSchemaRelPath))
+	if _, err := os.Stat(path); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if !before.changedSince(path) && !staged[grpcServicesSchemaRelPath] {
+		return nil, nil
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	manifest, diagnostics := grpcservices.ParseAndValidateManifest(body)
+	if diag.HasErrors(diagnostics) {
+		return diag.Errors(diagnostics), nil
+	}
+	canonical, diagnostics := grpcservices.CanonicalJSON(manifest)
+	if diag.HasErrors(diagnostics) {
+		return diag.Errors(diagnostics), nil
+	}
+	if !bytes.Equal(body, canonical) {
+		return []diag.Diagnostic{diag.Errorf(grpcInventoryNotCanonicalCode, "",
+			"the inventory is valid %s but its bytes are not the protocol's canonical form; describe commits the producer's bytes verbatim and does not rewrite them",
+			grpcservices.Protocol)}, nil
+	}
+	return nil, nil
+}
+
+// emitGRPCInventoryDiagnostics reports each diagnostic that refused the gRPC
+// service inventory as a coded diagnostic on file, the inventory's .gen path,
+// with its field context in the message.
+func emitGRPCInventoryDiagnostics(emit *jsonl.Emitter, file string, diagnostics []diag.Diagnostic) {
+	for _, d := range diagnostics {
+		message := d.Message
+		if d.Field != "" {
+			message = d.Field + ": " + message
+		}
+		emit.DiagnosticWithCode("error", message, file, 0, 0, d.Code)
+	}
 }
 
 // stagedSchemaArtifacts reads .gen/generate-result.json and returns the set of

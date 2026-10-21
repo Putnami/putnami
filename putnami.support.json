@@ -423,6 +423,13 @@
       "status": "preview"
     },
     {
+      "id": "go.putnami.dev/protocol/grpc-services",
+      "kind": "protocol",
+      "status": "preview",
+      "default": true,
+      "parity": "unsupported"
+    },
+    {
       "id": "go.putnami.dev/protocol/http-routes",
       "kind": "protocol",
       "status": "stable"

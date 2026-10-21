@@ -576,7 +576,25 @@
               "publishing-an-unmerged-canonical-provider-document-preserves-its-hash",
               "committed-feature-evidence-is-only-what-the-run-wrote",
               "committed-grpc-inventory-is-only-what-the-run-wrote",
-              "a-failed-describe-keeps-the-committed-grpc-inventory"
+              "a-failed-describe-keeps-the-committed-grpc-inventory",
+              "a-fresh-grpc-inventory-replaces-describes-own-stale-copy"
+            ]
+          }
+        },
+        {
+          "id": "grpc-inventory-checked-before-promotion",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-invalid-grpc-inventory-fails-describe-before-any-schema-is-promoted",
+              "a-non-canonical-grpc-inventory-is-refused-not-rewritten",
+              "the-schema-opt-out-still-checks-the-grpc-inventory",
+              "only-the-current-grpc-inventory-is-checked",
+              "an-unreadable-grpc-inventory-fails-describe"
             ]
           }
         },

@@ -290,6 +290,11 @@ stable, parameters and required lists are sorted, and duplicate generate /
 describe producers are merged by path and method. Non-OpenAPI artifacts with
 multiple producers fail instead of overwriting silently.
 
+`schema/grpc-services.json` is checked with `go.putnami.dev/protocol/grpc-services`
+before describe promotes any schema, also under the opt-out. A malformed,
+unsupported-version, wrong-digest or non-canonical inventory fails the build
+and is never rewritten; the committed files keep their previous bytes.
+
 The Putnami orchestrator's project-dependency ordering ensures consumer projects
 (e.g. a TS service) see the committed `schema/` files before their own build
 runs — supporting cross-language codegen in a monorepo without runtime plumbing.

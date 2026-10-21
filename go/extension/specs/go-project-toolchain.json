@@ -76,6 +76,10 @@
       "text": "Each committed generated contract has exactly one committer for a given run: when describe will run, generate defers the committed sidecar instead of writing a partial one, only changed files are committed, the committed feature evidence and gRPC service inventory hold only what a successful run wrote while a failed run leaves them as they were, and formatting-only publication of an unmerged framework OpenAPI document preserves its bytes and hash."
     },
     {
+      "id": "grpc-inventory-checked-before-promotion",
+      "text": "Before describe promotes any schema, the gRPC service inventory the run wrote or generate staged must pass the protocol module's own parser, validator, digest check and canonical form, whether or not the project commits schemas. A malformed, unsupported-version, wrong-digest or non-canonical one fails the run with a coded diagnostic, and an unreadable one fails the run; in either case describe commits and removes no schema file. An absent inventory or an untouched .gen leftover is not checked."
+    },
+    {
       "id": "generation-opt-out",
       "text": "A project that opts out of committing generated schemas still gets the build-only .gen copy, and the generation manifest's export points at that copy; the opt-out is refused for a project with no describe phase, whose .gen copy no task would restore, instead of losing the contract on the first cached build."
     },

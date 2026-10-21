@@ -22,9 +22,10 @@ service's own name, and its mount prefix has no dot segment.
 
 | Role | Implementation |
 | --- | --- |
-| Producer (Go) | `go.putnami.dev/grpc` — the native `Plugin`, the Connect `GatewayPlugin` and the `ApiBridge` write one union inventory to `schema/grpc-services.json` during describe (`go/framework/grpc/services_inventory.go`). The Go extension commits it verbatim and removes a stale copy when describe succeeds without writing one. |
+| Producer (Go) | `go.putnami.dev/grpc` — the native `Plugin`, the Connect `GatewayPlugin` and the `ApiBridge` write one union inventory to `schema/grpc-services.json` during describe (`go/framework/grpc/services_inventory.go`). |
 | Producer (TypeScript) | None. No TypeScript framework surface serves gRPC. |
-| Consumer | None in this repository. A consumer joins the inventory with the same build's `schema/http-routes.json`; the producer tests prove that join. |
+| Consumer (Go) | `@putnami/go`, a strict validator that controls promotion (`go/extension/internal/codegen/describe.go`). Before describe commits any schema, it checks the inventory the run wrote with `ParseAndValidateManifest` and refuses bytes that differ from `CanonicalJSON`, so a malformed, other-version, wrong-digest or non-canonical document fails the build and changes no committed file. It commits a valid document verbatim and removes a stale copy when describe succeeds without writing one. It reads no service fact. |
+| Consumer (joins) | None in this repository. A consumer joins the inventory with the same build's `schema/http-routes.json`; the producer tests prove that join. |
 
 A present file is evidence: the application composes a gRPC surface, and the
 file lists every service it registered. An empty `services` list states that the
@@ -157,17 +158,37 @@ reports today with `methodsKnown: false` may report them with
 (`go.putnami.dev/protocol/grpc-services`) owns the wire, the schema and the
 corpus; producers follow it.
 
-**Support status** — none. The protocol is not listed in
-[`putnami.support.json`](../../putnami.support.json), and it has one
-implementation.
+**Support status** — `preview` in the workspace-root
+[`putnami.support.json`](../../putnami.support.json) catalog, with
+`default: true` and `parity: unsupported`; [`protocols/support`](../support/README.md)
+defines the vocabulary. Every describe of an app that composes a gRPC surface
+writes the inventory, so it is part of the default experience. As a `preview`
+protocol it may break in a minor release whose release notes state the required
+user change.
 
-**Evidence**
+**Evidence for that status**
 
+- One implementation, Go: the `go.putnami.dev/grpc` describe emitter.
+- One active consumer in this tree: `@putnami/go` validates the document across
+  the module boundary before describe promotes any schema. Its tests in
+  `go/extension/internal/codegen/describe_test.go` refuse a malformed,
+  unsupported-version, wrong-digest and non-canonical inventory, and prove the
+  `go/go-project-toolchain#grpc-inventory-checked-before-promotion` requirement.
 - `conformance_test.go` runs the corpus under `fixtures/`.
 - `canonical_test.go` pins the golden bytes and digest, order independence, and
   input purity.
 - `version_test.go` pins the identifier and schema URL together;
   `drift_test.go` pins the Go types and closed enums against the schema.
+
+**What is missing for `stable`**
+
+- A consumer across a boundary this repository does not control. The one
+  consumer here validates the document and acts on none of its service facts.
+- A second implementation that runs this corpus, or a reviewed parity decision
+  beyond `parity: unsupported`.
+- An entry in the
+  [compatibility budget](../../tooling/cli/doc/21-compatibility-and-migration.md)
+  and a stated N-1 read window.
 
 **Owning user feature** — none. The inventory is a build output about a
 workload's surface. The outcome it reports belongs to the producer's

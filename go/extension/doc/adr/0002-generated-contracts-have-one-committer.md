@@ -34,6 +34,18 @@ overwritten.
 `.gen` write, and the manifest's export points at the `.gen` copy. A project
 with no describe phase may not set it (ADR 0005).
 
+**A protocol document is checked before anything is promoted.** Describe
+checks the gRPC service inventory (`putnami.grpc-services.v1`) that the run
+wrote or generate staged, before it commits or removes any schema file, and
+also when the project opts out of committing. It uses the protocol module's
+own strict parser, validator, digest check and canonical byte form, and keeps
+no copy of them. A malformed, unsupported-version, wrong-digest or
+non-canonical document fails the run with a coded diagnostic, and an
+unreadable one fails the run; in either case the committed files keep the
+last successful run's bytes. A valid document is
+committed verbatim. An absent inventory and an untouched `.gen` leftover are
+not checked.
+
 **Manifest paths are project-relative and slash-separated.** Producers
 relativize at the boundary; consumers resolve against the project root, and an
 absolute value resolves to itself.
@@ -52,6 +64,11 @@ rejected, not normalized.
   consumer.
 - **Absolutize manifest paths on read.** Every reader would need the
   producing checkout, which the cache entry does not carry.
+- **Canonicalize a valid but non-canonical inventory on the way in.** The
+  committed copy would no longer be the bytes its producer wrote, and the
+  committer would become a second producer.
+- **Check the inventory while walking `.gen/schema`.** A schema file that sorts
+  earlier would already be committed when the check fails.
 
 ## Consequences
 
@@ -60,3 +77,6 @@ rejected, not normalized.
   binaries must name one.
 - The merge is defined for OpenAPI only. Another artifact kind with two
   producers needs its own merge rule first.
+- `@putnami/go` depends on `go.putnami.dev/protocol/grpc-services`, through
+  the `extension-providers.protocol-contracts.v1` reference of its
+  architecture manifest. It reads no service fact from the document.

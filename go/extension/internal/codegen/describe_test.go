@@ -26,6 +26,7 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 
 	"go.putnami.dev/protocol/features/spectest"
+	grpcservices "go.putnami.dev/protocol/grpc-services"
 )
 
 func TestSnapshotSchemaDirEmptyDir(t *testing.T) {
@@ -1973,11 +1974,9 @@ func TestCollectArtifactsRemovesCommittedFeatureEvidenceItDidNotWrite(t *testing
 // committed sidecars stay.
 func TestCollectArtifactsRemovesCommittedGRPCInventoryItDidNotWrite(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "single-schema-committer", "committed-grpc-inventory-is-only-what-the-run-wrote")
-	const (
-		stale  = `{"protocol":"putnami.grpc-services.v1","services":[{"name":"old.v1.Gone"}]}` + "\n"
-		fresh  = `{"protocol":"putnami.grpc-services.v1","services":[]}` + "\n"
-		routes = `{"protocol":"putnami.http-routes.v1","routes":[]}` + "\n"
-	)
+	const routes = `{"protocol":"putnami.http-routes.v1","routes":[]}` + "\n"
+	stale := string(grpcInventory(t, "old.v1.Gone"))
+	fresh := string(grpcInventory(t))
 	for _, test := range []struct {
 		name           string
 		writeInventory bool
@@ -2029,6 +2028,73 @@ func TestCollectArtifactsRemovesCommittedGRPCInventoryItDidNotWrite(t *testing.T
 	}
 }
 
+// grpcInventory returns the protocol's canonical bytes for an inventory that
+// serves the named native gRPC services, built through the protocol module's
+// own canonicalizer.
+func grpcInventory(t *testing.T, names ...string) []byte {
+	t.Helper()
+	services := make([]grpcservices.Service, 0, len(names))
+	for _, name := range names {
+		services = append(services, grpcservices.Service{
+			Name:         name,
+			Transport:    grpcservices.TransportGRPC,
+			MethodsKnown: true,
+			Methods:      []grpcservices.Method{{Name: "Check"}},
+			Provenance: grpcservices.Provenance{
+				Project:    "example.com/svc",
+				Package:    "go.putnami.dev/grpc",
+				SourceKind: grpcservices.SourceGRPCServer,
+			},
+		})
+	}
+	body, diagnostics := grpcservices.CanonicalJSON(&grpcservices.Manifest{Services: services})
+	if len(diagnostics) > 0 {
+		t.Fatalf("canonical gRPC inventory fixture: %v", diagnostics)
+	}
+	return body
+}
+
+// The app's describe binary is the one producer of the gRPC service inventory,
+// so a differing copy already under .gen/schema is describe's own earlier
+// output, never a competing producer: the run's inventory replaces it and is
+// committed verbatim. runDescribe rebuilds .gen/schema from build-generate's
+// staging before it snapshots, and no static generator writes the inventory,
+// so this holds the collector's contract with a seeded snapshot.
+func TestCollectArtifactsReplacesDescribesOwnStaleGRPCInventory(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "single-schema-committer", "a-fresh-grpc-inventory-replaces-describes-own-stale-copy")
+	stale := grpcInventory(t, "old.v1.Gone")
+	fresh := grpcInventory(t, "items.v1.Items", "orders.v1.Orders")
+	projectPath := t.TempDir()
+	genDir := filepath.Join(projectPath, ".gen")
+	genInventory := filepath.Join(genDir, "schema", "grpc-services.json")
+	committed := filepath.Join(projectPath, "schema", "grpc-services.json")
+	for _, path := range []string{genInventory, committed} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, stale, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	snap := snapshotSchemaDir(filepath.Join(genDir, "schema"))
+	if err := os.WriteFile(genInventory, fresh, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	artifacts, err := collectArtifacts(projectPath, genDir, true, snap, nil)
+	if err != nil {
+		t.Fatalf("collectArtifacts: %v", err)
+	}
+	for _, path := range []string{genInventory, committed} {
+		if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, fresh) {
+			t.Fatalf("%s = %q (err %v), want the fresh inventory verbatim", path, got, err)
+		}
+	}
+	if !slices.Contains(artifacts, filepath.Join("schema", "grpc-services.json")) {
+		t.Fatalf("artifacts = %v, want the committed inventory listed", artifacts)
+	}
+}
+
 // A describe that fails leaves the committed gRPC service inventory as it was:
 // the removal runs only after a successful run, so a broken build never drops
 // the inventory of the last good one. A successful run whose app composes no
@@ -2038,10 +2104,12 @@ func TestRunDescribeRemovesTheGRPCInventoryOnlyAfterASuccessfulRun(t *testing.T)
 		t.Skip("shell-script stand-in not portable to Windows")
 	}
 	spectest.Proves(t, "go/go-project-toolchain", "single-schema-committer", "a-failed-describe-keeps-the-committed-grpc-inventory")
-	const (
-		stale = `{"protocol":"putnami.grpc-services.v1","services":[{"name":"old.v1.Gone"}]}` + "\n"
-		fresh = `{"protocol":"putnami.grpc-services.v1","services":[]}` + "\n"
-	)
+	stale := string(grpcInventory(t, "old.v1.Gone"))
+	fresh := string(grpcInventory(t))
+	freshFixture := filepath.Join(t.TempDir(), "grpc-services.json")
+	if err := os.WriteFile(freshFixture, []byte(fresh), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	for _, test := range []struct {
 		name    string
 		script  string
@@ -2067,7 +2135,7 @@ exit 0
 			name: "a successful describe commits the inventory it wrote",
 			script: `#!/bin/sh
 mkdir -p "$PUTNAMI_DESCRIBE_OUT/schema"
-printf '%s\n' '{"protocol":"putnami.grpc-services.v1","services":[]}' > "$PUTNAMI_DESCRIBE_OUT/schema/grpc-services.json"
+cp '` + freshFixture + `' "$PUTNAMI_DESCRIBE_OUT/schema/grpc-services.json"
 `,
 			want: fresh,
 		},
@@ -2107,6 +2175,365 @@ printf '%s\n' '{"protocol":"putnami.grpc-services.v1","services":[]}' > "$PUTNAM
 			}
 		})
 	}
+}
+
+// Committed files an earlier describe run left in the project of
+// runDescribeWritingGRPCInventory, and the api.proto its stand-in binary
+// writes. schema/api.proto sorts before schema/grpc-services.json, so the walk
+// that promotes schemas would reach it first.
+const (
+	previousAPIProto        = "syntax = \"proto3\";\npackage previous.v1;\n"
+	currentAPIProto         = "syntax = \"proto3\";\npackage current.v1;\n"
+	previousFeatureEvidence = `{"evidence":[]}` + "\n"
+)
+
+// describeInventoryRun is the outcome of runDescribeWritingGRPCInventory.
+type describeInventoryRun struct {
+	projectDir        string
+	previousInventory []byte
+	err               error
+	events            []map[string]any
+}
+
+// runDescribeWritingGRPCInventory runs runDescribe over a stand-in describe
+// binary that writes a new schema/api.proto and then inventory as
+// schema/grpc-services.json; a nil inventory makes that path a directory, which
+// cannot be read. The project holds the committed schema/api.proto, gRPC
+// service inventory and feature evidence an earlier run left. With commit
+// false the project opts out of committing its schemas.
+func runDescribeWritingGRPCInventory(t *testing.T, inventory []byte, commit bool) describeInventoryRun {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script stand-in not portable to Windows")
+	}
+	workspace := t.TempDir()
+	projectDir := filepath.Join(workspace, "svc")
+	fixtures := t.TempDir()
+	previousInventory := grpcInventory(t, "old.v1.Gone")
+	for path, body := range map[string][]byte{
+		filepath.Join(projectDir, "go.mod"):                                          []byte("module example.com/svc\n\nrequire go.putnami.dev/app v0.1.0\n"),
+		filepath.Join(projectDir, "main.go"):                                         []byte("package main\n\nimport _ \"go.putnami.dev/app\"\n\nfunc main() {}\n"),
+		filepath.Join(projectDir, "schema", "api.proto"):                             []byte(previousAPIProto),
+		filepath.Join(projectDir, "schema", "grpc-services.json"):                    previousInventory,
+		filepath.Join(projectDir, "schema", "feature-evidence", "go-framework.json"): []byte(previousFeatureEvidence),
+		filepath.Join(fixtures, "api.proto"):                                         []byte(currentAPIProto),
+		filepath.Join(fixtures, "grpc-services.json"):                                inventory,
+	} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, body, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeInventory := `cp '` + filepath.Join(fixtures, "grpc-services.json") + `' "$PUTNAMI_DESCRIBE_OUT/schema/grpc-services.json"`
+	if inventory == nil {
+		writeInventory = `mkdir -p "$PUTNAMI_DESCRIBE_OUT/schema/grpc-services.json"`
+	}
+	binPath := writeShellBinary(t, `#!/bin/sh
+set -e
+mkdir -p "$PUTNAMI_DESCRIBE_OUT/schema"
+cp '`+filepath.Join(fixtures, "api.proto")+`' "$PUTNAMI_DESCRIBE_OUT/schema/api.proto"
+`+writeInventory+`
+`)
+	compile := compileDescribeHost
+	compileDescribeHost = func(*pctx.Context, string) (string, func(), error) { return binPath, func() {}, nil }
+	t.Cleanup(func() { compileDescribeHost = compile })
+
+	options := map[string]json.RawMessage{}
+	if !commit {
+		options["generate"] = json.RawMessage(`{"schema":false}`)
+	}
+	ctx := &pctx.Context{WorkspaceRoot: workspace, CacheRoot: t.TempDir(), Project: pctx.Project{Path: "svc", FullPath: projectDir, Options: options}, Params: pctx.Params{}}
+	run := describeInventoryRun{projectDir: projectDir, previousInventory: previousInventory}
+	run.events = captureEmittedEvents(t, func() { _, run.err = runDescribe(ctx, jsonl.New()) })
+	return run
+}
+
+// captureEmittedEvents runs fn with os.Stdout redirected to a file and returns
+// the JSONL events emitted there.
+func captureEmittedEvents(t *testing.T, fn func()) []map[string]any {
+	t.Helper()
+	out, err := os.CreateTemp(t.TempDir(), "events-*.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	func() {
+		original := os.Stdout
+		defer func() { os.Stdout = original }()
+		os.Stdout = out
+		fn()
+	}()
+	if err := out.Close(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(out.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var events []map[string]any
+	for _, line := range bytes.Split(data, []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		var event map[string]any
+		if err := json.Unmarshal(line, &event); err != nil {
+			t.Fatalf("decode emitted event %q: %v", line, err)
+		}
+		events = append(events, event)
+	}
+	return events
+}
+
+// assertCommittedSchemasUnchanged fails unless every committed file the
+// earlier run left is still there, byte for byte.
+func (run describeInventoryRun) assertCommittedSchemasUnchanged(t *testing.T) {
+	t.Helper()
+	for rel, want := range map[string][]byte{
+		"schema/api.proto":                          []byte(previousAPIProto),
+		"schema/grpc-services.json":                 run.previousInventory,
+		"schema/feature-evidence/go-framework.json": []byte(previousFeatureEvidence),
+	} {
+		got, err := os.ReadFile(filepath.Join(run.projectDir, filepath.FromSlash(rel)))
+		if err != nil || !bytes.Equal(got, want) {
+			t.Errorf("committed %s = %q (err %v), want the earlier run's copy %q", rel, got, err, want)
+		}
+	}
+}
+
+// assertRefused fails unless the run failed naming code and emitted it as an
+// error diagnostic on the inventory's workspace-relative .gen path, with field
+// as the message's context, before any committed file changed. The stand-in
+// wrote a new .gen/schema/api.proto, which no promotion reached.
+func (run describeInventoryRun) assertRefused(t *testing.T, code, field string) {
+	t.Helper()
+	if run.err == nil || !strings.Contains(run.err.Error(), code) {
+		t.Fatalf("runDescribe error = %v, want a refusal naming %s", run.err, code)
+	}
+	var found bool
+	for _, event := range run.events {
+		if event["type"] != "diagnostic" || event["code"] != code {
+			continue
+		}
+		found = true
+		location, _ := event["location"].(map[string]any)
+		if event["severity"] != "error" || location["file"] != "svc/.gen/schema/grpc-services.json" {
+			t.Errorf("diagnostic = %#v, want an error on svc/.gen/schema/grpc-services.json", event)
+		}
+		if message, _ := event["message"].(string); field != "" && !strings.HasPrefix(message, field+": ") {
+			t.Errorf("diagnostic message = %q, want the field context %q", message, field)
+		}
+	}
+	if !found {
+		t.Fatalf("emitted events = %#v, want a %s diagnostic", run.events, code)
+	}
+	if got, err := os.ReadFile(filepath.Join(run.projectDir, ".gen", "schema", "api.proto")); err != nil || string(got) != currentAPIProto {
+		t.Fatalf(".gen/schema/api.proto = %q (err %v), want the stand-in's new copy", got, err)
+	}
+	run.assertCommittedSchemasUnchanged(t)
+}
+
+// A gRPC service inventory the protocol module refuses fails describe with the
+// protocol's own diagnostic before any schema is promoted: a schema file that
+// sorts earlier stays as the earlier run committed it, and the committed
+// inventory and feature evidence are neither replaced nor removed.
+func TestRunDescribeRefusesAnInvalidGRPCInventoryBeforePromotingAnySchema(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script stand-in not portable to Windows")
+	}
+	spectest.Proves(t, "go/go-project-toolchain", "grpc-inventory-checked-before-promotion", "an-invalid-grpc-inventory-fails-describe-before-any-schema-is-promoted")
+	valid := grpcInventory(t, "items.v1.Items")
+	manifest, diagnostics := grpcservices.ParseAndValidateManifest(valid)
+	if len(diagnostics) > 0 {
+		t.Fatalf("fixture: %v", diagnostics)
+	}
+	for _, test := range []struct {
+		name      string
+		inventory []byte
+		code      string
+		field     string
+	}{
+		{name: "malformed wire", inventory: valid[:len(valid)/2], code: grpcservices.ErrorCodeParseError},
+		{
+			name:      "unsupported protocol version",
+			inventory: bytes.Replace(valid, []byte(`"`+grpcservices.Protocol+`"`), []byte(`"putnami.grpc-services.v2"`), 1),
+			code:      grpcservices.ErrorCodeInvalidProtocol,
+			field:     "protocol",
+		},
+		{
+			name:      "wrong digest",
+			inventory: bytes.Replace(valid, []byte(manifest.Digest), []byte("sha256:"+strings.Repeat("0", 64)), 1),
+			code:      grpcservices.ErrorCodeDigestMismatch,
+			field:     "digest",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			runDescribeWritingGRPCInventory(t, test.inventory, true).assertRefused(t, test.code, test.field)
+		})
+	}
+}
+
+// Describe commits the producer's bytes verbatim, so a gRPC service inventory
+// that validates but is not the protocol's canonical byte form is refused, not
+// rewritten: the .gen copy keeps the producer's bytes and nothing is promoted.
+func TestRunDescribeRefusesANonCanonicalGRPCInventoryWithoutRewritingIt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script stand-in not portable to Windows")
+	}
+	spectest.Proves(t, "go/go-project-toolchain", "grpc-inventory-checked-before-promotion", "a-non-canonical-grpc-inventory-is-refused-not-rewritten")
+	canonical := grpcInventory(t, "items.v1.Items", "orders.v1.Orders")
+	manifest, diagnostics := grpcservices.ParseAndValidateManifest(canonical)
+	if len(diagnostics) > 0 {
+		t.Fatalf("fixture: %v", diagnostics)
+	}
+	manifest.Services[0], manifest.Services[1] = manifest.Services[1], manifest.Services[0]
+	unsorted, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, canonical); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name      string
+		inventory []byte
+	}{
+		{name: "unsorted services", inventory: append(unsorted, '\n')},
+		{name: "compact formatting", inventory: append(compact.Bytes(), '\n')},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if _, diagnostics := grpcservices.ParseAndValidateManifest(test.inventory); len(diagnostics) > 0 || bytes.Equal(test.inventory, canonical) {
+				t.Fatalf("fixture must validate and differ from the canonical bytes; diagnostics %v", diagnostics)
+			}
+			run := runDescribeWritingGRPCInventory(t, test.inventory, true)
+			run.assertRefused(t, grpcInventoryNotCanonicalCode, "")
+			if got, err := os.ReadFile(filepath.Join(run.projectDir, ".gen", "schema", "grpc-services.json")); err != nil || !bytes.Equal(got, test.inventory) {
+				t.Fatalf(".gen inventory = %q (err %v), want the producer's bytes unchanged", got, err)
+			}
+		})
+	}
+}
+
+// A project that does not commit its schemas still reads the gRPC service
+// inventory from its .gen copy, so describe checks it all the same: an invalid
+// one fails the run and leaves the committed files as they were, while a
+// canonical one passes, stays in .gen verbatim and removes the committed copy.
+func TestRunDescribeChecksTheGRPCInventoryWhenSchemasAreNotCommitted(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script stand-in not portable to Windows")
+	}
+	spectest.Proves(t, "go/go-project-toolchain", "grpc-inventory-checked-before-promotion", "the-schema-opt-out-still-checks-the-grpc-inventory")
+	valid := grpcInventory(t, "items.v1.Items")
+	manifest, diagnostics := grpcservices.ParseAndValidateManifest(valid)
+	if len(diagnostics) > 0 {
+		t.Fatalf("fixture: %v", diagnostics)
+	}
+	t.Run("an invalid inventory fails the run", func(t *testing.T) {
+		wrongDigest := bytes.Replace(valid, []byte(manifest.Digest), []byte("sha256:"+strings.Repeat("0", 64)), 1)
+		runDescribeWritingGRPCInventory(t, wrongDigest, false).assertRefused(t, grpcservices.ErrorCodeDigestMismatch, "digest")
+	})
+	t.Run("a canonical inventory stays in .gen", func(t *testing.T) {
+		run := runDescribeWritingGRPCInventory(t, valid, false)
+		if run.err != nil {
+			t.Fatalf("runDescribe: %v", run.err)
+		}
+		if got, err := os.ReadFile(filepath.Join(run.projectDir, ".gen", "schema", "grpc-services.json")); err != nil || !bytes.Equal(got, valid) {
+			t.Fatalf(".gen inventory = %q (err %v), want the producer's bytes", got, err)
+		}
+		if got, err := os.ReadFile(filepath.Join(run.projectDir, "schema", "grpc-services.json")); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("committed inventory = %q (err %v), want it removed", got, err)
+		}
+		if got, err := os.ReadFile(filepath.Join(run.projectDir, "schema", "api.proto")); err != nil || string(got) != previousAPIProto {
+			t.Fatalf("committed api.proto = %q (err %v), want it left as it was", got, err)
+		}
+	})
+}
+
+// Only the inventory this run would promote is checked: the copy the describe
+// binary wrote or rewrote, or one build-generate staged. An absent inventory
+// leaves service facts unavailable, and an untouched, unstaged leftover is
+// neither promoted nor checked.
+func TestPreflightGRPCInventoryChecksOnlyTheCurrentInventory(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "grpc-inventory-checked-before-promotion", "only-the-current-grpc-inventory-is-checked")
+	canonical := grpcInventory(t, "items.v1.Items")
+	malformed := []byte(`{"protocol":`)
+	staged := map[string]bool{grpcServicesSchemaRelPath: true}
+	for _, test := range []struct {
+		name      string
+		leftover  []byte          // written before the snapshot; nil writes none
+		written   []byte          // written after the snapshot; nil writes none
+		staged    map[string]bool // build-generate's staged schema paths
+		wantCodes []string
+	}{
+		{name: "absent"},
+		{name: "an untouched unstaged leftover is not checked", leftover: malformed},
+		{name: "a staged leftover is checked", leftover: malformed, staged: staged, wantCodes: []string{grpcservices.ErrorCodeParseError}},
+		{name: "a staged canonical leftover passes", leftover: canonical, staged: staged},
+		{name: "an inventory this run wrote is checked", written: malformed, wantCodes: []string{grpcservices.ErrorCodeParseError}},
+		{name: "a canonical inventory this run wrote passes", written: canonical},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			genDir := filepath.Join(t.TempDir(), ".gen")
+			path := filepath.Join(genDir, "schema", "grpc-services.json")
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if test.leftover != nil {
+				if err := os.WriteFile(path, test.leftover, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			before := snapshotSchemaDir(filepath.Join(genDir, "schema"))
+			if test.written != nil {
+				if err := os.WriteFile(path, test.written, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			diagnostics, err := preflightGRPCInventory(genDir, before, test.staged)
+			if err != nil {
+				t.Fatalf("preflightGRPCInventory: %v", err)
+			}
+			var codes []string
+			for _, d := range diagnostics {
+				codes = append(codes, d.Code)
+			}
+			if !slices.Equal(codes, test.wantCodes) {
+				t.Fatalf("diagnostic codes = %v, want %v", codes, test.wantCodes)
+			}
+		})
+	}
+}
+
+// An inventory describe cannot stat or read fails the run: it is never taken
+// for an absent one, and nothing is promoted.
+func TestDescribeFailsClosedWhenItCannotReadTheGRPCInventory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script stand-in not portable to Windows, and Windows reports a path under a regular file as absent")
+	}
+	spectest.Proves(t, "go/go-project-toolchain", "grpc-inventory-checked-before-promotion", "an-unreadable-grpc-inventory-fails-describe")
+	t.Run("an unreadable inventory fails runDescribe", func(t *testing.T) {
+		run := runDescribeWritingGRPCInventory(t, nil, true)
+		if run.err == nil || !strings.Contains(run.err.Error(), "check gRPC service inventory") {
+			t.Fatalf("runDescribe error = %v, want the read failure", run.err)
+		}
+		run.assertCommittedSchemasUnchanged(t)
+	})
+	t.Run("an inventory that cannot be stat'ed is an error", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Windows reports a path under a regular file as absent")
+		}
+		genDir := filepath.Join(t.TempDir(), ".gen")
+		if err := os.MkdirAll(genDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(genDir, "schema"), []byte("not a directory"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := preflightGRPCInventory(genDir, schemaSnapshot{}, nil); err == nil {
+			t.Fatal("preflightGRPCInventory succeeded, want the stat error")
+		}
+	})
 }
 
 func TestGRPCServicesDiagnosticsFromDescribeOutput(t *testing.T) {
