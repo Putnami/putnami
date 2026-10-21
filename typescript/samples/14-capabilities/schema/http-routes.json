@@ -1,0 +1,6 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [],
+  "digest": "sha256:fd4d81a72818dde428f4413b2bd84c3ae4cf53e296ce9187cc3d1156b965a03a"
+}

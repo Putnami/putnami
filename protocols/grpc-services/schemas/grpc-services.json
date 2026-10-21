@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-grpc-services-v1.json",
+  "title": "Putnami gRPC Services v1",
+  "description": "Language-neutral inventory of the gRPC and Connect services an application registered, written at build time.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "protocol", "services", "digest"],
+  "properties": {
+    "$schema": {
+      "const": "https://putnami.dev/schemas/putnami-grpc-services-v1.json",
+      "description": "Canonical schema reference."
+    },
+    "protocol": {
+      "const": "putnami.grpc-services.v1",
+      "description": "Wire contract identifier. A consumer fails closed on any other value."
+    },
+    "services": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/service" },
+      "description": "Every served service, sorted by name, transport and basePath. Name, transport and basePath together are unique."
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "SHA-256 of the canonical protocol/services projection."
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "description": "One protobuf identifier."
+    },
+    "serviceName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+      "description": "Fully qualified service name: one or more identifiers joined by '.'."
+    },
+    "transport": {
+      "type": "string",
+      "enum": ["grpc", "connect"],
+      "description": "How the service is reached: native gRPC, or Connect over an HTTP server."
+    },
+    "sourceKind": {
+      "type": "string",
+      "enum": ["grpc-server", "connect-gateway", "api-bridge"],
+      "description": "Framework surface that registered the service."
+    },
+    "method": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "clientStreaming", "serverStreaming"],
+      "properties": {
+        "name": { "$ref": "#/$defs/identifier", "description": "RPC name." },
+        "clientStreaming": { "type": "boolean", "description": "The caller sends a stream of messages." },
+        "serverStreaming": { "type": "boolean", "description": "The service answers with a stream of messages." }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "package", "sourceKind"],
+      "properties": {
+        "project": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Application that serves the service, as the HTTP route inventory names it."
+        },
+        "package": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Framework package that registered the service."
+        },
+        "sourceKind": { "$ref": "#/$defs/sourceKind", "description": "Registering surface." }
+      }
+    },
+    "serviceBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "transport", "methodsKnown", "methods", "provenance"],
+      "properties": {
+        "name": { "$ref": "#/$defs/serviceName", "description": "Fully qualified service name." },
+        "transport": { "$ref": "#/$defs/transport", "description": "How the service is reached." },
+        "basePath": {
+          "type": "string",
+          "pattern": "^(/[A-Za-z0-9._~!$&'+,;=@-]+)*/[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*/$",
+          "description": "Connect URL prefix ending in /<name>/. Required for connect, forbidden for grpc."
+        },
+        "methodsKnown": {
+          "type": "boolean",
+          "description": "Methods lists every served RPC. When false the framework cannot observe the methods and methods is empty."
+        },
+        "methods": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/method" },
+          "description": "Served RPCs sorted by name, with unique names."
+        },
+        "provenance": { "$ref": "#/$defs/provenance", "description": "Registering framework surface." }
+      }
+    },
+    "service": {
+      "allOf": [
+        { "$ref": "#/$defs/serviceBase" },
+        {
+          "oneOf": [
+            {
+              "required": ["transport"],
+              "not": { "required": ["basePath"] },
+              "properties": {
+                "transport": { "const": "grpc" },
+                "provenance": { "properties": { "sourceKind": { "const": "grpc-server" } } }
+              }
+            },
+            {
+              "required": ["transport", "basePath"],
+              "properties": {
+                "transport": { "const": "connect" },
+                "provenance": { "properties": { "sourceKind": { "enum": ["connect-gateway", "api-bridge"] } } }
+              }
+            }
+          ]
+        },
+        {
+          "if": { "properties": { "methodsKnown": { "const": false } } },
+          "then": { "properties": { "methods": { "maxItems": 0 } } }
+        }
+      ]
+    }
+  }
+}

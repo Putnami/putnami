@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "go/deps-edit#deps-add-resolves-a-workspace-member-from-the-tree",
     "go/deps-edit#deps-edit-reads-no-replaced-version",
     "go/deps-edit#deps-run-the-pinned-go",
     "go/deps-edit#deps-tidy-resolves-as-the-workspace-does",
@@ -19,6 +20,7 @@
     "go/go-project-toolchain#generation-opt-out",
     "go/go-project-toolchain#generation-path-safety",
     "go/go-project-toolchain#go-ecosystem-profile",
+    "go/go-project-toolchain#grpc-inventory-checked-before-promotion",
     "go/go-project-toolchain#image-input-producers",
     "go/go-project-toolchain#included-members-are-go-projects",
     "go/go-project-toolchain#included-members-join-go-work",

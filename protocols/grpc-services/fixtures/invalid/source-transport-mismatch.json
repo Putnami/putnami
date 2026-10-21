@@ -1,0 +1,24 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-grpc-services-v1.json",
+  "protocol": "putnami.grpc-services.v1",
+  "services": [
+    {
+      "name": "pkg.v1.Echo",
+      "transport": "grpc",
+      "methodsKnown": true,
+      "methods": [
+        {
+          "name": "Say",
+          "clientStreaming": false,
+          "serverStreaming": false
+        }
+      ],
+      "provenance": {
+        "project": "example/orders",
+        "package": "go.putnami.dev/grpc",
+        "sourceKind": "api-bridge"
+      }
+    }
+  ],
+  "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+}

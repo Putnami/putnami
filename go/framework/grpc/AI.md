@@ -122,13 +122,30 @@ See `doc/getting-started.md` for full reference, and
 what is derived from the descriptor and the two deliberate deviations from the
 specification.
 
+## Service inventory
+
+Describe writes `schema/grpc-services.json`
+([`putnami.grpc-services.v1`](../../../protocols/grpc-services/README.md)).
+`Plugin`, `GatewayPlugin` and `ApiBridge` are all describers; the first one the
+describe asks for writes the services of all three. Compose them with `Use`:
+`UseForDescribe` is refused because the inventory needs the configured root.
+
+- The native plugin lists what its registrars register, on a server it never
+  starts. A registrar must only register services.
+- The gateway lists each service `RegisterOn` mounted, with `methodsKnown:
+  false` and the mounted prefix as `basePath`.
+- The bridge lists each mounted URL as a method of its service; each one is an
+  exact `POST` route in `schema/http-routes.json`.
+
 ## Maintained contract
 
 This public package is `stable` in the workspace [support
 catalog](../../../putnami.support.json). Its behavior is defined by the [gRPC
 services specification](specs/grpc-services.json), the [bridge
-ADR](doc/adr/0001-bridge-reenters-the-endpoint-pipeline.md), and the
-[bounded-server ADR](doc/adr/0002-bounded-by-default-mounted-explicitly.md).
+ADR](doc/adr/0001-bridge-reenters-the-endpoint-pipeline.md), the
+[bounded-server ADR](doc/adr/0002-bounded-by-default-mounted-explicitly.md),
+and the [service-inventory
+ADR](doc/adr/0003-the-service-inventory-lists-registrations.md).
 Before v1.0, follow the workspace [migration-based compatibility
 policy](../../../RELEASE.md); do not infer strict compatibility between every
 `0.x` minor.

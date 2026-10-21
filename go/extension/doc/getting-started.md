@@ -450,6 +450,32 @@ steps in this extension, as two lifecycle jobs
   module with the `replace` directives of `go.work`. When a step fails, every
   `go.mod` and `go.sum` the run edited is put back.
 
+#### Adding a workspace module
+
+A module of the workspace does not need to be published before another one
+adds it. A spec without a version that names the module path a `use` directive
+of the governing `go.work` declares resolves from the tree, and no registry is
+asked:
+
+```bash
+putnami deps add go.putnami.dev/protocol/grpc-services --projects go.putnami.dev/grpc
+```
+
+- The module is required at the version `go.mod` already requires it at, else
+  at the placeholder of its major version: `v0.0.0`, or `vN.0.0` for a `/vN`
+  path.
+- `go.mod` gains a `replace` directive to the member's directory, relative to
+  the module, such as `../../../protocols/grpc-services`. A `replace` that
+  `go.mod` already states for the module stays as written.
+- A spec with a version, `@latest` included, asks the registry, as for any
+  other module. A spec that names no member resolves through `go list -m`.
+- The add fails before any go command runs when `go.work` does not parse, a
+  member has no `go.mod` with a module path, two members declare the module,
+  or the spec names the edited module.
+
+Only the `go.mod` of each `use` directive is read: a spec matches a module
+path, never a project name.
+
 The framework lookup asks the proxies of `GOPROXY`, as `go env` reports it, in
 order. A module `GONOPROXY` or `GOPRIVATE` matches is read from its origin, with
 the netrc credential `putnami cloud` refreshes first. A warning that no

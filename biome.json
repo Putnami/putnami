@@ -295,6 +295,7 @@
       "includes": [
         "**/schema/openapi.json",
         "**/schema/capabilities.json",
+        "**/schema/http-routes.json",
         "**/putnami.architecture.json",
         "**/client.putnami.json"
       ],

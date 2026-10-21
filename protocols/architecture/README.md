@@ -197,7 +197,7 @@ Published schemas:
 
 ## Current repository adoption
 
-The Putnami repository maps **94 of its 150 projects to 10 domains** and
+The Putnami repository maps **95 of its 151 projects to 10 domains** and
 excludes the other 56 with a reason and an owner each. There is no workspace-root
 baseline and no waiver file: adoption started clean and every wave landed with
 its declarations complete, so there has never been debt to record.
@@ -217,7 +217,7 @@ its declarations complete, so there has never been debt to record.
 
 | Domain | Owner | Projects | What it decides |
 |---|---|---|---|
-| `protocols` | protocols | 40 | The strict wire contracts every other domain speaks |
+| `protocols` | protocols | 41 | The strict wire contracts every other domain speaks |
 | `go-framework` | framework | 24 | The Go application runtime API and its documentation |
 | `typescript-framework` | framework | 14 | The TypeScript application runtime API and its documentation |
 | `extension-providers` | extension-providers | 8 | Probe answers, verification observations, provider results, the Python surface |

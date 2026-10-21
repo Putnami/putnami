@@ -1,0 +1,259 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [
+    {
+      "match": "exact",
+      "path": "/",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/blobs/echo",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/blobs/echo/post.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/blobs/{id}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/blobs/[id]/get.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/items/get.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/items/post.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/items/changes",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/items/changes/get.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/items/{id}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/items/[id]/get.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/items/{id}/adjust",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/items/[id]/adjust/get.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/items/{id}/history",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/items/[id]/history/get.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/items/{id}/negotiate",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/items/[id]/negotiate/get.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/items/{id}/watch",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/items/[id]/watch/get.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/proxy",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/proxy/get.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/quotes/{id}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/quotes/[id]/get.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/quotes/{id}/snapshot",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/quotes/[id]/snapshot/get.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/quotes/{id}/ticks",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/quotes/[id]/ticks/get.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/tenant-check",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/tenant-check/get.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/whoami",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/10-service-to-service",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/whoami/get.ts"
+      }
+    }
+  ],
+  "digest": "sha256:4076d63211681173e71669bb034748a7ae6444e74efdb27e4da79082e0899754"
+}

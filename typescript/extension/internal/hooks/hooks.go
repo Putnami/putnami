@@ -8,8 +8,11 @@ package hooks
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -33,6 +36,14 @@ const (
 
 const maxHookEventBytes = 16 * 1024 * 1024
 
+// The states of the version 1 route evaluation a preBuild hook reports as
+// data.httpRoutes in its summary: {"v":1,"state":"complete"} or
+// {"v":1,"state":"unavailable","reason":"<text>"}, with no other member.
+const (
+	routeEvaluationComplete    = "complete"
+	routeEvaluationUnavailable = "unavailable"
+)
+
 // Result holds the merged exports and assets from all invoked hooks.
 type Result struct {
 	Exports   map[string]string
@@ -40,18 +51,33 @@ type Result struct {
 	HookCount int
 	// Statuses collects the per-hook `status` field from each summary event,
 	// in invocation order ("ok", "empty", "skipped", or "" when the hook did
-	// not report one). Callers use it to distinguish "the hook regenerated
-	// its output" from "the hook ran but produced nothing" — reading the
-	// output file alone cannot tell a fresh write from a stale leftover.
+	// not report one). Callers use it to distinguish "the hook regenerated its
+	// output" from "the hook ran but produced nothing" — reading the output
+	// file alone cannot tell a fresh write from a stale leftover. A status
+	// never decides a route evaluation.
 	Statuses []string
+	// Unavailable states, one entry per cause and in a deterministic order,
+	// why this run cannot tell which outputs the hooks of this kind produce.
+	// Discovery entries come first, in dependency-name order: the project's
+	// package.json, or an installed dependency's putnami.extension.json, could
+	// not be read or parsed, so discovery may have missed a hook. For
+	// HookPreBuild, an entry in invocation order follows for each hook whose
+	// summary did not report a complete route evaluation (see
+	// routeEvaluationCause). The hooks that were discovered still ran and their
+	// outputs are merged. A caller that reads a missing output as "nothing
+	// produces it" must first check that this is empty. A discovery entry names
+	// no absolute path; a hook entry names the hook and quotes the reason it
+	// reported.
+	Unavailable []string
 }
 
-// extensionManifest is a minimal parse of putnami.extension.json. The hooks
-// map is keyed by hook kind (see Hook* constants); unknown keys are ignored
-// rather than failing the parse so extensions can grow new hooks without
-// breaking older runners.
-type extensionManifest struct {
-	Hooks map[string]*hookDefinition `json:"hooks"`
+// manifestDocument is the part of putnami.extension.json hook discovery reads.
+// Hooks is kept raw so that discovery can tell a JSON null from an absent
+// member; it decodes into a map keyed by hook kind (see Hook* constants).
+// Unknown keys are ignored rather than failing the parse so extensions can
+// grow new hooks without breaking older runners.
+type manifestDocument struct {
+	Hooks json.RawMessage `json:"hooks"`
 }
 
 // hookDefinition describes a hook command from the manifest. Fields the runner
@@ -97,14 +123,26 @@ type hookEvent struct {
 	Data json.RawMessage `json:"data"`
 }
 
-// hookSummaryData is the data field of a summary event. Status is optional:
-// hooks that follow the config-extract convention report "ok" / "empty" /
-// "skipped" alongside their exports (runHookCommand spreads the hook's
-// custom data into the summary), older hooks simply omit it.
+// hookSummaryData is the data field of a summary event. runHookCommand
+// spreads the hook's custom data into the summary. Status is optional: hooks
+// that follow the config-extract convention report "ok" / "empty" /
+// "skipped" alongside their exports, and older hooks simply omit it.
+// HTTPRoutes is the route evaluation a preBuild hook reports; it is kept raw,
+// so a JSON null stays distinct from an absent member, and RunHooks checks it
+// with routeEvaluationCause.
 type hookSummaryData struct {
-	Exports map[string]string `json:"exports"`
-	Assets  map[string]string `json:"assets"`
-	Status  string            `json:"status"`
+	Exports    map[string]string `json:"exports"`
+	Assets     map[string]string `json:"assets"`
+	Status     string            `json:"status"`
+	HTTPRoutes json.RawMessage   `json:"httpRoutes,omitempty"`
+}
+
+// hookReport is what a hook's summary states about its own run beyond its
+// outputs.
+type hookReport struct {
+	status string
+	// httpRoutes is the raw data.httpRoutes member, nil when it is absent.
+	httpRoutes json.RawMessage
 }
 
 // hookErrorData is the data field of an error event.
@@ -143,28 +181,30 @@ func (h discoveredHook) order() int {
 // hooks share one `.gen` tree, so the sequence is part of the build contract).
 // Returns an empty Result (never nil) when no dependency registers the hook,
 // and an error, before any hook runs, when a dependency the project declares
-// is not installed (see discoverHooks).
-// hookConfig is forwarded to each hook subprocess as its `config`; pass nil
+// is not installed (see discoverHooks), and at the first hook that fails or
+// whose summary cannot be parsed. Result.Unavailable lists the manifests
+// discovery could not read and, for HookPreBuild, every hook that returned
+// without a complete route evaluation; the later hooks still run, so the
+// caller sees every such cause at once and fails before it publishes any
+// output. hookConfig is forwarded to each hook subprocess as its `config`; pass nil
 // when the hook kind carries no project configuration. projectName is the
 // putnami project identity (see hookContext.ProjectName); pass "" when the
 // caller has no project identity to forward.
 func RunHooks(workspaceRoot, projectPath, projectName, hookKind, mode, bunBin string, debug bool, hookConfig map[string]any) (*Result, error) {
-	hooks, err := discoverHooks(workspaceRoot, projectPath, hookKind)
+	hooks, unavailable, err := discoverHooks(workspaceRoot, projectPath, hookKind)
 	if err != nil {
 		return nil, err
 	}
-	if len(hooks) == 0 {
-		return &Result{Exports: map[string]string{}, Assets: map[string]string{}, HookCount: 0}, nil
-	}
 
 	result := &Result{
-		Exports:   make(map[string]string),
-		Assets:    make(map[string]string),
-		HookCount: len(hooks),
+		Exports:     make(map[string]string),
+		Assets:      make(map[string]string),
+		HookCount:   len(hooks),
+		Unavailable: unavailable,
 	}
 
 	for _, h := range hooks {
-		exports, assets, status, err := invokeHook(workspaceRoot, projectPath, projectName, mode, bunBin, h, debug, hookConfig)
+		exports, assets, report, err := invokeHook(workspaceRoot, projectPath, projectName, mode, bunBin, h, debug, hookConfig)
 		if err != nil {
 			return nil, fmt.Errorf("hook %s: %w", h.name, err)
 		}
@@ -177,10 +217,124 @@ func RunHooks(workspaceRoot, projectPath, projectName, hookKind, mode, bunBin st
 		for k, v := range assets {
 			result.Assets[k] = v
 		}
-		result.Statuses = append(result.Statuses, status)
+		result.Statuses = append(result.Statuses, report.status)
+		// The route evaluation is a preBuild contract; other hook kinds keep
+		// their own result semantics.
+		if hookKind == HookPreBuild {
+			if cause := routeEvaluationCause(h.name, report.httpRoutes); cause != "" {
+				result.Unavailable = append(result.Unavailable, cause)
+			}
+		}
 	}
 
 	return result, nil
+}
+
+// routeEvaluationCause checks the data.httpRoutes member a preBuild hook
+// returned. It is "" for a complete evaluation, which certifies that the hook
+// evaluated its own framework-declared route contribution, with or without a
+// fragment. Otherwise it is the cause, naming the hook, that keeps the run from
+// telling which routes the project serves: the hook reported its routes
+// unavailable, or its member is absent or not the exact version 1 object. A
+// missing member cannot certify an evaluation.
+func routeEvaluationCause(hook string, raw json.RawMessage) string {
+	if raw == nil {
+		return "hook " + hook + " reported no route evaluation: its summary has no data.httpRoutes; " +
+			routeEvaluationGuidance(hook)
+	}
+	state, reason, err := parseRouteEvaluation(raw)
+	if err != nil {
+		return "hook " + hook + " reported a malformed route evaluation: data.httpRoutes " + err.Error() + "; " +
+			routeEvaluationGuidance(hook)
+	}
+	if state == routeEvaluationUnavailable {
+		return "hook " + hook + " reported its routes unavailable: " + reason
+	}
+	return ""
+}
+
+// routeEvaluationGuidance tells the owner of a hook how to make it report a
+// route evaluation.
+func routeEvaluationGuidance(hook string) string {
+	return "upgrade " + hook + " together with @putnami/typescript to releases that report data.httpRoutes, " +
+		`or adapt a custom hook to return {"v":1,"state":"complete"} as data.httpRoutes once it has evaluated its routes`
+}
+
+// parseRouteEvaluation reads a version 1 route evaluation: an object with v 1
+// and state complete, or state unavailable and a reason string that is not
+// blank. It refuses any other member, a reason on a complete evaluation, and
+// a JSON null anywhere a value is required. Members are checked in byte order,
+// so the error is the same for the same bytes.
+func parseRouteEvaluation(raw json.RawMessage) (state, reason string, err error) {
+	var members map[string]json.RawMessage
+	if json.Unmarshal(raw, &members) != nil || members == nil {
+		return "", "", errors.New("is not an object")
+	}
+	names := make([]string, 0, len(members))
+	for name := range members {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if name != "v" && name != "state" && name != "reason" {
+			return "", "", fmt.Errorf("has the member %q, which version 1 does not define", name)
+		}
+	}
+
+	var version int
+	rawVersion, ok := members["v"]
+	if !ok {
+		return "", "", errors.New("has no v")
+	}
+	if json.Unmarshal(rawVersion, &version) != nil || version != 1 {
+		return "", "", fmt.Errorf("has v %s, and only version 1 is supported", rawVersion)
+	}
+
+	rawState, ok := members["state"]
+	if !ok {
+		return "", "", errors.New("has no state")
+	}
+	if json.Unmarshal(rawState, &state) != nil || (state != routeEvaluationComplete && state != routeEvaluationUnavailable) {
+		return "", "", fmt.Errorf(`has state %s, not "complete" or "unavailable"`, rawState)
+	}
+
+	rawReason, hasReason := members["reason"]
+	if state == routeEvaluationComplete {
+		if hasReason {
+			return "", "", errors.New("is complete and has a reason, which only an unavailable evaluation carries")
+		}
+		return state, "", nil
+	}
+	if !hasReason || json.Unmarshal(rawReason, &reason) != nil || strings.TrimSpace(reason) == "" {
+		return "", "", errors.New("is unavailable without a reason string that is not blank")
+	}
+	return state, reason, nil
+}
+
+// Discovery is what hook discovery finds for one hook kind, without running a
+// hook.
+type Discovery struct {
+	// Hooks names the dependencies that declare a hook of the kind, in the
+	// order RunHooks invokes them.
+	Hooks []string
+	// Unavailable lists the manifests discovery could not use, as
+	// Result.Unavailable does.
+	Unavailable []string
+}
+
+// Discover runs hook discovery alone, so a caller that cannot run hooks can
+// tell a project that declares none from one whose hooks it would skip. It
+// fails exactly where RunHooks fails before it runs a hook.
+func Discover(workspaceRoot, projectPath, hookKind string) (Discovery, error) {
+	found, unavailable, err := discoverHooks(workspaceRoot, projectPath, hookKind)
+	if err != nil {
+		return Discovery{}, err
+	}
+	names := make([]string, 0, len(found))
+	for _, h := range found {
+		names = append(names, h.name)
+	}
+	return Discovery{Hooks: names, Unavailable: unavailable}, nil
 }
 
 // discoverHooks finds project dependencies whose putnami.extension.json
@@ -231,13 +385,31 @@ func RunHooks(workspaceRoot, projectPath, projectName, hookKind, mode, bunBin st
 // checkout. A dependency is installed where Node resolution finds it:
 // node_modules of the project, then of each parent directory up to the
 // workspace root (installedDependencyRoot).
-func discoverHooks(workspaceRoot, projectPath, hookKind string) ([]discoveredHook, error) {
-	pkg := project.ReadPackageJSONSafe(filepath.Join(projectPath, "package.json"))
-	if pkg == nil {
-		return nil, nil
+//
+// # An unreadable manifest makes discovery incomplete
+//
+// The second return value lists, in dependency-name order, each manifest discovery
+// needed and could not use: the project's package.json when it is missing,
+// unreadable or malformed (no hook is then discovered), and an installed
+// dependency's putnami.extension.json when it exists but cannot be read or
+// parsed (that dependency contributes no hook). A JSON null where discovery
+// needs an object is malformed (see requirePackageObjects and
+// parseManifestHook): encoding/json decodes it into an empty value without an
+// error, which would read as a project without dependencies or a dependency
+// without hooks. A dependency without a putnami.extension.json declares no
+// hook, which is not a gap. The hooks discovery did find are still returned
+// and run.
+func discoverHooks(workspaceRoot, projectPath, hookKind string) ([]discoveredHook, []string, error) {
+	pkg, err := project.ReadPackageJSON(filepath.Join(projectPath, "package.json"))
+	if err == nil {
+		err = requirePackageObjects(pkg)
+	}
+	if err != nil {
+		return nil, []string{describeManifestGap("package.json", err)}, nil
 	}
 
 	var hooks []discoveredHook
+	var unavailable []string
 
 	// Check all dependency types
 	allDeps := make(map[string]string)
@@ -266,15 +438,19 @@ func discoverHooks(workspaceRoot, projectPath, hookKind string) ([]discoveredHoo
 		manifestPath := filepath.Join(extRoot, "putnami.extension.json")
 		data, err := os.ReadFile(manifestPath)
 		if err != nil {
+			if !errors.Is(err, fs.ErrNotExist) {
+				unavailable = append(unavailable, describeManifestGap(depName+": putnami.extension.json", err))
+			}
 			continue
 		}
 
-		var manifest extensionManifest
-		if json.Unmarshal(data, &manifest) != nil {
+		hook, err := parseManifestHook(data, hookKind)
+		if err != nil {
+			unavailable = append(unavailable, describeManifestGap(depName+": putnami.extension.json", err))
 			continue
 		}
 
-		if hook := manifest.Hooks[hookKind]; hook != nil {
+		if hook != nil {
 			hooks = append(hooks, discoveredHook{
 				name:          depName,
 				kind:          hookKind,
@@ -285,7 +461,7 @@ func discoverHooks(workspaceRoot, projectPath, hookKind string) ([]discoveredHoo
 	}
 
 	if len(missing) > 0 {
-		return nil, fmt.Errorf("%s declares %s, which no node_modules from the project up to the workspace root holds: "+
+		return nil, nil, fmt.Errorf("%s declares %s, which no node_modules from the project up to the workspace root holds: "+
 			"the dependencies are not installed, so the hooks they contribute cannot run; run `putnami install`",
 			projectPath, strings.Join(missing, ", "))
 	}
@@ -296,7 +472,76 @@ func discoverHooks(workspaceRoot, projectPath, hookKind string) ([]discoveredHoo
 		return hooks[i].order() < hooks[j].order()
 	})
 
-	return hooks, nil
+	return hooks, unavailable, nil
+}
+
+// requirePackageObjects refuses a package.json that is JSON null, or whose
+// dependencies or devDependencies member is JSON null. Each would decode into
+// an empty value without an error and read as a project without
+// dependencies, which is a known absence of hooks.
+func requirePackageObjects(pkg *project.PackageJSON) error {
+	if pkg.Raw == nil {
+		return errors.New("the document is null, not an object")
+	}
+	for _, member := range []string{"dependencies", "devDependencies"} {
+		if raw, ok := pkg.Raw[member]; ok && isJSONNull(raw) {
+			return fmt.Errorf("%s is null, not an object", member)
+		}
+	}
+	return nil
+}
+
+// parseManifestHook returns the hook of the given kind that a
+// putnami.extension.json declares, or nil when it declares none. Every hook
+// kind must decode, as before; a JSON null for the document, for hooks or for
+// the requested kind is malformed, because it would otherwise read as a
+// dependency without that hook.
+func parseManifestHook(data []byte, hookKind string) (*hookDefinition, error) {
+	var document *manifestDocument
+	if err := json.Unmarshal(data, &document); err != nil {
+		return nil, err
+	}
+	if document == nil {
+		return nil, errors.New("the document is null, not an object")
+	}
+	if document.Hooks == nil {
+		return nil, nil
+	}
+	var hooks map[string]*hookDefinition
+	if err := json.Unmarshal(document.Hooks, &hooks); err != nil {
+		return nil, err
+	}
+	if hooks == nil {
+		return nil, errors.New("hooks is null, not an object")
+	}
+	hook, declared := hooks[hookKind]
+	if declared && hook == nil {
+		return nil, fmt.Errorf("hooks.%s is null, not an object", hookKind)
+	}
+	return hook, nil
+}
+
+// isJSONNull reports whether raw is the JSON null literal.
+func isJSONNull(raw json.RawMessage) bool {
+	return bytes.Equal(bytes.TrimSpace(raw), []byte("null"))
+}
+
+// describeManifestGap renders why discovery could not use the manifest named
+// by label. It names no absolute path: a read error contributes only its
+// cause, so the sentence is the same in every checkout.
+func describeManifestGap(label string, err error) string {
+	var pathErr *fs.PathError
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return label + " is missing"
+	case errors.As(err, &pathErr):
+		return label + " cannot be read: " + pathErr.Err.Error()
+	default:
+		if inner := errors.Unwrap(err); inner != nil {
+			err = inner
+		}
+		return label + " is malformed: " + err.Error()
+	}
 }
 
 // installedDependencyRoot returns the directory a declared dependency is
@@ -348,9 +593,9 @@ func resolutionDirs(workspaceRoot, projectPath string) []string {
 // invokeHook runs a single hook subprocess and parses its JSONL output. The
 // hook kind in `h.kind` is forwarded through the context so the bun-side
 // runner can dispatch on it. A hook declaring `preBuild` receives that exact
-// kind. The third
-// return value is the hook-reported summary status ("" when absent).
-func invokeHook(workspaceRoot, projectPath, projectName, mode, bunBin string, h discoveredHook, debug bool, hookConfig map[string]any) (map[string]string, map[string]string, string, error) {
+// kind. The third return value is what the summary reports about the run: its
+// status and its raw route evaluation.
+func invokeHook(workspaceRoot, projectPath, projectName, mode, bunBin string, h discoveredHook, debug bool, hookConfig map[string]any) (map[string]string, map[string]string, hookReport, error) {
 	// Write context file
 	ctx := hookContext{
 		WorkspaceRoot: workspaceRoot,
@@ -368,19 +613,19 @@ func invokeHook(workspaceRoot, projectPath, projectName, mode, bunBin string, h 
 
 	contextData, err := json.Marshal(ctx)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("marshaling context: %w", err)
+		return nil, nil, hookReport{}, fmt.Errorf("marshaling context: %w", err)
 	}
 
 	contextFile, err := os.CreateTemp("", "putnami-hook-*.json")
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("creating context file: %w", err)
+		return nil, nil, hookReport{}, fmt.Errorf("creating context file: %w", err)
 	}
 	contextPath := contextFile.Name()
 	defer os.Remove(contextPath)
 
 	if _, err := contextFile.Write(contextData); err != nil {
 		contextFile.Close()
-		return nil, nil, "", fmt.Errorf("writing context file: %w", err)
+		return nil, nil, hookReport{}, fmt.Errorf("writing context file: %w", err)
 	}
 	contextFile.Close()
 
@@ -414,19 +659,19 @@ func invokeHook(workspaceRoot, projectPath, projectName, mode, bunBin string, h 
 		exec.Timeout(timeout),
 	)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("executing hook: %w", err)
+		return nil, nil, hookReport{}, fmt.Errorf("executing hook: %w", err)
 	}
 
 	if !result.Success {
-		return nil, nil, "", fmt.Errorf("hook exited with code %d: %s", result.ExitCode, formatFailure(result.Stdout, result.Stderr))
+		return nil, nil, hookReport{}, fmt.Errorf("hook exited with code %d: %s", result.ExitCode, formatFailure(result.Stdout, result.Stderr))
 	}
 
 	// Parse JSONL output for summary event
-	exports, assets, status, err := parseSummary(result.Stdout)
+	exports, assets, report, err := parseSummary(result.Stdout)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("parsing hook output: %w", err)
+		return nil, nil, hookReport{}, fmt.Errorf("parsing hook output: %w", err)
 	}
-	return exports, assets, status, nil
+	return exports, assets, report, nil
 }
 
 // formatFailure builds the diagnostic message attached to a hook failure.
@@ -503,14 +748,14 @@ func truncateTail(s string, max int) string {
 }
 
 // parseSummary extracts exports, assets, and the optional hook-reported
-// status from the JSONL summary event.
+// status and route evaluation from the JSONL summary event.
 //
 // A successful hook always emits a summary (runHookCommand guarantees it), so
 // a missing or unparsable summary is a protocol violation, not an empty
 // result: returning empty maps here once silently dropped a hook's exports
 // when its summary line was truncated at the 64KB pipe buffer, shipping a
 // server binary with no static routes. Fail loudly instead.
-func parseSummary(output string) (map[string]string, map[string]string, string, error) {
+func parseSummary(output string) (map[string]string, map[string]string, hookReport, error) {
 	scanner := bufio.NewScanner(strings.NewReader(output))
 	scanner.Buffer(make([]byte, 0, 64*1024), maxHookEventBytes)
 	for scanner.Scan() {
@@ -525,7 +770,7 @@ func parseSummary(output string) (map[string]string, map[string]string, string, 
 			// line that carries the summary marker and still fails to parse
 			// means the summary itself is corrupt (e.g. truncated output).
 			if strings.Contains(line, `"type":"summary"`) {
-				return nil, nil, "", fmt.Errorf("summary event is not valid JSON (hook stdout truncated?): %s", truncateTail(line, 200))
+				return nil, nil, hookReport{}, fmt.Errorf("summary event is not valid JSON (hook stdout truncated?): %s", truncateTail(line, 200))
 			}
 			continue
 		}
@@ -536,7 +781,7 @@ func parseSummary(output string) (map[string]string, map[string]string, string, 
 
 		var data hookSummaryData
 		if err := json.Unmarshal(event.Data, &data); err != nil {
-			return nil, nil, "", fmt.Errorf("summary event has malformed data: %w", err)
+			return nil, nil, hookReport{}, fmt.Errorf("summary event has malformed data: %w", err)
 		}
 
 		exports := data.Exports
@@ -547,13 +792,13 @@ func parseSummary(output string) (map[string]string, map[string]string, string, 
 		if assets == nil {
 			assets = map[string]string{}
 		}
-		return exports, assets, data.Status, nil
+		return exports, assets, hookReport{status: data.Status, httpRoutes: data.HTTPRoutes}, nil
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, nil, "", fmt.Errorf("scanning hook output: %w", err)
+		return nil, nil, hookReport{}, fmt.Errorf("scanning hook output: %w", err)
 	}
 
-	return nil, nil, "", fmt.Errorf("hook exited successfully but emitted no summary event")
+	return nil, nil, hookReport{}, fmt.Errorf("hook exited successfully but emitted no summary event")
 }
 
 // expandTemplates replaces {extensionRoot}, {projectRoot}, {workspaceRoot} in a string.

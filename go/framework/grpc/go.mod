@@ -28,8 +28,9 @@ require (
 	go.putnami.dev/protocol/config v0.0.0 // indirect
 	go.putnami.dev/protocol/contracts v0.0.0 // indirect
 	go.putnami.dev/protocol/database v0.0.0 // indirect
-	go.putnami.dev/protocol/diagnostic v0.0.0 // indirect
+	go.putnami.dev/protocol/diagnostic v0.0.0
 	go.putnami.dev/protocol/events v0.0.0 // indirect
+	go.putnami.dev/protocol/grpc-services v0.0.0
 	go.putnami.dev/protocol/identity v0.0.0 // indirect
 	go.putnami.dev/protocol/infra v0.0.0 // indirect
 	go.putnami.dev/protocol/migration v0.0.0 // indirect
@@ -106,3 +107,5 @@ replace go.putnami.dev/ctxutil => ../ctxutil
 replace go.putnami.dev/protocol/keyring => ../../../protocols/keyring
 
 replace go.putnami.dev/security => ../security
+
+replace go.putnami.dev/protocol/grpc-services => ../../../protocols/grpc-services

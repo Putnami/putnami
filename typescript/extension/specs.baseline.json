@@ -8,6 +8,7 @@
     "typescript/typescript-project-toolchain#bounded-test-output",
     "typescript/typescript-project-toolchain#catalog-seeding",
     "typescript/typescript-project-toolchain#committed-client-drift",
+    "typescript/typescript-project-toolchain#committed-route-inventory",
     "typescript/typescript-project-toolchain#declared-assets-must-exist",
     "typescript/typescript-project-toolchain#deterministic-content-identity",
     "typescript/typescript-project-toolchain#dry-run-registry-probe",

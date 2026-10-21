@@ -255,7 +255,8 @@ dependents keep their keys and their hits. Describe declares the committed
 `schema/feature-evidence/go-framework.json` as an output, so a hit also
 restores the committed evidence of the binding it was stored at. The binding
 also covers the committed sidecars describe converges (`schema/openapi.json`,
-`schema/http-routes.json`, `schema/config.json`, `infra/requirements.json`).
+`schema/http-routes.json`, `schema/grpc-services.json`, `schema/config.json`,
+`infra/requirements.json`).
 When describe changes one, the CLI executes it once more at the binding of the
 converged tree, so the evidence a run leaves names the tree it leaves. See [Source-Bound Tasks](../../../tooling/cli/doc/10-caching.md#source-bound-tasks).
 
@@ -504,6 +505,43 @@ stable digest.
 Catch-alls, wildcards, and other patterns that cannot be represented safely by
 v1 fail the build with an `http_routes.unsupported_pattern` diagnostic instead
 of widening the public edge route.
+
+## gRPC service inventory
+
+An app that composes a `go.putnami.dev/grpc` surface emits
+`schema/grpc-services.json` during describe mode. The artifact uses
+`putnami.grpc-services.v1` and lists every service the native server, the
+Connect gateway and the api bridge registered. A validation failure in the app
+fails the build with a `grpc_services.*` diagnostic.
+
+Before it promotes any schema, describe checks the inventory this run wrote,
+or that build-generate staged, with the protocol module
+`go.putnami.dev/protocol/grpc-services`. The document must parse strictly,
+name the `putnami.grpc-services.v1` protocol, validate, carry the digest of
+its services, and be byte-identical to the protocol's canonical form. The
+check runs whether or not the project commits its schemas, because with
+`options.generate.schema=false` the `.gen` copy is the one consumers read.
+
+A document that fails the check fails the build with the protocol's own
+`grpc_services.*` diagnostic, on `.gen/schema/grpc-services.json`. A document
+that validates but is not byte-identical to the canonical form fails with
+`go.describe.grpc_inventory_not_canonical`: describe never rewrites producer
+bytes. An inventory describe cannot read also fails the build. In each case
+the run commits no schema file and removes none, so the committed inventory
+and the other committed sidecars keep the last successful run's bytes.
+
+A valid inventory is committed verbatim, like the route inventory. Its one
+producer is the app's describe binary, so a differing copy an earlier run left
+in `.gen` is replaced, not reported as a second producer. The check never
+reads the committed copy, and a `.gen` leftover that this run neither wrote nor
+staged is not checked or promoted. Describe validates the document; it does
+not act on the services it lists.
+
+The file is present only when the app composes a gRPC surface. Its absence
+leaves service facts unavailable; an emitted empty services list records a
+collected empty surface. A successful describe
+that writes no inventory removes the committed copy, as it does when the
+project does not commit its schemas. A failed describe leaves it as it was.
 
 ## Dependency Management
 

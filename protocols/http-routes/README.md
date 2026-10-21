@@ -20,7 +20,7 @@ corpus under [`fixtures/`](fixtures/).
 | Role | Implementation |
 | --- | --- |
 | Producer (Go) | `go.putnami.dev/http` — `ServerPlugin.Describe` canonicalizes typed API, manual, and static-mount routes into `schema/http-routes.json` (`go/framework/http/http_routes.go`). |
-| Producer (TypeScript) | `@putnami/application` and `@putnami/web` emit per-project route fragments; the TypeScript extension aggregates them into the same `schema/http-routes.json` (`typescript/extension/internal/build/http_routes.go`). |
+| Producer (TypeScript) | `@putnami/application` and `@putnami/web` emit per-project route fragments; the TypeScript extension aggregates them into `.gen/schema/http-routes.json` (`typescript/extension/internal/build/http_routes.go`) and commits that file verbatim to the same `schema/http-routes.json` (`typescript/extension/cmd/putnami-ts/build_generate.go`). |
 | Consumer (in repo) | `sites/telemetry.putnami.dev` pins its committed inventory against what the running server describes, then proves every undeclared path and method is rejected. |
 | Consumer (out of repo) | The deployment edge that builds a default-deny allowlist from the artifact. Ingestion and reconciliation stay outside this contract. |
 
@@ -56,6 +56,26 @@ admits a private route.
 detect that a public prefix or template would accidentally admit a private
 route. Provenance source kinds are closed: `typed-api`, `file-route`,
 `static-mount`, `public-file`, and `manual`.
+
+## Pages and actions
+
+A consumer tells a file-system page from its action with `provenance.sourceKind`
+and `methods` alone:
+
+- A `file-route` route whose methods are `GET` and `HEAD` is a **page**.
+- A `file-route` route whose methods are `POST`, at the same `match` and `path`
+  as a page, is that **page's action**.
+
+No other source kind is a page or an action, whatever its methods. The rule
+adds no field and changes no version: it reads fields every v1 inventory
+already carries.
+
+`evidencePath` corroborates the rule and does not decide it. A page file can
+produce several routes, because a finite static catch-all expands into one
+`exact` route per concrete path, so a consumer that counts page files counts
+the distinct `evidencePath` values of page routes, not the page routes. The
+TypeScript web producer sets `evidencePath` on every `file-route`: the page
+file for a page, and the `action.ts` beside it for an action.
 
 ## Match semantics and conversion
 

@@ -13,7 +13,7 @@ import { Glob, write } from 'bun';
 import { statSync } from 'node:fs';
 import { basename } from 'node:path';
 import { PutnamiConfig } from '@putnami/application';
-import { writeHttpRoutesFragment } from '@putnami/application/http-routes';
+import { completeHttpRoutesEvaluation, writeHttpRoutesFragment } from '@putnami/application/http-routes';
 import { useConfig } from '@putnami/runtime';
 import {
   fileExists,
@@ -69,6 +69,10 @@ const generateModel = standardHookModel.extend({
 
 /**
  * Run the React generation process.
+ *
+ * Every successful return reports a complete route evaluation, including a
+ * project without a React app directory or route files, which contributes no
+ * routes and writes no fragment.
  */
 async function runGenerate(_options: unknown, context: HookContext): Promise<HookResult> {
   const { projectRoot } = context;
@@ -95,7 +99,7 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
   const scanRoots = resolveScanRoots(projectRoot, config);
   if (scanRoots.length === 0) {
     emitLog('info', 'No React app directory found, skipping generation');
-    return { exports: {}, assets: {} };
+    return { exports: {}, assets: {}, data: { httpRoutes: completeHttpRoutesEvaluation() } };
   }
 
   const defaultScanPath = joinPath(projectRoot, 'src', 'app');
@@ -221,7 +225,7 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
 
   if (pages.length === 0 && layouts.length === 0) {
     emitLog('info', 'No React components found, skipping generation');
-    return { exports: {}, assets: {} };
+    return { exports: {}, assets: {}, data: { httpRoutes: completeHttpRoutesEvaluation() } };
   }
 
   emitProgress('Writing client generator', 30, 'generate');
@@ -343,6 +347,7 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
       'react-client-loader': reactClientPath,
     },
     assets,
+    data: { httpRoutes: completeHttpRoutesEvaluation() },
   };
 }
 

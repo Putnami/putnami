@@ -7,7 +7,8 @@
     "A server that configures nothing is still bounded in connection lifetime, keepalive tolerance, and concurrent streams",
     "A web or mobile caller reaches the same operations over Connect that an internal caller reaches over gRPC",
     "Wiring a gateway incompletely is reported at startup instead of surfacing as production 404s",
-    "A first-party Connect caller reaches a declared operation with the same values a REST caller reaches it with, over JSON or protobuf"
+    "A first-party Connect caller reaches a declared operation with the same values a REST caller reaches it with, over JSON or protobuf",
+    "A reader learns from the committed tree which gRPC and Connect services the application serves, without running it"
   ],
   "nonGoals": [
     "Generating Connect or gRPC stubs, which remain the job of protoc and buf against the published .proto document",
@@ -47,10 +48,15 @@
     {
       "id": "bridge-validation",
       "text": "A bridged call re-enters the endpoint's own validation pipeline, so it accepts and rejects exactly what the equivalent REST call would, and a numeric path parameter keeps its original decimal text rather than passing through float64. A body the bridge cannot read or decode is refused with the framework code http.bad_request at status 400, and one it cannot re-encode with the code internal at status 500."
+    },
+    {
+      "id": "service-inventory",
+      "text": "Describe emits one canonical service inventory from all composed surfaces. Native registrations run without a listener and include enabled reflection; gateway methods stay unknown and use mounted prefixes; bridge methods join exact POST routes. One elected writer unions the facts, collapses identical entries and rejects conflicts. UseForDescribe is refused. A configured surface with no registrations emits an empty inventory."
     }
   ],
   "decisions": [
     "go/framework/grpc/doc/adr/0001-bridge-reenters-the-endpoint-pipeline.md",
-    "go/framework/grpc/doc/adr/0002-bounded-by-default-mounted-explicitly.md"
+    "go/framework/grpc/doc/adr/0002-bounded-by-default-mounted-explicitly.md",
+    "go/framework/grpc/doc/adr/0003-the-service-inventory-lists-registrations.md"
   ]
 }

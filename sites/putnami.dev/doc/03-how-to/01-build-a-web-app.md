@@ -126,6 +126,13 @@ hydration · client-JS budget). A `.static()` route that reads request data fail
 the build — static means static. See the framework's
 `doc/rendering-modes.md` for the full guide.
 
+The build also commits `schema/http-routes.json`, with a build copy under
+`.gen/schema/`. Its `file-route` entries with `GET` and `HEAD` identify pages;
+a `POST` entry at the same path identifies the page's action. Count distinct
+`evidencePath` values when counting page files, because static expansion can
+produce several URLs from one file. Commit the generated inventory with your
+route changes: the build reports drift when the committed contract changes.
+
 ## Result
 
 You have a React SSR app with layout, file-based routing, and server-side data loading. The template gave you a working starting point — you extended it with a new page and a loader.

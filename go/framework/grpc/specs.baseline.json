@@ -9,6 +9,7 @@
     "go/grpc-services#gateway-mounting",
     "go/grpc-services#interceptor-chain",
     "go/grpc-services#reflection-opt-in",
-    "go/grpc-services#secure-defaults"
+    "go/grpc-services#secure-defaults",
+    "go/grpc-services#service-inventory"
   ]
 }

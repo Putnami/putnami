@@ -44,7 +44,7 @@ afterEach(() => {
 });
 
 describe('bin/generate.ts', () => {
-  it('bundles the tracker and declares the analytics routes', async () => {
+  it('bundles the tracker, declares the analytics routes and reports a complete route evaluation', async () => {
     const { projectRoot, contextPath } = createProject();
 
     const proc = Bun.spawn(['bun', 'run', join(packageRoot, 'bin', 'generate.ts'), '--putnami-context', contextPath], {
@@ -62,12 +62,18 @@ describe('bin/generate.ts', () => {
     expect(bundles).toHaveLength(1);
     expect(existsSync(join(bundleDir, bundles[0] as string))).toBe(true);
 
-    const summary = stdout
+    const summaryLines = stdout
       .split('\n')
       .filter((line) => line.trim().length > 0)
-      .map((line) => JSON.parse(line) as { type: string; data?: { assets?: Record<string, string> } })
-      .find((event) => event.type === 'summary');
-    expect(Object.keys(summary?.data?.assets ?? {})).toHaveLength(1);
+      .filter((line) => (JSON.parse(line) as { type: string }).type === 'summary');
+    expect(summaryLines).toHaveLength(1);
+    const summaryLine = summaryLines[0] as string;
+    const summary = JSON.parse(summaryLine) as {
+      data?: { assets?: Record<string, string>; httpRoutes?: unknown };
+    };
+    expect(Object.keys(summary.data?.assets ?? {})).toHaveLength(1);
+    expect(summary.data?.httpRoutes).toEqual({ v: 1, state: 'complete' });
+    expect(summaryLine).toContain('"httpRoutes":{"v":1,"state":"complete"}');
 
     const fragment = JSON.parse(readFileSync(join(projectRoot, '.gen', 'http-routes.d', 'analytics.json'), 'utf8')) as {
       routes: { path: string; match: string; methods: string[]; provenance: { package: string } }[];

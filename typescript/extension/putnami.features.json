@@ -245,7 +245,8 @@
               "an-existing-workspace-biome-config-is-preserved",
               "a-missing-extension-biome-default-fails-install",
               "a-fresh-workspace-install-is-idempotent-and-lint-uses-the-root-config",
-              "the-added-biome-is-the-release-the-rules-target"
+              "the-added-biome-is-the-release-the-rules-target",
+              "the-installed-biome-is-the-release-the-shipped-rules-name"
             ]
           }
         },
@@ -573,6 +574,27 @@
           }
         },
         {
+          "id": "committed-route-inventory",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-generate-http-routes-output-declares-fail-on-drift",
+              "successful-hooks-commit-the-aggregate-verbatim",
+              "an-unchanged-inventory-is-not-rewritten",
+              "complete-evaluations-without-a-fragment-remove-the-committed-copy",
+              "a-complete-empty-fragment-commits-an-empty-inventory",
+              "a-missing-or-malformed-route-evaluation-fails-naming-the-hook",
+              "unavailable-route-producers-fail-generate",
+              "a-failed-generate-preserves-the-committed-route-and-infra-facts",
+              "a-batched-generate-commits-the-solo-bytes"
+            ]
+          }
+        },
+        {
           "id": "source-bound-generate",
           "stage": "coded",
           "evidenceKinds": [
@@ -581,7 +603,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-generate-cache-policy-is-source-bound"
+              "the-generate-cache-policy-is-source-bound",
+              "the-generate-key-covers-hook-implementation"
             ]
           }
         },

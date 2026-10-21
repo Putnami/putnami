@@ -293,6 +293,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/extension",
+          "producerProject": "/protocols/grpc-services"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/extension",
           "producerProject": "/protocols/infra"
         },
         {

@@ -2,6 +2,24 @@
 
 `go.putnami.dev/grpc` provides a gRPC server plugin and a Connect protocol gateway for serving gRPC over HTTP/1.1.
 
+## Build-time service inventory
+
+The describe pass emits `schema/grpc-services.json` with the services registered
+by native gRPC servers, Connect gateways and API bridges. Native registrations
+include method names and streaming flags, using an unstarted server without
+binding a listener. Gateways report their mounted prefix and unknown methods;
+bridges report the exact POST methods they bind. Reflection services appear
+only when reflection is enabled.
+
+Compose these plugins with `Use` so describe sees the configured application.
+One writer emits the complete union, including when describe targets one
+surface. A configured surface with no services emits an empty list. An absent
+file leaves the facts unavailable. A successful build removes stale inventory
+when its producer is removed; a failed describe preserves the committed copy.
+
+See the [service inventory contract](../../framework/grpc/README.md#service-inventory)
+for the canonical protocol and the route joins for each transport.
+
 ## gRPC server plugin
 
 ### Basic setup

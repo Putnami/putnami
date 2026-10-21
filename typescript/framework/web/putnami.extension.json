@@ -7,11 +7,7 @@
       "command": "bun",
       "args": ["run", "{extensionRoot}/bin/generate"],
       "cwd": "{projectRoot}",
-      "timeoutMs": 120000,
-      "cache": {
-        "inputs": ["src/**/layout.tsx", "src/**/page.tsx", "src/**/error.tsx", "src/**/not-found.tsx"],
-        "outputs": [".gen/**/*"]
-      }
+      "timeoutMs": 120000
     }
   },
   "commands": {}

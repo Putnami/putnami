@@ -83,7 +83,7 @@ Steps:
 2. **Prepare `.gen/`** — creates or clears the `.gen/` directory
 3. **Copy assets** — copies files declared in `putnami.json` `options.generate.assets` (or legacy `.putnamirc.json`). A missing source is skipped with a warning; a copy that fails, such as a symlink to a directory inside a directory asset, fails the generate
 4. **Pre-build hooks** — discovers and runs hooks from dependencies that declare `preBuild` in their `putnami.extension.json`. Hooks can register exports and assets. They run in ascending `hooks.preBuild.order`, ties broken by extension name — see [hook order](#pre-build-hook-order). A dependency of `package.json` that no `node_modules` holds, from the project up to the workspace root, fails the generate before any hook runs: run `putnami install`. The cache key names the dependencies, not whether they are installed, so a generate that skipped their hooks would cache an incomplete `.gen/`, without `clientgen/config.json` or `schema/`, under the key of a complete one.
-5. **HTTP route inventory** — merges application and web framework facts into `.gen/schema/http-routes.json`
+5. **HTTP route inventory** — merges application and web framework facts into `.gen/schema/http-routes.json`, which the step after bundled serve commits to `schema/http-routes.json` — see [committed route inventory](#committed-route-inventory)
 6. **Infra requirements sync** — reconciles the committed `<project>/infra/requirements.json` from the `.gen/infra/*.json` scratch fragments the hooks just wrote — see [infra requirements ordering](#infra-requirements-ordering)
 7. **Version info** — writes/updates `.gen/version.json` with the `contentHash` field
 8. **Bundled serve** — if any hook registered `*-loader` exports, generates a bundled serve entrypoint that registers server-side loaders and starts the app
@@ -141,8 +141,12 @@ evidence to `.gen/schema/feature-evidence/typescript-framework.json` when the
 project maps a native feature to a proof. The evidence names the project's
 source binding: the `source-v1` digest the scheduler stamps into
 `.gen/version.json`. The binding covers every project file, test files, specs
-and `putnami.features.json` included. The generate key reads only `src/`,
-`public/`, `package.json` and the workspace configuration.
+and `putnami.features.json` included. The generate key reads `src/`, `bin/`,
+`putnami.extension.json`, `public/`, `package.json` and the workspace configuration.
+Hook code and manifest edits move the producer's generate key, and the
+`^generate` dependencies carry that change to each consumer. A custom hook
+whose implementation lives elsewhere declares those paths through the existing
+`filePatterns` option.
 
 So `build-generate` declares `cache.sourceBound`. An edit outside the key, such
 as a test file, keeps the generate key and every key that folds it. The CLI
@@ -155,8 +159,8 @@ keys and their hits. A project without feature evidence follows the same
 rule. See [Source-Bound Tasks](../../../tooling/cli/doc/10-caching.md#source-bound-tasks).
 
 `build-generate` also rewrites committed files the binding covers:
-`schema/openapi.json`, `infra/requirements.json` and a generated client inside
-the project. An execution that changes one of them moves its own project's
+`schema/openapi.json`, `schema/http-routes.json`, `infra/requirements.json` and
+a generated client inside the project. An execution that changes one of them moves its own project's
 binding after the hook wrote the evidence. ADR
 [0069](../../../tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md)
 states how the CLI settles that entry.
@@ -206,6 +210,70 @@ extension canonicalizes them after every hook, so hook order cannot change the
 artifact or its digest. Unsupported catch-alls and ambiguous static behavior
 fail with an `http_routes.*` diagnostic rather than producing a broad `/*`
 route.
+
+#### Committed route inventory
+
+`build-generate` commits the route inventory to `<project>/schema/http-routes.json`,
+the path the Go extension commits, so a consumer reads what a TypeScript
+application serves from the repository without running a build. The hooks are
+its only authors: the task copies the aggregate and composes nothing. It runs
+after bundled serve, so a generate that fails changes no committed inventory.
+
+Every pre-build hook reports its route evaluation as `data.httpRoutes` in its
+summary: `{"v":1,"state":"complete"}` once it has evaluated its own
+framework-declared route contribution, or
+`{"v":1,"state":"unavailable","reason":"<text>"}` when it could not. No other
+member is accepted, and only an unavailable evaluation carries a reason, which
+must not be blank. The evaluation does not depend on the summary `status`, and
+the hook runner adds no default, so a hook that omits it fails the run. The
+first-party hooks set it with `completeHttpRoutesEvaluation()` and
+`unavailableHttpRoutesEvaluation(reason)` from
+`@putnami/application/http-routes`. Other hook kinds, such as `configExtract`,
+do not report it. See
+[ADR 0005](./adr/0005-a-hook-certifies-its-route-evaluation-before-facts-are-committed.md).
+
+| The run | The committed `schema/http-routes.json` |
+|---------|-----------------------------------------|
+| Every hook reported a complete evaluation and the aggregate validated | Becomes a byte-for-byte copy of `.gen/schema/http-routes.json`. The copy is staged in a temporary file and renamed into place, and it is skipped when the bytes already match, so a warm build leaves the file and its mtime alone. |
+| Every hook reported a complete evaluation and the fragments hold no route, such as one fragment with `routes: []` | Becomes the known-empty canonical inventory, with `routes: []`. |
+| Every hook reported a complete evaluation and none wrote a fragment, including a project that declares no pre-build hook, with or without Bun, and one whose dependencies are plain packages without `putnami.extension.json` | Is removed: nothing produces it any more. |
+| A hook failed, including the `@putnami/application` hook when the `app()` factory throws | Stays as it stands; the generate fails with `GENERATE_FAILED` and the hook's error. |
+| A hook reported its routes unavailable, or returned no `data.httpRoutes` or a malformed one | Stays as it stands, and is not created; the generate fails with `HTTP_ROUTES_UNAVAILABLE`, which names each such hook and its cause. |
+| Discovery could not read or parse `package.json` or an installed dependency's `putnami.extension.json`, including a JSON `null` where discovery needs an object | Stays as it stands, and is not created; the generate fails with `HTTP_ROUTES_UNAVAILABLE`, which names the cause. |
+| Bun is not resolvable and the project declares a pre-build hook | Stays as it stands; the generate fails with `GENERATE_FAILED`, which names the hooks. |
+| Hook discovery or the aggregate failed | Stays as it stands; the generate fails. |
+
+A failed hook, a missing, malformed or unavailable route evaluation, an
+incomplete discovery and a missing Bun fail the run before it aggregates the
+route fragments, advertises the inventory, reconciles `infra/requirements.json`,
+promotes contracts or writes its generate result; an invalid aggregate fails it
+before the reconciliation. Such a run reports no exports or assets and keeps the
+committed route inventory and infra requirements as they stand. The run reads
+every hook's evaluation before it fails, so one diagnostic lists every hook to
+fix. Fragments a hook wrote under `.gen` before such a failure are not
+evidence: the next run clears them before its hooks run.
+
+A complete evaluation covers the routes the hook's framework declares at build
+time. Routes an application registers only at runtime, such as OAuth routes
+added while the application warms up, are not in the inventory.
+
+To upgrade, update each package that contributes a pre-build hook together with
+`@putnami/typescript`: a hook built before the evaluation existed fails the run
+with `HTTP_ROUTES_UNAVAILABLE`, naming the hook. Adapt a custom hook to return
+`{"v":1,"state":"complete"}` as `data.httpRoutes` once it has evaluated its
+routes, or the unavailable form with a reason when it could not.
+
+The inventory is committed for every project and reads no project option, so
+the task's cache key needs no extra input. The declared `httpRoutes` output
+carries `drift: "fail"`: when the regenerated, removed or restored inventory
+differs from the committed one, the task fails with `generated-output-drift`,
+and the worktree holds the new inventory to commit. The first build of an
+application that has never committed its inventory fails this way once.
+
+A consumer tells pages from actions with the rule the protocol states: a
+`file-route` route with methods `GET` and `HEAD` is a page, and a `file-route`
+route with method `POST` at the same path is that page's action — see
+[`protocols/http-routes`](../../../protocols/http-routes/README.md#pages-and-actions).
 
 ### Phase 2: Transpile
 
@@ -403,7 +471,7 @@ Every output has exactly one owning task:
 
 | Task | Owns | Root |
 |------|------|------|
-| `build-generate` | `.gen/` minus `.gen/deployment.json`, `.gen/requirements.json`, `.gen/infra/runtime.json` and `.gen/layers/`, `schema/capabilities.json`, `schema/openapi.json` (with `drift: "fail"`: a committed spec that differs from the one `openapi()` regenerates fails the task with `generated-output-drift` — commit the regenerated spec), and the generated client directory (via the `clientOutput` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
+| `build-generate` | `.gen/` minus `.gen/deployment.json`, `.gen/requirements.json`, `.gen/infra/runtime.json` and `.gen/layers/`, `schema/capabilities.json`, `schema/openapi.json` (with `drift: "fail"`: a committed spec that differs from the one `openapi()` regenerates fails the task with `generated-output-drift` — commit the regenerated spec), `schema/http-routes.json` (with `drift: "fail"`: a committed route inventory that differs from the one the hooks regenerate fails the task with `generated-output-drift` — commit the regenerated inventory; see [committed route inventory](#committed-route-inventory)), and the generated client directory (via the `clientOutput` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
 | `build-transpile` | `lib/` | per-command output dir |
 | `build-types` | `types/` | per-command output dir |
 | `build-compile` | `compile/` | per-command output dir |
@@ -418,7 +486,8 @@ Except the required `.gen/requirements.json` of `build-infra` and
 `.gen/deployment.json` of `package-deployment`, each declared output above may
 legitimately be absent after a successful run — a project with no entrypoint
 transpiles to nothing, coverage is only instrumented under `--enforce-coverage`,
-a project with no config blocks emits no schema, and a workload that authors
+a project with no config blocks emits no schema, a project whose hooks complete
+without a route fragment commits no route inventory, and a workload that authors
 `infra/runtime.json` gets no runtime defaults file.
 
 `build-generate` is the single producer of `<project>/.gen` — anything else

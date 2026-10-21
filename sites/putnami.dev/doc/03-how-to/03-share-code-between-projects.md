@@ -58,6 +58,20 @@ export const GET = endpoint()
   .handle((ctx) => ({ message: ctx.deps.greeting.message() }));
 ```
 
+## Go workspace modules
+
+For a Go consumer, use the module path declared by the shared library:
+
+```bash
+putnami deps add example.com/shared --projects api
+```
+
+A bare module path that uniquely matches a member of the consumer's `go.work`
+is resolved from that tree, including an unpublished library. The command
+adds a requirement and a relative local replacement while preserving an
+existing replacement. A spec with an explicit version, such as
+`example.com/shared@v1.2.3`, uses the published-version lookup.
+
 ## Result
 
 You now have shared code used by more than one project. The library is built, tested, and linked through workspace dependencies.

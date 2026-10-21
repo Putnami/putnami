@@ -74,6 +74,13 @@ type ApiBridge struct {
 	// provider mounts no proto plugin, and that is exactly when the bridge
 	// serves — and advertises — JSON only.
 	codec *connectwire.ProtoCodec
+	// served maps each Connect URL Configure mounted to whether it is a server
+	// stream. Describe lists exactly these methods.
+	served map[string]bool
+	// servedErr records a URL mounted twice with two different shapes.
+	servedErr error
+	// root is the application root Configure received.
+	root *app.Module
 }
 
 // NewApiBridge builds a bridge against an api plugin and a transport server. Defaults
@@ -127,7 +134,17 @@ func (b *ApiBridge) Name() string { return "grpc-api-bridge" }
 // so it mounted one URL twice while the descriptor declared two distinct
 // methods; a generated Connect client then called a method the bridge never
 // served.
-func (b *ApiBridge) Configure(_ context.Context, _ *app.Module) error {
+//
+// Every run refreshes the route bindings and retains URLs already mounted for
+// a binding. The service inventory lists each mounted method once however
+// often Configure runs.
+func (b *ApiBridge) Configure(_ context.Context, owner *app.Module) error {
+	if owner != nil {
+		b.root = owner.Root()
+	}
+	if b.served == nil {
+		b.served = map[string]bool{}
+	}
 	if b.apiPlugin == nil || b.server == nil {
 		return nil
 	}
@@ -148,6 +165,7 @@ func (b *ApiBridge) Configure(_ context.Context, _ *app.Module) error {
 		}
 		b.codec = codec
 	}
+	previousBound := b.bound
 	b.bound = map[string]string{}
 	b.duplex = map[string]bool{}
 	for _, def := range b.apiPlugin.Definitions() {
@@ -194,6 +212,10 @@ func (b *ApiBridge) Configure(_ context.Context, _ *app.Module) error {
 			rpcPath = fmt.Sprintf("/%s.%s/%s", b.config.PackageName, b.config.ServiceName, rpcName)
 		}
 		b.bound[key] = rpcPath
+		b.recordServedMethod(rpcPath, def.IsStream())
+		if previousBound[key] == rpcPath {
+			continue
+		}
 		route := connectRoute{definition: def, path: path, identity: rpcPath, serverSide: def.IsStream()}
 		if route.serverSide {
 			route.stream = def.BuildStreamHandler()

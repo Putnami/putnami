@@ -10,7 +10,11 @@
  */
 
 import { PutnamiConfig } from '@putnami/application';
-import { type GeneratedHttpRoute, writeHttpRoutesFragment } from '@putnami/application/http-routes';
+import {
+  completeHttpRoutesEvaluation,
+  type GeneratedHttpRoute,
+  writeHttpRoutesFragment,
+} from '@putnami/application/http-routes';
 import { type InferConfig, useConfig } from '@putnami/runtime';
 import { fileExists, joinPath, joinPosixPath, readProjectConfigFile, relativePath } from '@putnami/utils';
 import {
@@ -33,8 +37,9 @@ const generateModel = standardHookModel.extend({
  *
  * @param _options - Parsed command options (unused).
  * @param context - The hook context written by the CLI runner.
- * @returns The generated public assets. No `*-loader` export: the hook
- *   generates nothing server-side.
+ * @returns The generated public assets and a complete route evaluation for
+ *   the fragment it wrote. No `*-loader` export: the hook generates nothing
+ *   server-side.
  */
 async function runGenerate(_options: unknown, context: HookContext): Promise<HookResult> {
   const { projectRoot } = context;
@@ -84,7 +89,7 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
   emitArtifact('write', relativePath(projectRoot, fragment));
 
   emitProgress('Generation complete', 100, 'done');
-  return { assets };
+  return { assets, data: { httpRoutes: completeHttpRoutesEvaluation() } };
 }
 
 /**

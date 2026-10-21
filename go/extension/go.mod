@@ -46,6 +46,7 @@ require (
 	go.putnami.dev/protocol/database v0.0.0
 	go.putnami.dev/protocol/diagnostic v0.0.0
 	go.putnami.dev/protocol/extension v0.0.0
+	go.putnami.dev/protocol/grpc-services v0.0.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )
 
@@ -86,3 +87,5 @@ replace go.putnami.dev/protocol/workspace => ../../protocols/workspace
 replace go.putnami.dev/protocol/support => ../../protocols/support
 
 replace go.putnami.dev/protocol/architecture => ../../protocols/architecture
+
+replace go.putnami.dev/protocol/grpc-services => ../../protocols/grpc-services

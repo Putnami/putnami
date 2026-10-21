@@ -151,10 +151,15 @@ type Plugin struct {
 	registrars    []ServiceRegistrar
 	log           *logger.Logger
 	enableReflect bool
+	// root is the application root Configure received. Describe reads the
+	// service inventory of the whole tree under it.
+	root *app.Module
 }
 
 // ServiceRegistrar is a function that registers gRPC services on the server.
-// Each gRPC service package should provide a registrar function.
+// Each gRPC service package should provide a registrar function. Describe runs
+// every registrar on a server it never starts, so a registrar registers
+// services and does nothing else.
 type ServiceRegistrar func(server *grpc.Server)
 
 // NewPlugin creates a new gRPC server plugin.
@@ -204,14 +209,29 @@ func (p *Plugin) WithReflection(enabled bool) *Plugin {
 	return p
 }
 
-// Configure implements the plugin lifecycle. The gRPC plugin holds no
-// configure-time state: cross-cutting interceptors — including
-// grpc.DIInterceptor / grpc.DIStreamInterceptor for per-request DI scoping —
-// are wired explicitly by the caller via WithUnaryInterceptor /
-// WithStreamInterceptor, mirroring how LoggingInterceptor and
-// RecoveryInterceptor are registered.
-func (p *Plugin) Configure(_ context.Context, _ *app.Module) error {
+// Configure implements the plugin lifecycle. It records the application root
+// for Describe and nothing else, so repeating it changes nothing.
+// Cross-cutting interceptors — including grpc.DIInterceptor /
+// grpc.DIStreamInterceptor for per-request DI scoping — are wired explicitly
+// by the caller via WithUnaryInterceptor / WithStreamInterceptor, mirroring how
+// LoggingInterceptor and RecoveryInterceptor are registered.
+func (p *Plugin) Configure(_ context.Context, owner *app.Module) error {
+	if owner != nil {
+		p.root = owner.Root()
+	}
 	return nil
+}
+
+// registerServices runs every registrar on server, then registers reflection
+// when it is enabled. Start and Describe share it, so the inventory lists what
+// a started server serves.
+func (p *Plugin) registerServices(server *grpc.Server) {
+	for _, registrar := range p.registrars {
+		registrar(server)
+	}
+	if p.enableReflect {
+		reflection.Register(server)
+	}
 }
 
 // Start implements the plugin lifecycle — starts the gRPC server.
@@ -238,16 +258,7 @@ func (p *Plugin) Start(_ context.Context, _ *app.Module) error {
 	}
 
 	p.server = grpc.NewServer(opts...)
-
-	// Register services
-	for _, registrar := range p.registrars {
-		registrar(p.server)
-	}
-
-	// Enable reflection
-	if p.enableReflect {
-		reflection.Register(p.server)
-	}
+	p.registerServices(p.server)
 
 	// Start listening
 	addr := fmt.Sprintf(":%d", p.config.Port)

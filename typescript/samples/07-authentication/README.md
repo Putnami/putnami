@@ -19,12 +19,18 @@ OAuth2 + sessions + protected routes.
 openssl rand -hex 32  # cookieSecret
 ```
 
-**2. OAuth credentials** — Set via environment variables:
+**2. OAuth credentials** — Set via environment variables before you serve the sample:
 
 ```bash
 export OAUTH_CLIENT_ID=your-client-id
 export OAUTH_CLIENT_SECRET=your-client-secret
 ```
+
+`conf/.env.yaml` reads them into the `oauth.clientId` and `oauth.clientSecret`
+runtime configuration, and a higher-priority config source can supply them
+instead. The application requires both when it starts, in
+`src/oauth-credentials.ts`, so `putnami build` needs no credential. A value that
+is blank, or still a `${...}` reference to an unset variable, counts as missing.
 
 ## Routes
 
@@ -36,6 +42,11 @@ export OAUTH_CLIENT_SECRET=your-client-secret
 | GET | `/profile` | Protected: user profile |
 | GET | `/protected` | Protected: example resource |
 | GET | `/healthz` | Aggregate health check |
+
+`oAuth2()` registers `/login`, `/logout` and its callback route when the
+application warms up, at startup. The build does not run warmup, so the
+committed `schema/http-routes.json` does not list these routes: it holds the
+routes the build evaluates, not the ones registered at runtime.
 
 ## Run
 
@@ -131,8 +142,11 @@ The test drives the real OAuth/session plugin far enough to observe the public
 security boundary without contacting the provider: `/login` produces an
 authorization redirect, both protected endpoints return 401 without an
 authenticated session, and the session inspection endpoint reports anonymous
-state without disclosing credentials. Runtime startup also refuses missing
-OAuth environment variables instead of substituting committed secrets.
+state without disclosing credentials. The `app()` factory builds without OAuth
+credentials, so generation can evaluate it and list its routes, and runtime
+startup refuses a missing `OAUTH_CLIENT_ID` or `OAUTH_CLIENT_SECRET`, with the
+committed `conf/.env.yaml` loaded, and a credential left as an unresolved
+`${...}` reference, instead of substituting committed secrets.
 
 OAuth identity, encrypted sessions, and API `.secure()` middleware are owned by
 [`@putnami/application`](../../framework/application/README.md), outside the

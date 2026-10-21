@@ -1,0 +1,5 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-grpc-services-v1.json",
+  "protocol": "putnami.grpc-services.v1",
+  "digest": "sha256:e877d1895d1c90e8f140b75ee9c2b62e13a4ba69fa30db86509fb5d99a3d5b92"
+}

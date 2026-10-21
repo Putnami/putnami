@@ -86,9 +86,9 @@ export function resolveApplicationFromModule(mod: Record<string, unknown>, debug
  *   import of a module another extension has not generated yet). Never
  *   legitimate for a project that ships that entry point.
  * - `factory-error` — the module loaded; the `app()`/`default` factory threw
- *   while being invoked. Legitimate at build time: a factory is allowed to
- *   demand runtime configuration that only exists at deploy time (e.g.
- *   `typescript/samples/07-authentication` requires `OAUTH_CLIENT_ID`).
+ *   while being invoked, so the Application it would return is unknown. The
+ *   generate hook fails on it; config-extract treats it as any other missing
+ *   Application.
  * - `no-application` — the module loaded and simply is not an app (a plain
  *   library that depends on `@putnami/application`). Legitimate.
  */
@@ -148,10 +148,8 @@ export async function findApplication(
     // Loading the module and invoking its factory are probed in SEPARATE try
     // blocks on purpose. resolveApplicationFromModule CALLS `app()`/`default()`,
     // so sharing one try would report every factory that throws as if the module
-    // itself were unloadable — and a factory is entitled to throw at build time
-    // (it may demand deploy-time secrets). Keeping them apart is what lets a
-    // caller fail closed on a genuinely unloadable module without touching the
-    // legitimate cases.
+    // itself were unloadable. Keeping them apart lets each caller give a module
+    // that cannot be loaded and a factory that threw their own reason and remedy.
     let mod: Record<string, unknown>;
     try {
       mod = await import(entryPath);

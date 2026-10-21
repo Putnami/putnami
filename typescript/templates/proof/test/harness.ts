@@ -277,7 +277,7 @@ export function disposeProject(rendered: RenderedProject | undefined): void {
  * dependencies and devDependencies in byte order, keeps those whose
  * putnami.extension.json declares the hook, and runs them by declared `order`.
  * Each hook gets the context file and environment the extension gives it, and
- * must exit 0 with a summary event.
+ * must exit 0 with a summary event certifying a complete route evaluation.
  */
 export function runPreBuildHooks(rendered: RenderedProject, mode: string): Promise<StepResult> {
   return invokeInOrder(rendered, mode, discoverPreBuildHooks(rendered.project), 0, '');
@@ -326,10 +326,38 @@ async function invokeInOrder(
   if (result.exitCode !== 0) {
     return { exitCode: result.exitCode, output: transcript };
   }
-  if (!result.output.split('\n').some((line) => line.includes('"type":"summary"'))) {
-    return { exitCode: 1, output: `${transcript}hook ${current.name} exited 0 but emitted no summary event\n` };
+  if (!hasCompleteRouteEvaluation(result.output)) {
+    return { exitCode: 1, output: `${transcript}hook ${current.name} emitted no complete route evaluation\n` };
   }
   return invokeInOrder(rendered, mode, hooks, index + 1, transcript);
+}
+
+/** The first summary must carry the complete v1 literal accepted by hooks.RunHooks. */
+function hasCompleteRouteEvaluation(output: string): boolean {
+  for (const line of output.split('\n')) {
+    let event: { type?: string; data?: { httpRoutes?: Record<string, unknown> } } | null;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      if (line.includes('"type":"summary"')) {
+        return false;
+      }
+      continue;
+    }
+    if (event?.type !== 'summary') {
+      continue;
+    }
+    const evaluation = event.data?.httpRoutes;
+    return (
+      evaluation !== null &&
+      typeof evaluation === 'object' &&
+      !Array.isArray(evaluation) &&
+      Object.keys(evaluation).length === 2 &&
+      evaluation.v === 1 &&
+      evaluation.state === 'complete'
+    );
+  }
+  return false;
 }
 
 function invokeHook(

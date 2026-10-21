@@ -1,0 +1,343 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [
+    {
+      "match": "exact",
+      "path": "/",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/_putnami/analytics/events",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/analytics",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "prefix",
+      "path": "/analytics/",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/analytics",
+        "sourceKind": "static-mount",
+        "evidencePath": ".gen/public/analytics"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/api/projects",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/projects/api/get.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/api/projects",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/projects/api/post.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/api/projects/events",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/projects/api/events/get.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/api/projects/stream",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/projects/api/stream/get.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/api/projects/{id}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/projects/api/[id]/get.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/api/projects/{id}",
+      "methods": [
+        "PUT"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/projects/api/[id]/put.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/api/tasks",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/tasks/api/get.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/api/tasks",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/tasks/api/post.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/api/tasks/events",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/tasks/api/events/get.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/api/tasks/stream",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/tasks/api/stream/get.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/api/tasks/{taskId}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/tasks/api/[taskId]/get.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/api/tasks/{taskId}",
+      "methods": [
+        "PUT"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/tasks/api/[taskId]/put.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/projects",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/projects/web/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/projects/new",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/projects/web/new/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/projects/new",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/projects/web/new/action.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/projects/{id}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/projects/web/[id]/page.tsx"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/projects/{id}",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/projects/web/[id]/action.ts"
+      }
+    },
+    {
+      "match": "prefix",
+      "path": "/react/",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/web",
+        "sourceKind": "static-mount",
+        "evidencePath": ".gen/public/react"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/tasks",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/tasks/web/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/tasks",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/tasks/web/action.ts"
+      }
+    }
+  ],
+  "digest": "sha256:1cfe7f8ec79bca6885a11617e2c0adb43896f4985196bfe51c1e995d28b24173"
+}

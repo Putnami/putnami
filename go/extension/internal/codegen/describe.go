@@ -24,8 +24,11 @@ import (
 	"github.com/rogpeppe/go-internal/lockedfile"
 	"go.putnami.dev/go/extension/internal/codegen/openapiutil"
 	"go.putnami.dev/go/extension/internal/jobs/configextract"
+	"go.putnami.dev/go/extension/internal/parse"
 	"go.putnami.dev/go/extension/internal/toolchain"
 	protocfg "go.putnami.dev/protocol/config"
+	diag "go.putnami.dev/protocol/diagnostic"
+	grpcservices "go.putnami.dev/protocol/grpc-services"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/genresult"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -234,6 +237,19 @@ func runDescribe(ctx *pctx.Context, emit *jsonl.Emitter) (*describeResult, error
 	// with HTTP routes but no runtime OpenAPI plugin keeps build-generate's
 	// static stub, which is still the converged value.
 	staged := stagedSchemaArtifacts(projectPath)
+	// The gRPC service inventory is checked before any schema is promoted,
+	// whether or not the project commits its schemas: an invalid one fails the
+	// run here, so this run commits no schema file and removes none.
+	inventoryDiagnostics, err := preflightGRPCInventory(genDir, before, staged)
+	if err != nil {
+		return nil, fmt.Errorf("check gRPC service inventory: %w", err)
+	}
+	if len(inventoryDiagnostics) > 0 {
+		file := parse.DiagPath(ctx.WorkspaceRoot, projectPath, filepath.Join(".gen", filepath.FromSlash(grpcServicesSchemaRelPath)))
+		emitGRPCInventoryDiagnostics(emit, file, inventoryDiagnostics)
+		return nil, fmt.Errorf("gRPC service inventory %s is invalid; describe promoted no schema:\n%s",
+			file, diag.ErrorText(inventoryDiagnostics))
+	}
 	artifacts, err := collectArtifacts(projectPath, genDir, commitSchemas, before, staged)
 	if err != nil {
 		return nil, fmt.Errorf("collect artifacts: %w", err)
@@ -312,6 +328,13 @@ func isAPIProtoSchemaPath(rel string) bool {
 	return rel == apiProtoSchemaRelPath
 }
 
+// isGRPCServicesSchemaPath reports whether rel points at the gRPC service
+// inventory, which only the app's describe binary produces.
+func isGRPCServicesSchemaPath(rel string) bool {
+	rel = strings.TrimPrefix(strings.ReplaceAll(rel, "\\", "/"), "./")
+	return rel == grpcServicesSchemaRelPath
+}
+
 // isFeatureEvidencePath reports whether rel is a feature-evidence artifact
 // (schema/feature-evidence/*.json). Like capabilities.json, these have a
 // single producer — the app's describe binary (go/framework/app
@@ -323,7 +346,7 @@ func isFeatureEvidencePath(rel string) bool {
 	return strings.HasPrefix(rel, "schema/feature-evidence/") && strings.HasSuffix(rel, ".json")
 }
 
-var capabilityDiagnosticPattern = regexp.MustCompile(`\[((?:capabilities\.(?:parse_error|unknown_field|invalid_protocol_version|missing_project|invalid_name|missing_provenance|invalid_source_kind|invalid_schema_kind|invalid_discoverer_kind|invalid_infra_kind|invalid_probe|invalid_phase|invalid_capability_kind|missing_requires|missing_required_provider|duplicate_provider|conflicting_provider))|(?:http_routes\.[a-z_]+))\]\s+([^:\r\n]+):\s*([^\r\n]+)`)
+var capabilityDiagnosticPattern = regexp.MustCompile(`\[((?:capabilities\.(?:parse_error|unknown_field|invalid_protocol_version|missing_project|invalid_name|missing_provenance|invalid_source_kind|invalid_schema_kind|invalid_discoverer_kind|invalid_infra_kind|invalid_probe|invalid_phase|invalid_capability_kind|missing_requires|missing_required_provider|duplicate_provider|conflicting_provider))|(?:http_routes\.[a-z_]+)|(?:grpc_services\.[a-z_]+))\]\s+([^:\r\n]+):\s*([^\r\n]+)`)
 
 // emitCapabilityDiagnostics promotes the protocol validator's stable frames
 // from the described application's output into runtime diagnostic events. The
@@ -995,9 +1018,12 @@ func (s schemaSnapshot) content(path string) ([]byte, bool) {
 // removed producer) are ignored, so describe never resurrects them into the
 // tracked tree.
 //
-// The committed feature evidence is the one tracked file it removes: when this
-// run did not commit it, the copy an earlier run left goes
-// (removeUncommittedFeatureEvidence).
+// The committed feature evidence and the gRPC service inventory are the only
+// tracked files it removes: when this run did not commit one, the copy an
+// earlier run left goes (removeUncommittedDescribeOutputs).
+//
+// It does not validate the gRPC service inventory: runDescribe refuses an
+// invalid one with preflightGRPCInventory before calling it.
 func collectArtifacts(projectPath, genDir string, commit bool, before schemaSnapshot, staged map[string]bool) ([]string, error) {
 	var artifacts []string
 
@@ -1048,10 +1074,11 @@ func collectArtifacts(projectPath, genDir string, commit bool, before schemaSnap
 						return err
 					}
 				case isCapabilitiesSchemaPath(relSlash), isHTTPRoutesSchemaPath(relSlash),
-					isFeatureEvidencePath(relSlash), isAPIProtoSchemaPath(relSlash):
-					// capabilities.json, http-routes.json, api.proto and the
-					// feature-evidence artifacts have a single producer — the app's
-					// describe binary.
+					isGRPCServicesSchemaPath(relSlash), isFeatureEvidencePath(relSlash),
+					isAPIProtoSchemaPath(relSlash):
+					// capabilities.json, http-routes.json, grpc-services.json,
+					// api.proto and the feature-evidence artifacts have a single
+					// producer — the app's describe binary.
 					// A differing prior copy is describe's OWN stale output from an
 					// earlier incremental build or a build-generate cache restore,
 					// not a competing producer, so take the fresh describe output as
@@ -1102,7 +1129,7 @@ func collectArtifacts(projectPath, genDir string, commit bool, before schemaSnap
 	if err != nil {
 		return nil, err
 	}
-	if err := removeUncommittedFeatureEvidence(projectPath, artifacts); err != nil {
+	if err := removeUncommittedDescribeOutputs(projectPath, artifacts); err != nil {
 		return nil, err
 	}
 	return artifacts, nil
@@ -1113,26 +1140,116 @@ func collectArtifacts(projectPath, genDir string, commit bool, before schemaSnap
 // declares.
 const committedFeatureEvidenceRelPath = "schema/feature-evidence/go-framework.json"
 
-// removeUncommittedFeatureEvidence removes the committed feature evidence when
-// artifacts, the paths this run committed, do not name it: the app produced no
-// feature evidence, or the project does not commit its schemas. The evidence
-// names the source binding of the tree that produced it, and build-describe
-// declares the file as an output, so the scheduler stores what the path holds
-// after the run. Removing a copy an earlier run left makes the entry record the
-// file absent: a hit, on this machine or another, never restores evidence the
-// run that stored the entry did not write. Evidence files of other frameworks
-// in the same directory stay.
-func removeUncommittedFeatureEvidence(projectPath string, artifacts []string) error {
+// grpcServicesSchemaRelPath is the committed gRPC service inventory, relative
+// to the project (mirrors go.putnami.dev/grpc.GRPCServicesDescribePath without
+// making the extension depend on the framework module). Only the app's
+// describe binary writes it, and only when the app composes a gRPC surface.
+// Its absence leaves service facts unavailable; an emitted empty services
+// list is positive evidence that the configured surfaces have no services.
+const grpcServicesSchemaRelPath = "schema/grpc-services.json"
+
+// describeOnlyCommittedRelPaths are the committed files whose one writer is
+// the app's describe binary. A successful run that does not commit one of them
+// removes it (removeUncommittedDescribeOutputs).
+var describeOnlyCommittedRelPaths = []string{
+	committedFeatureEvidenceRelPath,
+	grpcServicesSchemaRelPath,
+}
+
+// removeUncommittedDescribeOutputs removes each describe-only committed file
+// that artifacts, the paths this run committed, do not name: the app produced
+// no such file, or the project does not commit its schemas. It runs only after
+// a successful describe, so a failed one leaves the tracked tree as it was.
+//
+// The feature evidence names the source binding of the tree that produced it,
+// and build-describe declares the file as an output, so the scheduler stores
+// what the path holds after the run. Removing a copy an earlier run left makes
+// the entry record the file absent: a hit, on this machine or another, never
+// restores evidence the run that stored the entry did not write. Evidence files
+// of other frameworks in the same directory stay.
+//
+// The gRPC service inventory is read at the exact commit. An absent file leaves
+// the facts unavailable, while a copy an earlier run left would list services
+// the current app does not declare.
+func removeUncommittedDescribeOutputs(projectPath string, artifacts []string) error {
+	committed := make(map[string]bool, len(artifacts))
 	for _, artifact := range artifacts {
-		if filepath.ToSlash(artifact) == committedFeatureEvidenceRelPath {
-			return nil
+		committed[filepath.ToSlash(artifact)] = true
+	}
+	for _, rel := range describeOnlyCommittedRelPaths {
+		if committed[rel] {
+			continue
+		}
+		err := os.Remove(filepath.Join(projectPath, filepath.FromSlash(rel)))
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("remove committed %s this run did not write: %w", rel, err)
 		}
 	}
-	err := os.Remove(filepath.Join(projectPath, filepath.FromSlash(committedFeatureEvidenceRelPath)))
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("remove committed feature evidence this run did not write: %w", err)
-	}
 	return nil
+}
+
+// grpcInventoryNotCanonicalCode is this extension's diagnostic code for a gRPC
+// service inventory that putnami.grpc-services.v1 accepts but whose bytes are
+// not the protocol's canonical form. The protocol's closed taxonomy names
+// invalid documents only, so the code lives in the extension's namespace.
+const grpcInventoryNotCanonicalCode = "go.describe.grpc_inventory_not_canonical"
+
+// preflightGRPCInventory checks the gRPC service inventory this run would
+// promote, before collectArtifacts writes or removes any file. It returns the
+// error diagnostics that refuse the inventory, and an error when the file
+// cannot be stat'ed or read.
+//
+// The inventory is current when the describe binary wrote or rewrote it
+// (before.changedSince) or build-generate staged it (staged). An absent file
+// leaves service facts unavailable and is not checked; neither is an
+// untouched, unstaged leftover, which collectArtifacts does not promote. A
+// current file must parse, validate and match its digest under the protocol
+// module (grpcservices.ParseAndValidateManifest), and its bytes must equal the
+// protocol's canonical form (grpcservices.CanonicalJSON): describe promotes
+// producer bytes verbatim, so it refuses a valid non-canonical document
+// instead of rewriting it. The committed copy is never read.
+func preflightGRPCInventory(genDir string, before schemaSnapshot, staged map[string]bool) ([]diag.Diagnostic, error) {
+	path := filepath.Join(genDir, filepath.FromSlash(grpcServicesSchemaRelPath))
+	if _, err := os.Stat(path); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if !before.changedSince(path) && !staged[grpcServicesSchemaRelPath] {
+		return nil, nil
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	manifest, diagnostics := grpcservices.ParseAndValidateManifest(body)
+	if diag.HasErrors(diagnostics) {
+		return diag.Errors(diagnostics), nil
+	}
+	canonical, diagnostics := grpcservices.CanonicalJSON(manifest)
+	if diag.HasErrors(diagnostics) {
+		return diag.Errors(diagnostics), nil
+	}
+	if !bytes.Equal(body, canonical) {
+		return []diag.Diagnostic{diag.Errorf(grpcInventoryNotCanonicalCode, "",
+			"the inventory is valid %s but its bytes are not the protocol's canonical form; describe commits the producer's bytes verbatim and does not rewrite them",
+			grpcservices.Protocol)}, nil
+	}
+	return nil, nil
+}
+
+// emitGRPCInventoryDiagnostics reports each diagnostic that refused the gRPC
+// service inventory as a coded diagnostic on file, the inventory's .gen path,
+// with its field context in the message.
+func emitGRPCInventoryDiagnostics(emit *jsonl.Emitter, file string, diagnostics []diag.Diagnostic) {
+	for _, d := range diagnostics {
+		message := d.Message
+		if d.Field != "" {
+			message = d.Field + ": " + message
+		}
+		emit.DiagnosticWithCode("error", message, file, 0, 0, d.Code)
+	}
 }
 
 // stagedSchemaArtifacts reads .gen/generate-result.json and returns the set of

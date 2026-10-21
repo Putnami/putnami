@@ -33,7 +33,7 @@ import {
 } from '@putnami/utils/hooks';
 import { activateBuildTimeConfig } from './_activate-config';
 import { type EntryPointFailure, findApplication, formatEntryPointFailures } from './_find-application';
-import { writeHttpRoutesFragment } from '../src/http-routes/generation';
+import { completeHttpRoutesEvaluation, writeHttpRoutesFragment } from '../src/http-routes/generation';
 
 const generateModel = standardHookModel.extend({
   name: 'generate',
@@ -234,7 +234,9 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
       emitLog('info', `Generated ${totalExports} exports, ${totalAssets} assets`);
     }
 
-    return { exports, assets };
+    // The Application was evaluated and its route fragment written, so this run
+    // certifies its route contribution. The hook runner adds no default.
+    return { exports, assets, data: { httpRoutes: completeHttpRoutesEvaluation() } };
   }
 
   // An entry point that exists but cannot be LOADED is not "this project has no
@@ -243,13 +245,10 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
   // and the extension fails much later with "generated server loaders require
   // schema/capabilities.json" and no cause.
   //
-  // Only `import-error` is fatal. The other two misses are legitimate and stay
-  // exactly as they were: a module that loads and exposes no Application is a
-  // plain library, and a factory that throws is entitled to demand deploy-time
-  // configuration at build time (typescript/samples/07-authentication requires
-  // OAUTH_CLIENT_ID inside `app()`). Widening this filter breaks builds that are
-  // green today, which is why the classification lives in findApplication rather
-  // than being re-derived from the error text here.
+  // `import-error` and `factory-error` are fatal; only `no-application` is a
+  // legitimate miss: a module that loads and exposes no Application is a plain
+  // library and serves no route. The classification lives in findApplication
+  // rather than being re-derived from the error text here.
   const unloadable = discoveryFailures.filter((failure) => failure.kind === 'import-error');
   if (unloadable.length > 0) {
     throw new Error(
@@ -258,6 +257,19 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
         'Fix the entry point (package.json "main", src/main.ts, src/app.ts, or src/index.ts). ' +
         'An import of a generated module that does not exist yet means the extension that generates it must run first — ' +
         'see hooks.<kind>.order in putnami.extension.json.',
+    );
+  }
+
+  // A factory that throws leaves the Application unevaluated: its routes,
+  // capabilities and infra requirements are unknown, and a successful run would
+  // report them as absent. The run fails before it writes any fragment.
+  const unevaluated = discoveryFailures.filter((failure) => failure.kind === 'factory-error');
+  if (unevaluated.length > 0) {
+    throw new Error(
+      'generate: the Application factory threw, so its routes and capabilities are unknown:\n' +
+        `${formatEntryPointFailures(unevaluated)}\n` +
+        'Make the factory evaluable without deploy-time values: read a secret or other deploy-time setting through ' +
+        'the runtime config and require it when the Application starts, not when the factory runs.',
     );
   }
 
@@ -274,9 +286,13 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
 
   emitProgress('Generation complete', 100, 'done');
 
+  // A library serves no route, so this run writes no route fragment. Its route
+  // contribution is still evaluated: a module that loads and exposes no
+  // Application contributes none, which is complete.
   return {
     exports: {},
     assets: packageAssets,
+    data: { httpRoutes: completeHttpRoutesEvaluation() },
   };
 }
 
