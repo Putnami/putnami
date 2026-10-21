@@ -1,12 +1,11 @@
 import {
   type Application,
+  type ClientProtobufDescriptor,
   application,
   decodeProto,
   encodeProto,
-  type ProtoDocument,
-  type ProtoFieldMeta,
 } from '@putnami/application';
-import { CredentialRegistryClosedError } from '@putnami/client';
+import { CredentialRegistryClosedError, protoMetaFromDescriptor } from '@putnami/client';
 import { generateTypeScriptClient, readOpenApiSource } from '@putnami/client/generator';
 import { resetConfigLoader } from '@putnami/runtime';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
@@ -97,11 +96,9 @@ describe('service-to-service sample', () => {
 
   it('should carry nested list items over the provider protobuf wire', async () => {
     const contract = JSON.parse(readFileSync(join(import.meta.dir, '..', 'schema', 'openapi.json'), 'utf8')) as {
-      'x-putnami-client': { protobuf: ProtoDocument };
+      'x-putnami-client': { protobuf: ClientProtobufDescriptor };
     };
-    const messages: Record<string, ProtoFieldMeta[]> = Object.fromEntries(
-      contract['x-putnami-client'].protobuf.messages.map((message) => [message.name, message.fields]),
-    );
+    const messages = protoMetaFromDescriptor(contract['x-putnami-client'].protobuf).messageMeta;
     const requestFields = messages['ListItemsRequest'];
     const responseFields = messages['ListItemsResponse'];
     expect(requestFields).toBeDefined();
