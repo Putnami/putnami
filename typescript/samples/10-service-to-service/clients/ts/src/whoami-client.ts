@@ -193,10 +193,34 @@ const SERVICE_DESCRIPTOR = {
           fields: [{ name: 'query', jsonName: 'query', number: 1, typeKind: 'message', type: 'ListItemsRequestQuery' }],
         },
         {
+          name: 'ListItemsResponseItems',
+          fields: [
+            { name: 'id', jsonName: 'id', number: 1, typeKind: 'scalar', type: 'string' },
+            { name: 'name', jsonName: 'name', number: 2, typeKind: 'scalar', type: 'string' },
+            { name: 'price', jsonName: 'price', number: 3, typeKind: 'scalar', type: 'double' },
+            { name: 'stock', jsonName: 'stock', number: 4, typeKind: 'scalar', type: 'double' },
+            {
+              name: 'discontinued_at',
+              jsonName: 'discontinuedAt',
+              number: 5,
+              typeKind: 'scalar',
+              type: 'string',
+              optional: true,
+            },
+          ],
+        },
+        {
           name: 'ListItemsResponse',
           fields: [
             { name: 'tenant', jsonName: 'tenant', number: 1, typeKind: 'scalar', type: 'string' },
-            { name: 'items', jsonName: 'items', number: 2, typeKind: 'scalar', type: 'string', repeated: true },
+            {
+              name: 'items',
+              jsonName: 'items',
+              number: 2,
+              typeKind: 'message',
+              type: 'ListItemsResponseItems',
+              repeated: true,
+            },
           ],
         },
         {
@@ -420,11 +444,35 @@ const SERVICE_DESCRIPTOR = {
         },
         { name: 'ListProxyRequest', fields: [] },
         {
+          name: 'ListProxyResponseItems',
+          fields: [
+            { name: 'id', jsonName: 'id', number: 1, typeKind: 'scalar', type: 'string' },
+            { name: 'name', jsonName: 'name', number: 2, typeKind: 'scalar', type: 'string' },
+            { name: 'price', jsonName: 'price', number: 3, typeKind: 'scalar', type: 'double' },
+            { name: 'stock', jsonName: 'stock', number: 4, typeKind: 'scalar', type: 'double' },
+            {
+              name: 'discontinued_at',
+              jsonName: 'discontinuedAt',
+              number: 5,
+              typeKind: 'scalar',
+              type: 'string',
+              optional: true,
+            },
+          ],
+        },
+        {
           name: 'ListProxyResponse',
           fields: [
             { name: 'message', jsonName: 'message', number: 1, typeKind: 'scalar', type: 'string' },
             { name: 'tenant', jsonName: 'tenant', number: 2, typeKind: 'scalar', type: 'string' },
-            { name: 'items', jsonName: 'items', number: 3, typeKind: 'scalar', type: 'string', repeated: true },
+            {
+              name: 'items',
+              jsonName: 'items',
+              number: 3,
+              typeKind: 'message',
+              type: 'ListProxyResponseItems',
+              repeated: true,
+            },
           ],
         },
         {

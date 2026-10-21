@@ -16,7 +16,7 @@
       }
     ]
   },
-  "contractSha256": "df3d42b40e3118a22c87b6fbcf1232ef39450c3a82431dfe9efb47681e4f85ac",
+  "contractSha256": "6e60bd86163ec59dde082730bcf8b126d692e88053787078b87dc4be09f2d2ed",
   "operations": [
     {
       "operationId": "getBlobs_id",
@@ -289,7 +289,7 @@
   "files": [
     {
       "path": "client.gen.go",
-      "sha256": "c28c31e8a70f0fba043494d2bccb24f688dc208c330c2ebc374ec198d82a8158"
+      "sha256": "62d47c3d677428ae03948f3430a051996ca443e00ed092087ab83300a8ce7807"
     }
   ]
 }

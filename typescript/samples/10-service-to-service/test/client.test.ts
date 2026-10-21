@@ -1,4 +1,11 @@
-import { type Application, application } from '@putnami/application';
+import {
+  type Application,
+  application,
+  decodeProto,
+  encodeProto,
+  type ProtoDocument,
+  type ProtoFieldMeta,
+} from '@putnami/application';
 import { CredentialRegistryClosedError } from '@putnami/client';
 import { generateTypeScriptClient, readOpenApiSource } from '@putnami/client/generator';
 import { resetConfigLoader } from '@putnami/runtime';
@@ -86,6 +93,42 @@ describe('service-to-service sample', () => {
       'item-2',
       'item-3',
     ]);
+  });
+
+  it('should carry nested list items over the provider protobuf wire', async () => {
+    const contract = JSON.parse(readFileSync(join(import.meta.dir, '..', 'schema', 'openapi.json'), 'utf8')) as {
+      'x-putnami-client': { protobuf: ProtoDocument };
+    };
+    const messages: Record<string, ProtoFieldMeta[]> = Object.fromEntries(
+      contract['x-putnami-client'].protobuf.messages.map((message) => [message.name, message.fields]),
+    );
+    const requestFields = messages['ListItemsRequest'];
+    const responseFields = messages['ListItemsResponse'];
+    expect(requestFields).toBeDefined();
+    expect(responseFields).toBeDefined();
+    const request = encodeProto({ query: { search: '', limit: 10 } }, requestFields, messages);
+    const response = await fetch(`${baseUrl}/catalog.items.v1.ItemsService/ListItems`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/proto',
+        accept: 'application/proto',
+        'x-catalog-tenant': 'tenant-proto',
+        [CATALOG_KEY_HEADER]: CATALOG_API_KEY,
+      },
+      body: request,
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('application/proto');
+
+    const result = decodeProto(new Uint8Array(await response.arrayBuffer()), responseFields, messages);
+    expect(result).toEqual({
+      tenant: 'tenant-proto',
+      items: [
+        { id: 'item-1', name: 'Widget', price: 9.99, stock: 100 },
+        { id: 'item-2', name: 'Gadget', price: 24.99, stock: 50, discontinuedAt: '2026-01-31' },
+        { id: 'item-3', name: 'Doohickey', price: 4.99, stock: 200 },
+      ],
+    });
   });
 
   it('should carry the declared query string and request header', async () => {

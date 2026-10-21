@@ -41,7 +41,7 @@
       }
     ]
   },
-  "contractSha256": "df3d42b40e3118a22c87b6fbcf1232ef39450c3a82431dfe9efb47681e4f85ac",
+  "contractSha256": "6e60bd86163ec59dde082730bcf8b126d692e88053787078b87dc4be09f2d2ed",
   "operations": [
     {
       "operationId": "getBlobs_id",
@@ -318,7 +318,7 @@
     },
     {
       "path": "src/blobs-client.ts",
-      "sha256": "93130fd6fce1a481f11e5069e3056e3be832ba7a8ddd384c44ae697c7de29cf0"
+      "sha256": "2a5c0c2dc3ad0e403c6a92912086fa7941bade8b75843e109ed707a3bd7b31f6"
     },
     {
       "path": "src/index.ts",
@@ -326,19 +326,19 @@
     },
     {
       "path": "src/items-client.ts",
-      "sha256": "71ed27bcdeebdec1657f6c758c09168c283edf95539e5bdfc0a5d7bca7354f26"
+      "sha256": "55056e9eb4b127d3ec309537c65143613f077e1e2e8257a0ce28bca1d5a5c361"
     },
     {
       "path": "src/proxy-client.ts",
-      "sha256": "edf007e7b57f45df45d76d736ecd4be8e3ca45de0b779e1d6c3466f9d8224931"
+      "sha256": "3bea4d0158bd7cb90491b66d7b6e909de71c4224649c2c6f48a4d2fffc29a32f"
     },
     {
       "path": "src/quotes-client.ts",
-      "sha256": "789aae1115865e88f6430a5c6d72f39d9cd7434e24f7d8e94ecf4780d3e72c99"
+      "sha256": "3809d7fba63ef82eed528bd4845b67fd591199cdc56bd49becc24bc3d46dd219"
     },
     {
       "path": "src/tenant-check-client.ts",
-      "sha256": "0ff334f570a5b09d5b0a80c0fe73dce384d4416a7a1dcee3fc508456970f4765"
+      "sha256": "e454b93fa3621cea502194f17c606333bf335690abe9fab1c8fc08812e61d22d"
     },
     {
       "path": "src/types.ts",
@@ -346,7 +346,7 @@
     },
     {
       "path": "src/whoami-client.ts",
-      "sha256": "d195320772adcd0389495513c241626e5ff873f483afa5b85250cefb417ba348"
+      "sha256": "c21a6e1db5a1e247cb57c3a4fe4370219d39ff352c2290bdbd32df2f18938962"
     },
     {
       "path": "tsconfig.json",
