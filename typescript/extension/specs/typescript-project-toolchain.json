@@ -73,7 +73,7 @@
     },
     {
       "id": "workspace-biome-default",
-      "text": "Workspace dependency installation materializes the Biome rules owned by the resolved TypeScript extension with the workspace-root role when the workspace has no configuration, preserves an existing workspace configuration byte-for-byte, and fails explicitly when the extension default cannot be read or parsed."
+      "text": "Workspace dependency installation materializes the Biome rules owned by the resolved TypeScript extension with the workspace-root role when the workspace has no configuration, preserves an existing workspace configuration byte-for-byte, and fails explicitly when the extension default cannot be read or parsed. The Biome devDependency it adds to a workspace without one is the exact release those rules' schema names."
     },
     {
       "id": "workspace-bun-pin",
