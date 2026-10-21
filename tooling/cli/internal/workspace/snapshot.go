@@ -138,7 +138,9 @@ type SnapshotProvider struct {
 	Implementation string `json:"implementation,omitempty"`
 	// InstallInputs are the workspace-root file names the provider's adapter
 	// declares as install inputs (ProviderScope.InstallInputs), sorted. Empty
-	// when the adapter declares none. They enter no digest.
+	// when the adapter declares none. They enter no digest. A record whose
+	// install inputs or language differ from the declaration, including a
+	// record that predates both members, is re-probed once.
 	InstallInputs []string `json:"installInputs,omitempty"`
 	// Language is the language id the provider's adapter declares
 	// (ProviderScope.Language). Empty when the adapter declares none. It enters

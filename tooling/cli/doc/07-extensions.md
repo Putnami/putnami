@@ -746,6 +746,14 @@ CLI-side behavior an author should count on:
 - `syncTask` is where the extension performs its own manifest mutations
   (`putnami projects sync` fans out to it). Core writes no language manifest.
 
+The optional `installInputs` names the files at the workspace root whose content
+change makes the installed tree stale, such as `bun.lock`. Each entry is a
+literal file name, never a path or a glob. The optional `language` is the
+lowercase id of the language whose projects the adapter claims, such as `go`.
+Core records both per extension in `.putnami/workspace-index.json`. When the
+declaration changes, the next run that synchronizes the workspace asks that
+extension once more and records the new declaration.
+
 ### Extension-owned machine caches
 
 An extension that keeps a machine-global cache owns it end to end. Core hands it

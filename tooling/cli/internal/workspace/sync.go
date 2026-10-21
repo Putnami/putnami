@@ -575,6 +575,14 @@ func planProbe(root string, existing *Snapshot, bindings []ProviderBinding, full
 			plan.stale[binding.Scope.Extension] = true
 			plan.reason = fmt.Sprintf("provider %s implementation changed", binding.Scope.Extension)
 		}
+		// A record also carries what the adapter declares. The implementation
+		// identity does not cover the manifest's workspace block, and an index
+		// written before these members existed records none, so the declaration
+		// is compared here; otherwise the record keeps an old declaration.
+		if declarationMoved(recorded, binding.Scope) {
+			plan.stale[binding.Scope.Extension] = true
+			plan.reason = fmt.Sprintf("provider %s install inputs or language changed", binding.Scope.Extension)
+		}
 	}
 
 	validity := existing.Validate(root)
@@ -674,6 +682,21 @@ func recordedProvider(snapshot *Snapshot, extension string) (SnapshotProvider, b
 // start on every command.
 func implementationMoved(recorded, bound string) bool {
 	return bound != "" && recorded != bound
+}
+
+// declarationMoved reports whether a recorded provider no longer records the
+// install inputs and the language its adapter declares now. The install inputs
+// compare as sets, and a record without them equals a declaration of none.
+func declarationMoved(recorded SnapshotProvider, scope ProviderScope) bool {
+	return recorded.Language != scope.Language ||
+		!slices.Equal(sortedNameSet(recorded.InstallInputs), sortedNameSet(scope.InstallInputs))
+}
+
+// sortedNameSet returns names sorted and without duplicates, as a new slice.
+func sortedNameSet(names []string) []string {
+	set := slices.Clone(names)
+	slices.Sort(set)
+	return slices.Compact(set)
 }
 
 func recordedResult(snapshot *Snapshot, extension string) (wsproto.ProbeResult, bool) {

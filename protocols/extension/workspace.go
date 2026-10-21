@@ -16,14 +16,16 @@
 //
 // Two invariants shape the declaration:
 //
-//   - PATHS, NOT MODULES. Every member here is a PATH pattern relative to a
-//     candidate directory. A probe contract must never assume that a project
-//     root is also a module root — that a Go project's directory contains the
-//     go.mod that declares it, that a package's directory is its npm workspace
-//     entry, that a Python project owns its pyproject.toml. Those coincide
-//     today in this repository and would stop coinciding the moment one module
-//     hosts several projects. Keying on paths keeps that a layout choice
-//     instead of a protocol break.
+//   - PATHS, NOT MODULES. Every pattern member here (markers, inputs,
+//     excludes) is a PATH pattern relative to a candidate directory. A probe
+//     contract must never assume that a project root is also a module root —
+//     that a Go project's directory contains the go.mod that declares it, that
+//     a package's directory is its npm workspace entry, that a Python project
+//     owns its pyproject.toml. Those coincide today in this repository and
+//     would stop coinciding the moment one module hosts several projects.
+//     Keying on paths keeps that a layout choice instead of a protocol break.
+//     InstallInputs is the one member relative to the WORKSPACE ROOT: it names
+//     literal files there, such as a lockfile, and no pattern.
 //
 //   - THE MARKERS ARE INPUTS. A marker's CONTENT is what the probe reads to
 //     answer "what project is this?", so a marker that is not also a metadata
@@ -104,7 +106,9 @@ type WorkspaceAdapter struct {
 	InstallInputs []string `json:"installInputs,omitempty"`
 	// Language is the lowercase id of the language whose projects this adapter
 	// claims ("go", "typescript", "python"). It matches
-	// WorkspaceLanguagePattern. Core records it in the workspace index.
+	// WorkspaceLanguagePattern. An empty value declares none, the same as an
+	// absent member, and the authoring schema accepts it for that reason. Core
+	// records it in the workspace index.
 	Language string `json:"language,omitempty"`
 }
 

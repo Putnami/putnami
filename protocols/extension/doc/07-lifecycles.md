@@ -233,20 +233,24 @@ own module, which the isolation above already forbids.
 | `excludes` | no | Directory patterns the scan must not descend into |
 | `syncTask` | no | A task in this manifest that performs the extension's own workspace mutations |
 | `installInputs` | no | Files whose content change makes the installed tree stale, such as a lockfile. Each is a literal file name at the **workspace root**, not a candidate-relative pattern: no `/`, no glob, each name once. Core records the set in `.putnami/workspace-index.json` |
-| `language` | no | The lowercase id of the language whose projects the adapter claims (`go`, `typescript`, `python`), matching `^[a-z][a-z0-9-]*$`. Core records it in `.putnami/workspace-index.json` |
+| `language` | no | The lowercase id of the language whose projects the adapter claims (`go`, `typescript`, `python`), matching `^[a-z][a-z0-9-]*$`. An empty value declares none. Core records it in `.putnami/workspace-index.json` |
 
 ### Paths, not modules
 
-Every member of the adapter is a **path pattern relative to a candidate
-directory**. Nothing in the contract can express "the module that owns this
-project", and that is deliberate: a probe contract must never assume a project
-root is also a module root — that a Go project's directory holds the `go.mod`
-that declares it, that a package directory is its own npm workspace entry, that
-a Python project owns its `pyproject.toml`.
+Every pattern member of the adapter (`markers`, `inputs`, `excludes`) is a
+**path pattern relative to a candidate directory**. Nothing in the contract can
+express "the module that owns this project", and that is deliberate: a probe
+contract must never assume a project root is also a module root — that a Go
+project's directory holds the `go.mod` that declares it, that a package
+directory is its own npm workspace entry, that a Python project owns its
+`pyproject.toml`.
 
 Those coincide in most repositories today and stop coinciding the moment one
 module hosts several projects. Keying on paths keeps that a layout choice
 instead of a protocol break.
+
+`installInputs` is the one member relative to the **workspace root**. It names
+literal files there, such as a lockfile, and never a pattern.
 
 ### The markers are inputs
 
