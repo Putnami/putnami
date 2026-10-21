@@ -261,11 +261,12 @@ The extension ships a comprehensive Biome config that covers TypeScript, JSON, C
 
 ### Custom Configuration
 
-To override the defaults, create a `biome.json` in your project root:
+To override the defaults, create a `biome.json` in your project root. It extends the workspace `biome.json`, the root configuration, so it declares `"root": false`: Biome refuses a second root configuration.
 
 ```json
 {
   "$schema": "https://biomejs.dev/schemas/2.5.3/schema.json",
+  "root": false,
   "extends": ["../../biome.json"],
   "linter": {
     "rules": {
