@@ -721,6 +721,51 @@ func TestEnsureWorkspaceDevDeps_InvalidManifestJSON(t *testing.T) {
 	}
 }
 
+// A fresh workspace gets exactly the Biome release the shipped rules' $schema
+// names.
+func TestEnsureWorkspaceDevDeps_AddsTheBiomeTheRulesTarget(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-biome-default", "the-added-biome-is-the-release-the-rules-target")
+	t.Parallel()
+	extensionRoot := extensionProjectRoot(t)
+	rules, err := os.ReadFile(filepath.Join(extensionRoot, "config", "biome.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config struct {
+		Schema string `json:"$schema"`
+	}
+	if err := json.Unmarshal(rules, &config); err != nil {
+		t.Fatal(err)
+	}
+	const schemaPrefix, schemaSuffix = "https://biomejs.dev/schemas/", "/schema.json"
+	if !strings.HasPrefix(config.Schema, schemaPrefix) || !strings.HasSuffix(config.Schema, schemaSuffix) {
+		t.Fatalf("shipped rules $schema = %q, want %s<release>%s", config.Schema, schemaPrefix, schemaSuffix)
+	}
+	target := strings.TrimSuffix(strings.TrimPrefix(config.Schema, schemaPrefix), schemaSuffix)
+	if !isPlainReleaseVersion(target) {
+		t.Fatalf("shipped rules target Biome %q, want a plain release", target)
+	}
+
+	wsDir := t.TempDir()
+	ctx := &pctx.Context{WorkspaceRoot: wsDir, Extension: pctx.Extension{Root: extensionRoot}}
+	if err := ensureWorkspaceDevDeps(ctx, jsonl.New()); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(wsDir, "package.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pkg struct {
+		DevDependencies map[string]string `json:"devDependencies"`
+	}
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		t.Fatal(err)
+	}
+	if got := pkg.DevDependencies["@biomejs/biome"]; got != target {
+		t.Fatalf("added @biomejs/biome = %q, want %q, the release the shipped rules target", got, target)
+	}
+}
+
 // ---- ensureWorkspaceTsConfig ----
 
 func TestEnsureWorkspaceTsConfig_CreatesWithExtends(t *testing.T) {
