@@ -24,7 +24,8 @@ type WorkspaceJobOutcome int
 const (
 	// WorkspaceJobOK: the job ran and every scheduled task succeeded.
 	WorkspaceJobOK WorkspaceJobOutcome = iota
-	// WorkspaceJobMissing: no discovered extension provides the job at all.
+	// WorkspaceJobMissing: no discovered extension provides the job at all, and
+	// every extension the workspace needs loaded.
 	WorkspaceJobMissing
 	// WorkspaceJobNoMatches: the job exists but matched no project, so nothing
 	// ran. It is a legitimate no-op, not a failure.
@@ -225,9 +226,11 @@ func (e LifecycleEnv) fetchBeforeRepositoryCode(ctx context.Context, wsRoot stri
 // completion (LifecycleEnv.fetchBeforeRepositoryCode): the fetch downloads the
 // dependencies, and the installers then run offline.
 //
-// A workspace where no loaded extension provides "workspace-install" has
-// nothing to install: DepsInstall succeeds. It prints one line saying so,
-// unless ctx marks an implicit install (shared.WithImplicitInstall).
+// A workspace where no extension provides "workspace-install", and every
+// extension it needs loaded, has nothing to install: DepsInstall succeeds and
+// prints one line saying so, unless ctx marks an implicit install
+// (shared.WithImplicitInstall). When an extension did not load, the runner
+// fails the run instead, since that extension may have been the provider.
 func DepsInstall(ctx context.Context, wsRoot string, cfg *wsproto.Config, filterTag, excludeTag string, env LifecycleEnv) error {
 	if err := env.fetchBeforeRepositoryCode(ctx, wsRoot, cfg, filterTag, excludeTag); err != nil {
 		return err
@@ -424,8 +427,10 @@ func runWorkspaceJob(ctx context.Context, env LifecycleEnv, req WorkspaceJobRequ
 	// EnsureArtifacts, so on a fresh zero-init worktree the lock-pinned
 	// workspace-install/deps-upgrade providers would not yet be materialized and
 	// the run's extension discovery would find none. Materialize them FIRST; it
-	// is deduped per-process and a no-op on the warm path, and stays best-effort
-	// (WorkspaceJobMissing remains the authoritative "no provider" signal).
+	// is deduped per-process and a no-op on the warm path, and stays best-effort:
+	// an extension it could not download does not load, and the runner then
+	// fails the run naming it, rather than report WorkspaceJobMissing, which
+	// means that no declared extension provides the job.
 	_ = EnsureArtifacts(ctx, req.WorkspaceRoot, req.Config)
 
 	if env.RunJob == nil {

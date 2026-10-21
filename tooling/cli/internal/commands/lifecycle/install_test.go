@@ -415,7 +415,8 @@ func TestInstall_ExplicitWithoutProviderPrintsOneLine(t *testing.T) {
 }
 
 // The first-use install before a job command prints nothing when no extension
-// provides workspace-install, and the command that follows runs.
+// provides workspace-install. It still runs the install and records the
+// workspace as installed, so a later command does not run it again.
 func TestInstall_ImplicitWithoutProviderPrintsNothing(t *testing.T) {
 	spectest.Proves(t, noInstallProviderFeature, "no-install-provider-nothing-to-install", "an-implicit-install-prints-nothing-when-no-extension-provides-workspace-install")
 	resetBootstrapEnv(t)
@@ -424,13 +425,19 @@ func TestInstall_ImplicitWithoutProviderPrintsNothing(t *testing.T) {
 	sharedtest.WriteJSONConfig(t, filepath.Join(dir, wsproto.WorkspaceConfigFilename), map[string]any{
 		"name": "install-ws", "extensions": []string{},
 	})
-	// No install marker yet: the workspace is stale.
+	if st, err := readInstallState(dir); err != nil || st != nil {
+		t.Fatalf("install marker before the bootstrap = %v, %v, want none", st, err)
+	}
 
+	var installs int
 	var err error
 	stdout, stderr := captureProcessOutput(t, func() {
 		err = EnsureWorkspaceBootstrap(context.Background(), dir, wsproto.Load(dir), BootstrapOptions{
 			Command: "build",
-			RunJob: func(context.Context, WorkspaceJobRequest) (WorkspaceJobResult, error) {
+			RunJob: func(_ context.Context, req WorkspaceJobRequest) (WorkspaceJobResult, error) {
+				if req.Job == "workspace-install" {
+					installs++
+				}
 				return WorkspaceJobResult{Outcome: WorkspaceJobMissing}, nil
 			},
 		})
@@ -440,5 +447,47 @@ func TestInstall_ImplicitWithoutProviderPrintsNothing(t *testing.T) {
 	}
 	if stdout != "" || stderr != "" {
 		t.Errorf("the implicit install printed stdout %q, stderr %q, want nothing", stdout, stderr)
+	}
+	if installs != 1 {
+		t.Errorf("the bootstrap asked for workspace-install %d times, want 1", installs)
+	}
+	if st, err := readInstallState(dir); err != nil || st == nil {
+		t.Errorf("install marker after the bootstrap = %v, %v, want it recorded", st, err)
+	}
+}
+
+// When the runner reports that an extension did not load, the explicit install
+// fails with that error, and the implicit install records no marker, so the
+// next command runs the install again instead of trusting a workspace whose
+// installer never ran.
+func TestInstall_AFailedInstallRecordsNoInstallMarker(t *testing.T) {
+	spectest.Proves(t, noInstallProviderFeature, "no-install-provider-nothing-to-install", "a-failed-install-records-no-install-marker")
+	resetBootstrapEnv(t)
+	hometest.Temp(t)
+	dir := t.TempDir()
+	sharedtest.WriteJSONConfig(t, filepath.Join(dir, wsproto.WorkspaceConfigFilename), map[string]any{
+		"name": "install-ws", "extensions": []string{},
+	})
+	notLoaded := errors.New("no loaded extension provides workspace-install; extension @acme/broken did not load: requires a newer putnami")
+	runJob := func(context.Context, WorkspaceJobRequest) (WorkspaceJobResult, error) {
+		return WorkspaceJobResult{Outcome: WorkspaceJobFailed}, notLoaded
+	}
+
+	var explicitErr, implicitErr error
+	var buf strings.Builder
+	captureProcessOutput(t, func() {
+		env := installTestEnv(&buf, WorkspaceJobFailed)
+		env.RunJob = runJob
+		explicitErr = Install(context.Background(), dir, wsproto.Load(dir), nil, env)
+		implicitErr = EnsureWorkspaceBootstrap(context.Background(), dir, wsproto.Load(dir), BootstrapOptions{Command: "build", RunJob: runJob})
+	})
+	if !errors.Is(explicitErr, notLoaded) {
+		t.Errorf("Install = %v, want the error that names the extension", explicitErr)
+	}
+	if implicitErr != nil {
+		t.Errorf("EnsureWorkspaceBootstrap = %v, want the command to go on", implicitErr)
+	}
+	if st, err := readInstallState(dir); err != nil || st != nil {
+		t.Errorf("install marker after failed installs = %v, %v, want none", st, err)
 	}
 }

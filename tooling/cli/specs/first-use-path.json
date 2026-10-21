@@ -35,7 +35,7 @@
     },
     {
       "id": "no-install-provider-nothing-to-install",
-      "text": "In a workspace where no loaded extension provides the workspace-install job, there is nothing to install and every install path succeeds. The implicit install before a job command prints nothing about it. An explicit command (install, upgrade, projects sync, init) prints one line saying no extension provides workspace-install, so there is nothing to install."
+      "text": "In a workspace where no extension that the workspace declares provides the workspace-install job, there is nothing to install: install and deps install succeed and print one line saying so, and the implicit install before a job command succeeds and prints nothing. A declared extension that does not load is not that case: the install fails and names the extension with its reason, and a failed install, implicit or explicit, records no install marker."
     }
   ],
   "decisions": [

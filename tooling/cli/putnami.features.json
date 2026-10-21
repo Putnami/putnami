@@ -3723,7 +3723,9 @@
             "kind": "acceptance",
             "checks": [
               "an-implicit-install-prints-nothing-when-no-extension-provides-workspace-install",
-              "an-explicit-command-prints-one-line-when-no-extension-provides-workspace-install"
+              "an-explicit-command-prints-one-line-when-no-extension-provides-workspace-install",
+              "a-declared-extension-that-does-not-load-fails-the-install",
+              "a-failed-install-records-no-install-marker"
             ]
           }
         }

@@ -2,9 +2,11 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"sort"
+	"strings"
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -165,7 +167,11 @@ func RunWorkspaceJob(ctx context.Context, req lifecycle.WorkspaceJobRequest) (li
 		if result.ExitCode != engine.ExitSuccess {
 			return lifecycle.WorkspaceJobResult{Outcome: lifecycle.WorkspaceJobFailed}, nil
 		}
-		if !workspaceJobProvided(req.WorkspaceRoot, req.Config, req.Job) {
+		provided, err := workspaceJobProvided(req.WorkspaceRoot, req.Config, req.Job)
+		if err != nil {
+			return lifecycle.WorkspaceJobResult{Outcome: lifecycle.WorkspaceJobFailed}, err
+		}
+		if !provided {
 			return lifecycle.WorkspaceJobResult{Outcome: lifecycle.WorkspaceJobMissing}, nil
 		}
 		return lifecycle.WorkspaceJobResult{Outcome: lifecycle.WorkspaceJobNoMatches}, nil
@@ -260,18 +266,77 @@ func reportWorkspaceJobActions(req lifecycle.WorkspaceJobRequest, plan []*schedu
 // It re-discovers because the engine owns the run's discovery and does not hand
 // the extension set back. That second pass only ever runs when the run planned
 // NOTHING — an error or no-op path — so a healthy install still discovers once.
-func workspaceJobProvided(wsRoot string, cfg *wsproto.Config, jobName string) bool {
+//
+// It returns an error, never "not provided", when the workspace or its
+// extensions cannot be read, or when no loaded extension provides jobName and a
+// declared extension or a locked dependency did not load: the provider may be
+// the one that is missing, so "nothing to install" would hide a broken install.
+func workspaceJobProvided(wsRoot string, cfg *wsproto.Config, jobName string) (bool, error) {
 	ws, err := workspace.Load(wsRoot)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("load workspace to find the %s provider: %w", jobName, err)
 	}
 	projectPaths := make([]string, len(ws.Projects))
 	for i, p := range ws.Projects {
 		projectPaths[i] = p.Path
 	}
-	extensions, err := extension.DiscoverExtensions(wsRoot, cfg, projectPaths)
+	discovered, err := extension.DiscoverExtensionsDetailed(wsRoot, cfg, projectPaths)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("discover extensions to find the %s provider: %w", jobName, err)
 	}
-	return len(extension.BuildJobMap(extensions)[jobName]) > 0
+	if len(extension.BuildJobMap(discovered.Extensions)[jobName]) > 0 {
+		return true, nil
+	}
+	if unloaded := unloadedExtensions(cfg, discovered); len(unloaded) > 0 {
+		return false, fmt.Errorf("no loaded extension provides %s; %s", jobName, strings.Join(unloaded, "; "))
+	}
+	return false, nil
+}
+
+// unloadedExtensions names each extension the workspace needs that discovery
+// did not load, with the reason: every skipped manifest, every declared
+// registry extension that is not installed, and every locked dependency that
+// did not load. An extension the workspace disables is not needed.
+func unloadedExtensions(cfg *wsproto.Config, discovered *extension.DiscoveryResult) []string {
+	disabled := make(map[string]bool)
+	if cfg != nil && cfg.Disable != nil {
+		for _, name := range cfg.Disable.Extensions {
+			disabled[name] = true
+		}
+	}
+	loaded := make(map[string]bool, len(discovered.Extensions))
+	for _, ext := range discovered.Extensions {
+		loaded[ext.Name] = true
+	}
+	named := make(map[string]bool)
+	var lines []string
+	for _, skip := range discovered.Skipped {
+		name := skip.Name
+		if name == "" {
+			name = skip.Ref
+		}
+		if disabled[name] || disabled[skip.Ref] {
+			continue
+		}
+		named[name], named[skip.Ref] = true, true
+		lines = append(lines, fmt.Sprintf("extension %s did not load: %v", name, skip.Reason))
+	}
+	var missing []string
+	if cfg != nil {
+		for _, name := range cfg.Extensions.Names() {
+			if strings.HasPrefix(name, "@") {
+				missing = append(missing, name)
+			}
+		}
+	}
+	missing = append(missing, discovered.MissingDependencies()...)
+	sort.Strings(missing)
+	for _, name := range missing {
+		if loaded[name] || disabled[name] || named[name] {
+			continue
+		}
+		named[name] = true
+		lines = append(lines, fmt.Sprintf("extension %s is not installed", name))
+	}
+	return lines
 }
