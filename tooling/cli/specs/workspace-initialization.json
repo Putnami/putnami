@@ -27,6 +27,10 @@
       "text": "Independent extension and template artifacts restore with bounded concurrency while lock updates and result reporting are committed in stable order after workers finish. An install writes the lock only when a requested fact changed, never for a same-version platform digest or download source alone. Hooks retain their existing sequencing and a failure never publishes a successful install marker."
     },
     {
+      "id": "install-state-inputs",
+      "text": "The first-use install treats the installed state as current while putnami.lock.json and each workspace-root file that a provider recorded in .putnami/workspace-index.json names in installInputs keep the content the last successful install recorded. No other file counts: a lockfile that no recorded provider declares never triggers the install. The bootstrap reads the index before the command syncs it, so a changed declaration counts from the first command after a sync records it."
+    },
+    {
       "id": "compact-progress",
       "text": "Default installation renders preparation progress in place on a supported terminal and prints a concise completed-action summary without unchanged artifact checks or successful job transcripts. Verbose mode exposes details, failures retain diagnostics, and redirected or machine output never receives terminal control sequences or human text on the machine stdout stream."
     }

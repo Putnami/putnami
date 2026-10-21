@@ -8,10 +8,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
-	"strings"
+	"slices"
 	"time"
 
+	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -26,102 +26,50 @@ const installStateFilename = "install-state.json"
 // stale so an old marker triggers a re-install rather than being misread.
 const installStateVersion = 1
 
-// coreInstallStateInputs are the workspace-root files CORE itself owns for the
-// first-use install decision. There is exactly one: the putnami lock, which
-// captures the installed extension set and their versions.
-//
-// Everything else that used to be here — bun.lock, bun.lockb, uv.lock, go.work —
-// was a hard-coded list of language filenames inside a language-neutral
-// orchestrator, and a later cleanup deleted it. Those files are now
-// named by the extensions that install from them, through the `workspace.inputs`
-// their adapters declare, and reach this decision through
-// workspaceInstallStateInputs.
-var coreInstallStateInputs = []string{"putnami.lock.json"}
+// coreInstallStateInput is the one workspace-root file the core itself owns
+// for the first-use install decision: the putnami lock, which records the
+// installed extensions and their versions. Every other input is a file an
+// extension declares in the installInputs of its workspace adapter.
+const coreInstallStateInput = "putnami.lock.json"
 
-// installStateInputShapes is the LOCK-SHAPED filter applied to what the adapters
-// declare, and it is the narrow answer to a code-review finding.
+// workspaceInstallStateInputs is the sorted set of workspace-root file names
+// whose content decides whether the installed workspace state is current: the
+// core's lock plus the install inputs of every provider the workspace index
+// records. A provider that declares no install inputs adds nothing, so the
+// content of its lockfiles does not decide the install state.
 //
-// An adapter's `workspace.inputs` answers ONE question: "what decides this
-// provider's probe answer?". The first-use install marker asks a different one:
-// "is the installed tree still the tree the lock describes?". That cutover fed
-// the first set to the second, which conscripted every root-level probe input —
-// so editing the repo-root `biome.json` or `tsconfig.base.json` made the next
-// command run a full workspace re-install. Those files change what a project
-// RESOLVES to; they install nothing.
+// The declarations are read from the persisted workspace index, not from the
+// extension manifests. EnsureWorkspaceBootstrap runs on every command, and its
+// steady-state path is a handful of stats; extension discovery would make it
+// the most expensive step of a command that does nothing. The index records
+// what each adapter declared, so reading it is one file.
 //
-// The correct separation is a declaration, not a filter: an adapter naming its
-// own install inputs. That needs a `workspace.installInputs` field on the
-// extension manifest — a protocol change with a schema bump and a twin on both
-// runtimes — so until it exists, core keeps this list, which is exactly the
-// pre-epic set restored as an intersection rather than as a source. The
-// difference from the deleted table matters: core does not go looking for these
-// files, it only ACCEPTS them when the owning adapter has declared them, so a
-// workspace with no Python extension still has no uv.lock in its fingerprint.
+// The bootstrap reads the index before the command's first workspace sync, so
+// a changed declaration counts from the first command after a sync records it.
+// An index the core cannot read, or a workspace with no index yet, resolves to
+// the core's lock alone; a marker that recorded more files then disagrees, and
+// the install runs.
 //
-// go.work is a lock in the sense that counts here: it names the modules the
-// workspace resolves against, and adding one changes what an install must
-// prepare. Go's checksum files stay out, because ordinary build and deploy flows
-// update them and a bootstrap input a normal command invalidates would re-run
-// the install on every other command.
-var installStateInputShapes = map[string]bool{
-	"putnami.lock.json": true,
-	"bun.lock":          true,
-	"bun.lockb":         true,
-	"uv.lock":           true,
-	"go.work":           true,
-}
-
-// workspaceInstallStateInputs is the workspace-ROOT file set whose content
-// decides whether the installed workspace state is current: core's own lock plus
-// every root-level, LOCK-SHAPED input the workspace adapters declare.
-//
-// The declarations are read from the persisted workspace index rather than by
-// discovering extensions, and that is a cost decision as much as a layering one.
-// EnsureWorkspaceBootstrap runs on EVERY command; its steady-state path is a
-// handful of stats, and paying extension discovery there would turn a ~0.015 ms
-// check into the most expensive thing a no-op command does. The index already
-// records what each adapter declared, with digests, so reading it is one file.
-//
-// A workspace with no index yet — a fresh checkout — resolves to core's lock
-// alone, which is the correct answer for the case the marker exists to catch:
-// nothing has been installed, so the install must run. The same holds if the
-// index is DELETED under a workspace that was installed: the recorded marker
-// then names inputs this function can no longer justify, the fingerprints
-// disagree, and the install re-runs. Erring toward re-installing is the right
-// direction for a decision that exists to make a fresh checkout work.
-//
-// Only ROOT-level inputs count. A per-project manifest is a metadata input, not
-// an install input; it invalidates the workspace probe, not the installed tree.
+// A recorded name the protocol refuses as an install input is skipped, so a
+// hand-edited index never makes the check read a file outside the workspace
+// root.
 func workspaceInstallStateInputs(wsRoot string) []string {
-	names := make([]string, 0, len(coreInstallStateInputs)+4)
-	names = append(names, coreInstallStateInputs...)
+	names := []string{coreInstallStateInput}
 
 	snapshot, err := workspace.LoadSnapshot(wsRoot)
 	if err == nil && snapshot != nil {
 		for _, provider := range snapshot.Providers {
-			for _, input := range provider.Inputs {
-				if strings.Contains(input.Path, "/") || strings.ContainsAny(input.Path, "*?[") {
+			for _, name := range provider.InstallInputs {
+				if clean, err := extproto.NormalizeInstallInput(name); err != nil || clean != name {
 					continue
 				}
-				if !installStateInputShapes[input.Path] {
-					continue
-				}
-				names = append(names, input.Path)
+				names = append(names, name)
 			}
 		}
 	}
 
-	sort.Strings(names)
-	deduped := names[:0]
-	previous := ""
-	for i, name := range names {
-		if i > 0 && name == previous {
-			continue
-		}
-		previous = name
-		deduped = append(deduped, name)
-	}
-	return deduped
+	slices.Sort(names)
+	return slices.Compact(names)
 }
 
 // lockFingerprint records a single lock file's identity. Size+ModTime drive the
@@ -162,11 +110,10 @@ func hashFile(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// scanLockFiles stats every candidate install input at the workspace root and
-// hashes the content of those present, in sorted name order (so the result is
-// deterministic). Absent files are skipped, which is what keeps the set
-// language-agnostic: a workspace with no Python extension simply has no uv.lock
-// to record.
+// scanLockFiles stats every install input at the workspace root and hashes the
+// content of those present, in sorted name order (so the result is
+// deterministic). An absent input is not recorded, so a declared file that
+// appears or disappears later changes the recorded set.
 func scanLockFiles(wsRoot string) ([]lockFingerprint, error) {
 	var out []lockFingerprint
 	for _, name := range workspaceInstallStateInputs(wsRoot) {
@@ -239,9 +186,9 @@ func writeInstallStateRaw(wsRoot string, st *InstallState) error {
 }
 
 // writeInstallState captures the current workspace lock state as the marker. It
-// is called at the end of a successful `putnami install`, so the recorded
-// fingerprint reflects post-install lock files (e.g. a bun.lock that
-// `bun install` just regenerated).
+// is called at the end of a successful `putnami install`, after the install's
+// own workspace sync, so the marker records the install inputs the index
+// declares then, with the content the installers left.
 func writeInstallState(wsRoot string) error {
 	files, err := scanLockFiles(wsRoot)
 	if err != nil {

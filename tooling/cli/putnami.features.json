@@ -2545,6 +2545,22 @@
           }
         },
         {
+          "id": "install-state-inputs",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declared-install-input-stales-the-install",
+              "an-undeclared-lockfile-leaves-the-install-current",
+              "the-putnami-lock-always-counts",
+              "a-changed-declaration-counts-after-the-sync-that-records-it"
+            ]
+          }
+        },
+        {
           "id": "compact-progress",
           "stage": "coded",
           "evidenceKinds": [

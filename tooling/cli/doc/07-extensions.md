@@ -757,6 +757,13 @@ extension once more and records the new declaration. `putnami context pack`
 lists the `language` of every extension that claims a project among that
 project's languages, and lists none for a project no declaring extension claims.
 
+The install state follows the recorded `installInputs`: the first-use
+auto-install runs when `putnami.lock.json` or a declared file changes, and core
+names no other file. An extension that declares no `installInputs` adds no file,
+so its lockfiles never trigger the install. The check reads the index before
+the command syncs it, so a changed declaration counts from the command after the
+one that records it.
+
 ### Extension-owned machine caches
 
 An extension that keeps a machine-global cache owns it end to end. Core hands it
