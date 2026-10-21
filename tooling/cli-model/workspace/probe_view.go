@@ -237,6 +237,7 @@ func ResolveProjectIdentity(p *Project, view *wsproto.MergedProject) {
 	p.Name = ""
 	p.Type = ""
 	p.Version = ""
+	p.SourceFile = ""
 	p.Tags = nil
 	p.Publish = nil
 	p.Extensions = nil
@@ -299,6 +300,7 @@ func ResolveProjectIdentity(p *Project, view *wsproto.MergedProject) {
 		if len(p.Extensions) == 0 {
 			p.Extensions = view.Extensions
 		}
+		p.SourceFile = view.SourceFile
 		p.Metadata = view.Metadata
 	}
 
