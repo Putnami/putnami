@@ -31,7 +31,7 @@
     },
     {
       "id": "init-lists-members-once",
-      "text": "putnami init --project lists the project it creates once in the workspace config and once in the workspaces of the root package.json, also when the dependency install that follows fails and leaves those files as init wrote them. The workspaces of the root package.json are the sorted projects that hold a package.json, and an empty array when no project holds one, never null."
+      "text": "putnami init --project lists the project it creates once in the workspace config, also when the dependency install that follows fails and leaves the config as init wrote it. Init writes no root package.json, with or without --project."
     },
     {
       "id": "no-install-provider-nothing-to-install",

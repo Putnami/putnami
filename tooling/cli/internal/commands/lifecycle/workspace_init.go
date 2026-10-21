@@ -20,7 +20,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/versioncmd"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
-	"go.putnami.dev/tooling/cli/internal/jsonutil"
 )
 
 // initExtensionConfig maps --extension shorthand to extension package + default
@@ -329,15 +328,6 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	}
 	iox.Fprintln(os.Stdout, "  ✓ Workspace config written (putnami.workspace.json)")
 
-	// Create package.json if it doesn't exist (needed for workspace-install)
-	pkgJSONPath := filepath.Join(cwd, "package.json")
-	if _, err := os.Stat(pkgJSONPath); os.IsNotExist(err) {
-		pkgJSON := fmt.Sprintf("{\n  \"name\": %q,\n  \"private\": true\n}\n", name)
-		if err := os.WriteFile(pkgJSONPath, []byte(pkgJSON), 0o644); err != nil {
-			return fmt.Errorf("write package.json: %w", err)
-		}
-	}
-
 	// --- Phase 2: Install extension ---
 	iox.Fprintln(os.Stdout)
 	iox.Fprintf(os.Stdout, "  → Adding extension…\n")
@@ -472,9 +462,6 @@ func initializeProject(
 			fmt.Errorf("register project %s in workspace config: %w", flags.project, err),
 			"putnami projects sync",
 		)
-	}
-	if err := scaffoldPackageJSONWorkspaces(cwd, projects); err != nil {
-		return fmt.Errorf("update package.json workspaces for project %s: %w", flags.project, err)
 	}
 
 	wsCfg = wsproto.Load(cwd)
@@ -622,42 +609,4 @@ func readWorkspaceConfigAt(dir string) *wsproto.Config {
 		return nil
 	}
 	return &cfg
-}
-
-// scaffoldPackageJSONWorkspaces writes the root package.json "workspaces" array
-// for a workspace `putnami init` just created: the sorted projects that hold a
-// package.json, each once, and an empty array when there is none.
-//
-// This is a SCAFFOLDING write, and it is the only npm-shaped manifest edit left
-// in core. It survives slice C4b's deletion of the workspaces-array writer from
-// `projects sync` for one reason: `init` runs before any extension exists in the
-// new workspace, so there is no TypeScript adapter to hand the write to and no
-// workspace probe to ask. From the first `putnami projects sync` onward the
-// array belongs to the TypeScript extension's own sync task, which rewrites it
-// from the resolved selection.
-func scaffoldPackageJSONWorkspaces(wsRoot string, projects []string) error {
-	pkgPath := filepath.Join(wsRoot, "package.json")
-	raw, err := jsonutil.ReadFile(pkgPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil // no package.json — nothing to update
-		}
-		return err
-	}
-
-	// Filter to projects that have a package.json (TS/JS projects). The list
-	// is never nil: a workspace with no such project gets an empty array, which
-	// is the value every reader of the field accepts, and not null.
-	workspaces := []string{}
-	for _, p := range projects {
-		projPkgPath := filepath.Join(wsRoot, p, "package.json")
-		if _, err := os.Stat(projPkgPath); err == nil {
-			workspaces = append(workspaces, p)
-		}
-	}
-	slices.Sort(workspaces)
-	workspaces = slices.Compact(workspaces)
-
-	raw.Set("workspaces", workspaces)
-	return jsonutil.WriteFile(pkgPath, raw)
 }
