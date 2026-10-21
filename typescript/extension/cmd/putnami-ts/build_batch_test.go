@@ -469,7 +469,7 @@ func TestRunBuildGenerateBatch_ForwardsPerProjectNameToHooks(t *testing.T) {
 				}
 			}
 		}
-		return &exec.Result{Success: true, ExitCode: 0, Stdout: `{"type":"summary","data":{"exports":{},"assets":{}}}` + "\n"}, nil
+		return &exec.Result{Success: true, ExitCode: 0, Stdout: completeHookSummary + "\n"}, nil
 	})
 
 	status, _, err := runBuildGenerateBatch(ctx)

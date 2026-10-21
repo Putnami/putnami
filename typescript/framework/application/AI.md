@@ -557,6 +557,31 @@ loaders, config registration, or startup. Loader imports and
 manifest config path must correspond to a real registered `ConfigDefinition`;
 the flattened manifest fields are not executable validators.
 
+`bin/generate.ts` fails when an entry point cannot be imported, and when the
+`app()` factory throws: an Application that was not evaluated has unknown
+routes, not absent ones. The error names the entry point and the factory's
+error, and the build fails with the committed `schema/http-routes.json`
+unchanged. Keep `app()` evaluable without deploy-time values: read a secret
+through a `Config` block and require it when the Application starts, for
+example in a plugin `warmup`. The hook succeeds with no output when the module
+exposes no Application, as a library does.
+
+Every preBuild hook reports its route evaluation as `data.httpRoutes` in its
+summary, and the TypeScript extension fails `build-generate`, naming the hook,
+when the member is missing or malformed. Build it with the helpers beside
+`writeHttpRoutesFragment` in `@putnami/application/http-routes`:
+`completeHttpRoutesEvaluation()` returns `{"v":1,"state":"complete"}` once the
+hook has evaluated its own framework-declared route contribution, with or
+without a fragment, and `unavailableHttpRoutesEvaluation(reason)` returns
+`{"v":1,"state":"unavailable","reason":"<reason>"}` and throws on a blank
+reason. Set it in the hook's `HookResult.data`; `runHookCommand` adds no
+default. `bin/generate.ts` returns the complete evaluation for an Application
+and for a library; a factory error stays a hook error, with no summary. An
+unavailable evaluation also fails `build-generate`, which keeps the committed
+`schema/http-routes.json` and `infra/requirements.json`. A complete evaluation
+does not cover routes registered only at runtime, such as OAuth routes
+registered during application warmup.
+
 Both hook scripts activate the workload's complete config registry before they
 read it, through the shared `bin/_activate-config.ts`: import every generated
 `*-loader` (which runs the route handlers' `configToken()` calls), then walk the

@@ -1062,6 +1062,13 @@
             "src/**/*.tsx"
           ]
         },
+        "hookImplementation": {
+          "from": "project",
+          "files": [
+            "bin/**",
+            "putnami.extension.json"
+          ]
+        },
         "assets": {
           "from": "project",
           "files": [
@@ -1171,7 +1178,7 @@
             "path": "schema/http-routes.json",
             "optionalEmpty": true,
             "drift": "fail",
-            "description": "The project's committed putnami.http-routes.v1 inventory: the canonical .gen/schema/http-routes.json this task aggregates from the framework pre-build hooks' route fragments, copied verbatim after every hook returned and the aggregate validated. The framework hooks are its sole authors; this task only copies the aggregate, and reads no project option to decide it. A run whose hooks ran and emitted no route removes the file; a run whose hooks did not run or failed leaves it as it stands. It is committed, and this task is its first writer in a session, so the engine compares what it writes, removes, or a cache hit restores with the bytes present before and fails the task with generated-output-drift on a difference — the worktree then holds the regenerated inventory to commit (protocols/extension ADR 0004). Absent for a project whose hooks emit no route."
+            "description": "The project's committed putnami.http-routes.v1 inventory: the canonical .gen/schema/http-routes.json this task aggregates from the framework pre-build hooks' route fragments, copied verbatim after every pre-build hook reported a complete data.httpRoutes evaluation, {\"v\":1,\"state\":\"complete\"}, and the aggregate validated. The framework hooks are its sole authors; this task only copies the aggregate, and reads no project option to decide it. Fragments that hold no route commit an inventory with routes []. A run whose hooks all reported complete and wrote no fragment removes the file, including for a project that declares no pre-build hook. The task fails and leaves the file and infra/requirements.json as they stand when a hook fails, when the aggregate is invalid, and, before it aggregates anything, when it cannot evaluate every route producer: discovery could not read package.json or a dependency's putnami.extension.json, a hook reported its routes unavailable or returned no or a malformed data.httpRoutes, or Bun is missing for a project with a pre-build hook. It is committed, and this task is its first writer in a session, so the engine compares what it writes, removes, or a cache hit restores with the bytes present before and fails the task with generated-output-drift on a difference — the worktree then holds the regenerated inventory to commit (protocols/extension ADR 0004). Absent for a project whose hooks complete without a route fragment."
           }
         },
         "effects": [

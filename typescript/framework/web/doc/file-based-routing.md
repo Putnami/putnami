@@ -25,6 +25,15 @@ by bounded asset prefixes. A static catch-all with a finite `paths()` registry
 is expanded into exact routes; other catch-alls produce an actionable build
 diagnostic instead of a broad edge route.
 
+Every successful run of the web pre-build hook reports a complete route
+evaluation in its summary. A project without an app directory or route files
+contributes no routes. The TypeScript build requires that report from every
+pre-build hook, so upgrade `@putnami/web` and `@putnami/typescript`
+together.
+
+The hook runs live whenever the TypeScript generate task executes. Cache reuse
+restores the enclosing task's outputs; the hook has no separate cached result.
+
 ## Route File Conventions
 
 ### Page Components (`page.tsx`)

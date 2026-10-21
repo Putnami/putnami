@@ -589,8 +589,9 @@ const typeScriptFeatureEvidencePath = ".gen/schema/feature-evidence/typescript-f
 
 // TestGenerateIsSourceBound pins the cache policy of the task that writes the
 // TypeScript feature evidence. The evidence names the project's source
-// binding, which covers every project file, while the task's key reads only
-// src, public and package.json. So the policy declares sourceBound (CLI ADR
+// binding, which covers every project file, while the task's key reads
+// source and hook implementations, public assets and package configuration.
+// The policy declares sourceBound (CLI ADR
 // 0069): the CLI stores and looks up the entry at a key that also binds the
 // binding, and an entry serves only at the binding its evidence names. The
 // evidence lives inside the .gen output this task owns and does not cede, so
@@ -619,6 +620,36 @@ func TestGenerateIsSourceBound(t *testing.T) {
 	}
 	if got := proto.RequiredCLIContract(m); got > m.CLIContract {
 		t.Errorf("the manifest is stamped %d and requires %d", m.CLIContract, got)
+	}
+}
+
+func TestGenerateKeysHookImplementationAndPropagatesIt(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "source-bound-generate", "the-generate-key-covers-hook-implementation")
+	m := loadExtensionManifest(t)
+	generate, ok := m.Tasks["build-generate"]
+	if !ok {
+		t.Fatal("manifest task \"build-generate\" is missing")
+	}
+	key := proto.DeriveTaskCacheKey(generate.Inputs)
+	for _, pattern := range []string{"bin/**", "putnami.extension.json"} {
+		if !slices.Contains(key.Files, pattern) {
+			t.Errorf("generate key files = %v, want %q so hook edits move the producer key", key.Files, pattern)
+		}
+	}
+	pipelines := 0
+	for name, command := range m.Commands {
+		for _, step := range command.Run {
+			if step.Task != "build-generate" {
+				continue
+			}
+			pipelines++
+			if !slices.Contains(step.DependsOn, "^generate") {
+				t.Errorf("%s step %s dependencies = %v, want ^generate to propagate hook implementation changes", name, step.ID, step.DependsOn)
+			}
+		}
+	}
+	if pipelines == 0 {
+		t.Fatal("no pipeline runs build-generate")
 	}
 }
 

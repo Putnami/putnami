@@ -163,10 +163,9 @@ describe('findApplication entry-point probing', () => {
     expect(failures.map((f) => f.kind)).toEqual(['no-application']);
   });
 
-  // The module loads fine; only the `app()` factory throws. Modelled on
-  // typescript/samples/07-authentication, whose factory calls
-  // requireEnv('OAUTH_CLIENT_ID') — that build is green and must stay green, so
-  // this must NOT be reported as an unloadable module.
+  // The module loads fine; only the `app()` factory throws. It is a factory
+  // error, not an unloadable module, so a caller reports the factory's own
+  // error and remedy instead of the import remedy.
   it('classifies a throwing app() factory as factory-error, not import-error', async () => {
     const { findApplication } = await import('../../bin/_find-application');
     writeFileSync(join(workloadDir, 'package.json'), JSON.stringify({ name: 'needs-secrets' }));

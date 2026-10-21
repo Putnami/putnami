@@ -73,3 +73,26 @@ export function writeHttpRoutesFragment(
   writeFileSync(output, `${JSON.stringify(fragment, null, 2)}\n`);
   return output;
 }
+
+/**
+ * The version 1 route evaluation a preBuild hook returns as `data.httpRoutes`
+ * on every successful exit. Each hook reports it explicitly; the hook runner
+ * adds no default. `complete` certifies that the hook evaluated its own
+ * framework-declared route contribution for this invocation, with or without a
+ * fragment, and makes no claim about routes registered at runtime.
+ * `unavailable` carries the nonempty reason the hook could not evaluate it.
+ */
+export type HttpRoutesEvaluation = { v: 1; state: 'complete' } | { v: 1; state: 'unavailable'; reason: string };
+
+/** The evaluation of a hook that evaluated its framework-declared route contribution. */
+export function completeHttpRoutesEvaluation(): HttpRoutesEvaluation {
+  return { v: 1, state: 'complete' };
+}
+
+/** The evaluation of a hook that could not evaluate its route contribution, and why. */
+export function unavailableHttpRoutesEvaluation(reason: string): HttpRoutesEvaluation {
+  if (typeof reason !== 'string' || reason.trim().length === 0) {
+    throw new Error('an unavailable HTTP route evaluation needs a nonempty reason');
+  }
+  return { v: 1, state: 'unavailable', reason };
+}

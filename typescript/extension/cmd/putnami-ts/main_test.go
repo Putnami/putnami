@@ -1904,7 +1904,7 @@ func TestDoGenerate_SyncsCommittedInfraRequirements(t *testing.T) {
 			[]byte(`{"protocolVersion":2,"databases":[{"name":"primary","engine":"postgres","schemas":["app"]}]}`), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		return &exec.Result{Success: true, ExitCode: 0, Stdout: `{"type":"summary","data":{}}` + "\n"}, nil
+		return &exec.Result{Success: true, ExitCode: 0, Stdout: completeHookSummary + "\n"}, nil
 	})
 
 	emit := jsonl.New()
@@ -1988,7 +1988,7 @@ func mockInfraFragmentHook(t *testing.T, projectPath string, fragments map[strin
 				return nil, err
 			}
 		}
-		return &exec.Result{Success: true, ExitCode: 0, Stdout: `{"type":"summary","data":{}}` + "\n"}, nil
+		return &exec.Result{Success: true, ExitCode: 0, Stdout: completeHookSummary + "\n"}, nil
 	})
 }
 

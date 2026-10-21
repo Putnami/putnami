@@ -1,6 +1,29 @@
 import { describe, expect, it } from 'bun:test';
-import { canonicalizeHttpRoutes } from '../../src/http-routes';
+import {
+  canonicalizeHttpRoutes,
+  completeHttpRoutesEvaluation,
+  unavailableHttpRoutesEvaluation,
+} from '../../src/http-routes';
 import { normalizeGeneratedHttpRoutePath } from '../../src/http-routes/generation';
+
+describe('HTTP route evaluation helpers', () => {
+  it('serializes a complete evaluation as the exact version 1 literal', () => {
+    expect(JSON.stringify(completeHttpRoutesEvaluation())).toBe('{"v":1,"state":"complete"}');
+  });
+
+  it('serializes an unavailable evaluation as the exact version 1 literal with its reason', () => {
+    expect(JSON.stringify(unavailableHttpRoutesEvaluation('the application factory failed'))).toBe(
+      '{"v":1,"state":"unavailable","reason":"the application factory failed"}',
+    );
+  });
+
+  it('refuses an unavailable evaluation without a nonempty reason', () => {
+    for (const reason of ['', '   ', '\n\t']) {
+      expect(() => unavailableHttpRoutesEvaluation(reason)).toThrow('needs a nonempty reason');
+    }
+    expect(() => unavailableHttpRoutesEvaluation(undefined as unknown as string)).toThrow('needs a nonempty reason');
+  });
+});
 
 describe('normalizeGeneratedHttpRoutePath catch-all wiring', () => {
   it('maps named catch-all spellings to the v1 {name...} template', () => {

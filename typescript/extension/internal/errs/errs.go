@@ -31,6 +31,12 @@ const (
 	CodeTranspileError Code = "TRANSPILE_ERROR"
 	CodeCompileError   Code = "COMPILE_ERROR"
 
+	// CodeHTTPRoutesUnavailable is the failure of a generate that cannot tell
+	// which routes the project serves: hook discovery could not read a
+	// manifest, or a preBuild hook did not report a complete data.httpRoutes
+	// evaluation. The run changes nothing in the committed schema/http-routes.json.
+	CodeHTTPRoutesUnavailable Code = "HTTP_ROUTES_UNAVAILABLE"
+
 	// Run / serve resolution codes.
 	CodeNoRunEntrypoint Code = "NO_RUN_ENTRYPOINT"
 	CodeNoServeExport   Code = "NO_SERVE_EXPORT"

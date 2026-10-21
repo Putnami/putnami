@@ -140,55 +140,63 @@ func doGenerate(ctx *pctx.Context, emit *jsonl.Emitter, projectPath string) (*bu
 	exports := make(map[string]string)
 	assets := make(map[string]string)
 
-	// hooksRan is true only once every preBuild hook returned and the route
-	// aggregate validated; httpRoutesPath is that aggregate, or "" when no hook
-	// emitted a route. Only that state may change the committed inventory.
-	hooksRan := false
-	httpRoutesPath := ""
-
-	bunBin, bunErr := resolveBunBin()
-	if bunErr == nil {
-		// Clear the scratch fragments before the producers run and reconcile the
-		// committed manifest once, after every one of them has returned: a
-		// producer deleted from code must not leave a requirement behind, and a
-		// sync taken mid-way would commit a strictly-degraded manifest.
-		if err := infra.ClearGeneratedRequirementSidecars(projectPath); err != nil {
-			return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "clearing generated infra requirements")
-		}
-		hookResult, err := hooks.RunHooks(ctx.WorkspaceRoot, projectPath, ctx.Project.Name, hooks.HookPreBuild, mode, bunBin, ctx.Params.Bool("debug", false), nil)
-		if err != nil {
-			return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "pre-build hooks")
-		}
-		for k, v := range hookResult.Exports {
-			exports[k] = v
-		}
-		for k, v := range hookResult.Assets {
-			assets[k] = v
-		}
-		routesPath, routesErr := build.AggregateHTTPRoutes(projectPath)
-		if routesErr != nil {
-			return nil, errs.Wrapf(routesErr, errs.CodeGenerateFailed, "aggregating HTTP route inventory")
-		}
-		if routesPath != "" {
-			assets[HTTPRoutesRelPath] = routesPath
-		}
-		hooksRan, httpRoutesPath = true, routesPath
-		// The converged producer set exists HERE, and only here. Every preBuild
-		// hook has returned, and the @putnami/application hook activates the full
-		// config registry (loader imports plus ConfigContributor blocks — see
-		// bin/_activate-config.ts) before it writes .gen/infra/secrets.json, so
-		// this sync sees the complete secret-name set alongside the database,
-		// migration, storage and event fragments the other producers wrote.
-		//
-		// build-generate is the sole committer of infra/requirements.json;
-		// config-extract-exec rewrites only the secrets fragment from the same
-		// activated registry (bin/_activate-config.ts) and reproduces the bytes
-		// committed here; it does not clear sidecars because it cannot regenerate
-		// the other fragments. The capability manifest and design graph have one
-		// author (the configExtract hook passes publishCapabilityManifest:false /
-		// publishDesignGraph:false).
-		syncGeneratedInfraRequirements(projectPath, emit)
+	bunBin, err := preBuildBun(ctx.WorkspaceRoot, projectPath)
+	if err != nil {
+		return nil, err
 	}
+	// Clear the scratch fragments before the producers run and reconcile the
+	// committed manifest once, after every one of them has returned: a
+	// producer deleted from code must not leave a requirement behind, and a
+	// sync taken mid-way would commit a strictly-degraded manifest.
+	if err := infra.ClearGeneratedRequirementSidecars(projectPath); err != nil {
+		return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "clearing generated infra requirements")
+	}
+	hookResult, err := hooks.RunHooks(ctx.WorkspaceRoot, projectPath, ctx.Project.Name, hooks.HookPreBuild, mode, bunBin, ctx.Params.Bool("debug", false), nil)
+	if err != nil {
+		return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "pre-build hooks")
+	}
+	// Every preBuild hook must report a complete route evaluation, and
+	// discovery must have read every manifest. A run without both cannot tell
+	// which routes the project serves. It fails here, with every cause the
+	// hooks returned, before it aggregates the fragments, advertises the
+	// aggregate, reconciles infra requirements, promotes a contract or writes a
+	// generate result, so the committed route inventory and infra requirements
+	// keep their bytes. The scratch fragments stay in .gen until the next run
+	// resets them.
+	if len(hookResult.Unavailable) > 0 {
+		return nil, httpRoutesUnavailableError(hookResult.Unavailable)
+	}
+	for k, v := range hookResult.Exports {
+		exports[k] = v
+	}
+	for k, v := range hookResult.Assets {
+		assets[k] = v
+	}
+	// httpRoutesPath is the validated aggregate, or "" when no hook wrote a
+	// fragment. A fragment with no route still yields an aggregate: a
+	// known-empty inventory with routes [].
+	httpRoutesPath, err := build.AggregateHTTPRoutes(projectPath)
+	if err != nil {
+		return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "aggregating HTTP route inventory")
+	}
+	if httpRoutesPath != "" {
+		assets[HTTPRoutesRelPath] = httpRoutesPath
+	}
+	// The converged producer set exists HERE, and only here. Every preBuild
+	// hook has returned, and the @putnami/application hook activates the full
+	// config registry (loader imports plus ConfigContributor blocks — see
+	// bin/_activate-config.ts) before it writes .gen/infra/secrets.json, so
+	// this sync sees the complete secret-name set alongside the database,
+	// migration, storage and event fragments the other producers wrote.
+	//
+	// build-generate is the sole committer of infra/requirements.json;
+	// config-extract-exec rewrites only the secrets fragment from the same
+	// activated registry (bin/_activate-config.ts) and reproduces the bytes
+	// committed here; it does not clear sidecars because it cannot regenerate
+	// the other fragments. The capability manifest and design graph have one
+	// author (the configExtract hook passes publishCapabilityManifest:false /
+	// publishDesignGraph:false).
+	syncGeneratedInfraRequirements(projectPath, emit)
 
 	// 4. Update version.json with content hash
 	emit.Progress(3, 5, "Updating version info")
@@ -237,12 +245,12 @@ func doGenerate(ctx *pctx.Context, emit *jsonl.Emitter, projectPath string) (*bu
 
 	// 5c. Commit the HTTP route inventory. It is committed by default, with no
 	// option, so this task reads no project option its cache key does not hold.
-	// A run whose hooks did not run leaves the committed copy as it stands; a
-	// hook or aggregate failure returned above, before this point.
-	if hooksRan {
-		if err := commitHTTPRoutes(projectPath, httpRoutesPath); err != nil {
-			return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "committing HTTP route inventory")
-		}
+	// Every run that reaches this point ran every preBuild hook, each of which
+	// reported a complete route evaluation, and validated the aggregate; any
+	// other run failed above, before this point, and left the committed copy as
+	// it stands.
+	if err := commitHTTPRoutes(projectPath, httpRoutesPath); err != nil {
+		return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "committing HTTP route inventory")
 	}
 
 	// 6. Write manifest
@@ -384,10 +392,11 @@ func promoteCapabilityManifest(projectPath, emittedPath string) (string, error) 
 const HTTPRoutesRelPath = "schema/http-routes.json"
 
 // commitHTTPRoutes makes the committed route inventory equal what the preBuild
-// hooks produced. The caller invokes it only after every hook returned and the
-// aggregate validated. emittedPath is that aggregate, promoted verbatim; it is
-// "" when no hook emitted a route, and then a committed copy has no producer
-// and is removed.
+// hooks produced. The caller invokes it only after every hook returned with a
+// complete route evaluation and the aggregate validated
+// (hooks.Result.Unavailable is empty). emittedPath is that aggregate, promoted
+// verbatim, including a known-empty one; it is "" when no hook wrote a
+// fragment, and then a committed copy has no producer and is removed.
 func commitHTTPRoutes(projectPath, emittedPath string) error {
 	if emittedPath != "" {
 		_, err := promoteSchemaArtifact(projectPath, emittedPath, HTTPRoutesRelPath)
@@ -398,6 +407,43 @@ func commitHTTPRoutes(projectPath, emittedPath string) error {
 		return fmt.Errorf("remove committed %s: %w", HTTPRoutesRelPath, err)
 	}
 	return nil
+}
+
+// httpRoutesUnavailableError is the failure of a generate that cannot tell
+// which routes the project serves: discovery could not read a manifest, or a
+// preBuild hook did not report a complete route evaluation. causes are the
+// entries of hooks.Result.Unavailable or hooks.Discovery.Unavailable. Solo and
+// batch report this one error through generateDiagnostics, so both attribute
+// the same code and text to the project.
+func httpRoutesUnavailableError(causes []string) error {
+	return errs.New(errs.CodeHTTPRoutesUnavailable,
+		"cannot tell which routes the project serves: "+strings.Join(causes, "; ")+
+			". Generate changed nothing in "+HTTPRoutesRelPath+"; resolve each cause, then generate again")
+}
+
+// preBuildBun resolves the Bun binary the preBuild hooks run with. A project
+// whose hook discovery is complete and finds no preBuild hook runs no hook, so
+// it needs no Bun: preBuildBun returns "" for it and its run proceeds, which
+// removes a route inventory that no producer writes any more. Without Bun, a
+// project with a preBuild hook, or whose hook discovery is incomplete, fails:
+// the run cannot tell which routes its hooks would report.
+func preBuildBun(workspaceRoot, projectPath string) (string, error) {
+	bunBin, bunErr := resolveBunBin()
+	if bunErr == nil {
+		return bunBin, nil
+	}
+	discovery, err := hooks.Discover(workspaceRoot, projectPath, hooks.HookPreBuild)
+	if err != nil {
+		return "", errs.Wrapf(err, errs.CodeGenerateFailed, "pre-build hooks")
+	}
+	if len(discovery.Hooks) > 0 {
+		return "", errs.Wrapf(bunErr, errs.CodeGenerateFailed,
+			"pre-build hooks of %s cannot run without Bun", strings.Join(discovery.Hooks, ", "))
+	}
+	if len(discovery.Unavailable) > 0 {
+		return "", httpRoutesUnavailableError(discovery.Unavailable)
+	}
+	return "", nil
 }
 
 // promoteSchemaArtifact copies a file a framework producer emitted under .gen

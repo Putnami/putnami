@@ -1,19 +1,27 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { HttpPlugin, api, oAuth2, platform, redirect } from '@putnami/application';
 import { createTestApp, type TestApp } from '@putnami/application/testing';
+import { requireOAuthCredentials } from '../src/oauth-credentials';
+import { setOAuthCredentials } from './credentials';
 
 describe('authentication sample', () => {
   let testApp: TestApp;
+  let restoreCredentials: () => void;
 
   beforeAll(async () => {
+    // The credentials reach the OAuth plugin through the same environment
+    // variables and conf/.env.yaml as in a served application.
+    restoreCredentials = setOAuthCredentials({
+      OAUTH_CLIENT_ID: 'test-client-id',
+      OAUTH_CLIENT_SECRET: 'test-client-secret',
+    });
     testApp = await createTestApp({
       plugins: [
         platform(),
+        requireOAuthCredentials(),
         oAuth2({
           authorizeUri: 'https://accounts.google.com/o/oauth2/v2/auth',
           tokenUri: 'https://oauth2.googleapis.com/token',
-          clientId: 'test-client-id',
-          clientSecret: 'test-client-secret',
           scopes: ['openid', 'email', 'profile'],
         }),
         api({ scanPath: 'src/api' }),
@@ -26,6 +34,7 @@ describe('authentication sample', () => {
 
   afterAll(async () => {
     await testApp.stop();
+    restoreCredentials();
   });
 
   describe('GET /healthz', () => {

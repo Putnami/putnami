@@ -28,7 +28,8 @@ TypeScript extension partitions entrypoints by export condition and runs one
   symbol becomes reachable from the browser entry closure.
 - The browser tracker is a **build output**. `bin/generate.ts` bundles
   `src/client/entry.ts` into `.gen/<publicFolder>/analytics/analytics.<hash>.js.gz`
-  and writes `.gen/http-routes.d/analytics.json`. Adding
+  and writes `.gen/http-routes.d/analytics.json`, then reports a complete
+  route evaluation (`data.httpRoutes`) in its hook summary. Adding
   `"@putnami/analytics": "workspace:*"` to a project's `package.json` is what
   makes that pre-build hook run for it.
 - The published package ships no `.ts` under `src/`. The entry is exported as

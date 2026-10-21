@@ -14,11 +14,17 @@
  *     entry point and the underlying import failure.
  *  2. A module that loads and simply exposes no Application stays legitimate
  *     (plain libraries depend on @putnami/application too) and still yields an
- *     empty, successful hook run.
- *  3. A module that loads but whose `app()` factory throws stays legitimate too:
- *     a factory may demand deploy-time configuration at build time
- *     (typescript/samples/07-authentication requires OAUTH_CLIENT_ID). Only the
- *     unloadable case is fatal — widening it breaks green builds.
+ *     empty, successful hook run with no route fragment and no summary status.
+ *     An Application that serves no route writes an empty route fragment.
+ *     Both successful runs report the complete route evaluation: their summary
+ *     line carries `"httpRoutes":{"v":1,"state":"complete"}`, the exact
+ *     literal of `completeHttpRoutesEvaluation()`, which the hook runner
+ *     never adds by default.
+ *  3. A module that loads but whose `app()` factory throws is a hard hook error:
+ *     the Application was not evaluated, so its routes are unknown, not absent.
+ *     The error names the entry point, the factory's own error and the remedy,
+ *     and the run writes no route fragment and prints no summary, so it reports
+ *     no route evaluation.
  *
  * ## 2. Secret names dropped from the deployability manifest
  *
@@ -63,6 +69,20 @@ interface HookRun {
   stdout: string;
   stderr: string;
 }
+
+/** The `data` of the hook's summary event, as the TypeScript extension reads it. */
+interface HookSummaryData {
+  exports?: Record<string, string>;
+  status?: unknown;
+  httpRoutes?: unknown;
+}
+
+/**
+ * The route evaluation member as it travels on the summary line. It is the
+ * serialization of `completeHttpRoutesEvaluation()` and the exact bytes the
+ * TypeScript extension accepts; the helper's own test pins the same literal.
+ */
+const COMPLETE_ROUTE_EVALUATION_WIRE = '"httpRoutes":{"v":1,"state":"complete"}';
 
 describe('generate hook (subprocess)', () => {
   let workloadDir: string;
@@ -146,14 +166,40 @@ describe('generate hook (subprocess)', () => {
     const run = runHook();
     expect(run.exitCode).toBe(0);
     expect(emptySummaryExports(run)).toEqual({});
+    // A library is a known absence: it serves no route, writes no fragment,
+    // and its summary carries no status. Its route contribution was still
+    // evaluated, so it reports the complete evaluation.
+    expect(summaryData(run)?.status).toBeUndefined();
+    expect(existsSync(applicationRoutesFragment())).toBe(false);
+    expect(summaryLine(run)).toContain(COMPLETE_ROUTE_EVALUATION_WIRE);
+    expect(summaryData(run)?.httpRoutes).toEqual({ v: 1, state: 'complete' });
   });
 
-  // Regression guard for the misclassification this hook shipped with first:
-  // resolveApplicationFromModule INVOKES the factory, so probing the import and
-  // the factory in one try reported 07-authentication (which calls
-  // requireEnv('OAUTH_CLIENT_ID') inside `app()`) as an unloadable module and
-  // failed a build that is green on main.
-  it('still succeeds when the app() factory throws for missing runtime config', () => {
+  it('writes the application route fragment for an Application that serves no route', () => {
+    writeMain(`
+      export const app = () => ({
+        build: async () => ({ exports: {}, httpRoutes: [] }),
+        use() { return this; },
+        getPlugins: () => [],
+        start: async () => {},
+      });
+    `);
+
+    const run = runHook();
+    expect(run.exitCode).toBe(0);
+    expect(summaryData(run)?.status).toBeUndefined();
+    const fragment = JSON.parse(readFileSync(applicationRoutesFragment(), 'utf-8')) as { routes: unknown[] };
+    expect(fragment.routes).toEqual([]);
+    // The evaluated Application certifies its route contribution, so the
+    // extension commits the empty fragment as a known-empty inventory.
+    expect(summaryLine(run)).toContain(COMPLETE_ROUTE_EVALUATION_WIRE);
+    expect(summaryData(run)?.httpRoutes).toEqual({ v: 1, state: 'complete' });
+  });
+
+  // resolveApplicationFromModule invokes the factory, so a factory that throws
+  // must fail as a factory error, with its own cause and the deploy-time remedy,
+  // not as an unloadable module whose remedy is the hook order.
+  it('fails when the app() factory throws, naming the entry point, the error and the remedy', () => {
     writeMain(`
       function requireEnv(name: string): string {
         const value = process.env[name];
@@ -170,17 +216,51 @@ describe('generate hook (subprocess)', () => {
     `);
 
     const run = runHook();
-    expect(run.exitCode).toBe(0);
-    expect(emptySummaryExports(run)).toEqual({});
+    expect(run.exitCode).not.toBe(0);
+    const message = errorMessage(run);
+    expect(message).toContain('the Application factory threw, so its routes and capabilities are unknown');
+    expect(message).toContain('src/main.ts: Missing required environment variable: OAUTH_CLIENT_ID_FIXTURE');
+    expect(message).toContain('require it when the Application starts');
+    expect(message).not.toContain('could not be loaded at all');
+    // The message names the entry point relative to the project, so the
+    // diagnostic is the same bytes on every machine.
+    expect(message).not.toContain(workloadDir);
+    // The Application was not evaluated, so the run states no route set, and
+    // no summary reports a successful run or a route evaluation.
+    expect(existsSync(applicationRoutesFragment())).toBe(false);
+    expect(summaryData(run)).toBeUndefined();
+    expect(run.stdout).not.toContain('"httpRoutes"');
   });
 
-  function emptySummaryExports(run: HookRun): Record<string, string> | undefined {
-    const summary = run.stdout
+  function applicationRoutesFragment(): string {
+    return join(workloadDir, '.gen', 'http-routes.d', 'application.json');
+  }
+
+  /** The raw JSONL line of the hook's last summary event, as the extension reads it. */
+  function summaryLine(run: HookRun): string | undefined {
+    return run.stdout
       .split('\n')
       .filter((line) => line.includes('"type":"summary"'))
-      .map((line) => JSON.parse(line) as { data?: { exports?: Record<string, string> } })
       .at(-1);
-    return summary?.data?.exports;
+  }
+
+  function summaryData(run: HookRun): HookSummaryData | undefined {
+    const line = summaryLine(run);
+    return line === undefined ? undefined : (JSON.parse(line) as { data?: HookSummaryData }).data;
+  }
+
+  function emptySummaryExports(run: HookRun): Record<string, string> | undefined {
+    return summaryData(run)?.exports;
+  }
+
+  /** The message of the hook's last error event, which the extension reports. */
+  function errorMessage(run: HookRun): string {
+    const event = run.stdout
+      .split('\n')
+      .filter((line) => line.includes('"type":"error"'))
+      .map((line) => JSON.parse(line) as { message?: unknown })
+      .at(-1);
+    return typeof event?.message === 'string' ? event.message : '';
   }
 });
 

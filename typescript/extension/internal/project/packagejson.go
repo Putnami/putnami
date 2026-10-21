@@ -51,6 +51,13 @@ func readPackageJSON(path string) (*PackageJSON, error) {
 	return &pkg, nil
 }
 
+// ReadPackageJSON reads and parses package.json. The error is the read error
+// (an *fs.PathError) or the parse error, so a caller can tell a missing file
+// from an unreadable or malformed one.
+func ReadPackageJSON(path string) (*PackageJSON, error) {
+	return readPackageJSON(path)
+}
+
 // ReadPackageJSONSafe reads package.json, returning nil if not found.
 func ReadPackageJSONSafe(path string) *PackageJSON {
 	pkg, err := readPackageJSON(path)

@@ -335,7 +335,8 @@ func setupUnmanifestedLoaderProject(t *testing.T) (*pctx.Context, string) {
 	}
 	mockAllExec(t, func(_ string, _ []string, _ ...exec.Option) (*exec.Result, error) {
 		return &exec.Result{Success: true, ExitCode: 0, Stdout: `{"type":"summary","data":` +
-			`{"exports":{"react-loader":"` + filepath.ToSlash(projectPath) + `/.gen/src/app/.react-application.gen.tsx"},"assets":{}}}` + "\n"}, nil
+			`{"exports":{"react-loader":"` + filepath.ToSlash(projectPath) + `/.gen/src/app/.react-application.gen.tsx"},"assets":{},` +
+			`"httpRoutes":{"v":1,"state":"complete"}}}` + "\n"}, nil
 	})
 	return ctx, projectPath
 }
@@ -355,7 +356,7 @@ func setupUninstalledDependencyProject(t *testing.T) (*pctx.Context, string) {
 	}
 	mockAllExec(t, func(_ string, args []string, _ ...exec.Option) (*exec.Result, error) {
 		t.Errorf("a process ran (%v) although a dependency of the project is not installed", args)
-		return &exec.Result{Success: true, Stdout: `{"type":"summary","data":{"exports":{},"assets":{}}}` + "\n"}, nil
+		return &exec.Result{Success: true, Stdout: completeHookSummary + "\n"}, nil
 	})
 	return ctx, projectPath
 }
