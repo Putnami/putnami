@@ -281,16 +281,25 @@ describe('registry seams', () => {
     expect(() => validateRegistryUrl('not a url')).toThrow(/invalid registry URL/);
   });
 
-  it('treats every registry-token failure mode as anonymous (fail-open to anonymous, never to a bad header)', () => {
-    expect(resolveRegistryToken('put.putnami.dev', () => ({ exitCode: 0, stdout: 'tok-123\n' }))).toBe('tok-123');
-    expect(resolveRegistryToken('put.putnami.dev', () => ({ exitCode: 1, stdout: 'tok-123' }))).toBeUndefined();
-    expect(resolveRegistryToken('put.putnami.dev', () => ({ exitCode: 0, stdout: '' }))).toBeUndefined();
+  it('treats every registry-token failure mode as anonymous (fail-open to anonymous, never to a bad header)', async () => {
+    expect(await resolveRegistryToken('put.putnami.dev', () => ({ exitCode: 0, stdout: 'tok-123\n' }))).toBe('tok-123');
+    expect(await resolveRegistryToken('put.putnami.dev', () => ({ exitCode: 1, stdout: 'tok-123' }))).toBeUndefined();
+    expect(await resolveRegistryToken('put.putnami.dev', () => ({ exitCode: 0, stdout: '' }))).toBeUndefined();
     // A human status line on stdout is not a bearer (protocols/registry ValidBearer).
-    expect(resolveRegistryToken('put.putnami.dev', () => ({ exitCode: 0, stdout: 'not signed in\n' }))).toBeUndefined();
     expect(
-      resolveRegistryToken('put.putnami.dev', () => {
+      await resolveRegistryToken('put.putnami.dev', () => ({ exitCode: 0, stdout: 'not signed in\n' })),
+    ).toBeUndefined();
+    expect(
+      await resolveRegistryToken('put.putnami.dev', () => {
         throw new Error('no putnami on PATH');
       }),
+    ).toBeUndefined();
+    // An async runner answers the same way as a sync one.
+    expect(
+      await resolveRegistryToken('put.putnami.dev', () => Promise.resolve({ exitCode: 0, stdout: 'tok-456\n' })),
+    ).toBe('tok-456');
+    expect(
+      await resolveRegistryToken('put.putnami.dev', () => Promise.reject(new Error('spawn failed'))),
     ).toBeUndefined();
   });
 

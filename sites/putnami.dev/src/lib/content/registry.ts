@@ -7,9 +7,12 @@
  *
  * - URL trust: https:// always; http:// only for loopback hosts or under
  *   `PUTNAMI_ALLOW_INSECURE_REGISTRY=1` (tooling/cli registry_url.go).
- * - Auth: the `registry-token/v1` seam (protocols/registry) — shell
- *   `putnami cloud registry-token --host <host>`; empty stdout, a non-zero
- *   exit, or a non-bearer value all mean "no token, proceed anonymously".
+ * - Auth: the `registry-token/v1` seam (protocols/registry) — spawn
+ *   `putnami cloud registry-token --host <host>` without a shell and without
+ *   blocking the event loop, with `PUTNAMI_NO_AUTO_INSTALL=1` (registrycred);
+ *   empty stdout, a non-zero exit, a non-bearer value, a missing CLI, or a
+ *   child stopped by its time or stdout bound all mean "no token, proceed
+ *   anonymously".
  * - Package naming: `RegistryRef` semantics — "site-content/cloud" →
  *   namespace "site-content", package "cloud"; unscoped names default to the
  *   "putnami" namespace.
@@ -80,27 +83,201 @@ export function validateRegistryUrl(raw: string): URL {
   throw new Error(`registry URL ${JSON.stringify(raw)} has unsupported scheme (only https and http are accepted)`);
 }
 
-/** Runs a command; the seam tests stub. Returns exit code and trimmed stdout. */
-export type CommandRunner = (argv: string[]) => { exitCode: number; stdout: string };
-
-function runPutnamiCommand(argv: string[]): { exitCode: number; stdout: string } {
-  // argv-form spawn of a fixed command: the host travels as a discrete
-  // argument, no shell is involved, so it cannot inject.
-  const proc = Bun.spawnSync(argv, { stdout: 'pipe', stderr: 'pipe' });
-  return { exitCode: proc.exitCode ?? 1, stdout: proc.stdout.toString() };
+/** Exit code and stdout of one command run. */
+export interface CommandResult {
+  exitCode: number;
+  stdout: string;
 }
 
 /**
- * Resolve a bearer for `host` through the registry-token/v1 seam. Any failure
- * mode (cloud absent, unmanaged host, signed out, non-bearer stdout) yields
- * undefined and the fetch proceeds anonymously — the digest check downstream
- * is what protects integrity, tokens only gate access.
+ * Runs a command; the seam tests stub. A runner may answer synchronously or
+ * with a promise: callers always await it.
  */
-export function resolveRegistryToken(host: string, run: CommandRunner = runPutnamiCommand): string | undefined {
-  if (host === '') return undefined;
-  let result: { exitCode: number; stdout: string };
+export type CommandRunner = (argv: string[]) => CommandResult | Promise<CommandResult>;
+
+/** Upper bound on one registry-token child, matching the Go seam (registrycred cloudTokenTimeout). */
+export const REGISTRY_TOKEN_TIMEOUT_MS = 30_000;
+
+/**
+ * Delay between SIGTERM and SIGKILL for a child that is still running, and the
+ * longest wait for its exit after SIGKILL.
+ */
+export const REGISTRY_TOKEN_KILL_GRACE_MS = 2000;
+
+/**
+ * Set to `1` in the registry-token child's environment, as the Go seam does
+ * (registrycred): the child mints one bearer and never runs a first-use install
+ * that would print on stdout ahead of the bearer.
+ */
+export const NO_AUTO_INSTALL_ENV = 'PUTNAMI_NO_AUTO_INSTALL';
+
+/** Upper bound on registry-token stdout; a bearer is far smaller. */
+export const MAX_REGISTRY_TOKEN_STDOUT_BYTES = 64 * 1024;
+
+/** The result every failed run maps to: the caller then proceeds anonymously. */
+const FAILED_RUN: CommandResult = { exitCode: 1, stdout: '' };
+
+export interface SpawnRunnerOptions {
+  /** Time after which the child is stopped and the run counts as failed. */
+  timeoutMs?: number;
+  /** Delay between SIGTERM and SIGKILL, and the longest wait for the exit after SIGKILL. */
+  killGraceMs?: number;
+  /** Stdout bytes beyond which the child is stopped and the run counts as failed. */
+  maxStdoutBytes?: number;
+}
+
+/**
+ * Read a stream to its end. Returns the bytes, or `null` once `cap` is passed;
+ * `cap` of `Infinity` drains and discards. Each chunk is awaited, so the event
+ * loop keeps serving while the child writes.
+ */
+async function drainStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  cap: number,
+  keep: boolean,
+): Promise<Uint8Array | null> {
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > cap) return null;
+    if (keep) chunks.push(value);
+  }
+  const out = new Uint8Array(keep ? total : 0);
+  let at = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, at);
+    at += chunk.length;
+  }
+  return out;
+}
+
+/** The part of a spawned child that {@link stopChild} uses. */
+interface RunningChild {
+  readonly exited: Promise<number>;
+  readonly exitCode: number | null;
+  readonly signalCode: string | null;
+  kill(signal?: number | NodeJS.Signals): void;
+}
+
+/** Resolves true once `child` has exited, or false after `ms`. */
+async function exitsWithin(child: RunningChild, ms: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const elapsed = new Promise<false>((resolve) => {
+    timer = setTimeout(() => resolve(false), ms);
+  });
   try {
-    result = run(['putnami', 'cloud', 'registry-token', '--host', host]);
+    return await Promise.race([child.exited.then(() => true), elapsed]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function sendSignal(child: RunningChild, signal: NodeJS.Signals): void {
+  try {
+    child.kill(signal);
+  } catch {
+    // A child that is already gone needs no signal.
+  }
+}
+
+/**
+ * Stop a child that is still running: SIGTERM, then SIGKILL once `graceMs`
+ * passes, then wait at most `graceMs` more for its exit. Never throws, and
+ * returns within `2 × graceMs`. A child that has already exited is left alone.
+ */
+async function stopChild(child: RunningChild, graceMs: number): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  sendSignal(child, 'SIGTERM');
+  if (await exitsWithin(child, graceMs)) return;
+  sendSignal(child, 'SIGKILL');
+  await exitsWithin(child, graceMs);
+}
+
+/**
+ * A runner that spawns `argv` without blocking the event loop. The child
+ * inherits this process's environment plus `PUTNAMI_NO_AUTO_INSTALL=1`. stdout
+ * and stderr are drained while the child runs; stderr is dropped, never logged.
+ *
+ * A run fails, and maps to {@link FAILED_RUN}, when `timeoutMs` passes, when
+ * stdout passes `maxStdoutBytes`, or when a pipe read fails. A spawn that
+ * throws (a missing executable) rejects instead, before any child exists. A
+ * failed child still running gets SIGTERM, then SIGKILL after `killGraceMs`.
+ * The returned promise settles within `timeoutMs + 2 × killGraceMs` plus
+ * scheduling: the second grace bounds the wait for the exit after SIGKILL. The
+ * pipe readers are then cancelled, so a grandchild that keeps a pipe open
+ * cannot hold the run.
+ *
+ * The child stays in this process's group, so a supervisor that stops the
+ * group also stops the child.
+ */
+export function spawnCommandRunner(options: SpawnRunnerOptions = {}): CommandRunner {
+  const timeoutMs = options.timeoutMs ?? REGISTRY_TOKEN_TIMEOUT_MS;
+  const killGraceMs = options.killGraceMs ?? REGISTRY_TOKEN_KILL_GRACE_MS;
+  const maxStdoutBytes = options.maxStdoutBytes ?? MAX_REGISTRY_TOKEN_STDOUT_BYTES;
+
+  return async (argv: string[]): Promise<CommandResult> => {
+    // argv-form spawn of a fixed command: the host travels as a discrete
+    // argument, no shell is involved, so it cannot inject. A missing
+    // executable throws here, before any resource exists; the caller maps
+    // that to anonymous.
+    const proc = Bun.spawn(argv, {
+      env: { ...process.env, [NO_AUTO_INSTALL_ENV]: '1' },
+      stdin: 'ignore',
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const stdoutReader = proc.stdout.getReader();
+    const stderrReader = proc.stderr.getReader();
+
+    // Settles once the deadline passes or stdout passes its cap.
+    let fail!: () => void;
+    const failed = new Promise<'failed'>((resolve) => {
+      fail = () => resolve('failed');
+    });
+    const deadline = setTimeout(() => fail(), timeoutMs);
+    const stdoutDone = drainStream(stdoutReader, maxStdoutBytes, true).then((bytes) => {
+      if (bytes === null) fail();
+      return bytes;
+    });
+    const stderrDone = drainStream(stderrReader, Number.POSITIVE_INFINITY, false);
+
+    try {
+      const outcome = await Promise.race([Promise.all([proc.exited, stdoutDone, stderrDone]), failed]);
+      if (outcome === 'failed') return FAILED_RUN;
+      const [, stdout] = outcome;
+      if (stdout === null) return FAILED_RUN;
+      return { exitCode: proc.exitCode ?? 1, stdout: new TextDecoder().decode(stdout) };
+    } catch {
+      return FAILED_RUN;
+    } finally {
+      clearTimeout(deadline);
+      await stopChild(proc, killGraceMs);
+      // Releases a pipe a surviving grandchild still holds; no-op once drained.
+      await Promise.allSettled([stdoutReader.cancel(), stderrReader.cancel()]);
+    }
+  };
+}
+
+const runPutnamiCommand: CommandRunner = spawnCommandRunner();
+
+/**
+ * Resolve a bearer for `host` through the registry-token/v1 seam. Any failure
+ * mode (cloud absent, unmanaged host, signed out, non-bearer stdout, a child
+ * that times out) yields undefined and the fetch proceeds anonymously — the
+ * digest check downstream is what protects integrity, tokens only gate access.
+ * The token is never logged.
+ */
+export async function resolveRegistryToken(
+  host: string,
+  run: CommandRunner = runPutnamiCommand,
+): Promise<string | undefined> {
+  if (host === '') return undefined;
+  let result: CommandResult;
+  try {
+    result = await run(['putnami', 'cloud', 'registry-token', '--host', host]);
   } catch {
     return undefined;
   }
@@ -168,7 +345,7 @@ export async function fetchBundleBlobFromRegistry(
     `${encodeURIComponent(namespace)}/${encodeURIComponent(pkg)}/blobs/${bundle.digest}`,
     base.href.endsWith('/') ? base.href : `${base.href}/`,
   );
-  const token = resolveRegistryToken(base.host, run);
+  const token = await resolveRegistryToken(base.host, run);
   const what = `fetch bundle blob ${bundle.package}@${bundle.digest.slice(0, 12)}`;
   const response = await registryGet(url, token, what);
   return readCappedBody(response, MAX_BUNDLE_BLOB_BYTES, what);
@@ -228,7 +405,7 @@ export async function fetchChannelPointerFromRegistry(
     `${encodeURIComponent(namespace)}/${encodeURIComponent(pkg)}/channels/${encodeURIComponent(channel)}`,
     base.href.endsWith('/') ? base.href : `${base.href}/`,
   );
-  const token = resolveRegistryToken(base.host, run);
+  const token = await resolveRegistryToken(base.host, run);
   const what = `resolve channel pointer ${packageName}@${channel}`;
   const response = await registryGet(url, token, what);
   const body = await readCappedBody(response, MAX_CHANNEL_POINTER_BYTES, what);
