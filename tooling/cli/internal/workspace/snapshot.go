@@ -136,6 +136,14 @@ type SnapshotProvider struct {
 	// while the bound provider still has this identity; an empty value is a
 	// record that predates the field and is re-probed once.
 	Implementation string `json:"implementation,omitempty"`
+	// InstallInputs are the workspace-root file names the provider's adapter
+	// declares as install inputs (ProviderScope.InstallInputs), sorted. Empty
+	// when the adapter declares none. They enter no digest.
+	InstallInputs []string `json:"installInputs,omitempty"`
+	// Language is the language id the provider's adapter declares
+	// (ProviderScope.Language). Empty when the adapter declares none. It enters
+	// no digest.
+	Language string `json:"language,omitempty"`
 }
 
 // SnapshotProject is one resolved project's recorded identity.

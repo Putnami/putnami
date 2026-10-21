@@ -232,6 +232,8 @@ own module, which the isolation above already forbids.
 | `inputs` | **yes** | Patterns whose **content** determines the probe's answer. Core hashes this bounded set on ordinary loads |
 | `excludes` | no | Directory patterns the scan must not descend into |
 | `syncTask` | no | A task in this manifest that performs the extension's own workspace mutations |
+| `installInputs` | no | Files whose content change makes the installed tree stale, such as a lockfile. Each is a literal file name at the **workspace root**, not a candidate-relative pattern: no `/`, no glob, each name once. Core records the set in `.putnami/workspace-index.json` |
+| `language` | no | The lowercase id of the language whose projects the adapter claims (`go`, `typescript`, `python`), matching `^[a-z][a-z0-9-]*$`. Core records it in `.putnami/workspace-index.json` |
 
 ### Paths, not modules
 

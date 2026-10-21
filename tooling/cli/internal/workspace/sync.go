@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -449,6 +450,8 @@ func synchronize(req SyncRequest) (*SyncOutcome, error) {
 			Result:         result,
 			Inputs:         providerInputs(root, candidates, binding.Scope.Inputs),
 			Implementation: binding.Implementation,
+			InstallInputs:  slices.Clone(binding.Scope.InstallInputs),
+			Language:       binding.Scope.Language,
 		})
 	}
 	// The orphans travel VERBATIM — result, digest and recorded inputs. The
@@ -503,8 +506,9 @@ func finishSync(root string, req SyncRequest, outcome *SyncOutcome, existing, re
 // snapshotStillHolds reports whether the recorded snapshot already describes
 // what the rebuild resolved. Every half is required: the identity and probe
 // digests answer "is this the same resolution", the provider digests answer "is
-// it the same provider answer", and re-hashing the recorded inputs answers
-// "does that resolution still match the tree".
+// it the same provider answer", the recorded declarations answer "does it
+// record what each adapter declares", and re-hashing the recorded inputs
+// answers "does that resolution still match the tree".
 func snapshotStillHolds(root string, existing, rebuilt *Snapshot) bool {
 	if existing == nil || rebuilt == nil {
 		return false
@@ -518,7 +522,9 @@ func snapshotStillHolds(root string, existing, rebuilt *Snapshot) bool {
 	for i := range existing.Providers {
 		if existing.Providers[i].Extension != rebuilt.Providers[i].Extension ||
 			existing.Providers[i].Digest != rebuilt.Providers[i].Digest ||
-			existing.Providers[i].Implementation != rebuilt.Providers[i].Implementation {
+			existing.Providers[i].Implementation != rebuilt.Providers[i].Implementation ||
+			!slices.Equal(existing.Providers[i].InstallInputs, rebuilt.Providers[i].InstallInputs) ||
+			existing.Providers[i].Language != rebuilt.Providers[i].Language {
 			return false
 		}
 	}

@@ -80,7 +80,9 @@
       "node_modules"
     ],
     "syncTask": "workspace-sync-exec",
-    "dependencySources": true
+    "dependencySources": true,
+    "installInputs": ["bun.lock", "bun.lockb"],
+    "language": "typescript"
   },
   "workspaceDevDependencies": {
     "@biomejs/biome": "2.5.3",

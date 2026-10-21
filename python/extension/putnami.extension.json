@@ -48,7 +48,9 @@
     "markers": ["pyproject.toml"],
     "inputs": ["pyproject.toml", "uv.lock"],
     "excludes": [".pytest_cache", ".ruff_cache", ".venv", "__pycache__", "build", "dist", "venv"],
-    "syncTask": "workspace-sync-exec"
+    "syncTask": "workspace-sync-exec",
+    "installInputs": ["uv.lock"],
+    "language": "python"
   },
   "commands": {
     "lint": {

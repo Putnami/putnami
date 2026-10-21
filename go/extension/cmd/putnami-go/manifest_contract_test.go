@@ -118,6 +118,23 @@ func TestExtensionManifestPassesFullValidation(t *testing.T) {
 // TestManifestExercisesTheV3TaskContract keeps the migration from silently
 // regressing to v2: a manifest whose tasks lose their `declares` blocks would
 // still validate (v3 is additive), so the version itself is asserted.
+// The workspace adapter names go.work as the one root file whose change makes
+// the installed tree stale: it names the modules an install prepares. go.sum
+// and go.work.sum stay out, because ordinary build and tidy flows rewrite them.
+// The adapter claims Go projects, under the language id "go".
+func TestWorkspaceAdapterDeclaresInstallInputsAndLanguage(t *testing.T) {
+	manifest := loadExtensionManifest(t)
+	if manifest.Workspace == nil {
+		t.Fatal("manifest declares no workspace adapter")
+	}
+	if got, want := manifest.Workspace.InstallInputs, []string{"go.work"}; !slices.Equal(got, want) {
+		t.Errorf("workspace.installInputs = %v, want %v", got, want)
+	}
+	if got := manifest.Workspace.Language; got != "go" {
+		t.Errorf("workspace.language = %q, want %q", got, "go")
+	}
+}
+
 func TestManifestExercisesTheV3TaskContract(t *testing.T) {
 	m := loadExtensionManifest(t)
 	if got := proto.ManifestProtocolVersion(m); got != proto.ProtocolVersionV3 {

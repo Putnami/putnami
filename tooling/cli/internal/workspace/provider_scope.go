@@ -49,6 +49,13 @@ type ProviderScope struct {
 	// DependencySources reports that the adapter declares edge attribution, so
 	// core may ask for it (wsproto.ProbeRequest.DependencySources).
 	DependencySources bool
+	// InstallInputs are the workspace-root file names whose content change
+	// makes the installed tree stale, sorted and deduplicated. A declared name
+	// the protocol rejects is dropped.
+	InstallInputs []string
+	// Language is the language id the adapter declares, or empty when it
+	// declares none or one the protocol rejects.
+	Language string
 }
 
 // NewProviderScope normalizes one declared adapter into a scope. It sorts and
@@ -66,6 +73,10 @@ func NewProviderScope(extension string, adapter *extproto.WorkspaceAdapter) (Pro
 		SyncTask:  strings.TrimSpace(adapter.SyncTask),
 
 		DependencySources: adapter.DependencySources,
+		InstallInputs:     normalizeInstallInputs(adapter.InstallInputs),
+	}
+	if extproto.IsWorkspaceLanguage(adapter.Language) {
+		scope.Language = adapter.Language
 	}
 	if len(scope.Markers) == 0 || len(scope.Inputs) == 0 {
 		// An adapter that marks nothing is never asked anything, and an adapter
@@ -82,6 +93,25 @@ func normalizePatternSet(patterns []string) []string {
 	out := make([]string, 0, len(patterns))
 	for _, pattern := range patterns {
 		clean, err := extproto.NormalizeInputPattern(pattern)
+		if err != nil || seen[clean] {
+			continue
+		}
+		seen[clean] = true
+		out = append(out, clean)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// normalizeInstallInputs is normalizePatternSet for the install-input set: it
+// keeps the names extproto.NormalizeInstallInput accepts, once each, sorted.
+// It returns nil for an adapter that declares none, so a provider without the
+// declaration records nothing.
+func normalizeInstallInputs(names []string) []string {
+	var out []string
+	seen := make(map[string]bool, len(names))
+	for _, name := range names {
+		clean, err := extproto.NormalizeInstallInput(name)
 		if err != nil || seen[clean] {
 			continue
 		}

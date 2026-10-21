@@ -15,7 +15,9 @@
     "markers": ["package.json"],
     "inputs": ["bun.lock", "package.json", "tsconfig*.json"],
     "excludes": ["dist", "node_modules"],
-    "syncTask": "workspace-sync"
+    "syncTask": "workspace-sync",
+    "installInputs": ["bun.lock", "bun.lockb"],
+    "language": "typescript"
   },
   "commands": {
     "test": {

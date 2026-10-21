@@ -69,6 +69,22 @@ func TestExtensionManifestPassesFullValidation(t *testing.T) {
 // TestManifestExercisesTheV3TaskContract keeps the migration from silently
 // regressing to v2: a manifest whose tasks lose their `declares` blocks would
 // still validate (v3 is additive), so the version itself is asserted.
+// The workspace adapter names uv.lock as the one root file whose change makes
+// the installed tree stale. The adapter claims Python projects, under the
+// language id "python".
+func TestWorkspaceAdapterDeclaresInstallInputsAndLanguage(t *testing.T) {
+	manifest := loadExtensionManifest(t)
+	if manifest.Workspace == nil {
+		t.Fatal("manifest declares no workspace adapter")
+	}
+	if got, want := manifest.Workspace.InstallInputs, []string{"uv.lock"}; !slices.Equal(got, want) {
+		t.Errorf("workspace.installInputs = %v, want %v", got, want)
+	}
+	if got := manifest.Workspace.Language; got != "python" {
+		t.Errorf("workspace.language = %q, want %q", got, "python")
+	}
+}
+
 func TestManifestExercisesTheV3TaskContract(t *testing.T) {
 	m := loadExtensionManifest(t)
 	if got := proto.ManifestProtocolVersion(m); got != proto.ProtocolVersionV3 {

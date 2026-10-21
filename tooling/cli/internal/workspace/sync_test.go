@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -406,6 +407,114 @@ func TestSynchronize_FreshSnapshotRebuildsTheMergedView(t *testing.T) {
 	if probed.Merged["web"].SourceName != adopted.Merged["web"].SourceName ||
 		probed.Merged["web"].Type != adopted.Merged["web"].Type {
 		t.Fatalf("adopted view %+v differs from the probed view %+v", adopted.Merged["web"], probed.Merged["web"])
+	}
+}
+
+// A provider's install inputs and language are recorded with its answer and
+// survive the write and the next load unchanged. A provider whose adapter
+// declares neither records neither, so its index entry keeps the bytes it had
+// before the members existed.
+func TestSynchronize_RecordedProviderRoundTripsItsDeclarations(t *testing.T) {
+	ws := syncFixture(t)
+	ts := &countingProvider{name: "@putnami/typescript"}
+	goProvider := &countingProvider{name: "@putnami/go"}
+	bindings := []ProviderBinding{
+		{
+			Scope: mustScope(t, ts.name, &extproto.WorkspaceAdapter{
+				Markers:       []string{"package.json"},
+				Inputs:        []string{"package.json"},
+				InstallInputs: []string{"bun.lockb", "bun.lock"},
+				Language:      "typescript",
+			}),
+			Provider: ts,
+		},
+		{
+			Scope:    scopeFor(t, goProvider.name, []string{"go.mod"}, []string{"go.mod"}),
+			Provider: goProvider,
+		},
+	}
+
+	if outcome := syncOnce(t, ws, bindings); !outcome.Persisted {
+		t.Fatal("first sync did not persist the snapshot")
+	}
+	loaded, err := LoadSnapshot(ws.Root)
+	if err != nil || loaded == nil {
+		t.Fatalf("LoadSnapshot = %v, %v", loaded, err)
+	}
+	recorded, ok := recordedProvider(loaded, ts.name)
+	if !ok {
+		t.Fatalf("no recorded provider %s", ts.name)
+	}
+	if !slices.Equal(recorded.InstallInputs, []string{"bun.lock", "bun.lockb"}) || recorded.Language != "typescript" {
+		t.Fatalf("recorded declarations = %v %q, want [bun.lock bun.lockb] typescript",
+			recorded.InstallInputs, recorded.Language)
+	}
+	bare, ok := recordedProvider(loaded, goProvider.name)
+	if !ok {
+		t.Fatalf("no recorded provider %s", goProvider.name)
+	}
+	if bare.InstallInputs != nil || bare.Language != "" {
+		t.Fatalf("a provider without the declarations recorded %v %q", bare.InstallInputs, bare.Language)
+	}
+
+	raw, err := os.ReadFile(SnapshotPath(ws.Root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(string(raw), `"installInputs"`); got != 1 {
+		t.Errorf("index carries %d installInputs members, want one: only the declaring provider writes it", got)
+	}
+	if got := strings.Count(string(raw), `"language"`); got != 1 {
+		t.Errorf("index carries %d language members, want one: only the declaring provider writes it", got)
+	}
+}
+
+// A changed declaration is a reason to write the index even when every answer
+// and every recorded input still holds: otherwise a full sync over an unchanged
+// tree would keep a record of what the adapter USED to declare.
+func TestSynchronize_FullSyncRecordsAChangedDeclaration(t *testing.T) {
+	ws := syncFixture(t)
+	provider := &countingProvider{name: "@putnami/python"}
+	before := []ProviderBinding{{
+		Scope:    scopeFor(t, provider.name, []string{"pyproject.toml"}, []string{"pyproject.toml"}),
+		Provider: provider,
+	}}
+	if outcome := syncOnce(t, ws, before); !outcome.Persisted {
+		t.Fatal("first sync did not persist the snapshot")
+	}
+
+	after := []ProviderBinding{{
+		Scope: mustScope(t, provider.name, &extproto.WorkspaceAdapter{
+			Markers:       []string{"pyproject.toml"},
+			Inputs:        []string{"pyproject.toml"},
+			InstallInputs: []string{"uv.lock"},
+			Language:      "python",
+		}),
+		Provider: provider,
+	}}
+	outcome, err := Synchronize(SyncRequest{Workspace: ws, Providers: after, Reason: wsproto.ProbeReasonLoad, Full: true})
+	if err != nil {
+		t.Fatalf("Synchronize: %v", err)
+	}
+	if !outcome.Persisted {
+		t.Fatal("a full sync whose adapter declarations changed did not rewrite the index")
+	}
+	loaded, err := LoadSnapshot(ws.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorded, _ := recordedProvider(loaded, provider.name)
+	if !slices.Equal(recorded.InstallInputs, []string{"uv.lock"}) || recorded.Language != "python" {
+		t.Fatalf("recorded declarations = %v %q, want [uv.lock] python", recorded.InstallInputs, recorded.Language)
+	}
+
+	// The same declaration again is no reason to write.
+	again, err := Synchronize(SyncRequest{Workspace: ws, Providers: after, Reason: wsproto.ProbeReasonLoad, Full: true})
+	if err != nil {
+		t.Fatalf("Synchronize: %v", err)
+	}
+	if again.Persisted {
+		t.Fatal("a full sync over an unchanged tree and unchanged declarations rewrote the index")
 	}
 }
 

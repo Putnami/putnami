@@ -1589,6 +1589,22 @@
         "dependencySources": {
           "type": "boolean",
           "description": "The probe attributes every edge it reports to the manifest family it came from (an import, or a declaration nothing imports). Core asks for the attribution only from an adapter that declares it: a provider built before the request member would reject a request carrying it."
+        },
+        "installInputs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[^/\\\\*?\\[\\]{}]+$",
+            "not": { "enum": [".", ".."] }
+          },
+          "description": "Files whose content change makes the installed tree stale, such as a lockfile. Each is a literal file name at the workspace root, unlike markers, inputs and excludes, which are candidate-directory-relative: no \"/\", no glob, each name once. Core records the set in the workspace index."
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "The lowercase id of the language whose projects this adapter claims, such as go, typescript or python. Core records it in the workspace index."
         }
       }
     },

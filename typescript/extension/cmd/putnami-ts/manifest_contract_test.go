@@ -1017,6 +1017,24 @@ func TestWorkspaceAdapterDeclaresEdgeAttribution(t *testing.T) {
 	}
 }
 
+// The workspace adapter names the bun lockfiles, text and binary, as the root
+// files whose change makes the installed tree stale. biome.json and the
+// tsconfig files change what a project resolves to and install nothing, so
+// they stay out. The adapter claims TypeScript projects, under the language id
+// "typescript".
+func TestWorkspaceAdapterDeclaresInstallInputsAndLanguage(t *testing.T) {
+	manifest := loadExtensionManifest(t)
+	if manifest.Workspace == nil {
+		t.Fatal("manifest declares no workspace adapter")
+	}
+	if got, want := manifest.Workspace.InstallInputs, []string{"bun.lock", "bun.lockb"}; !slices.Equal(got, want) {
+		t.Errorf("workspace.installInputs = %v, want %v", got, want)
+	}
+	if got := manifest.Workspace.Language; got != "typescript" {
+		t.Errorf("workspace.language = %q, want %q", got, "typescript")
+	}
+}
+
 // TestLintDocsIsKeyedOnTheCandidateCut holds the lint-docs declaration to the
 // one the SDK's docslinks.Job reads, so every language extension caches the
 // check on the same key. The check reads the workspace's Git candidate cut,
