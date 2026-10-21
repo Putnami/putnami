@@ -647,10 +647,9 @@ func AgentWorkflowPhaseApplies(wsRoot string, cfg *wsproto.Config) (bool, error)
 
 // EnsureAgentWorkflows is the implicit, lock-driven agent pass a fresh
 // worktree runs before its first command: the agent content of every opted-in
-// extension the COMMITTED lock pins, or the package manager already
-// installed, is materialized exactly as `putnami install` would. It skips an
-// unpinned extension and a package not installed yet (explicit install
-// installs both first), never builds a local extension's content (that is the
+// extension the COMMITTED lock pins is materialized exactly as `putnami
+// install` would. It skips an unpinned extension (explicit install installs it
+// first), never builds a local extension's content (that is the
 // authoring workspace's explicit `context generate`), never writes the lock,
 // and never removes anything. Once the files match, the pass reads and hashes
 // a few dozen files and writes nothing.
@@ -704,7 +703,7 @@ func EnsureAgentWorkflows(_ context.Context, wsRoot string, cfg *wsproto.Config)
 
 // ReconcileAgentWorkflows is the pass an agent session start runs (ADR 0040).
 // It brings the agent content of every opted-in extension to the release the
-// COMMITTED lock pins, or the package manager installed, so a worktree that
+// COMMITTED lock pins, so a worktree that
 // moved to another lock stops serving the instructions of the lock it was
 // installed with. The content is read from the extension release the worktree
 // already installed, so it never needs a download.
@@ -1033,10 +1032,6 @@ func DescribeAgentWorkflowPlan(wsRoot string, cfg *wsproto.Config, out io.Writer
 		return
 	}
 	for _, ref := range refs {
-		pin := "pinned by the extension"
-		if declared, err := extension.FindDeclaredExtension(wsRoot, cfg, ref.Extension); err == nil && declared.Package {
-			pin = "the package the package manager installs"
-		}
-		iox.Fprintf(out, "  Would materialize the agent content of extension %s at the version the extension resolves to (%s)\n", ref.Extension, pin)
+		iox.Fprintf(out, "  Would materialize the agent content of extension %s at the version the extension resolves to (pinned by the extension)\n", ref.Extension)
 	}
 }

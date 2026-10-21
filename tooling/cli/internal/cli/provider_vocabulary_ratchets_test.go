@@ -53,9 +53,7 @@ var providerVocabulary = []string{
 
 // providerVocabularyScopes are the core subtrees the epic emptied of provider
 // knowledge: the run composer, the plan/execute layer, the workspace model, and
-// extension resolution — which is in scope precisely because it holds the one
-// adapter the epic deliberately QUARANTINED rather than deleted
-// (TestQuarantineAdapterIsPinned).
+// extension resolution.
 //
 // The model module is scoped WHOLE rather than package by package: it exists to
 // hold the pure workspace, job and extension model and nothing else, so all of
@@ -84,7 +82,7 @@ type providerVocabularyResidue struct {
 // file that no longer names a provider must lose its entry, and an unlisted
 // file may not start.
 //
-// This list IS the effort's remaining tail, and it is short on purpose — seven
+// This list IS the effort's remaining tail, and it is short on purpose — six
 // files, one genuine behavioral branch among them. Each entry names what would
 // remove it, so the next program starts from an inventory rather than from a
 // grep. Adding an entry is a program-level decision: the epic's whole claim is
@@ -99,14 +97,14 @@ var providerVocabularyAllowlist = map[string]providerVocabularyResidue{
 			"declare option-derived project references generically",
 	},
 	"internal/extension/discovery.go": {
-		sites: 4,
-		why: "THE EPIC-D QUARANTINE. Discovery's third source is the root package.json's " +
-			"devDependencies: an npm-shaped way of declaring an installed extension, kept working " +
-			"because deleting it would break every workspace that installs extensions as npm " +
-			"packages. It is quarantined, not sanctioned — epic D owns replacing it with a " +
-			"provider-neutral installed-extension declaration. " +
-			"TestQuarantineAdapterIsPinned pins its exact shape so it can neither grow " +
-			"nor be quietly reshaped while it waits",
+		sites: 2,
+		why: "A NAME FALLBACK and a HOSTED REFUSAL, not a source. An extension manifest that names no " +
+			"extension takes the name and version of the package.json beside it. A hosted run refuses " +
+			"a path extension that lies inside a node_modules directory, because a package manager " +
+			"installed that code and the workspace lock does not pin it. No package.json and no " +
+			"node_modules directory supplies an extension. The fallback goes when every manifest " +
+			"carries its own name, and the refusal when a hosted run refuses every path extension " +
+			"that is not committed to the repository",
 	},
 	"internal/jobs/cachekey/extension_runtime.go": {
 		sites: 1,
@@ -335,82 +333,6 @@ func TestProviderVocabularyAllowlistOnlyShrinks(t *testing.T) {
 			t.Errorf("%s holds %d provider-naming sites, pinned at %d — %d added:\n%s\n"+
 				"  The entry covers the residue that was there, not new branches beside it: %s",
 				file, len(sites), residue.sites, len(sites)-residue.sites, describeSites(sites), residue.why)
-		}
-	}
-}
-
-// epicDQuarantineFile is the one adapter this program deliberately left in place.
-const epicDQuarantineFile = "internal/extension/discovery.go"
-
-// epicDQuarantineTokens are the literal tokens the root-package.json adapter is
-// built from. All of them must still appear in the quarantined file: together
-// they are its shape — read the root package.json, take devDependencies, look
-// each one up under node_modules.
-// The function token is spelled with its parenthesis so a RENAME is caught: a
-// bare "extractDevDeps" would still match "extractDevDepsRenamed", and a pin
-// that survives the thing it pins being renamed is not a pin.
-var epicDQuarantineTokens = []string{
-	`"package.json"`,
-	`"node_modules"`,
-	`"devDependencies"`,
-	"extractDevDeps(",
-}
-
-// epicDQuarantineExclusiveTokens are the tokens that identify the adapter
-// UNIQUELY: reading an npm manifest's devDependencies as a source of extension
-// identity. They may appear nowhere else in production, which is what
-// "quarantined" means here — one reader, in one file, where epic D already
-// knows to look.
-//
-// The other two tokens above are deliberately NOT exclusive: `"package.json"`
-// and `"node_modules"` appear in scan exclusions, template scaffolding, cache
-// hashing and the workspace-root marker, none of which read npm membership.
-// Claiming exclusivity for them would make this pin fire on unrelated work and
-// be deleted within a slice.
-var epicDQuarantineExclusiveTokens = []string{
-	`"devDependencies"`,
-	"extractDevDeps(",
-}
-
-// TestQuarantineAdapterIsPinned pins the quarantine two ways.
-//
-// The epic's contract is that core stops knowing about providers. This adapter
-// is the one exception it did not take: reading the root package.json's
-// devDependencies to find installed extensions is npm membership, and deleting
-// it would break every workspace that installs extensions that way. Epic D owns
-// the replacement.
-//
-// A quarantine that is not pinned is just a TODO. This test fails if the block
-// is removed or renamed here (an untracked deletion, which epic D must do
-// deliberately and with a migration) and if any of its tokens shows up in
-// another production file (the adapter spreading while it waits).
-func TestQuarantineAdapterIsPinned(t *testing.T) {
-	t.Parallel()
-	root := moduleRoot(t)
-	production, _ := goSources(t, root)
-
-	for _, tok := range epicDQuarantineTokens {
-		if count, _ := countTokenLines(t, root, []string{epicDQuarantineFile}, tok); count == 0 {
-			t.Errorf("%s no longer contains %s — the Epic-D quarantine (the root package.json "+
-				"devDependencies adapter) moved or was deleted. This test does not own its removal: deleting "+
-				"it breaks every workspace that installs extensions as npm packages. If epic D did "+
-				"remove it, delete this pin and its providerVocabularyAllowlist entry in the same "+
-				"change.", epicDQuarantineFile, tok)
-		}
-	}
-
-	var others []string
-	for _, rel := range production {
-		if rel != epicDQuarantineFile {
-			others = append(others, rel)
-		}
-	}
-	for _, tok := range epicDQuarantineExclusiveTokens {
-		if count, sites := countTokenLines(t, root, others, tok); count > 0 {
-			t.Errorf("%s appears outside the quarantine (%s):\n%s\n"+
-				"  The root package.json adapter is contained on purpose. A second reader of npm "+
-				"membership is a second thing epic D has to find and delete.",
-				tok, epicDQuarantineFile, indentSites(sites))
 		}
 	}
 }

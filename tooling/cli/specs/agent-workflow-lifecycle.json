@@ -10,7 +10,6 @@
     "Repeating any of the three commands with the same pin changes nothing on disk",
     "A v2 or v3 workspace can explicitly migrate its lock to v4",
     "A workspace that opts into an extension's agent content receives the instructions of exactly the extension version it installed",
-    "A workspace that installs an extension from npm receives its agent content from the same installed package as its commands and tools",
     "A workspace that still declares or records its workflows as separate artifacts is refused with nothing written and told what to replace or delete"
   ],
   "nonGoals": [
@@ -69,10 +68,6 @@
     {
       "id": "extension-agent-content-integrity",
       "text": "Every byte of an installed extension's content is bound through the extension's lock pin, its manifest digest and its content manifest digest, and a mismatch fails before the workspace is read. Collisions, symlinked destinations and overlaps with another extension abort with zero writes, a repeated install changes nothing, and an interrupted run converges on a rerun."
-    },
-    {
-      "id": "npm-extension-agent-content",
-      "text": "An npm extension declared in root package.json devDependencies ships its agent content from node_modules/<name>, where its commands load from: the package must carry the extension's name and manifest version and the packaged contribution. install, and an upgrade that runs the dependency phase, materialize it after the package manager runs, and never when it fails. A name declared both there and in extensions, or pinned while node_modules provides it, is refused with nothing written."
     },
     {
       "id": "superseded-owners-refused",

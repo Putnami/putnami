@@ -6,11 +6,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
-	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 	extproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -20,10 +18,10 @@ import (
 
 // DeclaredExtension is one extension declaration of the workspace resolved to
 // the name the extension answers to: an `extensions` entry of the workspace
-// config, or a devDependency of the root package.json.
+// config.
 type DeclaredExtension struct {
 	// Ref is the entry exactly as the workspace declares it: the `extensions`
-	// entry, or the devDependencies key.
+	// entry.
 	Ref string
 	// Name is the extension's resolved name.
 	Name string
@@ -31,14 +29,9 @@ type DeclaredExtension struct {
 	// or a workspace-relative `/` or `./` reference. A local extension is read
 	// from its directory and never pinned.
 	Local bool
-	// Package reports an extension the root package.json declares in
-	// devDependencies. The package manager installs it into
-	// node_modules/<name>, discovery loads its commands and tools from there,
-	// and the package manager's lock pins it.
-	Package bool
 	// Dir is the extension's root directory: the declared directory of a local
-	// extension, node_modules/<name> of a package. It is empty for a registry
-	// extension, whose installed tree is located through its lock pin.
+	// extension. It is empty for a registry extension, whose installed tree is
+	// located through its lock pin.
 	Dir string
 	// RequiredBy is the dependent of an extension the workspace does not
 	// declare but its graph holds (WalkWorkspaceGraph). Such a dependency is a
@@ -49,20 +42,14 @@ type DeclaredExtension struct {
 // FindDeclaredExtension resolves name to the one declaration of the workspace
 // that provides it, in discovery's order. An `extensions` entry comes first: a
 // registry entry answers to its own key, and a local entry to the name its
-// manifest resolves to, exactly as discovery names it. A root package.json
-// devDependency answers to its key when no `extensions` entry provides the
-// name, because discovery reads devDependencies last.
+// manifest resolves to, exactly as discovery names it.
 //
-// A dependency of the workspace's graph answers to its name next, before a
-// devDependency, because discovery loads it first: the workspace chose it
-// through the extension that requires it (ADR 0066).
+// A dependency of the workspace's graph answers to its name next: the
+// workspace chose it through the extension that requires it (ADR 0066).
 //
 // An extension the workspace does not declare, or declares twice, is an error:
 // agent content is only ever taken from an extension the workspace chose, and
-// from exactly one source. A registry entry and a devDependency of one name
-// are two sources — the lock pins one release, the package manager installs
-// another — so the pair is refused. A local entry shadows a devDependency in
-// discovery, so it is the one source.
+// from exactly one source.
 func FindDeclaredExtension(wsRoot string, cfg *wsproto.Config, name string) (DeclaredExtension, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -96,17 +83,8 @@ func FindDeclaredExtension(wsRoot string, cfg *wsproto.Config, name string) (Dec
 		if requiredBy := graphDependent(wsRoot, cfg, name); requiredBy != "" {
 			return DeclaredExtension{Ref: name, Name: name, RequiredBy: requiredBy}, nil
 		}
-		if declaresPackageExtension(wsRoot, name) {
-			return DeclaredExtension{Ref: name, Name: name, Package: true, Dir: installedPackageDir(wsRoot, name)}, nil
-		}
 		return DeclaredExtension{}, undeclaredExtension(name)
 	case 1:
-		if !matches[0].Local && declaresPackageExtension(wsRoot, name) {
-			return DeclaredExtension{}, fmt.Errorf(
-				"extension %s is declared twice: in %s extensions, where %s pins its release, and as a development dependency of the root package manifest, where the package manager installs its own. "+
-					"The two can be different releases, so its commands and its agent content could disagree; declare it once",
-				name, wsproto.WorkspaceConfigFilename, lockfile.LockFilename)
-		}
 		return matches[0], nil
 	default:
 		refs := make([]string, 0, len(matches))
@@ -120,9 +98,8 @@ func FindDeclaredExtension(wsRoot string, cfg *wsproto.Config, name string) (Dec
 
 // DeclaredExtensionNames returns the names of the extensions the workspace
 // declares, in sorted order: a registry entry answers to its own key, a local
-// entry to the name its manifest resolves to, and a development dependency of
-// the root package manifest to its key once the package manager installed an
-// extension manifest under it. A local entry that cannot be loaded is left out.
+// entry to the name its manifest resolves to. A local entry that cannot be
+// loaded is left out.
 func DeclaredExtensionNames(wsRoot string, cfg *wsproto.Config) []string {
 	if cfg == nil {
 		return nil
@@ -139,14 +116,6 @@ func DeclaredExtensionNames(wsRoot string, cfg *wsproto.Config) []string {
 		}
 		if ext, _ := tryLoadExtension(dir, ref, false); ext != nil && ext.Name != "" {
 			seen[ext.Name] = true
-		}
-	}
-	for name := range rootPackageDeclarations(wsRoot) {
-		if seen[name] || !validPackageName(name) {
-			continue
-		}
-		if _, err := os.Stat(filepath.Join(installedPackageDir(wsRoot, name), ManifestFilename)); err == nil {
-			seen[name] = true
 		}
 	}
 	names := make([]string, 0, len(seen))
@@ -194,47 +163,6 @@ func IsUndeclaredExtension(err error) bool {
 // extension whose manifest declares no agent content.
 var ErrNoAgentContent = errors.New("declares no agent content")
 
-// packageNameFormat is the package-name grammar a declared dependency key must
-// follow before it becomes a path under the package manager's install
-// directory: an optional @scope/ and one lowercase name, never a path
-// traversal.
-var packageNameFormat = regexp.MustCompile(`^(@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*$`)
-
-func validPackageName(name string) bool {
-	return packageNameFormat.MatchString(name) && !strings.Contains(name, "..")
-}
-
-// declaresPackageExtension reports whether the root package manifest declares
-// name among the development dependencies discovery reads extensions from
-// (rootPackageDeclarations). The declaration is read from the committed
-// manifest, so it holds before the package manager has installed anything.
-func declaresPackageExtension(wsRoot, name string) bool {
-	if !validPackageName(name) {
-		return false
-	}
-	_, declared := rootPackageDeclarations(wsRoot)[name]
-	return declared
-}
-
-// workspaceDisplayPath renders target relative to the workspace root, with
-// forward slashes, for a message.
-func workspaceDisplayPath(wsRoot, target string) string {
-	if rel, err := filepath.Rel(wsRoot, target); err == nil {
-		return filepath.ToSlash(rel)
-	}
-	return filepath.ToSlash(target)
-}
-
-// PackageExtensionInstalled reports whether the package manager has installed
-// the extension manifest of a package declaration.
-func PackageExtensionInstalled(declared DeclaredExtension) bool {
-	if !declared.Package || declared.Dir == "" {
-		return false
-	}
-	_, err := os.Stat(filepath.Join(declared.Dir, ManifestFilename))
-	return err == nil
-}
-
 // isLocalExtensionReference reports whether an `extensions` entry names a
 // directory rather than a registry artifact, by the rule the extension
 // commands apply.
@@ -276,13 +204,9 @@ type AgentContentSource struct {
 	Root string
 	// Local reports a development source declared by path.
 	Local bool
-	// Package reports an extension the package manager installed into
-	// node_modules from a root package.json devDependency.
-	Package bool
 	// ManifestHash is the SHA-256 of the extension manifest bytes. For an
 	// installed extension it is verified equal to the manifest digest its lock
-	// pin records, which is what binds the contribution to that pin. For a
-	// package it is the digest of the manifest the package manager installed.
+	// pin records, which is what binds the contribution to that pin.
 	ManifestHash string
 	// Contribution is the validated agentContent section.
 	Contribution extproto.AgentContentContribution
@@ -298,17 +222,7 @@ type AgentContentSource struct {
 // workspace's stable link must hash to exactly that digest, and it must carry
 // the packaged contribution form. The chain lock → extension manifest →
 // agentContent.manifestSha256 → content manifest → file digests then binds
-// every byte the materializer may write to the one release the lock pins. A
-// registry extension that node_modules also provides is refused: discovery
-// loads its commands from node_modules first, so they need not be the pinned
-// release.
-//
-// A package extension is read from node_modules/<name>, the package the
-// package manager installed: its package.json must carry the extension's name
-// and the version its manifest declares, and the manifest must carry the
-// packaged contribution form. The chain package → extension manifest →
-// agentContent.manifestSha256 → content manifest → file digests binds every
-// byte to that installed package, which the package manager's lock pins.
+// every byte the materializer may write to the one release the lock pins.
 //
 // A local extension is read from its declared directory and may be built from
 // its authored source.
@@ -320,90 +234,10 @@ func LocateAgentContent(wsRoot string, cfg *wsproto.Config, name string) (*Agent
 	if err != nil {
 		return nil, err
 	}
-	switch {
-	case declared.Local:
+	if declared.Local {
 		return locateLocalAgentContent(declared)
-	case declared.Package:
-		return locatePackageAgentContent(wsRoot, declared)
-	}
-	// A dependency loads from its lock pin whatever node_modules holds, so
-	// no package shadows it.
-	if declared.RequiredBy == "" {
-		if err := refuseShadowingPackage(wsRoot, declared.Name); err != nil {
-			return nil, err
-		}
 	}
 	return locateInstalledAgentContent(wsRoot, declared.Name)
-}
-
-// refuseShadowingPackage refuses a registry extension the package manager also
-// installed. For an `extensions` entry, discovery probes the package manager's
-// install directory before the pinned install (installedPackageDir), so a
-// loadable package there serves the extension's commands, and content bound to
-// the lock pin could belong to another release.
-func refuseShadowingPackage(wsRoot, name string) error {
-	if !validPackageName(name) {
-		return nil
-	}
-	dir := installedPackageDir(wsRoot, name)
-	if ext, _ := tryLoadExtension(dir, name, false); ext == nil {
-		return nil
-	}
-	return fmt.Errorf(
-		"extension %s is pinned by %s, but %s also provides it, and its commands load from there first, so they need not be the pinned release. "+
-			"Remove the package, or declare the extension only as a development dependency of the root package manifest",
-		name, lockfile.LockFilename, workspaceDisplayPath(wsRoot, dir))
-}
-
-// locatePackageAgentContent reads the contribution of an extension the package
-// manager installed. The package's own manifest names the release: it must be
-// the package declared under this name, at the version the extension manifest
-// carries, which is the version the package's packager stamps into it.
-func locatePackageAgentContent(wsRoot string, declared DeclaredExtension) (*AgentContentSource, error) {
-	name := declared.Name
-	display := workspaceDisplayPath(wsRoot, filepath.Join(declared.Dir, ManifestFilename))
-	data, err := readRegularManifest(filepath.Join(declared.Dir, ManifestFilename))
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, protocolcli.WithNext(fmt.Errorf("the root package manifest declares extension %s as a development dependency, but the package manager has not installed it (%s): run `putnami install`",
-			name, display), "putnami install")
-	}
-	if err != nil {
-		return nil, fmt.Errorf("extension %s (%s): %w", name, display, err)
-	}
-	pkgName, pkgVersion := readPackageNameVersion(declared.Dir)
-	if pkgName != name {
-		return nil, fmt.Errorf("%s holds package %q, not %s: an extension's agent content is read only from the package installed under its own name",
-			workspaceDisplayPath(wsRoot, declared.Dir), pkgName, name)
-	}
-	m, err := extproto.NegotiateManifest(display, data)
-	if err != nil {
-		return nil, err
-	}
-	if manifestName := strings.TrimSpace(m.Name); manifestName != "" && manifestName != name {
-		return nil, fmt.Errorf("package %s ships the manifest of extension %s: an extension package is published under the extension's own name", name, manifestName)
-	}
-	version := strings.TrimSpace(m.Version)
-	if version == "" || version != strings.TrimSpace(pkgVersion) {
-		return nil, fmt.Errorf("installed extension %s declares version %q, but its package is version %q: a packaged extension carries its package version in its manifest",
-			name, version, pkgVersion)
-	}
-	contribution, err := validatedContribution(name, m)
-	if err != nil {
-		return nil, err
-	}
-	if !contribution.Packaged() {
-		return nil, fmt.Errorf("installed extension %s@%s ships its agent content as source only; a published package carries the built tree bound by agentContent.manifestSha256. "+
-			"To build it from source, declare its directory in %s extensions",
-			name, version, wsproto.WorkspaceConfigFilename)
-	}
-	return &AgentContentSource{
-		Name:         name,
-		Version:      version,
-		Root:         declared.Dir,
-		Package:      true,
-		ManifestHash: lockfile.HashBytes(data),
-		Contribution: contribution,
-	}, nil
 }
 
 func locateLocalAgentContent(declared DeclaredExtension) (*AgentContentSource, error) {

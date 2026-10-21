@@ -124,8 +124,7 @@ func matchJobs(
 			return a.Priority > b.Priority
 		}
 
-		// Secondary: prefer extensions listed in the project's devDependencies
-		// or putnami.json extensions field
+		// Secondary: prefer extensions the project lists (proj.Extensions)
 		aMatch := extSet[a.ExtensionName]
 		bMatch := extSet[b.ExtensionName]
 		if aMatch != bMatch {

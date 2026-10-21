@@ -24,9 +24,8 @@ import (
 // the extension it declares under <name>. The entry names no version and no
 // source of its own — the content is the one the resolved extension ships, so
 // there is exactly one version to resolve, pin and upgrade — and it is never
-// pinned under `agentArtifacts`: the extension's own lock entry is the pin, or,
-// for an npm extension the root package.json declares, the package manager's
-// lock. Everything after resolution is the materializer's ordinary path: the same
+// pinned under `agentArtifacts`: the extension's own lock entry is the pin.
+// Everything after resolution is the materializer's ordinary path: the same
 // plan, the same run-wide collision and overlap checks, the same ownership
 // record, the same retirement when the entry is removed.
 //
@@ -240,9 +239,7 @@ var extensionNameFormat = regexp.MustCompile(`^(@[a-z0-9-]+/[a-z0-9-]+|[a-z0-9][
 // the extension manifest declares, and the identity digest recorded in the
 // ownership state is the extension manifest's own digest — the value the lock
 // binds — so a record names exactly which extension release installed its
-// files. For an npm extension the tree is the packaged one inside the package
-// the package manager installed, with the same three values read from it. A
-// local extension that declares its authored source is built with the
+// files. A local extension that declares its authored source is built with the
 // packager's builder on every run and staged in this worktree only.
 //
 // A contribution that supersedes an artifact this clone still records as
@@ -392,52 +389,21 @@ func localExtensionAgentContent(wsRoot string, cfg *wsproto.Config, ref AgentArt
 	return declared.Local, nil
 }
 
-// AgentContentFollowsPackageManager reports whether any opted-in extension is
-// an npm package the root package.json declares. Its content is read from the
-// package the package manager installs, so an adopting command plans the agent
-// phase after the package manager has run: before it, node_modules can still
-// hold the previous release, whose commands the next command no longer loads.
-// A declaration that does not resolve reports false here; the agent phase
-// reports it.
-func AgentContentFollowsPackageManager(wsRoot string, cfg *wsproto.Config) bool {
-	refs, err := DeclaredAgentArtifacts(wsRoot, cfg)
-	if err != nil {
-		return false
-	}
-	for _, ref := range refs {
-		declared, err := extension.FindDeclaredExtension(wsRoot, cfg, ref.Extension)
-		if err == nil && declared.Package {
-			return true
-		}
-	}
-	return false
-}
-
 // pinnedExtensionAgentContent resolves an opted-in contribution for the
 // passes that act only on what is already installed — the first-run ensure
 // pass and the session-start reconcile. It reports false, with no error, for a
 // local extension (those passes never build), for a registry extension the
-// lock does not pin (an explicit install pins it first), and for a package the
-// package manager has not installed yet (an explicit install runs it).
+// lock does not pin (an explicit install pins it first).
 func pinnedExtensionAgentContent(wsRoot string, cfg *wsproto.Config, lf *lockfile.LockFile, ref AgentArtifactRef) (AgentArtifactResolution, bool, error) {
 	declared, err := extension.FindDeclaredExtension(wsRoot, cfg, ref.Extension)
 	if err != nil {
 		return AgentArtifactResolution{}, false, agentArtifactFailure(ref.Name, nil, err)
 	}
-	switch {
-	case declared.Local:
+	if declared.Local || lf == nil {
 		return AgentArtifactResolution{}, false, nil
-	case declared.Package:
-		if !extension.PackageExtensionInstalled(declared) {
-			return AgentArtifactResolution{}, false, nil
-		}
-	default:
-		if lf == nil {
-			return AgentArtifactResolution{}, false, nil
-		}
-		if _, pinned := lf.GetExtension(ref.Extension); !pinned {
-			return AgentArtifactResolution{}, false, nil
-		}
+	}
+	if _, pinned := lf.GetExtension(ref.Extension); !pinned {
+		return AgentArtifactResolution{}, false, nil
 	}
 	resolution, err := resolveExtensionAgentContent(wsRoot, cfg, ref)
 	if err != nil {

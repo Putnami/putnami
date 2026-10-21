@@ -347,29 +347,12 @@ func upgradePhases(ctx context.Context, wsRoot string, cfg *wsproto.Config, curr
 		return err
 	}
 
-	// The content of an npm extension follows the package the package manager
-	// installs, so when this upgrade runs the dependency phase, the agent phase
-	// runs after it instead of inside the artifact phases.
-	agentAfterDeps := (all || flags.Deps) && agentctx.AgentContentFollowsPackageManager(wsRoot, cfg)
-
 	if all || flags.Extensions {
-		anyError = upgradeArtifactPhases(ctx, wsRoot, cfg, selector, flags, !agentAfterDeps) || anyError
+		anyError = upgradeArtifactPhases(ctx, wsRoot, cfg, selector, flags) || anyError
 	}
 
-	depsFailed := false
 	if all || flags.Deps {
-		depsFailed = upgradeDependencyPhase(ctx, wsRoot, cfg, selector, flags.DryRun, flags.ContinueOnError, env)
-		anyError = depsFailed || anyError
-	}
-
-	// A failed dependency phase skips the deferred agent phase, as install
-	// does: the previous content and record stay until a run whose package
-	// manager succeeds.
-	if agentAfterDeps && depsFailed {
-		iox.Fprintln(os.Stdout, "\n  Agent workflows")
-		iox.Fprintln(os.Stderr, "  ✗ Agent workflows update: skipped because the dependency phase failed; the previous content stays until the package manager succeeds")
-	} else if agentAfterDeps {
-		anyError = upgradeAgentWorkflowPhase(ctx, wsRoot, cfg, flags.DryRun) || anyError
+		anyError = upgradeDependencyPhase(ctx, wsRoot, cfg, selector, flags.DryRun, flags.ContinueOnError, env) || anyError
 	}
 
 	iox.Fprintln(os.Stdout)
@@ -411,11 +394,11 @@ func upgradeDependencyPhase(ctx context.Context, wsRoot string, cfg *wsproto.Con
 }
 
 // upgradeArtifactPhases runs the registry-artifact half of an upgrade —
-// extensions, templates and, when agentPhase is set, agent workflows — and
+// extensions, templates and agent workflows — and
 // reports whether any of them failed. Like every other upgrade phase these
 // COLLECT failures instead of returning at the first one, so a dead template
 // registry does not hide the state of the other two.
-func upgradeArtifactPhases(ctx context.Context, wsRoot string, cfg *wsproto.Config, selector upgradeSelector, flags UpgradeFlags, agentPhase bool) bool {
+func upgradeArtifactPhases(ctx context.Context, wsRoot string, cfg *wsproto.Config, selector upgradeSelector, flags UpgradeFlags) bool {
 	artifactOptions := extensions.ArtifactUpdateOptions{
 		ConstraintOverride: selector.RegistryTarget,
 		DryRun:             flags.DryRun,
@@ -448,9 +431,7 @@ func upgradeArtifactPhases(ctx context.Context, wsRoot string, cfg *wsproto.Conf
 		anyError = true
 	}
 
-	if agentPhase {
-		anyError = upgradeAgentWorkflowPhase(ctx, wsRoot, cfg, flags.DryRun) || anyError
-	}
+	anyError = upgradeAgentWorkflowPhase(ctx, wsRoot, cfg, flags.DryRun) || anyError
 	return anyError
 }
 

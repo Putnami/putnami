@@ -210,17 +210,6 @@ digest the lock records, the manifest's `agentContent.manifestSha256` matches
 the content manifest, and every file matches the content manifest's digest. A
 local extension has no pin at all; see the previous section.
 
-An npm extension is the exception, because a package manager installs it. The
-root `package.json` declares it in `devDependencies`, the package manager's lock
-pins it, and discovery loads its commands and tools from `node_modules/<name>`.
-Its content is read from that same package, after the package manager ran:
-`putnami install` materializes it after the workspace installers, and
-`putnami upgrade` after its dependency phase. The package's `package.json` must
-carry the extension's name and the version its manifest declares; the rest of
-the chain is the same. Declare such an extension only in `devDependencies`: an
-`extensions` entry of the same name is refused, because the two can be
-different releases.
-
 A fresh clone or worktree does not need an explicit install either. The
 implicit pass a job command (`build`, `test`, `lint`, `serve`, …) runs before
 its first job — the same one that materializes lock-pinned extensions and

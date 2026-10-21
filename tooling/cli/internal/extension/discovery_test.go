@@ -334,31 +334,6 @@ func TestDiscoverExtensions_NameFromPackageJSON(t *testing.T) {
 	}
 }
 
-func TestExtractDevDeps(t *testing.T) {
-	data := []byte(`{"devDependencies": {"@putnami/ts": "^1.0.0", "@putnami/go": "^2.0.0"}}`)
-	deps := extractDevDeps(data)
-	if len(deps) != 2 {
-		t.Fatalf("len = %d, want 2", len(deps))
-	}
-	if deps["@putnami/ts"] != "^1.0.0" {
-		t.Errorf("ts = %q, want %q", deps["@putnami/ts"], "^1.0.0")
-	}
-}
-
-func TestExtractDevDeps_InvalidJSON(t *testing.T) {
-	deps := extractDevDeps([]byte("{invalid"))
-	if deps != nil {
-		t.Error("extractDevDeps with invalid JSON should return nil")
-	}
-}
-
-func TestExtractDevDeps_NoDeps(t *testing.T) {
-	deps := extractDevDeps([]byte(`{"name": "test"}`))
-	if deps != nil {
-		t.Error("extractDevDeps with no devDependencies should return nil")
-	}
-}
-
 func TestSelectPreparedExtensionsReplacesAmbientAndHonorsUnavailable(t *testing.T) {
 	root := t.TempDir()
 	manifest := `{"name":"@putnami/cloud","version":"1.2.3","cliContract":4,"commands":{}}`

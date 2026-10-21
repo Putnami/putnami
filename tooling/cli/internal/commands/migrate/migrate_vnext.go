@@ -223,8 +223,8 @@ func applyVNextMigration(lf *lockfile.LockFile, report VNextReport) {
 // installedTaskContract reads the task-contract version an installed
 // extension's manifest declares, or returns the drift record explaining why it
 // could not. Probe order is fixed (stable symlink, versioned artifact
-// directory, node_modules) so the answer does not depend on the environment
-// beyond which of them exists.
+// directory) so the answer does not depend on the environment beyond which of
+// them exists.
 func installedTaskContract(root, name, version string) (int, *VNextDrift) {
 	for _, dir := range installedExtensionDirs(root, name, version) {
 		path := filepath.Join(dir, extension.ManifestFilename)
@@ -251,7 +251,7 @@ func installedExtensionDirs(root, name, version string) []string {
 	if version != "" {
 		dirs = append(dirs, layout.ArtifactDir(root, layout.Extensions, name, version))
 	}
-	return append(dirs, filepath.Join(root, "node_modules", filepath.FromSlash(name)))
+	return dirs
 }
 
 // renderVNextCheck writes the check result and returns the error that carries

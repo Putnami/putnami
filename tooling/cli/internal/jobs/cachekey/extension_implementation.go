@@ -89,7 +89,7 @@ func extensionImplementationDigest(
 //
 // A tree inside the artifact store is immutable: its digest is recorded beside
 // it, per archive digest, and later runs read that record. Every other tree,
-// such as a node_modules package or a per-worktree install, can change between
+// such as a per-worktree install, can change between
 // runs, so each run digests it again and nothing records it. A tree laid out as
 // an entry of another store, such as one an install under another artifact
 // directory linked, is digested the same way, without the bookkeeping that

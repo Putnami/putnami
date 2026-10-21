@@ -67,11 +67,15 @@ func DiscoverExtensions(workspaceRoot string, cfg *wsproto.Config, projectPaths 
 //  1. Workspace projects that have a putnami.extension.json, except one whose
 //     name the workspace config pins by name
 //  2. Explicitly referenced extensions from workspace config
-//     (checked as workspace path, node_modules, and .putnami/extensions/ via lock file)
+//     (checked as an absolute path, a workspace path, and .putnami/extensions/ via lock file)
 //  3. A project manifest source 1 set aside whose pinned build did not load
 //  4. The dependencies of the declared extensions, from the install layout
 //     (dependencyDiscovery)
-//  5. Extensions from node_modules (devDependencies), except a dependency name
+//
+// No package manager directory and no package.json is a source: an extension
+// loads only because it is a workspace extension project (source 1, which
+// needs no name in the workspace config), or because the workspace config, the
+// lock or a dependency names it.
 //
 // A name is registered once, by the first source that loads it. A workspace
 // config key equal to a project manifest's name, and that is not that
@@ -83,12 +87,12 @@ func DiscoverExtensions(workspaceRoot string, cfg *wsproto.Config, projectPaths 
 // explicitly referenced extension is only recorded as skipped when no probe
 // location loaded it.
 //
-// A hosted run (runcredential.Hosted) looks in no node_modules directory, and
-// reads a workspace config key as a workspace path only when the key is
-// path-shaped (declaredByPath): any other key names an extension, which loads
-// from the artifact store, and a workspace project of that name never loads in
-// place of a pinned build that is not installed (settlePinnedProjects). It keeps the extensions installed from the artifact
-// store (InArtifactStore) and the workspace's own path extensions
+// A hosted run (runcredential.Hosted) reads a workspace config key as a
+// workspace path only when the key is path-shaped (declaredByPath): any other
+// key names an extension, which loads from the artifact store, and a workspace
+// project of that name never loads in place of a pinned build that is not
+// installed (settlePinnedProjects). It keeps the extensions installed from the
+// artifact store (InArtifactStore) and the workspace's own path extensions
 // (WorkspacePathExtension), and returns every other one in Skipped. A path
 // extension loses its provider capabilities, each recorded in
 // RemovedCapabilities: no repository code can receive a credential, and the
@@ -170,7 +174,7 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 		}
 		// A ref that names a volume is a Windows absolute (or drive-relative)
 		// path, and only the absolute probe above can load it: joined under the
-		// workspace, node_modules or the install layout it names nothing.
+		// workspace or the install layout it names nothing.
 		if volume := filepath.VolumeName(extRef); volume != "" {
 			if ext == nil && len(refSkips) == 0 {
 				refSkips = append(refSkips, SkippedExtension{
@@ -199,19 +203,8 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 				continue
 			}
 		}
-		// Try as a package name in node_modules
-		var skip *SkippedExtension
-		if !hosted {
-			nmPath := installedPackageDir(workspaceRoot, extRef)
-			ext, skip = tryLoadExtension(nmPath, extRef, false)
-			collect(skip)
-			if ext != nil && !seen[ext.Name] {
-				seen[ext.Name] = true
-				extensions = append(extensions, ext)
-				continue
-			}
-		}
 		// Try as an installed extension via stable symlink or artifact directory
+		var skip *SkippedExtension
 		ext, skip = tryLoadInstalledExtension(workspaceRoot, extRef, lockFile)
 		collect(skip)
 		if ext != nil && !seen[ext.Name] {
@@ -227,33 +220,9 @@ func DiscoverExtensionsDetailed(workspaceRoot string, cfg *wsproto.Config, proje
 	extensions, unsettled := settlePinnedProjects(workspaceRoot, extensions, pinnedLocal, seen, hosted)
 	recordSkips(unsettled)
 
-	// 4. The dependencies of the declared extensions. Each one is marked seen,
-	// so a development dependency below never loads in its place.
-	extensions, dependencies, unloaded, dependencyRemoved := graph.run(extensions, seen)
+	// 4. The dependencies of the declared extensions.
+	extensions, dependencies, unloaded, dependencyRemoved := graph.run(extensions)
 	recordSkips(unloaded)
-
-	// 5. Scan root package.json devDependencies for extension packages.
-	// Quick-check: only attempt full manifest load for packages that
-	// actually have a putnami.extension.json, avoiding wasted I/O for
-	// non-extension devDependencies (typically the majority).
-	for depName := range rootPackageDeclarations(workspaceRoot) {
-		if hosted || seen[depName] {
-			continue
-		}
-		nmPath := installedPackageDir(workspaceRoot, depName)
-		manifestPath := filepath.Join(nmPath, "putnami.extension.json")
-		if _, err := os.Stat(manifestPath); err != nil {
-			continue
-		}
-		ext, skip := tryLoadExtension(nmPath, depName, false)
-		if skip != nil {
-			recordSkips([]SkippedExtension{*skip})
-		}
-		if ext != nil && !seen[ext.Name] {
-			seen[ext.Name] = true
-			extensions = append(extensions, ext)
-		}
-	}
 
 	extensions, notHosted, removed := keepHostedExtensions(workspaceRoot, extensions)
 	recordSkips(notHosted)
@@ -429,7 +398,7 @@ func LoadExtensionFromDir(absPath, refName string) *ExtensionDescription {
 // read surface was already selected from the workspace lock. A non-empty root
 // is loaded as an installed extension; an empty root means exact preparation
 // failed and the ref is removed. Unrelated local extensions remain untouched.
-// This keeps read consumers from choosing node_modules or a stale stable link
+// This keeps read consumers from choosing a stale stable link
 // after the bounded preparation pass made a lock-faithful decision.
 func SelectPreparedExtensions(discovered []*ExtensionDescription, prepared map[string]string) []*ExtensionDescription {
 	if len(prepared) == 0 {
@@ -718,7 +687,7 @@ func tryLoadExtension(absPath, refName string, installed bool) (*ExtensionDescri
 
 	// Determine canonical name. Priority:
 	// 1. Manifest name field
-	// 2. package.json name (npm packages)
+	// 2. package.json name
 	// 3. putnami.json name (native projects)
 	// 4. Reference name (fallback)
 	if ext.Name == "" {
@@ -782,38 +751,7 @@ func readPackageNameVersion(dir string) (string, string) {
 	return p.Name, p.Version
 }
 
-// installedPackageDir is the directory the package-manager sources of
-// discovery load the extension name from: an `extensions` entry probes it
-// before the pinned install, and a root devDependency is read from it. Agent
-// content resolves an extension through the same directory, so an extension's
-// commands and its content come from one installed package.
-func installedPackageDir(workspaceRoot, name string) string {
-	return filepath.Join(workspaceRoot, installedPackagesDirName, name)
-}
-
-// installedPackagesDirName is the name of the directory that the
-// package-manager sources of discovery load extensions from
-// (installedPackageDir).
+// installedPackagesDirName is the name of the directory a package manager
+// installs into. It is no source of extensions; a hosted run refuses a path
+// extension that lies inside one (inInstalledPackages).
 const installedPackagesDirName = "node_modules"
-
-// rootPackageDeclarations returns discovery's third source: the extensions the
-// workspace root's package manifest declares in devDependencies. A missing or
-// unreadable manifest declares none.
-func rootPackageDeclarations(workspaceRoot string) map[string]string {
-	data, err := os.ReadFile(filepath.Join(workspaceRoot, "package.json"))
-	if err != nil {
-		return nil
-	}
-	return extractDevDeps(data)
-}
-
-func extractDevDeps(packageJSONData []byte) map[string]string {
-	type pkg struct {
-		DevDependencies map[string]string `json:"devDependencies"`
-	}
-	var p pkg
-	if err := json.Unmarshal(packageJSONData, &p); err != nil {
-		return nil
-	}
-	return p.DevDependencies
-}

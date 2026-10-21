@@ -312,7 +312,7 @@ func TestMatchJob_PrefersProjectExtension(t *testing.T) {
 		"serve": {pyServe, tsServe},
 	}
 
-	// Project lists @putnami/typescript as an extension (from devDependencies)
+	// Project lists @putnami/typescript as an extension
 	proj := &workspace.Project{
 		Name:       "my-app",
 		Extensions: []string{"@putnami/typescript"},

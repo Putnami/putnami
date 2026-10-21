@@ -145,7 +145,7 @@ one of three ways:
 | Extension | Key carries |
 |-----------|-------------|
 | Workspace-local, with a prepared runtime | The prepared-runtime digest (see [Artifact Store](#artifact-store-binaries)) |
-| Installed: lock-pinned, per-worktree install, or `node_modules` package | The content digest of the installed tree, without version metadata |
+| Installed: lock-pinned or per-worktree install | The content digest of the installed tree, without version metadata |
 | Workspace-local without a prepared runtime, or local outside the workspace | The extension version |
 
 When the key carries a digest, it does not carry the version, so two builds of
@@ -2086,9 +2086,8 @@ an entry while its digest is computed or recorded; when the lock is not
 available within 2 seconds, the run computes the digest and records nothing. A
 record of another schema, or one that cannot be read, is computed again and
 replaced. Only an entry inside the store is trusted with a record: a
-`node_modules` package or a per-worktree install can change between runs, so
-each run hashes it again, and a file named `implementationdigest` there is
-payload like any other file. An entry of another store, such as one a link
+per-worktree install can change between runs, so each run hashes it again,
+and a file named `implementationdigest` there is payload like any other file. An entry of another store, such as one a link
 installed under another `PUTNAMI_ARTIFACT_DIR` names, is hashed again on each
 run too, and its record is neither read nor written. The bookkeeping files any
 store writes at an entry's root, `lastused` and `implementationdigest`, stay

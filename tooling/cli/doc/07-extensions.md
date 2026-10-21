@@ -7,10 +7,11 @@ Extensions provide the actual job implementations (build, test, lint, serve, etc
 Extensions are discovered from these sources, in order:
 
 1. **Workspace projects** — Any project containing a `putnami.extension.json` file at its root is an extension, unless the workspace pins its name (see below) or the name is an [extension dependency](#extension-dependencies) the workspace does not declare.
-2. **Explicit references** — Entries listed in `putnami.workspace.json` → `extensions` are resolved as a workspace path, then in `node_modules/`, then as the installed build the lock file pins.
+2. **Explicit references** — Entries listed in `putnami.workspace.json` → `extensions` are resolved as an absolute path, then as a workspace path, then as the installed build the lock file pins.
 3. **Set-aside workspace projects** — A project manifest that step 1 set aside for a pin loads here when the pinned build did not load, with a warning to run `putnami install`.
 4. **Extension dependencies** — Each dependency of a loaded extension loads from the build the lock pins. A dependency that does not load is reported with the extension that requires it, and a project of that name never loads in its place.
-5. **Node modules** — Extensions referenced in the root `package.json` `devDependencies` are looked up in `node_modules/`. A dependency name is skipped.
+
+No `node_modules` directory and no `package.json` is a source of extensions. An extension that only the root `package.json` `devDependencies` declare does not load, installed or not: declare it in `putnami.workspace.json` → `extensions` and run `putnami extensions install`.
 
 Each name is registered once, by the first source that loads it. Use `putnami extensions list` to see all discovered extensions with their version constraint, installed version and source.
 
@@ -944,9 +945,7 @@ so on down the graph. See
   Workflows](18-agent-workflows.md#how-a-workspace-opts-in)); a dependency gets
   neither entry.
 - **Edges.** The CLI follows the dependencies of an extension installed from
-  the artifact store or declared by path. It follows those of an extension
-  loaded from `node_modules` only when the workspace declares its name and
-  the lock pins it; otherwise the package manager owns them.
+  the artifact store or declared by path.
 - **What satisfies a dependency.** Only `putnami.workspace.json` does, by name
   or by a path whose manifest has that name. A dependency it declares is
   still checked against every constraint. A key of `~/.putnami/config.json`
@@ -1450,18 +1449,11 @@ comes from the directory the extension's commands and tools load from:
   pins the extension manifest, the manifest binds the content manifest, and the
   content manifest binds every file. `putnami upgrade` moves the extension and
   its content together.
-- **npm extension** (declared in the root `package.json` `devDependencies`):
-  the package manager installs it into `node_modules/<name>`, and its lock pins
-  it. `putnami install`, and `putnami upgrade` when it runs the dependency
-  phase, materialize the content after the package manager ran. The package's
-  `package.json` must carry the extension's name and the version its manifest
-  declares.
 - **Local extension** (declared by path): the content is built from its
   authored source.
 
-Declare an extension once. A registry entry and a devDependency of the same
-name, or a registry entry that `node_modules` also provides, are refused with
-nothing written: the two can be different releases
+Declare an extension once. An extension that only the root `package.json`
+declares in `devDependencies` is not declared at all
 ([ADR 0047](adr/0047-extension-owned-agent-content.md)).
 
 ## Hooks

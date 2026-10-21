@@ -173,32 +173,67 @@ func TestDiscoveryLoadsLockedDependenciesAfterTheDeclaredExtensions(t *testing.T
 	}
 }
 
-// A root package.json development dependency never loads in place of a
-// dependency: the locked build loads from the store, and an unpinned one loads
-// from nowhere.
-func TestDevDependenciesSkipADependencyName(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "the-graph-loads", "root-package-dependencies-skip-a-dependency-name")
+// An extension that only the root package.json development dependencies
+// declare does not load, installed in node_modules or not. It does not load in
+// place of a dependency either: the locked build loads from the store, and an
+// unpinned dependency loads from nowhere. Naming it in the workspace file
+// does not make node_modules a source.
+func TestARootPackageDevDependencyDoesNotLoad(t *testing.T) {
+	spectest.Proves(t, dependenciesFeature, "the-graph-loads", "a-root-package-dev-dependency-does-not-load")
 	f := newGraphFixture(t)
 	f.install(t, "@acme/app", graphManifest("@acme/app", 8, `{"@acme/dev": "", "@acme/lint": ""}`))
 	f.install(t, "@acme/dev", graphManifest("@acme/dev", 8, ""))
 	f.pin(t, "@acme/app", "@acme/dev")
-	writeExtensionManifest(t, installedPackageDir(f.ws, "@acme/dev"), graphManifest("@acme/dev", 4, ""))
-	writeExtensionManifest(t, installedPackageDir(f.ws, "@acme/lint"), graphManifest("@acme/lint", 4, ""))
-	writeExtensionManifest(t, installedPackageDir(f.ws, "@acme/other"), graphManifest("@acme/other", 4, ""))
+	writeExtensionManifest(t, nodeModulesDir(f.ws, "@acme/dev"), graphManifest("@acme/dev", 4, ""))
+	writeExtensionManifest(t, nodeModulesDir(f.ws, "@acme/lint"), graphManifest("@acme/lint", 4, ""))
+	writeExtensionManifest(t, nodeModulesDir(f.ws, "@acme/other"), graphManifest("@acme/other", 4, ""))
 	f.devDependencies(t, "@acme/dev", "@acme/lint", "@acme/other")
 
 	result := discover(t, f, f.config(t, "@acme/app"))
+	if got, want := extensionNames(result.Extensions), []string{"@acme/app", "@acme/dev"}; !slices.Equal(got, want) {
+		t.Fatalf("discovered %v, want %v: no development dependency loads", got, want)
+	}
 	if dev := FindExtensionByName(result.Extensions, "@acme/dev"); dev == nil || dev.Path != layout.StableDir(f.ws, layout.Extensions, "@acme/dev") {
 		t.Fatalf("@acme/dev = %+v, want the locked build, not the development dependency", dev)
-	}
-	if lint := FindExtensionByName(result.Extensions, "@acme/lint"); lint != nil {
-		t.Fatalf("the development dependency @acme/lint loaded from %s in place of an unpinned dependency", lint.Path)
 	}
 	if !IsDependencyNotPinned(skipFor(result, "@acme/lint")) {
 		t.Errorf("@acme/lint skip = %v, want the unpinned dependency", skipFor(result, "@acme/lint"))
 	}
-	if FindExtensionByName(result.Extensions, "@acme/other") == nil {
-		t.Error("a development dependency that is no dependency name stopped loading")
+
+	alone := discover(t, f, f.config(t))
+	if len(alone.Extensions) != 0 || len(alone.Skipped) != 0 {
+		t.Fatalf("with no declared extension, discovery loaded %v and skipped %+v", extensionNames(alone.Extensions), alone.Skipped)
+	}
+	named := discover(t, f, f.config(t, "@acme/other"))
+	if len(named.Extensions) != 0 {
+		t.Fatalf("a workspace file entry loaded %v from node_modules", extensionNames(named.Extensions))
+	}
+}
+
+// A key the lock pins is not read from node_modules. When its only manifest
+// sits there, with an edge, no declared root is found and the graph walk adds
+// no member, so the edge is never followed.
+func TestAPinnedDeclaredKeyIsNotReadFromNodeModules(t *testing.T) {
+	f := newGraphFixture(t)
+	writeExtensionManifest(t, nodeModulesDir(f.ws, "@acme/web"), graphManifest("@acme/web", 8, `{"@acme/runtime": "^1.0.0"}`))
+	f.install(t, "@acme/runtime", graphManifest("@acme/runtime", 8, ""))
+	f.pin(t, "@acme/web", "@acme/runtime")
+	cfg := f.config(t, "@acme/web")
+	lf, err := lockfile.ReadLockFile(f.ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if root, ok := ReadDeclaredRoot(f.ws, "@acme/web", lf); ok {
+		t.Fatalf("ReadDeclaredRoot found %+v, want none: node_modules is no source", root)
+	}
+	walk := WalkWorkspaceGraph(f.ws, cfg, lf, WalkOptions{})
+	if len(walk.Dependencies) != 0 || len(walk.Issues) != 0 {
+		t.Fatalf("the graph walk followed a node_modules manifest: %+v", walk)
+	}
+	result := discover(t, f, cfg)
+	if len(result.Extensions) != 0 || len(result.Dependencies) != 0 {
+		t.Fatalf("discovery loaded %v with dependencies %+v from node_modules", extensionNames(result.Extensions), result.Dependencies)
 	}
 }
 
@@ -231,60 +266,6 @@ func TestADependencyThatDoesNotLoadNamesItsDependent(t *testing.T) {
 		if dep.Name == "@acme/below" {
 			t.Errorf("discovery followed the edges of a manifest it refused: %+v", dep)
 		}
-	}
-}
-
-// The edges of an extension loaded from node_modules are not followed unless
-// the workspace declares its name and the lock pins it. Such a manifest loads
-// below rung 8, and a hook-only one loads with no stamp at all.
-func TestNodeModulesEdgesAreNotFollowed(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "node-modules-edges", "node-modules-edges-are-not-followed")
-	spectest.Proves(t, dependenciesFeature, "an-older-cli-refuses-a-dependent", "a-node-modules-manifest-loads-unstamped")
-	f := newGraphFixture(t)
-	writeExtensionManifest(t, installedPackageDir(f.ws, "@acme/web"), graphManifest("@acme/web", 4, `{"@acme/runtime": "^1.0.0"}`))
-	writeExtensionManifest(t, installedPackageDir(f.ws, "@acme/analytics"), `{"name": "@acme/analytics", "extensionDependencies": ["@acme/runtime"],
-		"hooks": {"preBuild": {"kind": "command", "command": "echo"}}, "commands": {}}`)
-	f.devDependencies(t, "@acme/analytics")
-	f.pin(t, "@acme/analytics")
-	cfg := f.config(t, "@acme/web")
-
-	result := discover(t, f, cfg)
-	if got, want := extensionNames(result.Extensions), []string{"@acme/web", "@acme/analytics"}; !slices.Equal(got, want) {
-		t.Fatalf("discovered %v, want %v: a node_modules manifest loads below rung 8", got, want)
-	}
-	if len(result.Dependencies) != 0 || len(result.Skipped) != 0 {
-		t.Fatalf("discovery followed node_modules edges: dependencies %+v, skipped %+v", result.Dependencies, result.Skipped)
-	}
-	lf, _ := lockfile.ReadLockFile(f.ws)
-	if walk := WalkWorkspaceGraph(f.ws, cfg, lf, WalkOptions{}); len(walk.Dependencies) != 0 || len(walk.Issues) != 0 {
-		t.Fatalf("the graph walk followed node_modules edges: %+v", walk)
-	}
-}
-
-// A declared name the lock pins has its edges followed wherever discovery
-// finds it, node_modules included, and loads there without the rung.
-func TestAPinnedDeclaredNameIsFollowedFromNodeModules(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "node-modules-edges", "a-pinned-declared-name-is-followed-from-node-modules")
-	f := newGraphFixture(t)
-	writeExtensionManifest(t, installedPackageDir(f.ws, "@acme/web"), graphManifest("@acme/web", 4, `{"@acme/runtime": "^1.0.0"}`))
-	f.install(t, "@acme/runtime", graphManifest("@acme/runtime", 8, ""))
-	f.pin(t, "@acme/web", "@acme/runtime")
-	cfg := f.config(t, "@acme/web")
-
-	result := discover(t, f, cfg)
-	if web := FindExtensionByName(result.Extensions, "@acme/web"); web == nil || web.Path != installedPackageDir(f.ws, "@acme/web") {
-		t.Fatalf("@acme/web = %+v, want the node_modules copy", web)
-	}
-	want := []GraphDependency{{Name: "@acme/runtime", RequiredBy: []string{"@acme/web"}, Loaded: true}}
-	if fmt.Sprint(result.Dependencies) != fmt.Sprint(want) {
-		t.Fatalf("dependencies = %+v, want %+v", result.Dependencies, want)
-	}
-	if FindExtensionByName(result.Extensions, "@acme/runtime") == nil {
-		t.Fatal("the locked dependency of a pinned node_modules root did not load")
-	}
-	lf, _ := lockfile.ReadLockFile(f.ws)
-	if walk := WalkWorkspaceGraph(f.ws, cfg, lf, WalkOptions{}); fmt.Sprint(walk.Dependencies) != fmt.Sprint(want) {
-		t.Fatalf("the graph walk = %+v, want %+v", walk.Dependencies, want)
 	}
 }
 
@@ -370,7 +351,6 @@ func TestAGlobalKeyForADependencyIsIgnoredByDiscovery(t *testing.T) {
 	f.install(t, "@acme/app", graphManifest("@acme/app", 8, `{"@acme/dev": ""}`))
 	f.install(t, "@acme/dev", graphManifest("@acme/dev", 8, ""))
 	f.pin(t, "@acme/app", "@acme/dev")
-	writeExtensionManifest(t, installedPackageDir(f.ws, "@acme/dev"), graphManifest("@acme/dev", 4, ""))
 	writeJSON(t, filepath.Join(f.home, wsproto.GlobalConfigDir, wsproto.GlobalConfigFilename), map[string]map[string]string{"extensions": {"@acme/dev": "2.0.0"}})
 	cfg := f.config(t, "@acme/app")
 	cfg.Extensions.List["@acme/dev"] = "2.0.0"
@@ -382,7 +362,7 @@ func TestAGlobalKeyForADependencyIsIgnoredByDiscovery(t *testing.T) {
 
 	result := discover(t, f, cfg)
 	if dev := FindExtensionByName(result.Extensions, "@acme/dev"); dev == nil || dev.Path != layout.StableDir(f.ws, layout.Extensions, "@acme/dev") {
-		t.Fatalf("@acme/dev = %+v, want the locked build, not the global key's node_modules copy", dev)
+		t.Fatalf("@acme/dev = %+v, want the locked build", dev)
 	}
 	if _, ok := (GraphWalk{Dependencies: result.Dependencies}).Dependency("@acme/dev"); !ok {
 		t.Errorf("@acme/dev is not a dependency of the graph: %+v", result.Dependencies)
@@ -486,8 +466,8 @@ func TestADependentManifestRequiresContract8(t *testing.T) {
 }
 
 // An agent-content opt-in may name a dependency of the workspace graph: it
-// resolves through the lock pin, and a node_modules package of that name does
-// not shadow it. Without the dependent, the name is not declared.
+// resolves through the lock pin. Without the dependent, the name is not
+// declared.
 func TestAgentContentMayNameADependency(t *testing.T) {
 	spectest.Proves(t, dependenciesFeature, "agent-content-may-name-a-dependency", "agent-content-may-name-a-dependency")
 	f := newGraphFixture(t)
@@ -511,11 +491,6 @@ func TestAgentContentMayNameADependency(t *testing.T) {
 	}
 	if source.Name != contentExtension || source.Version != "1.2.0" || source.Local {
 		t.Fatalf("source = %+v, want the locked dependency", source)
-	}
-	writeExtensionManifest(t, installedPackageDir(f.ws, contentExtension), packagedContentManifest("9.9.9"))
-	f.devDependencies(t, contentExtension)
-	if source, err := LocateAgentContent(f.ws, cfg, contentExtension); err != nil || source.Version != "1.2.0" {
-		t.Fatalf("with a node_modules package of its name, locate = %+v, %v; want the locked dependency", source, err)
 	}
 }
 
