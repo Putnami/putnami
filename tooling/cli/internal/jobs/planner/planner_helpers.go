@@ -32,6 +32,10 @@ type planCache struct {
 	// separators are illegal in filesystem paths and pattern globs, so no
 	// real key can collide with another.
 	hasFiles map[string]bool
+	// projectRoots is the loaded workspace's complete project inventory. A
+	// recursive activation probe may enter ordinary source directories, but
+	// not a nested project that owns its own files.
+	projectRoots map[string]bool
 
 	// fileContains is keyed by absolutePath + "\x00" + substring and memoizes
 	// step-activation content probes (e.g. "does this go.mod require the app
@@ -51,6 +55,7 @@ func newPlanCache() *planCache {
 		effectiveCommandParams: make(map[string]map[string]extension.ParamMap),
 		extActivates:           make(map[string]bool),
 		hasFiles:               make(map[string]bool),
+		projectRoots:           make(map[string]bool),
 		fileContains:           make(map[string]bool),
 		closureRoots:           make(map[string][]string),
 	}
@@ -62,17 +67,17 @@ func hasActivationFiles(projRoot string, patterns []string, cache *planCache) bo
 		if v, ok := cache.hasFiles[key]; ok {
 			return v
 		}
-		v := hasActivationFilesUncached(projRoot, patterns)
+		v := hasActivationFilesUncached(projRoot, patterns, cache.projectRoots)
 		cache.hasFiles[key] = v
 		return v
 	}
-	return hasActivationFilesUncached(projRoot, patterns)
+	return hasActivationFilesUncached(projRoot, patterns, nil)
 }
 
-func hasActivationFilesUncached(projRoot string, patterns []string) bool {
+func hasActivationFilesUncached(projRoot string, patterns []string, projectRoots map[string]bool) bool {
 	for _, pattern := range patterns {
 		if strings.Contains(pattern, "**") {
-			if matchDoubleStarGlob(projRoot, pattern) {
+			if matchDoubleStarGlob(projRoot, pattern, projectRoots) {
 				return true
 			}
 		} else {
@@ -87,8 +92,10 @@ func hasActivationFilesUncached(projRoot string, patterns []string) bool {
 
 // matchDoubleStarGlob handles glob patterns containing ** (recursive match).
 // Go's filepath.Glob does not support **. This function walks the directory
-// tree and matches each file against the non-** suffix of the pattern.
-func matchDoubleStarGlob(root, pattern string) bool {
+// tree within the owning project and matches each file against the non-**
+// suffix of the pattern.
+func matchDoubleStarGlob(root, pattern string, projectRoots map[string]bool) bool {
+	root = filepath.Clean(root)
 	// Split on "**/" or "**" to get the suffix pattern.
 	// e.g. "**/*.test.ts" → suffix "*.test.ts"
 	// e.g. "src/**/*.go"  → prefix "src", suffix "*.go"
@@ -102,6 +109,15 @@ func matchDoubleStarGlob(root, pattern string) bool {
 	if prefix != "" {
 		searchRoot = filepath.Join(root, prefix)
 	}
+	// A static prefix cannot start inside a nested declared project.
+	for dir := searchRoot; dir != root; dir = filepath.Dir(dir) {
+		if projectRoots[dir] {
+			return false
+		}
+		if filepath.Dir(dir) == dir {
+			break
+		}
+	}
 
 	found := false
 	_ = filepath.WalkDir(searchRoot, func(path string, d os.DirEntry, err error) error {
@@ -112,6 +128,11 @@ func matchDoubleStarGlob(root, pattern string) bool {
 			return nil
 		}
 		if d.IsDir() {
+			// Keep the starting project's own root eligible; a prefix may
+			// start the walk directly at a different project's root.
+			if path != root && projectRoots[filepath.Clean(path)] {
+				return filepath.SkipDir
+			}
 			// Skip common non-project directories for performance
 			if cachekey.ProjectWalkExcludedDirs[d.Name()] {
 				return filepath.SkipDir

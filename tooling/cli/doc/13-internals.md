@@ -336,9 +336,13 @@ Go's `filepath.Glob()` does not support `**` (recursive matching). The CLI imple
 
 1. Split the pattern on `**`.
 2. Extract prefix (before `**`) and suffix (after `**`).
-3. `filepath.WalkDir()` from the prefix directory.
-4. Match each file's name against the suffix pattern using `filepath.Match()`.
-5. Skip common non-project directories (`node_modules`, `.git`, `dist`, `vendor`).
+3. Check that the prefix directory is not inside a nested project from the
+   loaded graph.
+4. `filepath.WalkDir()` from the prefix directory.
+5. Match each file's name against the suffix pattern using `filepath.Match()`.
+6. Skip nested roots from the loaded project graph and common non-project
+   directories (`node_modules`, `.git`, `dist`, `vendor`). Ordinary source
+   subdirectories remain searchable.
 
 ### File Watching
 

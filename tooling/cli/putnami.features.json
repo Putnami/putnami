@@ -674,6 +674,20 @@
           }
         },
         {
+          "id": "recursive-activation-project-ownership",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "recursive-patterns-stay-with-the-selected-project",
+              "own-files-activate-selected-children-and-mixed-parents"
+            ]
+          }
+        },
+        {
           "id": "dependency-plan",
           "stage": "coded",
           "evidenceKinds": [

@@ -6,6 +6,7 @@ package planner
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
@@ -36,6 +37,9 @@ func Plan(
 	// so activation-file probes for the same (extension, project) pair are
 	// computed once per Plan invocation.
 	cache := newPlanCache()
+	for _, project := range ws.Projects {
+		cache.projectRoots[filepath.Clean(filepath.Join(ws.Root, filepath.FromSlash(project.Path)))] = true
+	}
 	recordEffectiveCommand := func(key, command string, params extension.ParamMap) {
 		if cache.effectiveCommands[key] == nil {
 			cache.effectiveCommands[key] = make(map[string]bool)

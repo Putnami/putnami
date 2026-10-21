@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect } from 'bun:test';
+import { once } from 'node:events';
 import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { Socket } from 'node:net';
 import { join } from 'node:path';
 import {
   application,
@@ -192,13 +195,61 @@ class Provider {
     this.hold = undefined;
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     this.release();
-    this.server.stop(true);
+    await this.server.stop(true);
+  }
+}
+
+/** Owns its loopback endpoint while every HTTP request fails at the socket. */
+class OwnedOutageProvider {
+  private readonly sockets = new Set<Socket>();
+  private readonly server = createServer((request, response) => {
+    if (this.down) {
+      request.socket.destroy();
+      return;
+    }
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ value: new URL(request.url ?? '/', 'http://127.0.0.1').pathname }));
+  });
+  private down = false;
+  private port = 0;
+
+  private constructor() {
+    this.server.on('connection', (socket) => {
+      this.sockets.add(socket);
+      socket.once('close', () => this.sockets.delete(socket));
+    });
+  }
+
+  static async start(): Promise<OwnedOutageProvider> {
+    const provider = new OwnedOutageProvider();
+    const listening = once(provider.server, 'listening');
+    provider.server.listen(0, '127.0.0.1');
+    await listening;
+    const address = provider.server.address();
+    if (!address || typeof address === 'string') throw new Error('outage provider has no loopback port');
+    provider.port = address.port;
+    return provider;
+  }
+
+  get url(): string {
+    return `http://127.0.0.1:${this.port}`;
+  }
+
+  outage(): void {
+    this.down = true;
+    for (const socket of this.sockets) socket.destroy();
+  }
+
+  async stop(): Promise<void> {
+    this.outage();
+    await new Promise<void>((resolve, reject) => this.server.close((error) => (error ? reject(error) : resolve())));
   }
 }
 
 const providers: Provider[] = [];
+const outageProviders: OwnedOutageProvider[] = [];
 const apps: ReturnType<typeof application>[] = [];
 /** The caches bind() injects: the low-level registration leaves their end to the caller. */
 const caches: ServiceResponseCache[] = [];
@@ -215,13 +266,22 @@ afterEach(async () => {
   // otherwise one retries against the closed port and records its failure in
   // whatever collector the next test file has installed.
   for (const cache of caches.splice(0)) cache.dispose();
-  for (const provider of providers.splice(0)) provider.stop();
-  await Promise.all(apps.splice(0).map((app) => app.stop()));
+  await Promise.all([
+    ...providers.splice(0).map((provider) => provider.stop()),
+    ...outageProviders.splice(0).map((provider) => provider.stop()),
+    ...apps.splice(0).map((app) => app.stop()),
+  ]);
 });
 
 function provider(): Provider {
   const created = new Provider();
   providers.push(created);
+  return created;
+}
+
+async function ownedOutageProvider(): Promise<OwnedOutageProvider> {
+  const created = await OwnedOutageProvider.start();
+  outageProviders.push(created);
   return created;
 }
 
@@ -299,6 +359,32 @@ async function until(condition: () => boolean): Promise<void> {
   }
 }
 
+/** A competing HTTP responder must not be able to take the provider's IPv4 port. */
+async function canAnswerOnProviderPort(url: string): Promise<boolean> {
+  const contender = createServer((_request, response) => {
+    response.writeHead(401, { Connection: 'close' });
+    response.end();
+  });
+  const port = Number(new URL(url).port);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      contender.once('error', reject);
+      contender.listen(port, '127.0.0.1', resolve);
+    });
+    const answer = await fetch(`http://127.0.0.1:${port}/probe`);
+    if (answer.status !== 401) throw new Error(`competing responder answered ${answer.status}, expected 401`);
+    await answer.body?.cancel();
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EADDRINUSE') return false;
+    throw error;
+  } finally {
+    if (contender.listening) {
+      await new Promise<void>((resolve, reject) => contender.close((error) => (error ? reject(error) : resolve())));
+    }
+  }
+}
+
 describe('generated client response cache', () => {
   specTest(
     'makes one upstream call per key and identity per fresh window under concurrent load',
@@ -347,13 +433,18 @@ describe('generated client response cache', () => {
       check: 'a-provider-failure-inside-the-stale-window-returns-the-stored-answer-and-is-counted',
     },
     async () => {
-      const upstream = provider();
+      const upstream = await ownedOutageProvider();
+      const upstreamUrl = upstream.url;
       const clock = new Clock();
-      const { client } = await bind(upstream.url, accountOperation(FRESH_STALE, { retry: { maxAttempts: 1 } }), clock);
+      const { client } = await bind(upstreamUrl, accountOperation(FRESH_STALE, { retry: { maxAttempts: 1 } }), clock);
       expect(await client.get('a1')).toEqual({ value: '/accounts/a1' });
 
-      upstream.stop();
+      upstream.outage();
+      expect(await canAnswerOnProviderPort(upstreamUrl)).toBe(false);
       clock.advance(6000);
+      const transportError = await client.get('a1', undefined, true).catch((caught: unknown) => caught);
+      expect(transportError).toBeInstanceOf(ClientError);
+      expect((transportError as ClientError).status).toBe(0);
       expect(await client.get('a1')).toEqual({ value: '/accounts/a1' });
       expect(staleServed()).toBe(1);
       clock.advance(300_000 - 6000 - 1);
@@ -364,6 +455,7 @@ describe('generated client response cache', () => {
       clock.advance(1);
       const error = await client.get('a1').catch((caught: unknown) => caught);
       expect(error).toBeInstanceOf(ClientError);
+      expect((error as ClientError).status).toBe(0);
       expect(staleServed()).toBe(0);
     },
   );
@@ -405,6 +497,14 @@ describe('generated client response cache', () => {
       const refusal = await second.client.get('gone').catch((caught: unknown) => caught);
       expect(refusal).toBeInstanceOf(ClientFrameworkError);
       expect((refusal as ClientFrameworkError).status).toBe(404);
+
+      await second.client.get('a1');
+      refusing.status = 401;
+      clock.advance(6000);
+      const unauthorized = await second.client.get('a1').catch((caught: unknown) => caught);
+      expect(unauthorized).toBeInstanceOf(ClientFrameworkError);
+      expect((unauthorized as ClientFrameworkError).status).toBe(401);
+      expect(staleServed()).toBe(0);
 
       const canceled = new AbortController();
       canceled.abort();
