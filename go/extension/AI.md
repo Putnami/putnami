@@ -220,7 +220,8 @@ preparing this extension's runtime does not need the closure first:
 a replace for each module that the replace closure provides and `go.mod` does
 not replace. The replace closure is every directory a local replace reaches,
 which is the source the runtime digest covers. Two directories that provide one
-module stop the build, and the module's own files are never written.
+module stop the build, and the module's own files are never written. A replace
+that no directory of the closure provides still has to be in `go.mod`.
 
 It deliberately does **not** align a `module` line to the project name: a
 project name (`@putnami/go`) and a module path (`go.putnami.dev/go/extension`)

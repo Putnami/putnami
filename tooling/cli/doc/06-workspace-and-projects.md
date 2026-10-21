@@ -129,9 +129,11 @@ What `projects sync` writes is deliberately narrow:
   inside a language manifest, so deciding "nothing to do" on a provider's behalf
   would be guessing.
 - **Core writes no native manifest**, `go.mod` included. A local Go extension
-  whose own `go.mod` misses a workspace replace still prepares: its `prepare`
-  builds from a copy of `go.mod` that completes the replace closure, so the sync
-  task that repairs the file can run.
+  whose own `go.mod` misses a workspace replace still prepares when a directory
+  of its replace closure provides that module: its `prepare` builds from a copy
+  of `go.mod` that completes the closure, so the sync task that repairs the file
+  can run. A replace that no directory of the closure provides still has to be
+  in `go.mod`.
 
 ### Workspace Probe
 

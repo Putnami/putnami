@@ -72,4 +72,5 @@ The adapter's `inputs` are `go.mod`, `**/*.go` and `go.work`. They exclude
   runtime, and preparing that runtime does not need the closure first:
   `bin/prepare` completes a copy of `go.mod` from the replace closure, which
   is the source the runtime digest covers, and never writes the module's own
-  files.
+  files. A replace that no directory of the closure provides still has to be
+  in `go.mod`.

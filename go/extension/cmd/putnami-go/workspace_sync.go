@@ -29,11 +29,12 @@ import (
 //
 // This task runs on a PREPARED runtime, and in a workspace that builds its
 // extensions from source, preparation compiles this module with `GOWORK=off`,
-// the mode go.work replaces do not apply in. A missing replace in THIS module's
-// own go.mod still does not stop that runtime: bin/prepare builds from a copy of
-// go.mod that it completes from the replace closure, the source the runtime
-// digest covers, so the runtime that repairs the file can be built before the
-// repair.
+// the mode go.work replaces do not apply in. A replace THIS module's go.mod
+// misses does not stop that runtime when a directory of the replace closure
+// provides the module: bin/prepare builds from a copy of go.mod that it
+// completes from that closure, the source the runtime digest covers, so the
+// runtime that repairs the file can be built before the repair. A replace that
+// no directory of the closure provides still has to be in go.mod.
 //
 // What this task deliberately does NOT do is align the `module` line to the
 // resolved project name. That is the one place the TypeScript pilot's shape
