@@ -383,6 +383,16 @@ func TestInstall_PinsTheDeclaredToolchainsBeforeTheInstallers(t *testing.T) {
 
 const noInstallProviderFeature = "cli/first-use-path"
 
+// writeWorkspaceWithoutExtensions writes a workspace config in dir that
+// declares no extension.
+func writeWorkspaceWithoutExtensions(t *testing.T, dir string) {
+	t.Helper()
+	config := []byte(`{"name":"install-ws","extensions":[]}`)
+	if err := os.WriteFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename), config, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // An explicit install in a workspace where no extension provides
 // workspace-install succeeds and prints exactly one line about it, without the
 // job list the old error carried.
@@ -390,9 +400,7 @@ func TestInstall_ExplicitWithoutProviderPrintsOneLine(t *testing.T) {
 	spectest.Proves(t, noInstallProviderFeature, "no-install-provider-nothing-to-install", "an-explicit-command-prints-one-line-when-no-extension-provides-workspace-install")
 	hometest.Temp(t)
 	dir := t.TempDir()
-	sharedtest.WriteJSONConfig(t, filepath.Join(dir, wsproto.WorkspaceConfigFilename), map[string]any{
-		"name": "install-ws", "extensions": []string{},
-	})
+	writeWorkspaceWithoutExtensions(t, dir)
 
 	var buf, deps strings.Builder
 	var installErr, depsErr error
@@ -422,9 +430,7 @@ func TestInstall_ImplicitWithoutProviderPrintsNothing(t *testing.T) {
 	resetBootstrapEnv(t)
 	hometest.Temp(t)
 	dir := t.TempDir()
-	sharedtest.WriteJSONConfig(t, filepath.Join(dir, wsproto.WorkspaceConfigFilename), map[string]any{
-		"name": "install-ws", "extensions": []string{},
-	})
+	writeWorkspaceWithoutExtensions(t, dir)
 	if st, err := readInstallState(dir); err != nil || st != nil {
 		t.Fatalf("install marker before the bootstrap = %v, %v, want none", st, err)
 	}
@@ -465,9 +471,7 @@ func TestInstall_AFailedInstallRecordsNoInstallMarker(t *testing.T) {
 	resetBootstrapEnv(t)
 	hometest.Temp(t)
 	dir := t.TempDir()
-	sharedtest.WriteJSONConfig(t, filepath.Join(dir, wsproto.WorkspaceConfigFilename), map[string]any{
-		"name": "install-ws", "extensions": []string{},
-	})
+	writeWorkspaceWithoutExtensions(t, dir)
 	notLoaded := errors.New("no loaded extension provides workspace-install; extension @acme/broken did not load: requires a newer putnami")
 	runJob := func(context.Context, WorkspaceJobRequest) (WorkspaceJobResult, error) {
 		return WorkspaceJobResult{Outcome: WorkspaceJobFailed}, notLoaded
