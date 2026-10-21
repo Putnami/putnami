@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import type { DiscoveredRoute } from '@putnami/application';
-import { ArrayOf, Email, Int, MapOf, OneOf, Optional, Uuid } from '@putnami/application';
+import { ArrayOf, Desc, Email, Int, MapOf, OneOf, Optional, Uuid } from '@putnami/application';
+import { validateSchema } from '@putnami/runtime';
+import { decodeProto, encodeProto } from '../../src/grpc/proto-codec';
+import { readRequestEnvelope } from '../../src/grpc/grpc-request';
 import { generateProto } from '../../src/proto/proto';
 
 describe('generateProto', () => {
@@ -279,6 +282,112 @@ describe('generateProto', () => {
   });
 
   describe('nested object schemas', () => {
+    it('preserves wrapped objects and collection item messages in request and response metadata', () => {
+      const routes: DiscoveredRoute[] = [
+        {
+          method: 'POST',
+          path: '/profiles',
+          schemas: {
+            body: {
+              profile: Optional({ name: String, address: { city: String } }),
+              entries: ArrayOf(Desc('entry', { name: String })),
+              lookup: MapOf(String, Desc('lookup value', { name: String })),
+            },
+            returns: { profile: Optional({ name: String }) },
+          },
+        },
+      ];
+      const proto = generateProto(routes, defaultOptions);
+      const body = proto.messageMeta.CreateProfilesRequestBody;
+      expect(body.find((field) => field.name === 'profile')).toMatchObject({
+        type: 'CreateProfilesRequestBodyProfile',
+        optional: true,
+      });
+      expect(body.find((field) => field.name === 'entries')).toMatchObject({
+        type: 'CreateProfilesRequestBodyEntries',
+        repeated: true,
+      });
+      expect(body.find((field) => field.name === 'lookup')).toMatchObject({
+        type: 'map',
+        mapValueType: 'CreateProfilesRequestBodyLookupValue',
+      });
+      expect(proto.messageMeta.CreateProfilesRequestBodyProfile).toEqual([
+        expect.objectContaining({ name: 'name', type: 'string' }),
+        expect.objectContaining({ name: 'address', type: 'CreateProfilesRequestBodyProfileAddress' }),
+      ]);
+      expect(proto.messageMeta.CreateProfilesRequestBodyProfileAddress[0].name).toBe('city');
+      expect(proto.messageMeta.CreateProfilesRequestBodyEntries[0].name).toBe('name');
+      expect(proto.messageMeta.CreateProfilesRequestBodyLookupValue[0].name).toBe('name');
+      expect(proto.messageMeta.CreateProfilesResponse[0]).toMatchObject({
+        type: 'CreateProfilesResponseProfile',
+        optional: true,
+      });
+      expect(proto.messageMeta.CreateProfilesResponseProfile[0].name).toBe('name');
+
+      const bare = generateProto(
+        [
+          {
+            method: 'POST',
+            path: '/profiles',
+            schemas: {
+              body: { profile: { name: String, address: { city: String } } },
+            },
+          },
+        ],
+        defaultOptions,
+      );
+      expect(proto.messageMeta.CreateProfilesRequestBodyProfile).toEqual(
+        bare.messageMeta.CreateProfilesRequestBodyProfile,
+      );
+      expect(proto.messageMeta.CreateProfilesRequestBodyProfileAddress).toEqual(
+        bare.messageMeta.CreateProfilesRequestBodyProfileAddress,
+      );
+      expect(bare.messageMeta.CreateProfilesRequestBody[0].optional).toBe(false);
+
+      const request = {
+        body: {
+          profile: { name: 'Ada', address: { city: 'Paris' } },
+          entries: [{ name: 'Lin' }],
+          lookup: { primary: { name: 'Kai' } },
+        },
+      };
+      const encoded = encodeProto(request, proto.messageMeta.CreateProfilesRequest, proto.messageMeta);
+      const decoded = decodeProto(encoded, proto.messageMeta.CreateProfilesRequest, proto.messageMeta);
+      expect(decoded).toEqual(request);
+      const bodyValue = readRequestEnvelope(decoded).body;
+      const validated = validateSchema(routes[0].schemas?.body ?? {}, bodyValue);
+      expect(validated.errors).toEqual([]);
+      expect(validated.data).toEqual(request.body);
+      expect(validateSchema(routes[0].schemas?.body ?? {}, { profile: 'Ada' }).errors).not.toEqual([]);
+      const absent = decodeProto(
+        encodeProto({ body: {} }, proto.messageMeta.CreateProfilesRequest, proto.messageMeta),
+        proto.messageMeta.CreateProfilesRequest,
+        proto.messageMeta,
+      );
+      expect((absent.body as Record<string, unknown>).profile).toBeUndefined();
+    });
+
+    it('refuses nullable collection members that protobuf cannot represent', () => {
+      expect(() =>
+        generateProto(
+          [{ method: 'POST', path: '/profiles', schemas: { body: { entries: ArrayOf(Optional({ name: String })) } } }],
+          defaultOptions,
+        ),
+      ).toThrow(/optional collection item/);
+      expect(() =>
+        generateProto(
+          [
+            {
+              method: 'POST',
+              path: '/profiles',
+              schemas: { body: { lookup: MapOf(String, Optional({ name: String })) } },
+            },
+          ],
+          defaultOptions,
+        ),
+      ).toThrow(/optional collection value/);
+    });
+
     it('should create sub-messages for nested objects in body', () => {
       const routes: DiscoveredRoute[] = [
         {

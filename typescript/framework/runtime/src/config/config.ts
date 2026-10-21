@@ -1,8 +1,8 @@
 import './env.declare';
 
 import { getDeep } from '@putnami/utils';
-import type { InferSchema, SchemaDefinition } from '../schema';
-import { isSchemaDescriptor, validateSchema } from '../schema';
+import type { InferSchema, SchemaDefinition, SchemaPrimitive } from '../schema';
+import { isNestedSchema, isSchemaDescriptor, validateSchema } from '../schema';
 import { getDefaultSources, loadGlobalConfig } from './config-source';
 import { runConfigLoaderResetHooks } from './loader-hooks';
 
@@ -381,41 +381,64 @@ export function redactErrors(
 ): string {
   return errors
     .map((e) => {
-      // Resolve the descriptor by walking the schema-relative path so nested
-      // sensitive fields are redacted, not just top-level ones.
-      const prop = resolveSchemaProp(schema, schemaPathForError(e.field, label));
-      const isSensitive = isSchemaDescriptor(prop) && prop.sensitive === true;
-      return isSensitive ? `${e.field} [redacted]` : e.message;
+      const safePath = resolveSensitivePath(schema, schemaPathForError(e.field, label), label);
+      return safePath ? `${safePath} [redacted]` : e.message;
     })
     .join(', ');
 }
 
-function schemaPathForError(field: string, label: string | undefined): string[] {
+function schemaPathForError(field: string, label: string | undefined): string {
   if (label && field.startsWith(`${label}.`)) {
-    return field.slice(label.length + 1).split('.');
+    return field.slice(label.length + 1);
   }
-  return field.split('.');
+  return field;
 }
 
-/**
- * Resolves the schema descriptor for a validation error's field path.
- *
- * The field path may still include a prefix when called directly without a
- * label. Skip leading segments until one matches a top-level schema key, then
- * walk the remaining segments so nested sensitive fields are resolved, not
- * just top-level ones.
- */
-function resolveSchemaProp(schema: SchemaDefinition, path: string[]): unknown {
-  let start = 0;
-  while (start < path.length && !Object.hasOwn(schema, path[start] as string)) {
-    start++;
-  }
-  if (start === path.length) return undefined;
+function resolveSensitivePath(schema: SchemaDefinition, path: string, label?: string): string | undefined {
+  if (label) return sensitiveFieldInSchema(schema, path, label);
 
-  let current: unknown = schema;
-  for (let i = start; i < path.length; i++) {
-    if (!current || typeof current !== 'object') return undefined;
-    current = (current as Record<string, unknown>)[path[i] as string];
+  // Direct callers may pass a field with a prefix but no config label.
+  for (let start = 0; start < path.length; start++) {
+    if (start > 0 && path[start - 1] !== '.') continue;
+    const safePath = sensitiveFieldInSchema(schema, path.slice(start), '');
+    if (safePath) return safePath;
   }
-  return current;
+  return undefined;
+}
+
+function sensitiveFieldInSchema(schema: SchemaDefinition, path: string, prefix: string): string | undefined {
+  for (const [key, prop] of Object.entries(schema)) {
+    if (!path.startsWith(key)) continue;
+    const rest = path.slice(key.length);
+    if (rest !== '' && !rest.startsWith('.') && !rest.startsWith('[')) continue;
+    const safePath = sensitiveFieldInProp(prop, rest, prefix ? `${prefix}.${key}` : key);
+    if (safePath) return safePath;
+  }
+  return undefined;
+}
+
+function sensitiveFieldInProp(prop: SchemaPrimitive, rest: string, safePath: string): string | undefined {
+  if (isSchemaDescriptor(prop)) {
+    if (prop.sensitive) return safePath;
+    if (prop.schema && rest.startsWith('.')) {
+      return sensitiveFieldInSchema(prop.schema, rest.slice(1), safePath);
+    }
+    const child = prop.array ? prop.items : prop.map ? prop.mapValue : undefined;
+    if (child && rest.startsWith('[')) return sensitiveFieldInCollection(child, rest, safePath);
+  } else if (isNestedSchema(prop) && rest.startsWith('.')) {
+    return sensitiveFieldInSchema(prop, rest.slice(1), safePath);
+  }
+  return undefined;
+}
+
+function sensitiveFieldInCollection(child: SchemaPrimitive, rest: string, safePath: string): string | undefined {
+  // Map keys are input-derived and may themselves contain dots or brackets.
+  // Try each closing bracket; the returned path contains only schema names.
+  for (let end = rest.indexOf(']'); end >= 0; end = rest.indexOf(']', end + 1)) {
+    const suffix = rest.slice(end + 1);
+    if (suffix !== '' && !suffix.startsWith('.') && !suffix.startsWith('[')) continue;
+    const result = sensitiveFieldInProp(child, suffix, safePath);
+    if (result) return result;
+  }
+  return undefined;
 }

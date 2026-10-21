@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import {
+  ArrayOf,
   Config,
   Default,
   Env,
   Int,
+  MapOf,
   Optional,
   resetConfigLoader,
   Sensitive,
@@ -309,6 +311,38 @@ describe('Config and useConfig', () => {
   });
 
   describe('Sensitive()', () => {
+    it('redacts wrapped leaves and input-derived keys below a sensitive object', () => {
+      const definition = Config('service', {
+        credentials: Sensitive({ byToken: MapOf(String, Int) }),
+        settings: Optional({ secret: Sensitive(Int), port: Int }),
+        tokens: MapOf(String, Sensitive(Int)),
+        attempts: ArrayOf(Sensitive(Int)),
+      });
+      process.env.CONFIG_DATA = JSON.stringify({
+        service: {
+          credentials: { byToken: { 'private-token-example': 'invalid' } },
+          settings: { secret: 'invalid', port: 'invalid' },
+          tokens: { 'another.private-token': 'invalid' },
+          attempts: ['invalid'],
+        },
+      });
+
+      let message = '';
+      try {
+        useConfig(definition);
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).toContain('service.credentials [redacted]');
+      expect(message).toContain('service.settings.secret [redacted]');
+      expect(message).toContain('service.tokens [redacted]');
+      expect(message).toContain('service.attempts [redacted]');
+      expect(message).toContain('service.settings.port must be of type number');
+      expect(message).not.toContain('private-token-example');
+      expect(message).not.toContain('another.private-token');
+      expect(message).not.toContain('service.credentials.byToken[');
+    });
+
     specTest(
       'redacts sensitive fields in validation errors',
       {

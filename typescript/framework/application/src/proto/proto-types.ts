@@ -104,11 +104,12 @@ export function schemaFieldToProto(
   }
 
   if (isNestedSchema(prop)) {
-    // Will be replaced with the nested message name by the caller
+    const nestedName = messageName ? `${messageName}${pascalCase(name)}` : 'message';
+    if (ctx && messageName) registerNestedMessage(ctx, nestedName, prop);
     return {
       name: toSnakeCase(name),
       jsonName: protoJsonName(toSnakeCase(name)),
-      type: 'message',
+      type: nestedName,
       number: fieldNumber,
       optional: false,
       repeated: false,
@@ -138,7 +139,7 @@ function descriptorToProtoField(
 
   // Array type
   if (desc.array && desc.items) {
-    const itemType = itemProtoType(desc.items);
+    const itemType = itemProtoType(desc.items, ctx, messageName, name);
     return {
       name: snake,
       jsonName: protoJsonName(snake),
@@ -167,6 +168,10 @@ function descriptorToProtoField(
     };
   }
 
+  if (desc.schema) {
+    return nestedDescriptorToProtoField(name, desc, fieldNumber, ctx, messageName);
+  }
+
   // Detect constraint-based type overrides
   const constraintType = desc.constraints ? constraintProtoType(desc.constraints, name, ctx, messageName) : undefined;
 
@@ -192,12 +197,53 @@ function descriptorToProtoField(
   return field;
 }
 
+function nestedDescriptorToProtoField(
+  name: string,
+  desc: SchemaDescriptor,
+  fieldNumber: number,
+  ctx?: GenerationContext,
+  messageName?: string,
+): MessageField {
+  const nestedName = messageName ? `${messageName}${pascalCase(name)}` : 'message';
+  if (ctx && messageName && desc.schema) registerNestedMessage(ctx, nestedName, desc.schema);
+  const snake = toSnakeCase(name);
+  return {
+    name: snake,
+    jsonName: protoJsonName(snake),
+    type: nestedName,
+    number: fieldNumber,
+    optional: desc.optional === true,
+    repeated: false,
+  };
+}
+
 /**
  * Determine the proto type for an array item.
  */
-function itemProtoType(item: SchemaPrimitive): string {
+function itemProtoType(
+  item: SchemaPrimitive,
+  ctx?: GenerationContext,
+  messageName?: string,
+  fieldName?: string,
+): string {
   if (isSchemaDescriptor(item)) {
+    if (item.array || item.map) throw new Error(`Cannot represent nested collection item '${fieldName}' in protobuf`);
+    if (item.optional) throw new Error(`Cannot represent optional collection item '${fieldName}' in protobuf`);
+    if (item.schema && ctx && messageName && fieldName) {
+      const nestedName = `${messageName}${pascalCase(fieldName)}`;
+      registerNestedMessage(ctx, nestedName, item.schema);
+      return nestedName;
+    }
+    if (item.constraints) {
+      const constrained = constraintProtoType(item.constraints, fieldName ?? '', ctx, messageName);
+      if (constrained) return constrained;
+    }
     return protoType(item.baseType);
+  }
+  if (isNestedSchema(item) && ctx && messageName && fieldName) {
+    const nestedName = `${messageName}${pascalCase(fieldName)}`;
+    registerNestedMessage(ctx, nestedName, item);
+    return nestedName;
   }
   return protoType(baseTypeName(item));
 }
@@ -237,6 +283,14 @@ function mapValueProtoType(
   fieldName?: string,
 ): string {
   if (isSchemaDescriptor(value)) {
+    if (value.array || value.map)
+      throw new Error(`Cannot represent nested collection value '${fieldName}' in protobuf`);
+    if (value.optional) throw new Error(`Cannot represent optional collection value '${fieldName}' in protobuf`);
+    if (value.schema && ctx && messageName && fieldName) {
+      const nestedName = `${messageName}${pascalCase(fieldName)}Value`;
+      registerNestedMessage(ctx, nestedName, value.schema);
+      return nestedName;
+    }
     if (value.constraints?.some((c) => c.name === 'integer')) return declaredIntegerWidth(value.constraints);
     return protoType(value.baseType);
   }
@@ -321,11 +375,6 @@ export function registerNestedMessage(
 
   for (const [key, prop] of Object.entries(schema)) {
     const field = schemaFieldToProto(key, prop, fieldNumber++, ctx, name);
-    if (isNestedSchema(prop)) {
-      const nestedName = `${name}${pascalCase(key)}`;
-      registerNestedMessage(ctx, nestedName, prop);
-      field.type = nestedName;
-    }
     fields.push(field);
   }
 
