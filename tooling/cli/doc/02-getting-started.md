@@ -141,7 +141,7 @@ mkdir my-workspace && cd my-workspace
 putnami workspace init
 ```
 
-This creates a `putnami.workspace.json` at the workspace root.
+This creates a `putnami.workspace.json` at the workspace root. It writes no language manifest: each extension's install creates the one it needs, such as the TypeScript root `package.json`.
 
 The local developer loop does not require `@putnami/cloud`. A workspace with
 only the Go and/or TypeScript extensions can install dependencies, build, test,

@@ -3711,7 +3711,7 @@
             "kind": "acceptance",
             "checks": [
               "init-lists-the-created-project-once",
-              "init-writes-an-empty-workspaces-list-not-null"
+              "init-writes-no-root-package-json"
             ]
           }
         },
