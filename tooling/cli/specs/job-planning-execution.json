@@ -54,6 +54,10 @@
       "text": "Every job run resolves one explicit project selection before planning and applies that selection to every requested command. A channel publish sharing the session narrows itself alone: its members come from the channel head, every other command keeps the caller's selection, and the run reports both sets."
     },
     {
+      "id": "recursive-activation-project-ownership",
+      "text": "Within a project's tree, recursive activation-file patterns use the loaded workspace project roots to exclude files owned by nested projects. Neither a static prefix starting below a nested project nor the directory walk can source a match from that project. Ordinary source subdirectories remain searchable, and a selected child or genuinely multi-language parent activates from its own matching files without requiring an explicit language-extension dependency for config-extract."
+    },
+    {
       "id": "dependency-plan",
       "text": "Planning produces a deterministic dependency DAG that preserves functional dependencies separately from write-serialization edges, resolves dependent-owned same-session prerequisites across every contributing provider, and rejects missing selected commands. A captured runner AFTER contract adds functional dependencies from every protected write to every required gate leaf before final authorization; missing gates and dependency cycles still fail closed."
     },

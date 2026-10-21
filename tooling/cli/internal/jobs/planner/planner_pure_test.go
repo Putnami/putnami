@@ -148,7 +148,7 @@ func TestHasActivationFiles_CacheReusesResult(t *testing.T) {
 	}
 
 	// Same call with no cache must hit the filesystem and return false.
-	if hasActivationFilesUncached(dir, []string{"*.go"}) {
+	if hasActivationFilesUncached(dir, []string{"*.go"}, nil) {
 		t.Error("expected miss on empty dir without a cached answer")
 	}
 }
@@ -234,7 +234,7 @@ func TestMatchDoubleStarGlob(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := tt.setupFn(t)
-			got := matchDoubleStarGlob(dir, tt.pattern)
+			got := matchDoubleStarGlob(dir, tt.pattern, nil)
 			if got != tt.want {
 				t.Errorf("matchDoubleStarGlob(%q) = %v, want %v", tt.pattern, got, tt.want)
 			}

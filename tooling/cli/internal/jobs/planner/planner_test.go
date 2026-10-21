@@ -1088,6 +1088,116 @@ func TestPlan_ConfigExtractActivatesForGoProjectWithoutExplicitExtension(t *test
 	}
 }
 
+func TestPlan_ConfigExtractRecursiveActivationStaysInOwningProject(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "recursive-activation-project-ownership", "recursive-patterns-stay-with-the-selected-project")
+	tests := []struct {
+		name      string
+		pattern   string
+		childPath string
+		filePath  string
+		wantGo    bool
+	}{
+		{"nested declared project", "**/*.go", "app/clients/go", "app/clients/go/client.go", false},
+		{"prefixed walk through declared project", "src/**/*.go", "app/src/generated", "app/src/generated/client.go", false},
+		{"prefix starts at declared project", "src/generated/**/*.go", "app/src/generated", "app/src/generated/client.go", false},
+		{"prefix starts below declared project", "clients/go/src/**/*.go", "app/clients/go", "app/clients/go/src/client.go", false},
+		{"ordinary source directory", "src/**/*.go", "app/clients/go", "app/src/components/handler.go", true},
+		{"prefix below ordinary source directory", "clients/local/src/**/*.go", "app/clients/go", "app/clients/local/src/handler.go", true},
+		{"parent's own Go source", "**/*.go", "app/clients/go", "app/src/handler.go", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeTestFile(t, filepath.Join(root, tt.filePath), "package example\n")
+			parent := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
+			child := &workspace.Project{ID: "/" + tt.childPath, Name: "child", Path: tt.childPath}
+			ws := testWorkspace(root, parent, child)
+			goExt := configExtractTestExtension("@putnami/go", tt.pattern)
+
+			planned, err := Plan(ws, []string{"config-extract"}, []*workspace.Project{parent}, []*extension.ExtensionDescription{goExt}, nil, nil, nil)
+			if err != nil {
+				t.Fatalf("Plan: %v", err)
+			}
+			if got := len(planned) > 0; got != tt.wantGo {
+				t.Fatalf("parent Go activation = %t, want %t; jobs = %v", got, tt.wantGo, jobKeys(planned))
+			}
+		})
+	}
+}
+
+func TestPlan_ConfigExtractKeepsChildAndMixedLanguageActivation(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "recursive-activation-project-ownership", "own-files-activate-selected-children-and-mixed-parents")
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "app", "package.json"), "{}")
+	writeTestFile(t, filepath.Join(root, "app", "clients", "go", "client.go"), "package client\n")
+	parent := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
+	child := &workspace.Project{ID: "/app/clients/go", Name: "client", Path: "app/clients/go"}
+	ws := testWorkspace(root, parent, child)
+	exts := []*extension.ExtensionDescription{
+		configExtractTestExtension("@putnami/go", "**/*.go", "go.mod"),
+		configExtractTestExtension("@putnami/typescript", "package.json"),
+	}
+
+	for _, tt := range []struct {
+		name     string
+		selected []*workspace.Project
+		want     []string
+	}{
+		{"parent only", []*workspace.Project{parent}, []string{"/app @putnami/typescript"}},
+		{"child only", []*workspace.Project{child}, []string{"/app/clients/go @putnami/go"}},
+		{"parent and child", ws.Projects, []string{"/app @putnami/typescript", "/app/clients/go @putnami/go"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			planned, err := Plan(ws, []string{"config-extract"}, tt.selected, exts, nil, nil, nil)
+			if err != nil {
+				t.Fatalf("Plan: %v", err)
+			}
+			var got []string
+			for _, job := range planned {
+				got = append(got, job.Project.ID+" "+job.Extension.Name)
+			}
+			sort.Strings(got)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("config-extract providers = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	writeTestFile(t, filepath.Join(root, "app", "src", "main.go"), "package app\n")
+	planned, err := Plan(ws, []string{"config-extract"}, []*workspace.Project{parent}, exts, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("Plan for mixed-language parent: %v", err)
+	}
+	var got []string
+	for _, job := range planned {
+		got = append(got, job.Extension.Name)
+	}
+	sort.Strings(got)
+	want := []string{"@putnami/go", "@putnami/typescript"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("mixed-language providers = %v, want %v", got, want)
+	}
+}
+
+func configExtractTestExtension(name string, activationFiles ...string) *extension.ExtensionDescription {
+	return &extension.ExtensionDescription{
+		Name: name,
+		Jobs: map[string]*extension.JobDefinition{
+			"config-extract": {
+				ExtensionName:   name,
+				Name:            "config-extract",
+				ActivationFiles: activationFiles,
+				PipelineSteps:   []extension.PipelineStep{{ID: "extract", Task: "config-extract-exec"}},
+			},
+		},
+		Tasks: map[string]extension.TaskDefinition{
+			"config-extract-exec": {Kind: "command", Command: "run"},
+		},
+	}
+}
+
 func TestPlan_CloudPublishConfigActivatesFromGeneratedSchema(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
