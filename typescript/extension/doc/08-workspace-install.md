@@ -80,13 +80,14 @@ when there is none.
 
 The command performs these steps:
 
-1. **Ensure workspace devDependencies** — adds required devDependencies (`@biomejs/biome`, `@types/bun`, `typescript`) to the workspace root `package.json` if they are not already present. Existing versions are never overridden. Biome is added at the exact release that the `$schema` of the shipped Biome rules names, never as a range.
-2. **List the workspace members** — writes the root `package.json` `workspaces` from the workspace membership, as `putnami projects sync` does: every member with a `package.json`, the workspace root excluded. A project created after the last `projects sync` is therefore installed, and a list that already matches is not rewritten. If the list cannot be read or written, the install fails before `bun install` runs.
-3. **Seed catalog entries** — for any package a member references with Bun's `catalog:` protocol but that is missing from the root catalog, an entry is added (pinned to `latest`) so `bun install` can resolve it. `@putnami/*` framework packages scaffolded by the templates are seeded this way; `putnami upgrade --deps` later pins them to an exact release. Existing catalog entries — Putnami or otherwise — are never overwritten.
+1. **Create the root `package.json`** — when the file is missing, writes `{"name": <workspace name>, "private": true, "workspaces": []}`. The name is the `name` in `putnami.workspace.json`, else the name of the workspace root directory. An existing file is never touched. `putnami projects sync` still creates no root `package.json`, so a Go-only or Python-only workspace gets none.
+2. **Ensure workspace devDependencies** — adds required devDependencies (`@biomejs/biome`, `@types/bun`, `typescript`) to the workspace root `package.json` if they are not already present. Existing versions are never overridden. Biome is added at the exact release that the `$schema` of the shipped Biome rules names, never as a range.
+3. **List the workspace members** — writes the root `package.json` `workspaces` from the workspace membership, as `putnami projects sync` does: every member with a `package.json`, the workspace root excluded. A project created after the last `projects sync` is therefore installed, and a list that already matches is not rewritten. If the list cannot be read or written, the install fails before `bun install` runs.
+4. **Seed catalog entries** — for any package a member references with Bun's `catalog:` protocol but that is missing from the root catalog, an entry is added (pinned to `latest`) so `bun install` can resolve it. `@putnami/*` framework packages scaffolded by the templates are seeded this way; `putnami upgrade --deps` later pins them to an exact release. Existing catalog entries — Putnami or otherwise — are never overwritten.
    When the install receives a channel other than `latest` through the `putnami-channel` job option, which `putnami init` sets for the channel it resolves on, a missing `@putnami/*` entry is the exact version that channel's dist-tag names for the package on the registry the workspace declares, never the channel name. A package the channel does not name fails the install before `bun install` runs; the seed does not read `latest` instead.
-4. **Declare the bun version** — when the root `package.json` has no `packageManager` field, the command runs `bun --version` with the Bun it selected (see [Which Bun runs](#which-bun-runs)) and writes `"packageManager": "bun@<version>"`. `putnami install` pins the lock's bun toolchain from that field, and TypeScript tasks then run only with a bun of that exact version. An existing field is never changed. A bun whose version is not a plain release, such as a canary build, is not declared.
-5. **Refresh the private-registry credential** — see below.
-6. **Run `bun install`** — executes `bun install` in the workspace root directory. Bun resolves all `workspace:*` and `catalog:` references and creates symlinks between workspace packages.
+5. **Declare the bun version** — when the root `package.json` has no `packageManager` field, the command runs `bun --version` with the Bun it selected (see [Which Bun runs](#which-bun-runs)) and writes `"packageManager": "bun@<version>"`. `putnami install` pins the lock's bun toolchain from that field, and TypeScript tasks then run only with a bun of that exact version. An existing field is never changed. A bun whose version is not a plain release, such as a canary build, is not declared.
+6. **Refresh the private-registry credential** — see below.
+7. **Run `bun install`** — executes `bun install` in the workspace root directory. Bun resolves all `workspace:*` and `catalog:` references and creates symlinks between workspace packages.
 
 When `--force` is not set, Bun skips installation if `bun.lock` is already up to date.
 
@@ -107,7 +108,7 @@ rather than `node_modules`.
 extension asks `@putnami/cloud` to write your npm credential for that registry:
 
 1. It reads the `@putnami:registry=` line from the workspace `.npmrc` — the line
-   step 5 above maintains — and takes its host.
+   step 6 above maintains — and takes its host.
 2. It runs `putnami cloud registry-token --host <host> --materialize`, which
    writes the `//<host>/:_authToken=` line in your own `~/.npmrc`.
 
@@ -139,7 +140,7 @@ the install are two jobs:
    refreshes no credential. Outside a hosted run it keeps the steps above
    unchanged.
 
-On a hosted run, neither command shapes the workspace manifests (steps 1 to 4
+On a hosted run, neither command shapes the workspace manifests (steps 1 to 5
 above, `tsconfig.json`, `biome.json` and the `.npmrc` scopes): both read the
 committed files as they are, so the install finds the manifests the fetch
 downloaded for, and no committed file changes. A manifest the committed

@@ -150,6 +150,70 @@ func TestWorkspaceInstallWithoutTheMembershipLeavesWorkspacesAlone(t *testing.T)
 	}
 }
 
+// A workspace with no root package.json gets one at install: a private
+// package named after the workspace, with the members listed. The extension
+// manifest declares no devDependencies, so no other step creates the file. A
+// second install rewrites nothing.
+func TestWorkspaceInstallCreatesTheMissingRootManifest(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-creates-the-root-manifest",
+		"a-missing-root-manifest-is-created-with-the-members")
+	ctx, dir := membershipTree(t)
+	ctx.WorkspaceProjects = membership()
+	manifest := filepath.Join(dir, "package.json")
+	if err := os.Remove(manifest); err != nil {
+		t.Fatal(err)
+	}
+
+	run := installRecordingWorkspaces(t, ctx)
+	if run.err != nil || run.status != "OK" {
+		t.Fatalf("runWorkspaceInstall = %q, %v; want OK", run.status, run.err)
+	}
+	if !slices.Equal(run.seen, []string{"web"}) {
+		t.Fatalf("workspaces when bun install started = %v, want [web]", run.seen)
+	}
+	if private := string(readJSONField(t, manifest, "private")); private != "true" {
+		t.Fatalf("private = %s, want true", private)
+	}
+
+	past := time.Now().Add(-time.Hour).Truncate(time.Second)
+	if err := os.Chtimes(manifest, past, past); err != nil {
+		t.Fatal(err)
+	}
+	if run := installRecordingWorkspaces(t, ctx); run.err != nil || run.status != "OK" {
+		t.Fatalf("second runWorkspaceInstall = %q, %v; want OK", run.status, run.err)
+	}
+	if info, err := os.Stat(manifest); err != nil || !info.ModTime().Equal(past) {
+		t.Fatalf("the second install rewrote package.json (%v, %v)", info, err)
+	}
+}
+
+// The created manifest takes the workspace name core sends in the job context,
+// else the name of the workspace root directory.
+func TestWorkspaceInstallNamesTheRootManifestAfterTheWorkspace(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-creates-the-root-manifest",
+		"the-name-is-the-workspace-name-else-the-directory-name")
+	for _, workspaceName := range []string{"acme", ""} {
+		ctx, dir := membershipTree(t)
+		ctx.Workspace.Name = workspaceName
+		manifest := filepath.Join(dir, "package.json")
+		if err := os.Remove(manifest); err != nil {
+			t.Fatal(err)
+		}
+
+		if run := installRecordingWorkspaces(t, ctx); run.err != nil || run.status != "OK" {
+			t.Fatalf("runWorkspaceInstall = %q, %v; want OK", run.status, run.err)
+		}
+		want := workspaceName
+		if want == "" {
+			want = filepath.Base(dir)
+		}
+		var name string
+		if err := json.Unmarshal(readJSONField(t, manifest, "name"), &name); err != nil || name != want {
+			t.Fatalf("workspace name %q: name = %q (%v), want %q", workspaceName, name, err, want)
+		}
+	}
+}
+
 // A root workspaces member the install cannot read fails the install before
 // bun runs, naming the file, rather than installing without the members.
 func TestWorkspaceInstallFailsOnAnUnreadableWorkspacesMember(t *testing.T) {

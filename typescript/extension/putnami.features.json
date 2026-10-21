@@ -305,6 +305,20 @@
           }
         },
         {
+          "id": "workspace-install-creates-the-root-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-root-manifest-is-created-with-the-members",
+              "the-name-is-the-workspace-name-else-the-directory-name"
+            ]
+          }
+        },
+        {
           "id": "hosted-install-fetches-first",
           "stage": "coded",
           "evidenceKinds": [

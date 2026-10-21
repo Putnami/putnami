@@ -93,9 +93,17 @@ func workspaceInstallArgs(force, hosted bool) []string {
 // and the .npmrc scope lines. workspace-fetch and workspace-install both call
 // it, so the fetch downloads for exactly the manifests the install reads. Each
 // step writes only what is missing or stale, so a second call rewrites
-// nothing. A failure to list the members or to materialize biome.json is
-// returned; the other steps log a warning and continue.
+// nothing. A failure to create the root package.json, to list the members or
+// to materialize biome.json is returned; the other steps log a warning and
+// continue.
 func shapeWorkspaceManifests(ctx *pctx.Context, emit *jsonl.Emitter, bunBin string) error {
+	// Create the root package.json when it is missing, so every step below
+	// finds the file it shapes. A workspace with a TypeScript install has
+	// asked for it.
+	if err := ensureRootManifest(ctx, emit); err != nil {
+		return err
+	}
+
 	// Ensure workspace devDependencies declared by this extension are present.
 	if err := ensureWorkspaceDevDeps(ctx, emit); err != nil {
 		emit.Log("warn", "failed to ensure workspace devDependencies: "+err.Error())
@@ -141,6 +149,44 @@ func shapeWorkspaceManifests(ctx *pctx.Context, emit *jsonl.Emitter, bunBin stri
 		emit.Log("warn", "failed to ensure workspace .npmrc: "+err.Error())
 	}
 	return nil
+}
+
+// ensureRootManifest writes the root package.json, as a private package named
+// after the workspace with an empty member list, when the file is missing. The
+// name is the workspace name of the job context, which core read from
+// putnami.workspace.json, else the root directory's name.
+// An existing file is never touched, so a second call rewrites nothing. The
+// membership step fills the list.
+func ensureRootManifest(ctx *pctx.Context, emit *jsonl.Emitter) error {
+	pkgPath := filepath.Join(ctx.WorkspaceRoot, "package.json")
+	if _, err := os.Stat(pkgPath); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("stat package.json: %w", err)
+	}
+	name, err := json.Marshal(workspaceManifestName(ctx))
+	if err != nil {
+		return fmt.Errorf("marshal the workspace name: %w", err)
+	}
+	pkg := map[string]json.RawMessage{
+		"name":       name,
+		"private":    json.RawMessage("true"),
+		"workspaces": json.RawMessage("[]"),
+	}
+	if err := writeRootManifest(pkgPath, pkg, []string{"name", "private", "workspaces"}); err != nil {
+		return err
+	}
+	emit.Log("info", "created package.json for the workspace "+string(name))
+	return nil
+}
+
+// workspaceManifestName is the workspace name of the job context, else the
+// name of the workspace root directory.
+func workspaceManifestName(ctx *pctx.Context) string {
+	if ctx.Workspace.Name != "" {
+		return ctx.Workspace.Name
+	}
+	return filepath.Base(ctx.WorkspaceRoot)
 }
 
 // ensureWorkspaceMembership writes the root package.json `workspaces` from the
@@ -235,14 +281,11 @@ func ensureWorkspaceDevDeps(ctx *pctx.Context, emit *jsonl.Emitter) error {
 		return nil
 	}
 
-	// Read workspace package.json (create a minimal one if it doesn't exist).
+	// Read workspace package.json, which ensureRootManifest has created.
 	pkgPath := filepath.Join(ctx.WorkspaceRoot, "package.json")
 	pkgData, err := os.ReadFile(pkgPath)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("read package.json: %w", err)
-		}
-		pkgData = []byte(`{"private": true}`)
+		return fmt.Errorf("read package.json: %w", err)
 	}
 
 	var pkg map[string]json.RawMessage
