@@ -508,6 +508,22 @@
               "mcp-registration-is-explicit-and-merge-aware"
             ]
           }
+        },
+        {
+          "id": "agent-context-languages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-claimed-project-reports-the-declared-language",
+              "a-project-claimed-by-two-providers-reports-both-sorted",
+              "a-provider-that-declares-no-language-adds-none",
+              "an-unclaimed-project-reports-none-whatever-its-files"
+            ]
+          }
         }
       ]
     },

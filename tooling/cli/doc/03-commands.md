@@ -872,6 +872,14 @@ when one drifted. Both accept `--output=json`. The MCP `agent_context` tool buil
 the same document in memory. The document contract is
 `go.putnami.dev/protocol/agentcontext`.
 
+A project's `identity.languages` are the `language` members of the workspace
+adapters of the loaded extensions (see [Extensions](07-extensions.md)), one for
+each extension whose probe the workspace index (`.putnami/workspace-index.json`)
+records as claiming the project. The pack reads no file name and runs no probe,
+so it lists no language for a project that no declaring extension claims, for a
+project whose extension is not installed, or for an extension that declares none.
+Run `putnami projects sync` to refresh the claims.
+
 #### `context map`
 
 `context map` renders the workspace orientation map — every project with its

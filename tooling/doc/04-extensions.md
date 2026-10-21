@@ -431,6 +431,9 @@ the installed tree stale, such as `bun.lock` or `uv.lock`. Each entry is a
 literal file name, never a path or a glob. `language` is the lowercase id of the
 language your projects are written in, such as `go`, `typescript` or `python`.
 The CLI records both per extension in `.putnami/workspace-index.json`.
+`putnami context pack` lists your `language` among the languages of each project
+your extension claims, and lists none for a project that no extension declaring a
+`language` claims.
 
 ### Machine caches
 

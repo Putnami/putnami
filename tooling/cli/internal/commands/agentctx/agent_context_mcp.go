@@ -99,9 +99,13 @@ func BuildAgentContextResult(wsRoot, cliVersion, projectSelector string) (AgentC
 	if proj == nil {
 		return AgentContextResult{}, cmderr.NotFoundf("project not found: %s", projectSelector)
 	}
+	languages, err := declaredProjectLanguages(ws)
+	if err != nil {
+		return AgentContextResult{}, err
+	}
 	revision := resolveWorkspaceRevision(wsRoot)
 
-	doc, rel, freshBytes, err := buildPackedDocument(ws, proj, revision, cliVersion)
+	doc, rel, freshBytes, err := buildPackedDocument(ws, proj, languages, revision, cliVersion)
 	if err != nil {
 		return AgentContextResult{}, err
 	}
