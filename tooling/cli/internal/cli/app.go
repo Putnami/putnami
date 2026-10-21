@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -100,12 +99,6 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	cwd, _ := os.Getwd()
 	wsRoot, _ := workspace.FindRoot(cwd)
 
-	// A package.json root gives way to the user scope for a command group only
-	// the user scope provides. The decision reads files and spawns nothing, so
-	// it comes before the relaunch: a root the user scope takes over pins no CLI.
-	claim := claimPackageRoot(ctx, args, cwd, wsRoot, providerChild)
-	wsRoot = claim.root(wsRoot)
-
 	// A hosted run, or one that enables the install provider, downloads the
 	// pinned CLI and the lock-pinned extensions through the credential provider
 	// of the user scope. The workspace's own provider is installed after the
@@ -173,13 +166,6 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// is consumed here, after the pinned-CLI relaunch and before any argv parse.
 	if requestPath := os.Getenv(runnerprovider.BoundRequestEnv); requestPath != "" {
 		return a.runBoundRequest(ctx, wsRoot, cfg, args, requestPath, providersEnv, boot)
-	}
-
-	// A user-scope pin that did not load leaves the claim open until it is
-	// repaired here, after the capability capture: a download spawns the
-	// registry credential helper, which must not inherit a capability transport.
-	if claim.ownsAfterRepair(ctx, os.Stderr) {
-		wsRoot, cfg = "", wsproto.Load("")
 	}
 
 	// The bootstrap provider serves the lock-pinned extension downloads that
@@ -705,135 +691,6 @@ func shouldDiscoverUserScope(args []string, wsRoot string) bool {
 		return false
 	}
 	return !isStructuredCommand(first)
-}
-
-// packageRootClaim is the user scope's claim on an invocation whose only root
-// is a package.json with a "workspaces" field. The user scope serves every
-// directory without putnami.workspace.json, and an npm or yarn monorepo has
-// none: a command group the user scope provides runs there as outside any
-// workspace, and nothing is bootstrapped or written into the repository.
-type packageRootClaim struct {
-	// owns is set when a loaded user-scope pin provides the command group and
-	// the package root does not declare that extension.
-	owns bool
-	// repair is set when a user-scope pin did not load, so the claim is decided
-	// by ownsAfterRepair.
-	repair   bool
-	wsRoot   string
-	userRoot string
-	command  string
-}
-
-// claimPackageRoot decides the claim from files, before the pinned-CLI
-// relaunch. A putnami.workspace.json at or above the working directory always
-// wins, and so does the package root when its own extensions provide the
-// command or its package.json declares the extension that provides it.
-//
-// A comma list, an alias to one, and an alias to a built-in command never name
-// a group; the internal release-set provider and a bound runner request never
-// read the user scope. For any other command the check reads one lock file
-// when the user scope pins nothing. Otherwise it resolves aliases, discovers
-// the package root's extensions, and loads the user-scope pins without
-// repairing them.
-func claimPackageRoot(ctx context.Context, args []string, cwd, wsRoot string, providerChild bool) packageRootClaim {
-	if wsRoot == "" || providerChild || os.Getenv(runnerprovider.BoundRequestEnv) != "" ||
-		!shouldDiscoverUserScope(args, "") || strings.Contains(args[0], ",") || workspaceManifestAbove(cwd) {
-		return packageRootClaim{}
-	}
-	userRoot, err := extension.ResolveUserScopeRoot()
-	if err != nil || !extension.UserScopeMayPin(userRoot) {
-		return packageRootClaim{}
-	}
-	cfg := wsproto.Load(wsRoot)
-	command := resolveAliasOrSelf(args[0], commandAliases{user: cfg.Aliases})
-	if strings.Contains(command, ",") || isStructuredCommand(command) || packageRootProvides(wsRoot, cfg, command) {
-		return packageRootClaim{}
-	}
-	claim := packageRootClaim{wsRoot: wsRoot, userRoot: userRoot, command: command}
-	if result, err := extension.DiscoverUserScopeExtensions(ctx, userRoot, nil); err == nil {
-		if owns, found := claim.provides(result); found || len(result.Skipped) == 0 {
-			claim.owns = owns
-			return claim
-		}
-	}
-	claim.repair = true
-	return claim
-}
-
-// root is the workspace root of the run: none when the user scope owns it.
-func (c packageRootClaim) root(wsRoot string) string {
-	if c.owns {
-		return ""
-	}
-	return wsRoot
-}
-
-// ownsAfterRepair decides a claim a user-scope pin left open. It repairs the
-// user scope as a run outside a workspace does. When the user scope still does
-// not provide the command group, its warnings are printed and the package root
-// keeps the run.
-func (c packageRootClaim) ownsAfterRepair(ctx context.Context, stderr io.Writer) bool {
-	if !c.repair {
-		return false
-	}
-	var installer *extension.Installer
-	if extension.ClaimUserScopeRepair(c.userRoot) {
-		installer = extension.NewUserScopeInstaller(c.userRoot)
-	}
-	result, err := extension.DiscoverUserScopeExtensions(ctx, c.userRoot, installer)
-	if err != nil {
-		iox.Fprintf(stderr, "putnami: warning: %v\n", err)
-		return false
-	}
-	if owns, found := c.provides(result); found {
-		return owns
-	}
-	for _, skipped := range result.Skipped {
-		iox.Fprintf(stderr, "putnami: warning: %v\n", skipped.Reason)
-	}
-	return false
-}
-
-// provides reports whether a user-scope extension in result provides the
-// claimed command group (found), and whether the package root leaves that
-// extension to the user scope (owns).
-func (c packageRootClaim) provides(result *extension.DiscoveryResult) (owns, found bool) {
-	for _, ext := range result.Extensions {
-		if _, ok := ext.CommandGroups[c.command]; ok {
-			return !extension.PackageRootDeclares(c.wsRoot, ext.Name), true
-		}
-	}
-	return false, false
-}
-
-// packageRootProvides reports whether the extensions a package root discovers
-// provide command, as a command group or as a flat command.
-func packageRootProvides(wsRoot string, cfg *wsproto.Config, command string) bool {
-	extensions, _ := extension.DiscoverExtensions(wsRoot, cfg, projectPathsForRoot(wsRoot))
-	if commandGroupsFor(extensions, wsRoot, false)[command] {
-		return true
-	}
-	for _, ext := range extensions {
-		if _, ok := ext.Commands[command]; ok {
-			return true
-		}
-	}
-	return false
-}
-
-// workspaceManifestAbove reports whether dir or one of its parents holds
-// putnami.workspace.json.
-func workspaceManifestAbove(dir string) bool {
-	for {
-		if wsproto.IsWorkspaceConfig(dir) {
-			return true
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return false
-		}
-		dir = parent
-	}
 }
 
 // discoverUserScopeExtensions loads the extensions pinned in the user scope.

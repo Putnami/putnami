@@ -70,7 +70,7 @@ command verticals under `internal/commands/`, is in
 ### Boot Sequence
 
 1. **Signal context** — `main()` creates a context that cancels on SIGINT/SIGTERM for graceful shutdown.
-2. **Workspace detection** — Walk upward from cwd looking for `putnami.workspace.json` or `package.json` with `workspaces`.
+2. **Workspace detection** — Walk upward from cwd looking for `putnami.workspace.json`, the only workspace marker.
 3. **Config loading** — Merge global (`~/.putnami/config.json`), workspace, and local config scopes.
 4. **Argument parsing** — Parse command(s), subcommand, global flags, job flags. Resolve aliases.
 5. **Routing** — Structured commands dispatch directly. Job commands proceed to the orchestration pipeline.

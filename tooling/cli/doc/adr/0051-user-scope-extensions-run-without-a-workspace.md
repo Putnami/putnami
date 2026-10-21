@@ -1,6 +1,10 @@
 # ADR 0051 — Extensions pinned in the user scope run without a workspace
 
 - **Status**: accepted
+- **Supersedes in part**: this ADR, decision 1 (the paragraphs on
+  `workspace.FindRoot` and `claimPackageRoot`). Only `putnami.workspace.json`
+  marks a workspace root, so no package-manager root is left to claim. See
+  requirement `workspace-root` of `cli/workspace-discovery-selection`.
 - **Scope**: `@putnami/cli` (`internal/cli`, `internal/commands/extensions`,
   `internal/extension`, `internal/jobs`, `internal/launch`,
   `internal/commandmeta`), `@putnami/cli-model` (`jobs.ScheduledJob`),

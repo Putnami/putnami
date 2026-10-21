@@ -69,14 +69,6 @@ func ClaimUserScopeRepair(userRoot string) bool {
 	return true
 }
 
-// UserScopeMayPin reports whether the user-scope lock at userRoot pins an
-// extension, or cannot be read, so a caller that needs the user scope only when
-// it pins something decides with one file read.
-func UserScopeMayPin(userRoot string) bool {
-	lf, err := lockfile.ReadLockFile(userRoot)
-	return err != nil || (lf != nil && len(lf.Extensions) > 0)
-}
-
 // UserScopeInstallCommand is the command that pins, or repairs the pin of, a
 // user-scope extension.
 func UserScopeInstallCommand(name string) string {

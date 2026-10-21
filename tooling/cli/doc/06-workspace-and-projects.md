@@ -4,14 +4,9 @@ The CLI operates on a **workspace** — a directory containing multiple **projec
 
 ## Workspace Detection
 
-The CLI finds the workspace root by walking upward from the current directory, checking each directory for:
+The CLI finds the workspace root by walking upward from the current directory to the nearest directory that holds `putnami.workspace.json`. That file is the only workspace marker. A `package.json` with a `workspaces` field marks no root: an npm or yarn monorepo without `putnami.workspace.json` is outside any workspace until `putnami init` makes it one.
 
-1. `putnami.workspace.json` — Putnami's native workspace config file.
-2. `package.json` with a `workspaces` field — Node.js workspace convention.
-
-The first match becomes the workspace root. If neither is found, structured commands that don't require a workspace (e.g., `workspace init`, `telemetry`, `completion`) still work; job commands fail with "no workspace found".
-
-A `package.json` root with no `putnami.workspace.json` at or above the current directory gives way to the user scope for a command group that only the user scope provides. See [The User Scope](07-extensions.md#the-user-scope).
+Outside a workspace, structured commands that don't require one (e.g., `workspace init`, `telemetry`, `completion`) still work, the user scope serves its command groups, and job commands fail with "no workspace found". See [The User Scope](07-extensions.md#the-user-scope).
 
 ## First use after checkout
 

@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/hometest"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 func TestParseInitFlags(t *testing.T) {
@@ -340,6 +342,46 @@ func TestWorkspaceInitWritesAnEmptyWorkspacesList(t *testing.T) {
 	}
 	if got := string(manifest["workspaces"]); got != "[]" {
 		t.Errorf("package.json workspaces = %s, want []\n%s", got, data)
+	}
+}
+
+// TestWorkspaceInitInAPackageManagerMonorepo: a directory whose package.json
+// declares workspaces is not a workspace root, so init there makes it one. It
+// writes putnami.workspace.json and leaves the package.json bytes as they are.
+func TestWorkspaceInitInAPackageManagerMonorepo(t *testing.T) {
+	dir := t.TempDir()
+	stubWorkspaceInitStages(t, "", 0)
+	t.Chdir(dir)
+	manifest := []byte(`{"name":"mono","private":true,"packageManager":"bun@1.3.0","workspaces":["packages/*"]}` + "\n")
+	if err := os.WriteFile(filepath.Join(dir, "package.json"), manifest, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "packages", "app"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if root, err := workspace.FindRoot(dir); err == nil {
+		t.Fatalf("FindRoot = %q, want no root before init", root)
+	}
+
+	output, err := captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), "", []string{"--workspace", "mono-ws", "--extension", "ts"}, LifecycleEnv{})
+	})
+	if err != nil {
+		t.Fatalf("WorkspaceInit: %v\n%s", err, output)
+	}
+
+	if cfg := wsproto.Load(dir); cfg.Name != "mono-ws" {
+		t.Errorf("workspace name = %q, want mono-ws", cfg.Name)
+	}
+	if root, err := workspace.FindRoot(filepath.Join(dir, "packages", "app")); err != nil || root == "" {
+		t.Errorf("FindRoot after init = %q, %v; want the initialized directory", root, err)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "package.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, manifest) {
+		t.Errorf("package.json changed:\n%s\nwant:\n%s", got, manifest)
 	}
 }
 

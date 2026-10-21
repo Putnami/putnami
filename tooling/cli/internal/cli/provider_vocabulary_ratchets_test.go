@@ -139,13 +139,6 @@ var providerVocabularyAllowlist = map[string]providerVocabularyResidue{
 			"repaired it. Non-extension modules are repaired by the Go extension's own task. It " +
 			"goes with the same change as extension_runtime.go's entry",
 	},
-	"internal/workspace/workspace.go": {
-		sites: 1,
-		why: "A ROOT MARKER: FindRoot accepts a package.json carrying a `workspaces` array as a " +
-			"workspace root, beside putnami.workspace.json. It predates the workspace config and " +
-			"exists so `putnami` works in an npm monorepo before anything is configured. It goes " +
-			"when first-use bootstrap can create the workspace config instead of inferring it",
-	},
 }
 
 // tokenizeIdentifier splits text on non-alphanumeric runes and camelCase

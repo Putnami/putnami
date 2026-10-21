@@ -12,7 +12,7 @@ Configuration is loaded from three scopes, merged in order (later overrides earl
 | Workspace | `<workspaceRoot>/putnami.workspace.json` | Shared workspace settings |
 | Local | `<cwd>/putnami.json` | Directory-specific overrides (if cwd differs from workspace root) |
 
-The workspace root is detected by walking upward from the current directory, looking for `putnami.workspace.json` or `package.json` with a `workspaces` field.
+The workspace root is detected by walking upward from the current directory, looking for `putnami.workspace.json`, the only workspace marker. A `package.json` with a `workspaces` field marks no root.
 
 ## Workspace Configuration
 
