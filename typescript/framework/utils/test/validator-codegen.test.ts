@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { specTest } from '@putnami/spectest';
 import type { SchemaDefinition } from '../src/shared/schema/schema';
-import { ArrayOf, Default, Int, Optional, Uuid } from '../src/shared/schema/schema';
+import { ArrayOf, Default, Int, Optional, Sensitive, Uuid } from '../src/shared/schema/schema';
 import { validateSchema } from '../src/shared/schema/validate';
 import { type AotFieldValidator, compileSchemaValidator } from '../src/shared/schema/validator-codegen';
 
@@ -217,6 +217,17 @@ describe('compileSchemaValidator parity with validateSchema', () => {
       const result = compileSchemaValidator({ id: Uuid }, { coerce: false });
       expect(result.inlineable).toBe(false);
       expect(result.source).toBe('');
+
+      const nested = { config: Sensitive({ retries: Default(Int, 3), port: Int }) };
+      const compiled = compileSchemaValidator(nested, { coerce: false });
+      expect(compiled.inlineable).toBe(false);
+      expect(compiled.source).toBe('');
+      expect(validateSchema(nested, { config: { port: 8080 } }).data).toEqual({
+        config: { retries: 3, port: 8080 },
+      });
+      expect(validateSchema(nested, { config: { port: 1.5 } }).errors.map((error) => error.field)).toEqual([
+        'field.config.port',
+      ]);
     },
   );
 });

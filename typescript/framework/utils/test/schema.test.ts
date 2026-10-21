@@ -9,6 +9,7 @@ import {
   Desc,
   Email,
   Env,
+  type InferPrimitive,
   Int,
   isNestedSchema,
   isSchemaDescriptor,
@@ -21,6 +22,7 @@ import {
   OneOf,
   Optional,
   Pattern,
+  ProductionUnsafeDefault,
   Resolve,
   Sensitive,
   Stream,
@@ -99,6 +101,36 @@ describe('schema utilities', () => {
     expect(describedNested.description).toBe('nested block');
     expect(describedNested.baseType).toBe('object');
     expect(describedNested.schema).toEqual({ inner: String });
+  });
+
+  it('retains plain nested declarations through every metadata helper and composition', () => {
+    const nested = { child: { age: Int, email: Email } };
+    const fallback = { child: { age: 7, email: 'child@example.com' } };
+    const resolver = async () => fallback;
+    const decorated = [
+      Optional(nested),
+      Default(nested, fallback),
+      Env('NESTED_CONFIG', nested),
+      Resolve(resolver, nested),
+      Sensitive(nested),
+      ProductionUnsafeDefault(nested),
+    ];
+
+    for (const entry of decorated) {
+      expect(entry.baseType).toBe('object');
+      expect(entry.schema).toBe(nested);
+      expect(entry.schema?.child).toBe(nested.child);
+    }
+
+    const composed = Sensitive(Optional(Env('NESTED_CONFIG', Desc('Nested settings', nested))));
+    expect(composed.schema).toBe(nested);
+    expect(composed.optional).toBe(true);
+    expect(composed.env).toBe('NESTED_CONFIG');
+    expect(composed.sensitive).toBe(true);
+    expect(composed.description).toBe('Nested settings');
+    const inferred: InferPrimitive<typeof composed> = fallback;
+    expect(inferred.child.age).toBe(7);
+    expect(nested.child.age).toBe(Int);
   });
 
   it('validates built-in constraints and constrained composition', () => {
@@ -195,6 +227,59 @@ describe('schema utilities', () => {
 });
 
 describe('validateSchema', () => {
+  it('validates children and nested defaults through metadata descriptors', () => {
+    const nested = { child: Int };
+    const def = schema({
+      optional: Optional(nested),
+      defaulted: Default({ child: Int, label: Default(String, 'ready') }, { child: 3, label: 'ready' }),
+      env: Env('NESTED_CONFIG', nested),
+      resolved: Resolve(async () => ({ child: 3 }), nested),
+      sensitive: Sensitive(nested),
+      unsafe: ProductionUnsafeDefault(nested),
+    });
+
+    const valid = validateSchema(def, {
+      env: { child: 1 },
+      resolved: { child: 2 },
+      sensitive: { child: 3 },
+      unsafe: { child: 4 },
+    });
+    expect(valid.errors).toEqual([]);
+    expect(valid.data['defaulted']).toEqual({ child: 3, label: 'ready' });
+    expect(valid.data).not.toHaveProperty('optional');
+
+    const childDefault = validateSchema(
+      { nested: Default({ child: Default(Int, 5) }, { child: 3 }) },
+      {
+        nested: {},
+      },
+    );
+    expect(childDefault.errors).toEqual([]);
+    expect(childDefault.data['nested']).toEqual({ child: 5 });
+
+    const invalidDefault = validateSchema({ nested: Default({ child: Int }, { child: 1.5 }) }, {});
+    expect(invalidDefault.errors.map((error) => error.field)).toEqual(['field.nested.child']);
+
+    const sentinel = 'example-sensitive-value';
+    const invalid = validateSchema(def, {
+      optional: { child: 'bad' },
+      defaulted: { child: 1.5 },
+      env: { child: 'bad' },
+      resolved: { child: 'bad' },
+      sensitive: { child: sentinel },
+      unsafe: { child: 'bad' },
+    });
+    expect(invalid.errors.map((error) => error.field)).toEqual([
+      'field.optional.child',
+      'field.defaulted.child',
+      'field.env.child',
+      'field.resolved.child',
+      'field.sensitive.child',
+      'field.unsafe.child',
+    ]);
+    expect(JSON.stringify(invalid.errors)).not.toContain(sentinel);
+  });
+
   specTest(
     'returns required errors when a required field is absent',
     {
