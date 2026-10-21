@@ -165,11 +165,8 @@ func RunWorkspaceJob(ctx context.Context, req lifecycle.WorkspaceJobRequest) (li
 		if result.ExitCode != engine.ExitSuccess {
 			return lifecycle.WorkspaceJobResult{Outcome: lifecycle.WorkspaceJobFailed}, nil
 		}
-		if available, provided := workspaceJobProviders(req.WorkspaceRoot, req.Config, req.Job); !provided {
-			return lifecycle.WorkspaceJobResult{
-				Outcome:       lifecycle.WorkspaceJobMissing,
-				AvailableJobs: available,
-			}, nil
+		if !workspaceJobProvided(req.WorkspaceRoot, req.Config, req.Job) {
+			return lifecycle.WorkspaceJobResult{Outcome: lifecycle.WorkspaceJobMissing}, nil
 		}
 		return lifecycle.WorkspaceJobResult{Outcome: lifecycle.WorkspaceJobNoMatches}, nil
 	}
@@ -257,16 +254,16 @@ func reportWorkspaceJobActions(req lifecycle.WorkspaceJobRequest, plan []*schedu
 	}
 }
 
-// workspaceJobProviders reports whether any discovered extension provides
-// jobName, plus the providable job names for the caller's error message.
+// workspaceJobProvided reports whether any discovered extension provides
+// jobName.
 //
 // It re-discovers because the engine owns the run's discovery and does not hand
 // the extension set back. That second pass only ever runs when the run planned
 // NOTHING — an error or no-op path — so a healthy install still discovers once.
-func workspaceJobProviders(wsRoot string, cfg *wsproto.Config, jobName string) (available string, provided bool) {
+func workspaceJobProvided(wsRoot string, cfg *wsproto.Config, jobName string) bool {
 	ws, err := workspace.Load(wsRoot)
 	if err != nil {
-		return "", false
+		return false
 	}
 	projectPaths := make([]string, len(ws.Projects))
 	for i, p := range ws.Projects {
@@ -274,8 +271,7 @@ func workspaceJobProviders(wsRoot string, cfg *wsproto.Config, jobName string) (
 	}
 	extensions, err := extension.DiscoverExtensions(wsRoot, cfg, projectPaths)
 	if err != nil {
-		return "", false
+		return false
 	}
-	jobMap := extension.BuildJobMap(extensions)
-	return lifecycle.FormatJobNames(jobMap), len(jobMap[jobName]) > 0
+	return len(extension.BuildJobMap(extensions)[jobName]) > 0
 }

@@ -3714,6 +3714,18 @@
               "init-writes-an-empty-workspaces-list-not-null"
             ]
           }
+        },
+        {
+          "id": "no-install-provider-nothing-to-install",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-implicit-install-prints-nothing-when-no-extension-provides-workspace-install",
+              "an-explicit-command-prints-one-line-when-no-extension-provides-workspace-install"
+            ]
+          }
         }
       ]
     },

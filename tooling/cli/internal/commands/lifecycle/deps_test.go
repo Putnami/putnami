@@ -8,7 +8,6 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
-	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -129,33 +128,5 @@ func TestGoCommandEnv_DropsInheritedAndPointsAtGoWork(t *testing.T) {
 	want := "GOWORK=" + filepath.Join(root, "go.work")
 	if len(goworks) != 1 || goworks[0] != want {
 		t.Errorf("GOWORK entries = %v, want exactly [%q]", goworks, want)
-	}
-}
-
-// FormatJobNames renders the "Available jobs:" line, so its order must not
-// depend on Go's randomized map iteration: the same broken workspace has to
-// produce the same message twice in a row.
-func TestFormatJobNames(t *testing.T) {
-	jobMap := map[string][]*extension.JobDefinition{
-		"build": nil,
-		"test":  nil,
-		"lint":  nil,
-	}
-
-	result := FormatJobNames(jobMap)
-	if result != "build, lint, test" {
-		t.Errorf("FormatJobNames() = %q, want %q", result, "build, lint, test")
-	}
-	for i := 0; i < 20; i++ {
-		if again := FormatJobNames(jobMap); again != result {
-			t.Fatalf("FormatJobNames() is not deterministic: %q then %q", result, again)
-		}
-	}
-}
-
-func TestFormatJobNamesEmpty(t *testing.T) {
-	result := FormatJobNames(map[string][]*extension.JobDefinition{})
-	if result != "" {
-		t.Errorf("FormatJobNames(empty) = %q, want empty", result)
 	}
 }

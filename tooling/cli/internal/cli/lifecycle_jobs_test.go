@@ -257,9 +257,6 @@ func TestRunWorkspaceJob_DistinguishesMissingProviderFromNoMatches(t *testing.T)
 		if result.Outcome != lifecycle.WorkspaceJobMissing {
 			t.Fatalf("outcome = %v, want WorkspaceJobMissing", result.Outcome)
 		}
-		if !strings.Contains(result.AvailableJobs, "workspace-install") {
-			t.Errorf("available jobs = %q, want it to name workspace-install", result.AvailableJobs)
-		}
 	})
 
 	t.Run("no matching project", func(t *testing.T) {
