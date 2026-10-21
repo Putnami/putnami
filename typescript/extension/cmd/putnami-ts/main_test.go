@@ -721,9 +721,8 @@ func TestEnsureWorkspaceDevDeps_InvalidManifestJSON(t *testing.T) {
 	}
 }
 
-// A Biome release outside the one the shipped rules target can change their
-// meaning, or ship without its platform executables: a fresh workspace gets
-// exactly the release the rules' $schema names.
+// A fresh workspace gets exactly the Biome release the shipped rules' $schema
+// names.
 func TestEnsureWorkspaceDevDeps_AddsTheBiomeTheRulesTarget(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-biome-default", "the-added-biome-is-the-release-the-rules-target")
 	t.Parallel()
