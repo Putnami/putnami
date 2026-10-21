@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -29,9 +28,9 @@ import (
 //     requirement each one's manifest names (the Go extension drops the module
 //     path the target's go.mod declares, then tidies the module);
 //   - a manifest entry whose importer has no extension with a deps-edit job
-//     (a TypeScript package dependency today) is reported with the edit to
-//     make, never half-applied: remove it from the project's package.json,
-//     then run `putnami deps install`;
+//     is reported with the edit to make, never half-applied: remove it from
+//     the manifest the workspace provider read the importer from, then run
+//     `putnami deps install`;
 //   - an orphan client manifest is a deletion, not an edit: the repair is to
 //     remove the generated target or restore its provider's contract, and
 //     guessing which one the user means is not this command's call.
@@ -60,9 +59,9 @@ const (
 type routedFinding struct {
 	finding workspace.DeclaredEdgeFinding
 	route   pruneRoute
-	// manifest is the workspace-relative package.json this command names for
-	// the hand edit of a manifest finding it keeps. It is empty when no single
-	// file can be named.
+	// manifest is the workspace-relative file the workspace provider read the
+	// importer from, which this command names for the hand edit of a manifest
+	// finding it keeps. It is empty when the provider reported none.
 	manifest string
 	// editor is the extension whose deps-edit job edits a manifest finding.
 	editor string
@@ -128,7 +127,7 @@ func requireFreshProviderView(ws *workspace.Workspace) error {
 // fixture. env runs the deps-edit jobs.
 func prunePlan(ctx context.Context, wsRoot string, ws *workspace.Workspace, editors map[string]string,
 	projectSelector string, dryRun bool, out io.Writer, env LifecycleEnv) error {
-	routed := routeFindings(wsRoot, ws, editors, selectedFindings(ws, projectSelector))
+	routed := routeFindings(ws, editors, selectedFindings(ws, projectSelector))
 	if len(routed) == 0 {
 		iox.Fprintln(out, "  No declared dependency edge without an import.")
 		return nil
@@ -167,7 +166,7 @@ func selectedFindings(ws *workspace.Workspace, projectSelector string) []workspa
 }
 
 // routeFindings decides the repair for each finding.
-func routeFindings(wsRoot string, ws *workspace.Workspace, editors map[string]string,
+func routeFindings(ws *workspace.Workspace, editors map[string]string,
 	findings []workspace.DeclaredEdgeFinding) []routedFinding {
 	routed := make([]routedFinding, 0, len(findings))
 	for _, finding := range findings {
@@ -175,30 +174,24 @@ func routeFindings(wsRoot string, ws *workspace.Workspace, editors map[string]st
 		if entry.route == pruneRouteManifest {
 			entry.editor = editors[finding.Project]
 		}
-		entry.manifest = manifestOf(wsRoot, ws, entry)
+		entry.manifest = manifestOf(ws, entry)
 		routed = append(routed, entry)
 	}
 	return routed
 }
 
-// manifestOf names the package.json that carries a manifest finding this
-// command keeps, when the importer has one. Any other manifest is not named,
-// because guessing the wrong file is worse than naming none.
-func manifestOf(wsRoot string, ws *workspace.Workspace, entry routedFinding) string {
+// manifestOf names the file the workspace provider read the importer of a
+// manifest finding from, when this command keeps the finding. It is empty when
+// the provider reported no file: guessing one is worse than naming none.
+func manifestOf(ws *workspace.Workspace, entry routedFinding) string {
 	if entry.finding.Class != workspace.DeclaredEdgeManifest || entry.route != pruneRouteKeep {
 		return ""
 	}
 	importer := ws.ProjectByID(entry.finding.Project)
-	if importer == nil || !packageManifestExists(filepath.Join(wsRoot, importer.Path)) {
+	if importer == nil {
 		return ""
 	}
-	return filepath.ToSlash(filepath.Join(importer.Path, "package.json"))
-}
-
-// packageManifestExists reports whether dir holds a package.json file.
-func packageManifestExists(dir string) bool {
-	info, err := os.Stat(filepath.Join(dir, "package.json"))
-	return err == nil && !info.IsDir()
+	return importer.SourceFile
 }
 
 // routeOf resolves one finding to its repair.
@@ -263,10 +256,11 @@ func pruneLocation(entry routedFinding) string {
 }
 
 // manualManifestEdit is the edit a manifest finding this command keeps needs
-// by hand. A package.json dependency is removed from the file and the
-// installers run again, the TypeScript path of `deps remove`'s documentation.
+// by hand: the dependency is removed from the manifest the provider read the
+// importer from, and the installers run again. Without a named manifest it
+// points at the importer's language manifest in general terms.
 func manualManifestEdit(entry routedFinding) string {
-	if strings.HasSuffix(entry.manifest, "package.json") {
+	if entry.manifest != "" {
 		return fmt.Sprintf("remove the dependency on %s from %s, then run `putnami deps install`",
 			entry.finding.TargetName, entry.manifest)
 	}

@@ -49,14 +49,17 @@ func TestAdoptProbeView_AppliesTheMergePrecedence(t *testing.T) {
 	ws.Projects[0].Scope = ScopeContribution{Name: "@acme/app-by-convention"}
 
 	ws.AdoptProbeView(mergedView(
-		wsproto.MergedProject{Path: "app", SourceName: "example.com/app", Type: "application",
-			Tags: []string{"go"}},
+		wsproto.MergedProject{Path: "app", SourceName: "example.com/app", SourceFile: "app/go.mod",
+			Type: "application", Tags: []string{"go"}},
 		// The merge has already resolved lib's explicit name; a provider that
 		// still reports its own manifest identity must not win over it.
 		wsproto.MergedProject{Path: "lib", SourceName: "@acme/lib", Type: "library"},
 	))
 
 	app := ws.ProjectByID("/app")
+	if app.SourceFile != "app/go.mod" {
+		t.Errorf("app sourceFile = %q, want the file the provider read the identity from", app.SourceFile)
+	}
 	if app.Name != "example.com/app" || app.SourceName != "example.com/app" {
 		t.Errorf("app name/sourceName = %q/%q, want the provider's identity to outrank the scope pattern",
 			app.Name, app.SourceName)

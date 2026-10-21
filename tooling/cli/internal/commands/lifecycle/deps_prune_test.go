@@ -141,9 +141,10 @@ func TestDepsPruneOnACleanWorkspaceSaysSo(t *testing.T) {
 	}
 }
 
-// A package.json dependency no import backs is kept: this command has no
-// writer for package.json. The dry run and the failed run name the file and
-// the edit to make by hand, and never send the user back to deps prune.
+// A manifest dependency no import backs is kept when the importer's extension
+// has no deps-edit job. The dry run and the failed run name the file the
+// provider read the importer from and the edit to make by hand, and never send
+// the user back to deps prune.
 func TestDepsPruneNamesTheHandEditForAManifestItKeeps(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-discovery-selection", "declared-edge-check",
 		"prune-names-the-hand-edit-for-a-manifest-it-keeps")
@@ -157,8 +158,9 @@ func TestDepsPruneNamesTheHandEditForAManifestItKeeps(t *testing.T) {
 	declared := map[string]wsproto.DependencySource{"@acme/ui": wsproto.DependencySourceDeclared}
 	ws := workspace.NewWorkspace(root, nil, []*workspace.Project{
 		{ID: "/libs/ui", Name: "@acme/ui", Path: "libs/ui"},
-		{ID: "/apps/web", Name: "@acme/web", Path: "apps/web", Dependencies: []string{"@acme/ui"}, DependencySources: declared},
-		// A manifest this command cannot name.
+		{ID: "/apps/web", Name: "@acme/web", Path: "apps/web", SourceFile: "apps/web/package.json",
+			Dependencies: []string{"@acme/ui"}, DependencySources: declared},
+		// A project whose provider reported no file.
 		{ID: "/apps/other", Name: "acme/other", Path: "apps/other", Dependencies: []string{"@acme/ui"}, DependencySources: declared},
 	})
 	const handEdit = "remove the dependency on @acme/ui from apps/web/package.json, then run `putnami deps install`"
@@ -180,7 +182,7 @@ func TestDepsPruneNamesTheHandEditForAManifestItKeeps(t *testing.T) {
 	out.Reset()
 	err = prunePlan(context.Background(), root, ws, nil, "", false, &out, LifecycleEnv{})
 	if err == nil {
-		t.Fatal("prune reported success while a package.json dependency was left behind")
+		t.Fatal("prune reported success while a manifest dependency was left behind")
 	}
 	for _, want := range []string{handEdit, unnamedEdit} {
 		if !strings.Contains(err.Error(), want) {
@@ -191,7 +193,42 @@ func TestDepsPruneNamesTheHandEditForAManifestItKeeps(t *testing.T) {
 		t.Errorf("error = %q, want no advice to run the command that just kept the finding", err)
 	}
 	if after, _ := os.ReadFile(manifest); !bytes.Equal(after, before) {
-		t.Errorf("prune rewrote package.json:\n%s", after)
+		t.Errorf("prune rewrote the manifest:\n%s", after)
+	}
+}
+
+// The hand edit names the file the provider reported, whatever its language,
+// and names no file when the provider reported none.
+func TestDepsPruneNamesTheManifestTheProviderRead(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "declared-edge-check",
+		"prune-names-the-manifest-the-provider-read")
+	root := t.TempDir()
+	declared := map[string]wsproto.DependencySource{"acme-lib": wsproto.DependencySourceDeclared}
+	ws := workspace.NewWorkspace(root, nil, []*workspace.Project{
+		{ID: "/lib", Name: "acme-lib", Path: "lib"},
+		{ID: "/svc", Name: "acme-svc", Path: "svc", SourceFile: "svc/pyproject.toml",
+			Dependencies: []string{"acme-lib"}, DependencySources: declared},
+		{ID: "/bare", Name: "acme-bare", Path: "bare",
+			Dependencies: []string{"acme-lib"}, DependencySources: declared},
+	})
+
+	var out bytes.Buffer
+	if err := prunePlan(context.Background(), root, ws, nil, "", true, &out, LifecycleEnv{}); err != nil {
+		t.Fatalf("dry run: %v", err)
+	}
+	listing := out.String()
+	for _, want := range []string{
+		"keep  acme-svc → acme-lib [manifest] in svc/pyproject.toml — " +
+			"remove the dependency on acme-lib from svc/pyproject.toml, then run `putnami deps install`",
+		"keep  acme-bare → acme-lib [manifest] in its own language manifest — " +
+			"remove the dependency on acme-lib from acme-bare's language manifest by hand",
+	} {
+		if !strings.Contains(listing, want) {
+			t.Errorf("dry run = %q, want the line %q", listing, want)
+		}
+	}
+	if strings.Contains(listing, "package.json") {
+		t.Errorf("dry run = %q, want no file the provider did not report", listing)
 	}
 }
 

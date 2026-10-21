@@ -12,6 +12,10 @@ type Project struct {
 	ID         string // canonical logical identity (transparent group folders omitted)
 	Name       string
 	SourceName string // identity before the scope namePattern override
+	// SourceFile is the workspace-relative file the workspace provider read
+	// SourceName from, in slash form. It is empty when no provider reported one.
+	// Informational: no cache key, job context or index entry reads it.
+	SourceFile string
 	// Version is the package version the workspace probe reported for this
 	// project — what its own native manifest declares. It is INFORMATIONAL:
 	// nothing in the job context, in a cache key, or in a release-set member
