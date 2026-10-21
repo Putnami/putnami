@@ -656,6 +656,8 @@ func TestEnsureWorkspaceDevDeps_NoWorkspaceDevDeps(t *testing.T) {
 	}
 }
 
+// The workspace install creates the root package.json before this step runs
+// (ensureRootManifest), so a missing file here is an error and creates nothing.
 func TestEnsureWorkspaceDevDeps_NoPackageJSON(t *testing.T) {
 	wsDir := t.TempDir()
 	extDir := t.TempDir()
@@ -663,27 +665,17 @@ func TestEnsureWorkspaceDevDeps_NoPackageJSON(t *testing.T) {
 	manifest := `{"workspaceDevDependencies":{"bun-types":"latest"}}`
 	os.WriteFile(filepath.Join(extDir, "putnami.extension.json"), []byte(manifest), 0644)
 
-	// No workspace package.json — should create one
 	ctx := &pctx.Context{
 		WorkspaceRoot: wsDir,
 		Extension:     pctx.Extension{Root: extDir},
 	}
 	emit := jsonl.New()
 
-	err := ensureWorkspaceDevDeps(ctx, emit)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err := ensureWorkspaceDevDeps(ctx, emit); err == nil {
+		t.Error("expected error for a missing package.json")
 	}
-
-	data, _ := os.ReadFile(filepath.Join(wsDir, "package.json"))
-	var pkg map[string]json.RawMessage
-	json.Unmarshal(data, &pkg)
-
-	var devDeps map[string]string
-	json.Unmarshal(pkg["devDependencies"], &devDeps)
-
-	if devDeps["bun-types"] != "latest" {
-		t.Errorf("bun-types = %q, want latest", devDeps["bun-types"])
+	if _, err := os.Stat(filepath.Join(wsDir, "package.json")); !os.IsNotExist(err) {
+		t.Errorf("package.json was created (stat error %v)", err)
 	}
 }
 

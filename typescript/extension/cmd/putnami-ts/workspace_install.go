@@ -96,6 +96,13 @@ func workspaceInstallArgs(force, hosted bool) []string {
 // nothing. A failure to list the members or to materialize biome.json is
 // returned; the other steps log a warning and continue.
 func shapeWorkspaceManifests(ctx *pctx.Context, emit *jsonl.Emitter, bunBin string) error {
+	// Create the root package.json when it is missing, so every step below
+	// finds the file it shapes. A workspace with a TypeScript install has
+	// asked for it.
+	if err := ensureRootManifest(ctx, emit); err != nil {
+		return err
+	}
+
 	// Ensure workspace devDependencies declared by this extension are present.
 	if err := ensureWorkspaceDevDeps(ctx, emit); err != nil {
 		emit.Log("warn", "failed to ensure workspace devDependencies: "+err.Error())
@@ -141,6 +148,48 @@ func shapeWorkspaceManifests(ctx *pctx.Context, emit *jsonl.Emitter, bunBin stri
 		emit.Log("warn", "failed to ensure workspace .npmrc: "+err.Error())
 	}
 	return nil
+}
+
+// ensureRootManifest writes the root package.json, as a private package named
+// after the workspace with an empty member list, when the file is missing. The
+// name is the `name` of putnami.workspace.json, else the root directory's name.
+// An existing file is never touched, so a second call rewrites nothing. The
+// membership step fills the list.
+func ensureRootManifest(ctx *pctx.Context, emit *jsonl.Emitter) error {
+	pkgPath := filepath.Join(ctx.WorkspaceRoot, "package.json")
+	if _, err := os.Stat(pkgPath); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("stat package.json: %w", err)
+	}
+	name, err := json.Marshal(workspaceManifestName(ctx.WorkspaceRoot))
+	if err != nil {
+		return fmt.Errorf("marshal the workspace name: %w", err)
+	}
+	pkg := map[string]json.RawMessage{
+		"name":       name,
+		"private":    json.RawMessage("true"),
+		"workspaces": json.RawMessage("[]"),
+	}
+	if err := writeRootManifest(pkgPath, pkg, []string{"name", "private", "workspaces"}); err != nil {
+		return err
+	}
+	emit.Log("info", "created package.json for the workspace "+string(name))
+	return nil
+}
+
+// workspaceManifestName is the name of the workspace at root: the `name` of
+// its putnami.workspace.json when that file has one, else the directory's name.
+func workspaceManifestName(root string) string {
+	if data, err := os.ReadFile(filepath.Join(root, "putnami.workspace.json")); err == nil {
+		var document struct {
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(data, &document) == nil && document.Name != "" {
+			return document.Name
+		}
+	}
+	return filepath.Base(root)
 }
 
 // ensureWorkspaceMembership writes the root package.json `workspaces` from the
@@ -235,14 +284,11 @@ func ensureWorkspaceDevDeps(ctx *pctx.Context, emit *jsonl.Emitter) error {
 		return nil
 	}
 
-	// Read workspace package.json (create a minimal one if it doesn't exist).
+	// Read workspace package.json, which ensureRootManifest has created.
 	pkgPath := filepath.Join(ctx.WorkspaceRoot, "package.json")
 	pkgData, err := os.ReadFile(pkgPath)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("read package.json: %w", err)
-		}
-		pkgData = []byte(`{"private": true}`)
+		return fmt.Errorf("read package.json: %w", err)
 	}
 
 	var pkg map[string]json.RawMessage
