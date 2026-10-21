@@ -65,8 +65,8 @@ func TestParseInitFlagsReadsTheChannel(t *testing.T) {
 	}
 }
 
-// The flag wins over the variable, the variable over the install record, and
-// the install record over latest. stable reads latest, as in `putnami upgrade`.
+// TestResolveChannelFlagStripsTheFlagAndFollowsInit checks that a command other
+// than init reads the channel as init does and does not pass the flag on.
 func TestResolveChannelFlagStripsTheFlagAndFollowsInit(t *testing.T) {
 	spectest.Proves(t, "cli/init-channel", "templates-test-builds-the-rendered-project",
 		"the-extension-installs-on-the-channel-the-run-chose")
@@ -124,6 +124,8 @@ func TestResolveChannelFlagStripsTheFlagAndFollowsInit(t *testing.T) {
 	}
 }
 
+// The flag wins over the variable, the variable over the install record, and
+// the install record over latest. stable reads latest, as in `putnami upgrade`.
 func TestResolveInitChannelPrecedence(t *testing.T) {
 	spectest.Proves(t, "cli/init-channel", "one-channel-choice", "the-flag-wins-over-the-variable-and-the-install-record")
 	tests := []struct {

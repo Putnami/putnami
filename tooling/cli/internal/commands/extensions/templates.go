@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	modelextension "go.putnami.dev/cli/model/extension"
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/template"
 
@@ -235,9 +236,16 @@ func TemplatesTest(ctx context.Context, args []string, channel string) error {
 		return fmt.Errorf("read template manifest: %w", err)
 	}
 
-	var manifest template.Manifest
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		return cmderr.Classify(fmt.Errorf("template manifest is invalid: %w", err), cmderr.ErrInvalidConfig)
+	manifest, diags := proto.ParseAndValidateManifest(data)
+	if diag.HasErrors(diags) {
+		problems := make([]string, 0, len(diags))
+		for _, d := range diag.Errors(diags) {
+			problems = append(problems, d.Message)
+		}
+		return cmderr.Classify(fmt.Errorf("template manifest is invalid: %s", strings.Join(problems, "; ")), cmderr.ErrInvalidConfig)
+	}
+	if !skipBuild && manifest.Extension == "" {
+		return cmderr.Classify(fmt.Errorf("template %s names no extension, so no build or test can run: pass --skip-build to check the render only", manifest.Name), cmderr.ErrInvalidConfig)
 	}
 
 	iox.Fprintf(os.Stdout, "  Testing template: %s\n", manifest.Name)
@@ -306,10 +314,6 @@ func TemplatesTest(ctx context.Context, args []string, channel string) error {
 
 	// Make the template discoverable the way a workspace template is, so
 	// `projects create` finds it by name.
-	templateName := manifest.Name
-	if templateName == "" {
-		templateName = filepath.Base(templateDir)
-	}
 	if err := stageTemplateUnderTest(tmpDir, templateDir); err != nil {
 		return err
 	}
@@ -322,23 +326,20 @@ func TemplatesTest(ctx context.Context, args []string, channel string) error {
 
 	// Install the template's extension by name, on the channel the run chose.
 	// The workspace config keeps the bare name, as init leaves it.
-	if manifest.Extension != "" {
-		artifact := manifest.Extension
-		if channel != "" {
-			artifact += "@" + channel
-			iox.Fprintf(os.Stdout, "  Channel: %s\n", channel)
-		}
-		iox.Fprintf(os.Stdout, "  Running: putnami extensions install %s\n", artifact)
-		if err := shared.RunGroupStreaming(ctx, tmpDir, env, cliPath, "extensions", "install", artifact); err != nil {
-			return fmt.Errorf("extension install failed: %w", err)
-		}
+	artifact := shared.ChannelArtifact(manifest.Extension, channel)
+	if channel != "" {
+		iox.Fprintf(os.Stdout, "  Channel: %s\n", channel)
+	}
+	iox.Fprintf(os.Stdout, "  Running: putnami extensions install %s\n", artifact)
+	if err := runNestedCLI(ctx, tmpDir, env, cliPath, "extensions", "install", artifact); err != nil {
+		return fmt.Errorf("extension install failed: %w", err)
 	}
 
 	// Create the project from the template, as a user does. Create renders it,
 	// lists it in the workspace config and runs the extension's project-setup
 	// job, which pins the toolchains and the module versions.
-	iox.Fprintf(os.Stdout, "\n  Running: putnami projects create %s --template %s\n", vars.ProjectName, templateName)
-	if err := shared.RunGroupStreaming(ctx, tmpDir, env, cliPath, "projects", "create", vars.ProjectName, "--template", templateName); err != nil {
+	iox.Fprintf(os.Stdout, "\n  Running: putnami projects create %s --template %s\n", vars.ProjectName, manifest.Name)
+	if err := runNestedCLI(ctx, tmpDir, env, cliPath, "projects", "create", vars.ProjectName, "--template", manifest.Name); err != nil {
 		return fmt.Errorf("projects create failed for template %s: %w", manifest.Name, err)
 	}
 
@@ -353,7 +354,7 @@ func TemplatesTest(ctx context.Context, args []string, channel string) error {
 	}
 	command := strings.Join(verbs, ",")
 	iox.Fprintf(os.Stdout, "\n  Running: putnami %s --projects %s\n", command, vars.ProjectName)
-	if err := shared.RunGroupStreaming(ctx, tmpDir, env, cliPath, command, "--projects", vars.ProjectName, "--no-cache", "--verbose"); err != nil {
+	if err := runNestedCLI(ctx, tmpDir, env, cliPath, command, "--projects", vars.ProjectName, "--no-cache", "--verbose"); err != nil {
 		return fmt.Errorf("%s failed for template %s: %w", command, manifest.Name, err)
 	}
 
@@ -361,18 +362,24 @@ func TemplatesTest(ctx context.Context, args []string, channel string) error {
 	return nil
 }
 
+// runNestedCLI runs the putnami executable for phase 3 of TemplatesTest. A test
+// replaces it to record the command lines without starting a process.
+var runNestedCLI = shared.RunGroupStreaming
+
 // declaredCheckVerbs returns the verbs of build and test, in that order, that
-// an extension installed in the workspace at workspaceDir declares. It reads
-// the extensions in process, as the planner does.
+// an extension installed in the workspace at workspaceDir declares as a job. It
+// reads the extensions in process and applies the test the planner applies
+// before it runs a command, so the command runs the verbs the planner accepts.
+// A verb in a manifest's vocabulary is no job.
 func declaredCheckVerbs(workspaceDir string) ([]string, error) {
 	found, err := extension.DiscoverExtensions(workspaceDir, wsproto.Load(workspaceDir), nil)
 	if err != nil {
 		return nil, err
 	}
-	declarers := extension.PublicDeclarers([]string{"build", "test"}, found)
+	jobs := modelextension.BuildJobMap(found)
 	var verbs []string
 	for _, verb := range []string{"build", "test"} {
-		if len(declarers[verb]) > 0 {
+		if len(jobs[verb]) > 0 {
 			verbs = append(verbs, verb)
 		}
 	}
@@ -405,13 +412,17 @@ func stageTemplateUnderTest(workspaceDir, templateDir string) error {
 
 // writeTemplateTestWorkspace writes the putnami.workspace.json of a template
 // test workspace into dir. It names the workspace and, when the template names
-// one, activates the template's extension. It lists no project and holds no
-// language manifest: `projects create` adds the project, and the project's own
-// files carry its language manifests.
+// one, activates the template's extension; with no extension it writes no
+// extensions member. It lists no project and holds no language manifest:
+// `projects create` adds the project, and the project's own files carry its
+// language manifests.
 func writeTemplateTestWorkspace(dir, extension string) error {
-	cfg := wsproto.Config{Name: "template-test-workspace"}
+	cfg := struct {
+		Name       string   `json:"name"`
+		Extensions []string `json:"extensions,omitempty"`
+	}{Name: "template-test-workspace"}
 	if extension != "" {
-		cfg.Extensions = wsproto.ExtensionsConfig{List: map[string]string{extension: ""}}
+		cfg.Extensions = []string{extension}
 	}
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {

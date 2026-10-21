@@ -32,7 +32,7 @@
     },
     {
       "id": "templates-test-builds-the-rendered-project",
-      "text": "putnami templates test copies the template into a temporary workspace that lists its extension and no project, then does what a user does: it installs the extension on the channel --channel or PUTNAMI_CHANNEL chooses, as init does, runs projects create from the template, and runs the build and test the extension declares on the project. It fails if the extension declares neither."
+      "text": "putnami templates test copies the template into a temporary workspace that lists its extension and no project, then does what a user does: it installs the extension on the channel --channel or PUTNAMI_CHANNEL chooses, as init does, runs projects create from the template, and runs the build and test commands the extension declares on the project. It refuses a template that names no extension unless --skip-build is set, and fails if the extension declares neither."
     },
     {
       "id": "release-smokes-hand-the-channel-to-init",

@@ -754,10 +754,11 @@ workspace. The workspace config lists the template's extension and no project,
 and holds no language manifest. The template sits at `under-test/templates/<dir>`,
 where template discovery finds it. The command installs the extension by name,
 runs `putnami projects create` from the template, which adds the project and
-runs the extension's project-setup job, then runs the build and test that
-the extension declares on the created project. An extension that declares no
-build, such as Python's, is tested without it. The command fails when the
-extension declares neither. `--channel <channel>` (or `PUTNAMI_CHANNEL`) installs the extension from
+runs the extension's project-setup job, then runs the build and test commands
+that the extension declares on the created project. An extension that declares
+no build command, such as Python's, is tested without it. The command fails
+when the extension declares neither. A template whose manifest names no
+extension can run only with `--skip-build`. `--channel <channel>` (or `PUTNAMI_CHANNEL`) installs the extension from
 that release channel, as `putnami init` does. `projects create` has no channel
 of its own.
 
