@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
@@ -105,7 +106,7 @@ func setUpProject(ctx context.Context, wsRoot, projectPath string, env Lifecycle
 		installErr = err
 	case len(pinned) > 0:
 		iox.Fprintf(env.out(), "  The workspace lock now pins %s; running the workspace installers before the setup…\n", strings.Join(pinned, ", "))
-		installErr = DepsInstall(ctx, wsRoot, wsproto.Load(wsRoot), "", "", env)
+		installErr = DepsInstall(shared.WithImplicitInstall(ctx), wsRoot, wsproto.Load(wsRoot), "", "", env)
 	}
 	return installErr, run("")
 }

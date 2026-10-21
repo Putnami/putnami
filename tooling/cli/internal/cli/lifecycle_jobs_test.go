@@ -232,8 +232,9 @@ func TestRunWorkspaceJob_LeavesNoPersistedRunState(t *testing.T) {
 }
 
 // The three outcomes the callers render differently must stay distinguishable
-// once the run is an engine run: "no extension provides this job" is an error
-// with the available names, while "the job matched no project" is a no-op.
+// once the run is an engine run: "no extension provides this job" is a missing
+// provider the caller reports its own way, while "the job matched no project"
+// is a no-op.
 func TestRunWorkspaceJob_DistinguishesMissingProviderFromNoMatches(t *testing.T) {
 	t.Run("missing provider", func(t *testing.T) {
 		wsRoot := t.TempDir()
@@ -256,9 +257,6 @@ func TestRunWorkspaceJob_DistinguishesMissingProviderFromNoMatches(t *testing.T)
 
 		if result.Outcome != lifecycle.WorkspaceJobMissing {
 			t.Fatalf("outcome = %v, want WorkspaceJobMissing", result.Outcome)
-		}
-		if !strings.Contains(result.AvailableJobs, "workspace-install") {
-			t.Errorf("available jobs = %q, want it to name workspace-install", result.AvailableJobs)
 		}
 	})
 
