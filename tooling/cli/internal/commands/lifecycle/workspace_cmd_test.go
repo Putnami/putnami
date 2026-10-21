@@ -346,8 +346,9 @@ func TestWorkspaceInitWritesAnEmptyWorkspacesList(t *testing.T) {
 }
 
 // TestWorkspaceInitInAPackageManagerMonorepo: a directory whose package.json
-// declares workspaces is not a workspace root, so init there makes it one. It
-// writes putnami.workspace.json and leaves the package.json bytes as they are.
+// declares workspaces is not a workspace root, so init there makes it one.
+// Without --project, init writes putnami.workspace.json and leaves the
+// package.json bytes as they are.
 func TestWorkspaceInitInAPackageManagerMonorepo(t *testing.T) {
 	dir := t.TempDir()
 	stubWorkspaceInitStages(t, "", 0)

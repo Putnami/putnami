@@ -20,9 +20,8 @@ import (
 // already installed is linked, not downloaded again.
 //
 // Nothing here reads a workspace, and inside a workspace the workspace's own
-// pins are the only ones. The one root the user scope can take over is a
-// package.json with "workspaces" and no putnami.workspace.json, for a command
-// group that root does not provide itself.
+// pins are the only ones. The user scope serves every directory without
+// putnami.workspace.json at or above it.
 
 // ResolveUserScopeRoot returns ~/.putnami/user, the root of the user scope,
 // beside the machine-wide artifact store under ~/.putnami. It fails when the

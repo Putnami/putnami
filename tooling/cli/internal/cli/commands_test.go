@@ -381,6 +381,7 @@ func TestRequireWorkspaceSuggestsInit(t *testing.T) {
 // package.json declares workspaces, without putnami.workspace.json, is not a
 // root: the command that needs a workspace gives the initialization error.
 func TestPackageJSONWorkspacesGiveTheInitError(t *testing.T) {
+	t.Parallel()
 	spectest.Proves(t, "cli/workspace-discovery-selection", "workspace-root", "a-package-manifest-does-not-mark-a-workspace-root")
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"mono","workspaces":["packages/*"]}`), 0o644); err != nil {

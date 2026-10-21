@@ -934,6 +934,42 @@ func writeMonorepo(t *testing.T, dir string) {
 	writeTestFile(t, filepath.Join(dir, "packages", "app", "package.json"), `{"name":"app"}`, 0o644)
 }
 
+// TestAppRun_UserScope_RepairsThePinAndResolvesAliases pins that a pin whose
+// link and artifact tree are gone is downloaded again and runs, that an alias
+// from ~/.putnami/config.json reaches the group, and that the caller directory
+// stays untouched.
+func TestAppRun_UserScope_RepairsThePinAndResolvesAliases(t *testing.T) {
+	userRoot, callerDir := userScopeTestEnv(t)
+	reg := newUserScopeRegistry(t, func(digest string) string { return "sha256:" + digest })
+	if code, output := runApp(t, "extensions", "install", "--user", userScopeExtensionName); code != cli.ExitSuccess {
+		t.Fatalf("extensions install --user exit = %d:\n%s", code, output)
+	}
+	writeTestFile(t, filepath.Join(os.Getenv("HOME"), ".putnami", "config.json"), `{"aliases":{"au":"audit"}}`, 0o644)
+	for _, dir := range []string{layout.StableDir(userRoot, layout.Extensions, userScopeExtensionName), os.Getenv("PUTNAMI_ARTIFACT_DIR")} {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The next invocation is a new process, which owns the repair.
+	t.Setenv(extension.UserScopeRepairEnv, "")
+	downloads := reg.requests.Load()
+	before := snapshotTree(t, callerDir)
+
+	for _, argv := range [][]string{{"audit", "run"}, {"au", "run"}} {
+		code, output := runApp(t, argv...)
+		if code != cli.ExitSuccess {
+			t.Fatalf("%v exit = %d, want %d:\n%s", argv, code, cli.ExitSuccess, output)
+		}
+		if run := parseUserScopeRun(t, output); run.marker != "user-scope" {
+			t.Fatalf("%v ran %q, want the user-scope extension", argv, run.marker)
+		}
+	}
+	if reg.requests.Load() == downloads {
+		t.Fatal("the pin whose tree was gone was not downloaded again")
+	}
+	assertSameTree(t, "the caller directory", before, snapshotTree(t, callerDir))
+}
+
 // TestAppRun_ExtensionsInstallUser_PinsVerifiesAndRuns pins the whole user
 // scope lifecycle from a directory that is not a workspace: install verifies
 // the archive and writes the lock entry and link, a re-run changes nothing and
