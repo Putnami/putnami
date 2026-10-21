@@ -501,6 +501,24 @@
           }
         },
         {
+          "id": "prepare-completes-the-replace-closure",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-module-the-closure-provides-builds-without-its-replace",
+              "prepare-writes-neither-go-mod-nor-go-sum",
+              "two-runs-build-the-same-bytes",
+              "the-module-own-replace-wins",
+              "two-providers-of-one-module-stop-the-build",
+              "the-build-adds-no-requirement"
+            ]
+          }
+        },
+        {
           "id": "repository-reads-are-declared-inputs",
           "stage": "coded",
           "evidenceKinds": [
