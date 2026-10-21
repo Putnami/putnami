@@ -33,7 +33,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/extension"
-	"go.putnami.dev/tooling/cli/internal/launch"
 	"go.putnami.dev/tooling/cli/internal/layout"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 )
@@ -894,14 +893,14 @@ func TestAppRun_ExtensionsInstallUser_ARefusalKeepsThePriorPin(t *testing.T) {
 }
 
 // TestAppRun_UserScope_RunsInAJavaScriptMonorepo pins that a root package.json
-// declaring "workspaces" is not a workspace for a command group the user scope
-// pins: from the monorepo root and from a package, the command runs from the
-// user scope in that directory, a subcommand that needs a workspace is refused
-// as outside one, and nothing is bootstrapped or written in the monorepo.
+// declaring "workspaces" is not a workspace root: from the monorepo root and
+// from a package, a command group the user scope pins runs from the user scope
+// in that directory, a subcommand that needs a workspace is refused as outside
+// one, and nothing is bootstrapped or written in the monorepo.
 func TestAppRun_UserScope_RunsInAJavaScriptMonorepo(t *testing.T) {
 	userRoot, callerDir := userScopeTestEnv(t)
 	pinUserScopeExtension(t, userRoot, "user-scope")
-	writeMonorepo(t, callerDir, "")
+	writeMonorepo(t, callerDir)
 	packageDir := filepath.Join(callerDir, "packages", "app")
 	before := snapshotTree(t, callerDir)
 
@@ -928,57 +927,24 @@ func TestAppRun_UserScope_RunsInAJavaScriptMonorepo(t *testing.T) {
 }
 
 // writeMonorepo writes an npm monorepo root at dir: a package.json declaring
-// "workspaces" plus extra fields, and one package.
-func writeMonorepo(t *testing.T, dir, extra string) {
+// "workspaces" and one package.
+func writeMonorepo(t *testing.T, dir string) {
 	t.Helper()
-	writeTestFile(t, filepath.Join(dir, "package.json"), `{"name":"mono","private":true,"workspaces":["packages/*"]`+extra+`}`, 0o644)
+	writeTestFile(t, filepath.Join(dir, "package.json"), `{"name":"mono","private":true,"workspaces":["packages/*"]}`, 0o644)
 	writeTestFile(t, filepath.Join(dir, "packages", "app", "package.json"), `{"name":"app"}`, 0o644)
 }
 
-// TestAppRun_UserScope_JavaScriptMonorepoKeepsTheGroupItProvides pins that a
-// package.json root keeps a command group it provides itself: the extension
-// its devDependencies install answers the group, including a subcommand that
-// needs a workspace, although the user scope pins another version of it. An
-// extension the root declares but has not installed yet keeps the group in the
-// monorepo too.
-func TestAppRun_UserScope_JavaScriptMonorepoKeepsTheGroupItProvides(t *testing.T) {
-	userRoot, callerDir := userScopeTestEnv(t)
-	pinUserScopeExtension(t, userRoot, "user-scope")
-	writeMonorepo(t, callerDir, `,"devDependencies":{"@acme/audit":"2.0.0"}`)
-	installed := filepath.Join(callerDir, "node_modules", "@acme", "audit")
-	writeTestFile(t, filepath.Join(installed, "putnami.extension.json"), userScopeExtensionManifest(userScopeExtensionName, "2.0.0"), 0o644)
-	writeTestFile(t, filepath.Join(installed, "run.sh"), userScopeExtensionScript("package-root"), 0o755)
-
-	for _, argv := range [][]string{{"audit", "run"}, {"audit", "check"}} {
-		code, output := runApp(t, argv...)
-		if code != cli.ExitSuccess {
-			t.Fatalf("%v exit = %d, want %d:\n%s", argv, code, cli.ExitSuccess, output)
-		}
-		if run := parseUserScopeRun(t, output); run.marker != "package-root" {
-			t.Fatalf("%v ran %q, want the package root's extension", argv, run.marker)
-		}
-	}
-
-	declared := t.TempDir()
-	writeMonorepo(t, declared, `,"devDependencies":{"@acme/audit":"2.0.0"}`)
-	t.Chdir(declared)
-	_, output := runApp(t, "audit", "run")
-	mustNotContain(t, output, "marker=user-scope")
-}
-
-// TestAppRun_UserScope_JavaScriptMonorepoRepairsThePinAndResolvesAliases pins
-// that the monorepo sees the user scope as a run outside a workspace does: a
-// pin whose link and artifact tree are gone is downloaded again and runs, an
-// alias from ~/.putnami/config.json reaches the group, and the monorepo stays
-// untouched.
-func TestAppRun_UserScope_JavaScriptMonorepoRepairsThePinAndResolvesAliases(t *testing.T) {
+// TestAppRun_UserScope_RepairsThePinAndResolvesAliases pins that a pin whose
+// link and artifact tree are gone is downloaded again and runs, that an alias
+// from ~/.putnami/config.json reaches the group, and that the caller directory
+// stays untouched.
+func TestAppRun_UserScope_RepairsThePinAndResolvesAliases(t *testing.T) {
 	userRoot, callerDir := userScopeTestEnv(t)
 	reg := newUserScopeRegistry(t, func(digest string) string { return "sha256:" + digest })
 	if code, output := runApp(t, "extensions", "install", "--user", userScopeExtensionName); code != cli.ExitSuccess {
 		t.Fatalf("extensions install --user exit = %d:\n%s", code, output)
 	}
 	writeTestFile(t, filepath.Join(os.Getenv("HOME"), ".putnami", "config.json"), `{"aliases":{"au":"audit"}}`, 0o644)
-	writeMonorepo(t, callerDir, "")
 	for _, dir := range []string{layout.StableDir(userRoot, layout.Extensions, userScopeExtensionName), os.Getenv("PUTNAMI_ARTIFACT_DIR")} {
 		if err := os.RemoveAll(dir); err != nil {
 			t.Fatal(err)
@@ -1001,97 +967,7 @@ func TestAppRun_UserScope_JavaScriptMonorepoRepairsThePinAndResolvesAliases(t *t
 	if reg.requests.Load() == downloads {
 		t.Fatal("the pin whose tree was gone was not downloaded again")
 	}
-	assertSameTree(t, "the monorepo", before, snapshotTree(t, callerDir))
-}
-
-// TestAppRun_UserScope_JavaScriptMonorepoLeavesItsOwnCommandsAlone pins that a
-// command no user-scope group can answer never reads the user scope in a
-// monorepo: with a pin whose link and tree are gone, a comma list, an alias to
-// a comma list and an alias to a built-in command make no registry request and
-// print no user-scope warning.
-func TestAppRun_UserScope_JavaScriptMonorepoLeavesItsOwnCommandsAlone(t *testing.T) {
-	userRoot, callerDir := userScopeTestEnv(t)
-	reg := newUserScopeRegistry(t, func(digest string) string { return "sha256:" + digest })
-	if code, output := runApp(t, "extensions", "install", "--user", userScopeExtensionName); code != cli.ExitSuccess {
-		t.Fatalf("extensions install --user exit = %d:\n%s", code, output)
-	}
-	writeTestFile(t, filepath.Join(os.Getenv("HOME"), ".putnami", "config.json"), `{"aliases":{"ext":"extensions","both":"audit,audit-run"}}`, 0o644)
-	writeMonorepo(t, callerDir, "")
-	for _, dir := range []string{layout.StableDir(userRoot, layout.Extensions, userScopeExtensionName), os.Getenv("PUTNAMI_ARTIFACT_DIR")} {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Fatal(err)
-		}
-	}
-	t.Setenv(extension.UserScopeRepairEnv, "")
-	downloads := reg.requests.Load()
-
-	for _, argv := range [][]string{{"audit,audit-run"}, {"both"}, {"ext", "list"}} {
-		_, output := runApp(t, argv...)
-		mustNotContain(t, output, "user-scope extension")
-		if got := reg.requests.Load(); got != downloads {
-			t.Fatalf("%v made %d registry requests, want none:\n%s", argv, got-downloads, output)
-		}
-	}
-}
-
-// TestAppRun_UserScope_JavaScriptMonorepoSkipsItsPinnedCLI pins that the user
-// scope takes a monorepo's command group before the pinned-CLI relaunch: the
-// monorepo's lock pins a CLI this machine cannot verify, the group still runs
-// from the user scope, and the monorepo's own commands stop at that pin.
-func TestAppRun_UserScope_JavaScriptMonorepoSkipsItsPinnedCLI(t *testing.T) {
-	userRoot, callerDir := userScopeTestEnv(t)
-	pinUserScopeExtension(t, userRoot, "user-scope")
-	writeMonorepo(t, callerDir, "")
-	lf := lockfile.NewLockFile()
-	lf.SetCLI(lockfile.LockEntry{Version: "0.0.1"})
-	if err := lockfile.WriteLockFile(callerDir, lf); err != nil {
-		t.Fatal(err)
-	}
-	// The gate runs the tests from a relaunched or relaunch-exempt CLI.
-	t.Setenv(launch.NoRelaunchEnv, "")
-	t.Setenv(launch.LaunchedEnv, "")
-
-	code, output := runApp(t, "audit", "run")
-	if code != cli.ExitSuccess {
-		t.Fatalf("audit run exit = %d, want %d:\n%s", code, cli.ExitSuccess, output)
-	}
-	if run := parseUserScopeRun(t, output); run.marker != "user-scope" {
-		t.Fatalf("audit run ran %q, want the user-scope extension", run.marker)
-	}
-
-	code, output = runApp(t, "audit-run")
-	if code == cli.ExitSuccess || !strings.Contains(output, "records no integrity digest") {
-		t.Fatalf("audit-run exit = %d, want the monorepo's CLI pin to stop it:\n%s", code, output)
-	}
-}
-
-// TestAppRun_UserScope_JavaScriptMonorepoWarnsOfAnUnloadablePin pins what a
-// monorepo run says when the user scope pins an extension that cannot be
-// loaded: the warning names both repair commands, and the package root keeps
-// the run.
-func TestAppRun_UserScope_JavaScriptMonorepoWarnsOfAnUnloadablePin(t *testing.T) {
-	userRoot, callerDir := userScopeTestEnv(t)
-	srv := httptest.NewServer(http.NotFoundHandler())
-	defer srv.Close()
-	t.Setenv(extension.PutRegistryURLEnv, srv.URL)
-	writeUserScopeLockEntry(t, userRoot, lockfile.LockEntry{
-		Version:     "1.0.0",
-		Integrities: map[string]string{lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH): strings.Repeat("a", 64)},
-	})
-	writeMonorepo(t, callerDir, "")
-
-	code, output := runApp(t, "audit", "run")
-	if code == cli.ExitSuccess {
-		t.Fatalf("audit run succeeded with an unloadable pin:\n%s", output)
-	}
-	for _, want := range []string{
-		extension.UserScopeInstallCommand(userScopeExtensionName),
-		extension.UserScopeLatestCommand(userScopeExtensionName),
-	} {
-		if !strings.Contains(output, want) {
-			t.Fatalf("the warning does not name %q:\n%s", want, output)
-		}
-	}
+	assertSameTree(t, "the caller directory", before, snapshotTree(t, callerDir))
 }
 
 // TestAppRun_ExtensionsInstallUser_PinsVerifiesAndRuns pins the whole user

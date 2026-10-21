@@ -15,6 +15,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // TestRunStructuredCommandWrapsLegacyPayloads exercises the dispatcher seam
@@ -370,6 +371,29 @@ func TestRequireWorkspaceSuggestsInit(t *testing.T) {
 	}
 	if err.Error() != cmderr.ErrNoWorkspace.Error() {
 		t.Errorf("message = %q, want %q (unchanged)", err.Error(), cmderr.ErrNoWorkspace.Error())
+	}
+	if got := protocolcli.SuggestedNext(err); got != "putnami workspace init" {
+		t.Errorf("SuggestedNext = %q, want %q", got, "putnami workspace init")
+	}
+}
+
+// TestPackageJSONWorkspacesGiveTheInitError verifies that a directory whose
+// package.json declares workspaces, without putnami.workspace.json, is not a
+// root: the command that needs a workspace gives the initialization error.
+func TestPackageJSONWorkspacesGiveTheInitError(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/workspace-discovery-selection", "workspace-root", "a-package-manifest-does-not-mark-a-workspace-root")
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"mono","workspaces":["packages/*"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wsRoot, _ := workspace.FindRoot(dir)
+	if wsRoot != "" {
+		t.Fatalf("FindRoot = %q, want no root", wsRoot)
+	}
+	err := (&CommandEnv{WsRoot: wsRoot}).requireWorkspace()
+	if !errors.Is(err, cmderr.ErrNoWorkspace) {
+		t.Fatalf("err = %v, want ErrNoWorkspace", err)
 	}
 	if got := protocolcli.SuggestedNext(err); got != "putnami workspace init" {
 		t.Errorf("SuggestedNext = %q, want %q", got, "putnami workspace init")

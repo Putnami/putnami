@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -128,20 +129,35 @@ func TestFindRoot_WithPutnamiRC(t *testing.T) {
 	}
 }
 
-func TestFindRoot_WithPackageJSON(t *testing.T) {
-	spectest.Proves(t, "cli/workspace-discovery-selection", "workspace-root", "discovery-walks-up-to-a-supported-marker")
+// A package.json that declares workspaces is a language manifest, not a
+// workspace marker: only putnami.workspace.json marks a root.
+func TestFindRoot_IgnoresPackageJSONWorkspaces(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "workspace-root", "a-package-manifest-does-not-mark-a-workspace-root")
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"test","workspaces":["packages/*"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	nested := filepath.Join(dir, "packages", "app")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
-	root, err := FindRoot(dir)
+	for _, start := range []string{dir, nested} {
+		if root, err := FindRoot(start); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("FindRoot(%s) = %q, %v; want os.ErrNotExist", start, root, err)
+		}
+	}
+
+	// The manifest decides the root once it is present, wherever package.json sits.
+	if err := os.WriteFile(filepath.Join(dir, "putnami.workspace.json"), []byte(`{"name":"test"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	root, err := FindRoot(nested)
 	if err != nil {
 		t.Fatalf("FindRoot: %v", err)
 	}
-	wantRoot := canonicalRoot(dir)
-	if root != wantRoot {
-		t.Errorf("FindRoot = %q, want %q", root, wantRoot)
+	if want := canonicalRoot(dir); root != want {
+		t.Errorf("FindRoot = %q, want %q", root, want)
 	}
 }
 

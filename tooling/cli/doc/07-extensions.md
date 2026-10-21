@@ -1064,29 +1064,11 @@ SDK.
 Inside a workspace the workspace's own pins are the only ones, so a workspace
 that pins version A of an extension runs A even when the user scope pins B.
 
-A JavaScript monorepo whose root `package.json` declares `workspaces` and has
-no `putnami.workspace.json` in the current directory or above it is the one
-exception. A command group runs there from the user scope, and nothing is
-installed or written in the monorepo, when all of these hold:
-
-- The user scope pins an extension that provides the group. A missing link is
-  repaired first, as outside a workspace, and aliases from
-  `~/.putnami/config.json` apply.
-- The monorepo's own extensions do not provide the command.
-- The root `package.json` does not list the providing extension in
-  `devDependencies`, installed or not.
-
-Otherwise the monorepo is the workspace. When a user-scope pin cannot be
-loaded and the monorepo does not provide the command either, the CLI prints
-the pin's warning, with both repair commands, before it runs the command in
-the monorepo.
-
-When the user scope takes the command group, the CLI version that the
-monorepo's `putnami.lock.json` pins does not apply: the CLI you invoked runs
-the command, as outside a workspace. A pin with a missing link is repaired
-only after the switch to the pinned CLI, so that pinned CLI decides the run.
-A pinned CLI that predates the user scope then runs the command in the
-monorepo; run `putnami extensions install --user <name>` to repair the link.
+A directory without `putnami.workspace.json` at or above it is outside any
+workspace, whatever else it holds. A JavaScript monorepo whose root
+`package.json` declares `workspaces` is one such directory: the user scope
+serves its command groups there, and nothing is installed or written in the
+monorepo. Run `putnami init` there to make it a workspace.
 
 ### Lock File
 

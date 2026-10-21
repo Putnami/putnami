@@ -61,12 +61,7 @@ my-workspace/
 
 ## Project discovery
 
-Putnami discovers projects from two sources, in priority order:
-
-1. **Workspace includes** — root `putnami.workspace.json` entries that resolve to direct projects or autonomous scopes
-2. **Package manager workspaces** — the root `package.json` `workspaces` field
-
-If a project appears in multiple sources, the first source wins.
+Putnami discovers projects from the workspace includes: the root `putnami.workspace.json` entries that resolve to direct projects or autonomous scopes. A root `package.json` `workspaces` field is not a discovery source.
 
 ## Scopes
 

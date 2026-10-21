@@ -77,21 +77,15 @@ func InvalidateLoadCache(root string) {
 	loadCache.Delete(loadKey(root))
 }
 
-// FindRoot walks upward from startDir looking for a workspace root:
-//   - putnami.workspace.json (always workspace-level)
-//   - package.json with a "workspaces" field (monorepo root)
+// FindRoot walks upward from startDir to the nearest directory that holds
+// putnami.workspace.json, the only workspace marker. It returns os.ErrNotExist
+// when no directory up to the filesystem root holds one.
 func FindRoot(startDir string) (string, error) {
 	dir := startDir
 	for {
-		// Check for workspace-level config
 		if wsproto.IsWorkspaceConfig(dir) {
 			return canonicalRoot(dir), nil
 		}
-		// Check for package.json with "workspaces" field
-		if isWorkspacePackageJSON(filepath.Join(dir, "package.json")) {
-			return canonicalRoot(dir), nil
-		}
-
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			break
@@ -99,21 +93,6 @@ func FindRoot(startDir string) (string, error) {
 		dir = parent
 	}
 	return "", os.ErrNotExist
-}
-
-// isWorkspacePackageJSON returns true if the file exists and contains a "workspaces" field.
-func isWorkspacePackageJSON(path string) bool {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return false
-	}
-	var v struct {
-		Workspaces json.RawMessage `json:"workspaces"`
-	}
-	if err := json.Unmarshal(data, &v); err != nil {
-		return false
-	}
-	return len(v.Workspaces) > 0
 }
 
 // Load discovers the workspace from the given root path. Results are

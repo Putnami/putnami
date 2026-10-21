@@ -20,9 +20,8 @@ import (
 // already installed is linked, not downloaded again.
 //
 // Nothing here reads a workspace, and inside a workspace the workspace's own
-// pins are the only ones. The one root the user scope can take over is a
-// package.json with "workspaces" and no putnami.workspace.json, for a command
-// group that root does not provide itself.
+// pins are the only ones. The user scope serves every directory without
+// putnami.workspace.json at or above it.
 
 // ResolveUserScopeRoot returns ~/.putnami/user, the root of the user scope,
 // beside the machine-wide artifact store under ~/.putnami. It fails when the
@@ -67,14 +66,6 @@ func ClaimUserScopeRepair(userRoot string) bool {
 	}
 	_ = os.Setenv(UserScopeRepairEnv, userRoot)
 	return true
-}
-
-// UserScopeMayPin reports whether the user-scope lock at userRoot pins an
-// extension, or cannot be read, so a caller that needs the user scope only when
-// it pins something decides with one file read.
-func UserScopeMayPin(userRoot string) bool {
-	lf, err := lockfile.ReadLockFile(userRoot)
-	return err != nil || (lf != nil && len(lf.Extensions) > 0)
 }
 
 // UserScopeInstallCommand is the command that pins, or repairs the pin of, a

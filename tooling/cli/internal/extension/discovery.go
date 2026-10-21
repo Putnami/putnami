@@ -807,13 +807,6 @@ func rootPackageDeclarations(workspaceRoot string) map[string]string {
 	return extractDevDeps(data)
 }
 
-// PackageRootDeclares reports whether the package manifest at workspaceRoot
-// declares name in devDependencies, whether or not it is installed yet.
-func PackageRootDeclares(workspaceRoot, name string) bool {
-	_, ok := rootPackageDeclarations(workspaceRoot)[name]
-	return ok
-}
-
 func extractDevDeps(packageJSONData []byte) map[string]string {
 	type pkg struct {
 		DevDependencies map[string]string `json:"devDependencies"`

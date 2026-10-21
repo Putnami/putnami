@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "workspace-root",
-      "text": "Workspace discovery walks upward to a supported workspace marker, canonicalizes the result, and gives commands that require a workspace an actionable initialization error when none exists."
+      "text": "Workspace discovery walks upward to the nearest putnami.workspace.json, the only workspace marker, so a package.json that declares workspaces marks no root. It canonicalizes the result, and gives commands that require a workspace an actionable initialization error when none exists."
     },
     {
       "id": "project-inventory",

@@ -143,7 +143,8 @@
             "checks": [
               "discovery-walks-up-to-a-supported-marker",
               "the-discovered-root-is-canonicalized",
-              "a-missing-workspace-yields-an-actionable-init-error"
+              "a-missing-workspace-yields-an-actionable-init-error",
+              "a-package-manifest-does-not-mark-a-workspace-root"
             ]
           }
         },
