@@ -83,10 +83,9 @@ package cli
 //	   extension such a manifest depends on. An older reader loads the
 //	   manifest without its dependencies, so it must refuse the stamp. The
 //	   floor binds a manifest loaded from the artifact store or from a path
-//	   the workspace declares, whose dependencies the CLI follows. A manifest
-//	   loaded from node_modules keeps loading unstamped: the package manager
-//	   owns its dependencies. For the stamper of a put archive, such a list is
-//	   contract surface, so a hook-only dependent is stamped 8 too.
+//	   the workspace declares, whose dependencies the CLI follows. For the
+//	   stamper of a put archive, such a list is contract surface, so a
+//	   hook-only dependent is stamped 8 too.
 //	7: ADDITIVE — two task-input meanings that one CLI release added
 //	   together, and a manifest that uses either is stamped 7:
 //	   - the releaseBaseline runtime task input: the project's version-line

@@ -68,7 +68,8 @@ Extensions are discovered from multiple locations:
 1. **Workspace config**: `putnami.workspace.json` → `extensions` array
 2. **Scope config**: Scope `putnami.json` → `extensions` array (inherited by projects)
 3. **Project config**: Project `putnami.json` → `extensions` array (per-project override)
-4. **Node modules**: `devDependencies` in `package.json` that contain `putnami.extension.json`
+
+No `node_modules` directory and no `package.json` is a source of extensions.
 
 Use `putnami extensions list` to see all discovered extensions with their version constraint, installed version and source.
 

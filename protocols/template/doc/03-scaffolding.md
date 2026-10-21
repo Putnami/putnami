@@ -24,8 +24,7 @@ This:
 4. Renders `.template` files with variable substitution and strips the suffix
    (see [`02-variables.md`](02-variables.md));
 5. Ensures the manifest's `extension` is registered in the project config;
-6. Adds `workspaceDevDependencies` to the workspace root, if the manifest
-   declares any.
+6. Runs the project-setup job of the project's extensions.
 
 ## Template Discovery
 
@@ -48,27 +47,31 @@ workspace rather than failing.
 Check that a template still produces a project that builds:
 
 ```bash
-putnami templates test [path] [--skip-build] [--keep]
+putnami templates test [path] [--skip-build] [--keep] [--channel <channel>]
 ```
 
 This:
 
-1. Creates a temporary workspace directory;
-2. Renders the template into it using the default test variables, with any
-   `testVariables` overrides from the manifest applied;
-3. Writes a minimal `putnami.workspace.json`, plus a root `package.json`
-   carrying `workspaceDevDependencies` when the manifest declares them;
-4. Registers the manifest's `extension` in the rendered project config;
-5. Verifies the rendered project has a `putnami.json` — a template that produces
+1. Creates a temporary workspace whose `putnami.workspace.json` lists the
+   manifest's `extension` and no project;
+2. Renders the template into a scratch directory using the default test
+   variables, with any `testVariables` overrides from the manifest applied;
+3. Verifies the rendered project has a `putnami.json` — a template that produces
    none is broken;
-6. Runs `putnami install`, then `putnami build,test --projects <projectName>
-   --no-cache --verbose` in the temporary workspace;
-7. Reports pass or fail and removes the temporary workspace.
+4. Copies the template where template discovery finds it, then runs
+   `putnami extensions install <extension>` and
+   `putnami projects create <projectName> --template <name>`;
+5. Runs the `build` and `test` commands the extension declares on the created
+   project, with `--no-cache`. It fails when the extension declares neither;
+6. Reports pass or fail and removes the temporary workspace.
+
+A template whose manifest names no `extension` runs only with `--skip-build`.
 
 | Flag | Purpose |
 |------|---------|
-| `--skip-build` | Stop after rendering and structure validation (steps 1–5) |
+| `--skip-build` | Stop after rendering and structure validation (steps 1–3) |
 | `--keep` | Keep the temporary workspace and print its path |
+| `--channel <channel>` | Install the extension from this release channel (or `PUTNAMI_CHANNEL`) |
 
 ### Test Variables
 

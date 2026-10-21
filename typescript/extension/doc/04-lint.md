@@ -222,7 +222,7 @@ Biome configuration is resolved in this order:
 
 1. **Project root** — `biome.json` in the project root
 2. **Workspace root** — `biome.json` in the workspace root
-3. **Extension default** — `node_modules/@putnami/typescript/config/biome.json`
+3. **Extension default** — `config/biome.json` in the installed TypeScript extension
 
 The first `biome.json` found wins. To customize, place a `biome.json` in your project or workspace root.
 
@@ -261,12 +261,13 @@ The extension ships a comprehensive Biome config that covers TypeScript, JSON, C
 
 ### Custom Configuration
 
-To override the defaults, create a `biome.json` in your project root:
+To override the defaults, create a `biome.json` in your project root. It extends the workspace `biome.json`, the root configuration, so it declares `"root": false`: Biome refuses a second root configuration.
 
 ```json
 {
   "$schema": "https://biomejs.dev/schemas/2.5.3/schema.json",
-  "extends": ["../../node_modules/@putnami/typescript/config/biome.json"],
+  "root": false,
+  "extends": ["../../biome.json"],
   "linter": {
     "rules": {
       "suspicious": {

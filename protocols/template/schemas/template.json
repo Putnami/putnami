@@ -30,7 +30,7 @@
     },
     "workspaceDevDependencies": {
       "type": "object",
-      "description": "Dev dependencies to add to the workspace root when using this template.",
+      "description": "Dev dependencies for the workspace root. No core command reads it.",
       "additionalProperties": { "type": "string" }
     },
     "testVariables": {

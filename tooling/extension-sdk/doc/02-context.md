@@ -25,7 +25,7 @@ func myJob(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[s
 
     // Extension & Job
     fmt.Println(ctx.Extension.Name) // "@putnami/go"
-    fmt.Println(ctx.Extension.Root) // "/home/user/my-project/node_modules/@putnami/go"
+    fmt.Println(ctx.Extension.Root) // "/home/user/my-project/.putnami/bin/extensions/@putnami/go"
     fmt.Println(ctx.Job.Name)       // "build"
 
     // Output paths

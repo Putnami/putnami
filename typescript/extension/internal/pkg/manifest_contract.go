@@ -27,9 +27,9 @@ const (
 	// hooks and dependencies.
 	putArchive packageForm = iota
 	// npmPackage is a package the package manager installs into node_modules.
-	// The CLI does not follow the dependencies of an extension it loads from
-	// there, so the stamp leaves them out (proto.RequiredLoadContract), and a
-	// hook-only framework package stays unstamped.
+	// CLI discovery finds no extension there, so the stamp leaves the
+	// dependency rung out (proto.RequiredLoadContract), and a hook-only
+	// framework package stays unstamped.
 	npmPackage
 )
 
