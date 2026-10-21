@@ -48,6 +48,14 @@ core CLI runs a job when the project's extension declares it.**
   `putnami install`.
 - Both jobs refuse a hosted run, whose dependencies are offline: they reach
   the network and rewrite `go.work`, `go.mod` and `go.sum`.
+- A `deps add` spec without a version that names the module a `go.work`
+  member declares resolves from the tree, with no registry query. The module
+  is required at the version `go.mod` requires it at, else at its major
+  version's placeholder, and replaced by the member's directory, relative to
+  the module, unless `go.mod` already replaces it. A spec with a version asks
+  the registry. When the member cannot be told apart, because `go.work` does
+  not parse, a member has no module path or two members declare the module,
+  the add fails instead of guessing.
 
 ## Consequences
 
@@ -65,3 +73,8 @@ core CLI runs a job when the project's extension declares it.**
   the version lookup needs the Go settings of the created project.
 - **One job per action.** `deps prune` edits several modules, and one job
   keeps them in one transaction.
+- **Ask the registry for every bare spec.** A workspace module that is not
+  published yet cannot be added then, and a hand-written `require` and
+  `replace` would bypass the transaction.
+- **Match a spec against project names.** A `putnami.json` name is not a
+  module path, so it could select the wrong module.

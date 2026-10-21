@@ -1,0 +1,67 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [
+    {
+      "match": "exact",
+      "path": "/",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/04-configuration",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/get.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/database",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/04-configuration",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/database/get.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/database/replica",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/04-configuration",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/database/replica/get.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/env",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/04-configuration",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/env/get.ts"
+      }
+    }
+  ],
+  "digest": "sha256:04616e0730877f1d7a2efe7f6a72d07f87fc60f54725dd44c8898b66a222c7c9"
+}

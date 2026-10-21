@@ -574,7 +574,9 @@
               "only-changed-files-are-committed",
               "an-unchanged-untouched-file-is-left-alone",
               "publishing-an-unmerged-canonical-provider-document-preserves-its-hash",
-              "committed-feature-evidence-is-only-what-the-run-wrote"
+              "committed-feature-evidence-is-only-what-the-run-wrote",
+              "committed-grpc-inventory-is-only-what-the-run-wrote",
+              "a-failed-describe-keeps-the-committed-grpc-inventory"
             ]
           }
         },
@@ -976,6 +978,25 @@
             "checks": [
               "prune-drops-the-module-path-the-target-go-mod-declares",
               "prune-reads-the-module-path-of-each-target-and-names-one-it-cannot-read"
+            ]
+          }
+        },
+        {
+          "id": "deps-add-resolves-a-workspace-member-from-the-tree",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "add-requires-an-unpublished-workspace-member-with-no-registry-query",
+              "add-resolves-members-from-the-tree-and-other-specs-from-the-registry",
+              "add-keeps-the-required-version-and-the-replace-go-mod-states-for-a-member",
+              "add-asks-the-registry-for-a-member-spec-that-states-a-version",
+              "add-refuses-a-member-it-cannot-identify-before-any-go-command",
+              "a-failed-later-step-puts-a-member-add-back",
+              "a-member-is-required-at-its-version-or-its-major-placeholder"
             ]
           }
         }

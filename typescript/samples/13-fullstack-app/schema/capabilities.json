@@ -1,0 +1,589 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-capabilities-v2.json",
+  "protocolVersion": 2,
+  "project": "@example/13-fullstack-app",
+  "configDefinitions": [
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "config",
+        "key": "analytics"
+      },
+      "path": "analytics",
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "bool"
+        },
+        {
+          "name": "mode",
+          "type": "string"
+        },
+        {
+          "name": "datasource",
+          "type": "string"
+        },
+        {
+          "name": "schema",
+          "type": "string"
+        },
+        {
+          "name": "secret",
+          "type": "string",
+          "sensitive": true
+        },
+        {
+          "name": "serverPageViews",
+          "type": "bool"
+        },
+        {
+          "name": "respectGpc",
+          "type": "bool"
+        },
+        {
+          "name": "respectDnt",
+          "type": "bool"
+        },
+        {
+          "name": "countryHeader",
+          "type": "string"
+        },
+        {
+          "name": "trustedProxies",
+          "type": "array"
+        },
+        {
+          "name": "retentionRawDays",
+          "type": "int"
+        },
+        {
+          "name": "retentionAggregateDays",
+          "type": "int"
+        },
+        {
+          "name": "retentionMode",
+          "type": "string"
+        },
+        {
+          "name": "maxPathKeysPerDay",
+          "type": "int"
+        },
+        {
+          "name": "rateLimitPerMinute",
+          "type": "int"
+        },
+        {
+          "name": "flushIntervalMs",
+          "type": "int"
+        },
+        {
+          "name": "flushWaitMs",
+          "type": "int"
+        },
+        {
+          "name": "queueCapacity",
+          "type": "int"
+        },
+        {
+          "name": "flushBatch",
+          "type": "int"
+        },
+        {
+          "name": "flushDeadlineMs",
+          "type": "int"
+        },
+        {
+          "name": "cookieName",
+          "type": "string"
+        },
+        {
+          "name": "cookieMaxAgeDays",
+          "type": "int"
+        }
+      ],
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "config",
+        "key": "events"
+      },
+      "path": "events",
+      "fields": [
+        {
+          "name": "delivery",
+          "type": "string"
+        },
+        {
+          "name": "transport",
+          "type": "string"
+        },
+        {
+          "name": "eventServer",
+          "type": "object"
+        },
+        {
+          "name": "push",
+          "type": "object"
+        }
+      ],
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "schemas": [
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "api-loader"
+      },
+      "name": "api-loader",
+      "kind": "route",
+      "path": ".gen/src/tasks/api/.api-application.gen.ts",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/src/tasks/api/.api-application.gen.ts"
+          }
+        ]
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "schema",
+        "subkind": "route",
+        "key": "react-loader"
+      },
+      "name": "react-loader",
+      "kind": "route",
+      "path": ".gen/src/app/.react-application.gen.tsx",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/src/app/.react-application.gen.tsx"
+          }
+        ]
+      }
+    }
+  ],
+  "discoverers": [
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "discoverer",
+        "subkind": "config",
+        "key": "analytics"
+      },
+      "name": "analytics",
+      "kind": "config",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "discoverer",
+        "subkind": "config",
+        "key": "events"
+      },
+      "name": "events",
+      "kind": "config",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "discoverer",
+        "subkind": "source",
+        "key": "api-1-loader"
+      },
+      "name": "api-1-loader",
+      "kind": "source",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/src/projects/api/.api-application.gen.ts"
+          }
+        ]
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "discoverer",
+        "subkind": "source",
+        "key": "events-loader"
+      },
+      "name": "events-loader",
+      "kind": "source",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/src/events/.events-application.gen.ts"
+          }
+        ]
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "discoverer",
+        "subkind": "source",
+        "key": "sql-loader"
+      },
+      "name": "sql-loader",
+      "kind": "source",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/src/.sql.gen.ts"
+          }
+        ]
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "discoverer",
+        "subkind": "source",
+        "key": "sql:app"
+      },
+      "name": "sql:app",
+      "kind": "source",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "discoverer",
+        "subkind": "source",
+        "key": "sql:putnami-analytics"
+      },
+      "name": "sql:putnami-analytics",
+      "kind": "source",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "discoverer",
+        "subkind": "source",
+        "key": "sql:tasks"
+      },
+      "name": "sql:tasks",
+      "kind": "source",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "migrations": [
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "migration",
+        "subkind": "sql",
+        "key": "app"
+      },
+      "name": "app",
+      "kind": "sql",
+      "datasource": "default",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "migration",
+        "subkind": "sql",
+        "key": "putnami-analytics"
+      },
+      "name": "putnami-analytics",
+      "kind": "sql",
+      "datasource": "default",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "migration",
+        "subkind": "sql",
+        "key": "tasks"
+      },
+      "name": "tasks",
+      "kind": "sql",
+      "datasource": "default",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "infraRequirements": [
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "infra",
+        "subkind": "database",
+        "key": "default"
+      },
+      "name": "default",
+      "kind": "database",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/database",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "package",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/infra/database.json"
+          }
+        ]
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "infra",
+        "subkind": "events",
+        "key": "project.created"
+      },
+      "name": "project.created",
+      "kind": "events",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/events",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "package",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/infra/events.json"
+          }
+        ]
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "infra",
+        "subkind": "events",
+        "key": "task.status.changed"
+      },
+      "name": "task.status.changed",
+      "kind": "events",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@putnami/events",
+        "sourceKind": "generated",
+        "declaration": {
+          "root": "package",
+          "path": "putnami.json"
+        },
+        "artifacts": [
+          {
+            "root": "project",
+            "path": ".gen/infra/events.json"
+          }
+        ]
+      }
+    }
+  ],
+  "healthContributors": [
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "health",
+        "subkind": "health",
+        "key": "database"
+      },
+      "name": "database",
+      "probe": "health",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ],
+  "packages": [
+    {
+      "identity": {
+        "ownerProject": "@example/13-fullstack-app",
+        "kind": "package",
+        "key": "@example/13-fullstack-app"
+      },
+      "package": "@example/13-fullstack-app",
+      "provenance": {
+        "project": "@example/13-fullstack-app",
+        "package": "@example/13-fullstack-app",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@putnami/database",
+        "kind": "package",
+        "key": "@putnami/database"
+      },
+      "package": "@putnami/database",
+      "provenance": {
+        "project": "@putnami/database",
+        "package": "@putnami/database",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    },
+    {
+      "identity": {
+        "ownerProject": "@putnami/events",
+        "kind": "package",
+        "key": "@putnami/events"
+      },
+      "package": "@putnami/events",
+      "provenance": {
+        "project": "@putnami/events",
+        "package": "@putnami/events",
+        "sourceKind": "framework",
+        "declaration": {
+          "root": "project",
+          "path": "putnami.json"
+        }
+      }
+    }
+  ]
+}

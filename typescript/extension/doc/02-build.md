@@ -83,7 +83,7 @@ Steps:
 2. **Prepare `.gen/`** — creates or clears the `.gen/` directory
 3. **Copy assets** — copies files declared in `putnami.json` `options.generate.assets` (or legacy `.putnamirc.json`). A missing source is skipped with a warning; a copy that fails, such as a symlink to a directory inside a directory asset, fails the generate
 4. **Pre-build hooks** — discovers and runs hooks from dependencies that declare `preBuild` in their `putnami.extension.json`. Hooks can register exports and assets. They run in ascending `hooks.preBuild.order`, ties broken by extension name — see [hook order](#pre-build-hook-order). A dependency of `package.json` that no `node_modules` holds, from the project up to the workspace root, fails the generate before any hook runs: run `putnami install`. The cache key names the dependencies, not whether they are installed, so a generate that skipped their hooks would cache an incomplete `.gen/`, without `clientgen/config.json` or `schema/`, under the key of a complete one.
-5. **HTTP route inventory** — merges application and web framework facts into `.gen/schema/http-routes.json`
+5. **HTTP route inventory** — merges application and web framework facts into `.gen/schema/http-routes.json`, which the step after bundled serve commits to `schema/http-routes.json` — see [committed route inventory](#committed-route-inventory)
 6. **Infra requirements sync** — reconciles the committed `<project>/infra/requirements.json` from the `.gen/infra/*.json` scratch fragments the hooks just wrote — see [infra requirements ordering](#infra-requirements-ordering)
 7. **Version info** — writes/updates `.gen/version.json` with the `contentHash` field
 8. **Bundled serve** — if any hook registered `*-loader` exports, generates a bundled serve entrypoint that registers server-side loaders and starts the app
@@ -155,8 +155,8 @@ keys and their hits. A project without feature evidence follows the same
 rule. See [Source-Bound Tasks](../../../tooling/cli/doc/10-caching.md#source-bound-tasks).
 
 `build-generate` also rewrites committed files the binding covers:
-`schema/openapi.json`, `infra/requirements.json` and a generated client inside
-the project. An execution that changes one of them moves its own project's
+`schema/openapi.json`, `schema/http-routes.json`, `infra/requirements.json` and
+a generated client inside the project. An execution that changes one of them moves its own project's
 binding after the hook wrote the evidence. ADR
 [0069](../../../tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md)
 states how the CLI settles that entry.
@@ -206,6 +206,33 @@ extension canonicalizes them after every hook, so hook order cannot change the
 artifact or its digest. Unsupported catch-alls and ambiguous static behavior
 fail with an `http_routes.*` diagnostic rather than producing a broad `/*`
 route.
+
+#### Committed route inventory
+
+`build-generate` commits the route inventory to `<project>/schema/http-routes.json`,
+the path the Go extension commits, so a consumer reads what a TypeScript
+application serves from the repository without running a build. The hooks are
+its only authors: the task copies the aggregate and composes nothing. It runs
+after bundled serve, so a generate that fails changes no committed inventory.
+
+| The run | The committed `schema/http-routes.json` |
+|---------|-----------------------------------------|
+| Every hook returned and the aggregate validated | Becomes a byte-for-byte copy of `.gen/schema/http-routes.json`. The copy is staged in a temporary file and renamed into place, and it is skipped when the bytes already match, so a warm build leaves the file and its mtime alone. |
+| The hooks ran, and none emitted a route | Is removed: nothing produces it any more. |
+| Bun is not resolvable, so no hook runs | Stays as it stands. |
+| A hook, hook discovery or the aggregate failed | Stays as it stands; the generate fails. |
+
+The inventory is committed for every project and reads no project option, so
+the task's cache key needs no extra input. The declared `httpRoutes` output
+carries `drift: "fail"`: when the regenerated, removed or restored inventory
+differs from the committed one, the task fails with `generated-output-drift`,
+and the worktree holds the new inventory to commit. The first build of an
+application that has never committed its inventory fails this way once.
+
+A consumer tells pages from actions with the rule the protocol states: a
+`file-route` route with methods `GET` and `HEAD` is a page, and a `file-route`
+route with method `POST` at the same path is that page's action — see
+[`protocols/http-routes`](../../../protocols/http-routes/README.md#pages-and-actions).
 
 ### Phase 2: Transpile
 
@@ -403,7 +430,7 @@ Every output has exactly one owning task:
 
 | Task | Owns | Root |
 |------|------|------|
-| `build-generate` | `.gen/` minus `.gen/deployment.json`, `.gen/requirements.json`, `.gen/infra/runtime.json` and `.gen/layers/`, `schema/capabilities.json`, `schema/openapi.json` (with `drift: "fail"`: a committed spec that differs from the one `openapi()` regenerates fails the task with `generated-output-drift` — commit the regenerated spec), and the generated client directory (via the `clientOutput` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
+| `build-generate` | `.gen/` minus `.gen/deployment.json`, `.gen/requirements.json`, `.gen/infra/runtime.json` and `.gen/layers/`, `schema/capabilities.json`, `schema/openapi.json` (with `drift: "fail"`: a committed spec that differs from the one `openapi()` regenerates fails the task with `generated-output-drift` — commit the regenerated spec), `schema/http-routes.json` (with `drift: "fail"`: a committed route inventory that differs from the one the hooks regenerate fails the task with `generated-output-drift` — commit the regenerated inventory; see [committed route inventory](#committed-route-inventory)), and the generated client directory (via the `clientOutput` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
 | `build-transpile` | `lib/` | per-command output dir |
 | `build-types` | `types/` | per-command output dir |
 | `build-compile` | `compile/` | per-command output dir |
@@ -418,7 +445,8 @@ Except the required `.gen/requirements.json` of `build-infra` and
 `.gen/deployment.json` of `package-deployment`, each declared output above may
 legitimately be absent after a successful run — a project with no entrypoint
 transpiles to nothing, coverage is only instrumented under `--enforce-coverage`,
-a project with no config blocks emits no schema, and a workload that authors
+a project with no config blocks emits no schema, a project whose hooks emit no
+route commits no route inventory, and a workload that authors
 `infra/runtime.json` gets no runtime defaults file.
 
 `build-generate` is the single producer of `<project>/.gen` — anything else

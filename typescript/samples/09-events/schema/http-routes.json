@@ -1,0 +1,50 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [
+    {
+      "match": "exact",
+      "path": "/",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/09-events",
+        "package": "@putnami/application",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/events",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/09-events",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/events/get.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/orders",
+      "methods": [
+        "POST"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/09-events",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/orders/post.ts"
+      }
+    }
+  ],
+  "digest": "sha256:969ebfed14209a31db8fbcedfd720ba0494ac1b5274f7d60ba1099f9676d5555"
+}

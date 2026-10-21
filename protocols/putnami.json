@@ -21,6 +21,7 @@
     "extension",
     "features",
     "gomod",
+    "grpc-services",
     "http-routes",
     "identity",
     "infra",

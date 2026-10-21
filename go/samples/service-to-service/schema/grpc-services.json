@@ -1,0 +1,110 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-grpc-services-v1.json",
+  "protocol": "putnami.grpc-services.v1",
+  "services": [
+    {
+      "name": "items.v1.ApiService",
+      "transport": "connect",
+      "basePath": "/items.v1.ApiService/",
+      "methodsKnown": true,
+      "methods": [
+        {
+          "name": "CreateBlobsEcho",
+          "clientStreaming": false,
+          "serverStreaming": false
+        },
+        {
+          "name": "CreateBodyCounter",
+          "clientStreaming": false,
+          "serverStreaming": false
+        },
+        {
+          "name": "CreateBodyFidelity",
+          "clientStreaming": false,
+          "serverStreaming": false
+        },
+        {
+          "name": "CreateBodyNullable",
+          "clientStreaming": false,
+          "serverStreaming": false
+        },
+        {
+          "name": "CreateBodyValues",
+          "clientStreaming": false,
+          "serverStreaming": false
+        },
+        {
+          "name": "CreateItems",
+          "clientStreaming": false,
+          "serverStreaming": false
+        },
+        {
+          "name": "GetBlobs",
+          "clientStreaming": false,
+          "serverStreaming": false
+        },
+        {
+          "name": "GetItems",
+          "clientStreaming": false,
+          "serverStreaming": false
+        },
+        {
+          "name": "GetItemsHistory",
+          "clientStreaming": false,
+          "serverStreaming": true
+        },
+        {
+          "name": "GetItemsWatch",
+          "clientStreaming": false,
+          "serverStreaming": true
+        },
+        {
+          "name": "GetQuotes",
+          "clientStreaming": false,
+          "serverStreaming": false
+        },
+        {
+          "name": "GetQuotesSnapshot",
+          "clientStreaming": false,
+          "serverStreaming": false
+        },
+        {
+          "name": "GetQuotesTicks",
+          "clientStreaming": false,
+          "serverStreaming": true
+        },
+        {
+          "name": "ListCredentialCheck",
+          "clientStreaming": false,
+          "serverStreaming": false
+        },
+        {
+          "name": "ListItems",
+          "clientStreaming": false,
+          "serverStreaming": false
+        },
+        {
+          "name": "ListItemsChanges",
+          "clientStreaming": false,
+          "serverStreaming": true
+        },
+        {
+          "name": "ListTenantCheck",
+          "clientStreaming": false,
+          "serverStreaming": false
+        },
+        {
+          "name": "ListWhoami",
+          "clientStreaming": false,
+          "serverStreaming": false
+        }
+      ],
+      "provenance": {
+        "project": "go.putnami.dev/examples/service-to-service",
+        "package": "go.putnami.dev/grpc",
+        "sourceKind": "api-bridge"
+      }
+    }
+  ],
+  "digest": "sha256:5c0dfa1484c7bf617418e051f0db817eed11ef0463117d407b1bdb2e5e9338b0"
+}

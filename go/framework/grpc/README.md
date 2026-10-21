@@ -157,6 +157,26 @@ a.Module.Use(grpcPlugin)
 a.Module.Use(gateway)
 ```
 
+## Service inventory
+
+A build's describe pass writes `schema/grpc-services.json`, the
+[`putnami.grpc-services.v1`](../../../protocols/grpc-services/README.md)
+inventory of every service the application registered. The Go extension commits
+it beside `schema/http-routes.json`.
+
+| Surface | Lists | `methodsKnown` | `basePath` |
+|---|---|---|---|
+| `Plugin` | every service its registrars register, plus reflection when enabled | `true`, with streaming flags | none |
+| `GatewayPlugin` | every service `RegisterOn` mounted | `false` | the mounted prefix route |
+| `ApiBridge` | every Connect URL it mounted, grouped by service | `true` | `/<package>.<Service>/` |
+
+The native plugin runs its registrars on a server that is never started, so a
+registrar must only register services. Compose every surface with `Use`; one
+added with `UseForDescribe` fails the describe. The first surface the describe
+asks for writes the services of all of them, so `PUTNAMI_DESCRIBE=grpc` writes
+the same file as a full describe. A composed surface that serves nothing writes
+an empty inventory; an application without one writes no file.
+
 ## Support and contract
 
 The SDD owner is `go`. `go.putnami.dev/grpc` is public, documented, maintained, and
@@ -170,7 +190,9 @@ backed by two durable decisions: [the Connect bridge re-enters the endpoint
 pipeline and is served from the published
 descriptor](doc/adr/0001-bridge-reenters-the-endpoint-pipeline.md), and [bound
 the server by default, mount the gateway
-explicitly](doc/adr/0002-bounded-by-default-mounted-explicitly.md).
+explicitly](doc/adr/0002-bounded-by-default-mounted-explicitly.md). [The
+service inventory lists registrations, from one
+writer](doc/adr/0003-the-service-inventory-lists-registrations.md).
 
 `ApiBridge` speaks Connect protocol version 1 in four shapes: a unary JSON body,
 a unary protobuf body, and a declared server stream in either codec as 5-byte
@@ -208,4 +230,5 @@ conformance corpus](../../../protocols/clientcontract/connect/corpus_test.go), [
 real Go provider over Connect](connect_interop_test.go),
 [keepalive and stream defaults](keepalive_test.go), [bounded
 shutdown](shutdown_test.go), [stream interceptors and gateway
-mounting](stream_gateway_test.go), and [concurrent RPC handling](concurrent_test.go).
+mounting](stream_gateway_test.go), [concurrent RPC handling](concurrent_test.go),
+and [the service inventory](services_inventory_test.go).

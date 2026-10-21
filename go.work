@@ -71,6 +71,7 @@ use (
 	./protocols/extension
 	./protocols/features
 	./protocols/gomod
+	./protocols/grpc-services
 	./protocols/http-routes
 	./protocols/identity
 	./protocols/infra

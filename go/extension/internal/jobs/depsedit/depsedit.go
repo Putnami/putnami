@@ -173,9 +173,8 @@ func refuseDropOnAdd(edits []edit) string {
 }
 
 // apply edits the requirements of one module, then tidies it (tidyModule).
-// add resolves the module specs with `go list -m` (resolveModules) and
-// requires what that returns with `go mod edit -require`; remove and prune run
-// `go mod edit -droprequire=<module>`.
+// add requires each module spec with `go mod edit -require` (addEdits); remove
+// and prune run `go mod edit -droprequire=<module>`.
 //
 // None of them runs `go get`. `go get` loads the module graph, which resolves
 // every version go.mod requires through the module proxy, whatever the edit
@@ -197,13 +196,11 @@ func apply(j *workspacejob.Job, action string, e edit) error {
 
 	args := []string{"-C", dir, "mod", "edit"}
 	if action == actionAdd {
-		resolved, err := resolveModules(j, dir, modules)
+		edits, err := addEdits(j, dir, modules)
 		if err != nil {
 			return err
 		}
-		for _, m := range resolved {
-			args = append(args, "-require="+m.Spec())
-		}
+		args = append(args, edits...)
 	} else {
 		for _, m := range modules {
 			// A version the caller gave is not part of the requirement to drop.
@@ -248,6 +245,52 @@ func modulePath(dir string) string {
 		return ""
 	}
 	return modfile.ModulePath(data)
+}
+
+// addEdits returns the `go mod edit` arguments that add specs to the module in
+// dir: one -require per spec, in spec order, then one -replace per go.work
+// member go.mod does not replace yet.
+//
+// A bare spec that names the module of a go.work member requires the member
+// from the tree (memberModules), so an unpublished workspace module is added
+// with no registry query. Every other spec resolves through `go list -m`
+// (resolveModules), which does not run when no spec is left for it.
+func addEdits(j *workspacejob.Job, dir string, specs []string) ([]string, error) {
+	members, err := memberModules(j.WorkspaceRoot, dir, specs)
+	if err != nil {
+		return nil, err
+	}
+	var published []string
+	for i, spec := range specs {
+		if _, ok := members[i]; !ok {
+			published = append(published, spec)
+		}
+	}
+	var resolved []workspacejob.Module
+	if len(published) > 0 {
+		if resolved, err = resolveModules(j, dir, published); err != nil {
+			return nil, err
+		}
+	}
+	var requires, replaces []string
+	for i := range specs {
+		m, ok := members[i]
+		if !ok {
+			requires = append(requires, "-require="+resolved[0].Spec())
+			resolved = resolved[1:]
+			continue
+		}
+		requires = append(requires, "-require="+m.Path+"@"+m.Version)
+		if m.Replace == "" {
+			j.Emit.Log("info", fmt.Sprintf("%s is the go.work member %s: requiring %s, keeping the replace go.mod states",
+				m.Path, m.Member, m.Version))
+			continue
+		}
+		replaces = append(replaces, "-replace="+m.Path+"="+m.Replace)
+		j.Emit.Log("info", fmt.Sprintf("%s is the go.work member %s: requiring %s, replaced by %s",
+			m.Path, m.Member, m.Version, m.Replace))
+	}
+	return append(requires, replaces...), nil
 }
 
 // resolveModules returns the module version each spec names, from one `go

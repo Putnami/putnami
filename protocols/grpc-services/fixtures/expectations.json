@@ -1,0 +1,37 @@
+{
+  "valid": [
+    "full.json",
+    "minimal.json"
+  ],
+  "invalid": {
+    "bad-digest.json": "grpc_services.digest_mismatch",
+    "base-path-dot-segment.json": "grpc_services.invalid_base_path",
+    "base-path-name-mismatch.json": "grpc_services.invalid_base_path",
+    "base-path-on-grpc.json": "grpc_services.invalid_base_path",
+    "base-path-relative.json": "grpc_services.invalid_base_path",
+    "duplicate-method.json": "grpc_services.duplicate_method",
+    "duplicate-service.json": "grpc_services.duplicate_service",
+    "empty-name-segment.json": "grpc_services.invalid_service_name",
+    "invalid-digest.json": "grpc_services.invalid_digest",
+    "invalid-method-name.json": "grpc_services.invalid_method_name",
+    "invalid-protocol.json": "grpc_services.invalid_protocol",
+    "invalid-schema.json": "grpc_services.invalid_schema",
+    "invalid-source-kind.json": "grpc_services.invalid_source_kind",
+    "invalid-transport.json": "grpc_services.invalid_transport",
+    "leading-digit-name.json": "grpc_services.invalid_service_name",
+    "methods-when-unknown.json": "grpc_services.invalid_methods",
+    "missing-base-path.json": "grpc_services.invalid_base_path",
+    "missing-methods-known.json": "grpc_services.parse_error",
+    "missing-package.json": "grpc_services.missing_provenance",
+    "missing-project.json": "grpc_services.missing_provenance",
+    "missing-server-streaming.json": "grpc_services.parse_error",
+    "missing-services.json": "grpc_services.parse_error",
+    "null-methods.json": "grpc_services.parse_error",
+    "slash-in-name.json": "grpc_services.invalid_service_name",
+    "source-transport-mismatch.json": "grpc_services.source_transport_mismatch",
+    "trailing-dot-name.json": "grpc_services.invalid_service_name",
+    "trailing-json.json": "grpc_services.parse_error",
+    "unknown-field.json": "grpc_services.unknown_field",
+    "unknown-service-field.json": "grpc_services.unknown_field"
+  }
+}

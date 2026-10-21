@@ -243,6 +243,7 @@ func (r ownerRow) String() string {
 func TestDeclaredOutputOwnerTable(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "committed-client-drift", "the-generate-client-output-declares-fail-on-drift")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "committed-openapi-drift", "the-generate-openapi-output-declares-fail-on-drift")
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "committed-route-inventory", "the-generate-http-routes-output-declares-fail-on-drift")
 	m := loadExtensionManifest(t)
 
 	want := []ownerRow{
@@ -250,6 +251,7 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 		{task: "build-generate", id: "capabilities", kind: "file", root: "project", path: "schema/capabilities.json", optionalEmpty: true},
 		{task: "build-generate", id: "client", kind: "directory", root: "project", path: "clientOutput", optionalEmpty: true, drift: "fail"},
 		{task: "build-generate", id: "gen", kind: "directory", root: "project", path: ".gen"},
+		{task: "build-generate", id: "httpRoutes", kind: "file", root: "project", path: "schema/http-routes.json", optionalEmpty: true, drift: "fail"},
 		{task: "build-generate", id: "openapi", kind: "file", root: "project", path: "schema/openapi.json", optionalEmpty: true, drift: "fail"},
 		// The aggregated deployability manifest and its runtime defaults
 		// sidecar, at the .gen/requirements.json and .gen/infra/runtime.json

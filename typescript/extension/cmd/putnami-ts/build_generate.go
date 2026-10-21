@@ -140,6 +140,12 @@ func doGenerate(ctx *pctx.Context, emit *jsonl.Emitter, projectPath string) (*bu
 	exports := make(map[string]string)
 	assets := make(map[string]string)
 
+	// hooksRan is true only once every preBuild hook returned and the route
+	// aggregate validated; httpRoutesPath is that aggregate, or "" when no hook
+	// emitted a route. Only that state may change the committed inventory.
+	hooksRan := false
+	httpRoutesPath := ""
+
 	bunBin, bunErr := resolveBunBin()
 	if bunErr == nil {
 		// Clear the scratch fragments before the producers run and reconcile the
@@ -159,13 +165,14 @@ func doGenerate(ctx *pctx.Context, emit *jsonl.Emitter, projectPath string) (*bu
 		for k, v := range hookResult.Assets {
 			assets[k] = v
 		}
-		httpRoutesPath, routesErr := build.AggregateHTTPRoutes(projectPath)
+		routesPath, routesErr := build.AggregateHTTPRoutes(projectPath)
 		if routesErr != nil {
 			return nil, errs.Wrapf(routesErr, errs.CodeGenerateFailed, "aggregating HTTP route inventory")
 		}
-		if httpRoutesPath != "" {
-			assets["schema/http-routes.json"] = httpRoutesPath
+		if routesPath != "" {
+			assets[HTTPRoutesRelPath] = routesPath
 		}
+		hooksRan, httpRoutesPath = true, routesPath
 		// The converged producer set exists HERE, and only here. Every preBuild
 		// hook has returned, and the @putnami/application hook activates the full
 		// config registry (loader imports plus ConfigContributor blocks — see
@@ -225,6 +232,16 @@ func doGenerate(ctx *pctx.Context, emit *jsonl.Emitter, projectPath string) (*bu
 	if projectCommitsCapabilityManifest(ctx) {
 		if _, err := promoteCapabilityManifest(projectPath, capabilitiesPath); err != nil {
 			return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "promoting capability manifest")
+		}
+	}
+
+	// 5c. Commit the HTTP route inventory. It is committed by default, with no
+	// option, so this task reads no project option its cache key does not hold.
+	// A run whose hooks did not run leaves the committed copy as it stands; a
+	// hook or aggregate failure returned above, before this point.
+	if hooksRan {
+		if err := commitHTTPRoutes(projectPath, httpRoutesPath); err != nil {
+			return nil, errs.Wrapf(err, errs.CodeGenerateFailed, "committing HTTP route inventory")
 		}
 	}
 
@@ -357,11 +374,43 @@ func projectCommitsCapabilityManifest(ctx *pctx.Context) bool {
 // extension keeps — the framework describes the application, the extension
 // promotes the description — and it is what lets `architecture validate` read
 // DARC evidence from a committed file without running a build.
-//
-// The write is atomic (temp file plus rename) so a crash mid-copy cannot leave
-// a truncated manifest in the tree, and it is skipped when the bytes already
-// match so a warm build does not touch the file's mtime.
 func promoteCapabilityManifest(projectPath, emittedPath string) (string, error) {
+	return promoteSchemaArtifact(projectPath, emittedPath, CapabilityManifestRelPath)
+}
+
+// HTTPRoutesRelPath is the project-relative path of the committed
+// putnami.http-routes.v1 inventory, the same path the Go extension commits,
+// and the asset key the aggregate is reported under.
+const HTTPRoutesRelPath = "schema/http-routes.json"
+
+// commitHTTPRoutes makes the committed route inventory equal what the preBuild
+// hooks produced. The caller invokes it only after every hook returned and the
+// aggregate validated. emittedPath is that aggregate, promoted verbatim; it is
+// "" when no hook emitted a route, and then a committed copy has no producer
+// and is removed.
+func commitHTTPRoutes(projectPath, emittedPath string) error {
+	if emittedPath != "" {
+		_, err := promoteSchemaArtifact(projectPath, emittedPath, HTTPRoutesRelPath)
+		return err
+	}
+	committed := filepath.Join(projectPath, filepath.FromSlash(HTTPRoutesRelPath))
+	if err := os.Remove(committed); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove committed %s: %w", HTTPRoutesRelPath, err)
+	}
+	return nil
+}
+
+// promoteSchemaArtifact copies a file a framework producer emitted under .gen
+// to relPath in the tracked tree, and returns the committed path. It never
+// composes content: the producer stays the artifact's sole author.
+//
+// An empty emittedPath, or one that does not exist, promotes nothing and
+// leaves a committed copy as it stands. The write is atomic: the bytes go to a
+// uniquely named temporary file in the destination directory, which is then
+// renamed over the committed path, so neither a crash nor a concurrent writer
+// leaves a truncated file. It is skipped when the bytes already match, so a
+// warm build does not touch the file's mtime.
+func promoteSchemaArtifact(projectPath, emittedPath, relPath string) (string, error) {
 	if emittedPath == "" {
 		return "", nil
 	}
@@ -370,22 +419,37 @@ func promoteCapabilityManifest(projectPath, emittedPath string) (string, error) 
 		if os.IsNotExist(err) {
 			return "", nil
 		}
-		return "", fmt.Errorf("read emitted capability manifest: %w", err)
+		return "", fmt.Errorf("read emitted %s: %w", relPath, err)
 	}
-	committed := filepath.Join(projectPath, filepath.FromSlash(CapabilityManifestRelPath))
+	committed := filepath.Join(projectPath, filepath.FromSlash(relPath))
 	if current, err := os.ReadFile(committed); err == nil && string(current) == string(emitted) { //nolint:gosec // a project-relative committed artifact
 		return committed, nil
 	}
-	if err := os.MkdirAll(filepath.Dir(committed), 0o755); err != nil {
-		return "", fmt.Errorf("create schema directory: %w", err)
+	dir := filepath.Dir(committed)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("create %s directory: %w", filepath.ToSlash(filepath.Dir(relPath)), err)
 	}
-	tmp := committed + ".tmp"
-	if err := os.WriteFile(tmp, emitted, 0o644); err != nil { //nolint:gosec // a committed schema artifact, world-readable like its siblings
-		return "", fmt.Errorf("stage capability manifest: %w", err)
+	tmp, err := os.CreateTemp(dir, "."+filepath.Base(committed)+".*.tmp")
+	if err != nil {
+		return "", fmt.Errorf("stage %s: %w", relPath, err)
 	}
-	if err := os.Rename(tmp, committed); err != nil {
-		_ = os.Remove(tmp)
-		return "", fmt.Errorf("publish capability manifest: %w", err)
+	staged := tmp.Name()
+	_, writeErr := tmp.Write(emitted)
+	if writeErr == nil {
+		// A committed schema artifact is world-readable like its siblings;
+		// CreateTemp opens the file 0600.
+		writeErr = tmp.Chmod(0o644)
+	}
+	if closeErr := tmp.Close(); writeErr == nil {
+		writeErr = closeErr
+	}
+	if writeErr != nil {
+		_ = os.Remove(staged)
+		return "", fmt.Errorf("stage %s: %w", relPath, writeErr)
+	}
+	if err := os.Rename(staged, committed); err != nil {
+		_ = os.Remove(staged)
+		return "", fmt.Errorf("publish %s: %w", relPath, err)
 	}
 	return committed, nil
 }

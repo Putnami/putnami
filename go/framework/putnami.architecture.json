@@ -553,6 +553,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/grpc",
+          "producerProject": "/protocols/grpc-services"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/framework/grpc",
           "producerProject": "/protocols/http-routes"
         },
         {

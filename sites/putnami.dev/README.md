@@ -134,8 +134,8 @@ evidence, never authority — emitting one cannot create a cross-domain permissi
 ## Public route surface
 
 The build emits a canonical `putnami.http-routes.v1` inventory of everything
-this workload serves at `.gen/schema/http-routes.json` (build output — never
-committed). Putnami Cloud consumes it to generate a default-deny edge
+this workload serves at `schema/http-routes.json`, with a build copy at
+`.gen/schema/http-routes.json`. Putnami Cloud consumes it to generate a default-deny edge
 allowlist, so it must stay a *complete* description of the served surface.
 
 This workload enables that policy explicitly with

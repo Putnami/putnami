@@ -255,7 +255,8 @@ dependents keep their keys and their hits. Describe declares the committed
 `schema/feature-evidence/go-framework.json` as an output, so a hit also
 restores the committed evidence of the binding it was stored at. The binding
 also covers the committed sidecars describe converges (`schema/openapi.json`,
-`schema/http-routes.json`, `schema/config.json`, `infra/requirements.json`).
+`schema/http-routes.json`, `schema/grpc-services.json`, `schema/config.json`,
+`infra/requirements.json`).
 When describe changes one, the CLI executes it once more at the binding of the
 converged tree, so the evidence a run leaves names the tree it leaves. See [Source-Bound Tasks](../../../tooling/cli/doc/10-caching.md#source-bound-tasks).
 
@@ -504,6 +505,21 @@ stable digest.
 Catch-alls, wildcards, and other patterns that cannot be represented safely by
 v1 fail the build with an `http_routes.unsupported_pattern` diagnostic instead
 of widening the public edge route.
+
+## gRPC service inventory
+
+An app that composes a `go.putnami.dev/grpc` surface emits
+`schema/grpc-services.json` during describe mode. The artifact uses
+`putnami.grpc-services.v1` and lists every service the native server, the
+Connect gateway and the api bridge registered. Describe commits it verbatim,
+like the route inventory. A validation failure fails the build with a
+`grpc_services.*` diagnostic.
+
+The file is present only when the app composes a gRPC surface. Its absence
+leaves service facts unavailable; an emitted empty services list records a
+collected empty surface. A successful describe
+that writes no inventory removes the committed copy, as it does when the
+project does not commit its schemas. A failed describe leaves it as it was.
 
 ## Dependency Management
 

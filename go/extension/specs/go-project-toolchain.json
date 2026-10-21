@@ -73,7 +73,7 @@
     },
     {
       "id": "single-schema-committer",
-      "text": "Each committed generated contract has exactly one committer for a given run: when describe will run, generate defers the committed sidecar instead of writing a partial one, only changed files are committed, the committed feature evidence holds only what the run wrote, and formatting-only publication of an unmerged framework OpenAPI document preserves its bytes and hash."
+      "text": "Each committed generated contract has exactly one committer for a given run: when describe will run, generate defers the committed sidecar instead of writing a partial one, only changed files are committed, the committed feature evidence and gRPC service inventory hold only what a successful run wrote while a failed run leaves them as they were, and formatting-only publication of an unmerged framework OpenAPI document preserves its bytes and hash."
     },
     {
       "id": "generation-opt-out",

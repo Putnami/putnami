@@ -559,6 +559,24 @@
           }
         },
         {
+          "id": "committed-route-inventory",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-generate-http-routes-output-declares-fail-on-drift",
+              "successful-hooks-commit-the-aggregate-verbatim",
+              "an-unchanged-inventory-is-not-rewritten",
+              "successful-hooks-without-routes-remove-the-committed-copy",
+              "failed-or-unrun-hooks-preserve-the-committed-copy",
+              "a-batched-generate-commits-the-solo-bytes"
+            ]
+          }
+        },
+        {
           "id": "source-bound-generate",
           "stage": "coded",
           "evidenceKinds": [

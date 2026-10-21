@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "go/deps-edit#deps-add-resolves-a-workspace-member-from-the-tree",
     "go/deps-edit#deps-edit-reads-no-replaced-version",
     "go/deps-edit#deps-run-the-pinned-go",
     "go/deps-edit#deps-tidy-resolves-as-the-workspace-does",

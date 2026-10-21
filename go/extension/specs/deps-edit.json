@@ -4,7 +4,8 @@
   "feature": "go/deps-edit",
   "outcomes": [
     "putnami deps add, deps remove and deps prune edit a Go module's requirements through the Go extension, so the core CLI runs no go command for them",
-    "An edit succeeds on a module that requires a version no proxy serves, and tidies the module as the workspace build resolves it"
+    "An edit succeeds on a module that requires a version no proxy serves, and tidies the module as the workspace build resolves it",
+    "A module of the workspace is added before it is published, from its source in the tree"
   ],
   "nonGoals": [
     "Editing putnami.json or choosing the projects prune drops, which the core CLI does",
@@ -13,7 +14,7 @@
   "requirements": [
     {
       "id": "deps-edit-reads-no-replaced-version",
-      "text": "deps-edit adds a module by resolving each spec with go list -m and requiring the result with go mod edit, and removes one with go mod edit -droprequire. It never runs go get, so a go.mod that requires a version no proxy serves is edited. A spec names a module path. A spec without a version takes the latest, or keeps the version go.mod requires when it is newer. An add refuses the version none and names the deps remove command."
+      "text": "deps-edit adds a module by resolving each spec with go list -m and requiring the result with go mod edit, and removes one with go mod edit -droprequire. It never runs go get, so a go.mod that requires a version no proxy serves is edited. A spec names a module path. A spec without a version that names no go.work member takes the latest, or keeps the version go.mod requires when it is newer. An add refuses the version none and names the deps remove command."
     },
     {
       "id": "deps-tidy-resolves-as-the-workspace-does",
@@ -26,6 +27,10 @@
     {
       "id": "prune-names-the-module-the-target-declares",
       "text": "A prune names each requirement to drop by the module path the go.mod in the target project's directory declares, not by the project's putnami.json name, and fails naming the target and the project when it cannot read one."
+    },
+    {
+      "id": "deps-add-resolves-a-workspace-member-from-the-tree",
+      "text": "Bare add specs resolve uniquely declared governing go.work modules without registry access. Preserve a valid required version and existing replacements; otherwise use a major placeholder and relative member replacement. Explicit versions and nonmembers retain registry lookup. Reject malformed, missing, ambiguous and self members before Go runs. Read member go.mod identities only. Apply within the existing rollback transaction."
     }
   ],
   "decisions": [

@@ -204,6 +204,7 @@ func authoredGoFrameworkDomain() *arch.Builder {
 				arch.Bind("/go/framework/grpc", "/protocols/diagnostic"),
 				arch.Bind("/go/framework/grpc", "/protocols/events"),
 				arch.Bind("/go/framework/grpc", "/protocols/features"),
+				arch.Bind("/go/framework/grpc", "/protocols/grpc-services"),
 				arch.Bind("/go/framework/grpc", "/protocols/http-routes"),
 				arch.Bind("/go/framework/grpc", "/protocols/identity"),
 				arch.Bind("/go/framework/grpc", "/protocols/infra"),

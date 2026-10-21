@@ -1964,3 +1964,159 @@ func TestCollectArtifactsRemovesCommittedFeatureEvidenceItDidNotWrite(t *testing
 		})
 	}
 }
+
+// The committed gRPC service inventory holds only what this run wrote. Only the
+// app's describe binary writes it, and only when the app composes a gRPC
+// surface. An absent file leaves the facts unavailable. A run
+// that commits a fresh inventory replaces the copy verbatim; a run whose app
+// wrote none, or whose project does not commit its schemas, removes it. Other
+// committed sidecars stay.
+func TestCollectArtifactsRemovesCommittedGRPCInventoryItDidNotWrite(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "single-schema-committer", "committed-grpc-inventory-is-only-what-the-run-wrote")
+	const (
+		stale  = `{"protocol":"putnami.grpc-services.v1","services":[{"name":"old.v1.Gone"}]}` + "\n"
+		fresh  = `{"protocol":"putnami.grpc-services.v1","services":[]}` + "\n"
+		routes = `{"protocol":"putnami.http-routes.v1","routes":[]}` + "\n"
+	)
+	for _, test := range []struct {
+		name           string
+		writeInventory bool
+		commit         bool
+		want           string // "" means the committed copy is absent
+	}{
+		{name: "fresh inventory is committed verbatim", writeInventory: true, commit: true, want: fresh},
+		{name: "no gRPC surface this run", writeInventory: false, commit: true},
+		{name: "schemas not committed", writeInventory: true, commit: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			projectPath := t.TempDir()
+			genDir := filepath.Join(projectPath, ".gen")
+			genSchemaDir := filepath.Join(genDir, "schema")
+			committedDir := filepath.Join(projectPath, "schema")
+			for _, dir := range []string{genSchemaDir, committedDir} {
+				if err := os.MkdirAll(dir, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			committed := filepath.Join(committedDir, "grpc-services.json")
+			otherSidecar := filepath.Join(committedDir, "http-routes.json")
+			for path, body := range map[string]string{committed: stale, otherSidecar: routes} {
+				if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			snap := snapshotSchemaDir(genSchemaDir)
+			if test.writeInventory {
+				if err := os.WriteFile(filepath.Join(genSchemaDir, "grpc-services.json"), []byte(fresh), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			if _, err := collectArtifacts(projectPath, genDir, test.commit, snap, nil); err != nil {
+				t.Fatalf("collectArtifacts: %v", err)
+			}
+			got, err := os.ReadFile(committed)
+			switch {
+			case test.want == "" && !errors.Is(err, os.ErrNotExist):
+				t.Fatalf("committed inventory = %q (err %v), want it removed", got, err)
+			case test.want != "" && (err != nil || string(got) != test.want):
+				t.Fatalf("committed inventory = %q (err %v), want %q", got, err, test.want)
+			}
+			if body, err := os.ReadFile(otherSidecar); err != nil || string(body) != routes {
+				t.Fatalf("committed route inventory = %q (err %v), want it left as it was", body, err)
+			}
+		})
+	}
+}
+
+// A describe that fails leaves the committed gRPC service inventory as it was:
+// the removal runs only after a successful run, so a broken build never drops
+// the inventory of the last good one. A successful run whose app composes no
+// gRPC surface removes it. The stand-in binary plays the app's describe mode.
+func TestRunDescribeRemovesTheGRPCInventoryOnlyAfterASuccessfulRun(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script stand-in not portable to Windows")
+	}
+	spectest.Proves(t, "go/go-project-toolchain", "single-schema-committer", "a-failed-describe-keeps-the-committed-grpc-inventory")
+	const (
+		stale = `{"protocol":"putnami.grpc-services.v1","services":[{"name":"old.v1.Gone"}]}` + "\n"
+		fresh = `{"protocol":"putnami.grpc-services.v1","services":[]}` + "\n"
+	)
+	for _, test := range []struct {
+		name    string
+		script  string
+		wantErr bool
+		want    string // "" means the committed copy is absent
+	}{
+		{
+			name: "a failed describe keeps it",
+			script: `#!/bin/sh
+echo 'grpc service inventory validation failed: [grpc_services.duplicate_service] services[1]: duplicate service' >&2
+exit 1
+`,
+			wantErr: true,
+			want:    stale,
+		},
+		{
+			name: "a successful describe without a gRPC surface removes it",
+			script: `#!/bin/sh
+exit 0
+`,
+		},
+		{
+			name: "a successful describe commits the inventory it wrote",
+			script: `#!/bin/sh
+mkdir -p "$PUTNAMI_DESCRIBE_OUT/schema"
+printf '%s\n' '{"protocol":"putnami.grpc-services.v1","services":[]}' > "$PUTNAMI_DESCRIBE_OUT/schema/grpc-services.json"
+`,
+			want: fresh,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			workspace := t.TempDir()
+			projectDir := filepath.Join(workspace, "svc")
+			for rel, body := range map[string]string{
+				"go.mod":                    "module example.com/svc\n\nrequire go.putnami.dev/app v0.1.0\n",
+				"main.go":                   "package main\n\nimport _ \"go.putnami.dev/app\"\n\nfunc main() {}\n",
+				"schema/grpc-services.json": stale,
+			} {
+				path := filepath.Join(projectDir, filepath.FromSlash(rel))
+				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			binPath := writeShellBinary(t, test.script)
+			compile := compileDescribeHost
+			compileDescribeHost = func(*pctx.Context, string) (string, func(), error) { return binPath, func() {}, nil }
+			t.Cleanup(func() { compileDescribeHost = compile })
+
+			ctx := &pctx.Context{WorkspaceRoot: workspace, CacheRoot: t.TempDir(), Project: pctx.Project{Path: "svc", FullPath: projectDir}, Params: pctx.Params{}}
+			_, err := runDescribe(ctx, jsonl.New())
+			if test.wantErr != (err != nil) {
+				t.Fatalf("runDescribe error = %v, want error %v", err, test.wantErr)
+			}
+			got, readErr := os.ReadFile(filepath.Join(projectDir, "schema", "grpc-services.json"))
+			switch {
+			case test.want == "" && !errors.Is(readErr, os.ErrNotExist):
+				t.Fatalf("committed inventory = %q (err %v), want it removed", got, readErr)
+			case test.want != "" && (readErr != nil || string(got) != test.want):
+				t.Fatalf("committed inventory = %q (err %v), want %q", got, readErr, test.want)
+			}
+		})
+	}
+}
+
+func TestGRPCServicesDiagnosticsFromDescribeOutput(t *testing.T) {
+	output := "grpc service inventory validation failed: " +
+		"[grpc_services.duplicate_service] services[1]: service \"items.v1.Items\" is listed twice"
+	event := captureCapabilityDiagnostic(t, output)
+	if event["type"] != "diagnostic" || event["code"] != "grpc_services.duplicate_service" {
+		t.Fatalf("event = %#v, want coded gRPC service diagnostic", event)
+	}
+	if message, _ := event["message"].(string); !strings.Contains(message, "services[1]") {
+		t.Fatalf("message = %q, want field context", message)
+	}
+}

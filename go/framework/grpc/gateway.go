@@ -30,6 +30,11 @@ type GatewayPlugin struct {
 	// reachable once RegisterOn mounts them on the HTTP server; the lifecycle
 	// hooks do not mount anything themselves.
 	mounted bool
+	// served maps each prefix RegisterOn mounted to the service name it
+	// serves. Describe lists exactly these services.
+	served map[string]string
+	// root is the application root Configure received.
+	root *app.Module
 }
 
 // ServiceHandler represents a Connect service handler to be mounted.
@@ -73,8 +78,12 @@ func (p *GatewayPlugin) MountHandler(path string, handler http.Handler) *Gateway
 	return p.Mount(ServiceHandler{Path: path, Handler: handler})
 }
 
-// Configure implements the plugin lifecycle.
-func (p *GatewayPlugin) Configure(_ context.Context, _ *app.Module) error {
+// Configure implements the plugin lifecycle. It records the application root
+// for Describe and nothing else, so repeating it changes nothing.
+func (p *GatewayPlugin) Configure(_ context.Context, owner *app.Module) error {
+	if owner != nil {
+		p.root = owner.Root()
+	}
 	return nil
 }
 
@@ -107,17 +116,24 @@ func (p *GatewayPlugin) Stop(_ context.Context, _ *app.Module) error {
 // The gateway mounts each service as a prefix mount that forwards every request
 // under the service subtree to the appropriate Connect handler. Handlers are
 // mounted under the configured PathPrefix, so a non-default prefix routes
-// services at "<PathPrefix>/<package.Service>/<method>".
+// services at "<PathPrefix>/<package.Service>/<method>". Each mount is also
+// recorded for the service inventory: the service name is the handler path
+// without its slashes, and its basePath is the mounted prefix.
 func (p *GatewayPlugin) RegisterOn(server *phttp.ServerPlugin) {
 	prefix := protocolplatform.NormalizePrefix(p.config.PathPrefix)
+	if p.served == nil {
+		p.served = map[string]string{}
+	}
 	for _, h := range p.handlers {
 		handler := h
 		// Mount the service subtree at a "/"-terminated prefix so the route
 		// inventory can represent it as a MatchPrefix / static-mount route; the
 		// HTTP router still matches the whole subtree ("<mount>*" is byte-identical
 		// to the old "<path>/*" wildcard).
-		mount := prefix + "/" + strings.Trim(handler.Path, "/") + "/"
+		name := strings.Trim(handler.Path, "/")
+		mount := prefix + "/" + name + "/"
 		server.RouteMount("POST", mount, connectBridge(handler.Handler))
+		p.served[mount] = name
 	}
 	p.mounted = true
 }

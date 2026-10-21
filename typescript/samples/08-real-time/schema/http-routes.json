@@ -1,0 +1,82 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [
+    {
+      "match": "exact",
+      "path": "/",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/08-real-time",
+        "package": "@putnami/application",
+        "sourceKind": "public-file",
+        "evidencePath": "public/index.html"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/chat",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/08-real-time",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/chat/ws.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/index",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/08-real-time",
+        "package": "@putnami/application",
+        "sourceKind": "public-file",
+        "evidencePath": "public/index.html"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/index.html",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/08-real-time",
+        "package": "@putnami/application",
+        "sourceKind": "public-file",
+        "evidencePath": "public/index.html"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/notifications",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/08-real-time",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/notifications/get.ts"
+      }
+    }
+  ],
+  "digest": "sha256:251e0b73f960ead9fbb35dfb46926abae152976a11edfd3eba681a9adc0befcf"
+}

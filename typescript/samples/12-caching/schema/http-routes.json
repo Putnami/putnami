@@ -1,0 +1,110 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [
+    {
+      "match": "exact",
+      "path": "/",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/12-caching",
+        "package": "@putnami/application",
+        "sourceKind": "manual"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/admin",
+      "methods": [
+        "DELETE"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/12-caching",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/admin/delete.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/admin",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/12-caching",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/admin/get.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/http/products",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/12-caching",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/http/products/get.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/http/products/{id}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/12-caching",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/http/products/[id]/get.ts"
+      }
+    },
+    {
+      "match": "exact",
+      "path": "/products",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/12-caching",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/products/get.ts"
+      }
+    },
+    {
+      "match": "template",
+      "path": "/products/{id}",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "@example/12-caching",
+        "package": "@putnami/application",
+        "sourceKind": "typed-api",
+        "evidencePath": "src/api/products/[id]/get.ts"
+      }
+    }
+  ],
+  "digest": "sha256:6378743e0c4382f7f45b1bbf79dd87b10dd06fa19a107635daf1bc6470addd02"
+}

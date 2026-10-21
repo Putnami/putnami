@@ -288,7 +288,7 @@
       }
     },
     {
-      "includes": ["**/schema/openapi.json"],
+      "includes": ["**/schema/openapi.json", "**/schema/http-routes.json"],
       "json": {
         "formatter": {
           "expand": "always"
