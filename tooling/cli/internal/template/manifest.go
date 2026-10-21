@@ -15,11 +15,10 @@ func LoadManifest(path string) (*Manifest, error) {
 // Resolve converts a raw manifest into a TemplateDescription.
 func Resolve(manifest *Manifest, absPath string) *TemplateDescription {
 	return &TemplateDescription{
-		Name:                     manifest.Name,
-		Version:                  manifest.Version,
-		Description:              manifest.Description,
-		Extension:                manifest.Extension,
-		Path:                     absPath,
-		WorkspaceDevDependencies: manifest.WorkspaceDevDependencies,
+		Name:        manifest.Name,
+		Version:     manifest.Version,
+		Description: manifest.Description,
+		Extension:   manifest.Extension,
+		Path:        absPath,
 	}
 }

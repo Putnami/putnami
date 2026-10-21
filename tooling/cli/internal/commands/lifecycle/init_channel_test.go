@@ -67,6 +67,63 @@ func TestParseInitFlagsReadsTheChannel(t *testing.T) {
 
 // The flag wins over the variable, the variable over the install record, and
 // the install record over latest. stable reads latest, as in `putnami upgrade`.
+func TestResolveChannelFlagStripsTheFlagAndFollowsInit(t *testing.T) {
+	spectest.Proves(t, "cli/init-channel", "templates-test-builds-the-rendered-project",
+		"the-extension-installs-on-the-channel-the-run-chose")
+
+	tests := []struct {
+		name        string
+		args        []string
+		env         string
+		record      string
+		wantChannel string
+		wantRest    []string
+		wantErr     bool
+	}{
+		{name: "a separate value", args: []string{"dir", "--channel", "canary", "--keep"},
+			wantChannel: "canary", wantRest: []string{"dir", "--keep"}},
+		{name: "an attached value", args: []string{"--channel=canary", "dir"},
+			wantChannel: "canary", wantRest: []string{"dir"}},
+		{name: "the flag wins over the variable", args: []string{"--channel", "canary"}, env: "next",
+			wantChannel: "canary", wantRest: []string{}},
+		{name: "the variable", args: []string{"dir"}, env: "next",
+			wantChannel: "next", wantRest: []string{"dir"}},
+		{name: "the install record", args: []string{"dir"}, record: "putnami-go-canary",
+			wantChannel: "canary", wantRest: []string{"dir"}},
+		{name: "stable reads latest", args: []string{"--channel", "stable"},
+			wantChannel: "", wantRest: []string{}},
+		{name: "no choice", args: []string{"dir", "--skip-build"},
+			wantChannel: "", wantRest: []string{"dir", "--skip-build"}},
+		{name: "an exact version", args: []string{"--channel", "1.2.3"}, wantErr: true},
+		{name: "a flag with no value", args: []string{"--channel"}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			installedAs(t, "lifecycle.test")
+			if tt.record != "" {
+				installedAs(t, tt.record)
+			}
+			t.Setenv(initChannelEnv, tt.env)
+			channel, rest, err := ResolveChannelFlag(tt.args)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("ResolveChannelFlag(%v) = %q, want an error", tt.args, channel)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ResolveChannelFlag(%v): %v", tt.args, err)
+			}
+			if channel != tt.wantChannel {
+				t.Errorf("channel = %q, want %q", channel, tt.wantChannel)
+			}
+			if !slices.Equal(rest, tt.wantRest) {
+				t.Errorf("rest = %v, want %v", rest, tt.wantRest)
+			}
+		})
+	}
+}
+
 func TestResolveInitChannelPrecedence(t *testing.T) {
 	spectest.Proves(t, "cli/init-channel", "one-channel-choice", "the-flag-wins-over-the-variable-and-the-install-record")
 	tests := []struct {

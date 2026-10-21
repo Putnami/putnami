@@ -576,11 +576,12 @@ var catalog = []Command{
 		Kind:        KindStructured,
 		Category:    "Extensions & Templates",
 		Summary:     "Test a template in a temporary workspace",
-		Description: "Test a template by rendering it into a temporary workspace and running build and test on the result",
-		Usage:       "putnami templates test [path] [--skip-build] [--keep]",
+		Description: "Test a template by rendering it, then creating a project from it in a temporary workspace and running the build and test its extension declares",
+		Usage:       "putnami templates test [path] [--skip-build] [--keep] [--channel <channel>]",
 		Flags: []Flag{
 			{Long: "--skip-build", Description: "Render the template without running build and test on it"},
 			{Long: "--keep", Description: "Keep the rendered temporary workspace for inspection"},
+			{Long: "--channel", Type: FlagValue, ValueName: "<channel>", Description: "Install the template's extension from one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)"},
 		},
 		Positionals: []Positional{{Name: "path"}},
 		Examples: []string{

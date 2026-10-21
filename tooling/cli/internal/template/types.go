@@ -12,11 +12,10 @@ type Manifest = proto.Manifest
 
 // TemplateDescription is the resolved, in-memory representation of a template.
 type TemplateDescription struct {
-	Name                     string
-	Version                  string
-	Description              string
-	Extension                string
-	Path                     string // absolute filesystem path
-	RelPath                  string // workspace-relative path
-	WorkspaceDevDependencies map[string]string
+	Name        string
+	Version     string
+	Description string
+	Extension   string
+	Path        string // absolute filesystem path
+	RelPath     string // workspace-relative path
 }

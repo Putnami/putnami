@@ -199,6 +199,7 @@ complete -c putnami -n '__putnami_seen_path sessions summary' -l 'since' -d 'Kee
 complete -c putnami -n '__putnami_seen_path templates install' -l 'latest' -d 'Ignore the lock file and resolve the latest versions'
 complete -c putnami -n '__putnami_seen_path templates package' -l 'stable' -d 'Publish under a stable version instead of a prerelease'
 complete -c putnami -n '__putnami_seen_path templates package' -l 'version' -d 'Version to stamp on the produced archive' -r
+complete -c putnami -n '__putnami_seen_path templates test' -l 'channel' -d 'Install the template\'s extension from one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -r
 complete -c putnami -n '__putnami_seen_path templates test' -l 'keep' -d 'Keep the rendered temporary workspace for inspection'
 complete -c putnami -n '__putnami_seen_path templates test' -l 'skip-build' -d 'Render the template without running build and test on it'
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'channel' -d 'Resolve a release channel (stable by default; canary for latest prerelease)' -r

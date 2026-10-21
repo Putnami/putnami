@@ -339,7 +339,11 @@ func cmdTemplates(env *CommandEnv) error {
 		// so they need no workspace.
 		return extensions.TemplatesValidate(env.Args)
 	case "test":
-		return extensions.TemplatesTest(env.Ctx, env.Args)
+		channel, args, err := lifecycle.ResolveChannelFlag(env.Args)
+		if err != nil {
+			return err
+		}
+		return extensions.TemplatesTest(env.Ctx, args, channel)
 	case "package":
 		return extensions.TemplatesPackage(env.Ctx, env.Args)
 	default:

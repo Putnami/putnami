@@ -97,6 +97,35 @@ func resolveInitChannel(flags initFlags, getenv func(string) string, executableN
 	return initChannel{name: latestChannel}, nil
 }
 
+// ResolveChannelFlag returns the channel a command other than init resolves
+// its artifacts on, with args minus the --channel flag and its value. The
+// choice follows init: --channel, else PUTNAMI_CHANNEL, else the install
+// record, else latest. The channel is "" for latest.
+func ResolveChannelFlag(args []string) (string, []string, error) {
+	var flags initFlags
+	rest := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		if value, ok := strings.CutPrefix(args[i], initChannelFlag+"="); ok {
+			flags.channel, flags.channelSet = value, true
+			continue
+		}
+		if args[i] != initChannelFlag {
+			rest = append(rest, args[i])
+			continue
+		}
+		flags.channelSet = true
+		if i+1 < len(args) {
+			flags.channel = args[i+1]
+			i++
+		}
+	}
+	channel, err := resolveInitChannel(flags, os.Getenv, runningCLIName())
+	if err != nil {
+		return "", nil, err
+	}
+	return channel.selected(), rest, nil
+}
+
 // channelName validates the channel a flag or a variable names and returns the
 // channel to resolve on: stable reads latest. source names the flag or the
 // variable in the error.

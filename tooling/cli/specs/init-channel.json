@@ -31,6 +31,10 @@
       "text": "The channel is a target of the init run only. putnami.workspace.json keeps bare artifact names, putnami.lock.json records the exact version, the digest and a version-pinned source of each artifact, and neither file names the channel. putnami upgrade reads neither PUTNAMI_CHANNEL nor the install record, and follows latest by default."
     },
     {
+      "id": "templates-test-builds-the-rendered-project",
+      "text": "putnami templates test copies the template into a temporary workspace that lists its extension and no project, then does what a user does: it installs the extension on the channel --channel or PUTNAMI_CHANNEL chooses, as init does, runs projects create from the template, and runs the build and test the extension declares on the project. It fails if the extension declares neither."
+    },
+    {
       "id": "release-smokes-hand-the-channel-to-init",
       "text": "smoke-check-release.sh and smoke-check-release.ps1 export the channel they are started on as PUTNAMI_CHANNEL, after they clear every PUTNAMI_ variable and before the init leg, so the init command line stays the public one and a value the caller exported never reaches it."
     }

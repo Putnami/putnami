@@ -839,6 +839,10 @@
       "path": "templates test",
       "flags": [
         {
+          "long": "--channel",
+          "type": "value"
+        },
+        {
           "long": "--keep",
           "type": "bool"
         },

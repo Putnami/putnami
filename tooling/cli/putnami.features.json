@@ -3642,6 +3642,19 @@
               "the-powershell-smoke-hands-its-channel-to-init"
             ]
           }
+        },
+        {
+          "id": "templates-test-builds-the-rendered-project",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-temporary-workspace-lists-the-extension-and-no-project-or-language-manifest",
+              "the-extension-installs-on-the-channel-the-run-chose",
+              "phase-3-runs-only-the-verbs-the-extension-declares"
+            ]
+          }
         }
       ]
     },

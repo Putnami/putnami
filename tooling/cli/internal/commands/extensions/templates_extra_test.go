@@ -5,13 +5,17 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/layout"
+	"go.putnami.dev/tooling/cli/internal/template"
 )
 
 func TestParseTemplateArg(t *testing.T) {
@@ -413,7 +417,7 @@ func TestTemplatesTest_SkipBuild(t *testing.T) {
 	}
 
 	out, err := sharedtest.CaptureStdout(t, func() error {
-		return TemplatesTest(context.Background(), []string{dir, "--skip-build"})
+		return TemplatesTest(context.Background(), []string{dir, "--skip-build"}, "")
 	})
 	if err != nil {
 		t.Fatalf("TemplatesTest: %v", err)
@@ -429,6 +433,154 @@ func TestTemplatesTest_SkipBuild(t *testing.T) {
 	}
 }
 
+// TestTemplatesTest_WritesAWorkspaceWithoutProjects reads back the temporary
+// workspace config. The template's extension is active, no project is listed
+// (`projects create` adds it), and no language manifest sits at the root.
+func TestTemplatesTest_WritesAWorkspaceWithoutProjects(t *testing.T) {
+	spectest.Proves(t, "cli/init-channel", "templates-test-builds-the-rendered-project",
+		"the-temporary-workspace-lists-the-extension-and-no-project-or-language-manifest")
+
+	dir := t.TempDir()
+	sharedtest.WriteJSONConfig(t, filepath.Join(dir, "putnami.template.json"), map[string]any{
+		"name":                     "tpl-test",
+		"version":                  "1.0.0",
+		"extension":                "@putnami/go",
+		"workspaceDevDependencies": map[string]string{"go.putnami.dev/go/extension": "latest"},
+	})
+	if err := os.WriteFile(filepath.Join(dir, "putnami.json.template"), []byte(`{"name":"{{.ProjectName}}"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tmpRoot := t.TempDir()
+	t.Setenv("TMPDIR", tmpRoot)
+
+	out, err := sharedtest.CaptureStdout(t, func() error {
+		return TemplatesTest(context.Background(), []string{dir, "--skip-build", "--keep"}, "")
+	})
+	if err != nil {
+		t.Fatalf("TemplatesTest: %v", err)
+	}
+	if !strings.Contains(out, "Temp workspace: ") {
+		t.Fatalf("output = %q, want the kept workspace path", out)
+	}
+
+	matches, err := filepath.Glob(filepath.Join(tmpRoot, "putnami-tpl-test-*"))
+	if err != nil || len(matches) != 1 {
+		t.Fatalf("kept workspaces = %v (err %v), want exactly one", matches, err)
+	}
+	ws := matches[0]
+
+	data, err := os.ReadFile(filepath.Join(ws, "putnami.workspace.json"))
+	if err != nil {
+		t.Fatalf("read workspace config: %v", err)
+	}
+	var cfg wsproto.Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("workspace config is invalid: %v\n%s", err, data)
+	}
+	if len(cfg.Includes) != 0 {
+		t.Errorf("includes = %v, want none", cfg.Includes)
+	}
+	if want := []string{"@putnami/go"}; !slices.Equal(cfg.Extensions.Names(), want) {
+		t.Errorf("extensions = %v, want %v", cfg.Extensions.Names(), want)
+	}
+	for _, name := range []string{"package.json", "go.work", "test-project"} {
+		if _, err := os.Stat(filepath.Join(ws, name)); !os.IsNotExist(err) {
+			t.Errorf("%s exists in the temporary workspace (stat err %v), want none", name, err)
+		}
+	}
+}
+
+// TestStageTemplateUnderTest_IsDiscoveredAndIsNoProject checks that the copy of
+// the template under test is a template by the discovery convention and a
+// project by no reading of the workspace.
+func TestStageTemplateUnderTest_IsDiscoveredAndIsNoProject(t *testing.T) {
+	src := t.TempDir()
+	sharedtest.WriteJSONConfig(t, filepath.Join(src, "putnami.template.json"), map[string]any{
+		"name":        "tpl-test",
+		"description": "a template",
+		"extension":   "@putnami/go",
+	})
+	if err := os.WriteFile(filepath.Join(src, "putnami.json"), []byte(`{"name":"tpl"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ws := t.TempDir()
+	if err := writeTemplateTestWorkspace(ws, "@putnami/go"); err != nil {
+		t.Fatal(err)
+	}
+	if err := stageTemplateUnderTest(ws, src); err != nil {
+		t.Fatalf("stageTemplateUnderTest: %v", err)
+	}
+
+	found, err := template.DiscoverTemplates(ws, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tpl := template.FindByName(found, "tpl-test"); tpl == nil || tpl.Extension != "@putnami/go" {
+		t.Fatalf("discovered templates = %v, want tpl-test from @putnami/go", found)
+	}
+	if cfg := wsproto.Load(ws); len(cfg.Includes) != 0 {
+		t.Errorf("includes = %v, want none", cfg.Includes)
+	}
+}
+
+// TestDeclaredCheckVerbs_FollowsTheInstalledExtension checks that phase 3 runs
+// only the verbs the installed extension declares: both, test alone (as Python
+// declares), or none.
+func TestDeclaredCheckVerbs_FollowsTheInstalledExtension(t *testing.T) {
+	spectest.Proves(t, "cli/init-channel", "templates-test-builds-the-rendered-project",
+		"phase-3-runs-only-the-verbs-the-extension-declares")
+
+	command := `{"run": [{"id": "x", "task": "t"}]}`
+	tests := []struct {
+		name     string
+		commands string
+		want     []string
+	}{
+		{name: "build and test", commands: `"build": ` + command + `, "test": ` + command, want: []string{"build", "test"}},
+		{name: "test alone", commands: `"lint": ` + command + `, "test": ` + command, want: []string{"test"}},
+		{name: "build alone", commands: `"build": ` + command, want: []string{"build"}},
+		{name: "neither", commands: `"lint": ` + command, want: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ws := t.TempDir()
+			if err := writeTemplateTestWorkspace(ws, "@acme/lang"); err != nil {
+				t.Fatal(err)
+			}
+			extDir := layout.StableDir(ws, layout.Extensions, "@acme/lang")
+			if err := os.MkdirAll(extDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			manifest := `{"name": "@acme/lang", "version": "1.0.0", "cliContract": 4, "commands": {` + tt.commands + `},
+				"tasks": {"t": {"kind": "command", "command": "echo"}}}`
+			if err := os.WriteFile(filepath.Join(extDir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			got, err := declaredCheckVerbs(ws)
+			if err != nil {
+				t.Fatalf("declaredCheckVerbs: %v", err)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("verbs = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestWriteTemplateTestWorkspace_NoExtension(t *testing.T) {
+	dir := t.TempDir()
+	if err := writeTemplateTestWorkspace(dir, ""); err != nil {
+		t.Fatalf("writeTemplateTestWorkspace: %v", err)
+	}
+	cfg := wsproto.Load(dir)
+	if len(cfg.Includes) != 0 {
+		t.Errorf("includes = %v, want none", cfg.Includes)
+	}
+	if names := cfg.Extensions.Names(); len(names) != 0 {
+		t.Errorf("extensions = %v, want none", names)
+	}
+}
+
 func TestTemplatesTest_RenderedProjectMissingConfig(t *testing.T) {
 	dir := t.TempDir()
 	// No putnami.json rendered → structure validation must fail.
@@ -441,7 +593,7 @@ func TestTemplatesTest_RenderedProjectMissingConfig(t *testing.T) {
 	}
 
 	_, err := sharedtest.CaptureStdout(t, func() error {
-		return TemplatesTest(context.Background(), []string{dir, "--skip-build"})
+		return TemplatesTest(context.Background(), []string{dir, "--skip-build"}, "")
 	})
 	if err == nil || !strings.Contains(err.Error(), "no putnami.json") {
 		t.Fatalf("err = %v, want missing putnami.json error", err)
@@ -453,7 +605,7 @@ func TestTemplatesTest_InvalidManifest(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "putnami.template.json"), []byte(`{bad json`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	err := TemplatesTest(context.Background(), []string{dir, "--skip-build"})
+	err := TemplatesTest(context.Background(), []string{dir, "--skip-build"}, "")
 	if err == nil || !strings.Contains(err.Error(), "template manifest is invalid") {
 		t.Fatalf("err = %v, want invalid manifest error", err)
 	}

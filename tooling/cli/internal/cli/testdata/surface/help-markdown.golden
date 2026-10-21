@@ -675,12 +675,12 @@ putnami templates validate [path]
 
 ### `putnami templates test`
 
-Test a template by rendering it into a temporary workspace and running build and test on the result
+Test a template by rendering it, then creating a project from it in a temporary workspace and running the build and test its extension declares
 
 **Usage**
 
 ```
-putnami templates test [path] [--skip-build] [--keep]
+putnami templates test [path] [--skip-build] [--keep] [--channel <channel>]
 ```
 
 **Flags**
@@ -689,6 +689,7 @@ putnami templates test [path] [--skip-build] [--keep]
 |------|-------------|
 | `--skip-build` | Render the template without running build and test on it |
 | `--keep` | Keep the rendered temporary workspace for inspection |
+| `--channel` <channel> | Install the template's extension from one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest) |
 
 **Examples**
 

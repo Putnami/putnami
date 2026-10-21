@@ -381,6 +381,7 @@ _putnami_flags_for() {
             ;;
         'templates test')
             reply=(
+                '--channel[Install the template'\''s extension from one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)]:channel:'
                 '--keep[Keep the rendered temporary workspace for inspection]'
                 '--skip-build[Render the template without running build and test on it]'
             )

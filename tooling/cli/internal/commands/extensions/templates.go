@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/template"
@@ -14,6 +15,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/template"
@@ -196,8 +198,18 @@ func TemplatesValidate(args []string) error {
 	return nil
 }
 
-// TemplatesTest renders a template into a temporary workspace and runs build+test on it.
-func TemplatesTest(ctx context.Context, args []string) error {
+// TemplatesTest tests a template in a temporary workspace.
+//
+// Phases 1 and 2 render the template into a scratch directory outside the
+// project tree and check the result, so a broken template fails before any
+// install. Phase 3 does what a user does: it installs the template's
+// extension, runs `projects create` from a copy of the template that the
+// workspace discovers by convention, then runs the build and test the
+// extension declares on the created project. The workspace config lists the
+// extension only; `projects create` adds the project and runs the extension's
+// project-setup job. channel is the release channel the extension installs on,
+// or "" for the workspace default.
+func TemplatesTest(ctx context.Context, args []string, channel string) error {
 	var skipBuild, keepDir bool
 	var filteredArgs []string
 	for _, a := range args {
@@ -253,27 +265,12 @@ func TemplatesTest(ctx context.Context, args []string) error {
 		iox.Fprintf(os.Stdout, "  Temp workspace: %s\n\n", tmpDir)
 	}
 
-	// Write minimal workspace config
-	wsConfig := fmt.Sprintf(`{
-  "name": "template-test-workspace",
-  "workspaces": ["%s"]
-}
-`, vars.ProjectPath)
-	if err := os.WriteFile(filepath.Join(tmpDir, "putnami.workspace.json"), []byte(wsConfig), 0o644); err != nil {
-		return fmt.Errorf("write workspace config: %w", err)
+	if err := writeTemplateTestWorkspace(tmpDir, manifest.Extension); err != nil {
+		return err
 	}
 
-	// Write workspace devDependencies if template declares them
-	if len(manifest.WorkspaceDevDependencies) > 0 {
-		depsJSON, _ := json.MarshalIndent(manifest.WorkspaceDevDependencies, "  ", "  ")
-		pkgJSON := fmt.Sprintf("{\n  \"devDependencies\": %s\n}\n", depsJSON)
-		if err := os.WriteFile(filepath.Join(tmpDir, "package.json"), []byte(pkgJSON), 0o644); err != nil {
-			return fmt.Errorf("write package.json: %w", err)
-		}
-	}
-
-	// Render template into workspace
-	projectDir := filepath.Join(tmpDir, vars.ProjectPath)
+	// Render template into a scratch directory the workspace does not list.
+	projectDir := filepath.Join(tmpDir, templateRenderDir, vars.ProjectPath)
 	if err := os.MkdirAll(filepath.Dir(projectDir), 0o755); err != nil {
 		return fmt.Errorf("create project parent: %w", err)
 	}
@@ -281,16 +278,6 @@ func TemplatesTest(ctx context.Context, args []string) error {
 	iox.Fprintf(os.Stdout, "  Phase 1: Render template\n")
 	if err := template.RenderDir(templateDir, projectDir, vars); err != nil {
 		return fmt.Errorf("render template: %w", err)
-	}
-
-	// Ensure extension is registered in the rendered project config
-	if manifest.Extension != "" {
-		cfgPath := filepath.Join(projectDir, "putnami.json")
-		if _, err := os.Stat(cfgPath); err == nil {
-			if err := shared.EnsureProjectExtension(projectDir, manifest.Extension); err != nil {
-				return fmt.Errorf("ensure project extension: %w", err)
-			}
-		}
 	}
 
 	iox.Fprintf(os.Stdout, "  ✓ Template rendered to %s\n\n", vars.ProjectPath)
@@ -317,23 +304,122 @@ func TemplatesTest(ctx context.Context, args []string) error {
 		return fmt.Errorf("locate CLI executable: %w", err)
 	}
 
-	// Run install first. These nested CLI invocations can run for a long time
-	// and fan out to grandchildren (job runner subprocesses), so spawn them in
-	// their own process group under ctx — a canceled `templates test` then
-	// tears down the whole tree instead of orphaning it.
+	// Make the template discoverable the way a workspace template is, so
+	// `projects create` finds it by name.
+	templateName := manifest.Name
+	if templateName == "" {
+		templateName = filepath.Base(templateDir)
+	}
+	if err := stageTemplateUnderTest(tmpDir, templateDir); err != nil {
+		return err
+	}
+
+	// These nested CLI invocations can run for a long time and fan out to
+	// grandchildren (job runner subprocesses), so spawn them in their own
+	// process group under ctx — a canceled `templates test` then tears down
+	// the whole tree instead of orphaning it.
 	env := append(os.Environ(), "PUTNAMI_NO_PROGRESS=true")
-	iox.Fprintf(os.Stdout, "  Running: putnami install\n")
-	if err := shared.RunGroupStreaming(ctx, tmpDir, env, cliPath, "install"); err != nil {
-		return fmt.Errorf("install failed: %w", err)
+
+	// Install the template's extension by name, on the channel the run chose.
+	// The workspace config keeps the bare name, as init leaves it.
+	if manifest.Extension != "" {
+		artifact := manifest.Extension
+		if channel != "" {
+			artifact += "@" + channel
+			iox.Fprintf(os.Stdout, "  Channel: %s\n", channel)
+		}
+		iox.Fprintf(os.Stdout, "  Running: putnami extensions install %s\n", artifact)
+		if err := shared.RunGroupStreaming(ctx, tmpDir, env, cliPath, "extensions", "install", artifact); err != nil {
+			return fmt.Errorf("extension install failed: %w", err)
+		}
 	}
 
-	// Run build,test on the rendered project
-	iox.Fprintf(os.Stdout, "\n  Running: putnami build,test --projects %s\n", vars.ProjectName)
-	if err := shared.RunGroupStreaming(ctx, tmpDir, env, cliPath, "build,test", "--projects", vars.ProjectName, "--no-cache", "--verbose"); err != nil {
-		return fmt.Errorf("build+test failed for template %s: %w", manifest.Name, err)
+	// Create the project from the template, as a user does. Create renders it,
+	// lists it in the workspace config and runs the extension's project-setup
+	// job, which pins the toolchains and the module versions.
+	iox.Fprintf(os.Stdout, "\n  Running: putnami projects create %s --template %s\n", vars.ProjectName, templateName)
+	if err := shared.RunGroupStreaming(ctx, tmpDir, env, cliPath, "projects", "create", vars.ProjectName, "--template", templateName); err != nil {
+		return fmt.Errorf("projects create failed for template %s: %w", manifest.Name, err)
 	}
 
-	iox.Fprintf(os.Stdout, "\n  ✓ Template %s passes build and test.\n", manifest.Name)
+	// Run the verbs the extension declares on the created project. An
+	// extension that declares no build, such as Python's, is tested without it.
+	verbs, err := declaredCheckVerbs(tmpDir)
+	if err != nil {
+		return fmt.Errorf("read the installed extensions: %w", err)
+	}
+	if len(verbs) == 0 {
+		return fmt.Errorf("extension %s declares neither build nor test: nothing to run on template %s", manifest.Extension, manifest.Name)
+	}
+	command := strings.Join(verbs, ",")
+	iox.Fprintf(os.Stdout, "\n  Running: putnami %s --projects %s\n", command, vars.ProjectName)
+	if err := shared.RunGroupStreaming(ctx, tmpDir, env, cliPath, command, "--projects", vars.ProjectName, "--no-cache", "--verbose"); err != nil {
+		return fmt.Errorf("%s failed for template %s: %w", command, manifest.Name, err)
+	}
+
+	iox.Fprintf(os.Stdout, "\n  ✓ Template %s passes %s.\n", manifest.Name, strings.Join(verbs, " and "))
+	return nil
+}
+
+// declaredCheckVerbs returns the verbs of build and test, in that order, that
+// an extension installed in the workspace at workspaceDir declares. It reads
+// the extensions in process, as the planner does.
+func declaredCheckVerbs(workspaceDir string) ([]string, error) {
+	found, err := extension.DiscoverExtensions(workspaceDir, wsproto.Load(workspaceDir), nil)
+	if err != nil {
+		return nil, err
+	}
+	declarers := extension.PublicDeclarers([]string{"build", "test"}, found)
+	var verbs []string
+	for _, verb := range []string{"build", "test"} {
+		if len(declarers[verb]) > 0 {
+			verbs = append(verbs, verb)
+		}
+	}
+	return verbs, nil
+}
+
+// templateRenderDir is the scratch directory of phases 1 and 2. It starts with
+// a dot, so template discovery skips it.
+const templateRenderDir = ".render"
+
+// templateDomainDir is the directory of the test workspace that holds the
+// template under test, at templateDomainDir/templates/<dir>: the layout
+// template discovery scans.
+const templateDomainDir = "under-test"
+
+// stageTemplateUnderTest copies templateDir into the test workspace at
+// templateDomainDir/templates/<dir>, where template discovery finds it by
+// convention. The copy is no project: the workspace config lists none.
+func stageTemplateUnderTest(workspaceDir, templateDir string) error {
+	absTemplateDir, err := filepath.Abs(templateDir)
+	if err != nil {
+		return fmt.Errorf("resolve template directory: %w", err)
+	}
+	copyDir := filepath.Join(workspaceDir, templateDomainDir, "templates", filepath.Base(absTemplateDir))
+	if err := os.CopyFS(copyDir, os.DirFS(absTemplateDir)); err != nil {
+		return fmt.Errorf("copy template into the workspace: %w", err)
+	}
+	return nil
+}
+
+// writeTemplateTestWorkspace writes the putnami.workspace.json of a template
+// test workspace into dir. It names the workspace and, when the template names
+// one, activates the template's extension. It lists no project and holds no
+// language manifest: `projects create` adds the project, and the project's own
+// files carry its language manifests.
+func writeTemplateTestWorkspace(dir, extension string) error {
+	cfg := wsproto.Config{Name: "template-test-workspace"}
+	if extension != "" {
+		cfg.Extensions = wsproto.ExtensionsConfig{List: map[string]string{extension: ""}}
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode workspace config: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "putnami.workspace.json"), append(data, '\n'), 0o644); err != nil {
+		return fmt.Errorf("write workspace config: %w", err)
+	}
 	return nil
 }
 
