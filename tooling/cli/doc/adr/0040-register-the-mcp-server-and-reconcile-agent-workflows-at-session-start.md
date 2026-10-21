@@ -1,6 +1,9 @@
 # ADR 0040 — Install registers the MCP server, and a session start reconciles agent workflows
 
 - **Status**: accepted
+- **Amended**: 2026-10-21, with [ADR 0047](0047-extension-owned-agent-content.md):
+  an installed npm package is no longer a source of agent content, so the
+  session-start pass reconciles only the extensions the committed lock pins.
 - **Scope**: `@putnami/cli` (`internal/commands/agentctx`,
   `internal/commands/lifecycle`, `internal/cli`), the extension SDK
   agent-content builder, public onboarding docs
