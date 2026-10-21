@@ -426,6 +426,13 @@ Provider-specific metadata is namespaced under your extension's name, and
 `syncTask` is where you make your own manifest edits (`putnami projects sync`
 runs it). An extension that declares no `workspace` block is never probed.
 
+Two optional members describe your ecosystem rather than one project.
+`installInputs` lists the files at the workspace root whose content change makes
+the installed tree stale, such as `bun.lock` or `uv.lock`. Each entry is a
+literal file name, never a path or a glob. `language` is the lowercase id of the
+language your projects are written in, such as `go`, `typescript` or `python`.
+The CLI records both per extension in `.putnami/workspace-index.json`.
+
 ### Machine caches
 
 An extension that keeps a machine-global cache owns it end to end. The CLI hands

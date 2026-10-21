@@ -16,14 +16,16 @@
 //
 // Two invariants shape the declaration:
 //
-//   - PATHS, NOT MODULES. Every member here is a PATH pattern relative to a
-//     candidate directory. A probe contract must never assume that a project
-//     root is also a module root — that a Go project's directory contains the
-//     go.mod that declares it, that a package's directory is its npm workspace
-//     entry, that a Python project owns its pyproject.toml. Those coincide
-//     today in this repository and would stop coinciding the moment one module
-//     hosts several projects. Keying on paths keeps that a layout choice
-//     instead of a protocol break.
+//   - PATHS, NOT MODULES. Every pattern member here (markers, inputs,
+//     excludes) is a PATH pattern relative to a candidate directory. A probe
+//     contract must never assume that a project root is also a module root —
+//     that a Go project's directory contains the go.mod that declares it, that
+//     a package's directory is its npm workspace entry, that a Python project
+//     owns its pyproject.toml. Those coincide today in this repository and
+//     would stop coinciding the moment one module hosts several projects.
+//     Keying on paths keeps that a layout choice instead of a protocol break.
+//     InstallInputs is the one member relative to the WORKSPACE ROOT: it names
+//     literal files there, such as a lockfile, and no pattern.
 //
 //   - THE MARKERS ARE INPUTS. A marker's CONTENT is what the probe reads to
 //     answer "what project is this?", so a marker that is not also a metadata
@@ -45,6 +47,8 @@ package extension
 
 import (
 	"fmt"
+	"regexp"
+	"sort"
 	"strings"
 
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -93,6 +97,42 @@ type WorkspaceAdapter struct {
 	// declares it, because a provider built before the request member would
 	// reject a request carrying it.
 	DependencySources bool `json:"dependencySources,omitempty"`
+	// InstallInputs are the files whose content change makes the installed
+	// tree stale: a lockfile, or a file that names the modules an install
+	// prepares ("bun.lock", "uv.lock", "go.work"). Each one is a literal file
+	// name at the WORKSPACE ROOT, unlike every pattern above, which is
+	// candidate-directory-relative: no "/", no glob, each name once. Core
+	// records the set in the workspace index.
+	InstallInputs []string `json:"installInputs,omitempty"`
+	// Language is the lowercase id of the language whose projects this adapter
+	// claims ("go", "typescript", "python"). It matches
+	// WorkspaceLanguagePattern. An empty value declares none, the same as an
+	// absent member, and the authoring schema accepts it for that reason. Core
+	// records it in the workspace index.
+	Language string `json:"language,omitempty"`
+}
+
+// WorkspaceLanguagePattern is the grammar of WorkspaceAdapter.Language.
+const WorkspaceLanguagePattern = `^[a-z][a-z0-9-]*$`
+
+var workspaceLanguageFormat = regexp.MustCompile(WorkspaceLanguagePattern)
+
+// IsWorkspaceLanguage reports whether s is a valid WorkspaceAdapter.Language.
+func IsWorkspaceLanguage(s string) bool {
+	return workspaceLanguageFormat.MatchString(s)
+}
+
+// NormalizeInstallInput returns the canonical form of one declared install
+// input, or an error explaining why it cannot name a file at the workspace
+// root. It is NormalizeRelativePath restricted to one path segment: a "/"
+// anywhere in the authored value is refused, "./go.work" included, because an
+// install input names a root file and never a path to one.
+func NormalizeInstallInput(name string) (string, error) {
+	trimmed := strings.TrimSpace(name)
+	if strings.Contains(trimmed, "/") {
+		return "", fmt.Errorf(`install input must be a file name at the workspace root, without "/"`)
+	}
+	return NormalizeRelativePath(trimmed)
 }
 
 // DeclaresWorkspaceAdapter reports whether the manifest contributes to project
@@ -116,8 +156,9 @@ func IsAlwaysExcludedDir(name string) bool {
 // returns nothing for a manifest without one, so wiring it into the strict path
 // cannot change any existing manifest's verdict.
 //
-// Diagnostics come out in a fixed order — markers, inputs, excludes, then the
-// cross-member rules — so two runs over one manifest are byte-identical.
+// Diagnostics come out in a fixed order — markers, inputs, excludes, install
+// inputs, language, then the cross-member rules — so two runs over one manifest
+// are byte-identical.
 func ValidateWorkspaceAdapter(m *Manifest) []diag.Diagnostic {
 	if m == nil || m.Workspace == nil {
 		return nil
@@ -148,6 +189,12 @@ func ValidateWorkspaceAdapter(m *Manifest) []diag.Diagnostic {
 				fmt.Sprintf("workspace.excludes[%d]", i),
 				"%q is excluded by core for every extension; declaring it here has no effect", exclude))
 		}
+	}
+
+	diags = append(diags, validateInstallInputs(adapter.InstallInputs)...)
+	if adapter.Language != "" && !IsWorkspaceLanguage(adapter.Language) {
+		diags = append(diags, diag.Errorf("invalid-value", "workspace.language",
+			"language %q must be lowercase letters, digits and hyphens, starting with a letter", adapter.Language))
 	}
 
 	// A marker is read by the probe, so its content must invalidate the
@@ -203,11 +250,33 @@ func validatePatternSet(field, noun string, patterns []string) ([]string, []diag
 	return normalized, diags
 }
 
+// validateInstallInputs checks the install-input list: each entry is a file
+// name at the workspace root (NormalizeInstallInput), declared once.
+func validateInstallInputs(names []string) []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	seen := make(map[string]bool, len(names))
+	for i, name := range names {
+		entry := fmt.Sprintf("workspace.installInputs[%d]", i)
+		clean, err := NormalizeInstallInput(name)
+		if err != nil {
+			diags = append(diags, diag.Errorf("invalid-workspace-path", entry,
+				"invalid install input %q: %v", name, err))
+			continue
+		}
+		if seen[clean] {
+			diags = append(diags, diag.Errorf("duplicate-value", entry,
+				"install input %q is declared more than once", name))
+			continue
+		}
+		seen[clean] = true
+	}
+	return diags
+}
+
 // NormalizeWorkspaceAdapter canonicalizes the adapter in place: every pattern
-// set is cleaned and sorted. Pattern sets are SETS — their order carries no
-// meaning — so sorting them is what makes the normalized probe declaration, and
-// therefore the workspace snapshot digest that includes it, independent of
-// authoring order.
+// set and the install-input set are cleaned and sorted. These are SETS — their
+// order carries no meaning — so sorting them makes the normalized declaration
+// independent of authoring order.
 func NormalizeWorkspaceAdapter(m *Manifest) {
 	if m == nil || m.Workspace == nil {
 		return
@@ -215,4 +284,25 @@ func NormalizeWorkspaceAdapter(m *Manifest) {
 	m.Workspace.Markers = normalizePatternList(m.Workspace.Markers)
 	m.Workspace.Inputs = normalizePatternList(m.Workspace.Inputs)
 	m.Workspace.Excludes = normalizePatternList(m.Workspace.Excludes)
+	m.Workspace.InstallInputs = normalizeInstallInputList(m.Workspace.InstallInputs)
+}
+
+// normalizeInstallInputList canonicalizes and sorts the install-input set,
+// dropping nothing: an entry that cannot be normalized is kept as authored so
+// validation reports it. The result is a new slice.
+func normalizeInstallInputList(names []string) []string {
+	if len(names) == 0 {
+		return names
+	}
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		normalized, err := NormalizeInstallInput(name)
+		if err != nil {
+			out = append(out, name)
+			continue
+		}
+		out = append(out, normalized)
+	}
+	sort.Strings(out)
+	return out
 }

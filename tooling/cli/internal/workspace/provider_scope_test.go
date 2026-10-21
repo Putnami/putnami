@@ -34,6 +34,41 @@ func TestNewProviderScope_NormalizesAndSorts(t *testing.T) {
 	}
 }
 
+// The install inputs are a SET of workspace-root file names and the language
+// is one id: the scope keeps what the protocol accepts, in one canonical order,
+// and drops the rest instead of recording a value the protocol rejects.
+func TestNewProviderScope_RecordsInstallInputsAndLanguage(t *testing.T) {
+	scope := mustScope(t, "@putnami/typescript", &extproto.WorkspaceAdapter{
+		Markers:       []string{"package.json"},
+		Inputs:        []string{"package.json"},
+		InstallInputs: []string{"bun.lockb", " bun.lock ", "bun.lock", "web/bun.lock", "*.lock", ""},
+		Language:      "typescript",
+	})
+	if !slices.Equal(scope.InstallInputs, []string{"bun.lock", "bun.lockb"}) {
+		t.Errorf("install inputs = %v, want the valid root names, sorted and deduped", scope.InstallInputs)
+	}
+	if scope.Language != "typescript" {
+		t.Errorf("language = %q, want typescript", scope.Language)
+	}
+
+	invalid := mustScope(t, "x", &extproto.WorkspaceAdapter{
+		Markers:  []string{"go.mod"},
+		Inputs:   []string{"go.mod"},
+		Language: "Go",
+	})
+	if invalid.Language != "" {
+		t.Errorf("language = %q, want an id the protocol rejects dropped", invalid.Language)
+	}
+
+	none := mustScope(t, "y", &extproto.WorkspaceAdapter{
+		Markers: []string{"go.mod"},
+		Inputs:  []string{"go.mod"},
+	})
+	if none.InstallInputs != nil || none.Language != "" {
+		t.Errorf("an adapter without the declarations recorded %v and %q", none.InstallInputs, none.Language)
+	}
+}
+
 func TestNewProviderScope_RejectsUnusableAdapters(t *testing.T) {
 	cases := map[string]*extproto.WorkspaceAdapter{
 		"no markers": {Inputs: []string{"package.json"}},

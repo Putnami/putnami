@@ -1549,7 +1549,7 @@
     "workspaceAdapter": {
       "type": "object",
       "additionalProperties": false,
-      "description": "How this extension participates in project discovery and workspace synchronization. Every member is a PATH pattern relative to a candidate directory: probe contracts key on paths and never assume a project root is also a module root.",
+      "description": "How this extension participates in project discovery and workspace synchronization. Every pattern member (markers, inputs, excludes) is a PATH pattern relative to a candidate directory: probe contracts key on paths and never assume a project root is also a module root. installInputs is the one member relative to the workspace root: it names literal files there.",
       "required": [
         "markers",
         "inputs"
@@ -1589,6 +1589,27 @@
         "dependencySources": {
           "type": "boolean",
           "description": "The probe attributes every edge it reports to the manifest family it came from (an import, or a declaration nothing imports). Core asks for the attribution only from an adapter that declares it: a provider built before the request member would reject a request carrying it."
+        },
+        "installInputs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[^/\\\\*?\\[\\]{}\\s]([^/\\\\*?\\[\\]{}]*[^/\\\\*?\\[\\]{}\\s])?$",
+            "not": {
+              "anyOf": [
+                { "enum": [".", ".."] },
+                { "pattern": "^[A-Za-z]:" }
+              ]
+            }
+          },
+          "description": "Files whose content change makes the installed tree stale, such as a lockfile. Each is a literal file name at the workspace root, unlike markers, inputs and excludes, which are candidate-directory-relative: no \"/\" or \"\\\", no glob, no drive prefix, not \".\" or \"..\", no surrounding whitespace, each name once. Core records the set in the workspace index."
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^([a-z][a-z0-9-]*)?$",
+          "description": "The lowercase id of the language whose projects this adapter claims, such as go, typescript or python. An empty value declares none, the same as an absent member. Core records it in the workspace index."
         }
       }
     },

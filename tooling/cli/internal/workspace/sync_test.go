@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -406,6 +407,238 @@ func TestSynchronize_FreshSnapshotRebuildsTheMergedView(t *testing.T) {
 	if probed.Merged["web"].SourceName != adopted.Merged["web"].SourceName ||
 		probed.Merged["web"].Type != adopted.Merged["web"].Type {
 		t.Fatalf("adopted view %+v differs from the probed view %+v", adopted.Merged["web"], probed.Merged["web"])
+	}
+}
+
+// A provider's install inputs and language are recorded with its answer and
+// survive the write and the next load unchanged. A provider whose adapter
+// declares neither records neither, so its index entry keeps the bytes it had
+// before the members existed.
+func TestSynchronize_RecordedProviderRoundTripsItsDeclarations(t *testing.T) {
+	ws := syncFixture(t)
+	ts := &countingProvider{name: "@putnami/typescript"}
+	goProvider := &countingProvider{name: "@putnami/go"}
+	bindings := []ProviderBinding{
+		{
+			Scope: mustScope(t, ts.name, &extproto.WorkspaceAdapter{
+				Markers:       []string{"package.json"},
+				Inputs:        []string{"package.json"},
+				InstallInputs: []string{"bun.lockb", "bun.lock"},
+				Language:      "typescript",
+			}),
+			Provider: ts,
+		},
+		{
+			Scope:    scopeFor(t, goProvider.name, []string{"go.mod"}, []string{"go.mod"}),
+			Provider: goProvider,
+		},
+	}
+
+	if outcome := syncOnce(t, ws, bindings); !outcome.Persisted {
+		t.Fatal("first sync did not persist the snapshot")
+	}
+	loaded, err := LoadSnapshot(ws.Root)
+	if err != nil || loaded == nil {
+		t.Fatalf("LoadSnapshot = %v, %v", loaded, err)
+	}
+	recorded, ok := recordedProvider(loaded, ts.name)
+	if !ok {
+		t.Fatalf("no recorded provider %s", ts.name)
+	}
+	if !slices.Equal(recorded.InstallInputs, []string{"bun.lock", "bun.lockb"}) || recorded.Language != "typescript" {
+		t.Fatalf("recorded declarations = %v %q, want [bun.lock bun.lockb] typescript",
+			recorded.InstallInputs, recorded.Language)
+	}
+	bare, ok := recordedProvider(loaded, goProvider.name)
+	if !ok {
+		t.Fatalf("no recorded provider %s", goProvider.name)
+	}
+	if bare.InstallInputs != nil || bare.Language != "" {
+		t.Fatalf("a provider without the declarations recorded %v %q", bare.InstallInputs, bare.Language)
+	}
+
+	raw, err := os.ReadFile(SnapshotPath(ws.Root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(string(raw), `"installInputs"`); got != 1 {
+		t.Errorf("index carries %d installInputs members, want one: only the declaring provider writes it", got)
+	}
+	if got := strings.Count(string(raw), `"language"`); got != 1 {
+		t.Errorf("index carries %d language members, want one: only the declaring provider writes it", got)
+	}
+}
+
+// A changed declaration is a reason to write the index even when every answer
+// and every recorded input still holds: otherwise a full sync over an unchanged
+// tree would keep a record of what the adapter USED to declare.
+func TestSynchronize_FullSyncRecordsAChangedDeclaration(t *testing.T) {
+	ws := syncFixture(t)
+	provider := &countingProvider{name: "@putnami/python"}
+	before := []ProviderBinding{{
+		Scope:    scopeFor(t, provider.name, []string{"pyproject.toml"}, []string{"pyproject.toml"}),
+		Provider: provider,
+	}}
+	if outcome := syncOnce(t, ws, before); !outcome.Persisted {
+		t.Fatal("first sync did not persist the snapshot")
+	}
+
+	after := []ProviderBinding{{
+		Scope: mustScope(t, provider.name, &extproto.WorkspaceAdapter{
+			Markers:       []string{"pyproject.toml"},
+			Inputs:        []string{"pyproject.toml"},
+			InstallInputs: []string{"uv.lock"},
+			Language:      "python",
+		}),
+		Provider: provider,
+	}}
+	outcome, err := Synchronize(SyncRequest{Workspace: ws, Providers: after, Reason: wsproto.ProbeReasonLoad, Full: true})
+	if err != nil {
+		t.Fatalf("Synchronize: %v", err)
+	}
+	if !outcome.Persisted {
+		t.Fatal("a full sync whose adapter declarations changed did not rewrite the index")
+	}
+	loaded, err := LoadSnapshot(ws.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorded, _ := recordedProvider(loaded, provider.name)
+	if !slices.Equal(recorded.InstallInputs, []string{"uv.lock"}) || recorded.Language != "python" {
+		t.Fatalf("recorded declarations = %v %q, want [uv.lock] python", recorded.InstallInputs, recorded.Language)
+	}
+
+	// The same declaration again is no reason to write.
+	again, err := Synchronize(SyncRequest{Workspace: ws, Providers: after, Reason: wsproto.ProbeReasonLoad, Full: true})
+	if err != nil {
+		t.Fatalf("Synchronize: %v", err)
+	}
+	if again.Persisted {
+		t.Fatal("a full sync over an unchanged tree and unchanged declarations rewrote the index")
+	}
+}
+
+// An index written before a provider record carried the declarations, or
+// rewritten by a CLI that does not know them, records none. The first ordinary
+// load re-asks each provider that declares them and records the declaration,
+// and the load after it starts no provider.
+func TestSynchronize_OrdinaryLoadRecordsTheDeclarationAnOlderIndexLacks(t *testing.T) {
+	ws := syncFixture(t)
+	provider := &countingProvider{name: "@putnami/typescript"}
+	bindings := []ProviderBinding{{
+		Scope: mustScope(t, provider.name, &extproto.WorkspaceAdapter{
+			Markers:       []string{"package.json"},
+			Inputs:        []string{"package.json"},
+			InstallInputs: []string{"bun.lockb", "bun.lock"},
+			Language:      "typescript",
+		}),
+		Provider:       provider,
+		Implementation: "runtime-1",
+	}}
+	syncOnce(t, ws, bindings)
+
+	// Rewrite the index the way an older CLI writes it: the same answers and
+	// inputs, without the two members.
+	older, err := LoadSnapshot(ws.Root)
+	if err != nil || older == nil {
+		t.Fatalf("LoadSnapshot = %v, %v", older, err)
+	}
+	for i := range older.Providers {
+		older.Providers[i].InstallInputs = nil
+		older.Providers[i].Language = ""
+	}
+	if err := WriteSnapshot(ws.Root, older, SnapshotWritePolicy{}); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(SnapshotPath(ws.Root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), `"installInputs"`) || strings.Contains(string(raw), `"language"`) {
+		t.Fatalf("the older index still records a declaration:\n%s", raw)
+	}
+
+	outcome := syncOnce(t, ws, bindings)
+	if outcome.Fresh || !outcome.Persisted {
+		t.Fatalf("ordinary load over an older index: fresh=%v persisted=%v, want a rewrite", outcome.Fresh, outcome.Persisted)
+	}
+	if !slices.Equal(outcome.Probed, []string{provider.name}) || provider.calls != 2 {
+		t.Fatalf("probed=%v calls=%d, want the declaring provider asked once more", outcome.Probed, provider.calls)
+	}
+	if !strings.Contains(outcome.Reason, "install inputs or language changed") {
+		t.Errorf("reason = %q, want it to name the changed declaration", outcome.Reason)
+	}
+	loaded, err := LoadSnapshot(ws.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorded, _ := recordedProvider(loaded, provider.name)
+	if !slices.Equal(recorded.InstallInputs, []string{"bun.lock", "bun.lockb"}) || recorded.Language != "typescript" {
+		t.Fatalf("recorded declarations = %v %q, want [bun.lock bun.lockb] typescript", recorded.InstallInputs, recorded.Language)
+	}
+
+	again := syncOnce(t, ws, bindings)
+	if !again.Fresh || provider.calls != 2 {
+		t.Fatalf("load after the refresh: fresh=%v calls=%d, want fresh with no provider started", again.Fresh, provider.calls)
+	}
+}
+
+// A workspace-local extension can edit only the workspace block of its
+// manifest. Its implementation identity covers its runtime, not that block,
+// so the ordinary load compares the declaration itself: a changed one is
+// re-asked and recorded, a removed one is dropped from the record, and an
+// unchanged one starts no provider.
+func TestSynchronize_OrdinaryLoadRecordsAChangedDeclaration(t *testing.T) {
+	ws := syncFixture(t)
+	provider := &countingProvider{name: "@acme/local"}
+	declare := func(adapter *extproto.WorkspaceAdapter) []ProviderBinding {
+		adapter.Markers = []string{"package.json"}
+		adapter.Inputs = []string{"package.json"}
+		return []ProviderBinding{{
+			Scope:          mustScope(t, provider.name, adapter),
+			Provider:       provider,
+			Implementation: "runtime-unchanged",
+		}}
+	}
+	recordedDeclaration := func() SnapshotProvider {
+		t.Helper()
+		loaded, err := LoadSnapshot(ws.Root)
+		if err != nil || loaded == nil {
+			t.Fatalf("LoadSnapshot = %v, %v", loaded, err)
+		}
+		recorded, ok := recordedProvider(loaded, provider.name)
+		if !ok {
+			t.Fatalf("no recorded provider %s", provider.name)
+		}
+		return recorded
+	}
+
+	first := declare(&extproto.WorkspaceAdapter{InstallInputs: []string{"bun.lock"}, Language: "typescript"})
+	if outcome := syncOnce(t, ws, first); !outcome.Persisted || provider.calls != 1 {
+		t.Fatalf("first sync: persisted=%v calls=%d", outcome.Persisted, provider.calls)
+	}
+
+	changed := declare(&extproto.WorkspaceAdapter{InstallInputs: []string{"bun.lockb", "bun.lock"}, Language: "typescript"})
+	outcome := syncOnce(t, ws, changed)
+	if outcome.Fresh || !outcome.Persisted || provider.calls != 2 {
+		t.Fatalf("changed declaration: fresh=%v persisted=%v calls=%d, want one probe and a rewrite",
+			outcome.Fresh, outcome.Persisted, provider.calls)
+	}
+	if recorded := recordedDeclaration(); !slices.Equal(recorded.InstallInputs, []string{"bun.lock", "bun.lockb"}) ||
+		recorded.Language != "typescript" {
+		t.Fatalf("recorded declarations = %v %q, want [bun.lock bun.lockb] typescript", recorded.InstallInputs, recorded.Language)
+	}
+
+	if outcome := syncOnce(t, ws, changed); !outcome.Fresh || provider.calls != 2 {
+		t.Fatalf("unchanged declaration: fresh=%v calls=%d, want fresh with no provider started", outcome.Fresh, provider.calls)
+	}
+
+	removed := declare(&extproto.WorkspaceAdapter{})
+	if outcome := syncOnce(t, ws, removed); !outcome.Persisted || provider.calls != 3 {
+		t.Fatalf("removed declaration: persisted=%v calls=%d, want one probe and a rewrite", outcome.Persisted, provider.calls)
+	}
+	if recorded := recordedDeclaration(); recorded.InstallInputs != nil || recorded.Language != "" {
+		t.Fatalf("a removed declaration is still recorded: %v %q", recorded.InstallInputs, recorded.Language)
 	}
 }
 

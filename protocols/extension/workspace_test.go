@@ -2,9 +2,11 @@ package extension
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 
+	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
 )
 
@@ -40,6 +42,17 @@ func TestValidateWorkspaceAdapter_AcceptedShapes(t *testing.T) {
 			Excludes: []string{"dist", "node_modules"},
 			SyncTask: "workspace-sync",
 		}, "workspace-sync"),
+		"install inputs and a language": adapterManifest(WorkspaceAdapter{
+			Markers:       []string{"package.json"},
+			Inputs:        []string{"package.json"},
+			InstallInputs: []string{"bun.lock", "bun.lockb", ".tool-versions"},
+			Language:      "typescript",
+		}),
+		"a language with digits and hyphens": adapterManifest(WorkspaceAdapter{
+			Markers:  []string{"Cargo.toml"},
+			Inputs:   []string{"Cargo.toml"},
+			Language: "c-sharp2",
+		}),
 	}
 	for name, m := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -167,6 +180,64 @@ func TestValidateWorkspaceAdapter_Rules(t *testing.T) {
 	}
 }
 
+// TestValidateWorkspaceAdapter_InstallInputsAndLanguage pins the two rules of
+// the install inputs and the language: an install input is a file name at the
+// workspace root, declared once, and a language is a lowercase id.
+func TestValidateWorkspaceAdapter_InstallInputsAndLanguage(t *testing.T) {
+	for name, value := range map[string]string{
+		"nested":            "web/bun.lock",
+		"dot-slash":         "./bun.lock",
+		"star glob":         "*.lock",
+		"question glob":     "uv.loc?",
+		"class glob":        "bun.lock[b]",
+		"template variable": "{workspaceRoot}.lock",
+		"empty":             "",
+		"blank":             "   ",
+		"parent":            "..",
+		"root":              ".",
+		"backslash":         `web\bun.lock`,
+		"drive":             "C:bun.lock",
+	} {
+		t.Run("install input "+name, func(t *testing.T) {
+			diags := ValidateWorkspaceAdapter(adapterManifest(WorkspaceAdapter{
+				Markers:       []string{"package.json"},
+				Inputs:        []string{"package.json"},
+				InstallInputs: []string{value},
+			}))
+			if !diag.HasErrors(diags) {
+				t.Fatalf("install input %q accepted: %v", value, diags)
+			}
+			assertDiag(t, diags, "invalid-workspace-path", "workspace.installInputs[0]")
+		})
+	}
+
+	t.Run("install input declared twice", func(t *testing.T) {
+		diags := ValidateWorkspaceAdapter(adapterManifest(WorkspaceAdapter{
+			Markers:       []string{"pyproject.toml"},
+			Inputs:        []string{"pyproject.toml"},
+			InstallInputs: []string{"uv.lock", " uv.lock "},
+		}))
+		if !diag.HasErrors(diags) {
+			t.Fatalf("a duplicate install input was accepted: %v", diags)
+		}
+		assertDiag(t, diags, "duplicate-value", "workspace.installInputs[1]")
+	})
+
+	for _, language := range []string{"Go", "1go", "go_lang", "-go", "type script"} {
+		t.Run("language "+language, func(t *testing.T) {
+			diags := ValidateWorkspaceAdapter(adapterManifest(WorkspaceAdapter{
+				Markers:  []string{"go.mod"},
+				Inputs:   []string{"go.mod"},
+				Language: language,
+			}))
+			if !diag.HasErrors(diags) {
+				t.Fatalf("language %q accepted: %v", language, diags)
+			}
+			assertDiag(t, diags, "invalid-value", "workspace.language")
+		})
+	}
+}
+
 // TestValidateWorkspaceAdapter_CoreOwnedExclusions pins that restating a
 // core-owned exclusion is reported as having no effect — and reported as a
 // WARNING, because the adapter is not wrong, only redundant.
@@ -260,13 +331,22 @@ func TestWorkspaceAdapterAccessors(t *testing.T) {
 func TestNormalizeWorkspaceAdapter_Canonical(t *testing.T) {
 	build := func() *Manifest {
 		return adapterManifest(WorkspaceAdapter{
-			Markers:  []string{"./package.json"},
-			Inputs:   []string{"tsconfig*.json", "./package.json", "bun.lock"},
-			Excludes: []string{"node_modules", "./dist/"},
+			Markers:       []string{"./package.json"},
+			Inputs:        []string{"tsconfig*.json", "./package.json", "bun.lock"},
+			Excludes:      []string{"node_modules", "./dist/"},
+			InstallInputs: []string{"bun.lockb", " bun.lock "},
+			Language:      "typescript",
 		})
 	}
 	m := build()
 	NormalizeWorkspaceAdapter(m)
+
+	if got, want := m.Workspace.InstallInputs, []string{"bun.lock", "bun.lockb"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("install inputs = %v, want %v", got, want)
+	}
+	if m.Workspace.Language != "typescript" {
+		t.Errorf("language = %q, want it unchanged", m.Workspace.Language)
+	}
 
 	if got, want := m.Workspace.Markers, []string{"package.json"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("markers = %v, want %v", got, want)
@@ -292,6 +372,59 @@ func TestNormalizeWorkspaceAdapter_Canonical(t *testing.T) {
 		if string(got) != string(canonical) {
 			t.Fatalf("iteration %d: serialization is not canonical\n want %s\n  got %s", i, canonical, got)
 		}
+	}
+}
+
+// TestNormalizeWorkspaceAdapter_KeepsAnInvalidInstallInput pins that
+// normalization never rewrites an install input it cannot read: validation
+// must still see the authored value.
+func TestNormalizeWorkspaceAdapter_KeepsAnInvalidInstallInput(t *testing.T) {
+	m := adapterManifest(WorkspaceAdapter{
+		Markers:       []string{"package.json"},
+		Inputs:        []string{"package.json"},
+		InstallInputs: []string{"web/bun.lock", "bun.lock"},
+	})
+	authored := m.Workspace.InstallInputs
+	NormalizeWorkspaceAdapter(m)
+	if got, want := m.Workspace.InstallInputs, []string{"bun.lock", "web/bun.lock"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("install inputs = %v, want %v", got, want)
+	}
+	if !reflect.DeepEqual(authored, []string{"web/bun.lock", "bun.lock"}) {
+		t.Errorf("normalization wrote through the authored slice: %v", authored)
+	}
+	assertDiag(t, ValidateWorkspaceAdapter(m), "invalid-workspace-path", "workspace.installInputs[1]")
+}
+
+// TestWorkspaceAdapterDeclarationsNeedNoContractRung pins that the install
+// inputs and the language are additive: they raise no load floor, so the
+// packager stamps such a manifest at the base contract, and the load path
+// reads it there. A reader without the members drops a declaration it has no
+// use for and plans nothing differently.
+func TestWorkspaceAdapterDeclarationsNeedNoContractRung(t *testing.T) {
+	data := []byte(fmt.Sprintf(`{
+		"name": "@test/go",
+		"cliContract": %d,
+		"workspace": {
+			"markers": ["go.mod"],
+			"inputs": ["go.mod", "go.work"],
+			"installInputs": ["go.work"],
+			"language": "go"
+		},
+		"commands": {"build": {"run": [{"id": "build", "task": "build"}]}},
+		"tasks": {"build": {"kind": "command", "command": "echo"}}
+	}`, protocolcli.CurrentContract))
+	m, err := NegotiateManifest("go.json", data)
+	if err != nil {
+		t.Fatalf("a base-contract manifest with the declarations did not load: %v", err)
+	}
+	if got := RequiredLoadContract(m); got != protocolcli.CurrentContract {
+		t.Fatalf("the declarations raised the load floor to %d, want %d", got, protocolcli.CurrentContract)
+	}
+	if got := RequiredCLIContract(m); got != protocolcli.CurrentContract {
+		t.Fatalf("the declarations raised the stamp to %d, want %d", got, protocolcli.CurrentContract)
+	}
+	if !reflect.DeepEqual(m.Workspace.InstallInputs, []string{"go.work"}) || m.Workspace.Language != "go" {
+		t.Fatalf("loaded adapter = %+v", m.Workspace)
 	}
 }
 

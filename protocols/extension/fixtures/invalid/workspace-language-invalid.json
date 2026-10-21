@@ -1,0 +1,15 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/workspace-language-invalid",
+  "workspace": {
+    "markers": ["package.json"],
+    "inputs": ["package.json"],
+    "language": "TypeScript"
+  },
+  "commands": {
+    "build": { "run": [{ "id": "build", "task": "build-exec" }] }
+  },
+  "tasks": {
+    "build-exec": { "kind": "command", "command": "echo" }
+  }
+}

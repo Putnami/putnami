@@ -39,7 +39,9 @@
     "inputs": ["go.mod", "**/*.go", "go.work"],
     "excludes": ["testdata", "vendor"],
     "syncTask": "workspace-sync-exec",
-    "dependencySources": true
+    "dependencySources": true,
+    "installInputs": ["go.work"],
+    "language": "go"
   },
   "commands": {
     "build": {

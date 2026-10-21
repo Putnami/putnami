@@ -1,0 +1,15 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/workspace-install-input-nested",
+  "workspace": {
+    "markers": ["package.json"],
+    "inputs": ["package.json"],
+    "installInputs": ["web/bun.lock"]
+  },
+  "commands": {
+    "build": { "run": [{ "id": "build", "task": "build-exec" }] }
+  },
+  "tasks": {
+    "build-exec": { "kind": "command", "command": "echo" }
+  }
+}

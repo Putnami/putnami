@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -449,6 +450,8 @@ func synchronize(req SyncRequest) (*SyncOutcome, error) {
 			Result:         result,
 			Inputs:         providerInputs(root, candidates, binding.Scope.Inputs),
 			Implementation: binding.Implementation,
+			InstallInputs:  slices.Clone(binding.Scope.InstallInputs),
+			Language:       binding.Scope.Language,
 		})
 	}
 	// The orphans travel VERBATIM — result, digest and recorded inputs. The
@@ -503,8 +506,9 @@ func finishSync(root string, req SyncRequest, outcome *SyncOutcome, existing, re
 // snapshotStillHolds reports whether the recorded snapshot already describes
 // what the rebuild resolved. Every half is required: the identity and probe
 // digests answer "is this the same resolution", the provider digests answer "is
-// it the same provider answer", and re-hashing the recorded inputs answers
-// "does that resolution still match the tree".
+// it the same provider answer", the recorded declarations answer "does it
+// record what each adapter declares", and re-hashing the recorded inputs
+// answers "does that resolution still match the tree".
 func snapshotStillHolds(root string, existing, rebuilt *Snapshot) bool {
 	if existing == nil || rebuilt == nil {
 		return false
@@ -518,7 +522,9 @@ func snapshotStillHolds(root string, existing, rebuilt *Snapshot) bool {
 	for i := range existing.Providers {
 		if existing.Providers[i].Extension != rebuilt.Providers[i].Extension ||
 			existing.Providers[i].Digest != rebuilt.Providers[i].Digest ||
-			existing.Providers[i].Implementation != rebuilt.Providers[i].Implementation {
+			existing.Providers[i].Implementation != rebuilt.Providers[i].Implementation ||
+			!slices.Equal(existing.Providers[i].InstallInputs, rebuilt.Providers[i].InstallInputs) ||
+			existing.Providers[i].Language != rebuilt.Providers[i].Language {
 			return false
 		}
 	}
@@ -568,6 +574,14 @@ func planProbe(root string, existing *Snapshot, bindings []ProviderBinding, full
 		if implementationMoved(recorded.Implementation, binding.Implementation) {
 			plan.stale[binding.Scope.Extension] = true
 			plan.reason = fmt.Sprintf("provider %s implementation changed", binding.Scope.Extension)
+		}
+		// A record also carries what the adapter declares. The implementation
+		// identity does not cover the manifest's workspace block, and an index
+		// written before these members existed records none, so the declaration
+		// is compared here; otherwise the record keeps an old declaration.
+		if declarationMoved(recorded, binding.Scope) {
+			plan.stale[binding.Scope.Extension] = true
+			plan.reason = fmt.Sprintf("provider %s install inputs or language changed", binding.Scope.Extension)
 		}
 	}
 
@@ -668,6 +682,21 @@ func recordedProvider(snapshot *Snapshot, extension string) (SnapshotProvider, b
 // start on every command.
 func implementationMoved(recorded, bound string) bool {
 	return bound != "" && recorded != bound
+}
+
+// declarationMoved reports whether a recorded provider no longer records the
+// install inputs and the language its adapter declares now. The install inputs
+// compare as sets, and a record without them equals a declaration of none.
+func declarationMoved(recorded SnapshotProvider, scope ProviderScope) bool {
+	return recorded.Language != scope.Language ||
+		!slices.Equal(sortedNameSet(recorded.InstallInputs), sortedNameSet(scope.InstallInputs))
+}
+
+// sortedNameSet returns names sorted and without duplicates, as a new slice.
+func sortedNameSet(names []string) []string {
+	set := slices.Clone(names)
+	slices.Sort(set)
+	return slices.Compact(set)
 }
 
 func recordedResult(snapshot *Snapshot, extension string) (wsproto.ProbeResult, bool) {

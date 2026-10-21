@@ -413,6 +413,10 @@ var lifecycleInvalidFixtureCodes = map[string][]string{
 	"workspace-marker-not-input.json": {"marker-not-input"},
 	// The sync task must exist, or workspace synchronization is unrunnable.
 	"workspace-unresolved-sync-task.json": {"unresolved-sync-task"},
+	// An install input names a file at the workspace root, never a path.
+	"workspace-install-input-nested.json": {"invalid-workspace-path"},
+	// A language id is lowercase letters, digits and hyphens.
+	"workspace-language-invalid.json": {"invalid-value"},
 	// One step-gating vocabulary, closed.
 	"step-run-on-invalid.json": {"invalid-enum"},
 	// A finalizer produces no result a dependent can consume.
