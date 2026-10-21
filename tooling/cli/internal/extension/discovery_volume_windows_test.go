@@ -13,8 +13,7 @@ import (
 // TestDiscoverExtensionsDetailed_RefusesAVolumeReferenceNamingIt pins how
 // discovery treats a Windows reference that names a volume: an absolute path
 // that holds a manifest loads, and any other one is refused with a skip that
-// names the reference, instead of being joined under the workspace or
-// node_modules.
+// names the reference, instead of being joined under the workspace.
 func TestDiscoverExtensionsDetailed_RefusesAVolumeReferenceNamingIt(t *testing.T) {
 	ws := t.TempDir()
 	present := filepath.Join(t.TempDir(), "present")

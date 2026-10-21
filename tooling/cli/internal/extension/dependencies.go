@@ -27,8 +27,7 @@ import (
 //
 // The CLI follows the edges of a member loaded from the artifact store or from
 // a path the workspace declares, and of a declared name the lock pins wherever
-// it loaded from. It does not follow the edges of any other extension loaded
-// from node_modules: the package manager installed it and owns them.
+// it loaded from. It does not follow the edges of any other extension.
 
 // portableChannel matches the channel alphabet every ecosystem accepts
 // (extproto.PortableChannelPattern).
@@ -304,8 +303,7 @@ func readManifestContract(path string) int {
 }
 
 // dependencyDiscovery is discovery's dependency step: it runs after the
-// declared extensions loaded and before the root package.json development
-// dependencies, which skip every name it records in seen.
+// declared extensions loaded.
 type dependencyDiscovery struct {
 	workspaceRoot string
 	cfg           *wsproto.Config
@@ -330,7 +328,7 @@ type dependencyDiscovery struct {
 // PinnedOver, or the extension of a global-configuration key, with one warning
 // that names the global configuration. A dependency that does not load is
 // returned in skipped, naming its dependent.
-func (d *dependencyDiscovery) run(extensions []*ExtensionDescription, seen map[string]bool) ([]*ExtensionDescription, []GraphDependency, []SkippedExtension, []RemovedCapability) {
+func (d *dependencyDiscovery) run(extensions []*ExtensionDescription) ([]*ExtensionDescription, []GraphDependency, []SkippedExtension, []RemovedCapability) {
 	candidates := d.roots(extensions, nil)
 	if !namesDependencies(candidates) {
 		return extensions, nil, nil, nil
@@ -372,7 +370,6 @@ func (d *dependencyDiscovery) run(extensions []*ExtensionDescription, seen map[s
 			}
 			extensions = slices.DeleteFunc(extensions, func(e *ExtensionDescription) bool { return e == existing })
 		}
-		seen[name] = true
 		if fromGlobalKey {
 			warnOnce("dependency-global-key:"+d.workspaceRoot+":"+name,
 				"the global configuration declares an extension the workspace graph requires as a dependency; the global key is ignored",
@@ -593,7 +590,7 @@ func WalkWorkspaceGraph(workspaceRoot string, cfg *wsproto.Config, lf *lockfile.
 		if r.at.dir != "" {
 			r.manifest = readRawManifest(r.at.dir, key)
 		}
-		dependent = dependent || (r.at.followed && len(r.manifest.deps) > 0)
+		dependent = dependent || len(r.manifest.deps) > 0
 		roots = append(roots, r)
 	}
 	var globalOnly map[string]bool
@@ -614,10 +611,7 @@ func WalkWorkspaceGraph(workspaceRoot string, cfg *wsproto.Config, lf *lockfile.
 			walk.Declared[name] = true
 		}
 		walk.Declared[r.key] = true
-		if !r.at.followed || !r.manifest.read || len(r.manifest.deps) == 0 {
-			continue
-		}
-		if r.at.floor && r.manifest.floorErr() != nil {
+		if !r.manifest.read || len(r.manifest.deps) == 0 || r.manifest.floorErr() != nil {
 			continue
 		}
 		members = append(members, graphMember{name: name, deps: r.manifest.deps})
@@ -684,43 +678,32 @@ type rootLocation struct {
 	// byPath reports a key that loaded as a path, so it declares the name its
 	// manifest has.
 	byPath bool
-	// followed reports whether the CLI follows the root's edges, and floor
-	// whether the dependency rung applies to its manifest.
-	followed, floor bool
 }
 
 // locateRoot returns where discovery loads the declared key from, in its
-// probe order: an absolute path, a workspace path, node_modules, then the
-// install layout. Its edges are followed except from node_modules, where the
-// lock must pin the key. The rung applies except from node_modules.
+// probe order: an absolute path, a workspace path, then the install layout.
 func locateRoot(workspaceRoot, key string, lf *lockfile.LockFile, hosted bool) rootLocation {
 	holds := func(dir string) bool {
 		_, err := os.Stat(filepath.Join(dir, ManifestFilename))
 		return err == nil
 	}
 	if filepath.IsAbs(key) && holds(key) {
-		return rootLocation{dir: key, byPath: true, followed: true, floor: true}
+		return rootLocation{dir: key, byPath: true}
 	}
 	if filepath.VolumeName(key) != "" {
 		return rootLocation{}
 	}
 	if rel, ok := normalizeWorkspaceExtensionPath(key); ok && (!hosted || declaredByPath(key)) {
 		if dir := filepath.Join(workspaceRoot, rel); holds(dir) {
-			return rootLocation{dir: dir, byPath: true, followed: true, floor: true}
+			return rootLocation{dir: dir, byPath: true}
 		}
 	}
 	var entry lockfile.LockEntry
-	pinned := false
 	if lf != nil {
-		entry, pinned = lf.GetExtension(key)
-	}
-	if !hosted {
-		if dir := installedPackageDir(workspaceRoot, key); holds(dir) {
-			return rootLocation{dir: dir, followed: pinned}
-		}
+		entry, _ = lf.GetExtension(key)
 	}
 	if dir := InstalledDependencyDir(workspaceRoot, key, entry.Version); dir != "" {
-		return rootLocation{dir: dir, followed: true, floor: true}
+		return rootLocation{dir: dir}
 	}
 	return rootLocation{}
 }
@@ -817,8 +800,6 @@ type DeclaredRoot struct {
 	// ByPath reports a key that loads as a path: it declares Name too, and its
 	// version is not checked against a constraint.
 	ByPath bool
-	// Followed reports whether the CLI follows its edges (ADR 0066 point 3).
-	Followed bool
 }
 
 // ReadDeclaredRoot reads the declared key where discovery loads it from, and
@@ -835,10 +816,7 @@ func ReadDeclaredRoot(workspaceRoot, key string, lf *lockfile.LockFile) (Declare
 	root := DeclaredRoot{
 		GraphManifest: GraphManifest{Name: m.name, Dependencies: m.edges()},
 		ByPath:        at.byPath,
-		Followed:      at.followed,
 	}
-	if at.floor {
-		root.FloorErr = m.floorErr()
-	}
+	root.FloorErr = m.floorErr()
 	return root, true
 }

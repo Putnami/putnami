@@ -10,7 +10,6 @@
   "nonGoals": [
     "Writing a dependency into putnami.workspace.json: the workspace keeps the roots its user wrote",
     "A new lock field or lock format version: the lock binds each manifest by hash, and the manifests carry the edges",
-    "Following the dependencies of an extension that loaded from node_modules",
     "Opting into a dependency's agent content because it installed",
     "Dependencies in the user scope, which has no workspace file to name its roots",
     "Counting dependencies as workspace-wide consumers in impact analysis"
@@ -23,10 +22,6 @@
     {
       "id": "what-satisfies-a-dependency",
       "text": "Only putnami.workspace.json satisfies a dependency, by name or by a path whose manifest has that name. A global-configuration key that names a graph member is ignored with one warning. An undeclared workspace project of a dependency's name is set aside, whether or not the lock pins the dependency, and never loads in its place."
-    },
-    {
-      "id": "node-modules-edges",
-      "text": "The edges of an extension loaded from node_modules are not followed, unless the workspace declares its name and the lock pins it."
     },
     {
       "id": "an-explicit-channel-flows-down",
@@ -46,7 +41,7 @@
     },
     {
       "id": "the-graph-loads",
-      "text": "Discovery loads every locked dependency of a loaded extension from the artifact store, after the declared extensions and before the root package.json development dependencies, which skip a dependency name. Context generation, option ownership and the missing-extension check include dependencies. A dependency that does not load is reported with the extension that requires it, and removing its only dependent stops loading it."
+      "text": "Discovery loads every locked dependency of a loaded extension from the artifact store, after the declared extensions. An extension that only the root package.json development dependencies declare does not load, installed in node_modules or not. Context generation, option ownership and the missing-extension check include dependencies. A dependency that does not load is reported with the extension that requires it, and removing its only dependent stops loading it."
     },
     {
       "id": "restore-follows-the-lock",
@@ -82,7 +77,7 @@
     },
     {
       "id": "an-older-cli-refuses-a-dependent",
-      "text": "A manifest whose extensionDependencies names a registry dependency requires CLI contract 8, ExtensionDependenciesContract. A CLI below rung 8 refuses such a manifest loaded from the artifact store or a declared path as requiring a newer putnami. A manifest loaded from node_modules, such as the published @putnami/web, keeps loading unstamped."
+      "text": "A manifest whose extensionDependencies names a registry dependency requires CLI contract 8, ExtensionDependenciesContract. A CLI below rung 8 refuses such a manifest loaded from the artifact store or a declared path as requiring a newer putnami."
     },
     {
       "id": "the-packager-stamps-a-dependent",

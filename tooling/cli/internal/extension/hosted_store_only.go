@@ -205,11 +205,11 @@ func pathExtensionRefusal(workspaceRoot string, ext *ExtensionDescription) error
 // inInstalledPackages reports whether rel, a resolved path relative to the
 // resolved workspace root, lies inside a directory that a package manager
 // installs into: a component of rel named installedPackagesDirName, in any
-// letter case, or a directory that is the same file as the one discovery's
-// package-manager sources load from (installedPackageDir), which a link
-// inside the workspace can make the same.
+// letter case, or a directory that is the same file as the installed packages
+// directory of the workspace root, which a link inside the workspace can make
+// the same.
 func inInstalledPackages(root, rel string) bool {
-	packages, packagesErr := os.Stat(installedPackageDir(root, ""))
+	packages, packagesErr := os.Stat(filepath.Join(root, installedPackagesDirName))
 	dir := root
 	for _, component := range strings.Split(rel, string(os.PathSeparator)) {
 		if strings.EqualFold(component, installedPackagesDirName) {

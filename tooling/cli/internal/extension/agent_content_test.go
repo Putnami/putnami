@@ -255,180 +255,39 @@ func TestFindDeclaredExtension_ReportsALocalEntryThatCannotLoad(t *testing.T) {
 	}
 }
 
-// declarePackageExtension writes a root package.json declaring name in
-// devDependencies, the way a workspace declares an npm extension.
-func declarePackageExtension(t *testing.T, wsRoot, name, version string) {
-	t.Helper()
-	data := fmt.Sprintf(`{"name":"ws","private":true,"devDependencies":{%q:%q}}`, name, version)
+// A root package.json development dependency declares no extension: its agent
+// content is neither located nor listed, installed in node_modules or not, and
+// a registry entry of the same name reads only its lock pin.
+func TestLocateAgentContent_IgnoresAPackageInNodeModules(t *testing.T) {
+	wsRoot := t.TempDir()
+	data := fmt.Sprintf(`{"name":"ws","private":true,"devDependencies":{%q:"1.2.0"}}`, contentExtension)
 	if err := os.WriteFile(filepath.Join(wsRoot, "package.json"), []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
-}
-
-// installPackageExtension writes what a package manager leaves in
-// node_modules for an npm extension: its package.json and its manifest. It
-// returns the package directory.
-func installPackageExtension(t *testing.T, wsRoot, packageName, packageVersion, manifest string) string {
-	t.Helper()
-	dir := filepath.Join(wsRoot, "node_modules", filepath.FromSlash(packageName))
-	writeExtensionManifest(t, dir, manifest)
-	pkg := fmt.Sprintf(`{"name":%q,"version":%q}`, packageName, packageVersion)
+	dir := nodeModulesDir(wsRoot, contentExtension)
+	writeExtensionManifest(t, dir, packagedContentManifest("1.2.0"))
+	pkg := fmt.Sprintf(`{"name":%q,"version":"1.2.0"}`, contentExtension)
 	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(pkg), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return dir
-}
 
-// An npm extension's content is read from the directory discovery loads its
-// commands and tools from, and bound to the package the package manager
-// installed there.
-func TestLocateAgentContent_ReadsAPackageFromWhereItsCommandsLoad(t *testing.T) {
-	wsRoot := t.TempDir()
-	cfg := contentConfig()
-	declarePackageExtension(t, wsRoot, contentExtension, "^1.2.0")
-	manifest := packagedContentManifest("1.2.0")
-	dir := installPackageExtension(t, wsRoot, contentExtension, "1.2.0", manifest)
+	if _, err := FindDeclaredExtension(wsRoot, contentConfig(), contentExtension); !IsUndeclaredExtension(err) {
+		t.Fatalf("find = %v, want an undeclared extension", err)
+	}
+	if source, err := LocateAgentContent(wsRoot, contentConfig(), contentExtension); err == nil || !IsUndeclaredExtension(err) {
+		t.Fatalf("locate = %+v, %v; want an undeclared extension", source, err)
+	}
+	if names := DeclaredExtensionNames(wsRoot, contentConfig()); len(names) != 0 {
+		t.Fatalf("declared names = %v, want none", names)
+	}
 
+	installContentExtension(t, wsRoot, "1.2.0", packagedContentManifest("1.2.0"))
+	cfg := contentConfig(contentExtension)
 	declared, err := FindDeclaredExtension(wsRoot, cfg, contentExtension)
-	if err != nil {
-		t.Fatalf("find: %v", err)
+	if err != nil || declared.Local || declared.Dir != "" {
+		t.Fatalf("with a registry entry, declared = %+v, err %v; want the registry entry alone", declared, err)
 	}
-	if !declared.Package || declared.Local || declared.Dir != dir || !PackageExtensionInstalled(declared) {
-		t.Fatalf("declared = %+v", declared)
-	}
-	source, err := LocateAgentContent(wsRoot, cfg, contentExtension)
-	if err != nil {
-		t.Fatalf("locate: %v", err)
-	}
-	if !source.Package || source.Local || source.Version != "1.2.0" || source.Root != dir {
-		t.Fatalf("source = %+v", source)
-	}
-	if source.ManifestHash != lockfile.HashBytes([]byte(manifest)) || source.Contribution.ManifestSHA256 != contentDigest {
-		t.Fatalf("source %+v is not bound to the installed manifest", source)
-	}
-
-	discovered, err := DiscoverExtensions(wsRoot, cfg, nil)
-	if err != nil {
-		t.Fatalf("discover: %v", err)
-	}
-	var commandsRoot string
-	for _, ext := range discovered {
-		if ext.Name == contentExtension {
-			commandsRoot = ext.Path
-		}
-	}
-	if commandsRoot != source.Root {
-		t.Fatalf("discovery loads %s from %q, but its content is read from %q", contentExtension, commandsRoot, source.Root)
-	}
-	if names := DeclaredExtensionNames(wsRoot, cfg); len(names) != 1 || names[0] != contentExtension {
-		t.Fatalf("declared names = %v", names)
-	}
-
-	// A local entry of the same name shadows the devDependency in discovery,
-	// so it is the one source.
-	writeExtensionManifest(t, filepath.Join(wsRoot, "tools", "contributor"), fmt.Sprintf(
-		`{"name":%q,"cliContract":%d,"agentContent":{"path":"agent-content","source":"agent-src"}}`,
-		contentExtension, protocolcli.AgentContentContract))
-	if declared, err := FindDeclaredExtension(wsRoot, contentConfig("/tools/contributor"), contentExtension); err != nil || !declared.Local {
-		t.Fatalf("declared = %+v, err %v; want the local entry", declared, err)
-	}
-}
-
-func TestLocateAgentContent_RefusesAPackageThatDoesNotBindItsContent(t *testing.T) {
-	sourceOnly := fmt.Sprintf(`{"name":%q,"version":"1.2.0","cliContract":%d,"agentContent":{"path":"agent-content","source":"agent-src"}}`,
-		contentExtension, protocolcli.AgentContentContract)
-	for name, tc := range map[string]struct {
-		setup func(t *testing.T, wsRoot string)
-		cfg   *wsproto.Config
-		want  string
-		// next is the command the error suggests; empty when it suggests none.
-		next string
-	}{
-		"a package the package manager has not installed": {
-			setup: func(t *testing.T, wsRoot string) {
-				declarePackageExtension(t, wsRoot, contentExtension, "1.2.0")
-			},
-			cfg:  contentConfig(),
-			want: "has not installed it",
-			next: "putnami install",
-		},
-		"another package installed under the name": {
-			setup: func(t *testing.T, wsRoot string) {
-				declarePackageExtension(t, wsRoot, contentExtension, "npm:@acme/other@1.2.0")
-				dir := installPackageExtension(t, wsRoot, contentExtension, "1.2.0", packagedContentManifest("1.2.0"))
-				if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"@acme/other","version":"1.2.0"}`), 0o644); err != nil {
-					t.Fatal(err)
-				}
-			},
-			cfg:  contentConfig(),
-			want: `holds package "@acme/other"`,
-		},
-		"a manifest version other than the package version": {
-			setup: func(t *testing.T, wsRoot string) {
-				declarePackageExtension(t, wsRoot, contentExtension, "1.3.0")
-				installPackageExtension(t, wsRoot, contentExtension, "1.3.0", packagedContentManifest("1.2.0"))
-			},
-			cfg:  contentConfig(),
-			want: "carries its package version",
-		},
-		"a package that ships only its source": {
-			setup: func(t *testing.T, wsRoot string) {
-				declarePackageExtension(t, wsRoot, contentExtension, "1.2.0")
-				installPackageExtension(t, wsRoot, contentExtension, "1.2.0", sourceOnly)
-			},
-			cfg:  contentConfig(),
-			want: "declare its directory",
-		},
-		"a package that ships another extension's manifest": {
-			setup: func(t *testing.T, wsRoot string) {
-				declarePackageExtension(t, wsRoot, contentExtension, "1.2.0")
-				installPackageExtension(t, wsRoot, contentExtension, "1.2.0",
-					strings.Replace(packagedContentManifest("1.2.0"), contentExtension, "@acme/other", 1))
-			},
-			cfg:  contentConfig(),
-			want: "published under the extension's own name",
-		},
-		"a registry entry the package manager also declares": {
-			setup: func(t *testing.T, wsRoot string) {
-				installContentExtension(t, wsRoot, "1.2.0", packagedContentManifest("1.2.0"))
-				declarePackageExtension(t, wsRoot, contentExtension, "1.2.0")
-			},
-			cfg:  contentConfig(contentExtension),
-			want: "declared twice",
-		},
-		"a registry entry node_modules also provides": {
-			setup: func(t *testing.T, wsRoot string) {
-				installContentExtension(t, wsRoot, "1.2.0", packagedContentManifest("1.2.0"))
-				installPackageExtension(t, wsRoot, contentExtension, "1.3.0", packagedContentManifest("1.3.0"))
-			},
-			cfg:  contentConfig(contentExtension),
-			want: "also provides it",
-		},
-		"a devDependency that is not a package name": {
-			setup: func(t *testing.T, wsRoot string) {
-				declarePackageExtension(t, wsRoot, "../"+contentExtension, "1.2.0")
-			},
-			cfg:  contentConfig(),
-			want: "declares no extension",
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			wsRoot := t.TempDir()
-			tc.setup(t, wsRoot)
-			lookup := contentExtension
-			if strings.HasPrefix(name, "a devDependency that is not") {
-				lookup = "../" + contentExtension
-			}
-			source, err := LocateAgentContent(wsRoot, tc.cfg, lookup)
-			if err == nil || source != nil {
-				t.Fatalf("located %+v, want a refusal", source)
-			}
-			if !strings.Contains(err.Error(), tc.want) {
-				t.Fatalf("error = %v, want it to mention %q", err, tc.want)
-			}
-			if got := protocolcli.SuggestedNext(err); got != tc.next {
-				t.Fatalf("suggested next step = %q, want %q", got, tc.next)
-			}
-		})
+	if source, err := LocateAgentContent(wsRoot, cfg, contentExtension); err != nil || source.Version != "1.2.0" || source.Local {
+		t.Fatalf("with a registry entry, locate = %+v, %v; want its lock pin", source, err)
 	}
 }

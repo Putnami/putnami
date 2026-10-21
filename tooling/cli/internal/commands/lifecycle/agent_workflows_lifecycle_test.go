@@ -2,7 +2,6 @@ package lifecycle
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -795,7 +794,7 @@ func runContentUpgrade(t *testing.T, root string) {
 	selector := upgradeSelector{Mode: "channel", Display: "stable", RegistryTarget: "latest", DepsTarget: "latest"}
 	var failed bool
 	out, err := captureStdout(t, func() error {
-		failed = upgradeArtifactPhases(context.Background(), root, wsproto.Load(root), selector, UpgradeFlags{Extensions: true}, true)
+		failed = upgradeArtifactPhases(context.Background(), root, wsproto.Load(root), selector, UpgradeFlags{Extensions: true})
 		return nil
 	})
 	if err != nil || failed {
@@ -1020,7 +1019,7 @@ func TestExtensionAgentContent_CollisionsAbortWithZeroWrites(t *testing.T) {
 		selector := upgradeSelector{Mode: "channel", Display: "stable", RegistryTarget: "latest", DepsTarget: "latest"}
 		var failed bool
 		if _, err := captureStdout(t, func() error {
-			failed = upgradeArtifactPhases(context.Background(), root, wsproto.Load(root), selector, UpgradeFlags{Extensions: true}, true)
+			failed = upgradeArtifactPhases(context.Background(), root, wsproto.Load(root), selector, UpgradeFlags{Extensions: true})
 			return nil
 		}); err != nil {
 			t.Fatal(err)
@@ -1327,246 +1326,6 @@ func TestExtensionAgentContent_OptInReferences(t *testing.T) {
 	if !strings.Contains(out.String(), "agent content of extension "+contentExtensionName) {
 		t.Fatalf("dry run = %q", out.String())
 	}
-}
-
-// An npm extension: the root package.json declares it in devDependencies, the
-// package manager installs it into node_modules, and discovery loads its
-// commands and tools from there.
-
-// npmPackageManager is the package manager of the npm cases, the one external
-// boundary they replace. Its workspace-install copies into node_modules the
-// package version the root package.json declares, with the package.json a
-// real install leaves; its deps-upgrade moves the declaration to the latest
-// version it holds. The packages are the SDK's real packaged trees.
-type npmPackageManager struct {
-	t        *testing.T
-	name     string
-	packages map[string]*sdkagentartifact.ExtensionPackage
-	latest   string
-	jobs     []string
-}
-
-func newNPMPackageManager(t *testing.T, name string) *npmPackageManager {
-	t.Helper()
-	hometest.Temp(t)
-	t.Setenv(artifactsEnsuredEnv, "")
-	return &npmPackageManager{t: t, name: name, packages: map[string]*sdkagentartifact.ExtensionPackage{}}
-}
-
-func (pm *npmPackageManager) publish(pkg *sdkagentartifact.ExtensionPackage) {
-	pm.packages[pkg.Version] = pkg
-	pm.latest = pkg.Version
-}
-
-func (pm *npmPackageManager) env(out *strings.Builder) LifecycleEnv {
-	return LifecycleEnv{Out: out, RunJob: pm.run}
-}
-
-func (pm *npmPackageManager) run(_ context.Context, req WorkspaceJobRequest) (WorkspaceJobResult, error) {
-	pm.jobs = append(pm.jobs, req.Job)
-	switch req.Job {
-	case "deps-upgrade":
-		declareNPMExtension(pm.t, req.WorkspaceRoot, pm.name, pm.latest)
-	case "workspace-install":
-		var manifest struct {
-			DevDependencies map[string]string `json:"devDependencies"`
-		}
-		if err := json.Unmarshal([]byte(readWorkspaceFile(pm.t, req.WorkspaceRoot, "package.json")), &manifest); err != nil {
-			pm.t.Fatalf("parse package.json: %v", err)
-		}
-		version := manifest.DevDependencies[pm.name]
-		pkg := pm.packages[version]
-		if pkg == nil {
-			return WorkspaceJobResult{Outcome: WorkspaceJobFailed}, nil
-		}
-		dir := filepath.Join(req.WorkspaceRoot, "node_modules", filepath.FromSlash(pm.name))
-		if err := os.RemoveAll(dir); err != nil {
-			pm.t.Fatal(err)
-		}
-		files := map[string]string{"package.json": fmt.Sprintf(`{"name":%q,"version":%q}`, pm.name, version)}
-		for member, data := range pkg.Members {
-			files[member] = string(data)
-		}
-		writeTree(pm.t, dir, files)
-	}
-	return WorkspaceJobResult{Outcome: WorkspaceJobOK}, nil
-}
-
-// declareNPMExtension writes the root package.json declaring name@version in
-// devDependencies.
-func declareNPMExtension(t *testing.T, root, name, version string) {
-	t.Helper()
-	writeTree(t, root, map[string]string{
-		"package.json": fmt.Sprintf(`{"name":"npm-ws","private":true,"devDependencies":{%q:%q}}`, name, version),
-	})
-}
-
-// assertNPMContentAt checks that the content on disk, its ownership record and
-// the directory discovery loads the extension's commands from all name the
-// installed package at version.
-func assertNPMContentAt(t *testing.T, root string, pkg *sdkagentartifact.ExtensionPackage, revision string) {
-	t.Helper()
-	if got := readAgentFile(t, root, ".claude/skills/fixture-review/SKILL.md"); !strings.Contains(got, "Review revision "+revision+".") {
-		t.Fatalf("content = %q, want revision %s", got, revision)
-	}
-	dir := filepath.Join(root, "node_modules", filepath.FromSlash(contentExtensionName))
-	installed, err := os.ReadFile(filepath.Join(dir, extension.ManifestFilename))
-	if err != nil {
-		t.Fatal(err)
-	}
-	state, err := agentartifacts.LoadState(root, contentExtensionName)
-	if err != nil || state == nil {
-		t.Fatalf("ownership state = %+v, err %v", state, err)
-	}
-	if state.ArtifactVersion != pkg.Version || state.ArchiveDigest != lockfile.HashBytes(installed) || state.ManifestHash != pkg.Content.ManifestSHA256 {
-		t.Fatalf("ownership state %+v does not name the installed package %s", state, pkg.Version)
-	}
-	discovered, err := extension.DiscoverExtensions(root, wsproto.Load(root), nil)
-	if err != nil {
-		t.Fatalf("discover: %v", err)
-	}
-	for _, ext := range discovered {
-		if ext.Name == contentExtensionName {
-			if ext.Path != dir || ext.Version != pkg.Version {
-				t.Fatalf("commands load from %s@%s, content came from %s@%s", ext.Path, ext.Version, dir, pkg.Version)
-			}
-			return
-		}
-	}
-	t.Fatalf("discovery did not load %s", contentExtensionName)
-}
-
-// The content of an npm extension comes from the package its commands load
-// from, through the real Install and upgrade entry points: install reads it
-// after the package manager ran, a reinstall changes nothing, a moved
-// declaration moves the content with the package, and an upgrade that moves
-// the package does the same.
-func TestExtensionAgentContent_NPMPackageFollowsThePackageManager(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "npm-extension-agent-content", "an-npm-extension-content-comes-from-the-package-its-commands-load-from")
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "npm-extension-agent-content", "install-and-upgrade-read-npm-content-after-the-package-manager")
-	pm := newNPMPackageManager(t, contentExtensionName)
-	v1 := packageContentExtension(t, contentExtensionName, "r1", "1.0.0", true)
-	v2 := packageContentExtension(t, contentExtensionName, "r2", "2.0.0", false)
-	v3 := packageContentExtension(t, contentExtensionName, "r3", "3.0.0", false)
-	for _, pkg := range []*sdkagentartifact.ExtensionPackage{v1, v2, v3} {
-		pm.publish(pkg)
-	}
-	root := contentWorkspace(t, nil, []string{contentExtensionOptIn})
-	declareNPMExtension(t, root, contentExtensionName, "1.0.0")
-
-	// A fresh clone: nothing is in node_modules until the package manager runs.
-	var out strings.Builder
-	if _, err := captureStdout(t, func() error {
-		return Install(context.Background(), root, wsproto.Load(root), nil, pm.env(&out))
-	}); err != nil {
-		t.Fatalf("install: %v\n%s", err, out.String())
-	}
-	assertNPMContentAt(t, root, v1, "r1")
-	readAgentFile(t, root, ".agents/skills/fixture-plan/SKILL.md")
-	assertNoAgentArtifactPins(t, root)
-	if _, pinned := extensionPin(t, root, contentExtensionName); pinned {
-		t.Fatal("an npm extension was pinned in putnami.lock.json; the package manager's lock pins it")
-	}
-
-	// Reinstall: nothing moves.
-	before := snapshotWorkspace(t, root, installStateMarker)
-	out.Reset()
-	if _, err := captureStdout(t, func() error {
-		return Install(context.Background(), root, wsproto.Load(root), nil, pm.env(&out))
-	}); err != nil {
-		t.Fatalf("reinstall: %v\n%s", err, out.String())
-	}
-	assertUnchangedWorkspace(t, before, snapshotWorkspace(t, root, installStateMarker))
-
-	// The declaration moves: install moves the package, then its content.
-	declareNPMExtension(t, root, contentExtensionName, "2.0.0")
-	out.Reset()
-	if _, err := captureStdout(t, func() error {
-		return Install(context.Background(), root, wsproto.Load(root), nil, pm.env(&out))
-	}); err != nil {
-		t.Fatalf("install after the declaration moved: %v\n%s", err, out.String())
-	}
-	assertNPMContentAt(t, root, v2, "r2")
-	assertFileMissing(t, root, ".agents/skills/fixture-plan/SKILL.md")
-
-	// upgrade --deps moves the package through the package manager, and the
-	// agent phase runs after it.
-	pm.jobs = nil
-	if _, err := captureStdout(t, func() error {
-		return Upgrade(context.Background(), root, wsproto.Load(root), "", "", UpgradeFlags{Deps: true}, pm.env(&out))
-	}); err != nil {
-		t.Fatalf("upgrade --deps: %v", err)
-	}
-	if strings.Join(pm.jobs, ",") != "deps-upgrade,workspace-install" {
-		t.Fatalf("package manager jobs = %v", pm.jobs)
-	}
-	assertNPMContentAt(t, root, v3, "r3")
-
-	// The implicit passes read the package already installed.
-	if err := os.RemoveAll(filepath.Join(root, ".claude")); err != nil {
-		t.Fatal(err)
-	}
-	if err := agentctx.EnsureAgentWorkflows(context.Background(), root, wsproto.Load(root)); err != nil {
-		t.Fatalf("ensure: %v", err)
-	}
-	assertNPMContentAt(t, root, v3, "r3")
-}
-
-// An upgrade whose dependency phase fails skips the agent phase, as install
-// does: node_modules may already hold the next package, but the content and
-// its record stay at the previous release until the package manager succeeds.
-func TestExtensionAgentContent_NPMUpgradeSkipsTheAgentPhaseWhenTheDependencyPhaseFails(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "npm-extension-agent-content", "install-and-upgrade-read-npm-content-after-the-package-manager")
-	pm := newNPMPackageManager(t, contentExtensionName)
-	v1 := packageContentExtension(t, contentExtensionName, "r1", "1.0.0", true)
-	pm.publish(v1)
-	root := contentWorkspace(t, nil, []string{contentExtensionOptIn})
-	declareNPMExtension(t, root, contentExtensionName, "1.0.0")
-	var out strings.Builder
-	if _, err := captureStdout(t, func() error {
-		return Install(context.Background(), root, wsproto.Load(root), nil, pm.env(&out))
-	}); err != nil {
-		t.Fatalf("install: %v\n%s", err, out.String())
-	}
-	assertNPMContentAt(t, root, v1, "r1")
-
-	// The package manager writes the next package, then reports a failure.
-	pm.publish(packageContentExtension(t, contentExtensionName, "r2", "2.0.0", false))
-	failing := func(ctx context.Context, req WorkspaceJobRequest) (WorkspaceJobResult, error) {
-		result, err := pm.run(ctx, req)
-		if req.Job == "workspace-install" {
-			return WorkspaceJobResult{Outcome: WorkspaceJobFailed}, err
-		}
-		return result, err
-	}
-	before := snapshotContentSurface(t, root)
-	pm.jobs = nil
-	if _, err := captureStdout(t, func() error {
-		return Upgrade(context.Background(), root, wsproto.Load(root), "", "", UpgradeFlags{Deps: true}, LifecycleEnv{Out: &out, RunJob: failing})
-	}); err == nil {
-		t.Fatal("an upgrade whose dependency phase failed reported success")
-	}
-	if strings.Join(pm.jobs, ",") != "deps-upgrade,workspace-install" {
-		t.Fatalf("package manager jobs = %v", pm.jobs)
-	}
-	assertUnchangedWorkspace(t, before, snapshotContentSurface(t, root))
-	if state, err := agentartifacts.LoadState(root, contentExtensionName); err != nil || state == nil || state.ArtifactVersion != "1.0.0" {
-		t.Fatalf("ownership record = %+v, err %v; want the previous release", state, err)
-	}
-}
-
-// One extension declared through two sources is refused with nothing written:
-// the lock pins one release and the package manager installs another.
-func TestExtensionAgentContent_NPMAndRegistryDeclarationsAreRefused(t *testing.T) {
-	spectest.Proves(t, "cli/agent-workflow-lifecycle", "npm-extension-agent-content", "a-second-source-for-one-extension-is-refused")
-	root, _ := seededContentWorkspace(t)
-	declareNPMExtension(t, root, contentExtensionName, "1.0.0")
-	before := snapshotContentSurface(t, root)
-	err := agentctx.InstallAgentWorkflows(context.Background(), root, wsproto.Load(root), nil)
-	if err == nil || !strings.Contains(err.Error(), "declared twice") {
-		t.Fatalf("error = %v, want the two sources refused", err)
-	}
-	assertUnchangedWorkspace(t, before, snapshotContentSurface(t, root))
 }
 
 // Agent content that supersedes separately declared artifacts. A consumer

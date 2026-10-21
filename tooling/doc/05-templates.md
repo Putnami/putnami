@@ -45,8 +45,7 @@ putnami projects create my-api --template go-server
 putnami projects create my-lib --template go-library
 
 # Experimental Python (explicit opt-in)
-putnami deps add @putnami/python
-putnami extensions install
+putnami extensions install @putnami/python
 putnami projects create my-api --template python-server
 putnami projects create my-lib --template python-library
 ```

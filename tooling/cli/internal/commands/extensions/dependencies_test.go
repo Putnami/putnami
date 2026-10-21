@@ -414,55 +414,6 @@ func TestASatisfiedDependencyInstallsNothing(t *testing.T) {
 	wantPins(t, r.locked(), map[string]string{"@acme/app": "1.0.0", "@acme/dev": "1.1.0"})
 }
 
-// An install follows no edge of an extension that loads from node_modules,
-// unless the workspace declares its name and the lock pins it.
-func TestAnInstallFollowsNodeModulesEdgesOnlyForAPinnedDeclaredName(t *testing.T) {
-	spectest.Proves(t, dependenciesFeature, "node-modules-edges", "node-modules-edges-are-not-followed")
-	spectest.Proves(t, dependenciesFeature, "node-modules-edges", "a-pinned-declared-name-is-followed-from-node-modules")
-	r := newGraphRegistry(t)
-	r.publish("@acme/app", "1.0.0", "")
-	r.publish("@acme/runtime", "1.0.0", "")
-	r.publish("@acme/analytics-runtime", "1.0.0", "")
-	for name, deps := range map[string]string{"@acme/web": `{"@acme/runtime": "^1.0.0"}`, "@acme/analytics": `["@acme/analytics-runtime"]`} {
-		dir := filepath.Join(r.ws, "node_modules", filepath.FromSlash(name))
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(dir, extension.ManifestFilename), []byte(registryManifest(name, "1.0.0", graphRelease{deps: deps, contract: 4})), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.WriteFile(filepath.Join(r.ws, "package.json"), []byte(`{"devDependencies": {"@acme/analytics": "1.0.0"}}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	cfg, _ := r.declare(map[string]string{"@acme/app": "", "@acme/web": ""})
-
-	r.mustRun(cfg, "@acme/app")
-	requests := r.takeRequests()
-	if got := append(requestsFor(requests, "@acme/runtime"), requestsFor(requests, "@acme/analytics-runtime")...); len(got) != 0 {
-		t.Fatalf("an install followed node_modules edges: %v", requests)
-	}
-
-	lf := lockfile.NewLockFile()
-	for _, name := range []string{"@acme/app", "@acme/web"} {
-		lf.SetExtension(name, lockfile.LockEntry{Version: "1.0.0"})
-	}
-	if err := lockfile.WriteLockFile(r.ws, lf); err != nil {
-		t.Fatal(err)
-	}
-	r.mustRun(cfg, "@acme/app")
-	requests = r.takeRequests()
-	if got := requestsFor(requests, "@acme/runtime"); !slices.Equal(got, []string{"^1.0.0"}) {
-		t.Fatalf("@acme/runtime requests = %v, want the pinned node_modules root's edge followed", got)
-	}
-	if got := requestsFor(requests, "@acme/analytics-runtime"); len(got) != 0 {
-		t.Fatalf("an install followed the edge of an undeclared devDependency: %v", got)
-	}
-	if r.locked()["@acme/runtime"] != "1.0.0" {
-		t.Errorf("lock pins %v, want @acme/runtime", r.locked())
-	}
-}
-
 // A global-configuration key that names a graph member is ignored, with one
 // warning that names the global configuration; the graph resolves the
 // extension. A global key that names no member still installs.

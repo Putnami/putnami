@@ -7,6 +7,12 @@
   refusals in §2 name no command. They say which entry to replace or which
   ownership record to delete, and `putnami install` drops every pin under
   `agentArtifacts`.
+- **Amended**: 2026-10-21, decisions 1, 3, 4 and 5 and the invariants: a
+  root `package.json` `devDependencies` entry is no longer a source of
+  extensions. `<name>` resolves through the workspace `extensions` entries
+  and their locked dependencies only, no content is read from `node_modules`,
+  a name declared in both places is no longer refused, and `install` and
+  `upgrade` run the agent phase in its one place.
 - **Scope**: `@putnami/cli` (`internal/commands/agentctx`, `internal/extension`,
   `internal/commands/lifecycle`), the `agentArtifacts` workspace declaration,
   the built-in starters

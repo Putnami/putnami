@@ -431,9 +431,7 @@ func (g *installGraph) graphRoots(cfg *wsproto.Config, work []artifactInstallWor
 				item.err = root.FloorErr
 				continue
 			}
-			if root.Followed {
-				members = append(members, graphMember{name: root.Name, deps: root.Dependencies, fresh: workFresh})
-			}
+			members = append(members, graphMember{name: root.Name, deps: root.Dependencies, fresh: workFresh})
 			continue
 		}
 		g.versions[item.name] = item.result.Version
@@ -466,7 +464,7 @@ func (g *installGraph) graphRoots(cfg *wsproto.Config, work []artifactInstallWor
 		} else if entry, pinned := g.ops.lockGet(g.lockFile, key); pinned {
 			g.versions[key] = entry.Version
 		}
-		if root.Followed && root.FloorErr == nil {
+		if root.FloorErr == nil {
 			members = append(members, graphMember{name: name, deps: root.Dependencies, fresh: contextFresh})
 		}
 	}

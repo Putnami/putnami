@@ -10,8 +10,8 @@ import (
 // release-archives guard so a failure three layers away can cite the root
 // cause instead of reporting silent absence.
 type SkippedExtension struct {
-	// Ref is the reference discovery was resolving (config name, project
-	// path, or devDependency name).
+	// Ref is the reference discovery was resolving (config name or project
+	// path).
 	Ref string
 	// Name is the extension's best-known canonical name (package.json /
 	// putnami.json, falling back to Ref).

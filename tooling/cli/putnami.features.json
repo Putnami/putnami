@@ -2061,21 +2061,6 @@
           }
         },
         {
-          "id": "npm-extension-agent-content",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "an-npm-extension-content-comes-from-the-package-its-commands-load-from",
-              "install-and-upgrade-read-npm-content-after-the-package-manager",
-              "a-second-source-for-one-extension-is-refused"
-            ]
-          }
-        },
-        {
           "id": "superseded-owners-refused",
           "stage": "coded",
           "evidenceKinds": [
@@ -4042,18 +4027,6 @@
           }
         },
         {
-          "id": "node-modules-edges",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "node-modules-edges-are-not-followed",
-              "a-pinned-declared-name-is-followed-from-node-modules"
-            ]
-          }
-        },
-        {
           "id": "an-explicit-channel-flows-down",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
@@ -4114,7 +4087,7 @@
             "kind": "acceptance",
             "checks": [
               "discovery-loads-a-locked-dependency",
-              "root-package-dependencies-skip-a-dependency-name",
+              "a-root-package-dev-dependency-does-not-load",
               "a-dependency-that-does-not-load-names-its-dependent"
             ]
           }
@@ -4229,8 +4202,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-dependent-manifest-requires-contract-8",
-              "a-node-modules-manifest-loads-unstamped"
+              "a-dependent-manifest-requires-contract-8"
             ]
           }
         },

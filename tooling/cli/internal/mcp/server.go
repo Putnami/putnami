@@ -142,8 +142,8 @@ type Options struct {
 	// the server never substitutes guidance from an ambient or latest version.
 	GuidanceIssues []GuidanceIssue
 	// PreparedExtensions maps registry names to exact stable roots selected by
-	// the workspace lock. Discovery replaces node_modules and other ambient
-	// copies with these roots before registering any tool.
+	// the workspace lock. Discovery replaces other ambient copies with
+	// these roots before registering any tool.
 	PreparedExtensions map[string]string
 	// UnavailableExtensions are registry extension names whose exact locked
 	// artifact preparation failed or whose lock pin is absent. Their ambient

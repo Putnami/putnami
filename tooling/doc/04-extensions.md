@@ -1,6 +1,6 @@
 # Extensions
 
-Extensions teach the CLI new capabilities. Each extension provides commands — build, test, lint, serve, publish — for a specific language, framework, or tool. The extension model is open: you can write extensions in any language and distribute them as workspace packages, npm packages, or standalone directories.
+Extensions teach the CLI new capabilities. Each extension provides commands — build, test, lint, serve, publish — for a specific language, framework, or tool. The extension model is open: you can write extensions in any language and distribute them as workspace packages or standalone directories.
 
 ## Official extensions
 
@@ -38,16 +38,15 @@ in its own `putnami.json`.
 ## Installing extensions
 
 ```bash
-putnami deps add @putnami/typescript @putnami/go @putnami/python
+putnami extensions install @putnami/typescript @putnami/go @putnami/python
 ```
 
-Extensions are auto-discovered from:
-
-1. **Workspace-level** entries in `putnami.workspace.json` → `extensions` field
-2. **Scope-level** entries in scope `putnami.json` → `extensions` field
-3. **Project-level** `devDependencies` in `package.json`
-
-No manual registration is needed for npm-based extensions.
+A workspace loads the extensions that `putnami.workspace.json` → `extensions`
+declares, pinned in `putnami.lock.json`, and the extensions that its
+`extensions` entries depend on. A scope or project `putnami.json` → `extensions`
+field only names the extensions that scope or project uses. No `package.json`
+and no `node_modules` directory is a source of extensions: an extension that
+only `devDependencies` declares does not load.
 
 An extension can depend on other extensions through `extensionDependencies`.
 Declare only the extensions you use: `putnami install` also installs each

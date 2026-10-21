@@ -74,7 +74,7 @@ command verticals under `internal/commands/`, is in
 3. **Config loading** — Merge global (`~/.putnami/config.json`), workspace, and local config scopes.
 4. **Argument parsing** — Parse command(s), subcommand, global flags, job flags. Resolve aliases.
 5. **Routing** — Structured commands dispatch directly. Job commands proceed to the orchestration pipeline.
-6. **Extension discovery** — Scan workspace projects, node_modules, and explicit references for `putnami.extension.json`.
+6. **Extension discovery** — Scan workspace projects and the extensions of `putnami.workspace.json` for `putnami.extension.json`.
 7. **Contract validation** — Validate task I/O wiring before planning.
 8. **Project selection** — Resolve the smart bare default or explicit `--impacted`, `--all`, `--projects`, `.`, `--tag`, and `--exclude` filters.
 9. **Version computation** — Compute version metadata from git state (SHA, branch, tag, dirty status) for job subprocesses.

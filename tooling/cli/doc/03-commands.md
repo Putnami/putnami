@@ -405,7 +405,7 @@ putnami install
 
 #### Agent workflows
 
-When `putnami.workspace.json` opts into an extension's agent content (`extension:<name>` in `agentArtifacts`), `install` materializes it **from the extension release the committed lock pins**. It resolves nothing for the content and never rewrites the lock for it, so a clone and a CI runner reproduce exactly the files the lock describes. For an npm extension the root `package.json` declares in `devDependencies`, the content comes from the package the package manager installs into `node_modules`, so `install` materializes it after the workspace installers ran.
+When `putnami.workspace.json` opts into an extension's agent content (`extension:<name>` in `agentArtifacts`), `install` materializes it **from the extension release the committed lock pins**. It resolves nothing for the content and never rewrites the lock for it, so a clone and a CI runner reproduce exactly the files the lock describes.
 
 Content whose bytes do not match the extension's pin, or a file you own that the content would overwrite, fails the command with a non-zero exit and leaves your files unchanged. A separately declared artifact (`name`, `name:channel` or `/path`) is refused with nothing written, and the error gives the steps that replace it with an `extension:<name>` entry. `install` drops every pin under `agentArtifacts` in the lock, since no declaration uses one; a hosted install fails and names them instead. A workspace that declares no `agentArtifacts` skips the phase entirely. See [Agent Workflows](18-agent-workflows.md#lifecycle-init-install-upgrade).
 
@@ -582,7 +582,7 @@ The dependency phase pins root workspace selectors before installing: Go
 modules are written as `go.work` `replace` directives, and TypeScript packages
 are written as exact `@putnami/*` versions in the root `package.json`
 `dependencies` and `overrides` sections.
-The `--extensions` phase also upgrades agent content, but **only** for extensions the workspace already opts into in `agentArtifacts`: upgrade never enrols a workspace that did not opt in. Each opted-in extension's content follows the release its extensions phase moved to, and is verified and planned before anything is written, so a collision or a bad digest leaves the previous files and the previous ownership record. Content the workspace no longer opts into is retired. When the workspace opts into an npm extension and the command runs the dependency phase (`upgrade`, `upgrade --deps`), the agent phase runs after that phase instead, so the content follows the package the package manager installed. `--dry-run` reports the opt-ins and what would be retired without resolving or downloading anything. See [Agent Workflows](18-agent-workflows.md#lifecycle-init-install-upgrade).
+The `--extensions` phase also upgrades agent content, but **only** for extensions the workspace already opts into in `agentArtifacts`: upgrade never enrols a workspace that did not opt in. Each opted-in extension's content follows the release its extensions phase moved to, and is verified and planned before anything is written, so a collision or a bad digest leaves the previous files and the previous ownership record. Content the workspace no longer opts into is retired. `--dry-run` reports the opt-ins and what would be retired without resolving or downloading anything. See [Agent Workflows](18-agent-workflows.md#lifecycle-init-install-upgrade).
 
 ### `extensions`
 
@@ -648,7 +648,7 @@ and `channelVersion` set. To move a pin to an older build, name the exact
 version: `putnami extensions install <name>@<version>`, or
 `putnami upgrade --version <version>`, which marks the move `↓`.
 
-`extensions list` shows one row per `extensions` key and one per other loaded extension, with its version constraint, installed version, and source. A `config` row is an entry of `extensions` in `putnami.workspace.json`, named by its key, which can be a path; its installed version is the one the lock records, not what this machine has. A `workspace` row is a loaded extension whose name is not such a key, for example one a workspace project or a `node_modules` package provides; its installed version is its manifest version. A path-declared extension therefore has two rows: a `config` row under its path and a `workspace` row under its name. Use `--output=jsonl` for machine-readable output.
+`extensions list` shows one row per `extensions` key and one per other loaded extension, with its version constraint, installed version, and source. A `config` row is an entry of `extensions` in `putnami.workspace.json`, named by its key, which can be a path; its installed version is the one the lock records, not what this machine has. A `workspace` row is a loaded extension whose name is not such a key, for example one a workspace project provides; its installed version is its manifest version. A path-declared extension therefore has two rows: a `config` row under its path and a `workspace` row under its name. Use `--output=jsonl` for machine-readable output.
 
 #### The user scope: `--user`
 

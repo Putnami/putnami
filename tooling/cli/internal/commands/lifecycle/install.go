@@ -259,14 +259,13 @@ func Install(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []str
 	}
 
 	// Agent content is materialized from the extension release the COMMITTED
-	// lock pins, or from the npm package the package manager installs —
-	// install never resolves a version and never rewrites the lock for it, so a
-	// clone reproduces the exact files the locks describe.
-	agentPhase, err := agentWorkflowInstallPhase(wsRoot, cfg)
+	// lock pins — install never resolves a version and never rewrites the lock
+	// for it, so a clone reproduces the exact files the lock describes.
+	optedIn, err := agentWorkflowsOptedIn(wsRoot, cfg)
 	if err != nil {
 		return fmt.Errorf("agent workflows install: %w", err)
 	}
-	if agentPhase == agentPhaseBeforeInstallers {
+	if optedIn {
 		if err := installAgentWorkflows(ctx, wsRoot, cfg, phaseIO); err != nil {
 			return err
 		}
@@ -274,11 +273,6 @@ func Install(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []str
 
 	if err := runWorkspaceInstallers(ctx, wsRoot, cfg, phaseIO); err != nil {
 		return err
-	}
-	if agentPhase == agentPhaseAfterInstallers {
-		if err := installAgentWorkflows(ctx, wsRoot, cfg, phaseIO); err != nil {
-			return err
-		}
 	}
 
 	// The lock is the machine preflight contract as well as the artifact lock:
@@ -318,33 +312,12 @@ func Install(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []str
 	return nil
 }
 
-// agentWorkflowPhase is where Install runs its agent phase, if anywhere.
-type agentWorkflowPhase int
-
-const (
-	// agentPhaseNone: the workspace opts into no agent content.
-	agentPhaseNone agentWorkflowPhase = iota
-	// agentPhaseBeforeInstallers: every opted-in extension's content is read
-	// from a release the extensions phase installed, or from a path.
-	agentPhaseBeforeInstallers
-	// agentPhaseAfterInstallers: an opted-in extension is an npm package. Its
-	// content is read from the package the package manager installs, so the
-	// phase waits for the workspace installers: before them, node_modules can
-	// still hold the release the next command no longer loads.
-	agentPhaseAfterInstallers
-)
-
-// agentWorkflowInstallPhase places Install's agent phase. A workspace that opts
-// into none skips it entirely, which is what keeps `agentArtifacts` an opt-in.
-func agentWorkflowInstallPhase(wsRoot string, cfg *wsproto.Config) (agentWorkflowPhase, error) {
+// agentWorkflowsOptedIn reports whether the workspace opts into agent content.
+// Install skips the agent phase entirely when it does not, which is what keeps
+// `agentArtifacts` an opt-in.
+func agentWorkflowsOptedIn(wsRoot string, cfg *wsproto.Config) (bool, error) {
 	declared, err := agentctx.DeclaredAgentArtifacts(wsRoot, cfg)
-	if err != nil || len(declared) == 0 {
-		return agentPhaseNone, err
-	}
-	if agentctx.AgentContentFollowsPackageManager(wsRoot, cfg) {
-		return agentPhaseAfterInstallers, nil
-	}
-	return agentPhaseBeforeInstallers, nil
+	return len(declared) > 0, err
 }
 
 // installPhaseIO is the progress and summary plumbing one phase of Install

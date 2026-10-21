@@ -26,18 +26,25 @@ func storeOnlyManifest(name string) string {
 }`, name)
 }
 
-// storeOnlyFixture writes a workspace with four extensions: a workspace
-// project (@acme/local), a registry extension present both in node_modules
-// and, through its stable link, in the artifact store (@acme/tool), a
-// directory committed where the stable link belongs (@acme/planted), and a
-// devDependency in node_modules (@acme/dev).
+// nodeModulesDir is the directory a package manager installs name into. No
+// source of extensions reads it, so a test writes an extension there to prove
+// that it does not load, or that a hosted run refuses a path into it.
+func nodeModulesDir(root, name string) string {
+	return filepath.Join(root, installedPackagesDirName, name)
+}
+
+// storeOnlyFixture writes a workspace with three extensions that can load: a
+// workspace project (@acme/local), a registry extension present both in
+// node_modules and, through its stable link, in the artifact store
+// (@acme/tool), and a directory committed where the stable link belongs
+// (@acme/planted). A devDependency in node_modules (@acme/dev) never loads.
 func storeOnlyFixture(t *testing.T) (ws, storeRoot string, cfg *wsproto.Config) {
 	t.Helper()
 	ws, storeRoot = t.TempDir(), t.TempDir()
 	t.Setenv("PUTNAMI_ARTIFACT_DIR", storeRoot)
 
 	writeExtensionManifest(t, filepath.Join(ws, "tools", "local"), storeOnlyManifest("@acme/local"))
-	writeExtensionManifest(t, installedPackageDir(ws, "@acme/tool"), storeOnlyManifest("@acme/tool"))
+	writeExtensionManifest(t, nodeModulesDir(ws, "@acme/tool"), storeOnlyManifest("@acme/tool"))
 	stored := filepath.Join(storeRoot, "extensions", "acme-tool@1.0.0")
 	writeExtensionManifest(t, stored, storeOnlyManifest("@acme/tool"))
 	link := layout.StableDir(ws, layout.Extensions, "@acme/tool")
@@ -48,7 +55,7 @@ func storeOnlyFixture(t *testing.T) (ws, storeRoot string, cfg *wsproto.Config) 
 		t.Fatal(err)
 	}
 	writeExtensionManifest(t, layout.StableDir(ws, layout.Extensions, "@acme/planted"), storeOnlyManifest("@acme/planted"))
-	writeExtensionManifest(t, installedPackageDir(ws, "@acme/dev"), storeOnlyManifest("@acme/dev"))
+	writeExtensionManifest(t, nodeModulesDir(ws, "@acme/dev"), storeOnlyManifest("@acme/dev"))
 	if err := os.WriteFile(filepath.Join(ws, "package.json"), []byte(`{"devDependencies": {"@acme/dev": "1.0.0"}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -61,9 +68,9 @@ func storeOnlyFixture(t *testing.T) (ws, storeRoot string, cfg *wsproto.Config) 
 // A hosted run keeps the extensions installed from the artifact store and the
 // workspace's own path extensions: a registry extension loads through its
 // stable link even when node_modules holds a copy, and the workspace project
-// loads from its path. A directory committed where a link belongs and a
-// devDependency are skipped with the reason. A run without the run credential
-// discovers all four, as before.
+// loads from its path. A directory committed where a link belongs is skipped
+// with the reason. A run without the run credential discovers the same three.
+// A devDependency in node_modules loads in neither run.
 func TestHostedDiscoveryKeepsStoreAndPathExtensions(t *testing.T) {
 	spectest.Proves(t, "cli/credential-custody", "hostile-process-finds-nothing", "hosted-run-runs-only-store-and-path-extensions")
 	ws, storeRoot, cfg := storeOnlyFixture(t)
@@ -72,11 +79,14 @@ func TestHostedDiscoveryKeepsStoreAndPathExtensions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := len(local.Extensions); got != 4 {
-		t.Fatalf("a local run discovered %d extensions, want 4", got)
+	if got := len(local.Extensions); got != 3 {
+		t.Fatalf("a local run discovered %v, want 3 extensions", extensionNames(local.Extensions))
 	}
-	if tool := FindExtensionByName(local.Extensions, "@acme/tool"); tool == nil || tool.Path != installedPackageDir(ws, "@acme/tool") {
-		t.Fatalf("a local run loads @acme/tool from node_modules, got %+v", tool)
+	if tool := FindExtensionByName(local.Extensions, "@acme/tool"); tool == nil || tool.Path != layout.StableDir(ws, layout.Extensions, "@acme/tool") {
+		t.Fatalf("a local run loads @acme/tool from its stable link, got %+v", tool)
+	}
+	if FindExtensionByName(local.Extensions, "@acme/dev") != nil {
+		t.Error("a local run loaded the devDependency from node_modules")
 	}
 
 	restore := runcredential.SetForTest("run-bearer")
@@ -143,8 +153,8 @@ func TestHostedDiscoverySkipsEveryOtherLocalSource(t *testing.T) {
 	writeExtensionManifest(t, filepath.Join(ws, "tools", "declared"), storeOnlyManifest("@acme/declared"))
 	writeExtensionManifest(t, filepath.Join(ws, "tools", "absolute"), storeOnlyManifest("@acme/absolute-inside"))
 	writeExtensionManifest(t, filepath.Join(outside, "ext"), storeOnlyManifest("@acme/absolute-outside"))
-	writeExtensionManifest(t, installedPackageDir(ws, "nm"), storeOnlyManifest("@acme/node-modules"))
-	writeExtensionManifest(t, installedPackageDir(filepath.Join(ws, "packages", "web"), "nested"), storeOnlyManifest("@acme/nested"))
+	writeExtensionManifest(t, nodeModulesDir(ws, "nm"), storeOnlyManifest("@acme/node-modules"))
+	writeExtensionManifest(t, nodeModulesDir(filepath.Join(ws, "packages", "web"), "nested"), storeOnlyManifest("@acme/nested"))
 	writeExtensionManifest(t, filepath.Join(outside, "escaped"), storeOnlyManifest("@acme/escaped"))
 	if err := os.Symlink(filepath.Join(outside, "escaped"), filepath.Join(ws, "tools", "escape")); err != nil {
 		t.Skipf("symlinks unavailable: %v", err)
@@ -484,8 +494,8 @@ func TestOnlyFromPathExtensions(t *testing.T) {
 func TestLoadWorkspacePathExtension(t *testing.T) {
 	ws, outside := t.TempDir(), t.TempDir()
 	writeExtensionManifest(t, filepath.Join(ws, "tools", "local"), storeOnlyManifest("@acme/local"))
-	writeExtensionManifest(t, installedPackageDir(ws, "nm"), storeOnlyManifest("@acme/nm"))
-	writeExtensionManifest(t, installedPackageDir(filepath.Join(ws, "tools", "web"), "nested"), storeOnlyManifest("@acme/nested"))
+	writeExtensionManifest(t, nodeModulesDir(ws, "nm"), storeOnlyManifest("@acme/nm"))
+	writeExtensionManifest(t, nodeModulesDir(filepath.Join(ws, "tools", "web"), "nested"), storeOnlyManifest("@acme/nested"))
 	writeExtensionManifest(t, filepath.Join(outside, "ext"), storeOnlyManifest("@acme/outside"))
 	for ref, want := range map[string]string{
 		"/tools/local":                    "@acme/local",
@@ -511,7 +521,7 @@ func TestLoadWorkspacePathExtension(t *testing.T) {
 	// workspace: a path into that directory loads nothing either.
 	linked := t.TempDir()
 	writeExtensionManifest(t, filepath.Join(linked, "pkgs", "sub", "nm"), storeOnlyManifest("@acme/nm"))
-	if err := os.Symlink(filepath.Join(linked, "pkgs", "sub"), installedPackageDir(linked, "")); err != nil {
+	if err := os.Symlink(filepath.Join(linked, "pkgs", "sub"), nodeModulesDir(linked, "")); err != nil {
 		t.Skipf("symlinks unavailable: %v", err)
 	}
 	if got := LoadWorkspacePathExtension(linked, "/pkgs/sub/nm"); got != nil {
