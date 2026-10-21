@@ -93,8 +93,9 @@ func workspaceInstallArgs(force, hosted bool) []string {
 // and the .npmrc scope lines. workspace-fetch and workspace-install both call
 // it, so the fetch downloads for exactly the manifests the install reads. Each
 // step writes only what is missing or stale, so a second call rewrites
-// nothing. A failure to list the members or to materialize biome.json is
-// returned; the other steps log a warning and continue.
+// nothing. A failure to create the root package.json, to list the members or
+// to materialize biome.json is returned; the other steps log a warning and
+// continue.
 func shapeWorkspaceManifests(ctx *pctx.Context, emit *jsonl.Emitter, bunBin string) error {
 	// Create the root package.json when it is missing, so every step below
 	// finds the file it shapes. A workspace with a TypeScript install has
@@ -152,7 +153,8 @@ func shapeWorkspaceManifests(ctx *pctx.Context, emit *jsonl.Emitter, bunBin stri
 
 // ensureRootManifest writes the root package.json, as a private package named
 // after the workspace with an empty member list, when the file is missing. The
-// name is the `name` of putnami.workspace.json, else the root directory's name.
+// name is the workspace name of the job context, which core read from
+// putnami.workspace.json, else the root directory's name.
 // An existing file is never touched, so a second call rewrites nothing. The
 // membership step fills the list.
 func ensureRootManifest(ctx *pctx.Context, emit *jsonl.Emitter) error {
@@ -162,7 +164,7 @@ func ensureRootManifest(ctx *pctx.Context, emit *jsonl.Emitter) error {
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("stat package.json: %w", err)
 	}
-	name, err := json.Marshal(workspaceManifestName(ctx.WorkspaceRoot))
+	name, err := json.Marshal(workspaceManifestName(ctx))
 	if err != nil {
 		return fmt.Errorf("marshal the workspace name: %w", err)
 	}
@@ -178,18 +180,13 @@ func ensureRootManifest(ctx *pctx.Context, emit *jsonl.Emitter) error {
 	return nil
 }
 
-// workspaceManifestName is the name of the workspace at root: the `name` of
-// its putnami.workspace.json when that file has one, else the directory's name.
-func workspaceManifestName(root string) string {
-	if data, err := os.ReadFile(filepath.Join(root, "putnami.workspace.json")); err == nil {
-		var document struct {
-			Name string `json:"name"`
-		}
-		if json.Unmarshal(data, &document) == nil && document.Name != "" {
-			return document.Name
-		}
+// workspaceManifestName is the workspace name of the job context, else the
+// name of the workspace root directory.
+func workspaceManifestName(ctx *pctx.Context) string {
+	if ctx.Workspace.Name != "" {
+		return ctx.Workspace.Name
 	}
-	return filepath.Base(root)
+	return filepath.Base(ctx.WorkspaceRoot)
 }
 
 // ensureWorkspaceMembership writes the root package.json `workspaces` from the

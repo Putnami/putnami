@@ -171,10 +171,6 @@ func TestWorkspaceInstallCreatesTheMissingRootManifest(t *testing.T) {
 	if !slices.Equal(run.seen, []string{"web"}) {
 		t.Fatalf("workspaces when bun install started = %v, want [web]", run.seen)
 	}
-	var name string
-	if err := json.Unmarshal(readJSONField(t, manifest, "name"), &name); err != nil || name != filepath.Base(dir) {
-		t.Fatalf("name = %q (%v), want %q", name, err, filepath.Base(dir))
-	}
 	if private := string(readJSONField(t, manifest, "private")); private != "true" {
 		t.Fatalf("private = %s, want true", private)
 	}
@@ -191,24 +187,30 @@ func TestWorkspaceInstallCreatesTheMissingRootManifest(t *testing.T) {
 	}
 }
 
-// The created manifest takes its name from putnami.workspace.json when that
-// file has one.
+// The created manifest takes the workspace name core sends in the job context,
+// else the name of the workspace root directory.
 func TestWorkspaceInstallNamesTheRootManifestAfterTheWorkspace(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-creates-the-root-manifest",
 		"the-name-is-the-workspace-name-else-the-directory-name")
-	ctx, dir := membershipTree(t)
-	manifest := filepath.Join(dir, "package.json")
-	if err := os.Remove(manifest); err != nil {
-		t.Fatal(err)
-	}
-	writeProbeFile(t, filepath.Join(dir, "putnami.workspace.json"), `{"name":"acme"}`)
+	for _, workspaceName := range []string{"acme", ""} {
+		ctx, dir := membershipTree(t)
+		ctx.Workspace.Name = workspaceName
+		manifest := filepath.Join(dir, "package.json")
+		if err := os.Remove(manifest); err != nil {
+			t.Fatal(err)
+		}
 
-	if run := installRecordingWorkspaces(t, ctx); run.err != nil || run.status != "OK" {
-		t.Fatalf("runWorkspaceInstall = %q, %v; want OK", run.status, run.err)
-	}
-	var name string
-	if err := json.Unmarshal(readJSONField(t, manifest, "name"), &name); err != nil || name != "acme" {
-		t.Fatalf("name = %q (%v), want acme", name, err)
+		if run := installRecordingWorkspaces(t, ctx); run.err != nil || run.status != "OK" {
+			t.Fatalf("runWorkspaceInstall = %q, %v; want OK", run.status, run.err)
+		}
+		want := workspaceName
+		if want == "" {
+			want = filepath.Base(dir)
+		}
+		var name string
+		if err := json.Unmarshal(readJSONField(t, manifest, "name"), &name); err != nil || name != want {
+			t.Fatalf("workspace name %q: name = %q (%v), want %q", workspaceName, name, err, want)
+		}
 	}
 }
 

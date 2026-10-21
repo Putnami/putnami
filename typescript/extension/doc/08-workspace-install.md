@@ -140,7 +140,7 @@ the install are two jobs:
    refreshes no credential. Outside a hosted run it keeps the steps above
    unchanged.
 
-On a hosted run, neither command shapes the workspace manifests (steps 1 to 4
+On a hosted run, neither command shapes the workspace manifests (steps 1 to 5
 above, `tsconfig.json`, `biome.json` and the `.npmrc` scopes): both read the
 committed files as they are, so the install finds the manifests the fetch
 downloaded for, and no committed file changes. A manifest the committed
