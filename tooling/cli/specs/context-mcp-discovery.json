@@ -59,6 +59,10 @@
     {
       "id": "host-session-launcher",
       "text": "The installer registers a missing user-scoped stable Putnami launcher through the supported Claude Code and Codex CLIs, recognizes its own definition by meaning rather than host formatting, migrates a registration it wrote earlier, preserves a customized human definition, and can be declined outright. The launcher resolves the active host workspace before lock-pinned relaunch and consumes its configured variable, storing no repository cwd; host policy, precedence, and trust remain authoritative."
+    },
+    {
+      "id": "agent-context-languages",
+      "text": "A project's languages in an agent-context document come from the workspace providers, not from file names. Each language that a loaded extension's manifest declares counts for every project the workspace index records that extension's probe as claiming. The languages are sorted and listed once. A project no declaring provider claims reports none."
     }
   ],
   "decisions": [

@@ -57,6 +57,7 @@ import (
 	"go.putnami.dev/protocol/infra"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -145,21 +146,23 @@ type ContextSafetyViolation struct {
 // agent-context Document, strictly by reference. revision and cliVersion are the
 // two non-deterministic inputs, passed as parameters so callers (and tests) pin
 // them: the command wiring resolves revision via `git rev-parse HEAD` and passes
-// the CLI version.
+// the CLI version. languages is what the workspace providers declare for each
+// project (see declaredProjectLanguages); the document reads no file name to
+// name a language.
 //
 // It also returns the PublishSafetyOptions the fail-closed gate must run with.
 // The SensitivePaths set is derived from the FACTS (a secret-declaring infra
 // manifest), independently of the flags placed on the document, so a future bug
 // that references a sensitive path without flagging it makes the gate fail closed
 // rather than silently leaking a reference.
-func BuildDocument(ws *workspace.Workspace, p *workspace.Project, revision, cliVersion string) (*agentcontext.Document, agentcontext.PublishSafetyOptions, error) {
+func BuildDocument(ws *workspace.Workspace, p *workspace.Project, languages workspace.ProjectLanguages, revision, cliVersion string) (*agentcontext.Document, agentcontext.PublishSafetyOptions, error) {
 	projDir := filepath.Join(ws.Root, p.Path)
 	sensitive := map[string]bool{}
 
 	doc := &agentcontext.Document{
 		Schema:           agentContextSchemaURI,
 		ProtocolVersion:  agentcontext.ProtocolVersion,
-		Identity:         buildIdentity(ws, p, projDir),
+		Identity:         buildIdentity(ws, p, languages),
 		CompositionRoots: buildCompositionRoots(ws, p, projDir),
 	}
 
@@ -213,35 +216,17 @@ func BuildDocument(ws *workspace.Workspace, p *workspace.Project, revision, cliV
 // mapping the project's declared dependency NAMES to ids; dependent ids come
 // straight from the dependency graph, which is keyed by and returns project ids.
 // Both id lists are deduped and sorted for determinism.
-func buildIdentity(ws *workspace.Workspace, p *workspace.Project, projDir string) agentcontext.Identity {
+func buildIdentity(ws *workspace.Workspace, p *workspace.Project, languages workspace.ProjectLanguages) agentcontext.Identity {
 	return agentcontext.Identity{
 		ID:           p.ID,
 		Name:         p.Name,
 		Path:         filepath.ToSlash(p.Path),
 		Type:         p.Type,
 		Tags:         append([]string(nil), p.Tags...),
-		Languages:    detectLanguages(projDir),
+		Languages:    languages.Of(p.Path),
 		Dependencies: resolveIDs(ws, p.Dependencies),
 		Dependents:   resolveIDs(ws, ws.Graph.DependentsOf(p.ID)),
 	}
-}
-
-// detectLanguages derives the project's languages from on-disk markers: a go.mod
-// yields "go", a package.json "typescript", and a pyproject.toml or setup.py
-// "python". The result is sorted and deduped so the section is deterministic.
-func detectLanguages(projDir string) []string {
-	var langs []string
-	if shared.FileExists(filepath.Join(projDir, "go.mod")) {
-		langs = append(langs, "go")
-	}
-	if shared.FileExists(filepath.Join(projDir, "package.json")) {
-		langs = append(langs, "typescript")
-	}
-	if shared.FileExists(filepath.Join(projDir, "pyproject.toml")) || shared.FileExists(filepath.Join(projDir, "setup.py")) {
-		langs = append(langs, "python")
-	}
-	sort.Strings(langs)
-	return langs
 }
 
 // resolveIDs maps a list of project references (names or ids) to canonical
@@ -1023,8 +1008,8 @@ func contextDocumentError(label, what string, diags []diag.Diagnostic) error {
 // them can disagree about what "current" means. A gate failure returns the same
 // exit-2 classified error for every caller — no unsafe or invalid document is
 // ever produced.
-func buildPackedDocument(ws *workspace.Workspace, p *workspace.Project, revision, cliVersion string) (*agentcontext.Document, string, []byte, error) {
-	doc, opts, err := BuildDocument(ws, p, revision, cliVersion)
+func buildPackedDocument(ws *workspace.Workspace, p *workspace.Project, languages workspace.ProjectLanguages, revision, cliVersion string) (*agentcontext.Document, string, []byte, error) {
+	doc, opts, err := BuildDocument(ws, p, languages, revision, cliVersion)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -1040,18 +1025,18 @@ func buildPackedDocument(ws *workspace.Workspace, p *workspace.Project, revision
 // the workspace-relative target path and the canonical bytes. It is the single
 // emit path both pack (which writes it) and check (which compares it) call, so
 // the two can never disagree about what "current" means.
-func packDocument(ws *workspace.Workspace, p *workspace.Project, revision, cliVersion string) (string, []byte, error) {
-	_, rel, data, err := buildPackedDocument(ws, p, revision, cliVersion)
+func packDocument(ws *workspace.Workspace, p *workspace.Project, languages workspace.ProjectLanguages, revision, cliVersion string) (string, []byte, error) {
+	_, rel, data, err := buildPackedDocument(ws, p, languages, revision, cliVersion)
 	return rel, data, err
 }
 
 // ContextPack aggregates and atomically writes an agent-context document for
 // each targeted project. Every emit runs the fail-closed publish-safety gate;
 // an unsafe document aborts the run (exit 2) before any file is touched for it.
-func ContextPack(ws *workspace.Workspace, projects []*workspace.Project, revision, cliVersion string) (ContextPackReport, error) {
+func ContextPack(ws *workspace.Workspace, projects []*workspace.Project, languages workspace.ProjectLanguages, revision, cliVersion string) (ContextPackReport, error) {
 	var report ContextPackReport
 	for _, p := range projects {
-		rel, data, err := packDocument(ws, p, revision, cliVersion)
+		rel, data, err := packDocument(ws, p, languages, revision, cliVersion)
 		if err != nil {
 			return ContextPackReport{}, err
 		}
@@ -1068,10 +1053,10 @@ func ContextPack(ws *workspace.Workspace, projects []*workspace.Project, revisio
 // drift. It writes nothing and returns an exit-2 error on drift (with the report
 // attached for the failure envelope); a publish-safety failure surfaces as its
 // own exit-2 error, so an unsafe document can never pass the freshness gate.
-func ContextCheck(ws *workspace.Workspace, projects []*workspace.Project, revision, cliVersion string) (ContextCheckReport, error) {
+func ContextCheck(ws *workspace.Workspace, projects []*workspace.Project, languages workspace.ProjectLanguages, revision, cliVersion string) (ContextCheckReport, error) {
 	report := ContextCheckReport{Outcome: ContextOutcomeClean, Checked: len(projects)}
 	for _, p := range projects {
-		rel, want, err := packDocument(ws, p, revision, cliVersion)
+		rel, want, err := packDocument(ws, p, languages, revision, cliVersion)
 		if err != nil {
 			return ContextCheckReport{}, err
 		}
@@ -1119,17 +1104,51 @@ func ContextPackCommand(wsRoot string, args []string, outputFormat, cliVersion s
 	if err != nil {
 		return err
 	}
+	languages, err := declaredProjectLanguages(ws)
+	if err != nil {
+		return err
+	}
 	revision := resolveWorkspaceRevision(wsRoot)
 
 	if hasCheckFlag(args) {
-		report, checkErr := ContextCheck(ws, projects, revision, cliVersion)
+		report, checkErr := ContextCheck(ws, projects, languages, revision, cliVersion)
 		return renderContextCheck(outputFormat, report, checkErr)
 	}
-	report, err := ContextPack(ws, projects, revision, cliVersion)
+	report, err := ContextPack(ws, projects, languages, revision, cliVersion)
 	if err != nil {
 		return err
 	}
 	return renderContextPack(outputFormat, report)
+}
+
+// declaredProjectLanguages resolves the languages the workspace providers
+// declare for each project: the language in the manifest of every loaded
+// extension that declares one, joined with the projects the workspace index
+// records that extension's probe as having claimed. See
+// workspace.DeclaredLanguages for why the language is read from the manifest
+// and the claims from the index.
+//
+// The pack never runs a probe, so a claim is as old as the last
+// synchronization; a project that was never claimed, whatever files it holds,
+// has no language. An index that cannot be read already produced a load
+// warning and counts as holding no claim.
+func declaredProjectLanguages(ws *workspace.Workspace) (workspace.ProjectLanguages, error) {
+	extensions, err := extension.DiscoverExtensions(ws.Root, ws.Config, ws.ProjectPaths())
+	if err != nil {
+		return nil, fmt.Errorf("resolve the workspace extensions: %w", err)
+	}
+	var scopes []workspace.ProviderScope
+	for _, ext := range extensions {
+		if ext == nil || ext.Workspace == nil {
+			continue
+		}
+		if scope, ok := workspace.NewProviderScope(ext.Name, ext.Workspace); ok {
+			scopes = append(scopes, scope)
+		}
+	}
+	// An unreadable index returns no snapshot; the workspace load reported it.
+	snapshot, _ := workspace.LoadSnapshot(ws.Root)
+	return workspace.DeclaredLanguages(snapshot, scopes), nil
 }
 
 // selectContextProjects resolves the projects to operate on. With no --project

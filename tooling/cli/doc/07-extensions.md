@@ -752,7 +752,9 @@ literal file name, never a path or a glob. The optional `language` is the
 lowercase id of the language whose projects the adapter claims, such as `go`.
 Core records both per extension in `.putnami/workspace-index.json`. When the
 declaration changes, the next run that synchronizes the workspace asks that
-extension once more and records the new declaration.
+extension once more and records the new declaration. `putnami context pack`
+lists the `language` of every extension that claims a project among that
+project's languages, and lists none for a project no declaring extension claims.
 
 ### Extension-owned machine caches
 

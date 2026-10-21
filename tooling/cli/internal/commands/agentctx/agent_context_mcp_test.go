@@ -54,7 +54,7 @@ func packLoadedApp(t *testing.T, root string) string {
 		t.Fatal("fixture app project did not load")
 	}
 	rev := resolveWorkspaceRevision(root)
-	if _, err := ContextPack(ws, []*workspace.Project{app}, rev, fixtureVersion); err != nil {
+	if _, err := ContextPack(ws, []*workspace.Project{app}, nil, rev, fixtureVersion); err != nil {
 		t.Fatalf("ContextPack: %v", err)
 	}
 	return rev

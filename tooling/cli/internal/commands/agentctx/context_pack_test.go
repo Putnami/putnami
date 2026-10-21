@@ -76,6 +76,10 @@ const appCapabilitiesManifest = `{
   ]
 }`
 
+// fixtureLanguages is what the providers declare for the fixture workspace: a Go
+// provider claimed the application.
+var fixtureLanguages = workspace.ProjectLanguages{"svc/app": {"go"}}
+
 // buildFixtureWorkspace writes a controlled two-project workspace under a temp
 // root: an application "app" (with a main, a describe hook, committed schema/
 // infra/migration artifacts including a secret-declaring infra manifest) that
@@ -140,7 +144,7 @@ func buildFixtureWorkspace(t *testing.T) (*workspace.Workspace, *workspace.Proje
 func TestBuildDocument_Deterministic(t *testing.T) {
 	ws, app := buildFixtureWorkspace(t)
 
-	doc, opts, err := BuildDocument(ws, app, fixtureRevision, fixtureVersion)
+	doc, opts, err := BuildDocument(ws, app, fixtureLanguages, fixtureRevision, fixtureVersion)
 	if err != nil {
 		t.Fatalf("BuildDocument: %v", err)
 	}
@@ -151,7 +155,7 @@ func TestBuildDocument_Deterministic(t *testing.T) {
 		t.Fatalf("canonicalDocumentBytes: %v", err)
 	}
 	for i := range 3 {
-		doc2, opts2, err := BuildDocument(ws, app, fixtureRevision, fixtureVersion)
+		doc2, opts2, err := BuildDocument(ws, app, fixtureLanguages, fixtureRevision, fixtureVersion)
 		if err != nil {
 			t.Fatalf("BuildDocument iteration %d: %v", i, err)
 		}
@@ -203,8 +207,8 @@ func TestBuildDocument_Deterministic(t *testing.T) {
 		t.Errorf("infra digest %q is not a sha256:<64hex> address", infraRef.Digest)
 	}
 
-	// Identity graph: declared dependency NAMES resolve to ids; languages derive
-	// from the go.mod marker.
+	// Identity graph: declared dependency NAMES resolve to ids; languages are the
+	// ones the providers declare for the project.
 	if got := doc.Identity.Dependencies; len(got) != 1 || got[0] != "/svc/lib" {
 		t.Errorf("dependencies = %v, want [/svc/lib]", got)
 	}
@@ -234,7 +238,7 @@ func TestBuildDocument_DependentsResolveToIDs(t *testing.T) {
 	if lib == nil {
 		t.Fatal("fixture lib project missing")
 	}
-	doc, _, err := BuildDocument(ws, lib, fixtureRevision, fixtureVersion)
+	doc, _, err := BuildDocument(ws, lib, nil, fixtureRevision, fixtureVersion)
 	if err != nil {
 		t.Fatalf("BuildDocument(lib): %v", err)
 	}
@@ -266,7 +270,7 @@ func TestBuildIdentity_GroupedProjectUsesLogicalIDAndPhysicalPath(t *testing.T) 
 	if p == nil {
 		t.Fatal("grouped project missing by logical ID")
 	}
-	identity := buildIdentity(ws, p, filepath.Join(root, filepath.FromSlash(projectPath)))
+	identity := buildIdentity(ws, p, nil)
 	if identity.ID != "/identity/auth-server" || identity.Path != projectPath {
 		t.Errorf("generated identity = {ID:%q Path:%q}, want logical ID and physical path", identity.ID, identity.Path)
 	}
@@ -297,7 +301,7 @@ func TestBuildCompositionRoots_GoConventionMain(t *testing.T) {
 	golib := &workspace.Project{ID: "/svc/golib", Name: "golib", Path: "svc/golib", Type: "application"}
 	ws := workspace.NewWorkspace(root, &wsproto.Config{}, []*workspace.Project{goapp, golib})
 
-	appDoc, _, err := BuildDocument(ws, goapp, fixtureRevision, fixtureVersion)
+	appDoc, _, err := BuildDocument(ws, goapp, nil, fixtureRevision, fixtureVersion)
 	if err != nil {
 		t.Fatalf("BuildDocument(goapp): %v", err)
 	}
@@ -309,7 +313,7 @@ func TestBuildCompositionRoots_GoConventionMain(t *testing.T) {
 		t.Errorf("goapp root = %+v, want applicationMain svc/goapp/main.go convention=main.go", rootEntry)
 	}
 
-	libDoc, _, err := BuildDocument(ws, golib, fixtureRevision, fixtureVersion)
+	libDoc, _, err := BuildDocument(ws, golib, nil, fixtureRevision, fixtureVersion)
 	if err != nil {
 		t.Fatalf("BuildDocument(golib): %v", err)
 	}
@@ -405,12 +409,12 @@ func TestContextCheck_FreshThenDrift(t *testing.T) {
 	projects := []*workspace.Project{app, lib}
 
 	// Before packing, every document is missing → drift.
-	pre, preErr := ContextCheck(ws, projects, fixtureRevision, fixtureVersion)
+	pre, preErr := ContextCheck(ws, projects, nil, fixtureRevision, fixtureVersion)
 	if preErr == nil || pre.Outcome != ContextOutcomeDrift {
 		t.Fatalf("pre-pack check should drift as missing, got outcome=%q err=%v", pre.Outcome, preErr)
 	}
 
-	if _, err := ContextPack(ws, projects, fixtureRevision, fixtureVersion); err != nil {
+	if _, err := ContextPack(ws, projects, nil, fixtureRevision, fixtureVersion); err != nil {
 		t.Fatalf("ContextPack: %v", err)
 	}
 
@@ -421,7 +425,7 @@ func TestContextCheck_FreshThenDrift(t *testing.T) {
 	}
 
 	// Freshly packed → clean, exit 0.
-	clean, cleanErr := ContextCheck(ws, projects, fixtureRevision, fixtureVersion)
+	clean, cleanErr := ContextCheck(ws, projects, nil, fixtureRevision, fixtureVersion)
 	if cleanErr != nil {
 		t.Fatalf("post-pack check returned error: %v", cleanErr)
 	}
@@ -435,7 +439,7 @@ func TestContextCheck_FreshThenDrift(t *testing.T) {
 		t.Fatalf("mutate capabilities: %v", err)
 	}
 
-	drift, driftErr := ContextCheck(ws, projects, fixtureRevision, fixtureVersion)
+	drift, driftErr := ContextCheck(ws, projects, nil, fixtureRevision, fixtureVersion)
 	if driftErr == nil {
 		t.Fatal("check should fail after a referenced artifact changed")
 	}
@@ -485,7 +489,7 @@ func assertBytesDiv4(t *testing.T, label, abs string, s agentcontext.SourceRange
 func TestBuildDocument_RepresentativeSources(t *testing.T) {
 	ws, app := buildFixtureWorkspace(t)
 
-	doc, _, err := BuildDocument(ws, app, fixtureRevision, fixtureVersion)
+	doc, _, err := BuildDocument(ws, app, nil, fixtureRevision, fixtureVersion)
 	if err != nil {
 		t.Fatalf("BuildDocument: %v", err)
 	}
@@ -607,7 +611,7 @@ func TestBuildDocument_Docs(t *testing.T) {
 		Config: &wsproto.ProjectConfig{Main: "main.go"}}
 	ws := workspace.NewWorkspace(root, &wsproto.Config{}, []*workspace.Project{app})
 
-	doc, _, err := BuildDocument(ws, app, fixtureRevision, fixtureVersion)
+	doc, _, err := BuildDocument(ws, app, nil, fixtureRevision, fixtureVersion)
 	if err != nil {
 		t.Fatalf("BuildDocument: %v", err)
 	}
@@ -659,7 +663,7 @@ func TestBuildDocument_OverridesApplied(t *testing.T) {
   "sensitive": ["svc/app/service.go"]
 }`)
 
-	doc, opts, err := BuildDocument(ws, app, fixtureRevision, fixtureVersion)
+	doc, opts, err := BuildDocument(ws, app, nil, fixtureRevision, fixtureVersion)
 	if err != nil {
 		t.Fatalf("BuildDocument: %v", err)
 	}
@@ -778,7 +782,7 @@ func buildConformanceFixture(t *testing.T, withOptIn bool, policy string) (*work
 func TestBuildTestsSection_Populated(t *testing.T) {
 	ws, app := buildConformanceFixture(t, true, "")
 
-	doc, opts, err := BuildDocument(ws, app, fixtureRevision, fixtureVersion)
+	doc, opts, err := BuildDocument(ws, app, nil, fixtureRevision, fixtureVersion)
 	if err != nil {
 		t.Fatalf("BuildDocument: %v", err)
 	}
@@ -828,7 +832,7 @@ func TestBuildTestsSection_Populated(t *testing.T) {
 		t.Fatalf("canonicalDocumentBytes: %v", err)
 	}
 	for i := range 3 {
-		doc2, opts2, err := BuildDocument(ws, app, fixtureRevision, fixtureVersion)
+		doc2, opts2, err := BuildDocument(ws, app, nil, fixtureRevision, fixtureVersion)
 		if err != nil {
 			t.Fatalf("BuildDocument iteration %d: %v", i, err)
 		}
@@ -861,7 +865,7 @@ func TestBuildTestsSection_PolicyIsConfigNotCI(t *testing.T) {
 	t.Setenv("CI", "1")
 
 	wsAuto, appAuto := buildConformanceFixture(t, true, "")
-	docAuto, _, err := BuildDocument(wsAuto, appAuto, fixtureRevision, fixtureVersion)
+	docAuto, _, err := BuildDocument(wsAuto, appAuto, nil, fixtureRevision, fixtureVersion)
 	if err != nil {
 		t.Fatalf("BuildDocument(auto): %v", err)
 	}
@@ -870,7 +874,7 @@ func TestBuildTestsSection_PolicyIsConfigNotCI(t *testing.T) {
 	}
 
 	wsReq, appReq := buildConformanceFixture(t, true, "require")
-	docReq, _, err := BuildDocument(wsReq, appReq, fixtureRevision, fixtureVersion)
+	docReq, _, err := BuildDocument(wsReq, appReq, nil, fixtureRevision, fixtureVersion)
 	if err != nil {
 		t.Fatalf("BuildDocument(require): %v", err)
 	}
@@ -886,7 +890,7 @@ func TestBuildTestsSection_PolicyIsConfigNotCI(t *testing.T) {
 func TestBuildTestsSection_ApplicableButUnopted(t *testing.T) {
 	ws, app := buildConformanceFixture(t, false, "")
 
-	doc, _, err := BuildDocument(ws, app, fixtureRevision, fixtureVersion)
+	doc, _, err := BuildDocument(ws, app, nil, fixtureRevision, fixtureVersion)
 	if err != nil {
 		t.Fatalf("BuildDocument: %v", err)
 	}
@@ -912,7 +916,7 @@ func TestBuildTestsSection_NoCapabilities(t *testing.T) {
 		t.Fatal("fixture lib project missing")
 	}
 
-	doc, _, err := BuildDocument(ws, lib, fixtureRevision, fixtureVersion)
+	doc, _, err := BuildDocument(ws, lib, nil, fixtureRevision, fixtureVersion)
 	if err != nil {
 		t.Fatalf("BuildDocument(lib): %v", err)
 	}
@@ -941,7 +945,7 @@ func TestBuildDocument_OverridesMalformedFailsClosed(t *testing.T) {
 		t.Fatalf("write overrides: %v", err)
 	}
 
-	_, _, err := BuildDocument(ws, app, fixtureRevision, fixtureVersion)
+	_, _, err := BuildDocument(ws, app, nil, fixtureRevision, fixtureVersion)
 	if err == nil {
 		t.Fatal("a malformed overrides file must make BuildDocument fail closed")
 	}
