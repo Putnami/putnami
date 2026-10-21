@@ -25,7 +25,7 @@ metadata:
 | `description` | **yes** | Human-readable purpose |
 | `version` | no | Template version (semver); stamped at package time when absent |
 | `extension` | no | The extension activated for projects created from this template |
-| `workspaceDevDependencies` | no | Dev dependencies added to the workspace root when the template is used |
+| `workspaceDevDependencies` | no | Dev dependencies for the workspace root. No core command reads it |
 | `testVariables` | no | Render-variable overrides used when testing the template |
 
 The strict pipeline mirrors the other protocol packages:

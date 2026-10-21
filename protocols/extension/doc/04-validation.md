@@ -204,11 +204,11 @@ exclusion (`!git:…`) selects nothing and requires no rung. A manifest whose
 the CLI loads it from the artifact store or a declared path, because the CLI
 installs and loads those dependencies and an older reader would drop them
 (`CheckDependencyContract`). `LoadManifest` enforces `RequiredLoadContract`,
-which leaves the dependency rung out, so a manifest loaded from
-`node_modules` loads unstamped. A manifest that declares `verbs` requires
-contract 9 wherever it loads from, `node_modules` included: its default traits
-change how the jobs of other extensions are planned, and an older reader would
-plan them with other traits. `RequiredLoadContract` includes that rung. A
+which leaves the dependency rung out; the npm packager stamps that contract. A
+manifest that declares `verbs` requires contract 9 wherever it loads from: its
+default traits change how the jobs of other extensions are planned, and an
+older reader would plan them with other traits. `RequiredLoadContract`
+includes that rung. A
 manifest with a task that declares `cache.sourceBound` requires contract 10
 wherever it loads from: a reader at 10 stores and looks up the task's entry at
 a key that also binds the project's source binding, and an older reader would
@@ -298,7 +298,6 @@ package job.
 | current | Go embed manifest stamped 5 or lower, or unstamped | Rejected: the stamp does not cover Go embed input semantics. |
 | current | agent-content manifest stamped 4, or unstamped | Rejected: the stamp does not cover the contribution. |
 | current | manifest naming a registry dependency, stamped 7 or lower or unstamped, from the artifact store or a declared path | Rejected: the stamp does not cover the dependencies the CLI would install and load. |
-| current | manifest naming a registry dependency, unstamped, from `node_modules` | Loads; the CLI does not follow its dependencies. |
 | current | contract-3 or lower manifest with a surface | Skipped, with the re-package/`putnami extensions update` remediation on the skip record; a contract-3 reader cannot represent `sessionPrerequisites`, so loading it would permit an ungated dependent command. |
 | contract-4 CLI | contract-5 artifact | Rejected by that CLI's own higher-contract arm ("requires a newer putnami"). Its permissive decode would drop `agentContent` silently, which is why the stamp, not the schema, carries the refusal. The remedy is `putnami upgrade`. |
 | contract-5 CLI | contract-6 artifact | Rejected by that CLI's own higher-contract arm. It cannot bind Go embed inputs to cache identity. |

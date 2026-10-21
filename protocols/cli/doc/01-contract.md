@@ -192,10 +192,8 @@ Contract `8` (`ExtensionDependenciesContract`) is additive for
 on, the CLI installs, pins and loads each one. A reader below 8 would load the
 extension without its dependencies, so it refuses the stamp. The floor binds a
 manifest loaded from the artifact store or from a path the workspace declares.
-A manifest loaded from `node_modules` keeps loading unstamped, because the CLI
-does not follow its dependencies. The Go archive packager stamps 8, even on a
-manifest that declares only hooks and dependencies; the npm packager leaves
-the list out of its stamp.
+The Go archive packager stamps 8, even on a manifest that declares only hooks
+and dependencies; the npm packager leaves the list out of its stamp.
 Contract `9` (`VerbVocabularyContract`) is additive for the `verbs` section:
 the verbs an extension declares, with their descriptions, aliases, default
 traits and related commands. From 9 on, help, completion and alias resolution

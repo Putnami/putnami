@@ -23,7 +23,7 @@ The smallest valid template manifest:
 | `description` | **yes** | Human-readable description |
 | `version` | no | Template version (semver) |
 | `extension` | no | Extension to activate for projects created from this template |
-| `workspaceDevDependencies` | no | Dev dependencies to add to the workspace root |
+| `workspaceDevDependencies` | no | Dev dependencies for the workspace root. No core command reads it |
 | `testVariables` | no | Render-variable overrides for `putnami templates test` (`projectName`, `projectModule`) |
 
 Unknown fields are rejected by both the strict parser and the schema.

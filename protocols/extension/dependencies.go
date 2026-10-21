@@ -54,9 +54,8 @@ func NamesRegistryDependency(m *Manifest) bool {
 // CheckDependencyContract refuses a manifest that names a registry dependency
 // under a stamp below ExtensionDependenciesContract. The CLI applies it to a
 // manifest it loads from the artifact store or from a path the workspace
-// declares, because it follows that manifest's dependencies. A manifest loaded
-// from node_modules is exempt: the package manager owns its dependencies, so
-// the npm framework packages keep loading unstamped.
+// declares, because it follows that manifest's dependencies. The npm packager
+// stamps without this rung (RequiredLoadContract).
 func CheckDependencyContract(path string, m *Manifest) error {
 	if !NamesRegistryDependency(m) || m.CLIContract >= protocolcli.ExtensionDependenciesContract {
 		return nil

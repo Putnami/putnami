@@ -175,8 +175,7 @@ constraint. The CLI acts only on a registry name (`@scope/name`). For an
 extension installed from the artifact store or declared by path, and for a
 declared name the lock pins, `putnami install` installs each registry
 dependency, pins it in `putnami.lock.json`, and discovery loads it. Any other
-name, and the dependencies of an extension the package manager installed in
-`node_modules`, are left to that package manager.
+name is left to the package manager.
 
 A dependency the workspace does not declare loses every reserved provider
 command: credential, cache and runner providers, session and log reporters,
@@ -186,8 +185,8 @@ when the workspace must use one of its providers.
 A manifest that names a registry dependency requires CLI contract 8
 (`ExtensionDependenciesContract`) when the CLI loads it from the artifact
 store or a declared path. The Go archive packager stamps 8 on it, even when
-it declares only hooks. The npm packager leaves the list out of its stamp, and
-a manifest loaded from `node_modules` loads unstamped.
+it declares only hooks. The npm packager leaves the list out of its stamp, so
+an npm package that declares only hooks stays unstamped.
 
 ## Extension Discovery
 
@@ -195,7 +194,8 @@ Extensions are discovered from:
 1. Workspace-level entries in `putnami.workspace.json` → `extensions`
 2. Scope-level entries in scope `putnami.json` → `extensions`
 3. The dependencies of those extensions that the lock pins
-4. Project-level `devDependencies` in `package.json`, except a dependency name
+
+No `node_modules` directory and no `package.json` is a source of extensions.
 
 Use `putnami extensions list` to see all discovered extensions.
 

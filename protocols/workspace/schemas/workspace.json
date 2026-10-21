@@ -142,7 +142,7 @@
         "extensions": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Extension names to disable (opt-out). Extensions are auto-discovered from devDependencies and workspace packages."
+          "description": "Extension names to disable (opt-out). Extensions load from the workspace projects and the `extensions` entries of the workspace config."
         },
         "jobs": {
           "type": "array",
