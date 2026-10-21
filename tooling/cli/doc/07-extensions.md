@@ -1276,7 +1276,7 @@ When a lock file (`putnami.lock.json`) exists, installed templates are resolved 
 | `description` | `string` | Human-readable description |
 | `version` | `string` | Semver version (optional) |
 | `extension` | `string` | Extension to activate for projects created from this template |
-| `workspaceDevDependencies` | `map[string]string` | Dev dependencies to add to the workspace root |
+| `workspaceDevDependencies` | `map[string]string` | Dev dependencies for the workspace root. The protocol keeps the field; no core command reads it |
 
 ### Using Templates
 

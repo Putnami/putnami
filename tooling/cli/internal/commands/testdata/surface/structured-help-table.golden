@@ -319,10 +319,11 @@ description: Remove an installed template
 usage: putnami templates remove <name>
 example: putnami templates remove go-server
 ═══ templates test ═══
-description: Test a template by rendering it into a temporary workspace and running build and test on the result
-usage: putnami templates test [path] [--skip-build] [--keep]
+description: Test a template by rendering it, then creating a project from it in a temporary workspace and running the build and test its extension declares
+usage: putnami templates test [path] [--skip-build] [--keep] [--channel <channel>]
 flag: --skip-build |  | Render the template without running build and test on it
 flag: --keep |  | Keep the rendered temporary workspace for inspection
+flag: --channel | <channel> | Install the template's extension from one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)
 example: putnami templates test
 example: putnami templates test ./my-template/ --skip-build
 ═══ templates update ═══

@@ -130,7 +130,7 @@ Authoring a template uses `templates validate`, `templates test` and `templates 
 
 ```bash
 putnami templates validate [path] # Validate a template manifest
-putnami templates test [path]     # Render the template and check the result
+putnami templates test [path]     # Render, then create, build and test the project
 putnami templates package [path]  # Package for distribution
 ```
 

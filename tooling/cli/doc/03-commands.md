@@ -741,11 +741,26 @@ putnami templates update               # Update to latest compatible versions (l
 putnami templates list                 # List configured and discovered templates
 putnami templates remove <name>        # Remove an installed template
 putnami templates validate [path]      # Validate a template manifest (for authors; needs no workspace)
-putnami templates test [path]          # Test by rendering and validating output (needs no workspace)
+putnami templates test [path]          # Render, then create the project in a temporary workspace, build and test as declared (needs no workspace)
 putnami templates package [path]       # Package for distribution (needs no workspace)
 ```
 
 `templates list` shows each template's name, constraint, installed version, and source (config or workspace). Use `--output=jsonl` for machine-readable output.
+
+`templates test` checks a template in two steps. First it renders the template
+into a scratch directory and checks that the result has a `putnami.json`;
+`--skip-build` stops here. Then it does what a user does, in a temporary
+workspace. The workspace config lists the template's extension and no project,
+and holds no language manifest. The template sits at `under-test/templates/<dir>`,
+where template discovery finds it. The command installs the extension by name,
+runs `putnami projects create` from the template, which adds the project and
+runs the extension's project-setup job, then runs the build and test commands
+that the extension declares on the created project. An extension that declares
+no build command, such as Python's, is tested without it. The command fails
+when the extension declares neither. A template whose manifest names no
+extension can run only with `--skip-build`. `--channel <channel>` (or `PUTNAMI_CHANNEL`) installs the extension from
+that release channel, as `putnami init` does. `projects create` has no channel
+of its own.
 
 Template archives contain `putnami.template.json` plus the renderable/static
 template content. Source-workspace declarations at the template root

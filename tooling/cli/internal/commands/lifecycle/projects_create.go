@@ -90,7 +90,7 @@ func createProjectFiles(ctx context.Context, wsRoot string, cfg *wsproto.Config,
 		iox.Fprintf(os.Stdout, "  Template %q not found locally, attempting install…\n", flags.template)
 		// The create of an init that chose a channel installs on that channel;
 		// any other create installs as the workspace configures the template.
-		if installErr := extensions.TemplatesInstall(ctx, wsRoot, cfg, []string{channelArtifact(flags.template, env.channel)}, ""); installErr == nil {
+		if installErr := extensions.TemplatesInstall(ctx, wsRoot, cfg, []string{shared.ChannelArtifact(flags.template, env.channel)}, ""); installErr == nil {
 			// Re-discover after install
 			templates, _ = template.DiscoverTemplates(wsRoot, projectPaths)
 			foundTemplate = template.FindByName(templates, flags.template)

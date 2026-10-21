@@ -129,7 +129,7 @@ These built-in commands manage workspace infrastructure:
 - `putnami templates list` — List configured and discovered templates
 - `putnami templates remove <name>` — Remove an installed template
 - `putnami templates validate [path]` — Validate a template manifest
-- `putnami templates test [path]` — Test a template by rendering it
+- `putnami templates test [path]` — Test a template: render it, create a project from it, build and test it
 - `putnami templates package [path]` — Package a template for distribution
 
 ### `putnami upgrade`

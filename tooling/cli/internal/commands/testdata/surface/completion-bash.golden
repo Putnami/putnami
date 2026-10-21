@@ -134,7 +134,7 @@ _putnami_flags_for() {
         'sessions summary') printf '%s\n' '--by-digest --command --since' ;;
         'templates install') printf '%s\n' '--latest' ;;
         'templates package') printf '%s\n' '--stable --version' ;;
-        'templates test') printf '%s\n' '--keep --skip-build' ;;
+        'templates test') printf '%s\n' '--channel --keep --skip-build' ;;
         'upgrade') printf '%s\n' '--channel --cli --deps --dry-run --extensions --from-source --global --namespace --release --version' ;;
         'workspace init') printf '%s\n' '--channel --extension --force --project --project-path --workspace' ;;
     esac

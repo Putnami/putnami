@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cmderr"
 	"go.putnami.dev/tooling/cli/internal/commands/agentctx"
 	"go.putnami.dev/tooling/cli/internal/commands/extensions"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/commands/versioncmd"
 	"go.putnami.dev/tooling/cli/internal/git"
 	"go.putnami.dev/tooling/cli/internal/iox"
@@ -344,7 +345,7 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	// Reload config from disk (now that putnami.workspace.json exists)
 	wsCfg := wsproto.Load(cwd)
 
-	if err := installExtension(ctx, cwd, wsCfg, []string{channelArtifact(extConfig.packageName, env.channel)}, ""); err != nil {
+	if err := installExtension(ctx, cwd, wsCfg, []string{shared.ChannelArtifact(extConfig.packageName, env.channel)}, ""); err != nil {
 		return protocolcli.WithNext(
 			fmt.Errorf("install extension %s: %w", extConfig.packageName, err),
 			"putnami extensions install",
@@ -438,7 +439,7 @@ func initializeProject(
 	iox.Fprintf(os.Stdout, "  → Installing template…\n")
 
 	wsCfg := wsproto.Load(cwd)
-	if err := installInitTemplate(ctx, cwd, wsCfg, []string{channelArtifact(extConfig.template, env.channel)}, ""); err != nil {
+	if err := installInitTemplate(ctx, cwd, wsCfg, []string{shared.ChannelArtifact(extConfig.template, env.channel)}, ""); err != nil {
 		return protocolcli.WithNext(
 			fmt.Errorf("install template %s: %w", extConfig.template, err),
 			"putnami templates install",
@@ -500,7 +501,7 @@ func membersWith(members []string, projectPath string) []string {
 // opt-in selects from the release the lock pins.
 func installInitAgentContent(ctx context.Context, cwd string, wsCfg *wsproto.Config, extConfig initExtensionConfig, channel string) error {
 	if extConfig.agentContent != "" {
-		if err := installExtension(ctx, cwd, wsCfg, []string{channelArtifact(extConfig.agentContent, channel)}, ""); err != nil {
+		if err := installExtension(ctx, cwd, wsCfg, []string{shared.ChannelArtifact(extConfig.agentContent, channel)}, ""); err != nil {
 			return fmt.Errorf("install extension %s: %w", extConfig.agentContent, err)
 		}
 	}
