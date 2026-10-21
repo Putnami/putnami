@@ -128,11 +128,12 @@ What `projects sync` writes is deliberately narrow:
   only when core found a membership change: core cannot know what is out of sync
   inside a language manifest, so deciding "nothing to do" on a provider's behalf
   would be guessing.
-- **One residue** stays in core: the `go.mod` replace closure of the LOCAL
-  EXTENSION modules whose runtime must be prepared before any extension can run.
-  A local extension is compiled in module mode, so a missing workspace replace in
-  its own `go.mod` makes it unbuildable — and therefore makes the sync task that
-  would repair it unable to run.
+- **Core writes no native manifest**, `go.mod` included. A local Go extension
+  whose own `go.mod` misses a workspace replace still prepares when a directory
+  of its replace closure provides that module: its `prepare` builds from a copy
+  of `go.mod` that completes the closure, so the sync task that repairs the file
+  can run. A replace that no directory of the closure provides still has to be
+  in `go.mod`.
 
 ### Workspace Probe
 

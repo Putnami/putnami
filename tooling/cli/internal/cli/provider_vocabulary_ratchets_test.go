@@ -82,7 +82,7 @@ type providerVocabularyResidue struct {
 // file that no longer names a provider must lose its entry, and an unlisted
 // file may not start.
 //
-// This list IS the effort's remaining tail, and it is short on purpose — six
+// This list IS the effort's remaining tail, and it is short on purpose — five
 // files, one genuine behavioral branch among them. Each entry names what would
 // remove it, so the next program starts from an inventory rather than from a
 // grep. Adding an entry is a program-level decision: the epic's whole claim is
@@ -128,14 +128,6 @@ var providerVocabularyAllowlist = map[string]providerVocabularyResidue{
 			"image/digest/channel fields no other registry has. An earlier change already narrowed this to " +
 			"one projection (the output complexity ceiling states it); it goes when a published " +
 			"record carries its own renderable shape",
-	},
-	"internal/workspace/gomod_bootstrap.go": {
-		sites: 4,
-		why: "BOOTSTRAP RESIDUE, and the one the C4b wave-2 gate report already named: core repairs " +
-			"the workspace `replace` directives in an EXTENSION's own go.mod, because an extension " +
-			"whose module cannot resolve cannot run the workspace-sync task that would have " +
-			"repaired it. Non-extension modules are repaired by the Go extension's own task. It " +
-			"goes with the same change as extension_runtime.go's entry",
 	},
 }
 

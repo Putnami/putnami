@@ -28,10 +28,146 @@ else
 fi
 mkdir -p "$output/compiled"
 tmp="$output/compiled/putnami-python.tmp.$$"
-trap 'rm -f "$tmp"' EXIT INT TERM
+modroot="$output/modfile.tmp.$$"
+trap 'rm -f "$tmp"; rm -rf "$modroot"' EXIT INT TERM
+
+nl='
+'
+tab="$(printf '\t')"
+
+# go_mod_facts reads the go.mod file $1 with `go mod edit -json` and prints one
+# line per fact: "module<TAB>path", then "replace<TAB>path" for each module the
+# file replaces and "local<TAB>dir" for each replacement that is a directory.
+go_mod_facts() {
+  "$go_binary" mod edit -json "$1" | awk '
+    function value(line) {
+      sub(/^[^:]*: "/, "", line)
+      sub(/",?$/, "", line)
+      return line
+    }
+    $0 == "\t\"Module\": {" { section = "module"; next }
+    $0 == "\t\"Replace\": [" { section = "replace"; next }
+    index($0, "\t\"") == 1 { section = ""; next }
+    section == "module" && index($0, "\t\t\"Path\": \"") == 1 { print "module\t" value($0); next }
+    section == "replace" && $0 == "\t\t\t\"Old\": {" { side = "old"; next }
+    section == "replace" && $0 == "\t\t\t\"New\": {" { side = "new"; next }
+    section == "replace" && index($0, "\t\t\t\t\"Path\": \"") == 1 {
+      if (side == "old") old = value($0); else new = value($0)
+      next
+    }
+    section == "replace" && index($0, "\t\t\t\t\"Version\": \"") == 1 { if (side == "new") versioned = 1; next }
+    section == "replace" && ($0 == "\t\t}" || $0 == "\t\t},") {
+      print "replace\t" old
+      if (!versioned) print "local\t" new
+      old = ""; new = ""; side = ""; versioned = 0
+      next
+    }
+  '
+}
+
+# replacement_dir prints the directory a replacement path $2 names, read from
+# the module directory $1, relative to this module and cleaned as Go cleans a
+# path. An absolute path stays absolute.
+replacement_dir() {
+  local joined absolute="" rest segment cleaned=""
+  case "$2" in
+    /*) joined="$2"; absolute="/" ;;
+    *) joined="$1/$2" ;;
+  esac
+  rest="$joined/"
+  while [ -n "$rest" ]; do
+    segment="${rest%%/*}"
+    rest="${rest#*/}"
+    case "$segment" in
+      "" | .) ;;
+      ..)
+        case "$cleaned" in
+          "" | .. | */..) [ -n "$absolute" ] || cleaned="${cleaned:+$cleaned/}.." ;;
+          */*) cleaned="${cleaned%/*}" ;;
+          *) cleaned="" ;;
+        esac
+        ;;
+      *) cleaned="${cleaned:+$cleaned/}$segment" ;;
+    esac
+  done
+  if [ -n "$absolute" ]; then
+    printf '/%s\n' "$cleaned"
+  else
+    case "$cleaned" in
+      "") printf '.\n' ;;
+      .. | ../*) printf '%s\n' "$cleaned" ;;
+      *) printf './%s\n' "$cleaned" ;;
+    esac
+  fi
+}
+
+# complete_replaces adds to the go.mod file $1 a replace for each module of the
+# replace closure that go.mod does not replace itself. The replace closure is
+# every directory a local replace reaches from this module, through the go.mod
+# files of the directories it reaches, which is the source view the runtime
+# digest covers. A module that two directories of the closure provide stops the
+# build.
+complete_replaces() {
+  local modfile="$1" facts kind value dir module target provider
+  local pending="" seen="$nl.$nl" replaced="$nl" completed=""
+
+  facts="$(go_mod_facts go.mod)"
+  while IFS="$tab" read -r kind value; do
+    case "$kind" in
+      replace) replaced="$replaced$value$nl" ;;
+      local)
+        target="$(replacement_dir . "$value")"
+        case "$seen" in
+          *"$nl$target$nl"*) ;;
+          *) seen="$seen$target$nl"; pending="$pending$target$nl" ;;
+        esac
+        ;;
+    esac
+  done <<EOF
+$facts
+EOF
+
+  while [ -n "$pending" ]; do
+    dir="${pending%%"$nl"*}"
+    pending="${pending#*"$nl"}"
+    [ -f "$dir/go.mod" ] || continue
+    facts="$(go_mod_facts "$dir/go.mod")"
+    module=""
+    while IFS="$tab" read -r kind value; do
+      case "$kind" in
+        module) module="$value" ;;
+        local)
+          target="$(replacement_dir "$dir" "$value")"
+          case "$seen" in
+            *"$nl$target$nl"*) ;;
+            *) seen="$seen$target$nl"; pending="$pending$target$nl" ;;
+          esac
+          ;;
+      esac
+    done <<EOF
+$facts
+EOF
+    [ -n "$module" ] || continue
+    case "$replaced" in *"$nl$module$nl"*) continue ;; esac
+    provider="$(printf '%s' "$completed" | awk -F "$tab" -v module="$module" '$1 == module { print $2 }')"
+    if [ -n "$provider" ]; then
+      printf 'prepare: the replace closure provides %s from both %s and %s; add a replace for it to go.mod\n' \
+        "$module" "$provider" "$dir" >&2
+      exit 1
+    fi
+    completed="$completed$module$tab$dir$nl"
+  done
+
+  printf '%s' "$completed" | LC_ALL=C sort | while IFS="$tab" read -r module dir; do
+    [ -n "$module" ] || continue
+    printf 'prepare: go.mod does not replace %s; the build uses %s from the replace closure\n' "$module" "$dir" >&2
+    "$go_binary" mod edit -replace="$module=$dir" "$modfile"
+  done
+}
+
 (
   export GOENV=off
-  export GOFLAGS="-mod=mod -buildvcs=false -trimpath"
+  export GOFLAGS="-mod=readonly -buildvcs=false -trimpath"
   export GO111MODULE=on
   export GOWORK=off
   export GOTOOLCHAIN=local
@@ -43,8 +179,18 @@ trap 'rm -f "$tmp"' EXIT INT TERM
   unset GO386 GOAMD64 GOARM GOARM64 GOMIPS GOMIPS64 GOPPC64 GORISCV64 GOWASM
   unset GOEXPERIMENT GOFIPS140 GODEBUG GO_EXTLINK_ENABLED GO_LDSO
 
-  "$go_binary" build -o "$tmp" ./cmd/putnami-python
+  # The build reads a copy of go.mod and go.sum that completes the replace
+  # closure, and never writes the module's own files.
+  mkdir -p "$modroot"
+  cat go.mod >"$modroot/go.mod"
+  if [ -f go.sum ]; then
+    cat go.sum >"$modroot/go.sum"
+  fi
+  complete_replaces "$modroot/go.mod"
+
+  "$go_binary" build -o "$tmp" -modfile="$modroot/go.mod" ./cmd/putnami-python
 )
 chmod +x "$tmp"
 mv "$tmp" "$output/compiled/putnami-python"
+rm -rf "$modroot"
 trap - EXIT INT TERM

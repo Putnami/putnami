@@ -35,6 +35,7 @@
     "go/go-project-toolchain#package-channel-index",
     "go/go-project-toolchain#per-module-channel-resolution",
     "go/go-project-toolchain#pinned-lint-tools",
+    "go/go-project-toolchain#prepare-completes-the-replace-closure",
     "go/go-project-toolchain#probe-graph-fidelity",
     "go/go-project-toolchain#probe-purity",
     "go/go-project-toolchain#registries-drive-go-origin",

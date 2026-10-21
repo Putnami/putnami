@@ -24,6 +24,7 @@ func TestPreparedRuntimesPreferExplicitGoRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	fakeSource := `#!/bin/sh
+[ "$1" = mod ] && exit 0
 printf '%s\n' "$*" > "$PREPARE_CAPTURE"
 previous=""
 for argument in "$@"; do
@@ -93,6 +94,7 @@ func TestPreparedRuntimesSanitizeHostileGoEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	fakeSource := `#!/bin/sh
+[ "$1" = mod ] && exit 0
 for name in \
   GOENV GOFLAGS GO111MODULE GOWORK GOTOOLCHAIN CGO_ENABLED \
   GOOS GOARCH GO386 GOAMD64 GOARM GOARM64 GOMIPS GOMIPS64 GOPPC64 GORISCV64 GOWASM \
@@ -143,7 +145,7 @@ exit 2
 	}
 	sanitized := map[string]string{
 		"GOENV":       "off",
-		"GOFLAGS":     "-mod=mod -buildvcs=false -trimpath",
+		"GOFLAGS":     "-mod=readonly -buildvcs=false -trimpath",
 		"GO111MODULE": "on",
 		"GOWORK":      "off",
 		"GOTOOLCHAIN": "local",

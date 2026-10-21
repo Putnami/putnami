@@ -108,15 +108,11 @@ func ProjectsSync(ctx context.Context, wsRoot string, cfg *wsproto.Config, args 
 	if ws.HasProbeView() {
 		nameChanges = reportNameDivergences(ws)
 	}
-	replaceChanges, err := repairBootstrapClosure(wsRoot, adapters, dryRun)
-	if err != nil {
-		return err
-	}
 
-	if len(added) == 0 && len(removed) == 0 && len(nameChanges) == 0 && len(replaceChanges) == 0 {
+	if len(added) == 0 && len(removed) == 0 && len(nameChanges) == 0 {
 		iox.Fprintln(os.Stdout, "  Putnami membership is in sync.")
 	} else {
-		printSyncDiff(added, removed, nameChanges, replaceChanges)
+		printSyncDiff(added, removed, nameChanges)
 	}
 
 	if dryRun {
@@ -218,39 +214,6 @@ func reportNameDivergences(ws *workspace.Workspace) []string {
 	}
 	sort.Strings(changes)
 	return changes
-}
-
-// repairBootstrapClosure completes the go.mod workspace-replace closure of the
-// LOCAL EXTENSION MODULES this sync must prepare a runtime from, and of nothing
-// else.
-//
-// This is the epic's one legal residue and the narrowest form of it. The full
-// closure belongs to the Go extension's own `workspace-sync` task (C4a) and is
-// maintained there on every sync; core keeps only the part that has to happen
-// BEFORE an extension runtime can be built, because a local extension whose own
-// go.mod is missing a workspace replace cannot be compiled in module mode and
-// therefore cannot run the task that would fix it. See
-// workspace.RepairBootstrapGoModClosure for why the ordering is real and what
-// would remove it.
-//
-// An extension that already has a prepared runtime needs no repair, so it is not
-// named: this is a bootstrap, not a second closure maintainer.
-func repairBootstrapClosure(
-	wsRoot string, adapters workspaceAdapters, dryRun bool,
-) ([]workspace.GoModReplaceChange, error) {
-	dirs := make([]string, 0, len(adapters.adapters))
-	for _, adapter := range adapters.adapters {
-		ext := adapter.ext
-		if ext == nil || ext.RuntimeExecutable != "" || ext.RelPath == "" {
-			continue
-		}
-		dirs = append(dirs, filepath.ToSlash(strings.TrimLeft(ext.RelPath, "/")))
-	}
-	changes, err := workspace.RepairBootstrapGoModClosure(wsRoot, dirs, dryRun)
-	if err != nil {
-		return nil, fmt.Errorf("repair extension bootstrap go.mod closure: %w", err)
-	}
-	return changes, nil
 }
 
 // workspaceAdapter is ONE resolved extension together with the provider binding
@@ -718,10 +681,9 @@ func probeCandidatePaths(ws *workspace.Workspace, scanned []string) []string {
 	return deduped
 }
 
-// printSyncDiff prints the sync change report: discovered/pruned projects,
-// aligned names, and per-module workspace replace additions, followed by a
-// one-line summary.
-func printSyncDiff(added, removed, nameChanges []string, replaceChanges []workspace.GoModReplaceChange) {
+// printSyncDiff prints the sync change report: discovered/pruned projects and
+// the names to align, followed by a one-line summary.
+func printSyncDiff(added, removed, nameChanges []string) {
 	iox.Fprintln(os.Stdout)
 	for _, p := range added {
 		iox.Fprintf(os.Stdout, "  + %s\n", p)
@@ -732,32 +694,10 @@ func printSyncDiff(added, removed, nameChanges []string, replaceChanges []worksp
 	for _, c := range nameChanges {
 		iox.Fprintln(os.Stdout, c)
 	}
-	replacesAdded := 0
-	for _, ch := range replaceChanges {
-		replacesAdded += len(ch.Added)
-		short := make([]string, len(ch.Added))
-		for i, mod := range ch.Added {
-			short[i] = shortModuleName(mod)
-		}
-		iox.Fprintf(os.Stdout, "  ~ %s/go.mod: +%d workspace replaces (%s)\n", ch.Dir, len(ch.Added), strings.Join(short, ", "))
-	}
-	// "to align", not "aligned": core stopped WRITING those manifests in slice
-	// C4b — each provider's own sync task does — so the count is a report, and
-	// claiming the alignment happened here would be claiming someone else's work.
+	// "to align", not "aligned": each provider's own sync task writes those
+	// manifests, so the count is a report of work the core does not do.
 	summary := fmt.Sprintf("\n  %d added, %d removed, %d names to align", len(added), len(removed), len(nameChanges))
-	if replacesAdded > 0 {
-		summary += fmt.Sprintf(", %d workspace replaces added", replacesAdded)
-	}
 	iox.Fprintln(os.Stdout, summary)
-}
-
-// shortModuleName trims the host element from a module path for compact diff
-// output (go.putnami.dev/protocol/config → protocol/config).
-func shortModuleName(mod string) string {
-	if idx := strings.Index(mod, "/"); idx >= 0 {
-		return mod[idx+1:]
-	}
-	return mod
 }
 
 // allKnownProjects returns a set of all project paths currently declared

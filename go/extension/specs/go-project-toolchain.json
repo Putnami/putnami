@@ -44,6 +44,10 @@
       "text": "Workspace sync appends only the missing transitive workspace replaces, after existing content, never rewriting bytes it did not add; a second run changes nothing, a dry run writes nothing, and a run with no resolved project selection fails closed."
     },
     {
+      "id": "prepare-completes-the-replace-closure",
+      "text": "The Go, Python and TypeScript extensions' prepare builds from a copy of go.mod and go.sum and never writes the module's own files. The copy gains a replace for each module that a directory of the replace closure provides and go.mod does not replace; the replace closure is every directory a local replace reaches. Two directories that provide one module stop the build, the build adds no requirement, and two runs over one tree build the same bytes."
+    },
+    {
       "id": "repository-reads-are-declared-inputs",
       "text": "Every repository file the Go extension's tests read outside the project (go.work, every go.work member's go.mod, every first-party extension manifest, the content policy and authored agent content of each manifest that ships content, and the npm packager's gate twin) is a declared test input, so editing one re-runs the suite instead of replaying an old verdict."
     },

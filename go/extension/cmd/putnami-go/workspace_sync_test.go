@@ -585,18 +585,14 @@ func TestSettleGoModules_TidyFailureWarnsAndContinues(t *testing.T) {
 	}
 }
 
-// TestSyncGoWorkspace_ProducesTheCorpusEdits is the NEW side of the
-// native-manifest-edit equivalence. Its twin,
-// TestCoreClosureProducesTheCorpusEdits in
-// tooling/cli/internal/workspace/go_probe_equivalence_test.go, runs the SAME
-// fixtures through the CLI codemod being retired, and both assert the same
-// byte-exact output.
+// TestSyncGoWorkspace_ProducesTheCorpusEdits asserts the closure codemod's
+// byte-exact output over every case of the closure corpus.
 func TestSyncGoWorkspace_ProducesTheCorpusEdits(t *testing.T) {
 	if got := goClosureDigest(goClosureCorpus()); got != goClosureFingerprint {
 		t.Fatalf("closure corpus fingerprint = %q, want %q\n"+
-			"apply the SAME edit to its twin in "+
-			"tooling/cli/internal/workspace/go_probe_equivalence_test.go and update "+
-			"goClosureFingerprint in both files", got, goClosureFingerprint)
+			"the closure corpus changed; if the edit is intended, update "+
+			"goClosureFingerprint and say in the commit which case moved "+
+			"and why the suite still covers what it covered before", got, goClosureFingerprint)
 	}
 
 	for _, c := range goClosureCorpus() {
