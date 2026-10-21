@@ -1,5 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { Config, Default, Env, Int, resetConfigLoader, Sensitive, useConfig, useRawConfigSection } from '../../src';
+import {
+  Config,
+  Default,
+  Env,
+  Int,
+  MapOf,
+  Optional,
+  resetConfigLoader,
+  Sensitive,
+  useConfig,
+  useRawConfigSection,
+} from '../../src';
 import { ConfigService } from '../../src/config/config-service';
 import type { ConfigSource } from '../../src/config/config-source';
 import { specTest } from '../../src/spectest';
@@ -39,6 +50,32 @@ describe('ConfigService', () => {
   });
 
   describe('get()', () => {
+    it('redacts sensitive descendants and dynamic map keys on a failed read', () => {
+      const definition = Config('service', {
+        credentials: Sensitive({ byToken: MapOf(String, Int) }),
+        settings: Optional({ secret: Sensitive(Int), port: Int }),
+      });
+      service = new ConfigService([
+        createInMemorySource('test', 80, {
+          service: {
+            credentials: { byToken: { 'private-token-example': 'invalid' } },
+            settings: { secret: 'invalid', port: 'invalid' },
+          },
+        }),
+      ]);
+
+      let message = '';
+      try {
+        service.get(definition);
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).toContain('service.credentials [redacted]');
+      expect(message).toContain('service.settings.secret [redacted]');
+      expect(message).toContain('service.settings.port must be of type number');
+      expect(message).not.toContain('private-token-example');
+    });
+
     it('loads and validates config from sources', () => {
       const source = createInMemorySource('test', 80, {
         test: { host: 'prod.db', port: 5432 },

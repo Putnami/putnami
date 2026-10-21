@@ -1,13 +1,12 @@
-import { isNestedSchema } from '@putnami/runtime';
 import type { DiscoveredRoute } from '../api';
 import { isExternalClientPolicy } from '../api/client-contract';
 import { pascalCase, renderProto } from './proto-render';
 import {
-  type MessageField,
-  type ProtoOptions,
   GenerationContext,
   registerNestedMessage,
   schemaFieldToProto,
+  type MessageField,
+  type ProtoOptions,
 } from './proto-types';
 
 // Re-export types from split modules so consumers don't need to know about the split
@@ -306,11 +305,6 @@ function buildResponseMessage(ctx: GenerationContext, rpcName: string, route: Di
 
   for (const [key, prop] of Object.entries(route.schemas.returns)) {
     const field = schemaFieldToProto(key, prop, fieldNumber++, ctx, messageName);
-    if (isNestedSchema(prop)) {
-      const nestedName = `${messageName}${pascalCase(key)}`;
-      registerNestedMessage(ctx, nestedName, prop);
-      field.type = nestedName;
-    }
     fields.push(field);
   }
 

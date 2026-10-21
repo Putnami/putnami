@@ -36,10 +36,9 @@ export interface SchemaDescriptor<T = unknown> {
   /** Human-readable description for documentation (OpenAPI, etc.) */
   readonly description?: string;
   /**
-   * Nested object payload — set by `Desc(description, { ... })` so that
-   * description metadata can be attached to a nested schema without
-   * losing its shape. The validator and config extractor recurse into
-   * `schema` when present and `baseType === 'object'`.
+   * Nested object payload — retained when metadata is attached to a plain
+   * nested schema. The validator and config extractor recurse into `schema`
+   * when present and `baseType === 'object'`.
    */
   readonly schema?: NestedSchema;
   /** Phantom type for inference — never use at runtime */
@@ -134,16 +133,24 @@ function descriptor<T>(
   return { __schema: SCHEMA_MARKER, baseType, ...opts } as SchemaDescriptor<T>;
 }
 
+/** Convert a schema primitive to a descriptor without discarding nested fields. */
+function descriptorFor<P extends SchemaPrimitive>(type: P): SchemaDescriptor<InferPrimitive<P>> {
+  if (isSchemaDescriptor(type)) {
+    return { ...type } as SchemaDescriptor<InferPrimitive<P>>;
+  }
+  if (isNestedSchema(type)) {
+    return descriptor<InferPrimitive<P>>('object', { schema: type });
+  }
+  return descriptor<InferPrimitive<P>>(baseTypeName(type));
+}
+
 // ---------------------------------------------------------------------------
 // Schema primitives
 // ---------------------------------------------------------------------------
 
 /** Mark a property as optional */
 export function Optional<P extends SchemaPrimitive>(type: P): SchemaDescriptor<InferPrimitive<P> | undefined> {
-  if (isSchemaDescriptor(type)) {
-    return { ...type, optional: true } as unknown as SchemaDescriptor<InferPrimitive<P> | undefined>;
-  }
-  return descriptor<InferPrimitive<P> | undefined>(baseTypeName(type), { optional: true });
+  return { ...descriptorFor(type), optional: true } as SchemaDescriptor<InferPrimitive<P> | undefined>;
 }
 
 /** Array of items */
@@ -400,8 +407,7 @@ export function Default<P extends SchemaPrimitive, D extends InferPrimitive<P>>(
   type: P,
   value: D,
 ): SchemaDescriptor<InferPrimitive<P>> {
-  const base = isSchemaDescriptor(type) ? { ...type } : descriptor<InferPrimitive<P>>(baseTypeName(type));
-  return { ...base, default: value } as SchemaDescriptor<InferPrimitive<P>>;
+  return { ...descriptorFor(type), default: value } as SchemaDescriptor<InferPrimitive<P>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -410,8 +416,7 @@ export function Default<P extends SchemaPrimitive, D extends InferPrimitive<P>>(
 
 /** Read the value from an environment variable. Falls through to YAML / default if unset. */
 export function Env<P extends SchemaPrimitive>(envVar: string, type: P): SchemaDescriptor<InferPrimitive<P>> {
-  const base = isSchemaDescriptor(type) ? { ...type } : descriptor<InferPrimitive<P>>(baseTypeName(type));
-  return { ...base, env: envVar } as SchemaDescriptor<InferPrimitive<P>>;
+  return { ...descriptorFor(type), env: envVar } as SchemaDescriptor<InferPrimitive<P>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -423,8 +428,7 @@ export function Resolve<P extends SchemaPrimitive>(
   fn: () => Promise<unknown>,
   type: P,
 ): SchemaDescriptor<InferPrimitive<P>> {
-  const base = isSchemaDescriptor(type) ? { ...type } : descriptor<InferPrimitive<P>>(baseTypeName(type));
-  return { ...base, resolve: fn } as SchemaDescriptor<InferPrimitive<P>>;
+  return { ...descriptorFor(type), resolve: fn } as SchemaDescriptor<InferPrimitive<P>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -433,8 +437,7 @@ export function Resolve<P extends SchemaPrimitive>(
 
 /** Mark a field as sensitive. Validation errors will redact the value. */
 export function Sensitive<P extends SchemaPrimitive>(type: P): SchemaDescriptor<InferPrimitive<P>> {
-  const base = isSchemaDescriptor(type) ? { ...type } : descriptor<InferPrimitive<P>>(baseTypeName(type));
-  return { ...base, sensitive: true } as SchemaDescriptor<InferPrimitive<P>>;
+  return { ...descriptorFor(type), sensitive: true } as SchemaDescriptor<InferPrimitive<P>>;
 }
 
 /**
@@ -445,8 +448,7 @@ export function Sensitive<P extends SchemaPrimitive>(type: P): SchemaDescriptor<
  * sources. Twin of the Go `productionUnsafeDefault:"true"` struct tag.
  */
 export function ProductionUnsafeDefault<P extends SchemaPrimitive>(type: P): SchemaDescriptor<InferPrimitive<P>> {
-  const base = isSchemaDescriptor(type) ? { ...type } : descriptor<InferPrimitive<P>>(baseTypeName(type));
-  return { ...base, productionUnsafeDefault: true } as SchemaDescriptor<InferPrimitive<P>>;
+  return { ...descriptorFor(type), productionUnsafeDefault: true } as SchemaDescriptor<InferPrimitive<P>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -467,15 +469,5 @@ export function ProductionUnsafeDefault<P extends SchemaPrimitive>(type: P): Sch
  * ```
  */
 export function Desc<P extends SchemaPrimitive>(description: string, type: P): SchemaDescriptor<InferPrimitive<P>> {
-  if (isNestedSchema(type)) {
-    // Wrap the nested object in a descriptor that carries the description.
-    // The validator and config extractor recognize `schema` on an object
-    // descriptor and recurse into it, so the nested shape is preserved.
-    return descriptor<InferPrimitive<P>>('object', {
-      description,
-      schema: type as NestedSchema,
-    });
-  }
-  const base = isSchemaDescriptor(type) ? { ...type } : descriptor<InferPrimitive<P>>(baseTypeName(type));
-  return { ...base, description } as SchemaDescriptor<InferPrimitive<P>>;
+  return { ...descriptorFor(type), description } as SchemaDescriptor<InferPrimitive<P>>;
 }

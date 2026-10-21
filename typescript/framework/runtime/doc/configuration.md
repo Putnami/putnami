@@ -273,6 +273,10 @@ const DbConfig = Config('database', {
 });
 ```
 
+`Sensitive()` also protects errors from nested fields. Wrap a whole object to
+protect every descendant; validation errors use the declared field path and do
+not include submitted map keys beneath that object.
+
 ## Multi-Datasource Pattern
 
 Load the same config definition from different paths. Useful for multiple database connections, API endpoints, etc.

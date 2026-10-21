@@ -3298,6 +3298,47 @@
           ]
         },
         {
+          "name": "ListItemsResponseItems",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "name",
+              "jsonName": "name",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "price",
+              "jsonName": "price",
+              "number": 3,
+              "typeKind": "scalar",
+              "type": "double"
+            },
+            {
+              "name": "stock",
+              "jsonName": "stock",
+              "number": 4,
+              "typeKind": "scalar",
+              "type": "double"
+            },
+            {
+              "name": "discontinued_at",
+              "jsonName": "discontinuedAt",
+              "number": 5,
+              "typeKind": "scalar",
+              "type": "string",
+              "optional": true
+            }
+          ]
+        },
+        {
           "name": "ListItemsResponse",
           "fields": [
             {
@@ -3311,8 +3352,8 @@
               "name": "items",
               "jsonName": "items",
               "number": 2,
-              "typeKind": "scalar",
-              "type": "string",
+              "typeKind": "message",
+              "type": "ListItemsResponseItems",
               "repeated": true
             }
           ]
@@ -3820,6 +3861,47 @@
           "fields": []
         },
         {
+          "name": "ListProxyResponseItems",
+          "fields": [
+            {
+              "name": "id",
+              "jsonName": "id",
+              "number": 1,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "name",
+              "jsonName": "name",
+              "number": 2,
+              "typeKind": "scalar",
+              "type": "string"
+            },
+            {
+              "name": "price",
+              "jsonName": "price",
+              "number": 3,
+              "typeKind": "scalar",
+              "type": "double"
+            },
+            {
+              "name": "stock",
+              "jsonName": "stock",
+              "number": 4,
+              "typeKind": "scalar",
+              "type": "double"
+            },
+            {
+              "name": "discontinued_at",
+              "jsonName": "discontinuedAt",
+              "number": 5,
+              "typeKind": "scalar",
+              "type": "string",
+              "optional": true
+            }
+          ]
+        },
+        {
           "name": "ListProxyResponse",
           "fields": [
             {
@@ -3840,8 +3922,8 @@
               "name": "items",
               "jsonName": "items",
               "number": 3,
-              "typeKind": "scalar",
-              "type": "string",
+              "typeKind": "message",
+              "type": "ListProxyResponseItems",
               "repeated": true
             }
           ]

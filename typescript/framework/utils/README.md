@@ -80,6 +80,17 @@ const { data, errors } = validateSchema(DatabaseSchema, input);
 Coercion is off by default: a JSON body is checked against its declared type,
 while path and query segments — always strings on the wire — opt in.
 
+Metadata helpers also accept plain nested object declarations. They retain the
+child fields and constraints when composed, so defaults and validation still
+apply at each nested path and config extraction can emit the full shape:
+
+```typescript
+const MessagingSchema = {
+  pubsub: Optional({ topic: String, retries: Default(Int, 3) }),
+  eventServer: Sensitive(Env('EVENT_SERVER', { port: Int })),
+};
+```
+
 ### Object Utilities (Browser + Server)
 
 | Function | Description |

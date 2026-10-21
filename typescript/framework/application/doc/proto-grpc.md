@@ -58,6 +58,11 @@ The `ProtoPlugin` traverses your API routes (discovered via `ApiPlugin`) and con
 | `MapOf(K, V)` | `map<K, V>` | Proto3 map field (keys must be scalar) |
 | Nested object | Sub-message | Auto-generated message type |
 
+Metadata wrappers such as `Optional({ name: String })` retain the nested object
+message and its declared child fields. Arrays of objects and maps with object
+values likewise reference generated messages; an optional object field retains
+explicit presence.
+
 **Wire format support:**
 
 The codec handles all proto3 scalar types with correct wire encoding:

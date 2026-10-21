@@ -11,8 +11,11 @@ import {
   Int,
   MapOf,
   Optional,
+  OneOf,
   ProductionUnsafeDefault,
+  Resolve,
   Sensitive,
+  Url,
 } from '@putnami/runtime';
 import {
   computeSchemaHash,
@@ -237,6 +240,66 @@ describe('extractConfigSchema end-to-end', () => {
   function findField(fields: FieldSchema[], name: string): FieldSchema | undefined {
     return fields.find((f) => f.name === name);
   }
+
+  it('retains metadata-wrapped Auth-like nested config in the manifest and generated JSON Schema', () => {
+    const def = Config('auth', {
+      pubsub: Optional({
+        project: String,
+        topics: MapOf(String, { delivery: OneOf('push', 'pull') }),
+      }),
+      push: Default({ subscriptions: ArrayOf({ endpoint: Url, token: Sensitive(String) }) }, { subscriptions: [] }),
+      eventServer: Sensitive(
+        ProductionUnsafeDefault(
+          Env(
+            'AUTH_EVENT_SERVER',
+            Resolve(async () => ({}), {
+              enabled: Default(Boolean, false),
+              port: Int,
+            }),
+          ),
+        ),
+      ),
+    });
+
+    const manifest = extractConfigSchema({ appName: 'e2e-app', version: '0.0.0', output: false, definitions: [def] });
+    if (!manifest) throw new Error('expected manifest from extractConfigSchema');
+    const block = manifest.configs.find((config) => config.path === 'auth');
+    if (!block) throw new Error('expected auth config block');
+
+    const pubsub = findField(block.fields, 'pubsub');
+    expect(pubsub?.type).toBe('object');
+    expect(findField(pubsub?.fields ?? [], 'project')?.type).toBe('string');
+    const topics = findField(pubsub?.fields ?? [], 'topics');
+    expect(topics?.type).toBe('map');
+    expect(findField(topics?.values?.fields ?? [], 'delivery')?.constraints).toEqual(['oneOf']);
+
+    const push = findField(block.fields, 'push');
+    expect(push?.type).toBe('object');
+    const subscriptions = findField(push?.fields ?? [], 'subscriptions');
+    expect(subscriptions?.type).toBe('array');
+    expect(findField(subscriptions?.items?.fields ?? [], 'endpoint')?.constraints).toEqual(['url']);
+    expect(findField(subscriptions?.items?.fields ?? [], 'token')?.sensitive).toBe(true);
+
+    const eventServer = findField(block.fields, 'eventServer');
+    expect(eventServer?.type).toBe('object');
+    expect(eventServer?.env).toBe('AUTH_EVENT_SERVER');
+    expect(eventServer?.sensitive).toBe(true);
+    expect(eventServer?.productionUnsafeDefault).toBe(true);
+    expect(findField(eventServer?.fields ?? [], 'enabled')?.default).toBe('false');
+    expect(findField(eventServer?.fields ?? [], 'port')?.constraints).toEqual(['integer']);
+
+    const generated = renderJSONSchema(manifest);
+    expect(generated).toHaveProperty(
+      'properties.auth.properties.pubsub.properties.topics.additionalProperties.properties.delivery.x-constraints',
+      ['oneOf'],
+    );
+    expect(generated).toHaveProperty(
+      'properties.auth.properties.push.properties.subscriptions.items.properties.endpoint.x-constraints',
+      ['url'],
+    );
+    expect(generated).toHaveProperty('properties.auth.properties.eventServer.properties.port');
+    expect(generated).toHaveProperty('properties.auth.properties.eventServer.x-sensitive', true);
+  });
 
   // Each test feeds its definitions through the `definitions` option so
   // the global config registry stays untouched — application bootstraps
