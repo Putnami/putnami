@@ -435,6 +435,11 @@ The CLI records both per extension in `.putnami/workspace-index.json`.
 your extension claims, and lists none for a project that no extension declaring a
 `language` claims.
 
+The first-use auto-install follows `installInputs`: when a declared file
+changes, the next command runs `putnami install`. The CLI knows no lockfile of
+its own besides `putnami.lock.json`, so a lockfile you do not declare never
+triggers the install.
+
 ### Machine caches
 
 An extension that keeps a machine-global cache owns it end to end. The CLI hands

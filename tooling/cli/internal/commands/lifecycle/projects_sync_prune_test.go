@@ -46,7 +46,7 @@ func TestProjectsSync_PruneRefusesWhenARecordedProviderDidNotResolve(t *testing.
 	// resolved set is empty while the recorded set is not: exactly the shape a
 	// fresh worktree, an unmaterialized extension artifact or a failed discovery
 	// produces.
-	declareAdapterInputs(t, root, "package.json")
+	recordProviders(t, root, workspace.SnapshotProvider{Extension: "@fixture/adapter", Inputs: probeInputs("package.json")})
 
 	output, err := captureStdout(t, func() error {
 		return ProjectsSync(context.Background(), root, wsproto.Load(root),

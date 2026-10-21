@@ -1,53 +1,50 @@
 package lifecycle
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// declareAdapterInputs writes the workspace index entries the install-state
-// fingerprint reads.
-//
-// The fingerprint is core's own lock plus the
-// ROOT-level `workspace.inputs` the extensions declare, and those declarations
-// are read back from the persisted index rather than by discovering extensions
-// (EnsureWorkspaceBootstrap runs on every command; discovery there would be the
-// most expensive thing a no-op command does). A workspace with no index yet
-// resolves to core's lock alone, which is the correct answer for a fresh
-// checkout: nothing has been installed.
-func declareAdapterInputs(t *testing.T, ws string, inputs ...string) {
+// recordProviders writes a workspace index that records the given providers,
+// the file the install-state check reads the install inputs from.
+func recordProviders(t *testing.T, ws string, providers ...workspace.SnapshotProvider) {
 	t.Helper()
-	entries := make([]map[string]any, 0, len(inputs))
-	for _, input := range inputs {
-		entries = append(entries, map[string]any{"path": input, "digest": "absent"})
+	snapshot := &workspace.Snapshot{Version: 4, ProbeDigest: "wp1:test", IdentityDigest: "wsid1:test"}
+	for _, provider := range providers {
+		if provider.Digest == "" {
+			provider.Digest = "wp1:test"
+		}
+		provider.Result = wsproto.ProbeResult{Version: wsproto.ProbeProtocolVersion, Extension: provider.Extension}
+		snapshot.Providers = append(snapshot.Providers, provider)
 	}
-	index := map[string]any{
-		"version":        1,
-		"probeDigest":    "wp1:test",
-		"identityDigest": "wsid1:test",
-		"providers": []map[string]any{{
-			"extension": "@fixture/adapter",
-			"digest":    "wp1:test",
-			"result":    map[string]any{"version": 1, "extension": "@fixture/adapter"},
-			"inputs":    entries,
-		}},
-	}
-	encoded, err := json.MarshalIndent(index, "", "  ")
-	if err != nil {
+	if err := workspace.WriteSnapshot(ws, snapshot, workspace.SnapshotWritePolicy{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(ws, ".putnami"), 0o755); err != nil {
-		t.Fatal(err)
+}
+
+// declareInstallInputs records one provider whose adapter declares the given
+// install inputs.
+func declareInstallInputs(t *testing.T, ws string, names ...string) {
+	t.Helper()
+	recordProviders(t, ws, workspace.SnapshotProvider{Extension: "@fixture/adapter", InstallInputs: names})
+}
+
+// probeInputs is the recorded probe-input list of a provider: names a probe
+// reads, with no digest a test depends on.
+func probeInputs(names ...string) []workspace.SnapshotInput {
+	inputs := make([]workspace.SnapshotInput, 0, len(names))
+	for _, name := range names {
+		inputs = append(inputs, workspace.SnapshotInput{Path: name, Digest: "absent"})
 	}
-	if err := os.WriteFile(filepath.Join(ws, ".putnami", "workspace-index.json"), encoded, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	return inputs
 }
 
 func writeLock(t *testing.T, ws, name, content string) string {
@@ -113,56 +110,90 @@ func TestCombinedFingerprint_DependsOnContentNotMtime(t *testing.T) {
 	}
 }
 
-// A lock file no adapter declares — and that is not core's own — is invisible
-// to the fingerprint. That is the layering, stated as a test: core stopped
-// carrying a hard-coded table of language filenames, so a bun.lock in a
-// workspace with no TypeScript extension changes nothing about whether the
-// installed state is current.
-func TestEvalInstall_UndeclaredLockFileIsNotAnInput(t *testing.T) {
-	ws := t.TempDir()
-	writeLock(t, ws, "putnami.lock.json", `{}`)
-	if err := writeInstallState(ws); err != nil {
-		t.Fatal(err)
-	}
-	writeLock(t, ws, "bun.lock", "nobody declared me")
-	if stale, _ := evalInstall(ws); stale {
-		t.Error("an undeclared root file forced a re-install; only core's lock and adapter-declared inputs count")
-	}
-}
-
-// And declaring it is what brings it back, without core learning the filename.
-func TestEvalInstall_DeclaredLockFileBecomesAnInput(t *testing.T) {
+// A provider whose adapter declares a file in installInputs makes that file
+// decide the install state: a content change stales the install.
+func TestEvalInstall_ADeclaredInstallInputStalesTheInstall(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-initialization", "install-state-inputs", "a-declared-install-input-stales-the-install")
 	ws := t.TempDir()
 	writeLock(t, ws, "putnami.lock.json", `{}`)
 	writeLock(t, ws, "bun.lock", "v1")
-	declareAdapterInputs(t, ws, "bun.lock")
+	declareInstallInputs(t, ws, "bun.lock")
+	if got := workspaceInstallStateInputs(ws); !slices.Equal(got, []string{"bun.lock", "putnami.lock.json"}) {
+		t.Fatalf("inputs = %v, want the declared install input and the core's lock", got)
+	}
 	if err := writeInstallState(ws); err != nil {
 		t.Fatal(err)
 	}
-	writeLock(t, ws, "bun.lock", "v2-longer")
+	if stale, repair := evalInstall(ws); stale || repair != nil {
+		t.Fatalf("the install state is not current after the install: stale=%v repair=%v", stale, repair != nil)
+	}
+	rewriteLock(t, ws, "bun.lock", "v2")
 	if stale, _ := evalInstall(ws); !stale {
-		t.Error("a declared adapter input changed and the install state stayed current")
+		t.Error("a declared install input changed and the install state stayed current")
 	}
 }
 
-// PROBE inputs and INSTALL inputs answer different questions, and conflating
-// them made a repo-root `biome.json` edit trigger a full workspace re-install.
-// An adapter declares `workspace.inputs` to say what decides its probe
-// ANSWER; the first-use marker asks whether the installed TREE is still current.
-// Only the lock-shaped intersection counts.
-func TestEvalInstall_NonLockRootInputsAreNotInstallInputs(t *testing.T) {
+// A provider that declares no install inputs adds no file to the install
+// state, even a lockfile its probe reads. Editing that lockfile leaves the
+// install current: the core names no language lockfile of its own.
+func TestEvalInstall_AnUndeclaredLockfileLeavesTheInstallCurrent(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-initialization", "install-state-inputs", "an-undeclared-lockfile-leaves-the-install-current")
+	ws := t.TempDir()
+	writeLock(t, ws, "putnami.lock.json", `{}`)
+	writeLock(t, ws, "bun.lock", "v1")
+	recordProviders(t, ws, workspace.SnapshotProvider{
+		Extension: "@fixture/adapter",
+		Inputs:    probeInputs("bun.lock", "package.json"),
+	})
+	if got := workspaceInstallStateInputs(ws); !slices.Equal(got, []string{"putnami.lock.json"}) {
+		t.Fatalf("inputs = %v, want the core's lock alone", got)
+	}
+	if err := writeInstallState(ws); err != nil {
+		t.Fatal(err)
+	}
+	rewriteLock(t, ws, "bun.lock", "v2")
+	if stale, _ := evalInstall(ws); stale {
+		t.Error("a lockfile no provider declares as an install input staled the install")
+	}
+}
+
+// The core's own lock decides the install state whatever the providers
+// declare, and with no workspace index at all.
+func TestEvalInstall_ThePutnamiLockAlwaysCounts(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-initialization", "install-state-inputs", "the-putnami-lock-always-counts")
+	for name, record := range map[string]func(t *testing.T, ws string){
+		"no index":                    func(*testing.T, string) {},
+		"a provider declaring none":   func(t *testing.T, ws string) { declareInstallInputs(t, ws) },
+		"a provider declaring a file": func(t *testing.T, ws string) { declareInstallInputs(t, ws, "bun.lock") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			ws := t.TempDir()
+			writeLock(t, ws, "putnami.lock.json", `{"v":1}`)
+			record(t, ws)
+			if err := writeInstallState(ws); err != nil {
+				t.Fatal(err)
+			}
+			rewriteLock(t, ws, "putnami.lock.json", `{"v":2}`)
+			if stale, _ := evalInstall(ws); !stale {
+				t.Error("putnami.lock.json changed and the install state stayed current")
+			}
+		})
+	}
+}
+
+// Probe inputs and install inputs answer different questions: a root file a
+// probe reads decides what a project resolves to and installs nothing. Only
+// the declared install inputs count.
+func TestEvalInstall_ProbeInputsAreNotInstallInputs(t *testing.T) {
 	ws := t.TempDir()
 	writeLock(t, ws, "putnami.lock.json", `{}`)
 	writeLock(t, ws, "biome.json", `{"formatter":{"indentWidth":2}}`)
 	writeLock(t, ws, "bun.lock", "v1")
-	declareAdapterInputs(t, ws, "biome.json", "bunfig.toml", "bun.lock", "package.json",
-		"tsconfig.base.json", "go.mod")
-
-	got := workspaceInstallStateInputs(ws)
-	want := []string{"bun.lock", "putnami.lock.json"}
-	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
-		t.Fatalf("inputs = %v, want %v — only lock-shaped declarations may enlist", got, want)
-	}
+	recordProviders(t, ws, workspace.SnapshotProvider{
+		Extension:     "@fixture/adapter",
+		Inputs:        probeInputs("biome.json", "bun.lock", "package.json", "tsconfig.base.json"),
+		InstallInputs: []string{"bun.lock"},
+	})
 
 	if err := writeInstallState(ws); err != nil {
 		t.Fatal(err)
@@ -171,21 +202,56 @@ func TestEvalInstall_NonLockRootInputsAreNotInstallInputs(t *testing.T) {
 	if stale, repair := evalInstall(ws); stale || repair != nil {
 		t.Errorf("editing a root probe input forced a re-install (stale=%v repair=%v)", stale, repair != nil)
 	}
-	writeLock(t, ws, "bun.lock", "v2-longer")
+	rewriteLock(t, ws, "bun.lock", "v2")
 	if stale, _ := evalInstall(ws); !stale {
-		t.Error("a declared LOCK changed and the install state stayed current")
+		t.Error("a declared install input changed and the install state stayed current")
 	}
 }
 
-// Per-PROJECT manifests are metadata inputs, not install inputs: they invalidate
-// the workspace probe, not the installed tree. Recording them here would make
-// every project-level edit re-run the first-use install check.
-func TestEvalInstall_OnlyRootLevelInputsCount(t *testing.T) {
+// The install inputs of every recorded provider count, each name once.
+func TestEvalInstall_EveryRecordedProviderContributesItsInstallInputs(t *testing.T) {
+	ws := t.TempDir()
+	recordProviders(t, ws,
+		workspace.SnapshotProvider{Extension: "@fixture/a", InstallInputs: []string{"b.lock", "a.lock"}},
+		workspace.SnapshotProvider{Extension: "@fixture/b", InstallInputs: []string{"a.lock", "c.lock"}},
+		workspace.SnapshotProvider{Extension: "@fixture/c"},
+	)
+	want := []string{"a.lock", "b.lock", "c.lock", "putnami.lock.json"}
+	if got := workspaceInstallStateInputs(ws); !slices.Equal(got, want) {
+		t.Errorf("inputs = %v, want %v", got, want)
+	}
+}
+
+// The index is a file in the workspace, and a hand-edited one can record a
+// name no adapter could declare. The check skips every name the protocol
+// refuses as an install input, so it never reads a file outside the root.
+func TestEvalInstall_ARecordedNameTheProtocolRefusesIsSkipped(t *testing.T) {
 	ws := t.TempDir()
 	writeLock(t, ws, "putnami.lock.json", `{}`)
-	declareAdapterInputs(t, ws, "bun.lock", "apps/web/package.json", "*.lock")
-	if got := workspaceInstallStateInputs(ws); len(got) != 2 || got[0] != "bun.lock" || got[1] != "putnami.lock.json" {
-		t.Errorf("inputs = %v, want core's lock plus the root-level declaration only", got)
+	declareInstallInputs(t, ws, "bun.lock", "apps/web/bun.lock", "*.lock", "../outside.lock", "..", " bun.lockb", "")
+	if got := workspaceInstallStateInputs(ws); !slices.Equal(got, []string{"bun.lock", "putnami.lock.json"}) {
+		t.Errorf("inputs = %v, want the core's lock plus the one valid name", got)
+	}
+}
+
+// An unreadable index adds nothing: the check falls back to the core's lock,
+// and a marker that recorded more files no longer matches.
+func TestEvalInstall_AnUnreadableIndexLeavesTheCoreLockAlone(t *testing.T) {
+	ws := t.TempDir()
+	writeLock(t, ws, "putnami.lock.json", `{}`)
+	writeLock(t, ws, "bun.lock", "v1")
+	declareInstallInputs(t, ws, "bun.lock")
+	if err := writeInstallState(ws); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(workspace.SnapshotPath(ws), []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := workspaceInstallStateInputs(ws); !slices.Equal(got, []string{"putnami.lock.json"}) {
+		t.Fatalf("inputs = %v, want the core's lock alone", got)
+	}
+	if stale, _ := evalInstall(ws); !stale {
+		t.Error("a marker that recorded a file the check no longer reads stayed current")
 	}
 }
 
@@ -201,7 +267,7 @@ func TestEvalInstall_FreshAfterWrite(t *testing.T) {
 	ws := t.TempDir()
 	writeLock(t, ws, "putnami.lock.json", `{"x":1}`)
 	writeLock(t, ws, "bun.lock", "lockfile content")
-	declareAdapterInputs(t, ws, "bun.lock")
+	declareInstallInputs(t, ws, "bun.lock")
 	if err := writeInstallState(ws); err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +304,7 @@ func TestEvalInstall_AHostedRunIgnoresACurrentMarker(t *testing.T) {
 func TestEvalInstall_ContentChangeIsStale(t *testing.T) {
 	ws := t.TempDir()
 	writeLock(t, ws, "bun.lock", "v1")
-	declareAdapterInputs(t, ws, "bun.lock")
+	declareInstallInputs(t, ws, "bun.lock")
 	if err := writeInstallState(ws); err != nil {
 		t.Fatal(err)
 	}
@@ -248,10 +314,8 @@ func TestEvalInstall_ContentChangeIsStale(t *testing.T) {
 	}
 }
 
-// uv.lock reaches the fingerprint the same way every other language lock does:
-// the Python adapter declares it and core accepts the declaration. What this test
-// owns is that plumbing, not the change-detection mechanism — TestEvalInstall_
-// ContentChangeIsStale and TestEvalInstall_MtimeOnlyChangeIsNotStale own that.
+// A rewrite of a declared install input that keeps its length stales the
+// install.
 //
 // The rewrite keeps the length a real `version = N` bump would keep, so it goes
 // through rewriteLock: on a filesystem whose stamps are coarser than two
@@ -260,7 +324,7 @@ func TestEvalInstall_ContentChangeIsStale(t *testing.T) {
 func TestEvalInstall_UVLockChangeIsStale(t *testing.T) {
 	ws := t.TempDir()
 	writeLock(t, ws, "uv.lock", "version = 1\n")
-	declareAdapterInputs(t, ws, "uv.lock")
+	declareInstallInputs(t, ws, "uv.lock")
 	if err := writeInstallState(ws); err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +350,7 @@ func TestEvalInstall_UVLockChangeIsStale(t *testing.T) {
 func TestEvalInstall_SameSizeAndMtimeContentChangeIsNotDetected(t *testing.T) {
 	ws := t.TempDir()
 	p := writeLock(t, ws, "uv.lock", "version = 1\n")
-	declareAdapterInputs(t, ws, "uv.lock")
+	declareInstallInputs(t, ws, "uv.lock")
 	if err := writeInstallState(ws); err != nil {
 		t.Fatal(err)
 	}
@@ -316,12 +380,14 @@ func TestEvalInstall_SameSizeAndMtimeContentChangeIsNotDetected(t *testing.T) {
 	}
 }
 
+// The Go extension declares go.work and not its checksum files, which ordinary
+// builds update, so a checksum change leaves the install current.
 func TestEvalInstall_GoChecksumChangesAreNotStale(t *testing.T) {
 	ws := t.TempDir()
 	writeLock(t, ws, "putnami.lock.json", `{}`)
 	writeLock(t, ws, "go.sum", "example.com/dep v1.0.0 h1:old\n")
 	writeLock(t, ws, "go.work.sum", "example.com/workdep v1.0.0/go.mod h1:old\n")
-	declareAdapterInputs(t, ws, "go.mod", "go.work")
+	declareInstallInputs(t, ws, "go.work")
 	if err := writeInstallState(ws); err != nil {
 		t.Fatal(err)
 	}
@@ -341,7 +407,7 @@ func TestEvalInstall_GoChecksumChangesAreNotStale(t *testing.T) {
 func TestEvalInstall_MtimeOnlyChangeIsNotStale(t *testing.T) {
 	ws := t.TempDir()
 	p := writeLock(t, ws, "go.work", "go 1.23\n")
-	declareAdapterInputs(t, ws, "go.work")
+	declareInstallInputs(t, ws, "go.work")
 	if err := writeInstallState(ws); err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +431,7 @@ func TestEvalInstall_MtimeOnlyChangeIsNotStale(t *testing.T) {
 func TestEvalInstall_LockFileAddedIsStale(t *testing.T) {
 	ws := t.TempDir()
 	writeLock(t, ws, "putnami.lock.json", `{}`)
-	declareAdapterInputs(t, ws, "go.work")
+	declareInstallInputs(t, ws, "go.work")
 	if err := writeInstallState(ws); err != nil {
 		t.Fatal(err)
 	}
@@ -379,7 +445,7 @@ func TestEvalInstall_LockFileRemovedIsStale(t *testing.T) {
 	ws := t.TempDir()
 	writeLock(t, ws, "putnami.lock.json", `{}`)
 	p := writeLock(t, ws, "go.work", "go 1.23\n")
-	declareAdapterInputs(t, ws, "go.work")
+	declareInstallInputs(t, ws, "go.work")
 	if err := writeInstallState(ws); err != nil {
 		t.Fatal(err)
 	}

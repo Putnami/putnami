@@ -459,15 +459,12 @@ token-source recipes) are already in place. You no longer have to remember to ru
 `putnami install` first.
 
 The check is marker-gated: `putnami install` records a content hash of the
-workspace install inputs (`putnami.lock.json`, `bun.lock`, `uv.lock`, `go.work`,
-…) in `.putnami/install-state.json` (gitignored). A later command stat-compares
-those files (~0.015 ms warm) and re-installs only when their **content** actually
-changes — a `git pull` that merely touches mtimes does not trigger a reinstall.
-Go checksum outputs (`go.sum`, `go.work.sum`) are ignored because ordinary
-build/deploy commands can update them and `putnami install` does not materialize
-Go module dependencies. It is best-effort: if the auto-install fails (offline,
-missing token), the command still runs and surfaces its own error. With
-[`--credential-fd`](#run-credential---credential-fd), a failed auto-install
+workspace install inputs in `.putnami/install-state.json` (gitignored). A later
+command stat-compares those files (~0.015 ms warm) and re-installs only when
+their **content** actually changes — a `git pull` that merely touches mtimes
+does not trigger a reinstall. It is best-effort: if the auto-install fails
+(offline, missing token), the command still runs and surfaces its own error.
+With [`--credential-fd`](#run-credential---credential-fd), a failed auto-install
 stops the command before it plans any task, and it exits 1.
 
 With [`--credential-fd`](#run-credential---credential-fd), the check ignores the
@@ -475,12 +472,20 @@ marker and the install always runs. A repository can commit a marker that
 matches its locks, and the install it would skip is the one that fetches the
 dependencies before any repository code runs.
 
-The input set is an **intersection**, not a source: a workspace-root file counts
-only when the extension that installs from it declared it in its adapter's
-`workspace.inputs` *and* it is one of the lock-shaped names above. Probe inputs
-and install inputs are different questions — a root `biome.json` or
-`tsconfig.base.json` decides what a project resolves to, and installs nothing —
-so declaring one does not enlist it here.
+The install inputs are `putnami.lock.json` plus the workspace-root files each
+extension declares in the `installInputs` of its workspace adapter, such as a
+lockfile. The CLI reads the declarations that `.putnami/workspace-index.json`
+records, and names no lockfile itself. A lockfile that no extension declares
+does not count: the lockfiles of an extension that declares no `installInputs`
+never trigger the auto-install. The `inputs` of an adapter decide what a
+project resolves to, not whether the install is current.
+
+The check runs before the command syncs the workspace index. When an
+extension's declaration changes, for example after an upgrade or an edit to a
+local extension, the first command records the new declaration and the next
+command compares against it. After an upgrade from a CLI that did not record
+`installInputs`, a workspace that holds a declared lockfile runs the install
+once, on the first command.
 
 It is inert under `--plan` and `--dry-run` (which only print a note when the
 workspace is out of date), and for the `install`/`deps`/`upgrade` commands
