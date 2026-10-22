@@ -229,6 +229,42 @@ The `event` payload of a `task:event` record stays owned by
 [`protocols/runtime`](../../runtime/README.md) and is versioned there; this
 contract treats it as an opaque object.
 
+### Workspace load warnings
+
+`workspaceWarnings` is an additive optional member of the result envelope. It
+lists the non-fatal warnings the command's workspace load recorded, in load
+order. These are the same warnings the command writes to stderr as
+`putnami: warning: <message>` lines:
+
+```json
+{"protocolVersion":2,"command":"projects list","status":"success","exitCode":0,
+ "data":[{"id":"apps/web","name":"web","path":"apps/web"}],
+ "workspaceWarnings":[{"code":"workspace.provider_view_unavailable",
+  "message":"no workspace provider view (.putnami/workspace-index.json): ..."}]}
+```
+
+- Each entry has a `code` and a `message`, both non-empty. Branch on `code`,
+  never on `message`: the code is stable, the prose is not.
+- The code set is open. A reader ignores a code it does not know. The current
+  codes are `workspace.provider_view_unavailable`, `workspace.probe_view_rejected`,
+  `workspace.index_unreadable`, `workspace.name_divergence` and
+  `workspace.jobs_ignored`.
+- The member is absent when the load recorded no warning or the command loads
+  no workspace. An empty array is invalid.
+- It is allowed beside any status, because a load that warned can still end in
+  a failure.
+- `--quiet` hides the stderr lines and keeps the envelope member.
+
+The name is `workspaceWarnings`, not `warnings`, because `warnings` already
+names the count of warning-severity task diagnostics in the report's
+`commands[]`. A load warning is a different thing: one finding about the
+workspace, not a count of a task's diagnostics.
+
+`projects list`, `projects describe`, `scopes list` and `workspace describe`
+fill the member. `completion` and `projects tag` take no `--output=json`, so
+their warnings stay on stderr. A job run's envelope does not carry the member
+yet: its load warnings are on stderr only.
+
 ### Test case records
 
 A `test:case` record reports one test case of a test task, so a reader shows
@@ -916,6 +952,7 @@ nothing else — not the CLI version, not a flag.
 | `data.jobs[]` (`package`, `job`, `status`, `durationMs`, `cache`, `coalesced`, `error`) | not on the envelope — the failures are `run.failures[]` with a typed identity; the full per-task list is the recorded session file's `tasks[]` |
 | _(no field: v1 had none)_ | `run.failures[].diagnostics[]` |
 | human plan table from `--plan` / plan-only `--dry-run` | `plan` with `status: "success"`, `exitCode: 0`, and no `run` / `data` / `error` |
+| _(no field: v1 wrote load warnings to stderr only)_ | `workspaceWarnings[].{code,message}` |
 
 Two behavior changes travel with the shape, both settled above:
 

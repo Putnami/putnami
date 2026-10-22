@@ -1009,9 +1009,9 @@ func TestCompletionScripts_OfferNamesAndBasenamesAsTargets(t *testing.T) {
 
 func TestCompletionWarnsOnAnUnindexedWorkspace(t *testing.T) {
 	generators := map[string]func(w, warnings *bytes.Buffer, root string){
-		"bash": func(w, warnings *bytes.Buffer, root string) { CompletionBash(w, root, &wsproto.Config{}, warnings) },
-		"zsh":  func(w, warnings *bytes.Buffer, root string) { CompletionZsh(w, root, &wsproto.Config{}, warnings) },
-		"fish": func(w, warnings *bytes.Buffer, root string) { CompletionFish(w, root, &wsproto.Config{}, warnings) },
+		"bash": func(w, warnings *bytes.Buffer, root string) { CompletionBash(w, root, &wsproto.Config{}, workspace.NewWarningReport(warnings)) },
+		"zsh":  func(w, warnings *bytes.Buffer, root string) { CompletionZsh(w, root, &wsproto.Config{}, workspace.NewWarningReport(warnings)) },
+		"fish": func(w, warnings *bytes.Buffer, root string) { CompletionFish(w, root, &wsproto.Config{}, workspace.NewWarningReport(warnings)) },
 	}
 	for shell, generate := range generators {
 		t.Run(shell, func(t *testing.T) {

@@ -3,7 +3,6 @@ package lifecycle
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -14,13 +13,13 @@ import (
 
 // WorkspaceDescribe shows workspace information including projects,
 // extensions, and configuration. The warnings workspace.Load recorded go to
-// warnings (nil writes none).
-func WorkspaceDescribe(wsRoot string, cfg *wsproto.Config, outputFormat string, warnings io.Writer) error {
+// warnings (nil reports none).
+func WorkspaceDescribe(wsRoot string, cfg *wsproto.Config, outputFormat string, warnings *workspace.WarningReport) error {
 	ws, err := workspace.Load(wsRoot)
 	if err != nil {
 		return fmt.Errorf("load workspace: %w", err)
 	}
-	workspace.WriteWarnings(warnings, ws)
+	warnings.Report(ws)
 
 	if outputFormat == "jsonl" {
 		return workspaceDescribeJSONL(ws, cfg)

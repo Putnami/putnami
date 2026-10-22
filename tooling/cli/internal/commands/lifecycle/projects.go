@@ -3,7 +3,6 @@ package lifecycle
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"sort"
 	"strings"
@@ -15,14 +14,14 @@ import (
 )
 
 // ProjectsList lists all projects in the workspace with their paths and tags.
-// The warnings workspace.Load recorded go to warnings (nil writes none), so a
+// The warnings workspace.Load recorded go to warnings (nil reports none), so a
 // name resolved from authored config alone is reported as such.
-func ProjectsList(wsRoot string, cfg *wsproto.Config, outputFormat string, warnings io.Writer) error {
+func ProjectsList(wsRoot string, cfg *wsproto.Config, outputFormat string, warnings *workspace.WarningReport) error {
 	ws, err := workspace.Load(wsRoot)
 	if err != nil {
 		return fmt.Errorf("load workspace: %w", err)
 	}
-	workspace.WriteWarnings(warnings, ws)
+	warnings.Report(ws)
 
 	projects := sortedProjects(ws.Projects)
 
@@ -46,8 +45,8 @@ func ProjectsList(wsRoot string, cfg *wsproto.Config, outputFormat string, warni
 }
 
 // ProjectsDescribe shows detailed information about a specific project. The
-// warnings workspace.Load recorded go to warnings (nil writes none).
-func ProjectsDescribe(wsRoot string, cfg *wsproto.Config, args []string, outputFormat string, warnings io.Writer) error {
+// warnings workspace.Load recorded go to warnings (nil reports none).
+func ProjectsDescribe(wsRoot string, cfg *wsproto.Config, args []string, outputFormat string, warnings *workspace.WarningReport) error {
 	if len(args) < 1 {
 		return cmderr.Usagef("project name required: projects describe <name>")
 	}
@@ -57,7 +56,7 @@ func ProjectsDescribe(wsRoot string, cfg *wsproto.Config, args []string, outputF
 	if err != nil {
 		return fmt.Errorf("load workspace: %w", err)
 	}
-	workspace.WriteWarnings(warnings, ws)
+	warnings.Report(ws)
 
 	proj := ws.ProjectByID(projectName)
 	if proj == nil {

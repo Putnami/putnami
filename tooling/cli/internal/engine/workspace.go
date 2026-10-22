@@ -44,7 +44,7 @@ func loadWorkspaceAndExtensions(req *Request) (*workspace.Workspace, *extension.
 	// parse errors lead to "my project isn't listed" with zero diagnostic.
 	// Quiet mode still hides them so scripts can stay clean.
 	if !req.Global.Quiet {
-		workspace.WriteWarnings(os.Stderr, ws)
+		workspace.NewWarningReport(os.Stderr).Report(ws)
 	}
 
 	projectPaths := make([]string, len(ws.Projects))

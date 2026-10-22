@@ -1060,7 +1060,7 @@ func (s *Server) workspaceContextResource(ctx context.Context) (workspaceContext
 	data := workspaceContextData{
 		Name:            ws.Name,
 		Root:            ws.Root,
-		Warnings:        append([]string(nil), ws.Warnings...),
+		Warnings:        ws.WarningMessages(),
 		Layout:          workspaceLayoutContext{},
 		Projects:        make([]workspaceProject, 0, len(ws.Projects)),
 		Graph:           make(map[string]graphContext, len(ws.Projects)),

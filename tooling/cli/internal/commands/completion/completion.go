@@ -1,7 +1,6 @@
 package completion
 
 import (
-	"io"
 	"maps"
 	"path/filepath"
 	"slices"
@@ -77,10 +76,10 @@ func withoutAbsentProviders(flags []commandmeta.GlobalFlag, declared map[string]
 }
 
 // gatherCompletionContext collects what the generated scripts embed. The
-// warnings workspace.Load recorded go to warnings (nil writes none): the
+// warnings workspace.Load recorded go to warnings (nil reports none): the
 // project names embedded in a script come from authored config alone until the
 // workspace index exists.
-func gatherCompletionContext(wsRoot string, cfg *wsproto.Config, warnings io.Writer) completionContext {
+func gatherCompletionContext(wsRoot string, cfg *wsproto.Config, warnings *workspace.WarningReport) completionContext {
 	ctx := completionContext{
 		structuredDesc:       map[string]string{},
 		subcommands:          map[string][]string{},
@@ -111,7 +110,7 @@ func gatherCompletionContext(wsRoot string, cfg *wsproto.Config, warnings io.Wri
 	if wsRoot != "" {
 		projectPaths := []string{}
 		ws, _ := workspace.Load(wsRoot)
-		workspace.WriteWarnings(warnings, ws)
+		warnings.Report(ws)
 		if ws != nil {
 			for _, p := range ws.Projects {
 				ctx.projects = append(ctx.projects, p.Name)

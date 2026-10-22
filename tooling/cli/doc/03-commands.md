@@ -235,12 +235,18 @@ committed), a project without a `putnami.json` takes its name from authored
 config alone, so `projects list` and `projects describe` can show a different
 name than they show once the index exists. Both commands write the warning that
 the engine commands write (`putnami: warning: no workspace provider view ...`) to
-stderr, so stdout and the `--output` document stay unchanged. `--quiet` hides it.
-Run `putnami projects sync` to build the index.
+stderr. `--quiet` hides it. Run `putnami projects sync` to build the index.
+
+With `--output=json` or `--output=jsonl`, the result envelope also lists each
+load warning in `workspaceWarnings`, with its stable code (for example
+`workspace.provider_view_unavailable`) and its message, under `--quiet` too.
+The `data` payload does not change. See
+[the result contract](../../../protocols/cli/doc/02-result-v2.md#workspace-load-warnings).
 
 `projects tag`, `scopes list` and `workspace describe` write the same warning
-under the same rules. `projects sync` reports the state itself and writes no
-separate warning.
+under the same rules; `scopes list` and `workspace describe` also put it in
+their envelope. `projects sync` reports the state itself and writes no separate
+warning.
 
 `projects create <name> --template <template>` renders the template and lists
 the project in the workspace config. It then runs the `project-setup` job of

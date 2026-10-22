@@ -166,6 +166,7 @@ var v2StructDefs = map[string]any{
 	"plannedTask":              PlannedTask{},
 	"planSummary":              PlanSummary{},
 	"resultEnvelope":           ResultV2{},
+	"workspaceWarning":         WorkspaceWarning{},
 	"sessionStreamRecord":      SessionStreamRecord{},
 	"boundedSessionEndRecord":  BoundedSessionEndRecord{},
 	"mcpResult":                MCPResult{},

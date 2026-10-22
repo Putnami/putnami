@@ -409,6 +409,12 @@ var (
 		opt("run", runSummary),
 		opt("plan", planSummary),
 		opt("error", resultError),
+		opt("workspaceWarnings", nonEmptyArrayOf(workspaceWarning)),
+	}
+
+	workspaceWarningFields = []field{
+		req("code", nonEmptyString),
+		req("message", nonEmptyString),
 	}
 
 	sessionStreamRecordFields = []field{
@@ -617,6 +623,7 @@ var v2FieldSets = map[string][]field{
 	"plannedTask":              plannedTaskFields,
 	"planSummary":              planSummaryFields,
 	"resultEnvelope":           resultEnvelopeFields,
+	"workspaceWarning":         workspaceWarningFields,
 	"sessionStreamRecord":      sessionStreamRecordFields,
 	"boundedSessionEndRecord":  boundedSessionEndRecordFields,
 	"mcpResult":                mcpResultFields,
@@ -664,6 +671,10 @@ func identity(v *validator, path string, value any) {
 
 func resultError(v *validator, path string, value any) {
 	object(v, path, value, resultErrorFields)
+}
+
+func workspaceWarning(v *validator, path string, value any) {
+	object(v, path, value, workspaceWarningFields)
 }
 
 func diagnostic(v *validator, path string, value any) {

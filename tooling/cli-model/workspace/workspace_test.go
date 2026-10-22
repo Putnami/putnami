@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -12,8 +13,15 @@ func TestWorkspaceWarningCodesDoNotDependOnMessageText(t *testing.T) {
 	if !ws.HasWarningCode(WarningCodeProviderViewUnavailable) {
 		t.Fatal("typed provider-view warning was not retained")
 	}
-	if len(ws.Warnings) != 2 || len(ws.WarningCodes) != 1 {
-		t.Fatalf("warnings=%v codes=%v", ws.Warnings, ws.WarningCodes)
+	want := []Warning{
+		{Code: WarningCodeProviderViewUnavailable, Message: "first wording"},
+		{Code: WarningCodeProviderViewUnavailable, Message: "reworded"},
+	}
+	if !reflect.DeepEqual(ws.Warnings, want) {
+		t.Fatalf("warnings = %v, want %v", ws.Warnings, want)
+	}
+	if got := ws.WarningMessages(); !reflect.DeepEqual(got, []string{"first wording", "reworded"}) {
+		t.Fatalf("messages = %v", got)
 	}
 }
 

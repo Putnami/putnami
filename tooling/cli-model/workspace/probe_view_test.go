@@ -311,7 +311,7 @@ func TestAdoptProbeView_ReportsDuplicateResolvedNames(t *testing.T) {
 
 	found := false
 	for _, warning := range ws.Warnings {
-		if strings.Contains(warning, "duplicate project name") {
+		if warning.Code == WarningCodeProbeViewRejected && strings.Contains(warning.Message, "duplicate project name") {
 			found = true
 		}
 	}
@@ -414,7 +414,7 @@ func TestAdoptProbeView_KeepsThePreviousViewWhenTheNewOneIsUnloadable(t *testing
 	if got := ws.ProjectByID("/app"); got == nil || got.Name != "example.com/app" {
 		t.Errorf("app = %+v, want the previous view's identity kept", got)
 	}
-	if warning := strings.Join(ws.Warnings, "\n"); !strings.Contains(warning, "dependency cycle") {
+	if warning := strings.Join(ws.WarningMessages(), "\n"); !strings.Contains(warning, "dependency cycle") {
 		t.Errorf("the refusal was silent:\n%s", warning)
 	}
 }

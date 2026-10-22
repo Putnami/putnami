@@ -11,6 +11,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
 	"go.putnami.dev/tooling/cli/internal/output"
 	"go.putnami.dev/tooling/cli/internal/progress"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // CommandEnv is the standardized input passed to every structured command
@@ -33,6 +34,38 @@ type CommandEnv struct {
 	OutputFormat string
 	// Global holds the parsed global flags.
 	Global GlobalFlags
+
+	// warnings keeps the workspace load warnings the command reported.
+	// WorkspaceWarnings creates it on first use.
+	warnings *workspace.WarningReport
+}
+
+// WorkspaceWarnings returns the report a command that reads the workspace hands
+// its load warnings to. The report writes them where warningWriter says and
+// keeps them, so a structured command's result envelope carries them in
+// workspaceWarnings, under --quiet too.
+func (e *CommandEnv) WorkspaceWarnings() *workspace.WarningReport {
+	if e.warnings == nil {
+		e.warnings = workspace.NewWarningReport(warningWriter(e))
+	}
+	return e.warnings
+}
+
+// envelopeWarnings returns the reported workspace warnings in their result
+// envelope shape, or nil when the command reported none.
+func (e *CommandEnv) envelopeWarnings() []protocolcli.WorkspaceWarning {
+	if e == nil {
+		return nil
+	}
+	reported := e.warnings.Warnings()
+	if len(reported) == 0 {
+		return nil
+	}
+	warnings := make([]protocolcli.WorkspaceWarning, len(reported))
+	for i, warning := range reported {
+		warnings[i] = protocolcli.WorkspaceWarning{Code: string(warning.Code), Message: warning.Message}
+	}
+	return warnings
 }
 
 // Progress returns a progress.Reporter that writes human-readable phase/step

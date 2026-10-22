@@ -579,6 +579,22 @@ export interface ResultV2 {
   /** A successful plan-only preview; exclusive with `run`, `data`, and `error`. */
   plan?: PlanSummary;
   error?: ResultErrorV2;
+  /**
+   * The non-fatal warnings the command's workspace load recorded, in load
+   * order. Absent when there are none; never an empty array.
+   */
+  workspaceWarnings?: WorkspaceWarning[];
+}
+
+/**
+ * One non-fatal warning a workspace load recorded. Branch on `code`, never on
+ * `message`. The code set is open: ignore a code you do not know.
+ */
+export interface WorkspaceWarning {
+  /** Stable machine reason, for example `workspace.provider_view_unavailable`. */
+  code: string;
+  /** Human-readable warning, the text the command also writes to stderr. */
+  message: string;
 }
 
 /** One `--output=jsonl` line; `plan:end` is live-only, not a session event. */
@@ -1478,6 +1494,17 @@ function arrayOf(item: Check): Check {
   };
 }
 
+/** An array that holds at least one element: an optional list with nothing to report is absent, never empty. */
+function nonEmptyArrayOf(item: Check): Check {
+  return (v, path, value) => {
+    if (Array.isArray(value) && value.length === 0) {
+      v.add(VIOLATION_CODE.invalidValue, path);
+      return;
+    }
+    arrayOf(item)(v, path, value);
+  };
+}
+
 function intMapValues(v: Validator, path: string, value: unknown): void {
   if (!isObject(value)) {
     v.add(VIOLATION_CODE.invalidType, path);
@@ -1578,6 +1605,10 @@ const diagnosticFields: Field[] = [
 ];
 
 const resultError: Check = (v, path, value) => object(v, path, value, resultErrorFields);
+
+const workspaceWarningFields: Field[] = [req('code', nonEmptyString), req('message', nonEmptyString)];
+
+const workspaceWarning: Check = (v, path, value) => object(v, path, value, workspaceWarningFields);
 const diagnostic: Check = (v, path, value) => object(v, path, value, diagnosticFields);
 
 const executionRecordFields: Field[] = [
@@ -2435,6 +2466,7 @@ const resultEnvelopeFields: Field[] = [
   opt('run', runSummary),
   opt('plan', planSummary),
   opt('error', resultError),
+  opt('workspaceWarnings', nonEmptyArrayOf(workspaceWarning)),
 ];
 
 const sessionStreamRecordFields: Field[] = [
@@ -3009,6 +3041,7 @@ export const V2_FIELD_NAMES: Record<string, { members: string[]; required: strin
       ['plannedTask', plannedTaskFields],
       ['planSummary', planSummaryFields],
       ['resultEnvelope', resultEnvelopeFields],
+      ['workspaceWarning', workspaceWarningFields],
       ['sessionStreamRecord', sessionStreamRecordFields],
       ['boundedSessionEndRecord', boundedSessionEndRecordFields],
       ['mcpResult', mcpResultFields],

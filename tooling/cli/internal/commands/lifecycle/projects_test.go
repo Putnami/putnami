@@ -820,13 +820,19 @@ func TestProjectsList_WarnsOnAnUnindexedWorkspace(t *testing.T) {
 		t.Run("format="+format, func(t *testing.T) {
 			root := sharedtest.UnindexedWorkspace(t)
 			var stderr bytes.Buffer
+			report := workspace.NewWarningReport(&stderr)
 			stdout, err := captureStdout(t, func() error {
-				return ProjectsList(root, nil, format, &stderr)
+				return ProjectsList(root, nil, format, report)
 			})
 			if err != nil {
 				t.Fatalf("ProjectsList: %v", err)
 			}
 			assertProviderViewWarning(t, stderr.String())
+			kept := report.Warnings()
+			if len(kept) != 1 || kept[0].Code != workspace.WarningCodeProviderViewUnavailable ||
+				!strings.Contains(stderr.String(), kept[0].Message) {
+				t.Errorf("report kept %v, want the one provider-view warning written to stderr", kept)
+			}
 			if strings.Contains(stdout, "warning") {
 				t.Errorf("the warning reached stdout:\n%s", stdout)
 			}
@@ -846,7 +852,7 @@ func TestProjectsList_IndexedWorkspaceAndQuietWriteNoWarning(t *testing.T) {
 	sharedtest.RecordWorkspaceIndex(t, root)
 	var stderr bytes.Buffer
 	stdout, err := captureStdout(t, func() error {
-		return ProjectsList(root, nil, "jsonl", &stderr)
+		return ProjectsList(root, nil, "jsonl", workspace.NewWarningReport(&stderr))
 	})
 	if err != nil {
 		t.Fatalf("ProjectsList: %v", err)
@@ -863,7 +869,7 @@ func TestProjectsDescribe_WarnsOnAnUnindexedWorkspace(t *testing.T) {
 	root := sharedtest.UnindexedWorkspace(t)
 	var stderr bytes.Buffer
 	if _, err := captureStdout(t, func() error {
-		return ProjectsDescribe(root, nil, []string{"/web"}, "", &stderr)
+		return ProjectsDescribe(root, nil, []string{"/web"}, "", workspace.NewWarningReport(&stderr))
 	}); err != nil {
 		t.Fatalf("ProjectsDescribe: %v", err)
 	}
@@ -872,7 +878,7 @@ func TestProjectsDescribe_WarnsOnAnUnindexedWorkspace(t *testing.T) {
 	sharedtest.RecordWorkspaceIndex(t, root)
 	stderr.Reset()
 	if _, err := captureStdout(t, func() error {
-		return ProjectsDescribe(root, nil, []string{"/web"}, "", &stderr)
+		return ProjectsDescribe(root, nil, []string{"/web"}, "", workspace.NewWarningReport(&stderr))
 	}); err != nil {
 		t.Fatalf("ProjectsDescribe (indexed): %v", err)
 	}
@@ -893,13 +899,13 @@ func quietly(t *testing.T, fn func() error) error {
 func TestWorkspaceReadingCommandsWarnOnAnUnindexedWorkspace(t *testing.T) {
 	commands := map[string]func(root string, warnings io.Writer) error{
 		"workspace describe": func(root string, warnings io.Writer) error {
-			return WorkspaceDescribe(root, wsproto.Load(root), "", warnings)
+			return WorkspaceDescribe(root, wsproto.Load(root), "", workspace.NewWarningReport(warnings))
 		},
 		"scopes list": func(root string, warnings io.Writer) error {
-			return ScopesList(root, wsproto.Load(root), "", warnings)
+			return ScopesList(root, wsproto.Load(root), "", workspace.NewWarningReport(warnings))
 		},
 		"projects tag": func(root string, warnings io.Writer) error {
-			return ProjectsTag(root, wsproto.Load(root), []string{"web"}, warnings)
+			return ProjectsTag(root, wsproto.Load(root), []string{"web"}, workspace.NewWarningReport(warnings))
 		},
 	}
 	for name, run := range commands {
@@ -920,7 +926,7 @@ func TestWorkspaceReadingCommandsWarnOnAnUnindexedWorkspace(t *testing.T) {
 			if name == "projects tag" {
 				// The recorded view renames the project.
 				run = func(root string, warnings io.Writer) error {
-					return ProjectsTag(root, wsproto.Load(root), []string{"@acme/web"}, warnings)
+					return ProjectsTag(root, wsproto.Load(root), []string{"@acme/web"}, workspace.NewWarningReport(warnings))
 				}
 			}
 			if _, err := captureStdout(t, func() error { return run(root, &stderr) }); err != nil {
