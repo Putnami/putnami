@@ -1,0 +1,53 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/contributor-executable",
+  "outcomes": [
+    "The @putnami/contributor executable serves putnami change verify, change finalize and change language, and prints what the core commands it replaced printed",
+    "A contributor publishes a squash-ready proposal through the providers the workspace binds, and a native verifier judges the workflow record against the repository"
+  ],
+  "nonGoals": [
+    "Choosing a tasks, proposals or memory provider for the workspace, or falling back to another one",
+    "Authorizing publication, merge or deployment: the mandate and the repository's controls still decide",
+    "Launching the executable and opening the host RPC channel, which the core CLI does"
+  ],
+  "requirements": [
+    {
+      "id": "provider-neutral-publication",
+      "text": "putnami change finalize consumes a current native dossier or explicitly waits for named hosted checks; it executes no local gate. It pushes and publishes through bound contracts with exact readback and checked preconditions. Partial delivery preserves the opaque parent identity without closing or delivered transition. Draft seeds carry no closing directive. Unresolved writes stop without retry."
+    },
+    {
+      "id": "repository-policy",
+      "text": "options[\"@putnami/contributor\"] holds task sources, claimed/delivered states, tier labels and worker profiles, language/publication controls and active integrations. The finalizer takes the delivered state, the task reference and the language from it. Backlog, filter, rank and plan-label settings have no canonical consumer."
+    },
+    {
+      "id": "squash-ready-publication",
+      "text": "Build selects one final local or hosted gate after independent review. Publication consumes a current dossier or awaits named hosted checks, never runs a local gate and rechecks proof per boundary. Hosted parent publication needs an immutable workflow and completion eligibility; incomplete parents need partial delivery, needing no workflow when only featureAuthority.none projects own its paths. Exact hosted proof can advance eligible current units, keeps later obligations and yields a replayable receipt."
+    },
+    {
+      "id": "native-workflow-validation",
+      "text": "The native verifier checks tracked, safe feature/spec sources, complete requirement/check coverage, units, stage entry/exit contracts, preserved challenges and native producer provenance. Reached stages are monotonic; current-unit readiness ignores superseded or later artifacts. Hosted ready needs exact policy-named provider checks on the same head and tree; native replay preserves the original workflow. Pending, blocked, stale, missing and unsupported states remain visible."
+    },
+    {
+      "id": "change-language-parity",
+      "text": "putnami change language, served by the @putnami/contributor executable, reports the same findings and exit codes as goldens recorded from putnami contributor language, the core command it replaces. The tasks mode reads the tasks provider through the host RPC channel putnami opens for the launch, and the other modes never open it. A run with no channel exits 2 and names the interactive launch."
+    },
+    {
+      "id": "change-verify-parity",
+      "text": "putnami change verify, served by the @putnami/contributor executable, prints the same verdict document and exit code as goldens recorded from putnami tree verify, the core command it replaces, in every mode, with or without a workspace. It reads a restored verification report through the host RPC channel putnami opens for the launch; without that channel only such a report is not verified, with a reason naming the channel. No process the verifier starts receives the channel."
+    },
+    {
+      "id": "change-finalize-parity",
+      "text": "The @putnami/contributor executable behind putnami change finalize reaches the providers, the owners of changed paths and restored verification reports through the one host RPC channel putnami opens for the launch. A usage error never opens it, and no git command it starts receives it."
+    },
+    {
+      "id": "local-evidence-verification",
+      "text": "The evidence verifier that putnami change finalize applies checks an execute run's local evidence against the worktree it runs in, without a workspace, and writes one JSON verdict. A failure, a call with no mode included, writes {\"verdict\":\"not-verified\",\"reason\":...} on one line. Evidence is read as fatal UTF-8, an object that repeats a member is refused, and every path resolves against the Git top level."
+    }
+  ],
+  "decisions": [
+    "tooling/contributor/doc/adr/0002-build-and-versioned-workflow-record.md",
+    "tooling/contributor/doc/adr/0005-the-contributor-executable-serves-the-change-noun.md",
+    "tooling/contributor/doc/adr/0006-the-contributor-executable-serves-change-finalize.md"
+  ]
+}

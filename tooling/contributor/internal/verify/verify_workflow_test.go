@@ -160,7 +160,7 @@ func (f *verifyFixture) issuedReadyReceipt() fxObj {
 }
 
 func TestWorkflowNativeChecksAndDossier(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "workflow-versions-and-references")
+	spectest.Proves(t, "tooling/contributor-executable", "native-workflow-validation", "workflow-versions-and-references")
 	t.Parallel()
 	f, w := newWorkflowFixture(t)
 	result := f.workflow(w, false, "")
@@ -182,7 +182,7 @@ func TestWorkflowNativeChecksAndDossier(t *testing.T) {
 }
 
 func TestWorkflowSourcesMustBeTrackedNativeFiles(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "workflow-versions-and-references")
+	spectest.Proves(t, "tooling/contributor-executable", "native-workflow-validation", "workflow-versions-and-references")
 	t.Parallel()
 	for _, tc := range []struct {
 		name, file, reason string
@@ -258,7 +258,7 @@ func TestWorkflowRestoredReportRequiresNativeCacheCorroboration(t *testing.T) {
 }
 
 func TestWorkflowRejectsNativeInventoryAndProofFailures(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "native-requirement-check-coverage")
+	spectest.Proves(t, "tooling/contributor-executable", "native-workflow-validation", "native-requirement-check-coverage")
 	t.Parallel()
 	cases := []struct {
 		name, reason string
@@ -365,7 +365,7 @@ func TestWorkflowRejectsNativeInventoryAndProofFailures(t *testing.T) {
 }
 
 func TestWorkflowLaterScopeAndUnitReceipts(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "delivery-receipts-and-parent-completeness")
+	spectest.Proves(t, "tooling/contributor-executable", "native-workflow-validation", "delivery-receipts-and-parent-completeness")
 	t.Parallel()
 	f, w := newWorkflowFixture(t)
 	manifest := f.readJSON(".context/putnami.features.json")
@@ -456,7 +456,7 @@ func TestWorkflowLaterScopeAndUnitReceipts(t *testing.T) {
 // exactly where the collector produces it, so an excluded unobserved
 // requirement leaves the current unit ready, and anything else is refused.
 func TestWorkflowReplaysUnobservedReclassification(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "native-requirement-check-coverage")
+	spectest.Proves(t, "tooling/contributor-executable", "native-workflow-validation", "native-requirement-check-coverage")
 	t.Parallel()
 	cases := []struct {
 		name, reason string
@@ -542,7 +542,7 @@ func TestWorkflowReplaysUnobservedReclassification(t *testing.T) {
 }
 
 func TestWorkflowArtifactAndHandoffBindings(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "relevant-artifact-invalidation")
+	spectest.Proves(t, "tooling/contributor-executable", "native-workflow-validation", "relevant-artifact-invalidation")
 	t.Parallel()
 	f, w := newWorkflowFixture(t)
 	source := f.note("design-v1", "Chosen interaction design.")
@@ -643,7 +643,7 @@ func TestWorkflowDeliveryRequiresExactNativeReceipt(t *testing.T) {
 }
 
 func TestWorkflowDeliveryAcceptsProvenLaterStage(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "delivery-receipts-and-parent-completeness")
+	spectest.Proves(t, "tooling/contributor-executable", "native-workflow-validation", "delivery-receipts-and-parent-completeness")
 	t.Parallel()
 	f, w := newWorkflowFixture(t)
 	unit := fxObjAt(w, "units", 0)
@@ -675,7 +675,7 @@ func TestWorkflowDeliveryAcceptsProvenLaterStage(t *testing.T) {
 }
 
 func TestWorkflowReadyReceiptResumesNativeDossier(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "delivery-receipts-and-parent-completeness")
+	spectest.Proves(t, "tooling/contributor-executable", "native-workflow-validation", "delivery-receipts-and-parent-completeness")
 	t.Parallel()
 	f, w := newWorkflowFixture(t)
 	unit := fxObjAt(w, "units", 0)
@@ -741,7 +741,7 @@ func TestWorkflowReadyReceiptRejectsBareAndStaleClaims(t *testing.T) {
 }
 
 func TestWorkflowRejectsUnknownNativeProjectAndMissingHandoff(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "native-workflow-validation", "experiment-and-handoff-inputs")
+	spectest.Proves(t, "tooling/contributor-executable", "native-workflow-validation", "experiment-and-handoff-inputs")
 	t.Parallel()
 	f, w := newWorkflowFixture(t)
 	fxObjAt(w, "units", 0, "projects", 0)["id"] = "/fabricated"

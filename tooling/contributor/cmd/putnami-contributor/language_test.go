@@ -24,7 +24,7 @@ import (
 // languageFeature and languageRequirement name the requirement the tests
 // below prove.
 const (
-	languageFeature     = "cli/contributor-workflows"
+	languageFeature     = "tooling/contributor-executable"
 	languageRequirement = "change-language-parity"
 
 	// coreFailureLine ends a golden whose run exits 2. The core's command

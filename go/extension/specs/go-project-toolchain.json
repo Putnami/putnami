@@ -234,6 +234,22 @@
     {
       "id": "go-pin-reuses-the-machine-record",
       "text": "The Go extension records each release it resolves from the go.dev index as toolchains/go/go-<version>.pin.json under the Putnami home, and answers a release its record names with no request. A record that does not parse or names another release, another source or a value that is not a SHA-256 is ignored and replaced. A Putnami home it cannot write in still yields the pin, and a failed lookup writes no record."
+    },
+    {
+      "id": "the-packager-stamps-a-dependent",
+      "text": "The Go archive packager stamps contract 8 on every extension it packages with a registry dependency, and an extension that declares only hooks and dependencies takes the stamp without the strict requirement of a command, tool or agent content. The TypeScript npm packager leaves the list out of its stamp decision."
+    },
+    {
+      "id": "command-kinds-and-traits",
+      "text": "The Go packager stamps CLI contract 11 on a manifest that declares a command kind, a workload, or the kind and phase of a batchable task, in both package forms, and fails packaging of a kind outside the vocabulary."
+    },
+    {
+      "id": "publish-tasks-declare-their-channels",
+      "text": "The Go extension's publish-docker task declares the docker channel and publish-go the go channel, and no other task declares one. The Go packager stamps CLI contract 12 on a manifest whose task lists publishChannels, in both package forms, and fails packaging of a list on a task without the registry effect."
+    },
+    {
+      "id": "vocabulary-default-traits",
+      "text": "The Go packager validates a verb vocabulary strictly and stamps CLI contract 9 in both package forms, validates one that sits next to a registry dependency in full, and fails packaging of a defective one."
     }
   ],
   "decisions": [

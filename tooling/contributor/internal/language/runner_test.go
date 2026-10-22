@@ -34,7 +34,7 @@ func TestLanguageFileExclusions(t *testing.T) {
 }
 
 func TestTaskLanguageFollowsPagesThroughProvider(t *testing.T) {
-	spectest.Proves(t, "cli/contributor-workflows", "change-language-parity", "the-language-check-pages-tasks-through-the-call-seam")
+	spectest.Proves(t, "tooling/contributor-executable", "change-language-parity", "the-language-check-pages-tasks-through-the-call-seam")
 	var out, errors bytes.Buffer
 	calls := 0
 	runner := LanguageRunner{Root: t.TempDir(), Out: &out, Err: &errors, Call: func(_ context.Context, contract, operation string, request json.RawMessage) (collab.Envelope, error) {

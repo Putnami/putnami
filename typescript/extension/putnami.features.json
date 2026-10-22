@@ -642,6 +642,46 @@
               "an-unreadable-release-warns-instead-of-failing"
             ]
           }
+        },
+        {
+          "id": "command-kinds-and-traits",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-npm-packager-stamps-command-kinds"
+            ]
+          }
+        },
+        {
+          "id": "publish-tasks-declare-their-channels",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-typescript-extension-declares-its-publish-channels",
+              "the-npm-packager-stamps-publish-channels"
+            ]
+          }
+        },
+        {
+          "id": "vocabulary-default-traits",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-npm-packager-validates-and-stamps-a-vocabulary"
+            ]
+          }
         }
       ]
     }

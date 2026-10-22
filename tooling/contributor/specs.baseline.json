@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "tooling/contributor-executable#change-finalize-parity",
+    "tooling/contributor-executable#change-language-parity",
+    "tooling/contributor-executable#change-verify-parity",
+    "tooling/contributor-executable#local-evidence-verification",
+    "tooling/contributor-executable#native-workflow-validation",
+    "tooling/contributor-executable#provider-neutral-publication",
+    "tooling/contributor-executable#repository-policy",
+    "tooling/contributor-executable#squash-ready-publication"
+  ]
+}

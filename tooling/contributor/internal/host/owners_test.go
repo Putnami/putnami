@@ -18,7 +18,7 @@ import (
 // connection the first of them dialed.
 func TestOneChannelServesEveryCallOnOneConnection(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/contributor-workflows", "change-finalize-parity", "one-host-channel-serves-the-run")
+	spectest.Proves(t, "tooling/contributor-executable", "change-finalize-parity", "one-host-channel-serves-the-run")
 	// One answer decodes as each of the three results.
 	answer := map[string]any{"contract": "tasks", "operation": "find", "outcome": "ok", "result": map[string]any{},
 		"report": []byte("report bytes"), "owners": []wire.PathOwners{{Path: "a.go", Projects: []wire.OwningProject{{ID: "/a", Path: "."}}}}}

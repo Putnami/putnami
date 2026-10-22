@@ -39,7 +39,7 @@
     },
     {
       "id": "extension-verb-vocabulary",
-      "text": "An extension manifest may declare a verb vocabulary: an ordered list of verbs, each with a description, aliases, default traits and related commands. The CLI merges the loaded vocabularies in extension-name order; the first declaration of a verb wins, and a second warns. Help, completion, impact-plan and the live view read the result. Its aliases are the only short command names; a same-named workspace alias hides one with a warning, and an alias never takes a verb, command, command group or core root."
+      "text": "An extension manifest may declare a verb vocabulary: an ordered list of verbs, each with a description, aliases, default traits and related commands. The CLI merges the loaded vocabularies in extension-name order. Help, completion, impact-plan and the live view read the result. Its aliases are the only short command names; a same-named workspace alias hides one with a warning, and an alias never takes a verb, command, command group or core root."
     },
     {
       "id": "vocabulary-default-traits",
@@ -119,7 +119,7 @@
     },
     {
       "id": "declared-verification-producers",
-      "text": "The verification report comes from verification-kind commands and the criteria projection from criteria-kind commands, via the tasks that declare each as a command-output file; a stepless verification job also writes the report. A session naming a verification command carries the spec gate, which plans those commands to recover cached reports and the declaring criteria commands to learn applicability. A warm hit restores both artifacts. Coverage comes from verification jobs and replays under their command."
+      "text": "A session naming a verification command carries the spec gate, which plans those commands to recover cached reports and the declaring criteria commands to learn applicability. A warm hit restores both the verification report and the criteria projection. Coverage comes from verification jobs and replays under their command."
     },
     {
       "id": "batch-parity-and-live-cells-follow-declared-kinds",
@@ -227,11 +227,11 @@
     },
     {
       "id": "command-kinds-and-traits",
-      "text": "A command's traits may declare its kind (verification, criteria, diagnostics or files), its workload (serve or once), that it rewrites sources, and that it consumes the release set; a batchable task may declare the kind and phase of its shared invocation. Strict validation refuses a value outside each vocabulary. A manifest that declares any of them requires CLI contract 11 wherever it loads from, and the packagers stamp it. Declared traits replace a verb's defaults wholesale, kind included."
+      "text": "A command's traits may declare its kind (verification, criteria, diagnostics or files), its workload (serve or once), that it rewrites sources, and that it consumes the release set; a batchable task may declare the kind and phase of its shared invocation. Strict validation refuses a value outside each vocabulary. A manifest that declares any of them requires CLI contract 11 wherever it loads from."
     },
     {
       "id": "publish-tasks-declare-their-channels",
-      "text": "A task's v3 declaration may list publishChannels, the publish channels the task publishes, in the grammar of a project's publish list. The list names at least one channel and each once, is normalized to sorted order, and requires the registry effect; strict validation refuses any other list. A manifest with such a task requires CLI contract 12 wherever it loads from, the packagers stamp it, and a planned job exposes its task's channels."
+      "text": "A task's v3 declaration may list publishChannels, the publish channels the task publishes, in the grammar of a project's publish list. The list names at least one channel and each once, is normalized to sorted order, and requires the registry effect; strict validation refuses any other list. A manifest with such a task requires CLI contract 12 wherever it loads from, and a planned job exposes its task's channels."
     },
     {
       "id": "source-bound-stamp",

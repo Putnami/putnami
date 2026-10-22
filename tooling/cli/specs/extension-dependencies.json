@@ -78,10 +78,6 @@
     {
       "id": "an-older-cli-refuses-a-dependent",
       "text": "A manifest whose extensionDependencies names a registry dependency requires CLI contract 8, ExtensionDependenciesContract. A CLI below rung 8 refuses such a manifest loaded from the artifact store or a declared path as requiring a newer putnami."
-    },
-    {
-      "id": "the-packager-stamps-a-dependent",
-      "text": "The Go archive packager stamps contract 8 on every extension it packages with a registry dependency, and an extension that declares only hooks and dependencies takes the stamp without the strict requirement of a command, tool or agent content. The TypeScript npm packager leaves the list out of its stamp decision."
     }
   ],
   "decisions": [

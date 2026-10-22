@@ -163,7 +163,7 @@ func TestTheCommandPrintsTheResultInTheOutputMode(t *testing.T) {
 // message prefix of each.
 func TestTheCommandExitCodes(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/contributor-workflows", "change-finalize-parity", "a-usage-error-never-dials-the-host")
+	spectest.Proves(t, "tooling/contributor-executable", "change-finalize-parity", "a-usage-error-never-dials-the-host")
 	command, h, stdout, stderr, args := draftCommand(t, "")
 	if code := command.Run(context.Background(), append(args, "--gate", "local")); code != 2 || h.calls != 0 || stdout.Len() != 0 ||
 		stderr.String() != "change finalize: --gate accepts only ci; local proof uses --verification-file\n" {

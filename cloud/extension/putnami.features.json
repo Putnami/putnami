@@ -252,6 +252,29 @@
           }
         }
       ]
+    },
+    {
+      "id": "cloud/publish-channels",
+      "type": "feature",
+      "name": "Publish channels of the Cloud publish command",
+      "outcome": "A publishing run counts a project's declared channel as served only by a planned Cloud task that declares it, so the archive and site content uploads serve their channels and the other uploads serve none",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "publish-tasks-declare-their-channels",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cloud-extension-declares-its-publish-channels"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

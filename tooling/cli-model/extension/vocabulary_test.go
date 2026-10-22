@@ -47,7 +47,7 @@ func TestMergeVocabulary_MergesInExtensionNameOrderAndTheFirstDeclarationWins(t 
 
 func TestMergeVocabulary_WarnsWhenTwoVocabulariesDeclareOneVerb(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "extension-verb-vocabulary", "two-vocabularies-declaring-one-verb-warn")
+	spectest.Proves(t, "cli/job-model", "extension-verb-vocabulary", "two-vocabularies-declaring-one-verb-warn")
 	registry := proto.CommandTraits{InjectPublishChannels: true, SideEffects: proto.SideEffectsRegistry}
 	zeta := vocabularyExtension("@acme/zeta", VerbDefinition{Name: "publish", Description: "Zeta publish.", Traits: &registry})
 	alpha := vocabularyExtension("@acme/alpha",
@@ -70,7 +70,7 @@ func TestMergeVocabulary_WarnsWhenTwoVocabulariesDeclareOneVerb(t *testing.T) {
 // gives publish none leaves it with none.
 func TestApplyVocabularyTraits_AVocabularyGivesItsVerbsSideEffects(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "traits-alone-give-a-job-its-side-effects")
+	spectest.Proves(t, "cli/job-model", "vocabulary-default-traits", "traits-alone-give-a-job-its-side-effects")
 	manifest := &Manifest{Name: "@acme/go", Commands: map[string]CommandDefinition{"deploy": {}, "publish": {}, "package": {}}}
 	jobs := Resolve(manifest, "/ext")
 	harmless := proto.CommandTraits{InjectPublishChannels: true}
@@ -104,7 +104,7 @@ func TestApplyVocabularyTraits_AVocabularyGivesItsVerbsSideEffects(t *testing.T)
 // traits.
 func TestResolve_DeclaredTraitsReplaceTheVerbsSideEffects(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "vocabulary-default-traits", "traits-alone-give-a-job-its-side-effects")
+	spectest.Proves(t, "cli/job-model", "vocabulary-default-traits", "traits-alone-give-a-job-its-side-effects")
 	channels := proto.CommandTraits{InjectPublishChannels: true}
 	heavy := proto.CommandTraits{Heavy: true}
 	jobs := Resolve(&Manifest{Name: "@acme/release", Commands: map[string]CommandDefinition{
@@ -134,7 +134,7 @@ func TestResolve_DeclaredTraitsReplaceTheVerbsSideEffects(t *testing.T) {
 // traits, kind and workload included.
 func TestApplyVocabularyTraits_AJobWithoutDeclaredTraitsTakesItsVerbsKindAndWorkload(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "command-kinds-and-traits", "a-job-without-declared-traits-takes-its-verbs-kind-and-workload")
+	spectest.Proves(t, "cli/job-model", "command-kinds-and-traits", "a-job-without-declared-traits-takes-its-verbs-kind-and-workload")
 	jobs := Resolve(&Manifest{Name: "@acme/go", Commands: map[string]CommandDefinition{
 		"check": {}, "serve": {}, "release": {}, "publish": {}, "bundle": {},
 	}}, "/ext")
@@ -170,7 +170,7 @@ func TestApplyVocabularyTraits_AJobWithoutDeclaredTraitsTakesItsVerbsKindAndWork
 // declares, and a command that declares its own keeps it.
 func TestResolve_DeclaredTraitsReplaceTheVerbsKindWholesale(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/job-planning-execution", "command-kinds-and-traits", "declared-traits-replace-the-verbs-kind-wholesale")
+	spectest.Proves(t, "cli/job-model", "command-kinds-and-traits", "declared-traits-replace-the-verbs-kind-wholesale")
 	runnable := proto.CommandTraits{RequiresRunnable: true}
 	files := proto.CommandTraits{Heavy: true, Kind: proto.CommandKindFiles}
 	jobs := Resolve(&Manifest{Name: "@acme/go", Commands: map[string]CommandDefinition{

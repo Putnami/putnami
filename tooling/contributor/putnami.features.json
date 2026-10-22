@@ -1,0 +1,146 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "tooling",
+  "features": [
+    {
+      "id": "tooling/contributor-executable",
+      "type": "feature",
+      "name": "Contributor executable",
+      "outcome": "A contributor verifies a native workflow record, finalizes a squash-ready proposal and evaluates the language rule with the putnami change verify, change finalize and change language commands that the @putnami/contributor executable serves",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "provider-neutral-publication",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-finalizer-publishes-through-the-contracts",
+              "partial-delivery-never-closes-parent",
+              "the-read-back-carries-what-the-upsert-answered",
+              "an-unresolved-write-stops-without-a-retry"
+            ]
+          }
+        },
+        {
+          "id": "repository-policy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-policy-selects-the-delivered-state-reference-and-language"
+            ]
+          }
+        },
+        {
+          "id": "squash-ready-publication",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-draft-opens-before-the-first-edit",
+              "the-body-is-the-squash-message",
+              "no-publication-names-an-agent",
+              "an-explicit-hosted-gate-waits-without-local-execution",
+              "hosted-parent-workflow-completeness",
+              "a-featureless-partial-needs-no-workflow"
+            ]
+          }
+        },
+        {
+          "id": "native-workflow-validation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workflow-versions-and-references",
+              "native-requirement-check-coverage",
+              "relevant-artifact-invalidation",
+              "delivery-receipts-and-parent-completeness",
+              "experiment-and-handoff-inputs",
+              "hosted-workflow-readiness-bound-to-required-checks"
+            ]
+          }
+        },
+        {
+          "id": "change-language-parity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "change-language-reports-what-contributor-language-reports",
+              "the-language-check-pages-tasks-through-the-call-seam",
+              "tasks-reach-the-provider-through-the-host-channel",
+              "other-modes-never-dial-the-host",
+              "tasks-without-a-channel-exit-2"
+            ]
+          }
+        },
+        {
+          "id": "change-verify-parity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "change-verify-prints-what-tree-verify-prints",
+              "a-restored-report-is-read-through-the-host-channel",
+              "without-a-channel-only-a-restored-report-is-not-verified",
+              "no-process-receives-the-host-channel",
+              "change-verify-runs-with-and-without-a-workspace"
+            ]
+          }
+        },
+        {
+          "id": "change-finalize-parity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "ownership-comes-from-the-host-channel",
+              "one-host-channel-serves-the-run",
+              "a-usage-error-never-dials-the-host",
+              "no-git-command-receives-the-host-channel"
+            ]
+          }
+        },
+        {
+          "id": "local-evidence-verification",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bare-call-is-a-not-verified-verdict-on-stdout-alone",
+              "evidence-is-read-strictly-against-the-git-top-level"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

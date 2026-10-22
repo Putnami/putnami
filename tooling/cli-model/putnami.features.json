@@ -125,6 +125,69 @@
           }
         }
       ]
+    },
+    {
+      "id": "cli/job-model",
+      "type": "feature",
+      "name": "CLI job model",
+      "outcome": "Every consumer of the CLI's job model sees one deterministic answer for what traits, side effects, kind and verification outputs a job has, from a pure library the engine cannot reach back into",
+      "owner": "tooling",
+      "target": "modeled",
+      "requirements": [
+        {
+          "id": "extension-verb-vocabulary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "two-vocabularies-declaring-one-verb-warn"
+            ]
+          }
+        },
+        {
+          "id": "vocabulary-default-traits",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "traits-alone-give-a-job-its-side-effects"
+            ]
+          }
+        },
+        {
+          "id": "command-kinds-and-traits",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-job-without-declared-traits-takes-its-verbs-kind-and-workload",
+              "declared-traits-replace-the-verbs-kind-wholesale"
+            ]
+          }
+        },
+        {
+          "id": "declared-verification-producers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-producer-is-a-declaring-task-of-a-command-of-its-kind"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

@@ -2,6 +2,10 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "cli/job-model#command-kinds-and-traits",
+    "cli/job-model#declared-verification-producers",
+    "cli/job-model#extension-verb-vocabulary",
+    "cli/job-model#vocabulary-default-traits",
     "cli/workspace-model#canonical-identity",
     "cli/workspace-model#change-impact",
     "cli/workspace-model#dependency-graph",

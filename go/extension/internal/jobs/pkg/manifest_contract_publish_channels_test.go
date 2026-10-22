@@ -28,7 +28,7 @@ const publishChannelsManifest = `{
 // channel list on a task without the registry effect fails packaging and leaves
 // the staged manifest as it was.
 func TestGateStampsPublishChannels(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "publish-tasks-declare-their-channels", "the-go-packager-stamps-publish-channels")
+	spectest.Proves(t, "go/go-project-toolchain", "publish-tasks-declare-their-channels", "the-go-packager-stamps-publish-channels")
 	for name, form := range map[string]packageForm{"put archive": putArchive, "npm package": npmPackage} {
 		dir := stageManifest(t, publishChannelsManifest)
 		if err := gateAndStampManifestContract(dir, form); err != nil {

@@ -2,7 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "name": "@putnami/contributor",
   "tags": ["tooling", "go", "extension"],
-  "extensions": ["/go/extension"],
+  "extensions": ["/go/extension", "/tooling/sdd-extension"],
   "disable": {
     "jobs": ["serve"]
   },
@@ -11,6 +11,11 @@
     "@putnami/go": {
       "entrypoint": "./cmd/putnami-contributor",
       "version-var": "main.runtimeVersion"
+    },
+    "sdd": {
+      "verification": {
+        "specs": "enforce"
+      }
     },
     "test": {
       "filePatterns": ["putnami.extension.json", "bin/prepare"]
