@@ -28,11 +28,6 @@
       "type": "string",
       "description": "Extension to activate for projects created from this template."
     },
-    "workspaceDevDependencies": {
-      "type": "object",
-      "description": "Dev dependencies for the workspace root. No core command reads it.",
-      "additionalProperties": { "type": "string" }
-    },
     "testVariables": {
       "type": "object",
       "description": "Variable overrides for template testing. Keys are variable names (e.g., projectName), values are the test values to use instead of defaults.",

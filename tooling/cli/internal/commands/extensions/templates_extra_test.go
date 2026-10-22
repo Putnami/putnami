@@ -443,11 +443,10 @@ func TestTemplatesTest_WritesAWorkspaceWithoutProjects(t *testing.T) {
 
 	dir := t.TempDir()
 	sharedtest.WriteJSONConfig(t, filepath.Join(dir, "putnami.template.json"), map[string]any{
-		"name":                     "tpl-test",
-		"description":              "a template",
-		"version":                  "1.0.0",
-		"extension":                "@putnami/go",
-		"workspaceDevDependencies": map[string]string{"go.putnami.dev/go/extension": "latest"},
+		"name":        "tpl-test",
+		"description": "a template",
+		"version":     "1.0.0",
+		"extension":   "@putnami/go",
 	})
 	if err := os.WriteFile(filepath.Join(dir, "putnami.json.template"), []byte(`{"name":"{{.ProjectName}}"}`), 0o644); err != nil {
 		t.Fatal(err)

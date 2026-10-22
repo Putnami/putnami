@@ -68,18 +68,6 @@ func TestValidateManifest_Valid(t *testing.T) {
 	}
 }
 
-func TestNormalizeManifest(t *testing.T) {
-	m := &Manifest{Name: "t", Description: "d"}
-	NormalizeManifest(m)
-	if m.WorkspaceDevDependencies == nil {
-		t.Error("WorkspaceDevDependencies should be initialized")
-	}
-}
-
-func TestNormalizeManifest_Nil(t *testing.T) {
-	NormalizeManifest(nil) // should not panic
-}
-
 func TestParseAndValidateManifest_Valid(t *testing.T) {
 	data := []byte(`{"name": "t", "description": "d"}`)
 	m, diags := ParseAndValidateManifest(data)
@@ -88,9 +76,6 @@ func TestParseAndValidateManifest_Valid(t *testing.T) {
 	}
 	if m == nil {
 		t.Fatal("manifest should not be nil")
-	}
-	if m.WorkspaceDevDependencies == nil {
-		t.Error("expected normalization to initialize WorkspaceDevDependencies")
 	}
 }
 

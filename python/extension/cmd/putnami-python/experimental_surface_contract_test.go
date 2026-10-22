@@ -12,10 +12,9 @@ import (
 )
 
 type experimentalTemplateManifest struct {
-	Name                     string            `json:"name"`
-	Description              string            `json:"description"`
-	Extension                string            `json:"extension"`
-	WorkspaceDevDependencies map[string]string `json:"workspaceDevDependencies"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Extension   string `json:"extension"`
 }
 
 type experimentalSupportEntry struct {
@@ -65,9 +64,6 @@ func TestExperimentalPythonTemplatesDeclareTheirBoundary(t *testing.T) {
 		}
 		if manifest.Extension != "@putnami/python" {
 			t.Errorf("%s extension = %q, want @putnami/python", template.name, manifest.Extension)
-		}
-		if manifest.WorkspaceDevDependencies["go.putnami.dev/python/extension"] == "" {
-			t.Errorf("%s does not declare the Python extension dependency", template.name)
 		}
 		for _, disclosure := range []string{"experimental", "non-default", "parity"} {
 			if !strings.Contains(strings.ToLower(manifest.Description), disclosure) {

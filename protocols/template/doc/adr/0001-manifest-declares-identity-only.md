@@ -2,6 +2,8 @@
 
 - **Status**: accepted
 - **Scope**: `go.putnami.dev/protocol/template` (`protocols/template`)
+- **Amended**: 2026-10-22: the manifest no longer declares
+  `workspaceDevDependencies`, which no command read.
 
 ## Context
 
@@ -17,7 +19,7 @@ would pin each of them in every published archive.
 The manifest declares identity and requirements only:
 
 - identity: `name`, `description`, `version`;
-- what the produced project needs: `extension`, `workspaceDevDependencies`;
+- what the produced project needs: `extension`;
 - how CI exercises the template: `testVariables`;
 - the `$schema` editor pointer.
 

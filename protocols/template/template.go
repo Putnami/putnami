@@ -26,13 +26,12 @@ func IsTemplateRootPackagingExclusion(name string) bool {
 
 // Manifest is the root of putnami.template.json.
 type Manifest struct {
-	Schema                   string            `json:"$schema,omitempty"`
-	Name                     string            `json:"name"`
-	Version                  string            `json:"version,omitempty"`
-	Description              string            `json:"description"`
-	Extension                string            `json:"extension,omitempty"`
-	WorkspaceDevDependencies map[string]string `json:"workspaceDevDependencies,omitempty"`
-	TestVariables            map[string]string `json:"testVariables,omitempty"`
+	Schema        string            `json:"$schema,omitempty"`
+	Name          string            `json:"name"`
+	Version       string            `json:"version,omitempty"`
+	Description   string            `json:"description"`
+	Extension     string            `json:"extension,omitempty"`
+	TestVariables map[string]string `json:"testVariables,omitempty"`
 }
 
 // LoadManifest reads and parses a putnami.template.json file.
