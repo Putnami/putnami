@@ -213,7 +213,7 @@ Create a project from template
 **Usage**
 
 ```
-putnami projects create <name> --template <template> [--path <path>] [--force]
+putnami projects create <name> --template <template> [--path <path>] [--channel <channel>] [--force]
 ```
 
 **Flags**
@@ -222,12 +222,14 @@ putnami projects create <name> --template <template> [--path <path>] [--force]
 |------|-------------|
 | `--template` <template> | Template to scaffold from |
 | `--path` <path> | Workspace-relative project path |
+| `--channel` <channel> | Resolve the template, the project setup and the dependency install on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest) |
 | `--force` | Overwrite an existing project directory |
 
 **Examples**
 
 - `putnami projects create my-app --template typescript-web`
 - `putnami projects create my-app --template typescript-web --path apps/my-app`
+- `putnami projects create my-api --template go-server --channel canary`
 
 ### `putnami projects describe`
 
@@ -689,7 +691,7 @@ putnami templates test [path] [--skip-build] [--keep] [--channel <channel>]
 |------|-------------|
 | `--skip-build` | Render the template without running build and test on it |
 | `--keep` | Keep the rendered temporary workspace for inspection |
-| `--channel` <channel> | Install the template's extension from one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest) |
+| `--channel` <channel> | Install the template's extension and create the project on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest) |
 
 **Examples**
 

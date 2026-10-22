@@ -175,6 +175,7 @@ complete -c putnami -n '__putnami_seen_path install' -l 'latest' -d 'Ignore the 
 complete -c putnami -n '__putnami_seen_path migrate vnext' -l 'apply' -d 'Perform the migration, atomically and idempotently'
 complete -c putnami -n '__putnami_seen_path migrate vnext' -l 'check' -d 'Report the pending migration without writing (default); exits non-zero when a migration is needed'
 complete -c putnami -n '__putnami_seen_path pin' -l 'remove' -d 'Remove the CLI version pin'
+complete -c putnami -n '__putnami_seen_path projects create' -l 'channel' -d 'Resolve the template, the project setup and the dependency install on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -r
 complete -c putnami -n '__putnami_seen_path projects create' -l 'force' -d 'Overwrite an existing project directory'
 complete -c putnami -n '__putnami_seen_path projects create' -l 'path' -d 'Workspace-relative project path' -r
 complete -c putnami -n '__putnami_seen_path projects create' -l 'template' -d 'Template to scaffold from' -r
@@ -199,7 +200,7 @@ complete -c putnami -n '__putnami_seen_path sessions summary' -l 'since' -d 'Kee
 complete -c putnami -n '__putnami_seen_path templates install' -l 'latest' -d 'Ignore the lock file and resolve the latest versions'
 complete -c putnami -n '__putnami_seen_path templates package' -l 'stable' -d 'Publish under a stable version instead of a prerelease'
 complete -c putnami -n '__putnami_seen_path templates package' -l 'version' -d 'Version to stamp on the produced archive' -r
-complete -c putnami -n '__putnami_seen_path templates test' -l 'channel' -d 'Install the template\'s extension from one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -r
+complete -c putnami -n '__putnami_seen_path templates test' -l 'channel' -d 'Install the template\'s extension and create the project on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -r
 complete -c putnami -n '__putnami_seen_path templates test' -l 'keep' -d 'Keep the rendered temporary workspace for inspection'
 complete -c putnami -n '__putnami_seen_path templates test' -l 'skip-build' -d 'Render the template without running build and test on it'
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'channel' -d 'Resolve a release channel (stable by default; canary for latest prerelease)' -r

@@ -122,7 +122,7 @@ _putnami_flags_for() {
         'install') printf '%s\n' '--latest' ;;
         'migrate vnext') printf '%s\n' '--apply --check' ;;
         'pin') printf '%s\n' '--remove' ;;
-        'projects create') printf '%s\n' '--force --path --template' ;;
+        'projects create') printf '%s\n' '--channel --force --path --template' ;;
         'projects sync') printf '%s\n' '--prune --skip-install' ;;
         'projects tag') printf '%s\n' '--remove --set' ;;
         'qualify') printf '%s\n' '--expect-sha --platform-prefix --print-contract --ready-timeout --request-timeout --target' ;;

@@ -1,6 +1,8 @@
 # ADR 0056 — `init` resolves on one channel
 
 - **Status**: accepted
+- **Amended**: 2026-10-22: `projects create` run on its own takes the same
+  channel choice as `init`, and hands it to the same resolutions.
 - **Scope**: `@putnami/cli` (`tooling/cli/internal/commands/lifecycle`:
   `init_channel.go`, `workspace_init.go`, `deps.go`, `projects_create.go`,
   `projects_create_goframework.go`), `@putnami/typescript`
@@ -121,7 +123,7 @@ sent before.
 - **Go.** For a channel other than `latest`, the framework version comes from
   the Go version query `@v/<channel>.info` instead of `@latest`, on the same
   proxies and origin, with the same credentials. `projects create` run on its
-  own still asks `@latest`.
+  own asks the channel its own choice names, and `@latest` without one.
 - **Python.** The starter depends on no Putnami framework package. Nothing
   beyond the extension and the template is resolved.
 

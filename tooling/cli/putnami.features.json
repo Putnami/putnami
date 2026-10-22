@@ -3604,7 +3604,7 @@
       "id": "cli/init-channel",
       "type": "feature",
       "name": "Init resolves on one channel",
-      "outcome": "A user who runs putnami init on a release channel gets a workspace whose extensions, template and starter dependencies all come from that channel, and the workspace it creates pins no channel",
+      "outcome": "A user who runs putnami init or putnami projects create on a release channel gets extensions, a template and starter dependencies that all come from that channel, and the workspace pins no channel",
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
@@ -3652,6 +3652,19 @@
           }
         },
         {
+          "id": "projects-create-takes-a-channel",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "create-resolves-on-the-channel-init-would",
+              "create-without-a-choice-installs-on-latest",
+              "the-create-to-run-again-names-the-channel"
+            ]
+          }
+        },
+        {
           "id": "the-workspace-pins-no-channel",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
@@ -3685,6 +3698,7 @@
             "checks": [
               "the-temporary-workspace-lists-the-extension-and-no-project-or-language-manifest",
               "the-extension-installs-on-the-channel-the-run-chose",
+              "the-project-is-created-on-the-channel-the-run-chose",
               "phase-3-runs-only-the-verbs-the-extension-declares"
             ]
           }

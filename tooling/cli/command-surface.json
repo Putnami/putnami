@@ -562,6 +562,10 @@
       "path": "projects create",
       "flags": [
         {
+          "long": "--channel",
+          "type": "value"
+        },
+        {
           "long": "--force",
           "type": "bool"
         },

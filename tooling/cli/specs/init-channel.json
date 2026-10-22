@@ -4,6 +4,7 @@
   "feature": "cli/init-channel",
   "outcomes": [
     "A user who runs putnami init on a release channel gets a workspace whose extensions, template and starter dependencies all come from that channel",
+    "A user who runs putnami projects create on a release channel gets a project whose template, setup and dependencies come from that channel",
     "A release candidate is smoke-tested on its own immutable channel, whatever latest names and even while latest is empty",
     "The workspace init creates pins no channel: its lock records exact versions, and putnami upgrade follows latest by default"
   ],
@@ -11,7 +12,7 @@
     "Choosing an exact version: the release lines do not share one version, so one version cannot name a release set",
     "Recording the install channel in a file: the name of the installed binary is the record, and putnami upgrade renames it",
     "Resolving a release set through a provider: each registry resolves the channel natively",
-    "Changing putnami upgrade, putnami install or projects create run on its own"
+    "Changing putnami upgrade or putnami install"
   ],
   "requirements": [
     {
@@ -27,12 +28,16 @@
       "text": "Without a channel choice and without an install record, and on latest, init sends the requests it sent before it took a channel: bare artifact names, and no putnami-channel option to the workspace installers or the project-setup job."
     },
     {
+      "id": "projects-create-takes-a-channel",
+      "text": "putnami projects create run on its own resolves on one channel as init does: --channel, else PUTNAMI_CHANNEL, else the install record, else latest, with the same usage errors. On a channel other than latest, the template install it falls back to, the project-setup job and the workspace installers read that channel, and the create it names to run again carries --channel. Without a choice it sends what it sent before."
+    },
+    {
       "id": "the-workspace-pins-no-channel",
-      "text": "The channel is a target of the init run only. putnami.workspace.json keeps bare artifact names, putnami.lock.json records the exact version, the digest and a version-pinned source of each artifact, and neither file names the channel. putnami upgrade reads neither PUTNAMI_CHANNEL nor the install record, and follows latest by default."
+      "text": "The channel is a target of the init or create run only. putnami.workspace.json keeps bare artifact names, putnami.lock.json records the exact version, the digest and a version-pinned source of each artifact, and neither file names the channel. putnami upgrade reads neither PUTNAMI_CHANNEL nor the install record, and follows latest by default."
     },
     {
       "id": "templates-test-builds-the-rendered-project",
-      "text": "putnami templates test copies the template into a temporary workspace that lists its extension and no project, then does what a user does: it installs the extension on the channel --channel or PUTNAMI_CHANNEL chooses, as init does, runs projects create from the template, and runs the build and test commands the extension declares on the project. It refuses a template that names no extension unless --skip-build is set, and fails if the extension declares neither."
+      "text": "putnami templates test copies the template into a temporary workspace that lists its extension and no project, then does what a user does: it installs the extension on the channel --channel or PUTNAMI_CHANNEL chooses, as init does, runs projects create from the template on that channel, and runs the build and test commands the extension declares on the project. It refuses a template that names no extension unless --skip-build is set, and fails if the extension declares neither."
     },
     {
       "id": "release-smokes-hand-the-channel-to-init",

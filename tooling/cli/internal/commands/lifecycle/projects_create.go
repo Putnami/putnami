@@ -23,10 +23,17 @@ type createFlags struct {
 	template string
 	path     string
 	force    bool
+	// channel is the release channel the create resolves on, "" for latest.
+	// No argument sets it: ProjectsCreate resolves --channel before parsing,
+	// and the create of init receives init's channel.
+	channel string
 }
 
 // ProjectsCreate scaffolds a new project from an extension template, then runs
-// the project-setup job of the project's extensions (setUpProject). env runs
+// the project-setup job of the project's extensions (setUpProject). It
+// resolves on the channel init would (ResolveChannelFlag): the template
+// install it falls back to, the project-setup job and the workspace installers
+// read that channel. env runs
 // the job, and the workspace installers when a toolchain the job requires does
 // not resolve and the lock pins it once the job's prepare stage wrote its
 // source. When those installers fail and the setup still succeeds, the project
@@ -35,6 +42,14 @@ type createFlags struct {
 // and create exits non-zero naming the create command to run again with
 // --force.
 func ProjectsCreate(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, env LifecycleEnv) error {
+	channel, args, err := ResolveChannelFlag(args)
+	if err != nil {
+		return err
+	}
+	env.channel = channel
+	if channel != "" {
+		iox.Fprintf(os.Stdout, "  Channel: %s\n", channel)
+	}
 	created, err := createProjectFiles(ctx, wsRoot, cfg, args, env)
 	if err != nil {
 		return err
@@ -73,6 +88,7 @@ func createProjectFiles(ctx context.Context, wsRoot string, cfg *wsproto.Config,
 	if err != nil {
 		return createdProject{}, err
 	}
+	flags.channel = env.channel
 
 	// Discover templates
 	projectPaths := discoverProjectPaths(wsRoot)
@@ -88,8 +104,8 @@ func createProjectFiles(ctx context.Context, wsRoot string, cfg *wsproto.Config,
 	// If not found locally, try installing it
 	if foundTemplate == nil {
 		iox.Fprintf(os.Stdout, "  Template %q not found locally, attempting install…\n", flags.template)
-		// The create of an init that chose a channel installs on that channel;
-		// any other create installs as the workspace configures the template.
+		// A create on a channel installs on that channel; any other create
+		// installs as the workspace configures the template.
 		if installErr := extensions.TemplatesInstall(ctx, wsRoot, cfg, []string{shared.ChannelArtifact(flags.template, env.channel)}, ""); installErr == nil {
 			// Re-discover after install
 			templates, _ = template.DiscoverTemplates(wsRoot, projectPaths)
@@ -197,8 +213,8 @@ func parseProjectsCreateArgs(args []string) (string, createFlags, error) {
 	return name, flags, nil
 }
 
-// projectsCreateRetryCommand is the command that creates the project again
-// over the directory a failed create left behind.
+// projectsCreateRetryCommand is the command that creates the project again,
+// on the same channel, over the directory a failed create left behind.
 func projectsCreateRetryCommand(name string, flags createFlags, projectPath string) string {
 	flags.force = true
 	return projectsCreateCommand(name, flags, projectPath)
@@ -209,6 +225,9 @@ func projectsCreateCommand(name string, flags createFlags, projectPath string) s
 	command := "putnami projects create " + name + " --template " + flags.template
 	if flags.path != "" {
 		command += " --path " + projectPath
+	}
+	if flags.channel != "" {
+		command += " --channel " + flags.channel
 	}
 	if flags.force {
 		command += " --force"

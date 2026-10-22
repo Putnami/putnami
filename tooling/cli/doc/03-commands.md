@@ -245,8 +245,8 @@ separate warning.
 `projects create <name> --template <template>` renders the template and lists
 the project in the workspace config. It then runs the `project-setup` job of
 the template's extension for the new project, when the extension declares one.
-The job receives the directory of the project as `path` and, in a `putnami
-init` that resolves on a channel, that channel as `putnami-channel`. For a Go
+The job receives the directory of the project as `path` and, when the create
+resolves on a channel, that channel as `putnami-channel`. For a Go
 project, `@putnami/go` adds the project to `go.work`, pins the framework
 release, and runs `go mod tidy`: see
 [the Go extension](../../../go/extension/doc/getting-started.md#project-setup-and-dependency-edits).
@@ -260,6 +260,13 @@ toolchain that the extension locks, and runs the job once. A pinned toolchain
 that is not installed ends that run with an error that names `putnami install`.
 When the installers fail but the job then succeeds, the project stays and the
 command exits non-zero with the command to run next: `putnami deps install`.
+
+`--channel <channel>` resolves the create on one release channel, chosen as
+`putnami init` chooses it: the flag, then `PUTNAMI_CHANNEL`, then the channel
+the CLI was installed from, then latest. The template install that create falls
+back to, the `project-setup` job and the dependency install read that channel.
+The workspace config and the lock name no channel, and a failed create names
+the create to run again with the same `--channel`.
 When the job fails, the project stays and the command exits non-zero with the
 create command to run again with `--force`.
 
@@ -763,9 +770,8 @@ runs the extension's project-setup job, then runs the build and test commands
 that the extension declares on the created project. An extension that declares
 no build command, such as Python's, is tested without it. The command fails
 when the extension declares neither. A template whose manifest names no
-extension can run only with `--skip-build`. `--channel <channel>` (or `PUTNAMI_CHANNEL`) installs the extension from
-that release channel, as `putnami init` does. `projects create` has no channel
-of its own.
+extension can run only with `--skip-build`. `--channel <channel>` (or `PUTNAMI_CHANNEL`) installs the extension and
+creates the project on that release channel, as `putnami init` does.
 
 Template archives contain `putnami.template.json` plus the renderable/static
 template content. Source-workspace declarations at the template root
