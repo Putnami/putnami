@@ -190,6 +190,52 @@ func TestAnUnmappedStateIsUnsupported(t *testing.T) {
 	}
 }
 
+func TestTransitionsWithEmptyLabels(t *testing.T) {
+	spectest.Proves(t, feature, "configurable-state-mapping", "transitions-with-empty-labels-send-an-array")
+	for _, state := range []collab.TaskState{collab.TaskStateDone, collab.TaskStateCanceled} {
+		for _, start := range []struct {
+			name   string
+			labels []string
+		}{
+			{name: "unlabeled"},
+			{name: "last-state-label", labels: []string{"status/in-progress"}},
+			{name: "visible-label", labels: []string{"bug", "status/in-progress"}},
+		} {
+			t.Run(string(state)+"/"+start.name, func(t *testing.T) {
+				h := newHarness(t)
+				seeded := h.seedIssue("Close me", "", start.labels...)
+				ref := refJSON(collab.Ref{Source: "github:acme/app", ID: strconv.Itoa(seeded.number)})
+				var before, moved collab.TaskResult
+				h.ok("tasks", "get", `{"ref":`+ref+`}`, &before)
+				h.ok("tasks", "transition", `{"ref":`+ref+`,"state":"`+string(state)+`","expectedRevision":"`+before.Task.Revision+`"}`, &moved)
+				reason := "completed"
+				if state == collab.TaskStateCanceled {
+					reason = "not_planned"
+				}
+				issue := h.issue(seeded.number)
+				if issue.state != "closed" || issue.stateReason != reason || moved.Task.State != state || moved.Task.ProviderState != "closed:"+reason {
+					t.Fatalf("transition: GitHub state %s/%s, answered %+v", issue.state, issue.stateReason, moved.Task)
+				}
+				var want []string
+				if start.name == "visible-label" {
+					want = []string{"bug"}
+				}
+				if !slices.Equal(issue.labels, want) || !slices.Equal(moved.Task.Labels, want) {
+					t.Fatalf("transition left labels %v, answered %v; want %v", issue.labels, moved.Task.Labels, want)
+				}
+				patches := h.fake.count("PATCH", `/issues/[0-9]+$`)
+				if patches != 1 {
+					t.Fatalf("transition sent %d patches; want one array-valued label write", patches)
+				}
+				h.ok("tasks", "transition", `{"ref":`+ref+`,"state":"`+string(state)+`"}`, &moved)
+				if h.fake.count("PATCH", `/issues/[0-9]+$`) != patches || moved.Task.State != state {
+					t.Fatalf("repeated transition wrote again or answered %+v", moved.Task)
+				}
+			})
+		}
+	}
+}
+
 func TestStateLabelsChangeOnlyThroughTransition(t *testing.T) {
 	spectest.Proves(t, feature, "configurable-state-mapping", "state-labels-change-only-through-transition")
 	h := newHarness(t)

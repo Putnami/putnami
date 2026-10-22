@@ -22,7 +22,7 @@
     },
     {
       "id": "configurable-state-mapping",
-      "text": "Task states map to issue labels through binding settings, none hard-coded: a transition removes every state label and applies the target state's first label, also when an open issue reads as that state through another label or, for open, through no label; done and canceled close the issue as completed and not planned; a state that needs a label and has none is unsupported; create applies a state label only for a state that needs one; create and update refuse a state label."
+      "text": "States map to configured issue labels. Transitions remove all state labels and apply the target's first label, even when another label or no label supplies the current state. done and canceled close as completed and not planned; empty resulting label lists are encoded as arrays, never null. Unmapped states needing labels are unsupported. Create applies state labels only for states that need one; create and update refuse state labels."
     },
     {
       "id": "exact-proposal-identity",
