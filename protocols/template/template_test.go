@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	diag "go.putnami.dev/protocol/diagnostic"
 )
 
 func TestIsTemplateRootPackagingExclusion(t *testing.T) {
@@ -73,24 +75,32 @@ func TestLoadManifest_InvalidJSON(t *testing.T) {
 	}
 }
 
-func TestLoadManifest_WithDevDeps(t *testing.T) {
+// The lenient read answers the identity question for any archive, including
+// one that declares a field the strict parser refuses.
+func TestLoadManifest_IgnoresAFieldTheStrictParserRefuses(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ManifestFilename)
 
 	data := `{
 		"name": "test-template",
 		"description": "Test",
+		"extension": "@putnami/go",
 		"workspaceDevDependencies": {
-			"@putnami/typescript": "^1.0.0"
+			"go.putnami.dev/go/extension": "latest"
 		}
 	}`
-	os.WriteFile(path, []byte(data), 0o644)
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	m, err := LoadManifest(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m.WorkspaceDevDependencies["@putnami/typescript"] != "^1.0.0" {
-		t.Errorf("devDeps = %v", m.WorkspaceDevDependencies)
+	if m.Name != "test-template" || m.Extension != "@putnami/go" {
+		t.Errorf("manifest = %+v, want the name and extension", m)
+	}
+	if _, diags := ParseManifestStrict([]byte(data)); !diag.HasErrors(diags) {
+		t.Error("the strict parser accepted workspaceDevDependencies")
 	}
 }

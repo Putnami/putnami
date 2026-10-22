@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-template.json",
+  "name": "go-library",
+  "description": "A template that declares a field the protocol does not define",
+  "extension": "@putnami/go",
+  "workspaceDevDependencies": {
+    "go.putnami.dev/go/extension": "latest"
+  }
+}

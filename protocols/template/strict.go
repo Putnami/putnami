@@ -43,18 +43,6 @@ func ValidateManifest(m *Manifest) []diag.Diagnostic {
 	return diags
 }
 
-// NormalizeManifest applies canonical defaults to a parsed template manifest
-// for deterministic output. It modifies the manifest in place.
-func NormalizeManifest(m *Manifest) {
-	if m == nil {
-		return
-	}
-
-	if m.WorkspaceDevDependencies == nil {
-		m.WorkspaceDevDependencies = make(map[string]string)
-	}
-}
-
 // ParseAndValidateManifest combines strict parsing and validation in one call.
 func ParseAndValidateManifest(data []byte) (*Manifest, []diag.Diagnostic) {
 	m, diags := ParseManifestStrict(data)
@@ -65,12 +53,10 @@ func ParseAndValidateManifest(data []byte) (*Manifest, []diag.Diagnostic) {
 	vDiags := ValidateManifest(m)
 	diags = append(diags, vDiags...)
 
-	NormalizeManifest(m)
-
 	return m, diags
 }
 
-// StrictLoadManifest reads data and applies strict parse, validate, and normalize.
+// StrictLoadManifest reads data and applies strict parse and validate.
 func StrictLoadManifest(path string, data []byte) (*Manifest, []diag.Diagnostic) {
 	m, diags := ParseAndValidateManifest(data)
 	if diag.HasErrors(diags) {

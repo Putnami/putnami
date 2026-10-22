@@ -25,16 +25,14 @@ metadata:
 | `description` | **yes** | Human-readable purpose |
 | `version` | no | Template version (semver); stamped at package time when absent |
 | `extension` | no | The extension activated for projects created from this template |
-| `workspaceDevDependencies` | no | Dev dependencies for the workspace root. No core command reads it |
 | `testVariables` | no | Render-variable overrides used when testing the template |
 
-The strict pipeline mirrors the other protocol packages:
+The strict pipeline mirrors the other protocol packages, minus the normalize
+step: no field has a default to fill.
 
 - `ParseManifestStrict()` decodes with unknown fields rejected;
 - `ValidateManifest()` enforces the two required fields;
-- `NormalizeManifest()` fills canonical defaults (an absent
-  `workspaceDevDependencies` becomes an empty map) in place;
-- `ParseAndValidateManifest()` runs all three and returns structured
+- `ParseAndValidateManifest()` runs both and returns structured
   diagnostics;
 - `StrictLoadManifest()` additionally prefixes each diagnostic with the manifest
   path, because the diagnostic protocol models no line or column for manifest
