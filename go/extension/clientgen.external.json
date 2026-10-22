@@ -71,6 +71,29 @@
         "go/extension/internal/jobs/publish/publish_test.go"
       ],
       "reason": "Uploads a module zip and its metadata to a Go module registry over the module proxy protocol. A dry-run publish sends one GET of the module zip to ask whether the registry already serves the version."
+    },
+    {
+      "authority": "Go toolchain download index at go.dev/dl (the ?mode=json machine-readable index)",
+      "adapter": "go/extension/internal/workspacejob/goresolve.go",
+      "callsites": [
+        {
+          "path": "go/extension/internal/workspacejob/goresolve.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "aba0b134f60140827d3f84432c1182ad89c8bec697386c986774462c9df1ab2a"
+        },
+        {
+          "path": "go/extension/internal/workspacejob/goresolve.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "5564401ee8c6db8b78172fb3a55edacfbf01e3196b477c7d2b373a0fb13407e5"
+        }
+      ],
+      "owner": "@putnami/go",
+      "tests": [
+        "go/extension/internal/workspacejob/goresolve_test.go"
+      ],
+      "reason": "Reads the SHA-256 go.dev publishes for each archive of the Go release go.work declares, so the toolchain-resolve answer pins those archives in the workspace lock."
     }
   ]
 }

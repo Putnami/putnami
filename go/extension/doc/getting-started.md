@@ -268,6 +268,17 @@ credentials, such as `https://user:token@mirror.example/go.zip`, appears in the
 job output without them, and the credentials go only to that URL's scheme and
 host, after a redirect too.
 
+**Toolchain pin resolution:** the extension answers the CLI's
+`__putnami toolchain-resolve` call for the lock identity `go`. It keeps the
+committed pin of the release `go.work` declares (the higher of its `go` and
+`toolchain` directives), or any committed pin when `go.work` declares none. A
+declared release the lock does not pin comes from the machine's pin record,
+`toolchains/go/go-{version}.pin.json` under the Putnami home, else from the
+go.dev release index, which the answer then records; an offline call with no
+record reports a problem. Each pin names, per platform, the archive the
+installer downloads and its SHA-256, and a pin with no archive for the host
+platform is reported as a problem.
+
 Go is installed to `~/.putnami/toolchains/go/go-{version}/`, where the Go
 distribution is the `go` directory. `PUTNAMI_HOME` relocates `~/.putnami`; when
 neither `PUTNAMI_HOME` nor a home directory is set, the Putnami home is

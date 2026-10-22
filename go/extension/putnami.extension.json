@@ -27,6 +27,7 @@
       }
     },
     "runToolchains": ["runtimeCompiler"],
+    "resolves": ["go"],
     "prepare": {
       "command": "{extensionRoot}/bin/prepare",
       "args": ["--output", "{runtimeOutput}"],

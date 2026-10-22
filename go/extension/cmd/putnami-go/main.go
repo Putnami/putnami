@@ -192,6 +192,14 @@ func runEntrypoint(
 		}
 		return nil
 	}
+	// The toolchain-resolve call is a control call of the same shape: one
+	// request on stdin, one result on stdout, nothing on stdout on failure.
+	if handled, err := handleToolchainResolve(args, os.Stdin, stdout, getenv); handled {
+		if err != nil {
+			return fmt.Errorf("toolchain-resolve: %w", err)
+		}
+		return nil
+	}
 	if len(args) > 0 && args[0] == mcpToolArg {
 		return runMCPTool(context.Background(), os.Stdin, stdout)
 	}
