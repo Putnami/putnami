@@ -64,12 +64,17 @@ A runtime toolchain candidate may come from `provisioned`, under CLI contract
    `provisioned` candidate for the toolchain it answers for, in place of its
    `putnami-home` one. A missing or incomplete folder fails a job that needs
    it, with `putnami install` as the remedy. A toolchain that locks an
-   identity another extension answers for, such as the `go` of the TypeScript
-   and Python runtime compilers, keeps its `putnami-home` candidate.
+   identity another extension answers for keeps its `putnami-home` candidate
+   when that path is the provisioned executable, as the `go` runtime compiler
+   of every other extension does: Go's archive holds `go/bin/go`. Otherwise it
+   lists the `provisioned` candidate, as the Bun of `@putnami/clientgen`'s
+   TypeScript emitter does.
 6. **Each extension keeps its declaration and its default.** It reads its own
-   declaration (`go.work`, `packageManager`, `[tool.uv]`), pins its default
-   release when the workspace declares none, and its `workspace-install`
-   still writes a missing declaration, as ADR 0019 decision 4 states.
+   declaration (`go.work`, `packageManager`, `[tool.uv]`). The TypeScript and
+   Python extensions pin their default release when the workspace declares
+   none; the Go extension keeps a committed pin and otherwise pins nothing
+   until `go.work` declares a release. Each `workspace-install` still writes
+   a missing declaration, as ADR 0019 decision 4 states.
 
 ADR 0019 decisions 6 and 7 stand. Decision 3 still resolves an alias that only
 `workspace-install` needs as optional, and still reports it after the run.
@@ -85,8 +90,9 @@ ADR 0019 decisions 6 and 7 stand. Decision 3 still resolves an alias that only
 ## Consequences
 
 - Pinning a new toolchain changes one extension, not the core.
-- The CLI, the Go, TypeScript and Python extensions ship together: their
-  manifests require contract 13, which only this core implements.
+- The CLI and the Go, TypeScript, Python and clientgen extensions ship
+  together: their manifests require contract 13, which only this core
+  implements.
 - The CLI unpacks `zip` toolchain archives, because Bun publishes only zip
   archives and Go and uv publish zip archives for Windows. CLI decision D-W2
   states which archives stay `tar.gz`.

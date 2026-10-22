@@ -1164,16 +1164,17 @@ resolves no toolchain release itself: an extension lists the lock identities it
 answers for in `runtime.resolves`, and answers for their pins. The Go extension
 answers for `go` from `go.work`, the TypeScript extension for `bun` from
 `package.json#packageManager`, and the Python extension for `uv` from the
-`[tool.uv]` table of the root `pyproject.toml`. Each pins its default release
-when the workspace declares none, and each extension's documentation describes
-its answer.
+`[tool.uv]` table of the root `pyproject.toml`. The TypeScript and Python
+extensions pin their default release when the workspace declares none. The Go
+extension keeps a committed pin, and pins nothing until `go.work` declares a
+release. Each extension's documentation describes its answer.
 
 `putnami install`, `putnami init`, `putnami projects create` and the implicit
 install run a toolchain pins phase before any `workspace-install`. The phase
 sends one request to each installed extension that answers for a toolchain,
 through `<executable> __putnami toolchain-resolve`, with the transport and
 timeout of the workspace probe. The request names the identities, the lock's
-committed entries for them, the host platform, and whether the run is hosted.
+committed entries for them, the host platform, and whether the run is offline.
 The answer gives each identity an exact version and, per platform, the archive's
 URL, its format (`tar.gz` or `zip`), the executable's path inside it and its
 SHA-256 digest. It can give a problem with a remedy instead, such as the

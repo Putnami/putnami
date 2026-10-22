@@ -1945,8 +1945,8 @@ worktrees share downloaded bytes, while their mutable dependency trees remain
 isolated. In CI, persist `~/.bun/install/cache` and reconstruct `node_modules`
 with `bun install --frozen-lockfile`.
 
-A Bun that `@putnami/typescript` installed under the Putnami home keeps its
-package cache under its own install,
+A Bun that Putnami installed under the Putnami home keeps its package cache
+under its own install,
 `~/.putnami/toolchains/bun/bun-<version>/install/cache`, and writes nothing to
 `~/.bun`. `putnami cache gc` bounds each of those caches separately, with the
 budget and grace period below: each installed release has its own 10 GiB. `PUTNAMI_BUN_CACHE_DIR` or `BUN_INSTALL_CACHE_DIR` names one

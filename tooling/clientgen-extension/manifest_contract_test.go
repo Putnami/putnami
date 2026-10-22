@@ -251,7 +251,7 @@ func TestTypeScriptEmitterResolvesTheBunUnderThePutnamiHome(t *testing.T) {
 		{From: proto.RuntimeToolchainCandidatePath, Path: "bun"},
 		{From: proto.RuntimeToolchainCandidateEnvironment, Environment: "BUN_INSTALL", Path: "bin/bun"},
 		{From: proto.RuntimeToolchainCandidateHome, Path: ".bun/bin/bun"},
-		{From: proto.RuntimeToolchainCandidatePutnamiHome, Path: "toolchains/bun/bun-{version}/bin/bun"},
+		{From: proto.RuntimeToolchainCandidateProvisioned},
 	}
 	if !reflect.DeepEqual(emitter.Candidates, want) {
 		t.Fatalf("typescriptEmitter candidates = %+v, want %+v", emitter.Candidates, want)

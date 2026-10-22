@@ -71,12 +71,10 @@ putnami serve api-gateway
 
 ## Toolchain Management
 
-Go is auto-managed. If the `go` binary in PATH is not the release `putnami.lock.json` pins, the extension downloads and verifies the pinned release, and installs it once for the machine under `~/.putnami/toolchains/go/go-<version>/`. Every workspace that pins the release runs that install. Without a pin, the workspace's Go version is a minimum, read from:
+Go is auto-managed. If no `go` on the machine reports the release `putnami.lock.json` pins, `putnami install` downloads the pinned release, verifies it against the digest the lock records, and installs it once for the machine under `~/.putnami/toolchains/go/go-<version>/`. Every workspace that pins the release runs that install, and the extension installs no Go itself. Without a pin, the workspace's Go version is a minimum, read from:
 
 1. `go.work` directive at workspace root
 2. `go.mod` in the project directory
-3. Latest stable from `https://go.dev/VERSION`
-4. Fallback: `1.23.0`
 
 Lint tools are pinned in [`tools/versions.json`](./tools/versions.json), which is
 the machine-readable contract for CI images and setup scripts. `putnami install`
