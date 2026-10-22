@@ -90,7 +90,9 @@ GitHub token, from everything it writes.
   issue is `canceled` when GitHub closed it as not planned or as a duplicate,
   and `done` otherwise. A transition removes every state label and applies the
   target's first label; `done` and `canceled` also close the issue with the
-  matching reason, and an open state reopens a closed one. A transition to the
+  matching reason, including an unlabeled issue or one whose last state label
+  is removed. Empty label lists are sent as arrays rather than `null`.
+  An open state reopens a closed one. A transition to the
   state an open issue already reads as still applies the first label when
   another label decided it (`status/needs-design` becomes
   `status/needs-review` in the reference mapping), and writes nothing when the

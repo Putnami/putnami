@@ -141,7 +141,7 @@ func (m stateMap) stateOf(issue *ghIssue) (collab.TaskState, string) {
 // visibleLabels are an issue's labels outside the state mapping, which is
 // what a task's labels are and what tasks.update replaces.
 func (m stateMap) visibleLabels(names []string) []string {
-	var visible []string
+	visible := make([]string, 0, len(names))
 	for _, name := range names {
 		if !m.isStateLabel(name) {
 			visible = append(visible, name)

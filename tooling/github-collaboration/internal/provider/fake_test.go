@@ -575,6 +575,13 @@ func (f *fakeGitHub) patchIssue(w http.ResponseWriter, r *http.Request, match []
 		writeJSON(w, http.StatusBadRequest, map[string]any{"message": "Problems parsing JSON"})
 		return
 	}
+	if raw, present := request["labels"]; present {
+		var labels []string
+		if err := json.Unmarshal(raw, &labels); err != nil || labels == nil {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"message": "Invalid request: labels must be an array"})
+			return
+		}
+	}
 	for member, raw := range request {
 		switch member {
 		case "title":

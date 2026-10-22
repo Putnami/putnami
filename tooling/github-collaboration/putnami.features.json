@@ -40,7 +40,8 @@
               "a-transition-to-open-gives-an-issue-without-a-state-label-the-first-label",
               "an-unmapped-state-is-unsupported",
               "done-and-canceled-close-the-issue-with-their-reason",
-              "state-labels-change-only-through-transition"
+              "state-labels-change-only-through-transition",
+              "transitions-with-empty-labels-send-an-array"
             ]
           }
         },
