@@ -58,6 +58,10 @@ Release archives ship that binary so end users do not need Go installed.
 Source checkouts prepare the same path with
 [`bin/prepare-runtime`](bin/prepare-runtime), which builds with the module's
 `GOWORK=off` replace closure into the core-assigned runtime output directory.
+It builds with `-trimpath` and `-buildvcs=false`, without cgo, for the host
+platform, and ignores the caller's `GOFLAGS`, `GOOS`, `GOARCH`, `GOEXPERIMENT`
+and the other Go controls that change the compiled bytes. Two prepares of one
+runtime digest build the same binary.
 
 Every manifest task and MCP tool runs `{extensionRuntime}`, including the
 remote build-cache provider. The Putnami CLI resolves `{extensionRuntime}` to the

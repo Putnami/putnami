@@ -1,7 +1,8 @@
 #!/usr/bin/env sh
 # Build the @putnami/cloud runtime into the output directory assigned by the
-# contract-v3 runtime preparer. This intentionally uses the module's own
-# replace closure instead of the caller's Go workspace.
+# contract-v3 runtime preparer. The build uses the module's own replace closure
+# instead of the caller's Go workspace, and pins every Go control that changes
+# the compiled bytes, so one runtime digest builds one binary.
 set -eu
 
 if [ "$#" -ne 2 ] || [ "$1" != "--output" ] || [ -z "$2" ]; then
@@ -15,9 +16,31 @@ case "$output" in
   *) output="$(pwd)/$output" ;;
 esac
 
+if [ -n "${GOROOT:-}" ] && [ -x "$GOROOT/bin/go" ]; then
+  go_binary="$GOROOT/bin/go"
+elif command -v go >/dev/null 2>&1; then
+  go_binary=$(command -v go)
+else
+  echo 'prepare-runtime: Go compiler not found; checked $GOROOT/bin/go and PATH' >&2
+  exit 1
+fi
+
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 extension_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
 cd "$extension_root"
 
+export GOENV=off
+export GOFLAGS="-mod=readonly -buildvcs=false -trimpath"
+export GO111MODULE=on
+export GOWORK=off
+export GOTOOLCHAIN=local
+export CGO_ENABLED=0
+
+# Cache, proxy and toolchain locations stay as the caller set them. The ambient
+# controls that change the compiled artifact do not reach the build.
+unset GOOS GOARCH
+unset GO386 GOAMD64 GOARM GOARM64 GOMIPS GOMIPS64 GOPPC64 GORISCV64 GOWASM
+unset GOEXPERIMENT GOFIPS140 GODEBUG GO_EXTLINK_ENABLED GO_LDSO
+
 mkdir -p "$output/compiled"
-GOWORK=off exec go build -o "$output/compiled/putnami-cloud" ./cmd/putnami-cloud
+exec "$go_binary" build -o "$output/compiled/putnami-cloud" ./cmd/putnami-cloud
