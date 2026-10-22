@@ -564,6 +564,7 @@ func TestWriteFile_ReportsIOFailure(t *testing.T) {
 // assemble a manifest without the builder.
 func TestValidate_StandaloneManifest(t *testing.T) {
 	m := &proto.Manifest{
+		Name: "sample/standalone",
 		Commands: map[string]proto.CommandDefinition{
 			"build": {Run: []proto.PipelineStep{{ID: "build", Task: "build-exec"}}},
 		},

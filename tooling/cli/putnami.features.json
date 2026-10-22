@@ -1428,6 +1428,21 @@
           }
         },
         {
+          "id": "an-extension-manifest-names-its-extension",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-manifest-without-a-name-is-refused-by-validation",
+              "an-installed-manifest-without-a-name-keeps-loading",
+              "discovery-reads-no-package-json"
+            ]
+          }
+        },
+        {
           "id": "source-bound-stamp",
           "stage": "coded",
           "evidenceKinds": [

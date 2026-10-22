@@ -116,6 +116,7 @@ func TestParseManifest_Strict_BatchableProjectsParam(t *testing.T) {
 	const runsTest = `{"run": [{"id": "test", "task": "test"}]}`
 	manifest := func(command, batchable, extra string) []byte {
 		return []byte(`{
+			"name": "@test/extension",
 			"commands": {
 				"test": ` + command + `
 			},
@@ -140,6 +141,7 @@ func TestParseManifest_Strict_BatchableProjectsParam(t *testing.T) {
 	// A flag of the same name on a command that does NOT run the task keys
 	// nothing this task computes, so it stays legal.
 	unrelated := []byte(`{
+		"name": "@test/extension",
 		"commands": {
 			"test": ` + runsTest + `,
 			"other": {"flags": {"batch-max-projects": {"type": "number"}}, "run": [{"id": "other", "task": "other"}]}
@@ -225,6 +227,7 @@ func TestParseManifest_Strict_BatchableTaskRequiresTool(t *testing.T) {
 // resources — so only the shape is validated.
 func TestParseManifest_Strict_TaskResourceClaims(t *testing.T) {
 	data := []byte(`{
+		"name": "@test/extension",
 		"cliContract": 4,
 		"commands": {
 			"test": {
@@ -394,6 +397,7 @@ func TestValidateManifest_MissingCommands(t *testing.T) {
 func TestValidateManifest_ToolOnlyExtension(t *testing.T) {
 	trueVal, falseVal := true, false
 	m := &Manifest{
+		Name: "@test/extension",
 		Tools: map[string]ToolDefinition{
 			"putnami.search": {
 				Description: "Search the hosted index.",
@@ -418,6 +422,7 @@ func TestValidateManifest_ToolOnlyExtension(t *testing.T) {
 
 func TestValidateManifest_InvalidToolDefinition(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Tools: map[string]ToolDefinition{
 			"bare": {
 				Description: "Missing required execution and safety data.",
@@ -442,6 +447,7 @@ func TestValidateManifest_InvalidToolDefinition(t *testing.T) {
 
 func TestValidateManifest_EmptyPipeline(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"build": {Run: nil},
 		},
@@ -454,6 +460,7 @@ func TestValidateManifest_EmptyPipeline(t *testing.T) {
 
 func TestValidateManifest_MissingStepFields(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"build": {Run: []PipelineStep{{}}},
 		},
@@ -467,6 +474,7 @@ func TestValidateManifest_MissingStepFields(t *testing.T) {
 
 func TestValidateManifest_UnresolvedTask(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"build": {Run: []PipelineStep{{ID: "s1", Task: "nonexistent"}}},
 		},
@@ -501,6 +509,7 @@ func TestValidateManifest_StepRunOn(t *testing.T) {
 	}
 
 	valid := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{"test": {Run: []PipelineStep{
 			{ID: "setup", Task: "setup"},
 			{ID: "run", Task: "t", DependsOn: []string{"setup"}},
@@ -516,6 +525,7 @@ func TestValidateManifest_StepRunOn(t *testing.T) {
 	}
 
 	unknown := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{"test": {Run: []PipelineStep{
 			{ID: "run", Task: "t", RunOn: "failure"},
 		}}},
@@ -539,6 +549,7 @@ func TestValidateManifest_FinalizesRelation(t *testing.T) {
 	}
 	build := func() *Manifest {
 		return &Manifest{
+			Name: "@test/extension",
 			Commands: map[string]CommandDefinition{"test": {Run: []PipelineStep{
 				{ID: "setup", Task: "setup"},
 				{ID: "first", Task: "work", DependsOn: []string{"setup"}},
@@ -596,6 +607,7 @@ func TestValidateManifest_FinalizesRelation(t *testing.T) {
 func TestValidateManifest_AStepBelongsToAtMostOneInvocation(t *testing.T) {
 	disabled := false
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{"test": {Run: []PipelineStep{
 			{ID: "setup", Task: "setup"},
 			{ID: "setup-2", Task: "setup"},
@@ -661,6 +673,7 @@ func TestValidateManifest_AStepBelongsToAtMostOneInvocation(t *testing.T) {
 func TestValidateManifest_FinalizerBinding(t *testing.T) {
 	disabled := false
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{"test": {Run: []PipelineStep{
 			{ID: "setup", Task: "setup"},
 			{ID: "run", Task: "t", DependsOn: []string{"setup"}},
@@ -702,6 +715,7 @@ func TestValidateManifest_FinalizerBinding(t *testing.T) {
 
 func TestValidateManifest_CommandDependenciesRejectPipelineStepRefs(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"build": {
 				DependsOn: []string{"^build", "/workspace-install", "*generate", "!^generate", "prepare", "!lint"},
@@ -730,6 +744,7 @@ func TestValidateManifest_CommandDependenciesRejectPipelineStepRefs(t *testing.T
 
 func TestValidateManifest_AlsoRunsContract(t *testing.T) {
 	manifest := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"validate": {
 				AlsoRuns: []string{"validate-workspace"},
@@ -769,6 +784,7 @@ func TestValidateManifest_AlsoRunsContract(t *testing.T) {
 
 func TestValidateManifest_SessionPrerequisiteContract(t *testing.T) {
 	manifest := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"deploy": {
 				Flags: map[string]FlagDefinition{"apps": {Type: "string"}},
@@ -811,6 +827,7 @@ func TestValidateManifest_SessionPrerequisiteContract(t *testing.T) {
 
 func TestValidateManifest_SessionPrerequisiteParamDiagnosticsAreSorted(t *testing.T) {
 	manifest := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"deploy": {
 				SessionPrerequisites: []SessionPrerequisiteDefinition{{
@@ -844,6 +861,7 @@ func TestValidateManifest_SessionPrerequisiteParamDiagnosticsAreSorted(t *testin
 
 func TestValidateManifest_SessionPrerequisiteExpressionsAreStrict(t *testing.T) {
 	manifest := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"deploy": {
 				SessionPrerequisites: []SessionPrerequisiteDefinition{
@@ -876,6 +894,7 @@ func TestValidateManifest_SessionPrerequisiteExpressionsAreStrict(t *testing.T) 
 
 func TestValidateManifest_InvalidInputSource(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"build": {Run: []PipelineStep{{ID: "s1", Task: "t1"}}},
 		},
@@ -903,6 +922,7 @@ func TestValidateManifest_InvalidInputSource(t *testing.T) {
 
 func TestValidateManifest_Valid(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"build": {Run: []PipelineStep{{ID: "s1", Task: "t1"}}},
 		},
@@ -918,6 +938,7 @@ func TestValidateManifest_Valid(t *testing.T) {
 
 func TestValidateManifest_ReservedGlobalFlagShadows(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"test": {
 				Flags: map[string]FlagDefinition{
@@ -969,6 +990,7 @@ func TestValidateManifest_ReservedGlobalFlagShadows(t *testing.T) {
 
 func TestValidateManifest_NestedSubcommandsInheritCommand(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"cloud-config": {Run: []PipelineStep{{ID: "config", Task: "config-task"}}},
 		},
@@ -1001,6 +1023,7 @@ func TestValidateManifest_NestedSubcommandsInheritCommand(t *testing.T) {
 
 func TestValidateManifest_FlatCommandGroupStillValid(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"demo-login": {Run: []PipelineStep{{ID: "login", Task: "login-task"}}},
 		},
@@ -1023,6 +1046,7 @@ func TestValidateManifest_FlatCommandGroupStillValid(t *testing.T) {
 
 func TestValidateManifest_TopLevelSubcommandStillRequiresCommand(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"cloud-config": {Run: []PipelineStep{{ID: "config", Task: "config-task"}}},
 		},
@@ -1055,6 +1079,7 @@ func TestValidateManifest_TopLevelSubcommandStillRequiresCommand(t *testing.T) {
 
 func TestValidateManifest_ExampleRequiresCommand(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"cloud-status": {Run: []PipelineStep{{ID: "status", Task: "status-task"}}},
 		},
@@ -1135,6 +1160,7 @@ func TestParseManifest_Strict_CommandGroupFlags(t *testing.T) {
 
 func TestValidateManifest_ExamplesWithCommandValid(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"cloud-status": {Run: []PipelineStep{{ID: "status", Task: "status-task"}}},
 		},
@@ -1179,6 +1205,7 @@ func TestNormalizeManifest_Nil(t *testing.T) {
 
 func TestNormalizeManifest_DerivesCacheKey(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Tasks: map[string]TaskDefinition{
 			"t1": {
 				Kind:    "command",
@@ -1202,8 +1229,39 @@ func TestNormalizeManifest_DerivesCacheKey(t *testing.T) {
 	}
 }
 
+// A manifest names its extension: strict validation refuses one without a
+// name, with a required-field diagnostic on the name field, and nothing else.
+func TestValidateManifest_RequiresName(t *testing.T) {
+	data := []byte(`{
+		"commands": {"build": {"run": [{"id": "s1", "task": "t1"}]}},
+		"tasks": {"t1": {"kind": "command", "command": "go"}}
+	}`)
+
+	for name, validate := range map[string]func(*Manifest) []diag.Diagnostic{
+		"ValidateManifest":     ValidateManifest,
+		"FullValidateManifest": FullValidateManifest,
+	} {
+		t.Run(name, func(t *testing.T) {
+			m, parseDiags := ParseManifest(data)
+			if diag.HasErrors(parseDiags) {
+				t.Fatalf("parse: %v", parseDiags)
+			}
+			errs := diag.Errors(validate(m))
+			if len(errs) != 1 || errs[0].Code != "required-field" || errs[0].Field != "name" {
+				t.Fatalf("nameless manifest diagnostics = %v, want one required-field on name", errs)
+			}
+
+			m.Name = "@test/extension"
+			if errs := diag.Errors(validate(m)); len(errs) != 0 {
+				t.Fatalf("named manifest refused: %v", errs)
+			}
+		})
+	}
+}
+
 func TestParseAndValidateManifest_Valid(t *testing.T) {
 	data := []byte(`{
+		"name": "@test/extension",
 		"cliContract": 4,
 		"commands": {
 			"build": {
@@ -1237,6 +1295,7 @@ func TestParseAndValidateManifest_ParseError(t *testing.T) {
 
 func TestValidatePipelineDAG_Acyclic(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"build": {
 				Run: []PipelineStep{
@@ -1256,6 +1315,7 @@ func TestValidatePipelineDAG_Acyclic(t *testing.T) {
 
 func TestValidatePipelineDAG_Cycle(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"build": {
 				Run: []PipelineStep{
@@ -1290,6 +1350,7 @@ func TestValidatePipelineDAG_Nil(t *testing.T) {
 
 func TestValidateSchemaRefs_Valid(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Contracts: &ContractsDefinition{
 			Schemas: map[string]map[string]any{
 				"input-schema":  {"type": "object"},
@@ -1308,6 +1369,7 @@ func TestValidateSchemaRefs_Valid(t *testing.T) {
 
 func TestValidateSchemaRefs_Unresolved(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Contracts: &ContractsDefinition{
 			Schemas: map[string]map[string]any{},
 		},
@@ -1326,6 +1388,7 @@ func TestValidateSchemaRefs_Unresolved(t *testing.T) {
 
 func TestValidateSchemaRefs_NoContracts(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Tasks: map[string]TaskDefinition{
 			"t1": {Kind: "command", Command: "go", InputSchemaRef: "something"},
 		},
@@ -1338,6 +1401,7 @@ func TestValidateSchemaRefs_NoContracts(t *testing.T) {
 
 func TestFullValidateManifest_Valid(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"build": {Run: []PipelineStep{{ID: "s1", Task: "t1"}}},
 		},
@@ -1353,6 +1417,7 @@ func TestFullValidateManifest_Valid(t *testing.T) {
 
 func TestFullValidateManifest_CatchesCycle(t *testing.T) {
 	m := &Manifest{
+		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"build": {
 				Run: []PipelineStep{

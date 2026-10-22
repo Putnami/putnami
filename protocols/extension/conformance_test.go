@@ -99,6 +99,7 @@ func TestConformance_SessionPrerequisiteValueRejectsNull(t *testing.T) {
 	}
 
 	manifest, parseDiags := ParseManifest([]byte(`{
+		"name": "@test/extension",
 		"commands": {"deploy": {
 			"sessionPrerequisites": [{"command":"publish", "params":{"docker":{"value":null}}}],
 			"run": [{"id":"deploy", "task":"work"}]

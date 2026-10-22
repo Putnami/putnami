@@ -163,6 +163,7 @@ func TestAnUnknownKindWorkloadOrPhaseIsRefused(t *testing.T) {
 	}
 	for _, kind := range ValidBatchKinds {
 		m := &Manifest{
+			Name:     "@test/extension",
 			Commands: map[string]CommandDefinition{"lint": {Run: []PipelineStep{{ID: "a", Task: "a"}}}},
 			Tasks: map[string]TaskDefinition{"a": {Kind: "command", Command: "echo", TimeoutMs: -1,
 				Batchable: &TaskBatchPolicy{Tool: "lint", Kind: kind, Phase: "lint-check"}}},

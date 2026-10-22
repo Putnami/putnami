@@ -682,6 +682,19 @@
               "the-npm-packager-validates-and-stamps-a-vocabulary"
             ]
           }
+        },
+        {
+          "id": "the-packager-refuses-a-nameless-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-npm-packager-refuses-a-nameless-manifest"
+            ]
+          }
         }
       ]
     }

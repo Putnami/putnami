@@ -35,6 +35,7 @@ func TestGoEmbedSelectorRequiresAdditiveCLIContract(t *testing.T) {
 
 func TestFullValidateManifestSharesGoEmbedSelectorRulesWithLoader(t *testing.T) {
 	base := &Manifest{
+		Name:     "@test/extension",
 		Commands: map[string]CommandDefinition{"build": {Run: []PipelineStep{{ID: "build", Task: "build"}}}},
 		Tasks: map[string]TaskDefinition{"build": {Kind: "command", Command: "echo", Inputs: map[string]TaskInputPort{
 			"sources": {From: TaskInputFromProject, Files: []string{"**/*.go", "go-embed:build"}},

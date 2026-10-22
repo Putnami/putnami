@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
@@ -299,7 +300,11 @@ func TestDiscoverExtensions_NameFromPutnamiJSON(t *testing.T) {
 	}
 }
 
-func TestDiscoverExtensions_NameFromPackageJSON(t *testing.T) {
+// The name and version of a discovered extension never come from the folder's
+// package.json: with no name in the manifest and no putnami.json, the
+// reference names the extension and the version stays empty.
+func TestDiscoverExtensions_NameFromReferenceIgnoresPackageJSON(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-extension-manifest-names-its-extension", "discovery-reads-no-package-json")
 	dir := t.TempDir()
 
 	extDir := filepath.Join(dir, "ext")
@@ -326,11 +331,78 @@ func TestDiscoverExtensions_NameFromPackageJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DiscoverExtensions: %v", err)
 	}
-	if exts[0].Name != "@putnami/from-pkg" {
-		t.Errorf("Name = %q, want %q", exts[0].Name, "@putnami/from-pkg")
+	if len(exts) != 1 {
+		t.Fatalf("expected 1, got %d", len(exts))
 	}
-	if exts[0].Version != "2.0.0" {
-		t.Errorf("Version = %q, want %q", exts[0].Version, "2.0.0")
+	if exts[0].Name != "ext" {
+		t.Errorf("Name = %q, want the reference %q", exts[0].Name, "ext")
+	}
+	if exts[0].Version != "" {
+		t.Errorf("Version = %q, want empty: package.json is no source", exts[0].Version)
+	}
+}
+
+// An installed manifest without a name, released before the manifest required
+// one, keeps loading under the reference that installed it.
+func TestTryLoadExtension_InstalledManifestWithoutANameLoadsUnderItsReference(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-extension-manifest-names-its-extension", "an-installed-manifest-without-a-name-keeps-loading")
+	dir := t.TempDir()
+	manifest := `{
+		"cliContract": 4,
+		"commands": {"build": {"run": [{"id": "b", "task": "t"}]}},
+		"tasks": {"t": {"kind": "command", "command": "echo"}}
+	}`
+	if err := os.WriteFile(filepath.Join(dir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ext, skipped := tryLoadExtension(dir, "@acme/released", true)
+	if skipped != nil || ext == nil {
+		t.Fatalf("tryLoadExtension = %+v, %+v; want the extension loaded", ext, skipped)
+	}
+	if ext.Name != "@acme/released" {
+		t.Errorf("Name = %q, want the reference %q", ext.Name, "@acme/released")
+	}
+	for _, job := range ext.Jobs {
+		if job.ExtensionName != "@acme/released" {
+			t.Errorf("job %q belongs to %q, want %q", job.Name, job.ExtensionName, "@acme/released")
+		}
+	}
+}
+
+// The manifest alone supplies the name and the version, ahead of putnami.json.
+func TestDiscoverExtensions_NameAndVersionFromManifest(t *testing.T) {
+	dir := t.TempDir()
+
+	extDir := filepath.Join(dir, "ext")
+	if err := os.MkdirAll(extDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	manifest := `{
+		"name": "@putnami/from-manifest",
+		"version": "3.1.0",
+		"cliContract": 4,
+		"commands": {"build": {"run": [{"id": "b", "task": "t"}]}},
+		"tasks": {"t": {"kind": "command", "command": "echo"}}
+	}`
+	if err := os.WriteFile(filepath.Join(extDir, "putnami.extension.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rc := `{"name": "@putnami/from-rc"}`
+	if err := os.WriteFile(filepath.Join(extDir, wsproto.ConfigFilename), []byte(rc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	exts, err := DiscoverExtensions(dir, &wsproto.Config{}, []string{"ext"})
+	if err != nil {
+		t.Fatalf("DiscoverExtensions: %v", err)
+	}
+	if len(exts) != 1 {
+		t.Fatalf("expected 1, got %d", len(exts))
+	}
+	if exts[0].Name != "@putnami/from-manifest" || exts[0].Version != "3.1.0" {
+		t.Errorf("Name, Version = %q, %q; want %q, %q", exts[0].Name, exts[0].Version, "@putnami/from-manifest", "3.1.0")
 	}
 }
 

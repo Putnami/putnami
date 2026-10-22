@@ -186,6 +186,10 @@
     {
       "id": "vocabulary-default-traits",
       "text": "The npm packager validates a verb vocabulary and stamps CLI contract 9, and fails packaging of a defective one."
+    },
+    {
+      "id": "the-packager-refuses-a-nameless-manifest",
+      "text": "The npm packager refuses to publish an extension manifest without a name, a hook-only one included, before it stamps a contract, and leaves the staged manifest as staged."
     }
   ],
   "decisions": [

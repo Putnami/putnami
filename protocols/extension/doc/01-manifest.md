@@ -9,6 +9,7 @@ The smallest valid extension manifest has a single command with at least one pip
 ```json
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@acme/example",
   "commands": {
     "build": {
       "run": [{ "id": "build", "task": "build-exec" }]
@@ -29,7 +30,7 @@ The smallest valid extension manifest has a single command with at least one pip
 | Field | Required | Description |
 |-------|----------|-------------|
 | `$schema` | no | JSON Schema reference for editor support |
-| `name` | no | Extension identifier (e.g., `@putnami/typescript`) |
+| `name` | yes | Extension identifier (e.g., `@putnami/typescript`): a scoped name (`@scope/name`) or a kebab-case identifier |
 | `version` | no | Extension version (semver) |
 | `cliContract` | no | CLI ↔ extension contract version, stamped by the package job after strict validation (earned, not claimed — see [validation](04-validation.md)) |
 | `commands` | one of `commands`, `tools`, `agentContent`, `verbs` | Public commands exposed to users |
@@ -45,6 +46,15 @@ The smallest valid extension manifest has a single command with at least one pip
 | `tools` | one of `commands`, `tools`, `agentContent`, `verbs` | Namespaced MCP tools the extension contributes |
 | `agentContent` | one of `commands`, `tools`, `agentContent`, `verbs` | Agent instructions the extension ships under its own version — see below |
 | `verbs` | one of `commands`, `tools`, `agentContent`, `verbs` | The verb vocabulary: verbs other extensions run, with their descriptions, aliases, default traits and related commands. Requires CLI contract 9 — see [verbs](06-verbs.md#declaring-a-verb-vocabulary) |
+
+A manifest must name its extension. Strict validation, `putnami extensions
+validate` and the packagers refuse one without a `name`, with a `required-field`
+diagnostic on `name`; a hook-only manifest the packagers publish needs a name
+too. The loader does not apply the rule: an installed artifact released without
+a name keeps loading under the reference that installed it. Discovery takes the
+extension name from the manifest, else from the `name` of the `putnami.json` in
+the extension directory, else from the reference, and the version from the
+manifest alone. It reads no `package.json`.
 
 A manifest must contribute something: at least one command, MCP tool,
 agent-content contribution, or verb vocabulary. A content-only extension — no

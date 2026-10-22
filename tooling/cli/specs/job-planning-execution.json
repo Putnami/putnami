@@ -234,6 +234,10 @@
       "text": "A task's v3 declaration may list publishChannels, the publish channels the task publishes, in the grammar of a project's publish list. The list names at least one channel and each once, is normalized to sorted order, and requires the registry effect; strict validation refuses any other list. A manifest with such a task requires CLI contract 12 wherever it loads from, and a planned job exposes its task's channels."
     },
     {
+      "id": "an-extension-manifest-names-its-extension",
+      "text": "An extension manifest names its extension. Strict validation and putnami extensions validate refuse a manifest without a name; the loader still loads an installed manifest without one, under its reference. Discovery names an extension from its manifest, else the name in its putnami.json, else its reference, takes its version from the manifest alone, and reads no package.json."
+    },
+    {
       "id": "source-bound-stamp",
       "text": "A source-bound task rewrites its project's binding stamp whole, so a reader sees the earlier stamp or the new one. The source-bound tasks of one project take turns from the stamp rewrite to the capture of their entry, within a session and across sessions. A restore of paths the binding excludes keeps the project's computed binding."
     },

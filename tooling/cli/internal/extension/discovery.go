@@ -664,10 +664,7 @@ func tryLoadExtension(absPath, refName string, installed bool) (*ExtensionDescri
 	manifest, err := LoadManifest(manifestPath)
 	if err != nil {
 		skip := &SkippedExtension{Ref: refName, Path: absPath, Reason: err}
-		skip.Name, skip.Version = readPackageNameVersion(absPath)
-		if skip.Name == "" {
-			skip.Name = readPutnamiRCName(absPath)
-		}
+		skip.Name = readPutnamiRCName(absPath)
 		if skip.Name == "" {
 			skip.Name = refName
 		}
@@ -687,18 +684,9 @@ func tryLoadExtension(absPath, refName string, installed bool) (*ExtensionDescri
 
 	// Determine canonical name. Priority:
 	// 1. Manifest name field
-	// 2. package.json name
-	// 3. putnami.json name (native projects)
-	// 4. Reference name (fallback)
-	if ext.Name == "" {
-		pkgName, pkgVersion := readPackageNameVersion(absPath)
-		if pkgName != "" {
-			ext.Name = pkgName
-			if ext.Version == "" {
-				ext.Version = pkgVersion
-			}
-		}
-	}
+	// 2. putnami.json name (native projects)
+	// 3. Reference name (fallback)
+	// The version comes from the manifest alone.
 	if ext.Name == "" {
 		rcName := readPutnamiRCName(absPath)
 		if rcName != "" {
@@ -733,22 +721,6 @@ func readPutnamiRCName(dir string) string {
 		return ""
 	}
 	return r.Name
-}
-
-func readPackageNameVersion(dir string) (string, string) {
-	data, err := os.ReadFile(filepath.Join(dir, "package.json"))
-	if err != nil {
-		return "", ""
-	}
-	type pkg struct {
-		Name    string `json:"name"`
-		Version string `json:"version"`
-	}
-	var p pkg
-	if err := json.Unmarshal(data, &p); err != nil {
-		return "", ""
-	}
-	return p.Name, p.Version
 }
 
 // installedPackagesDirName is the name of the directory a package manager

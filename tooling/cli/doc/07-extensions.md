@@ -54,7 +54,7 @@ Each extension is defined by a `putnami.extension.json` file:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `name` | `string` | Extension identifier (e.g., `@putnami/typescript`) |
+| `name` | `string` | Extension identifier (e.g., `@putnami/typescript`). Required: `putnami extensions validate` and the packagers refuse a manifest without it |
 | `version` | `string` | Semver version |
 | `autoServe` | `bool` | Whether to auto-serve projects using this extension |
 | `extensionDependencies` | `map[string]string` | Other extensions this one needs, each with a version constraint. Installing it installs and pins each registry dependency (`@scope/name`), and a manifest that names one requires CLI contract 8 — see [Extension Dependencies](#extension-dependencies) |

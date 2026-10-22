@@ -16,9 +16,10 @@ import (
 )
 
 // npmAgentContentManifest is an npm extension that ships a command and its own
-// agent content. It names no extension: the package.json name is the name the
+// agent content. Its manifest name is the package.json name, the name the
 // package is published and resolved under.
 const npmAgentContentManifest = `{
+	"name": "@acme/npm-tooling",
 	"cliContract": 5,
 	"commands": {
 		"review": {"run": [{"id": "r", "task": "t"}]}

@@ -201,6 +201,38 @@ func TestExtensionsValidate_AnUnknownKindWorkloadOrPhaseIsRefused(t *testing.T) 
 	}
 }
 
+// `putnami extensions validate` refuses a manifest that names no extension, as
+// a required-field error on name, and accepts the same manifest once it has one.
+func TestExtensionsValidate_AManifestWithoutANameIsRefused(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "an-extension-manifest-names-its-extension", "a-manifest-without-a-name-is-refused-by-validation")
+	manifest := `{
+  "commands": {"build": {"run": [{"id": "build", "task": "build-exec"}]}},
+  "tasks": {"build-exec": {"kind": "command", "command": "echo"}}
+}`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "putnami.extension.json")
+	if err := os.WriteFile(path, []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) })
+	if err == nil {
+		t.Fatalf("a manifest without a name validated:\n%s", out)
+	}
+	for _, want := range []string{"name: extension name is required", "required-field"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+
+	named := strings.Replace(manifest, "{\n", "{\n  \"name\": \"@putnami/test-ext\",\n", 1)
+	if err := os.WriteFile(path, []byte(named), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := sharedtest.CaptureStdout(t, func() error { return ExtensionsValidate([]string{dir}) }); err != nil {
+		t.Fatalf("the same manifest with a name must validate: %v\n%s", err, out)
+	}
+}
+
 // `putnami extensions validate` refuses a publish channel list that is empty,
 // names a channel twice, or sits on a task that does not publish to a
 // registry, and names each offending task.

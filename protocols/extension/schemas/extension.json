@@ -5,6 +5,7 @@
   "description": "Polyglot-first extension manifest. Public commands stay simple while internal tasks are atomic and composable via pipeline-mode commands.",
   "type": "object",
   "additionalProperties": false,
+  "required": ["name"],
   "properties": {
     "$schema": {
       "type": "string",
@@ -12,7 +13,7 @@
     },
     "name": {
       "type": "string",
-      "description": "Extension name. Must be a scoped package name (@scope/name) or a simple kebab-case identifier.",
+      "description": "Extension name, required. Must be a scoped package name (@scope/name) or a simple kebab-case identifier. A manifest that lacks it fails strict validation; an installed artifact that predates the requirement keeps loading under its reference name.",
       "pattern": "^(@[a-z0-9-]+/[a-z0-9-]+|[a-z0-9][a-z0-9-]*)$"
     },
     "version": {

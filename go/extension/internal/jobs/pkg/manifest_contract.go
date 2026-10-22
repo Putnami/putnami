@@ -42,16 +42,18 @@ const (
 // any other protocol violation) fails the package job and never reaches a
 // registry.
 //
-// The gate applies only to manifests that declare a contract surface
-// (non-empty commands, commandGroups, or tools, or an agentContent or verbs
-// section).
-// Hook-only manifests (e.g. framework packages shipping a preBuild hook with
-// `"commands": {}`) expose neither flags nor agent-facing tools for the
-// contract to govern and intentionally fail full strict validation, so they
-// are left untouched and unstamped (contract 0 → outside the ladder). A put
-// archive whose hook-only manifest names a registry extension dependency is
-// the exception: it is stamped without the full validation
-// (stampDependencyContract).
+// Every manifest must name its extension, a hook-only one included
+// (requireManifestName).
+//
+// The strict validation applies only to manifests that declare a contract
+// surface (non-empty commands, commandGroups, or tools, or an agentContent or
+// verbs section). Hook-only manifests (e.g. framework packages shipping a
+// preBuild hook with `"commands": {}`) expose neither flags nor agent-facing
+// tools for the contract to govern and intentionally fail full strict
+// validation, so they are left untouched and unstamped (contract 0 → outside
+// the ladder). A put archive whose hook-only manifest names a registry
+// extension dependency is the exception: it is stamped without the full
+// validation (stampDependencyContract).
 //
 // The gate has ONE postcondition, and it covers both arms: whatever this job is
 // about to ship LOADS under this build's loader (verifyStagedManifestLoads),
@@ -80,6 +82,9 @@ func gateAndStampManifestContract(stageDir string, form packageForm) error {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return fmt.Errorf("parse staged extension manifest: %w", err)
 	}
+	if err := requireManifestName(raw); err != nil {
+		return err
+	}
 	if !manifestDeclaresContractSurface(raw) {
 		if form == putArchive && namesRegistryDependency(raw) {
 			return stampDependencyContract(stageDir, manifestPath, data, raw)
@@ -105,6 +110,17 @@ func gateAndStampManifestContract(stageDir string, form packageForm) error {
 			contract, diagnosticMessages(errs))
 	}
 	return stampAndVerify(stageDir, manifestPath, data, raw, contract)
+}
+
+// requireManifestName refuses a manifest that names no extension. The name is
+// part of the identity a registry publishes, so it is required of every
+// manifest the packager ships, a hook-only one included, which the full strict
+// validation never reaches (protocol rule: required-field on "name").
+func requireManifestName(raw map[string]any) error {
+	if name, _ := raw["name"].(string); name == "" {
+		return fmt.Errorf("staged extension manifest cannot be published: required-field name: the extension name is required")
+	}
+	return nil
 }
 
 // stampDependencyContract is the stamp-only arm of a put archive whose

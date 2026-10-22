@@ -958,6 +958,19 @@
               "the-go-packager-validates-a-vocabulary-next-to-a-dependency"
             ]
           }
+        },
+        {
+          "id": "the-packager-refuses-a-nameless-manifest",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-packager-refuses-a-nameless-manifest"
+            ]
+          }
         }
       ]
     },
