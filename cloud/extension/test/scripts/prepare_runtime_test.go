@@ -11,6 +11,10 @@ import (
 	"testing"
 )
 
+// compiledRuntime is the runtime path prepare-runtime writes, relative to its
+// output directory.
+const compiledRuntime = "compiled/putnami-cloud"
+
 // hostileGoEnvironment holds Go controls that change the compiled bytes when
 // they reach the build.
 var hostileGoEnvironment = map[string]string{
@@ -137,7 +141,7 @@ printf '%s\n' "$*" > "$PREPARE_CAPTURE.args"
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "build -o " + filepath.Join(output, "compiled", "putnami-cloud") + " ./cmd/putnami-cloud"
+	want := "build -o " + filepath.Join(output, filepath.FromSlash(compiledRuntime)) + " ./cmd/putnami-cloud"
 	if got := strings.TrimSpace(string(args)); got != want {
 		t.Errorf("go received %q, want %q", got, want)
 	}
@@ -169,7 +173,7 @@ func TestPrepareRuntimeBuildsTheSameBytesTwice(t *testing.T) {
 		if combined, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("prepare-runtime failed: %v\n%s", err, combined)
 		}
-		compiled := filepath.Join(output, "compiled", "putnami-cloud")
+		compiled := filepath.Join(output, filepath.FromSlash(compiledRuntime))
 		data, err := os.ReadFile(compiled)
 		if err != nil {
 			t.Fatal(err)
