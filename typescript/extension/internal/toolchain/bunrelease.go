@@ -156,30 +156,41 @@ func lockedBunRelease(workspaceRoot string) (BunRelease, bool, error) {
 }
 
 // declaredBunVersion returns the Bun release the workspace root package.json
-// declares in packageManager, as "bun@<version>", normalized the way the CLI
-// normalizes it before it pins the lock: a leading "v" is dropped and a
-// MAJOR.MINOR version gets a ".0" patch. It returns "" when the manifest is
-// missing, unreadable, or declares no Bun.
+// declares (readDeclaredBunVersion), and "" when the manifest is missing,
+// unreadable, or declares no Bun.
 func declaredBunVersion(workspaceRoot string) string {
+	version, _ := readDeclaredBunVersion(workspaceRoot)
+	return version
+}
+
+// readDeclaredBunVersion returns the Bun release the workspace root
+// package.json declares in packageManager, as "bun@<version>", normalized the
+// way the CLI normalizes it before it pins the lock: a leading "v" is dropped
+// and a MAJOR.MINOR version gets a ".0" patch. It returns "" when the manifest
+// is missing or declares no Bun, and an error when it cannot be read or parsed.
+func readDeclaredBunVersion(workspaceRoot string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(workspaceRoot, "package.json"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	}
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("read package.json: %w", err)
 	}
 	var pkg struct {
 		PackageManager string `json:"packageManager"`
 	}
 	if err := json.Unmarshal(data, &pkg); err != nil {
-		return ""
+		return "", fmt.Errorf("parse package.json: %w", err)
 	}
 	version, ok := strings.CutPrefix(strings.TrimSpace(pkg.PackageManager), "bun@")
 	if !ok {
-		return ""
+		return "", nil
 	}
 	version = strings.TrimPrefix(strings.TrimSpace(version), "v")
 	if strings.Count(version, ".") == 1 {
 		version += ".0"
 	}
-	return version
+	return version, nil
 }
 
 // IsPlainBunRelease reports whether version is MAJOR.MINOR.PATCH with decimal

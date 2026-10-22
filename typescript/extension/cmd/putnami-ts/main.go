@@ -93,6 +93,15 @@ func main() {
 		}
 		return
 	}
+	// The toolchain-resolve call is a control call of the same shape: one
+	// request on stdin, one answer on stdout, and no answer at all on failure.
+	if handled, err := handleToolchainResolve(os.Args[1:]); handled {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "putnami-ts: toolchain-resolve: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 	// The reserved cache commands are workspace-level and consume the
 	// environment (PUTNAMI_CACHE_ROOT, PUTNAMI_EXTENSION_CACHE_ROOT and the Bun
 	// cache overrides) rather than the per-job --putnamiContext contract, so

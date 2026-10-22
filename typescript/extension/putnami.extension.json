@@ -38,6 +38,7 @@
       }
     },
     "runToolchains": ["taskRuntime"],
+    "resolves": ["bun"],
     "prepare": {
       "command": "{extensionRoot}/bin/prepare",
       "args": [
