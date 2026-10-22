@@ -255,7 +255,7 @@
     },
     {
       "id": "deps-edit-runs-in-the-project-extension",
-      "text": "putnami deps add and deps remove run the deps-edit job of the selected project's extension for that project only, with the params action and edits, one {project, path, modules} entry, and under --dry-run the param dry-run, true, under which the job writes no file and the CLI prints the plan the job emits as an always-visible summary; deps prune hands it each manifest finding with the target directories. The extension is one the project lists in dependencies or extensions that declares the job, the first by name of several. A project whose extensions declare none is refused, naming them and the hand edit. A failed job fails the command."
+      "text": "deps add and deps remove run the deps-edit job of the selected project's extension for that project only, with the params action, edits (one {project, path, modules} entry) and, under --dry-run, dry-run true; the CLI prints a summary the job marks always visible. deps prune hands it each manifest finding with the target directories. The extension is the first by name the project lists that declares the job. A project whose extensions declare none is refused, naming them. A failed job fails the command."
     },
     {
       "id": "the-cache-provider-owns-its-configuration",
