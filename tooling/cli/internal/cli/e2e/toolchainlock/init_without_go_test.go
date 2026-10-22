@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -33,7 +32,6 @@ import (
 	"go.putnami.dev/tooling/cli/internal/cli"
 	"go.putnami.dev/tooling/cli/internal/cli/clitest"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
-	"go.putnami.dev/tooling/cli/internal/commands/versioncmd"
 	"go.putnami.dev/tooling/cli/internal/hometest"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/workspace"
@@ -53,32 +51,29 @@ var errNoGo = errors.New("no go command is available")
 
 // A consumer who installed only Putnami runs `putnami init --extension go
 // --project app` on a host with no Go at all. Init installs the Go extension
-// and the go-server template from the registry. The Go the extension locks
-// does not resolve, so create runs the prepare stage of the extension's
-// project-setup, which writes go.work and runs no go. Create then pins the Go
-// go.work declares from the release index, runs workspace-install over the new
-// project, which downloads the pinned archive and checks it against the pinned
-// SHA-256 before it installs it, and runs project-setup once, which sets the
-// project up with that Go. No task fails. A build runs with it. The chain is
-// the real one: WorkspaceInit → DepsInstall and ProjectsCreate →
-// RunWorkspaceJob → Engine.Run → runtime toolchain resolution → the
-// extension's task. The registry and the Go release index and download are
-// local servers, so nothing reaches the network.
+// and the go-server template from the registry, and asks the extension for
+// its toolchain pins before its first workspace-install: with no go.work yet,
+// it pins nothing. The Go the extension locks does not resolve, so create runs
+// the prepare stage of the extension's project-setup, which writes go.work and
+// runs no go. Create then asks the extension again, which pins the Go go.work
+// declares, with the archive of the release and its SHA-256, and runs
+// workspace-install over the new project, which downloads that archive and
+// checks it against the pinned SHA-256 before it installs it. It runs
+// project-setup once, which sets the project up with that Go. No task fails. A
+// build runs with it. The chain is the real one: WorkspaceInit → the toolchain
+// pins phase → DepsInstall and ProjectsCreate → RunWorkspaceJob → Engine.Run →
+// runtime toolchain resolution → the extension's task. The registry and the Go
+// download are local servers, so nothing reaches the network.
 //
-// The Go is installed once for the machine, under the Putnami home, and the
-// workspace holds no copy: a second workspace that init sets up on the same
-// machine runs the same install, downloads no archive, and pins the release
-// from the record the first pin left, with no request to the release index.
-//
-// The extension is a fixture whose workspace-install and project-setup do what
-// @putnami/go's do for these steps: the install installs nothing while nothing
-// declares Go, and installs the release the lock pins, verified, where its
-// candidates look.
+// The extension is a fixture whose toolchain-resolve, workspace-install and
+// project-setup do what @putnami/go's do for these steps: the answer pins the
+// release go.work declares and nothing without go.work, the install installs
+// nothing while nothing declares Go, and installs the release the lock pins,
+// verified, where its candidates look.
 func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "project-setup-runs-in-the-project-extension",
 		"a-bare-host-create-sets-the-project-up-with-no-failed-task")
-	spectest.Proves(t, "cli/toolchain-lock", "go-pin-reuses-the-machine-record",
-		"a-second-init-makes-no-request-to-the-release-index")
+	spectest.Proves(t, "cli/toolchain-lock", "init-records-pins", "init-pins-what-the-extensions-answer")
 	clitest.RequireShell(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("shell runtime fixture")
@@ -109,28 +104,26 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 	goArchive := goReleaseArchive(t, goCalls)
 	goArchiveName := fmt.Sprintf("go%s.%s-%s.tar.gz", initGoRelease, runtime.GOOS, runtime.GOARCH)
 	goArchiveDigest := sha256Hex(goArchive)
-	var goIndexRequests, goDownloads atomic.Int32
-	goDev := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/dl/":
-			goIndexRequests.Add(1)
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode([]goDevRelease{{
-				Version: "go" + initGoRelease,
-				Files: []goDevFile{{
-					Filename: goArchiveName, OS: runtime.GOOS, Arch: runtime.GOARCH,
-					SHA256: goArchiveDigest, Kind: "archive",
-				}},
-			}})
-		case "/dl/" + goArchiveName:
-			goDownloads.Add(1)
-			_, _ = w.Write(goArchive)
-		default:
+	var goDownloads atomic.Int32
+	releases := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/dl/"+goArchiveName {
 			http.NotFound(w, r)
+			return
 		}
+		goDownloads.Add(1)
+		_, _ = w.Write(goArchive)
 	}))
-	t.Cleanup(goDev.Close)
-	t.Cleanup(versioncmd.SetGoReleaseEndpoints(goDev.URL+"/dl/?mode=json&include=all", goDev.URL+"/dl/"))
+	t.Cleanup(releases.Close)
+	goArchiveURL := releases.URL + "/dl/" + goArchiveName
+	// What the fixture extension knows of the release it pins: where its
+	// archive is, and the SHA-256 its vendor publishes.
+	release, err := json.Marshal(goFixtureRelease{URL: goArchiveURL, SHA256: goArchiveDigest})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(records, goFixtureReleaseFile), release, 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	registry := newFixtureRegistry(t, map[string][]byte{
 		"/putnami/go/download":        goExtensionArchive(t, records),
@@ -161,6 +154,12 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 		t.Fatalf("runtime toolchain logs of init =\n%s\nwant the installed Go reported at info level and no warning", got)
 	}
 
+	// Init asks the extension before its first workspace-install, when no
+	// go.work exists, and create asks it again once the prepare stage wrote
+	// go.work.
+	if got, want := fixtureRuns(t, records, "resolve"), []string{"no go.work", "go " + initGoRelease}; !slices.Equal(got, want) {
+		t.Fatalf("toolchain-resolve runs = %v, want %v\n%s", got, want, transcript)
+	}
 	// Before the project exists, workspace-install matches no project. Create's
 	// run installs the pinned Go, and init's last install finds it in place.
 	if got, want := fixtureRuns(t, records, "install"), []string{"installed", "present"}; !slices.Equal(got, want) {
@@ -170,20 +169,16 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 	if got := goDownloads.Load(); got != 1 {
 		t.Fatalf("the Go archive was downloaded %d times, want once", got)
 	}
-	// The first pin of the release on the machine asks the release index.
-	firstIndexRequests := goIndexRequests.Load()
-	if firstIndexRequests < 1 {
-		t.Fatal("the first init pinned Go without a request to the release index; this test guards nothing")
-	}
 	lock, err := lockfile.ReadLockFile(wsRoot)
 	if err != nil || lock == nil {
 		t.Fatalf("read the lock init left: %v", err)
 	}
+	platform := lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH)
 	pin, pinned := lock.GetToolchain("go")
-	if !pinned || pin.Version != initGoRelease || pin.Source != goDev.URL+"/dl/" ||
-		pin.Integrities[lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH)] != goArchiveDigest {
-		t.Fatalf("toolchains.go = %+v (present %v), want %s from %s/dl/ with the archive's SHA-256 %s",
-			pin, pinned, initGoRelease, goDev.URL, goArchiveDigest)
+	if lock.Version != lockfile.FormatVersionV5 || !pinned || pin.Version != initGoRelease ||
+		pin.Archives[platform].URL != goArchiveURL || pin.Integrities[platform] != goArchiveDigest {
+		t.Fatalf("lock version %d, toolchains.go = %+v (present %v); want version 5 and the pin the extension answered: %s from %s with the archive's SHA-256 %s",
+			lock.Version, pin, pinned, initGoRelease, goArchiveURL, goArchiveDigest)
 	}
 	if data, err := os.ReadFile(filepath.Join(wsRoot, "go.work")); err != nil || string(data) != "go "+initGoRelease+"\n\nuse ./app\n" {
 		t.Fatalf("go.work = %q, %v; want the bytes project-setup writes for app", data, err)
@@ -228,52 +223,6 @@ func TestInit_SetsAGoProjectUpOnAHostWithoutGo(t *testing.T) {
 	if got := goDownloads.Load(); got != 1 {
 		t.Fatalf("the build downloaded the Go archive again: %d downloads", got)
 	}
-
-	// A second workspace on the machine pins the same release from the record
-	// of the first, with no request to the release index: every
-	// workspace-install of its init finds the install of the first one, no
-	// archive is downloaded, and its go commands run with that install.
-	secondRoot, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Chdir(secondRoot)
-	transcript = clitest.CaptureStdoutStderr(t, func() {
-		initErr = lifecycle.WorkspaceInit(context.Background(), "",
-			[]string{"--workspace", "go-ws-2", "--extension", "go", "--project", "app"}, env)
-	})
-	if initErr != nil {
-		t.Fatalf("putnami init --extension go --project app in a second workspace: %v\n%s", initErr, transcript)
-	}
-	requireNoFailedTask(t, progress.String()+transcript)
-	if got, want := fixtureRuns(t, records, "install"), []string{"installed", "present", "present", "present"}; !slices.Equal(got, want) {
-		t.Fatalf("workspace-install runs = %v, want %v: the second workspace finds the installed Go\n%s", got, want, transcript)
-	}
-	if got := goIndexRequests.Load() - firstIndexRequests; got != 0 {
-		t.Fatalf("the second workspace asked the release index %d times, want no request: the first init left the pin record", got)
-	}
-	if got := goDownloads.Load(); got != 1 {
-		t.Fatalf("the second workspace downloaded the Go archive: %d downloads, want the one of the first", got)
-	}
-	secondLock, err := lockfile.ReadLockFile(secondRoot)
-	if err != nil || secondLock == nil {
-		t.Fatalf("read the lock the second init left: %v", err)
-	}
-	if secondPin, pinned := secondLock.GetToolchain("go"); !pinned || secondPin.Version != pin.Version ||
-		secondPin.Source != pin.Source || !maps.Equal(secondPin.Integrities, pin.Integrities) {
-		t.Fatalf("toolchains.go of the second workspace = %+v (present %v), want the pin of the first %+v",
-			secondPin, pinned, pin)
-	}
-	if _, err := os.Lstat(filepath.Join(secondRoot, ".putnami", "extensions", "@putnami-go")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("the second workspace holds a Go release of its own: %v", err)
-	}
-	if got := fixtureRuns(t, records, "setup"); !slices.Equal(got, append(wantSetups, wantSetups...)) {
-		t.Fatalf("project-setup runs = %v, want those of the first workspace twice\n%s", got, transcript)
-	}
-	if got := readLines(t, goCalls); !slices.Equal(got, append(wantCalls, wantCalls...)) {
-		t.Fatalf("go calls =\n%s\nwant those of the first workspace twice, with the same installed Go:\n%s",
-			strings.Join(got, "\n"), strings.Join(wantCalls, "\n"))
-	}
 	if unexpected := registry.unexpected(); len(unexpected) > 0 {
 		t.Fatalf("the registry was asked for artifacts the fixture does not serve: %v", unexpected)
 	}
@@ -290,20 +239,15 @@ func requireNoFailedTask(t *testing.T, output string) {
 	}
 }
 
-// goDevRelease is one entry of the go.dev release index
-// (https://go.dev/dl/?mode=json&include=all), as the fake go.dev serves it.
-type goDevRelease struct {
-	Version string      `json:"version"`
-	Files   []goDevFile `json:"files"`
-}
+// goFixtureReleaseFile is the file, in the fixture's records directory, that
+// says where the archive of the fixture Go release is and its SHA-256.
+const goFixtureReleaseFile = "go-release.json"
 
-// goDevFile is one downloadable file of a goDevRelease.
-type goDevFile struct {
-	Filename string `json:"filename"`
-	OS       string `json:"os"`
-	Arch     string `json:"arch"`
-	SHA256   string `json:"sha256"`
-	Kind     string `json:"kind"`
+// goFixtureRelease is what the fixture @putnami/go knows of the release it
+// pins: the archive's URL and the SHA-256 its vendor publishes.
+type goFixtureRelease struct {
+	URL    string `json:"url"`
+	SHA256 string `json:"sha256"`
 }
 
 // fixtureRegistry serves extension and template archives by download path,
@@ -341,10 +285,10 @@ func (r *fixtureRegistry) unexpected() []string {
 }
 
 // goExtensionArchive is the fixture @putnami/go: its runtime execs the test
-// binary as the extension (runGoExtensionFixture), and its run toolchain
-// resolves the Go the lock pins from PATH, from the install under the Putnami
-// home, or from a copy inside the workspace, the candidates @putnami/go
-// declares for a host without Go.
+// binary as the extension (runGoExtensionFixture), it answers the go pin, and
+// its run toolchain resolves the Go the lock pins from PATH, from the install
+// under the Putnami home, or from a copy inside the workspace, the candidates
+// @putnami/go declares for a host without Go.
 func goExtensionArchive(t *testing.T, records string) []byte {
 	t.Helper()
 	testBinary, err := os.Executable()
@@ -369,7 +313,8 @@ func goExtensionArchive(t *testing.T, records string) []byte {
         "prependPath": true
       }
     },
-    "runToolchains": ["runtimeCompiler"]
+    "runToolchains": ["runtimeCompiler"],
+    "resolves": ["go"]
   },
   "commands": {
     "workspace-install": {
@@ -498,9 +443,10 @@ func readLines(t *testing.T, file string) []string {
 }
 
 // runGoExtensionFixture is the fixture @putnami/go runtime, run by the test
-// binary under goExtensionFixtureEnv. It answers the runtime handshake,
-// installs the Go the lock pins on workspace-install, sets a project up on
-// project-setup, and records each run in the directory the variable names.
+// binary under goExtensionFixtureEnv. It answers the runtime handshake and
+// toolchain-resolve, installs the Go the lock pins on workspace-install, sets
+// a project up on project-setup, and records each run in the directory the
+// variable names.
 func runGoExtensionFixture(args []string) int {
 	if len(args) >= 2 && args[0] == "__putnami" && args[1] == "runtime-info" {
 		fmt.Printf(`{"extension":"@putnami/go","version":"0.1.0","platform":%q,"cliContract":%d,"runtimeProtocol":%d,"runtimeABI":%d}`+"\n",
@@ -509,6 +455,16 @@ func runGoExtensionFixture(args []string) int {
 		return 0
 	}
 	records := os.Getenv(goExtensionFixtureEnv)
+	if handled, err := wsproto.ServeToolchainResolve(args, os.Stdin, os.Stdout,
+		func(request wsproto.ToolchainResolveRequest) (wsproto.ToolchainResolveResult, error) {
+			return resolveGoFixturePin(records, request)
+		}); handled {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		return 0
+	}
 	root := os.Getenv("PUTNAMI_WORKSPACE_ROOT")
 	if root == "" {
 		var err error
@@ -549,6 +505,49 @@ func runGoExtensionFixture(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+// resolveGoFixturePin is the fixture toolchain-resolve: it pins the Go the
+// go.work of the workspace root, its working directory, declares, with the
+// archive and SHA-256 of goFixtureReleaseFile, and pins nothing without
+// go.work. It records what it found in the resolve runs.
+func resolveGoFixturePin(records string, request wsproto.ToolchainResolveRequest) (wsproto.ToolchainResolveResult, error) {
+	runs := filepath.Join(records, "resolve-runs.txt")
+	root, err := os.Getwd()
+	if err != nil {
+		return wsproto.ToolchainResolveResult{}, err
+	}
+	data, err := os.ReadFile(filepath.Join(root, "go.work"))
+	if errors.Is(err, os.ErrNotExist) {
+		return wsproto.ToolchainResolveResult{}, appendLine(runs, "no go.work")
+	}
+	if err != nil {
+		return wsproto.ToolchainResolveResult{}, err
+	}
+	version := ""
+	for _, line := range strings.Split(string(data), "\n") {
+		if fields := strings.Fields(line); len(fields) == 2 && fields[0] == "go" {
+			version = fields[1]
+		}
+	}
+	data, err = os.ReadFile(filepath.Join(records, goFixtureReleaseFile))
+	if err != nil {
+		return wsproto.ToolchainResolveResult{}, err
+	}
+	var release goFixtureRelease
+	if err := json.Unmarshal(data, &release); err != nil {
+		return wsproto.ToolchainResolveResult{}, err
+	}
+	if err := appendLine(runs, "go "+version); err != nil {
+		return wsproto.ToolchainResolveResult{}, err
+	}
+	return wsproto.ToolchainResolveResult{Toolchains: map[string]wsproto.ToolchainResolution{"go": {Pin: &wsproto.LockToolchainEntry{
+		Version:     version,
+		Integrities: map[string]string{request.Platform: release.SHA256},
+		Archives: map[string]wsproto.LockToolchainArchive{request.Platform: {
+			URL: release.URL, Format: wsproto.LockArchiveFormatTarGz, Executable: "go/bin/go",
+		}},
+	}}}}, nil
 }
 
 // setUpGoProjectFixture is the fixture project-setup: the go commands
@@ -640,8 +639,8 @@ func readFixtureSetupParams(args []string) (fixtureSetupJobParams, error) {
 }
 
 // installPinnedGoFixture installs the Go the workspace lock pins where the
-// fixture's putnami-home candidate looks, after checking the downloaded
-// archive against the pinned SHA-256. Without a pin it installs nothing while
+// fixture's putnami-home candidate looks, after checking the archive it
+// downloads from the pinned URL against the pinned SHA-256. Without a pin it installs nothing while
 // nothing declares Go, and fails once go.work does.
 func installPinnedGoFixture(root string) (string, error) {
 	lock, err := lockfile.ReadLockFile(root)
@@ -667,22 +666,22 @@ func installPinnedGoFixture(root string) (string, error) {
 	if _, err := os.Stat(filepath.Join(dir, "go", "bin", "go")); err == nil {
 		return "present", nil
 	}
-	want := pin.Integrities[lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH)]
-	name := fmt.Sprintf("go%s.%s-%s.tar.gz", pin.Version, runtime.GOOS, runtime.GOARCH)
-	resp, err := http.Get(pin.Source + name) //nolint:gosec,noctx // G107: the source the lock pins, a loopback server here
+	platform := lockfile.PlatformKey(runtime.GOOS, runtime.GOARCH)
+	want, url := pin.Integrities[platform], pin.Archives[platform].URL
+	resp, err := http.Get(url) //nolint:gosec,noctx // G107: the archive the lock pins, a loopback server here
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("GET %s%s: HTTP %d", pin.Source, name, resp.StatusCode)
+		return "", fmt.Errorf("GET %s: HTTP %d", url, resp.StatusCode)
 	}
 	archive, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
 	if err != nil {
 		return "", err
 	}
 	if got := sha256Hex(archive); got != want {
-		return "", fmt.Errorf("%s has SHA-256 %s, the lock pins %s", name, got, want)
+		return "", fmt.Errorf("%s has SHA-256 %s, the lock pins %s", url, got, want)
 	}
 	if err := extractTarGz(archive, dir); err != nil {
 		return "", err

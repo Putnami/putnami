@@ -53,7 +53,9 @@ type ExecProbeProvider struct {
 	// primitive already classifies them, and "prepare failed" and "no runtime
 	// declared" have different remedies.
 	Resolve func() (string, error)
-	// Args is the argv tail. Empty means the reserved control invocation.
+	// Args is the argv tail. Empty means the reserved control invocation of
+	// the exchange: wsproto.ProbeControlArgs for Probe and
+	// wsproto.ToolchainResolveControlArgs for ResolveToolchains.
 	Args []string
 	// Dir is the process working directory. It must be the workspace root:
 	// every path in the exchange is repo-relative, so a provider that resolves
@@ -88,7 +90,79 @@ func (p *ExecProbeProvider) Probe(request wsproto.ProbeRequest) (wsproto.ProbeRe
 	if err := wsproto.EncodeProbeRequest(&payload, request); err != nil {
 		return wsproto.ProbeResult{}, wsproto.NewProbeFailure(wsproto.ProbeFailureTransport, p.Extension, "%v", err)
 	}
+	stdout, stderr, err := p.exchange(executable, wsproto.ProbeControlArgs(), &payload, "probe", "workspace probe of ")
+	if err != nil {
+		return wsproto.ProbeResult{}, err
+	}
 
+	data, err := wsproto.DecodeProbeDocument(stdout)
+	if err != nil {
+		return wsproto.ProbeResult{}, wsproto.NewProbeFailure(wsproto.ProbeFailureTransport, p.Extension,
+			"%v%s", err, formatProviderStderr(stderr))
+	}
+
+	result, diags := wsproto.ParseAndValidateProbeResult(data)
+	if result == nil || diag.HasErrors(diags) {
+		failure := wsproto.NewProbeFailure(wsproto.ProbeFailureInvalidResult, p.Extension,
+			"probe answer rejected by the v%d contract", wsproto.ProbeProtocolVersion)
+		failure.Diagnostics = diag.Errors(diags)
+		return wsproto.ProbeResult{}, failure
+	}
+	return *result, nil
+}
+
+// ResolveToolchains asks the provider for its toolchain pins: it spawns the
+// provider with the toolchain-resolve control invocation
+// (wsproto.ToolchainResolveControlArgs) when Args is empty, writes one
+// request, and reads one result. The executable, its preparation, the
+// repository-code record, the timeout and the failure classes are Probe's.
+//
+// The result is returned only once it passes its own validation and the check
+// against the request (wsproto.ValidateToolchainResolveAnswer). Any other
+// answer is a ProbeFailureInvalidResult failure carrying the diagnostics.
+func (p *ExecProbeProvider) ResolveToolchains(request wsproto.ToolchainResolveRequest) (wsproto.ToolchainResolveResult, error) {
+	executable, err := p.executable()
+	if err != nil {
+		return wsproto.ToolchainResolveResult{}, err
+	}
+
+	var payload bytes.Buffer
+	if err := wsproto.EncodeToolchainResolveRequest(&payload, request); err != nil {
+		return wsproto.ToolchainResolveResult{}, wsproto.NewProbeFailure(wsproto.ProbeFailureTransport, p.Extension, "%v", err)
+	}
+	stdout, stderr, err := p.exchange(executable, wsproto.ToolchainResolveControlArgs(), &payload, "toolchain-resolve", "toolchain-resolve of ")
+	if err != nil {
+		return wsproto.ToolchainResolveResult{}, err
+	}
+
+	data, err := wsproto.DecodeToolchainResolveDocument(stdout)
+	if err != nil {
+		return wsproto.ToolchainResolveResult{}, wsproto.NewProbeFailure(wsproto.ProbeFailureTransport, p.Extension,
+			"%v%s", err, formatProviderStderr(stderr))
+	}
+
+	result, diags := wsproto.ParseAndValidateToolchainResolveResult(data)
+	if result != nil && !diag.HasErrors(diags) {
+		diags = append(diags, wsproto.ValidateToolchainResolveAnswer(&request, result)...)
+	}
+	if result == nil || diag.HasErrors(diags) {
+		failure := wsproto.NewProbeFailure(wsproto.ProbeFailureInvalidResult, p.Extension,
+			"toolchain-resolve answer rejected by the v%d contract", wsproto.ToolchainResolveProtocolVersion)
+		failure.Diagnostics = diag.Errors(diags)
+		return wsproto.ToolchainResolveResult{}, failure
+	}
+	return *result, nil
+}
+
+// exchange runs executable once with payload on its stdin and returns what it
+// wrote. Args, when set, replaces controlArgs. what names the exchange in a
+// failure message, and custody prefixes the extension name in the
+// repository-code record.
+//
+// A failure to run is classified: the deadline as ProbeFailureTimeout, a
+// missing or non-executable file as ProbeFailureUnavailable, and any other
+// exit as ProbeFailureTransport carrying the provider's stderr.
+func (p *ExecProbeProvider) exchange(executable string, controlArgs []string, payload *bytes.Buffer, what, custody string) (*bytes.Buffer, string, error) {
 	parent := p.Context
 	if parent == nil {
 		parent = context.Background()
@@ -102,15 +176,15 @@ func (p *ExecProbeProvider) Probe(request wsproto.ProbeRequest) (wsproto.ProbeRe
 
 	args := p.Args
 	if len(args) == 0 {
-		args = wsproto.ProbeControlArgs()
+		args = controlArgs
 	}
 	if !p.PreparedBeforeRun {
-		runcredential.MarkRepositoryCodeStarted("workspace probe of " + p.Extension)
+		runcredential.MarkRepositoryCodeStarted(custody + p.Extension)
 	}
 	cmd := exec.CommandContext(ctx, executable, args...) //nolint:gosec // executable is a resolved extension runtime
 	cmd.Dir = p.Dir
 	cmd.Env = p.Env
-	cmd.Stdin = &payload
+	cmd.Stdin = payload
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -121,8 +195,8 @@ func (p *ExecProbeProvider) Probe(request wsproto.ProbeRequest) (wsproto.ProbeRe
 		// signal error, and reporting that instead of the timeout would send
 		// the user looking for a crash that never happened.
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return wsproto.ProbeResult{}, wsproto.NewProbeFailure(wsproto.ProbeFailureTimeout, p.Extension,
-				"probe did not answer within %s", timeout)
+			return nil, "", wsproto.NewProbeFailure(wsproto.ProbeFailureTimeout, p.Extension,
+				"%s did not answer within %s", what, timeout)
 		}
 		// "The provider could not be STARTED" and "the provider ran and failed"
 		// need different remedies — repair the extension versus fix its bug —
@@ -131,27 +205,13 @@ func (p *ExecProbeProvider) Probe(request wsproto.ProbeRequest) (wsproto.ProbeRe
 		// error for a resolved path; both mean the same thing here.
 		var notFound *exec.Error
 		if errors.As(err, &notFound) || errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrPermission) {
-			return wsproto.ProbeResult{}, wsproto.NewProbeFailure(wsproto.ProbeFailureUnavailable, p.Extension,
+			return nil, "", wsproto.NewProbeFailure(wsproto.ProbeFailureUnavailable, p.Extension,
 				"could not start %s: %v", executable, err)
 		}
-		return wsproto.ProbeResult{}, wsproto.NewProbeFailure(wsproto.ProbeFailureTransport, p.Extension,
-			"probe exited with an error: %v%s", err, formatProviderStderr(stderr.String()))
+		return nil, "", wsproto.NewProbeFailure(wsproto.ProbeFailureTransport, p.Extension,
+			"%s exited with an error: %v%s", what, err, formatProviderStderr(stderr.String()))
 	}
-
-	data, err := wsproto.DecodeProbeDocument(&stdout)
-	if err != nil {
-		return wsproto.ProbeResult{}, wsproto.NewProbeFailure(wsproto.ProbeFailureTransport, p.Extension,
-			"%v%s", err, formatProviderStderr(stderr.String()))
-	}
-
-	result, diags := wsproto.ParseAndValidateProbeResult(data)
-	if result == nil || diag.HasErrors(diags) {
-		failure := wsproto.NewProbeFailure(wsproto.ProbeFailureInvalidResult, p.Extension,
-			"probe answer rejected by the v%d contract", wsproto.ProbeProtocolVersion)
-		failure.Diagnostics = diag.Errors(diags)
-		return wsproto.ProbeResult{}, failure
-	}
-	return *result, nil
+	return &stdout, stderr.String(), nil
 }
 
 // executable resolves the provider's runtime, preparing it on first use.

@@ -18,6 +18,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/fixtureproc"
 	"go.putnami.dev/tooling/cli/internal/jobs/toolchain"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchainpins"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -231,26 +232,34 @@ func pinSetupToolchain(lock *lockfile.LockFile, name string) {
 	})
 }
 
-// toolchainPinning is the lock step of a create whose setup toolchain does not
-// resolve: it pins the toolchain named lock, as the implicit install's lock
-// step pins one from the file the prepare stage wrote, or nothing when lock is
-// empty, and counts its runs.
+// toolchainPinning is the toolchain pins phase of a create whose setup
+// toolchain does not resolve: it pins the toolchain named lock, as an
+// extension answers one from the file the prepare stage wrote, or nothing when
+// lock is empty, and counts its runs. A run asked as an implicit install fails
+// the test: create is explicit.
 type toolchainPinning struct {
+	t    *testing.T
 	lock string
 	runs atomic.Int32
 }
 
-func (p *toolchainPinning) pin(_ context.Context, root string) (bool, error) {
+func (p *toolchainPinning) pin(_ context.Context, root string, opts toolchainpins.Options) (toolchainpins.Result, error) {
 	p.runs.Add(1)
+	if opts.Implicit {
+		p.t.Errorf("create ran the toolchain pins phase as an implicit install")
+	}
 	if p.lock == "" {
-		return false, nil
+		return toolchainpins.Result{}, nil
 	}
 	lock, err := lockfile.ReadLockFile(root)
 	if err != nil {
-		return false, err
+		return toolchainpins.Result{}, err
 	}
 	pinSetupToolchain(lock, p.lock)
-	return true, lockfile.WriteLockFile(root, lock)
+	if err := lockfile.WriteLockFile(root, lock); err != nil {
+		return toolchainpins.Result{}, err
+	}
+	return toolchainpins.Result{Toolchains: lock.Toolchains, Added: []string{p.lock}, Written: true}, nil
 }
 
 // jobsAsked names each job request the recorder received with its params.
@@ -271,7 +280,7 @@ func TestCreateRunsTheSetupOnceWhenItsToolchainsResolve(t *testing.T) {
 		"create-runs-the-setup-once-when-its-toolchains-resolve")
 	root := setupToolchainWorkspace(t, true)
 	recorder := &jobRecorder{outcome: WorkspaceJobOK}
-	pinning := &toolchainPinning{lock: "acme"}
+	pinning := &toolchainPinning{t: t, lock: "acme"}
 	var out bytes.Buffer
 	installErr, err := setUpProject(context.Background(), root, "api",
 		LifecycleEnv{Out: &out, RunJob: recorder.run, pinToolchains: pinning.pin})
@@ -282,13 +291,13 @@ func TestCreateRunsTheSetupOnceWhenItsToolchainsResolve(t *testing.T) {
 		t.Fatalf("jobs = %v, want %v", got, want)
 	}
 	if runs := pinning.runs.Load(); runs != 0 {
-		t.Fatalf("the lock step ran %d times, want none", runs)
+		t.Fatalf("the toolchain pins phase ran %d times, want none", runs)
 	}
 }
 
 // When a toolchain project-setup requires does not resolve, create runs the
-// job's prepare stage, then the lock step. It runs the workspace installers
-// only when that step pinned a toolchain the extension's runtime locks, and
+// job's prepare stage, then the toolchain pins phase. It runs the workspace installers
+// only when that phase pinned a toolchain the extension's runtime locks, and
 // then runs the job once.
 func TestCreatePreparesPinsAndInstallsOnlyAToolchainTheExtensionLocks(t *testing.T) {
 	t.Parallel()
@@ -312,7 +321,7 @@ func TestCreatePreparesPinsAndInstallsOnlyAToolchainTheExtensionLocks(t *testing
 			t.Parallel()
 			root := setupToolchainWorkspace(t, false)
 			recorder := &jobRecorder{outcome: WorkspaceJobOK}
-			pinning := &toolchainPinning{lock: tc.pins}
+			pinning := &toolchainPinning{t: t, lock: tc.pins}
 			var out bytes.Buffer
 			installErr, err := setUpProject(context.Background(), root, "api",
 				LifecycleEnv{Out: &out, RunJob: recorder.run, pinToolchains: pinning.pin})
@@ -323,7 +332,7 @@ func TestCreatePreparesPinsAndInstallsOnlyAToolchainTheExtensionLocks(t *testing
 				t.Fatalf("jobs = %v, want %v", got, tc.want)
 			}
 			if runs := pinning.runs.Load(); runs != 1 {
-				t.Fatalf("the lock step ran %d times, want once", runs)
+				t.Fatalf("the toolchain pins phase ran %d times, want once", runs)
 			}
 		})
 	}

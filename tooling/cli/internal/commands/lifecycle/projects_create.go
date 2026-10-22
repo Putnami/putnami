@@ -36,11 +36,11 @@ type createFlags struct {
 // read that channel. env runs
 // the job, and the workspace installers when a toolchain the job requires does
 // not resolve and the lock pins it once the job's prepare stage wrote its
-// source. When those installers fail and the setup still succeeds, the project
-// is kept, and create exits non-zero naming the command that finishes the
-// install, as `init --project` does. When the setup fails, the project is kept
-// and create exits non-zero naming the create command to run again with
-// --force.
+// source. When the toolchain pins phase or those installers fail and the setup
+// still succeeds, the project is kept, and create exits non-zero naming the
+// command that finishes the install, as `init --project` does. When the setup
+// fails, the project is kept and create exits non-zero naming the create
+// command to run again with --force.
 func ProjectsCreate(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, env LifecycleEnv) error {
 	channel, args, err := ResolveChannelFlag(args)
 	if err != nil {
@@ -55,9 +55,15 @@ func ProjectsCreate(ctx context.Context, wsRoot string, cfg *wsproto.Config, arg
 		return err
 	}
 	if created.installErr != nil {
+		// A failed toolchain pins phase names its own next step, which deps
+		// install, which runs no such phase, cannot take.
+		next := protocolcli.SuggestedNext(created.installErr)
+		if next == "" {
+			next = "putnami deps install"
+		}
 		return protocolcli.WithNext(
 			fmt.Errorf("install workspace dependencies after creating %s: %w", created.name, created.installErr),
-			"putnami deps install")
+			next)
 	}
 	return nil
 }

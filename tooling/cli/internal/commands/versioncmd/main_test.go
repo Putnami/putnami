@@ -48,9 +48,8 @@ func TestMain(m *testing.M) {
 	os.Unsetenv(extension.PrivatePutRegistryURLEnv)
 	os.Unsetenv(extensionproto.OfflineDependenciesEnv)
 	os.Unsetenv(extensionproto.JobCredentialFDEnv)
-	// A Go pin reads and writes a pin record under the Putnami home. The
-	// process runs in a home of its own, so no test reads the records of the
-	// host or leaves one there.
+	// The process runs in a Putnami home of its own, so no test reads the
+	// host's home or leaves a file there.
 	home, err := os.MkdirTemp("", "putnami-versioncmd-home-")
 	if err != nil {
 		_, _ = os.Stderr.WriteString("create the test Putnami home: " + err.Error() + "\n")

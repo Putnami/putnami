@@ -66,9 +66,9 @@ import (
 //     (ExtensionsInstall*, TemplatesInstall*, ExtensionsUpdateWithOptions,
 //     TemplatesUpdateWithOptions).
 //   - lifecycle → versioncmd: install and upgrade check and pin the CLI
-//     version they are installing or upgrading to (RefreshLockMetadata,
-//     VersionUpdateWithOptions, VersionInstallFromSource), and workspace-init
-//     records the lock's toolchain pins after its last dependency install
+//     version they are installing or upgrading to (VersionUpdateWithOptions,
+//     VersionInstallFromSource), and install and workspace-init stamp the
+//     lock's CLI pin with its output protocol version
 //     (RefreshLockMetadataWithResult).
 //   - lifecycle → completion: upgrade refreshes shell completions once the
 //     new binary is in place (RefreshShellCompletions).
@@ -218,8 +218,8 @@ const (
 		"and templates as part of their own flow (ExtensionsInstall*, TemplatesInstall*, " +
 		"ExtensionsUpdateWithOptions, TemplatesUpdateWithOptions)"
 	whyLifecycleVersioncmd = "install and upgrade check and pin the CLI version they are installing or " +
-		"upgrading to (RefreshLockMetadata, VersionUpdateWithOptions, VersionInstallFromSource), and " +
-		"workspace-init records the lock's toolchain pins after its last dependency install " +
+		"upgrading to (VersionUpdateWithOptions, VersionInstallFromSource), and install and " +
+		"workspace-init stamp the lock's CLI pin with its output protocol version " +
 		"(RefreshLockMetadataWithResult)"
 	whyLifecycleCompletion = "upgrade refreshes shell completions once the new binary is in place " +
 		"(RefreshShellCompletions)"

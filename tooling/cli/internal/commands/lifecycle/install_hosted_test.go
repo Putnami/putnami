@@ -7,28 +7,33 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/hometest"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchainpins"
 	"go.putnami.dev/tooling/cli/internal/lockfile"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
 // A hosted install leaves the committed lock byte for byte, even a CLI pin
 // that a CLI of another version wrote without its protocol version, which an
-// install without the run credential stamps. It pins no toolchain and writes
-// no assistant content either.
+// install without the run credential stamps. Its toolchain pins phase runs as
+// a hosted, offline run, which writes no lock, and it writes no assistant
+// content either.
 func TestInstall_AHostedInstallWritesNoLock(t *testing.T) {
 	spectest.Proves(t, "cli/credential-custody", "cold-install-leaves-locks-unchanged", "hosted-install-writes-no-lock")
 	hometest.Temp(t)
-	origPin, origFill := pinExplicitToolchains, fillImplicitToolchainPins
-	t.Cleanup(func() { pinExplicitToolchains, fillImplicitToolchainPins = origPin, origFill })
-	var pinned int
-	pinExplicitToolchains = func(context.Context, string) (bool, error) { pinned++; return true, nil }
-	fillImplicitToolchainPins = func(context.Context, string) (bool, error) { pinned++; return true, nil }
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
+	var phases []toolchainpins.Options
+	pinToolchains := func(_ context.Context, _ string, opts toolchainpins.Options) (toolchainpins.Result, error) {
+		phases = append(phases, opts)
+		return toolchainpins.Result{Hosted: opts.Hosted}, nil
+	}
 
 	var dir string
 	install := func(bearer string) (before, after []byte) {
@@ -48,6 +53,7 @@ func TestInstall_AHostedInstallWritesNoLock(t *testing.T) {
 		var out strings.Builder
 		env := installTestEnv(&out, WorkspaceJobOK)
 		env.CLIVersion = "4.2.1"
+		env.pinToolchains = pinToolchains
 		if _, err := captureStdout(t, func() error {
 			return Install(context.Background(), dir, wsproto.Load(dir), nil, env)
 		}); err != nil {
@@ -56,8 +62,9 @@ func TestInstall_AHostedInstallWritesNoLock(t *testing.T) {
 		return before, readLock(t, dir)
 	}
 
-	if before, after := install("run-bearer"); !bytes.Equal(before, after) || pinned != 0 {
-		t.Fatalf("a hosted install changed the lock (%d pin calls):\n%s\nto\n%s", pinned, before, after)
+	hosted := toolchainpins.Options{Hosted: true, Offline: true}
+	if before, after := install("run-bearer"); !bytes.Equal(before, after) || !slices.Equal(phases, []toolchainpins.Options{hosted}) {
+		t.Fatalf("a hosted install changed the lock (toolchain pins phases %+v, want one %+v):\n%s\nto\n%s", phases, hosted, before, after)
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -69,8 +76,9 @@ func TestInstall_AHostedInstallWritesNoLock(t *testing.T) {
 			t.Errorf("a hosted install wrote %s into the workspace", name)
 		}
 	}
-	if before, after := install(""); bytes.Equal(before, after) || pinned == 0 {
-		t.Fatalf("an install without the run credential left the lock unstamped (%d pin calls):\n%s", pinned, after)
+	phases = nil
+	if before, after := install(""); bytes.Equal(before, after) || !slices.Equal(phases, []toolchainpins.Options{{}}) {
+		t.Fatalf("an install without the run credential left the lock unstamped (toolchain pins phases %+v):\n%s", phases, after)
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".mcp.json")); err != nil {
 		t.Errorf("an install without the run credential registered no MCP server: %v", err)
@@ -86,12 +94,8 @@ func TestInstall_AHostedInstallWritesNoLock(t *testing.T) {
 // nothing and runs its hooks with the extensions.
 func TestInstall_AHostedInstallFetchesBeforeAnyHookOrInstaller(t *testing.T) {
 	hometest.Temp(t)
-	origHooks, origPin, origFill := runDeferredInstallHooks, pinExplicitToolchains, fillImplicitToolchainPins
-	t.Cleanup(func() {
-		runDeferredInstallHooks, pinExplicitToolchains, fillImplicitToolchainPins = origHooks, origPin, origFill
-	})
-	pinExplicitToolchains = func(context.Context, string) (bool, error) { return false, nil }
-	fillImplicitToolchainPins = func(context.Context, string) (bool, error) { return false, nil }
+	origHooks := runDeferredInstallHooks
+	t.Cleanup(func() { runDeferredInstallHooks = origHooks })
 	const hooksRan = "onInstall hooks"
 	install := "workspace-install"
 
@@ -128,6 +132,8 @@ func TestInstall_AHostedInstallFetchesBeforeAnyHookOrInstaller(t *testing.T) {
 			}, BeforeRepositoryCode: func(context.Context) error {
 				ran = append(ran, beforeRepositoryCode)
 				return nil
+			}, pinToolchains: func(context.Context, string, toolchainpins.Options) (toolchainpins.Result, error) {
+				return toolchainpins.Result{}, nil
 			}}
 			_, err := captureStdout(t, func() error {
 				return Install(context.Background(), dir, wsproto.Load(dir), nil, env)

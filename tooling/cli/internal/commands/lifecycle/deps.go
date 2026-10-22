@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
+	"go.putnami.dev/tooling/cli/internal/jobs/toolchainpins"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -163,10 +164,9 @@ type LifecycleEnv struct {
 	// job option (installParams), and the project create resolves its template
 	// on it.
 	channel string
-	// pinToolchains is the lock step create takes when a toolchain the
-	// project-setup job requires does not resolve (setUpProject). Nil is
-	// fillImplicitToolchainPins.
-	pinToolchains func(ctx context.Context, wsRoot string) (bool, error)
+	// pinToolchains is the toolchain pins phase every lifecycle command runs
+	// (resolveToolchainPins). Nil is toolchainpins.Resolve.
+	pinToolchains func(ctx context.Context, wsRoot string, opts toolchainpins.Options) (toolchainpins.Result, error)
 }
 
 // installParams is the job options of the workspace fetch and installers: the

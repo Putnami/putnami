@@ -177,12 +177,6 @@ func setCLIPin(ctx context.Context, wsRoot, version, runningVersion string) erro
 		}
 	}
 	lf.SetCLI(entry)
-	if err := refreshToolchainLock(ctx, wsRoot, lf); err != nil {
-		// Pin is the recovery hatch for a broken workspace CLI and must not be
-		// disabled by an unrelated vendor checksum endpoint. Keep the previous
-		// toolchain dimension intact; install remains the fail-closed refresh.
-		slog.Debug("pin: refresh toolchains", "error", err)
-	}
 	if err := lockfile.WriteLockFile(wsRoot, lf); err != nil {
 		return fmt.Errorf("pin: write lock: %w", err)
 	}
