@@ -208,24 +208,44 @@ describe('retryInterceptor overall deadline', () => {
       check: 'a-separate-max-elapsed-caps-total-time-across-attempts',
     },
     async () => {
-      let calls = 0;
-      const interceptor = retryInterceptor(
-        { maxRetries: 10, baseDelayMs: 1, jitter: false },
-        { timeoutMs: 15, maxElapsedMs: 60 },
-      );
+      const realNow = Date.now;
+      const realTimeout = AbortSignal.timeout;
+      let now = 1000;
+      const attemptTimeouts: number[] = [];
+      try {
+        Date.now = () => now;
+        // Deliver each timeout after its requested duration plus a fixed 2ms of
+        // scheduler delay. The clock advances only here, regardless of host load.
+        AbortSignal.timeout = (ms) => {
+          attemptTimeouts.push(ms);
+          const controller = new AbortController();
+          queueMicrotask(() => {
+            now += ms + 2;
+            controller.abort(new DOMException('The operation timed out', 'TimeoutError'));
+          });
+          return controller.signal;
+        };
 
-      const next = slowNext((attempt) => {
-        calls = attempt + 1;
-        return 'timeout';
-      });
+        let calls = 0;
+        const interceptor = retryInterceptor(
+          { maxRetries: 10, baseDelayMs: 1, jitter: false },
+          { timeoutMs: 15, maxElapsedMs: 60 },
+        );
+        const next = slowNext((attempt) => {
+          calls = attempt + 1;
+          return 'timeout';
+        });
 
-      const start = Date.now();
-      await expect(interceptor(makeRequest(), next)).rejects.toThrow();
-      const elapsed = Date.now() - start;
+        await expect(interceptor(makeRequest(), next)).rejects.toThrow();
 
-      // Total bounded by maxElapsedMs (≈4 × 15ms attempts), not 11 × 15ms.
-      expect(elapsed).toBeLessThan(140);
-      expect(calls).toBeLessThanOrEqual(6);
+        // Three full attempts consume 51ms. The fourth gets only the 9ms
+        // remaining, and the 60ms deadline stops the sequence before 10 retries.
+        expect(attemptTimeouts).toEqual([15, 15, 15, 9]);
+        expect(calls).toBe(4);
+      } finally {
+        Date.now = realNow;
+        AbortSignal.timeout = realTimeout;
+      }
     },
   );
 
