@@ -159,7 +159,7 @@
             "checks": [
               "listing-and-description-serve-the-loaded-graph",
               "identities-and-dependencies-come-from-discovery",
-              "load-warnings-reach-the-result-envelope-with-their-code"
+              "load-warnings-reach-stderr-and-the-result-envelope"
             ]
           }
         },

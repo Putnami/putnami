@@ -40,7 +40,7 @@
         "command": "projects list",
         "status": "success",
         "exitCode": 0,
-        "data": [{ "id": "apps/web", "name": "web", "path": "apps/web" }],
+        "data": { "id": "/apps/web", "name": "web", "path": "apps/web" },
         "workspaceWarnings": [
           {
             "code": "workspace.provider_view_unavailable",

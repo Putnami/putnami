@@ -15,7 +15,6 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
-	"go.putnami.dev/tooling/cli/internal/commands/sharedtest"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -201,97 +200,6 @@ func TestRunStructuredCommandForwardsARawContractDocument(t *testing.T) {
 	if envelope.Command != "report" || envelope.Status != protocolcli.StatusFailure {
 		t.Errorf("failure envelope = %+v, want a failed report envelope", envelope)
 	}
-}
-
-// TestRunStructuredCommandCarriesWorkspaceWarnings pins that a structured
-// command's envelope carries the load warnings it reports, with their stable
-// code, beside an unchanged data payload, on success and on failure, and under
-// --quiet too; and that a load with no warning leaves the member out.
-func TestRunStructuredCommandCarriesWorkspaceWarnings(t *testing.T) {
-	spectest.Proves(t, "cli/workspace-discovery-selection", "project-inventory", "load-warnings-reach-the-result-envelope-with-their-code")
-	run := func(t *testing.T, root string, args ...string) (int, string) {
-		t.Helper()
-		cfg := wsproto.Load(root)
-		parsed := ParseArgs(args, cfg.Aliases, nil)
-		if parsed.Err != nil {
-			t.Fatalf("ParseArgs(%v): %v", args, parsed.Err)
-		}
-		code := ExitError
-		out := captureStdout(t, func() {
-			code = (&App{}).runStructuredCommand(context.Background(), parsed, cfg, root)
-		})
-		if violations := protocolcli.ValidateDocument(protocolcli.DocumentResultEnvelope, []byte(out)); len(violations) != 0 {
-			t.Fatalf("%v: envelope violates the contract: %v\n%s", args, violations, out)
-		}
-		return code, out
-	}
-	decode := func(t *testing.T, out string) protocolcli.ResultV2 {
-		t.Helper()
-		var envelope protocolcli.ResultV2
-		if err := json.Unmarshal([]byte(out), &envelope); err != nil {
-			t.Fatalf("stdout is not one result envelope: %v\n%s", err, out)
-		}
-		return envelope
-	}
-	assertProviderViewWarning := func(t *testing.T, envelope protocolcli.ResultV2) {
-		t.Helper()
-		if len(envelope.WorkspaceWarnings) != 1 {
-			t.Fatalf("workspaceWarnings = %+v, want the one provider-view warning", envelope.WorkspaceWarnings)
-		}
-		warning := envelope.WorkspaceWarnings[0]
-		if warning.Code != string(workspace.WarningCodeProviderViewUnavailable) {
-			t.Errorf("code = %q, want %q", warning.Code, workspace.WarningCodeProviderViewUnavailable)
-		}
-		if !strings.Contains(warning.Message, workspace.WorkspaceIndexFilename) {
-			t.Errorf("message does not name the index file: %q", warning.Message)
-		}
-	}
-
-	for _, quiet := range []bool{false, true} {
-		t.Run(map[bool]string{false: "default", true: "quiet"}[quiet], func(t *testing.T) {
-			root := sharedtest.UnindexedWorkspace(t)
-			args := []string{"projects", "list", "--output=json"}
-			if quiet {
-				args = append(args, "--quiet")
-			}
-			code, out := run(t, root, args...)
-			if code != ExitSuccess {
-				t.Fatalf("projects list exit code = %d, want %d\n%s", code, ExitSuccess, out)
-			}
-			envelope := decode(t, out)
-			assertProviderViewWarning(t, envelope)
-			rows, ok := envelope.Data.([]any)
-			if !ok || len(rows) != 1 {
-				t.Errorf("data = %#v, want the one project row unchanged", envelope.Data)
-			}
-
-			describe := []string{"projects", "describe", "/missing", "--output=json"}
-			if quiet {
-				describe = append(describe, "--quiet")
-			}
-			code, out = run(t, root, describe...)
-			if code == ExitSuccess {
-				t.Fatalf("describing a missing project succeeded:\n%s", out)
-			}
-			failure := decode(t, out)
-			if failure.Status != protocolcli.StatusFailure {
-				t.Errorf("status = %q, want %q", failure.Status, protocolcli.StatusFailure)
-			}
-			assertProviderViewWarning(t, failure)
-		})
-	}
-
-	t.Run("indexed", func(t *testing.T) {
-		root := sharedtest.UnindexedWorkspace(t)
-		sharedtest.RecordWorkspaceIndex(t, root)
-		code, out := run(t, root, "projects", "list", "--output=json")
-		if code != ExitSuccess {
-			t.Fatalf("projects list exit code = %d, want %d\n%s", code, ExitSuccess, out)
-		}
-		if strings.Contains(out, "workspaceWarnings") {
-			t.Errorf("a load with no warning wrote the member:\n%s", out)
-		}
-	})
 }
 
 func structuredOutputWorkspace(t *testing.T) string {

@@ -9,6 +9,7 @@ import (
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commandmeta"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // Shell completion is a projection of the command
@@ -20,7 +21,7 @@ import (
 
 // completionGenerators are the three scripts, rendered with no workspace so only
 // the catalog-derived half is exercised.
-var completionGenerators = map[string]func(io.Writer, string, *wsproto.Config, io.Writer){
+var completionGenerators = map[string]func(io.Writer, string, *wsproto.Config, *workspace.WarningReport){
 	"bash": CompletionBash,
 	"zsh":  CompletionZsh,
 	"fish": CompletionFish,

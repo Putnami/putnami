@@ -238,7 +238,7 @@ order. These are the same warnings the command writes to stderr as
 
 ```json
 {"protocolVersion":2,"command":"projects list","status":"success","exitCode":0,
- "data":[{"id":"apps/web","name":"web","path":"apps/web"}],
+ "data":{"id":"/apps/web","name":"web","path":"apps/web"},
  "workspaceWarnings":[{"code":"workspace.provider_view_unavailable",
   "message":"no workspace provider view (.putnami/workspace-index.json): ..."}]}
 ```
